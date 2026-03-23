@@ -11,8 +11,15 @@
 
 
 #include <functional>
+#include <sal/types.h>
 #include <vector>
 #include "kahan.hxx"
+
+#if defined(SPREADSHEETENGINE_DLLIMPLEMENTATION)
+#define SC_MATRIXOPS_DLLPUBLIC SAL_DLLPUBLIC_EXPORT
+#else
+#define SC_MATRIXOPS_DLLPUBLIC SAL_DLLPUBLIC_IMPORT
+#endif
 
 namespace sc::op {
 
@@ -35,26 +42,26 @@ struct Op_
 using Op = Op_<std::function<void(double&, double)>, double>;
 using kOp = Op_<std::function<void(KahanSum&, double)>, KahanSum>;
 
-void fkOpSum(KahanSum& rAccum, double fVal);
-void fkOpSumSquare(KahanSum& rAccum, double fVal);
+SC_MATRIXOPS_DLLPUBLIC void fkOpSum(KahanSum& rAccum, double fVal);
+SC_MATRIXOPS_DLLPUBLIC void fkOpSumSquare(KahanSum& rAccum, double fVal);
 
-extern kOp kOpSum;
-extern kOp kOpSumSquare;
-extern std::vector<kOp> kOpSumAndSumSquare;
+extern SC_MATRIXOPS_DLLPUBLIC kOp kOpSum;
+extern SC_MATRIXOPS_DLLPUBLIC kOp kOpSumSquare;
+extern SC_MATRIXOPS_DLLPUBLIC std::vector<kOp> kOpSumAndSumSquare;
 
-struct Sum
+struct SC_MATRIXOPS_DLLPUBLIC Sum
 {
     static const double InitVal;
     void operator()(KahanSum& rAccum, double fVal) const;
 };
 
-struct SumSquare
+struct SC_MATRIXOPS_DLLPUBLIC SumSquare
 {
     static const double InitVal;
     void operator()(KahanSum& rAccum, double fVal) const;
 };
 
-struct Product
+struct SC_MATRIXOPS_DLLPUBLIC Product
 {
     static const double InitVal;
     void operator()(double& rAccum, double fVal) const;
@@ -62,6 +69,6 @@ struct Product
 
 }
 
-
+#undef SC_MATRIXOPS_DLLPUBLIC
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

@@ -77,9 +77,11 @@
 #include <sfx2/linkmgr.hxx>
 #include <interpre.hxx>
 #include <spreadsheetengine/compat/formula/FormulaGrammar.hxx>
+#include <spreadsheetengine/core/CompilerSupport.hxx>
 
 using namespace formula;
 namespace seformula = spreadsheetengine::compat::formula;
+namespace secompiler = spreadsheetengine::core::compiler;
 using namespace ::com::sun::star;
 
 const CharClass*                    ScCompiler::pCharClassEnglish = nullptr;
@@ -103,185 +105,6 @@ enum ScanState
     ssGetTableRefColumn,
     ssStop
 };
-
-constexpr std::array<ScCharFlags, 128> makeCommonCharTable()
-{
-    std::array<ScCharFlags, 128> a;
-    a.fill(ScCharFlags::Illegal);
-
-    // Allow tabs/newlines.
-    // Allow saving whitespace as is (as per OpenFormula specification v.1.2, clause 5.14 "Whitespace").
-    a['\t'] = ScCharFlags::CharDontCare | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['\n'] = ScCharFlags::CharDontCare | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['\r'] = ScCharFlags::CharDontCare | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-
-    a[' '] = ScCharFlags::CharDontCare | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['!'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['"'] = ScCharFlags::CharString | ScCharFlags::StringSep;
-    a['#'] = ScCharFlags::WordSep | ScCharFlags::CharErrConst;
-    a['$'] = ScCharFlags::CharWord | ScCharFlags::Word | ScCharFlags::CharIdent | ScCharFlags::Ident;
-    a['%'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['&'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['\''] = ScCharFlags::NameSep;
-    a['('] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a[')'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['*'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['+'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueExp | ScCharFlags::ValueSign;
-    a[','] = ScCharFlags::CharValue | ScCharFlags::Value;
-    a['-'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueExp | ScCharFlags::ValueSign;
-    a['.'] = ScCharFlags::Word | ScCharFlags::CharValue | ScCharFlags::Value | ScCharFlags::Ident | ScCharFlags::Name;
-    a['/'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-
-    for (int i = '0'; i <= '9'; i++)
-        a[i] = ScCharFlags::CharValue | ScCharFlags::Word | ScCharFlags::Value | ScCharFlags::ValueExp | ScCharFlags::ValueValue | ScCharFlags::Ident | ScCharFlags::Name;
-
-    a[':'] = ScCharFlags::Char | ScCharFlags::Word;
-    a[';'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['<'] = ScCharFlags::CharBool | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['='] = ScCharFlags::Char | ScCharFlags::Bool | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['>'] = ScCharFlags::CharBool | ScCharFlags::Bool | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['?'] = ScCharFlags::CharWord | ScCharFlags::Word | ScCharFlags::Name;
-    /* @ */ // FREE
-
-    for (int i = 'A'; i <= 'Z'; i++)
-        a[i] = ScCharFlags::CharWord | ScCharFlags::Word | ScCharFlags::CharIdent | ScCharFlags::Ident | ScCharFlags::CharName | ScCharFlags::Name;
-
-    /* [ */ // FREE
-    /* \ */ // FREE
-    /* ] */ // FREE
-
-    a['^'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['_'] = ScCharFlags::CharWord | ScCharFlags::Word | ScCharFlags::CharIdent | ScCharFlags::Ident | ScCharFlags::CharName | ScCharFlags::Name;
-    /* ` */ // FREE
-
-    for (int i = 'a'; i <= 'z'; i++)
-        a[i] = ScCharFlags::CharWord | ScCharFlags::Word | ScCharFlags::CharIdent | ScCharFlags::Ident | ScCharFlags::CharName | ScCharFlags::Name;
-
-    a['{'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep; // array open
-    a['|'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep; // array row sep (Should be OOo specific)
-    a['}'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep; // array close
-    a['~'] = ScCharFlags::Char;        // OOo specific
-    /* 127 */ // FREE
-
-    return a;
-}
-
-constexpr std::array<ScCharFlags, 128> makeCharTable_OOO_A1()
-{
-    auto a = makeCommonCharTable();
-    a['['] = ScCharFlags::Char;
-    a[']'] = ScCharFlags::Char;
-    return a;
-}
-
-constexpr std::array<ScCharFlags, 128> makeCharTable_OOO_A1_ODF()
-{
-    auto a = makeCommonCharTable();
-    a['!'] |= ScCharFlags::OdfLabelOp;
-    a['$'] |= ScCharFlags::OdfNameMarker;
-    a['['] = ScCharFlags::OdfLBracket;
-    a[']'] = ScCharFlags::OdfRBracket;
-    return a;
-}
-
-constexpr std::array<ScCharFlags, 128> makeCharTable_XL()
-{
-    auto a = makeCommonCharTable();
-    a[' '] |= ScCharFlags::Word;
-    a['!'] |= ScCharFlags::Ident | ScCharFlags::Word;
-    a['"'] |= ScCharFlags::Word;
-    a['#'] &= ~ScCharFlags::WordSep;
-    a['#'] |= ScCharFlags::Word;
-    a['%'] |= ScCharFlags::Word;
-    a['&'] |= ScCharFlags::Word;
-    a['\''] |= ScCharFlags::Word;
-    a['('] |= ScCharFlags::Word;
-    a[')'] |= ScCharFlags::Word;
-    a['*'] |= ScCharFlags::Word;
-    a['+'] |= ScCharFlags::Word;
-#if 0 /* this really needs to be locale specific. */
-    a[','] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-#else
-    a[','] |= ScCharFlags::Word;
-#endif
-    a['-'] |= ScCharFlags::Word;
-
-    a[';'] |= ScCharFlags::Word;
-    a['<'] |= ScCharFlags::Word;
-    a['='] |= ScCharFlags::Word;
-    a['>'] |= ScCharFlags::Word;
-    /* ? */ // question really is not permitted in sheet name
-    a['@'] |= ScCharFlags::Word;
-    a['['] = ScCharFlags::Word;
-    a[']'] = ScCharFlags::Word;
-    a['{'] |= ScCharFlags::Word;
-    a['|'] |= ScCharFlags::Word;
-    a['}'] |= ScCharFlags::Word;
-    a['~'] |= ScCharFlags::Word;
-    return a;
-}
-
-constexpr std::array<ScCharFlags, 128> makeCharTable_XL_A1()
-{
-    auto a = makeCharTable_XL();
-    a['['] |= ScCharFlags::Char;
-    a[']'] |= ScCharFlags::Char;
-    return a;
-}
-
-constexpr std::array<ScCharFlags, 128> makeCharTable_XL_OOX()
-{
-    auto a = makeCharTable_XL_A1();
-    a['['] |= ScCharFlags::CharIdent;
-    a[']'] |= ScCharFlags::Ident;
-    return a;
-}
-
-constexpr std::array<ScCharFlags, 128> makeCharTable_XL_R1C1()
-{
-    auto a = makeCharTable_XL();
-    a['['] |= ScCharFlags::Ident;
-    a[']'] |= ScCharFlags::Ident;
-    return a;
-}
-
-const std::array<ScCharFlags, 128>& getCharTable(FormulaGrammar::AddressConvention eConv)
-{
-    switch (eConv)
-    {
-        case FormulaGrammar::CONV_OOO:
-        {
-            static constexpr auto table_OOO_A1(makeCharTable_OOO_A1());
-            return table_OOO_A1;
-        }
-        case FormulaGrammar::CONV_ODF:
-        {
-            static constexpr auto table_OOO_A1_ODF(makeCharTable_OOO_A1_ODF());
-            return table_OOO_A1_ODF;
-        }
-        case FormulaGrammar::CONV_XL_A1:
-        {
-            static constexpr auto table_XL_A1(makeCharTable_XL_A1());
-            return table_XL_A1;
-        }
-        case FormulaGrammar::CONV_XL_R1C1:
-        {
-            static constexpr auto table_XL_R1C1(makeCharTable_XL_R1C1());
-            return table_XL_R1C1;
-        }
-        case FormulaGrammar::CONV_XL_OOX:
-        {
-            static constexpr auto table_XL_OOX(makeCharTable_XL_OOX());
-            return table_XL_OOX;
-        }
-        case FormulaGrammar::CONV_UNSPECIFIED:
-        default:
-        {
-            assert(!"Unimplemented convention");
-            std::abort();
-        }
-    }
-}
 
 }
 
@@ -544,7 +367,7 @@ ScCompiler::Convention::~Convention()
 
 ScCompiler::Convention::Convention( FormulaGrammar::AddressConvention eConv )
     : meConv(eConv)
-    , mrCharTable(getCharTable(eConv))
+    , mrCharTable(secompiler::getCharTable(eConv))
 {
     ScCompiler::pConventions[ meConv ] = this;
 }

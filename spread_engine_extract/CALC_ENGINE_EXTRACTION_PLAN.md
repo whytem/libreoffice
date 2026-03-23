@@ -235,6 +235,21 @@ Recommended area-to-test mapping:
     the relocated `sc::op` runtime symbols from `spreadsheetengine`
   - this keeps the public Calc headers stable while starting to move the
     matrix/runtime substrate out of the `sc` library
+  - the `sc::op` symbols are now explicitly imported/exported so clean relinks
+    of `libsclo.so` and downstream test targets continue to succeed against the
+    extracted implementation
+- Phase 4: first slice in progress
+  - Calc-specific address-convention character-table construction now lives in
+    `spread_engine_extract/source/core/CompilerSupport.cxx`
+  - `sc/source/core/tool/compiler.cxx` now delegates `mrCharTable`
+    initialization to `spreadsheetengine::core::compiler::getCharTable()`
+  - this is a narrow compiler extraction that moves tokenization policy for
+    Calc formula conventions without yet moving the larger compiler facade
+  - validation completed with
+    `CppunitTest_sc_ucalc_formula`,
+    `CppunitTest_sc_ucalc_formula2`,
+    `CppunitTest_sc_spreadsheet_functions_test`, and
+    `CppunitTest_sc_ucalc_range`
 
 ## Phased Roadmap
 

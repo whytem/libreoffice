@@ -33,6 +33,7 @@ $(eval $(call gb_Library_use_libraries,spreadsheetengine,\
 $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spread_engine_extract/source/compat/formula/FormulaGrammar \
     spread_engine_extract/source/core/CalcConfig \
+    spread_engine_extract/source/core/CompilerSupport \
     spread_engine_extract/source/core/MatrixOperators \
     spread_engine_extract/source/core/Phase0 \
 ))
