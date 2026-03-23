@@ -47,6 +47,7 @@ $(eval $(call gb_Module_add_moduledirs,cross_toolset,\
 	shell \
 	solenv \
 	soltools \
+	spread_engine_extract \
 	$(if $(filter EMSCRIPTEN,$(BUILD_TYPE_FOR_HOST)),static) \
 	stoc \
 	store \

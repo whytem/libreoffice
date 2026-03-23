@@ -14,6 +14,7 @@
 #include <formula/opcode.hxx>
 #include <rtl/ustring.hxx>
 #include <sal/log.hxx>
+#include <spreadsheetengine/bridge/CalcPhase0Bridge.hxx>
 #include <comphelper/configuration.hxx>
 
 #include <calcconfig.hxx>
@@ -36,6 +37,8 @@ static rtl::Reference<ConfigurationListener> const & getFormulaCalculationListen
 
 static ForceCalculationType forceCalculationTypeInit()
 {
+    static_assert(spreadsheetengine::bridge::kCalcBridgeEnabled);
+
     const char* env = getenv( "SC_FORCE_CALCULATION" );
     if( env != nullptr )
     {
