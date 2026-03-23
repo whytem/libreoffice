@@ -14,7 +14,6 @@
 #include <cmath>
 
 #include <kahan.hxx>
-#include <math.hxx>
 #include <o3tl/untaint.hxx>
 #include <rtl/math.hxx>
 
@@ -529,7 +528,7 @@ double computeNominalAnnualRate(double fEffectiveRate, double fPeriods)
 
 double computeStraightLineDepreciation(double fCost, double fSalvage, double fLife)
 {
-    return sc::div(fCost - fSalvage, fLife);
+    return o3tl::div_allow_zero(fCost - fSalvage, fLife);
 }
 
 } // namespace spreadsheetengine::core::math

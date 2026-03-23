@@ -6,6 +6,9 @@ files mix true spreadsheet-engine logic with document-model concerns, UI-adjacen
 concerns, filter support, and some functionality shared elsewhere in
 LibreOffice.
 
+A parallel plan for making `spread_engine_extract/` independently buildable as
+a standalone package lives in `spread_engine_extract/STANDALONE_PACKAGE_PLAN.md`.
+
 The goal is not a big-bang rewrite. The goal is to progressively concentrate
 the spreadsheet-specific calculation logic into a new module under
 `spread_engine_extract/`, while leaving Calc's document shell, UI, and
