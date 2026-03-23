@@ -20,7 +20,6 @@
 #include <memory>
 #include <interpre.hxx>
 
-#include <comphelper/string.hxx>
 #include <o3tl/float_int_conversion.hxx>
 #include <o3tl/string_view.hxx>
 #include <sfx2/bindings.hxx>
@@ -47,6 +46,13 @@
 #include <stlpool.hxx>
 #include <stlsheet.hxx>
 #include <dpcache.hxx>
+#include <spreadsheetengine/core/DateTimeParts.hxx>
+#include <spreadsheetengine/core/DateTimeWeek.hxx>
+#include <spreadsheetengine/core/DateTimeWorkday.hxx>
+#include <spreadsheetengine/core/MathFinancial.hxx>
+#include <spreadsheetengine/core/MathRounding.hxx>
+#include <spreadsheetengine/core/MathScalar.hxx>
+#include <spreadsheetengine/core/NumeralConversion.hxx>
 
 #include <com/sun/star/sheet/DataPilotFieldFilter.hpp>
 
@@ -54,6 +60,9 @@
 
 using namespace com::sun::star;
 using namespace formula;
+namespace sedatetime = spreadsheetengine::core::datetime;
+namespace semath = spreadsheetengine::core::math;
+namespace seconvert = spreadsheetengine::core::convert;
 
 #define SCdEpsilon                1.0E-7
 
@@ -64,39 +73,12 @@ double ScInterpreter::GetDateSerial( sal_Int16 nYear, sal_Int16 nMonth, sal_Int1
 {
     if ( nYear < 100 && !bStrict )
         nYear = mrContext.NFExpandTwoDigitYear( nYear );
-    // Do not use a default Date ctor here because it asks system time with a
-    // performance penalty.
-    sal_Int16 nY, nM, nD;
-    if (bStrict)
-    {
-        nY = nYear;
-        nM = nMonth;
-        nD = nDay;
-    }
-    else
-    {
-        if (nMonth > 0)
-        {
-            nY = nYear + (nMonth-1) / 12;
-            nM = ((nMonth-1) % 12) + 1;
-        }
-        else
-        {
-            nY = nYear + (nMonth-12) / 12;
-            nM = 12 - (-nMonth) % 12;
-        }
-        nD = 1;
-    }
-    Date aDate( nD, nM, nY);
-    if (!bStrict)
-        aDate.AddDays( nDay - 1 );
-    if (aDate.IsValidAndGregorian())
-        return static_cast<double>(aDate - mrContext.NFGetNullDate());
-    else
-    {
-        SetError(FormulaError::NoValue);
-        return 0;
-    }
+    if (std::optional<double> fSerial = sedatetime::makeDateSerial(
+            mrContext.NFGetNullDate(), nYear, nMonth, nDay, bStrict))
+        return *fSerial;
+
+    SetError(FormulaError::NoValue);
+    return 0;
 }
 
 void ScInterpreter::ScGetActDate()
@@ -121,23 +103,18 @@ void ScInterpreter::ScGetActTime()
 
 void ScInterpreter::ScGetYear()
 {
-    Date aDate = mrContext.NFGetNullDate();
-    aDate.AddDays( GetFloor32());
-    PushDouble( static_cast<double>(aDate.GetYear()) );
+    PushDouble(sedatetime::extractYear(mrContext.NFGetNullDate(), GetFloor32()));
 }
 
 void ScInterpreter::ScGetMonth()
 {
-    Date aDate = mrContext.NFGetNullDate();
-    aDate.AddDays( GetFloor32());
-    PushDouble( static_cast<double>(aDate.GetMonth()) );
+    PushDouble(sedatetime::extractMonth(mrContext.NFGetNullDate(), GetFloor32()));
 }
 
 void ScInterpreter::ScGetDay()
 {
-    Date aDate = mrContext.NFGetNullDate();
-    if (aDate.CheckedAddDays(GetFloor32()))
-        PushDouble(static_cast<double>(aDate.GetDay()));
+    if (std::optional<double> fDay = sedatetime::extractDay(mrContext.NFGetNullDate(), GetFloor32()))
+        PushDouble(*fDay);
     else
     {
         SetError(FormulaError::IllegalArgument);
@@ -147,29 +124,17 @@ void ScInterpreter::ScGetDay()
 
 void ScInterpreter::ScGetMin()
 {
-    sal_uInt16 nHour, nMinute, nSecond;
-    double fFractionOfSecond;
-    tools::Time::GetClock( GetDouble(), nHour, nMinute, nSecond, fFractionOfSecond, 0);
-    PushDouble( nMinute);
+    PushDouble(sedatetime::extractMinute(GetDouble()));
 }
 
 void ScInterpreter::ScGetSec()
 {
-    sal_uInt16 nHour, nMinute, nSecond;
-    double fFractionOfSecond;
-    tools::Time::GetClock( GetDouble(), nHour, nMinute, nSecond, fFractionOfSecond, 0);
-    if ( fFractionOfSecond >= 0.5 )
-        nSecond = ( nSecond + 1 ) % 60;
-    PushDouble( nSecond );
-
+    PushDouble(sedatetime::extractSecond(GetDouble()));
 }
 
 void ScInterpreter::ScGetHour()
 {
-    sal_uInt16 nHour, nMinute, nSecond;
-    double fFractionOfSecond;
-    tools::Time::GetClock( GetDouble(), nHour, nMinute, nSecond, fFractionOfSecond, 0);
-    PushDouble( nHour);
+    PushDouble(sedatetime::extractHour(GetDouble()));
 }
 
 void ScInterpreter::ScGetDateValue()
@@ -204,39 +169,11 @@ void ScInterpreter::ScGetDayOfWeek()
     else
         nFlag = 1;
 
-    Date aDate = mrContext.NFGetNullDate();
-    aDate.AddDays( GetFloor32());
-    int nVal = static_cast<int>(aDate.GetDayOfWeek());  // MONDAY = 0
-    switch (nFlag)
-    {
-        case 1:     // Sunday = 1
-            if (nVal == 6)
-                nVal = 1;
-            else
-                nVal += 2;
-        break;
-        case 2:     // Monday = 1
-            nVal += 1;
-        break;
-        case 3:     // Monday = 0
-            ;   // nothing
-        break;
-        case 11:    // Monday = 1
-        case 12:    // Tuesday = 1
-        case 13:    // Wednesday = 1
-        case 14:    // Thursday = 1
-        case 15:    // Friday = 1
-        case 16:    // Saturday = 1
-        case 17:    // Sunday = 1
-            if (nVal < nFlag - 11)      // x = nFlag - 11 = 0,1,2,3,4,5,6
-                nVal += 19 - nFlag;     // nVal += (8 - (nFlag - 11) = 8 - x = 8,7,6,5,4,3,2)
-            else
-                nVal -= nFlag - 12;     // nVal -= ((nFlag - 11) - 1 = x - 1 = -1,0,1,2,3,4,5)
-        break;
-        default:
-            SetError( FormulaError::IllegalArgument);
-    }
-    PushInt( nVal );
+    const auto aResult
+        = sedatetime::computeDayOfWeek(mrContext.NFGetNullDate(), GetFloor32(), nFlag);
+    if (!aResult.mbValid)
+        SetError(FormulaError::IllegalArgument);
+    PushInt(aResult.mnValue);
 }
 
 void ScInterpreter::ScWeeknumOOo()
@@ -244,10 +181,7 @@ void ScInterpreter::ScWeeknumOOo()
     if ( MustHaveParamCount( GetByte(), 2 ) )
     {
         sal_Int16 nFlag = GetInt16();
-
-        Date aDate = mrContext.NFGetNullDate();
-        aDate.AddDays( GetFloor32());
-        PushInt( static_cast<int>(aDate.GetWeekOfYear( nFlag == 1 ? SUNDAY : MONDAY )));
+        PushInt(sedatetime::computeWeeknumOOo(mrContext.NFGetNullDate(), GetFloor32(), nFlag));
     }
 }
 
@@ -258,53 +192,17 @@ void ScInterpreter::ScGetWeekOfYear()
         return;
 
     sal_Int16 nFlag = (nParamCount == 1) ? 1 : GetInt16WithDefault(1);
-
-    Date aDate = mrContext.NFGetNullDate();
-    aDate.AddDays( GetFloor32());
-
-    sal_Int32 nMinimumNumberOfDaysInWeek;
-    DayOfWeek eFirstDayOfWeek;
-    switch ( nFlag )
-    {
-        case   1 :
-            eFirstDayOfWeek = SUNDAY;
-            nMinimumNumberOfDaysInWeek = 1;
-            break;
-        case   2 :
-            eFirstDayOfWeek = MONDAY;
-            nMinimumNumberOfDaysInWeek = 1;
-            break;
-        case  11 :
-        case  12 :
-        case  13 :
-        case  14 :
-        case  15 :
-        case  16 :
-        case  17 :
-            eFirstDayOfWeek = static_cast<DayOfWeek>( nFlag - 11 ); // MONDAY := 0
-            nMinimumNumberOfDaysInWeek = 1; //the week containing January 1 is week 1
-            break;
-        case  21 :
-        case 150 :
-            // ISO 8601
-            eFirstDayOfWeek = MONDAY;
-            nMinimumNumberOfDaysInWeek = 4;
-            break;
-        default :
-            PushIllegalArgument();
-            return;
-    }
-    PushInt( static_cast<int>(aDate.GetWeekOfYear( eFirstDayOfWeek, nMinimumNumberOfDaysInWeek )) );
+    if (std::optional<int> nWeek
+        = sedatetime::computeWeekOfYear(mrContext.NFGetNullDate(), GetFloor32(), nFlag))
+        PushInt(*nWeek);
+    else
+        PushIllegalArgument();
 }
 
 void ScInterpreter::ScGetIsoWeekOfYear()
 {
     if ( MustHaveParamCount( GetByte(), 1 ) )
-    {
-        Date aDate = mrContext.NFGetNullDate();
-        aDate.AddDays( GetFloor32());
-        PushInt( static_cast<int>(aDate.GetWeekOfYear()) );
-    }
+        PushInt(sedatetime::computeIsoWeekOfYear(mrContext.NFGetNullDate(), GetFloor32()));
 }
 
 void ScInterpreter::ScEasterSunday()
@@ -321,30 +219,11 @@ void ScInterpreter::ScEasterSunday()
     }
     if ( nYear < 100 )
         nYear = mrContext.NFExpandTwoDigitYear( nYear );
-    if (nYear < 1583 || nYear > 9956)
-    {
-        // Valid Gregorian and maximum year constraints not met.
+    if (std::optional<double> fSerial
+        = sedatetime::computeEasterSundaySerial(mrContext.NFGetNullDate(), nYear))
+        PushDouble(*fSerial);
+    else
         PushIllegalArgument();
-        return;
-    }
-    // don't worry, be happy :)
-    int B,C,D,E,F,G,H,I,K,L,M,N,O;
-    N = nYear % 19;
-    B = int(nYear / 100);
-    C = nYear % 100;
-    D = int(B / 4);
-    E = B % 4;
-    F = int((B + 8) / 25);
-    G = int((B - F + 1) / 3);
-    H = (19 * N + B - D - G + 15) % 30;
-    I = int(C / 4);
-    K = C % 4;
-    L = (32 + 2 * E + 2 * I - H - K) % 7;
-    M = int((N + 11 * H + 22 * L) / 451);
-    O = H + L - 7 * M + 114;
-    sal_Int16 nDay = sal::static_int_cast<sal_Int16>( O % 31 + 1 );
-    sal_Int16 nMonth = sal::static_int_cast<sal_Int16>( int(O / 31) );
-    PushDouble( GetDateSerial( nYear, nMonth, nDay, true ) );
 }
 
 FormulaError ScInterpreter::GetWeekendAndHolidayMasks(
@@ -357,24 +236,11 @@ FormulaError ScInterpreter::GetWeekendAndHolidayMasks(
         GetNumberSequenceArray( 1, nWeekendDays, false );
         if ( nGlobalError != FormulaError::NONE )
             return nGlobalError;
-        else
-        {
-            if ( nWeekendDays.size() != 7 )
-                return  FormulaError::IllegalArgument;
-
-            // Weekend days defined by string, Sunday...Saturday
-            for ( int i = 0; i < 7; i++ )
-                bWeekendMask[ i ] = static_cast<bool>(nWeekendDays[ ( i == 6 ? 0 : i + 1 ) ]);
-        }
+        if (!sedatetime::applyWeekendMaskSequence(nWeekendDays, bWeekendMask))
+            return FormulaError::IllegalArgument;
     }
     else
-    {
-        for ( int i = 0; i < 7; i++ )
-            bWeekendMask[ i] = false;
-
-        bWeekendMask[ SATURDAY ] = true;
-        bWeekendMask[ SUNDAY ]   = true;
-    }
+        sedatetime::setDefaultWeekendMask(bWeekendMask);
 
     if ( nParamCount >= 3 )
     {
@@ -439,67 +305,12 @@ FormulaError ScInterpreter::GetWeekendAndHolidayMasks_MS(
         }
     }
 
-    for ( int i = 0; i < 7; i++ )
-        bWeekendMask[ i] = false;
-
     if ( aWeekendDays.isEmpty() )
-    {
-        bWeekendMask[ SATURDAY ] = true;
-        bWeekendMask[ SUNDAY ]   = true;
-    }
+        sedatetime::setDefaultWeekendMask(bWeekendMask);
     else
     {
-        switch ( aWeekendDays.getLength() )
-        {
-            case 1 :
-                // Weekend days defined by code
-                switch ( aWeekendDays[ 0 ] )
-                {
-                    case '1' : bWeekendMask[ SATURDAY ]  = true; bWeekendMask[ SUNDAY ]    = true; break;
-                    case '2' : bWeekendMask[ SUNDAY ]    = true; bWeekendMask[ MONDAY ]    = true; break;
-                    case '3' : bWeekendMask[ MONDAY ]    = true; bWeekendMask[ TUESDAY ]   = true; break;
-                    case '4' : bWeekendMask[ TUESDAY ]   = true; bWeekendMask[ WEDNESDAY ] = true; break;
-                    case '5' : bWeekendMask[ WEDNESDAY ] = true; bWeekendMask[ THURSDAY ]  = true; break;
-                    case '6' : bWeekendMask[ THURSDAY ]  = true; bWeekendMask[ FRIDAY ]    = true; break;
-                    case '7' : bWeekendMask[ FRIDAY ]    = true; bWeekendMask[ SATURDAY ]  = true; break;
-                    default  : nErr = FormulaError::IllegalArgument;                                          break;
-                }
-                break;
-            case 2 :
-                // Weekend day defined by code
-                if ( aWeekendDays[ 0 ] == '1' )
-                {
-                    switch ( aWeekendDays[ 1 ] )
-                    {
-                        case '1' : bWeekendMask[ SUNDAY ]    = true; break;
-                        case '2' : bWeekendMask[ MONDAY ]    = true; break;
-                        case '3' : bWeekendMask[ TUESDAY ]   = true; break;
-                        case '4' : bWeekendMask[ WEDNESDAY ] = true; break;
-                        case '5' : bWeekendMask[ THURSDAY ]  = true; break;
-                        case '6' : bWeekendMask[ FRIDAY ]    = true; break;
-                        case '7' : bWeekendMask[ SATURDAY ]  = true; break;
-                        default  : nErr = FormulaError::IllegalArgument;        break;
-                    }
-                }
-                else
-                    nErr = FormulaError::IllegalArgument;
-                break;
-            case 7 :
-                // Weekend days defined by string
-                for ( int i = 0; i < 7 && nErr == FormulaError::NONE; i++ )
-                {
-                    switch ( aWeekendDays[ i ] )
-                    {
-                        case '0' : bWeekendMask[ i ] = false; break;
-                        case '1' : bWeekendMask[ i ] = true;  break;
-                        default  : nErr = FormulaError::IllegalArgument; break;
-                    }
-                }
-                break;
-            default :
-                nErr = FormulaError::IllegalArgument;
-                break;
-        }
+        if (!sedatetime::applyWeekendMaskMsSpec(aWeekendDays, bWorkdayFunction, bWeekendMask))
+            nErr = FormulaError::IllegalArgument;
     }
     return nErr;
 }
@@ -538,25 +349,8 @@ void ScInterpreter::ScNetWorkdays( bool bOOXML_Version )
         }
         nDate2 += nNullDate;
         nDate1 += nNullDate;
-
-        sal_Int32 nCnt = 0;
-        size_t nRef = 0;
-        bool bReverse = ( nDate1 > nDate2 );
-        if ( bReverse )
-            std::swap( nDate1, nDate2 );
-        size_t nMax = nSortArray.size();
-        while ( nDate1 <= nDate2 )
-        {
-            if ( !bWeekendMask[ GetDayOfWeek( nDate1 ) ] )
-            {
-                while ( nRef < nMax && nSortArray.at( nRef ) < nDate1 )
-                    nRef++;
-                if ( nRef >= nMax || nSortArray.at( nRef ) != nDate1 )
-                    nCnt++;
-            }
-            ++nDate1;
-        }
-        PushDouble( static_cast<double>( bReverse ? -nCnt : nCnt ) );
+        PushDouble(static_cast<double>(
+            sedatetime::countWorkdays(nDate1, nDate2, nSortArray, bWeekendMask)));
     }
 }
 
@@ -589,46 +383,8 @@ void ScInterpreter::ScWorkday_MS()
         if ( !nDays )
             PushDouble( static_cast<double>( nDate - nNullDate ) );
         else
-        {
-            size_t nMax = nSortArray.size();
-            if ( nDays > 0 )
-            {
-                size_t nRef = 0;
-                while ( nDays )
-                {
-                    do
-                    {
-                        ++nDate;
-                    }
-                    while ( bWeekendMask[ GetDayOfWeek( nDate ) ] ); //jump over weekend day(s)
-
-                    while ( nRef < nMax && nSortArray.at( nRef ) < nDate )
-                        nRef++;
-
-                    if ( nRef >= nMax || nSortArray.at( nRef ) != nDate )
-                        nDays--;
-                }
-            }
-            else
-            {
-                sal_Int16 nRef = nMax - 1;
-                while ( nDays )
-                {
-                    do
-                    {
-                      --nDate;
-                    }
-                    while ( bWeekendMask[ GetDayOfWeek( nDate ) ] ); //jump over weekend day(s)
-
-                    while ( nRef >= 0 && nSortArray.at( nRef ) > nDate )
-                        nRef--;
-
-                    if (nRef < 0 || nSortArray.at(nRef) != nDate)
-                         nDays++;
-                }
-            }
-            PushDouble( static_cast<double>( nDate - nNullDate ) );
-        }
+            PushDouble(static_cast<double>(
+                sedatetime::advanceWorkday(nDate, nDays, nSortArray, bWeekendMask) - nNullDate));
     }
 }
 
@@ -657,11 +413,10 @@ void ScInterpreter::ScGetTime()
         double fSec = GetDouble();
         double fMin = GetDouble();
         double fHour = GetDouble();
-        double fTime = fmod( (fHour * ::tools::Time::secondPerHour) + (fMin * ::tools::Time::secondPerMinute) + fSec, DATE_TIME_FACTOR) / DATE_TIME_FACTOR;
-        if (fTime < 0)
-            PushIllegalArgument();
+        if (std::optional<double> fTime = sedatetime::makeTimeSerial(fHour, fMin, fSec))
+            PushDouble(*fTime);
         else
-            PushDouble( fTime);
+            PushIllegalArgument();
     }
 }
 
@@ -671,7 +426,7 @@ void ScInterpreter::ScGetDiffDate()
     {
         double fDate2 = GetDouble();
         double fDate1 = GetDouble();
-        PushDouble(fDate1 - fDate2);
+        PushDouble(sedatetime::computeDiffDate(fDate1, fDate2));
     }
 }
 
@@ -712,57 +467,8 @@ void ScInterpreter::ScGetDiffDate360()
     if (nGlobalError != FormulaError::NONE)
         PushError( nGlobalError);
     else
-    {
-        sal_Int32 nSign;
-        // #i84934# only for non-US European algorithm swap dates. Else
-        // follow Excel's meaningless extrapolation for "interoperability".
-        if (bFlag && (nDate2 < nDate1))
-        {
-            nSign = nDate1;
-            nDate1 = nDate2;
-            nDate2 = nSign;
-            nSign = -1;
-        }
-        else
-            nSign = 1;
-        Date aDate1 = mrContext.NFGetNullDate();
-        aDate1.AddDays( nDate1);
-        Date aDate2 = mrContext.NFGetNullDate();
-        aDate2.AddDays( nDate2);
-        if (aDate1.GetDay() == 31)
-            aDate1.AddDays( -1);
-        else if (!bFlag)
-        {
-            if (aDate1.GetMonth() == 2)
-            {
-                switch ( aDate1.GetDay() )
-                {
-                    case 28 :
-                        if ( !aDate1.IsLeapYear() )
-                            aDate1.SetDay(30);
-                    break;
-                    case 29 :
-                        aDate1.SetDay(30);
-                    break;
-                }
-            }
-        }
-        if (aDate2.GetDay() == 31)
-        {
-            if (!bFlag )
-            {
-                if (aDate1.GetDay() == 30)
-                    aDate2.AddDays( -1);
-            }
-            else
-                aDate2.SetDay(30);
-        }
-        PushDouble( static_cast<double>(nSign) *
-            (  static_cast<double>(aDate2.GetDay()) + static_cast<double>(aDate2.GetMonth()) * 30.0 +
-               static_cast<double>(aDate2.GetYear()) * 360.0
-             - static_cast<double>(aDate1.GetDay()) - static_cast<double>(aDate1.GetMonth()) * 30.0
-             - static_cast<double>(aDate1.GetYear()) * 360.0) );
-    }
+        PushDouble(sedatetime::computeDiffDate360(
+            mrContext.NFGetNullDate(), nDate1, nDate2, bFlag));
 }
 
 // fdo#44456 function DATEDIF as defined in ODF1.2 (Par. 6.10.3)
@@ -781,136 +487,9 @@ void ScInterpreter::ScGetDateDif()
         return;
     }
 
-    // Excel doesn't swap dates or return negative numbers, so don't we.
-    if (nDate1 > nDate2)
-    {
-        PushIllegalArgument();
-        return;
-    }
-
-    double dd = nDate2 - nDate1;
-    // Zero difference or number of days can be returned immediately.
-    if (dd == 0.0 || aInterval.equalsIgnoreAsciiCase( "d" ))
-    {
-        PushDouble( dd );
-        return;
-    }
-
-    // split dates in day, month, year for use with formats other than "d"
-    sal_uInt16 d1, m1, d2, m2;
-    sal_Int16 y1, y2;
-    Date aDate1( mrContext.NFGetNullDate());
-    aDate1.AddDays( nDate1);
-    y1 = aDate1.GetYear();
-    m1 = aDate1.GetMonth();
-    d1 = aDate1.GetDay();
-    Date aDate2( mrContext.NFGetNullDate());
-    aDate2.AddDays( nDate2);
-    y2 = aDate2.GetYear();
-    m2 = aDate2.GetMonth();
-    d2 = aDate2.GetDay();
-
-    // Close the year 0 gap to calculate year difference.
-    if (y1 < 0 && y2 > 0)
-        ++y1;
-    else if (y1 > 0 && y2 < 0)
-        ++y2;
-
-    if (  aInterval.equalsIgnoreAsciiCase( "m" ) )
-    {
-        // Return number of months.
-        int md = m2 - m1 + 12 * (y2 - y1);
-        if (d1 > d2)
-            --md;
-        PushInt( md );
-    }
-    else if ( aInterval.equalsIgnoreAsciiCase( "y" ) )
-    {
-        // Return number of years.
-        int yd;
-        if ( y2 > y1 )
-        {
-            if (m2 > m1 || (m2 == m1 && d2 >= d1))
-                yd = y2 - y1;       // complete years between dates
-            else
-                yd = y2 - y1 - 1;   // one incomplete year
-        }
-        else
-        {
-            // Year is equal as we don't allow reversed arguments, no
-            // complete year between dates.
-            yd = 0;
-        }
-        PushInt( yd );
-    }
-    else if ( aInterval.equalsIgnoreAsciiCase( "md" ) )
-    {
-        // Return number of days, excluding months and years.
-        // This is actually the remainder of days when subtracting years
-        // and months from the difference of dates. Birthday-like 23 years
-        // and 10 months and 19 days.
-
-        // Algorithm's roll-over behavior extracted from Excel by try and
-        // error...
-        // If day1 <= day2 then simply day2 - day1.
-        // If day1 > day2 then set month1 to month2-1 and year1 to
-        // year2(-1) and subtract dates, e.g. for 2012-01-28,2012-03-01 set
-        // 2012-02-28 and then (2012-03-01)-(2012-02-28) => 2 days (leap
-        // year).
-        // For 2011-01-29,2011-03-01 the non-existent 2011-02-29 rolls over
-        // to 2011-03-01 so the result is 0. Same for day 31 in months with
-        // only 30 days.
-
-        tools::Long nd;
-        if (d1 <= d2)
-            nd = d2 - d1;
-        else
-        {
-            if (m2 == 1)
-            {
-                aDate1.SetYear( y2 == 1 ? -1 : y2 - 1 );
-                aDate1.SetMonth( 12 );
-            }
-            else
-            {
-                aDate1.SetYear( y2 );
-                aDate1.SetMonth( m2 - 1 );
-            }
-            aDate1.Normalize();
-            nd = aDate2 - aDate1;
-        }
-        PushDouble( nd );
-    }
-    else if ( aInterval.equalsIgnoreAsciiCase( "ym" ) )
-    {
-        // Return number of months, excluding years.
-        int md = m2 - m1 + 12 * (y2 - y1);
-        if (d1 > d2)
-            --md;
-        md %= 12;
-        PushInt( md );
-    }
-    else if ( aInterval.equalsIgnoreAsciiCase( "yd" ) )
-    {
-        // Return number of days, excluding years.
-
-        // Condition corresponds with "y".
-        if (m2 > m1 || (m2 == m1 && d2 >= d1))
-            aDate1.SetYear( y2 );
-        else
-            aDate1.SetYear( y2 - 1 );
-            // XXX NOTE: Excel for the case 1988-06-22,2012-05-11 returns
-            // 323, whereas the result here is 324. Don't they use the leap
-            // year of 2012?
-            // http://www.cpearson.com/excel/datedif.aspx "DATEDIF And Leap
-            // Years" is not correct and Excel 2010 correctly returns 0 in
-            // both cases mentioned there. Also using year1 as mentioned
-            // produces incorrect results in other cases and different from
-            // Excel 2010. Apparently they fixed some calculations.
-        aDate1.Normalize();
-        double fd = aDate2 - aDate1;
-        PushDouble( fd );
-    }
+    if (std::optional<double> fResult
+        = sedatetime::computeDateDif(mrContext.NFGetNullDate(), nDate1, nDate2, aInterval))
+        PushDouble(*fResult);
     else
         PushIllegalArgument();               // unsupported format
 }
@@ -940,23 +519,17 @@ void ScInterpreter::ScGetTimeValue()
 
 void ScInterpreter::ScPlusMinus()
 {
-    double fVal = GetDouble();
-    short n = 0;
-    if (fVal < 0.0)
-        n = -1;
-    else if (fVal > 0.0)
-        n = 1;
-    PushInt( n );
+    PushInt( semath::computePlusMinus( GetDouble() ) );
 }
 
 void ScInterpreter::ScAbs()
 {
-    PushDouble(std::abs(GetDouble()));
+    PushDouble( semath::computeAbs( GetDouble() ) );
 }
 
 void ScInterpreter::ScInt()
 {
-    PushDouble(::rtl::math::approxFloor(GetDouble()));
+    PushDouble( semath::computeInt( GetDouble() ) );
 }
 
 void ScInterpreter::RoundNumber( rtl_math_RoundingMode eMode )
@@ -973,56 +546,7 @@ void ScInterpreter::RoundNumber( rtl_math_RoundingMode eMode )
         const sal_Int16 nDec = GetInt16();
         const double fX = GetDouble();
         if (nGlobalError == FormulaError::NONE)
-        {
-            // A quite aggressive approach with 12 significant digits.
-            // However, using 14 or some other doesn't work because other
-            // values may fail, like =ROUNDDOWN(2-5E-015;13) would produce
-            // 2 (another example in tdf#124286).
-            constexpr sal_Int16 kSigDig = 12;
-
-            if ( ( eMode == rtl_math_RoundingMode_Down ||
-                   eMode == rtl_math_RoundingMode_Up ) &&
-                 nDec < kSigDig && fmod( fX, 1.0 ) != 0.0 )
-
-            {
-                // tdf124286 : round to significant digits before rounding
-                //             down or up to avoid unexpected rounding errors
-                //             caused by decimal -> binary -> decimal conversion
-
-                double fRes = fX;
-                // Similar to RoundSignificant() but omitting the back-scaling
-                // and interim integer rounding before the final rounding,
-                // which would result in double rounding. Instead, adjust the
-                // decimals and round into integer part before scaling back.
-                const double fTemp = floor( log10( std::abs(fRes))) + 1.0 - kSigDig;
-                // Avoid inaccuracy of negative powers of 10.
-                if (fTemp < 0.0)
-                    fRes *= pow(10.0, -fTemp);
-                else
-                    fRes /= pow(10.0, fTemp);
-                if (std::isfinite(fRes))
-                {
-                    // fRes is now at a decimal normalized scale.
-                    // Truncate up-rounding to opposite direction for values
-                    // like 0.0600000000000005 =ROUNDUP(8.06-8;2) that here now
-                    // is 600000000000.005 and otherwise would yield 0.07
-                    if (eMode == rtl_math_RoundingMode_Up)
-                        fRes = ::rtl::math::approxFloor(fRes);
-                    fVal = ::rtl::math::round( fRes, nDec + fTemp, eMode );
-                    if (fTemp < 0.0)
-                        fVal /= pow(10.0, -fTemp);
-                    else
-                        fVal *= pow(10.0, fTemp);
-                }
-                else
-                {
-                    // Overflow. Let our round() decide if and how to round.
-                    fVal = ::rtl::math::round( fX, nDec, eMode );
-                }
-            }
-            else
-                fVal = ::rtl::math::round( fX, nDec, eMode );
-        }
+            fVal = semath::roundToDecimals( fX, nDec, eMode );
     }
     PushDouble(fVal);
 }
@@ -1044,21 +568,7 @@ void ScInterpreter::ScRoundUp()
 
 void ScInterpreter::RoundSignificant( double fX, double fDigits, double &fRes )
 {
-    double fTemp = floor( log10( std::abs(fX) ) ) + 1.0 - fDigits;
-    double fIn = fX;
-    // Avoid inaccuracy of negative powers of 10.
-    if (fTemp < 0.0)
-        fIn *= pow(10.0, -fTemp);
-    else
-        fIn /= pow(10.0, fTemp);
-    // For very large fX there might be an overflow in fIn resulting in
-    // non-finite. rtl::math::round() handles that and it will be propagated as
-    // usual.
-    fRes = ::rtl::math::round(fIn);
-    if (fTemp < 0.0)
-        fRes /= pow(10.0, -fTemp);
-    else
-        fRes *= pow(10.0, fTemp);
+    fRes = semath::roundToSignificantDigits( fX, fDigits );
 }
 
 // tdf#105931
@@ -1117,18 +627,10 @@ void ScInterpreter::ScCeil( bool bODFF )
         PushInt( 0 );
     else
     {
-        if ( bODFF && fVal * fDec < 0 )
-            PushIllegalArgument();
+        if (std::optional<double> fResult = semath::computeCeiling( fVal, fDec, bAbs, bODFF ))
+            PushDouble(*fResult);
         else
-        {
-            if ( fVal * fDec < 0.0 )
-                fDec = -fDec;
-
-            if ( !bAbs && fVal < 0.0 )
-                PushDouble(::rtl::math::approxFloor( fVal / fDec ) * fDec );
-            else
-                PushDouble(::rtl::math::approxCeil( fVal / fDec ) * fDec );
-        }
+            PushIllegalArgument();
     }
 }
 
@@ -1140,12 +642,8 @@ void ScInterpreter::ScCeil_MS()
 
     double fDec = GetDouble();
     double fVal = GetDouble();
-    if ( fVal == 0 || fDec == 0.0 )
-        PushInt(0);
-    else if ( fVal * fDec > 0 )
-        PushDouble(::rtl::math::approxCeil( fVal / fDec ) * fDec );
-    else if ( fVal < 0.0 )
-        PushDouble(::rtl::math::approxFloor( fVal / -fDec ) * -fDec );
+    if (std::optional<double> fResult = semath::computeCeilingMs( fVal, fDec ))
+        PushDouble(*fResult);
     else
         PushIllegalArgument();
 }
@@ -1170,7 +668,7 @@ void ScInterpreter::ScCeil_Precise()
     if ( fDec == 0.0 || fVal == 0.0 )
         PushInt( 0 );
     else
-        PushDouble(::rtl::math::approxCeil( fVal / fDec ) * fDec );
+        PushDouble(semath::computeCeilingPrecise( fVal, fDec ));
 }
 
 /** tdf69552 ODFF1.2 function FLOOR and Excel function FLOOR.MATH
@@ -1205,18 +703,10 @@ void ScInterpreter::ScFloor( bool bODFF )
         PushInt( 0 );
     else
     {
-        if ( bODFF && ( fVal * fDec < 0.0 ) )
-            PushIllegalArgument();
+        if (std::optional<double> fResult = semath::computeFloor( fVal, fDec, bAbs, bODFF ))
+            PushDouble(*fResult);
         else
-        {
-            if ( fVal * fDec < 0.0 )
-                fDec = -fDec;
-
-            if ( !bAbs && fVal < 0.0 )
-                PushDouble(::rtl::math::approxCeil( fVal / fDec ) * fDec );
-            else
-                PushDouble(::rtl::math::approxFloor( fVal / fDec ) * fDec );
-        }
+            PushIllegalArgument();
     }
 }
 
@@ -1228,15 +718,8 @@ void ScInterpreter::ScFloor_MS()
 
     double fDec = GetDouble();
     double fVal = GetDouble();
-
-    if ( fVal == 0 )
-        PushInt( 0 );
-    else if ( fVal * fDec > 0 )
-        PushDouble(::rtl::math::approxFloor( fVal / fDec ) * fDec );
-    else if ( fDec == 0 )
-        PushIllegalArgument();
-    else if ( fVal < 0.0 )
-        PushDouble(::rtl::math::approxCeil( fVal / -fDec ) * -fDec );
+    if (std::optional<double> fResult = semath::computeFloorMs( fVal, fDec ))
+        PushDouble(*fResult);
     else
         PushIllegalArgument();
 }
@@ -1252,34 +735,17 @@ void ScInterpreter::ScFloor_Precise()
     if ( fDec == 0.0 || fVal == 0.0 )
         PushInt( 0 );
     else
-        PushDouble(::rtl::math::approxFloor( fVal / fDec ) * fDec );
+        PushDouble(semath::computeFloorPrecise( fVal, fDec ));
 }
 
 void ScInterpreter::ScEven()
 {
-    double fVal = GetDouble();
-    if (fVal < 0.0)
-        PushDouble(::rtl::math::approxFloor(fVal/2.0) * 2.0);
-    else
-        PushDouble(::rtl::math::approxCeil(fVal/2.0) * 2.0);
+    PushDouble(semath::computeEven(GetDouble()));
 }
 
 void ScInterpreter::ScOdd()
 {
-    double fVal = GetDouble();
-    if (fVal >= 0.0)
-    {
-        fVal = ::rtl::math::approxCeil(fVal);
-        if (fmod(fVal, 2.0) == 0.0)
-            ++fVal;
-    }
-    else
-    {
-        fVal = ::rtl::math::approxFloor(fVal);
-        if (fmod(fVal, 2.0) == 0.0)
-            --fVal;
-    }
-    PushDouble(fVal);
+    PushDouble(semath::computeOdd(GetDouble()));
 }
 
 void ScInterpreter::ScArcTan2()
@@ -1288,7 +754,7 @@ void ScInterpreter::ScArcTan2()
     {
         double fVal2 = GetDouble();
         double fVal1 = GetDouble();
-        PushDouble(atan2(fVal2, fVal1));
+        PushDouble( semath::computeArcTan2( fVal2, fVal1 ) );
     }
 }
 
@@ -1300,26 +766,24 @@ void ScInterpreter::ScLog()
 
     double fBase = nParamCount == 2 ? GetDouble() : 10.0;
     double fVal = GetDouble();
-    if (fVal > 0.0 && fBase > 0.0 && fBase != 1.0)
-        PushDouble(log(fVal) / log(fBase));
+    if (std::optional<double> fResult = semath::computeLog( fVal, fBase ))
+        PushDouble(*fResult);
     else
         PushIllegalArgument();
 }
 
 void ScInterpreter::ScLn()
 {
-    double fVal = GetDouble();
-    if (fVal > 0.0)
-        PushDouble(log(fVal));
+    if (std::optional<double> fResult = semath::computeLn( GetDouble() ))
+        PushDouble(*fResult);
     else
         PushIllegalArgument();
 }
 
 void ScInterpreter::ScLog10()
 {
-    double fVal = GetDouble();
-    if (fVal > 0.0)
-        PushDouble(log10(fVal));
+    if (std::optional<double> fResult = semath::computeLog10( GetDouble() ))
+        PushDouble(*fResult);
     else
         PushIllegalArgument();
 }
@@ -1660,7 +1124,8 @@ void ScInterpreter::ScISPMT()
         if( nGlobalError != FormulaError::NONE )
             PushError( nGlobalError);
         else
-            PushDouble( fInvest * fRate * (o3tl::div_allow_zero(fPeriod, fTotal) - 1.0) );
+            PushDouble( semath::computeInterestSchedulePayment(
+                fRate, fPeriod, fTotal, fInvest ) );
     }
 }
 
@@ -1668,20 +1133,7 @@ void ScInterpreter::ScISPMT()
 double ScInterpreter::ScGetPV(double fRate, double fNper, double fPmt,
                               double fFv, bool bPayInAdvance)
 {
-    double fPv;
-    if (fRate == 0.0)
-        fPv = fFv + fPmt * fNper;
-    else
-    {
-        if (bPayInAdvance)
-            fPv = (fFv * pow(1.0 + fRate, -fNper))
-                    + (fPmt * (1.0 - pow(1.0 + fRate, -fNper + 1.0)) / fRate)
-                    + fPmt;
-        else
-            fPv = (fFv * pow(1.0 + fRate, -fNper))
-                    + (fPmt * (1.0 - pow(1.0 + fRate, -fNper)) / fRate);
-    }
-    return -fPv;
+    return semath::computePresentValue(fRate, fNper, fPmt, fFv, bPayInAdvance);
 }
 
 void ScInterpreter::ScPV()
@@ -1708,28 +1160,14 @@ void ScInterpreter::ScSYD()
         double fLife = GetDouble();
         double fSalvage = GetDouble();
         double fCost = GetDouble();
-        double fSyd = o3tl::div_allow_zero((fCost - fSalvage) * (fLife - fPer + 1.0),
-                      (fLife * (fLife + 1.0)) / 2.0);
-        PushDouble(fSyd);
+        PushDouble(semath::computeSumOfYearsDepreciation(fCost, fSalvage, fLife, fPer));
     }
 }
 
 double ScInterpreter::ScGetDDB(double fCost, double fSalvage, double fLife,
                 double fPeriod, double fFactor)
 {
-    double fDdb, fRate, fOldValue, fNewValue;
-    fRate = o3tl::div_allow_zero(fFactor, fLife);
-    if (fRate >= 1.0)
-    {
-        fRate = 1.0;
-        fOldValue = fPeriod == 1.0 ? fCost : 0;
-    }
-    else
-        fOldValue = fCost * pow(1.0 - fRate, fPeriod - 1.0);
-    fNewValue = fCost * pow(1.0 - fRate, fPeriod);
-
-    fDdb = fNewValue < fSalvage ? fOldValue - fSalvage : fOldValue - fNewValue;
-    return fDdb < 0 ? 0 : fDdb;
+    return semath::computeDoubleDecliningBalance(fCost, fSalvage, fLife, fPeriod, fFactor);
 }
 
 void ScInterpreter::ScDDB()
@@ -1769,71 +1207,15 @@ void ScInterpreter::ScDB()
         PushIllegalArgument();
         return;
     }
-    double fOffRate = 1.0 - pow(fSalvage / fCost, 1.0 / fLife);
-    fOffRate = ::rtl::math::approxFloor((fOffRate * 1000.0) + 0.5) / 1000.0;
-    double fFirstOffRate = fCost * fOffRate * fMonths / 12.0;
-    double fDb = 0.0;
-    if (::rtl::math::approxFloor(fPeriod) == 1)
-        fDb = fFirstOffRate;
-    else
-    {
-        KahanSum fSumOffRate = fFirstOffRate;
-        double fMin = fLife;
-        if (fMin > fPeriod) fMin = fPeriod;
-        sal_uInt16 iMax = static_cast<sal_uInt16>(::rtl::math::approxFloor(fMin));
-        for (sal_uInt16 i = 2; i <= iMax; i++)
-        {
-            fDb = -(fSumOffRate - fCost).get() * fOffRate;
-            fSumOffRate += fDb;
-        }
-        if (fPeriod > fLife)
-            fDb = -(fSumOffRate - fCost).get() * fOffRate * (12.0 - fMonths) / 12.0;
-    }
-    PushDouble(fDb);
+    PushDouble(semath::computeFixedDecliningBalance(
+        fCost, fSalvage, fLife, fPeriod, fMonths));
 }
 
 double ScInterpreter::ScInterVDB(double fCost, double fSalvage, double fLife,
                              double fLife1, double fPeriod, double fFactor)
 {
-    KahanSum fVdb = 0.0;
-    double fIntEnd   = ::rtl::math::approxCeil(fPeriod);
-    sal_uLong nLoopEnd   = static_cast<sal_uLong>(fIntEnd);
-
-    double fTerm, fSln = 0; // SLN: Straight-Line Depreciation
-    double fSalvageValue = fCost - fSalvage;
-    bool bNowSln = false;
-
-    double fDdb;
-    sal_uLong i;
-    for ( i = 1; i <= nLoopEnd; i++)
-    {
-        if(!bNowSln)
-        {
-            fDdb = ScGetDDB(fCost, fSalvage, fLife, static_cast<double>(i), fFactor);
-            fSln = fSalvageValue/ (fLife1 - static_cast<double>(i-1));
-
-            if (fSln > fDdb)
-            {
-                fTerm = fSln;
-                bNowSln = true;
-            }
-            else
-            {
-                fTerm = fDdb;
-                fSalvageValue -= fDdb;
-            }
-        }
-        else
-        {
-            fTerm = fSln;
-        }
-
-        if ( i == nLoopEnd)
-            fTerm *= ( fPeriod + 1.0 - fIntEnd );
-
-        fVdb += fTerm;
-    }
-    return fVdb.get();
+    return semath::computeVariableDecliningBalanceSegment(
+        fCost, fSalvage, fLife, fLife1, fPeriod, fFactor);
 }
 
 void ScInterpreter::ScVDB()
@@ -1855,62 +1237,8 @@ void ScInterpreter::ScVDB()
                       || fSalvage > fCost || fFactor <= 0.0)
         PushIllegalArgument();
     else
-    {
-        double fIntStart = ::rtl::math::approxFloor(fStart);
-        double fIntEnd   = ::rtl::math::approxCeil(fEnd);
-        sal_uLong nLoopStart = static_cast<sal_uLong>(fIntStart);
-        sal_uLong nLoopEnd   = static_cast<sal_uLong>(fIntEnd);
-
-        if (bNoSwitch)
-        {
-            for (sal_uLong i = nLoopStart + 1; i <= nLoopEnd; i++)
-            {
-                double fTerm = ScGetDDB(fCost, fSalvage, fLife, static_cast<double>(i), fFactor);
-
-                //respect partial period in the Beginning/ End:
-                if ( i == nLoopStart+1 )
-                    fTerm *= ( std::min( fEnd, fIntStart + 1.0 ) - fStart );
-                else if ( i == nLoopEnd )
-                    fTerm *= ( fEnd + 1.0 - fIntEnd );
-
-                fVdb += fTerm;
-            }
-        }
-        else
-        {
-            double fPart = 0.0;
-            // respect partial period in the Beginning / End:
-            if ( !::rtl::math::approxEqual( fStart, fIntStart ) ||
-                 !::rtl::math::approxEqual( fEnd, fIntEnd ) )
-            {
-                if ( !::rtl::math::approxEqual( fStart, fIntStart ) )
-                {
-                    // part to be subtracted at the beginning
-                    double fTempIntEnd = fIntStart + 1.0;
-                    double fTempValue = fCost -
-                        ScInterVDB( fCost, fSalvage, fLife, fLife, fIntStart, fFactor );
-                    fPart += ( fStart - fIntStart ) *
-                        ScInterVDB( fTempValue, fSalvage, fLife, fLife - fIntStart,
-                        fTempIntEnd - fIntStart, fFactor);
-                }
-                if ( !::rtl::math::approxEqual( fEnd, fIntEnd ) )
-                {
-                    // part to be subtracted at the end
-                    double fTempIntStart = fIntEnd - 1.0;
-                    double fTempValue = fCost -
-                        ScInterVDB( fCost, fSalvage, fLife, fLife, fTempIntStart, fFactor );
-                    fPart += ( fIntEnd - fEnd ) *
-                        ScInterVDB( fTempValue, fSalvage, fLife, fLife - fTempIntStart,
-                        fIntEnd - fTempIntStart, fFactor);
-                }
-            }
-            // calculate depreciation for whole periods
-            fCost -= ScInterVDB( fCost, fSalvage, fLife, fLife, fIntStart, fFactor );
-            fVdb = ScInterVDB( fCost, fSalvage, fLife, fLife - fIntStart,
-                fIntEnd - fIntStart, fFactor);
-            fVdb -= fPart;
-        }
-    }
+        fVdb = semath::computeVariableDecliningBalance(
+            fCost, fSalvage, fLife, fStart, fEnd, fFactor, bNoSwitch);
     PushDouble(fVdb.get());
 }
 
@@ -1924,7 +1252,7 @@ void ScInterpreter::ScPDuration()
         if ( fFuture <= 0.0 || fPresent <= 0.0 || fRate <= 0.0 )
             PushIllegalArgument();
         else
-            PushDouble( std::log( fFuture / fPresent ) / std::log1p( fRate ) );
+            PushDouble( semath::computePaybackDuration( fRate, fPresent, fFuture ) );
     }
 }
 
@@ -1936,26 +1264,14 @@ void ScInterpreter::ScSLN()
         double fLife = GetDouble();
         double fSalvage = GetDouble();
         double fCost = GetDouble();
-        PushDouble( div( fCost - fSalvage, fLife ) );
+        PushDouble(semath::computeStraightLineDepreciation(fCost, fSalvage, fLife));
     }
 }
 
 double ScInterpreter::ScGetPMT(double fRate, double fNper, double fPv,
                        double fFv, bool bPayInAdvance)
 {
-    double fPayment;
-    if (fRate == 0.0)
-        fPayment = o3tl::div_allow_zero(fPv + fFv, fNper);
-    else
-    {
-        if (bPayInAdvance) // payment in advance
-            fPayment = (fFv + fPv * exp( fNper * ::std::log1p(fRate) ) ) * fRate /
-                (std::expm1( (fNper + 1) * ::std::log1p(fRate) ) - fRate);
-        else  // payment in arrear
-            fPayment = (fFv + fPv * exp(fNper * ::std::log1p(fRate) ) ) * fRate /
-                std::expm1( fNper * ::std::log1p(fRate) );
-    }
-    return -fPayment;
+    return semath::computePayment(fRate, fNper, fPv, fFv, bPayInAdvance);
 }
 
 void ScInterpreter::ScPMT()
@@ -1983,25 +1299,15 @@ void ScInterpreter::ScRRI()
         if ( fNrOfPeriods <= 0.0  || fPresentValue == 0.0 )
             PushIllegalArgument();
         else
-            PushDouble(pow(fFutureValue / fPresentValue, 1.0 / fNrOfPeriods) - 1.0);
+            PushDouble(semath::computeGrowthRateOverPeriods(
+                fNrOfPeriods, fPresentValue, fFutureValue));
     }
 }
 
 double ScInterpreter::ScGetFV(double fRate, double fNper, double fPmt,
                               double fPv, bool bPayInAdvance)
 {
-    double fFv;
-    if (fRate == 0.0)
-        fFv = fPv + fPmt * fNper;
-    else
-    {
-        double fTerm = pow(1.0 + fRate, fNper);
-        if (bPayInAdvance)
-            fFv = fPv * fTerm + fPmt*(1.0 + fRate)*(fTerm - 1.0)/fRate;
-        else
-            fFv = fPv * fTerm + fPmt*(fTerm - 1.0)/fRate;
-    }
-    return -fFv;
+    return semath::computeFutureValue(fRate, fNper, fPmt, fPv, bPayInAdvance);
 }
 
 void ScInterpreter::ScFV()
@@ -2028,116 +1334,8 @@ void ScInterpreter::ScNper()
     double fPV   = GetDouble();      // Present Value
     double fPmt  = GetDouble();      // Payment
     double fRate = GetDouble();
-    // Note that due to the function specification in ODFF1.2 (and Excel) the
-    // amount to be paid to get from fPV to fFV is fFV_+_fPV.
-    if ( fPV + fFV == 0.0 )
-        PushDouble( 0.0 );
-    else if (fRate == 0.0)
-        PushDouble(-o3tl::div_allow_zero(fPV + fFV, fPmt));
-    else if (bPayInAdvance)
-        PushDouble(log(-o3tl::div_allow_zero(fRate*fFV-fPmt*(1.0+fRate), (fRate*fPV+fPmt*(1.0+fRate))))
-                  / std::log1p(fRate));
-    else
-        PushDouble(log(-(fRate*fFV-fPmt)/(fRate*fPV+fPmt)) / std::log1p(fRate));
-}
-
-bool ScInterpreter::RateIteration( double fNper, double fPayment, double fPv,
-                                   double fFv, bool bPayType, double & fGuess )
-{
-    // See also #i15090#
-    // Newton-Raphson method: x(i+1) = x(i) - f(x(i)) / f'(x(i))
-    // This solution handles integer and non-integer values of Nper different.
-    // If ODFF will constraint Nper to integer, the distinction of cases can be
-    // removed; only the integer-part is needed then.
-    bool bValid = true, bFound = false;
-    double fX, fXnew, fTerm, fTermDerivation;
-    double fGeoSeries, fGeoSeriesDerivation;
-    const sal_uInt16 nIterationsMax = 150;
-    sal_uInt16 nCount = 0;
-    const double fEpsilonSmall = 1.0E-14;
-    if ( bPayType )
-    {
-        // payment at beginning of each period
-        fFv = fFv - fPayment;
-        fPv = fPv + fPayment;
-    }
-    if (fNper == ::rtl::math::round( fNper ))
-    { // Nper is an integer value
-        fX = fGuess;
-        while (!bFound && nCount < nIterationsMax)
-        {
-            double fPowN, fPowNminus1;  // for (1.0+fX)^Nper and (1.0+fX)^(Nper-1)
-            fPowNminus1 = pow( 1.0+fX, fNper-1.0);
-            fPowN = fPowNminus1 * (1.0+fX);
-            if (fX == 0.0)
-            {
-                fGeoSeries = fNper;
-                fGeoSeriesDerivation = fNper * (fNper-1.0)/2.0;
-            }
-            else
-            {
-                fGeoSeries = (fPowN-1.0)/fX;
-                fGeoSeriesDerivation = fNper * fPowNminus1 / fX - fGeoSeries / fX;
-            }
-            fTerm = fFv + fPv *fPowN+ fPayment * fGeoSeries;
-            fTermDerivation = fPv * fNper * fPowNminus1 + fPayment * fGeoSeriesDerivation;
-            if (std::abs(fTerm) < fEpsilonSmall)
-                bFound = true;  // will catch root which is at an extreme
-            else
-            {
-                if (fTermDerivation == 0.0)
-                    fXnew = fX + 1.1 * SCdEpsilon;  // move away from zero slope
-                else
-                    fXnew = fX - fTerm / fTermDerivation;
-                nCount++;
-                // more accuracy not possible in oscillating cases
-                bFound = (std::abs(fXnew - fX) < SCdEpsilon);
-                fX = fXnew;
-            }
-        }
-        // Gnumeric returns roots < -1, Excel gives an error in that cases,
-        // ODFF says nothing about it. Enable the statement, if you want Excel's
-        // behavior.
-        //bValid =(fX >=-1.0);
-        // Update 2013-06-17: Gnumeric (v1.12.2) doesn't return roots <= -1
-        // anymore.
-        bValid = (fX > -1.0);
-    }
-    else
-    { // Nper is not an integer value.
-        fX = (fGuess < -1.0) ? -1.0 : fGuess;   // start with a valid fX
-        while (bValid && !bFound && nCount < nIterationsMax)
-        {
-            if (fX == 0.0)
-            {
-                fGeoSeries = fNper;
-                fGeoSeriesDerivation = fNper * (fNper-1.0)/2.0;
-            }
-            else
-            {
-                fGeoSeries = (pow( 1.0+fX, fNper) - 1.0) / fX;
-                fGeoSeriesDerivation = fNper * pow( 1.0+fX, fNper-1.0) / fX - fGeoSeries / fX;
-            }
-            fTerm = fFv + fPv *pow(1.0 + fX,fNper)+ fPayment * fGeoSeries;
-            fTermDerivation = fPv * fNper * pow( 1.0+fX, fNper-1.0) + fPayment * fGeoSeriesDerivation;
-            if (std::abs(fTerm) < fEpsilonSmall)
-                bFound = true;  // will catch root which is at an extreme
-            else
-            {
-                if (fTermDerivation == 0.0)
-                    fXnew = fX + 1.1 * SCdEpsilon;  // move away from zero slope
-                else
-                    fXnew = fX - fTerm / fTermDerivation;
-                nCount++;
-                // more accuracy not possible in oscillating cases
-                bFound = (std::abs(fXnew - fX) < SCdEpsilon);
-                fX = fXnew;
-                bValid = (fX >= -1.0);  // otherwise pow(1.0+fX,fNper) will fail
-            }
-        }
-    }
-    fGuess = fX;    // return approximate root
-    return bValid && bFound;
+    PushDouble(semath::computePeriodsForFutureValue(
+        fRate, fPmt, fPV, fFV, bPayInAdvance));
 }
 
 // In Calc UI it is the function RATE(Nper;Pmt;Pv;Fv;Type;Guess)
@@ -2156,62 +1354,26 @@ void ScInterpreter::ScRate()
     double fPv = GetDouble();
     double fPayment = GetDouble();
     double fNper = GetDouble();
-    double fOrigGuess = fGuess;
-
     if (fNper <= 0.0) // constraint from ODFF spec
     {
         PushIllegalArgument();
         return;
     }
-    bool bValid = RateIteration(fNper, fPayment, fPv, fFv, bPayType, fGuess);
-
-    if (!bValid)
-    {
-        /* TODO: try also for specified guess values, not only default? As is,
-         * a specified 0.1 guess may be error result but a default 0.1 guess
-         * may succeed. On the other hand, using a different guess value than
-         * the specified one may not be desired, even if that didn't match. */
-        if (bDefaultGuess)
-        {
-            /* TODO: this is rather ugly, instead of looping over different
-             * guess values and doing a Newton goal seek for each we could
-             * first insert the values into the RATE equation to obtain a set
-             * of y values and then do a bisecting goal seek, possibly using
-             * different algorithms. */
-            double fX = fOrigGuess;
-            for (int nStep = 2; nStep <= 10 && !bValid; ++nStep)
-            {
-                fGuess = fX * nStep;
-                bValid = RateIteration( fNper, fPayment, fPv, fFv, bPayType, fGuess);
-                if (!bValid)
-                {
-                    fGuess = fX / nStep;
-                    bValid = RateIteration( fNper, fPayment, fPv, fFv, bPayType, fGuess);
-                }
-            }
-        }
-        if (!bValid)
-            SetError(FormulaError::NoConvergence);
-    }
-    PushDouble(fGuess);
+    const semath::FinancialRateResult aResult = semath::solveRate(
+        fNper, fPayment, fPv, fFv, bPayType, fGuess, bDefaultGuess);
+    if (!aResult.mbConverged)
+        SetError(FormulaError::NoConvergence);
+    PushDouble(aResult.mfRate);
 }
 
 double ScInterpreter::ScGetIpmt(double fRate, double fPer, double fNper, double fPv,
                                  double fFv, bool bPayInAdvance, double& fPmt)
 {
-    fPmt = ScGetPMT(fRate, fNper, fPv, fFv, bPayInAdvance);     // for PPMT also if fPer == 1
-    double fIpmt;
+    const semath::FinancialInterestPayment aResult = semath::computeInterestPayment(
+        fRate, fPer, fNper, fPv, fFv, bPayInAdvance);
+    fPmt = aResult.mfPayment;
     nFuncFmtType = SvNumFormatType::CURRENCY;
-    if (fPer == 1.0)
-        fIpmt = bPayInAdvance ? 0.0 : -fPv;
-    else
-    {
-        if (bPayInAdvance)
-            fIpmt = ScGetFV(fRate, fPer-2.0, fPmt, fPv, true) - fPmt;
-        else
-            fIpmt = ScGetFV(fRate, fPer-1.0, fPmt, fPv, false);
-    }
-    return fIpmt * fRate;
+    return aResult.mfInterest;
 }
 
 void ScInterpreter::ScIpmt()
@@ -2276,25 +1438,8 @@ void ScInterpreter::ScCumIpmt()
     else
     {
         bool bPayInAdvance = static_cast<bool>(fFlag);
-        sal_uLong nStart = static_cast<sal_uLong>(fStart);
-        sal_uLong nEnd = static_cast<sal_uLong>(fEnd) ;
-        double fPmt = ScGetPMT(fRate, fNper, fPv, 0.0, bPayInAdvance);
-        KahanSum fIpmt = 0.0;
-        if (nStart == 1)
-        {
-            if (!bPayInAdvance)
-                fIpmt = -fPv;
-            nStart++;
-        }
-        for (sal_uLong i = nStart; i <= nEnd; i++)
-        {
-            if (bPayInAdvance)
-                fIpmt += ScGetFV(fRate, static_cast<double>(i-2), fPmt, fPv, true) - fPmt;
-            else
-                fIpmt += ScGetFV(fRate, static_cast<double>(i-1), fPmt, fPv, false);
-        }
-        fIpmt *= fRate;
-        PushDouble(fIpmt.get());
+        PushDouble(semath::computeCumulativeInterest(
+            fRate, fStart, fEnd, fNper, fPv, 0.0, bPayInAdvance));
     }
 }
 
@@ -2317,23 +1462,8 @@ void ScInterpreter::ScCumPrinc()
     else
     {
         bool bPayInAdvance = static_cast<bool>(fFlag);
-        double fPmt = ScGetPMT(fRate, fNper, fPv, 0.0, bPayInAdvance);
-        KahanSum fPpmt = 0.0;
-        sal_uLong nStart = static_cast<sal_uLong>(fStart);
-        sal_uLong nEnd = static_cast<sal_uLong>(fEnd);
-        if (nStart == 1)
-        {
-            fPpmt = bPayInAdvance ? fPmt : fPmt + fPv * fRate;
-            nStart++;
-        }
-        for (sal_uLong i = nStart; i <= nEnd; i++)
-        {
-            if (bPayInAdvance)
-                fPpmt += fPmt - (ScGetFV(fRate, static_cast<double>(i-2), fPmt, fPv, true) - fPmt) * fRate;
-            else
-                fPpmt += fPmt - ScGetFV(fRate, static_cast<double>(i-1), fPmt, fPv, false) * fRate;
-        }
-        PushDouble(fPpmt.get());
+        PushDouble(semath::computeCumulativePrincipal(
+            fRate, fStart, fEnd, fNper, fPv, 0.0, bPayInAdvance));
     }
 }
 
@@ -2352,7 +1482,7 @@ void ScInterpreter::ScEffect()
     else
     {
         fPeriods = ::rtl::math::approxFloor(fPeriods);
-        PushDouble(pow(1.0 + fNominal/fPeriods, fPeriods) - 1.0);
+        PushDouble(semath::computeEffectiveAnnualRate(fNominal, fPeriods));
     }
 }
 
@@ -2368,7 +1498,7 @@ void ScInterpreter::ScNominal()
         else
         {
             fPeriods = ::rtl::math::approxFloor(fPeriods);
-            PushDouble( (pow(fEffective + 1.0, 1.0 / fPeriods) - 1.0) * fPeriods );
+            PushDouble(semath::computeNominalAnnualRate(fEffective, fPeriods));
         }
     }
 }
@@ -2385,11 +1515,8 @@ void ScInterpreter::ScMod()
         return;
     }
     double fNum = GetDouble();   // Numerator
-    double fRes = ::rtl::math::approxSub( fNum,
-            ::rtl::math::approxFloor( fNum / fDenom ) * fDenom );
-    if ( ( fDenom > 0 && fRes >= 0 && fRes < fDenom ) ||
-         ( fDenom < 0 && fRes <= 0 && fRes > fDenom ) )
-        PushDouble( fRes );
+    if (std::optional<double> fResult = semath::computeMod( fNum, fDenom ))
+        PushDouble(*fResult);
     else
         PushError( FormulaError::NoValue );
 }
@@ -2848,120 +1975,22 @@ void ScInterpreter::ScBase()
     if ( !MustHaveParamCount( nParamCount, 2, 3 ) )
         return;
 
-    static const sal_Unicode pDigits[] = {
-        '0','1','2','3','4','5','6','7','8','9',
-        'A','B','C','D','E','F','G','H','I','J','K','L','M',
-        'N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
-        0
-    };
-    static const int nDigits = SAL_N_ELEMENTS(pDigits) - 1;
-    sal_Int32 nMinLen;
-    if ( nParamCount == 3 )
+    const std::optional<double> ofMinLength
+        = (nParamCount == 3) ? std::optional<double>(GetDouble()) : std::nullopt;
+    const double fBase = GetDouble();
+    const double fValue = GetDouble();
+    if (nGlobalError != FormulaError::NONE)
     {
-        double fLen = ::rtl::math::approxFloor( GetDouble() );
-        if ( 1.0 <= fLen && fLen < SAL_MAX_UINT16 )
-            nMinLen = static_cast<sal_Int32>(fLen);
-        else
-            nMinLen = fLen == 0.0 ? 1 : 0; // 0 means error
+        PushIllegalArgument();
+        return;
     }
-    else
-        nMinLen = 1;
-    double fBase = ::rtl::math::approxFloor( GetDouble() );
-    double fVal = ::rtl::math::approxFloor( GetDouble() );
-    double fChars = ((fVal > 0.0 && fBase > 0.0) ?
-        (ceil( log( fVal ) / log( fBase ) ) + 2.0) :
-        2.0);
-    if ( fChars >= SAL_MAX_UINT16 )
-        nMinLen = 0;    // Error
 
-    if ( nGlobalError == FormulaError::NONE && nMinLen && 2 <= fBase && fBase <= nDigits && 0 <= fVal )
-    {
-        const sal_Int32 nConstBuf = 128;
-        sal_Unicode aBuf[nConstBuf];
-        sal_Int32 nBuf = std::max<sal_Int32>( fChars, nMinLen + 1 );
-        sal_Unicode* pBuf = (nBuf <= nConstBuf ? aBuf : new sal_Unicode[nBuf]);
-        for ( sal_Int32 j = 0; j < nBuf; ++j )
-        {
-            pBuf[j] = '0';
-        }
-        sal_Unicode* p = pBuf + nBuf - 1;
-        *p = 0;
-        if ( o3tl::convertsToAtMost(fVal, sal_uLong(~0)) )
-        {
-            sal_uLong nVal = static_cast<sal_uLong>(fVal);
-            sal_uLong nBase = static_cast<sal_uLong>(fBase);
-            while ( nVal && p > pBuf )
-            {
-                *--p = pDigits[ nVal % nBase ];
-                nVal /= nBase;
-            }
-            fVal = static_cast<double>(nVal);
-        }
-        else
-        {
-            bool bDirt = false;
-            while ( fVal && p > pBuf )
-            {
-//TODO: roundoff error starting with numbers greater than 2**48
-//                  double fDig = ::rtl::math::approxFloor( fmod( fVal, fBase ) );
-// a little bit better:
-                double fInt = ::rtl::math::approxFloor( fVal / fBase );
-                double fMult = fInt * fBase;
-#if 0
-                // =BASIS(1e308;36) => GPF with
-                // nDig = (size_t) ::rtl::math::approxFloor( fVal - fMult );
-                // in spite off previous test if fVal >= fMult
-                double fDebug1 = fVal - fMult;
-                // fVal    := 7,5975311883090e+290
-                // fMult   := 7,5975311883090e+290
-                // fDebug1 := 1,3848924157003e+275  <- RoundOff-Error
-                // fVal != fMult, aber: ::rtl::math::approxEqual( fVal, fMult ) == TRUE
-                double fDebug2 = ::rtl::math::approxSub( fVal, fMult );
-                // and ::rtl::math::approxSub( fVal, fMult ) == 0
-                double fDebug3 = ( fInt ? fVal / fInt : 0.0 );
-
-                // Actual after strange fDebug1 and fVal < fMult is fDebug2 == fBase, but
-                // anyway it can't be compared, then bDirt is executed an everything is good...
-
-                // prevent compiler warnings
-                (void)fDebug1; (void)fDebug2; (void)fDebug3;
-#endif
-                size_t nDig;
-                if ( fVal < fMult )
-                {   // something is wrong there
-                    bDirt = true;
-                    nDig = 0;
-                }
-                else
-                {
-                    double fDig = ::rtl::math::approxFloor( ::rtl::math::approxSub( fVal, fMult ) );
-                    if ( bDirt )
-                    {
-                        bDirt = false;
-                        --fDig;
-                    }
-                    if ( fDig <= 0.0 )
-                        nDig = 0;
-                    else if ( fDig >= fBase )
-                        nDig = static_cast<size_t>(fBase) - 1;
-                    else
-                        nDig = static_cast<size_t>(fDig);
-                }
-                *--p = pDigits[ nDig ];
-                fVal = fInt;
-            }
-        }
-        if ( fVal )
-            PushError( FormulaError::StringOverflow );
-        else
-        {
-            if ( nBuf - (p - pBuf) <= nMinLen )
-                p = pBuf + nBuf - 1 - nMinLen;
-            PushStringBuffer( p );
-        }
-        if ( pBuf != aBuf )
-            delete [] pBuf;
-    }
+    const seconvert::NumeralStringResult aResult
+        = seconvert::convertToBase(fValue, fBase, ofMinLength);
+    if (aResult.meError == seconvert::NumeralStringError::None)
+        PushString(aResult.maValue);
+    else if (aResult.meError == seconvert::NumeralStringError::StringOverflow)
+        PushError(FormulaError::StringOverflow);
     else
         PushIllegalArgument();
 }
@@ -2971,53 +2000,16 @@ void ScInterpreter::ScDecimal()
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
 
-    double fBase = ::rtl::math::approxFloor( GetDouble() );
-    OUString aStr = GetString().getString();
-    if ( nGlobalError == FormulaError::NONE && 2 <= fBase && fBase <= 36 )
+    const double fBase = GetDouble();
+    const OUString aText = GetString().getString();
+    if (nGlobalError != FormulaError::NONE)
     {
-        double fVal = 0.0;
-        int nBase = static_cast<int>(fBase);
-        const sal_Unicode* p = aStr.getStr();
-        while ( *p == ' ' || *p == '\t' )
-            p++;        // strip leading white space
-        if ( nBase == 16 )
-        {   // evtl. hex-prefix stripped
-            if ( *p == 'x' || *p == 'X' )
-                p++;
-            else if ( *p == '0' && (*(p+1) == 'x' || *(p+1) == 'X') )
-                p += 2;
-        }
-        while ( *p )
-        {
-            int n;
-            if ( '0' <= *p && *p <= '9' )
-                n = *p - '0';
-            else if ( 'A' <= *p && *p <= 'Z' )
-                n = 10 + (*p - 'A');
-            else if ( 'a' <= *p && *p <= 'z' )
-                n = 10 + (*p - 'a');
-            else
-                n = nBase;
-            if ( nBase <= n )
-            {
-                if ( *(p+1) == 0 &&
-                        ( (nBase ==  2 && (*p == 'b' || *p == 'B'))
-                        ||(nBase == 16 && (*p == 'h' || *p == 'H')) )
-                    )
-                    ;       // 101b and F00Dh are ok
-                else
-                {
-                    PushIllegalArgument();
-                    return ;
-                }
-            }
-            else
-                fVal = fVal * fBase + n;
-            p++;
-
-        }
-        PushDouble( fVal );
+        PushIllegalArgument();
+        return;
     }
+
+    if (std::optional<double> fValue = seconvert::convertFromBase(aText, fBase))
+        PushDouble(*fValue);
     else
         PushIllegalArgument();
 }
@@ -3051,139 +2043,26 @@ void ScInterpreter::ScRoman()
     if( !MustHaveParamCount( nParamCount, 1, 2 ) )
         return;
 
-    double fMode = (nParamCount == 2) ? ::rtl::math::approxFloor( GetDouble() ) : 0.0;
-    double fVal = ::rtl::math::approxFloor( GetDouble() );
+    const std::optional<double> ofMode
+        = (nParamCount == 2) ? std::optional<double>(GetDouble()) : std::nullopt;
+    const double fValue = GetDouble();
     if( nGlobalError != FormulaError::NONE )
         PushError( nGlobalError);
-    else if( (fMode >= 0.0) && (fMode < 5.0) && (fVal >= 0.0) && (fVal < 4000.0) )
-    {
-        static const sal_Unicode pChars[] = { 'M', 'D', 'C', 'L', 'X', 'V', 'I' };
-        static const sal_uInt16 pValues[] = { 1000, 500, 100, 50, 10, 5, 1 };
-        static const sal_uInt16 nMaxIndex = sal_uInt16(SAL_N_ELEMENTS(pValues) - 1);
-
-        OUStringBuffer aRoman;
-        sal_uInt16 nVal = static_cast<sal_uInt16>(fVal);
-        sal_uInt16 nMode = static_cast<sal_uInt16>(fMode);
-
-        for( sal_uInt16 i = 0; i <= nMaxIndex / 2; i++ )
-        {
-            sal_uInt16 nIndex = 2 * i;
-            sal_uInt16 nDigit = nVal / pValues[ nIndex ];
-
-            if( (nDigit % 5) == 4 )
-            {
-                // assert can't happen with nVal<4000 precondition
-                assert( ((nDigit == 4) ? (nIndex >= 1) : (nIndex >= 2)));
-
-                sal_uInt16 nIndex2 = (nDigit == 4) ? nIndex - 1 : nIndex - 2;
-                sal_uInt16 nSteps = 0;
-                while( (nSteps < nMode) && (nIndex < nMaxIndex) )
-                {
-                    nSteps++;
-                    if( pValues[ nIndex2 ] - pValues[ nIndex + 1 ] <= nVal )
-                        nIndex++;
-                    else
-                        nSteps = nMode;
-                }
-                aRoman.append( OUStringChar(pChars[ nIndex ]) + OUStringChar(pChars[ nIndex2 ]) );
-                nVal = sal::static_int_cast<sal_uInt16>( nVal + pValues[ nIndex ] );
-                nVal = sal::static_int_cast<sal_uInt16>( nVal - pValues[ nIndex2 ] );
-            }
-            else
-            {
-                if( nDigit > 4 )
-                {
-                    // assert can't happen with nVal<4000 precondition
-                    assert( nIndex >= 1 );
-                    aRoman.append( pChars[ nIndex - 1 ] );
-                }
-                sal_Int32 nPad = nDigit % 5;
-                if (nPad)
-                {
-                    comphelper::string::padToLength(aRoman, aRoman.getLength() + nPad,
-                        pChars[nIndex]);
-                }
-                nVal %= pValues[ nIndex ];
-            }
-        }
-
-        PushString( aRoman.makeStringAndClear() );
-    }
+    else if (std::optional<OUString> aRoman = seconvert::convertToRoman(fValue, ofMode))
+        PushString(*aRoman);
     else
         PushIllegalArgument();
 }
 
-static bool lcl_GetArabicValue( sal_Unicode cChar, sal_uInt16& rnValue, bool& rbIsDec )
-{
-    switch( cChar )
-    {
-        case 'M':   rnValue = 1000; rbIsDec = true;     break;
-        case 'D':   rnValue = 500;  rbIsDec = false;    break;
-        case 'C':   rnValue = 100;  rbIsDec = true;     break;
-        case 'L':   rnValue = 50;   rbIsDec = false;    break;
-        case 'X':   rnValue = 10;   rbIsDec = true;     break;
-        case 'V':   rnValue = 5;    rbIsDec = false;    break;
-        case 'I':   rnValue = 1;    rbIsDec = true;     break;
-        default:    return false;
-    }
-    return true;
-}
-
 void ScInterpreter::ScArabic()
 {
-    OUString aRoman = GetString().getString();
+    const OUString aRoman = GetString().getString();
     if( nGlobalError != FormulaError::NONE )
         PushError( nGlobalError);
+    else if (std::optional<sal_Int32> nValue = seconvert::convertFromRoman(aRoman))
+        PushInt(*nValue);
     else
-    {
-        aRoman = aRoman.toAsciiUpperCase();
-
-        sal_uInt16 nValue = 0;
-        sal_uInt16 nValidRest = 3999;
-        sal_Int32 nCharIndex = 0;
-        sal_Int32 nCharCount = aRoman.getLength();
-        bool bValid = true;
-
-        while( bValid && (nCharIndex < nCharCount) )
-        {
-            sal_uInt16 nDigit1 = 0;
-            sal_uInt16 nDigit2 = 0;
-            bool bIsDec1 = false;
-            bValid = lcl_GetArabicValue( aRoman[nCharIndex], nDigit1, bIsDec1 );
-            if( bValid && (nCharIndex + 1 < nCharCount) )
-            {
-                bool bIsDec2 = false;
-                bValid = lcl_GetArabicValue( aRoman[nCharIndex + 1], nDigit2, bIsDec2 );
-            }
-            if( bValid )
-            {
-                if( nDigit1 >= nDigit2 )
-                {
-                    nValue = sal::static_int_cast<sal_uInt16>( nValue + nDigit1 );
-                    nValidRest %= (nDigit1 * (bIsDec1 ? 5 : 2));
-                    bValid = (nValidRest >= nDigit1);
-                    if( bValid )
-                        nValidRest = sal::static_int_cast<sal_uInt16>( nValidRest - nDigit1 );
-                    nCharIndex++;
-                }
-                else if( nDigit1 * 2 != nDigit2 )
-                {
-                    sal_uInt16 nDiff = nDigit2 - nDigit1;
-                    nValue = sal::static_int_cast<sal_uInt16>( nValue + nDiff );
-                    bValid = (nValidRest >= nDiff);
-                    if( bValid )
-                        nValidRest = nDigit1 - 1;
-                    nCharIndex += 2;
-                }
-                else
-                    bValid = false;
-            }
-        }
-        if( bValid )
-            PushInt( nValue );
-        else
-            PushIllegalArgument();
-    }
+        PushIllegalArgument();
 }
 
 void ScInterpreter::ScHyperLink()

@@ -58,6 +58,11 @@
 #include <cellkeytranslator.hxx>
 #include <lookupcache.hxx>
 #include <rangenam.hxx>
+#include <spreadsheetengine/core/MathBitwise.hxx>
+#include <spreadsheetengine/core/MathTranscendental.hxx>
+#include <spreadsheetengine/core/TextCase.hxx>
+#include <spreadsheetengine/core/TextScalar.hxx>
+#include <spreadsheetengine/core/TextWidth.hxx>
 #include <rangeutl.hxx>
 #include <compiler.hxx>
 #include <externalrefmgr.hxx>
@@ -78,11 +83,11 @@
 #include <string_view>
 #include <cmath>
 
-const sal_uInt64 n2power48 = SAL_CONST_UINT64( 281474976710656); // 2^48
-
 ScCalcConfig *ScInterpreter::mpGlobalConfig = nullptr;
 
 using namespace formula;
+namespace semath = spreadsheetengine::core::math;
+namespace setext = spreadsheetengine::core::text;
 
 void ScInterpreter::ScIfJump()
 {
@@ -1588,98 +1593,72 @@ void ScInterpreter::ScNot()
 
 void ScInterpreter::ScBitAnd()
 {
-
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
 
-    double num1 = ::rtl::math::approxFloor( GetDouble());
-    double num2 = ::rtl::math::approxFloor( GetDouble());
-    if (    (num1 >= n2power48) || (num1 < 0) ||
-            (num2 >= n2power48) || (num2 < 0))
-        PushIllegalArgument();
+    const double fRight = GetDouble();
+    const double fLeft = GetDouble();
+    if (std::optional<double> fResult = semath::computeBitAnd(fLeft, fRight))
+        PushDouble(*fResult);
     else
-        PushDouble (static_cast<sal_uInt64>(num1) & static_cast<sal_uInt64>(num2));
+        PushIllegalArgument();
 }
 
 void ScInterpreter::ScBitOr()
 {
-
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
 
-    double num1 = ::rtl::math::approxFloor( GetDouble());
-    double num2 = ::rtl::math::approxFloor( GetDouble());
-    if (    (num1 >= n2power48) || (num1 < 0) ||
-            (num2 >= n2power48) || (num2 < 0))
-        PushIllegalArgument();
+    const double fRight = GetDouble();
+    const double fLeft = GetDouble();
+    if (std::optional<double> fResult = semath::computeBitOr(fLeft, fRight))
+        PushDouble(*fResult);
     else
-        PushDouble (static_cast<sal_uInt64>(num1) | static_cast<sal_uInt64>(num2));
+        PushIllegalArgument();
 }
 
 void ScInterpreter::ScBitXor()
 {
-
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
 
-    double num1 = ::rtl::math::approxFloor( GetDouble());
-    double num2 = ::rtl::math::approxFloor( GetDouble());
-    if (    (num1 >= n2power48) || (num1 < 0) ||
-            (num2 >= n2power48) || (num2 < 0))
-        PushIllegalArgument();
+    const double fRight = GetDouble();
+    const double fLeft = GetDouble();
+    if (std::optional<double> fResult = semath::computeBitXor(fLeft, fRight))
+        PushDouble(*fResult);
     else
-        PushDouble (static_cast<sal_uInt64>(num1) ^ static_cast<sal_uInt64>(num2));
+        PushIllegalArgument();
 }
 
 void ScInterpreter::ScBitLshift()
 {
-
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
 
-    double fShift = ::rtl::math::approxFloor( GetDouble());
-    double num = ::rtl::math::approxFloor( GetDouble());
-    if ((num >= n2power48) || (num < 0))
-        PushIllegalArgument();
+    const double fShift = GetDouble();
+    const double fValue = GetDouble();
+    if (std::optional<double> fResult = semath::computeBitLeftShift(fValue, fShift))
+        PushDouble(*fResult);
     else
-    {
-        double fRes;
-        if (fShift < 0)
-            fRes = ::rtl::math::approxFloor( num / pow( 2.0, -fShift));
-        else if (fShift == 0)
-            fRes = num;
-        else
-            fRes = num * pow( 2.0, fShift);
-        PushDouble( fRes);
-    }
+        PushIllegalArgument();
 }
 
 void ScInterpreter::ScBitRshift()
 {
-
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
 
-    double fShift = ::rtl::math::approxFloor( GetDouble());
-    double num = ::rtl::math::approxFloor( GetDouble());
-    if ((num >= n2power48) || (num < 0))
-        PushIllegalArgument();
+    const double fShift = GetDouble();
+    const double fValue = GetDouble();
+    if (std::optional<double> fResult = semath::computeBitRightShift(fValue, fShift))
+        PushDouble(*fResult);
     else
-    {
-        double fRes;
-        if (fShift < 0)
-            fRes = num * pow( 2.0, -fShift);
-        else if (fShift == 0)
-            fRes = num;
-        else
-            fRes = ::rtl::math::approxFloor( num / pow( 2.0, fShift));
-        PushDouble( fRes);
-    }
+        PushIllegalArgument();
 }
 
 void ScInterpreter::ScPi()
 {
-    PushDouble(M_PI);
+    PushDouble(semath::computePi());
 }
 
 void ScInterpreter::ScRandomImpl( const std::function<double( double fFirst, double fLast )>& RandomFunc,
@@ -1869,136 +1848,132 @@ void ScInterpreter::ScFalse()
 
 void ScInterpreter::ScDeg()
 {
-    PushDouble(basegfx::rad2deg(GetDouble()));
+    PushDouble(semath::computeDegrees(GetDouble()));
 }
 
 void ScInterpreter::ScRad()
 {
-    PushDouble(basegfx::deg2rad(GetDouble()));
+    PushDouble(semath::computeRadians(GetDouble()));
 }
 
 void ScInterpreter::ScSin()
 {
-    PushDouble(::rtl::math::sin(GetDouble()));
+    PushDouble(semath::computeSin(GetDouble()));
 }
 
 void ScInterpreter::ScCos()
 {
-    PushDouble(::rtl::math::cos(GetDouble()));
+    PushDouble(semath::computeCos(GetDouble()));
 }
 
 void ScInterpreter::ScTan()
 {
-    PushDouble(::rtl::math::tan(GetDouble()));
+    PushDouble(semath::computeTan(GetDouble()));
 }
 
 void ScInterpreter::ScCot()
 {
-    PushDouble(1.0 / ::rtl::math::tan(GetDouble()));
+    PushDouble(semath::computeCot(GetDouble()));
 }
 
 void ScInterpreter::ScArcSin()
 {
-    PushDouble(asin(GetDouble()));
+    PushDouble(semath::computeArcSin(GetDouble()));
 }
 
 void ScInterpreter::ScArcCos()
 {
-    PushDouble(acos(GetDouble()));
+    PushDouble(semath::computeArcCos(GetDouble()));
 }
 
 void ScInterpreter::ScArcTan()
 {
-    PushDouble(atan(GetDouble()));
+    PushDouble(semath::computeArcTan(GetDouble()));
 }
 
 void ScInterpreter::ScArcCot()
 {
-    PushDouble((M_PI_2) - atan(GetDouble()));
+    PushDouble(semath::computeArcCot(GetDouble()));
 }
 
 void ScInterpreter::ScSinHyp()
 {
-    PushDouble(sinh(GetDouble()));
+    PushDouble(semath::computeSinHyp(GetDouble()));
 }
 
 void ScInterpreter::ScCosHyp()
 {
-    PushDouble(cosh(GetDouble()));
+    PushDouble(semath::computeCosHyp(GetDouble()));
 }
 
 void ScInterpreter::ScTanHyp()
 {
-    PushDouble(tanh(GetDouble()));
+    PushDouble(semath::computeTanHyp(GetDouble()));
 }
 
 void ScInterpreter::ScCotHyp()
 {
-    PushDouble(1.0 / tanh(GetDouble()));
+    PushDouble(semath::computeCotHyp(GetDouble()));
 }
 
 void ScInterpreter::ScArcSinHyp()
 {
-    PushDouble( ::rtl::math::asinh( GetDouble()));
+    PushDouble(semath::computeArcSinHyp(GetDouble()));
 }
 
 void ScInterpreter::ScArcCosHyp()
 {
-    double fVal = GetDouble();
-    if (fVal < 1.0)
-        PushIllegalArgument();
+    if (std::optional<double> fResult = semath::computeArcCosHyp(GetDouble()))
+        PushDouble(*fResult);
     else
-        PushDouble( ::rtl::math::acosh( fVal));
+        PushIllegalArgument();
 }
 
 void ScInterpreter::ScArcTanHyp()
 {
-    double fVal = GetDouble();
-    if (fabs(fVal) >= 1.0)
-        PushIllegalArgument();
+    if (std::optional<double> fResult = semath::computeArcTanHyp(GetDouble()))
+        PushDouble(*fResult);
     else
-        PushDouble(::atanh(fVal));
+        PushIllegalArgument();
 }
 
 void ScInterpreter::ScArcCotHyp()
 {
-    double nVal = GetDouble();
-    if (fabs(nVal) <= 1.0)
-        PushIllegalArgument();
+    if (std::optional<double> fResult = semath::computeArcCotHyp(GetDouble()))
+        PushDouble(*fResult);
     else
-        PushDouble(0.5 * log((nVal + 1.0) / (nVal - 1.0)));
+        PushIllegalArgument();
 }
 
 void ScInterpreter::ScCosecant()
 {
-    PushDouble(1.0 / ::rtl::math::sin(GetDouble()));
+    PushDouble(semath::computeCosecant(GetDouble()));
 }
 
 void ScInterpreter::ScSecant()
 {
-    PushDouble(1.0 / ::rtl::math::cos(GetDouble()));
+    PushDouble(semath::computeSecant(GetDouble()));
 }
 
 void ScInterpreter::ScCosecantHyp()
 {
-    PushDouble(1.0 / sinh(GetDouble()));
+    PushDouble(semath::computeCosecantHyp(GetDouble()));
 }
 
 void ScInterpreter::ScSecantHyp()
 {
-    PushDouble(1.0 / cosh(GetDouble()));
+    PushDouble(semath::computeSecantHyp(GetDouble()));
 }
 
 void ScInterpreter::ScExp()
 {
-    PushDouble(exp(GetDouble()));
+    PushDouble(semath::computeExp(GetDouble()));
 }
 
 void ScInterpreter::ScSqrt()
 {
-    double fVal = GetDouble();
-    if (fVal >= 0.0)
-        PushDouble(sqrt(fVal));
+    if (std::optional<double> fResult = semath::computeSqrt(GetDouble()))
+        PushDouble(*fResult);
     else
         PushIllegalArgument();
 }
@@ -3233,67 +3208,31 @@ void ScInterpreter::ScN()
 
 void ScInterpreter::ScTrim()
 {
-    // Doesn't only trim but also removes duplicated blanks within!
-    OUString aVal = comphelper::string::strip(GetString().getString(), ' ');
-    OUStringBuffer aStr;
-    const sal_Unicode* p = aVal.getStr();
-    const sal_Unicode* const pEnd = p + aVal.getLength();
-    while ( p < pEnd )
-    {
-        if ( *p != ' ' || p[-1] != ' ' )    // first can't be ' ', so -1 is fine
-            aStr.append(*p);
-        p++;
-    }
-    PushString(aStr.makeStringAndClear());
+    PushString(setext::trimRepeatedSpaces(GetString().getString()));
 }
 
 void ScInterpreter::ScUpper()
 {
-    OUString aString = ScGlobal::getCharClass().uppercase(GetString().getString());
-    PushString(aString);
+    PushString(spreadsheetengine::core::text::uppercase(
+        ScGlobal::getCharClass(), GetString().getString()));
 }
 
 void ScInterpreter::ScProper()
 {
 //2do: what to do with I18N-CJK ?!?
-    OUStringBuffer aStr(GetString().getString());
-    const sal_Int32 nLen = aStr.getLength();
-    if ( nLen > 0 )
-    {
-        OUString aUpr(ScGlobal::getCharClass().uppercase(aStr.toString()));
-        OUString aLwr(ScGlobal::getCharClass().lowercase(aStr.toString()));
-        aStr[0] = aUpr[0];
-        sal_Int32 nPos = 1;
-        while( nPos < nLen )
-        {
-            OUString aTmpStr( aStr[nPos-1] );
-            if ( !ScGlobal::getCharClass().isLetter( aTmpStr, 0 ) )
-                aStr[nPos] = aUpr[nPos];
-            else
-                aStr[nPos] = aLwr[nPos];
-            ++nPos;
-        }
-    }
-    PushString(aStr.makeStringAndClear());
+    PushString(spreadsheetengine::core::text::propercase(
+        ScGlobal::getCharClass(), GetString().getString()));
 }
 
 void ScInterpreter::ScLower()
 {
-    OUString aString = ScGlobal::getCharClass().lowercase(GetString().getString());
-    PushString(aString);
+    PushString(spreadsheetengine::core::text::lowercase(
+        ScGlobal::getCharClass(), GetString().getString()));
 }
 
 void ScInterpreter::ScLen()
 {
-    OUString aStr = GetString().getString();
-    sal_Int32 nIdx = 0;
-    sal_Int32 nCnt = 0;
-    while ( nIdx < aStr.getLength() )
-    {
-        aStr.iterateCodePoints( &nIdx );
-        ++nCnt;
-    }
-    PushDouble( nCnt );
+    PushDouble(setext::countCodePoints(GetString().getString()));
 }
 
 void ScInterpreter::ScT()
@@ -3444,190 +3383,65 @@ void ScInterpreter::ScValue()
 // fdo#57180
 void ScInterpreter::ScNumberValue()
 {
-
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 1, 3 ) )
         return;
 
-    OUString aInputString;
-    OUString aGroupSeparator;
-    sal_Unicode cDecimalSeparator = 0;
-
-    if ( nParamCount == 3 )
-        aGroupSeparator = GetString().getString();
-
-    if ( nParamCount >= 2 )
-    {
-        OUString aDecimalSeparator = GetString().getString();
-        if ( aDecimalSeparator.getLength() == 1  )
-            cDecimalSeparator = aDecimalSeparator[ 0 ];
-        else
-        {
-            PushIllegalArgument();  //if given, separator length must be 1
-            return;
-        }
-    }
-
-    if ( cDecimalSeparator && aGroupSeparator.indexOf( cDecimalSeparator ) != -1 )
-    {
-        PushIllegalArgument(); //decimal separator cannot appear in group separator
-        return;
-    }
+    std::optional<OUString> oGroupSeparator;
+    std::optional<OUString> oDecimalSeparator;
+    if (nParamCount == 3)
+        oGroupSeparator = GetString().getString();
+    if (nParamCount >= 2)
+        oDecimalSeparator = GetString().getString();
 
     switch (GetStackType())
     {
         case svDouble:
         return; // leave on stack
         default:
-        aInputString = GetString().getString();
+        break;
     }
+    OUString aInputString = GetString().getString();
     if ( nGlobalError != FormulaError::NONE )
     {
         PushError( nGlobalError );
         return;
     }
-    if ( aInputString.isEmpty() )
+
+    const setext::NumberValueResult aResult = setext::parseNumberValue(
+        aInputString, oDecimalSeparator, oGroupSeparator, maCalcConfig.mbEmptyStringAsZero);
+    switch (aResult.meStatus)
     {
-        if ( maCalcConfig.mbEmptyStringAsZero )
-            PushDouble( 0.0 );
-        else
+        case setext::NumberValueStatus::Ok:
+            PushDouble(aResult.mfValue);
+            return;
+        case setext::NumberValueStatus::IllegalArgument:
+            PushIllegalArgument();
+            return;
+        case setext::NumberValueStatus::NoValue:
             PushNoValue();
-        return;
+            return;
     }
-
-    sal_Int32 nDecSep = aInputString.indexOf( cDecimalSeparator );
-    if ( nDecSep != 0 )
-    {
-        OUString aTemporary( nDecSep >= 0 ? aInputString.copy( 0, nDecSep ) : aInputString );
-        sal_Int32 nIndex = 0;
-        while (nIndex < aGroupSeparator.getLength())
-        {
-            sal_uInt32 nChar = aGroupSeparator.iterateCodePoints( &nIndex );
-            aTemporary = aTemporary.replaceAll( OUString( &nChar, 1 ), "" );
-        }
-        if ( nDecSep >= 0 )
-            aInputString = aTemporary + aInputString.subView( nDecSep );
-        else
-            aInputString = aTemporary;
-    }
-
-    for ( sal_Int32 i = aInputString.getLength(); --i >= 0; )
-    {
-        sal_Unicode c = aInputString[ i ];
-        if ( c == 0x0020 || c == 0x0009 || c == 0x000A || c == 0x000D )
-            aInputString = aInputString.replaceAt( i, 1, u"" ); // remove spaces etc.
-    }
-    sal_Int32 nPercentCount = 0;
-    for ( sal_Int32 i = aInputString.getLength() - 1; i >= 0 && aInputString[ i ] == 0x0025; i-- )
-    {
-        aInputString = aInputString.replaceAt( i, 1, u"" );  // remove and count trailing '%'
-        nPercentCount++;
-    }
-
-    rtl_math_ConversionStatus eStatus;
-    sal_Int32 nParseEnd;
-    double fVal = ::rtl::math::stringToDouble( aInputString, cDecimalSeparator, 0, &eStatus, &nParseEnd );
-    if ( eStatus == rtl_math_ConversionStatus_Ok && nParseEnd == aInputString.getLength() )
-    {
-        if (nPercentCount)
-            fVal *= pow( 10.0, -(nPercentCount * 2));    // process '%' from input string
-        PushDouble(fVal);
-        return;
-    }
-    PushNoValue();
-}
-
-static bool lcl_ScInterpreter_IsPrintable( sal_uInt32 nCodePoint )
-{
-    return ( !u_isISOControl(nCodePoint) /*not in Cc*/
-             && u_isdefined(nCodePoint)  /*not in Cn*/ );
 }
 
 
 void ScInterpreter::ScClean()
 {
-    OUString aStr = GetString().getString();
-
-    OUStringBuffer aBuf( aStr.getLength() );
-    sal_Int32 nIdx = 0;
-    while ( nIdx <  aStr.getLength() )
-    {
-        sal_uInt32 c = aStr.iterateCodePoints( &nIdx );
-        if ( lcl_ScInterpreter_IsPrintable( c ) )
-            aBuf.appendUtf32( c );
-    }
-    PushString( aBuf.makeStringAndClear() );
+    PushString(setext::cleanPrintable(GetString().getString()));
 }
 
 
 void ScInterpreter::ScCode()
 {
-//2do: make it full range unicode?
-    OUString aStr = GetString().getString();
-    if (aStr.isEmpty())
-        PushInt(0);
-    else
-    {
-        //"classic" ByteString conversion flags
-        const sal_uInt32 convertFlags =
-            RTL_UNICODETOTEXT_FLAGS_NONSPACING_IGNORE |
-            RTL_UNICODETOTEXT_FLAGS_CONTROL_IGNORE |
-            RTL_UNICODETOTEXT_FLAGS_FLUSH |
-            RTL_UNICODETOTEXT_FLAGS_UNDEFINED_DEFAULT |
-            RTL_UNICODETOTEXT_FLAGS_INVALID_DEFAULT |
-            RTL_UNICODETOTEXT_FLAGS_UNDEFINED_REPLACE;
-        PushInt( static_cast<unsigned char>(OUStringToOString(OUStringChar(aStr[0]), osl_getThreadTextEncoding(), convertFlags).toChar()) );
-    }
+    PushInt(setext::codeFromText(GetString().getString()));
 }
 
 void ScInterpreter::ScChar()
 {
-//2do: make it full range unicode?
-    double fVal = GetDouble();
-    if (fVal < 0.0 || fVal >= 256.0)
-        PushIllegalArgument();
+    if (std::optional<OUString> aStr = setext::charFromValue(GetDouble()))
+        PushString(*aStr);
     else
-    {
-        //"classic" ByteString conversion flags
-        const sal_uInt32 convertFlags =
-            RTL_TEXTTOUNICODE_FLAGS_UNDEFINED_DEFAULT |
-            RTL_TEXTTOUNICODE_FLAGS_MBUNDEFINED_DEFAULT |
-            RTL_TEXTTOUNICODE_FLAGS_INVALID_DEFAULT;
-
-        char cEncodedChar = static_cast<char>(fVal);
-        OUString aStr(&cEncodedChar, 1,  osl_getThreadTextEncoding(), convertFlags);
-        PushString(aStr);
-    }
-}
-
-/* #i70213# fullwidth/halfwidth conversion provided by
- * Takashi Nakamoto <bluedwarf@ooo>
- * erAck: added Excel compatibility conversions as seen in issue's test case. */
-
-static OUString lcl_convertIntoHalfWidth( const OUString & rStr )
-{
-    // Make the initialization thread-safe. Since another function needs to be called, move it all to another
-    // function and thread-safely initialize a static reference in this function.
-    auto init = []() -> utl::TransliterationWrapper&
-        {
-        static utl::TransliterationWrapper trans( ::comphelper::getProcessComponentContext(), TransliterationFlags::NONE );
-        trans.loadModuleByImplName( u"FULLWIDTH_HALFWIDTH_LIKE_ASC"_ustr, LANGUAGE_SYSTEM );
-        return trans;
-        };
-    static utl::TransliterationWrapper& aTrans( init());
-    return aTrans.transliterate( rStr, 0, sal_uInt16( rStr.getLength() ) );
-}
-
-static OUString lcl_convertIntoFullWidth( const OUString & rStr )
-{
-    auto init = []() -> utl::TransliterationWrapper&
-        {
-        static utl::TransliterationWrapper trans( ::comphelper::getProcessComponentContext(), TransliterationFlags::NONE );
-        trans.loadModuleByImplName( u"HALFWIDTH_FULLWIDTH_LIKE_JIS"_ustr, LANGUAGE_SYSTEM );
-        return trans;
-        };
-    static utl::TransliterationWrapper& aTrans( init());
-    return aTrans.transliterate( rStr, 0, sal_uInt16( rStr.getLength() ) );
+        PushIllegalArgument();
 }
 
 /* ODFF:
@@ -3643,7 +3457,7 @@ static OUString lcl_convertIntoFullWidth( const OUString & rStr )
 void ScInterpreter::ScJis()
 {
     if (MustHaveParamCount( GetByte(), 1))
-        PushString( lcl_convertIntoFullWidth( GetString().getString()));
+        PushString(spreadsheetengine::core::text::convertIntoFullWidth(GetString().getString()));
 }
 
 /* ODFF:
@@ -3655,20 +3469,17 @@ void ScInterpreter::ScJis()
 void ScInterpreter::ScAsc()
 {
     if (MustHaveParamCount( GetByte(), 1))
-        PushString( lcl_convertIntoHalfWidth( GetString().getString()));
+        PushString(spreadsheetengine::core::text::convertIntoHalfWidth(GetString().getString()));
 }
 
 void ScInterpreter::ScUnicode()
 {
     if ( MustHaveParamCount( GetByte(), 1 ) )
     {
-        OUString aStr = GetString().getString();
-        if (aStr.isEmpty())
-            PushIllegalParameter();
+        if (std::optional<double> fValue = setext::unicodeFromText(GetString().getString()))
+            PushDouble(*fValue);
         else
-        {
-            PushDouble(aStr.iterateCodePoints(&o3tl::temporary(sal_Int32(0))));
-        }
+            PushIllegalParameter();
     }
 }
 
@@ -3677,13 +3488,12 @@ void ScInterpreter::ScUnichar()
     if ( MustHaveParamCount( GetByte(), 1 ) )
     {
         sal_uInt32 nCodePoint = GetUInt32();
-        if (nGlobalError != FormulaError::NONE || !rtl::isUnicodeCodePoint(nCodePoint))
+        if (nGlobalError != FormulaError::NONE)
             PushIllegalArgument();
+        else if (std::optional<OUString> aStr = setext::unicharFromCodePoint(nCodePoint))
+            PushString(*aStr);
         else
-        {
-            OUString aStr( &nCodePoint, 1 );
-            PushString( aStr );
-        }
+            PushIllegalArgument();
     }
 }
 

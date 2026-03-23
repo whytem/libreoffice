@@ -23,19 +23,36 @@ $(eval $(call gb_Library_use_sdk_api,spreadsheetengine))
 
 $(eval $(call gb_Library_use_externals,spreadsheetengine,\
     boost_headers \
+    icu_headers \
+    icuuc \
 ))
 
 $(eval $(call gb_Library_use_libraries,spreadsheetengine,\
+    comphelper \
     for \
     sal \
+    tl \
+    utl \
 ))
 
 $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spread_engine_extract/source/compat/formula/FormulaGrammar \
+    spread_engine_extract/source/core/MathBitwise \
     spread_engine_extract/source/core/CalcConfig \
     spread_engine_extract/source/core/CompilerSupport \
+    spread_engine_extract/source/core/DateTimeParts \
+    spread_engine_extract/source/core/DateTimeWeek \
+    spread_engine_extract/source/core/DateTimeWorkday \
+    spread_engine_extract/source/core/MathFinancial \
+    spread_engine_extract/source/core/MathRounding \
+    spread_engine_extract/source/core/MathScalar \
+    spread_engine_extract/source/core/MathTranscendental \
     spread_engine_extract/source/core/MatrixOperators \
+    spread_engine_extract/source/core/NumeralConversion \
     spread_engine_extract/source/core/Phase0 \
+    spread_engine_extract/source/core/TextCase \
+    spread_engine_extract/source/core/TextScalar \
+    spread_engine_extract/source/core/TextWidth \
 ))
 
 # vim: set noet sw=4 ts=4:

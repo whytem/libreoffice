@@ -924,8 +924,6 @@ public:
                           double fPv, bool bPayInAdvance);
     void ScFV();
     void ScNper();
-    static bool RateIteration(double fNper, double fPayment, double fPv,
-                              double fFv, bool bPayType, double& fGuess);
     void ScRate();
     double ScGetIpmt(double fRate, double fPer, double fNper, double fPv,
                                  double fFv, bool bPayInAdvance, double& fPmt);

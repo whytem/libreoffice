@@ -250,6 +250,113 @@ Recommended area-to-test mapping:
     `CppunitTest_sc_ucalc_formula2`,
     `CppunitTest_sc_spreadsheet_functions_test`, and
     `CppunitTest_sc_ucalc_range`
+- Phase 5: substantially complete for low-coupling interpreter helper families
+  - the numeric-policy part of Calc's rounding family now lives in
+    `spread_engine_extract/source/core/MathRounding.cxx`
+  - `sc/source/core/tool/interpr2.cxx` keeps argument decoding and error
+    handling, but delegates `ROUND*`, `CEILING*`, `FLOOR*`, `EVEN`, and `ODD`
+    calculations to `spreadsheetengine::core::math`
+  - this gives Phase 5 its first interpreter-family seam without moving
+    `ScInterpreter` state management out of Calc
+  - a second scalar-math slice now lives in
+    `spread_engine_extract/source/core/MathScalar.cxx`
+  - `sc/source/core/tool/interpr2.cxx` now also delegates `SIGN`, `ABS`,
+    `INT`, `ATAN2`, `LOG`, `LN`, `LOG10`, and `MOD` numeric policy to the
+    extracted helper while keeping Calc-side parameter validation and error
+    pushes stable
+  - a third financial-helper slice now lives in
+    `spread_engine_extract/source/core/MathFinancial.cxx`
+  - `sc/source/core/tool/interpr2.cxx` now delegates the time-value-of-money
+    helper family behind `PV`, `PMT`, `FV`, `IPMT`, `PPMT`, `CUMIPMT`, and
+    `CUMPRINC` to the extracted financial helper while still keeping
+    argument-count checks, defaults, and Calc-visible error behavior in place
+  - a fourth depreciation-helper slice now also lives in
+    `spread_engine_extract/source/core/MathFinancial.cxx`
+  - `sc/source/core/tool/interpr2.cxx` now delegates `SYD`, `SLN`, `DDB`,
+    `DB`, and `VDB` numeric policy, including the intermediate declining-balance
+    helper flow, to the extracted financial helper while preserving Calc-side
+    validation and error handling
+  - a fifth financial-rate slice now also lives in
+    `spread_engine_extract/source/core/MathFinancial.cxx`
+  - `sc/source/core/tool/interpr2.cxx` now delegates `PDURATION`, `RRI`,
+    `NPER`, `EFFECT`, and `NOMINAL` numeric policy to the extracted helper,
+    while leaving argument-count checks and invalid-input handling in Calc
+  - a sixth financial-solver slice now also lives in
+    `spread_engine_extract/source/core/MathFinancial.cxx`
+  - `sc/source/core/tool/interpr2.cxx` now delegates `ISPMT` and the `RATE`
+    solving path, including the Newton iteration and alternate-guess fallback,
+    to the extracted financial helper while keeping Calc-side argument
+    validation and `NoConvergence` error behavior stable
+  - a seventh transcendental slice now lives in
+    `spread_engine_extract/source/core/MathTranscendental.cxx`
+  - `sc/source/core/tool/interpr1.cxx` now delegates `PI`, degree/radian
+    conversion, trigonometric and hyperbolic-trigonometric helpers, `EXP`,
+    and `SQRT` numeric policy to the extracted helper while keeping
+    Calc-visible invalid-domain handling in place
+  - an eighth bitwise slice now lives in
+    `spread_engine_extract/source/core/MathBitwise.cxx`
+  - `sc/source/core/tool/interpr1.cxx` now delegates `BITAND`, `BITOR`,
+    `BITXOR`, `BITLSHIFT`, and `BITRSHIFT` to the extracted helper while
+    preserving existing Calc argument-count checks and `IllegalArgument`
+    behavior
+  - a ninth numeral-conversion slice now lives in
+    `spread_engine_extract/source/core/NumeralConversion.cxx`
+  - `sc/source/core/tool/interpr2.cxx` now delegates `BASE`, `DECIMAL`,
+    `ROMAN`, and `ARABIC` to the extracted helper while keeping Calc-side
+    stack decoding and user-visible error routing stable
+  - a tenth text-scalar slice now lives in
+    `spread_engine_extract/source/core/TextScalar.cxx`
+  - `sc/source/core/tool/interpr1.cxx` now delegates `TRIM`, `LEN`,
+    `NUMBERVALUE`, `CLEAN`, `CODE`, `CHAR`, `UNICODE`, and `UNICHAR`
+    scalar text/codepoint policy to the extracted helper while keeping
+    Calc-side stack handling and array/ref behavior in place
+  - an eleventh text-case slice now lives in
+    `spread_engine_extract/source/core/TextCase.cxx`
+  - `sc/source/core/tool/interpr1.cxx` now delegates `UPPER`, `LOWER`,
+    and `PROPER` case-shaping logic to the extracted helper while still
+    passing the existing locale-aware `CharClass` from Calc
+  - a twelfth text-width slice now lives in
+    `spread_engine_extract/source/core/TextWidth.cxx`
+  - `sc/source/core/tool/interpr1.cxx` now delegates `ASC` and `JIS`
+    half-width/full-width conversion logic to the extracted helper
+  - a thirteenth date-parts slice now lives in
+    `spread_engine_extract/source/core/DateTimeParts.cxx`
+  - `sc/source/core/tool/interpr2.cxx` now delegates `YEAR`, `MONTH`, `DAY`,
+    `HOUR`, `MINUTE`, `SECOND`, `DATE`, `TIME`, `DAYS`, `DAYS360`,
+    `DATEDIF`, and `EASTERSUNDAY` calendar/date-difference logic to the
+    extracted helper while keeping Calc-side stack decoding and visible error
+    routing stable
+  - a fourteenth date-week slice now lives in
+    `spread_engine_extract/source/core/DateTimeWeek.cxx`
+  - `sc/source/core/tool/interpr2.cxx` now delegates `WEEKDAY`, `WEEKNUM`,
+    `ISOWEEKNUM`, and the legacy OOo week-number helper to the extracted
+    helper while preserving Calc's existing argument-count handling and
+    invalid-flag behavior
+  - a fifteenth workday slice now lives in
+    `spread_engine_extract/source/core/DateTimeWorkday.cxx`
+  - `sc/source/core/tool/interpr2.cxx` now delegates weekend-mask mapping plus
+    the pure `NETWORKDAYS` and `WORKDAY` counting/shift algorithms to the
+    extracted helper while leaving holiday-array parsing and stack interaction
+    in Calc
+  - per-slice validation completed with
+    `CppunitTest_sc_financial_functions_test`,
+    `CppunitTest_sc_datetime_functions_test`,
+    `CppunitTest_sc_mathematical_functions_test`,
+    `CppunitTest_sc_text_functions_test`,
+    `CppunitTest_sc_spreadsheet_functions_test`, and
+    `CppunitTest_sc_ucalc`
+  - a broader Phase 5 milestone validation also completed with
+    `CppunitTest_sc_ucalc`,
+    `CppunitTest_sc_mathematical_functions_test`,
+    `CppunitTest_sc_financial_functions_test`,
+    `CppunitTest_sc_text_functions_test`,
+    `CppunitTest_sc_spreadsheet_functions_test`, and
+    `CppunitTest_sc_ucalc_formula2`
+  - Phase 5 is now substantially complete for pure numeric, simple text, and
+    core calendar/workday helper families; the remaining interpreter work is
+    concentrated in logical/control-flow, reference-aware text/value behavior,
+    locale-aware date/time parsing, lookup/query, and array-aware or
+    document-coupled evaluation paths
 
 ## Phased Roadmap
 
@@ -415,6 +522,9 @@ Approach:
 - keep `ScInterpreter` as the stable facade used by existing Calc code
 - each iteration should relocate only one family or one helper cluster
 - avoid renaming public Calc types while behavior is still moving
+- arithmetic/scalar/transcendental/financial/bitwise/simple-text helper slices
+  are now mostly extracted; prioritize the remaining document-aware families
+  next
 
 Validation:
 
