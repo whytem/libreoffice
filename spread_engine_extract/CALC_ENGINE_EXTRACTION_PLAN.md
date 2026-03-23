@@ -228,6 +228,13 @@ Recommended area-to-test mapping:
     `spread_engine_extract/source/core/CalcConfig.cxx`
   - `sc/source/core/tool/calcconfig.cxx` now delegates those helpers to the
     new module while keeping `ScCalcConfig` itself in Calc
+- Phase 3: first slice in progress
+  - the `matrixoperators` implementation now lives in
+    `spread_engine_extract/source/core/MatrixOperators.cxx`
+  - `sc` no longer builds its own `matrixoperators` object and instead consumes
+    the relocated `sc::op` runtime symbols from `spreadsheetengine`
+  - this keeps the public Calc headers stable while starting to move the
+    matrix/runtime substrate out of the `sc` library
 
 ## Phased Roadmap
 
