@@ -64,6 +64,7 @@ $(eval $(call gb_CppunitTest_use_libraries,sc_ucalc$(1), \
     sb \
     sfx \
     sot \
+    spreadsheetengine \
     subsequenttest \
     svl \
     svt \

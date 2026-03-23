@@ -14,8 +14,10 @@
 #include <externalrefmgr.hxx>
 #include <globstr.hrc>
 #include <scresid.hxx>
+#include <spreadsheetengine/compat/formula/FormulaGrammar.hxx>
 
 using namespace com::sun::star;
+namespace seformula = spreadsheetengine::compat::formula;
 
 namespace sc {
 
@@ -34,10 +36,10 @@ void insertAllNames( TokenStringContext::IndexNameMapType& rMap, const ScRangeNa
 
 TokenStringContext::TokenStringContext( const ScDocument& rDoc, formula::FormulaGrammar::Grammar eGram ) :
     meGram(eGram),
-    mpRefConv(ScCompiler::GetRefConvention(formula::FormulaGrammar::extractRefConvention(eGram)))
+    mpRefConv(ScCompiler::GetRefConvention(seformula::FormulaGrammar::extractRefConvention(eGram)))
 {
     formula::FormulaCompiler aComp;
-    mxOpCodeMap = aComp.GetOpCodeMap(formula::FormulaGrammar::extractFormulaLanguage(eGram));
+    mxOpCodeMap = aComp.GetOpCodeMap(seformula::FormulaGrammar::extractFormulaLanguage(eGram));
     if (mxOpCodeMap)
         maErrRef = mxOpCodeMap->getSymbol(ocErrRef);
     else
@@ -50,7 +52,7 @@ TokenStringContext::TokenStringContext( const ScDocument& rDoc, formula::Formula
     maTabNames = rDoc.GetAllTableNames();
     {
         for (auto& rTabName : maTabNames)
-            ScCompiler::CheckTabQuotes(rTabName, formula::FormulaGrammar::extractRefConvention(eGram));
+            ScCompiler::CheckTabQuotes(rTabName, seformula::FormulaGrammar::extractRefConvention(eGram));
     }
 
     // Fetch all named range names.
@@ -119,7 +121,7 @@ void CompileFormulaContext::updateTabNames()
     maTabNames = mrDoc.GetAllTableNames();
     {
         for (auto& rTabName : maTabNames)
-            ScCompiler::CheckTabQuotes(rTabName, formula::FormulaGrammar::extractRefConvention(meGram));
+            ScCompiler::CheckTabQuotes(rTabName, seformula::FormulaGrammar::extractRefConvention(meGram));
     }
 }
 

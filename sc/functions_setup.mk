@@ -44,6 +44,7 @@ $(eval $(call gb_CppunitTest_use_libraries,sc_$(1)_functions_test, \
     scqahelper \
     sfx \
     sot \
+    spreadsheetengine \
     svl \
     svt \
     svx \

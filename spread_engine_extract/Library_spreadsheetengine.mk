@@ -18,11 +18,14 @@ $(eval $(call gb_Library_add_defs,spreadsheetengine,\
     -DSPREADSHEETENGINE_DLLIMPLEMENTATION \
 ))
 
+$(eval $(call gb_Library_use_sdk_api,spreadsheetengine))
+
 $(eval $(call gb_Library_use_libraries,spreadsheetengine,\
     sal \
 ))
 
 $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
+    spread_engine_extract/source/compat/formula/FormulaGrammar \
     spread_engine_extract/source/core/Phase0 \
 ))
 

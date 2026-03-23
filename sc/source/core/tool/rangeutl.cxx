@@ -29,9 +29,11 @@
 #include <externalrefmgr.hxx>
 #include <compiler.hxx>
 #include <refupdatecontext.hxx>
+#include <spreadsheetengine/compat/formula/FormulaGrammar.hxx>
 
 using ::formula::FormulaGrammar;
 using namespace ::com::sun::star;
+namespace seformula = spreadsheetengine::compat::formula;
 
 bool ScRangeUtil::MakeArea( const OUString&   rAreaStr,
                             ScArea&         rArea,
@@ -299,10 +301,10 @@ bool ScRangeUtil::MakeRangeFromName (
             // position if expression has relative references and details say so.
             if (bUseDetailsPos)
                 aStrArea = pData->GetSymbol( ScAddress( rDetails.nCol, rDetails.nRow, nCurTab),
-                        FormulaGrammar::mergeToGrammar(rDoc.GetGrammar(), rDetails.eConv));
+                        seformula::FormulaGrammar::mergeToGrammar(rDoc.GetGrammar(), rDetails.eConv));
             else
                 aStrArea = pData->GetSymbol(
-                        FormulaGrammar::mergeToGrammar(rDoc.GetGrammar(), rDetails.eConv));
+                        seformula::FormulaGrammar::mergeToGrammar(rDoc.GetGrammar(), rDetails.eConv));
 
             if ( IsAbsArea( aStrArea, rDoc, nTable,
                             nullptr, &aStartPos, &aEndPos, rDetails ) )

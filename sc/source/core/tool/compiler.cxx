@@ -76,8 +76,10 @@
 #include <officecfg/Office/Common.hxx>
 #include <sfx2/linkmgr.hxx>
 #include <interpre.hxx>
+#include <spreadsheetengine/compat/formula/FormulaGrammar.hxx>
 
 using namespace formula;
+namespace seformula = spreadsheetengine::compat::formula;
 using namespace ::com::sun::star;
 
 const CharClass*                    ScCompiler::pCharClassEnglish = nullptr;
@@ -460,7 +462,7 @@ void ScCompiler::SetGrammar( const FormulaGrammar::Grammar eGrammar )
     else
     {
         FormulaGrammar::Grammar eMyGrammar = eGrammar;
-        const sal_Int32 nFormulaLanguage = FormulaGrammar::extractFormulaLanguage( eMyGrammar);
+        const sal_Int32 nFormulaLanguage = seformula::FormulaGrammar::extractFormulaLanguage(eMyGrammar);
         OpCodeMapPtr xMap = GetFinalOpCodeMap( nFormulaLanguage);
         OSL_ENSURE( xMap, "ScCompiler::SetGrammar: unknown formula language");
         if (!xMap)
@@ -491,7 +493,7 @@ std::vector<OUString> &ScCompiler::GetSetupTabNames() const
     {
         rTabNames = rDoc.GetAllTableNames();
         for (auto& rTabName : rTabNames)
-            ScCompiler::CheckTabQuotes(rTabName, formula::FormulaGrammar::extractRefConvention(meGrammar));
+            ScCompiler::CheckTabQuotes(rTabName, seformula::FormulaGrammar::extractRefConvention(meGrammar));
     }
 
     return rTabNames;
@@ -524,7 +526,7 @@ void ScCompiler::SetGrammarAndRefConvention(
         const FormulaGrammar::Grammar eNewGrammar, const FormulaGrammar::Grammar eOldGrammar )
 {
     meGrammar = eNewGrammar;    // SetRefConvention needs the new grammar set!
-    FormulaGrammar::AddressConvention eConv = FormulaGrammar::extractRefConvention( meGrammar);
+    FormulaGrammar::AddressConvention eConv = seformula::FormulaGrammar::extractRefConvention(meGrammar);
     if (eConv == FormulaGrammar::CONV_UNSPECIFIED && eOldGrammar == FormulaGrammar::GRAM_UNSPECIFIED)
         SetRefConvention( rDoc.GetAddressConvention());
     else
@@ -2129,8 +2131,8 @@ const ScCompiler::Convention* ScCompiler::GetRefConvention( FormulaGrammar::Addr
 void ScCompiler::SetRefConvention( const ScCompiler::Convention *pConvP )
 {
     pConv = pConvP;
-    meGrammar = FormulaGrammar::mergeToGrammar( meGrammar, pConv->meConv);
-    assert( FormulaGrammar::isSupported( meGrammar));
+    meGrammar = seformula::FormulaGrammar::mergeToGrammar(meGrammar, pConv->meConv);
+    assert(seformula::FormulaGrammar::isSupported(meGrammar));
 }
 
 void ScCompiler::SetError(FormulaError nError)
@@ -2349,14 +2351,14 @@ Label_MaskStateMachine:
                     // [filename]Sheet!R1C1 that needs to be scanned
                     // entirely, or can be ocTableRefOpen, of which the first
                     // transforms an ocDBArea into an ocTableRef.
-                    if (c == '[' && FormulaGrammar::isExcelSyntax( meGrammar)
+                    if (c == '[' && seformula::FormulaGrammar::isExcelSyntax(meGrammar)
                             && eLastOp != ocDBArea && maTableRefs.empty())
                     {
                         // [0]!Global_Range_Name, is a special case in OOXML
                         // syntax, where the '0' is referencing to self and we
                         // do not need it, so we should skip it, in order to
                         // later it will be more recognisable for IsNamedRange.
-                        if (FormulaGrammar::isRefConventionOOXML(meGrammar) &&
+                        if (seformula::FormulaGrammar::isRefConventionOOXML(meGrammar) &&
                                 pSrc[0] == '0' && pSrc[1] == ']' && pSrc[2] == '!')
                         {
                             pSrc += 3;
@@ -3005,7 +3007,7 @@ bool ScCompiler::ParseOpCode( const OUString& rName, bool bInArray )
                 eOp = ocSep;
             else if (rName == ";")
             {
-                switch (FormulaGrammar::extractFormulaLanguage( meGrammar))
+                switch (seformula::FormulaGrammar::extractFormulaLanguage(meGrammar))
                 {
                     // Only for languages/grammars that actually use ';'
                     // parameter separator.
@@ -3197,7 +3199,7 @@ static bool lcl_ParenthesisFollows( const sal_Unicode* p )
 
 bool ScCompiler::ParseValue( const OUString& rSym )
 {
-    const sal_Int32 nFormulaLanguage = FormulaGrammar::extractFormulaLanguage( GetGrammar());
+    const sal_Int32 nFormulaLanguage = seformula::FormulaGrammar::extractFormulaLanguage(GetGrammar());
     if (nFormulaLanguage == css::sheet::FormulaLanguage::ODFF || nFormulaLanguage == css::sheet::FormulaLanguage::OOXML)
     {
         // Speedup things for ODFF, only well-formed numbers, not locale
@@ -3658,7 +3660,7 @@ bool ScCompiler::ParseMacro( const OUString& rName )
     // use only unprefixed name if encountered. BASIC doesn't allow '.' in a
     // function name so a function "USER.FOO" could not exist, and macro check
     // is assigned the lowest priority in function name check.
-    if (FormulaGrammar::isODFF( GetGrammar()) && aName.startsWithIgnoreAsciiCase("USER."))
+    if (seformula::FormulaGrammar::isODFF(GetGrammar()) && aName.startsWithIgnoreAsciiCase("USER."))
         aName = aName.copy(5);
 
     SbxMethod* pMeth = static_cast<SbxMethod*>(pObj->Find( aName, SbxClassType::Method ));
@@ -4445,7 +4447,7 @@ void ScCompiler::AutoCorrectParsedSymbol()
 
 bool ScCompiler::ToUpperAsciiOrI18nIsAscii( OUString& rUpper, const OUString& rOrg ) const
 {
-    if (FormulaGrammar::isODFF( meGrammar) || FormulaGrammar::isOOXML( meGrammar))
+    if (seformula::FormulaGrammar::isODFF(meGrammar) || seformula::FormulaGrammar::isOOXML(meGrammar))
     {
         // ODFF and OOXML have defined sets of English function names, avoid
         // i18n overhead.
@@ -4868,8 +4870,8 @@ std::unique_ptr<ScTokenArray> ScCompiler::CompileString( const OUString& rFormul
         short   nSep;
     };
     // FunctionStack only used if PODF or OOXML!
-    bool bPODF = FormulaGrammar::isPODF( meGrammar);
-    bool bOOXML = FormulaGrammar::isOOXML( meGrammar);
+    bool bPODF = seformula::FormulaGrammar::isPODF(meGrammar);
+    bool bOOXML = seformula::FormulaGrammar::isOOXML(meGrammar);
     bool bUseFunctionStack = (bPODF || bOOXML);
     const size_t nAlloc = 512;
     FunctionStack aFuncs[ nAlloc ];

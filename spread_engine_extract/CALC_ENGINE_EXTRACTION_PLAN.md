@@ -213,10 +213,15 @@ Recommended area-to-test mapping:
     broader engine profile
   - validation completed with `make Library_spreadsheetengine` and the smoke
     spreadsheet gate passing
-- Phase 1: next in progress
-  - first target is to copy one narrow `formula/source/core/api/*` slice into
-    `spread_engine_extract/source/compat/formula/` and route Calc to it through
-    a small, testable seam
+- Phase 1: first slice in progress
+  - a Calc-owned copy of the `FormulaGrammar` helper logic now lives under
+    `spread_engine_extract/source/compat/formula/`
+  - core Calc call sites in the compiler, token-string context, and range
+    utility code can now use the copied grammar helper implementation while
+    keeping the existing `formula::FormulaGrammar` enum types in place
+  - the next slice should extend the copied compatibility layer to additional
+    `formula/source/core/api/*` helpers and reduce remaining direct helper use
+    from the old `formula` module
 
 ## Phased Roadmap
 
