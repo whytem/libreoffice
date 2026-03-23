@@ -20,12 +20,18 @@ $(eval $(call gb_Library_add_defs,spreadsheetengine,\
 
 $(eval $(call gb_Library_use_sdk_api,spreadsheetengine))
 
+$(eval $(call gb_Library_use_externals,spreadsheetengine,\
+    boost_headers \
+))
+
 $(eval $(call gb_Library_use_libraries,spreadsheetengine,\
+    for \
     sal \
 ))
 
 $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spread_engine_extract/source/compat/formula/FormulaGrammar \
+    spread_engine_extract/source/core/CalcConfig \
     spread_engine_extract/source/core/Phase0 \
 ))
 

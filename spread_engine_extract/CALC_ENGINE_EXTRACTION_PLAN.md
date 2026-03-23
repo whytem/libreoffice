@@ -222,6 +222,12 @@ Recommended area-to-test mapping:
   - the next slice should extend the copied compatibility layer to additional
     `formula/source/core/api/*` helpers and reduce remaining direct helper use
     from the old `formula` module
+- Phase 2: first slice in progress
+  - pure Calc-config helper logic for forced-calculation environment parsing
+    and OpenCL opcode-set string conversion now lives in
+    `spread_engine_extract/source/core/CalcConfig.cxx`
+  - `sc/source/core/tool/calcconfig.cxx` now delegates those helpers to the
+    new module while keeping `ScCalcConfig` itself in Calc
 
 ## Phased Roadmap
 

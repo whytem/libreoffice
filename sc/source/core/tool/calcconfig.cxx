@@ -9,12 +9,9 @@
 
 #include <ostream>
 
-#include <formula/FormulaCompiler.hxx>
-#include <formula/grammar.hxx>
-#include <formula/opcode.hxx>
 #include <rtl/ustring.hxx>
-#include <sal/log.hxx>
 #include <spreadsheetengine/bridge/CalcPhase0Bridge.hxx>
+#include <spreadsheetengine/core/CalcConfig.hxx>
 #include <comphelper/configuration.hxx>
 
 #include <calcconfig.hxx>
@@ -35,37 +32,28 @@ static rtl::Reference<ConfigurationListener> const & getFormulaCalculationListen
     return xListener;
 }
 
-static ForceCalculationType forceCalculationTypeInit()
+static ForceCalculationType toScForceCalculationType(
+    spreadsheetengine::core::ForceCalculationMode eMode)
 {
-    static_assert(spreadsheetengine::bridge::kCalcBridgeEnabled);
-
-    const char* env = getenv( "SC_FORCE_CALCULATION" );
-    if( env != nullptr )
+    switch (eMode)
     {
-        if( strcmp( env, "opencl" ) == 0 )
-        {
-            SAL_INFO("sc.core.formulagroup", "Forcing calculations to use OpenCL");
+        case spreadsheetengine::core::ForceCalculationMode::OpenCL:
             return ForceCalculationOpenCL;
-        }
-        if( strcmp( env, "threads" ) == 0 )
-        {
-            SAL_INFO("sc.core.formulagroup", "Forcing calculations to use threads");
+        case spreadsheetengine::core::ForceCalculationMode::Threads:
             return ForceCalculationThreads;
-        }
-        if( strcmp( env, "core" ) == 0 )
-        {
-            SAL_INFO("sc.core.formulagroup", "Forcing calculations to use core");
+        case spreadsheetengine::core::ForceCalculationMode::Core:
             return ForceCalculationCore;
-        }
-        SAL_WARN("sc.core.formulagroup", "Unrecognized value of SC_FORCE_CALCULATION");
-        abort();
+        case spreadsheetengine::core::ForceCalculationMode::None:
+        default:
+            return ForceCalculationNone;
     }
-    return ForceCalculationNone;
 }
 
 ForceCalculationType ScCalcConfig::getForceCalculationType()
 {
-    static const ForceCalculationType type = forceCalculationTypeInit();
+    static_assert(spreadsheetengine::bridge::kCalcBridgeEnabled);
+    static const ForceCalculationType type
+        = toScForceCalculationType(spreadsheetengine::core::getForceCalculationModeFromEnv());
     return type;
 }
 
@@ -189,56 +177,12 @@ bool ScCalcConfig::operator!= (const ScCalcConfig& r) const
 
 OUString ScOpCodeSetToSymbolicString(const ScCalcConfig::OpCodeSet& rOpCodes)
 {
-    OUStringBuffer result(256);
-    formula::FormulaCompiler aCompiler;
-    formula::FormulaCompiler::OpCodeMapPtr pOpCodeMap(aCompiler.GetOpCodeMap(css::sheet::FormulaLanguage::ENGLISH));
-
-    for (auto i = rOpCodes->begin(); i != rOpCodes->end(); ++i)
-    {
-        if (i != rOpCodes->begin())
-            result.append(';');
-        result.append(pOpCodeMap->getSymbol(*i));
-    }
-
-    return result.makeStringAndClear();
+    return spreadsheetengine::core::formulaOpCodeSetToSymbolicString(rOpCodes);
 }
 
 ScCalcConfig::OpCodeSet ScStringToOpCodeSet(std::u16string_view rOpCodes)
 {
-    ScCalcConfig::OpCodeSet result = std::make_shared<o3tl::sorted_vector< OpCode >>();
-    formula::FormulaCompiler aCompiler;
-    formula::FormulaCompiler::OpCodeMapPtr pOpCodeMap(aCompiler.GetOpCodeMap(css::sheet::FormulaLanguage::ENGLISH));
-
-    const formula::OpCodeHashMap& rHashMap(pOpCodeMap->getHashMap());
-
-    sal_Int32 fromIndex(0);
-    sal_Int32 semicolon;
-    OUString s(OUString::Concat(rOpCodes) + ";");
-
-    while ((semicolon = s.indexOf(';', fromIndex)) >= 0)
-    {
-        if (semicolon > fromIndex)
-        {
-            OUString element(s.copy(fromIndex, semicolon - fromIndex));
-            sal_Int32 n = element.toInt32();
-            if (n > 0 || (n == 0 && element == "0"))
-                result->insert(static_cast<OpCode>(n));
-            else
-            {
-                auto opcode(rHashMap.find(element));
-                if (opcode != rHashMap.end())
-                    result->insert(opcode->second);
-                else
-                    SAL_WARN("sc.opencl", "Unrecognized OpCode " << element << " in OpCode set string");
-            }
-        }
-        fromIndex = semicolon+1;
-    }
-    // HACK: Both unary and binary minus have the same string but different opcodes.
-    if( result->find( ocSub ) != result->end())
-        result->insert( ocNegSub );
-
-    return result;
+    return spreadsheetengine::core::stringToFormulaOpCodeSet(rOpCodes);
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
