@@ -229,6 +229,8 @@ inline api::Error parseExpectedError(std::string_view rValue)
         return api::Error::None;
     if (rValue == "IllegalArgument")
         return api::Error::IllegalArgument;
+    if (rValue == "DivisionByZero")
+        return api::Error::DivisionByZero;
     if (rValue == "StringOverflow")
         return api::Error::StringOverflow;
     if (rValue == "NoValue")

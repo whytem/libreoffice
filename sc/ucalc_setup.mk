@@ -84,6 +84,7 @@ $(eval $(call gb_CppunitTest_use_libraries,sc_ucalc$(1), \
 ))
 
 $(eval $(call gb_CppunitTest_set_include,sc_ucalc$(1),\
+    -I$(SRCDIR)/spread_engine_extract/inc \
     -I$(SRCDIR)/sc/source/ui/inc \
     -I$(SRCDIR)/sc/source/core/inc \
     -I$(SRCDIR)/sc/inc \

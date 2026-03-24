@@ -738,12 +738,110 @@ Work:
   - array-aware and matrix-aware helpers
   - document-coupled evaluator helpers that can now target host interfaces
 
+Implementation approach:
+
+- execute Phase 9 in narrow passes instead of trying to move `ScInterpreter`
+  or `ScDocument` logic wholesale
+- pass 1: host contract primitives
+  - introduce engine-owned host-facing types for:
+    - cell address and sheet identity
+    - scalar, string, error, and matrix-backed cell value views
+    - resolved references and small result wrappers
+  - define minimal service interfaces for:
+    - reading a cell or range
+    - null-date and locale/time services
+    - text conversion and formatting hooks that remain host-bound
+  - keep this pass behavior-free: it should only establish types and seams
+- pass 2: minimal Calc adapter and standalone in-memory host
+  - add a Calc adapter layer that implements the host interfaces over
+    `ScDocument`, `ScInterpreterContext`, and the already-extracted runtime
+    helpers
+  - add a tiny standalone workbook/sheet store that implements the same
+    interfaces for parity tests
+  - use this pass to prove that nontrivial evaluator code can target the host
+    abstraction without changing spreadsheet results yet
+- pass 3: logical and control-flow families first
+  - start with the smallest coupled families that benefit from host access but
+    do not yet need full query or dependency machinery
+  - preferred first candidates:
+    - `IF`, `IFERROR`, `IFNA`, `CHOOSE`
+    - reference-light helpers that mostly need value fetching and lazy branch
+      control
+  - keep branch selection and visible error behavior identical in Calc while
+    moving reusable decision logic into the engine
+- pass 4: locale-aware text and date parsing
+  - move the spreadsheet-facing parsing helpers that still depend on Calc host
+    services:
+    - `DATEVALUE`, `TIMEVALUE`
+    - richer text-to-number and locale-aware text coercion paths
+    - any remaining width/case/encoding-dependent interpreter helpers that now
+      fit the host service interfaces
+  - validate these slices through both standalone shared cases and Calc formula
+    evaluation
+- pass 5: lookup/query helpers
+  - extract reusable lookup and criteria-evaluation helpers behind explicit
+    host callbacks for:
+    - value access
+    - comparator/query policy
+    - range iteration
+  - preferred first candidates:
+    - `MATCH`
+    - `LOOKUP`
+    - `VLOOKUP`/`HLOOKUP` subroutines that can be separated from sheet/document
+      orchestration
+- pass 6: array-aware and document-coupled evaluator helpers
+  - move the remaining interpreter pieces that operate on references, arrays,
+    or mixed scalar/matrix evaluation once the host contracts are proven
+  - keep anything still tied to dependency graphs or formula-cell ownership out
+    of Phase 9 and defer it to Phase 10
+
+First logical slice:
+
+- add engine-owned host contract headers and a no-op Calc adapter seam without
+  changing formula behavior
+- add a standalone `spreadsheetengine_host_tests` target that exercises the
+  in-memory host on basic cell/range fetches
+- validate that the contracts compile in both standalone and LibreOffice
+  builds before moving any interpreter family onto them
+
+Status:
+
+- completed
+- implemented in:
+  - `spread_engine_extract/inc/spreadsheetengine/api/Host.hxx`
+  - `spread_engine_extract/inc/spreadsheetengine/core/InMemoryHost.hxx`
+  - `spread_engine_extract/inc/spreadsheetengine/compat/libreoffice/Host.hxx`
+  - `spread_engine_extract/tests/standalone/host_api_tests.cxx`
+  - `sc/qa/unit/ucalc_shared_cases.cxx`
+
+Current status:
+
+- prerequisites from earlier phases are in place:
+  - standalone and LibreOffice builds already exercise shared extracted code
+  - shared TSV parity cases now run in both the standalone suite and the new
+    Calc-side `CppunitTest_sc_ucalc_shared_cases` target
+  - Phase 8 completed the host-independent matrix/runtime substrate, so Phase 9
+    can focus on genuinely host-aware evaluator work
+- pass 1 is now substantially complete:
+  - the engine owns workbook/runtime/cell-read host contracts
+  - resolved-reference and matrix-backed value-view primitives are defined
+  - host-bound text coercion and number-formatting seams are defined
+  - the standalone suite exercises those contracts through the in-memory host
+  - Calc exercises them through a thin `ScDocument` adapter seam
+- the remaining gaps are no longer contract-shape problems:
+  - the next meaningful work is to move the first genuinely host-aware
+    interpreter helpers onto these seams
+  - preferred next step: start pass 3 with a narrow logical/control-flow slice
+    such as `IF`/`IFERROR` branch and error-selection helpers
+
 Validation:
 
 - standalone:
   - host-runtime tests
   - evaluator parity cases against the in-memory host
+  - shared-case TSV runner where the rows are spreadsheet-facing
 - LibreOffice:
+  - `CppunitTest_sc_ucalc_shared_cases`
   - `CppunitTest_sc_logical_functions_test`
   - `CppunitTest_sc_text_functions_test`
   - `CppunitTest_sc_spreadsheet_functions_test`

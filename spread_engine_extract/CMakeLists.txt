@@ -74,6 +74,10 @@ add_spreadsheetengine_test(spreadsheetengine_execution_tests
     ${SPREADSHEETENGINE_STANDALONE_EXECUTION_TEST_SOURCES}
 )
 
+add_spreadsheetengine_test(spreadsheetengine_host_tests
+    ${SPREADSHEETENGINE_STANDALONE_HOST_TEST_SOURCES}
+)
+
 if(BUILD_TESTING)
     add_test(NAME spreadsheetengine_smoke COMMAND spreadsheetengine_smoke)
 endif()

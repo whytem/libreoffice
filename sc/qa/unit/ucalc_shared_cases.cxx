@@ -12,6 +12,7 @@
 #include <scopetools.hxx>
 
 #include <formula/errorcodes.hxx>
+#include <spreadsheetengine/compat/libreoffice/Host.hxx>
 
 #include <cmath>
 #include <cstdint>
@@ -295,6 +296,78 @@ double encodeDateTokenAsYmdNumber(std::string_view rToken)
 class TestSharedCases : public ScUcalcTestBase
 {
 };
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testCalcHostAdapter)
+{
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"Host"_ustr);
+
+    spreadsheetengine::compat::libreoffice::DocumentEvaluationHost aHost(*m_pDoc, u"en-US");
+
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aHost.sheetCount());
+    CPPUNIT_ASSERT(aHost.hasSheet(0));
+    CPPUNIT_ASSERT(!aHost.hasSheet(1));
+
+    const auto aSheetName = aHost.getSheetName(0);
+    CPPUNIT_ASSERT(aSheetName);
+    CPPUNIT_ASSERT_EQUAL(u"Host"_ustr, spreadsheetengine::compat::libreoffice::toLibreOfficeString(aSheetName.maValue));
+
+    const auto aNullDate = aHost.getNullDate();
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::int16_t>(1899), aNullDate.mnYear);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::int16_t>(12), aNullDate.mnMonth);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::int16_t>(30), aNullDate.mnDay);
+    CPPUNIT_ASSERT_EQUAL(u"en-US"_ustr, spreadsheetengine::compat::libreoffice::toLibreOfficeString(aHost.getLocaleTag()));
+
+    setValueCell(m_pDoc, 0, 42.5);
+    setTextCell(m_pDoc, 1, u"hello"_ustr);
+    m_pDoc->SetFormula(ScAddress(2, 0, 0), u"=1/0"_ustr, formula::FormulaGrammar::GRAM_NATIVE_UI);
+
+    const auto aNumber = aHost.getCellValue({ 0, 0, 0 });
+    CPPUNIT_ASSERT(aNumber);
+    CPPUNIT_ASSERT(aNumber.maValue.isNumber());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(42.5, aNumber.maValue.mfNumber, 1e-12);
+
+    const auto aText = aHost.getCellValue({ 0, 1, 0 });
+    CPPUNIT_ASSERT(aText);
+    CPPUNIT_ASSERT(aText.maValue.isText());
+    CPPUNIT_ASSERT_EQUAL(u"hello"_ustr, spreadsheetengine::compat::libreoffice::toLibreOfficeString(aText.maValue.maString));
+
+    const auto aError = aHost.getCellValue({ 0, 2, 0 });
+    CPPUNIT_ASSERT(aError);
+    CPPUNIT_ASSERT(aError.maValue.isError());
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::Error::DivisionByZero, aError.maValue.meError);
+
+    const auto aEmpty = aHost.getCellValue({ 0, 4, 0 });
+    CPPUNIT_ASSERT(aEmpty);
+    CPPUNIT_ASSERT(aEmpty.maValue.isEmpty());
+
+    const auto aRangeValue = aHost.getRangeValue({ { 0, 0, 0 }, { 0, 1, 0 } }, 1, 0);
+    CPPUNIT_ASSERT(aRangeValue);
+    CPPUNIT_ASSERT(aRangeValue.maValue.isText());
+    CPPUNIT_ASSERT_EQUAL(u"hello"_ustr, spreadsheetengine::compat::libreoffice::toLibreOfficeString(aRangeValue.maValue.maString));
+
+    const auto aBadOffset = aHost.getRangeValue({ { 0, 0, 0 }, { 0, 1, 0 } }, 2, 0);
+    CPPUNIT_ASSERT(!aBadOffset);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::Error::IllegalArgument, aBadOffset.meError);
+
+    const auto aResolved = aHost.resolveReference({ { 0, 0, 0 }, { 0, 1, 0 } });
+    CPPUNIT_ASSERT(aResolved);
+    CPPUNIT_ASSERT(aResolved.maValue.isNormalized());
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aResolved.maValue.matrixDimensions().mnColumns);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aResolved.maValue.matrixDimensions().mnRows);
+
+    const auto aParsedNumber = aHost.parseNumber(u"42.5");
+    CPPUNIT_ASSERT(aParsedNumber);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(42.5, aParsedNumber.maValue.mfValue, 1e-12);
+
+    const auto aNotNumber = aHost.parseNumber(u"hello");
+    CPPUNIT_ASSERT(!aNotNumber);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::Error::NoValue, aNotNumber.meError);
+
+    const auto aFormattedNumber = aHost.formatNumber(42.5);
+    CPPUNIT_ASSERT(aFormattedNumber);
+    CPPUNIT_ASSERT(!aFormattedNumber.maValue.empty());
+}
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testNumeralSharedCases)
 {
