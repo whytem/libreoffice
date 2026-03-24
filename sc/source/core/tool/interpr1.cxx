@@ -59,6 +59,7 @@
 #include <lookupcache.hxx>
 #include <rangenam.hxx>
 #include <spreadsheetengine/api/Logic.hxx>
+#include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Parsing.hxx>
 #include <spreadsheetengine/core/MathBitwise.hxx>
 #include <spreadsheetengine/core/MathTranscendental.hxx>
@@ -94,6 +95,7 @@ ScCalcConfig *ScInterpreter::mpGlobalConfig = nullptr;
 using namespace formula;
 namespace semath = spreadsheetengine::core::math;
 namespace selogic = spreadsheetengine::api::logic;
+namespace selookup = spreadsheetengine::api::lookup;
 namespace setext = spreadsheetengine::core::text;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 
@@ -110,6 +112,110 @@ selibreoffice::TransliterationWidthConversionService& getWidthConversionService(
 {
     static selibreoffice::TransliterationWidthConversionService aService;
     return aService;
+}
+
+MatchMode toCalcMatchMode(selookup::MatchMode eMatchMode)
+{
+    switch (eMatchMode)
+    {
+        case selookup::MatchMode::ExactOrNotAvailable:
+            return exactorNA;
+        case selookup::MatchMode::ExactOrNextSmaller:
+            return exactorS;
+        case selookup::MatchMode::ExactOrNextLarger:
+            return exactorG;
+        case selookup::MatchMode::Wildcard:
+            return wildcard;
+        case selookup::MatchMode::Regex:
+            return regex;
+    }
+
+    return exactorNA;
+}
+
+LookupSearchMode toCalcSearchMode(selookup::SearchMode eSearchMode)
+{
+    switch (eSearchMode)
+    {
+        case selookup::SearchMode::Forward:
+            return LookupSearchMode::Forward;
+        case selookup::SearchMode::Reverse:
+            return LookupSearchMode::Reverse;
+        case selookup::SearchMode::BinaryAscending:
+            return LookupSearchMode::BinaryAscending;
+        case selookup::SearchMode::BinaryDescending:
+            return LookupSearchMode::BinaryDescending;
+    }
+
+    return LookupSearchMode::Forward;
+}
+
+selookup::SearchMode toLookupSearchMode(LookupSearchMode eSearchMode)
+{
+    switch (eSearchMode)
+    {
+        case LookupSearchMode::Forward:
+            return selookup::SearchMode::Forward;
+        case LookupSearchMode::Reverse:
+            return selookup::SearchMode::Reverse;
+        case LookupSearchMode::BinaryAscending:
+            return selookup::SearchMode::BinaryAscending;
+        case LookupSearchMode::BinaryDescending:
+            return selookup::SearchMode::BinaryDescending;
+    }
+
+    return selookup::SearchMode::Forward;
+}
+
+selookup::Operation toLookupOperation(sal_uInt16 nOpCode)
+{
+    switch (nOpCode)
+    {
+        case SC_OPCODE_MATCH:
+            return selookup::Operation::Match;
+        case SC_OPCODE_X_MATCH:
+            return selookup::Operation::XMatch;
+        case SC_OPCODE_LOOKUP:
+            return selookup::Operation::Lookup;
+        case SC_OPCODE_H_LOOKUP:
+            return selookup::Operation::HLookup;
+        case SC_OPCODE_V_LOOKUP:
+            return selookup::Operation::VLookup;
+        case SC_OPCODE_X_LOOKUP:
+            return selookup::Operation::XLookup;
+        default:
+            return selookup::Operation::Lookup;
+    }
+}
+
+ScQueryOp toCalcQueryOp(selookup::ComparisonOp eComparison)
+{
+    switch (eComparison)
+    {
+        case selookup::ComparisonOp::Equal:
+            return SC_EQUAL;
+        case selookup::ComparisonOp::LessEqual:
+            return SC_LESS_EQUAL;
+        case selookup::ComparisonOp::GreaterEqual:
+            return SC_GREATER_EQUAL;
+    }
+
+    return SC_EQUAL;
+}
+
+utl::SearchParam::SearchType toCalcSearchType(selookup::PatternMode ePattern)
+{
+    switch (ePattern)
+    {
+        case selookup::PatternMode::Wildcard:
+            return utl::SearchParam::SearchType::Wildcard;
+        case selookup::PatternMode::Regex:
+            return utl::SearchParam::SearchType::Regexp;
+        case selookup::PatternMode::Detect:
+        case selookup::PatternMode::Normal:
+        default:
+            return utl::SearchParam::SearchType::Normal;
+    }
 }
 
 }
@@ -4827,26 +4933,14 @@ void ScInterpreter::ScMatch()
     vsa.nSearchOpCode = SC_OPCODE_MATCH;
 
     // get match mode
-    double fType = ( nParamCount == 3 ? GetDouble() : 1.0 );
-    switch ( static_cast<int>(fType) )
+    const auto aModePlan = selookup::normalizeMatchType(nParamCount == 3 ? GetDouble() : 1.0);
+    if (!aModePlan)
     {
-        case -1 :
-            vsa.eMatchMode  = exactorG;
-            vsa.eSearchMode = LookupSearchMode::BinaryDescending;
-            break;
-        case 0 :
-            vsa.eMatchMode  = exactorNA;
-            vsa.eSearchMode = LookupSearchMode::Forward;
-            break;
-        case 1 :
-            // default value
-            vsa.eMatchMode  = exactorS;
-            vsa.eSearchMode = LookupSearchMode::BinaryAscending;
-            break;
-        default :
-            PushIllegalParameter();
-            return;
+        PushIllegalParameter();
+        return;
     }
+    vsa.eMatchMode = toCalcMatchMode(aModePlan.maValue.meMatchMode);
+    vsa.eSearchMode = toCalcSearchMode(aModePlan.maValue.meSearchMode);
 
     // get vector to be searched
     switch (GetStackType())
@@ -4991,14 +5085,13 @@ void ScInterpreter::ScXMatch()
     // get search mode
     if (nParamCount == 4)
     {
-        sal_Int16 k = GetInt16();
-        if (k >= -2 && k <= 2 && k != 0)
-            vsa.eSearchMode = static_cast<LookupSearchMode>(k);
-        else
+        const auto aSearchMode = selookup::normalizeSearchMode(GetInt16());
+        if (!aSearchMode)
         {
             PushIllegalParameter();
             return;
         }
+        vsa.eSearchMode = toCalcSearchMode(aSearchMode.maValue);
     }
     else
         vsa.eSearchMode = LookupSearchMode::Forward;
@@ -5006,14 +5099,13 @@ void ScInterpreter::ScXMatch()
     // get match mode
     if (nParamCount >= 3)
     {
-        sal_Int16 k = GetInt16();
-        if (k >= -1 && k <= 3)
-            vsa.eMatchMode = static_cast<MatchMode>(k);
-        else
+        const auto aMatchMode = selookup::normalizeExtendedMatchMode(GetInt16());
+        if (!aMatchMode)
         {
             PushIllegalParameter();
             return;
         }
+        vsa.eMatchMode = toCalcMatchMode(aMatchMode.maValue);
     }
     else
         vsa.eMatchMode = exactorNA;
@@ -6826,8 +6918,10 @@ void ScInterpreter::ScLookup()
                 PushIllegalParameter();
                 return;
             }
-            bVertical = (nRow2 - nRow1) >= (nCol2 - nCol1);
-            nLenMajor = bVertical ? nRow2 - nRow1 + 1 : nCol2 - nCol1 + 1;
+            const auto aMajorLayout = selookup::majorVectorLayout(
+                { nCol2 - nCol1 + 1, nRow2 - nRow1 + 1 });
+            bVertical = aMajorLayout.meOrientation == selookup::VectorOrientation::Column;
+            nLenMajor = aMajorLayout.mnLength;
         }
         break;
         case svMatrix:
@@ -6843,8 +6937,10 @@ void ScInterpreter::ScLookup()
 
             SCSIZE nC, nR;
             pDataMat->GetDimensions(nC, nR);
-            bVertical = (nR >= nC);
-            nLenMajor = bVertical ? nR : nC;
+            const auto aMajorLayout = selookup::majorVectorLayout(
+                { static_cast<sal_Int32>(nC), static_cast<sal_Int32>(nR) });
+            bVertical = aMajorLayout.meOrientation == selookup::VectorOrientation::Column;
+            nLenMajor = aMajorLayout.mnLength;
             nCol2 = nC - 1;
             nRow2 = nR - 1;
         }
@@ -7149,18 +7245,21 @@ void ScInterpreter::ScLookup()
 
         if (pResMat)
         {
-            VectorMatrixAccessor aResMatAcc(*pResMat, (nResRow2 - nResRow1) > 0);
-            // Result array is matrix.
-            // Note this does not replicate the other dimension.
-            if (o3tl::make_unsigned(nDelta) >= aResMatAcc.GetElementCount())
+            const auto aResultCoordinate = selookup::planVectorElement(
+                (nResRow2 - nResRow1) > 0 ? selookup::VectorOrientation::Column
+                                          : selookup::VectorOrientation::Row,
+                nDelta, { static_cast<sal_Int32>(nResCol2 + 1), static_cast<sal_Int32>(nResRow2 + 1) });
+            if (!aResultCoordinate)
             {
                 PushNA();
                 return;
             }
-            if (aResMatAcc.IsValue(nDelta))
-                PushDouble(aResMatAcc.GetDouble(nDelta));
+            if (pResMat->IsValue(aResultCoordinate.maValue.mnColumn, aResultCoordinate.maValue.mnRow))
+                PushDouble(
+                    pResMat->GetDouble(aResultCoordinate.maValue.mnColumn, aResultCoordinate.maValue.mnRow));
             else
-                PushString(aResMatAcc.GetString(nDelta));
+                PushString(
+                    pResMat->GetString(aResultCoordinate.maValue.mnColumn, aResultCoordinate.maValue.mnRow));
         }
         else if (nParamCount == 3)
         {
@@ -7233,20 +7332,21 @@ void ScInterpreter::ScLookup()
             // No result array. Use the data array to get the final value from.
             // Propagate errors from matrix again.
             pDataMat->SetErrorInterpreter( this);
-            if (bVertical)
+            const auto aResultCoordinate = selookup::planTabularLookupResult(
+                bVertical ? selookup::VectorOrientation::Column : selookup::VectorOrientation::Row,
+                nDelta, bVertical ? static_cast<sal_Int32>(nC - 1) : static_cast<sal_Int32>(nR - 1),
+                { static_cast<sal_Int32>(nC), static_cast<sal_Int32>(nR) });
+            if (!aResultCoordinate)
             {
-                if (pDataMat->IsValue(nC-1, nDelta))
-                    PushDouble(pDataMat->GetDouble(nC-1, nDelta));
-                else
-                    PushString(pDataMat->GetString(nC-1, nDelta));
+                PushNA();
+                return;
             }
+            if (pDataMat->IsValue(aResultCoordinate.maValue.mnColumn, aResultCoordinate.maValue.mnRow))
+                PushDouble(
+                    pDataMat->GetDouble(aResultCoordinate.maValue.mnColumn, aResultCoordinate.maValue.mnRow));
             else
-            {
-                if (pDataMat->IsValue(nDelta, nR-1))
-                    PushDouble(pDataMat->GetDouble(nDelta, nR-1));
-                else
-                    PushString(pDataMat->GetString(nDelta, nR-1));
-            }
+                PushString(
+                    pDataMat->GetString(aResultCoordinate.maValue.mnColumn, aResultCoordinate.maValue.mnRow));
         }
 
         return;
@@ -7600,24 +7700,30 @@ void ScInterpreter::CalculateLookup(bool bHLookup)
         }
         if ( nDelta != SCSIZE_MAX )
         {
-            SCSIZE nX = static_cast<SCSIZE>(nSpIndex);
-            SCSIZE nY = nDelta;
-            SCSIZE nXs = 0;
-            SCSIZE nYs = nY;
-            if ( bHLookup )
+            const auto aSearchCoordinate = selookup::planVectorElement(
+                bHLookup ? selookup::VectorOrientation::Row : selookup::VectorOrientation::Column,
+                nDelta, { static_cast<sal_Int32>(nC), static_cast<sal_Int32>(nR) });
+            const auto aResultCoordinate = selookup::planTabularLookupResult(
+                bHLookup ? selookup::VectorOrientation::Row : selookup::VectorOrientation::Column,
+                nDelta, bHLookup ? static_cast<sal_Int32>(nZIndex) : static_cast<sal_Int32>(nSpIndex),
+                { static_cast<sal_Int32>(nC), static_cast<sal_Int32>(nR) });
+            if (!aSearchCoordinate || !aResultCoordinate)
             {
-                nX = nDelta;
-                nY = static_cast<SCSIZE>(nZIndex);
-                nXs = nX;
-                nYs = 0;
+                PushNA();
+                return;
             }
-            assert( nX < nC && nY < nR );
-            if (!(rItem.meType == ScQueryEntry::ByString && pMat->IsValue( nXs, nYs)))
+            assert(o3tl::make_unsigned(aResultCoordinate.maValue.mnColumn) < nC
+                   && o3tl::make_unsigned(aResultCoordinate.maValue.mnRow) < nR);
+            if (!(rItem.meType == ScQueryEntry::ByString
+                  && pMat->IsValue(aSearchCoordinate.maValue.mnColumn, aSearchCoordinate.maValue.mnRow)))
             {
-                if (pMat->IsStringOrEmpty( nX, nY))
-                    PushString(pMat->GetString( nX, nY).getString());
+                if (pMat->IsStringOrEmpty(
+                        aResultCoordinate.maValue.mnColumn, aResultCoordinate.maValue.mnRow))
+                    PushString(pMat->GetString(
+                        aResultCoordinate.maValue.mnColumn, aResultCoordinate.maValue.mnRow).getString());
                 else
-                    PushDouble(pMat->GetDouble( nX, nY));
+                    PushDouble(
+                        pMat->GetDouble(aResultCoordinate.maValue.mnColumn, aResultCoordinate.maValue.mnRow));
             }
             else
                 PushNA();
@@ -7752,28 +7858,26 @@ void ScInterpreter::ScXLookup()
 
     if ( nParamCount == 6 )
     {
-        sal_Int16 k = GetInt16();
-        if ( k >= -2 && k <= 2 && k != 0 )
-            vsa.eSearchMode = static_cast<LookupSearchMode>(k);
-        else
+        const auto aSearchMode = selookup::normalizeSearchMode(GetInt16());
+        if (!aSearchMode)
         {
             PushIllegalParameter();
             return;
         }
+        vsa.eSearchMode = toCalcSearchMode(aSearchMode.maValue);
     }
     else
         vsa.eSearchMode = LookupSearchMode::Forward;
 
     if ( nParamCount >= 5 )
     {
-        sal_Int16 k = GetInt16();
-        if ( k >= -1 && k <= 3 )
-            vsa.eMatchMode = static_cast<MatchMode>(k);
-        else
+        const auto aMatchMode = selookup::normalizeExtendedMatchMode(GetInt16());
+        if (!aMatchMode)
         {
             PushIllegalParameter();
             return;
         }
+        vsa.eMatchMode = toCalcMatchMode(aMatchMode.maValue);
     }
     else
         vsa.eMatchMode = exactorNA;
@@ -7888,7 +7992,9 @@ void ScInterpreter::ScXLookup()
             PushIllegalParameter();
             return;
     }
-    if ( ( nsR >= nsC && nsR != nrR ) || ( nsR < nsC && nsC != nrC ) )
+    if (!selookup::validateXLookupResultShape(
+            { static_cast<sal_Int32>(nsC), static_cast<sal_Int32>(nsR) },
+            { static_cast<sal_Int32>(nrC), static_cast<sal_Int32>(nrR) }))
     {
         // search matrix must have same number of elements as result matrix in search direction
         PushIllegalParameter();
@@ -7991,24 +8097,19 @@ void ScInterpreter::ScXLookup()
         //  found, output result
         assert( vsa.bVLookup ? ( o3tl::make_unsigned(vsa.nIndex) < nrR ) :
                                ( o3tl::make_unsigned(vsa.nIndex) < nrC ) );
-        SCSIZE nX;
-        SCSIZE nY;
-        SCSIZE nResCols;
-        SCSIZE nResRows;
-        if ( vsa.bVLookup )
+        const auto aResultSlice = selookup::planXLookupResultSlice(
+            vsa.bVLookup ? selookup::VectorOrientation::Column
+                         : selookup::VectorOrientation::Row,
+            vsa.nIndex, { static_cast<sal_Int32>(nrC), static_cast<sal_Int32>(nrR) });
+        if (!aResultSlice)
         {
-            nX = static_cast<SCSIZE>(0);
-            nY = vsa.nIndex;
-            nResCols = nrC;
-            nResRows = 1;
+            PushIllegalParameter();
+            return;
         }
-        else
-        {
-            nX = vsa.nIndex;
-            nY = static_cast<SCSIZE>(0);
-            nResCols = 1;
-            nResRows = nrR;
-        }
+        const SCSIZE nX = aResultSlice.maValue.maStart.mnColumn;
+        const SCSIZE nY = aResultSlice.maValue.maStart.mnRow;
+        const SCSIZE nResCols = aResultSlice.maValue.maDimensions.mnColumns;
+        const SCSIZE nResRows = aResultSlice.maValue.maDimensions.mnRows;
         // if result has more than one row or column push double ref or matrix, else push single ref
         if ( nResCols > 1 || nResRows > 1 )
         {
@@ -12860,72 +12961,42 @@ bool ScInterpreter::SearchVectorForValue( VectorSearchArguments& vsa )
     ScQueryEntry& rEntry = rParam.GetEntry(0);
     rEntry.nField = vsa.eSearchMode != LookupSearchMode::Reverse ? vsa.nCol1 : vsa.nCol2;
     rEntry.bDoQuery = true;
-    switch ( vsa.eMatchMode )
+    const auto aSearchPolicy = selookup::buildSearchPolicy(
+        toLookupOperation(vsa.nSearchOpCode), static_cast<selookup::MatchMode>(vsa.eMatchMode),
+        toLookupSearchMode(vsa.eSearchMode), vsa.isStringSearch, mrDoc.IsInVBAMode(),
+        MayBeWildcard(vsa.sSearchStr.getString()), MayBeRegExp(vsa.sSearchStr.getString()));
+    if (!aSearchPolicy)
     {
-        case exactorNA :
-            rEntry.eOp = SC_EQUAL;
-            break;
-
-        case exactorS :
-            rEntry.eOp = SC_LESS_EQUAL;
-            break;
-
-        case exactorG :
-            rEntry.eOp = SC_GREATER_EQUAL;
-            break;
-
-        case wildcard :
-        case regex :
-            // this mode can only used with XLOOKUP/XMATCH
-            if ( vsa.nSearchOpCode == SC_OPCODE_X_LOOKUP || vsa.nSearchOpCode == SC_OPCODE_X_MATCH )
-            {
-                // Wildcard/Regex search mode with binary search is not allowed
-                if (vsa.eSearchMode == LookupSearchMode::BinaryAscending || vsa.eSearchMode == LookupSearchMode::BinaryDescending)
-                {
-                    PushNoValue();
-                    return false;
-                }
-
-                rEntry.eOp = SC_EQUAL;
-                if ( vsa.isStringSearch )
-                {
-                    if (vsa.eMatchMode == wildcard && MayBeWildcard(vsa.sSearchStr.getString()))
-                        rParam.eSearchType = utl::SearchParam::SearchType::Wildcard;
-                    else if (vsa.eMatchMode == regex && MayBeRegExp(vsa.sSearchStr.getString()))
-                        rParam.eSearchType = utl::SearchParam::SearchType::Regexp;
-                    else
-                        rParam.eSearchType = utl::SearchParam::SearchType::Normal;
-                }
-            }
-            else
-            {
-                PushIllegalParameter();
-                return false;
-            }
-            break;
-
-        default :
+        if (aSearchPolicy.meError == spreadsheetengine::api::Error::NoValue)
+            PushNoValue();
+        else
             PushIllegalParameter();
-            return false;
+        return false;
     }
+    rEntry.eOp = toCalcQueryOp(aSearchPolicy.maValue.meComparison);
 
     ScQueryEntry::Item& rItem = rEntry.GetQueryItem();
-    // allow to match empty cells as result if we are looking for the next smaller
-    // or larger values in case of the new lookup functions
-    if (rEntry.eOp != SC_EQUAL && (vsa.nSearchOpCode == SC_OPCODE_X_LOOKUP ||
-        vsa.nSearchOpCode == SC_OPCODE_X_MATCH))
-        rItem.mbMatchEmpty = true;
+    rItem.mbMatchEmpty = aSearchPolicy.maValue.mbAllowMatchEmpty;
 
     if ( vsa.isStringSearch )
     {
         rItem.meType   = ScQueryEntry::ByString;
         rItem.maString = vsa.sSearchStr;
-        if ( vsa.nSearchOpCode == SC_OPCODE_MATCH )
+        switch (aSearchPolicy.maValue.mePattern)
         {
-            if ( mrDoc.IsInVBAMode() )
+            case selookup::PatternMode::Wildcard:
                 rParam.eSearchType = utl::SearchParam::SearchType::Wildcard;
-            else
+                break;
+            case selookup::PatternMode::Regex:
+                rParam.eSearchType = utl::SearchParam::SearchType::Regexp;
+                break;
+            case selookup::PatternMode::Detect:
                 rParam.eSearchType = DetectSearchType(rEntry.GetQueryItem().maString.getString(), mrDoc);
+                break;
+            case selookup::PatternMode::Normal:
+            default:
+                rParam.eSearchType = toCalcSearchType(aSearchPolicy.maValue.mePattern);
+                break;
         }
     }
     else if ( vsa.isEmptySearch && (vsa.nSearchOpCode == SC_OPCODE_X_LOOKUP ||
@@ -12954,26 +13025,14 @@ bool ScInterpreter::SearchVectorForValue( VectorSearchArguments& vsa )
             return false;
     }
 
-    // MATCH expects index starting with 1, XLOOKUP expects index starting with 0
-    if ( vsa.nHitIndex > 0 )
+    const auto aResolvedIndex = selookup::resolveSearchResultIndex(
+        toLookupOperation(vsa.nSearchOpCode), static_cast<sal_Int32>(vsa.nHitIndex),
+        vsa.nBestFit != SCSIZE_MAX
+            ? std::optional<sal_Int32>(static_cast<sal_Int32>(vsa.nBestFit))
+            : std::nullopt);
+    if (aResolvedIndex)
     {
-        vsa.nIndex = ( vsa.nSearchOpCode == SC_OPCODE_X_LOOKUP ? --vsa.nHitIndex : vsa.nHitIndex );
-        return true;
-    }
-    else  if ( vsa.nHitIndex == 0 && vsa.nBestFit != SCSIZE_MAX )
-    {
-        if ( vsa.nSearchOpCode == SC_OPCODE_X_LOOKUP )
-        {
-            vsa.nIndex = vsa.nBestFit;
-            if ( !vsa.pMatSrc )
-            {
-                vsa.nIndex -= ( vsa.bVLookup ? vsa.nRow1 : vsa.nCol1 );
-            }
-        }
-        else
-        {
-            vsa.nIndex = ++vsa.nBestFit;
-        }
+        vsa.nIndex = aResolvedIndex.maValue;
         return true;
     }
 

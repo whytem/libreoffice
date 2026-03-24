@@ -854,9 +854,6 @@ Current status:
 - the remaining pass 3 leftovers are mostly adapter-side mechanics:
   - jump-matrix setup and result buffering still live in Calc
   - lazy branch execution and token-stack ownership still live in Calc
-- the next meaningful work should move to pass 4:
-  - locale-aware text and date parsing, using the host contracts that are now
-    in place
 - pass 4 is now substantially complete for the first spreadsheet-facing parsing slice:
   - the host contract now distinguishes parsed number/date/time/datetime results
     and supports the `LAX_TIME` parse mode needed by `TIMEVALUE`
@@ -869,6 +866,35 @@ Current status:
   - the main remaining pass 4 leftovers are broader `ConvertStringToValue()`
     and formula-wide coercion paths that touch more than the direct
     spreadsheet-facing parsing functions
+- pass 5 is now substantially complete for the low-coupling lookup/query layer:
+  - engine-owned lookup helpers now cover:
+    - `MATCH` / `XMATCH` mode normalization
+    - reusable search-policy planning for equality, approximate, wildcard, and
+      regex lookup modes
+    - vector-shape and result-shape validation for lookup-oriented matrix paths
+    - index/result planning shared by `LOOKUP`, `VLOOKUP`/`HLOOKUP`, and
+      `XLOOKUP`
+  - Calc now consumes that lookup planner layer in:
+    - `ScMatch()`
+    - `ScXMatch()`
+    - `ScLookup()`
+    - `CalculateLookup()`
+    - `ScXLookup()`
+    - `SearchVectorForValue()`
+  - the standalone suite now exercises the extracted lookup policies directly
+    through `spreadsheetengine_lookup_tests`
+  - Calc validation now includes the lookup-heavy gates in
+    `CppunitTest_sc_ucalc_formula2` and the sorted-range `MATCH` coverage in
+    `CppunitTest_sc_ucalc_sort`
+- the main remaining pass 5 leftovers are the genuinely host-heavy pieces:
+  - comparator and query policy that still depends on Calc iterators and search
+    services
+  - lookup-cache ownership and reuse
+  - broader criteria/query evaluation that is closer to Phase 10 dependency and
+    cache work
+- the next meaningful work should move to pass 6:
+  - array-aware and document-coupled evaluator helpers that can now target the
+    host/runtime seams from Phases 8 and 9
 
 Validation:
 
@@ -876,12 +902,15 @@ Validation:
   - host-runtime tests
   - evaluator parity cases against the in-memory host
   - shared-case TSV runner where the rows are spreadsheet-facing
+  - `spreadsheetengine_lookup_tests`
 - LibreOffice:
   - `CppunitTest_sc_ucalc_shared_cases`
   - `CppunitTest_sc_logical_functions_test`
   - `CppunitTest_sc_text_functions_test`
   - `CppunitTest_sc_spreadsheet_functions_test`
   - `CppunitTest_sc_ucalc`
+  - `CppunitTest_sc_ucalc_formula2`
+  - `CppunitTest_sc_ucalc_sort`
   - targeted function-family tests for each extracted slice
 
 Exit criteria:
