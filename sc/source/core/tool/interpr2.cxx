@@ -17,6 +17,7 @@
  *   the License at http://www.apache.org/licenses/LICENSE-2.0 .
  */
 
+#include <algorithm>
 #include <memory>
 #include <interpre.hxx>
 
@@ -53,6 +54,7 @@
 #include <spreadsheetengine/core/MathRounding.hxx>
 #include <spreadsheetengine/core/MathScalar.hxx>
 #include <spreadsheetengine/core/NumeralConversion.hxx>
+#include <spreadsheetengine/compat/libreoffice/Date.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 
 #include <com/sun/star/sheet/DataPilotFieldFilter.hpp>
@@ -66,6 +68,39 @@ namespace semath = spreadsheetengine::core::math;
 namespace seconvert = spreadsheetengine::core::convert;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 
+namespace
+{
+
+spreadsheetengine::api::WeekendMask toEngineWeekendMask(const bool bWeekendMask[7])
+{
+    spreadsheetengine::api::WeekendMask aWeekendMask {};
+    std::copy_n(bWeekendMask, aWeekendMask.size(), aWeekendMask.begin());
+    return aWeekendMask;
+}
+
+void copyWeekendMask(
+    const spreadsheetengine::api::WeekendMask& rWeekendMask, bool bDestination[7])
+{
+    std::copy(rWeekendMask.begin(), rWeekendMask.end(), bDestination);
+}
+
+std::vector<spreadsheetengine::api::DateSerial> toEngineHolidaySerials(
+    const std::vector<double>& rSortArray)
+{
+    std::vector<spreadsheetengine::api::DateSerial> aHolidaySerials;
+    aHolidaySerials.reserve(rSortArray.size());
+    for (double fDate : rSortArray)
+        aHolidaySerials.push_back(static_cast<spreadsheetengine::api::DateSerial>(fDate));
+    return aHolidaySerials;
+}
+
+spreadsheetengine::api::DateParts toEngineNullDate(const Date& rNullDate)
+{
+    return selibreoffice::toApiDateParts(rNullDate);
+}
+
+}
+
 #define SCdEpsilon                1.0E-7
 
 // Date and Time
@@ -76,7 +111,7 @@ double ScInterpreter::GetDateSerial( sal_Int16 nYear, sal_Int16 nMonth, sal_Int1
     if ( nYear < 100 && !bStrict )
         nYear = mrContext.NFExpandTwoDigitYear( nYear );
     if (std::optional<double> fSerial = sedatetime::makeDateSerial(
-            mrContext.NFGetNullDate(), nYear, nMonth, nDay, bStrict))
+            toEngineNullDate(mrContext.NFGetNullDate()), nYear, nMonth, nDay, bStrict))
         return *fSerial;
 
     SetError(FormulaError::NoValue);
@@ -105,17 +140,20 @@ void ScInterpreter::ScGetActTime()
 
 void ScInterpreter::ScGetYear()
 {
-    PushDouble(sedatetime::extractYear(mrContext.NFGetNullDate(), GetFloor32()));
+    PushDouble(sedatetime::extractYear(
+        toEngineNullDate(mrContext.NFGetNullDate()), GetFloor32()));
 }
 
 void ScInterpreter::ScGetMonth()
 {
-    PushDouble(sedatetime::extractMonth(mrContext.NFGetNullDate(), GetFloor32()));
+    PushDouble(sedatetime::extractMonth(
+        toEngineNullDate(mrContext.NFGetNullDate()), GetFloor32()));
 }
 
 void ScInterpreter::ScGetDay()
 {
-    if (std::optional<double> fDay = sedatetime::extractDay(mrContext.NFGetNullDate(), GetFloor32()))
+    if (std::optional<double> fDay
+        = sedatetime::extractDay(toEngineNullDate(mrContext.NFGetNullDate()), GetFloor32()))
         PushDouble(*fDay);
     else
     {
@@ -172,7 +210,8 @@ void ScInterpreter::ScGetDayOfWeek()
         nFlag = 1;
 
     const auto aResult
-        = sedatetime::computeDayOfWeek(mrContext.NFGetNullDate(), GetFloor32(), nFlag);
+        = sedatetime::computeDayOfWeek(
+            toEngineNullDate(mrContext.NFGetNullDate()), GetFloor32(), nFlag);
     if (!aResult.mbValid)
         SetError(FormulaError::IllegalArgument);
     PushInt(aResult.mnValue);
@@ -183,7 +222,8 @@ void ScInterpreter::ScWeeknumOOo()
     if ( MustHaveParamCount( GetByte(), 2 ) )
     {
         sal_Int16 nFlag = GetInt16();
-        PushInt(sedatetime::computeWeeknumOOo(mrContext.NFGetNullDate(), GetFloor32(), nFlag));
+        PushInt(sedatetime::computeWeeknumOOo(
+            toEngineNullDate(mrContext.NFGetNullDate()), GetFloor32(), nFlag));
     }
 }
 
@@ -195,7 +235,8 @@ void ScInterpreter::ScGetWeekOfYear()
 
     sal_Int16 nFlag = (nParamCount == 1) ? 1 : GetInt16WithDefault(1);
     if (std::optional<int> nWeek
-        = sedatetime::computeWeekOfYear(mrContext.NFGetNullDate(), GetFloor32(), nFlag))
+        = sedatetime::computeWeekOfYear(
+            toEngineNullDate(mrContext.NFGetNullDate()), GetFloor32(), nFlag))
         PushInt(*nWeek);
     else
         PushIllegalArgument();
@@ -204,7 +245,8 @@ void ScInterpreter::ScGetWeekOfYear()
 void ScInterpreter::ScGetIsoWeekOfYear()
 {
     if ( MustHaveParamCount( GetByte(), 1 ) )
-        PushInt(sedatetime::computeIsoWeekOfYear(mrContext.NFGetNullDate(), GetFloor32()));
+        PushInt(sedatetime::computeIsoWeekOfYear(
+            toEngineNullDate(mrContext.NFGetNullDate()), GetFloor32()));
 }
 
 void ScInterpreter::ScEasterSunday()
@@ -222,7 +264,8 @@ void ScInterpreter::ScEasterSunday()
     if ( nYear < 100 )
         nYear = mrContext.NFExpandTwoDigitYear( nYear );
     if (std::optional<double> fSerial
-        = sedatetime::computeEasterSundaySerial(mrContext.NFGetNullDate(), nYear))
+        = sedatetime::computeEasterSundaySerial(
+            toEngineNullDate(mrContext.NFGetNullDate()), nYear))
         PushDouble(*fSerial);
     else
         PushIllegalArgument();
@@ -238,11 +281,17 @@ FormulaError ScInterpreter::GetWeekendAndHolidayMasks(
         GetNumberSequenceArray( 1, nWeekendDays, false );
         if ( nGlobalError != FormulaError::NONE )
             return nGlobalError;
-        if (!sedatetime::applyWeekendMaskSequence(nWeekendDays, bWeekendMask))
+        auto aWeekendMask = toEngineWeekendMask(bWeekendMask);
+        if (!sedatetime::applyWeekendMaskSequence(nWeekendDays, aWeekendMask))
             return FormulaError::IllegalArgument;
+        copyWeekendMask(aWeekendMask, bWeekendMask);
     }
     else
-        sedatetime::setDefaultWeekendMask(bWeekendMask);
+    {
+        auto aWeekendMask = toEngineWeekendMask(bWeekendMask);
+        sedatetime::setDefaultWeekendMask(aWeekendMask);
+        copyWeekendMask(aWeekendMask, bWeekendMask);
+    }
 
     if ( nParamCount >= 3 )
     {
@@ -308,11 +357,18 @@ FormulaError ScInterpreter::GetWeekendAndHolidayMasks_MS(
     }
 
     if ( aWeekendDays.isEmpty() )
-        sedatetime::setDefaultWeekendMask(bWeekendMask);
+    {
+        auto aWeekendMask = toEngineWeekendMask(bWeekendMask);
+        sedatetime::setDefaultWeekendMask(aWeekendMask);
+        copyWeekendMask(aWeekendMask, bWeekendMask);
+    }
     else
     {
-        if (!sedatetime::applyWeekendMaskMsSpec(aWeekendDays, bWorkdayFunction, bWeekendMask))
+        auto aWeekendMask = toEngineWeekendMask(bWeekendMask);
+        if (!sedatetime::applyWeekendMaskMsSpec(
+                selibreoffice::toApiString(aWeekendDays), bWorkdayFunction, aWeekendMask))
             nErr = FormulaError::IllegalArgument;
+        copyWeekendMask(aWeekendMask, bWeekendMask);
     }
     return nErr;
 }
@@ -351,8 +407,10 @@ void ScInterpreter::ScNetWorkdays( bool bOOXML_Version )
         }
         nDate2 += nNullDate;
         nDate1 += nNullDate;
+        const auto aHolidaySerials = toEngineHolidaySerials(nSortArray);
         PushDouble(static_cast<double>(
-            sedatetime::countWorkdays(nDate1, nDate2, nSortArray, bWeekendMask)));
+            sedatetime::countWorkdays(
+                nDate1, nDate2, aHolidaySerials, toEngineWeekendMask(bWeekendMask))));
     }
 }
 
@@ -385,8 +443,13 @@ void ScInterpreter::ScWorkday_MS()
         if ( !nDays )
             PushDouble( static_cast<double>( nDate - nNullDate ) );
         else
+        {
+            const auto aHolidaySerials = toEngineHolidaySerials(nSortArray);
             PushDouble(static_cast<double>(
-                sedatetime::advanceWorkday(nDate, nDays, nSortArray, bWeekendMask) - nNullDate));
+                sedatetime::advanceWorkday(
+                    nDate, nDays, aHolidaySerials, toEngineWeekendMask(bWeekendMask))
+                - nNullDate));
+        }
     }
 }
 
@@ -470,7 +533,7 @@ void ScInterpreter::ScGetDiffDate360()
         PushError( nGlobalError);
     else
         PushDouble(sedatetime::computeDiffDate360(
-            mrContext.NFGetNullDate(), nDate1, nDate2, bFlag));
+            toEngineNullDate(mrContext.NFGetNullDate()), nDate1, nDate2, bFlag));
 }
 
 // fdo#44456 function DATEDIF as defined in ODF1.2 (Par. 6.10.3)
@@ -490,7 +553,9 @@ void ScInterpreter::ScGetDateDif()
     }
 
     if (std::optional<double> fResult
-        = sedatetime::computeDateDif(mrContext.NFGetNullDate(), nDate1, nDate2, aInterval))
+        = sedatetime::computeDateDif(
+            toEngineNullDate(mrContext.NFGetNullDate()), nDate1, nDate2,
+            selibreoffice::toApiString(aInterval)))
         PushDouble(*fResult);
     else
         PushIllegalArgument();               // unsupported format

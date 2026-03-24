@@ -9,41 +9,41 @@
 
 #include <spreadsheetengine/core/TextCase.hxx>
 
-#include <rtl/ustrbuf.hxx>
-
 namespace spreadsheetengine::core::text
 {
 
-OUString uppercase(const CharClass& rCharClass, const OUString& rInput)
+spreadsheetengine::api::String uppercase(
+    const CaseMappingService& rCaseService, spreadsheetengine::api::StringView rInput)
 {
-    return rCharClass.uppercase(rInput);
+    return rCaseService.uppercase(rInput);
 }
 
-OUString lowercase(const CharClass& rCharClass, const OUString& rInput)
+spreadsheetengine::api::String lowercase(
+    const CaseMappingService& rCaseService, spreadsheetengine::api::StringView rInput)
 {
-    return rCharClass.lowercase(rInput);
+    return rCaseService.lowercase(rInput);
 }
 
-OUString propercase(const CharClass& rCharClass, const OUString& rInput)
+spreadsheetengine::api::String propercase(
+    const CaseMappingService& rCaseService, spreadsheetengine::api::StringView rInput)
 {
-    OUStringBuffer aBuffer(rInput);
-    const sal_Int32 nLength = aBuffer.getLength();
-    if (nLength == 0)
-        return aBuffer.makeStringAndClear();
+    spreadsheetengine::api::String aBuffer(rInput);
+    if (aBuffer.empty())
+        return aBuffer;
 
-    const OUString aUpper(rCharClass.uppercase(aBuffer.toString()));
-    const OUString aLower(rCharClass.lowercase(aBuffer.toString()));
+    const auto aUpper = rCaseService.uppercase(aBuffer);
+    const auto aLower = rCaseService.lowercase(aBuffer);
     aBuffer[0] = aUpper[0];
 
-    for (sal_Int32 nPos = 1; nPos < nLength; ++nPos)
+    for (std::size_t nPos = 1; nPos < aBuffer.size(); ++nPos)
     {
-        if (!rCharClass.isLetter(OUString(aBuffer[nPos - 1]), 0))
+        if (!rCaseService.isLetter(aBuffer[nPos - 1]))
             aBuffer[nPos] = aUpper[nPos];
         else
             aBuffer[nPos] = aLower[nPos];
     }
 
-    return aBuffer.makeStringAndClear();
+    return aBuffer;
 }
 
 } // namespace spreadsheetengine::core::text

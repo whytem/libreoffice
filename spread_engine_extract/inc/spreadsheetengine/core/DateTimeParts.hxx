@@ -11,23 +11,26 @@
 
 #include <optional>
 
-#include <rtl/ustring.hxx>
 #include <sal/types.h>
+#include <spreadsheetengine/api/Date.hxx>
+#include <spreadsheetengine/api/String.hxx>
 #include <spreadsheetengine/spreadsheetenginedllapi.h>
-
-class Date;
 
 namespace spreadsheetengine::core::datetime
 {
 
 SPREADSHEETENGINE_DLLPUBLIC std::optional<double> makeDateSerial(
-    const Date& rNullDate, sal_Int16 nYear, sal_Int16 nMonth, sal_Int16 nDay, bool bStrict);
+    const spreadsheetengine::api::DateParts& rNullDate, sal_Int16 nYear, sal_Int16 nMonth,
+    sal_Int16 nDay, bool bStrict);
 
-SPREADSHEETENGINE_DLLPUBLIC double extractYear(const Date& rNullDate, sal_Int32 nDays);
+SPREADSHEETENGINE_DLLPUBLIC double extractYear(
+    const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays);
 
-SPREADSHEETENGINE_DLLPUBLIC double extractMonth(const Date& rNullDate, sal_Int32 nDays);
+SPREADSHEETENGINE_DLLPUBLIC double extractMonth(
+    const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays);
 
-SPREADSHEETENGINE_DLLPUBLIC std::optional<double> extractDay(const Date& rNullDate, sal_Int32 nDays);
+SPREADSHEETENGINE_DLLPUBLIC std::optional<double> extractDay(
+    const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays);
 
 SPREADSHEETENGINE_DLLPUBLIC double extractMinute(double fTimeValue);
 
@@ -39,15 +42,17 @@ SPREADSHEETENGINE_DLLPUBLIC std::optional<double> makeTimeSerial(
     double fHour, double fMinute, double fSecond);
 
 SPREADSHEETENGINE_DLLPUBLIC std::optional<double> computeEasterSundaySerial(
-    const Date& rNullDate, sal_Int16 nYear);
+    const spreadsheetengine::api::DateParts& rNullDate, sal_Int16 nYear);
 
 SPREADSHEETENGINE_DLLPUBLIC double computeDiffDate(double fDate1, double fDate2);
 
 SPREADSHEETENGINE_DLLPUBLIC double computeDiffDate360(
-    const Date& rNullDate, sal_Int32 nDate1, sal_Int32 nDate2, bool bEuropeanMethod);
+    const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDate1,
+    spreadsheetengine::api::DateSerial nDate2, bool bEuropeanMethod);
 
 SPREADSHEETENGINE_DLLPUBLIC std::optional<double> computeDateDif(
-    const Date& rNullDate, sal_Int32 nDate1, sal_Int32 nDate2, const OUString& rInterval);
+    const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDate1,
+    spreadsheetengine::api::DateSerial nDate2, spreadsheetengine::api::StringView rInterval);
 
 } // namespace spreadsheetengine::core::datetime
 

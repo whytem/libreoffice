@@ -11,16 +11,30 @@
 
 #include <optional>
 
-#include <tools/date.hxx>
+#include "DateAlgorithms.hxx"
 
 namespace spreadsheetengine::core::datetime
 {
 
-WeekdayResult computeDayOfWeek(const Date& rNullDate, sal_Int32 nDays, sal_Int16 nFlag)
+namespace sedate = spreadsheetengine::core::detail::date;
+
+namespace
 {
-    Date aDate = rNullDate;
-    aDate.AddDays(nDays);
-    int nValue = static_cast<int>(aDate.GetDayOfWeek());
+
+spreadsheetengine::api::DateParts getDateForSerial(
+    const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays)
+{
+    return sedate::fromAbsoluteDays(sedate::toAbsoluteDays(rNullDate) + nDays);
+}
+
+}
+
+WeekdayResult computeDayOfWeek(
+    const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays,
+    sal_Int16 nFlag)
+{
+    const auto aDate = getDateForSerial(rNullDate, nDays);
+    int nValue = static_cast<int>(sedate::getDayOfWeekFromAbsoluteDays(sedate::toAbsoluteDays(aDate)));
 
     switch (nFlag)
     {
@@ -54,28 +68,28 @@ WeekdayResult computeDayOfWeek(const Date& rNullDate, sal_Int32 nDays, sal_Int16
     return { nValue, true };
 }
 
-int computeWeeknumOOo(const Date& rNullDate, sal_Int32 nDays, sal_Int16 nFlag)
+int computeWeeknumOOo(const spreadsheetengine::api::DateParts& rNullDate,
+    spreadsheetengine::api::DateSerial nDays, sal_Int16 nFlag)
 {
-    Date aDate = rNullDate;
-    aDate.AddDays(nDays);
-    return static_cast<int>(aDate.GetWeekOfYear(nFlag == 1 ? SUNDAY : MONDAY));
+    const auto aDate = getDateForSerial(rNullDate, nDays);
+    return static_cast<int>(sedate::getWeekOfYear(aDate, nFlag == 1 ? 6 : 0, 1));
 }
 
-std::optional<int> computeWeekOfYear(const Date& rNullDate, sal_Int32 nDays, sal_Int16 nFlag)
+std::optional<int> computeWeekOfYear(const spreadsheetengine::api::DateParts& rNullDate,
+    spreadsheetengine::api::DateSerial nDays, sal_Int16 nFlag)
 {
-    Date aDate = rNullDate;
-    aDate.AddDays(nDays);
+    const auto aDate = getDateForSerial(rNullDate, nDays);
 
     sal_Int32 nMinimumNumberOfDaysInWeek;
-    DayOfWeek eFirstDayOfWeek;
+    sal_Int16 nFirstDayOfWeek;
     switch (nFlag)
     {
         case 1:
-            eFirstDayOfWeek = SUNDAY;
+            nFirstDayOfWeek = 6;
             nMinimumNumberOfDaysInWeek = 1;
             break;
         case 2:
-            eFirstDayOfWeek = MONDAY;
+            nFirstDayOfWeek = 0;
             nMinimumNumberOfDaysInWeek = 1;
             break;
         case 11:
@@ -85,26 +99,26 @@ std::optional<int> computeWeekOfYear(const Date& rNullDate, sal_Int32 nDays, sal
         case 15:
         case 16:
         case 17:
-            eFirstDayOfWeek = static_cast<DayOfWeek>(nFlag - 11);
+            nFirstDayOfWeek = nFlag - 11;
             nMinimumNumberOfDaysInWeek = 1;
             break;
         case 21:
         case 150:
-            eFirstDayOfWeek = MONDAY;
+            nFirstDayOfWeek = 0;
             nMinimumNumberOfDaysInWeek = 4;
             break;
         default:
             return std::nullopt;
     }
 
-    return static_cast<int>(aDate.GetWeekOfYear(eFirstDayOfWeek, nMinimumNumberOfDaysInWeek));
+    return static_cast<int>(sedate::getWeekOfYear(aDate, nFirstDayOfWeek, nMinimumNumberOfDaysInWeek));
 }
 
-int computeIsoWeekOfYear(const Date& rNullDate, sal_Int32 nDays)
+int computeIsoWeekOfYear(
+    const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays)
 {
-    Date aDate = rNullDate;
-    aDate.AddDays(nDays);
-    return static_cast<int>(aDate.GetWeekOfYear());
+    const auto aDate = getDateForSerial(rNullDate, nDays);
+    return static_cast<int>(sedate::getWeekOfYear(aDate, 0, 4));
 }
 
 } // namespace spreadsheetengine::core::datetime

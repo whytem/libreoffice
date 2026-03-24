@@ -9,85 +9,152 @@
 
 #include <spreadsheetengine/core/DateTimeParts.hxx>
 
+#include <algorithm>
 #include <cmath>
 #include <optional>
 
 #include <rtl/math.hxx>
-#include <tools/date.hxx>
-#include <tools/long.hxx>
-#include <tools/time.hxx>
+
+#include "DateAlgorithms.hxx"
 
 namespace spreadsheetengine::core::datetime
 {
 
-std::optional<double> makeDateSerial(
-    const Date& rNullDate, sal_Int16 nYear, sal_Int16 nMonth, sal_Int16 nDay, bool bStrict)
+namespace sedate = spreadsheetengine::core::detail::date;
+
+namespace
+{
+
+bool equalsIgnoreAsciiCase(spreadsheetengine::api::StringView rLeft,
+    spreadsheetengine::api::StringView rRight)
+{
+    if (rLeft.size() != rRight.size())
+        return false;
+
+    auto toUpper = [](char16_t c) -> char16_t {
+        if (c >= u'a' && c <= u'z')
+            return c - (u'a' - u'A');
+        return c;
+    };
+
+    for (std::size_t i = 0; i < rLeft.size(); ++i)
+    {
+        if (toUpper(rLeft[i]) != toUpper(rRight[i]))
+            return false;
+    }
+    return true;
+}
+
+spreadsheetengine::api::DateParts getDateForSerial(
+    const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays)
+{
+    return sedate::fromAbsoluteDays(sedate::toAbsoluteDays(rNullDate) + nDays);
+}
+
+void splitClock(double fTimeInDays, sal_uInt16& nHour, sal_uInt16& nMinute, sal_uInt16& nSecond,
+    double& fFractionOfSecond)
+{
+    constexpr double fSecondsPerMinute = 60.0;
+    constexpr double fSecondsPerHour = 3600.0;
+    constexpr double fSecondsPerDay = 86400.0;
+
+    const double fTime = fTimeInDays - rtl::math::approxFloor(fTimeInDays);
+    if (fTime <= 0.0 || fTime >= 1.0)
+    {
+        nHour = nMinute = nSecond = 0;
+        fFractionOfSecond = 0.0;
+        return;
+    }
+
+    const double fRawSeconds = fTime * fSecondsPerDay;
+    int nDec = 9;
+    const double fAbsTimeInDays = std::fabs(fTimeInDays);
+    if (fAbsTimeInDays >= 1.0)
+    {
+        const int nDig = static_cast<int>(std::ceil(std::log10(fAbsTimeInDays)));
+        nDec = std::clamp(10 - nDig, 2, 9);
+    }
+    double fSeconds = rtl::math::round(fRawSeconds, nDec, rtl_math_RoundingMode_Corrected);
+    if (fSeconds >= fSecondsPerDay)
+        fSeconds = fRawSeconds;
+
+    nHour = static_cast<sal_uInt16>(fSeconds / fSecondsPerHour);
+    fSeconds -= nHour * fSecondsPerHour;
+    nMinute = static_cast<sal_uInt16>(fSeconds / fSecondsPerMinute);
+    fSeconds -= nMinute * fSecondsPerMinute;
+    nSecond = static_cast<sal_uInt16>(fSeconds);
+    fFractionOfSecond = fSeconds - nSecond;
+}
+
+}
+
+std::optional<double> makeDateSerial(const spreadsheetengine::api::DateParts& rNullDate,
+    sal_Int16 nYear, sal_Int16 nMonth, sal_Int16 nDay, bool bStrict)
 {
     sal_Int16 nCalcYear = nYear;
     sal_Int16 nCalcMonth = nMonth;
     sal_Int16 nCalcDay = nDay;
     if (!bStrict)
     {
-        if (nMonth > 0)
+        while (nCalcMonth > 12)
         {
-            nCalcYear = nYear + (nMonth - 1) / 12;
-            nCalcMonth = ((nMonth - 1) % 12) + 1;
+            nCalcMonth -= 12;
+            ++nCalcYear;
+            if (nCalcYear == 0)
+                nCalcYear = 1;
         }
-        else
+        while (nCalcMonth <= 0)
         {
-            nCalcYear = nYear + (nMonth - 12) / 12;
-            nCalcMonth = 12 - (-nMonth) % 12;
+            nCalcMonth += 12;
+            --nCalcYear;
+            if (nCalcYear == 0)
+                nCalcYear = -1;
         }
         nCalcDay = 1;
     }
 
-    Date aDate(nCalcDay, nCalcMonth, nCalcYear);
+    if (!sedate::isValidDate(
+            static_cast<sal_uInt16>(nCalcDay), static_cast<sal_uInt16>(nCalcMonth), nCalcYear))
+    {
+        return std::nullopt;
+    }
+
+    auto aDate = spreadsheetengine::api::DateParts{ nCalcYear, nCalcMonth, nCalcDay };
     if (!bStrict)
-        aDate.AddDays(nDay - 1);
+        aDate = sedate::fromAbsoluteDays(sedate::toAbsoluteDays(aDate) + (nDay - 1));
 
-    if (!aDate.IsValidAndGregorian())
+    if (!sedate::isValidAndGregorian(static_cast<sal_uInt16>(aDate.mnDay),
+            static_cast<sal_uInt16>(aDate.mnMonth), static_cast<sal_Int16>(aDate.mnYear)))
+    {
         return std::nullopt;
+    }
 
-    return static_cast<double>(aDate - rNullDate);
+    return static_cast<double>(sedate::toAbsoluteDays(aDate) - sedate::toAbsoluteDays(rNullDate));
 }
 
-double extractYear(const Date& rNullDate, sal_Int32 nDays)
+double extractYear(
+    const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays)
 {
-    Date aDate = rNullDate;
-    aDate.AddDays(nDays);
-    return static_cast<double>(aDate.GetYear());
+    return static_cast<double>(getDateForSerial(rNullDate, nDays).mnYear);
 }
 
-double extractMonth(const Date& rNullDate, sal_Int32 nDays)
+double extractMonth(
+    const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays)
 {
-    Date aDate = rNullDate;
-    aDate.AddDays(nDays);
-    return static_cast<double>(aDate.GetMonth());
+    return static_cast<double>(getDateForSerial(rNullDate, nDays).mnMonth);
 }
 
-std::optional<double> extractDay(const Date& rNullDate, sal_Int32 nDays)
+std::optional<double> extractDay(
+    const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays)
 {
-    Date aDate = rNullDate;
-    if (!aDate.CheckedAddDays(nDays))
-        return std::nullopt;
-
-    return static_cast<double>(aDate.GetDay());
-}
-
-namespace
-{
-
-void splitClock(double fTimeValue, sal_uInt16& rHour, sal_uInt16& rMinute, sal_uInt16& rSecond,
-    double& rFractionOfSecond)
-{
-    tools::Time::GetClock(fTimeValue, rHour, rMinute, rSecond, rFractionOfSecond, 0);
-}
-
+    return static_cast<double>(getDateForSerial(rNullDate, nDays).mnDay);
 }
 
 double extractMinute(double fTimeValue)
 {
-    sal_uInt16 nHour, nMinute, nSecond;
+    sal_uInt16 nHour;
+    sal_uInt16 nMinute;
+    sal_uInt16 nSecond;
     double fFractionOfSecond;
     splitClock(fTimeValue, nHour, nMinute, nSecond, fFractionOfSecond);
     return nMinute;
@@ -95,7 +162,9 @@ double extractMinute(double fTimeValue)
 
 double extractSecond(double fTimeValue)
 {
-    sal_uInt16 nHour, nMinute, nSecond;
+    sal_uInt16 nHour;
+    sal_uInt16 nMinute;
+    sal_uInt16 nSecond;
     double fFractionOfSecond;
     splitClock(fTimeValue, nHour, nMinute, nSecond, fFractionOfSecond);
     if (fFractionOfSecond >= 0.5)
@@ -105,7 +174,9 @@ double extractSecond(double fTimeValue)
 
 double extractHour(double fTimeValue)
 {
-    sal_uInt16 nHour, nMinute, nSecond;
+    sal_uInt16 nHour;
+    sal_uInt16 nMinute;
+    sal_uInt16 nSecond;
     double fFractionOfSecond;
     splitClock(fTimeValue, nHour, nMinute, nSecond, fFractionOfSecond);
     return nHour;
@@ -113,19 +184,20 @@ double extractHour(double fTimeValue)
 
 std::optional<double> makeTimeSerial(double fHour, double fMinute, double fSecond)
 {
-    const double fDaySeconds = static_cast<double>(::tools::Time::secondPerDay);
-    const double fTime = std::fmod(
-                             (fHour * ::tools::Time::secondPerHour)
-                                 + (fMinute * ::tools::Time::secondPerMinute) + fSecond,
-                             fDaySeconds)
-                         / fDaySeconds;
+    constexpr double fSecondsPerMinute = 60.0;
+    constexpr double fSecondsPerHour = 3600.0;
+    constexpr double fSecondsPerDay = 86400.0;
+
+    const double fTime = std::fmod((fHour * fSecondsPerHour) + (fMinute * fSecondsPerMinute) + fSecond,
+                             fSecondsPerDay)
+                         / fSecondsPerDay;
     if (fTime < 0.0)
         return std::nullopt;
-
     return fTime;
 }
 
-std::optional<double> computeEasterSundaySerial(const Date& rNullDate, sal_Int16 nYear)
+std::optional<double> computeEasterSundaySerial(
+    const spreadsheetengine::api::DateParts& rNullDate, sal_Int16 nYear)
 {
     if (nYear < 1583 || nYear > 9956)
         return std::nullopt;
@@ -143,18 +215,16 @@ std::optional<double> computeEasterSundaySerial(const Date& rNullDate, sal_Int16
     const int L = (32 + 2 * E + 2 * I - H - K) % 7;
     const int M = int((N + 11 * H + 22 * L) / 451);
     const int O = H + L - 7 * M + 114;
-    const sal_Int16 nDay = sal::static_int_cast<sal_Int16>(O % 31 + 1);
-    const sal_Int16 nMonth = sal::static_int_cast<sal_Int16>(int(O / 31));
+    const sal_Int16 nDay = static_cast<sal_Int16>(O % 31 + 1);
+    const sal_Int16 nMonth = static_cast<sal_Int16>(int(O / 31));
     return makeDateSerial(rNullDate, nYear, nMonth, nDay, true);
 }
 
-double computeDiffDate(double fDate1, double fDate2)
-{
-    return fDate1 - fDate2;
-}
+double computeDiffDate(double fDate1, double fDate2) { return fDate1 - fDate2; }
 
-double computeDiffDate360(
-    const Date& rNullDate, sal_Int32 nDate1, sal_Int32 nDate2, bool bEuropeanMethod)
+double computeDiffDate360(const spreadsheetengine::api::DateParts& rNullDate,
+    spreadsheetengine::api::DateSerial nDate1, spreadsheetengine::api::DateSerial nDate2,
+    bool bEuropeanMethod)
 {
     sal_Int32 nSign = 1;
     if (bEuropeanMethod && (nDate2 < nDate1))
@@ -163,74 +233,69 @@ double computeDiffDate360(
         nSign = -1;
     }
 
-    Date aDate1 = rNullDate;
-    aDate1.AddDays(nDate1);
-    Date aDate2 = rNullDate;
-    aDate2.AddDays(nDate2);
-    if (aDate1.GetDay() == 31)
-        aDate1.AddDays(-1);
-    else if (!bEuropeanMethod && aDate1.GetMonth() == 2)
+    auto aDate1 = getDateForSerial(rNullDate, nDate1);
+    auto aDate2 = getDateForSerial(rNullDate, nDate2);
+    if (aDate1.mnDay == 31)
+        aDate1 = sedate::fromAbsoluteDays(sedate::toAbsoluteDays(aDate1) - 1);
+    else if (!bEuropeanMethod && aDate1.mnMonth == 2)
     {
-        switch (aDate1.GetDay())
+        switch (aDate1.mnDay)
         {
             case 28:
-                if (!aDate1.IsLeapYear())
-                    aDate1.SetDay(30);
+                if (!sedate::isLeapYear(static_cast<sal_Int16>(aDate1.mnYear)))
+                    aDate1.mnDay = 30;
                 break;
             case 29:
-                aDate1.SetDay(30);
+                aDate1.mnDay = 30;
                 break;
         }
     }
 
-    if (aDate2.GetDay() == 31)
+    if (aDate2.mnDay == 31)
     {
         if (!bEuropeanMethod)
         {
-            if (aDate1.GetDay() == 30)
-                aDate2.AddDays(-1);
+            if (aDate1.mnDay == 30)
+                aDate2 = sedate::fromAbsoluteDays(sedate::toAbsoluteDays(aDate2) - 1);
         }
         else
-            aDate2.SetDay(30);
+            aDate2.mnDay = 30;
     }
 
     return static_cast<double>(nSign)
-           * (static_cast<double>(aDate2.GetDay())
-              + static_cast<double>(aDate2.GetMonth()) * 30.0
-              + static_cast<double>(aDate2.GetYear()) * 360.0
-              - static_cast<double>(aDate1.GetDay())
-              - static_cast<double>(aDate1.GetMonth()) * 30.0
-              - static_cast<double>(aDate1.GetYear()) * 360.0);
+           * (static_cast<double>(aDate2.mnDay) + static_cast<double>(aDate2.mnMonth) * 30.0
+              + static_cast<double>(aDate2.mnYear) * 360.0
+              - static_cast<double>(aDate1.mnDay) - static_cast<double>(aDate1.mnMonth) * 30.0
+              - static_cast<double>(aDate1.mnYear) * 360.0);
 }
 
-std::optional<double> computeDateDif(
-    const Date& rNullDate, sal_Int32 nDate1, sal_Int32 nDate2, const OUString& rInterval)
+std::optional<double> computeDateDif(const spreadsheetengine::api::DateParts& rNullDate,
+    spreadsheetengine::api::DateSerial nDate1, spreadsheetengine::api::DateSerial nDate2,
+    spreadsheetengine::api::StringView rInterval)
 {
     if (nDate1 > nDate2)
         return std::nullopt;
 
     const double fDaysDifference = nDate2 - nDate1;
-    if (fDaysDifference == 0.0 || rInterval.equalsIgnoreAsciiCase("d"))
+    if (fDaysDifference == 0.0 || equalsIgnoreAsciiCase(rInterval, u"d"))
         return fDaysDifference;
 
-    Date aDate1(rNullDate);
-    aDate1.AddDays(nDate1);
-    Date aDate2(rNullDate);
-    aDate2.AddDays(nDate2);
+    auto aDate1 = getDateForSerial(rNullDate, nDate1);
+    auto aDate2 = getDateForSerial(rNullDate, nDate2);
 
-    sal_uInt16 d1 = aDate1.GetDay();
-    sal_uInt16 m1 = aDate1.GetMonth();
-    sal_uInt16 d2 = aDate2.GetDay();
-    sal_uInt16 m2 = aDate2.GetMonth();
-    sal_Int16 y1 = aDate1.GetYear();
-    sal_Int16 y2 = aDate2.GetYear();
+    sal_uInt16 d1 = static_cast<sal_uInt16>(aDate1.mnDay);
+    sal_uInt16 m1 = static_cast<sal_uInt16>(aDate1.mnMonth);
+    sal_uInt16 d2 = static_cast<sal_uInt16>(aDate2.mnDay);
+    sal_uInt16 m2 = static_cast<sal_uInt16>(aDate2.mnMonth);
+    sal_Int16 y1 = static_cast<sal_Int16>(aDate1.mnYear);
+    sal_Int16 y2 = static_cast<sal_Int16>(aDate2.mnYear);
 
     if (y1 < 0 && y2 > 0)
         ++y1;
     else if (y1 > 0 && y2 < 0)
         ++y2;
 
-    if (rInterval.equalsIgnoreAsciiCase("m"))
+    if (equalsIgnoreAsciiCase(rInterval, u"m"))
     {
         int nMonths = m2 - m1 + 12 * (y2 - y1);
         if (d1 > d2)
@@ -238,7 +303,7 @@ std::optional<double> computeDateDif(
         return static_cast<double>(nMonths);
     }
 
-    if (rInterval.equalsIgnoreAsciiCase("y"))
+    if (equalsIgnoreAsciiCase(rInterval, u"y"))
     {
         int nYears;
         if (y2 > y1)
@@ -253,30 +318,34 @@ std::optional<double> computeDateDif(
         return static_cast<double>(nYears);
     }
 
-    if (rInterval.equalsIgnoreAsciiCase("md"))
+    if (equalsIgnoreAsciiCase(rInterval, u"md"))
     {
-        tools::Long nDays;
+        sal_Int32 nDays;
         if (d1 <= d2)
             nDays = d2 - d1;
         else
         {
             if (m2 == 1)
             {
-                aDate1.SetYear(y2 == 1 ? -1 : y2 - 1);
-                aDate1.SetMonth(12);
+                aDate1.mnYear = (y2 == 1 ? -1 : y2 - 1);
+                aDate1.mnMonth = 12;
             }
             else
             {
-                aDate1.SetYear(y2);
-                aDate1.SetMonth(m2 - 1);
+                aDate1.mnYear = y2;
+                aDate1.mnMonth = static_cast<std::int16_t>(m2 - 1);
             }
-            aDate1.Normalize();
-            nDays = aDate2 - aDate1;
+            auto nDay = static_cast<sal_uInt16>(aDate1.mnDay);
+            auto nMonth = static_cast<sal_uInt16>(aDate1.mnMonth);
+            auto nYear = static_cast<sal_Int16>(aDate1.mnYear);
+            sedate::normalize(nDay, nMonth, nYear);
+            aDate1 = { nYear, static_cast<std::int16_t>(nMonth), static_cast<std::int16_t>(nDay) };
+            nDays = sedate::toAbsoluteDays(aDate2) - sedate::toAbsoluteDays(aDate1);
         }
         return static_cast<double>(nDays);
     }
 
-    if (rInterval.equalsIgnoreAsciiCase("ym"))
+    if (equalsIgnoreAsciiCase(rInterval, u"ym"))
     {
         int nMonths = m2 - m1 + 12 * (y2 - y1);
         if (d1 > d2)
@@ -284,14 +353,19 @@ std::optional<double> computeDateDif(
         return static_cast<double>(nMonths % 12);
     }
 
-    if (rInterval.equalsIgnoreAsciiCase("yd"))
+    if (equalsIgnoreAsciiCase(rInterval, u"yd"))
     {
         if (m2 > m1 || (m2 == m1 && d2 >= d1))
-            aDate1.SetYear(y2);
+            aDate1.mnYear = y2;
         else
-            aDate1.SetYear(y2 - 1);
-        aDate1.Normalize();
-        return static_cast<double>(aDate2 - aDate1);
+            aDate1.mnYear = (y2 == 1 ? -1 : y2 - 1);
+
+        auto nDay = static_cast<sal_uInt16>(aDate1.mnDay);
+        auto nMonth = static_cast<sal_uInt16>(aDate1.mnMonth);
+        auto nYear = static_cast<sal_Int16>(aDate1.mnYear);
+        sedate::normalize(nDay, nMonth, nYear);
+        aDate1 = { nYear, static_cast<std::int16_t>(nMonth), static_cast<std::int16_t>(nDay) };
+        return static_cast<double>(sedate::toAbsoluteDays(aDate2) - sedate::toAbsoluteDays(aDate1));
     }
 
     return std::nullopt;

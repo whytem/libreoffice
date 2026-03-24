@@ -63,6 +63,8 @@
 #include <spreadsheetengine/core/TextCase.hxx>
 #include <spreadsheetengine/core/TextScalar.hxx>
 #include <spreadsheetengine/core/TextWidth.hxx>
+#include <spreadsheetengine/compat/libreoffice/String.hxx>
+#include <spreadsheetengine/compat/libreoffice/TextServices.hxx>
 #include <rangeutl.hxx>
 #include <compiler.hxx>
 #include <externalrefmgr.hxx>
@@ -88,6 +90,24 @@ ScCalcConfig *ScInterpreter::mpGlobalConfig = nullptr;
 using namespace formula;
 namespace semath = spreadsheetengine::core::math;
 namespace setext = spreadsheetengine::core::text;
+namespace selibreoffice = spreadsheetengine::compat::libreoffice;
+
+namespace
+{
+
+selibreoffice::SystemTextEncodingService& getTextEncodingService()
+{
+    static selibreoffice::SystemTextEncodingService aService;
+    return aService;
+}
+
+selibreoffice::TransliterationWidthConversionService& getWidthConversionService()
+{
+    static selibreoffice::TransliterationWidthConversionService aService;
+    return aService;
+}
+
+}
 
 void ScInterpreter::ScIfJump()
 {
@@ -3208,31 +3228,38 @@ void ScInterpreter::ScN()
 
 void ScInterpreter::ScTrim()
 {
-    PushString(setext::trimRepeatedSpaces(GetString().getString()));
+    PushString(selibreoffice::toLibreOfficeString(
+        setext::trimRepeatedSpaces(selibreoffice::toApiString(GetString().getString()))));
 }
 
 void ScInterpreter::ScUpper()
 {
-    PushString(spreadsheetengine::core::text::uppercase(
-        ScGlobal::getCharClass(), GetString().getString()));
+    const selibreoffice::CharClassCaseMappingService aCaseService(ScGlobal::getCharClass());
+    PushString(selibreoffice::toLibreOfficeString(
+        spreadsheetengine::core::text::uppercase(
+            aCaseService, selibreoffice::toApiString(GetString().getString()))));
 }
 
 void ScInterpreter::ScProper()
 {
 //2do: what to do with I18N-CJK ?!?
-    PushString(spreadsheetengine::core::text::propercase(
-        ScGlobal::getCharClass(), GetString().getString()));
+    const selibreoffice::CharClassCaseMappingService aCaseService(ScGlobal::getCharClass());
+    PushString(selibreoffice::toLibreOfficeString(
+        spreadsheetengine::core::text::propercase(
+            aCaseService, selibreoffice::toApiString(GetString().getString()))));
 }
 
 void ScInterpreter::ScLower()
 {
-    PushString(spreadsheetengine::core::text::lowercase(
-        ScGlobal::getCharClass(), GetString().getString()));
+    const selibreoffice::CharClassCaseMappingService aCaseService(ScGlobal::getCharClass());
+    PushString(selibreoffice::toLibreOfficeString(
+        spreadsheetengine::core::text::lowercase(
+            aCaseService, selibreoffice::toApiString(GetString().getString()))));
 }
 
 void ScInterpreter::ScLen()
 {
-    PushDouble(setext::countCodePoints(GetString().getString()));
+    PushDouble(setext::countCodePoints(selibreoffice::toApiString(GetString().getString())));
 }
 
 void ScInterpreter::ScT()
@@ -3409,7 +3436,10 @@ void ScInterpreter::ScNumberValue()
     }
 
     const setext::NumberValueResult aResult = setext::parseNumberValue(
-        aInputString, oDecimalSeparator, oGroupSeparator, maCalcConfig.mbEmptyStringAsZero);
+        selibreoffice::toApiString(aInputString),
+        oDecimalSeparator ? std::optional(selibreoffice::toApiString(*oDecimalSeparator)) : std::nullopt,
+        oGroupSeparator ? std::optional(selibreoffice::toApiString(*oGroupSeparator)) : std::nullopt,
+        maCalcConfig.mbEmptyStringAsZero);
     switch (aResult.meStatus)
     {
         case setext::NumberValueStatus::Ok:
@@ -3427,19 +3457,21 @@ void ScInterpreter::ScNumberValue()
 
 void ScInterpreter::ScClean()
 {
-    PushString(setext::cleanPrintable(GetString().getString()));
+    PushString(selibreoffice::toLibreOfficeString(
+        setext::cleanPrintable(selibreoffice::toApiString(GetString().getString()))));
 }
 
 
 void ScInterpreter::ScCode()
 {
-    PushInt(setext::codeFromText(GetString().getString()));
+    PushInt(setext::codeFromText(
+        getTextEncodingService(), selibreoffice::toApiString(GetString().getString())));
 }
 
 void ScInterpreter::ScChar()
 {
-    if (std::optional<OUString> aStr = setext::charFromValue(GetDouble()))
-        PushString(*aStr);
+    if (auto aStr = setext::charFromValue(getTextEncodingService(), GetDouble()))
+        PushString(selibreoffice::toLibreOfficeString(*aStr));
     else
         PushIllegalArgument();
 }
@@ -3457,7 +3489,9 @@ void ScInterpreter::ScChar()
 void ScInterpreter::ScJis()
 {
     if (MustHaveParamCount( GetByte(), 1))
-        PushString(spreadsheetengine::core::text::convertIntoFullWidth(GetString().getString()));
+        PushString(selibreoffice::toLibreOfficeString(
+            spreadsheetengine::core::text::convertIntoFullWidth(
+                getWidthConversionService(), selibreoffice::toApiString(GetString().getString()))));
 }
 
 /* ODFF:
@@ -3469,14 +3503,17 @@ void ScInterpreter::ScJis()
 void ScInterpreter::ScAsc()
 {
     if (MustHaveParamCount( GetByte(), 1))
-        PushString(spreadsheetengine::core::text::convertIntoHalfWidth(GetString().getString()));
+        PushString(selibreoffice::toLibreOfficeString(
+            spreadsheetengine::core::text::convertIntoHalfWidth(
+                getWidthConversionService(), selibreoffice::toApiString(GetString().getString()))));
 }
 
 void ScInterpreter::ScUnicode()
 {
     if ( MustHaveParamCount( GetByte(), 1 ) )
     {
-        if (std::optional<double> fValue = setext::unicodeFromText(GetString().getString()))
+        if (std::optional<double> fValue
+            = setext::unicodeFromText(selibreoffice::toApiString(GetString().getString())))
             PushDouble(*fValue);
         else
             PushIllegalParameter();
@@ -3490,8 +3527,8 @@ void ScInterpreter::ScUnichar()
         sal_uInt32 nCodePoint = GetUInt32();
         if (nGlobalError != FormulaError::NONE)
             PushIllegalArgument();
-        else if (std::optional<OUString> aStr = setext::unicharFromCodePoint(nCodePoint))
-            PushString(*aStr);
+        else if (auto aStr = setext::unicharFromCodePoint(nCodePoint))
+            PushString(selibreoffice::toLibreOfficeString(*aStr));
         else
             PushIllegalArgument();
     }

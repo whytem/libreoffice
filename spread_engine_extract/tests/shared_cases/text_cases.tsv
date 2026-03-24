@@ -1,0 +1,14 @@
+# function	input_a	input_b	input_c	input_d	expected	error
+TRIM	  a   b  				a b	
+LEN	Aé😀				3	
+NUMBERVALUE	1,234.5%	.	,		12.345	
+CLEAN	A\u0001B				AB	
+CODE	A				65	
+CHAR	65				A	
+UNICODE	😀				128512	
+UNICHAR	128512				😀	
+UPPER	abc				ABC	
+LOWER	ABC				abc	
+PROPER	hello world				Hello World	
+ASC	Ａ				A	
+JIS	A				Ａ	

@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 project(spreadsheetengine_standalone LANGUAGES CXX)
 
 include(CTest)
+find_package(ICU REQUIRED COMPONENTS uc)
 
 set(SPREADSHEETENGINE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 
@@ -21,6 +22,7 @@ target_include_directories(spreadsheetengine_core
         "${CMAKE_CURRENT_SOURCE_DIR}/inc"
         "${CMAKE_CURRENT_SOURCE_DIR}/standalone/include"
 )
+target_link_libraries(spreadsheetengine_core PUBLIC ICU::uc)
 
 add_executable(spreadsheetengine_smoke
     ${SPREADSHEETENGINE_STANDALONE_SMOKE_SOURCES}

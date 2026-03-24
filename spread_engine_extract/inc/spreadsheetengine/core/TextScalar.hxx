@@ -11,9 +11,10 @@
 
 #include <optional>
 
-#include <rtl/ustring.hxx>
 #include <sal/types.h>
 
+#include <spreadsheetengine/api/String.hxx>
+#include <spreadsheetengine/core/TextServices.hxx>
 #include <spreadsheetengine/spreadsheetenginedllapi.h>
 
 namespace spreadsheetengine::core::text
@@ -32,16 +33,24 @@ struct NumberValueResult
     double mfValue = 0.0;
 };
 
-SPREADSHEETENGINE_DLLPUBLIC OUString trimRepeatedSpaces(const OUString& rInput);
-SPREADSHEETENGINE_DLLPUBLIC sal_Int32 countCodePoints(const OUString& rInput);
+SPREADSHEETENGINE_DLLPUBLIC spreadsheetengine::api::String trimRepeatedSpaces(
+    spreadsheetengine::api::StringView rInput);
+SPREADSHEETENGINE_DLLPUBLIC sal_Int32 countCodePoints(
+    spreadsheetengine::api::StringView rInput);
 SPREADSHEETENGINE_DLLPUBLIC NumberValueResult parseNumberValue(
-    const OUString& rInput, const std::optional<OUString>& roDecimalSeparator,
-    const std::optional<OUString>& roGroupSeparator, bool bEmptyStringAsZero);
-SPREADSHEETENGINE_DLLPUBLIC OUString cleanPrintable(const OUString& rInput);
-SPREADSHEETENGINE_DLLPUBLIC sal_Int32 codeFromText(const OUString& rInput);
-SPREADSHEETENGINE_DLLPUBLIC std::optional<OUString> charFromValue(double fValue);
-SPREADSHEETENGINE_DLLPUBLIC std::optional<double> unicodeFromText(const OUString& rInput);
-SPREADSHEETENGINE_DLLPUBLIC std::optional<OUString> unicharFromCodePoint(sal_uInt32 nCodePoint);
+    spreadsheetengine::api::StringView rInput,
+    const std::optional<spreadsheetengine::api::String>& roDecimalSeparator,
+    const std::optional<spreadsheetengine::api::String>& roGroupSeparator, bool bEmptyStringAsZero);
+SPREADSHEETENGINE_DLLPUBLIC spreadsheetengine::api::String cleanPrintable(
+    spreadsheetengine::api::StringView rInput);
+SPREADSHEETENGINE_DLLPUBLIC sal_Int32 codeFromText(
+    const SingleByteEncodingService& rEncodingService, spreadsheetengine::api::StringView rInput);
+SPREADSHEETENGINE_DLLPUBLIC std::optional<spreadsheetengine::api::String> charFromValue(
+    const SingleByteEncodingService& rEncodingService, double fValue);
+SPREADSHEETENGINE_DLLPUBLIC std::optional<double> unicodeFromText(
+    spreadsheetengine::api::StringView rInput);
+SPREADSHEETENGINE_DLLPUBLIC std::optional<spreadsheetengine::api::String> unicharFromCodePoint(
+    sal_uInt32 nCodePoint);
 
 } // namespace spreadsheetengine::core::text
 

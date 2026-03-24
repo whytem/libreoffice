@@ -9,20 +9,19 @@
 
 #pragma once
 
-#include <rtl/ustring.hxx>
-#include <unotools/charclass.hxx>
-
+#include <spreadsheetengine/api/String.hxx>
+#include <spreadsheetengine/core/TextServices.hxx>
 #include <spreadsheetengine/spreadsheetenginedllapi.h>
 
 namespace spreadsheetengine::core::text
 {
 
-SPREADSHEETENGINE_DLLPUBLIC OUString uppercase(
-    const CharClass& rCharClass, const OUString& rInput);
-SPREADSHEETENGINE_DLLPUBLIC OUString lowercase(
-    const CharClass& rCharClass, const OUString& rInput);
-SPREADSHEETENGINE_DLLPUBLIC OUString propercase(
-    const CharClass& rCharClass, const OUString& rInput);
+SPREADSHEETENGINE_DLLPUBLIC spreadsheetengine::api::String uppercase(
+    const CaseMappingService& rCaseService, spreadsheetengine::api::StringView rInput);
+SPREADSHEETENGINE_DLLPUBLIC spreadsheetengine::api::String lowercase(
+    const CaseMappingService& rCaseService, spreadsheetengine::api::StringView rInput);
+SPREADSHEETENGINE_DLLPUBLIC spreadsheetengine::api::String propercase(
+    const CaseMappingService& rCaseService, spreadsheetengine::api::StringView rInput);
 
 } // namespace spreadsheetengine::core::text
 

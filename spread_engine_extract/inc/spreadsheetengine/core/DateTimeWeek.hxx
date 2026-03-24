@@ -12,9 +12,8 @@
 #include <optional>
 
 #include <sal/types.h>
+#include <spreadsheetengine/api/Date.hxx>
 #include <spreadsheetengine/spreadsheetenginedllapi.h>
-
-class Date;
 
 namespace spreadsheetengine::core::datetime
 {
@@ -26,15 +25,18 @@ struct WeekdayResult
 };
 
 SPREADSHEETENGINE_DLLPUBLIC WeekdayResult computeDayOfWeek(
-    const Date& rNullDate, sal_Int32 nDays, sal_Int16 nFlag);
+    const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays,
+    sal_Int16 nFlag);
 
-SPREADSHEETENGINE_DLLPUBLIC int computeWeeknumOOo(
-    const Date& rNullDate, sal_Int32 nDays, sal_Int16 nFlag);
+SPREADSHEETENGINE_DLLPUBLIC int computeWeeknumOOo(const spreadsheetengine::api::DateParts& rNullDate,
+    spreadsheetengine::api::DateSerial nDays, sal_Int16 nFlag);
 
 SPREADSHEETENGINE_DLLPUBLIC std::optional<int> computeWeekOfYear(
-    const Date& rNullDate, sal_Int32 nDays, sal_Int16 nFlag);
+    const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays,
+    sal_Int16 nFlag);
 
-SPREADSHEETENGINE_DLLPUBLIC int computeIsoWeekOfYear(const Date& rNullDate, sal_Int32 nDays);
+SPREADSHEETENGINE_DLLPUBLIC int computeIsoWeekOfYear(
+    const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays);
 
 } // namespace spreadsheetengine::core::datetime
 

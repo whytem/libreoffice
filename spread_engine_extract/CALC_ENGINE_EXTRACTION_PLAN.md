@@ -102,7 +102,7 @@ standalone build as the engine grows.
   - a standalone-facing math API exists in `api/Math.hxx`
   - LibreOffice adapters exist under `compat/libreoffice/`
   - standalone tests run against the API layer rather than internal headers
-- Phase 6 first slice in progress:
+- Phase 6 is now substantially complete for the portable helper lane:
   - `NumeralConversion` now uses engine-owned string types instead of
     `OUString` in its core interface
   - a standalone-facing numeral API now exists in `api/Numeral.hxx`
@@ -112,6 +112,38 @@ standalone build as the engine grows.
     standalone-ready
   - a first shared parity seed now exists at
     `tests/shared_cases/numeral_conversion_cases.tsv`
+  - `DateTimeWorkday` now uses engine-owned date serial and string types in its
+    core interface instead of `OUString` and `tools/date.hxx` day constants
+  - a standalone-facing workday API now exists in `api/Workday.hxx`
+  - the standalone source manifest now treats `DateTimeWorkday.cxx` as
+    standalone-ready
+  - a shared parity seed now also exists at
+    `tests/shared_cases/workday_cases.tsv`
+  - `DateTimeWeek` and `DateTimeParts` now use engine-owned date parts and
+    string-view types in their core interfaces instead of `Date` and `OUString`
+  - a copied internal Gregorian calendar helper now lives in
+    `source/core/DateAlgorithms.hxx` and is shared by the extracted date
+    helper families
+  - a standalone-facing calendar API now exists in `api/Calendar.hxx`
+  - the standalone source manifest now treats `DateTimeWeek.cxx` and
+    `DateTimeParts.cxx` as standalone-ready
+  - a shared parity seed now also exists at
+    `tests/shared_cases/calendar_cases.tsv`
+  - `TextScalar`, `TextCase`, and `TextWidth` now use engine-owned string
+    types plus extracted service interfaces instead of direct LibreOffice
+    runtime dependencies
+  - LibreOffice-backed text adapters now live under
+    `compat/libreoffice/TextServices.hxx`
+  - a standalone-facing text API now exists in `api/Text.hxx`
+  - the standalone source manifest now treats `TextScalar.cxx`,
+    `TextCase.cxx`, and `TextWidth.cxx` as standalone-ready
+  - a shared parity seed now also exists at `tests/shared_cases/text_cases.tsv`
+  - the Phase 6 validation lane has been exercised successfully in both modes:
+    - standalone `spreadsheetengine_smoke` and `spreadsheetengine_tests`
+    - LibreOffice `CppunitTest_sc_text_functions_test`
+    - LibreOffice `CppunitTest_sc_datetime_functions_test`
+    - LibreOffice `CppunitTest_sc_spreadsheet_functions_test`
+    - LibreOffice `CppunitTest_sc_ucalc`
 
 ### Current validation lanes
 
@@ -197,6 +229,13 @@ Exit criteria:
 - helper families above compile in standalone mode without `sc/` headers
 - helper APIs use engine-owned types
 - parity datasets exist for the migrated behavior
+
+Status:
+
+- substantially complete
+- the remaining richer locale-aware parsing and document-aware text behavior
+  belongs with the Phase 9 host-runtime and coupled-interpreter work, not with
+  this low-coupling helper lane
 
 ### Phase 7: Own Formula, Compiler, And Config Primitives
 
@@ -400,8 +439,8 @@ Every implementation slice should do all of the following:
 The most practical next path is:
 
 1. Phase 6:
-   - finish portability and parity for the already extracted helper families,
-     especially numeral, text, and date/time helpers
+   - closed enough to treat as a maintained validation lane rather than the
+     main implementation focus
 2. Phase 7:
    - own the remaining formula/compiler/config primitives that still leak
      `formula/` and Calc vocabulary

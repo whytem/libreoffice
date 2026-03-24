@@ -9,22 +9,19 @@
 
 #pragma once
 
-#include <array>
-#include <cstdint>
+#include <tools/date.hxx>
 
-namespace spreadsheetengine::api
+#include <spreadsheetengine/api/Date.hxx>
+
+namespace spreadsheetengine::compat::libreoffice
 {
 
-using DateSerial = std::int32_t;
-using WeekendMask = std::array<bool, 7>;
-
-struct DateParts
+inline spreadsheetengine::api::DateParts toApiDateParts(const Date& rDate)
 {
-    std::int16_t mnYear = 0;
-    std::int16_t mnMonth = 0;
-    std::int16_t mnDay = 0;
-};
+    return { rDate.GetYear(), static_cast<std::int16_t>(rDate.GetMonth()),
+        static_cast<std::int16_t>(rDate.GetDay()) };
+}
 
-} // namespace spreadsheetengine::api
+} // namespace spreadsheetengine::compat::libreoffice
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

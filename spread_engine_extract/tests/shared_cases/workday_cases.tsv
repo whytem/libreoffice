@@ -1,0 +1,6 @@
+# function	input_a	input_b	input_c	input_d	expected	error
+WEEKENDMASK.DEFAULT				0000011	
+WEEKENDMASK.MS	0000011			0000011	
+NETWORKDAYS	1	10	8	0000011	7	
+WORKDAY	5	1	8	0000011	9	
+WEEKENDMASK.MS	1111111	TRUE			IllegalArgument

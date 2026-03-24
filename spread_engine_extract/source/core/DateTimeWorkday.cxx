@@ -12,125 +12,136 @@
 #include <algorithm>
 #include <cstddef>
 
-#include <tools/date.hxx>
-
 namespace spreadsheetengine::core::datetime
 {
 
 namespace
 {
 
-sal_Int16 getNormalizedDayOfWeek(sal_Int32 nDate)
+constexpr std::size_t MONDAY_INDEX = 0;
+constexpr std::size_t TUESDAY_INDEX = 1;
+constexpr std::size_t WEDNESDAY_INDEX = 2;
+constexpr std::size_t THURSDAY_INDEX = 3;
+constexpr std::size_t FRIDAY_INDEX = 4;
+constexpr std::size_t SATURDAY_INDEX = 5;
+constexpr std::size_t SUNDAY_INDEX = 6;
+
+std::size_t getNormalizedDayOfWeek(spreadsheetengine::api::DateSerial nDate)
 {
-    return static_cast<sal_Int16>((nDate - 1) % 7);
+    auto nDay = static_cast<int>((nDate - 1) % 7);
+    if (nDay < 0)
+        nDay += 7;
+    return static_cast<std::size_t>(nDay);
 }
 
 }
 
-void setDefaultWeekendMask(bool bWeekendMask[7])
+void setDefaultWeekendMask(spreadsheetengine::api::WeekendMask& rWeekendMask)
 {
-    std::fill_n(bWeekendMask, 7, false);
-    bWeekendMask[SATURDAY] = true;
-    bWeekendMask[SUNDAY] = true;
+    rWeekendMask.fill(false);
+    rWeekendMask[SATURDAY_INDEX] = true;
+    rWeekendMask[SUNDAY_INDEX] = true;
 }
 
-bool applyWeekendMaskSequence(const std::vector<double>& rWeekendDays, bool bWeekendMask[7])
+bool applyWeekendMaskSequence(
+    const std::vector<double>& rWeekendDays, spreadsheetengine::api::WeekendMask& rWeekendMask)
 {
     if (rWeekendDays.size() != 7)
         return false;
 
-    for (int i = 0; i < 7; ++i)
-        bWeekendMask[i] = static_cast<bool>(rWeekendDays[(i == 6 ? 0 : i + 1)]);
+    for (std::size_t i = 0; i < rWeekendMask.size(); ++i)
+        rWeekendMask[i] = static_cast<bool>(rWeekendDays[(i == SUNDAY_INDEX) ? 0 : i + 1]);
     return true;
 }
 
-bool applyWeekendMaskMsSpec(const OUString& rWeekendDays, bool bWorkdayFunction, bool bWeekendMask[7])
+bool applyWeekendMaskMsSpec(spreadsheetengine::api::StringView rWeekendDays, bool bWorkdayFunction,
+    spreadsheetengine::api::WeekendMask& rWeekendMask)
 {
-    setDefaultWeekendMask(bWeekendMask);
-    if (rWeekendDays.isEmpty())
+    setDefaultWeekendMask(rWeekendMask);
+    if (rWeekendDays.empty())
         return true;
 
-    if (bWorkdayFunction && rWeekendDays == "1111111")
+    if (bWorkdayFunction && rWeekendDays == u"1111111")
         return false;
 
-    std::fill_n(bWeekendMask, 7, false);
-    switch (rWeekendDays.getLength())
+    rWeekendMask.fill(false);
+    switch (rWeekendDays.size())
     {
         case 1:
             switch (rWeekendDays[0])
             {
-                case '1':
-                    bWeekendMask[SATURDAY] = true;
-                    bWeekendMask[SUNDAY] = true;
+                case u'1':
+                    rWeekendMask[SATURDAY_INDEX] = true;
+                    rWeekendMask[SUNDAY_INDEX] = true;
                     break;
-                case '2':
-                    bWeekendMask[SUNDAY] = true;
-                    bWeekendMask[MONDAY] = true;
+                case u'2':
+                    rWeekendMask[SUNDAY_INDEX] = true;
+                    rWeekendMask[MONDAY_INDEX] = true;
                     break;
-                case '3':
-                    bWeekendMask[MONDAY] = true;
-                    bWeekendMask[TUESDAY] = true;
+                case u'3':
+                    rWeekendMask[MONDAY_INDEX] = true;
+                    rWeekendMask[TUESDAY_INDEX] = true;
                     break;
-                case '4':
-                    bWeekendMask[TUESDAY] = true;
-                    bWeekendMask[WEDNESDAY] = true;
+                case u'4':
+                    rWeekendMask[TUESDAY_INDEX] = true;
+                    rWeekendMask[WEDNESDAY_INDEX] = true;
                     break;
-                case '5':
-                    bWeekendMask[WEDNESDAY] = true;
-                    bWeekendMask[THURSDAY] = true;
+                case u'5':
+                    rWeekendMask[WEDNESDAY_INDEX] = true;
+                    rWeekendMask[THURSDAY_INDEX] = true;
                     break;
-                case '6':
-                    bWeekendMask[THURSDAY] = true;
-                    bWeekendMask[FRIDAY] = true;
+                case u'6':
+                    rWeekendMask[THURSDAY_INDEX] = true;
+                    rWeekendMask[FRIDAY_INDEX] = true;
                     break;
-                case '7':
-                    bWeekendMask[FRIDAY] = true;
-                    bWeekendMask[SATURDAY] = true;
+                case u'7':
+                    rWeekendMask[FRIDAY_INDEX] = true;
+                    rWeekendMask[SATURDAY_INDEX] = true;
                     break;
                 default:
                     return false;
             }
             return true;
         case 2:
-            if (rWeekendDays[0] != '1')
+            if (rWeekendDays[0] != u'1')
                 return false;
             switch (rWeekendDays[1])
             {
-                case '1':
-                    bWeekendMask[SUNDAY] = true;
+                case u'1':
+                    rWeekendMask[SUNDAY_INDEX] = true;
                     break;
-                case '2':
-                    bWeekendMask[MONDAY] = true;
+                case u'2':
+                    rWeekendMask[MONDAY_INDEX] = true;
                     break;
-                case '3':
-                    bWeekendMask[TUESDAY] = true;
+                case u'3':
+                    rWeekendMask[TUESDAY_INDEX] = true;
                     break;
-                case '4':
-                    bWeekendMask[WEDNESDAY] = true;
+                case u'4':
+                    rWeekendMask[WEDNESDAY_INDEX] = true;
                     break;
-                case '5':
-                    bWeekendMask[THURSDAY] = true;
+                case u'5':
+                    rWeekendMask[THURSDAY_INDEX] = true;
                     break;
-                case '6':
-                    bWeekendMask[FRIDAY] = true;
+                case u'6':
+                    rWeekendMask[FRIDAY_INDEX] = true;
                     break;
-                case '7':
-                    bWeekendMask[SATURDAY] = true;
+                case u'7':
+                    rWeekendMask[SATURDAY_INDEX] = true;
                     break;
                 default:
                     return false;
             }
             return true;
         case 7:
-            for (int i = 0; i < 7; ++i)
+            for (std::size_t i = 0; i < rWeekendMask.size(); ++i)
             {
                 switch (rWeekendDays[i])
                 {
-                    case '0':
-                        bWeekendMask[i] = false;
+                    case u'0':
+                        rWeekendMask[i] = false;
                         break;
-                    case '1':
-                        bWeekendMask[i] = true;
+                    case u'1':
+                        rWeekendMask[i] = true;
                         break;
                     default:
                         return false;
@@ -142,9 +153,10 @@ bool applyWeekendMaskMsSpec(const OUString& rWeekendDays, bool bWorkdayFunction,
     }
 }
 
-sal_Int32 countWorkdays(
-    sal_Int32 nDate1, sal_Int32 nDate2, const std::vector<double>& rSortedHolidays,
-    const bool bWeekendMask[7])
+sal_Int32 countWorkdays(spreadsheetengine::api::DateSerial nDate1,
+    spreadsheetengine::api::DateSerial nDate2,
+    const std::vector<spreadsheetengine::api::DateSerial>& rSortedHolidays,
+    const spreadsheetengine::api::WeekendMask& rWeekendMask)
 {
     sal_Int32 nCount = 0;
     std::size_t nRef = 0;
@@ -155,7 +167,7 @@ sal_Int32 countWorkdays(
     const std::size_t nMax = rSortedHolidays.size();
     while (nDate1 <= nDate2)
     {
-        if (!bWeekendMask[getNormalizedDayOfWeek(nDate1)])
+        if (!rWeekendMask[getNormalizedDayOfWeek(nDate1)])
         {
             while (nRef < nMax && rSortedHolidays[nRef] < nDate1)
                 ++nRef;
@@ -168,9 +180,10 @@ sal_Int32 countWorkdays(
     return bReverse ? -nCount : nCount;
 }
 
-sal_Int32 advanceWorkday(
-    sal_Int32 nDate, sal_Int32 nDays, const std::vector<double>& rSortedHolidays,
-    const bool bWeekendMask[7])
+spreadsheetengine::api::DateSerial advanceWorkday(spreadsheetengine::api::DateSerial nDate,
+    spreadsheetengine::api::DateSerial nDays,
+    const std::vector<spreadsheetengine::api::DateSerial>& rSortedHolidays,
+    const spreadsheetengine::api::WeekendMask& rWeekendMask)
 {
     if (!nDays)
         return nDate;
@@ -184,7 +197,7 @@ sal_Int32 advanceWorkday(
             do
             {
                 ++nDate;
-            } while (bWeekendMask[getNormalizedDayOfWeek(nDate)]);
+            } while (rWeekendMask[getNormalizedDayOfWeek(nDate)]);
 
             while (nRef < nMax && rSortedHolidays[nRef] < nDate)
                 ++nRef;
@@ -201,7 +214,7 @@ sal_Int32 advanceWorkday(
             do
             {
                 --nDate;
-            } while (bWeekendMask[getNormalizedDayOfWeek(nDate)]);
+            } while (rWeekendMask[getNormalizedDayOfWeek(nDate)]);
 
             while (nRef >= 0 && rSortedHolidays[static_cast<std::size_t>(nRef)] > nDate)
                 --nRef;

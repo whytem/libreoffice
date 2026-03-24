@@ -9,15 +9,17 @@
 
 #pragma once
 
-#include <rtl/ustring.hxx>
-
+#include <spreadsheetengine/api/String.hxx>
+#include <spreadsheetengine/core/TextServices.hxx>
 #include <spreadsheetengine/spreadsheetenginedllapi.h>
 
 namespace spreadsheetengine::core::text
 {
 
-SPREADSHEETENGINE_DLLPUBLIC OUString convertIntoHalfWidth(const OUString& rInput);
-SPREADSHEETENGINE_DLLPUBLIC OUString convertIntoFullWidth(const OUString& rInput);
+SPREADSHEETENGINE_DLLPUBLIC spreadsheetengine::api::String convertIntoHalfWidth(
+    const WidthConversionService& rWidthService, spreadsheetengine::api::StringView rInput);
+SPREADSHEETENGINE_DLLPUBLIC spreadsheetengine::api::String convertIntoFullWidth(
+    const WidthConversionService& rWidthService, spreadsheetengine::api::StringView rInput);
 
 } // namespace spreadsheetengine::core::text
 

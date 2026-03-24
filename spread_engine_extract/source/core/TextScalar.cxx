@@ -12,11 +12,7 @@
 #include <cmath>
 #include <optional>
 
-#include <osl/thread.h>
-#include <rtl/character.hxx>
 #include <rtl/math.hxx>
-#include <rtl/textenc.h>
-#include <rtl/ustrbuf.hxx>
 #include <unicode/uchar.h>
 
 namespace spreadsheetengine::core::text
@@ -25,67 +21,117 @@ namespace spreadsheetengine::core::text
 namespace
 {
 
-bool isPrintableCodePoint(sal_uInt32 nCodePoint)
+bool isHighSurrogate(char16_t cChar) { return 0xD800 <= cChar && cChar <= 0xDBFF; }
+bool isLowSurrogate(char16_t cChar) { return 0xDC00 <= cChar && cChar <= 0xDFFF; }
+
+char32_t iterateCodePoint(spreadsheetengine::api::StringView rInput, std::size_t& rIndex)
 {
+    const char16_t cLead = rInput[rIndex++];
+    if (isHighSurrogate(cLead) && rIndex < rInput.size() && isLowSurrogate(rInput[rIndex]))
+    {
+        const char32_t nTrail = rInput[rIndex++] - 0xDC00;
+        return ((static_cast<char32_t>(cLead) - 0xD800) << 10) + nTrail + 0x10000;
+    }
+    return cLead;
+}
+
+void appendCodePoint(spreadsheetengine::api::String& rOutput, char32_t nCodePoint)
+{
+    if (nCodePoint <= 0xFFFF)
+        rOutput.push_back(static_cast<char16_t>(nCodePoint));
+    else
+    {
+        nCodePoint -= 0x10000;
+        rOutput.push_back(static_cast<char16_t>(0xD800 + (nCodePoint >> 10)));
+        rOutput.push_back(static_cast<char16_t>(0xDC00 + (nCodePoint & 0x3FF)));
+    }
+}
+
+bool isUnicodeScalarValue(char32_t nCodePoint)
+{
+    return nCodePoint <= 0x10FFFF && !(0xD800 <= nCodePoint && nCodePoint <= 0xDFFF);
+}
+
+bool isPrintableCodePoint(char32_t nCodePoint)
+{
+    if (!isUnicodeScalarValue(nCodePoint))
+        return false;
     return !u_isISOControl(nCodePoint) && u_isdefined(nCodePoint);
 }
 
+bool containsChar(spreadsheetengine::api::StringView rInput, char16_t cNeedle)
+{
+    return rInput.find(cNeedle) != spreadsheetengine::api::StringView::npos;
 }
 
-OUString trimRepeatedSpaces(const OUString& rInput)
+void removeChars(spreadsheetengine::api::String& rInput, spreadsheetengine::api::StringView rChars)
 {
-    const sal_Int32 nLength = rInput.getLength();
-    sal_Int32 nStart = 0;
-    while (nStart < nLength && rInput[nStart] == ' ')
+    spreadsheetengine::api::String aResult;
+    aResult.reserve(rInput.size());
+    for (char16_t c : rInput)
+    {
+        if (!containsChar(rChars, c))
+            aResult.push_back(c);
+    }
+    rInput.swap(aResult);
+}
+
+}
+
+spreadsheetengine::api::String trimRepeatedSpaces(spreadsheetengine::api::StringView rInput)
+{
+    const std::size_t nLength = rInput.size();
+    std::size_t nStart = 0;
+    while (nStart < nLength && rInput[nStart] == u' ')
         ++nStart;
 
-    sal_Int32 nEnd = nLength;
-    while (nEnd > nStart && rInput[nEnd - 1] == ' ')
+    std::size_t nEnd = nLength;
+    while (nEnd > nStart && rInput[nEnd - 1] == u' ')
         --nEnd;
 
-    OUStringBuffer aBuffer;
+    spreadsheetengine::api::String aBuffer;
     bool bPreviousWasSpace = false;
-    for (sal_Int32 i = nStart; i < nEnd; ++i)
+    for (std::size_t i = nStart; i < nEnd; ++i)
     {
-        const sal_Unicode c = rInput[i];
-        if (c == ' ')
+        const char16_t cChar = rInput[i];
+        if (cChar == u' ')
         {
             if (!bPreviousWasSpace)
-                aBuffer.append(c);
+                aBuffer.push_back(cChar);
             bPreviousWasSpace = true;
         }
         else
         {
-            aBuffer.append(c);
+            aBuffer.push_back(cChar);
             bPreviousWasSpace = false;
         }
     }
 
-    return aBuffer.makeStringAndClear();
+    return aBuffer;
 }
 
-sal_Int32 countCodePoints(const OUString& rInput)
+sal_Int32 countCodePoints(spreadsheetengine::api::StringView rInput)
 {
-    sal_Int32 nIndex = 0;
+    std::size_t nIndex = 0;
     sal_Int32 nCount = 0;
-    while (nIndex < rInput.getLength())
+    while (nIndex < rInput.size())
     {
-        rInput.iterateCodePoints(&nIndex);
+        iterateCodePoint(rInput, nIndex);
         ++nCount;
     }
     return nCount;
 }
 
-NumberValueResult parseNumberValue(
-    const OUString& rInput, const std::optional<OUString>& roDecimalSeparator,
-    const std::optional<OUString>& roGroupSeparator, bool bEmptyStringAsZero)
+NumberValueResult parseNumberValue(spreadsheetengine::api::StringView rInput,
+    const std::optional<spreadsheetengine::api::String>& roDecimalSeparator,
+    const std::optional<spreadsheetengine::api::String>& roGroupSeparator, bool bEmptyStringAsZero)
 {
     NumberValueResult aResult;
 
-    sal_Unicode cDecimalSeparator = 0;
+    char16_t cDecimalSeparator = 0;
     if (roDecimalSeparator)
     {
-        if (roDecimalSeparator->getLength() != 1)
+        if (roDecimalSeparator->size() != 1)
         {
             aResult.meStatus = NumberValueStatus::IllegalArgument;
             return aResult;
@@ -93,56 +139,50 @@ NumberValueResult parseNumberValue(
         cDecimalSeparator = (*roDecimalSeparator)[0];
     }
 
-    const OUString aGroupSeparator = roGroupSeparator.value_or(OUString());
-    if (cDecimalSeparator && aGroupSeparator.indexOf(cDecimalSeparator) != -1)
+    const auto aGroupSeparator = roGroupSeparator.value_or(spreadsheetengine::api::String());
+    if (cDecimalSeparator && containsChar(aGroupSeparator, cDecimalSeparator))
     {
         aResult.meStatus = NumberValueStatus::IllegalArgument;
         return aResult;
     }
 
-    if (rInput.isEmpty())
+    if (rInput.empty())
     {
         aResult.meStatus = bEmptyStringAsZero ? NumberValueStatus::Ok : NumberValueStatus::NoValue;
         aResult.mfValue = 0.0;
         return aResult;
     }
 
-    OUString aInputString(rInput);
-    const sal_Int32 nDecSep = aInputString.indexOf(cDecimalSeparator);
-    if (nDecSep != 0)
+    spreadsheetengine::api::String aInputString(rInput);
+    const auto nDecSepPos = cDecimalSeparator ? aInputString.find(cDecimalSeparator)
+                                              : spreadsheetengine::api::String::npos;
+    if (nDecSepPos != 0)
     {
-        OUString aTemporary(nDecSep >= 0 ? aInputString.copy(0, nDecSep) : aInputString);
-        sal_Int32 nIndex = 0;
-        while (nIndex < aGroupSeparator.getLength())
-        {
-            sal_uInt32 nChar = aGroupSeparator.iterateCodePoints(&nIndex);
-            aTemporary = aTemporary.replaceAll(OUString(&nChar, 1), u"");
-        }
-        if (nDecSep >= 0)
-            aInputString = aTemporary + aInputString.subView(nDecSep);
+        spreadsheetengine::api::String aTemporary(
+            nDecSepPos != spreadsheetengine::api::String::npos ? aInputString.substr(0, nDecSepPos)
+                                                               : aInputString);
+        removeChars(aTemporary, aGroupSeparator);
+        if (nDecSepPos != spreadsheetengine::api::String::npos)
+            aInputString = aTemporary + aInputString.substr(nDecSepPos);
         else
             aInputString = aTemporary;
     }
 
-    for (sal_Int32 i = aInputString.getLength(); --i >= 0;)
-    {
-        const sal_Unicode c = aInputString[i];
-        if (c == 0x0020 || c == 0x0009 || c == 0x000A || c == 0x000D)
-            aInputString = aInputString.replaceAt(i, 1, u"");
-    }
+    removeChars(aInputString, u" \t\n\r");
 
     sal_Int32 nPercentCount = 0;
-    for (sal_Int32 i = aInputString.getLength() - 1; i >= 0 && aInputString[i] == 0x0025; --i)
+    while (!aInputString.empty() && aInputString.back() == u'%')
     {
-        aInputString = aInputString.replaceAt(i, 1, u"");
+        aInputString.pop_back();
         ++nPercentCount;
     }
 
-    rtl_math_ConversionStatus eStatus;
-    sal_Int32 nParseEnd;
-    double fValue
-        = ::rtl::math::stringToDouble(aInputString, cDecimalSeparator, 0, &eStatus, &nParseEnd);
-    if (eStatus == rtl_math_ConversionStatus_Ok && nParseEnd == aInputString.getLength())
+    rtl_math_ConversionStatus eStatus = rtl_math_ConversionStatus_Ok;
+    sal_Int32 nParseEnd = 0;
+    double fValue = rtl::math::stringToDouble(
+        aInputString, cDecimalSeparator, 0, &eStatus, &nParseEnd);
+    if (eStatus == rtl_math_ConversionStatus_Ok
+        && nParseEnd == static_cast<sal_Int32>(aInputString.size()))
     {
         if (nPercentCount)
             fValue *= std::pow(10.0, -(nPercentCount * 2));
@@ -155,62 +195,52 @@ NumberValueResult parseNumberValue(
     return aResult;
 }
 
-OUString cleanPrintable(const OUString& rInput)
+spreadsheetengine::api::String cleanPrintable(spreadsheetengine::api::StringView rInput)
 {
-    OUStringBuffer aBuffer(rInput.getLength());
-    sal_Int32 nIndex = 0;
-    while (nIndex < rInput.getLength())
+    spreadsheetengine::api::String aBuffer;
+    std::size_t nIndex = 0;
+    while (nIndex < rInput.size())
     {
-        sal_uInt32 nCodePoint = rInput.iterateCodePoints(&nIndex);
+        const char32_t nCodePoint = iterateCodePoint(rInput, nIndex);
         if (isPrintableCodePoint(nCodePoint))
-            aBuffer.appendUtf32(nCodePoint);
+            appendCodePoint(aBuffer, nCodePoint);
     }
-    return aBuffer.makeStringAndClear();
+    return aBuffer;
 }
 
-sal_Int32 codeFromText(const OUString& rInput)
+sal_Int32 codeFromText(
+    const SingleByteEncodingService& rEncodingService, spreadsheetengine::api::StringView rInput)
 {
-    if (rInput.isEmpty())
+    if (rInput.empty())
         return 0;
-
-    const sal_uInt32 nConvertFlags = RTL_UNICODETOTEXT_FLAGS_NONSPACING_IGNORE
-                                     | RTL_UNICODETOTEXT_FLAGS_CONTROL_IGNORE
-                                     | RTL_UNICODETOTEXT_FLAGS_FLUSH
-                                     | RTL_UNICODETOTEXT_FLAGS_UNDEFINED_DEFAULT
-                                     | RTL_UNICODETOTEXT_FLAGS_INVALID_DEFAULT
-                                     | RTL_UNICODETOTEXT_FLAGS_UNDEFINED_REPLACE;
-    return static_cast<unsigned char>(
-        OUStringToOString(OUStringChar(rInput[0]), osl_getThreadTextEncoding(), nConvertFlags)
-            .toChar());
+    return rEncodingService.encodeFirstCharacter(rInput);
 }
 
-std::optional<OUString> charFromValue(double fValue)
+std::optional<spreadsheetengine::api::String> charFromValue(
+    const SingleByteEncodingService& rEncodingService, double fValue)
 {
     if (fValue < 0.0 || fValue >= 256.0)
         return std::nullopt;
-
-    const sal_uInt32 nConvertFlags = RTL_TEXTTOUNICODE_FLAGS_UNDEFINED_DEFAULT
-                                     | RTL_TEXTTOUNICODE_FLAGS_MBUNDEFINED_DEFAULT
-                                     | RTL_TEXTTOUNICODE_FLAGS_INVALID_DEFAULT;
-    const char cEncodedChar = static_cast<char>(fValue);
-    return OUString(&cEncodedChar, 1, osl_getThreadTextEncoding(), nConvertFlags);
+    return rEncodingService.decodeSingleByte(static_cast<unsigned char>(fValue));
 }
 
-std::optional<double> unicodeFromText(const OUString& rInput)
+std::optional<double> unicodeFromText(spreadsheetengine::api::StringView rInput)
 {
-    if (rInput.isEmpty())
+    if (rInput.empty())
         return std::nullopt;
 
-    sal_Int32 nIndex = 0;
-    return static_cast<double>(rInput.iterateCodePoints(&nIndex));
+    std::size_t nIndex = 0;
+    return static_cast<double>(iterateCodePoint(rInput, nIndex));
 }
 
-std::optional<OUString> unicharFromCodePoint(sal_uInt32 nCodePoint)
+std::optional<spreadsheetengine::api::String> unicharFromCodePoint(sal_uInt32 nCodePoint)
 {
-    if (!rtl::isUnicodeCodePoint(nCodePoint))
+    if (!isUnicodeScalarValue(nCodePoint))
         return std::nullopt;
 
-    return OUString(&nCodePoint, 1);
+    spreadsheetengine::api::String aResult;
+    appendCodePoint(aResult, nCodePoint);
+    return aResult;
 }
 
 } // namespace spreadsheetengine::core::text

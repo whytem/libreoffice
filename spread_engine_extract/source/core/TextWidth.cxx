@@ -9,37 +9,19 @@
 
 #include <spreadsheetengine/core/TextWidth.hxx>
 
-#include <comphelper/processfactory.hxx>
-#include <i18nutil/transliteration.hxx>
-#include <unotools/transliterationwrapper.hxx>
-
 namespace spreadsheetengine::core::text
 {
 
-OUString convertIntoHalfWidth(const OUString& rInput)
+spreadsheetengine::api::String convertIntoHalfWidth(
+    const WidthConversionService& rWidthService, spreadsheetengine::api::StringView rInput)
 {
-    auto init = []() -> utl::TransliterationWrapper&
-    {
-        static utl::TransliterationWrapper trans(
-            comphelper::getProcessComponentContext(), static_cast<TransliterationFlags>(0));
-        trans.loadModuleByImplName(u"FULLWIDTH_HALFWIDTH_LIKE_ASC"_ustr, LANGUAGE_SYSTEM);
-        return trans;
-    };
-    static utl::TransliterationWrapper& rTrans(init());
-    return rTrans.transliterate(rInput, 0, sal_uInt16(rInput.getLength()));
+    return rWidthService.toHalfWidth(rInput);
 }
 
-OUString convertIntoFullWidth(const OUString& rInput)
+spreadsheetengine::api::String convertIntoFullWidth(
+    const WidthConversionService& rWidthService, spreadsheetengine::api::StringView rInput)
 {
-    auto init = []() -> utl::TransliterationWrapper&
-    {
-        static utl::TransliterationWrapper trans(
-            comphelper::getProcessComponentContext(), static_cast<TransliterationFlags>(0));
-        trans.loadModuleByImplName(u"HALFWIDTH_FULLWIDTH_LIKE_JIS"_ustr, LANGUAGE_SYSTEM);
-        return trans;
-    };
-    static utl::TransliterationWrapper& rTrans(init());
-    return rTrans.transliterate(rInput, 0, sal_uInt16(rInput.getLength()));
+    return rWidthService.toFullWidth(rInput);
 }
 
 } // namespace spreadsheetengine::core::text

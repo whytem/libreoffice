@@ -11,28 +11,33 @@
 
 #include <vector>
 
-#include <rtl/ustring.hxx>
 #include <sal/types.h>
+#include <spreadsheetengine/api/Date.hxx>
+#include <spreadsheetengine/api/String.hxx>
 #include <spreadsheetengine/spreadsheetenginedllapi.h>
 
 namespace spreadsheetengine::core::datetime
 {
 
-SPREADSHEETENGINE_DLLPUBLIC void setDefaultWeekendMask(bool bWeekendMask[7]);
+SPREADSHEETENGINE_DLLPUBLIC void setDefaultWeekendMask(
+    spreadsheetengine::api::WeekendMask& rWeekendMask);
 
 SPREADSHEETENGINE_DLLPUBLIC bool applyWeekendMaskSequence(
-    const std::vector<double>& rWeekendDays, bool bWeekendMask[7]);
+    const std::vector<double>& rWeekendDays, spreadsheetengine::api::WeekendMask& rWeekendMask);
 
 SPREADSHEETENGINE_DLLPUBLIC bool applyWeekendMaskMsSpec(
-    const OUString& rWeekendDays, bool bWorkdayFunction, bool bWeekendMask[7]);
+    spreadsheetengine::api::StringView rWeekendDays, bool bWorkdayFunction,
+    spreadsheetengine::api::WeekendMask& rWeekendMask);
 
 SPREADSHEETENGINE_DLLPUBLIC sal_Int32 countWorkdays(
-    sal_Int32 nDate1, sal_Int32 nDate2, const std::vector<double>& rSortedHolidays,
-    const bool bWeekendMask[7]);
+    spreadsheetengine::api::DateSerial nDate1, spreadsheetengine::api::DateSerial nDate2,
+    const std::vector<spreadsheetengine::api::DateSerial>& rSortedHolidays,
+    const spreadsheetengine::api::WeekendMask& rWeekendMask);
 
-SPREADSHEETENGINE_DLLPUBLIC sal_Int32 advanceWorkday(
-    sal_Int32 nDate, sal_Int32 nDays, const std::vector<double>& rSortedHolidays,
-    const bool bWeekendMask[7]);
+SPREADSHEETENGINE_DLLPUBLIC spreadsheetengine::api::DateSerial advanceWorkday(
+    spreadsheetengine::api::DateSerial nDate, spreadsheetengine::api::DateSerial nDays,
+    const std::vector<spreadsheetengine::api::DateSerial>& rSortedHolidays,
+    const spreadsheetengine::api::WeekendMask& rWeekendMask);
 
 } // namespace spreadsheetengine::core::datetime
 
