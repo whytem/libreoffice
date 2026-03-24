@@ -11,6 +11,7 @@
 
 #include <rtl/ustring.hxx>
 #include <spreadsheetengine/bridge/CalcPhase0Bridge.hxx>
+#include <spreadsheetengine/core/ForceCalculation.hxx>
 #include <spreadsheetengine/core/CalcConfig.hxx>
 #include <comphelper/configuration.hxx>
 
@@ -33,17 +34,17 @@ static rtl::Reference<ConfigurationListener> const & getFormulaCalculationListen
 }
 
 static ForceCalculationType toScForceCalculationType(
-    spreadsheetengine::core::ForceCalculationMode eMode)
+    spreadsheetengine::api::ForceCalculationMode eMode)
 {
     switch (eMode)
     {
-        case spreadsheetengine::core::ForceCalculationMode::OpenCL:
+        case spreadsheetengine::api::ForceCalculationMode::OpenCL:
             return ForceCalculationOpenCL;
-        case spreadsheetengine::core::ForceCalculationMode::Threads:
+        case spreadsheetengine::api::ForceCalculationMode::Threads:
             return ForceCalculationThreads;
-        case spreadsheetengine::core::ForceCalculationMode::Core:
+        case spreadsheetengine::api::ForceCalculationMode::Core:
             return ForceCalculationCore;
-        case spreadsheetengine::core::ForceCalculationMode::None:
+        case spreadsheetengine::api::ForceCalculationMode::None:
         default:
             return ForceCalculationNone;
     }
@@ -53,7 +54,7 @@ ForceCalculationType ScCalcConfig::getForceCalculationType()
 {
     static_assert(spreadsheetengine::bridge::kCalcBridgeEnabled);
     static const ForceCalculationType type
-        = toScForceCalculationType(spreadsheetengine::core::getForceCalculationModeFromEnv());
+        = toScForceCalculationType(spreadsheetengine::core::config::getForceCalculationModeFromEnv());
     return type;
 }
 

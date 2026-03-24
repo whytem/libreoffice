@@ -76,10 +76,13 @@
 #include <officecfg/Office/Common.hxx>
 #include <sfx2/linkmgr.hxx>
 #include <interpre.hxx>
+#include <spreadsheetengine/api/Compiler.hxx>
+#include <spreadsheetengine/api/Grammar.hxx>
 #include <spreadsheetengine/compat/formula/FormulaGrammar.hxx>
 #include <spreadsheetengine/core/CompilerSupport.hxx>
 
 using namespace formula;
+namespace seapi = spreadsheetengine::api;
 namespace seformula = spreadsheetengine::compat::formula;
 namespace secompiler = spreadsheetengine::core::compiler;
 using namespace ::com::sun::star;
@@ -105,6 +108,83 @@ enum ScanState
     ssGetTableRefColumn,
     ssStop
 };
+
+seapi::AddressConvention toEngineAddressConvention(FormulaGrammar::AddressConvention eConv)
+{
+    switch (eConv)
+    {
+        case FormulaGrammar::CONV_OOO:
+            return seapi::AddressConvention::OooA1;
+        case FormulaGrammar::CONV_ODF:
+            return seapi::AddressConvention::OdfA1;
+        case FormulaGrammar::CONV_XL_A1:
+            return seapi::AddressConvention::XlA1;
+        case FormulaGrammar::CONV_XL_R1C1:
+            return seapi::AddressConvention::XlR1C1;
+        case FormulaGrammar::CONV_XL_OOX:
+            return seapi::AddressConvention::XlOox;
+        case FormulaGrammar::CONV_UNSPECIFIED:
+        default:
+            return seapi::AddressConvention::Unknown;
+    }
+}
+
+ScCharFlags toScCharFlags(seapi::CompilerCharFlags eFlags)
+{
+    return static_cast<ScCharFlags>(static_cast<sal_uInt32>(eFlags));
+}
+
+std::array<ScCharFlags, 128> toScCharTable(
+    const std::array<seapi::CompilerCharFlags, 128>& rTable)
+{
+    std::array<ScCharFlags, 128> aTable;
+    for (std::size_t i = 0; i < rTable.size(); ++i)
+        aTable[i] = toScCharFlags(rTable[i]);
+    return aTable;
+}
+
+const std::array<ScCharFlags, 128>& getScCharTable(FormulaGrammar::AddressConvention eConv)
+{
+    switch (toEngineAddressConvention(eConv))
+    {
+        case seapi::AddressConvention::OooA1:
+        {
+            static const auto aTable = toScCharTable(
+                secompiler::getCharTable(seapi::AddressConvention::OooA1));
+            return aTable;
+        }
+        case seapi::AddressConvention::OdfA1:
+        {
+            static const auto aTable = toScCharTable(
+                secompiler::getCharTable(seapi::AddressConvention::OdfA1));
+            return aTable;
+        }
+        case seapi::AddressConvention::XlA1:
+        {
+            static const auto aTable = toScCharTable(
+                secompiler::getCharTable(seapi::AddressConvention::XlA1));
+            return aTable;
+        }
+        case seapi::AddressConvention::XlR1C1:
+        {
+            static const auto aTable = toScCharTable(
+                secompiler::getCharTable(seapi::AddressConvention::XlR1C1));
+            return aTable;
+        }
+        case seapi::AddressConvention::XlOox:
+        {
+            static const auto aTable = toScCharTable(
+                secompiler::getCharTable(seapi::AddressConvention::XlOox));
+            return aTable;
+        }
+        case seapi::AddressConvention::Unknown:
+        default:
+            OSL_FAIL("Unimplemented convention");
+            static const auto aFallback = toScCharTable(
+                secompiler::getCharTable(seapi::AddressConvention::OooA1));
+            return aFallback;
+    }
+}
 
 }
 
@@ -367,7 +447,7 @@ ScCompiler::Convention::~Convention()
 
 ScCompiler::Convention::Convention( FormulaGrammar::AddressConvention eConv )
     : meConv(eConv)
-    , mrCharTable(secompiler::getCharTable(eConv))
+    , mrCharTable(getScCharTable(eConv))
 {
     ScCompiler::pConventions[ meConv ] = this;
 }

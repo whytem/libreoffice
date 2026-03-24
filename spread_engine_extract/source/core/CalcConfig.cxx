@@ -9,9 +9,6 @@
 
 #include <spreadsheetengine/core/CalcConfig.hxx>
 
-#include <cstdlib>
-#include <cstring>
-
 #include <com/sun/star/sheet/FormulaLanguage.hpp>
 #include <formula/FormulaCompiler.hxx>
 #include <rtl/ustrbuf.hxx>
@@ -19,32 +16,6 @@
 
 namespace spreadsheetengine::core
 {
-
-ForceCalculationMode getForceCalculationModeFromEnv()
-{
-    const char* env = std::getenv("SC_FORCE_CALCULATION");
-    if (env == nullptr)
-        return ForceCalculationMode::None;
-
-    if (std::strcmp(env, "opencl") == 0)
-    {
-        SAL_INFO("sc.core.formulagroup", "Forcing calculations to use OpenCL");
-        return ForceCalculationMode::OpenCL;
-    }
-    if (std::strcmp(env, "threads") == 0)
-    {
-        SAL_INFO("sc.core.formulagroup", "Forcing calculations to use threads");
-        return ForceCalculationMode::Threads;
-    }
-    if (std::strcmp(env, "core") == 0)
-    {
-        SAL_INFO("sc.core.formulagroup", "Forcing calculations to use core");
-        return ForceCalculationMode::Core;
-    }
-
-    SAL_WARN("sc.core.formulagroup", "Unrecognized value of SC_FORCE_CALCULATION");
-    std::abort();
-}
 
 OUString formulaOpCodeSetToSymbolicString(const FormulaOpCodeSet& rOpCodes)
 {

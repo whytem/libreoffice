@@ -102,6 +102,16 @@ standalone build as the engine grows.
   - a standalone-facing math API exists in `api/Math.hxx`
   - LibreOffice adapters exist under `compat/libreoffice/`
   - standalone tests run against the API layer rather than internal headers
+- Standalone suite structure improved:
+  - the previous monolithic standalone API test binary has been split into
+    area-specific executables
+  - standalone CTest now reports:
+    - `spreadsheetengine_smoke`
+    - `spreadsheetengine_compiler_tests`
+    - `spreadsheetengine_math_tests`
+    - `spreadsheetengine_calendar_tests`
+    - `spreadsheetengine_text_tests`
+    - `spreadsheetengine_config_tests`
 - Phase 6 is now substantially complete for the portable helper lane:
   - `NumeralConversion` now uses engine-owned string types instead of
     `OUString` in its core interface
@@ -139,11 +149,47 @@ standalone build as the engine grows.
     `TextCase.cxx`, and `TextWidth.cxx` as standalone-ready
   - a shared parity seed now also exists at `tests/shared_cases/text_cases.tsv`
   - the Phase 6 validation lane has been exercised successfully in both modes:
-    - standalone `spreadsheetengine_smoke` and `spreadsheetengine_tests`
+    - standalone `spreadsheetengine_smoke`
+    - standalone `spreadsheetengine_math_tests`
+    - standalone `spreadsheetengine_calendar_tests`
+    - standalone `spreadsheetengine_text_tests`
     - LibreOffice `CppunitTest_sc_text_functions_test`
     - LibreOffice `CppunitTest_sc_datetime_functions_test`
     - LibreOffice `CppunitTest_sc_spreadsheet_functions_test`
     - LibreOffice `CppunitTest_sc_ucalc`
+- Phase 7 started:
+  - `CompilerSupport` no longer exposes `compiler.hxx`, `ScCharFlags`, or
+    `formula::FormulaGrammar::AddressConvention`
+  - engine-owned compiler char flags now live in `api/Compiler.hxx`
+  - `CompilerSupport` now uses engine-owned `api::AddressConvention`
+  - Calc consumes that slice through a thin conversion shim in
+    `sc/source/core/tool/compiler.cxx`
+  - the standalone source manifest now treats `CompilerSupport.cxx` as
+    standalone-ready
+  - the first compiler-support standalone assertions now run in
+    `tests/standalone/compiler_api_tests.cxx`
+  - the first Phase 7 slice has been validated successfully in both modes:
+    - standalone `spreadsheetengine_smoke`
+    - standalone `spreadsheetengine_compiler_tests`
+    - LibreOffice `CppunitTest_sc_ucalc_formula`
+    - LibreOffice `CppunitTest_sc_ucalc_formula2`
+    - LibreOffice `CppunitTest_sc_ucalc_range`
+    - LibreOffice `CppunitTest_sc_spreadsheet_functions_test`
+  - the second Phase 7 slice has started on the config side:
+    - force-calculation parsing now lives in a standalone-safe config seam
+      under `core/ForceCalculation.hxx` and `source/core/ForceCalculation.cxx`
+    - engine-owned config vocabulary now includes `api::ForceCalculationMode`
+    - `CalcConfig` retains the opcode-set helpers while delegating the
+      environment parsing path to the new seam
+    - standalone coverage now includes `spreadsheetengine_config_tests`
+    - the combined compiler/config slice has been validated successfully in
+      both modes:
+      - standalone all six standalone tests passed
+      - LibreOffice `CppunitTest_sc_ucalc_formula`
+      - LibreOffice `CppunitTest_sc_ucalc_formula2`
+      - LibreOffice `CppunitTest_sc_ucalc_range`
+      - LibreOffice `CppunitTest_sc_spreadsheet_functions_test`
+      - LibreOffice `CppunitTest_sc_ucalc`
 
 ### Current validation lanes
 
@@ -216,7 +262,9 @@ Validation:
 
 - standalone:
   - `spreadsheetengine_smoke`
-  - `spreadsheetengine_tests`
+  - `spreadsheetengine_math_tests`
+  - `spreadsheetengine_calendar_tests`
+  - `spreadsheetengine_text_tests`
   - dedicated tests for migrated text/date/numeral helpers
 - LibreOffice:
   - `CppunitTest_sc_text_functions_test`
@@ -254,6 +302,24 @@ Work:
 - switch additional Calc compiler/config call sites to the copied engine-owned
   primitives
 
+Execution approach:
+
+- slice 1:
+  - isolate pure compiler char-table data behind engine-owned conventions and
+    bit flags
+  - keep Calc on a one-file conversion shim
+  - make the slice standalone-buildable immediately
+- slice 2:
+  - extract Calc-config force-calculation parsing from formula/opcode
+    dependencies where possible
+  - introduce engine-owned opcode identifiers or symbolic config vocabulary for
+    OpenCL/threading subsets
+- slice 3:
+  - widen the copied grammar/config layer just enough to let compiler/config
+    helpers stop depending on `formula/` headers
+  - retarget additional Calc compiler/config call sites once the vocabulary is
+    owned
+
 Validation:
 
 - standalone:
@@ -269,6 +335,14 @@ Exit criteria:
 
 - no standalone-exposed compiler/config header includes `formula/` or `sc/inc`
 - Calc compiler seams use engine-owned or copied primitives at the boundary
+
+Status:
+
+- started
+- standalone suite now split into six independently reported tests
+- compiler-support slice complete and validated
+- force-calculation config slice complete and validated
+- next logical slice is the Calc-config/opcode symbolic-vocabulary seam
 
 ### Phase 8: Matrix And Execution Substrate Ownership
 

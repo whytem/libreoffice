@@ -43,6 +43,7 @@ $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spread_engine_extract/source/core/DateTimeParts \
     spread_engine_extract/source/core/DateTimeWeek \
     spread_engine_extract/source/core/DateTimeWorkday \
+    spread_engine_extract/source/core/ForceCalculation \
     spread_engine_extract/source/core/MathFinancial \
     spread_engine_extract/source/core/MathRounding \
     spread_engine_extract/source/core/MathScalar \

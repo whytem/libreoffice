@@ -31,14 +31,35 @@ add_executable(spreadsheetengine_smoke
 target_compile_features(spreadsheetengine_smoke PRIVATE cxx_std_20)
 target_link_libraries(spreadsheetengine_smoke PRIVATE spreadsheetengine::core)
 
-add_executable(spreadsheetengine_tests
-    ${SPREADSHEETENGINE_STANDALONE_TEST_SOURCES}
+function(add_spreadsheetengine_test target_name)
+    add_executable(${target_name} ${ARGN})
+    target_compile_features(${target_name} PRIVATE cxx_std_20)
+    target_link_libraries(${target_name} PRIVATE spreadsheetengine::core)
+    if(BUILD_TESTING)
+        add_test(NAME ${target_name} COMMAND ${target_name})
+    endif()
+endfunction()
+
+add_spreadsheetengine_test(spreadsheetengine_compiler_tests
+    ${SPREADSHEETENGINE_STANDALONE_COMPILER_TEST_SOURCES}
 )
 
-target_compile_features(spreadsheetengine_tests PRIVATE cxx_std_20)
-target_link_libraries(spreadsheetengine_tests PRIVATE spreadsheetengine::core)
+add_spreadsheetengine_test(spreadsheetengine_math_tests
+    ${SPREADSHEETENGINE_STANDALONE_MATH_TEST_SOURCES}
+)
+
+add_spreadsheetengine_test(spreadsheetengine_calendar_tests
+    ${SPREADSHEETENGINE_STANDALONE_CALENDAR_TEST_SOURCES}
+)
+
+add_spreadsheetengine_test(spreadsheetengine_text_tests
+    ${SPREADSHEETENGINE_STANDALONE_TEXT_TEST_SOURCES}
+)
+
+add_spreadsheetengine_test(spreadsheetengine_config_tests
+    ${SPREADSHEETENGINE_STANDALONE_CONFIG_TEST_SOURCES}
+)
 
 if(BUILD_TESTING)
     add_test(NAME spreadsheetengine_smoke COMMAND spreadsheetengine_smoke)
-    add_test(NAME spreadsheetengine_tests COMMAND spreadsheetengine_tests)
 endif()

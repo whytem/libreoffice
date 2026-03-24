@@ -9,18 +9,21 @@
 
 #pragma once
 
-#include <array>
+#include <optional>
+#include <string_view>
 
-#include <spreadsheetengine/api/Compiler.hxx>
-#include <spreadsheetengine/api/Grammar.hxx>
+#include <spreadsheetengine/api/Config.hxx>
 #include <spreadsheetengine/spreadsheetenginedllapi.h>
 
-namespace spreadsheetengine::core::compiler
+namespace spreadsheetengine::core::config
 {
 
-SPREADSHEETENGINE_DLLPUBLIC const std::array<spreadsheetengine::api::CompilerCharFlags, 128>&
-getCharTable(spreadsheetengine::api::AddressConvention eConv);
+SPREADSHEETENGINE_DLLPUBLIC std::optional<spreadsheetengine::api::ForceCalculationMode>
+parseForceCalculationMode(std::optional<std::string_view> oValue);
 
-} // namespace spreadsheetengine::core::compiler
+SPREADSHEETENGINE_DLLPUBLIC spreadsheetengine::api::ForceCalculationMode
+getForceCalculationModeFromEnv();
+
+} // namespace spreadsheetengine::core::config
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

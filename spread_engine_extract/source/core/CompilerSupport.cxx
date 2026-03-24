@@ -17,171 +17,186 @@ namespace spreadsheetengine::core::compiler
 namespace
 {
 
-constexpr std::array<ScCharFlags, 128> makeCommonCharTable()
+using spreadsheetengine::api::AddressConvention;
+using spreadsheetengine::api::CompilerCharFlags;
+
+constexpr std::array<CompilerCharFlags, 128> makeCommonCharTable()
 {
-    std::array<ScCharFlags, 128> a;
-    a.fill(ScCharFlags::Illegal);
+    std::array<CompilerCharFlags, 128> a;
+    a.fill(CompilerCharFlags::Illegal);
 
-    a['\t'] = ScCharFlags::CharDontCare | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['\n'] = ScCharFlags::CharDontCare | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['\r'] = ScCharFlags::CharDontCare | ScCharFlags::WordSep | ScCharFlags::ValueSep;
+    a['\t'] = CompilerCharFlags::CharDontCare | CompilerCharFlags::WordSep
+              | CompilerCharFlags::ValueSep;
+    a['\n'] = CompilerCharFlags::CharDontCare | CompilerCharFlags::WordSep
+              | CompilerCharFlags::ValueSep;
+    a['\r'] = CompilerCharFlags::CharDontCare | CompilerCharFlags::WordSep
+              | CompilerCharFlags::ValueSep;
 
-    a[' '] = ScCharFlags::CharDontCare | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['!'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['"'] = ScCharFlags::CharString | ScCharFlags::StringSep;
-    a['#'] = ScCharFlags::WordSep | ScCharFlags::CharErrConst;
-    a['$'] = ScCharFlags::CharWord | ScCharFlags::Word | ScCharFlags::CharIdent | ScCharFlags::Ident;
-    a['%'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['&'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['\''] = ScCharFlags::NameSep;
-    a['('] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a[')'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['*'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['+'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueExp | ScCharFlags::ValueSign;
-    a[','] = ScCharFlags::CharValue | ScCharFlags::Value;
-    a['-'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueExp | ScCharFlags::ValueSign;
-    a['.'] = ScCharFlags::Word | ScCharFlags::CharValue | ScCharFlags::Value | ScCharFlags::Ident
-             | ScCharFlags::Name;
-    a['/'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
+    a[' '] = CompilerCharFlags::CharDontCare | CompilerCharFlags::WordSep
+             | CompilerCharFlags::ValueSep;
+    a['!'] = CompilerCharFlags::Char | CompilerCharFlags::WordSep | CompilerCharFlags::ValueSep;
+    a['"'] = CompilerCharFlags::CharString | CompilerCharFlags::StringSep;
+    a['#'] = CompilerCharFlags::WordSep | CompilerCharFlags::CharErrConst;
+    a['$'] = CompilerCharFlags::CharWord | CompilerCharFlags::Word
+             | CompilerCharFlags::CharIdent | CompilerCharFlags::Ident;
+    a['%'] = CompilerCharFlags::Char | CompilerCharFlags::WordSep | CompilerCharFlags::ValueSep;
+    a['&'] = CompilerCharFlags::Char | CompilerCharFlags::WordSep | CompilerCharFlags::ValueSep;
+    a['\''] = CompilerCharFlags::NameSep;
+    a['('] = CompilerCharFlags::Char | CompilerCharFlags::WordSep | CompilerCharFlags::ValueSep;
+    a[')'] = CompilerCharFlags::Char | CompilerCharFlags::WordSep | CompilerCharFlags::ValueSep;
+    a['*'] = CompilerCharFlags::Char | CompilerCharFlags::WordSep | CompilerCharFlags::ValueSep;
+    a['+'] = CompilerCharFlags::Char | CompilerCharFlags::WordSep
+             | CompilerCharFlags::ValueExp | CompilerCharFlags::ValueSign;
+    a[','] = CompilerCharFlags::CharValue | CompilerCharFlags::Value;
+    a['-'] = CompilerCharFlags::Char | CompilerCharFlags::WordSep
+             | CompilerCharFlags::ValueExp | CompilerCharFlags::ValueSign;
+    a['.'] = CompilerCharFlags::Word | CompilerCharFlags::CharValue | CompilerCharFlags::Value
+             | CompilerCharFlags::Ident | CompilerCharFlags::Name;
+    a['/'] = CompilerCharFlags::Char | CompilerCharFlags::WordSep | CompilerCharFlags::ValueSep;
 
     for (int i = '0'; i <= '9'; ++i)
-        a[i] = ScCharFlags::CharValue | ScCharFlags::Word | ScCharFlags::Value
-               | ScCharFlags::ValueExp | ScCharFlags::ValueValue | ScCharFlags::Ident
-               | ScCharFlags::Name;
+        a[i] = CompilerCharFlags::CharValue | CompilerCharFlags::Word | CompilerCharFlags::Value
+               | CompilerCharFlags::ValueExp | CompilerCharFlags::ValueValue
+               | CompilerCharFlags::Ident | CompilerCharFlags::Name;
 
-    a[':'] = ScCharFlags::Char | ScCharFlags::Word;
-    a[';'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['<'] = ScCharFlags::CharBool | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['='] = ScCharFlags::Char | ScCharFlags::Bool | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['>'] = ScCharFlags::CharBool | ScCharFlags::Bool | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['?'] = ScCharFlags::CharWord | ScCharFlags::Word | ScCharFlags::Name;
+    a[':'] = CompilerCharFlags::Char | CompilerCharFlags::Word;
+    a[';'] = CompilerCharFlags::Char | CompilerCharFlags::WordSep | CompilerCharFlags::ValueSep;
+    a['<'] = CompilerCharFlags::CharBool | CompilerCharFlags::WordSep
+             | CompilerCharFlags::ValueSep;
+    a['='] = CompilerCharFlags::Char | CompilerCharFlags::Bool | CompilerCharFlags::WordSep
+             | CompilerCharFlags::ValueSep;
+    a['>'] = CompilerCharFlags::CharBool | CompilerCharFlags::Bool | CompilerCharFlags::WordSep
+             | CompilerCharFlags::ValueSep;
+    a['?'] = CompilerCharFlags::CharWord | CompilerCharFlags::Word | CompilerCharFlags::Name;
 
     for (int i = 'A'; i <= 'Z'; ++i)
-        a[i] = ScCharFlags::CharWord | ScCharFlags::Word | ScCharFlags::CharIdent
-               | ScCharFlags::Ident | ScCharFlags::CharName | ScCharFlags::Name;
+        a[i] = CompilerCharFlags::CharWord | CompilerCharFlags::Word
+               | CompilerCharFlags::CharIdent | CompilerCharFlags::Ident
+               | CompilerCharFlags::CharName | CompilerCharFlags::Name;
 
-    a['^'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['_'] = ScCharFlags::CharWord | ScCharFlags::Word | ScCharFlags::CharIdent
-             | ScCharFlags::Ident | ScCharFlags::CharName | ScCharFlags::Name;
+    a['^'] = CompilerCharFlags::Char | CompilerCharFlags::WordSep | CompilerCharFlags::ValueSep;
+    a['_'] = CompilerCharFlags::CharWord | CompilerCharFlags::Word
+             | CompilerCharFlags::CharIdent | CompilerCharFlags::Ident
+             | CompilerCharFlags::CharName | CompilerCharFlags::Name;
 
     for (int i = 'a'; i <= 'z'; ++i)
-        a[i] = ScCharFlags::CharWord | ScCharFlags::Word | ScCharFlags::CharIdent
-               | ScCharFlags::Ident | ScCharFlags::CharName | ScCharFlags::Name;
+        a[i] = CompilerCharFlags::CharWord | CompilerCharFlags::Word
+               | CompilerCharFlags::CharIdent | CompilerCharFlags::Ident
+               | CompilerCharFlags::CharName | CompilerCharFlags::Name;
 
-    a['{'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['|'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['}'] = ScCharFlags::Char | ScCharFlags::WordSep | ScCharFlags::ValueSep;
-    a['~'] = ScCharFlags::Char;
+    a['{'] = CompilerCharFlags::Char | CompilerCharFlags::WordSep | CompilerCharFlags::ValueSep;
+    a['|'] = CompilerCharFlags::Char | CompilerCharFlags::WordSep | CompilerCharFlags::ValueSep;
+    a['}'] = CompilerCharFlags::Char | CompilerCharFlags::WordSep | CompilerCharFlags::ValueSep;
+    a['~'] = CompilerCharFlags::Char;
 
     return a;
 }
 
-constexpr std::array<ScCharFlags, 128> makeCharTable_OOO_A1()
+constexpr std::array<CompilerCharFlags, 128> makeCharTable_OOO_A1()
 {
     auto a = makeCommonCharTable();
-    a['['] = ScCharFlags::Char;
-    a[']'] = ScCharFlags::Char;
+    a['['] = CompilerCharFlags::Char;
+    a[']'] = CompilerCharFlags::Char;
     return a;
 }
 
-constexpr std::array<ScCharFlags, 128> makeCharTable_OOO_A1_ODF()
+constexpr std::array<CompilerCharFlags, 128> makeCharTable_OOO_A1_ODF()
 {
     auto a = makeCommonCharTable();
-    a['!'] |= ScCharFlags::OdfLabelOp;
-    a['$'] |= ScCharFlags::OdfNameMarker;
-    a['['] = ScCharFlags::OdfLBracket;
-    a[']'] = ScCharFlags::OdfRBracket;
+    a['!'] |= CompilerCharFlags::OdfLabelOp;
+    a['$'] |= CompilerCharFlags::OdfNameMarker;
+    a['['] = CompilerCharFlags::OdfLBracket;
+    a[']'] = CompilerCharFlags::OdfRBracket;
     return a;
 }
 
-constexpr std::array<ScCharFlags, 128> makeCharTable_XL()
+constexpr std::array<CompilerCharFlags, 128> makeCharTable_XL()
 {
     auto a = makeCommonCharTable();
-    a[' '] |= ScCharFlags::Word;
-    a['!'] |= ScCharFlags::Ident | ScCharFlags::Word;
-    a['"'] |= ScCharFlags::Word;
-    a['#'] &= ~ScCharFlags::WordSep;
-    a['#'] |= ScCharFlags::Word;
-    a['%'] |= ScCharFlags::Word;
-    a['&'] |= ScCharFlags::Word;
-    a['\''] |= ScCharFlags::Word;
-    a['('] |= ScCharFlags::Word;
-    a[')'] |= ScCharFlags::Word;
-    a['*'] |= ScCharFlags::Word;
-    a['+'] |= ScCharFlags::Word;
-    a[','] |= ScCharFlags::Word;
-    a['-'] |= ScCharFlags::Word;
-    a[';'] |= ScCharFlags::Word;
-    a['<'] |= ScCharFlags::Word;
-    a['='] |= ScCharFlags::Word;
-    a['>'] |= ScCharFlags::Word;
-    a['@'] |= ScCharFlags::Word;
-    a['['] = ScCharFlags::Word;
-    a[']'] = ScCharFlags::Word;
-    a['{'] |= ScCharFlags::Word;
-    a['|'] |= ScCharFlags::Word;
-    a['}'] |= ScCharFlags::Word;
-    a['~'] |= ScCharFlags::Word;
+    a[' '] |= CompilerCharFlags::Word;
+    a['!'] |= CompilerCharFlags::Ident | CompilerCharFlags::Word;
+    a['"'] |= CompilerCharFlags::Word;
+    a['#'] &= ~CompilerCharFlags::WordSep;
+    a['#'] |= CompilerCharFlags::Word;
+    a['%'] |= CompilerCharFlags::Word;
+    a['&'] |= CompilerCharFlags::Word;
+    a['\''] |= CompilerCharFlags::Word;
+    a['('] |= CompilerCharFlags::Word;
+    a[')'] |= CompilerCharFlags::Word;
+    a['*'] |= CompilerCharFlags::Word;
+    a['+'] |= CompilerCharFlags::Word;
+    a[','] |= CompilerCharFlags::Word;
+    a['-'] |= CompilerCharFlags::Word;
+    a[';'] |= CompilerCharFlags::Word;
+    a['<'] |= CompilerCharFlags::Word;
+    a['='] |= CompilerCharFlags::Word;
+    a['>'] |= CompilerCharFlags::Word;
+    a['@'] |= CompilerCharFlags::Word;
+    a['['] = CompilerCharFlags::Word;
+    a[']'] = CompilerCharFlags::Word;
+    a['{'] |= CompilerCharFlags::Word;
+    a['|'] |= CompilerCharFlags::Word;
+    a['}'] |= CompilerCharFlags::Word;
+    a['~'] |= CompilerCharFlags::Word;
     return a;
 }
 
-constexpr std::array<ScCharFlags, 128> makeCharTable_XL_A1()
+constexpr std::array<CompilerCharFlags, 128> makeCharTable_XL_A1()
 {
     auto a = makeCharTable_XL();
-    a['['] |= ScCharFlags::Char;
-    a[']'] |= ScCharFlags::Char;
+    a['['] |= CompilerCharFlags::Char;
+    a[']'] |= CompilerCharFlags::Char;
     return a;
 }
 
-constexpr std::array<ScCharFlags, 128> makeCharTable_XL_OOX()
+constexpr std::array<CompilerCharFlags, 128> makeCharTable_XL_OOX()
 {
     auto a = makeCharTable_XL_A1();
-    a['['] |= ScCharFlags::CharIdent;
-    a[']'] |= ScCharFlags::Ident;
+    a['['] |= CompilerCharFlags::CharIdent;
+    a[']'] |= CompilerCharFlags::Ident;
     return a;
 }
 
-constexpr std::array<ScCharFlags, 128> makeCharTable_XL_R1C1()
+constexpr std::array<CompilerCharFlags, 128> makeCharTable_XL_R1C1()
 {
     auto a = makeCharTable_XL();
-    a['['] |= ScCharFlags::Ident;
-    a[']'] |= ScCharFlags::Ident;
+    a['['] |= CompilerCharFlags::Ident;
+    a[']'] |= CompilerCharFlags::Ident;
     return a;
 }
 
 } // namespace
 
-const std::array<ScCharFlags, 128>&
-getCharTable(formula::FormulaGrammar::AddressConvention eConv)
+const std::array<CompilerCharFlags, 128>& getCharTable(AddressConvention eConv)
 {
     switch (eConv)
     {
-        case formula::FormulaGrammar::CONV_OOO:
+        case AddressConvention::OooA1:
         {
             static constexpr auto table_OOO_A1 = makeCharTable_OOO_A1();
             return table_OOO_A1;
         }
-        case formula::FormulaGrammar::CONV_ODF:
+        case AddressConvention::OdfA1:
         {
             static constexpr auto table_OOO_A1_ODF = makeCharTable_OOO_A1_ODF();
             return table_OOO_A1_ODF;
         }
-        case formula::FormulaGrammar::CONV_XL_A1:
+        case AddressConvention::XlA1:
         {
             static constexpr auto table_XL_A1 = makeCharTable_XL_A1();
             return table_XL_A1;
         }
-        case formula::FormulaGrammar::CONV_XL_R1C1:
+        case AddressConvention::XlR1C1:
         {
             static constexpr auto table_XL_R1C1 = makeCharTable_XL_R1C1();
             return table_XL_R1C1;
         }
-        case formula::FormulaGrammar::CONV_XL_OOX:
+        case AddressConvention::XlOox:
         {
             static constexpr auto table_XL_OOX = makeCharTable_XL_OOX();
             return table_XL_OOX;
         }
-        case formula::FormulaGrammar::CONV_UNSPECIFIED:
+        case AddressConvention::Unknown:
         default:
             assert(!"Unimplemented convention");
             std::abort();

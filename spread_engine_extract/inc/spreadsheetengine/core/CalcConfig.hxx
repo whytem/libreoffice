@@ -15,22 +15,14 @@
 #include <formula/opcode.hxx>
 #include <o3tl/sorted_vector.hxx>
 #include <rtl/ustring.hxx>
+#include <spreadsheetengine/api/Config.hxx>
 #include <spreadsheetengine/spreadsheetenginedllapi.h>
 
 namespace spreadsheetengine::core
 {
 
-enum class ForceCalculationMode
-{
-    None,
-    Core,
-    OpenCL,
-    Threads
-};
-
 using FormulaOpCodeSet = std::shared_ptr<o3tl::sorted_vector<OpCode>>;
 
-SPREADSHEETENGINE_DLLPUBLIC ForceCalculationMode getForceCalculationModeFromEnv();
 SPREADSHEETENGINE_DLLPUBLIC OUString formulaOpCodeSetToSymbolicString(const FormulaOpCodeSet& rOpCodes);
 SPREADSHEETENGINE_DLLPUBLIC FormulaOpCodeSet stringToFormulaOpCodeSet(std::u16string_view rOpCodes);
 
