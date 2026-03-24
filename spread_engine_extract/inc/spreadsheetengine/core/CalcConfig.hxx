@@ -9,22 +9,34 @@
 
 #pragma once
 
-#include <memory>
+#include <optional>
 #include <string_view>
+#include <vector>
 
-#include <formula/opcode.hxx>
-#include <o3tl/sorted_vector.hxx>
-#include <rtl/ustring.hxx>
 #include <spreadsheetengine/api/Config.hxx>
+#include <spreadsheetengine/api/String.hxx>
 #include <spreadsheetengine/spreadsheetenginedllapi.h>
 
 namespace spreadsheetengine::core
 {
 
-using FormulaOpCodeSet = std::shared_ptr<o3tl::sorted_vector<OpCode>>;
+using ConfigOpCodeSymbolList = std::vector<spreadsheetengine::api::ConfigOpCodeSymbol>;
+using SymbolicOpCodeList = std::vector<spreadsheetengine::api::String>;
 
-SPREADSHEETENGINE_DLLPUBLIC OUString formulaOpCodeSetToSymbolicString(const FormulaOpCodeSet& rOpCodes);
-SPREADSHEETENGINE_DLLPUBLIC FormulaOpCodeSet stringToFormulaOpCodeSet(std::u16string_view rOpCodes);
+SPREADSHEETENGINE_DLLPUBLIC spreadsheetengine::api::StringView
+configOpCodeSymbolName(spreadsheetengine::api::ConfigOpCodeSymbol eSymbol);
+SPREADSHEETENGINE_DLLPUBLIC std::optional<spreadsheetengine::api::ConfigOpCodeSymbol>
+findConfigOpCodeSymbol(spreadsheetengine::api::StringView rToken);
+SPREADSHEETENGINE_DLLPUBLIC spreadsheetengine::api::String
+configOpCodeSymbolListToString(const ConfigOpCodeSymbolList& rSymbols);
+SPREADSHEETENGINE_DLLPUBLIC const ConfigOpCodeSymbolList&
+defaultOpenCLSubsetConfigOpCodes();
+SPREADSHEETENGINE_DLLPUBLIC spreadsheetengine::api::String
+symbolicOpCodeListToString(const SymbolicOpCodeList& rOpCodes);
+SPREADSHEETENGINE_DLLPUBLIC SymbolicOpCodeList
+stringToSymbolicOpCodeList(std::u16string_view rOpCodes);
+SPREADSHEETENGINE_DLLPUBLIC const SymbolicOpCodeList&
+defaultOpenCLSubsetSymbolicOpCodes();
 
 } // namespace spreadsheetengine::core
 

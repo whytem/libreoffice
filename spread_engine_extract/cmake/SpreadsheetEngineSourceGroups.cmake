@@ -6,6 +6,8 @@
 # list into the standalone-ready core list.
 
 set(SPREADSHEETENGINE_STANDALONE_CORE_SOURCES
+    "${SPREADSHEETENGINE_ROOT}/source/compat/formula/FormulaGrammar.cxx"
+    "${SPREADSHEETENGINE_ROOT}/source/core/CalcConfig.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/CompilerSupport.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/Phase0.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/DateTimeParts.cxx"
@@ -48,7 +50,5 @@ set(SPREADSHEETENGINE_STANDALONE_CONFIG_TEST_SOURCES
 )
 
 set(SPREADSHEETENGINE_STANDALONE_DEFERRED_SOURCES
-    "${SPREADSHEETENGINE_ROOT}/source/compat/formula/FormulaGrammar.cxx"
-    "${SPREADSHEETENGINE_ROOT}/source/core/CalcConfig.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/MatrixOperators.cxx"
 )

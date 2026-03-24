@@ -4,6 +4,7 @@
 
 #include <spreadsheetengine/api/Compiler.hxx>
 #include <spreadsheetengine/api/Grammar.hxx>
+#include <spreadsheetengine/compat/formula/FormulaGrammar.hxx>
 #include <spreadsheetengine/core/CompilerSupport.hxx>
 
 #include "TestSupport.hxx"
@@ -31,6 +32,34 @@ int main()
             rXlTable[']'], CompilerCharFlags::Ident))
     {
         return fail("spreadsheetengine_compiler_tests", "OOXML char table mismatch");
+    }
+
+    const auto aApiGrammar
+        = spreadsheetengine::compat::formula::FormulaGrammar::mapAPItoGrammar(true, false);
+    if (aApiGrammar.meLanguage != spreadsheetengine::api::FormulaLanguage::Api
+        || aApiGrammar.meAddressConvention != spreadsheetengine::api::AddressConvention::OooA1
+        || !aApiGrammar.mbEnglish)
+    {
+        return fail("spreadsheetengine_compiler_tests", "API grammar mapping mismatch");
+    }
+
+    const auto aMergedGrammar = spreadsheetengine::compat::formula::FormulaGrammar::mergeToGrammar(
+        aApiGrammar, spreadsheetengine::api::AddressConvention::XlOox);
+    if (!spreadsheetengine::compat::formula::FormulaGrammar::isExcelSyntax(aMergedGrammar)
+        || !spreadsheetengine::compat::formula::FormulaGrammar::isRefConventionOOXML(
+               aMergedGrammar))
+    {
+        return fail("spreadsheetengine_compiler_tests", "grammar merge mismatch");
+    }
+
+    if (!spreadsheetengine::compat::formula::FormulaGrammar::isSupported(
+            { spreadsheetengine::api::FormulaLanguage::XlEnglish,
+                spreadsheetengine::api::AddressConvention::XlA1, true })
+        || spreadsheetengine::compat::formula::FormulaGrammar::isSupported(
+            { spreadsheetengine::api::FormulaLanguage::Native,
+                spreadsheetengine::api::AddressConvention::XlOox, false }))
+    {
+        return fail("spreadsheetengine_compiler_tests", "grammar support mismatch");
     }
 
     std::cout << "spreadsheetengine compiler api tests passed\n";

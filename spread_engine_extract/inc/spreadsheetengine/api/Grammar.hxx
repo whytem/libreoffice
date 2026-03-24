@@ -16,6 +16,9 @@ enum class FormulaLanguage
 {
     Unknown,
     Native,
+    English,
+    XlEnglish,
+    Api,
     Odf11,
     Odff,
     Ooxml,

@@ -29,10 +29,12 @@
 #include <externalrefmgr.hxx>
 #include <compiler.hxx>
 #include <refupdatecontext.hxx>
+#include <spreadsheetengine/compat/libreoffice/Grammar.hxx>
 #include <spreadsheetengine/compat/formula/FormulaGrammar.hxx>
 
 using ::formula::FormulaGrammar;
 using namespace ::com::sun::star;
+namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace seformula = spreadsheetengine::compat::formula;
 
 bool ScRangeUtil::MakeArea( const OUString&   rAreaStr,
@@ -300,11 +302,18 @@ bool ScRangeUtil::MakeRangeFromName (
             // tdf#145077: create range string according to current cell cursor
             // position if expression has relative references and details say so.
             if (bUseDetailsPos)
-                aStrArea = pData->GetSymbol( ScAddress( rDetails.nCol, rDetails.nRow, nCurTab),
-                        seformula::FormulaGrammar::mergeToGrammar(rDoc.GetGrammar(), rDetails.eConv));
+                aStrArea = pData->GetSymbol(
+                    ScAddress(rDetails.nCol, rDetails.nRow, nCurTab),
+                    selibreoffice::toLibreOfficeGrammar(
+                        seformula::FormulaGrammar::mergeToGrammar(
+                            selibreoffice::toApiGrammar(rDoc.GetGrammar()),
+                            selibreoffice::toApiAddressConvention(rDetails.eConv))));
             else
                 aStrArea = pData->GetSymbol(
-                        seformula::FormulaGrammar::mergeToGrammar(rDoc.GetGrammar(), rDetails.eConv));
+                    selibreoffice::toLibreOfficeGrammar(
+                        seformula::FormulaGrammar::mergeToGrammar(
+                            selibreoffice::toApiGrammar(rDoc.GetGrammar()),
+                            selibreoffice::toApiAddressConvention(rDetails.eConv))));
 
             if ( IsAbsArea( aStrArea, rDoc, nTable,
                             nullptr, &aStartPos, &aEndPos, rDetails ) )

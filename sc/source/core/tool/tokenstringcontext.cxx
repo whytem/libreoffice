@@ -14,9 +14,11 @@
 #include <externalrefmgr.hxx>
 #include <globstr.hrc>
 #include <scresid.hxx>
+#include <spreadsheetengine/compat/libreoffice/Grammar.hxx>
 #include <spreadsheetengine/compat/formula/FormulaGrammar.hxx>
 
 using namespace com::sun::star;
+namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace seformula = spreadsheetengine::compat::formula;
 
 namespace sc {
@@ -32,14 +34,27 @@ void insertAllNames( TokenStringContext::IndexNameMapType& rMap, const ScRangeNa
     }
 }
 
+formula::FormulaGrammar::AddressConvention toCalcRefConvention(
+    formula::FormulaGrammar::Grammar eGrammar)
+{
+    return selibreoffice::toLibreOfficeAddressConvention(
+        seformula::FormulaGrammar::extractRefConvention(selibreoffice::toApiGrammar(eGrammar)));
+}
+
+sal_Int32 toCalcFormulaLanguage(formula::FormulaGrammar::Grammar eGrammar)
+{
+    return selibreoffice::toLibreOfficeFormulaLanguage(
+        seformula::FormulaGrammar::extractFormulaLanguage(selibreoffice::toApiGrammar(eGrammar)));
+}
+
 }
 
 TokenStringContext::TokenStringContext( const ScDocument& rDoc, formula::FormulaGrammar::Grammar eGram ) :
     meGram(eGram),
-    mpRefConv(ScCompiler::GetRefConvention(seformula::FormulaGrammar::extractRefConvention(eGram)))
+    mpRefConv(ScCompiler::GetRefConvention(toCalcRefConvention(eGram)))
 {
     formula::FormulaCompiler aComp;
-    mxOpCodeMap = aComp.GetOpCodeMap(seformula::FormulaGrammar::extractFormulaLanguage(eGram));
+    mxOpCodeMap = aComp.GetOpCodeMap(toCalcFormulaLanguage(eGram));
     if (mxOpCodeMap)
         maErrRef = mxOpCodeMap->getSymbol(ocErrRef);
     else
@@ -52,7 +67,7 @@ TokenStringContext::TokenStringContext( const ScDocument& rDoc, formula::Formula
     maTabNames = rDoc.GetAllTableNames();
     {
         for (auto& rTabName : maTabNames)
-            ScCompiler::CheckTabQuotes(rTabName, seformula::FormulaGrammar::extractRefConvention(eGram));
+            ScCompiler::CheckTabQuotes(rTabName, toCalcRefConvention(eGram));
     }
 
     // Fetch all named range names.
@@ -121,7 +136,7 @@ void CompileFormulaContext::updateTabNames()
     maTabNames = mrDoc.GetAllTableNames();
     {
         for (auto& rTabName : maTabNames)
-            ScCompiler::CheckTabQuotes(rTabName, seformula::FormulaGrammar::extractRefConvention(meGram));
+            ScCompiler::CheckTabQuotes(rTabName, toCalcRefConvention(meGram));
     }
 }
 

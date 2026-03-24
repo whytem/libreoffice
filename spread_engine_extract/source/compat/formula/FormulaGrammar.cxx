@@ -9,8 +9,6 @@
 
 #include <spreadsheetengine/compat/formula/FormulaGrammar.hxx>
 
-#include <cassert>
-
 namespace spreadsheetengine::compat::formula
 {
 
@@ -18,60 +16,62 @@ FormulaGrammar::Grammar FormulaGrammar::mapAPItoGrammar(const bool bEnglish, con
 {
     Grammar eGrammar;
     if (bEnglish && bXML)
-        eGrammar = ::formula::FormulaGrammar::GRAM_PODF;
+        eGrammar = { FormulaLanguage::Odf11, AddressConvention::OdfA1, true };
     else if (bEnglish && !bXML)
-        eGrammar = ::formula::FormulaGrammar::GRAM_API;
+        eGrammar = { FormulaLanguage::Api, AddressConvention::OooA1, true };
     else if (!bEnglish && bXML)
-        eGrammar = ::formula::FormulaGrammar::GRAM_NATIVE_ODF;
+        eGrammar = { FormulaLanguage::Native, AddressConvention::OdfA1, false };
     else
-        eGrammar = ::formula::FormulaGrammar::GRAM_NATIVE;
+        eGrammar = { FormulaLanguage::Native, AddressConvention::OooA1, false };
     return eGrammar;
 }
 
-bool FormulaGrammar::isSupported(const Grammar eGrammar)
+bool FormulaGrammar::isSupported(const Grammar& rGrammar)
 {
-    switch (eGrammar)
+    switch (rGrammar.meLanguage)
     {
-        case ::formula::FormulaGrammar::GRAM_ODFF:
-        case ::formula::FormulaGrammar::GRAM_PODF:
-        case ::formula::FormulaGrammar::GRAM_ENGLISH:
-        case ::formula::FormulaGrammar::GRAM_NATIVE:
-        case ::formula::FormulaGrammar::GRAM_ODFF_UI:
-        case ::formula::FormulaGrammar::GRAM_ODFF_A1:
-        case ::formula::FormulaGrammar::GRAM_PODF_UI:
-        case ::formula::FormulaGrammar::GRAM_PODF_A1:
-        case ::formula::FormulaGrammar::GRAM_NATIVE_UI:
-        case ::formula::FormulaGrammar::GRAM_NATIVE_ODF:
-        case ::formula::FormulaGrammar::GRAM_NATIVE_XL_A1:
-        case ::formula::FormulaGrammar::GRAM_NATIVE_XL_R1C1:
-        case ::formula::FormulaGrammar::GRAM_ENGLISH_XL_A1:
-        case ::formula::FormulaGrammar::GRAM_ENGLISH_XL_R1C1:
-        case ::formula::FormulaGrammar::GRAM_ENGLISH_XL_OOX:
-        case ::formula::FormulaGrammar::GRAM_OOXML:
-        case ::formula::FormulaGrammar::GRAM_API:
+        case FormulaLanguage::Odff:
+        case FormulaLanguage::Odf11:
+            return rGrammar.mbEnglish
+                   && (rGrammar.meAddressConvention == AddressConvention::OdfA1
+                       || rGrammar.meAddressConvention == AddressConvention::Unknown
+                       || rGrammar.meAddressConvention == AddressConvention::OooA1);
+        case FormulaLanguage::English:
+        case FormulaLanguage::Api:
+            return rGrammar.mbEnglish
+                   && rGrammar.meAddressConvention == AddressConvention::OooA1;
+        case FormulaLanguage::Native:
+            return !rGrammar.mbEnglish
+                   && (rGrammar.meAddressConvention == AddressConvention::OooA1
+                       || rGrammar.meAddressConvention == AddressConvention::Unknown
+                       || rGrammar.meAddressConvention == AddressConvention::OdfA1
+                       || rGrammar.meAddressConvention == AddressConvention::XlA1
+                       || rGrammar.meAddressConvention == AddressConvention::XlR1C1);
+        case FormulaLanguage::XlEnglish:
+            return rGrammar.mbEnglish
+                   && (rGrammar.meAddressConvention == AddressConvention::XlA1
+                       || rGrammar.meAddressConvention == AddressConvention::XlR1C1
+                       || rGrammar.meAddressConvention == AddressConvention::XlOox);
+        case FormulaLanguage::Ooxml:
+            return rGrammar.mbEnglish
+                   && rGrammar.meAddressConvention == AddressConvention::XlOox;
+        case FormulaLanguage::External:
             return true;
         default:
-            return extractFormulaLanguage(eGrammar) == ::formula::FormulaGrammar::GRAM_EXTERNAL;
+            return false;
     }
 }
 
-FormulaGrammar::Grammar FormulaGrammar::setEnglishBit(const Grammar eGrammar, const bool bEnglish)
+FormulaGrammar::Grammar FormulaGrammar::setEnglishBit(Grammar eGrammar, const bool bEnglish)
 {
-    if (bEnglish)
-        return static_cast<Grammar>(eGrammar | kEnglishBit);
-
-    return static_cast<Grammar>(eGrammar & ~kEnglishBit);
+    eGrammar.mbEnglish = bEnglish;
+    return eGrammar;
 }
 
-FormulaGrammar::Grammar FormulaGrammar::mergeToGrammar(const Grammar eGrammar, const AddressConvention eConv)
+FormulaGrammar::Grammar FormulaGrammar::mergeToGrammar(Grammar eGrammar, const AddressConvention eConv)
 {
-    const bool bEnglish = isEnglish(eGrammar);
-    Grammar eGram = static_cast<Grammar>(
-        extractFormulaLanguage(eGrammar)
-        | ((eConv + kConventionOffset) << kConventionShift));
-    eGram = setEnglishBit(eGram, bEnglish);
-    assert(isSupported(eGram));
-    return eGram;
+    eGrammar.meAddressConvention = eConv;
+    return eGrammar;
 }
 
 } // namespace spreadsheetengine::compat::formula

@@ -9,8 +9,7 @@
 
 #pragma once
 
-#include <formula/grammar.hxx>
-#include <sal/types.h>
+#include <spreadsheetengine/api/Grammar.hxx>
 #include <spreadsheetengine/spreadsheetenginedllapi.h>
 
 namespace spreadsheetengine::compat::formula
@@ -19,71 +18,65 @@ namespace spreadsheetengine::compat::formula
 /**
  * Calc-owned copy of the FormulaGrammar helper logic.
  *
- * During the early extraction phases we keep using the existing
- * ::formula::FormulaGrammar enums and bit layout so Calc can be retargeted in
- * small slices without forcing a broad public type migration.
+ * This layer now uses spreadsheetengine-owned grammar enums so it can be
+ * built and tested outside LibreOffice. Calc bridges to the legacy
+ * ::formula::FormulaGrammar values at the boundary.
  */
 class SPREADSHEETENGINE_DLLPUBLIC FormulaGrammar
 {
 public:
-    using AddressConvention = ::formula::FormulaGrammar::AddressConvention;
-    using Grammar = ::formula::FormulaGrammar::Grammar;
+    using AddressConvention = spreadsheetengine::api::AddressConvention;
+    using FormulaLanguage = spreadsheetengine::api::FormulaLanguage;
+    using Grammar = spreadsheetengine::api::Grammar;
 
-    static constexpr int kConventionOffset = ::formula::FormulaGrammar::kConventionOffset;
-    static constexpr int kConventionShift = ::formula::FormulaGrammar::kConventionShift;
-    static constexpr int kEnglishBit = ::formula::FormulaGrammar::kEnglishBit;
-    static constexpr int kFlagMask = ::formula::FormulaGrammar::kFlagMask;
-
-    static bool isEnglish(Grammar eGrammar)
+    static bool isEnglish(const Grammar& rGrammar)
     {
-        return (eGrammar & kEnglishBit) != 0;
+        return rGrammar.mbEnglish;
     }
 
     static Grammar mapAPItoGrammar(bool bEnglish, bool bXML);
-    static bool isSupported(Grammar eGrammar);
+    static bool isSupported(const Grammar& rGrammar);
 
-    static sal_Int32 extractFormulaLanguage(Grammar eGrammar)
+    static FormulaLanguage extractFormulaLanguage(const Grammar& rGrammar)
     {
-        return eGrammar & kFlagMask;
+        return rGrammar.meLanguage;
     }
 
-    static AddressConvention extractRefConvention(Grammar eGrammar)
+    static AddressConvention extractRefConvention(const Grammar& rGrammar)
     {
-        return static_cast<AddressConvention>(
-            ((eGrammar & ~kEnglishBit) >> kConventionShift) - kConventionOffset);
+        return rGrammar.meAddressConvention;
     }
 
     static Grammar setEnglishBit(Grammar eGrammar, bool bEnglish);
     static Grammar mergeToGrammar(Grammar eGrammar, AddressConvention eConv);
 
-    static bool isPODF(Grammar eGrammar)
+    static bool isPODF(const Grammar& rGrammar)
     {
-        return extractFormulaLanguage(eGrammar) == css::sheet::FormulaLanguage::ODF_11;
+        return extractFormulaLanguage(rGrammar) == FormulaLanguage::Odf11;
     }
 
-    static bool isODFF(Grammar eGrammar)
+    static bool isODFF(const Grammar& rGrammar)
     {
-        return extractFormulaLanguage(eGrammar) == css::sheet::FormulaLanguage::ODFF;
+        return extractFormulaLanguage(rGrammar) == FormulaLanguage::Odff;
     }
 
-    static bool isOOXML(Grammar eGrammar)
+    static bool isOOXML(const Grammar& rGrammar)
     {
-        return extractFormulaLanguage(eGrammar) == css::sheet::FormulaLanguage::OOXML;
+        return extractFormulaLanguage(rGrammar) == FormulaLanguage::Ooxml;
     }
 
-    static bool isRefConventionOOXML(Grammar eGrammar)
+    static bool isRefConventionOOXML(const Grammar& rGrammar)
     {
-        return extractRefConvention(eGrammar)
-            == AddressConvention::CONV_XL_OOX;
+        return extractRefConvention(rGrammar) == AddressConvention::XlOox;
     }
 
-    static bool isExcelSyntax(Grammar eGrammar)
+    static bool isExcelSyntax(const Grammar& rGrammar)
     {
-        switch (extractRefConvention(eGrammar))
+        switch (extractRefConvention(rGrammar))
         {
-            case AddressConvention::CONV_XL_A1:
-            case AddressConvention::CONV_XL_R1C1:
-            case AddressConvention::CONV_XL_OOX:
+            case AddressConvention::XlA1:
+            case AddressConvention::XlR1C1:
+            case AddressConvention::XlOox:
                 return true;
             default:
                 return false;
