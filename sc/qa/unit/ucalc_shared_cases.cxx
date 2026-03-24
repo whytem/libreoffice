@@ -502,6 +502,116 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testLocaleParsingSharedCases)
     }
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testDynamicArrayHelperFunctions)
+{
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"ArrayHelpers"_ustr);
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+
+    auto setNumberBlock = [this](SCCOL nStartCol, SCROW nStartRow,
+                                 std::initializer_list<std::initializer_list<double>> aRows) {
+        SCROW nRow = nStartRow;
+        for (const auto& rRow : aRows)
+        {
+            SCCOL nCol = nStartCol;
+            for (double fValue : rRow)
+            {
+                m_pDoc->SetValue(ScAddress(nCol, nRow, 0), fValue);
+                ++nCol;
+            }
+            ++nRow;
+        }
+    };
+
+    auto assertValueCell = [this](SCCOL nCol, SCROW nRow, double fExpected) {
+        CPPUNIT_ASSERT_EQUAL(FormulaError::NONE, m_pDoc->GetErrCode(ScAddress(nCol, nRow, 0)));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(fExpected, m_pDoc->GetValue(ScAddress(nCol, nRow, 0)), 1e-12);
+    };
+
+    setNumberBlock(0, 0, { { 1, 2, 3 }, { 4, 5, 6 }, { 7, 8, 9 } });
+    setNumberBlock(20, 0, { { 10, 11 }, { 12, 13 } });
+    setNumberBlock(23, 0, { { 20, 21 }, { 22, 23 } });
+    setNumberBlock(3, 0, { { 1 }, { 2 }, { 3 }, { 4 }, { 5 } });
+
+    m_pDoc->InsertMatrixFormula(5, 0, 6, 1, aMark, u"=TAKE(A1:C3;2;2)"_ustr);
+    assertValueCell(5, 0, 1);
+    assertValueCell(6, 0, 2);
+    assertValueCell(5, 1, 4);
+    assertValueCell(6, 1, 5);
+
+    m_pDoc->InsertMatrixFormula(8, 0, 9, 1, aMark, u"=DROP(A1:C3;1;1)"_ustr);
+    assertValueCell(8, 0, 5);
+    assertValueCell(9, 0, 6);
+    assertValueCell(8, 1, 8);
+    assertValueCell(9, 1, 9);
+
+    m_pDoc->InsertMatrixFormula(5, 4, 7, 6, aMark, u"=EXPAND(A1:B2;3;3;0)"_ustr);
+    assertValueCell(5, 4, 1);
+    assertValueCell(6, 4, 2);
+    assertValueCell(7, 4, 0);
+    assertValueCell(5, 5, 4);
+    assertValueCell(6, 5, 5);
+    assertValueCell(7, 6, 0);
+
+    m_pDoc->InsertMatrixFormula(9, 4, 10, 6, aMark, u"=CHOOSECOLS(A1:C3;3;1)"_ustr);
+    assertValueCell(9, 4, 3);
+    assertValueCell(10, 4, 1);
+    assertValueCell(9, 6, 9);
+    assertValueCell(10, 6, 7);
+
+    m_pDoc->InsertMatrixFormula(13, 4, 15, 5, aMark, u"=CHOOSEROWS(A1:C3;3;1)"_ustr);
+    assertValueCell(13, 4, 7);
+    assertValueCell(14, 4, 8);
+    assertValueCell(15, 4, 9);
+    assertValueCell(13, 5, 1);
+    assertValueCell(15, 5, 3);
+
+    m_pDoc->InsertMatrixFormula(5, 9, 5, 12, aMark, u"=TOCOL(A1:B2)"_ustr);
+    assertValueCell(5, 9, 1);
+    assertValueCell(5, 10, 2);
+    assertValueCell(5, 11, 4);
+    assertValueCell(5, 12, 5);
+
+    m_pDoc->InsertMatrixFormula(7, 9, 10, 9, aMark, u"=TOROW(A1:B2)"_ustr);
+    assertValueCell(7, 9, 1);
+    assertValueCell(8, 9, 2);
+    assertValueCell(9, 9, 4);
+    assertValueCell(10, 9, 5);
+
+    m_pDoc->InsertMatrixFormula(12, 9, 13, 11, aMark, u"=WRAPROWS(D1:D5;2;0)"_ustr);
+    assertValueCell(12, 9, 1);
+    assertValueCell(13, 9, 2);
+    assertValueCell(12, 10, 3);
+    assertValueCell(13, 10, 4);
+    assertValueCell(12, 11, 5);
+    assertValueCell(13, 11, 0);
+
+    m_pDoc->InsertMatrixFormula(15, 9, 17, 10, aMark, u"=WRAPCOLS(D1:D5;2;0)"_ustr);
+    assertValueCell(15, 9, 1);
+    assertValueCell(15, 10, 2);
+    assertValueCell(16, 9, 3);
+    assertValueCell(16, 10, 4);
+    assertValueCell(17, 9, 5);
+    assertValueCell(17, 10, 0);
+
+    m_pDoc->InsertMatrixFormula(5, 14, 8, 15, aMark, u"=HSTACK(U1:V2;X1:Y2)"_ustr);
+    assertValueCell(5, 14, 10);
+    assertValueCell(6, 14, 11);
+    assertValueCell(7, 14, 20);
+    assertValueCell(8, 14, 21);
+    assertValueCell(5, 15, 12);
+    assertValueCell(8, 15, 23);
+
+    m_pDoc->InsertMatrixFormula(5, 18, 6, 21, aMark, u"=VSTACK(U1:V2;X1:Y2)"_ustr);
+    assertValueCell(5, 18, 10);
+    assertValueCell(6, 18, 11);
+    assertValueCell(5, 19, 12);
+    assertValueCell(6, 19, 13);
+    assertValueCell(5, 20, 20);
+    assertValueCell(6, 21, 23);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testNumeralSharedCases)
 {
     sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);

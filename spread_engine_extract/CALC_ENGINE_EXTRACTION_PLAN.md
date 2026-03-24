@@ -892,9 +892,34 @@ Current status:
   - lookup-cache ownership and reuse
   - broader criteria/query evaluation that is closer to Phase 10 dependency and
     cache work
-- the next meaningful work should move to pass 6:
-  - array-aware and document-coupled evaluator helpers that can now target the
-    host/runtime seams from Phases 8 and 9
+- pass 6 is now substantially complete for the low-coupling array-aware evaluator layer:
+  - engine-owned array helpers now cover reusable planning for:
+    - `TAKE` / `DROP`
+    - `CHOOSECOLS` / `CHOOSEROWS`
+    - `EXPAND`
+    - `TOCOL` / `TOROW`
+    - `WRAPCOLS` / `WRAPROWS`
+    - `HSTACK` / `VSTACK` dimension accumulation
+  - Calc now consumes that helper layer in the dynamic-array reshaping and
+    selection functions in `interpr1.cxx`, while still owning cell copying,
+    token-stack orchestration, and matrix/reference materialization
+  - standalone coverage now includes `spreadsheetengine_array_tests`
+  - Calc-side coverage now includes direct dynamic-array formula cases in
+    `CppunitTest_sc_ucalc_shared_cases`, in addition to the broader `ucalc`
+    and smoke gates
+- the main remaining pass 6 leftovers are the more document-coupled evaluator
+  pieces:
+  - `INDEX` / `OFFSET` / `INDIRECT` reference semantics
+  - ref-list and reference-generator behaviors that still depend on Calc
+    document ownership
+  - matrix/reference-producing evaluator paths that are closer to Phase 10's
+    dependency/reference work than to the already-extracted array planner layer
+- the next meaningful work should move beyond the low-coupling pass-6 array
+  layer:
+  - either finish the remaining document-coupled reference helpers in a narrow
+    follow-up slice
+  - or begin the Phase 10 dependency/reference extraction if we want to tackle
+    those heavier seams in their more natural home
 
 Validation:
 
@@ -903,6 +928,7 @@ Validation:
   - evaluator parity cases against the in-memory host
   - shared-case TSV runner where the rows are spreadsheet-facing
   - `spreadsheetengine_lookup_tests`
+  - `spreadsheetengine_array_tests`
 - LibreOffice:
   - `CppunitTest_sc_ucalc_shared_cases`
   - `CppunitTest_sc_logical_functions_test`

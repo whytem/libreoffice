@@ -67,6 +67,8 @@ struct MatrixDimensions
     MatrixSize mnColumns = 0;
     MatrixSize mnRows = 0;
 
+    [[nodiscard]] constexpr bool operator==(const MatrixDimensions& rOther) const = default;
+
     [[nodiscard]] constexpr bool isAllocated() const { return mnColumns >= 0 && mnRows >= 0; }
 
     [[nodiscard]] constexpr bool isEmpty() const { return mnColumns == 0 || mnRows == 0; }
@@ -84,6 +86,8 @@ struct MatrixCoordinate
 {
     MatrixSize mnColumn = 0;
     MatrixSize mnRow = 0;
+
+    [[nodiscard]] constexpr bool operator==(const MatrixCoordinate& rOther) const = default;
 };
 
 [[nodiscard]] constexpr bool isValidCoordinate(

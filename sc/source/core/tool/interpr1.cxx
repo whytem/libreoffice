@@ -58,6 +58,7 @@
 #include <cellkeytranslator.hxx>
 #include <lookupcache.hxx>
 #include <rangenam.hxx>
+#include <spreadsheetengine/api/Array.hxx>
 #include <spreadsheetengine/api/Logic.hxx>
 #include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Parsing.hxx>
@@ -94,6 +95,7 @@ ScCalcConfig *ScInterpreter::mpGlobalConfig = nullptr;
 
 using namespace formula;
 namespace semath = spreadsheetengine::core::math;
+namespace searray = spreadsheetengine::api::array;
 namespace selogic = spreadsheetengine::api::logic;
 namespace selookup = spreadsheetengine::api::lookup;
 namespace setext = spreadsheetengine::core::text;
@@ -8844,71 +8846,19 @@ void ScInterpreter::ScTakeOrDrop(bool bTake)
         return;
     }
 
-    std::vector<std::pair<SCSIZE, SCSIZE>> aResPos;
-
-    SCSIZE nMinCol = 0;
-    SCSIZE nMaxCol = nsC;
-    if (nArgCols.has_value())
+    const auto aSlice = searray::planTakeDropSlice(
+        { static_cast<sal_Int32>(nsC), static_cast<sal_Int32>(nsR) }, bTake, nArgRows, nArgCols);
+    if (!aSlice)
     {
-        if (o3tl::make_unsigned(std::abs(nArgCols.value())) < nsC)
-        {
-            if (bTake)
-            {
-                if (nArgCols.value() < 0)
-                    nMinCol = nsC + nArgCols.value();
-                else
-                    nMaxCol = nArgCols.value();
-            }
-            else
-            {
-                if (nArgCols.value() < 0)
-                    nMaxCol = nsC + nArgCols.value();
-                else
-                    nMinCol = nArgCols.value();
-            }
-        }
-    }
-
-    SCSIZE nMinRow = 0;
-    SCSIZE nMaxRow = nsR;
-    if (nArgRows.has_value())
-    {
-        if (o3tl::make_unsigned(std::abs(nArgRows.value())) < nsR)
-        {
-            if (bTake)
-            {
-                if (nArgRows.value() < 0)
-                    nMinRow = nsR + nArgRows.value();
-                else
-                    nMaxRow = nArgRows.value();
-            }
-            else
-            {
-                if (nArgRows.value() < 0)
-                    nMaxRow = nsR + nArgRows.value();
-                else
-                    nMinRow = nArgRows.value();
-            }
-        }
-    }
-
-    for (SCSIZE col = nMinCol; col < nMaxCol; col++)
-    {
-        for (SCSIZE row = nMinRow; row < nMaxRow; row++)
-        {
-            aResPos.emplace_back(col, row);
-        }
-    }
-
-    // No result
-    if (aResPos.size() == 0)
-    {
-        PushNA();
+        if (aSlice.meError == spreadsheetengine::api::Error::NotAvailable)
+            PushNA();
+        else
+            PushIllegalArgument();
         return;
     }
 
-    SCSIZE nColumns = nMaxCol - nMinCol;
-    SCSIZE nRows = nMaxRow - nMinRow;
+    const SCSIZE nColumns = aSlice.maValue.maDimensions.mnColumns;
+    const SCSIZE nRows = aSlice.maValue.maDimensions.mnRows;
     ScMatrixRef pResMat = GetNewMat(nColumns, nRows, /*bEmpty*/true);
     if (!pResMat)
     {
@@ -8916,13 +8866,12 @@ void ScInterpreter::ScTakeOrDrop(bool bTake)
         return;
     }
 
-    size_t iPos = 0;
     for (SCSIZE col = 0; col < nColumns; ++col)
     {
         for (SCSIZE row = 0; row < nRows; ++row)
         {
-            lcl_FillCell(pMatSource, pResMat, aResPos[iPos].first, aResPos[iPos].second, col, row);
-            ++iPos;
+            lcl_FillCell(pMatSource, pResMat, aSlice.maValue.maStart.mnColumn + col,
+                         aSlice.maValue.maStart.mnRow + row, col, row);
         }
     }
 
@@ -9004,20 +8953,17 @@ void ScInterpreter::ScChooseColsOrRows(bool bCols)
         {
             for (SCSIZE row = 0; row < nR; row++)
             {
-                if (!pRefMatrix->IsStringOrEmpty(nC, nR))
+                if (!pRefMatrix->IsStringOrEmpty(col, row))
                 {
-                    sal_Int32 nParam = double_to_int32(pRefMatrix->GetDouble(col, row));
-                    sal_Int32 nMax = bCols ? nsC : nsR;
-                    if (nParam < 0)
-                        nParam = nMax + nParam + 1;
-
-                    if (nParam <= 0 || nParam > nMax)
+                    const auto aSelection = searray::normalizeSelectionIndex(
+                        double_to_int32(pRefMatrix->GetDouble(col, row)),
+                        bCols ? static_cast<sal_Int32>(nsC) : static_cast<sal_Int32>(nsR));
+                    if (!aSelection)
                     {
                         PushIllegalParameter();
                         return;
                     }
-                    else
-                        aParamsVector.push_back(nParam);
+                    aParamsVector.push_back(aSelection.maValue);
                 }
                 else
                 {
@@ -9028,8 +8974,18 @@ void ScInterpreter::ScChooseColsOrRows(bool bCols)
         }
     }
 
-    SCSIZE nColumns = bCols ? aParamsVector.size() : nsC;
-    SCSIZE nRows = bCols ? nsR : aParamsVector.size();
+    const auto aResultDimensions = searray::planChooseResultDimensions(
+        { static_cast<sal_Int32>(nsC), static_cast<sal_Int32>(nsR) },
+        static_cast<sal_Int32>(aParamsVector.size()),
+        bCols ? searray::Axis::Columns : searray::Axis::Rows);
+    if (!aResultDimensions)
+    {
+        PushIllegalArgument();
+        return;
+    }
+
+    SCSIZE nColumns = aResultDimensions.maValue.mnColumns;
+    SCSIZE nRows = aResultDimensions.maValue.mnRows;
     ScMatrixRef pResMat = GetNewMat(nColumns, nRows, /*bEmpty*/true);
     if (!pResMat)
     {
@@ -9042,9 +8998,9 @@ void ScInterpreter::ScChooseColsOrRows(bool bCols)
         for(SCSIZE row = 0; row < nRows; ++row)
         {
             if (bCols)
-                lcl_FillCell(pMatSource, pResMat, aParamsVector[col] - 1, row, col, row);
+                lcl_FillCell(pMatSource, pResMat, aParamsVector[col], row, col, row);
             else
-                lcl_FillCell(pMatSource, pResMat, col, aParamsVector[row] - 1, col, row);
+                lcl_FillCell(pMatSource, pResMat, col, aParamsVector[row], col, row);
         }
     }
 
@@ -9122,29 +9078,15 @@ void ScInterpreter::ScExpand()
         return;
     }
 
-    SCSIZE nColumns = nsC;
-    SCSIZE nRows = nsR;
-    if (nArgCols.has_value())
+    const auto aExpandDimensions = searray::planExpandDimensions(
+        { static_cast<sal_Int32>(nsC), static_cast<sal_Int32>(nsR) }, nArgRows, nArgCols);
+    if (!aExpandDimensions)
     {
-        if (o3tl::make_unsigned(std::abs(nArgCols.value())) < nsC)
-        {
-            PushIllegalArgument();
-            return;
-        }
-        else
-            nColumns = nArgCols.value();
+        PushIllegalArgument();
+        return;
     }
-
-    if (nArgRows.has_value())
-    {
-        if (o3tl::make_unsigned(std::abs(nArgRows.value())) < nsR)
-        {
-            PushIllegalArgument();
-            return;
-        }
-        else
-            nRows = nArgRows.value();
-    }
+    const SCSIZE nColumns = aExpandDimensions.maValue.mnColumns;
+    const SCSIZE nRows = aExpandDimensions.maValue.mnRows;
 
     ScMatrixRef pResMat = GetNewMat(nColumns, nRows, /*bEmpty*/true);
     if (!pResMat)
@@ -9197,8 +9139,7 @@ void ScInterpreter::ScHorizontalOrVerticalStack(bool bHorizontal)
     //reverse order of parameter stack to read them from first to last
     ReverseStack(nParamCount);
 
-    SCSIZE nColumns = 0;
-    SCSIZE nRows = 0;
+    spreadsheetengine::api::MatrixDimensions aStackDimensions;
     std::vector<ScMatrixRef> aResMatrix;
     while (nGlobalError == FormulaError::NONE && nParamCount-- > 0)
     {
@@ -9217,8 +9158,9 @@ void ScInterpreter::ScHorizontalOrVerticalStack(bool bHorizontal)
 
         SCSIZE nC = 0, nR = 0;
         pRefMatrix->GetDimensions(nC, nR);
-        nColumns = bHorizontal ? nColumns + nC : std::max(nColumns, nC);
-        nRows = bHorizontal ? std::max(nRows , nR) : nRows + nR;
+        aStackDimensions = searray::appendStackDimensions(
+            aStackDimensions, { static_cast<sal_Int32>(nC), static_cast<sal_Int32>(nR) },
+            bHorizontal ? searray::StackDirection::Horizontal : searray::StackDirection::Vertical);
         aResMatrix.emplace_back(pRefMatrix);
     }
 
@@ -9229,7 +9171,7 @@ void ScInterpreter::ScHorizontalOrVerticalStack(bool bHorizontal)
         return;
     }
 
-    ScMatrixRef pResMat = GetNewMat(nColumns, nRows, /*bEmpty*/true);
+    ScMatrixRef pResMat = GetNewMat(aStackDimensions.mnColumns, aStackDimensions.mnRows, /*bEmpty*/true);
     if (!pResMat)
     {
         PushIllegalArgument();
@@ -9245,7 +9187,7 @@ void ScInterpreter::ScHorizontalOrVerticalStack(bool bHorizontal)
         {
             for (SCSIZE col = 0; col < nC; ++col)
             {
-                for (SCSIZE row = 0; row < nRows; ++row)
+                for (SCSIZE row = 0; row < aStackDimensions.mnRows; ++row)
                 {
                     if (row < nR)
                         lcl_FillCell(rMatrix, pResMat, col, row, nCount, row);
@@ -9259,7 +9201,7 @@ void ScInterpreter::ScHorizontalOrVerticalStack(bool bHorizontal)
         {
             for (SCSIZE row = 0; row < nR; ++row)
             {
-                for (SCSIZE col = 0; col < nColumns; ++col)
+                for (SCSIZE col = 0; col < aStackDimensions.mnColumns; ++col)
                 {
                     if (col < nC)
                         lcl_FillCell(rMatrix, pResMat, col, row, col, nCount);
@@ -9727,23 +9669,24 @@ void ScInterpreter::ScToColOrRow(bool bCol)
         {
             SCSIZE nCol = bByColumn ? i : j;
             SCSIZE nRow = bByColumn ? j : i;
-            if ((eIgnoreValues == IgnoreValues::ALL || eIgnoreValues == IgnoreValues::BLANKS) && pMatSource->IsEmptyCell(nCol, nRow))
-                continue; // Nothing to do
-            else if ((eIgnoreValues == IgnoreValues::ALL || eIgnoreValues == IgnoreValues::ERRORS) && pMatSource->GetError(nCol, nRow) != FormulaError::NONE)
-                continue; // Nothing to do
-            else
+            if (searray::shouldIncludeFlattenedValue(
+                    static_cast<searray::FlattenIgnore>(eIgnoreValues),
+                    pMatSource->IsEmptyCell(nCol, nRow),
+                    pMatSource->GetError(nCol, nRow) != FormulaError::NONE))
                 aResPos.emplace_back(nCol, nRow);
         }
 
     }
-    // No result
-    if (aResPos.size() == 0)
+    const auto aFlattenDimensions
+        = searray::planFlattenOutputDimensions(aResPos.size(), bCol);
+    if (!aFlattenDimensions)
     {
         PushNA();
         return;
     }
-    SCSIZE nColumns = bCol? 1 : aResPos.size();
-    SCSIZE nRows = bCol? aResPos.size() : 1;
+
+    SCSIZE nColumns = aFlattenDimensions.maValue.mnColumns;
+    SCSIZE nRows = aFlattenDimensions.maValue.mnRows;
 
     ScMatrixRef pResMat = GetNewMat(nColumns, nRows, /*bEmpty*/true);
     if (!pResMat)
@@ -9755,10 +9698,9 @@ void ScInterpreter::ScToColOrRow(bool bCol)
     // fill result matrix to the same column
     for (SCSIZE iPos = 0; iPos < aResPos.size(); ++iPos)
     {
-        if (bCol)
-            lcl_FillCell(pMatSource, pResMat, aResPos[iPos].first, aResPos[iPos].second, 0, iPos);
-        else
-            lcl_FillCell(pMatSource, pResMat, aResPos[iPos].first, aResPos[iPos].second, iPos, 0);
+        const auto aDest = searray::flattenDestination(iPos, bCol);
+        lcl_FillCell(pMatSource, pResMat, aResPos[iPos].first, aResPos[iPos].second,
+                     aDest.mnColumn, aDest.mnRow);
     }
 
     PushMatrix(pResMat);
@@ -10154,31 +10096,22 @@ void ScInterpreter::ScWrapColsOrRows(bool bCols)
             return;
     }
 
-    if (nGlobalError != FormulaError::NONE || nsC < 1 || nsR < 1 || (nsC > 1 && nsR > 1))
+    if (nGlobalError != FormulaError::NONE || nsC < 1 || nsR < 1)
     {
         PushIllegalArgument();
         return;
     }
 
-    std::vector<std::pair<SCSIZE, SCSIZE>> aResPos;
-    for (SCSIZE col = 0; col < nsC; col++)
+    const auto aWrapDimensions = searray::planWrapOutputDimensions(
+        { static_cast<sal_Int32>(nsC), static_cast<sal_Int32>(nsR) }, nWrap, bCols);
+    if (!aWrapDimensions)
     {
-        for (SCSIZE row = 0; row < nsR; row++)
-        {
-            aResPos.emplace_back(col, row);
-        }
-    }
-
-    // No result
-    if (aResPos.size() == 0)
-    {
-        PushNA();
+        PushIllegalArgument();
         return;
     }
 
-    SCSIZE nCeil = std::ceil(aResPos.size() / static_cast<double>(nWrap));
-    SCSIZE nColumns = bCols ?  nCeil : nWrap;
-    SCSIZE nRows = bCols ? nWrap : nCeil;
+    SCSIZE nColumns = aWrapDimensions.maValue.mnColumns;
+    SCSIZE nRows = aWrapDimensions.maValue.mnRows;
     ScMatrixRef pResMat = GetNewMat(nColumns, nRows, /*bEmpty*/true);
     if (!pResMat)
     {
@@ -10186,30 +10119,31 @@ void ScInterpreter::ScWrapColsOrRows(bool bCols)
         return;
     }
 
-    if (!bCols)
-        std::swap(nColumns, nRows);
+    const SCSIZE nElementCount = nsC * nsR;
+    for (SCSIZE iPos = 0; iPos < nElementCount; ++iPos)
+    {
+        const auto aDest = searray::wrapDestination(iPos, nWrap, bCols);
+        const SCSIZE nSourceCol = nsC == 1 ? 0 : iPos;
+        const SCSIZE nSourceRow = nsC == 1 ? iPos : 0;
+        lcl_FillCell(pMatSource, pResMat, nSourceCol, nSourceRow, aDest.mnColumn, aDest.mnRow);
+    }
 
-    size_t iPos = 0;
     for (SCSIZE col = 0; col < nColumns; ++col)
     {
         for (SCSIZE row = 0; row < nRows; ++row)
         {
-            SCSIZE nC = bCols ? col : row;
-            SCSIZE nR = bCols ? row : col;
-            if (iPos < aResPos.size())
-            {
-                lcl_FillCell(pMatSource, pResMat, aResPos[iPos].first, aResPos[iPos].second, nC, nR);
-                ++iPos;
-            }
-            else if (bDouble.has_value())
+            const SCSIZE nLinearIndex = bCols ? (col * nWrap + row) : (row * nWrap + col);
+            if (nLinearIndex < nElementCount)
+                continue;
+            if (bDouble.has_value())
             {
                 if (bDouble.value())
-                    pResMat->PutDouble(fNumber, nC, nR);
+                    pResMat->PutDouble(fNumber, col, row);
                 else
-                    pResMat->PutString(aString, nC, nR);
+                    pResMat->PutString(aString, col, row);
             }
             else
-                pResMat->PutError(FormulaError::NotAvailable, nC, nR);
+                pResMat->PutError(FormulaError::NotAvailable, col, row);
         }
     }
 
