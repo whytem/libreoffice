@@ -15,6 +15,7 @@
 #include <formula/token.hxx>
 #include <sal/log.hxx>
 #include <svl/numformat.hxx>
+#include <spreadsheetengine/api/Logic.hxx>
 
 #include <cmath>
 #include <memory>
@@ -1839,32 +1840,25 @@ void ScInterpreter::ScIfs_MS()
     {
         bool bVal = GetBool();
         nParamCount--;
-        if ( bVal )
+        switch (spreadsheetengine::api::logic::evaluateIfsCondition(
+                    bVal, nGlobalError != FormulaError::NONE, nParamCount))
         {
-            // TRUE
-            if ( nParamCount < 1 )
-            {
-                // no parameter given for THEN
-                PushParameterExpected();
-                return;
-            }
-            bFinished = true;
-        }
-        else
-        {
-            // FALSE
-            if ( nParamCount >= 3 )
-            {
-                // ELSEIF path
+            case spreadsheetengine::api::logic::IfsAction::SelectCurrentResult:
+                bFinished = true;
+                break;
+            case spreadsheetengine::api::logic::IfsAction::SkipCurrentResult:
                 Pop();
                 nParamCount--;
-            }
-            else
-            {
-                // no parameter given for ELSE
+                break;
+            case spreadsheetengine::api::logic::IfsAction::ReturnParameterExpected:
+                PushParameterExpected();
+                return;
+            case spreadsheetengine::api::logic::IfsAction::ReturnNotAvailable:
                 PushNA();
                 return;
-            }
+            case spreadsheetengine::api::logic::IfsAction::ReturnNoValue:
+                PushNoValue();
+                return;
         }
     }
 

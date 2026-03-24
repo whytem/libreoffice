@@ -22,7 +22,8 @@ enum class Error
     Domain,
     StringOverflow,
     NoValue,
-    NoConvergence
+    NoConvergence,
+    NotAvailable
 };
 
 template <typename T> struct ValueResult

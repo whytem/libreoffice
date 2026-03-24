@@ -58,8 +58,10 @@
 #include <cellkeytranslator.hxx>
 #include <lookupcache.hxx>
 #include <rangenam.hxx>
+#include <spreadsheetengine/api/Logic.hxx>
 #include <spreadsheetengine/core/MathBitwise.hxx>
 #include <spreadsheetengine/core/MathTranscendental.hxx>
+#include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <spreadsheetengine/core/TextCase.hxx>
 #include <spreadsheetengine/core/TextScalar.hxx>
 #include <spreadsheetengine/core/TextWidth.hxx>
@@ -89,6 +91,7 @@ ScCalcConfig *ScInterpreter::mpGlobalConfig = nullptr;
 
 using namespace formula;
 namespace semath = spreadsheetengine::core::math;
+namespace selogic = spreadsheetengine::api::logic;
 namespace setext = spreadsheetengine::core::text;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 
@@ -162,36 +165,29 @@ void ScInterpreter::ScIfJump()
 void ScInterpreter::ScIfJumpNotMatrix( const short* pJump, short nJumpCount )
 {
     const bool bCondition = GetBool();
-    if (nGlobalError != FormulaError::NONE)
-    {   // Propagate error, not THEN- or ELSE-path, jump behind.
-        PushError(nGlobalError);
-        aCode.Jump( pJump[ nJumpCount ], pJump[ nJumpCount ] );
-    }
-    else if ( bCondition )
-    {   // TRUE
-        if( nJumpCount >= 2 )
-        {   // THEN path
+    switch (selogic::selectIfBranch(bCondition, nGlobalError != FormulaError::NONE,
+                nJumpCount >= 2, nJumpCount == 3))
+    {
+        case selogic::IfBranchAction::PropagateError:
+            PushError(nGlobalError);
+            aCode.Jump( pJump[ nJumpCount ], pJump[ nJumpCount ] );
+            break;
+        case selogic::IfBranchAction::ThenPath:
             aCode.Jump( pJump[ 1 ], pJump[ nJumpCount ] );
-        }
-        else
-        {   // no parameter given for THEN
+            break;
+        case selogic::IfBranchAction::ElsePath:
+            aCode.Jump( pJump[ 2 ], pJump[ nJumpCount ] );
+            break;
+        case selogic::IfBranchAction::ReturnTrue:
             nFuncFmtType = SvNumFormatType::LOGICAL;
             PushInt(1);
             aCode.Jump( pJump[ nJumpCount ], pJump[ nJumpCount ] );
-        }
-    }
-    else
-    {   // FALSE
-        if( nJumpCount == 3 )
-        {   // ELSE path
-            aCode.Jump( pJump[ 2 ], pJump[ nJumpCount ] );
-        }
-        else
-        {   // no parameter given for ELSE
+            break;
+        case selogic::IfBranchAction::ReturnFalse:
             nFuncFmtType = SvNumFormatType::LOGICAL;
             PushInt(0);
             aCode.Jump( pJump[ nJumpCount ], pJump[ nJumpCount ] );
-        }
+            break;
     }
 }
 
@@ -261,7 +257,13 @@ void ScInterpreter::ScIfError( bool bNAonly )
 
                     ScRefCellValue aCell(mrDoc, aAdr);
                     nGlobalError = GetCellErrCode(aCell);
-                    if (nGlobalError != FormulaError::NONE)
+                    if (selogic::matchesIfErrorPolicy(
+                            nGlobalError == FormulaError::NotAvailable
+                                ? spreadsheetengine::api::Error::NotAvailable
+                                : (nGlobalError == FormulaError::NONE
+                                       ? spreadsheetengine::api::Error::None
+                                       : spreadsheetengine::api::Error::IllegalArgument),
+                            bNAonly))
                         bError = true;
                 }
             }
@@ -302,7 +304,13 @@ void ScInterpreter::ScIfError( bool bNAonly )
                     for (SCSIZE nR=0; nR < nRows && !bError; ++nR)
                     {
                         FormulaError nErr = pMat->GetError( nC, nR );
-                        if (nErr != FormulaError::NONE && (!bNAonly || nErr == FormulaError::NotAvailable))
+                        if (selogic::matchesIfErrorPolicy(
+                                nErr == FormulaError::NotAvailable
+                                    ? spreadsheetengine::api::Error::NotAvailable
+                                    : (nErr == FormulaError::NONE
+                                           ? spreadsheetengine::api::Error::None
+                                           : spreadsheetengine::api::Error::IllegalArgument),
+                                bNAonly))
                         {
                             bError = true;
                             nErrorCol = nC;
@@ -346,7 +354,13 @@ void ScInterpreter::ScIfError( bool bNAonly )
                         for ( ; nR < nRows; ++nR)
                         {
                             FormulaError nErr = pMat->GetError( nC, nR );
-                            if (nErr != FormulaError::NONE && (!bNAonly || nErr == FormulaError::NotAvailable))
+                            if (selogic::matchesIfErrorPolicy(
+                                    nErr == FormulaError::NotAvailable
+                                        ? spreadsheetengine::api::Error::NotAvailable
+                                        : (nErr == FormulaError::NONE
+                                               ? spreadsheetengine::api::Error::None
+                                               : spreadsheetengine::api::Error::IllegalArgument),
+                                    bNAonly))
                             {   // TRUE, THEN path
                                 pJumpMat->SetJump( nC, nR, 1.0, pJump[ 1 ], pJump[ nJumpCount ] );
                             }
@@ -369,7 +383,13 @@ void ScInterpreter::ScIfError( bool bNAonly )
             break;
     }
 
-    if (bError && (!bNAonly || nGlobalError == FormulaError::NotAvailable))
+    const auto eIfErrorAction = selogic::selectIfErrorAction(
+        nGlobalError == FormulaError::NotAvailable
+            ? spreadsheetengine::api::Error::NotAvailable
+            : (bError ? spreadsheetengine::api::Error::IllegalArgument
+                      : spreadsheetengine::api::Error::None),
+        bNAonly);
+    if (bError && eIfErrorAction == selogic::IfErrorAction::EvaluateAlternate)
     {
         // error, calculate 2nd argument
         nGlobalError = FormulaError::NONE;
@@ -425,15 +445,18 @@ void ScInterpreter::ScChooseJump()
                             if ( bIsValue )
                             {
                                 fVal = pMat->GetDouble(nC, nR);
-                                bIsValue = std::isfinite( fVal );
-                                if ( bIsValue )
+                                if (const auto oJumpIndex = selogic::normalizeChooseIndex(fVal, nJumpCount))
                                 {
-                                    fVal = ::rtl::math::approxFloor( fVal);
-                                    if ( (fVal < 1) || (fVal >= nJumpCount))
+                                    fVal = *oJumpIndex;
+                                }
+                                else
+                                {
+                                    bIsValue = false;
+                                    if (std::isfinite(fVal))
                                     {
-                                        bIsValue = false;
                                         fVal = CreateDoubleError(
-                                                FormulaError::IllegalArgument);
+                                            selibreoffice::toFormulaError(
+                                                spreadsheetengine::api::Error::IllegalArgument));
                                     }
                                 }
                             }
@@ -471,9 +494,10 @@ void ScInterpreter::ScChooseJump()
         default:
         {
             sal_Int16 nJumpIndex = GetInt16();
-            if (nGlobalError == FormulaError::NONE && (nJumpIndex >= 1) && (nJumpIndex < nJumpCount))
+            const auto aJumpDecision = selogic::chooseJumpIndex(nJumpIndex, nJumpCount);
+            if (nGlobalError == FormulaError::NONE && aJumpDecision)
             {
-                aCode.Jump( pJump[ static_cast<short>(nJumpIndex) ], pJump[ nJumpCount ] );
+                aCode.Jump( pJump[ static_cast<short>(aJumpDecision.maValue) ], pJump[ nJumpCount ] );
                 bHaveJump = true;
             }
             else

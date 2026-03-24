@@ -839,11 +839,24 @@ Current status:
     host-driven number coercion/formatting without depending on Calc classes
   - those helpers are exercised in both the standalone suite and the
     Calc-side shared-case target
-- the next meaningful work is no longer host scaffolding:
-  - Phase 9 should now move to pass 3 and extract the first genuinely
-    host-aware interpreter helpers
-  - preferred next step: start with a narrow logical/control-flow slice such
-    as `IF` / `IFERROR` / `IFNA` branch and error-selection helpers
+- pass 3 is now substantially complete for the low-coupling control-flow layer:
+  - engine-owned logical helpers now cover reusable decision logic for:
+    - `IF`
+    - `IFERROR` / `IFNA`
+    - `CHOOSE`
+    - `IFS`
+  - Calc now consumes that helper layer while still owning stack management,
+    token movement, and jump-matrix orchestration
+  - the standalone suite exercises the decision policies directly through the
+    new `spreadsheetengine_logic_tests` target
+  - Calc coverage now includes the logical-function gate in addition to the
+    shared-case and smoke gates
+- the remaining pass 3 leftovers are mostly adapter-side mechanics:
+  - jump-matrix setup and result buffering still live in Calc
+  - lazy branch execution and token-stack ownership still live in Calc
+- the next meaningful work should move to pass 4:
+  - locale-aware text and date parsing, using the host contracts that are now
+    in place
 
 Validation:
 

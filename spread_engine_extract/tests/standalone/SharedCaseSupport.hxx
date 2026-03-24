@@ -239,6 +239,8 @@ inline api::Error parseExpectedError(std::string_view rValue)
         return api::Error::Domain;
     if (rValue == "NoConvergence")
         return api::Error::NoConvergence;
+    if (rValue == "NotAvailable")
+        return api::Error::NotAvailable;
 
     throw std::runtime_error("unknown expected error token in shared case");
 }

@@ -12,11 +12,11 @@
 #include <cellvalue.hxx>
 #include <document.hxx>
 #include <formulacell.hxx>
-#include <formula/errorcodes.hxx>
 #include <interpretercontext.hxx>
 
 #include <spreadsheetengine/api/Host.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
+#include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 
 namespace spreadsheetengine::compat::libreoffice
@@ -30,28 +30,6 @@ inline spreadsheetengine::api::CellAddress toApiCellAddress(const ScAddress& rAd
 inline ScAddress toLibreOfficeAddress(const spreadsheetengine::api::CellAddress& rAddress)
 {
     return ScAddress(rAddress.mnColumn, rAddress.mnRow, rAddress.mnSheet);
-}
-
-inline spreadsheetengine::api::Error toApiError(FormulaError eError)
-{
-    switch (eError)
-    {
-        case FormulaError::IllegalArgument:
-            return spreadsheetengine::api::Error::IllegalArgument;
-        case FormulaError::DivisionByZero:
-            return spreadsheetengine::api::Error::DivisionByZero;
-        case FormulaError::IllegalFPOperation:
-            return spreadsheetengine::api::Error::Domain;
-        case FormulaError::StringOverflow:
-            return spreadsheetengine::api::Error::StringOverflow;
-        case FormulaError::NoValue:
-            return spreadsheetengine::api::Error::NoValue;
-        case FormulaError::NoConvergence:
-            return spreadsheetengine::api::Error::NoConvergence;
-        case FormulaError::NONE:
-        default:
-            return spreadsheetengine::api::Error::None;
-    }
 }
 
 class DocumentEvaluationHost final : public spreadsheetengine::api::EvaluationHost
