@@ -9,6 +9,7 @@ DEFAULT_TARGETS=(
     CppunitTest_sc_ucalc
     CppunitTest_sc_ucalc_formula
     CppunitTest_sc_ucalc_formula2
+    CppunitTest_sc_ucalc_shared_cases
     CppunitTest_sc_spreadsheet_functions_test
 )
 
@@ -25,6 +26,7 @@ ENGINE_TARGETS=(
     CppunitTest_sc_ucalc_pivottable
     CppunitTest_sc_ucalc_rangelst
     CppunitTest_sc_ucalc_range
+    CppunitTest_sc_ucalc_shared_cases
     CppunitTest_sc_ucalc_sharedformula
     CppunitTest_sc_ucalc_sparkline
     CppunitTest_sc_ucalc_solver

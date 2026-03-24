@@ -54,6 +54,7 @@ $(eval $(call gb_Module_add_check_targets,sc,\
 	CppunitTest_sc_ucalc_pivottable \
 	CppunitTest_sc_ucalc_rangelst \
 	CppunitTest_sc_ucalc_range \
+	CppunitTest_sc_ucalc_shared_cases \
 	CppunitTest_sc_ucalc_sharedformula \
 	CppunitTest_sc_ucalc_sparkline \
 	CppunitTest_sc_ucalc_solver \
