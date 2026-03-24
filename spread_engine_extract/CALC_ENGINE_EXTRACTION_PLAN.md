@@ -891,7 +891,7 @@ Current status:
 
 Assessment:
 
-- Phase 8 is now substantially complete
+- Phase 8 is complete
 - the remaining work in `scmatrix` is no longer mainly substrate ownership;
   it is mostly:
   - matrix-aware evaluator and aggregation behavior
@@ -901,6 +901,9 @@ Assessment:
   - public-header cleanup that crosses wider LibreOffice include graphs
 - those residual items are better handled as part of the Phase 9 host/runtime
   transition instead of continuing to treat them as pure substrate extraction
+- a final audit of `scmatrix`, `jumpmatrix`, and `interpretercontext` did not
+  find another remaining host-independent runtime slice large enough to justify
+  a separate Phase 8 iteration
 
 Validation:
 
