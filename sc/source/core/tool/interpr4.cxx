@@ -33,6 +33,7 @@
 #include <basic/sbxobj.hxx>
 #include <basic/sbuno.hxx>
 #include <osl/thread.h>
+#include <spreadsheetengine/core/ExecutionContext.hxx>
 #include <svl/numformat.hxx>
 #include <svl/zforlist.hxx>
 #include <svl/sharedstringpool.hxx>
@@ -1772,24 +1773,23 @@ formula::FormulaToken* ScInterpreter::CreateFormulaDoubleToken( double fVal, SvN
     assert( mrContext.maTokens.size() == TOKEN_CACHE_SIZE );
 
     // Find a spare token
-    for ( auto p : mrContext.maTokens )
+    if (auto p = spreadsheetengine::core::execution::findReusableCachedToken(
+            mrContext.maTokens, [](formula::FormulaTypedDoubleToken* pToken) {
+                return pToken->GetRef() == 1;
+            }))
     {
-        if (p && p->GetRef() == 1)
-        {
-            p->SetDouble(fVal);
-            p->SetDoubleType( static_cast<sal_Int16>(nFmt) );
-            return p;
-        }
+        p->SetDouble(fVal);
+        p->SetDoubleType( static_cast<sal_Int16>(nFmt) );
+        return p;
     }
 
     // Allocate a new token
     auto p = new FormulaTypedDoubleToken( fVal, static_cast<sal_Int16>(nFmt) );
     p->SetRefCntPolicy(RefCntPolicy::UnsafeRef);
-    if ( mrContext.maTokens[mrContext.mnTokenCachePos] )
-        mrContext.maTokens[mrContext.mnTokenCachePos]->DecRef();
-    mrContext.maTokens[mrContext.mnTokenCachePos] = p;
-    p->IncRef();
-    mrContext.mnTokenCachePos = (mrContext.mnTokenCachePos + 1) % TOKEN_CACHE_SIZE;
+    spreadsheetengine::core::execution::replaceCachedToken(
+        mrContext.maTokens, mrContext.mnTokenCachePos, p,
+        [](formula::FormulaTypedDoubleToken* pToken) { pToken->DecRef(); },
+        [](formula::FormulaTypedDoubleToken* pToken) { pToken->IncRef(); });
     return p;
 }
 

@@ -767,6 +767,55 @@ Current status:
     `sc/source/core/tool/interpretercontext.cxx` for the first small
     `ScInterpreterContext` split without changing document, formatter, or
     lookup-cache semantics
+- twenty-first slice completed:
+  - the extracted execution-context layer now also owns reusable-token lookup
+    and ring replacement helpers for the typed-double token cache
+  - Calc consumes those helpers in `sc/source/core/tool/interpr4.cxx` for
+    `CreateFormulaDoubleToken()` without changing token reuse or reference
+    counting behavior
+- twenty-second slice completed:
+  - the extracted execution-context layer now also owns non-threaded
+    interpreter-context pool acquire, active-slot, and release planning helpers
+  - Calc consumes those helpers in
+    `sc/source/core/tool/interpretercontext.cxx` for
+    `ScInterpreterContextPool` lifecycle bookkeeping without changing pooling
+    or guard semantics
+- twenty-third slice completed:
+  - the extracted execution-context layer now also owns threaded
+    interpreter-context pool slot planning and shared live-context iteration
+    helpers
+  - Calc consumes those helpers in
+    `sc/source/core/tool/interpretercontext.cxx` for threaded pool
+    initialization, pool cleanup, lookup-cache clearing, and module-exit
+    teardown without changing document or formatter behavior
+- twenty-fourth slice completed:
+  - the extracted execution-context layer now also owns small recent-cache
+    lookup and promotion helpers for formatter-side MRU state
+  - Calc consumes those helpers in
+    `sc/source/core/tool/interpretercontext.cxx` for `NFGetType()` and
+    `NFGetFormatForLanguageIfBuiltIn()` without changing formatting or cache
+    hit behavior
+- twenty-fifth slice completed:
+  - the extracted execution-context layer now also owns doc and formatter
+    rebind planning for interpreter-context state transitions
+  - Calc consumes those helpers in
+    `sc/source/core/tool/interpretercontext.cxx` for `SetDocAndFormatter()`
+    without changing lookup-cache invalidation or formatter-cache reset
+    behavior
+- twenty-sixth slice completed:
+  - the extracted execution-context layer now also owns compact high/low
+    cache-key composition for formatter-side MRU state
+  - Calc consumes that helper in
+    `sc/source/core/tool/interpretercontext.cxx` for
+    `NFGetFormatForLanguageIfBuiltIn()` without changing cache keys or
+    formatting results
+- twenty-seventh slice completed:
+  - the extracted execution-context layer now also owns recent-cache
+    lookup-or-populate sequencing for formatter-side MRU state
+  - Calc consumes that helper in
+    `sc/source/core/tool/interpretercontext.cxx` for `NFGetType()` and
+    `NFGetFormatForLanguageIfBuiltIn()` without changing cache fill order,
+    cache hits, or formatting results
 
 Validation:
 

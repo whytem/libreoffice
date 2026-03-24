@@ -62,21 +62,25 @@ void ScInterpreterContext::ResetTokens()
 
 void ScInterpreterContext::SetDocAndFormatter(const ScDocument& rDoc, SvNumberFormatter* pFormatter)
 {
-    if (mpDoc != &rDoc)
+    const auto aPlan = spreadsheetengine::core::execution::planContextRebind(
+        mpDoc, &rDoc, mpFormatter, pFormatter);
+    if (aPlan.mbResetLookupCache)
     {
         mxScLookupCache.reset();
         mpDoc = &rDoc;
     }
-    if (mpFormatter != pFormatter)
+    if (aPlan.mbFormatterChanged)
     {
         mpFormatter = pFormatter;
 
         // formatter has changed
         prepFormatterForRoMode(pFormatter);
 
-        // drop cache
-        spreadsheetengine::core::execution::resetRecentCache(maNFBuiltInCache);
-        spreadsheetengine::core::execution::resetRecentCache(maNFTypeCache);
+        if (aPlan.mbResetRecentCaches)
+        {
+            spreadsheetengine::core::execution::resetRecentCache(maNFBuiltInCache);
+            spreadsheetengine::core::execution::resetRecentCache(maNFTypeCache);
+        }
     }
 }
 
@@ -121,20 +125,16 @@ SvNumFormatType ScInterpreterContext::NFGetType(sal_uInt32 nFIndex) const
     if (!mpDoc->IsThreadedGroupCalcInProgress())
         return GetFormatTable()->GetType(nFIndex);
 
-    auto aFind = std::find_if(maNFTypeCache.begin(), maNFTypeCache.end(),
-                              [nFIndex](const NFType& e) { return e.nKey == nFIndex; });
-    if (aFind != maNFTypeCache.end())
-        return aFind->eType;
+    const auto& rEntry = spreadsheetengine::core::execution::getOrInsertRecentCacheEntry(
+        maNFTypeCache, [nFIndex](const NFType& e) { return e.nKey == nFIndex; },
+        [this, nFIndex]() {
+            NFType aEntry;
+            aEntry.nKey = nFIndex;
+            aEntry.eType = mpFormatData->GetType(nFIndex);
+            return aEntry;
+        });
 
-    SvNumFormatType eType = mpFormatData->GetType(nFIndex);
-
-    std::move_backward(maNFTypeCache.begin(),
-                       std::next(maNFTypeCache.begin(), maNFTypeCache.size() - 1),
-                       maNFTypeCache.end());
-    maNFTypeCache[0].nKey = nFIndex;
-    maNFTypeCache[0].eType = eType;
-
-    return eType;
+    return rEntry.eType;
 }
 
 const SvNumberformat* ScInterpreterContext::NFGetFormatEntry(sal_uInt32 nKey) const
@@ -194,23 +194,20 @@ sal_uInt32 ScInterpreterContext::NFGetFormatForLanguageIfBuiltIn(sal_uInt32 nFor
     if (!mpDoc->IsThreadedGroupCalcInProgress())
         return GetFormatTable()->GetFormatForLanguageIfBuiltIn(nFormat, eLnge);
 
-    sal_uInt64 nKey = (static_cast<sal_uInt64>(nFormat) << 32) | eLnge.get();
+    sal_uInt64 nKey = spreadsheetengine::core::execution::composeHighLowCacheKey(nFormat,
+                                                                                 eLnge.get());
 
-    auto aFind = std::find_if(maNFBuiltInCache.begin(), maNFBuiltInCache.end(),
-                              [nKey](const NFBuiltIn& e) { return e.nKey == nKey; });
-    if (aFind != maNFBuiltInCache.end())
-        return aFind->nFormat;
+    const auto& rEntry = spreadsheetengine::core::execution::getOrInsertRecentCacheEntry(
+        maNFBuiltInCache, [nKey](const NFBuiltIn& e) { return e.nKey == nKey; },
+        [this, nKey, nFormat, eLnge]() {
+            NFBuiltIn aEntry;
+            aEntry.nKey = nKey;
+            aEntry.nFormat = SvNFEngine::GetFormatForLanguageIfBuiltIn(*mxLanguageData, *mpNatNum,
+                                                                       maROPolicy, nFormat, eLnge);
+            return aEntry;
+        });
 
-    nFormat = SvNFEngine::GetFormatForLanguageIfBuiltIn(*mxLanguageData, *mpNatNum, maROPolicy,
-                                                        nFormat, eLnge);
-
-    std::move_backward(maNFBuiltInCache.begin(),
-                       std::next(maNFBuiltInCache.begin(), maNFBuiltInCache.size() - 1),
-                       maNFBuiltInCache.end());
-    maNFBuiltInCache[0].nKey = nKey;
-    maNFBuiltInCache[0].nFormat = nFormat;
-
-    return nFormat;
+    return rEntry.nFormat;
 }
 
 sal_uInt32 ScInterpreterContext::NFGetStandardFormat(SvNumFormatType eType, LanguageType eLnge)
@@ -347,7 +344,10 @@ void ScInterpreterContextPool::Init(size_t nNumThreads, const ScDocument& rDoc,
     maPool.resize(nNumThreads);
     for (size_t nIdx = 0; nIdx < nNumThreads; ++nIdx)
     {
-        if (nIdx >= nOldSize)
+        const auto aPlan
+            = spreadsheetengine::core::execution::planThreadedPoolSlot(nOldSize, nNumThreads, nIdx);
+        assert(aPlan.mbValid);
+        if (aPlan.mbCreateNew)
             maPool[nIdx].reset(new ScInterpreterContext(rDoc, pFormatter));
         else
             maPool[nIdx]->SetDocAndFormatter(rDoc, pFormatter);
@@ -358,7 +358,8 @@ ScInterpreterContext*
 ScInterpreterContextPool::GetInterpreterContextForThreadIdx(size_t nThreadIdx) const
 {
     assert(mbThreaded);
-    assert(nThreadIdx < maPool.size());
+    assert(spreadsheetengine::core::execution::isValidThreadedPoolIndex(maPool.size(),
+                                                                        nThreadIdx));
     return maPool[nThreadIdx].get();
 }
 
@@ -366,10 +367,11 @@ ScInterpreterContextPool::GetInterpreterContextForThreadIdx(size_t nThreadIdx) c
 void ScInterpreterContextPool::Init(const ScDocument& rDoc, SvNumberFormatter* pFormatter)
 {
     assert(!mbThreaded);
-    assert(mnNextFree <= maPool.size());
-    bool bCreateNew = (maPool.size() == mnNextFree);
-    size_t nCurrIdx = mnNextFree;
-    if (bCreateNew)
+    const auto aPlan
+        = spreadsheetengine::core::execution::planNonThreadedPoolAcquire(maPool.size(), mnNextFree);
+    assert(aPlan.mbValid);
+    const size_t nCurrIdx = aPlan.mnSlotIndex;
+    if (aPlan.mbCreateNew)
     {
         maPool.resize(maPool.size() + 1);
         maPool[nCurrIdx].reset(new ScInterpreterContext(rDoc, pFormatter));
@@ -377,47 +379,58 @@ void ScInterpreterContextPool::Init(const ScDocument& rDoc, SvNumberFormatter* p
     else
         maPool[nCurrIdx]->SetDocAndFormatter(rDoc, pFormatter);
 
-    ++mnNextFree;
+    mnNextFree = aPlan.mnNextFreeAfterAcquire;
 }
 
 ScInterpreterContext* ScInterpreterContextPool::GetInterpreterContext() const
 {
     assert(!mbThreaded);
-    assert(mnNextFree && (mnNextFree <= maPool.size()));
-    return maPool[mnNextFree - 1].get();
+    assert(spreadsheetengine::core::execution::hasActiveNonThreadedPoolContext(
+        maPool.size(), mnNextFree));
+    return maPool[spreadsheetengine::core::execution::activeNonThreadedPoolContextIndex(
+                      maPool.size(), mnNextFree)]
+        .get();
 }
 
 void ScInterpreterContextPool::ReturnToPool()
 {
     if (mbThreaded)
     {
-        for (size_t nIdx = 0; nIdx < maPool.size(); ++nIdx)
-            maPool[nIdx]->Cleanup();
+        spreadsheetengine::core::execution::forEachLivePoolContext(maPool,
+                                                                   [](ScInterpreterContext& rCtx) {
+                                                                       rCtx.Cleanup();
+                                                                   });
     }
     else
     {
-        assert(mnNextFree && (mnNextFree <= maPool.size()));
-        --mnNextFree;
-        maPool[mnNextFree]->Cleanup();
+        const auto aPlan = spreadsheetengine::core::execution::planNonThreadedPoolRelease(
+            maPool.size(), mnNextFree);
+        assert(aPlan.mbValid);
+        mnNextFree = aPlan.mnNextFreeAfterRelease;
+        maPool[aPlan.mnReleasedIndex]->Cleanup();
     }
 }
 
 // static
 void ScInterpreterContextPool::ClearLookupCaches(const ScDocument* pDoc)
 {
-    for (auto& rPtr : aThreadedInterpreterPool.maPool)
-        rPtr->ClearLookupCache(pDoc);
-    for (auto& rPtr : aNonThreadedInterpreterPool.maPool)
-        rPtr->ClearLookupCache(pDoc);
+    spreadsheetengine::core::execution::forEachLivePoolContext(
+        aThreadedInterpreterPool.maPool,
+        [pDoc](ScInterpreterContext& rCtx) { rCtx.ClearLookupCache(pDoc); });
+    spreadsheetengine::core::execution::forEachLivePoolContext(
+        aNonThreadedInterpreterPool.maPool,
+        [pDoc](ScInterpreterContext& rCtx) { rCtx.ClearLookupCache(pDoc); });
 }
 
 // static
 void ScInterpreterContextPool::ModuleExiting()
 {
-    for (auto& rPtr : aThreadedInterpreterPool.maPool)
-        rPtr->mxLanguageData.reset();
-    for (auto& rPtr : aNonThreadedInterpreterPool.maPool)
-        rPtr->mxLanguageData.reset();
+    spreadsheetengine::core::execution::forEachLivePoolContext(
+        aThreadedInterpreterPool.maPool,
+        [](ScInterpreterContext& rCtx) { rCtx.mxLanguageData.reset(); });
+    spreadsheetengine::core::execution::forEachLivePoolContext(
+        aNonThreadedInterpreterPool.maPool,
+        [](ScInterpreterContext& rCtx) { rCtx.mxLanguageData.reset(); });
 }
 
 /* ScThreadedInterpreterContextGetterGuard */
@@ -454,7 +467,8 @@ ScInterpreterContextGetterGuard::ScInterpreterContextGetterGuard(const ScDocumen
 
 ScInterpreterContextGetterGuard::~ScInterpreterContextGetterGuard()
 {
-    assert(nContextIdx == (rPool.mnNextFree - 1));
+    assert(nContextIdx == spreadsheetengine::core::execution::activeNonThreadedPoolContextIndex(
+                              rPool.maPool.size(), rPool.mnNextFree));
     rPool.ReturnToPool();
 }
 
