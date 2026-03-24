@@ -19,6 +19,7 @@ enum class Error
     None,
     IllegalArgument,
     Domain,
+    StringOverflow,
     NoValue,
     NoConvergence
 };

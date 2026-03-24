@@ -11,9 +11,9 @@
 
 #include <optional>
 
-#include <rtl/ustring.hxx>
 #include <sal/types.h>
 
+#include <spreadsheetengine/api/String.hxx>
 #include <spreadsheetengine/spreadsheetenginedllapi.h>
 
 namespace spreadsheetengine::core::convert
@@ -29,20 +29,20 @@ enum class NumeralStringError
 struct NumeralStringResult
 {
     NumeralStringError meError = NumeralStringError::None;
-    OUString maValue;
+    spreadsheetengine::api::String maValue;
 };
 
 SPREADSHEETENGINE_DLLPUBLIC NumeralStringResult convertToBase(
     double fValue, double fBase, std::optional<double> ofMinLength);
 
 SPREADSHEETENGINE_DLLPUBLIC std::optional<double> convertFromBase(
-    const OUString& rText, double fBase);
+    spreadsheetengine::api::StringView rText, double fBase);
 
-SPREADSHEETENGINE_DLLPUBLIC std::optional<OUString> convertToRoman(
+SPREADSHEETENGINE_DLLPUBLIC std::optional<spreadsheetengine::api::String> convertToRoman(
     double fValue, std::optional<double> ofMode);
 
 SPREADSHEETENGINE_DLLPUBLIC std::optional<sal_Int32> convertFromRoman(
-    const OUString& rRoman);
+    spreadsheetengine::api::StringView rRoman);
 
 } // namespace spreadsheetengine::core::convert
 

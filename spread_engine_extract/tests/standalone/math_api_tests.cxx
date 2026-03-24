@@ -7,6 +7,7 @@
 
 #include <spreadsheetengine/api/Error.hxx>
 #include <spreadsheetengine/api/Math.hxx>
+#include <spreadsheetengine/api/Numeral.hxx>
 
 namespace
 {
@@ -30,6 +31,7 @@ int main()
     using spreadsheetengine::api::Error;
     using spreadsheetengine::api::RoundingMode;
     using namespace spreadsheetengine::api::math;
+    using namespace spreadsheetengine::api::numeral;
 
     if (!almostEqual(abs(-7.25), 7.25))
         return fail("abs() mismatch");
@@ -93,6 +95,26 @@ int main()
 
     if (!almostEqual(effectiveAnnualRate(0.12, 12.0), std::pow(1.01, 12.0) - 1.0))
         return fail("effectiveAnnualRate() mismatch");
+
+    const auto aBase = toBase(255.0, 16.0, 4.0);
+    if (!aBase || aBase.maValue != u"00FF")
+        return fail("toBase() mismatch");
+
+    const auto aOverflow = toBase(8.0, 2.0, 70000.0);
+    if (aOverflow || aOverflow.meError != Error::IllegalArgument)
+        return fail("toBase() invalid-min-length handling mismatch");
+
+    const auto aDecimal = fromBase(u"FF", 16.0);
+    if (!aDecimal || !almostEqual(aDecimal.maValue, 255.0))
+        return fail("fromBase() mismatch");
+
+    const auto aRoman = toRoman(1999.0);
+    if (!aRoman || aRoman.maValue != u"MCMXCIX")
+        return fail("toRoman() mismatch");
+
+    const auto aArabic = fromRoman(u"mcmxcix");
+    if (!aArabic || aArabic.maValue != 1999)
+        return fail("fromRoman() mismatch");
 
     std::cout << "spreadsheetengine api tests passed\n";
     return EXIT_SUCCESS;

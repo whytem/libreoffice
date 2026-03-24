@@ -18,7 +18,7 @@ namespace spreadsheetengine::compat::libreoffice
 
 inline spreadsheetengine::api::String toApiString(const OUString& rValue)
 {
-    return spreadsheetengine::api::String(rValue.begin(), rValue.end());
+    return spreadsheetengine::api::String(rValue.getStr(), rValue.getLength());
 }
 
 inline OUString toLibreOfficeString(const spreadsheetengine::api::String& rValue)

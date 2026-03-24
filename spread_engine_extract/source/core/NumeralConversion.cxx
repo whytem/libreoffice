@@ -13,9 +13,7 @@
 #include <cmath>
 #include <limits>
 #include <optional>
-#include <vector>
 
-#include <o3tl/float_int_conversion.hxx>
 #include <rtl/math.hxx>
 
 namespace spreadsheetengine::core::convert
@@ -24,43 +22,45 @@ namespace spreadsheetengine::core::convert
 namespace
 {
 
-constexpr sal_Unicode DIGITS[] = {
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 0
-};
+constexpr sal_Unicode DIGITS[] = u"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+constexpr int DIGIT_COUNT = static_cast<int>((sizeof(DIGITS) / sizeof(DIGITS[0])) - 1);
 
-constexpr int DIGIT_COUNT = SAL_N_ELEMENTS(DIGITS) - 1;
+sal_Unicode asciiToUpper(sal_Unicode cChar)
+{
+    if (cChar >= u'a' && cChar <= u'z')
+        return cChar - (u'a' - u'A');
+    return cChar;
+}
 
 bool getArabicValue(sal_Unicode cChar, sal_uInt16& rnValue, bool& rbIsDec)
 {
-    switch (cChar)
+    switch (asciiToUpper(cChar))
     {
-        case 'M':
+        case u'M':
             rnValue = 1000;
             rbIsDec = true;
             break;
-        case 'D':
+        case u'D':
             rnValue = 500;
             rbIsDec = false;
             break;
-        case 'C':
+        case u'C':
             rnValue = 100;
             rbIsDec = true;
             break;
-        case 'L':
+        case u'L':
             rnValue = 50;
             rbIsDec = false;
             break;
-        case 'X':
+        case u'X':
             rnValue = 10;
             rbIsDec = true;
             break;
-        case 'V':
+        case u'V':
             rnValue = 5;
             rbIsDec = false;
             break;
-        case 'I':
+        case u'I':
             rnValue = 1;
             rbIsDec = true;
             break;
@@ -68,6 +68,13 @@ bool getArabicValue(sal_Unicode cChar, sal_uInt16& rnValue, bool& rbIsDec)
             return false;
     }
     return true;
+}
+
+bool isIntegralAndAtMostUInt64(double fValue)
+{
+    return fValue >= 0.0
+           && fValue <= static_cast<double>(std::numeric_limits<sal_uInt64>::max())
+           && ::rtl::math::approxEqual(fValue, ::rtl::math::approxFloor(fValue));
 }
 
 }
@@ -80,7 +87,7 @@ NumeralStringResult convertToBase(double fValue, double fBase, std::optional<dou
     if (ofMinLength)
     {
         const double fLen = ::rtl::math::approxFloor(*ofMinLength);
-        if (1.0 <= fLen && fLen < SAL_MAX_UINT16)
+        if (1.0 <= fLen && fLen < static_cast<double>(std::numeric_limits<sal_uInt16>::max()))
             nMinLen = static_cast<sal_Int32>(fLen);
         else
             nMinLen = (fLen == 0.0) ? 1 : 0;
@@ -92,7 +99,7 @@ NumeralStringResult convertToBase(double fValue, double fBase, std::optional<dou
     const double fChars = (fValue > 0.0 && fBase > 0.0 && fBase != 1.0)
                               ? (std::ceil(std::log(fValue) / std::log(fBase)) + 2.0)
                               : 2.0;
-    if (fChars >= SAL_MAX_UINT16)
+    if (fChars >= static_cast<double>(std::numeric_limits<sal_uInt16>::max()))
         nMinLen = 0;
 
     if (!(nMinLen && 2.0 <= fBase && fBase <= DIGIT_COUNT && 0.0 <= fValue))
@@ -101,71 +108,64 @@ NumeralStringResult convertToBase(double fValue, double fBase, std::optional<dou
         return aResult;
     }
 
-    const sal_Int32 nBuf = std::max<sal_Int32>(static_cast<sal_Int32>(fChars), nMinLen + 1);
-    std::vector<sal_Unicode> aBuf(static_cast<std::size_t>(nBuf + 1), '0');
-    aBuf[static_cast<std::size_t>(nBuf)] = 0;
-    sal_Unicode* pBuf = aBuf.data();
-    sal_Unicode* p = pBuf + nBuf;
-
-    if (o3tl::convertsToAtMost(fValue, std::numeric_limits<sal_uInt64>::max()))
+    spreadsheetengine::api::String aDigits;
+    if (isIntegralAndAtMostUInt64(fValue))
     {
-        sal_uInt64 nVal = static_cast<sal_uInt64>(fValue);
+        sal_uInt64 nValue = static_cast<sal_uInt64>(fValue);
         const sal_uInt64 nBase = static_cast<sal_uInt64>(fBase);
-        while (nVal && p > pBuf)
+        do
         {
-            *--p = DIGITS[nVal % nBase];
-            nVal /= nBase;
-        }
-        fValue = static_cast<double>(nVal);
+            aDigits.push_back(DIGITS[nValue % nBase]);
+            nValue /= nBase;
+        } while (nValue != 0);
     }
     else
     {
         bool bDirt = false;
-        while (fValue && p > pBuf)
+        do
         {
             const double fInt = ::rtl::math::approxFloor(fValue / fBase);
             const double fMult = fInt * fBase;
-            std::size_t nDig;
+            std::size_t nDigit = 0;
             if (fValue < fMult)
             {
                 bDirt = true;
-                nDig = 0;
             }
             else
             {
-                double fDig
+                double fDigit
                     = ::rtl::math::approxFloor(::rtl::math::approxSub(fValue, fMult));
                 if (bDirt)
                 {
                     bDirt = false;
-                    --fDig;
+                    --fDigit;
                 }
-                if (fDig <= 0.0)
-                    nDig = 0;
-                else if (fDig >= fBase)
-                    nDig = static_cast<std::size_t>(fBase) - 1;
-                else
-                    nDig = static_cast<std::size_t>(fDig);
+                if (fDigit > 0.0)
+                {
+                    if (fDigit >= fBase)
+                        nDigit = static_cast<std::size_t>(fBase) - 1;
+                    else
+                        nDigit = static_cast<std::size_t>(fDigit);
+                }
             }
-            *--p = DIGITS[nDig];
+            aDigits.push_back(DIGITS[nDigit]);
             fValue = fInt;
-        }
+        } while (fValue != 0.0);
     }
 
-    if (fValue)
+    std::reverse(aDigits.begin(), aDigits.end());
+    if (aDigits.size() < static_cast<std::size_t>(nMinLen))
     {
-        aResult.meError = NumeralStringError::StringOverflow;
-        return aResult;
+        aResult.maValue.assign(static_cast<std::size_t>(nMinLen) - aDigits.size(), u'0');
+        aResult.maValue += aDigits;
     }
+    else
+        aResult.maValue = std::move(aDigits);
 
-    if (nBuf - (p - pBuf) <= nMinLen)
-        p = pBuf + nBuf - nMinLen;
-
-    aResult.maValue = OUString(p);
     return aResult;
 }
 
-std::optional<double> convertFromBase(const OUString& rText, double fBase)
+std::optional<double> convertFromBase(spreadsheetengine::api::StringView rText, double fBase)
 {
     fBase = ::rtl::math::approxFloor(fBase);
     if (!(2.0 <= fBase && fBase <= 36.0))
@@ -173,49 +173,53 @@ std::optional<double> convertFromBase(const OUString& rText, double fBase)
 
     double fValue = 0.0;
     const int nBase = static_cast<int>(fBase);
-    const sal_Unicode* p = rText.getStr();
-    while (*p == ' ' || *p == '\t')
-        ++p;
+    std::size_t nIndex = 0;
+    while (nIndex < rText.size() && (rText[nIndex] == u' ' || rText[nIndex] == u'\t'))
+        ++nIndex;
 
     if (nBase == 16)
     {
-        if (*p == 'x' || *p == 'X')
-            ++p;
-        else if (*p == '0' && (*(p + 1) == 'x' || *(p + 1) == 'X'))
-            p += 2;
+        if (nIndex < rText.size() && (rText[nIndex] == u'x' || rText[nIndex] == u'X'))
+            ++nIndex;
+        else if (nIndex + 1 < rText.size() && rText[nIndex] == u'0'
+                 && (rText[nIndex + 1] == u'x' || rText[nIndex + 1] == u'X'))
+        {
+            nIndex += 2;
+        }
     }
 
-    while (*p)
+    for (; nIndex < rText.size(); ++nIndex)
     {
-        int n;
-        if ('0' <= *p && *p <= '9')
-            n = *p - '0';
-        else if ('A' <= *p && *p <= 'Z')
-            n = 10 + (*p - 'A');
-        else if ('a' <= *p && *p <= 'z')
-            n = 10 + (*p - 'a');
+        const sal_Unicode cChar = rText[nIndex];
+        int nDigit;
+        if (u'0' <= cChar && cChar <= u'9')
+            nDigit = cChar - u'0';
+        else if (u'A' <= cChar && cChar <= u'Z')
+            nDigit = 10 + (cChar - u'A');
+        else if (u'a' <= cChar && cChar <= u'z')
+            nDigit = 10 + (cChar - u'a');
         else
-            n = nBase;
+            nDigit = nBase;
 
-        if (nBase <= n)
+        if (nBase <= nDigit)
         {
-            if (*(p + 1) == 0
-                && ((nBase == 2 && (*p == 'b' || *p == 'B'))
-                    || (nBase == 16 && (*p == 'h' || *p == 'H'))))
-            {
+            const bool bHasTrailingBaseSuffix
+                = (nIndex + 1 == rText.size())
+                  && ((nBase == 2 && (cChar == u'b' || cChar == u'B'))
+                      || (nBase == 16 && (cChar == u'h' || cChar == u'H')));
+            if (bHasTrailingBaseSuffix)
                 break;
-            }
             return std::nullopt;
         }
 
-        fValue = fValue * fBase + n;
-        ++p;
+        fValue = fValue * fBase + nDigit;
     }
 
     return fValue;
 }
 
-std::optional<OUString> convertToRoman(double fValue, std::optional<double> ofMode)
+std::optional<spreadsheetengine::api::String> convertToRoman(
+    double fValue, std::optional<double> ofMode)
 {
     const double fNormalizedMode = ofMode ? ::rtl::math::approxFloor(*ofMode) : 0.0;
     const double fNormalizedValue = ::rtl::math::approxFloor(fValue);
@@ -226,11 +230,11 @@ std::optional<OUString> convertToRoman(double fValue, std::optional<double> ofMo
         return std::nullopt;
     }
 
-    static const sal_Unicode pChars[] = { 'M', 'D', 'C', 'L', 'X', 'V', 'I' };
+    static const sal_Unicode pChars[] = { u'M', u'D', u'C', u'L', u'X', u'V', u'I' };
     static const sal_uInt16 pValues[] = { 1000, 500, 100, 50, 10, 5, 1 };
-    static const sal_uInt16 nMaxIndex = sal_uInt16(SAL_N_ELEMENTS(pValues) - 1);
+    static const sal_uInt16 nMaxIndex = static_cast<sal_uInt16>((sizeof(pValues) / sizeof(pValues[0])) - 1);
 
-    OUStringBuffer aRoman;
+    spreadsheetengine::api::String aRoman;
     sal_uInt16 nValue = static_cast<sal_uInt16>(fNormalizedValue);
     const sal_uInt16 nMode = static_cast<sal_uInt16>(fNormalizedMode);
 
@@ -251,34 +255,33 @@ std::optional<OUString> convertToRoman(double fValue, std::optional<double> ofMo
                 else
                     nSteps = nMode;
             }
-            aRoman.append(OUStringChar(pChars[nIndex]) + OUStringChar(pChars[nIndex2]));
-            nValue = sal::static_int_cast<sal_uInt16>(nValue + pValues[nIndex]);
-            nValue = sal::static_int_cast<sal_uInt16>(nValue - pValues[nIndex2]);
+            aRoman.push_back(pChars[nIndex]);
+            aRoman.push_back(pChars[nIndex2]);
+            nValue = static_cast<sal_uInt16>(nValue + pValues[nIndex]);
+            nValue = static_cast<sal_uInt16>(nValue - pValues[nIndex2]);
         }
         else
         {
             if (nDigit > 4)
-                aRoman.append(pChars[nIndex - 1]);
+                aRoman.push_back(pChars[nIndex - 1]);
 
             sal_Int32 nPad = nDigit % 5;
             while (nPad-- > 0)
-                aRoman.append(pChars[nIndex]);
+                aRoman.push_back(pChars[nIndex]);
 
             nValue %= pValues[nIndex];
         }
     }
 
-    return aRoman.makeStringAndClear();
+    return aRoman;
 }
 
-std::optional<sal_Int32> convertFromRoman(const OUString& rRoman)
+std::optional<sal_Int32> convertFromRoman(spreadsheetengine::api::StringView rRoman)
 {
-    const OUString aRoman = rRoman.toAsciiUpperCase();
-
     sal_uInt16 nValue = 0;
     sal_uInt16 nValidRest = 3999;
-    sal_Int32 nCharIndex = 0;
-    const sal_Int32 nCharCount = aRoman.getLength();
+    std::size_t nCharIndex = 0;
+    const std::size_t nCharCount = rRoman.size();
     bool bValid = true;
 
     while (bValid && (nCharIndex < nCharCount))
@@ -286,27 +289,27 @@ std::optional<sal_Int32> convertFromRoman(const OUString& rRoman)
         sal_uInt16 nDigit1 = 0;
         sal_uInt16 nDigit2 = 0;
         bool bIsDec1 = false;
-        bValid = getArabicValue(aRoman[nCharIndex], nDigit1, bIsDec1);
+        bValid = getArabicValue(rRoman[nCharIndex], nDigit1, bIsDec1);
         if (bValid && (nCharIndex + 1 < nCharCount))
         {
             bool bIsDec2 = false;
-            bValid = getArabicValue(aRoman[nCharIndex + 1], nDigit2, bIsDec2);
+            bValid = getArabicValue(rRoman[nCharIndex + 1], nDigit2, bIsDec2);
         }
         if (bValid)
         {
             if (nDigit1 >= nDigit2)
             {
-                nValue = sal::static_int_cast<sal_uInt16>(nValue + nDigit1);
+                nValue = static_cast<sal_uInt16>(nValue + nDigit1);
                 nValidRest %= (nDigit1 * (bIsDec1 ? 5 : 2));
                 bValid = (nValidRest >= nDigit1);
                 if (bValid)
-                    nValidRest = sal::static_int_cast<sal_uInt16>(nValidRest - nDigit1);
+                    nValidRest = static_cast<sal_uInt16>(nValidRest - nDigit1);
                 ++nCharIndex;
             }
             else if (nDigit1 * 2 != nDigit2)
             {
                 const sal_uInt16 nDiff = nDigit2 - nDigit1;
-                nValue = sal::static_int_cast<sal_uInt16>(nValue + nDiff);
+                nValue = static_cast<sal_uInt16>(nValue + nDiff);
                 bValid = (nValidRest >= nDiff);
                 if (bValid)
                     nValidRest = nDigit1 - 1;

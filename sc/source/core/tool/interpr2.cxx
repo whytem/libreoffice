@@ -53,6 +53,7 @@
 #include <spreadsheetengine/core/MathRounding.hxx>
 #include <spreadsheetengine/core/MathScalar.hxx>
 #include <spreadsheetengine/core/NumeralConversion.hxx>
+#include <spreadsheetengine/compat/libreoffice/String.hxx>
 
 #include <com/sun/star/sheet/DataPilotFieldFilter.hpp>
 
@@ -63,6 +64,7 @@ using namespace formula;
 namespace sedatetime = spreadsheetengine::core::datetime;
 namespace semath = spreadsheetengine::core::math;
 namespace seconvert = spreadsheetengine::core::convert;
+namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 
 #define SCdEpsilon                1.0E-7
 
@@ -1988,7 +1990,7 @@ void ScInterpreter::ScBase()
     const seconvert::NumeralStringResult aResult
         = seconvert::convertToBase(fValue, fBase, ofMinLength);
     if (aResult.meError == seconvert::NumeralStringError::None)
-        PushString(aResult.maValue);
+        PushString(selibreoffice::toLibreOfficeString(aResult.maValue));
     else if (aResult.meError == seconvert::NumeralStringError::StringOverflow)
         PushError(FormulaError::StringOverflow);
     else
@@ -2008,7 +2010,8 @@ void ScInterpreter::ScDecimal()
         return;
     }
 
-    if (std::optional<double> fValue = seconvert::convertFromBase(aText, fBase))
+    if (std::optional<double> fValue
+        = seconvert::convertFromBase(selibreoffice::toApiString(aText), fBase))
         PushDouble(*fValue);
     else
         PushIllegalArgument();
@@ -2048,8 +2051,8 @@ void ScInterpreter::ScRoman()
     const double fValue = GetDouble();
     if( nGlobalError != FormulaError::NONE )
         PushError( nGlobalError);
-    else if (std::optional<OUString> aRoman = seconvert::convertToRoman(fValue, ofMode))
-        PushString(*aRoman);
+    else if (auto aRoman = seconvert::convertToRoman(fValue, ofMode))
+        PushString(selibreoffice::toLibreOfficeString(*aRoman));
     else
         PushIllegalArgument();
 }
@@ -2059,7 +2062,8 @@ void ScInterpreter::ScArabic()
     const OUString aRoman = GetString().getString();
     if( nGlobalError != FormulaError::NONE )
         PushError( nGlobalError);
-    else if (std::optional<sal_Int32> nValue = seconvert::convertFromRoman(aRoman))
+    else if (std::optional<sal_Int32> nValue
+             = seconvert::convertFromRoman(selibreoffice::toApiString(aRoman)))
         PushInt(*nValue);
     else
         PushIllegalArgument();

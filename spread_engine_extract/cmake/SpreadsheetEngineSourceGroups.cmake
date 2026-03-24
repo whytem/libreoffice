@@ -12,6 +12,7 @@ set(SPREADSHEETENGINE_STANDALONE_CORE_SOURCES
     "${SPREADSHEETENGINE_ROOT}/source/core/MathRounding.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/MathScalar.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/MathTranscendental.cxx"
+    "${SPREADSHEETENGINE_ROOT}/source/core/NumeralConversion.cxx"
 )
 
 set(SPREADSHEETENGINE_STANDALONE_SMOKE_SOURCES
@@ -30,7 +31,6 @@ set(SPREADSHEETENGINE_STANDALONE_DEFERRED_SOURCES
     "${SPREADSHEETENGINE_ROOT}/source/core/DateTimeWeek.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/DateTimeWorkday.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/MatrixOperators.cxx"
-    "${SPREADSHEETENGINE_ROOT}/source/core/NumeralConversion.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/TextCase.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/TextScalar.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/TextWidth.cxx"
