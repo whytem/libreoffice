@@ -219,6 +219,34 @@ template <typename ValidContainer>
     return makeCoordinate(nColumn, nRow);
 }
 
+template <typename Column, typename Row>
+[[nodiscard]] constexpr bool isCoordinateValid(
+    const api::MatrixDimensions& rDimensions, Column nColumn, Row nRow)
+{
+    return api::isValidCoordinate(rDimensions, makeCoordinate(nColumn, nRow));
+}
+
+template <typename Column, typename Row>
+[[nodiscard]] constexpr bool normalizeReplicatedCoordinateInPlace(
+    const api::MatrixDimensions& rDimensions, Column& rnColumn, Row& rnRow)
+{
+    auto aCoordinate = makeCoordinate(rnColumn, rnRow);
+    if (!api::normalizeReplicatedCoordinate(rDimensions, aCoordinate))
+        return false;
+
+    rnColumn = aCoordinate.mnColumn;
+    rnRow = aCoordinate.mnRow;
+    return true;
+}
+
+template <typename Column, typename Row>
+[[nodiscard]] constexpr bool isValidOrReplicatedCoordinate(
+    const api::MatrixDimensions& rDimensions, Column& rnColumn, Row& rnRow)
+{
+    return isCoordinateValid(rDimensions, rnColumn, rnRow)
+           || normalizeReplicatedCoordinateInPlace(rDimensions, rnColumn, rnRow);
+}
+
 [[nodiscard]] constexpr bool isSizeAllocatable(
     const api::MatrixDimensions& rDimensions, sal_uInt64 nElementsMax)
 {

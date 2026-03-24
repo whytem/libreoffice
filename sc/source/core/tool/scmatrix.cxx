@@ -416,6 +416,67 @@ FormulaError toFormulaError(spreadsheetengine::core::matrix::AllocationFallback 
     return FormulaError::NONE;
 }
 
+spreadsheetengine::core::matrix::StoredElementType toStoredElementType(mdds::mtm::element_t eType)
+{
+    switch (eType)
+    {
+        case mdds::mtm::element_boolean:
+            return spreadsheetengine::core::matrix::StoredElementType::Boolean;
+        case mdds::mtm::element_numeric:
+            return spreadsheetengine::core::matrix::StoredElementType::Numeric;
+        case mdds::mtm::element_string:
+            return spreadsheetengine::core::matrix::StoredElementType::String;
+        case mdds::mtm::element_empty:
+            return spreadsheetengine::core::matrix::StoredElementType::Empty;
+        default:
+            break;
+    }
+
+    return spreadsheetengine::core::matrix::StoredElementType::Unknown;
+}
+
+spreadsheetengine::core::matrix::StoredFlagType toStoredFlagType(mdds::mtm::element_t eType)
+{
+    switch (eType)
+    {
+        case mdds::mtm::element_empty:
+            return spreadsheetengine::core::matrix::StoredFlagType::Empty;
+        case mdds::mtm::element_integer:
+            return spreadsheetengine::core::matrix::StoredFlagType::Integer;
+        default:
+            break;
+    }
+
+    return spreadsheetengine::core::matrix::StoredFlagType::Unknown;
+}
+
+sal_uInt8 getStoredFlagValue(const MatrixFlagImplType& rFlags, SCSIZE nRow, SCSIZE nCol)
+{
+    return toStoredFlagType(rFlags.get_type(nRow, nCol))
+               == spreadsheetengine::core::matrix::StoredFlagType::Integer
+           ? rFlags.get<uint8_t>(nRow, nCol)
+           : 0;
+}
+
+ScMatValType toScMatValType(spreadsheetengine::api::MatrixValueType eType)
+{
+    switch (eType)
+    {
+        case spreadsheetengine::api::MatrixValueType::Value:
+            return ScMatValType::Value;
+        case spreadsheetengine::api::MatrixValueType::Boolean:
+            return ScMatValType::Boolean;
+        case spreadsheetengine::api::MatrixValueType::Text:
+            return ScMatValType::String;
+        case spreadsheetengine::api::MatrixValueType::Empty:
+            return ScMatValType::Empty;
+        case spreadsheetengine::api::MatrixValueType::EmptyPath:
+            return ScMatValType::EmptyPath;
+    }
+
+    return ScMatValType::Empty;
+}
+
 ScMatrixImpl::ScMatrixImpl(SCSIZE nC, SCSIZE nR) :
     maMat(nR, nC), maMatFlag(nR, nC), pErrorInterpreter(nullptr)
 {
@@ -519,27 +580,22 @@ SCSIZE ScMatrixImpl::GetElementCount() const
 bool ScMatrixImpl::ValidColRow( SCSIZE nC, SCSIZE nR) const
 {
     MatrixImplType::size_pair_type aSize = maMat.size();
-    const auto aDimensions = spreadsheetengine::core::matrix::makeDimensions(aSize.column, aSize.row);
-    const auto aCoordinate = spreadsheetengine::core::matrix::makeCoordinate(nC, nR);
-    return spreadsheetengine::api::isValidCoordinate(aDimensions, aCoordinate);
+    return spreadsheetengine::core::matrix::isCoordinateValid(
+        spreadsheetengine::core::matrix::makeDimensions(aSize.column, aSize.row), nC, nR);
 }
 
 bool ScMatrixImpl::ValidColRowReplicated( SCSIZE & rC, SCSIZE & rR ) const
 {
     MatrixImplType::size_pair_type aSize = maMat.size();
-    const auto aDimensions = spreadsheetengine::core::matrix::makeDimensions(aSize.column, aSize.row);
-    auto aCoordinate = spreadsheetengine::core::matrix::makeCoordinate(rC, rR);
-    if (!spreadsheetengine::api::normalizeReplicatedCoordinate(aDimensions, aCoordinate))
-        return false;
-
-    rC = aCoordinate.mnColumn;
-    rR = aCoordinate.mnRow;
-    return true;
+    return spreadsheetengine::core::matrix::normalizeReplicatedCoordinateInPlace(
+        spreadsheetengine::core::matrix::makeDimensions(aSize.column, aSize.row), rC, rR);
 }
 
 bool ScMatrixImpl::ValidColRowOrReplicated( SCSIZE & rC, SCSIZE & rR ) const
 {
-    return ValidColRow( rC, rR) || ValidColRowReplicated( rC, rR);
+    MatrixImplType::size_pair_type aSize = maMat.size();
+    return spreadsheetengine::core::matrix::isValidOrReplicatedCoordinate(
+        spreadsheetengine::core::matrix::makeDimensions(aSize.column, aSize.row), rC, rR);
 }
 
 void ScMatrixImpl::SetErrorAtInterpreter( FormulaError nError ) const
@@ -652,7 +708,8 @@ void ScMatrixImpl::PutEmptyPath(SCSIZE nC, SCSIZE nR)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Warray-bounds"
 #endif
-        maMatFlag.set(nR, nC, SC_MATFLAG_EMPTYPATH);
+        maMatFlag.set(nR, nC, spreadsheetengine::core::matrix::storedFlagValue(
+                                  spreadsheetengine::core::matrix::StoredEmptyKind::Path));
 #if defined __GNUC__ && !defined __clang__ && __GNUC__ == 12 && __cplusplus == 202002L
 #pragma GCC diagnostic pop
 #endif
@@ -783,7 +840,9 @@ svl::SharedString ScMatrixImpl::GetString( ScInterpreterContext& rContext, SCSIZ
             return maMat.get_string(aPos);
         case mdds::mtm::element_empty:
         {
-            if (maMatFlag.get<uint8_t>(nR, nC) != SC_MATFLAG_EMPTYPATH)
+            if (!spreadsheetengine::core::matrix::isStoredEmptyPath(
+                    toStoredElementType(maMat.get_type(aPos)),
+                    getStoredFlagValue(maMatFlag, nR, nC)))
                 // not an empty path.
                 return svl::SharedString::getEmptyString();
 
@@ -821,36 +880,28 @@ ScMatrixValue ScMatrixImpl::Get(SCSIZE nC, SCSIZE nR) const
     if (ValidColRowOrReplicated(nC, nR))
     {
         MatrixImplType::const_position_type aPos = maMat.position(nR, nC);
-        mdds::mtm::element_t eType = maMat.get_type(aPos);
-        switch (eType)
+        const auto eStoredType = toStoredElementType(maMat.get_type(aPos));
+        switch (eStoredType)
         {
-            case mdds::mtm::element_boolean:
-                aVal.nType = ScMatValType::Boolean;
+            case spreadsheetengine::core::matrix::StoredElementType::Boolean:
+                aVal.nType = toScMatValType(spreadsheetengine::api::MatrixValueType::Boolean);
                 aVal.fVal = double(maMat.get_boolean(aPos));
             break;
-            case mdds::mtm::element_numeric:
-                aVal.nType = ScMatValType::Value;
+            case spreadsheetengine::core::matrix::StoredElementType::Numeric:
+                aVal.nType = toScMatValType(spreadsheetengine::api::MatrixValueType::Value);
                 aVal.fVal = maMat.get_numeric(aPos);
             break;
-            case mdds::mtm::element_string:
-                aVal.nType = ScMatValType::String;
+            case spreadsheetengine::core::matrix::StoredElementType::String:
+                aVal.nType = toScMatValType(spreadsheetengine::api::MatrixValueType::Text);
                 aVal.aStr = maMat.get_string(aPos);
             break;
-            case mdds::mtm::element_empty:
+            case spreadsheetengine::core::matrix::StoredElementType::Empty:
                 /* TODO: do we need to pass the differentiation of 'empty' and
                  * 'empty result' to the outer world anywhere? */
-                switch (maMatFlag.get_type(nR, nC))
-                {
-                    case mdds::mtm::element_empty:
-                        aVal.nType = ScMatValType::Empty;
-                    break;
-                    case mdds::mtm::element_integer:
-                        aVal.nType = maMatFlag.get<uint8_t>(nR, nC)
-                            == SC_MATFLAG_EMPTYPATH ? ScMatValType::EmptyPath : ScMatValType::Empty;
-                    break;
-                    default:
-                        assert(false);
-                }
+                aVal.nType = toScMatValType(
+                    spreadsheetengine::core::matrix::classifyStoredValueType(
+                        eStoredType, toStoredFlagType(maMatFlag.get_type(nR, nC)),
+                        getStoredFlagValue(maMatFlag, nR, nC)));
                 aVal.fVal = 0.0;
             break;
             default:
@@ -876,15 +927,8 @@ bool ScMatrixImpl::IsStringOrEmpty( SCSIZE nC, SCSIZE nR ) const
     if (!ValidColRowOrReplicated( nC, nR ))
         return false;
 
-    switch (maMat.get_type(nR, nC))
-    {
-        case mdds::mtm::element_empty:
-        case mdds::mtm::element_string:
-            return true;
-        default:
-            ;
-    }
-    return false;
+    return spreadsheetengine::core::matrix::isStoredStringOrEmpty(
+        toStoredElementType(maMat.get_type(nR, nC)));
 }
 
 bool ScMatrixImpl::IsEmpty( SCSIZE nC, SCSIZE nR ) const
@@ -894,8 +938,8 @@ bool ScMatrixImpl::IsEmpty( SCSIZE nC, SCSIZE nR ) const
 
     // Flag must indicate an 'empty' or 'empty cell' or 'empty result' element,
     // but not an 'empty path' element.
-    return maMat.get_type(nR, nC) == mdds::mtm::element_empty &&
-        maMatFlag.get_integer(nR, nC) != SC_MATFLAG_EMPTYPATH;
+    return spreadsheetengine::core::matrix::isStoredLogicalEmpty(
+        toStoredElementType(maMat.get_type(nR, nC)), getStoredFlagValue(maMatFlag, nR, nC));
 }
 
 bool ScMatrixImpl::IsEmptyCell( SCSIZE nC, SCSIZE nR ) const
@@ -905,8 +949,9 @@ bool ScMatrixImpl::IsEmptyCell( SCSIZE nC, SCSIZE nR ) const
 
     // Flag must indicate an 'empty cell' element instead of an
     // 'empty' or 'empty result' or 'empty path' element.
-    return maMat.get_type(nR, nC) == mdds::mtm::element_empty &&
-        maMatFlag.get_type(nR, nC) == mdds::mtm::element_empty;
+    return spreadsheetengine::core::matrix::isStoredEmptyCell(
+        toStoredElementType(maMat.get_type(nR, nC)),
+        toStoredFlagType(maMatFlag.get_type(nR, nC)));
 }
 
 bool ScMatrixImpl::IsEmptyResult( SCSIZE nC, SCSIZE nR ) const
@@ -916,16 +961,16 @@ bool ScMatrixImpl::IsEmptyResult( SCSIZE nC, SCSIZE nR ) const
 
     // Flag must indicate an 'empty result' element instead of an
     // 'empty' or 'empty cell' or 'empty path' element.
-    return maMat.get_type(nR, nC) == mdds::mtm::element_empty &&
-        maMatFlag.get_integer(nR, nC) == SC_MATFLAG_EMPTYRESULT;
+    return spreadsheetengine::core::matrix::isStoredEmptyResult(
+        toStoredElementType(maMat.get_type(nR, nC)), getStoredFlagValue(maMatFlag, nR, nC));
 }
 
 bool ScMatrixImpl::IsEmptyPath( SCSIZE nC, SCSIZE nR ) const
 {
     // Flag must indicate an 'empty path' element.
     if (ValidColRowOrReplicated( nC, nR ))
-        return maMat.get_type(nR, nC) == mdds::mtm::element_empty &&
-            maMatFlag.get_integer(nR, nC) == SC_MATFLAG_EMPTYPATH;
+        return spreadsheetengine::core::matrix::isStoredEmptyPath(
+            toStoredElementType(maMat.get_type(nR, nC)), getStoredFlagValue(maMatFlag, nR, nC));
     else
         return true;
 }
@@ -942,15 +987,8 @@ bool ScMatrixImpl::IsValue( SCSIZE nC, SCSIZE nR ) const
     if (!ValidColRowOrReplicated( nC, nR ))
         return false;
 
-    switch (maMat.get_type(nR, nC))
-    {
-        case mdds::mtm::element_boolean:
-        case mdds::mtm::element_numeric:
-            return true;
-        default:
-            ;
-    }
-    return false;
+    return spreadsheetengine::core::matrix::isStoredValue(
+        toStoredElementType(maMat.get_type(nR, nC)));
 }
 
 bool ScMatrixImpl::IsValueOrEmpty( SCSIZE nC, SCSIZE nR ) const
@@ -958,16 +996,8 @@ bool ScMatrixImpl::IsValueOrEmpty( SCSIZE nC, SCSIZE nR ) const
     if (!ValidColRowOrReplicated( nC, nR ))
         return false;
 
-    switch (maMat.get_type(nR, nC))
-    {
-        case mdds::mtm::element_boolean:
-        case mdds::mtm::element_numeric:
-        case mdds::mtm::element_empty:
-            return true;
-        default:
-            ;
-    }
-    return false;
+    return spreadsheetengine::core::matrix::isStoredValueOrEmpty(
+        toStoredElementType(maMat.get_type(nR, nC)));
 }
 
 bool ScMatrixImpl::IsBoolean( SCSIZE nC, SCSIZE nR ) const
@@ -975,7 +1005,8 @@ bool ScMatrixImpl::IsBoolean( SCSIZE nC, SCSIZE nR ) const
     if (!ValidColRowOrReplicated( nC, nR ))
         return false;
 
-    return maMat.get_type(nR, nC) == mdds::mtm::element_boolean;
+    return spreadsheetengine::core::matrix::isStoredBoolean(
+        toStoredElementType(maMat.get_type(nR, nC)));
 }
 
 bool ScMatrixImpl::IsNumeric() const
@@ -1091,7 +1122,9 @@ void ScMatrixImpl::PutEmptyResultVector( SCSIZE nCount, SCSIZE nC, SCSIZE nR )
     {
         maMat.set_empty(nR, nC, nCount);
         // Flag to indicate that this is 'empty result', not 'empty' or 'empty path'.
-        std::vector<uint8_t> aVals(nCount, SC_MATFLAG_EMPTYRESULT);
+        std::vector<uint8_t> aVals(
+            nCount, spreadsheetengine::core::matrix::storedFlagValue(
+                        spreadsheetengine::core::matrix::StoredEmptyKind::Result));
         maMatFlag.set(nR, nC, aVals.begin(), aVals.end());
     }
     else
@@ -1110,7 +1143,9 @@ void ScMatrixImpl::PutEmptyPathVector( SCSIZE nCount, SCSIZE nC, SCSIZE nR )
     {
         maMat.set_empty(nR, nC, nCount);
         // Flag to indicate 'empty path'.
-        std::vector<uint8_t> aVals(nCount, SC_MATFLAG_EMPTYPATH);
+        std::vector<uint8_t> aVals(
+            nCount, spreadsheetengine::core::matrix::storedFlagValue(
+                        spreadsheetengine::core::matrix::StoredEmptyKind::Path));
         maMatFlag.set(nR, nC, aVals.begin(), aVals.end());
     }
     else
@@ -3049,16 +3084,8 @@ void ScMatrixImpl::MatConcat(SCSIZE nMaxCol, SCSIZE nMaxRow, const ScMatrixRef& 
 
 bool ScMatrixImpl::IsValueOrEmpty( const MatrixImplType::const_position_type & rPos ) const
 {
-    switch (maMat.get_type(rPos))
-    {
-        case mdds::mtm::element_boolean:
-        case mdds::mtm::element_numeric:
-        case mdds::mtm::element_empty:
-            return true;
-        default:
-            ;
-    }
-    return false;
+    return spreadsheetengine::core::matrix::isStoredValueOrEmpty(
+        toStoredElementType(maMat.get_type(rPos)));
 }
 
 double ScMatrixImpl::GetDouble(const MatrixImplType::const_position_type & rPos) const
@@ -3078,15 +3105,8 @@ FormulaError ScMatrixImpl::GetErrorIfNotString( const MatrixImplType::const_posi
 
 bool ScMatrixImpl::IsValue( const MatrixImplType::const_position_type & rPos ) const
 {
-    switch (maMat.get_type(rPos))
-    {
-        case mdds::mtm::element_boolean:
-        case mdds::mtm::element_numeric:
-            return true;
-        default:
-            ;
-    }
-    return false;
+    return spreadsheetengine::core::matrix::isStoredValue(
+        toStoredElementType(maMat.get_type(rPos)));
 }
 
 FormulaError ScMatrixImpl::GetError(const MatrixImplType::const_position_type & rPos) const
@@ -3097,15 +3117,8 @@ FormulaError ScMatrixImpl::GetError(const MatrixImplType::const_position_type & 
 
 bool ScMatrixImpl::IsStringOrEmpty(const MatrixImplType::const_position_type & rPos) const
 {
-    switch (maMat.get_type(rPos))
-    {
-        case mdds::mtm::element_empty:
-        case mdds::mtm::element_string:
-            return true;
-        default:
-            ;
-    }
-    return false;
+    return spreadsheetengine::core::matrix::isStoredStringOrEmpty(
+        toStoredElementType(maMat.get_type(rPos)));
 }
 
 void ScMatrixImpl::ExecuteBinaryOp(SCSIZE nMaxCol, SCSIZE nMaxRow, const ScMatrix& rInputMat1, const ScMatrix& rInputMat2,
@@ -3387,7 +3400,7 @@ bool ScMatrix::ValidColRowReplicated( SCSIZE & rC, SCSIZE & rR ) const
 
 bool ScMatrix::ValidColRowOrReplicated( SCSIZE & rC, SCSIZE & rR ) const
 {
-    return ValidColRow( rC, rR) || ValidColRowReplicated( rC, rR);
+    return pImpl->ValidColRowOrReplicated(rC, rR);
 }
 
 void ScMatrix::PutDouble(double fVal, SCSIZE nC, SCSIZE nR)

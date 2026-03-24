@@ -18,6 +18,32 @@ namespace spreadsheetengine::core::matrix
 
 constexpr sal_uInt64 kAverageMatrixElementBytes = 12;
 constexpr sal_uInt64 kArbitraryColumnCap = 128;
+constexpr sal_uInt8 kEmptyResultFlagValue = 1;
+constexpr sal_uInt8 kEmptyPathFlagValue = 2;
+
+enum class StoredElementType : sal_uInt8
+{
+    Unknown,
+    Empty,
+    Numeric,
+    Boolean,
+    String
+};
+
+enum class StoredFlagType : sal_uInt8
+{
+    Unknown,
+    Empty,
+    Integer
+};
+
+enum class StoredEmptyKind : sal_uInt8
+{
+    Unknown,
+    Cell,
+    Result,
+    Path
+};
 
 enum class AllocationFallback
 {
@@ -36,6 +62,109 @@ struct AllocationPlan
         return meFallback != AllocationFallback::None;
     }
 };
+
+[[nodiscard]] constexpr bool isStoredStringOrEmpty(StoredElementType eType)
+{
+    return eType == StoredElementType::Empty || eType == StoredElementType::String;
+}
+
+[[nodiscard]] constexpr bool isStoredValue(StoredElementType eType)
+{
+    return eType == StoredElementType::Boolean || eType == StoredElementType::Numeric;
+}
+
+[[nodiscard]] constexpr bool isStoredValueOrEmpty(StoredElementType eType)
+{
+    return isStoredValue(eType) || eType == StoredElementType::Empty;
+}
+
+[[nodiscard]] constexpr bool isStoredBoolean(StoredElementType eType)
+{
+    return eType == StoredElementType::Boolean;
+}
+
+[[nodiscard]] constexpr bool isStoredEmptyCell(StoredElementType eType, StoredFlagType eFlagType)
+{
+    return eType == StoredElementType::Empty && eFlagType == StoredFlagType::Empty;
+}
+
+[[nodiscard]] constexpr StoredEmptyKind classifyStoredEmptyKind(
+    StoredFlagType eFlagType, sal_uInt8 nFlagValue)
+{
+    if (eFlagType == StoredFlagType::Empty)
+        return StoredEmptyKind::Cell;
+    if (eFlagType != StoredFlagType::Integer)
+        return StoredEmptyKind::Unknown;
+
+    switch (nFlagValue)
+    {
+        case kEmptyResultFlagValue:
+            return StoredEmptyKind::Result;
+        case kEmptyPathFlagValue:
+            return StoredEmptyKind::Path;
+        default:
+            break;
+    }
+
+    return StoredEmptyKind::Unknown;
+}
+
+[[nodiscard]] constexpr sal_uInt8 storedFlagValue(StoredEmptyKind eKind)
+{
+    switch (eKind)
+    {
+        case StoredEmptyKind::Result:
+            return kEmptyResultFlagValue;
+        case StoredEmptyKind::Path:
+            return kEmptyPathFlagValue;
+        case StoredEmptyKind::Cell:
+        case StoredEmptyKind::Unknown:
+            break;
+    }
+
+    return 0;
+}
+
+[[nodiscard]] constexpr bool isStoredEmptyResult(StoredElementType eType, sal_uInt8 nFlagValue)
+{
+    return eType == StoredElementType::Empty
+           && classifyStoredEmptyKind(StoredFlagType::Integer, nFlagValue) == StoredEmptyKind::Result;
+}
+
+[[nodiscard]] constexpr bool isStoredEmptyPath(StoredElementType eType, sal_uInt8 nFlagValue)
+{
+    return eType == StoredElementType::Empty
+           && classifyStoredEmptyKind(StoredFlagType::Integer, nFlagValue) == StoredEmptyKind::Path;
+}
+
+[[nodiscard]] constexpr bool isStoredLogicalEmpty(StoredElementType eType, sal_uInt8 nFlagValue)
+{
+    return eType == StoredElementType::Empty && !isStoredEmptyPath(eType, nFlagValue);
+}
+
+[[nodiscard]] constexpr api::MatrixValueType classifyStoredValueType(
+    StoredElementType eType, StoredFlagType eFlagType, sal_uInt8 nFlagValue)
+{
+    switch (eType)
+    {
+        case StoredElementType::Boolean:
+            return api::MatrixValueType::Boolean;
+        case StoredElementType::Numeric:
+            return api::MatrixValueType::Value;
+        case StoredElementType::String:
+            return api::MatrixValueType::Text;
+        case StoredElementType::Empty:
+            if (eFlagType == StoredFlagType::Empty)
+                return api::MatrixValueType::Empty;
+            return classifyStoredEmptyKind(eFlagType, nFlagValue) == StoredEmptyKind::Path
+                       ? api::MatrixValueType::EmptyPath
+                       : api::MatrixValueType::Empty;
+        case StoredElementType::Unknown:
+            break;
+    }
+
+    return api::MatrixValueType::Empty;
+}
 
 [[nodiscard]] constexpr sal_uInt64 defaultMemoryBudgetBytes(sal_uInt64 nPointerBytes)
 {

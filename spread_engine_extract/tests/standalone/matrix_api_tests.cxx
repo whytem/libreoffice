@@ -78,6 +78,63 @@ int main()
         return fail("spreadsheetengine_matrix_tests", "matrix default budget mismatch");
     }
 
+    if (!spreadsheetengine::core::matrix::isStoredStringOrEmpty(
+            spreadsheetengine::core::matrix::StoredElementType::String)
+        || !spreadsheetengine::core::matrix::isStoredStringOrEmpty(
+            spreadsheetengine::core::matrix::StoredElementType::Empty)
+        || spreadsheetengine::core::matrix::isStoredStringOrEmpty(
+            spreadsheetengine::core::matrix::StoredElementType::Numeric)
+        || !spreadsheetengine::core::matrix::isStoredValue(
+            spreadsheetengine::core::matrix::StoredElementType::Numeric)
+        || !spreadsheetengine::core::matrix::isStoredValueOrEmpty(
+            spreadsheetengine::core::matrix::StoredElementType::Empty)
+        || !spreadsheetengine::core::matrix::isStoredBoolean(
+            spreadsheetengine::core::matrix::StoredElementType::Boolean))
+    {
+        return fail("spreadsheetengine_matrix_tests", "stored element classification mismatch");
+    }
+
+    if (!spreadsheetengine::core::matrix::isStoredEmptyCell(
+            spreadsheetengine::core::matrix::StoredElementType::Empty,
+            spreadsheetengine::core::matrix::StoredFlagType::Empty)
+        || spreadsheetengine::core::matrix::classifyStoredEmptyKind(
+               spreadsheetengine::core::matrix::StoredFlagType::Empty, 0)
+               != spreadsheetengine::core::matrix::StoredEmptyKind::Cell
+        || spreadsheetengine::core::matrix::classifyStoredEmptyKind(
+               spreadsheetengine::core::matrix::StoredFlagType::Integer,
+               spreadsheetengine::core::matrix::kEmptyResultFlagValue)
+               != spreadsheetengine::core::matrix::StoredEmptyKind::Result
+        || spreadsheetengine::core::matrix::classifyStoredEmptyKind(
+               spreadsheetengine::core::matrix::StoredFlagType::Integer,
+               spreadsheetengine::core::matrix::kEmptyPathFlagValue)
+               != spreadsheetengine::core::matrix::StoredEmptyKind::Path
+        || spreadsheetengine::core::matrix::storedFlagValue(
+               spreadsheetengine::core::matrix::StoredEmptyKind::Result)
+               != spreadsheetengine::core::matrix::kEmptyResultFlagValue
+        || spreadsheetengine::core::matrix::storedFlagValue(
+               spreadsheetengine::core::matrix::StoredEmptyKind::Path)
+               != spreadsheetengine::core::matrix::kEmptyPathFlagValue
+        || !spreadsheetengine::core::matrix::isStoredEmptyResult(
+            spreadsheetengine::core::matrix::StoredElementType::Empty,
+            spreadsheetengine::core::matrix::kEmptyResultFlagValue)
+        || !spreadsheetengine::core::matrix::isStoredEmptyPath(
+            spreadsheetengine::core::matrix::StoredElementType::Empty,
+            spreadsheetengine::core::matrix::kEmptyPathFlagValue)
+        || !spreadsheetengine::core::matrix::isStoredLogicalEmpty(
+            spreadsheetengine::core::matrix::StoredElementType::Empty, 0)
+        || spreadsheetengine::core::matrix::classifyStoredValueType(
+               spreadsheetengine::core::matrix::StoredElementType::Empty,
+               spreadsheetengine::core::matrix::StoredFlagType::Integer,
+               spreadsheetengine::core::matrix::kEmptyPathFlagValue)
+               != spreadsheetengine::api::MatrixValueType::EmptyPath
+        || spreadsheetengine::core::matrix::classifyStoredValueType(
+               spreadsheetengine::core::matrix::StoredElementType::String,
+               spreadsheetengine::core::matrix::StoredFlagType::Unknown, 0)
+               != spreadsheetengine::api::MatrixValueType::Text)
+    {
+        return fail("spreadsheetengine_matrix_tests", "stored empty classification mismatch");
+    }
+
     if (spreadsheetengine::core::matrix::budgetWithReleasedCurrentElements(10, 3) != 13
         || spreadsheetengine::core::matrix::budgetAfterAllocation(13, { 4, 2 }) != 5
         || spreadsheetengine::core::matrix::budgetAfterConstruction(13, { 4, 2 }) != 5
@@ -113,6 +170,28 @@ int main()
     MatrixCoordinate aNonVectorCoordinate { 3, 3 };
     if (spreadsheetengine::api::normalizeReplicatedCoordinate({ 2, 2 }, aNonVectorCoordinate))
         return fail("spreadsheetengine_matrix_tests", "2D replication should fail");
+
+    MatrixCoordinate aReplicatedCoordinate { 9, 2 };
+    if (!spreadsheetengine::core::matrix::isCoordinateValid({ 3, 4 }, 2, 3)
+        || spreadsheetengine::core::matrix::isCoordinateValid({ 3, 4 }, 3, 3)
+        || !spreadsheetengine::core::matrix::normalizeReplicatedCoordinateInPlace(
+            MatrixDimensions { 1, 4 }, aReplicatedCoordinate.mnColumn, aReplicatedCoordinate.mnRow)
+        || aReplicatedCoordinate.mnColumn != 0 || aReplicatedCoordinate.mnRow != 2)
+    {
+        return fail("spreadsheetengine_matrix_tests", "coordinate validation mismatch");
+    }
+
+    MatrixCoordinate aValidOrReplicated { 9, 2 };
+    MatrixCoordinate aAlreadyValid { 2, 3 };
+    if (!spreadsheetengine::core::matrix::isValidOrReplicatedCoordinate(
+            MatrixDimensions { 1, 4 }, aValidOrReplicated.mnColumn, aValidOrReplicated.mnRow)
+        || aValidOrReplicated.mnColumn != 0 || aValidOrReplicated.mnRow != 2
+        || !spreadsheetengine::core::matrix::isValidOrReplicatedCoordinate(
+            MatrixDimensions { 3, 4 }, aAlreadyValid.mnColumn, aAlreadyValid.mnRow)
+        || aAlreadyValid.mnColumn != 2 || aAlreadyValid.mnRow != 3)
+    {
+        return fail("spreadsheetengine_matrix_tests", "valid-or-replicated coordinate mismatch");
+    }
 
     const MatrixCoordinate aLinearCoordinate
         = spreadsheetengine::core::matrix::coordinateFromLinearIndex({ 3, 4 }, 6);

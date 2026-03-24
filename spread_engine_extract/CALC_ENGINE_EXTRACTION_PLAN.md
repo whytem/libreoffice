@@ -846,6 +846,61 @@ Current status:
   - Calc consumes that helper in `sc/source/core/tool/jumpmatrix.cxx` for
     `FlushBufferOtherThan()` without changing flush decisions, write order, or
     reset behavior
+- thirty-third slice completed:
+  - the extracted matrix-geometry layer now also owns direct coordinate
+    validity and replicated-coordinate normalization helpers
+  - Calc consumes those helpers in `sc/source/core/tool/scmatrix.cxx` for the
+    `ValidColRow()` and `ValidColRowReplicated()` paths without changing
+    coordinate acceptance or replication results
+- thirty-fourth slice completed:
+  - the extracted matrix-geometry layer now also owns the combined
+    valid-or-replicated coordinate check
+  - Calc consumes that helper in `sc/source/core/tool/scmatrix.cxx` for the
+    `ValidColRowOrReplicated()` path without changing fallback semantics or the
+    observable coordinates returned to callers
+- thirty-fifth slice completed:
+  - the extracted matrix-runtime layer now also owns stored-element
+    classification helpers for string-or-empty, value, value-or-empty, and
+    boolean checks
+  - Calc consumes those helpers in `sc/source/core/tool/scmatrix.cxx` for the
+    `IsStringOrEmpty()`, `IsValue()`, `IsValueOrEmpty()`, and `IsBoolean()`
+    paths without changing replicated-coordinate handling or observable type
+    answers
+- thirty-sixth slice completed:
+  - the extracted matrix-runtime layer now also owns empty-state
+    classification helpers and stored-value-type mapping for empty, empty
+    result, and empty path elements
+  - Calc consumes those helpers in `sc/source/core/tool/scmatrix.cxx` for the
+    `Get()`, `IsEmpty()`, `IsEmptyCell()`, `IsEmptyResult()`, and
+    `IsEmptyPath()` paths without changing exposed matrix value types or empty
+    semantics
+- thirty-seventh slice completed:
+  - the extracted matrix-runtime layer now also owns stored-empty-kind
+    planning and flag-value helpers for empty-cell, empty-result, and
+    empty-path writes
+  - Calc consumes those helpers in `sc/source/core/tool/scmatrix.cxx` for the
+    `PutEmptyPath()`, `PutEmptyResultVector()`, and `PutEmptyPathVector()`
+    paths without changing persisted matrix flags or visible empty semantics
+- thirty-eighth slice completed:
+  - the extracted matrix-runtime layer now also owns the remaining private
+    position-based stored-element classifiers used by binary matrix execution
+  - Calc consumes those helpers in `sc/source/core/tool/scmatrix.cxx` for the
+    internal `IsValueOrEmpty()`, `IsValue()`, and `IsStringOrEmpty()` paths
+    used by `ExecuteBinaryOp()` without changing array-op coercion or error
+    propagation
+
+Assessment:
+
+- Phase 8 is now substantially complete
+- the remaining work in `scmatrix` is no longer mainly substrate ownership;
+  it is mostly:
+  - matrix-aware evaluator and aggregation behavior
+  - compare/query and coercion semantics
+  - formatting or string-conversion paths that still rely on Calc host
+    services
+  - public-header cleanup that crosses wider LibreOffice include graphs
+- those residual items are better handled as part of the Phase 9 host/runtime
+  transition instead of continuing to treat them as pure substrate extraction
 
 Validation:
 
