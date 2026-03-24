@@ -44,6 +44,10 @@ add_spreadsheetengine_test(spreadsheetengine_compiler_tests
     ${SPREADSHEETENGINE_STANDALONE_COMPILER_TEST_SOURCES}
 )
 
+add_spreadsheetengine_test(spreadsheetengine_matrix_tests
+    ${SPREADSHEETENGINE_STANDALONE_MATRIX_TEST_SOURCES}
+)
+
 add_spreadsheetengine_test(spreadsheetengine_math_tests
     ${SPREADSHEETENGINE_STANDALONE_MATH_TEST_SOURCES}
 )
@@ -58,6 +62,10 @@ add_spreadsheetengine_test(spreadsheetengine_text_tests
 
 add_spreadsheetengine_test(spreadsheetengine_config_tests
     ${SPREADSHEETENGINE_STANDALONE_CONFIG_TEST_SOURCES}
+)
+
+add_spreadsheetengine_test(spreadsheetengine_execution_tests
+    ${SPREADSHEETENGINE_STANDALONE_EXECUTION_TEST_SOURCES}
 )
 
 if(BUILD_TESTING)

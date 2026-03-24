@@ -637,6 +637,136 @@ Work:
 - introduce engine-owned matrix value, accumulator, and jump/reference support
   types
 - keep Calc-side adapters thin and mechanical
+- execute the phase in this order instead of attempting a wholesale move:
+  - matrix core types and replication/dimension helpers
+  - pure `ScMatrix` storage and iteration logic
+  - `ScJumpMatrix` runtime state and buffering
+  - an `ExecutionContext` split from the execution-local parts of
+    `ScInterpreterContext`
+  - Calc-only host services such as number formatting, lookup caches, and
+    document access remain explicit adapters until Phase 9
+
+Current status:
+
+- first slice completed:
+  - engine-owned matrix API/value types now live under
+    `spread_engine_extract/inc/spreadsheetengine/api/Matrix.hxx`
+  - standalone runtime-substrate coverage now includes
+    `spreadsheetengine_matrix_tests`
+  - Calc consumes the first extracted matrix helpers through
+    `sc/source/core/tool/scmatrix.cxx` for element-count and
+    replication/validation behavior without changing the public `ScMatrix`
+    interface yet
+- second slice completed:
+  - engine-owned matrix geometry helpers now live under
+    `spread_engine_extract/inc/spreadsheetengine/core/MatrixGeometry.hxx`
+  - Calc now consumes extracted allocatability, index-to-coordinate, and
+    column-vector placement rules through `sc/source/core/tool/scmatrix.cxx`
+  - standalone matrix tests now cover those geometry helpers directly
+- third slice completed:
+  - the extracted matrix geometry layer now also owns range validation and
+    row/column span helpers used by pure matrix write/fill logic
+  - Calc consumes those helpers in `sc/source/core/tool/scmatrix.cxx` for
+    rectangular fill and vector-write checks without changing matrix storage
+    semantics
+- fourth slice completed:
+  - engine-owned jump-matrix runtime helpers now live under
+    `spread_engine_extract/inc/spreadsheetengine/core/JumpMatrixRuntime.hxx`
+  - Calc consumes extracted jump-coordinate normalization, cursor advancement,
+    result-dimension expansion, and buffered-write threshold checks through
+    `sc/source/core/tool/jumpmatrix.cxx`
+- fifth slice completed:
+  - engine-owned matrix runtime helpers now live under
+    `spread_engine_extract/inc/spreadsheetengine/core/MatrixRuntime.hxx`
+  - Calc now consumes extracted element-budget and allocatable-shape logic in
+    `sc/source/core/tool/scmatrix.cxx` for size checks and matrix-limit
+    planning
+- sixth slice completed:
+  - the jump-matrix runtime layer now also owns buffered-write continuation
+    rules
+  - Calc consumes those helpers in `sc/source/core/tool/jumpmatrix.cxx` for
+    buffer flush decisions without changing result semantics
+- seventh slice completed:
+  - the extracted matrix runtime layer now also owns allocation planning and
+    fallback-shape decisions
+  - Calc consumes those helpers in `sc/source/core/tool/scmatrix.cxx` for
+    constructor and resize fallback planning while preserving the existing
+    error behavior
+- eighth slice completed:
+  - the jump-matrix runtime layer now also owns result-expansion planning
+    including fill ranges and cursor adjustment
+  - Calc consumes those helpers in `sc/source/core/tool/jumpmatrix.cxx` for
+    result-matrix growth without changing formula results
+- ninth slice completed:
+  - the extracted matrix runtime layer now also owns default memory-budget
+    policy and clone/extend planning helpers
+  - Calc consumes those helpers in `sc/source/core/tool/scmatrix.cxx` for
+    platform-default matrix limits and clone target sizing while preserving
+    existing matrix contents and error behavior
+- tenth slice completed:
+  - the jump-matrix runtime layer now also owns buffer-window lifecycle
+    helpers used when opening and continuing buffered result writes
+  - Calc consumes those helpers in `sc/source/core/tool/jumpmatrix.cxx` for
+    buffered result accumulation without changing runtime semantics
+- eleventh slice completed:
+  - the extracted jump-matrix runtime layer now also owns linear jump-entry
+    indexing and buffered-write progression helpers
+  - Calc consumes those helpers in `sc/source/core/tool/jumpmatrix.cxx` for
+    jump entry access and buffer-count progression without changing results
+- twelfth slice completed:
+  - the extracted jump-matrix runtime layer now also owns buffered-write flush
+    decision helpers
+  - Calc consumes those helpers in `sc/source/core/tool/jumpmatrix.cxx` to
+    decide when buffered result ranges must be flushed without changing result
+    ordering or values
+- thirteenth slice completed:
+  - the extracted matrix runtime layer now also owns resize-budget accounting
+    and resize planning helpers
+  - Calc consumes those helpers in `sc/source/core/tool/scmatrix.cxx` for
+    resize allocation planning while preserving existing fallback and error
+    behavior
+- fourteenth slice completed:
+  - the extracted matrix runtime layer now also owns copy-destination
+    compatibility checks for matrix storage copies
+  - Calc consumes those helpers in `sc/source/core/tool/scmatrix.cxx` for
+    `MatCopy` destination-size validation without changing matrix contents
+- fifteenth slice completed:
+  - the extracted jump-matrix runtime layer now also owns buffered result-write
+    planning helpers that combine threshold gating with same-type window
+    progression
+  - Calc consumes those helpers in `sc/source/core/tool/jumpmatrix.cxx` for
+    result buffering decisions without changing buffered write ordering or
+    values
+- sixteenth slice completed:
+  - the extracted matrix runtime layer now also owns matrix budget lifecycle
+    bookkeeping for construction and destruction
+  - Calc consumes those helpers in `sc/source/core/tool/scmatrix.cxx` for
+    `ScMatrixImpl` allocation-budget updates while preserving existing matrix
+    size limits and fallback behavior
+- seventeenth slice completed:
+  - the extracted matrix geometry layer now also owns column-major index
+    flattening helpers, including offset-aware indexing
+  - Calc consumes those helpers in `sc/source/core/tool/jumpmatrix.cxx` for
+    jump-entry indexing and in `sc/source/core/tool/scmatrix.cxx` for
+    `MatConcat` result-buffer indexing
+- eighteenth slice completed:
+  - the extracted matrix geometry layer now also owns range-write planning for
+    pure matrix fill operations
+  - Calc consumes those helpers in `sc/source/core/tool/scmatrix.cxx` for
+    `FillDouble` range validation and span sizing
+- nineteenth slice completed:
+  - the extracted matrix geometry layer now also owns column-vector write
+    planning for pure matrix storage writes
+  - Calc consumes those helpers in `sc/source/core/tool/scmatrix.cxx` for the
+    vectorized double, string, empty-result, and empty-path write paths
+- twentieth slice completed:
+  - the extracted execution-context layer now also owns generic token-cache
+    reset, scratch cleanup, recent-cache reset, and doc-bound-state clearing
+    helpers
+  - Calc consumes those helpers in
+    `sc/source/core/tool/interpretercontext.cxx` for the first small
+    `ScInterpreterContext` split without changing document, formatter, or
+    lookup-cache semantics
 
 Validation:
 

@@ -20,6 +20,8 @@
 #include <scmatrix.hxx>
 #include <global.hxx>
 #include <address.hxx>
+#include <spreadsheetengine/core/MatrixGeometry.hxx>
+#include <spreadsheetengine/core/MatrixRuntime.hxx>
 #include <formula/errorcodes.hxx>
 #include <interpre.hxx>
 #include <mtvelements.hxx>
@@ -372,44 +374,74 @@ static std::atomic<size_t> nElementsMax;
  */
 static size_t GetElementsMax( size_t nMemory )
 {
-    // Arbitrarily assuming 12 bytes per element, 8 bytes double plus
-    // overhead. Stored as an array in an mdds container it's less, but for
-    // strings or mixed matrix it can be much more...
-    constexpr size_t nPerElem = 12;
     if (nMemory)
-        return nMemory / nPerElem;
+        return spreadsheetengine::core::matrix::elementsForMemoryBudget(nMemory);
 
-    // Arbitrarily assuming 1GB memory. Could be dynamic at some point.
-    constexpr size_t nMemMax = 0x40000000;
-    // With 1GB that's ~85M elements, or 85 whole columns.
-    constexpr size_t nElemMax = nMemMax / nPerElem;
-    // With MAXROWCOUNT==1048576 and 128 columns => 128M elements, 1.5GB
-    constexpr size_t nArbitraryLimit = size_t(MAXROWCOUNT) * 128;
-    // With the constant 1GB from above that's the actual value.
-    return std::min(nElemMax, nArbitraryLimit);
+    return spreadsheetengine::core::matrix::defaultElementLimitForPlatform(
+        MAXROWCOUNT, SAL_TYPES_SIZEOFPOINTER);
+}
+
+size_t EnsureElementsMaxInitialized()
+{
+    std::call_once(bElementsMaxFetched,
+        []()
+        {
+            const char* pEnv = std::getenv("SC_MAX_MATRIX_ELEMENTS");
+            if (pEnv)
+            {
+                // Environment specifies the overall elements pool.
+                nElementsMax = std::atoi(pEnv);
+            }
+            else
+            {
+                nElementsMax = GetElementsMax(0);
+            }
+        });
+
+    return nElementsMax;
+}
+
+FormulaError toFormulaError(spreadsheetengine::core::matrix::AllocationFallback eFallback)
+{
+    switch (eFallback)
+    {
+        case spreadsheetengine::core::matrix::AllocationFallback::MatrixSize:
+            return FormulaError::MatrixSize;
+        case spreadsheetengine::core::matrix::AllocationFallback::StackOverflow:
+            return FormulaError::StackOverflow;
+        case spreadsheetengine::core::matrix::AllocationFallback::None:
+            break;
+    }
+
+    return FormulaError::NONE;
 }
 
 ScMatrixImpl::ScMatrixImpl(SCSIZE nC, SCSIZE nR) :
     maMat(nR, nC), maMatFlag(nR, nC), pErrorInterpreter(nullptr)
 {
-    nElementsMax -= GetElementCount();
+    nElementsMax = spreadsheetengine::core::matrix::budgetAfterConstruction(
+        nElementsMax, spreadsheetengine::core::matrix::makeDimensions(nC, nR));
 }
 
 ScMatrixImpl::ScMatrixImpl(SCSIZE nC, SCSIZE nR, double fInitVal) :
     maMat(nR, nC, fInitVal), maMatFlag(nR, nC), pErrorInterpreter(nullptr)
 {
-    nElementsMax -= GetElementCount();
+    nElementsMax = spreadsheetengine::core::matrix::budgetAfterConstruction(
+        nElementsMax, spreadsheetengine::core::matrix::makeDimensions(nC, nR));
 }
 
 ScMatrixImpl::ScMatrixImpl( size_t nC, size_t nR, const std::vector<double>& rInitVals ) :
     maMat(nR, nC, rInitVals.begin(), rInitVals.end()), maMatFlag(nR, nC), pErrorInterpreter(nullptr)
 {
-    nElementsMax -= GetElementCount();
+    nElementsMax = spreadsheetengine::core::matrix::budgetAfterConstruction(
+        nElementsMax, spreadsheetengine::core::matrix::makeDimensions(nC, nR));
 }
 
 ScMatrixImpl::~ScMatrixImpl()
 {
-    nElementsMax += GetElementCount();
+    nElementsMax = spreadsheetengine::core::matrix::budgetAfterDestruction(
+        nElementsMax,
+        spreadsheetengine::core::matrix::makeDimensions(maMat.size().column, maMat.size().row));
     suppress_fun_call_w_exception(Clear());
 }
 
@@ -421,36 +453,48 @@ void ScMatrixImpl::Clear()
 
 void ScMatrixImpl::Resize(SCSIZE nC, SCSIZE nR)
 {
-    nElementsMax += GetElementCount();
-    if (ScMatrix::IsSizeAllocatable( nC, nR))
+    EnsureElementsMaxInitialized();
+    const auto nCurrentElementCount = static_cast<sal_uInt64>(GetElementCount());
+    const auto aPlan = spreadsheetengine::core::matrix::planResize(
+        spreadsheetengine::core::matrix::makeDimensions(nC, nR), nCurrentElementCount, nElementsMax,
+        spreadsheetengine::core::matrix::AllocationFallback::MatrixSize);
+    if (!aPlan.usesFallback())
     {
-        maMat.resize(nR, nC);
-        maMatFlag.resize(nR, nC);
+        maMat.resize(aPlan.maStorageDimensions.mnRows, aPlan.maStorageDimensions.mnColumns);
+        maMatFlag.resize(aPlan.maStorageDimensions.mnRows, aPlan.maStorageDimensions.mnColumns);
     }
     else
     {
         // Invalid matrix size, allocate 1x1 matrix with error value.
-        maMat.resize(1, 1, CreateDoubleError( FormulaError::MatrixSize));
-        maMatFlag.resize(1, 1);
+        maMat.resize(aPlan.maStorageDimensions.mnRows, aPlan.maStorageDimensions.mnColumns,
+                     CreateDoubleError(toFormulaError(aPlan.meFallback)));
+        maMatFlag.resize(aPlan.maStorageDimensions.mnRows, aPlan.maStorageDimensions.mnColumns);
     }
-    nElementsMax -= GetElementCount();
+    nElementsMax = spreadsheetengine::core::matrix::budgetAfterResize(
+        nElementsMax, nCurrentElementCount, aPlan.maStorageDimensions);
 }
 
 void ScMatrixImpl::Resize(SCSIZE nC, SCSIZE nR, double fVal)
 {
-    nElementsMax += GetElementCount();
-    if (ScMatrix::IsSizeAllocatable( nC, nR))
+    EnsureElementsMaxInitialized();
+    const auto nCurrentElementCount = static_cast<sal_uInt64>(GetElementCount());
+    const auto aPlan = spreadsheetengine::core::matrix::planResize(
+        spreadsheetengine::core::matrix::makeDimensions(nC, nR), nCurrentElementCount, nElementsMax,
+        spreadsheetengine::core::matrix::AllocationFallback::StackOverflow);
+    if (!aPlan.usesFallback())
     {
-        maMat.resize(nR, nC, fVal);
-        maMatFlag.resize(nR, nC);
+        maMat.resize(aPlan.maStorageDimensions.mnRows, aPlan.maStorageDimensions.mnColumns, fVal);
+        maMatFlag.resize(aPlan.maStorageDimensions.mnRows, aPlan.maStorageDimensions.mnColumns);
     }
     else
     {
         // Invalid matrix size, allocate 1x1 matrix with error value.
-        maMat.resize(1, 1, CreateDoubleError( FormulaError::StackOverflow));
-        maMatFlag.resize(1, 1);
+        maMat.resize(aPlan.maStorageDimensions.mnRows, aPlan.maStorageDimensions.mnColumns,
+                     CreateDoubleError(toFormulaError(aPlan.meFallback)));
+        maMatFlag.resize(aPlan.maStorageDimensions.mnRows, aPlan.maStorageDimensions.mnColumns);
     }
-    nElementsMax -= GetElementCount();
+    nElementsMax = spreadsheetengine::core::matrix::budgetAfterResize(
+        nElementsMax, nCurrentElementCount, aPlan.maStorageDimensions);
 }
 
 void ScMatrixImpl::SetErrorInterpreter( ScInterpreter* p)
@@ -468,37 +512,29 @@ void ScMatrixImpl::GetDimensions( SCSIZE& rC, SCSIZE& rR) const
 SCSIZE ScMatrixImpl::GetElementCount() const
 {
     MatrixImplType::size_pair_type aSize = maMat.size();
-    return aSize.row * aSize.column;
+    const auto aDimensions = spreadsheetengine::core::matrix::makeDimensions(aSize.column, aSize.row);
+    return aDimensions.elementCount();
 }
 
 bool ScMatrixImpl::ValidColRow( SCSIZE nC, SCSIZE nR) const
 {
     MatrixImplType::size_pair_type aSize = maMat.size();
-    return nR < aSize.row && nC < aSize.column;
+    const auto aDimensions = spreadsheetengine::core::matrix::makeDimensions(aSize.column, aSize.row);
+    const auto aCoordinate = spreadsheetengine::core::matrix::makeCoordinate(nC, nR);
+    return spreadsheetengine::api::isValidCoordinate(aDimensions, aCoordinate);
 }
 
 bool ScMatrixImpl::ValidColRowReplicated( SCSIZE & rC, SCSIZE & rR ) const
 {
     MatrixImplType::size_pair_type aSize = maMat.size();
-    if (aSize.column == 1 && aSize.row == 1)
-    {
-        rC = 0;
-        rR = 0;
-        return true;
-    }
-    else if (aSize.column == 1 && rR < aSize.row)
-    {
-        // single column matrix.
-        rC = 0;
-        return true;
-    }
-    else if (aSize.row == 1 && rC < aSize.column)
-    {
-        // single row matrix.
-        rR = 0;
-        return true;
-    }
-    return false;
+    const auto aDimensions = spreadsheetengine::core::matrix::makeDimensions(aSize.column, aSize.row);
+    auto aCoordinate = spreadsheetengine::core::matrix::makeCoordinate(rC, rR);
+    if (!spreadsheetengine::api::normalizeReplicatedCoordinate(aDimensions, aCoordinate))
+        return false;
+
+    rC = aCoordinate.mnColumn;
+    rR = aCoordinate.mnRow;
+    return true;
 }
 
 bool ScMatrixImpl::ValidColRowOrReplicated( SCSIZE & rC, SCSIZE & rR ) const
@@ -949,7 +985,13 @@ bool ScMatrixImpl::IsNumeric() const
 
 void ScMatrixImpl::MatCopy(ScMatrixImpl& mRes) const
 {
-    if (maMat.size().row > mRes.maMat.size().row || maMat.size().column > mRes.maMat.size().column)
+    const auto aSourceDimensions
+        = spreadsheetengine::core::matrix::makeDimensions(maMat.size().column, maMat.size().row);
+    const auto aDestinationDimensions
+        = spreadsheetengine::core::matrix::makeDimensions(
+            mRes.maMat.size().column, mRes.maMat.size().row);
+    if (!spreadsheetengine::core::matrix::canCopyIntoDestination(
+            aSourceDimensions, aDestinationDimensions))
     {
         // destination matrix is not large enough.
         OSL_FAIL("ScMatrixImpl::MatCopy: dimension error");
@@ -967,12 +1009,19 @@ void ScMatrixImpl::MatTrans(ScMatrixImpl& mRes) const
 
 void ScMatrixImpl::FillDouble( double fVal, SCSIZE nC1, SCSIZE nR1, SCSIZE nC2, SCSIZE nR2 )
 {
-    if (ValidColRow( nC1, nR1) && ValidColRow( nC2, nR2))
+    const auto aDimensions = spreadsheetengine::core::matrix::makeDimensions(
+        maMat.size().column, maMat.size().row);
+    const auto aPlan = spreadsheetengine::core::matrix::planRangeWrite(
+        aDimensions, spreadsheetengine::core::matrix::makeRange(
+                         spreadsheetengine::core::matrix::makeCoordinate(nC1, nR1),
+                         spreadsheetengine::core::matrix::makeCoordinate(nC2, nR2)));
+    if (aPlan.mbValid)
     {
         for (SCSIZE j = nC1; j <= nC2; ++j)
         {
             // Passing value array is much faster.
-            std::vector<double> aVals(nR2-nR1+1, fVal);
+            std::vector<double> aVals(
+                spreadsheetengine::core::matrix::rowCount(aPlan.maRange), fVal);
             maMat.set(nR1, j, aVals.begin(), aVals.end());
         }
     }
@@ -984,7 +1033,11 @@ void ScMatrixImpl::FillDouble( double fVal, SCSIZE nC1, SCSIZE nR1, SCSIZE nC2, 
 
 void ScMatrixImpl::PutDoubleVector( const ::std::vector< double > & rVec, SCSIZE nC, SCSIZE nR )
 {
-    if (!rVec.empty() && ValidColRow( nC, nR) && ValidColRow( nC, nR + rVec.size() - 1))
+    const auto aDimensions = spreadsheetengine::core::matrix::makeDimensions(
+        maMat.size().column, maMat.size().row);
+    const auto aPlan = spreadsheetengine::core::matrix::planColumnVectorWrite(
+        aDimensions, spreadsheetengine::core::matrix::makeCoordinate(nC, nR), rVec.size());
+    if (aPlan.mbValid)
     {
         maMat.set(nR, nC, rVec.begin(), rVec.end());
     }
@@ -996,7 +1049,11 @@ void ScMatrixImpl::PutDoubleVector( const ::std::vector< double > & rVec, SCSIZE
 
 void ScMatrixImpl::PutStringVector( const ::std::vector< svl::SharedString > & rVec, SCSIZE nC, SCSIZE nR )
 {
-    if (!rVec.empty() && ValidColRow( nC, nR) && ValidColRow( nC, nR + rVec.size() - 1))
+    const auto aDimensions = spreadsheetengine::core::matrix::makeDimensions(
+        maMat.size().column, maMat.size().row);
+    const auto aPlan = spreadsheetengine::core::matrix::planColumnVectorWrite(
+        aDimensions, spreadsheetengine::core::matrix::makeCoordinate(nC, nR), rVec.size());
+    if (aPlan.mbValid)
     {
         maMat.set(nR, nC, rVec.begin(), rVec.end());
     }
@@ -1008,7 +1065,11 @@ void ScMatrixImpl::PutStringVector( const ::std::vector< svl::SharedString > & r
 
 void ScMatrixImpl::PutEmptyVector( SCSIZE nCount, SCSIZE nC, SCSIZE nR )
 {
-    if (nCount && ValidColRow( nC, nR) && ValidColRow( nC, nR + nCount - 1))
+    const auto aDimensions = spreadsheetengine::core::matrix::makeDimensions(
+        maMat.size().column, maMat.size().row);
+    const auto aPlan = spreadsheetengine::core::matrix::planColumnVectorWrite(
+        aDimensions, spreadsheetengine::core::matrix::makeCoordinate(nC, nR), nCount);
+    if (aPlan.mbValid)
     {
         maMat.set_empty(nR, nC, nCount);
         // Flag to indicate that this is 'empty', not 'empty result' or 'empty path'.
@@ -1022,7 +1083,11 @@ void ScMatrixImpl::PutEmptyVector( SCSIZE nCount, SCSIZE nC, SCSIZE nR )
 
 void ScMatrixImpl::PutEmptyResultVector( SCSIZE nCount, SCSIZE nC, SCSIZE nR )
 {
-    if (nCount && ValidColRow( nC, nR) && ValidColRow( nC, nR + nCount - 1))
+    const auto aDimensions = spreadsheetengine::core::matrix::makeDimensions(
+        maMat.size().column, maMat.size().row);
+    const auto aPlan = spreadsheetengine::core::matrix::planColumnVectorWrite(
+        aDimensions, spreadsheetengine::core::matrix::makeCoordinate(nC, nR), nCount);
+    if (aPlan.mbValid)
     {
         maMat.set_empty(nR, nC, nCount);
         // Flag to indicate that this is 'empty result', not 'empty' or 'empty path'.
@@ -1037,7 +1102,11 @@ void ScMatrixImpl::PutEmptyResultVector( SCSIZE nCount, SCSIZE nC, SCSIZE nR )
 
 void ScMatrixImpl::PutEmptyPathVector( SCSIZE nCount, SCSIZE nC, SCSIZE nR )
 {
-    if (nCount && ValidColRow( nC, nR) && ValidColRow( nC, nR + nCount - 1))
+    const auto aDimensions = spreadsheetengine::core::matrix::makeDimensions(
+        maMat.size().column, maMat.size().row);
+    const auto aPlan = spreadsheetengine::core::matrix::planColumnVectorWrite(
+        aDimensions, spreadsheetengine::core::matrix::makeCoordinate(nC, nR), nCount);
+    if (aPlan.mbValid)
     {
         maMat.set_empty(nR, nC, nCount);
         // Flag to indicate 'empty path'.
@@ -2773,25 +2842,22 @@ void ScMatrixImpl::CalcPosition(SCSIZE nIndex, SCSIZE& rC, SCSIZE& rR) const
 {
     SCSIZE nRowSize = maMat.size().row;
     SAL_WARN_IF( !nRowSize, "sc.core", "ScMatrixImpl::CalcPosition: 0 rows!");
-    rC = nRowSize > 1 ? nIndex / nRowSize : nIndex;
-    rR = nIndex - rC*nRowSize;
+    const auto aCoordinate = spreadsheetengine::core::matrix::coordinateFromLinearIndex(
+        spreadsheetengine::core::matrix::makeDimensions(maMat.size().column, maMat.size().row),
+        nIndex);
+    rC = aCoordinate.mnColumn;
+    rR = aCoordinate.mnRow;
 }
 
 void ScMatrixImpl::CalcTransPosition(SCSIZE nIndex, SCSIZE& rC, SCSIZE& rR) const
 {
     SCSIZE nColSize = maMat.size().column;
     SAL_WARN_IF(!nColSize, "sc.core", "ScMatrixImpl::CalcPosition: 0 cols!");
-    rR = nColSize > 1 ? nIndex / nColSize : nIndex;
-    rC = nIndex - rR * nColSize;
-}
-
-namespace {
-
-size_t get_index(SCSIZE nMaxRow, size_t nRow, size_t nCol, size_t nRowOffset, size_t nColOffset)
-{
-    return nMaxRow * (nCol + nColOffset) + nRow + nRowOffset;
-}
-
+    const auto aCoordinate = spreadsheetengine::core::matrix::coordinateFromTransposedLinearIndex(
+        spreadsheetengine::core::matrix::makeDimensions(maMat.size().column, maMat.size().row),
+        nIndex);
+    rC = aCoordinate.mnColumn;
+    rR = aCoordinate.mnRow;
 }
 
 void ScMatrixImpl::MatConcat(SCSIZE nMaxCol, SCSIZE nMaxRow, const ScMatrixRef& xMat1, const ScMatrixRef& xMat2,
@@ -2808,34 +2874,41 @@ void ScMatrixImpl::MatConcat(SCSIZE nMaxCol, SCSIZE nMaxRow, const ScMatrixRef& 
     std::vector<OUString> aString(nMaxCol * nMaxRow);
     std::vector<bool> aValid(nMaxCol * nMaxRow, true);
     std::vector<FormulaError> nErrors(nMaxCol * nMaxRow,FormulaError::NONE);
+    const auto aConcatDimensions
+        = spreadsheetengine::core::matrix::makeDimensions(nMaxCol, nMaxRow);
 
     size_t nRowOffset = 0;
     size_t nColOffset = 0;
+    std::function<size_t(size_t, size_t)> getIndex = [&](size_t nRow, size_t nCol) {
+        return spreadsheetengine::core::matrix::offsetColumnMajorLinearIndex(
+            aConcatDimensions, spreadsheetengine::core::matrix::makeCoordinate(nCol, nRow),
+            nColOffset, nRowOffset);
+    };
     std::function<void(size_t, size_t, double)> aDoubleFunc =
         [&](size_t nRow, size_t nCol, double nVal)
         {
             FormulaError nErr = GetDoubleErrorValue(nVal);
             if (nErr != FormulaError::NONE)
             {
-                aValid[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] = false;
-                nErrors[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] = nErr;
+                aValid[getIndex(nRow, nCol)] = false;
+                nErrors[getIndex(nRow, nCol)] = nErr;
                 return;
             }
             OUString aStr = rContext.NFGetInputLineString( nVal, nKey );
-            aString[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] = aString[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] + aStr;
+            aString[getIndex(nRow, nCol)] = aString[getIndex(nRow, nCol)] + aStr;
         };
 
     std::function<void(size_t, size_t, bool)> aBoolFunc =
         [&](size_t nRow, size_t nCol, bool nVal)
         {
             OUString aStr = rContext.NFGetInputLineString( nVal ? 1.0 : 0.0, nKey);
-            aString[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] = aString[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] + aStr;
+            aString[getIndex(nRow, nCol)] = aString[getIndex(nRow, nCol)] + aStr;
         };
 
     std::function<void(size_t, size_t, const svl::SharedString&)> aStringFunc =
         [&](size_t nRow, size_t nCol, const svl::SharedString& aStr)
         {
-            aString[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] = aString[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] + aStr.getString();
+            aString[getIndex(nRow, nCol)] = aString[getIndex(nRow, nCol)] + aStr.getString();
         };
 
     std::function<void(size_t, size_t)> aEmptyFunc =
@@ -2877,33 +2950,33 @@ void ScMatrixImpl::MatConcat(SCSIZE nMaxCol, SCSIZE nMaxRow, const ScMatrixRef& 
             FormulaError nErr = GetDoubleErrorValue(nVal);
             if (nErr != FormulaError::NONE)
             {
-                aValid[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] = false;
-                nErrors[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] = nErr;
+                aValid[getIndex(nRow, nCol)] = false;
+                nErrors[getIndex(nRow, nCol)] = nErr;
                 return;
             }
             OUString aStr = rContext.NFGetInputLineString( nVal, nKey );
-            aSharedString[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] = rStringPool.intern(aString[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] + aStr);
+            aSharedString[getIndex(nRow, nCol)] = rStringPool.intern(aString[getIndex(nRow, nCol)] + aStr);
         };
 
     std::function<void(size_t, size_t, bool)> aBoolFunc2 =
         [&](size_t nRow, size_t nCol, bool nVal)
         {
             OUString aStr = rContext.NFGetInputLineString( nVal ? 1.0 : 0.0, nKey);
-            aSharedString[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] = rStringPool.intern(aString[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] + aStr);
+            aSharedString[getIndex(nRow, nCol)] = rStringPool.intern(aString[getIndex(nRow, nCol)] + aStr);
         };
 
     std::function<void(size_t, size_t, const svl::SharedString&)> aStringFunc2 =
         [&](size_t nRow, size_t nCol, const svl::SharedString& aStr)
         {
-            aSharedString[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] =
-                rStringPool.intern(aString[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] + aStr.getString());
+            aSharedString[getIndex(nRow, nCol)] =
+                rStringPool.intern(aString[getIndex(nRow, nCol)] + aStr.getString());
         };
 
     std::function<void(size_t, size_t)> aEmptyFunc2 =
         [&](size_t nRow, size_t nCol)
         {
-            aSharedString[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)] =
-                rStringPool.intern(aString[get_index(nMaxRow, nRow, nCol, nRowOffset, nColOffset)]);
+            aSharedString[getIndex(nRow, nCol)] =
+                rStringPool.intern(aString[getIndex(nRow, nCol)]);
         };
 
     nRowOffset = 0;
@@ -2932,6 +3005,8 @@ void ScMatrixImpl::MatConcat(SCSIZE nMaxCol, SCSIZE nMaxRow, const ScMatrixRef& 
                 std::pair<size_t, size_t>(nMaxRow - 1, nMaxCol - 1),
                 std::move(aDoubleFunc2), std::move(aBoolFunc2), std::move(aStringFunc2), std::move(aEmptyFunc2));
 
+    nRowOffset = 0;
+    nColOffset = 0;
     aString.clear();
 
     MatrixImplType::position_type pos = maMat.position(0, 0);
@@ -2939,14 +3014,13 @@ void ScMatrixImpl::MatConcat(SCSIZE nMaxCol, SCSIZE nMaxRow, const ScMatrixRef& 
     {
         for (SCSIZE j = 0; j < nMaxRow && i < nMaxCol; ++j)
         {
-            if (aValid[nMaxRow * i + j])
+            const auto nIndex = getIndex(j, i);
+            if (aValid[nIndex])
             {
-                auto itr = aValid.begin();
-                std::advance(itr, nMaxRow * i + j);
+                auto itr = std::next(aValid.begin(), nIndex);
                 auto itrEnd = std::find(itr, aValid.end(), false);
                 size_t nSteps = std::distance(itr, itrEnd);
-                auto itrStr = aSharedString.begin();
-                std::advance(itrStr, nMaxRow * i + j);
+                auto itrStr = std::next(aSharedString.begin(), nIndex);
                 auto itrEndStr = itrStr;
                 std::advance(itrEndStr, nSteps);
                 pos = maMat.set(pos, itrStr, itrEndStr);
@@ -2961,7 +3035,7 @@ void ScMatrixImpl::MatConcat(SCSIZE nMaxCol, SCSIZE nMaxRow, const ScMatrixRef& 
             }
             else
             {
-                pos = maMat.set(pos, CreateDoubleError(nErrors[nMaxRow * i + j]));
+                pos = maMat.set(pos, CreateDoubleError(nErrors[nIndex]));
             }
             pos = MatrixImplType::next_position(pos);
         }
@@ -3163,41 +3237,18 @@ bool ScMatrix::IsSizeAllocatable( SCSIZE nC, SCSIZE nR )
 {
     SAL_WARN_IF( !nC, "sc.core", "ScMatrix with 0 columns!");
     SAL_WARN_IF( !nR, "sc.core", "ScMatrix with 0 rows!");
+    const auto aDimensions = spreadsheetengine::core::matrix::makeDimensions(nC, nR);
     // 0-size matrix is valid, it could be resized later.
-    if ((nC && !nR) || (!nC && nR))
+    if (!spreadsheetengine::core::matrix::hasAllocatableShape(aDimensions))
     {
         SAL_WARN( "sc.core", "ScMatrix one-dimensional zero: " << nC << " columns * " << nR << " rows");
         return false;
     }
-    if (!nC || !nR)
+    if (aDimensions.isEmpty())
         return true;
 
-    std::call_once(bElementsMaxFetched,
-        []()
-        {
-            const char* pEnv = std::getenv("SC_MAX_MATRIX_ELEMENTS");
-            if (pEnv)
-            {
-                // Environment specifies the overall elements pool.
-                nElementsMax = std::atoi(pEnv);
-            }
-            else
-            {
-                // GetElementsMax() uses an (~arbitrary) elements limit.
-                // The actual allocation depends on the types of individual matrix
-                // elements and is averaged for type double.
-#if SAL_TYPES_SIZEOFPOINTER < 8
-                // Assume 1GB memory could be consumed by matrices.
-                constexpr size_t nMemMax = 0x40000000;
-#else
-                // Assume 6GB memory could be consumed by matrices.
-                constexpr size_t nMemMax = 0x180000000;
-#endif
-                nElementsMax = GetElementsMax( nMemMax);
-            }
-        });
-
-    if (nC > (nElementsMax / nR))
+    if (!spreadsheetengine::core::matrix::fitsWithinElementLimit(
+            aDimensions, EnsureElementsMaxInitialized()))
     {
         SAL_WARN( "sc.core", "ScMatrix overflow: " << nC << " columns * " << nR << " rows");
         return false;
@@ -3208,31 +3259,46 @@ bool ScMatrix::IsSizeAllocatable( SCSIZE nC, SCSIZE nR )
 ScMatrix::ScMatrix( SCSIZE nC, SCSIZE nR) :
     nRefCnt(0), mbCloneIfConst(true)
 {
-    if (ScMatrix::IsSizeAllocatable( nC, nR))
-        pImpl.reset( new ScMatrixImpl( nC, nR));
+    EnsureElementsMaxInitialized();
+    const auto aPlan = spreadsheetengine::core::matrix::planAllocation(
+        spreadsheetengine::core::matrix::makeDimensions(nC, nR), nElementsMax,
+        spreadsheetengine::core::matrix::AllocationFallback::MatrixSize);
+    if (!aPlan.usesFallback())
+        pImpl.reset(new ScMatrixImpl(aPlan.maStorageDimensions.mnColumns, aPlan.maStorageDimensions.mnRows));
     else
-        // Invalid matrix size, allocate 1x1 matrix with error value.
-        pImpl.reset( new ScMatrixImpl( 1,1, CreateDoubleError( FormulaError::MatrixSize)));
+        pImpl.reset(new ScMatrixImpl(aPlan.maStorageDimensions.mnColumns,
+                                     aPlan.maStorageDimensions.mnRows,
+                                     CreateDoubleError(toFormulaError(aPlan.meFallback))));
 }
 
 ScMatrix::ScMatrix(SCSIZE nC, SCSIZE nR, double fInitVal) :
     nRefCnt(0), mbCloneIfConst(true)
 {
-    if (ScMatrix::IsSizeAllocatable( nC, nR))
-        pImpl.reset( new ScMatrixImpl( nC, nR, fInitVal));
+    EnsureElementsMaxInitialized();
+    const auto aPlan = spreadsheetengine::core::matrix::planAllocation(
+        spreadsheetengine::core::matrix::makeDimensions(nC, nR), nElementsMax,
+        spreadsheetengine::core::matrix::AllocationFallback::MatrixSize);
+    if (!aPlan.usesFallback())
+        pImpl.reset(new ScMatrixImpl(aPlan.maStorageDimensions.mnColumns, aPlan.maStorageDimensions.mnRows, fInitVal));
     else
-        // Invalid matrix size, allocate 1x1 matrix with error value.
-        pImpl.reset( new ScMatrixImpl( 1,1, CreateDoubleError( FormulaError::MatrixSize)));
+        pImpl.reset(new ScMatrixImpl(aPlan.maStorageDimensions.mnColumns,
+                                     aPlan.maStorageDimensions.mnRows,
+                                     CreateDoubleError(toFormulaError(aPlan.meFallback))));
 }
 
 ScMatrix::ScMatrix( size_t nC, size_t nR, const std::vector<double>& rInitVals ) :
     nRefCnt(0), mbCloneIfConst(true)
 {
-    if (ScMatrix::IsSizeAllocatable( nC, nR))
-        pImpl.reset( new ScMatrixImpl( nC, nR, rInitVals));
+    EnsureElementsMaxInitialized();
+    const auto aPlan = spreadsheetengine::core::matrix::planAllocation(
+        spreadsheetengine::core::matrix::makeDimensions(nC, nR), nElementsMax,
+        spreadsheetengine::core::matrix::AllocationFallback::MatrixSize);
+    if (!aPlan.usesFallback())
+        pImpl.reset(new ScMatrixImpl(aPlan.maStorageDimensions.mnColumns, aPlan.maStorageDimensions.mnRows, rInitVals));
     else
-        // Invalid matrix size, allocate 1x1 matrix with error value.
-        pImpl.reset( new ScMatrixImpl( 1,1, CreateDoubleError( FormulaError::MatrixSize)));
+        pImpl.reset(new ScMatrixImpl(aPlan.maStorageDimensions.mnColumns,
+                                     aPlan.maStorageDimensions.mnRows,
+                                     CreateDoubleError(toFormulaError(aPlan.meFallback))));
 }
 
 ScMatrix::~ScMatrix()
@@ -3243,7 +3309,9 @@ ScMatrix* ScMatrix::Clone() const
 {
     SCSIZE nC, nR;
     pImpl->GetDimensions(nC, nR);
-    ScMatrix* pScMat = new ScMatrix(nC, nR);
+    const auto aCloneDimensions = spreadsheetengine::core::matrix::cloneDimensions(
+        spreadsheetengine::core::matrix::makeDimensions(nC, nR));
+    ScMatrix* pScMat = new ScMatrix(aCloneDimensions.mnColumns, aCloneDimensions.mnRows);
     MatCopy(*pScMat);
     pScMat->SetErrorInterpreter(pImpl->GetErrorInterpreter());    // TODO: really?
     return pScMat;
@@ -3276,7 +3344,12 @@ void ScMatrix::Resize(SCSIZE nC, SCSIZE nR, double fVal)
 
 ScMatrix* ScMatrix::CloneAndExtend(SCSIZE nNewCols, SCSIZE nNewRows) const
 {
-    ScMatrix* pScMat = new ScMatrix(nNewCols, nNewRows);
+    SCSIZE nC, nR;
+    pImpl->GetDimensions(nC, nR);
+    const auto aCloneDimensions = spreadsheetengine::core::matrix::extendedCloneDimensions(
+        spreadsheetengine::core::matrix::makeDimensions(nC, nR),
+        spreadsheetengine::core::matrix::makeDimensions(nNewCols, nNewRows));
+    ScMatrix* pScMat = new ScMatrix(aCloneDimensions.mnColumns, aCloneDimensions.mnRows);
     MatCopy(*pScMat);
     pScMat->SetErrorInterpreter(pImpl->GetErrorInterpreter());
     return pScMat;

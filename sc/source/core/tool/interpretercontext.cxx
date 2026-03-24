@@ -18,6 +18,7 @@
  */
 
 #include <interpretercontext.hxx>
+#include <spreadsheetengine/core/ExecutionContext.hxx>
 #include <svl/numformat.hxx>
 #include <svl/zforlist.hxx>
 
@@ -54,12 +55,9 @@ ScInterpreterContext::~ScInterpreterContext() { ResetTokens(); }
 
 void ScInterpreterContext::ResetTokens()
 {
-    for (auto p : maTokens)
-        if (p)
-            p->DecRef();
-
-    mnTokenCachePos = 0;
-    std::fill(maTokens.begin(), maTokens.end(), nullptr);
+    spreadsheetengine::core::execution::resetTokenCache(
+        maTokens, mnTokenCachePos,
+        [](formula::FormulaTypedDoubleToken* pToken) { pToken->DecRef(); });
 }
 
 void ScInterpreterContext::SetDocAndFormatter(const ScDocument& rDoc, SvNumberFormatter* pFormatter)
@@ -77,8 +75,8 @@ void ScInterpreterContext::SetDocAndFormatter(const ScDocument& rDoc, SvNumberFo
         prepFormatterForRoMode(pFormatter);
 
         // drop cache
-        std::fill(maNFBuiltInCache.begin(), maNFBuiltInCache.end(), NFBuiltIn());
-        std::fill(maNFTypeCache.begin(), maNFTypeCache.end(), NFType());
+        spreadsheetengine::core::execution::resetRecentCache(maNFBuiltInCache);
+        spreadsheetengine::core::execution::resetRecentCache(maNFTypeCache);
     }
 }
 
@@ -106,22 +104,16 @@ void ScInterpreterContext::MergeDefaultFormatKeys(SvNumberFormatter& rFormatter)
 void ScInterpreterContext::Cleanup()
 {
     // Do not disturb mxScLookupCache.
-    maConditions.clear();
-    maDelayedSetNumberFormat.clear();
-    ResetTokens();
+    spreadsheetengine::core::execution::cleanupScratchState(
+        maConditions, maDelayedSetNumberFormat, maTokens, mnTokenCachePos,
+        [](formula::FormulaTypedDoubleToken* pToken) { pToken->DecRef(); });
 }
 
 void ScInterpreterContext::ClearLookupCache(const ScDocument* pDoc)
 {
-    if (pDoc == mpDoc)
-    {
-        mxScLookupCache.reset();
-        mxLanguageData.reset();
-        mxAuxFormatKeyMap.reset();
-        mpFormatter = nullptr;
-        mpFormatData = nullptr;
-        mpNatNum = nullptr;
-    }
+    spreadsheetengine::core::execution::clearDocBoundStateIfMatches(
+        pDoc, mpDoc, mxScLookupCache, mxLanguageData, mxAuxFormatKeyMap, mpFormatter, mpFormatData,
+        mpNatNum);
 }
 
 SvNumFormatType ScInterpreterContext::NFGetType(sal_uInt32 nFIndex) const

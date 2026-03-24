@@ -19,6 +19,7 @@
 
 #include <jumpmatrix.hxx>
 #include <scmatrix.hxx>
+#include <spreadsheetengine/core/JumpMatrixRuntime.hxx>
 #include <osl/diagnose.h>
 
 namespace {
@@ -63,32 +64,32 @@ void ScJumpMatrix::GetDimensions(SCSIZE& rCols, SCSIZE& rRows) const
 void ScJumpMatrix::SetJump(SCSIZE nCol, SCSIZE nRow, double fBool,
                            short nStart, short nNext)
 {
-    mvJump[static_cast<sal_uInt64>(nCol) * nRows + nRow].SetJump(fBool, nStart, nNext, SHRT_MAX);
+    mvJump[spreadsheetengine::core::jumpmatrix::jumpEntryIndex(
+        spreadsheetengine::core::matrix::makeDimensions(nCols, nRows),
+        spreadsheetengine::core::matrix::makeCoordinate(nCol, nRow))]
+        .SetJump(fBool, nStart, nNext, SHRT_MAX);
 }
 
 void ScJumpMatrix::GetJump(
     SCSIZE nCol, SCSIZE nRow, double& rBool, short& rStart, short& rNext, short& rStop) const
 {
-    if (nCols == 1 && nRows == 1)
-    {
-        nCol = 0;
-        nRow = 0;
-    }
-    else if (nCols == 1 && nRow < nRows) nCol = 0;
-    else if (nRows == 1 && nCol < nCols) nRow = 0;
-    else if (nCols <= nCol || nRows <= nRow)
+    auto aCoordinate = spreadsheetengine::core::matrix::makeCoordinate(nCol, nRow);
+    if (!spreadsheetengine::core::jumpmatrix::normalizeJumpCoordinate(
+            spreadsheetengine::core::matrix::makeDimensions(nCols, nRows), aCoordinate))
     {
         OSL_FAIL("ScJumpMatrix::GetJump: dimension error");
-        nCol = 0;
-        nRow = 0;
+        aCoordinate = spreadsheetengine::core::matrix::makeCoordinate(0, 0);
     }
-    mvJump[static_cast<sal_uInt64>(nCol) * nRows + nRow].
+    nCol = aCoordinate.mnColumn;
+    nRow = aCoordinate.mnRow;
+    mvJump[spreadsheetengine::core::jumpmatrix::jumpEntryIndex(
+        spreadsheetengine::core::matrix::makeDimensions(nCols, nRows), aCoordinate)].
         GetJump(rBool, rStart, rNext, rStop);
 }
 
 void ScJumpMatrix::SetAllJumps(double fBool, short nStart, short nNext, short nStop)
 {
-    sal_uInt64 n = static_cast<sal_uInt64>(nCols) * nRows;
+    sal_uInt64 n = spreadsheetengine::core::matrix::makeDimensions(nCols, nRows).elementCount();
     for (sal_uInt64 j = 0; j < n; ++j)
     {
         mvJump[j].SetJump(fBool, nStart,
@@ -109,21 +110,16 @@ void ScJumpMatrix::GetPos(SCSIZE& rCol, SCSIZE& rRow) const
 
 bool ScJumpMatrix::Next(SCSIZE& rCol, SCSIZE& rRow)
 {
-    if (!bStarted)
-    {
-        bStarted = true;
-        nCurCol = nCurRow = 0;
-    }
-    else
-    {
-        if (++nCurRow >= nResMatRows)
-        {
-            nCurRow = 0;
-            ++nCurCol;
-        }
-    }
+    spreadsheetengine::core::jumpmatrix::ResultCursor aCursor {
+        spreadsheetengine::core::matrix::makeCoordinate(nCurCol, nCurRow), bStarted
+    };
+    const bool bHasNext = spreadsheetengine::core::jumpmatrix::advanceResultCursor(
+        spreadsheetengine::core::matrix::makeDimensions(nResMatCols, nResMatRows), aCursor);
+    nCurCol = aCursor.maCoordinate.mnColumn;
+    nCurRow = aCursor.maCoordinate.mnRow;
+    bStarted = aCursor.mbStarted;
     GetPos(rCol, rRow);
-    return nCurCol < nResMatCols;
+    return bHasNext;
 }
 
 void ScJumpMatrix::GetResMatDimensions(SCSIZE& rCols, SCSIZE& rRows)
@@ -134,30 +130,36 @@ void ScJumpMatrix::GetResMatDimensions(SCSIZE& rCols, SCSIZE& rRows)
 
 void ScJumpMatrix::SetNewResMat(SCSIZE nNewCols, SCSIZE nNewRows)
 {
-    if (nNewCols <= nResMatCols && nNewRows <= nResMatRows)
+    const auto aPlan = spreadsheetengine::core::jumpmatrix::planResultExpansion(
+        spreadsheetengine::core::matrix::makeDimensions(nCols, nRows),
+        spreadsheetengine::core::matrix::makeDimensions(nResMatCols, nResMatRows),
+        spreadsheetengine::core::matrix::makeDimensions(nNewCols, nNewRows),
+        spreadsheetengine::core::matrix::makeCoordinate(nCurCol, nCurRow));
+    const auto nExpandedCols = static_cast<SCSIZE>(aPlan.maExpandedDimensions.mnColumns);
+    const auto nExpandedRows = static_cast<SCSIZE>(aPlan.maExpandedDimensions.mnRows);
+    if (!aPlan.mbNeedsExpansion)
         return;
 
     FlushBufferOtherThan( BUFFER_NONE, 0, 0);
-    pMat = pMat->CloneAndExtend(nNewCols, nNewRows);
-    if (nResMatCols < nNewCols)
+    pMat = pMat->CloneAndExtend(nExpandedCols, nExpandedRows);
+    if (aPlan.mbFillNewColumns)
     {
         pMat->FillDouble(
             CreateDoubleError(FormulaError::NotAvailable),
-            nResMatCols, 0, nNewCols - 1, nResMatRows - 1);
+            aPlan.maNewColumnRange.maStart.mnColumn, aPlan.maNewColumnRange.maStart.mnRow,
+            aPlan.maNewColumnRange.maEnd.mnColumn, aPlan.maNewColumnRange.maEnd.mnRow);
     }
-    if (nResMatRows < nNewRows)
+    if (aPlan.mbFillNewRows)
     {
         pMat->FillDouble(
             CreateDoubleError(FormulaError::NotAvailable),
-            0, nResMatRows, nNewCols - 1, nNewRows - 1);
+            aPlan.maNewRowRange.maStart.mnColumn, aPlan.maNewRowRange.maStart.mnRow,
+            aPlan.maNewRowRange.maEnd.mnColumn, aPlan.maNewRowRange.maEnd.mnRow);
     }
-    if (nRows == 1 && nCurCol != 0)
-    {
-        nCurCol = 0;
-        nCurRow = nResMatRows - 1;
-    }
-    nResMatCols = nNewCols;
-    nResMatRows = nNewRows;
+    nCurCol = aPlan.maAdjustedCursor.mnColumn;
+    nCurRow = aPlan.maAdjustedCursor.mnRow;
+    nResMatCols = nExpandedCols;
+    nResMatRows = nExpandedRows;
 }
 
 bool ScJumpMatrix::HasResultMatrix() const
@@ -173,26 +175,39 @@ ScRefList& ScJumpMatrix::GetRefList()
 
 void ScJumpMatrix::FlushBufferOtherThan( ScJumpMatrix::BufferType eType, SCSIZE nC, SCSIZE nR )
 {
-    if (!mvBufferDoubles.empty() &&
-            (eType != BUFFER_DOUBLE || nC != mnBufferCol || nR != mnBufferRowStart + mvBufferDoubles.size()))
+    const auto aRequestedCoordinate = spreadsheetengine::core::matrix::makeCoordinate(nC, nR);
+    if (spreadsheetengine::core::jumpmatrix::shouldFlushBufferedWindow(
+            spreadsheetengine::core::jumpmatrix::makeBufferWindow(
+                spreadsheetengine::core::matrix::makeCoordinate(mnBufferCol, mnBufferRowStart),
+                static_cast<spreadsheetengine::api::MatrixSize>(mvBufferDoubles.size())),
+            eType == BUFFER_DOUBLE, aRequestedCoordinate))
     {
         pMat->PutDoubleVector( mvBufferDoubles, mnBufferCol, mnBufferRowStart);
         mvBufferDoubles.clear();
     }
-    if (!mvBufferStrings.empty() &&
-            (eType != BUFFER_STRING || nC != mnBufferCol || nR != mnBufferRowStart + mvBufferStrings.size()))
+    if (spreadsheetengine::core::jumpmatrix::shouldFlushBufferedWindow(
+            spreadsheetengine::core::jumpmatrix::makeBufferWindow(
+                spreadsheetengine::core::matrix::makeCoordinate(mnBufferCol, mnBufferRowStart),
+                static_cast<spreadsheetengine::api::MatrixSize>(mvBufferStrings.size())),
+            eType == BUFFER_STRING, aRequestedCoordinate))
     {
         pMat->PutStringVector( mvBufferStrings, mnBufferCol, mnBufferRowStart);
         mvBufferStrings.clear();
     }
-    if (mnBufferEmptyCount &&
-            (eType != BUFFER_EMPTY || nC != mnBufferCol || nR != mnBufferRowStart + mnBufferEmptyCount))
+    if (spreadsheetengine::core::jumpmatrix::shouldFlushBufferedWindow(
+            spreadsheetengine::core::jumpmatrix::makeBufferWindow(
+                spreadsheetengine::core::matrix::makeCoordinate(mnBufferCol, mnBufferRowStart),
+                static_cast<spreadsheetengine::api::MatrixSize>(mnBufferEmptyCount)),
+            eType == BUFFER_EMPTY, aRequestedCoordinate))
     {
         pMat->PutEmptyVector( mnBufferEmptyCount, mnBufferCol, mnBufferRowStart);
         mnBufferEmptyCount = 0;
     }
-    if (mnBufferEmptyPathCount &&
-            (eType != BUFFER_EMPTYPATH || nC != mnBufferCol || nR != mnBufferRowStart + mnBufferEmptyPathCount))
+    if (spreadsheetengine::core::jumpmatrix::shouldFlushBufferedWindow(
+            spreadsheetengine::core::jumpmatrix::makeBufferWindow(
+                spreadsheetengine::core::matrix::makeCoordinate(mnBufferCol, mnBufferRowStart),
+                static_cast<spreadsheetengine::api::MatrixSize>(mnBufferEmptyPathCount)),
+            eType == BUFFER_EMPTYPATH, aRequestedCoordinate))
     {
         pMat->PutEmptyPathVector( mnBufferEmptyPathCount, mnBufferCol, mnBufferRowStart);
         mnBufferEmptyPathCount = 0;
@@ -201,72 +216,86 @@ void ScJumpMatrix::FlushBufferOtherThan( ScJumpMatrix::BufferType eType, SCSIZE 
 
 ScMatrix* ScJumpMatrix::GetResultMatrix()
 {
-    if (nResMatRows >= kBufferThreshold)
+    if (spreadsheetengine::core::jumpmatrix::shouldBufferResultWrites(
+            spreadsheetengine::core::matrix::makeDimensions(nResMatCols, nResMatRows),
+            kBufferThreshold))
         FlushBufferOtherThan( BUFFER_NONE, 0, 0);
     return pMat.get();
 }
 
 void ScJumpMatrix::PutResultDouble( double fVal, SCSIZE nC, SCSIZE nR )
 {
-    if (nResMatRows < kBufferThreshold)
+    const auto aPlan = spreadsheetengine::core::jumpmatrix::planBufferedResultWrite(
+        spreadsheetengine::core::matrix::makeDimensions(nResMatCols, nResMatRows), kBufferThreshold,
+        spreadsheetengine::core::jumpmatrix::makeBufferWindow(
+            spreadsheetengine::core::matrix::makeCoordinate(mnBufferCol, mnBufferRowStart),
+            static_cast<spreadsheetengine::api::MatrixSize>(mvBufferDoubles.size())),
+        spreadsheetengine::core::matrix::makeCoordinate(nC, nR));
+    if (!aPlan.mbBufferWrite)
         pMat->PutDouble( fVal, nC, nR);
     else
     {
         FlushBufferOtherThan( BUFFER_DOUBLE, nC, nR);
-        if (mvBufferDoubles.empty())
-        {
-            mnBufferCol = nC;
-            mnBufferRowStart = nR;
-        }
+        mnBufferCol = aPlan.maWindow.maStart.mnColumn;
+        mnBufferRowStart = aPlan.maWindow.maStart.mnRow;
         mvBufferDoubles.push_back( fVal);
     }
 }
 
 void ScJumpMatrix::PutResultString( const svl::SharedString& rStr, SCSIZE nC, SCSIZE nR )
 {
-    if (nResMatRows < kBufferThreshold)
+    const auto aPlan = spreadsheetengine::core::jumpmatrix::planBufferedResultWrite(
+        spreadsheetengine::core::matrix::makeDimensions(nResMatCols, nResMatRows), kBufferThreshold,
+        spreadsheetengine::core::jumpmatrix::makeBufferWindow(
+            spreadsheetengine::core::matrix::makeCoordinate(mnBufferCol, mnBufferRowStart),
+            static_cast<spreadsheetengine::api::MatrixSize>(mvBufferStrings.size())),
+        spreadsheetengine::core::matrix::makeCoordinate(nC, nR));
+    if (!aPlan.mbBufferWrite)
         pMat->PutString( rStr, nC, nR);
     else
     {
         FlushBufferOtherThan( BUFFER_STRING, nC, nR);
-        if (mvBufferStrings.empty())
-        {
-            mnBufferCol = nC;
-            mnBufferRowStart = nR;
-        }
+        mnBufferCol = aPlan.maWindow.maStart.mnColumn;
+        mnBufferRowStart = aPlan.maWindow.maStart.mnRow;
         mvBufferStrings.push_back( rStr);
     }
 }
 
 void ScJumpMatrix::PutResultEmpty( SCSIZE nC, SCSIZE nR )
 {
-    if (nResMatRows < kBufferThreshold)
+    const auto aPlan = spreadsheetengine::core::jumpmatrix::planBufferedResultWrite(
+        spreadsheetengine::core::matrix::makeDimensions(nResMatCols, nResMatRows), kBufferThreshold,
+        spreadsheetengine::core::jumpmatrix::makeBufferWindow(
+            spreadsheetengine::core::matrix::makeCoordinate(mnBufferCol, mnBufferRowStart),
+            static_cast<spreadsheetengine::api::MatrixSize>(mnBufferEmptyCount)),
+        spreadsheetengine::core::matrix::makeCoordinate(nC, nR));
+    if (!aPlan.mbBufferWrite)
         pMat->PutEmpty( nC, nR);
     else
     {
         FlushBufferOtherThan( BUFFER_EMPTY, nC, nR);
-        if (!mnBufferEmptyCount)
-        {
-            mnBufferCol = nC;
-            mnBufferRowStart = nR;
-        }
-        ++mnBufferEmptyCount;
+        mnBufferCol = aPlan.maWindow.maStart.mnColumn;
+        mnBufferRowStart = aPlan.maWindow.maStart.mnRow;
+        mnBufferEmptyCount = aPlan.maWindow.mnCount;
     }
 }
 
 void ScJumpMatrix::PutResultEmptyPath( SCSIZE nC, SCSIZE nR )
 {
-    if (nResMatRows < kBufferThreshold)
+    const auto aPlan = spreadsheetengine::core::jumpmatrix::planBufferedResultWrite(
+        spreadsheetengine::core::matrix::makeDimensions(nResMatCols, nResMatRows), kBufferThreshold,
+        spreadsheetengine::core::jumpmatrix::makeBufferWindow(
+            spreadsheetengine::core::matrix::makeCoordinate(mnBufferCol, mnBufferRowStart),
+            static_cast<spreadsheetengine::api::MatrixSize>(mnBufferEmptyPathCount)),
+        spreadsheetengine::core::matrix::makeCoordinate(nC, nR));
+    if (!aPlan.mbBufferWrite)
         pMat->PutEmptyPath( nC, nR);
     else
     {
         FlushBufferOtherThan( BUFFER_EMPTYPATH, nC, nR);
-        if (!mnBufferEmptyPathCount)
-        {
-            mnBufferCol = nC;
-            mnBufferRowStart = nR;
-        }
-        ++mnBufferEmptyPathCount;
+        mnBufferCol = aPlan.maWindow.maStart.mnColumn;
+        mnBufferRowStart = aPlan.maWindow.maStart.mnRow;
+        mnBufferEmptyPathCount = aPlan.maWindow.mnCount;
     }
 }
 
