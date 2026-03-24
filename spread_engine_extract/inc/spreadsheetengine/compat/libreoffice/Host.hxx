@@ -32,6 +32,18 @@ inline ScAddress toLibreOfficeAddress(const spreadsheetengine::api::CellAddress&
     return ScAddress(rAddress.mnColumn, rAddress.mnRow, rAddress.mnSheet);
 }
 
+inline spreadsheetengine::api::NumberParseResult::Kind toApiParseKind(SvNumFormatType eType)
+{
+    const auto eMaskedType = eType & ~SvNumFormatType::DEFINED;
+    if (eMaskedType == SvNumFormatType::DATE)
+        return spreadsheetengine::api::NumberParseResult::Kind::Date;
+    if (eMaskedType == SvNumFormatType::TIME)
+        return spreadsheetengine::api::NumberParseResult::Kind::Time;
+    if (eMaskedType == SvNumFormatType::DATETIME)
+        return spreadsheetengine::api::NumberParseResult::Kind::DateTime;
+    return spreadsheetengine::api::NumberParseResult::Kind::Number;
+}
+
 class DocumentEvaluationHost final : public spreadsheetengine::api::EvaluationHost
 {
     const ScDocument& mrDoc;
@@ -163,22 +175,29 @@ public:
     }
 
     [[nodiscard]] spreadsheetengine::api::ValueResult<spreadsheetengine::api::NumberParseResult>
-    parseNumber(spreadsheetengine::api::StringView rValue) const override
+    parseNumber(spreadsheetengine::api::StringView rValue,
+        spreadsheetengine::api::NumberParseMode eMode = spreadsheetengine::api::NumberParseMode::General) const override
     {
         sal_uInt32 nFormat = 0;
         double fValue = 0.0;
         const OUString aString = toLibreOfficeString(spreadsheetengine::api::String(rValue));
+        const SvNumInputOptions eInputOptions = eMode == spreadsheetengine::api::NumberParseMode::LaxTime
+                                                    ? SvNumInputOptions::LAX_TIME
+                                                    : SvNumInputOptions::NONE;
         const bool bParsed = mpContext
-                                 ? mpContext->NFIsNumberFormat(aString, nFormat, fValue)
-                                 : mrDoc.GetFormatTable()->IsNumberFormat(aString, nFormat, fValue);
+                                 ? mpContext->NFIsNumberFormat(aString, nFormat, fValue, eInputOptions)
+                                 : mrDoc.GetFormatTable()->IsNumberFormat(
+                                       aString, nFormat, fValue, eInputOptions);
         if (!bParsed)
         {
             return spreadsheetengine::api::ValueResult<spreadsheetengine::api::NumberParseResult>::failure(
                 spreadsheetengine::api::Error::NoValue);
         }
 
+        const SvNumFormatType eType
+            = mpContext ? mpContext->NFGetType(nFormat) : mrDoc.GetFormatTable()->GetType(nFormat);
         return spreadsheetengine::api::ValueResult<spreadsheetengine::api::NumberParseResult>::success(
-            { fValue, nFormat });
+            { fValue, nFormat, toApiParseKind(eType) });
     }
 
     [[nodiscard]] spreadsheetengine::api::ValueResult<spreadsheetengine::api::String> formatNumber(

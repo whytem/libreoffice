@@ -14,6 +14,8 @@
 #include <formula/errorcodes.hxx>
 #include <interpretercontext.hxx>
 #include <spreadsheetengine/compat/libreoffice/Host.hxx>
+#include <spreadsheetengine/api/Host.hxx>
+#include <spreadsheetengine/api/Parsing.hxx>
 #include <spreadsheetengine/core/HostValueAccess.hxx>
 
 #include <cmath>
@@ -252,7 +254,7 @@ OUString makeDateFormula(std::string_view rToken)
 
 void setTextCell(ScDocument* pDoc, SCCOL nCol, const OUString& rValue)
 {
-    pDoc->SetString(ScAddress(nCol, 0, 0), rValue);
+    pDoc->SetTextCell(ScAddress(nCol, 0, 0), rValue);
 }
 
 void setValueCell(ScDocument* pDoc, SCCOL nCol, double fValue)
@@ -362,6 +364,8 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testCalcHostAdapter)
     const auto aParsedNumber = aHost.parseNumber(u"42.5");
     CPPUNIT_ASSERT(aParsedNumber);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(42.5, aParsedNumber.maValue.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::NumberParseResult::Kind::Number, aParsedNumber.maValue.meKind);
 
     const auto aNotNumber = aHost.parseNumber(u"hello");
     CPPUNIT_ASSERT(!aNotNumber);
@@ -378,6 +382,25 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testCalcHostAdapter)
     const auto aContextParsedNumber = aContextHost.parseNumber(u"42.5");
     CPPUNIT_ASSERT(aContextParsedNumber);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(42.5, aContextParsedNumber.maValue.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::NumberParseResult::Kind::Number,
+        aContextParsedNumber.maValue.meKind);
+
+    const auto aContextParsedDate = aContextHost.parseNumber(u"1954-07-20");
+    CPPUNIT_ASSERT(aContextParsedDate);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::NumberParseResult::Kind::Date, aContextParsedDate.maValue.meKind);
+
+    const auto aContextParsedDateTime = aContextHost.parseNumber(u"1954-07-20 16:30:01");
+    CPPUNIT_ASSERT(aContextParsedDateTime);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::NumberParseResult::Kind::DateTime,
+        aContextParsedDateTime.maValue.meKind);
+
+    const auto aContextParsedTime = aContextHost.parseNumber(
+        u"16:30:01", spreadsheetengine::api::NumberParseMode::LaxTime);
+    CPPUNIT_ASSERT(aContextParsedTime);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::NumberParseResult::Kind::Time, aContextParsedTime.maValue.meKind);
 
     const auto aContextFormattedNumber = aContextHost.formatNumber(42.5);
     CPPUNIT_ASSERT(aContextFormattedNumber);
@@ -430,6 +453,53 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testCalcHostAdapter)
         aHost, aTextNumberView.maValue);
     CPPUNIT_ASSERT(aCoercedViewNumber);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(42.5, aCoercedViewNumber.maValue.mfValue, 1e-12);
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testLocaleParsingSharedCases)
+{
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"LocaleParsing"_ustr);
+
+    for (const auto& rRow : loadSharedCaseRows("locale_parsing_cases.tsv"))
+    {
+        clearRange(m_pDoc, ScRange(0, 0, 0, 5, 5, 0));
+        CPPUNIT_ASSERT_MESSAGE(
+            failSharedCase(rRow, "locale parsing shared case column mismatch").c_str(),
+            rRow.maColumns.size() >= 6);
+
+        const auto& rFunction = rRow.maColumns[0];
+        const auto aInput = decodeUtf8TestString(rRow.maColumns[1]);
+        const FormulaError eExpectedError = parseExpectedError(rRow.maColumns[5]);
+        setTextCell(m_pDoc, 0, aInput);
+
+        OUString aFormula;
+        if (rFunction == "VALUE")
+            aFormula = u"=VALUE(A1)"_ustr;
+        else if (rFunction == "DATEVALUE")
+            aFormula = u"=DATEVALUE(A1)"_ustr;
+        else if (rFunction == "TIMEVALUE")
+            aFormula = u"=TIMEVALUE(A1)"_ustr;
+        else
+            CPPUNIT_FAIL(failSharedCase(rRow, "unknown locale parsing function").c_str());
+
+        if (eExpectedError != FormulaError::NONE)
+        {
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                failSharedCase(rRow, "locale parsing error mismatch").c_str(), eExpectedError,
+                evaluateFormulaError(m_pDoc, aFormula));
+        }
+        else
+        {
+            const ScAddress aFormulaPos(5, 0, 0);
+            m_pDoc->SetString(aFormulaPos, aFormula);
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                failSharedCase(rRow, "locale parsing unexpected error").c_str(),
+                FormulaError::NONE, m_pDoc->GetErrCode(aFormulaPos));
+            CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(
+                failSharedCase(rRow, "locale parsing value mismatch").c_str(),
+                parseDouble(rRow.maColumns[4]), m_pDoc->GetValue(aFormulaPos), 1e-12);
+        }
+    }
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testNumeralSharedCases)

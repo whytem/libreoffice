@@ -41,6 +41,8 @@ SPREADSHEETENGINE_DLLPUBLIC double extractHour(double fTimeValue);
 SPREADSHEETENGINE_DLLPUBLIC std::optional<double> makeTimeSerial(
     double fHour, double fMinute, double fSecond);
 
+SPREADSHEETENGINE_DLLPUBLIC double normalizeTimeFraction(double fTimeInDays);
+
 SPREADSHEETENGINE_DLLPUBLIC std::optional<double> computeEasterSundaySerial(
     const spreadsheetengine::api::DateParts& rNullDate, sal_Int16 nYear);
 

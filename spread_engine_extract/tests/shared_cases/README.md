@@ -11,6 +11,8 @@ Current usage:
   test binaries
 - Calc-side coverage runs the spreadsheet-facing rows from
   `CppunitTest_sc_ucalc_shared_cases`
+- locale-aware spreadsheet parsing parity currently lives in
+  `locale_parsing_cases.tsv` and runs in both lanes
 
 Some rows may temporarily remain standalone-only when they exercise
 helper-layer contracts that do not yet map 1:1 onto spreadsheet-facing Calc

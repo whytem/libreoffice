@@ -196,6 +196,35 @@ std::optional<double> makeTimeSerial(double fHour, double fMinute, double fSecon
     return fTime;
 }
 
+double normalizeTimeFraction(double fTimeInDays)
+{
+    constexpr sal_uInt64 nNanoSecondsPerSecond = 1000000000ULL;
+    constexpr sal_uInt64 nNanoSecondsPerDay = 86400ULL * nNanoSecondsPerSecond;
+    constexpr sal_uInt64 nAccuracyEpsilonNanoseconds = 300ULL;
+
+    const double fTime = fTimeInDays - rtl::math::approxFloor(fTimeInDays);
+    if (fTime <= 0.0 || fTime >= 1.0)
+        return 0.0;
+
+    sal_Int64 nNanoSeconds
+        = static_cast<sal_Int64>(rtl::math::approxFloor(fTime * nNanoSecondsPerDay));
+    const sal_Int64 nRemainder = nNanoSeconds % static_cast<sal_Int64>(nNanoSecondsPerSecond);
+    if (nRemainder)
+    {
+        const sal_uInt64 nDistance = std::abs(nRemainder);
+        if (nDistance <= nAccuracyEpsilonNanoseconds)
+            nNanoSeconds -= nRemainder;
+        else if (nDistance >= nNanoSecondsPerSecond - nAccuracyEpsilonNanoseconds)
+        {
+            nNanoSeconds += static_cast<sal_Int64>(nNanoSecondsPerSecond - nDistance);
+            if (nNanoSeconds >= static_cast<sal_Int64>(nNanoSecondsPerDay))
+                nNanoSeconds %= static_cast<sal_Int64>(nNanoSecondsPerDay);
+        }
+    }
+
+    return static_cast<double>(nNanoSeconds) / static_cast<double>(nNanoSecondsPerDay);
+}
+
 std::optional<double> computeEasterSundaySerial(
     const spreadsheetengine::api::DateParts& rNullDate, sal_Int16 nYear)
 {

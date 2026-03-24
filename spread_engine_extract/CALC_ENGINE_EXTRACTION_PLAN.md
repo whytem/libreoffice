@@ -857,6 +857,18 @@ Current status:
 - the next meaningful work should move to pass 4:
   - locale-aware text and date parsing, using the host contracts that are now
     in place
+- pass 4 is now substantially complete for the first spreadsheet-facing parsing slice:
+  - the host contract now distinguishes parsed number/date/time/datetime results
+    and supports the `LAX_TIME` parse mode needed by `TIMEVALUE`
+  - engine-owned parsing helpers now cover spreadsheet-facing `VALUE`,
+    `DATEVALUE`, and `TIMEVALUE` behavior over the host interface
+  - Calc now consumes those helpers while keeping wider interpreter and
+    workbook orchestration local
+  - parity coverage now includes a shared TSV dataset for locale-aware parsing
+    that runs in both the standalone suite and `CppunitTest_sc_ucalc_shared_cases`
+  - the main remaining pass 4 leftovers are broader `ConvertStringToValue()`
+    and formula-wide coercion paths that touch more than the direct
+    spreadsheet-facing parsing functions
 
 Validation:
 

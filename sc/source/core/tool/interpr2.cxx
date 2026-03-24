@@ -28,7 +28,6 @@
 #include <sfx2/objsh.hxx>
 #include <svl/numformat.hxx>
 #include <svl/zforlist.hxx>
-#include <tools/duration.hxx>
 #include <sal/macros.h>
 #include <osl/diagnose.h>
 
@@ -47,9 +46,11 @@
 #include <stlpool.hxx>
 #include <stlsheet.hxx>
 #include <dpcache.hxx>
+#include <spreadsheetengine/api/Parsing.hxx>
 #include <spreadsheetengine/core/DateTimeParts.hxx>
 #include <spreadsheetengine/core/DateTimeWeek.hxx>
 #include <spreadsheetengine/core/DateTimeWorkday.hxx>
+#include <spreadsheetengine/compat/libreoffice/Host.hxx>
 #include <spreadsheetengine/core/MathFinancial.hxx>
 #include <spreadsheetengine/core/MathRounding.hxx>
 #include <spreadsheetengine/core/MathScalar.hxx>
@@ -180,18 +181,13 @@ void ScInterpreter::ScGetHour()
 void ScInterpreter::ScGetDateValue()
 {
     OUString aInputString = GetString().getString();
-    sal_uInt32 nFIndex = 0;                 // for a default country/language
-    double fVal;
-    if (mrContext.NFIsNumberFormat(aInputString, nFIndex, fVal))
+    selibreoffice::DocumentEvaluationHost aHost(mrDoc, mrContext);
+    const auto aResult = spreadsheetengine::api::parsing::dateValueFromText(
+        aHost, selibreoffice::toApiString(aInputString));
+    if (aResult)
     {
-        SvNumFormatType eType = mrContext.NFGetType(nFIndex);
-        if (eType == SvNumFormatType::DATE || eType == SvNumFormatType::DATETIME)
-        {
-            nFuncFmtType = SvNumFormatType::DATE;
-            PushDouble(::rtl::math::approxFloor(fVal));
-        }
-        else
-            PushIllegalArgument();
+        nFuncFmtType = SvNumFormatType::DATE;
+        PushDouble(aResult.maValue);
     }
     else
         PushIllegalArgument();
@@ -564,21 +560,13 @@ void ScInterpreter::ScGetDateDif()
 void ScInterpreter::ScGetTimeValue()
 {
     OUString aInputString = GetString().getString();
-    sal_uInt32 nFIndex = 0;                 // damit default Land/Spr.
-    double fVal;
-    if (mrContext.NFIsNumberFormat(aInputString, nFIndex, fVal, SvNumInputOptions::LAX_TIME))
+    selibreoffice::DocumentEvaluationHost aHost(mrDoc, mrContext);
+    const auto aResult = spreadsheetengine::api::parsing::timeValueFromText(
+        aHost, selibreoffice::toApiString(aInputString));
+    if (aResult)
     {
-        SvNumFormatType eType = mrContext.NFGetType(nFIndex);
-        if (eType == SvNumFormatType::TIME || eType == SvNumFormatType::DATETIME)
-        {
-            nFuncFmtType = SvNumFormatType::TIME;
-            double fDateVal = rtl::math::approxFloor(fVal);
-            double fTimeVal = fVal - fDateVal;
-            fTimeVal = ::tools::Duration(fTimeVal).GetInDays();  // force corrected
-            PushDouble(fTimeVal);
-        }
-        else
-            PushIllegalArgument();
+        nFuncFmtType = SvNumFormatType::TIME;
+        PushDouble(aResult.maValue);
     }
     else
         PushIllegalArgument();

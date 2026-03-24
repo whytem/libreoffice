@@ -74,8 +74,22 @@ struct NumberParseResult
 {
     double mfValue = 0.0;
     FormatIndex mnFormat = 0;
+    enum class Kind : sal_uInt8
+    {
+        Number,
+        Date,
+        Time,
+        DateTime
+    };
+    Kind meKind = Kind::Number;
 
     [[nodiscard]] constexpr bool operator==(const NumberParseResult& rOther) const = default;
+};
+
+enum class NumberParseMode : sal_uInt8
+{
+    General,
+    LaxTime
 };
 
 struct ResolvedReference
@@ -233,7 +247,8 @@ class TextCoercion
 public:
     virtual ~TextCoercion() = default;
 
-    [[nodiscard]] virtual ValueResult<NumberParseResult> parseNumber(StringView rValue) const = 0;
+    [[nodiscard]] virtual ValueResult<NumberParseResult> parseNumber(
+        StringView rValue, NumberParseMode eMode = NumberParseMode::General) const = 0;
 };
 
 class ValueFormatting

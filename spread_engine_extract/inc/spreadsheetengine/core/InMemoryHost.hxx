@@ -30,7 +30,7 @@ class InMemoryEvaluationHost final : public api::EvaluationHost
     std::vector<Sheet> maSheets;
     api::DateParts maNullDate { 1899, 12, 30 };
     api::String maLocaleTag;
-    std::map<api::String, api::NumberParseResult> maParsedNumbers;
+    std::map<std::pair<api::String, api::NumberParseMode>, api::NumberParseResult> maParsedNumbers;
     std::map<std::pair<double, api::FormatIndex>, api::String> maFormattedNumbers;
 
     [[nodiscard]] const Sheet* getSheet(api::SheetId nSheet) const
@@ -58,10 +58,11 @@ public:
 
     void setLocaleTag(api::StringView rLocaleTag) { maLocaleTag = api::String(rLocaleTag); }
 
-    void setParsedNumber(
-        api::StringView rText, double fValue, api::FormatIndex nFormat = 0)
+    void setParsedNumber(api::StringView rText, double fValue, api::FormatIndex nFormat = 0,
+        api::NumberParseResult::Kind eKind = api::NumberParseResult::Kind::Number,
+        api::NumberParseMode eMode = api::NumberParseMode::General)
     {
-        maParsedNumbers[api::String(rText)] = { fValue, nFormat };
+        maParsedNumbers[{ api::String(rText), eMode }] = { fValue, nFormat, eKind };
     }
 
     void setFormattedNumber(
@@ -140,11 +141,17 @@ public:
     }
 
     [[nodiscard]] api::ValueResult<api::NumberParseResult> parseNumber(
-        api::StringView rValue) const override
+        api::StringView rValue, api::NumberParseMode eMode = api::NumberParseMode::General) const override
     {
-        const auto aIt = maParsedNumbers.find(api::String(rValue));
+        const auto aKey = std::make_pair(api::String(rValue), eMode);
+        auto aIt = maParsedNumbers.find(aKey);
+        if (aIt == maParsedNumbers.end() && eMode != api::NumberParseMode::General)
+            aIt = maParsedNumbers.find(
+                std::make_pair(api::String(rValue), api::NumberParseMode::General));
         if (aIt == maParsedNumbers.end())
+        {
             return api::ValueResult<api::NumberParseResult>::failure(api::Error::NoValue);
+        }
 
         return api::ValueResult<api::NumberParseResult>::success(aIt->second);
     }

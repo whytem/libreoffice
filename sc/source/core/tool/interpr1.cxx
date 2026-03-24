@@ -59,9 +59,11 @@
 #include <lookupcache.hxx>
 #include <rangenam.hxx>
 #include <spreadsheetengine/api/Logic.hxx>
+#include <spreadsheetengine/api/Parsing.hxx>
 #include <spreadsheetengine/core/MathBitwise.hxx>
 #include <spreadsheetengine/core/MathTranscendental.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
+#include <spreadsheetengine/compat/libreoffice/Host.hxx>
 #include <spreadsheetengine/core/TextCase.hxx>
 #include <spreadsheetengine/core/TextScalar.hxx>
 #include <spreadsheetengine/core/TextWidth.hxx>
@@ -3424,9 +3426,11 @@ void ScInterpreter::ScValue()
             break;
     }
 
-    sal_uInt32 nFIndex = 0;     // 0 for default locale
-    if (mrContext.NFIsNumberFormat(aInputString, nFIndex, fVal))
-        PushDouble(fVal);
+    selibreoffice::DocumentEvaluationHost aHost(mrDoc, mrContext);
+    const auto aResult = spreadsheetengine::api::parsing::valueFromText(
+        aHost, selibreoffice::toApiString(aInputString));
+    if (aResult)
+        PushDouble(aResult.maValue);
     else
         PushIllegalArgument();
 }

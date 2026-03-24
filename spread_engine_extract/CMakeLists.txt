@@ -82,6 +82,10 @@ add_spreadsheetengine_test(spreadsheetengine_logic_tests
     ${SPREADSHEETENGINE_STANDALONE_LOGIC_TEST_SOURCES}
 )
 
+add_spreadsheetengine_test(spreadsheetengine_parsing_tests
+    ${SPREADSHEETENGINE_STANDALONE_PARSING_TEST_SOURCES}
+)
+
 if(BUILD_TESTING)
     add_test(NAME spreadsheetengine_smoke COMMAND spreadsheetengine_smoke)
 endif()

@@ -156,7 +156,9 @@ int main()
 
     const auto aParsedNumber = aHost.parseNumber(u"42.5");
     if (!aParsedNumber || !almostEqual(aParsedNumber.maValue.mfValue, 42.5)
-        || aParsedNumber.maValue.mnFormat != 11)
+        || aParsedNumber.maValue.mnFormat != 11
+        || aParsedNumber.maValue.meKind
+               != spreadsheetengine::api::NumberParseResult::Kind::Number)
     {
         return fail("spreadsheetengine_host_tests", "parseNumber() mismatch");
     }
