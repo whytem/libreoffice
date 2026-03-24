@@ -29,11 +29,17 @@ add_executable(spreadsheetengine_smoke
 )
 
 target_compile_features(spreadsheetengine_smoke PRIVATE cxx_std_20)
+target_compile_definitions(spreadsheetengine_smoke
+    PRIVATE SPREADSHEETENGINE_TEST_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+)
 target_link_libraries(spreadsheetengine_smoke PRIVATE spreadsheetengine::core)
 
 function(add_spreadsheetengine_test target_name)
     add_executable(${target_name} ${ARGN})
     target_compile_features(${target_name} PRIVATE cxx_std_20)
+    target_compile_definitions(${target_name}
+        PRIVATE SPREADSHEETENGINE_TEST_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+    )
     target_link_libraries(${target_name} PRIVATE spreadsheetengine::core)
     if(BUILD_TESTING)
         add_test(NAME ${target_name} COMMAND ${target_name})

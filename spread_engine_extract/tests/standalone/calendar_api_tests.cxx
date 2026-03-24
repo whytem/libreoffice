@@ -8,6 +8,7 @@
 #include <spreadsheetengine/api/Error.hxx>
 #include <spreadsheetengine/api/Workday.hxx>
 
+#include "SharedCaseSupport.hxx"
 #include "TestSupport.hxx"
 
 int main()
@@ -127,6 +128,319 @@ int main()
         || !almostEqual(aDateDifYM.maValue, 2.0))
     {
         return fail("spreadsheetengine_calendar_tests", "dateDif() mismatch");
+    }
+
+    const auto maskToString = [](const spreadsheetengine::api::WeekendMask& rMask) {
+        std::string aMask(7, '0');
+        for (std::size_t i = 0; i < rMask.size(); ++i)
+            aMask[i] = rMask[i] ? '1' : '0';
+        return aMask;
+    };
+
+    const auto parseDateSerialToken = [&](std::string_view rToken) -> std::optional<DateSerial> {
+        if (rToken.empty())
+            return std::nullopt;
+        if (rToken.find('-') == std::string_view::npos)
+        {
+            return static_cast<DateSerial>(
+                spreadsheetengine::standalone::test::parseDouble(rToken));
+        }
+
+        const std::string aToken(rToken);
+        const std::size_t nDash1 = aToken.find('-');
+        const std::size_t nDash2 = aToken.find('-', nDash1 + 1);
+        if (nDash1 == std::string::npos || nDash2 == std::string::npos)
+            return std::nullopt;
+
+        const auto aSerial = makeDateSerial(
+            aNullDate, static_cast<sal_Int16>(std::stoi(aToken.substr(0, nDash1))),
+            static_cast<sal_Int16>(std::stoi(aToken.substr(nDash1 + 1, nDash2 - nDash1 - 1))),
+            static_cast<sal_Int16>(std::stoi(aToken.substr(nDash2 + 1))), true);
+        if (!aSerial)
+            return std::nullopt;
+        return static_cast<DateSerial>(aSerial.maValue);
+    };
+
+    const auto parseHolidayList = [&](std::string_view rToken) {
+        std::vector<DateSerial> aHolidays;
+        std::size_t nStart = 0;
+        while (nStart < rToken.size())
+        {
+            const std::size_t nComma = rToken.find(',', nStart);
+            const auto aPart = rToken.substr(
+                nStart, nComma == std::string_view::npos ? rToken.size() - nStart : nComma - nStart);
+            if (!aPart.empty())
+            {
+                const auto oSerial = parseDateSerialToken(aPart);
+                if (!oSerial)
+                    return std::optional<std::vector<DateSerial>>();
+                aHolidays.push_back(*oSerial);
+            }
+
+            if (nComma == std::string_view::npos)
+                break;
+            nStart = nComma + 1;
+        }
+
+        return std::optional<std::vector<DateSerial>>(aHolidays);
+    };
+
+    for (const auto& rRow :
+         spreadsheetengine::standalone::test::loadSharedCaseRows("calendar_cases.tsv"))
+    {
+        if (rRow.maColumns.size() < 7)
+        {
+            return failSharedCase(
+                "spreadsheetengine_calendar_tests", rRow, "calendar shared case column mismatch");
+        }
+
+        const auto& rFunction = rRow.maColumns[0];
+        if (rFunction == "DATE")
+        {
+            const auto aResult = makeDateSerial(
+                aNullDate, static_cast<sal_Int16>(spreadsheetengine::standalone::test::parseDouble(
+                               rRow.maColumns[1])),
+                static_cast<sal_Int16>(spreadsheetengine::standalone::test::parseDouble(
+                    rRow.maColumns[2])),
+                static_cast<sal_Int16>(spreadsheetengine::standalone::test::parseDouble(
+                    rRow.maColumns[3])),
+                rRow.maColumns[4] == "STRICT");
+            if (!aResult
+                || !almostEqual(
+                    aResult.maValue,
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase("spreadsheetengine_calendar_tests", rRow, "DATE mismatch");
+            }
+        }
+        else if (rFunction == "YEARFROM")
+        {
+            if (!almostEqual(yearFromSerial(
+                                 aNullDate, static_cast<DateSerial>(spreadsheetengine::standalone::test::parseDouble(
+                                                rRow.maColumns[1]))),
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_calendar_tests", rRow, "YEARFROM mismatch");
+            }
+        }
+        else if (rFunction == "MONTHFROM")
+        {
+            if (!almostEqual(monthFromSerial(
+                                 aNullDate, static_cast<DateSerial>(spreadsheetengine::standalone::test::parseDouble(
+                                                rRow.maColumns[1]))),
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_calendar_tests", rRow, "MONTHFROM mismatch");
+            }
+        }
+        else if (rFunction == "DAYFROM")
+        {
+            const auto aResult = dayFromSerial(
+                aNullDate, static_cast<DateSerial>(
+                               spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1])));
+            if (!aResult
+                || !almostEqual(
+                    aResult.maValue,
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_calendar_tests", rRow, "DAYFROM mismatch");
+            }
+        }
+        else if (rFunction == "TIME")
+        {
+            const auto aResult = makeTimeSerial(
+                spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2]),
+                spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[3]));
+            if (!aResult
+                || !almostEqual(
+                    aResult.maValue,
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase("spreadsheetengine_calendar_tests", rRow, "TIME mismatch");
+            }
+        }
+        else if (rFunction == "WEEKDAY")
+        {
+            const auto aResult = dayOfWeek(
+                aNullDate, static_cast<DateSerial>(
+                               spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1])),
+                static_cast<sal_Int16>(
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])));
+            if (!aResult
+                || aResult.maValue
+                       != static_cast<int>(
+                           spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase("spreadsheetengine_calendar_tests", rRow, "WEEKDAY mismatch");
+            }
+        }
+        else if (rFunction == "WEEKNUM_OOO")
+        {
+            if (weeknumOOo(
+                    aNullDate,
+                    static_cast<DateSerial>(
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1])),
+                    static_cast<sal_Int16>(
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])))
+                != static_cast<int>(
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_calendar_tests", rRow, "WEEKNUM_OOO mismatch");
+            }
+        }
+        else if (rFunction == "ISOWEEKNUM")
+        {
+            const auto oDate = parseDateSerialToken(rRow.maColumns[1]);
+            if (!oDate
+                || isoWeekOfYear(aNullDate, *oDate)
+                       != static_cast<int>(
+                           spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_calendar_tests", rRow, "ISOWEEKNUM mismatch");
+            }
+        }
+        else if (rFunction == "EASTERSUNDAY")
+        {
+            const auto aResult = easterSundaySerial(
+                aNullDate, static_cast<sal_Int16>(
+                               spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1])));
+            const auto oExpectedSerial = parseDateSerialToken(rRow.maColumns[5]);
+            if (!aResult || !oExpectedSerial
+                || !almostEqual(aResult.maValue, static_cast<double>(*oExpectedSerial)))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_calendar_tests", rRow, "EASTERSUNDAY mismatch");
+            }
+        }
+        else if (rFunction == "DAYS360")
+        {
+            const auto oDate1 = parseDateSerialToken(rRow.maColumns[1]);
+            const auto oDate2 = parseDateSerialToken(rRow.maColumns[2]);
+            if (!oDate1 || !oDate2
+                || !almostEqual(
+                    diffDate360(aNullDate, *oDate1, *oDate2, false),
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase("spreadsheetengine_calendar_tests", rRow, "DAYS360 mismatch");
+            }
+        }
+        else if (rFunction == "DATEDIF")
+        {
+            const auto oDate1 = parseDateSerialToken(rRow.maColumns[1]);
+            const auto oDate2 = parseDateSerialToken(rRow.maColumns[2]);
+            const auto aResult = oDate1 && oDate2
+                                     ? dateDif(aNullDate, *oDate1, *oDate2,
+                                           spreadsheetengine::standalone::test::decodeUtf8TestString(
+                                               rRow.maColumns[3]))
+                                     : spreadsheetengine::api::ValueResult<double>::failure(
+                                           Error::IllegalArgument);
+            if (!aResult
+                || !almostEqual(
+                    aResult.maValue,
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase("spreadsheetengine_calendar_tests", rRow, "DATEDIF mismatch");
+            }
+        }
+        else
+        {
+            return failSharedCase(
+                "spreadsheetengine_calendar_tests", rRow, "unknown calendar shared-case function");
+        }
+    }
+
+    for (const auto& rRow :
+         spreadsheetengine::standalone::test::loadSharedCaseRows("workday_cases.tsv"))
+    {
+        if (rRow.maColumns.size() < 7)
+        {
+            return failSharedCase(
+                "spreadsheetengine_calendar_tests", rRow, "workday shared case column mismatch");
+        }
+
+        const auto& rFunction = rRow.maColumns[0];
+        const auto eExpectedError
+            = spreadsheetengine::standalone::test::parseExpectedError(rRow.maColumns[6]);
+
+        if (rFunction == "WEEKENDMASK.DEFAULT")
+        {
+            if (maskToString(defaultWeekendMask()) != rRow.maColumns[5])
+            {
+                return failSharedCase(
+                    "spreadsheetengine_calendar_tests", rRow, "WEEKENDMASK.DEFAULT mismatch");
+            }
+        }
+        else if (rFunction == "WEEKENDMASK.MS")
+        {
+            const auto aResult = weekendMaskFromMsSpec(
+                spreadsheetengine::standalone::test::decodeUtf8TestString(rRow.maColumns[1]),
+                spreadsheetengine::standalone::test::parseBool(rRow.maColumns[2]));
+            if (eExpectedError != Error::None)
+            {
+                if (aResult || aResult.meError != eExpectedError)
+                {
+                    return failSharedCase(
+                        "spreadsheetengine_calendar_tests", rRow,
+                        "WEEKENDMASK.MS error mismatch");
+                }
+            }
+            else if (!aResult || maskToString(aResult.maValue) != rRow.maColumns[5])
+            {
+                return failSharedCase(
+                    "spreadsheetengine_calendar_tests", rRow, "WEEKENDMASK.MS mismatch");
+            }
+        }
+        else if (rFunction == "NETWORKDAYS")
+        {
+            const auto oHolidays = parseHolidayList(rRow.maColumns[3]);
+            const auto aWeekendMask = weekendMaskFromMsSpec(
+                spreadsheetengine::standalone::test::decodeUtf8TestString(rRow.maColumns[4]),
+                false);
+            if (!oHolidays || !aWeekendMask
+                || countWorkdays(
+                       static_cast<DateSerial>(
+                           spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1])),
+                       static_cast<DateSerial>(
+                           spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])),
+                       *oHolidays, aWeekendMask.maValue)
+                       != static_cast<DateSerial>(
+                           spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_calendar_tests", rRow, "NETWORKDAYS mismatch");
+            }
+        }
+        else if (rFunction == "WORKDAY")
+        {
+            const auto oHolidays = parseHolidayList(rRow.maColumns[3]);
+            const auto aWeekendMask = weekendMaskFromMsSpec(
+                spreadsheetengine::standalone::test::decodeUtf8TestString(rRow.maColumns[4]),
+                true);
+            if (!oHolidays || !aWeekendMask
+                || advanceWorkday(
+                       static_cast<DateSerial>(
+                           spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1])),
+                       static_cast<DateSerial>(
+                           spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])),
+                       *oHolidays, aWeekendMask.maValue)
+                       != static_cast<DateSerial>(
+                           spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_calendar_tests", rRow, "WORKDAY mismatch");
+            }
+        }
+        else
+        {
+            return failSharedCase(
+                "spreadsheetengine_calendar_tests", rRow, "unknown workday shared-case function");
+        }
     }
 
     std::cout << "spreadsheetengine calendar api tests passed\n";

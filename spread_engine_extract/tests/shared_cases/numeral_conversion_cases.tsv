@@ -3,4 +3,4 @@ BASE	255	16	4	00FF
 DECIMAL	FF	16		255	
 ROMAN	1999			MCMXCIX	
 ARABIC	mcmxcix			1999	
-BASE	8	2	70000		StringOverflow
+BASE	8	2	70000		IllegalArgument

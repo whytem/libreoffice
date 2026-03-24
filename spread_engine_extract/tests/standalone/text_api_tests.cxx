@@ -5,6 +5,7 @@
 #include <spreadsheetengine/api/Error.hxx>
 #include <spreadsheetengine/api/Text.hxx>
 
+#include "SharedCaseSupport.hxx"
 #include "TestSupport.hxx"
 #include "TextTestDoubles.hxx"
 
@@ -69,6 +70,135 @@ int main()
         || spreadsheetengine::api::text::convertIntoHalfWidth(aWidthService, u"Ａ") != u"A")
     {
         return fail("spreadsheetengine_text_tests", "width conversion mismatch");
+    }
+
+    for (const auto& rRow :
+         spreadsheetengine::standalone::test::loadSharedCaseRows("text_cases.tsv"))
+    {
+        if (rRow.maColumns.size() < 7)
+            return failSharedCase(
+                "spreadsheetengine_text_tests", rRow, "text shared case column mismatch");
+
+        const auto& rFunction = rRow.maColumns[0];
+        const auto aInputA = spreadsheetengine::standalone::test::decodeUtf8TestString(rRow.maColumns[1]);
+        const auto aInputB = spreadsheetengine::standalone::test::decodeUtf8TestString(rRow.maColumns[2]);
+        const auto aInputC = spreadsheetengine::standalone::test::decodeUtf8TestString(rRow.maColumns[3]);
+        const auto aExpected
+            = spreadsheetengine::standalone::test::decodeUtf8TestString(rRow.maColumns[5]);
+        const auto eExpectedError
+            = spreadsheetengine::standalone::test::parseExpectedError(rRow.maColumns[6]);
+
+        if (rFunction == "TRIM")
+        {
+            if (spreadsheetengine::api::text::trimRepeatedSpaces(aInputA) != aExpected)
+                return failSharedCase("spreadsheetengine_text_tests", rRow, "TRIM mismatch");
+        }
+        else if (rFunction == "LEN")
+        {
+            if (spreadsheetengine::api::text::countCodePoints(aInputA)
+                != static_cast<sal_Int32>(
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase("spreadsheetengine_text_tests", rRow, "LEN mismatch");
+            }
+        }
+        else if (rFunction == "NUMBERVALUE")
+        {
+            const auto aResult = spreadsheetengine::api::text::parseNumberValue(
+                aInputA,
+                rRow.maColumns[2].empty() ? std::nullopt
+                                          : std::optional<spreadsheetengine::api::String>(aInputB),
+                rRow.maColumns[3].empty() ? std::nullopt
+                                          : std::optional<spreadsheetengine::api::String>(aInputC),
+                false);
+            if (eExpectedError != Error::None)
+            {
+                if (aResult || aResult.meError != eExpectedError)
+                {
+                    return failSharedCase(
+                        "spreadsheetengine_text_tests", rRow, "NUMBERVALUE error mismatch");
+                }
+            }
+            else if (!aResult
+                     || !almostEqual(
+                         aResult.maValue,
+                         spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_text_tests", rRow, "NUMBERVALUE value mismatch");
+            }
+        }
+        else if (rFunction == "CLEAN")
+        {
+            if (spreadsheetengine::api::text::cleanPrintable(aInputA) != aExpected)
+                return failSharedCase("spreadsheetengine_text_tests", rRow, "CLEAN mismatch");
+        }
+        else if (rFunction == "CODE")
+        {
+            if (spreadsheetengine::api::text::codeFromText(aEncodingService, aInputA)
+                != static_cast<sal_Int32>(
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase("spreadsheetengine_text_tests", rRow, "CODE mismatch");
+            }
+        }
+        else if (rFunction == "CHAR")
+        {
+            const auto aResult = spreadsheetengine::api::text::charFromValue(
+                aEncodingService,
+                spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]));
+            if (!aResult || aResult.maValue != aExpected)
+                return failSharedCase("spreadsheetengine_text_tests", rRow, "CHAR mismatch");
+        }
+        else if (rFunction == "UNICODE")
+        {
+            const auto aResult = spreadsheetengine::api::text::unicodeFromText(aInputA);
+            if (!aResult
+                || !almostEqual(
+                    aResult.maValue,
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
+            {
+                return failSharedCase("spreadsheetengine_text_tests", rRow, "UNICODE mismatch");
+            }
+        }
+        else if (rFunction == "UNICHAR")
+        {
+            const auto aResult = spreadsheetengine::api::text::unicharFromCodePoint(
+                static_cast<sal_uInt32>(
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1])));
+            if (!aResult || aResult.maValue != aExpected)
+                return failSharedCase("spreadsheetengine_text_tests", rRow, "UNICHAR mismatch");
+        }
+        else if (rFunction == "UPPER")
+        {
+            if (spreadsheetengine::api::text::uppercase(aCaseService, aInputA) != aExpected)
+                return failSharedCase("spreadsheetengine_text_tests", rRow, "UPPER mismatch");
+        }
+        else if (rFunction == "LOWER")
+        {
+            if (spreadsheetengine::api::text::lowercase(aCaseService, aInputA) != aExpected)
+                return failSharedCase("spreadsheetengine_text_tests", rRow, "LOWER mismatch");
+        }
+        else if (rFunction == "PROPER")
+        {
+            if (spreadsheetengine::api::text::propercase(aCaseService, aInputA) != aExpected)
+                return failSharedCase("spreadsheetengine_text_tests", rRow, "PROPER mismatch");
+        }
+        else if (rFunction == "ASC")
+        {
+            if (spreadsheetengine::api::text::convertIntoHalfWidth(aWidthService, aInputA) != aExpected)
+                return failSharedCase("spreadsheetengine_text_tests", rRow, "ASC mismatch");
+        }
+        else if (rFunction == "JIS")
+        {
+            if (spreadsheetengine::api::text::convertIntoFullWidth(aWidthService, aInputA) != aExpected)
+                return failSharedCase("spreadsheetengine_text_tests", rRow, "JIS mismatch");
+        }
+        else
+        {
+            return failSharedCase(
+                "spreadsheetengine_text_tests", rRow, "unknown text shared-case function");
+        }
     }
 
     std::cout << "spreadsheetengine text api tests passed\n";

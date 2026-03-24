@@ -7,6 +7,7 @@
 #include <spreadsheetengine/api/Math.hxx>
 #include <spreadsheetengine/api/Numeral.hxx>
 
+#include "SharedCaseSupport.hxx"
 #include "TestSupport.hxx"
 
 int main()
@@ -102,6 +103,98 @@ int main()
     const auto aArabic = fromRoman(u"mcmxcix");
     if (!aArabic || aArabic.maValue != 1999)
         return fail("spreadsheetengine_math_tests", "fromRoman() mismatch");
+
+    for (const auto& rRow : spreadsheetengine::standalone::test::loadSharedCaseRows(
+             "numeral_conversion_cases.tsv"))
+    {
+        if (rRow.maColumns.size() < 6)
+            return failSharedCase(
+                "spreadsheetengine_math_tests", rRow, "numeral shared case column mismatch");
+
+        const auto& rFunction = rRow.maColumns[0];
+        const auto eExpectedError
+            = spreadsheetengine::standalone::test::parseExpectedError(rRow.maColumns[5]);
+
+        if (rFunction == "BASE")
+        {
+            const auto aResult = toBase(
+                spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2]),
+                rRow.maColumns[3].empty()
+                    ? std::nullopt
+                    : std::optional<double>(spreadsheetengine::standalone::test::parseDouble(
+                          rRow.maColumns[3])));
+            if (eExpectedError != Error::None)
+            {
+                if (aResult || aResult.meError != eExpectedError)
+                {
+                    return failSharedCase(
+                        "spreadsheetengine_math_tests", rRow, "BASE error mismatch");
+                }
+            }
+            else if (!aResult
+                     || aResult.maValue
+                            != spreadsheetengine::standalone::test::decodeUtf8TestString(
+                                rRow.maColumns[4]))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_math_tests", rRow, "BASE value mismatch");
+            }
+        }
+        else if (rFunction == "DECIMAL")
+        {
+            const auto aResult = fromBase(
+                spreadsheetengine::standalone::test::decodeUtf8TestString(rRow.maColumns[1]),
+                spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2]));
+            if (eExpectedError != Error::None)
+            {
+                if (aResult || aResult.meError != eExpectedError)
+                {
+                    return failSharedCase(
+                        "spreadsheetengine_math_tests", rRow, "DECIMAL error mismatch");
+                }
+            }
+            else if (!aResult
+                     || !almostEqual(
+                         aResult.maValue,
+                         spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[4])))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_math_tests", rRow, "DECIMAL value mismatch");
+            }
+        }
+        else if (rFunction == "ROMAN")
+        {
+            const auto aResult = toRoman(
+                spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]));
+            if (!aResult
+                || aResult.maValue
+                       != spreadsheetengine::standalone::test::decodeUtf8TestString(
+                           rRow.maColumns[4]))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_math_tests", rRow, "ROMAN value mismatch");
+            }
+        }
+        else if (rFunction == "ARABIC")
+        {
+            const auto aResult = fromRoman(
+                spreadsheetengine::standalone::test::decodeUtf8TestString(rRow.maColumns[1]));
+            if (!aResult
+                || !almostEqual(
+                    static_cast<double>(aResult.maValue),
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[4])))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_math_tests", rRow, "ARABIC value mismatch");
+            }
+        }
+        else
+        {
+            return failSharedCase(
+                "spreadsheetengine_math_tests", rRow, "unknown numeral shared-case function");
+        }
+    }
 
     std::cout << "spreadsheetengine math api tests passed\n";
     return EXIT_SUCCESS;
