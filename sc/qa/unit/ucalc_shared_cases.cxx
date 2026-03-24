@@ -12,7 +12,9 @@
 #include <scopetools.hxx>
 
 #include <formula/errorcodes.hxx>
+#include <interpretercontext.hxx>
 #include <spreadsheetengine/compat/libreoffice/Host.hxx>
+#include <spreadsheetengine/core/HostValueAccess.hxx>
 
 #include <cmath>
 #include <cstdint>
@@ -321,6 +323,7 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testCalcHostAdapter)
     setValueCell(m_pDoc, 0, 42.5);
     setTextCell(m_pDoc, 1, u"hello"_ustr);
     m_pDoc->SetFormula(ScAddress(2, 0, 0), u"=1/0"_ustr, formula::FormulaGrammar::GRAM_NATIVE_UI);
+    setTextCell(m_pDoc, 4, u"42.5"_ustr);
 
     const auto aNumber = aHost.getCellValue({ 0, 0, 0 });
     CPPUNIT_ASSERT(aNumber);
@@ -337,7 +340,7 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testCalcHostAdapter)
     CPPUNIT_ASSERT(aError.maValue.isError());
     CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::Error::DivisionByZero, aError.maValue.meError);
 
-    const auto aEmpty = aHost.getCellValue({ 0, 4, 0 });
+    const auto aEmpty = aHost.getCellValue({ 0, 5, 0 });
     CPPUNIT_ASSERT(aEmpty);
     CPPUNIT_ASSERT(aEmpty.maValue.isEmpty());
 
@@ -367,6 +370,66 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testCalcHostAdapter)
     const auto aFormattedNumber = aHost.formatNumber(42.5);
     CPPUNIT_ASSERT(aFormattedNumber);
     CPPUNIT_ASSERT(!aFormattedNumber.maValue.empty());
+
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    spreadsheetengine::compat::libreoffice::DocumentEvaluationHost aContextHost(*m_pDoc, rContext,
+                                                                                 u"en-US");
+
+    const auto aContextParsedNumber = aContextHost.parseNumber(u"42.5");
+    CPPUNIT_ASSERT(aContextParsedNumber);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(42.5, aContextParsedNumber.maValue.mfValue, 1e-12);
+
+    const auto aContextFormattedNumber = aContextHost.formatNumber(42.5);
+    CPPUNIT_ASSERT(aContextFormattedNumber);
+    CPPUNIT_ASSERT(!aContextFormattedNumber.maValue.empty());
+
+    const auto aScalarView = spreadsheetengine::core::host::readValueView(
+        aHost, { { 0, 0, 0 }, { 0, 0, 0 } });
+    CPPUNIT_ASSERT(aScalarView);
+    CPPUNIT_ASSERT(aScalarView.maValue.isScalar());
+
+    const auto aMatrixView = spreadsheetengine::core::host::readValueView(
+        aHost, { { 0, 0, 0 }, { 0, 1, 0 } });
+    CPPUNIT_ASSERT(aMatrixView);
+    CPPUNIT_ASSERT(aMatrixView.maValue.isMatrixReference());
+
+    const auto aScalarElement
+        = spreadsheetengine::core::host::readValueViewElement(aHost, aScalarView.maValue);
+    CPPUNIT_ASSERT(aScalarElement);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(42.5, aScalarElement.maValue.mfNumber, 1e-12);
+
+    const auto aMatrixElement
+        = spreadsheetengine::core::host::readValueViewElement(aHost, aMatrixView.maValue, 1, 0);
+    CPPUNIT_ASSERT(aMatrixElement);
+    CPPUNIT_ASSERT(aMatrixElement.maValue.isText());
+    CPPUNIT_ASSERT_EQUAL(u"hello"_ustr,
+                         spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                             aMatrixElement.maValue.maString));
+
+    const auto aCoercedNumber = spreadsheetengine::core::host::coerceToNumber(
+        aHost, spreadsheetengine::api::CellValue::text(u"42.5"));
+    CPPUNIT_ASSERT(aCoercedNumber);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(42.5, aCoercedNumber.maValue.mfValue, 1e-12);
+
+    const auto aCoercedEmpty = spreadsheetengine::core::host::coerceToNumber(
+        aHost, spreadsheetengine::api::CellValue::empty());
+    CPPUNIT_ASSERT(!aCoercedEmpty);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::Error::NoValue, aCoercedEmpty.meError);
+
+    const auto aFormattedValue = spreadsheetengine::core::host::formatValue(
+        aHost, spreadsheetengine::api::CellValue::number(42.5));
+    CPPUNIT_ASSERT(aFormattedValue);
+    CPPUNIT_ASSERT(!aFormattedValue.maValue.empty());
+
+    const auto aTextNumberView = spreadsheetengine::core::host::readValueView(
+        aHost, { { 0, 4, 0 }, { 0, 4, 0 } });
+    CPPUNIT_ASSERT(aTextNumberView);
+    CPPUNIT_ASSERT(aTextNumberView.maValue.isScalar());
+
+    const auto aCoercedViewNumber = spreadsheetengine::core::host::coerceValueViewElementToNumber(
+        aHost, aTextNumberView.maValue);
+    CPPUNIT_ASSERT(aCoercedViewNumber);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(42.5, aCoercedViewNumber.maValue.mfValue, 1e-12);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testNumeralSharedCases)

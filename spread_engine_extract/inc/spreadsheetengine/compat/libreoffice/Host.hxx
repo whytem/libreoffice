@@ -13,6 +13,7 @@
 #include <document.hxx>
 #include <formulacell.hxx>
 #include <formula/errorcodes.hxx>
+#include <interpretercontext.hxx>
 
 #include <spreadsheetengine/api/Host.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
@@ -56,6 +57,7 @@ inline spreadsheetengine::api::Error toApiError(FormulaError eError)
 class DocumentEvaluationHost final : public spreadsheetengine::api::EvaluationHost
 {
     const ScDocument& mrDoc;
+    ScInterpreterContext* mpContext;
     spreadsheetengine::api::String maLocaleTag;
 
     [[nodiscard]] spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>
@@ -104,6 +106,15 @@ public:
     explicit DocumentEvaluationHost(
         const ScDocument& rDoc, spreadsheetengine::api::StringView rLocaleTag = {})
         : mrDoc(rDoc)
+        , mpContext(nullptr)
+        , maLocaleTag(rLocaleTag)
+    {
+    }
+
+    explicit DocumentEvaluationHost(const ScDocument& rDoc, ScInterpreterContext& rContext,
+        spreadsheetengine::api::StringView rLocaleTag = {})
+        : mrDoc(rDoc)
+        , mpContext(&rContext)
         , maLocaleTag(rLocaleTag)
     {
     }
@@ -178,8 +189,11 @@ public:
     {
         sal_uInt32 nFormat = 0;
         double fValue = 0.0;
-        if (!mrDoc.GetFormatTable()->IsNumberFormat(
-                toLibreOfficeString(spreadsheetengine::api::String(rValue)), nFormat, fValue))
+        const OUString aString = toLibreOfficeString(spreadsheetengine::api::String(rValue));
+        const bool bParsed = mpContext
+                                 ? mpContext->NFIsNumberFormat(aString, nFormat, fValue)
+                                 : mrDoc.GetFormatTable()->IsNumberFormat(aString, nFormat, fValue);
+        if (!bParsed)
         {
             return spreadsheetengine::api::ValueResult<spreadsheetengine::api::NumberParseResult>::failure(
                 spreadsheetengine::api::Error::NoValue);
@@ -192,8 +206,11 @@ public:
     [[nodiscard]] spreadsheetengine::api::ValueResult<spreadsheetengine::api::String> formatNumber(
         double fValue, spreadsheetengine::api::FormatIndex nFormat = 0) const override
     {
+        const OUString aFormatted = mpContext
+                                        ? mpContext->NFGetInputLineString(fValue, nFormat)
+                                        : mrDoc.GetFormatTable()->GetInputLineString(fValue, nFormat);
         return spreadsheetengine::api::ValueResult<spreadsheetengine::api::String>::success(
-            toApiString(mrDoc.GetFormatTable()->GetInputLineString(fValue, nFormat)));
+            toApiString(aFormatted));
     }
 };
 

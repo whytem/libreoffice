@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include <spreadsheetengine/api/Host.hxx>
+#include <spreadsheetengine/core/HostValueAccess.hxx>
 #include <spreadsheetengine/core/InMemoryHost.hxx>
 
 #include "TestSupport.hxx"
@@ -16,7 +17,12 @@ int main()
     using spreadsheetengine::api::CellValueView;
     using spreadsheetengine::api::DateParts;
     using spreadsheetengine::api::Error;
+    using spreadsheetengine::core::host::coerceToNumber;
+    using spreadsheetengine::core::host::coerceValueViewElementToNumber;
+    using spreadsheetengine::core::host::formatValue;
     using spreadsheetengine::core::host::InMemoryEvaluationHost;
+    using spreadsheetengine::core::host::readValueView;
+    using spreadsheetengine::core::host::readValueViewElement;
     using spreadsheetengine::standalone::test::almostEqual;
     using spreadsheetengine::standalone::test::fail;
 
@@ -52,7 +58,8 @@ int main()
     if (!aHost.setCellValue({ nSheet0, 0, 0 }, CellValue::number(42.5))
         || !aHost.setCellValue({ nSheet0, 1, 0 }, CellValue::text(u"hello"))
         || !aHost.setCellValue({ nSheet0, 2, 0 }, CellValue::error(Error::NoValue))
-        || !aHost.setCellValue({ nSheet0, 3, 0 }, CellValue::boolean(true)))
+        || !aHost.setCellValue({ nSheet0, 3, 0 }, CellValue::boolean(true))
+        || !aHost.setCellValue({ nSheet0, 4, 0 }, CellValue::text(u"42.5")))
     {
         return fail("spreadsheetengine_host_tests", "setCellValue() mismatch");
     }
@@ -76,7 +83,7 @@ int main()
         return fail("spreadsheetengine_host_tests", "boolean cell read mismatch");
     }
 
-    const auto aEmpty = aHost.getCellValue({ nSheet0, 4, 0 });
+    const auto aEmpty = aHost.getCellValue({ nSheet0, 5, 0 });
     if (!aEmpty || !aEmpty.maValue.isEmpty())
         return fail("spreadsheetengine_host_tests", "empty cell read mismatch");
 
@@ -107,6 +114,14 @@ int main()
     if (aInvalidRange || aInvalidRange.meError != Error::IllegalArgument)
         return fail("spreadsheetengine_host_tests", "invalid reference handling mismatch");
 
+    const auto aScalarResolved = readValueView(
+        aHost, CellRange { CellAddress { nSheet0, 0, 0 }, CellAddress { nSheet0, 0, 0 } });
+    if (!aScalarResolved || !aScalarResolved.maValue.isScalar()
+        || !aScalarResolved.maValue.maValue.isNumber())
+    {
+        return fail("spreadsheetengine_host_tests", "scalar value view resolution mismatch");
+    }
+
     const auto aScalarView = CellValueView::scalar(CellValue::number(7.0));
     if (!aScalarView.isScalar() || aScalarView.isMatrixReference()
         || !almostEqual(aScalarView.maValue.mfNumber, 7.0))
@@ -119,6 +134,24 @@ int main()
         || aMatrixView.maReference.matrixDimensions().mnColumns != 4)
     {
         return fail("spreadsheetengine_host_tests", "matrix value view mismatch");
+    }
+
+    const auto aResolvedMatrixView = readValueView(aHost, aRange);
+    if (!aResolvedMatrixView || !aResolvedMatrixView.maValue.isMatrixReference())
+        return fail("spreadsheetengine_host_tests", "matrix value view resolution mismatch");
+
+    const auto aScalarElement = readValueViewElement(aHost, aScalarResolved.maValue);
+    if (!aScalarElement || !aScalarElement.maValue.isNumber()
+        || !almostEqual(aScalarElement.maValue.mfNumber, 42.5))
+    {
+        return fail("spreadsheetengine_host_tests", "scalar element fetch mismatch");
+    }
+
+    const auto aMatrixElement = readValueViewElement(aHost, aResolvedMatrixView.maValue, 1, 0);
+    if (!aMatrixElement || !aMatrixElement.maValue.isText()
+        || aMatrixElement.maValue.maString != u"hello")
+    {
+        return fail("spreadsheetengine_host_tests", "matrix element fetch mismatch");
     }
 
     const auto aParsedNumber = aHost.parseNumber(u"42.5");
@@ -139,6 +172,36 @@ int main()
     const auto aMissingFormat = aHost.formatNumber(42.5, 12);
     if (aMissingFormat || aMissingFormat.meError != Error::IllegalArgument)
         return fail("spreadsheetengine_host_tests", "formatNumber() error mismatch");
+
+    const auto aCoercedNumeric = coerceToNumber(aHost, CellValue::text(u"42.5"));
+    if (!aCoercedNumeric || !almostEqual(aCoercedNumeric.maValue.mfValue, 42.5))
+        return fail("spreadsheetengine_host_tests", "coerceToNumber() text mismatch");
+
+    const auto aCoercedEmpty = coerceToNumber(aHost, CellValue::empty());
+    if (aCoercedEmpty || aCoercedEmpty.meError != Error::NoValue)
+        return fail("spreadsheetengine_host_tests", "coerceToNumber() empty mismatch");
+
+    const auto aFormattedText = formatValue(aHost, CellValue::number(42.5), 11);
+    if (!aFormattedText || aFormattedText.maValue != u"42.5")
+        return fail("spreadsheetengine_host_tests", "formatValue() number mismatch");
+
+    const auto aFormattedError = formatValue(aHost, CellValue::error(Error::DivisionByZero));
+    if (aFormattedError || aFormattedError.meError != Error::DivisionByZero)
+        return fail("spreadsheetengine_host_tests", "formatValue() error mismatch");
+
+    const auto aCoercedMatrixValue = coerceValueViewElementToNumber(aHost, aResolvedMatrixView.maValue);
+    if (!aCoercedMatrixValue || !almostEqual(aCoercedMatrixValue.maValue.mfValue, 42.5))
+        return fail("spreadsheetengine_host_tests", "coerceValueViewElementToNumber() mismatch");
+
+    const auto aTextNumberView = readValueView(
+        aHost, CellRange { CellAddress { nSheet0, 4, 0 }, CellAddress { nSheet0, 4, 0 } });
+    if (!aTextNumberView || !aTextNumberView.maValue.isScalar())
+        return fail("spreadsheetengine_host_tests", "text-number view mismatch");
+
+    const auto aCoercedMatrixText
+        = coerceValueViewElementToNumber(aHost, aTextNumberView.maValue);
+    if (!aCoercedMatrixText || !almostEqual(aCoercedMatrixText.maValue.mfValue, 42.5))
+        return fail("spreadsheetengine_host_tests", "coerceValueViewElementToNumber() text mismatch");
 
     std::cout << "spreadsheetengine host api tests passed\n";
     return EXIT_SUCCESS;

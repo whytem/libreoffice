@@ -811,6 +811,7 @@ Status:
   - `spread_engine_extract/inc/spreadsheetengine/api/Host.hxx`
   - `spread_engine_extract/inc/spreadsheetengine/core/InMemoryHost.hxx`
   - `spread_engine_extract/inc/spreadsheetengine/compat/libreoffice/Host.hxx`
+  - `spread_engine_extract/inc/spreadsheetengine/core/HostValueAccess.hxx`
   - `spread_engine_extract/tests/standalone/host_api_tests.cxx`
   - `sc/qa/unit/ucalc_shared_cases.cxx`
 
@@ -822,17 +823,27 @@ Current status:
     Calc-side `CppunitTest_sc_ucalc_shared_cases` target
   - Phase 8 completed the host-independent matrix/runtime substrate, so Phase 9
     can focus on genuinely host-aware evaluator work
-- pass 1 is now substantially complete:
+- pass 1 is complete:
   - the engine owns workbook/runtime/cell-read host contracts
   - resolved-reference and matrix-backed value-view primitives are defined
   - host-bound text coercion and number-formatting seams are defined
   - the standalone suite exercises those contracts through the in-memory host
   - Calc exercises them through a thin `ScDocument` adapter seam
-- the remaining gaps are no longer contract-shape problems:
-  - the next meaningful work is to move the first genuinely host-aware
-    interpreter helpers onto these seams
-  - preferred next step: start pass 3 with a narrow logical/control-flow slice
-    such as `IF`/`IFERROR` branch and error-selection helpers
+- pass 2 is now substantially complete:
+  - the standalone in-memory host and Calc adapter both implement the same
+    host contracts
+  - the Calc adapter can now route parse/format behavior through
+    `ScInterpreterContext`, not just raw document formatting
+  - engine-owned host helper logic in `HostValueAccess.hxx` now resolves
+    scalar vs matrix-backed views, fetches reference elements, and performs
+    host-driven number coercion/formatting without depending on Calc classes
+  - those helpers are exercised in both the standalone suite and the
+    Calc-side shared-case target
+- the next meaningful work is no longer host scaffolding:
+  - Phase 9 should now move to pass 3 and extract the first genuinely
+    host-aware interpreter helpers
+  - preferred next step: start with a narrow logical/control-flow slice such
+    as `IF` / `IFERROR` / `IFNA` branch and error-selection helpers
 
 Validation:
 
