@@ -44,6 +44,19 @@ struct BufferedWritePlan
     bool mbFlushCurrentType = false;
 };
 
+template <typename Column, typename Row, typename Count>
+[[nodiscard]] constexpr BufferWindow bufferWindowFromState(Column nColumn, Row nRow, Count nCount)
+{
+    return { matrix::makeCoordinate(nColumn, nRow), static_cast<api::MatrixSize>(nCount) };
+}
+
+template <typename Column, typename Row>
+constexpr void applyBufferWindowStart(const BufferWindow& rWindow, Column& rnColumn, Row& rnRow)
+{
+    rnColumn = rWindow.maStart.mnColumn;
+    rnRow = rWindow.maStart.mnRow;
+}
+
 [[nodiscard]] constexpr bool normalizeJumpCoordinate(
     const api::MatrixDimensions& rDimensions, api::MatrixCoordinate& rCoordinate)
 {
@@ -171,6 +184,19 @@ struct BufferedWritePlan
 {
     return rWindow.mnCount > 0
            && (!bSameBufferType || !isBufferedWriteContinuation(rWindow, rCoordinate));
+}
+
+template <typename FlushAction, typename ResetAction>
+bool flushBufferedWindowIfNeeded(const BufferWindow& rWindow, bool bSameBufferType,
+                                 const api::MatrixCoordinate& rCoordinate, FlushAction aFlushAction,
+                                 ResetAction aResetAction)
+{
+    if (!shouldFlushBufferedWindow(rWindow, bSameBufferType, rCoordinate))
+        return false;
+
+    aFlushAction();
+    aResetAction();
+    return true;
 }
 
 [[nodiscard]] constexpr BufferedWritePlan planBufferedResultWrite(

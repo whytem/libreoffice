@@ -816,6 +816,36 @@ Current status:
     `sc/source/core/tool/interpretercontext.cxx` for `NFGetType()` and
     `NFGetFormatForLanguageIfBuiltIn()` without changing cache fill order,
     cache hits, or formatting results
+- twenty-eighth slice completed:
+  - the extracted matrix-geometry layer now also owns broadcast-execution
+    planning for vector replication against target matrix dimensions
+  - Calc consumes that helper in `sc/source/core/tool/scmatrix.cxx` for
+    `MatConcat()` without changing concatenation replication, execution
+    extents, or result ordering
+- twenty-ninth slice completed:
+  - the extracted matrix-geometry layer now also owns contiguous valid-run
+    planning for bulk matrix writeback
+  - Calc consumes that helper in `sc/source/core/tool/scmatrix.cxx` for the
+    `MatConcat()` writeback pass without changing valid/error segmentation or
+    shared-string run lengths
+- thirtieth slice completed:
+  - the extracted matrix-geometry layer now also owns the column-major
+    loop-resume coordinate math used after contiguous bulk writes
+  - Calc consumes that helper in `sc/source/core/tool/scmatrix.cxx` for the
+    `MatConcat()` writeback loop without changing traversal order or result
+    placement
+- thirty-first slice completed:
+  - the extracted jump-matrix runtime layer now also owns buffered-window state
+    construction and start-coordinate application helpers
+  - Calc consumes those helpers in `sc/source/core/tool/jumpmatrix.cxx` for
+    buffered result-write bookkeeping without changing window origin or count
+    behavior
+- thirty-second slice completed:
+  - the extracted jump-matrix runtime layer now also owns generic
+    flush-if-needed control flow for buffered result windows
+  - Calc consumes that helper in `sc/source/core/tool/jumpmatrix.cxx` for
+    `FlushBufferOtherThan()` without changing flush decisions, write order, or
+    reset behavior
 
 Validation:
 

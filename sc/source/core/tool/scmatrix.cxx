@@ -2917,29 +2917,32 @@ void ScMatrixImpl::MatConcat(SCSIZE nMaxCol, SCSIZE nMaxRow, const ScMatrixRef& 
             // Nothing. Concatenating an empty string to an existing string.
         };
 
-
-    if (nC1 == 1 || nR1 == 1)
+    const auto aConcatPlan1 = spreadsheetengine::core::matrix::planBroadcastExecution(
+        spreadsheetengine::core::matrix::makeDimensions(nC1, nR1), aConcatDimensions);
+    assert(aConcatPlan1.mbValid);
+    if (aConcatPlan1.mbReplicated)
     {
-        size_t nRowRep = nR1 == 1 ? nMaxRow : 1;
-        size_t nColRep = nC1 == 1 ? nMaxCol : 1;
-
-        for (size_t i = 0; i < nRowRep; ++i)
+        for (size_t i = 0; i < aConcatPlan1.mnRowRepeats; ++i)
         {
             nRowOffset = i;
-            for (size_t j = 0; j < nColRep; ++j)
+            for (size_t j = 0; j < aConcatPlan1.mnColumnRepeats; ++j)
             {
                 nColOffset = j;
                 xMat1->ExecuteOperation(
-                        std::pair<size_t, size_t>(0, 0),
-                        std::pair<size_t, size_t>(std::min(nR1, nMaxRow) - 1, std::min(nC1, nMaxCol) - 1),
+                        std::pair<size_t, size_t>(aConcatPlan1.maOperationRange.maStart.mnRow,
+                                                  aConcatPlan1.maOperationRange.maStart.mnColumn),
+                        std::pair<size_t, size_t>(aConcatPlan1.maOperationRange.maEnd.mnRow,
+                                                  aConcatPlan1.maOperationRange.maEnd.mnColumn),
                         aDoubleFunc, aBoolFunc, aStringFunc, aEmptyFunc);
             }
         }
     }
     else
         xMat1->ExecuteOperation(
-                std::pair<size_t, size_t>(0, 0),
-                std::pair<size_t, size_t>(nMaxRow - 1, nMaxCol - 1),
+                std::pair<size_t, size_t>(aConcatPlan1.maOperationRange.maStart.mnRow,
+                                          aConcatPlan1.maOperationRange.maStart.mnColumn),
+                std::pair<size_t, size_t>(aConcatPlan1.maOperationRange.maEnd.mnRow,
+                                          aConcatPlan1.maOperationRange.maEnd.mnColumn),
                 std::move(aDoubleFunc), std::move(aBoolFunc), std::move(aStringFunc), std::move(aEmptyFunc));
 
     std::vector<svl::SharedString> aSharedString(nMaxCol*nMaxRow);
@@ -2981,28 +2984,32 @@ void ScMatrixImpl::MatConcat(SCSIZE nMaxCol, SCSIZE nMaxRow, const ScMatrixRef& 
 
     nRowOffset = 0;
     nColOffset = 0;
-    if (nC2 == 1 || nR2 == 1)
+    const auto aConcatPlan2 = spreadsheetengine::core::matrix::planBroadcastExecution(
+        spreadsheetengine::core::matrix::makeDimensions(nC2, nR2), aConcatDimensions);
+    assert(aConcatPlan2.mbValid);
+    if (aConcatPlan2.mbReplicated)
     {
-        size_t nRowRep = nR2 == 1 ? nMaxRow : 1;
-        size_t nColRep = nC2 == 1 ? nMaxCol : 1;
-
-        for (size_t i = 0; i < nRowRep; ++i)
+        for (size_t i = 0; i < aConcatPlan2.mnRowRepeats; ++i)
         {
             nRowOffset = i;
-            for (size_t j = 0; j < nColRep; ++j)
+            for (size_t j = 0; j < aConcatPlan2.mnColumnRepeats; ++j)
             {
                 nColOffset = j;
                 xMat2->ExecuteOperation(
-                        std::pair<size_t, size_t>(0, 0),
-                        std::pair<size_t, size_t>(std::min(nR2, nMaxRow) - 1, std::min(nC2, nMaxCol) - 1),
+                        std::pair<size_t, size_t>(aConcatPlan2.maOperationRange.maStart.mnRow,
+                                                  aConcatPlan2.maOperationRange.maStart.mnColumn),
+                        std::pair<size_t, size_t>(aConcatPlan2.maOperationRange.maEnd.mnRow,
+                                                  aConcatPlan2.maOperationRange.maEnd.mnColumn),
                         aDoubleFunc2, aBoolFunc2, aStringFunc2, aEmptyFunc2);
             }
         }
     }
     else
         xMat2->ExecuteOperation(
-                std::pair<size_t, size_t>(0, 0),
-                std::pair<size_t, size_t>(nMaxRow - 1, nMaxCol - 1),
+                std::pair<size_t, size_t>(aConcatPlan2.maOperationRange.maStart.mnRow,
+                                          aConcatPlan2.maOperationRange.maStart.mnColumn),
+                std::pair<size_t, size_t>(aConcatPlan2.maOperationRange.maEnd.mnRow,
+                                          aConcatPlan2.maOperationRange.maEnd.mnColumn),
                 std::move(aDoubleFunc2), std::move(aBoolFunc2), std::move(aStringFunc2), std::move(aEmptyFunc2));
 
     nRowOffset = 0;
@@ -3017,21 +3024,19 @@ void ScMatrixImpl::MatConcat(SCSIZE nMaxCol, SCSIZE nMaxRow, const ScMatrixRef& 
             const auto nIndex = getIndex(j, i);
             if (aValid[nIndex])
             {
-                auto itr = std::next(aValid.begin(), nIndex);
-                auto itrEnd = std::find(itr, aValid.end(), false);
-                size_t nSteps = std::distance(itr, itrEnd);
+                const auto aRunPlan
+                    = spreadsheetengine::core::matrix::planContiguousValidRun(aValid, nIndex);
+                assert(aRunPlan.mbValid);
+                size_t nSteps = aRunPlan.mnLength;
                 auto itrStr = std::next(aSharedString.begin(), nIndex);
                 auto itrEndStr = itrStr;
                 std::advance(itrEndStr, nSteps);
                 pos = maMat.set(pos, itrStr, itrEndStr);
-                size_t nColSteps = nSteps / nMaxRow;
-                i += nColSteps;
-                j += nSteps % nMaxRow;
-                if (j >= nMaxRow)
-                {
-                    j -= nMaxRow;
-                    ++i;
-                }
+                const auto aResumeCoordinate
+                    = spreadsheetengine::core::matrix::advanceColumnMajorLoopSeedCoordinate(
+                        spreadsheetengine::core::matrix::makeCoordinate(i, j), nMaxRow, nSteps);
+                i = aResumeCoordinate.mnColumn;
+                j = aResumeCoordinate.mnRow;
             }
             else
             {

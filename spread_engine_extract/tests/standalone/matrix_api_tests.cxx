@@ -1,6 +1,7 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
 #include <iostream>
+#include <vector>
 
 #include <spreadsheetengine/api/Matrix.hxx>
 #include <spreadsheetengine/core/JumpMatrixRuntime.hxx>
@@ -164,6 +165,59 @@ int main()
         return fail("spreadsheetengine_matrix_tests", "column vector planning mismatch");
     }
 
+    const auto aBroadcastRowPlan
+        = spreadsheetengine::core::matrix::planBroadcastExecution({ 3, 1 }, { 3, 4 });
+    if (!aBroadcastRowPlan.mbValid || !aBroadcastRowPlan.mbReplicated
+        || aBroadcastRowPlan.mnRowRepeats != 4 || aBroadcastRowPlan.mnColumnRepeats != 1
+        || aBroadcastRowPlan.maOperationRange.maEnd.mnColumn != 2
+        || aBroadcastRowPlan.maOperationRange.maEnd.mnRow != 0)
+    {
+        return fail("spreadsheetengine_matrix_tests", "row broadcast planning mismatch");
+    }
+
+    const auto aBroadcastColumnPlan
+        = spreadsheetengine::core::matrix::planBroadcastExecution({ 1, 4 }, { 3, 4 });
+    if (!aBroadcastColumnPlan.mbValid || !aBroadcastColumnPlan.mbReplicated
+        || aBroadcastColumnPlan.mnRowRepeats != 1 || aBroadcastColumnPlan.mnColumnRepeats != 3
+        || aBroadcastColumnPlan.maOperationRange.maEnd.mnColumn != 0
+        || aBroadcastColumnPlan.maOperationRange.maEnd.mnRow != 3)
+    {
+        return fail("spreadsheetengine_matrix_tests", "column broadcast planning mismatch");
+    }
+
+    const auto aPlainBroadcastPlan
+        = spreadsheetengine::core::matrix::planBroadcastExecution({ 3, 4 }, { 3, 4 });
+    if (!aPlainBroadcastPlan.mbValid || aPlainBroadcastPlan.mbReplicated
+        || aPlainBroadcastPlan.mnRowRepeats != 1 || aPlainBroadcastPlan.mnColumnRepeats != 1
+        || aPlainBroadcastPlan.maOperationRange.maEnd.mnColumn != 2
+        || aPlainBroadcastPlan.maOperationRange.maEnd.mnRow != 3
+        || spreadsheetengine::core::matrix::planBroadcastExecution({ 3, 4 }, { 0, 0 }).mbValid)
+    {
+        return fail("spreadsheetengine_matrix_tests", "plain broadcast planning mismatch");
+    }
+
+    const std::vector<bool> aValidityRun { true, true, true, false, true };
+    const auto aValidRunPlan
+        = spreadsheetengine::core::matrix::planContiguousValidRun(aValidityRun, 1);
+    if (!aValidRunPlan.mbValid || aValidRunPlan.mnStartIndex != 1 || aValidRunPlan.mnLength != 2
+        || spreadsheetengine::core::matrix::planContiguousValidRun(aValidityRun, 3).mbValid)
+    {
+        return fail("spreadsheetengine_matrix_tests", "valid run planning mismatch");
+    }
+
+    const auto aLoopSeedCoordinate
+        = spreadsheetengine::core::matrix::advanceColumnMajorLoopSeedCoordinate({ 0, 0 }, 4, 2);
+    const auto aWrappedLoopSeedCoordinate
+        = spreadsheetengine::core::matrix::advanceColumnMajorLoopSeedCoordinate({ 0, 3 }, 4, 2);
+    if (aLoopSeedCoordinate.mnColumn != 0 || aLoopSeedCoordinate.mnRow != 2
+        || aWrappedLoopSeedCoordinate.mnColumn != 1 || aWrappedLoopSeedCoordinate.mnRow != 1
+        || spreadsheetengine::core::matrix::advanceColumnMajorLoopSeedCoordinate({ 2, 1 }, 0, 5)
+               .mnColumn
+               != 2)
+    {
+        return fail("spreadsheetengine_matrix_tests", "loop seed coordinate mismatch");
+    }
+
     MatrixCoordinate aJumpCoordinate { 9, 2 };
     if (!spreadsheetengine::core::jumpmatrix::normalizeJumpCoordinate({ 1, 4 }, aJumpCoordinate)
         || aJumpCoordinate.mnColumn != 0 || aJumpCoordinate.mnRow != 2)
@@ -262,6 +316,19 @@ int main()
         return fail("spreadsheetengine_matrix_tests", "jump buffer window opening mismatch");
     }
 
+    const auto aStateWindow
+        = spreadsheetengine::core::jumpmatrix::bufferWindowFromState(4u, 7u, 3u);
+    MatrixCoordinate aAppliedWindowStart {};
+    spreadsheetengine::core::jumpmatrix::applyBufferWindowStart(aStateWindow,
+                                                                aAppliedWindowStart.mnColumn,
+                                                                aAppliedWindowStart.mnRow);
+    if (aStateWindow.maStart.mnColumn != 4 || aStateWindow.maStart.mnRow != 7
+        || aStateWindow.mnCount != 3 || aAppliedWindowStart.mnColumn != 4
+        || aAppliedWindowStart.mnRow != 7)
+    {
+        return fail("spreadsheetengine_matrix_tests", "jump buffer state mismatch");
+    }
+
     const auto aNextBuffer = spreadsheetengine::core::jumpmatrix::nextBufferedWriteWindow(
         spreadsheetengine::core::jumpmatrix::makeBufferWindow({ 1, 3 }, 2), { 1, 5 });
     if (aNextBuffer.maStart.mnColumn != 1 || aNextBuffer.maStart.mnRow != 3
@@ -278,6 +345,20 @@ int main()
             spreadsheetengine::core::jumpmatrix::makeBufferWindow({ 1, 3 }, 2), true, { 2, 5 }))
     {
         return fail("spreadsheetengine_matrix_tests", "jump buffer flush decision mismatch");
+    }
+
+    int nFlushCount = 0;
+    int nResetCount = 0;
+    if (!spreadsheetengine::core::jumpmatrix::flushBufferedWindowIfNeeded(
+            spreadsheetengine::core::jumpmatrix::makeBufferWindow({ 1, 3 }, 2), false, { 1, 5 },
+            [&nFlushCount]() { ++nFlushCount; }, [&nResetCount]() { ++nResetCount; })
+        || nFlushCount != 1 || nResetCount != 1
+        || spreadsheetengine::core::jumpmatrix::flushBufferedWindowIfNeeded(
+            spreadsheetengine::core::jumpmatrix::makeBufferWindow({ 1, 3 }, 2), true, { 1, 5 },
+            [&nFlushCount]() { ++nFlushCount; }, [&nResetCount]() { ++nResetCount; })
+        || nFlushCount != 1 || nResetCount != 1)
+    {
+        return fail("spreadsheetengine_matrix_tests", "jump buffer flush helper mismatch");
     }
 
     const auto aBufferedWritePlan = spreadsheetengine::core::jumpmatrix::planBufferedResultWrite(

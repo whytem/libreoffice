@@ -11,7 +11,9 @@
 
 #include <spreadsheetengine/api/Matrix.hxx>
 
+#include <algorithm>
 #include <sal/types.h>
+#include <iterator>
 
 namespace spreadsheetengine::core::matrix
 {
@@ -25,6 +27,22 @@ struct MatrixRange
 struct MatrixWritePlan
 {
     MatrixRange maRange {};
+    bool mbValid = false;
+};
+
+struct BroadcastExecutionPlan
+{
+    MatrixRange maOperationRange {};
+    sal_uInt64 mnRowRepeats = 0;
+    sal_uInt64 mnColumnRepeats = 0;
+    bool mbReplicated = false;
+    bool mbValid = false;
+};
+
+struct ValidRunPlan
+{
+    sal_uInt64 mnStartIndex = 0;
+    sal_uInt64 mnLength = 0;
     bool mbValid = false;
 };
 
@@ -138,6 +156,67 @@ struct MatrixWritePlan
 {
     const bool bValid = canPlaceColumnVector(rDimensions, rStart, nCount);
     return { bValid ? columnVectorRange(rStart, nCount) : MatrixRange {}, bValid };
+}
+
+[[nodiscard]] constexpr BroadcastExecutionPlan planBroadcastExecution(
+    const api::MatrixDimensions& rSourceDimensions, const api::MatrixDimensions& rTargetDimensions)
+{
+    if (!rSourceDimensions.isAllocated() || !rTargetDimensions.isAllocated() || rTargetDimensions.isEmpty())
+        return {};
+
+    const bool bReplicated = rSourceDimensions.mnColumns == 1 || rSourceDimensions.mnRows == 1;
+    if (!bReplicated)
+    {
+        return { makeRange(makeCoordinate(0, 0),
+                           makeCoordinate(static_cast<sal_uInt64>(rTargetDimensions.mnColumns) - 1,
+                                          static_cast<sal_uInt64>(rTargetDimensions.mnRows) - 1)),
+                 1, 1, false, true };
+    }
+
+    const sal_uInt64 nOperationColumns = std::min(static_cast<sal_uInt64>(rSourceDimensions.mnColumns),
+                                                  static_cast<sal_uInt64>(rTargetDimensions.mnColumns));
+    const sal_uInt64 nOperationRows = std::min(static_cast<sal_uInt64>(rSourceDimensions.mnRows),
+                                               static_cast<sal_uInt64>(rTargetDimensions.mnRows));
+    if (!nOperationColumns || !nOperationRows)
+        return {};
+
+    return { makeRange(makeCoordinate(0, 0),
+                       makeCoordinate(nOperationColumns - 1, nOperationRows - 1)),
+             rSourceDimensions.mnRows == 1 ? static_cast<sal_uInt64>(rTargetDimensions.mnRows) : 1,
+             rSourceDimensions.mnColumns == 1 ? static_cast<sal_uInt64>(rTargetDimensions.mnColumns)
+                                              : 1,
+             true, true };
+}
+
+template <typename ValidContainer>
+[[nodiscard]] auto planContiguousValidRun(const ValidContainer& rValid, sal_uInt64 nStartIndex)
+    -> ValidRunPlan
+{
+    if (nStartIndex >= rValid.size() || !rValid[nStartIndex])
+        return {};
+
+    auto aBegin = std::next(rValid.begin(), nStartIndex);
+    auto aEnd = std::find(aBegin, rValid.end(), false);
+    return { nStartIndex, static_cast<sal_uInt64>(std::distance(aBegin, aEnd)), true };
+}
+
+[[nodiscard]] constexpr api::MatrixCoordinate advanceColumnMajorLoopSeedCoordinate(
+    const api::MatrixCoordinate& rCurrentCoordinate, sal_uInt64 nRowCount, sal_uInt64 nRunLength)
+{
+    if (!nRowCount)
+        return rCurrentCoordinate;
+
+    sal_uInt64 nColumn = static_cast<sal_uInt64>(rCurrentCoordinate.mnColumn)
+                         + (nRunLength / nRowCount);
+    sal_uInt64 nRow
+        = static_cast<sal_uInt64>(rCurrentCoordinate.mnRow) + (nRunLength % nRowCount);
+    if (nRow >= nRowCount)
+    {
+        nRow -= nRowCount;
+        ++nColumn;
+    }
+
+    return makeCoordinate(nColumn, nRow);
 }
 
 [[nodiscard]] constexpr bool isSizeAllocatable(
