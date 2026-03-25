@@ -19,6 +19,14 @@ int main()
     using spreadsheetengine::core::formulacell::TableOpDirtyPlan;
     using spreadsheetengine::core::formulacell::VolatileKind;
     using spreadsheetengine::core::formulacellrefupdate::CopyUpdatePlan;
+    using spreadsheetengine::core::formulacellrefupdate::InsertDeleteTabUpdatePlan;
+    using spreadsheetengine::core::formulacellrefupdate::MoveUpdatePlan;
+    using spreadsheetengine::core::formulacellrefupdate::MoveTabUpdatePlan;
+    using spreadsheetengine::core::formulacellrefupdate::GrowFinishPlan;
+    using spreadsheetengine::core::formulacellrefupdate::ShiftUpdatePlan;
+    using spreadsheetengine::core::formulacellrefupdate::Transpose3DFlagPlan;
+    using spreadsheetengine::core::formulacellrefupdate::TransposeFinishPlan;
+    using spreadsheetengine::core::formulacellrefupdate::TransposePositionPlan;
     using spreadsheetengine::standalone::test::fail;
 
     if (spreadsheetengine::core::formulacell::makeSetDirtyPlan(
@@ -169,6 +177,128 @@ int main()
                != CopyUpdatePlan { { 5, 11, 19 }, true, false, true, true })
     {
         return fail("spreadsheetengine_formulacell_tests", "copy update plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacellrefupdate::makeMoveUpdatePlan(
+            { 5, 11, 19 }, false, 2, 3, 1, false, false, false, false, false, false, false,
+            false, false, false)
+            != MoveUpdatePlan { { 5, 11, 19 }, false, false, false, false, false, false,
+                false }
+        || spreadsheetengine::core::formulacellrefupdate::makeMoveUpdatePlan(
+               { 5, 11, 19 }, true, 2, 3, 1, true, false, true, false, true, false, false,
+               false, false, false)
+               != MoveUpdatePlan { { 4, 9, 16 }, true, true, false, true, false, true,
+                   true }
+        || spreadsheetengine::core::formulacellrefupdate::makeMoveUpdatePlan(
+               { 5, 11, 19 }, false, 2, 3, 1, true, false, false, false, false, true, false,
+               false, false, false)
+               != MoveUpdatePlan { { 5, 11, 19 }, true, false, false, true, true, true,
+                   true }
+        || spreadsheetengine::core::formulacellrefupdate::makeMoveUpdatePlan(
+               { 5, 11, 19 }, true, 2, 3, 1, true, true, false, true, false, false, true,
+               true, true, true)
+               != MoveUpdatePlan { { 4, 9, 16 }, true, true, false, true, true, false,
+                   false })
+    {
+        return fail("spreadsheetengine_formulacell_tests", "move update plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacellrefupdate::makeShiftUpdatePlan(
+            { 5, 11, 19 }, { 5, 11, 19 }, true, false, false, false, false, false, false,
+            false, false, false)
+            != ShiftUpdatePlan { false, true, false, false, false, false, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeShiftUpdatePlan(
+               { 5, 11, 19 }, { 5, 11, 20 }, false, true, false, true, false, true, false,
+               false, false, false)
+               != ShiftUpdatePlan { true, true, true, true, false, true, true }
+        || spreadsheetengine::core::formulacellrefupdate::makeShiftUpdatePlan(
+               { 5, 11, 19 }, { 5, 11, 19 }, false, true, true, false, true, false, false,
+               false, false, true)
+               != ShiftUpdatePlan { true, true, true, true, false, true, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeShiftUpdatePlan(
+               { 5, 11, 19 }, { 5, 14, 19 }, true, true, false, true, false, false, true,
+               true, true, false)
+               != ShiftUpdatePlan { true, true, true, true, true, true, true })
+    {
+        return fail("spreadsheetengine_formulacell_tests", "shift update plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacellrefupdate::makeInsertTabUpdatePlan(
+            5, 3, 2, true, true, true)
+            != InsertDeleteTabUpdatePlan { true, false, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeInsertTabUpdatePlan(
+               5, 7, 2, false, false, true)
+               != InsertDeleteTabUpdatePlan { false, false, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeInsertTabUpdatePlan(
+               5, 5, 2, false, true, false)
+               != InsertDeleteTabUpdatePlan { true, true, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeInsertTabUpdatePlan(
+               5, 3, 2, false, true, true)
+               != InsertDeleteTabUpdatePlan { true, true, true })
+    {
+        return fail("spreadsheetengine_formulacell_tests", "insert-tab update plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacellrefupdate::makeDeleteTabUpdatePlan(
+            5, 3, 2, true, true, true)
+            != InsertDeleteTabUpdatePlan { true, false, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeDeleteTabUpdatePlan(
+               4, 5, 2, false, false, true)
+               != InsertDeleteTabUpdatePlan { false, false, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeDeleteTabUpdatePlan(
+               8, 5, 2, false, true, false)
+               != InsertDeleteTabUpdatePlan { true, true, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeDeleteTabUpdatePlan(
+               8, 5, 2, false, true, true)
+               != InsertDeleteTabUpdatePlan { true, true, true })
+    {
+        return fail("spreadsheetengine_formulacell_tests", "delete-tab update plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacellrefupdate::makeMoveTabUpdatePlan(
+            true, true, true)
+            != MoveTabUpdatePlan { false, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeMoveTabUpdatePlan(
+               false, false, true)
+               != MoveTabUpdatePlan { false, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeMoveTabUpdatePlan(
+               false, true, false)
+               != MoveTabUpdatePlan { true, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeMoveTabUpdatePlan(
+               false, true, true)
+               != MoveTabUpdatePlan { true, true }
+        || !spreadsheetengine::core::formulacellrefupdate::shouldCompileAfterTabAdjust(true)
+        || spreadsheetengine::core::formulacellrefupdate::shouldCompileAfterTabAdjust(false))
+    {
+        return fail("spreadsheetengine_formulacell_tests", "move-tab update plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacellrefupdate::makeTransposePositionPlan(
+            { 2, 11, 21 }, { { 0, 2, 3 }, { 0, 4, 5 } }, { 2, 10, 20 }, 5)
+            != TransposePositionPlan { { { 2, 10, 20 }, { 2, 12, 22 } }, { 0, 3, 4 }, true }
+        || spreadsheetengine::core::formulacellrefupdate::makeTransposePositionPlan(
+               { 0, 0, 0 }, { { 0, 2, 3 }, { 0, 4, 5 } }, { 2, 10, 20 }, 5)
+               != TransposePositionPlan { { { 2, 10, 20 }, { 2, 12, 22 } }, { 0, 0, 0 }, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeTranspose3DFlagPlan(
+               { { 2, 10, 20 }, { 4, 12, 22 } }, 0, 2, false, true, true)
+               != Transpose3DFlagPlan { true, true }
+        || spreadsheetengine::core::formulacellrefupdate::makeTranspose3DFlagPlan(
+               { { 2, 10, 20 }, { 2, 12, 22 } }, 2, 2, true, true, true)
+               != Transpose3DFlagPlan { false, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeTransposeFinishPlan(false, false)
+               != TransposeFinishPlan { false, false, false, true }
+        || spreadsheetengine::core::formulacellrefupdate::makeTransposeFinishPlan(true, true)
+               != TransposeFinishPlan { true, true, true, false })
+    {
+        return fail("spreadsheetengine_formulacell_tests", "transpose update plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacellrefupdate::makeGrowFinishPlan(false)
+            != GrowFinishPlan { false, false, true }
+        || spreadsheetengine::core::formulacellrefupdate::makeGrowFinishPlan(true)
+               != GrowFinishPlan { true, true, false })
+    {
+        return fail("spreadsheetengine_formulacell_tests", "grow update plan mismatch");
     }
 
     std::cout << "spreadsheetengine formulacell api tests passed\n";

@@ -3304,12 +3304,13 @@ bool ScFormulaCell::UpdateReferenceOnShift(
         // Just in case...
         return false;
 
-    bool bCellStateChanged = false;
+    using spreadsheetengine::core::formulacellrefupdate::makeShiftUpdatePlan;
+
     ScAddress aUndoPos( aPos );         // position for undo cell in pUndoDoc
     if ( pUndoCellPos )
         aUndoPos = *pUndoCellPos;
     ScAddress aOldPos( aPos );
-    bCellStateChanged = UpdatePosOnShift(rCxt);
+    const bool bCellPositionChanged = UpdatePosOnShift(rCxt);
 
     // Check presence of any references or column row names.
     bool bHasRefs = pCode->HasReferences();
@@ -3318,12 +3319,12 @@ bool ScFormulaCell::UpdateReferenceOnShift(
     {
         bHasRefs = bHasColRowNames;
     }
-    bool bOnRefMove = pCode->IsRecalcModeOnRefMove();
+    const bool bRecalcOnRefMove = pCode->IsRecalcModeOnRefMove();
 
-    if (!bHasRefs && !bOnRefMove)
+    if (!bHasRefs && !bRecalcOnRefMove)
         // This formula cell contains no references, nor needs recalculating
         // on reference update. Bail out.
-        return bCellStateChanged;
+        return bCellPositionChanged;
 
     std::unique_ptr<ScTokenArray> pOldCode;
     if (pUndoDoc)
@@ -3343,15 +3344,8 @@ bool ScFormulaCell::UpdateReferenceOnShift(
             bRecompile = true;
     }
 
-    if (bValChanged || bRefModified)
-        bCellStateChanged = true;
-
-    if (bOnRefMove)
-        // Cell may reference itself, e.g. ocColumn, ocRow without parameter
-        bOnRefMove = (bValChanged || (aPos != aOldPos) || bRefModified);
-
-    bool bNewListening = false;
     bool bInDeleteUndo = false;
+    bool bHasRelName = false;
 
     if (bHasRefs)
     {
@@ -3364,56 +3358,48 @@ bool ScFormulaCell::UpdateReferenceOnShift(
         bInDeleteUndo = (pChangeTrack && pChangeTrack->IsInDeleteUndo());
 
         // RelNameRefs are always moved
-        bool bHasRelName = false;
         if (!bRecompile)
         {
             RelNameRef eRelNameRef = HasRelNameReference();
             bHasRelName = (eRelNameRef != RelNameRef::NONE);
             bRecompile = (eRelNameRef == RelNameRef::DOUBLE);
         }
-        // Reference changed and new listening needed?
-        // Except in Insert/Delete without specialities.
-        bNewListening = (bRefModified || bRecompile
-                || (bValChanged && bInDeleteUndo) || bHasRelName);
-
-        if ( bNewListening )
-            EndListeningTo(rDocument, pOldCode.get(), aOldPos);
     }
+    const auto aPlan = makeShiftUpdatePlan(
+        { aOldPos.Tab(), aOldPos.Col(), aOldPos.Row() }, { aPos.Tab(), aPos.Col(), aPos.Row() },
+        bCellPositionChanged, bHasRefs, bHasColRowNames, bRecalcOnRefMove, bValChanged,
+        bRefModified, bRecompile, bHasRelName, bCompile, bInDeleteUndo);
 
-    // NeedDirty for changes except for Copy and Move/Insert without RelNames
-    bool bNeedDirty = (bValChanged || bRecompile || bOnRefMove);
+    if (aPlan.mbNeedEndListening)
+        EndListeningTo(rDocument, pOldCode.get(), aOldPos);
 
-    if (pUndoDoc && (bValChanged || bOnRefMove))
+    if (pUndoDoc && aPlan.mbNeedUndoCapture)
         setOldCodeToUndo(*pUndoDoc, aUndoPos, pOldCode.get(), eTempGrammar, cMatrixFlag);
 
-    bCompile |= bRecompile;
+    bCompile = aPlan.mbNeedCompile;
     if (bCompile)
     {
-        CompileTokenArray( bNewListening ); // no Listening
-        bNeedDirty = true;
+        CompileTokenArray( aPlan.mbNeedEndListening ); // no Listening
     }
 
-    if ( !bInDeleteUndo )
+    if (aPlan.mbNeedSetNeedsListening)
     {   // In ChangeTrack Delete-Reject listeners are established in
         // InsertCol/InsertRow
-        if ( bNewListening )
-        {
-            // Inserts/Deletes re-establish listeners after all
-            // UpdateReference calls.
-            // All replaced shared formula listeners have to be
-            // established after an Insert or Delete. Do nothing here.
-            SetNeedsListening( true);
-        }
+        // Inserts/Deletes re-establish listeners after all
+        // UpdateReference calls.
+        // All replaced shared formula listeners have to be
+        // established after an Insert or Delete. Do nothing here.
+        SetNeedsListening( true);
     }
 
-    if (bNeedDirty)
+    if (aPlan.mbNeedPostponedDirty)
     {   // Cut off references, invalid or similar?
         // Postpone SetDirty() until all listeners have been re-established in
         // Inserts/Deletes.
         mbPostponedDirty = true;
     }
 
-    return bCellStateChanged;
+    return aPlan.mbCellStateChanged;
 }
 
 bool ScFormulaCell::UpdateReferenceOnMove(
@@ -3422,21 +3408,18 @@ bool ScFormulaCell::UpdateReferenceOnMove(
     if (rCxt.meMode != URM_MOVE)
         return false;
 
+    using spreadsheetengine::core::formulacellrefupdate::computePreviousPosition;
+    using spreadsheetengine::core::formulacellrefupdate::makeMoveUpdatePlan;
+
     ScAddress aUndoPos( aPos );         // position for undo cell in pUndoDoc
     if ( pUndoCellPos )
         aUndoPos = *pUndoCellPos;
-    ScAddress aOldPos( aPos );
-
     bool bCellInMoveTarget = rCxt.maRange.Contains(aPos);
-
-    if ( bCellInMoveTarget )
-    {
-        // The cell is being moved or copied to a new position. I guess the
-        // position has been updated prior to this call?  Determine
-        // its original position before the move which will be used to adjust
-        // relative references later.
-        aOldPos.Set(aPos.Col() - rCxt.mnColDelta, aPos.Row() - rCxt.mnRowDelta, aPos.Tab() - rCxt.mnTabDelta);
-    }
+    const auto aOldPosition = computePreviousPosition(
+        { aPos.Tab(), aPos.Col(), aPos.Row() }, bCellInMoveTarget, rCxt.mnColDelta,
+        rCxt.mnRowDelta, rCxt.mnTabDelta);
+    const ScAddress aOldPos(
+        aOldPosition.mnColumn, aOldPosition.mnRow, aOldPosition.mnSheet);
 
     // Check presence of any references or column row names.
     bool bHasRefs = pCode->HasReferences();
@@ -3446,14 +3429,13 @@ bool ScFormulaCell::UpdateReferenceOnMove(
         bHasColRowNames = (formula::FormulaTokenArrayPlainIterator(*pCode).GetNextColRowName() != nullptr);
         bHasRefs = bHasColRowNames;
     }
-    bool bOnRefMove = pCode->IsRecalcModeOnRefMove();
+    const bool bRecalcOnRefMove = pCode->IsRecalcModeOnRefMove();
 
-    if (!bHasRefs && !bOnRefMove)
+    if (!bHasRefs && !bRecalcOnRefMove)
         // This formula cell contains no references, nor needs recalculating
         // on reference update. Bail out.
         return false;
 
-    bool bCellStateChanged = false;
     std::unique_ptr<ScTokenArray> pOldCode;
     if (pUndoDoc)
         pOldCode = pCode->Clone();
@@ -3472,16 +3454,8 @@ bool ScFormulaCell::UpdateReferenceOnMove(
             bCompile = true;
     }
 
-    if (bValChanged || bRefModified)
-        bCellStateChanged = true;
-
-    if (bOnRefMove)
-        // Cell may reference itself, e.g. ocColumn, ocRow without parameter
-        bOnRefMove = (bValChanged || (aPos != aOldPos));
-
     bool bColRowNameCompile = false;
     bool bHasRelName = false;
-    bool bNewListening = false;
     bool bInDeleteUndo = false;
 
     if (bHasRefs)
@@ -3498,53 +3472,38 @@ bool ScFormulaCell::UpdateReferenceOnMove(
         RelNameRef eRelNameRef = HasRelNameReference();
         bHasRelName = (eRelNameRef != RelNameRef::NONE);
         bCompile |= (eRelNameRef == RelNameRef::DOUBLE);
-        // Reference changed and new listening needed?
-        // Except in Insert/Delete without specialties.
-        bNewListening = (bRefModified || bColRowNameCompile
-                || bValChanged || bHasRelName)
-            // #i36299# Don't duplicate action during cut&paste / drag&drop
-            // on a cell in the range moved, start/end listeners is done
-            // via ScDocument::DeleteArea() and ScDocument::CopyFromClip().
-            && !(rDocument.IsInsertingFromOtherDoc() && rCxt.maRange.Contains(aPos));
-
-        if ( bNewListening )
-            EndListeningTo(rDocument, pOldCode.get(), aOldPos);
     }
+    const auto aPlan = makeMoveUpdatePlan(
+        { aPos.Tab(), aPos.Col(), aPos.Row() }, bCellInMoveTarget, rCxt.mnColDelta,
+        rCxt.mnRowDelta, rCxt.mnTabDelta, bHasRefs, bHasColRowNames, bRecalcOnRefMove,
+        bValChanged, bRefModified, bColRowNameCompile,
+        bHasRelName, bCompile, rDocument.IsInsertingFromOtherDoc(), bInDeleteUndo);
 
-    bool bNeedDirty = false;
-    // NeedDirty for changes except for Copy and Move/Insert without RelNames
-    if ( bRefModified || bColRowNameCompile ||
-         (bValChanged && bHasRelName ) || bOnRefMove)
-        bNeedDirty = true;
+    if (aPlan.mbNeedEndListening)
+        EndListeningTo(rDocument, pOldCode.get(), aOldPos);
 
-    if (pUndoDoc && !bCellInMoveTarget && (bValChanged || bRefModified || bOnRefMove))
+    if (pUndoDoc && aPlan.mbNeedUndoCapture)
         setOldCodeToUndo(*pUndoDoc, aUndoPos, pOldCode.get(), eTempGrammar, cMatrixFlag);
 
-    bValChanged = false;
-
-    bCompile = (bCompile || bValChanged || bColRowNameCompile);
-    if ( bCompile )
+    bCompile = aPlan.mbNeedCompile;
+    if (bCompile)
     {
-        CompileTokenArray( bNewListening ); // no Listening
-        bNeedDirty = true;
+        CompileTokenArray( aPlan.mbNeedEndListening ); // no Listening
     }
 
-    if ( !bInDeleteUndo )
+    if (aPlan.mbNeedStartListening)
     {   // In ChangeTrack Delete-Reject listeners are established in
         // InsertCol/InsertRow
-        if ( bNewListening )
-        {
-            StartListeningTo( rDocument );
-        }
+        StartListeningTo( rDocument );
     }
 
-    if (bNeedDirty)
+    if (aPlan.mbNeedDirty)
     {   // Cut off references, invalid or similar?
         sc::AutoCalcSwitch aACSwitch(rDocument, false);
         SetDirty();
     }
 
-    return bCellStateChanged;
+    return aPlan.mbCellStateChanged;
 }
 
 bool ScFormulaCell::UpdateReferenceOnCopy(
@@ -3577,7 +3536,8 @@ bool ScFormulaCell::UpdateReferenceOnCopy(
     if (pUndoDoc && aPlan.mbNeedUndoCapture)
         setOldCodeToUndo(*pUndoDoc, aUndoPos, pOldCode.get(), eTempGrammar, cMatrixFlag);
 
-    if (aPlan.mbNeedCompile)
+    bCompile = aPlan.mbNeedCompile;
+    if (bCompile)
     {
         CompileTokenArray(); // no Listening
     }
@@ -3628,12 +3588,17 @@ bool ScFormulaCell::UpdateReference(
 
 void ScFormulaCell::UpdateInsertTab( const sc::RefUpdateInsertTabContext& rCxt )
 {
+    using spreadsheetengine::core::formulacellrefupdate::makeInsertTabUpdatePlan;
+    using spreadsheetengine::core::formulacellrefupdate::shouldCompileAfterTabAdjust;
+
     // Adjust tokens only when it's not grouped or grouped top cell.
     bool bAdjustCode = !mxGroup || mxGroup->mpTopCell == this;
-    bool bPosChanged = (rCxt.mnInsertPos <= aPos.Tab());
-    if (rDocument.IsClipOrUndo() || !pCode->HasReferences())
+    const auto aPlan = makeInsertTabUpdatePlan(
+        aPos.Tab(), rCxt.mnInsertPos, rCxt.mnSheets, rDocument.IsClipOrUndo(), pCode->HasReferences(),
+        bAdjustCode);
+    if (!aPlan.mbNeedEndListening)
     {
-        if (bPosChanged)
+        if (aPlan.mbPositionChanged)
             aPos.IncTab(rCxt.mnSheets);
 
         return;
@@ -3642,28 +3607,31 @@ void ScFormulaCell::UpdateInsertTab( const sc::RefUpdateInsertTabContext& rCxt )
     EndListeningTo( rDocument );
     ScAddress aOldPos = aPos;
     // IncTab _after_ EndListeningTo and _before_ Compiler UpdateInsertTab!
-    if (bPosChanged)
+    if (aPlan.mbPositionChanged)
         aPos.IncTab(rCxt.mnSheets);
 
-    if (!bAdjustCode)
+    if (!aPlan.mbNeedAdjustCode)
         return;
 
     sc::RefUpdateResult aRes = pCode->AdjustReferenceOnInsertedTab(rCxt, aOldPos);
-    if (aRes.mbNameModified)
-        // Re-compile after new sheet(s) have been inserted.
-        bCompile = true;
+    bCompile |= shouldCompileAfterTabAdjust(aRes.mbNameModified);
 
     // no StartListeningTo because the new sheets have not been inserted yet.
 }
 
 void ScFormulaCell::UpdateDeleteTab( const sc::RefUpdateDeleteTabContext& rCxt )
 {
+    using spreadsheetengine::core::formulacellrefupdate::makeDeleteTabUpdatePlan;
+    using spreadsheetengine::core::formulacellrefupdate::shouldCompileAfterTabAdjust;
+
     // Adjust tokens only when it's not grouped or grouped top cell.
     bool bAdjustCode = !mxGroup || mxGroup->mpTopCell == this;
-    bool bPosChanged = (aPos.Tab() >= rCxt.mnDeletePos + rCxt.mnSheets);
-    if (rDocument.IsClipOrUndo() || !pCode->HasReferences())
+    const auto aPlan = makeDeleteTabUpdatePlan(
+        aPos.Tab(), rCxt.mnDeletePos, rCxt.mnSheets, rDocument.IsClipOrUndo(),
+        pCode->HasReferences(), bAdjustCode);
+    if (!aPlan.mbNeedEndListening)
     {
-        if (bPosChanged)
+        if (aPlan.mbPositionChanged)
             aPos.IncTab(-1*rCxt.mnSheets);
         return;
     }
@@ -3671,24 +3639,26 @@ void ScFormulaCell::UpdateDeleteTab( const sc::RefUpdateDeleteTabContext& rCxt )
     EndListeningTo( rDocument );
     // IncTab _after_ EndListeningTo and _before_ Compiler UpdateDeleteTab!
     ScAddress aOldPos = aPos;
-    if (bPosChanged)
+    if (aPlan.mbPositionChanged)
         aPos.IncTab(-1*rCxt.mnSheets);
 
-    if (!bAdjustCode)
+    if (!aPlan.mbNeedAdjustCode)
         return;
 
     sc::RefUpdateResult aRes = pCode->AdjustReferenceOnDeletedTab(rCxt, aOldPos);
-    if (aRes.mbNameModified)
-        // Re-compile after sheet(s) have been deleted.
-        bCompile = true;
+    bCompile |= shouldCompileAfterTabAdjust(aRes.mbNameModified);
 }
 
 void ScFormulaCell::UpdateMoveTab( const sc::RefUpdateMoveTabContext& rCxt, SCTAB nTabNo )
 {
+    using spreadsheetengine::core::formulacellrefupdate::makeMoveTabUpdatePlan;
+    using spreadsheetengine::core::formulacellrefupdate::shouldCompileAfterTabAdjust;
+
     // Adjust tokens only when it's not grouped or grouped top cell.
     bool bAdjustCode = !mxGroup || mxGroup->mpTopCell == this;
-
-    if (!pCode->HasReferences() || rDocument.IsClipOrUndo())
+    const auto aPlan = makeMoveTabUpdatePlan(
+        rDocument.IsClipOrUndo(), pCode->HasReferences(), bAdjustCode);
+    if (!aPlan.mbNeedEndListening)
     {
         aPos.SetTab(nTabNo);
         return;
@@ -3701,13 +3671,11 @@ void ScFormulaCell::UpdateMoveTab( const sc::RefUpdateMoveTabContext& rCxt, SCTA
 
     // no StartListeningTo because pTab[nTab] not yet correct!
 
-    if (!bAdjustCode)
+    if (!aPlan.mbNeedAdjustCode)
         return;
 
     sc::RefUpdateResult aRes = pCode->AdjustReferenceOnMovedTab(rCxt, aOldPos);
-    if (aRes.mbNameModified)
-        // Re-compile after sheet(s) have been deleted.
-        bCompile = true;
+    bCompile |= shouldCompileAfterTabAdjust(aRes.mbNameModified);
 }
 
 void ScFormulaCell::UpdateInsertTabAbs(SCTAB nTable)
@@ -3824,29 +3792,20 @@ void ScFormulaCell::TransposeReference()
 void ScFormulaCell::UpdateTranspose( const ScRange& rSource, const ScAddress& rDest,
                                         ScDocument* pUndoDoc )
 {
+    using spreadsheetengine::core::formulacellrefupdate::makeTranspose3DFlagPlan;
+    using spreadsheetengine::core::formulacellrefupdate::makeTransposeFinishPlan;
+    using spreadsheetengine::core::formulacellrefupdate::makeTransposePositionPlan;
+
     EndListeningTo( rDocument );
 
-    ScAddress aOldPos = aPos;
-    bool bPosChanged = false; // Whether this cell has been moved
-
-    // Dest range is transposed
-    ScRange aDestRange( rDest, ScAddress(
-                static_cast<SCCOL>(rDest.Col() + rSource.aEnd.Row() - rSource.aStart.Row()),
-                static_cast<SCROW>(rDest.Row() + rSource.aEnd.Col() - rSource.aStart.Col()),
-                rDest.Tab() + rSource.aEnd.Tab() - rSource.aStart.Tab() ) );
-
-    // cell within range
-    if ( aDestRange.Contains( aOldPos ) )
-    {
-        // References of these cells were not changed by ScTokenArray::AdjustReferenceOnMove()
-        // Count back Positions
-        SCCOL nRelPosX = aOldPos.Col();
-        SCROW nRelPosY = aOldPos.Row();
-        SCTAB nRelPosZ = aOldPos.Tab();
-        ScRefUpdate::DoTranspose( nRelPosX, nRelPosY, nRelPosZ, rDocument, aDestRange, rSource.aStart );
-        aOldPos.Set( nRelPosX, nRelPosY, nRelPosZ );
-        bPosChanged = true;
-    }
+    const auto aPositionPlan = makeTransposePositionPlan(
+        { aPos.Tab(), aPos.Col(), aPos.Row() },
+        { { rSource.aStart.Tab(), rSource.aStart.Col(), rSource.aStart.Row() },
+            { rSource.aEnd.Tab(), rSource.aEnd.Col(), rSource.aEnd.Row() } },
+        { rDest.Tab(), rDest.Col(), rDest.Row() }, rDocument.GetTableCount());
+    const ScAddress aOldPos(
+        aPositionPlan.maOldPosition.mnColumn, aPositionPlan.maOldPosition.mnRow,
+        aPositionPlan.maOldPosition.mnSheet);
 
     std::unique_ptr<ScTokenArray> pOld;
     if (pUndoDoc)
@@ -3868,47 +3827,51 @@ void ScFormulaCell::UpdateTranspose( const ScRange& rSource, const ScAddress& rD
             SingleDoubleRefModifier aMod(*t);
             ScComplexRefData& rRef = aMod.Ref();
             ScRange aAbs = rRef.toAbs(rDocument, aOldPos);
-            bool bMod = (ScRefUpdate::UpdateTranspose(rDocument, rSource, rDest, aAbs) != UR_NOTHING || bPosChanged);
+            bool bMod = (ScRefUpdate::UpdateTranspose(rDocument, rSource, rDest, aAbs) != UR_NOTHING
+                         || aPositionPlan.mbPositionChanged);
             if (bMod)
             {
                 rRef.SetRange(rDocument.GetSheetLimits(), aAbs, aPos); // based on the new anchor position.
                 bRefChanged = true;
 
-                // Absolute sheet reference => set 3D flag.
-                // More than one sheet referenced => has to have both 3D flags.
-                // If end part has 3D flag => start part must have it too.
-                // The same behavior as in ScTokenArray::AdjustReferenceOnMove() is used for 3D-Flags.
-                rRef.Ref2.SetFlag3D(aAbs.aStart.Tab() != aAbs.aEnd.Tab() || !rRef.Ref2.IsTabRel());
-                rRef.Ref1.SetFlag3D(
-                    (rSource.aStart.Tab() != rDest.Tab() && !bPosChanged)
-                    || !rRef.Ref1.IsTabRel() || rRef.Ref2.IsFlag3D());
+                const auto aFlagPlan = makeTranspose3DFlagPlan(
+                    { { aAbs.aStart.Tab(), aAbs.aStart.Col(), aAbs.aStart.Row() },
+                        { aAbs.aEnd.Tab(), aAbs.aEnd.Col(), aAbs.aEnd.Row() } },
+                    rSource.aStart.Tab(), rDest.Tab(), aPositionPlan.mbPositionChanged,
+                    rRef.Ref1.IsTabRel(), rRef.Ref2.IsTabRel());
+                rRef.Ref2.SetFlag3D(aFlagPlan.mbRef2Flag3D);
+                rRef.Ref1.SetFlag3D(aFlagPlan.mbRef1Flag3D);
             }
         }
     }
 
-    if (bRefChanged)
+    const auto aFinishPlan = makeTransposeFinishPlan(bRefChanged, pUndoDoc != nullptr);
+    if (aFinishPlan.mbNeedUndoCapture)
     {
-        if (pUndoDoc)
-        {
-            // Similar to setOldCodeToUndo(), but it cannot be used due to the check
-            // pUndoDoc->GetCellType(aPos) == CELLTYPE_FORMULA
-            ScFormulaCell* pFCell = new ScFormulaCell(
-                    *pUndoDoc, aPos, pOld ? *pOld : ScTokenArray(*pUndoDoc), eTempGrammar, cMatrixFlag);
+        // Similar to setOldCodeToUndo(), but it cannot be used due to the check
+        // pUndoDoc->GetCellType(aPos) == CELLTYPE_FORMULA
+        ScFormulaCell* pFCell = new ScFormulaCell(
+                *pUndoDoc, aPos, pOld ? *pOld : ScTokenArray(*pUndoDoc), eTempGrammar, cMatrixFlag);
 
-            pFCell->aResult.SetToken( nullptr);  // to recognize it as changed later (Cut/Paste!)
-            pUndoDoc->SetFormulaCell(aPos, pFCell);
-        }
+        pFCell->aResult.SetToken( nullptr);  // to recognize it as changed later (Cut/Paste!)
+        pUndoDoc->SetFormulaCell(aPos, pFCell);
+    }
 
+    if (aFinishPlan.mbNeedCompile)
+    {
         bCompile = true;
         CompileTokenArray(); // also call StartListeningTo
-        SetDirty();
+        if (aFinishPlan.mbNeedDirty)
+            SetDirty();
     }
-    else
+    else if (aFinishPlan.mbNeedRestoreListening)
         StartListeningTo( rDocument ); // Listener as previous
 }
 
 void ScFormulaCell::UpdateGrow( const ScRange& rArea, SCCOL nGrowX, SCROW nGrowY )
 {
+    using spreadsheetengine::core::formulacellrefupdate::makeGrowFinishPlan;
+
     EndListeningTo( rDocument );
 
     bool bRefChanged = false;
@@ -3938,13 +3901,15 @@ void ScFormulaCell::UpdateGrow( const ScRange& rArea, SCCOL nGrowX, SCROW nGrowY
         }
     }
 
-    if (bRefChanged)
+    const auto aFinishPlan = makeGrowFinishPlan(bRefChanged);
+    if (aFinishPlan.mbNeedCompile)
     {
         bCompile = true;
         CompileTokenArray(); // Also call StartListeningTo
-        SetDirty();
+        if (aFinishPlan.mbNeedDirty)
+            SetDirty();
     }
-    else
+    else if (aFinishPlan.mbNeedRestoreListening)
         StartListeningTo( rDocument ); // Listener as previous
 }
 

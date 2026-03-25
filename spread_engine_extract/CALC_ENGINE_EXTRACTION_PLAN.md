@@ -1373,14 +1373,36 @@ Current status:
     - transpose range-update eligibility and application
     - grow-range X/Y eligibility and application
   - engine-owned formulacell reference-update planning now also covers the
-    first `ScFormulaCell` action-plan seam:
+    first `ScFormulaCell` action-plan seams:
+    - dirty / compile / listening / postponed-dirty planning for
+      `UpdateReferenceOnShift()`
     - original-position recovery for copy/move-within-range updates
     - undo-capture eligibility for `UpdateReferenceOnCopy()`
     - dirty / compile planning for copy-time reference updates
+    - post-adjust dirty / compile / undo / listening planning for
+      `UpdateReferenceOnMove()`
+    - insert/delete/move-tab preflight planning for:
+      - position-change detection
+      - listener teardown eligibility
+      - grouped-top-cell adjust-code gating
+      - name-modified recompilation requests
+    - these now cover:
+      - `UpdateInsertTab()`
+      - `UpdateDeleteTab()`
+      - `UpdateMoveTab()`
+    - transpose planning for:
+      - transposed destination-range geometry
+      - old-anchor recovery for cells moved by transpose
+      - 3D-flag recomputation after transposed reference updates
+      - final undo/compile/dirty vs restore-listening action selection
+    - this now covers `UpdateTranspose()`
+    - grow planning for:
+      - final compile/dirty vs restore-listening action selection
+    - this now covers `UpdateGrow()`
   - Calc now consumes those helpers from `refupdat.cxx`, while still owning:
     - `ScBigRange` update handling
     - the remaining `ScFormulaCell::UpdateReference*()` orchestration beyond
-      the copy planner seam
+      the shift/copy/move and tab-update planner seams
     - undo-document writes, listening, and recompilation side effects
   - validation is green for the first pass-6 checkpoint:
     - standalone: `ctest` passes `18/18`
