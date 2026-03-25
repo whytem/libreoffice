@@ -45,6 +45,19 @@ int main()
         return fail("spreadsheetengine_sharedformula_tests", "group run plan mismatch");
     }
 
+    if (!spreadsheetengine::api::sharedformula::isValidListenAddress({ 0, 1, 2 })
+        || spreadsheetengine::api::sharedformula::isValidListenAddress({ -1, 1, 2 })
+        || spreadsheetengine::api::sharedformula::makeGroupSingleRefListenPlan({ 0, 1, 2 })
+               != spreadsheetengine::api::sharedformula::GroupSingleRefListenPlan {
+                   { 0, 1, 2 }, true }
+        || spreadsheetengine::api::sharedformula::makeGroupSingleRefListenPlan({ 0, -1, 2 })
+               != spreadsheetengine::api::sharedformula::GroupSingleRefListenPlan {
+                   { 0, -1, 2 }, false })
+    {
+        return fail("spreadsheetengine_sharedformula_tests",
+                    "single-ref listening plan mismatch");
+    }
+
     if (spreadsheetengine::api::sharedformula::makeGroupDoubleRefListenPlan(
             { { 0, 1, 2 }, { 0, 3, 4 } }, true, true, 5)
             != spreadsheetengine::api::sharedformula::GroupDoubleRefListenPlan {

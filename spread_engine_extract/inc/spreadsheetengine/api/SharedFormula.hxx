@@ -99,6 +99,14 @@ struct GroupDoubleRefListenPlan
     [[nodiscard]] constexpr bool operator==(const GroupDoubleRefListenPlan& rOther) const = default;
 };
 
+struct GroupSingleRefListenPlan
+{
+    CellAddress maAddress;
+    bool mbListen = false;
+
+    [[nodiscard]] constexpr bool operator==(const GroupSingleRefListenPlan& rOther) const = default;
+};
+
 [[nodiscard]] constexpr bool shouldJoinFormulaCells(TokenCompareState eState)
 {
     return eState != TokenCompareState::NotEqual;
@@ -146,6 +154,17 @@ struct GroupDoubleRefListenPlan
         return { GroupRunAction::ExtendExistingGroup, false };
 
     return { GroupRunAction::CreateGroup, eState == TokenCompareState::EqualInvariant };
+}
+
+[[nodiscard]] constexpr bool isValidListenAddress(const CellAddress& rAddress)
+{
+    return rAddress.mnSheet >= 0 && rAddress.mnColumn >= 0 && rAddress.mnRow >= 0;
+}
+
+[[nodiscard]] constexpr GroupSingleRefListenPlan makeGroupSingleRefListenPlan(
+    const CellAddress& rAddress)
+{
+    return { rAddress, isValidListenAddress(rAddress) };
 }
 
 [[nodiscard]] constexpr GroupDoubleRefListenPlan makeGroupDoubleRefListenPlan(

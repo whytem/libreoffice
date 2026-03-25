@@ -65,6 +65,7 @@
 #include <listenerqueryids.hxx>
 #include <grouparealistener.hxx>
 #include <formulalogger.hxx>
+#include <spreadsheetengine/core/FormulaCellReferenceUpdate.hxx>
 #include <spreadsheetengine/core/FormulaCellState.hxx>
 #include <com/sun/star/sheet/FormulaLanguage.hpp>
 
@@ -3552,51 +3553,36 @@ bool ScFormulaCell::UpdateReferenceOnCopy(
     if (rCxt.meMode != URM_COPY)
         return false;
 
+    using spreadsheetengine::core::formulacellrefupdate::makeCopyUpdatePlan;
+
     ScAddress aUndoPos( aPos );         // position for undo cell in pUndoDoc
     if ( pUndoCellPos )
         aUndoPos = *pUndoCellPos;
-    ScAddress aOldPos( aPos );
-
-    if (rCxt.maRange.Contains(aPos))
-    {
-        // The cell is being moved or copied to a new position. I guess the
-        // position has been updated prior to this call?  Determine
-        // its original position before the move which will be used to adjust
-        // relative references later.
-        aOldPos.Set(aPos.Col() - rCxt.mnColDelta, aPos.Row() - rCxt.mnRowDelta, aPos.Tab() - rCxt.mnTabDelta);
-    }
 
     // Check presence of any references or column row names.
-    bool bHasRefs = pCode->HasReferences();
     bool bHasColRowNames = (formula::FormulaTokenArrayPlainIterator(*pCode).GetNextColRowName() != nullptr);
-    bHasRefs = bHasRefs || bHasColRowNames;
-    bool bOnRefMove = pCode->IsRecalcModeOnRefMove();
-
-    if (!bHasRefs && !bOnRefMove)
+    const auto aPlan = makeCopyUpdatePlan(
+        { aPos.Tab(), aPos.Col(), aPos.Row() }, rCxt.maRange.Contains(aPos), rCxt.mnColDelta,
+        rCxt.mnRowDelta, rCxt.mnTabDelta, pCode->HasReferences(), bHasColRowNames,
+        pCode->IsRecalcModeOnRefMove(), bCompile);
+    if (!aPlan.mbHasWork)
         // This formula cell contains no references, nor needs recalculating
         // on reference update. Bail out.
         return false;
 
     std::unique_ptr<ScTokenArray> pOldCode;
-    if (pUndoDoc)
+    if (pUndoDoc && aPlan.mbNeedUndoCapture)
         pOldCode = pCode->Clone();
 
-    if (bOnRefMove)
-        // Cell may reference itself, e.g. ocColumn, ocRow without parameter
-        bOnRefMove = (aPos != aOldPos);
-
-    bool bNeedDirty = bOnRefMove;
-
-    if (pUndoDoc && bOnRefMove)
+    if (pUndoDoc && aPlan.mbNeedUndoCapture)
         setOldCodeToUndo(*pUndoDoc, aUndoPos, pOldCode.get(), eTempGrammar, cMatrixFlag);
 
-    if (bCompile)
+    if (aPlan.mbNeedCompile)
     {
         CompileTokenArray(); // no Listening
-        bNeedDirty = true;
     }
 
-    if (bNeedDirty)
+    if (aPlan.mbNeedDirty)
     {   // Cut off references, invalid or similar?
         sc::AutoCalcSwitch aACSwitch(rDocument, false);
         SetDirty();

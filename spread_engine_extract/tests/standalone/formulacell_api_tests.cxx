@@ -2,12 +2,14 @@
 
 #include <iostream>
 
+#include <spreadsheetengine/core/FormulaCellReferenceUpdate.hxx>
 #include <spreadsheetengine/core/FormulaCellState.hxx>
 
 #include "TestSupport.hxx"
 
 int main()
 {
+    using spreadsheetengine::api::CellAddress;
     using spreadsheetengine::core::formulacell::CalcAfterLoadPlan;
     using spreadsheetengine::core::formulacell::DirtyPlan;
     using spreadsheetengine::core::formulacell::LoadTrackingPlan;
@@ -16,6 +18,7 @@ int main()
     using spreadsheetengine::core::formulacell::ParallelCalculationPlan;
     using spreadsheetengine::core::formulacell::TableOpDirtyPlan;
     using spreadsheetengine::core::formulacell::VolatileKind;
+    using spreadsheetengine::core::formulacellrefupdate::CopyUpdatePlan;
     using spreadsheetengine::standalone::test::fail;
 
     if (spreadsheetengine::core::formulacell::makeSetDirtyPlan(
@@ -139,6 +142,33 @@ int main()
                != TableOpDirtyPlan { false, false, false, false, false })
     {
         return fail("spreadsheetengine_formulacell_tests", "table op dirty plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacellrefupdate::computePreviousPosition(
+            { 5, 11, 19 }, false, 2, 3, 1)
+            != CellAddress { 5, 11, 19 }
+        || spreadsheetengine::core::formulacellrefupdate::computePreviousPosition(
+               { 5, 11, 19 }, true, 2, 3, 1)
+               != CellAddress { 4, 9, 16 })
+    {
+        return fail("spreadsheetengine_formulacell_tests",
+                    "copy previous-position plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacellrefupdate::makeCopyUpdatePlan(
+            { 5, 11, 19 }, false, 2, 3, 1, false, false, false, false)
+            != CopyUpdatePlan { { 5, 11, 19 }, false, false, false, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeCopyUpdatePlan(
+               { 5, 11, 19 }, true, 2, 3, 1, false, false, true, false)
+               != CopyUpdatePlan { { 4, 9, 16 }, true, true, true, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeCopyUpdatePlan(
+               { 5, 11, 19 }, false, 2, 3, 1, true, false, false, false)
+               != CopyUpdatePlan { { 5, 11, 19 }, true, false, false, false }
+        || spreadsheetengine::core::formulacellrefupdate::makeCopyUpdatePlan(
+               { 5, 11, 19 }, false, 2, 3, 1, false, true, false, true)
+               != CopyUpdatePlan { { 5, 11, 19 }, true, false, true, true })
+    {
+        return fail("spreadsheetengine_formulacell_tests", "copy update plan mismatch");
     }
 
     std::cout << "spreadsheetengine formulacell api tests passed\n";

@@ -369,9 +369,12 @@ void SharedFormulaUtil::startListeningAsGroup( sc::StartListeningContext& rCxt, 
             {
                 const ScSingleRefData* pRef = t->GetSingleRef();
                 ScAddress aPos = pRef->toAbs(rDoc, rTopCell.aPos);
+                const seshared::GroupSingleRefListenPlan aListenPlan
+                    = seshared::makeGroupSingleRefListenPlan(
+                        spreadsheetengine::compat::libreoffice::toApiCellAddress(aPos));
                 ScFormulaCell** pp = ppSharedTop;
                 ScFormulaCell** ppEnd = ppSharedTop + xGroup->mnLength;
-                if (aPos.IsValid())
+                if (aListenPlan.mbListen)
                     if (ScTable* pTable = rDoc.FetchTable(aPos.Tab()))
                         pTable->CreateColumnIfNotExists(aPos.Col()).StartListeningSingleRefFormulaCells(rCxt, pRef, aPos, pp, ppEnd);
             }

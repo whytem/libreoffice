@@ -1040,6 +1040,91 @@ Implementation approach:
   - this is where listener/query/cache integration and the remaining
     `ScFormulaCell` ownership changes should converge
 
+Heavyweight tail execution strategy:
+
+- treat the final pass as four converging streams instead of one giant move:
+  - stream A: pure reference-update kernels from `refupdat.cxx`
+  - stream B: `ScFormulaCell::UpdateReference*()` decision planning
+  - stream C: tab / transpose / grow shared update helpers
+  - stream D: dependency / recalc orchestration and group-evaluation fallback
+- keep the engine focused on algorithm ownership, not document ownership
+  - move pure planning and transformation logic first
+  - keep listener registration, undo-document writes, and broadcaster/tree
+    mutation in Calc adapters until the algorithm layer is stable
+- introduce engine-owned action plans for every heavyweight slice instead of
+  trying to move side effects directly
+  - reference-update plan:
+    - whether position changes
+    - whether references or names changed
+    - whether recompilation is required
+    - whether listeners must be restarted
+    - whether the cell must be dirtied
+    - whether undo capture is required
+  - recalc/dependency plan:
+    - whether dependency evaluation must abort
+    - whether group calc may proceed
+    - whether fallback to scalar evaluation is required
+    - whether group/listener/tree state must be reset
+- recommended order inside the heavyweight tail:
+  1. extract pure `ScRefUpdate` kernels first
+     - `Update()`
+     - `MoveRelWrap()`
+     - `DoTranspose()`
+     - `UpdateTranspose()`
+     - `UpdateGrow()`
+     - this gives the later `ScFormulaCell` and shared-formula work one stable
+       engine-owned reference-motion layer instead of duplicating semantics
+  2. extract `ScFormulaCell` update planners on top of those kernels
+     - `UpdateReferenceOnShift()`
+     - `UpdateReferenceOnMove()`
+     - `UpdateReferenceOnCopy()`
+     - keep `EndListeningTo()`, `StartListeningTo()`, undo-cell materialization,
+       and `CompileTokenArray()` in Calc while moving the decision logic out
+  3. extract the tab / transpose / grow family next
+     - `UpdateInsertTab()`
+     - `UpdateDeleteTab()`
+     - `UpdateMoveTab()`
+     - `UpdateInsertTabAbs()`
+     - `UpdateTranspose()`
+     - `UpdateGrow()`
+     - these are still high-coupling, but they become much safer once both the
+       kernel layer and the `ScFormulaCell` update plans already exist
+  4. only then converge on dependency / recalc orchestration
+     - recursion/dependency abort gates
+     - group-evaluation fallback policy
+     - dirty / formula-tree / listener reset planning tied to group eval
+     - keep document graph ownership in Calc until the final step
+- prefer extracting “decision tables” out of `ScFormulaCell` rather than
+  lifting whole methods
+  - the less risky pattern is:
+    - gather current cell/document state in Calc
+    - call engine planner
+    - execute returned actions in Calc
+  - this preserves behavior while still moving the real recalc policy out of
+    Calc
+- validation should tighten as the tail progresses:
+  - standalone:
+    - keep the full `ctest` lane green
+    - add dedicated reference-update / formulacell-update tests as each action
+      plan appears
+  - LibreOffice:
+    - always run:
+      - `CppunitTest_sc_ucalc`
+      - `CppunitTest_sc_ucalc_formula2`
+      - `CppunitTest_sc_ucalc_copypaste`
+      - `CppunitTest_sc_ucalc_sharedformula`
+      - `CppunitTest_sc_spreadsheet_functions_test`
+    - add when relevant:
+      - `CppunitTest_sc_cache_test`
+      - `CppunitTest_sc_ucalc_sort`
+      - `CppunitTest_sc_ucalc_shared_cases`
+      - `CppunitTest_sc_parallelism` when the environment issue is resolved
+- stop conditions for the final pass:
+  - once reference-motion algorithms and `ScFormulaCell` update/recalc planning
+    primarily live in the engine, Phase 10 is complete even if Calc still owns
+    the last listener/document side effects
+  - anything left after that is Phase 11 cleanup, not Phase 10 extraction
+
 What not to do early:
 
 - do not start Phase 10 by moving all of `formulacell.cxx`
@@ -1239,6 +1324,7 @@ Current status:
     - shared-formula row-bound normalization for split and unshare bulk passes
     - shared-top retrieval and join-above eligibility checks
     - group-run planning for `groupFormulaCells()`
+    - grouped single-reference listener eligibility planning
     - grouped double-reference listened-range planning for listener setup
   - Calc now consumes those helpers from `sharedformula.cxx` and
     `sharedformula.hxx`, while still owning:
@@ -1277,6 +1363,33 @@ Current status:
       - `CppunitTest_sc_ucalc_copypaste`
       - `CppunitTest_sc_ucalc_formula2`
       - `CppunitTest_sc_spreadsheet_functions_test`
+- pass 6 is now started with the first pure reference-update kernel slice:
+  - engine-owned reference-update policy now covers:
+    - the main normalized `ScRefUpdate::Update()` kernel for non-big-range
+      reference motion, including insert/delete, move, reorder, expand, and
+      sticky-result classification
+    - relative-reference wrap normalization for `ScComplexRefData`
+    - transpose address motion
+    - transpose range-update eligibility and application
+    - grow-range X/Y eligibility and application
+  - engine-owned formulacell reference-update planning now also covers the
+    first `ScFormulaCell` action-plan seam:
+    - original-position recovery for copy/move-within-range updates
+    - undo-capture eligibility for `UpdateReferenceOnCopy()`
+    - dirty / compile planning for copy-time reference updates
+  - Calc now consumes those helpers from `refupdat.cxx`, while still owning:
+    - `ScBigRange` update handling
+    - the remaining `ScFormulaCell::UpdateReference*()` orchestration beyond
+      the copy planner seam
+    - undo-document writes, listening, and recompilation side effects
+  - validation is green for the first pass-6 checkpoint:
+    - standalone: `ctest` passes `18/18`
+    - LibreOffice:
+      - `CppunitTest_sc_ucalc`
+      - `CppunitTest_sc_ucalc_formula2`
+      - `CppunitTest_sc_ucalc_copypaste`
+      - `CppunitTest_sc_spreadsheet_functions_test`
+      - `CppunitTest_sc_ucalc_sharedformula`
 - taken together, Phase 10 is now substantially complete for the preparatory
   and mid-coupling passes
   - the remaining work is concentrated in the high-coupling tail:
