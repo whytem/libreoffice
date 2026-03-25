@@ -5064,12 +5064,14 @@ bool ScFormulaCell::InterpretFormulaGroupThreading(sc::FormulaLogger::GroupScope
             SAL_INFO("sc.threaded", "Done");
         }
 
-        ScAddress aStartPos(mxGroup->mpTopCell->aPos);
-        SCROW nSpanLen = nEndOffset - nStartOffset + 1;
-        aStartPos.SetRow(aStartPos.Row() + nStartOffset);
+        const auto aCompletionPlan
+            = spreadsheetengine::core::formulacell::makeThreadingCompletionPlan(
+                mxGroup->mpTopCell->aPos.Row(), nStartOffset, nEndOffset);
         // Reuse one of the previously allocated interpreter objects here.
-        rDocument.HandleStuffAfterParallelCalculation(nColStart, nColEnd, aStartPos.Row(), nSpanLen,
-                                                       aStartPos.Tab(), aInterpreters[0].get());
+        rDocument.HandleStuffAfterParallelCalculation(
+            nColStart, nColEnd, static_cast<SCROW>(aCompletionPlan.mnStartRow),
+            static_cast<SCROW>(aCompletionPlan.mnSpanLength), mxGroup->mpTopCell->aPos.Tab(),
+            aInterpreters[0].get());
 
         return true;
     }
@@ -5177,12 +5179,17 @@ bool ScFormulaCell::InterpretFormulaGroupOpenCL(sc::FormulaLogger::GroupScope& a
     // Heuristic: Certain old low-end OpenCL implementations don't
     // work for us with too large group lengths. 1000 was determined
     // empirically to be a good compromise.
-    if (openclwrapper::gpuEnv.mbNeedsTDRAvoidance)
-        nMaxGroupLength = 1000;
+    const bool bNeedsTDRAvoidance = openclwrapper::gpuEnv.mbNeedsTDRAvoidance;
+#else
+    const bool bNeedsTDRAvoidance = false;
 #endif
 
-    if (std::getenv("SC_MAX_GROUP_LENGTH"))
-        nMaxGroupLength = std::atoi(std::getenv("SC_MAX_GROUP_LENGTH"));
+    const char* pMaxGroupLengthEnv = std::getenv("SC_MAX_GROUP_LENGTH");
+    const auto aMaxGroupLengthPlan
+        = spreadsheetengine::core::formulacell::makeOpenCLMaxGroupLengthPlan(
+            bNeedsTDRAvoidance, pMaxGroupLengthEnv != nullptr,
+            pMaxGroupLengthEnv ? std::atoi(pMaxGroupLengthEnv) : 0);
+    nMaxGroupLength = aMaxGroupLengthPlan.mnMaxGroupLength;
 
     const auto aChunkingPlan = spreadsheetengine::core::formulacell::makeOpenCLChunkingPlan(
         GetSharedLength(), nMaxGroupLength);

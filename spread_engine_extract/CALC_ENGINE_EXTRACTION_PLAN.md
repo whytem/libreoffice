@@ -1363,7 +1363,8 @@ Current status:
       - `CppunitTest_sc_ucalc_copypaste`
       - `CppunitTest_sc_ucalc_formula2`
       - `CppunitTest_sc_spreadsheet_functions_test`
-- pass 6 is now started with the first pure reference-update kernel slice:
+- pass 6 is now substantially complete for the reference-update and recalc
+  planner layer:
   - engine-owned reference-update policy now covers:
     - the main normalized `ScRefUpdate::Update()` kernel for non-big-range
       reference motion, including insert/delete, move, reorder, expand, and
@@ -1439,13 +1440,18 @@ Current status:
       - group chunk partitioning and per-chunk offset/length calculation
       - temporary-group cleanup on token-conversion or interpreter failure
       - temporary-group transfer and finalization after successful chunks
+    - final backend helper planning for:
+      - OpenCL max-group-length selection from TDR-avoidance and env override
+      - threaded post-parallel completion span calculation
   - Calc now consumes those helpers from `refupdat.cxx`, while still owning:
     - `ScBigRange` update handling
-    - the remaining deeper dependency/recalc orchestration beyond the initial
-      `CheckComputeDependencies()`, `Interpret()`, and backend dependency-stage
-      planner seams
+    - backend execution and document-side orchestration such as:
+      - thread-pool scheduling and interpreter-context wiring
+      - `ScDependantsCalculator` execution
+      - `ScGroupTokenConverter` and `FormulaGroupInterpreter` execution
+      - token compilation, static-reference resolution, and document mutation
     - undo-document writes, listening, and recompilation side effects
-  - validation is green for the first pass-6 checkpoint:
+  - validation is green for the current pass-6 checkpoint:
     - standalone: `ctest` passes `18/18`
     - LibreOffice:
       - `CppunitTest_sc_ucalc`
@@ -1458,7 +1464,7 @@ Current status:
   - the remaining work is concentrated in the high-coupling tail:
     - broader `ScFormulaCell` result/dependency ownership
     - shared-formula/document integration details
-    - reference update and recalculation algorithms from pass 6
+    - the backend-execution and document-mutation remainder of pass 6
 
 Exit criteria:
 

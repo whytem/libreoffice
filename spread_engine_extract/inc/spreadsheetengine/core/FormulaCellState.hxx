@@ -10,6 +10,7 @@
 #pragma once
 
 #include <cassert>
+#include <climits>
 
 #include <sal/types.h>
 
@@ -267,6 +268,23 @@ struct OpenCLChunkCleanupPlan
     bool mbSetGroupCalcEnabled = false;
 
     [[nodiscard]] constexpr bool operator==(const OpenCLChunkCleanupPlan& rOther) const
+        = default;
+};
+
+struct OpenCLMaxGroupLengthPlan
+{
+    sal_Int32 mnMaxGroupLength = INT_MAX;
+
+    [[nodiscard]] constexpr bool operator==(const OpenCLMaxGroupLengthPlan& rOther) const
+        = default;
+};
+
+struct ThreadingCompletionPlan
+{
+    sal_Int32 mnStartRow = 0;
+    sal_Int32 mnSpanLength = 0;
+
+    [[nodiscard]] constexpr bool operator==(const ThreadingCompletionPlan& rOther) const
         = default;
 };
 
@@ -646,6 +664,23 @@ struct OpenCLChunkCleanupPlan
     bool bUseTemporaryGroups)
 {
     return { false, bUseTemporaryGroups, false, false, true };
+}
+
+[[nodiscard]] constexpr OpenCLMaxGroupLengthPlan makeOpenCLMaxGroupLengthPlan(
+    bool bNeedsTDRAvoidance, bool bHasEnvOverride, sal_Int32 nEnvMaxGroupLength)
+{
+    sal_Int32 nMaxGroupLength = INT_MAX;
+    if (bNeedsTDRAvoidance)
+        nMaxGroupLength = 1000;
+    if (bHasEnvOverride)
+        nMaxGroupLength = nEnvMaxGroupLength;
+    return { nMaxGroupLength };
+}
+
+[[nodiscard]] constexpr ThreadingCompletionPlan makeThreadingCompletionPlan(
+    sal_Int32 nTopRow, sal_Int32 nStartOffset, sal_Int32 nEndOffset)
+{
+    return { nTopRow + nStartOffset, nEndOffset - nStartOffset + 1 };
 }
 
 } // namespace spreadsheetengine::core::formulacell

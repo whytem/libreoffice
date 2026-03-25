@@ -29,8 +29,10 @@ int main()
     using spreadsheetengine::core::formulacell::OpenCLChunkCleanupPlan;
     using spreadsheetengine::core::formulacell::OpenCLChunkingPlan;
     using spreadsheetengine::core::formulacell::OpenCLChunkSpan;
+    using spreadsheetengine::core::formulacell::OpenCLMaxGroupLengthPlan;
     using spreadsheetengine::core::formulacell::ParallelCalculationPlan;
     using spreadsheetengine::core::formulacell::TableOpDirtyPlan;
+    using spreadsheetengine::core::formulacell::ThreadingCompletionPlan;
     using spreadsheetengine::core::formulacell::ThreadingProbeFallbackPlan;
     using spreadsheetengine::core::formulacell::ThreadingProbeWindowPlan;
     using spreadsheetengine::core::formulacell::VolatileKind;
@@ -421,6 +423,21 @@ int main()
     {
         return fail("spreadsheetengine_formulacell_tests",
                     "opencl chunk plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacell::makeOpenCLMaxGroupLengthPlan(false, false, 1234)
+            != OpenCLMaxGroupLengthPlan { INT_MAX }
+        || spreadsheetengine::core::formulacell::makeOpenCLMaxGroupLengthPlan(true, false, 1234)
+               != OpenCLMaxGroupLengthPlan { 1000 }
+        || spreadsheetengine::core::formulacell::makeOpenCLMaxGroupLengthPlan(false, true, 2048)
+               != OpenCLMaxGroupLengthPlan { 2048 }
+        || spreadsheetengine::core::formulacell::makeOpenCLMaxGroupLengthPlan(true, true, 2048)
+               != OpenCLMaxGroupLengthPlan { 2048 }
+        || spreadsheetengine::core::formulacell::makeThreadingCompletionPlan(20, 3, 8)
+               != ThreadingCompletionPlan { 23, 6 })
+    {
+        return fail("spreadsheetengine_formulacell_tests",
+                    "final backend plan mismatch");
     }
 
     if (spreadsheetengine::core::formulacellrefupdate::computePreviousPosition(
