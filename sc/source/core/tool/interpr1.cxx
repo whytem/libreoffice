@@ -63,9 +63,11 @@
 #include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Parsing.hxx>
 #include <spreadsheetengine/api/Reference.hxx>
+#include <spreadsheetengine/api/StringReference.hxx>
 #include <spreadsheetengine/core/MathBitwise.hxx>
 #include <spreadsheetengine/core/MathTranscendental.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
+#include <spreadsheetengine/compat/libreoffice/Grammar.hxx>
 #include <spreadsheetengine/compat/libreoffice/Host.hxx>
 #include <spreadsheetengine/core/TextCase.hxx>
 #include <spreadsheetengine/core/TextScalar.hxx>
@@ -100,6 +102,7 @@ namespace searray = spreadsheetengine::api::array;
 namespace selogic = spreadsheetengine::api::logic;
 namespace selookup = spreadsheetengine::api::lookup;
 namespace seref = spreadsheetengine::api::reference;
+namespace sestringref = spreadsheetengine::api::stringreference;
 namespace setext = spreadsheetengine::core::text;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 
@@ -10658,22 +10661,14 @@ void ScInterpreter::ScIndirect()
     if ( !MustHaveParamCount( nParamCount, 1, 2 )  )
         return;
 
-    // Reference address syntax for INDIRECT is configurable.
-    FormulaGrammar::AddressConvention eConv = maCalcConfig.meStringRefAddressSyntax;
-    if (eConv == FormulaGrammar::CONV_UNSPECIFIED)
-        // Use the current address syntax if unspecified.
-        eConv = mrDoc.GetAddressConvention();
-
-    // either CONV_A1_XL_A1 was explicitly configured, or it wasn't possible
-    // to determine which syntax to use during doc import
-    bool bTryXlA1 = (eConv == FormulaGrammar::CONV_A1_XL_A1);
-
-    if (nParamCount == 2 && 0.0 == GetDouble() )
-    {
-        // Overwrite the config and try Excel R1C1.
-        eConv = FormulaGrammar::CONV_XL_R1C1;
-        bTryXlA1 = false;
-    }
+    const bool bForceR1C1 = (nParamCount == 2 && 0.0 == GetDouble());
+    const auto aSyntaxPolicy = sestringref::resolveIndirectAddressSyntaxPolicy(
+        selibreoffice::toApiAddressConvention(maCalcConfig.meStringRefAddressSyntax),
+        selibreoffice::toApiAddressConvention(mrDoc.GetAddressConvention()),
+        maCalcConfig.meStringRefAddressSyntax == FormulaGrammar::CONV_A1_XL_A1, bForceR1C1);
+    FormulaGrammar::AddressConvention eConv
+        = selibreoffice::toLibreOfficeAddressConvention(aSyntaxPolicy.mePrimary);
+    const bool bTryXlA1 = aSyntaxPolicy.moFallback == spreadsheetengine::api::AddressConvention::XlA1;
 
     svl::SharedString sSharedRefStr = GetString();
     const OUString & sRefStr = sSharedRefStr.getString();
@@ -10684,7 +10679,7 @@ void ScInterpreter::ScIndirect()
         return;
     }
 
-    const ScAddress::Details aDetails( bTryXlA1 ? FormulaGrammar::CONV_OOO : eConv, aPos );
+    const ScAddress::Details aDetails( eConv, aPos );
     const ScAddress::Details aDetailsXlA1( FormulaGrammar::CONV_XL_A1, aPos );
     SCTAB nTab = aPos.Tab();
 
@@ -10902,20 +10897,12 @@ void ScInterpreter::ScAddressFunc()
     if( nParamCount >= 5 )
         sTabStr = GetString().getString();
 
-    FormulaGrammar::AddressConvention eConv = FormulaGrammar::CONV_OOO;      // default
-    if (nParamCount >= 4 && 0.0 == GetDoubleWithDefault( 1.0))
-        eConv = FormulaGrammar::CONV_XL_R1C1;
-    else
-    {
-        // If A1 syntax is requested then the actual sheet separator and format
-        // convention depends on the syntax configured for INDIRECT to match
-        // that, and if it is unspecified then the document's address syntax.
-        FormulaGrammar::AddressConvention eForceConv = maCalcConfig.meStringRefAddressSyntax;
-        if (eForceConv == FormulaGrammar::CONV_UNSPECIFIED)
-            eForceConv = mrDoc.GetAddressConvention();
-        if (eForceConv == FormulaGrammar::CONV_XL_A1 || eForceConv == FormulaGrammar::CONV_XL_R1C1)
-            eConv = FormulaGrammar::CONV_XL_A1;     // for anything Excel use Excel A1
-    }
+    const bool bForceR1C1 = (nParamCount >= 4 && 0.0 == GetDoubleWithDefault( 1.0));
+    const FormulaGrammar::AddressConvention eConv
+        = selibreoffice::toLibreOfficeAddressConvention(
+            sestringref::resolveAddressFunctionConvention(
+                selibreoffice::toApiAddressConvention(maCalcConfig.meStringRefAddressSyntax),
+                selibreoffice::toApiAddressConvention(mrDoc.GetAddressConvention()), bForceR1C1));
 
     ScRefFlags  nFlags = ScRefFlags::COL_ABS | ScRefFlags::ROW_ABS;   // default
     if( nParamCount >= 3 )

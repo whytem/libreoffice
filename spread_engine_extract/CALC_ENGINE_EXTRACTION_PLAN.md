@@ -920,14 +920,24 @@ Current status:
   - standalone coverage now includes `spreadsheetengine_reference_tests`
   - Calc validation for the reference-producing slice now includes
     `CppunitTest_sc_ucalc_formula2` in addition to shared-case and smoke gates
-- Phase 9 is now substantially complete:
-  - the remaining document-coupled evaluator work is no longer mainly about
-    introducing a host/runtime model or extracting reusable evaluator policy
-  - the main leftovers are the compiler/name-resolution-heavy parts of
-    `INDIRECT`, ref-list/reference-generator ownership details, and the broader
-    reference/dependency behavior that fits more naturally with Phase 10
-  - any additional Phase 9 work should be opportunistic cleanup, not a new
-    major extraction lane
+- a final closeout cleanup slice is now also in place:
+  - engine-owned string-reference helpers in `StringReference.hxx` now cover:
+    - `INDIRECT` address-syntax policy resolution
+    - `ADDRESS` string-reference convention selection
+  - Calc now consumes that policy layer in `ScIndirect()` and
+    `ScAddressFunc()` while still owning actual name resolution, compilation,
+    and external/table-reference materialization
+  - standalone coverage now extends the compiler-policy lane to exercise the
+    new string-reference decisions directly
+- Phase 9 is now complete:
+  - the host/runtime model needed by the extracted interpreter families is in
+    place and exercised in both standalone and Calc-integrated lanes
+  - the remaining related work is no longer Phase 9-shaped:
+    - compiler/name-resolution-heavy `INDIRECT` internals
+    - ref-list/reference-generator ownership details
+    - broader reference/dependency/recalculation behavior
+  - those remaining seams belong with Phase 10's reference and dependency work,
+    not with additional Phase 9 closeout
 
 Validation:
 
@@ -938,6 +948,7 @@ Validation:
   - `spreadsheetengine_lookup_tests`
   - `spreadsheetengine_array_tests`
   - `spreadsheetengine_reference_tests`
+  - compiler-policy coverage for `INDIRECT` / `ADDRESS` string-reference rules
 - LibreOffice:
   - `CppunitTest_sc_ucalc_shared_cases`
   - `CppunitTest_sc_logical_functions_test`

@@ -4,6 +4,7 @@
 
 #include <spreadsheetengine/api/Compiler.hxx>
 #include <spreadsheetengine/api/Grammar.hxx>
+#include <spreadsheetengine/api/StringReference.hxx>
 #include <spreadsheetengine/compat/formula/FormulaGrammar.hxx>
 #include <spreadsheetengine/core/CompilerSupport.hxx>
 
@@ -60,6 +61,37 @@ int main()
                 spreadsheetengine::api::AddressConvention::XlOox, false }))
     {
         return fail("spreadsheetengine_compiler_tests", "grammar support mismatch");
+    }
+
+    const auto aIndirectHybrid
+        = spreadsheetengine::api::stringreference::resolveIndirectAddressSyntaxPolicy(
+            spreadsheetengine::api::AddressConvention::Unknown,
+            spreadsheetengine::api::AddressConvention::XlA1, true, false);
+    const auto aIndirectConfigured
+        = spreadsheetengine::api::stringreference::resolveIndirectAddressSyntaxPolicy(
+            spreadsheetengine::api::AddressConvention::OdfA1,
+            spreadsheetengine::api::AddressConvention::XlA1, false, false);
+    const auto aIndirectR1C1
+        = spreadsheetengine::api::stringreference::resolveIndirectAddressSyntaxPolicy(
+            spreadsheetengine::api::AddressConvention::OooA1,
+            spreadsheetengine::api::AddressConvention::XlA1, false, true);
+    const auto aAddressConv = spreadsheetengine::api::stringreference::resolveAddressFunctionConvention(
+        spreadsheetengine::api::AddressConvention::XlR1C1,
+        spreadsheetengine::api::AddressConvention::OooA1, false);
+    const auto aAddressDefault
+        = spreadsheetengine::api::stringreference::resolveAddressFunctionConvention(
+            spreadsheetengine::api::AddressConvention::Unknown,
+            spreadsheetengine::api::AddressConvention::OdfA1, false);
+    if (aIndirectHybrid.mePrimary != spreadsheetengine::api::AddressConvention::OooA1
+        || aIndirectHybrid.moFallback != spreadsheetengine::api::AddressConvention::XlA1
+        || aIndirectConfigured.mePrimary != spreadsheetengine::api::AddressConvention::OdfA1
+        || aIndirectConfigured.moFallback.has_value()
+        || aIndirectR1C1.mePrimary != spreadsheetengine::api::AddressConvention::XlR1C1
+        || aIndirectR1C1.moFallback.has_value()
+        || aAddressConv != spreadsheetengine::api::AddressConvention::XlA1
+        || aAddressDefault != spreadsheetengine::api::AddressConvention::OooA1)
+    {
+        return fail("spreadsheetengine_compiler_tests", "string reference policy mismatch");
     }
 
     std::cout << "spreadsheetengine compiler api tests passed\n";
