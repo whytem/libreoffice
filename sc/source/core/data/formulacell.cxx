@@ -4268,32 +4268,6 @@ ScFormulaCell::CompareState ScFormulaCell::CompareByTokenArray( const ScFormulaC
 
 namespace {
 
-// Split N into optimally equal-sized pieces, each not larger than K.
-// Return value P is number of pieces. A returns the number of pieces
-// one larger than N/P, 0..P-1.
-
-int splitup(int N, int K, int& A)
-{
-    assert(N > 0);
-    assert(K > 0);
-
-    A = 0;
-
-    if (N <= K)
-        return 1;
-
-    const int ideal_num_parts = N / K;
-    if (ideal_num_parts * K == N)
-        return ideal_num_parts;
-
-    const int num_parts = ideal_num_parts + 1;
-    const int nominal_part_size = N / num_parts;
-
-    A = N - num_parts * nominal_part_size;
-
-    return num_parts;
-}
-
 struct ScDependantsCalculator
 {
     ScDocument& mrDoc;
@@ -5210,19 +5184,17 @@ bool ScFormulaCell::InterpretFormulaGroupOpenCL(sc::FormulaLogger::GroupScope& a
     if (std::getenv("SC_MAX_GROUP_LENGTH"))
         nMaxGroupLength = std::atoi(std::getenv("SC_MAX_GROUP_LENGTH"));
 
-    int nNumOnePlus;
-    const int nNumParts = splitup(GetSharedLength(), nMaxGroupLength, nNumOnePlus);
-
-    int nOffset = 0;
-    int nCurChunkSize;
+    const auto aChunkingPlan = spreadsheetengine::core::formulacell::makeOpenCLChunkingPlan(
+        GetSharedLength(), nMaxGroupLength);
     ScAddress aOrigPos = mxGroup->mpTopCell->aPos;
-    for (int i = 0; i < nNumParts; i++, nOffset += nCurChunkSize)
+    for (int i = 0; i < aChunkingPlan.mnNumParts; ++i)
     {
-        nCurChunkSize = GetSharedLength()/nNumParts + (i < nNumOnePlus ? 1 : 0);
+        const auto aChunkSpan = spreadsheetengine::core::formulacell::makeOpenCLChunkSpan(
+            GetSharedLength(), aChunkingPlan.mnNumParts, aChunkingPlan.mnNumOnePlus, i);
 
         ScFormulaCellGroupRef xGroup;
 
-        if (nNumParts == 1)
+        if (!aChunkingPlan.mbUseTemporaryGroups)
             xGroup = mxGroup;
         else
         {
@@ -5230,9 +5202,9 @@ bool ScFormulaCell::InterpretFormulaGroupOpenCL(sc::FormulaLogger::GroupScope& a
             xGroup = new ScFormulaCellGroup();
             xGroup->mpTopCell = mxGroup->mpTopCell;
             xGroup->mpTopCell->aPos = aOrigPos;
-            xGroup->mpTopCell->aPos.IncRow(nOffset);
+            xGroup->mpTopCell->aPos.IncRow(aChunkSpan.mnOffset);
             xGroup->mbInvariant = mxGroup->mbInvariant;
-            xGroup->mnLength = nCurChunkSize;
+            xGroup->mnLength = aChunkSpan.mnLength;
             xGroup->mpCode = std::move(mxGroup->mpCode); // temporarily transfer
         }
 
@@ -5258,15 +5230,17 @@ bool ScFormulaCell::InterpretFormulaGroupOpenCL(sc::FormulaLogger::GroupScope& a
             else
                 SAL_INFO("sc.opencl", "conversion of group " << xGroup->mpTopCell->aPos << " failed, disabling");
 
-            mxGroup->meCalcState = sc::GroupCalcDisabled;
-
-            // Undo the hack above
-            if (nNumParts > 1)
-            {
+            const auto aFailurePlan
+                = spreadsheetengine::core::formulacell::makeOpenCLChunkFailurePlan(
+                    aChunkingPlan.mbUseTemporaryGroups);
+            if (aFailurePlan.mbDisableGroupCalc)
+                mxGroup->meCalcState = sc::GroupCalcDisabled;
+            if (aFailurePlan.mbRestoreOriginalPosition)
                 mxGroup->mpTopCell->aPos = aOrigPos;
+            if (aFailurePlan.mbDetachTemporaryTopCell)
                 xGroup->mpTopCell = nullptr;
+            if (aFailurePlan.mbRestoreTransferredCode)
                 mxGroup->mpCode = std::move(xGroup->mpCode);
-            }
 
             aScope.addMessage(u"group token conversion failed"_ustr);
             return false;
@@ -5282,15 +5256,17 @@ bool ScFormulaCell::InterpretFormulaGroupOpenCL(sc::FormulaLogger::GroupScope& a
         {
             SAL_INFO("sc.opencl", "interpreting group " << mxGroup->mpTopCell->aPos
                 << " (state " << static_cast<int>(mxGroup->meCalcState) << ") failed, disabling");
-            mxGroup->meCalcState = sc::GroupCalcDisabled;
-
-            // Undo the hack above
-            if (nNumParts > 1)
-            {
+            const auto aFailurePlan
+                = spreadsheetengine::core::formulacell::makeOpenCLChunkFailurePlan(
+                    aChunkingPlan.mbUseTemporaryGroups);
+            if (aFailurePlan.mbDisableGroupCalc)
+                mxGroup->meCalcState = sc::GroupCalcDisabled;
+            if (aFailurePlan.mbRestoreOriginalPosition)
                 mxGroup->mpTopCell->aPos = aOrigPos;
+            if (aFailurePlan.mbDetachTemporaryTopCell)
                 xGroup->mpTopCell = nullptr;
+            if (aFailurePlan.mbRestoreTransferredCode)
                 mxGroup->mpCode = std::move(xGroup->mpCode);
-            }
 
             aScope.addMessage(u"group interpretation unsuccessful"_ustr);
             return false;
@@ -5298,16 +5274,22 @@ bool ScFormulaCell::InterpretFormulaGroupOpenCL(sc::FormulaLogger::GroupScope& a
 
         aScope.setCalcComplete();
 
-        if (nNumParts > 1)
-        {
+        const auto aTransferPlan
+            = spreadsheetengine::core::formulacell::makeOpenCLChunkSuccessTransferPlan(
+                aChunkingPlan.mbUseTemporaryGroups);
+        if (aTransferPlan.mbDetachTemporaryTopCell)
             xGroup->mpTopCell = nullptr;
+        if (aTransferPlan.mbRestoreTransferredCode)
             mxGroup->mpCode = std::move(xGroup->mpCode);
-        }
     }
 
-    if (nNumParts > 1)
+    const auto aFinalizationPlan
+        = spreadsheetengine::core::formulacell::makeOpenCLChunkFinalizationPlan(
+            aChunkingPlan.mbUseTemporaryGroups);
+    if (aFinalizationPlan.mbRestoreOriginalPosition)
         mxGroup->mpTopCell->aPos = aOrigPos;
-    mxGroup->meCalcState = sc::GroupCalcEnabled;
+    if (aFinalizationPlan.mbSetGroupCalcEnabled)
+        mxGroup->meCalcState = sc::GroupCalcEnabled;
     return true;
 }
 

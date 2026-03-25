@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <cassert>
+
 #include <sal/types.h>
 
 namespace spreadsheetengine::core::formulacell
@@ -236,6 +238,35 @@ struct ThreadingProbeFallbackPlan
     bool mbRedoOriginalDependencyCheck = false;
 
     [[nodiscard]] constexpr bool operator==(const ThreadingProbeFallbackPlan& rOther) const
+        = default;
+};
+
+struct OpenCLChunkingPlan
+{
+    sal_Int32 mnNumParts = 0;
+    sal_Int32 mnNumOnePlus = 0;
+    bool mbUseTemporaryGroups = false;
+
+    [[nodiscard]] constexpr bool operator==(const OpenCLChunkingPlan& rOther) const = default;
+};
+
+struct OpenCLChunkSpan
+{
+    sal_Int32 mnOffset = 0;
+    sal_Int32 mnLength = 0;
+
+    [[nodiscard]] constexpr bool operator==(const OpenCLChunkSpan& rOther) const = default;
+};
+
+struct OpenCLChunkCleanupPlan
+{
+    bool mbDisableGroupCalc = false;
+    bool mbRestoreOriginalPosition = false;
+    bool mbDetachTemporaryTopCell = false;
+    bool mbRestoreTransferredCode = false;
+    bool mbSetGroupCalcEnabled = false;
+
+    [[nodiscard]] constexpr bool operator==(const OpenCLChunkCleanupPlan& rOther) const
         = default;
 };
 
@@ -564,6 +595,57 @@ struct ThreadingProbeFallbackPlan
         return { nCurrentColumn, nCurrentColumn, bRedoOriginalDependencyCheck };
 
     return { nStartColumn, nEndColumn, false };
+}
+
+[[nodiscard]] constexpr OpenCLChunkingPlan makeOpenCLChunkingPlan(
+    sal_Int32 nSharedLength, sal_Int32 nMaxGroupLength)
+{
+    assert(nSharedLength > 0);
+    assert(nMaxGroupLength > 0);
+
+    sal_Int32 nNumOnePlus = 0;
+    sal_Int32 nNumParts = 1;
+    if (nSharedLength > nMaxGroupLength)
+    {
+        const sal_Int32 nIdealNumParts = nSharedLength / nMaxGroupLength;
+        if (nIdealNumParts * nMaxGroupLength == nSharedLength)
+            nNumParts = nIdealNumParts;
+        else
+        {
+            nNumParts = nIdealNumParts + 1;
+            const sal_Int32 nNominalPartSize = nSharedLength / nNumParts;
+            nNumOnePlus = nSharedLength - nNumParts * nNominalPartSize;
+        }
+    }
+
+    return { nNumParts, nNumOnePlus, nNumParts > 1 };
+}
+
+[[nodiscard]] constexpr OpenCLChunkSpan makeOpenCLChunkSpan(
+    sal_Int32 nSharedLength, sal_Int32 nNumParts, sal_Int32 nNumOnePlus, sal_Int32 nChunkIndex)
+{
+    const sal_Int32 nBasePartSize = nSharedLength / nNumParts;
+    const sal_Int32 nOffsetAdjustment = nChunkIndex < nNumOnePlus ? nChunkIndex : nNumOnePlus;
+    return { nChunkIndex * nBasePartSize + nOffsetAdjustment,
+             nBasePartSize + (nChunkIndex < nNumOnePlus ? 1 : 0) };
+}
+
+[[nodiscard]] constexpr OpenCLChunkCleanupPlan makeOpenCLChunkFailurePlan(
+    bool bUseTemporaryGroups)
+{
+    return { true, bUseTemporaryGroups, bUseTemporaryGroups, bUseTemporaryGroups, false };
+}
+
+[[nodiscard]] constexpr OpenCLChunkCleanupPlan makeOpenCLChunkSuccessTransferPlan(
+    bool bUseTemporaryGroups)
+{
+    return { false, false, bUseTemporaryGroups, bUseTemporaryGroups, false };
+}
+
+[[nodiscard]] constexpr OpenCLChunkCleanupPlan makeOpenCLChunkFinalizationPlan(
+    bool bUseTemporaryGroups)
+{
+    return { false, bUseTemporaryGroups, false, false, true };
 }
 
 } // namespace spreadsheetengine::core::formulacell

@@ -26,6 +26,9 @@ int main()
     using spreadsheetengine::core::formulacell::LoadTrackingPlan;
     using spreadsheetengine::core::formulacell::NotifyKind;
     using spreadsheetengine::core::formulacell::NotifyPlan;
+    using spreadsheetengine::core::formulacell::OpenCLChunkCleanupPlan;
+    using spreadsheetengine::core::formulacell::OpenCLChunkingPlan;
+    using spreadsheetengine::core::formulacell::OpenCLChunkSpan;
     using spreadsheetengine::core::formulacell::ParallelCalculationPlan;
     using spreadsheetengine::core::formulacell::TableOpDirtyPlan;
     using spreadsheetengine::core::formulacell::ThreadingProbeFallbackPlan;
@@ -387,6 +390,37 @@ int main()
     {
         return fail("spreadsheetengine_formulacell_tests",
                     "threading probe plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacell::makeOpenCLChunkingPlan(10, 1000)
+            != OpenCLChunkingPlan { 1, 0, false }
+        || spreadsheetengine::core::formulacell::makeOpenCLChunkingPlan(1000, 1000)
+               != OpenCLChunkingPlan { 1, 0, false }
+        || spreadsheetengine::core::formulacell::makeOpenCLChunkingPlan(1001, 1000)
+               != OpenCLChunkingPlan { 2, 1, true }
+        || spreadsheetengine::core::formulacell::makeOpenCLChunkingPlan(10, 4)
+               != OpenCLChunkingPlan { 3, 1, true }
+        || spreadsheetengine::core::formulacell::makeOpenCLChunkSpan(10, 3, 1, 0)
+               != OpenCLChunkSpan { 0, 4 }
+        || spreadsheetengine::core::formulacell::makeOpenCLChunkSpan(10, 3, 1, 1)
+               != OpenCLChunkSpan { 4, 3 }
+        || spreadsheetengine::core::formulacell::makeOpenCLChunkSpan(10, 3, 1, 2)
+               != OpenCLChunkSpan { 7, 3 }
+        || spreadsheetengine::core::formulacell::makeOpenCLChunkFailurePlan(false)
+               != OpenCLChunkCleanupPlan { true, false, false, false, false }
+        || spreadsheetengine::core::formulacell::makeOpenCLChunkFailurePlan(true)
+               != OpenCLChunkCleanupPlan { true, true, true, true, false }
+        || spreadsheetengine::core::formulacell::makeOpenCLChunkSuccessTransferPlan(false)
+               != OpenCLChunkCleanupPlan { false, false, false, false, false }
+        || spreadsheetengine::core::formulacell::makeOpenCLChunkSuccessTransferPlan(true)
+               != OpenCLChunkCleanupPlan { false, false, true, true, false }
+        || spreadsheetengine::core::formulacell::makeOpenCLChunkFinalizationPlan(false)
+               != OpenCLChunkCleanupPlan { false, false, false, false, true }
+        || spreadsheetengine::core::formulacell::makeOpenCLChunkFinalizationPlan(true)
+               != OpenCLChunkCleanupPlan { false, true, false, false, true })
+    {
+        return fail("spreadsheetengine_formulacell_tests",
+                    "opencl chunk plan mismatch");
     }
 
     if (spreadsheetengine::core::formulacellrefupdate::computePreviousPosition(

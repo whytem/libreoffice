@@ -1435,6 +1435,10 @@ Current status:
       - whether neighbor-group probing should run at all
       - collapse-back-to-current-column fallback after failed speculative probe
       - redo of the original dependency check after probe-time dirtying
+    - OpenCL chunk orchestration planning for:
+      - group chunk partitioning and per-chunk offset/length calculation
+      - temporary-group cleanup on token-conversion or interpreter failure
+      - temporary-group transfer and finalization after successful chunks
   - Calc now consumes those helpers from `refupdat.cxx`, while still owning:
     - `ScBigRange` update handling
     - the remaining deeper dependency/recalc orchestration beyond the initial
