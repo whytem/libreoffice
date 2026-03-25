@@ -1161,6 +1161,37 @@ Current status:
     - broader query-policy extraction fits better with Phase 10 pass 3
     - listener and invalidation ownership stays Calc-side until the later
       dependency/recalc passes
+- pass 3 is now started with the first pure query-policy slice:
+  - engine-owned query policy now covers:
+    - operator classification for text and partial-text matches
+    - ends-with operator detection
+    - whole-cell vs partial-match policy
+    - wildcard / regexp gate checks
+    - query-by-value vs query-by-string classification
+    - multi-item equality fast-path thresholds
+    - sorted-cache collection and probe helpers for numeric and string identity
+      caches
+    - fast string-equality path selection
+    - operator-driven wildcard and substring match evaluation rules
+  - Calc now adapts `ScQueryOp`, `ScQueryEntry::QueryType`, search type, and
+    cell-class facts into that engine-owned policy layer from
+    `queryevaluator.cxx`
+  - Calc also consumes the engine-owned multi-item cache helpers from
+    `queryevaluator.cxx` while still owning the actual `ScQueryEntry` item
+    containers and evaluator-local cache vectors
+  - Calc also still owns the heavyweight parts of string comparison:
+    - transliteration
+    - collator setup
+    - string materialization from cells
+    - wildcard / regexp search execution
+  - table iteration, string-pool ownership, transliteration, collator setup,
+    and number-format-sensitive comparison remain in Calc for now
+  - validation is green for the first pass-3 slice:
+    - standalone: `ctest` passes `16/16`
+    - LibreOffice:
+      - `CppunitTest_sc_ucalc_sort`
+      - `CppunitTest_sc_ucalc`
+      - `CppunitTest_sc_ucalc_copypaste`
 
 Exit criteria:
 

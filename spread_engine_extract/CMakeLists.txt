@@ -102,6 +102,10 @@ add_spreadsheetengine_test(spreadsheetengine_carrier_tests
     ${SPREADSHEETENGINE_STANDALONE_CARRIER_TEST_SOURCES}
 )
 
+add_spreadsheetengine_test(spreadsheetengine_query_tests
+    ${SPREADSHEETENGINE_STANDALONE_QUERY_TEST_SOURCES}
+)
+
 if(BUILD_TESTING)
     add_test(NAME spreadsheetengine_smoke COMMAND spreadsheetengine_smoke)
 endif()
