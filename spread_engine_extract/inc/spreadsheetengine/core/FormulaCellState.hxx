@@ -29,6 +29,50 @@ enum class VolatileKind : sal_uInt8
     NotVolatile
 };
 
+enum class DependencyCheckFailure : sal_uInt8
+{
+    None,
+    Cycle,
+    RecursionLimit,
+    GroupsNotIndependent,
+    DependencyCalculationFailed
+};
+
+enum class GroupInterpretFailure : sal_uInt8
+{
+    None,
+    DependencyComputationAborted,
+    FormulaGroupNotIndependent,
+    GroupsNotIndependent,
+    CycleDuringDependencyComputation,
+    ParentCycleSkipTail
+};
+
+enum class GroupBackendFailure : sal_uInt8
+{
+    None,
+    DependencyCheckFailedPreviously,
+    ThreadingProhibited,
+    ThreadingOpcodeDisabled,
+    ThreadingDisabled,
+    OpenCLVectorOpcodeDisabled,
+    OpenCLVectorStackVariableDisabled,
+    OpenCLVectorNotInSubset,
+    OpenCLVectorUnknown,
+    OpenCLNotVectorizable,
+    OpenCLDisabled,
+    InterpreterTableOp
+};
+
+enum class OpenCLVectorStateClass : sal_uInt8
+{
+    Enabled,
+    DisabledByOpcode,
+    DisabledByStackVariable,
+    DisabledNotInSubset,
+    DisabledOrUnknown
+};
+
 struct DirtyPlan
 {
     bool mbSkip = false;
@@ -92,6 +136,56 @@ struct ParallelCalculationPlan
     bool mbEndAlwaysListeningArea = false;
 
     [[nodiscard]] constexpr bool operator==(const ParallelCalculationPlan& rOther) const = default;
+};
+
+struct DependencyCheckPlan
+{
+    bool mbCanProceed = true;
+    bool mbDisableGroupCalc = false;
+    DependencyCheckFailure meFailure = DependencyCheckFailure::None;
+
+    [[nodiscard]] constexpr bool operator==(const DependencyCheckPlan& rOther) const = default;
+};
+
+struct GroupInterpretPreflightPlan
+{
+    bool mbCanProceed = true;
+    bool mbAbortDependencyComputation = false;
+    bool mbNeedCycleCheckGuard = false;
+    GroupInterpretFailure meFailure = GroupInterpretFailure::None;
+
+    [[nodiscard]] constexpr bool operator==(const GroupInterpretPreflightPlan& rOther) const
+        = default;
+};
+
+struct GroupInterpretFallbackPlan
+{
+    bool mbSkipInterpretTail = false;
+    GroupInterpretFailure meFailure = GroupInterpretFailure::None;
+
+    [[nodiscard]] constexpr bool operator==(const GroupInterpretFallbackPlan& rOther) const
+        = default;
+};
+
+struct GroupBackendDependencyPlan
+{
+    bool mbCanProceed = true;
+    bool mbNeedDependencyCheck = false;
+    bool mbMarkDependencyComputed = false;
+    bool mbMarkDependencyCheckFailed = false;
+
+    [[nodiscard]] constexpr bool operator==(const GroupBackendDependencyPlan& rOther) const
+        = default;
+};
+
+struct GroupBackendPreflightPlan
+{
+    bool mbCanProceed = true;
+    bool mbEmitFailureMessage = false;
+    GroupBackendFailure meFailure = GroupBackendFailure::None;
+
+    [[nodiscard]] constexpr bool operator==(const GroupBackendPreflightPlan& rOther) const
+        = default;
 };
 
 [[nodiscard]] constexpr DirtyPlan makeSetDirtyPlan(
@@ -213,6 +307,149 @@ struct ParallelCalculationPlan
 
     if (!bCurrentTableOpDirty || !bInFormulaTree)
         return { false, true, !bCurrentTableOpDirty, true, true };
+
+    return {};
+}
+
+[[nodiscard]] constexpr DependencyCheckPlan makeDependencyCheckPreflightPlan(
+    bool bPartOfCycle)
+{
+    if (!bPartOfCycle)
+        return {};
+
+    return { false, true, DependencyCheckFailure::Cycle };
+}
+
+[[nodiscard]] constexpr DependencyCheckPlan makeDependencyCheckResultPlan(
+    bool bInRecursionReturn, bool bPartOfCycle, bool bGroupsIndependent, bool bOKToParallelize)
+{
+    if (bInRecursionReturn)
+        return { false, true, DependencyCheckFailure::RecursionLimit };
+
+    if (bPartOfCycle)
+        return { false, true, DependencyCheckFailure::Cycle };
+
+    if (!bGroupsIndependent)
+        return { false, false, DependencyCheckFailure::GroupsNotIndependent };
+
+    if (!bOKToParallelize)
+        return { false, true, DependencyCheckFailure::DependencyCalculationFailed };
+
+    return {};
+}
+
+[[nodiscard]] constexpr GroupInterpretPreflightPlan makeGroupInterpretPreflightPlan(
+    bool bAbortingDependencyComputation, bool bHasGroup, bool bFormulaGroupIndependent,
+    bool bGroupsIndependent)
+{
+    if (bAbortingDependencyComputation)
+        return { false, false, false, GroupInterpretFailure::DependencyComputationAborted };
+
+    if (bHasGroup && !bFormulaGroupIndependent)
+        return { false, false, false, GroupInterpretFailure::FormulaGroupNotIndependent };
+
+    if (!bGroupsIndependent)
+        return { false, false, false, GroupInterpretFailure::GroupsNotIndependent };
+
+    return {};
+}
+
+[[nodiscard]] constexpr GroupInterpretPreflightPlan makeGroupInterpretCycleAbortPlan(
+    bool bSeenInPath, bool bInDependencyComputation, bool bAnyCycleMemberInDependencyEvalMode)
+{
+    if (bSeenInPath && bInDependencyComputation && bAnyCycleMemberInDependencyEvalMode)
+        return { false, true, true, GroupInterpretFailure::CycleDuringDependencyComputation };
+
+    return {};
+}
+
+[[nodiscard]] constexpr GroupInterpretFallbackPlan makeGroupInterpretFallbackPlan(
+    bool bGroupsIndependent, bool bSkipTailForParentCycle)
+{
+    if (!bGroupsIndependent)
+        return { true, GroupInterpretFailure::GroupsNotIndependent };
+
+    if (bSkipTailForParentCycle)
+        return { true, GroupInterpretFailure::ParentCycleSkipTail };
+
+    return {};
+}
+
+[[nodiscard]] constexpr GroupBackendDependencyPlan makeGroupBackendDependencyEntryPlan(
+    bool bDependencyComputed, bool bDependencyCheckFailed)
+{
+    if (bDependencyCheckFailed)
+        return { false, false, false, false };
+
+    if (bDependencyComputed)
+        return {};
+
+    return { true, true, false, false };
+}
+
+[[nodiscard]] constexpr GroupBackendDependencyPlan makeGroupBackendDependencyResultPlan(
+    bool bDependencyCheckSucceeded)
+{
+    if (bDependencyCheckSucceeded)
+        return { true, false, true, false };
+
+    return { false, false, true, true };
+}
+
+[[nodiscard]] constexpr GroupBackendPreflightPlan makeThreadingBackendPreflightPlan(
+    bool bDependencyCheckFailed, bool bThreadingProhibited, bool bCodeEnabledForThreading,
+    bool bThreadingEnabled)
+{
+    if (bDependencyCheckFailed)
+        return { false, false, GroupBackendFailure::DependencyCheckFailedPreviously };
+
+    if (bThreadingProhibited)
+        return { false, false, GroupBackendFailure::ThreadingProhibited };
+
+    if (!bCodeEnabledForThreading)
+        return { false, false, GroupBackendFailure::ThreadingOpcodeDisabled };
+
+    if (!bThreadingEnabled)
+        return { false, false, GroupBackendFailure::ThreadingDisabled };
+
+    return {};
+}
+
+[[nodiscard]] constexpr GroupBackendPreflightPlan makeOpenCLBackendPreflightPlan(
+    OpenCLVectorStateClass eVectorStateClass, bool bCanVectorize, bool bOpenCLEnabled,
+    bool bInInterpreterTableOp, bool bDependencyCheckFailed)
+{
+    switch (eVectorStateClass)
+    {
+        case OpenCLVectorStateClass::DisabledByOpcode:
+            if (!bCanVectorize)
+                return { false, true, GroupBackendFailure::OpenCLVectorOpcodeDisabled };
+            return { true, true, GroupBackendFailure::OpenCLVectorOpcodeDisabled };
+        case OpenCLVectorStateClass::DisabledByStackVariable:
+            if (!bCanVectorize)
+                return { false, true, GroupBackendFailure::OpenCLVectorStackVariableDisabled };
+            return { true, true, GroupBackendFailure::OpenCLVectorStackVariableDisabled };
+        case OpenCLVectorStateClass::DisabledNotInSubset:
+            if (!bCanVectorize)
+                return { false, true, GroupBackendFailure::OpenCLVectorNotInSubset };
+            return { true, true, GroupBackendFailure::OpenCLVectorNotInSubset };
+        case OpenCLVectorStateClass::DisabledOrUnknown:
+            return { false, true, GroupBackendFailure::OpenCLVectorUnknown };
+        case OpenCLVectorStateClass::Enabled:
+            break;
+    }
+
+    if (!bCanVectorize)
+        return { false, false, GroupBackendFailure::OpenCLNotVectorizable };
+
+    if (!bOpenCLEnabled)
+        return { false, true, GroupBackendFailure::OpenCLDisabled };
+
+    if (bInInterpreterTableOp)
+        return { false, false, GroupBackendFailure::InterpreterTableOp };
+
+    if (bDependencyCheckFailed)
+        return { false, false, GroupBackendFailure::DependencyCheckFailedPreviously };
 
     return {};
 }

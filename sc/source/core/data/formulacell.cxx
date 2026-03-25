@@ -1545,19 +1545,30 @@ bool ScFormulaCell::Interpret(SCROW nStartOffset, SCROW nEndOffset)
 
     // The result would possibly depend on a cell without a valid value, bail out
     // the entire dependency computation.
-    if (rRecursionHelper.IsAbortingDependencyComputation())
+    const bool bHasGroup = mxGroup != nullptr;
+    const bool bFormulaGroupIndependent
+        = !mxGroup || rRecursionHelper.CheckFGIndependence(mxGroup.get());
+    const bool bGroupsIndependent
+        = (!mxGroup || bFormulaGroupIndependent) ? rRecursionHelper.AreGroupsIndependent() : true;
+    const auto aPreflightPlan = spreadsheetengine::core::formulacell::makeGroupInterpretPreflightPlan(
+        rRecursionHelper.IsAbortingDependencyComputation(), bHasGroup, bFormulaGroupIndependent,
+        bGroupsIndependent);
+    if (!aPreflightPlan.mbCanProceed)
         return false;
-
-    if ((mxGroup && !rRecursionHelper.CheckFGIndependence(mxGroup.get())) || !rRecursionHelper.AreGroupsIndependent())
-        return bGroupInterpreted;
 
     static ForceCalculationType forceType = ScCalcConfig::getForceCalculationType();
     TemporaryCellGroupMaker cellGroupMaker( this, forceType != ForceCalculationNone && forceType != ForceCalculationCore );
 
     ScFormulaCell* pTopCell = mxGroup ? mxGroup->mpTopCell : this;
+    const bool bInDependencyComputation = rRecursionHelper.GetDepComputeLevel() != 0;
+    const bool bAnyCycleMemberInDependencyEvalMode
+        = (pTopCell->mbSeenInPath && bInDependencyComputation)
+              ? rRecursionHelper.AnyCycleMemberInDependencyEvalMode(pTopCell)
+              : false;
 
-    if (pTopCell->mbSeenInPath && rRecursionHelper.GetDepComputeLevel() &&
-        rRecursionHelper.AnyCycleMemberInDependencyEvalMode(pTopCell))
+    const auto aCycleAbortPlan = spreadsheetengine::core::formulacell::makeGroupInterpretCycleAbortPlan(
+        pTopCell->mbSeenInPath, bInDependencyComputation, bAnyCycleMemberInDependencyEvalMode);
+    if (!aCycleAbortPlan.mbCanProceed)
     {
         // This call arose from a dependency calculation and we just found a cycle.
         // This will mark all elements in the cycle as parts-of-cycle.
@@ -1641,15 +1652,10 @@ bool ScFormulaCell::Interpret(SCROW nStartOffset, SCROW nEndOffset)
         {
             // This call resulted from a dependency calculation for a multigroup-threading attempt,
             // but found dependency among the groups.
-            if (!rRecursionHelper.AreGroupsIndependent())
-            {
-                rDocument.DecInterpretLevel();
-                return bGroupInterpreted;
-            }
-            // Dependency calc inside InterpretFormulaGroup() failed due to
-            // detection of a cycle and there are parent FG's in the cycle.
-            // Skip InterpretTail() in such cases, only run InterpretTail for the "cycle-starting" FG
-            if (!bPartOfCycleBefore && bPartOfCycleAfter && rRecursionHelper.AnyParentFGInCycle())
+            const auto aFallbackPlan = spreadsheetengine::core::formulacell::makeGroupInterpretFallbackPlan(
+                rRecursionHelper.AreGroupsIndependent(),
+                !bPartOfCycleBefore && bPartOfCycleAfter && rRecursionHelper.AnyParentFGInCycle());
+            if (aFallbackPlan.mbSkipInterpretTail)
             {
                 rDocument.DecInterpretLevel();
                 return bGroupInterpreted;
@@ -4766,6 +4772,33 @@ bool ScFormulaCell::CheckComputeDependencies(sc::FormulaLogger::GroupScope& rSco
                                              ScAddress* pDirtiedAddress)
 {
     ScRecursionHelper& rRecursionHelper = rDocument.GetRecursionHelper();
+    const auto applyDependencyCheckPlan
+        = [this, &rScope](const spreadsheetengine::core::formulacell::DependencyCheckPlan& rPlan) {
+              if (rPlan.mbDisableGroupCalc)
+                  mxGroup->meCalcState = sc::GroupCalcDisabled;
+
+              switch (rPlan.meFailure)
+              {
+                  case spreadsheetengine::core::formulacell::DependencyCheckFailure::None:
+                      return true;
+                  case spreadsheetengine::core::formulacell::DependencyCheckFailure::Cycle:
+                      rScope.addMessage(u"found circular formula-group dependencies"_ustr);
+                      return false;
+                  case spreadsheetengine::core::formulacell::DependencyCheckFailure::RecursionLimit:
+                      rScope.addMessage(
+                          u"Recursion limit reached, cannot thread this formula group now"_ustr);
+                      return false;
+                  case spreadsheetengine::core::formulacell::DependencyCheckFailure::GroupsNotIndependent:
+                      rScope.addMessage(u"multi-group-dependency failed"_ustr);
+                      return false;
+                  case spreadsheetengine::core::formulacell::DependencyCheckFailure::DependencyCalculationFailed:
+                      rScope.addMessage(u"could not do new dependencies calculation thing"_ustr);
+                      return false;
+              }
+
+              return false;
+          };
+
     // iterate over code in the formula ...
     // ensure all input is pre-calculated -
     // to avoid writing during the calculation
@@ -4782,12 +4815,11 @@ bool ScFormulaCell::CheckComputeDependencies(sc::FormulaLogger::GroupScope& rSco
     bool bOKToParallelize = false;
     {
         ScFormulaGroupCycleCheckGuard aCycleCheckGuard(rRecursionHelper, this);
-        if (mxGroup->mbPartOfCycle)
-        {
-            mxGroup->meCalcState = sc::GroupCalcDisabled;
-            rScope.addMessage(u"found circular formula-group dependencies"_ustr);
-            return false;
-        }
+        const auto aPreflightPlan
+            = spreadsheetengine::core::formulacell::makeDependencyCheckPreflightPlan(
+                mxGroup->mbPartOfCycle);
+        if (!aPreflightPlan.mbCanProceed)
+            return applyDependencyCheckPlan(aPreflightPlan);
 
         ScFormulaGroupDependencyComputeGuard aDepComputeGuard(rRecursionHelper);
         ScDependantsCalculator aCalculator(rDocument, *pCode, *this, mxGroup->mpTopCell->aPos, fromFirstRow, nStartOffset, nEndOffset);
@@ -4795,33 +4827,14 @@ bool ScFormulaCell::CheckComputeDependencies(sc::FormulaLogger::GroupScope& rSco
 
     }
 
-    if (rRecursionHelper.IsInRecursionReturn())
-    {
-        mxGroup->meCalcState = sc::GroupCalcDisabled;
-        rScope.addMessage(u"Recursion limit reached, cannot thread this formula group now"_ustr);
-        return false;
-    }
-
-    if (mxGroup->mbPartOfCycle)
-    {
-        mxGroup->meCalcState = sc::GroupCalcDisabled;
-        rScope.addMessage(u"found circular formula-group dependencies"_ustr);
-        return false;
-    }
-
-    if (!rRecursionHelper.AreGroupsIndependent())
+    const auto aResultPlan = spreadsheetengine::core::formulacell::makeDependencyCheckResultPlan(
+        rRecursionHelper.IsInRecursionReturn(), mxGroup->mbPartOfCycle,
+        rRecursionHelper.AreGroupsIndependent(), bOKToParallelize);
+    if (!aResultPlan.mbCanProceed)
     {
         // This call resulted from a dependency calculation for a multigroup-threading attempt,
         // but found dependency among the groups.
-        rScope.addMessage(u"multi-group-dependency failed"_ustr);
-        return false;
-    }
-
-    if (!bOKToParallelize)
-    {
-        mxGroup->meCalcState = sc::GroupCalcDisabled;
-        rScope.addMessage(u"could not do new dependencies calculation thing"_ustr);
-        return false;
+        return applyDependencyCheckPlan(aResultPlan);
     }
 
     return true;
@@ -4893,19 +4906,30 @@ bool ScFormulaCell::InterpretFormulaGroupThreading(sc::FormulaLogger::GroupScope
                                                    SCROW nEndOffset)
 {
     static const bool bThreadingProhibited = std::getenv("SC_NO_THREADED_CALCULATION");
-    if (!bDependencyCheckFailed && !bThreadingProhibited &&
-        pCode->IsEnabledForThreading() &&
-        ScCalcConfig::isThreadingEnabled())
+    const auto aPreflightPlan
+        = spreadsheetengine::core::formulacell::makeThreadingBackendPreflightPlan(
+            bDependencyCheckFailed, bThreadingProhibited, pCode->IsEnabledForThreading(),
+            ScCalcConfig::isThreadingEnabled());
+    if (aPreflightPlan.mbCanProceed)
     {
-        ScRangeList aOrigDependencies;
-        if(!bDependencyComputed && !CheckComputeDependencies(aScope, false, nStartOffset, nEndOffset, false, &aOrigDependencies))
-        {
-            bDependencyComputed = true;
-            bDependencyCheckFailed = true;
+        const auto aDependencyEntryPlan
+            = spreadsheetengine::core::formulacell::makeGroupBackendDependencyEntryPlan(
+                bDependencyComputed, bDependencyCheckFailed);
+        if (!aDependencyEntryPlan.mbCanProceed)
             return false;
-        }
 
-        bDependencyComputed = true;
+        ScRangeList aOrigDependencies;
+        if (aDependencyEntryPlan.mbNeedDependencyCheck)
+        {
+            const auto aDependencyResultPlan
+                = spreadsheetengine::core::formulacell::makeGroupBackendDependencyResultPlan(
+                    CheckComputeDependencies(aScope, false, nStartOffset, nEndOffset, false,
+                                             &aOrigDependencies));
+            bDependencyComputed = aDependencyResultPlan.mbMarkDependencyComputed;
+            bDependencyCheckFailed = aDependencyResultPlan.mbMarkDependencyCheckFailed;
+            if (!aDependencyResultPlan.mbCanProceed)
+                return false;
+        }
 
         // Then do the threaded calculation
 
@@ -5079,54 +5103,89 @@ bool ScFormulaCell::InterpretFormulaGroupOpenCL(sc::FormulaLogger::GroupScope& a
                                                 bool& bDependencyComputed,
                                                 bool& bDependencyCheckFailed)
 {
+    auto addBackendFailureMessage
+        = [&aScope](spreadsheetengine::core::formulacell::GroupBackendFailure eFailure) {
+              switch (eFailure)
+              {
+                  case spreadsheetengine::core::formulacell::GroupBackendFailure::OpenCLVectorOpcodeDisabled:
+                      aScope.addMessage(
+                          u"group calc disabled due to vector state (non-vector-supporting opcode)"_ustr);
+                      break;
+                  case spreadsheetengine::core::formulacell::GroupBackendFailure::OpenCLVectorStackVariableDisabled:
+                      aScope.addMessage(
+                          u"group calc disabled due to vector state (non-vector-supporting stack variable)"_ustr);
+                      break;
+                  case spreadsheetengine::core::formulacell::GroupBackendFailure::OpenCLVectorNotInSubset:
+                      aScope.addMessage(
+                          u"group calc disabled due to vector state (opcode not in subset)"_ustr);
+                      break;
+                  case spreadsheetengine::core::formulacell::GroupBackendFailure::OpenCLVectorUnknown:
+                      aScope.addMessage(
+                          u"group calc disabled due to vector state (unknown)"_ustr);
+                      break;
+                  case spreadsheetengine::core::formulacell::GroupBackendFailure::OpenCLDisabled:
+                      aScope.addMessage(u"opencl not enabled"_ustr);
+                      break;
+                  default:
+                      break;
+              }
+          };
+
     bool bCanVectorize = pCode->IsEnabledForOpenCL();
+    spreadsheetengine::core::formulacell::OpenCLVectorStateClass eVectorStateClass;
     switch (pCode->GetVectorState())
     {
         case FormulaVectorEnabled:
         case FormulaVectorCheckReference:
-        break;
+            eVectorStateClass
+                = spreadsheetengine::core::formulacell::OpenCLVectorStateClass::Enabled;
+            break;
 
         // Not good.
         case FormulaVectorDisabledByOpCode:
-            aScope.addMessage(u"group calc disabled due to vector state (non-vector-supporting opcode)"_ustr);
+            eVectorStateClass
+                = spreadsheetengine::core::formulacell::OpenCLVectorStateClass::DisabledByOpcode;
             break;
         case FormulaVectorDisabledByStackVariable:
-            aScope.addMessage(u"group calc disabled due to vector state (non-vector-supporting stack variable)"_ustr);
+            eVectorStateClass = spreadsheetengine::core::formulacell::OpenCLVectorStateClass::
+                DisabledByStackVariable;
             break;
         case FormulaVectorDisabledNotInSubSet:
-            aScope.addMessage(u"group calc disabled due to vector state (opcode not in subset)"_ustr);
+            eVectorStateClass
+                = spreadsheetengine::core::formulacell::OpenCLVectorStateClass::DisabledNotInSubset;
             break;
         case FormulaVectorDisabled:
         case FormulaVectorUnknown:
         default:
-            aScope.addMessage(u"group calc disabled due to vector state (unknown)"_ustr);
+            eVectorStateClass
+                = spreadsheetengine::core::formulacell::OpenCLVectorStateClass::DisabledOrUnknown;
+            break;
+    }
+    const auto aPreflightPlan
+        = spreadsheetengine::core::formulacell::makeOpenCLBackendPreflightPlan(
+            eVectorStateClass, bCanVectorize, ScCalcConfig::isOpenCLEnabled(),
+            rDocument.IsInInterpreterTableOp(), bDependencyCheckFailed);
+    if (aPreflightPlan.mbEmitFailureMessage)
+        addBackendFailureMessage(aPreflightPlan.meFailure);
+    if (!aPreflightPlan.mbCanProceed)
+        return false;
+
+    const auto aDependencyEntryPlan
+        = spreadsheetengine::core::formulacell::makeGroupBackendDependencyEntryPlan(
+            bDependencyComputed, bDependencyCheckFailed);
+    if (!aDependencyEntryPlan.mbCanProceed)
+        return false;
+
+    if (aDependencyEntryPlan.mbNeedDependencyCheck)
+    {
+        const auto aDependencyResultPlan
+            = spreadsheetengine::core::formulacell::makeGroupBackendDependencyResultPlan(
+                CheckComputeDependencies(aScope, true, 0, mxGroup->mnLength - 1));
+        bDependencyComputed = aDependencyResultPlan.mbMarkDependencyComputed;
+        bDependencyCheckFailed = aDependencyResultPlan.mbMarkDependencyCheckFailed;
+        if (!aDependencyResultPlan.mbCanProceed)
             return false;
     }
-
-    if (!bCanVectorize)
-        return false;
-
-    if (!ScCalcConfig::isOpenCLEnabled())
-    {
-        aScope.addMessage(u"opencl not enabled"_ustr);
-        return false;
-    }
-
-    // TableOp does tricks with using a cell with different values, just bail out.
-    if(rDocument.IsInInterpreterTableOp())
-        return false;
-
-    if (bDependencyCheckFailed)
-        return false;
-
-    if(!bDependencyComputed && !CheckComputeDependencies(aScope, true, 0, mxGroup->mnLength - 1))
-    {
-        bDependencyComputed = true;
-        bDependencyCheckFailed = true;
-        return false;
-    }
-
-    bDependencyComputed = true;
 
     // TODO : Disable invariant formula group interpretation for now in order
     // to get implicit intersection to work.

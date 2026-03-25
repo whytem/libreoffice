@@ -11,7 +11,15 @@ int main()
 {
     using spreadsheetengine::api::CellAddress;
     using spreadsheetengine::core::formulacell::CalcAfterLoadPlan;
+    using spreadsheetengine::core::formulacell::DependencyCheckFailure;
+    using spreadsheetengine::core::formulacell::DependencyCheckPlan;
     using spreadsheetengine::core::formulacell::DirtyPlan;
+    using spreadsheetengine::core::formulacell::GroupBackendFailure;
+    using spreadsheetengine::core::formulacell::GroupInterpretFailure;
+    using spreadsheetengine::core::formulacell::GroupBackendDependencyPlan;
+    using spreadsheetengine::core::formulacell::GroupBackendPreflightPlan;
+    using spreadsheetengine::core::formulacell::GroupInterpretFallbackPlan;
+    using spreadsheetengine::core::formulacell::GroupInterpretPreflightPlan;
     using spreadsheetengine::core::formulacell::LoadTrackingPlan;
     using spreadsheetengine::core::formulacell::NotifyKind;
     using spreadsheetengine::core::formulacell::NotifyPlan;
@@ -150,6 +158,154 @@ int main()
                != TableOpDirtyPlan { false, false, false, false, false })
     {
         return fail("spreadsheetengine_formulacell_tests", "table op dirty plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacell::makeDependencyCheckPreflightPlan(false)
+            != DependencyCheckPlan { true, false, DependencyCheckFailure::None }
+        || spreadsheetengine::core::formulacell::makeDependencyCheckPreflightPlan(true)
+               != DependencyCheckPlan { false, true, DependencyCheckFailure::Cycle }
+        || spreadsheetengine::core::formulacell::makeDependencyCheckResultPlan(
+               true, false, true, true)
+               != DependencyCheckPlan { false, true, DependencyCheckFailure::RecursionLimit }
+        || spreadsheetengine::core::formulacell::makeDependencyCheckResultPlan(
+               false, true, true, true)
+               != DependencyCheckPlan { false, true, DependencyCheckFailure::Cycle }
+        || spreadsheetengine::core::formulacell::makeDependencyCheckResultPlan(
+               false, false, false, true)
+               != DependencyCheckPlan { false, false,
+                   DependencyCheckFailure::GroupsNotIndependent }
+        || spreadsheetengine::core::formulacell::makeDependencyCheckResultPlan(
+               false, false, true, false)
+               != DependencyCheckPlan { false, true,
+                   DependencyCheckFailure::DependencyCalculationFailed }
+        || spreadsheetengine::core::formulacell::makeDependencyCheckResultPlan(
+               false, false, true, true)
+               != DependencyCheckPlan { true, false, DependencyCheckFailure::None })
+    {
+        return fail("spreadsheetengine_formulacell_tests",
+                    "dependency check plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacell::makeGroupInterpretPreflightPlan(
+            false, false, true, true)
+            != GroupInterpretPreflightPlan { true, false, false, GroupInterpretFailure::None }
+        || spreadsheetengine::core::formulacell::makeGroupInterpretPreflightPlan(
+               true, true, true, true)
+               != GroupInterpretPreflightPlan { false, false, false,
+                   GroupInterpretFailure::DependencyComputationAborted }
+        || spreadsheetengine::core::formulacell::makeGroupInterpretPreflightPlan(
+               false, true, false, true)
+               != GroupInterpretPreflightPlan { false, false, false,
+                   GroupInterpretFailure::FormulaGroupNotIndependent }
+        || spreadsheetengine::core::formulacell::makeGroupInterpretPreflightPlan(
+               false, false, true, false)
+               != GroupInterpretPreflightPlan { false, false, false,
+                   GroupInterpretFailure::GroupsNotIndependent }
+        || spreadsheetengine::core::formulacell::makeGroupInterpretCycleAbortPlan(
+               false, true, true)
+               != GroupInterpretPreflightPlan { true, false, false, GroupInterpretFailure::None }
+        || spreadsheetengine::core::formulacell::makeGroupInterpretCycleAbortPlan(
+               true, false, true)
+               != GroupInterpretPreflightPlan { true, false, false, GroupInterpretFailure::None }
+        || spreadsheetengine::core::formulacell::makeGroupInterpretCycleAbortPlan(
+               true, true, false)
+               != GroupInterpretPreflightPlan { true, false, false, GroupInterpretFailure::None }
+        || spreadsheetengine::core::formulacell::makeGroupInterpretCycleAbortPlan(
+               true, true, true)
+               != GroupInterpretPreflightPlan { false, true, true,
+                   GroupInterpretFailure::CycleDuringDependencyComputation }
+        || spreadsheetengine::core::formulacell::makeGroupInterpretFallbackPlan(true, false)
+               != GroupInterpretFallbackPlan { false, GroupInterpretFailure::None }
+        || spreadsheetengine::core::formulacell::makeGroupInterpretFallbackPlan(false, false)
+               != GroupInterpretFallbackPlan { true, GroupInterpretFailure::GroupsNotIndependent }
+        || spreadsheetengine::core::formulacell::makeGroupInterpretFallbackPlan(true, true)
+               != GroupInterpretFallbackPlan { true, GroupInterpretFailure::ParentCycleSkipTail })
+    {
+        return fail("spreadsheetengine_formulacell_tests",
+                    "group interpret plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacell::makeGroupBackendDependencyEntryPlan(false, false)
+            != GroupBackendDependencyPlan { true, true, false, false }
+        || spreadsheetengine::core::formulacell::makeGroupBackendDependencyEntryPlan(true, false)
+               != GroupBackendDependencyPlan { true, false, false, false }
+        || spreadsheetengine::core::formulacell::makeGroupBackendDependencyEntryPlan(false, true)
+               != GroupBackendDependencyPlan { false, false, false, false }
+        || spreadsheetengine::core::formulacell::makeGroupBackendDependencyResultPlan(true)
+               != GroupBackendDependencyPlan { true, false, true, false }
+        || spreadsheetengine::core::formulacell::makeGroupBackendDependencyResultPlan(false)
+               != GroupBackendDependencyPlan { false, false, true, true })
+    {
+        return fail("spreadsheetengine_formulacell_tests",
+                    "group backend dependency plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacell::makeThreadingBackendPreflightPlan(
+            false, false, true, true)
+            != GroupBackendPreflightPlan { true, false, GroupBackendFailure::None }
+        || spreadsheetengine::core::formulacell::makeThreadingBackendPreflightPlan(
+               true, false, true, true)
+               != GroupBackendPreflightPlan { false, false,
+                   GroupBackendFailure::DependencyCheckFailedPreviously }
+        || spreadsheetengine::core::formulacell::makeThreadingBackendPreflightPlan(
+               false, true, true, true)
+               != GroupBackendPreflightPlan { false, false,
+                   GroupBackendFailure::ThreadingProhibited }
+        || spreadsheetengine::core::formulacell::makeThreadingBackendPreflightPlan(
+               false, false, false, true)
+               != GroupBackendPreflightPlan { false, false,
+                   GroupBackendFailure::ThreadingOpcodeDisabled }
+        || spreadsheetengine::core::formulacell::makeThreadingBackendPreflightPlan(
+               false, false, true, false)
+               != GroupBackendPreflightPlan { false, false,
+                   GroupBackendFailure::ThreadingDisabled }
+        || spreadsheetengine::core::formulacell::makeOpenCLBackendPreflightPlan(
+               spreadsheetengine::core::formulacell::OpenCLVectorStateClass::Enabled, true,
+               true, false, false)
+               != GroupBackendPreflightPlan { true, false, GroupBackendFailure::None }
+        || spreadsheetengine::core::formulacell::makeOpenCLBackendPreflightPlan(
+               spreadsheetengine::core::formulacell::OpenCLVectorStateClass::DisabledByOpcode,
+               false, true, false, false)
+               != GroupBackendPreflightPlan { false, true,
+                   GroupBackendFailure::OpenCLVectorOpcodeDisabled }
+        || spreadsheetengine::core::formulacell::makeOpenCLBackendPreflightPlan(
+               spreadsheetengine::core::formulacell::OpenCLVectorStateClass::DisabledByStackVariable,
+               false, true, false, false)
+               != GroupBackendPreflightPlan { false, true,
+                   GroupBackendFailure::OpenCLVectorStackVariableDisabled }
+        || spreadsheetengine::core::formulacell::makeOpenCLBackendPreflightPlan(
+               spreadsheetengine::core::formulacell::OpenCLVectorStateClass::DisabledNotInSubset,
+               false, true, false, false)
+               != GroupBackendPreflightPlan { false, true,
+                   GroupBackendFailure::OpenCLVectorNotInSubset }
+        || spreadsheetengine::core::formulacell::makeOpenCLBackendPreflightPlan(
+               spreadsheetengine::core::formulacell::OpenCLVectorStateClass::DisabledOrUnknown,
+               false, true, false, false)
+               != GroupBackendPreflightPlan { false, true,
+                   GroupBackendFailure::OpenCLVectorUnknown }
+        || spreadsheetengine::core::formulacell::makeOpenCLBackendPreflightPlan(
+               spreadsheetengine::core::formulacell::OpenCLVectorStateClass::Enabled, false,
+               true, false, false)
+               != GroupBackendPreflightPlan { false, false,
+                   GroupBackendFailure::OpenCLNotVectorizable }
+        || spreadsheetengine::core::formulacell::makeOpenCLBackendPreflightPlan(
+               spreadsheetengine::core::formulacell::OpenCLVectorStateClass::Enabled, true,
+               false, false, false)
+               != GroupBackendPreflightPlan { false, true,
+                   GroupBackendFailure::OpenCLDisabled }
+        || spreadsheetengine::core::formulacell::makeOpenCLBackendPreflightPlan(
+               spreadsheetengine::core::formulacell::OpenCLVectorStateClass::Enabled, true,
+               true, true, false)
+               != GroupBackendPreflightPlan { false, false,
+                   GroupBackendFailure::InterpreterTableOp }
+        || spreadsheetengine::core::formulacell::makeOpenCLBackendPreflightPlan(
+               spreadsheetengine::core::formulacell::OpenCLVectorStateClass::Enabled, true,
+               true, false, true)
+               != GroupBackendPreflightPlan { false, false,
+                   GroupBackendFailure::DependencyCheckFailedPreviously })
+    {
+        return fail("spreadsheetengine_formulacell_tests",
+                    "group backend preflight plan mismatch");
     }
 
     if (spreadsheetengine::core::formulacellrefupdate::computePreviousPosition(

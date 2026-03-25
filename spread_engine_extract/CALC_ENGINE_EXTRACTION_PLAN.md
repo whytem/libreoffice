@@ -1399,10 +1399,36 @@ Current status:
     - grow planning for:
       - final compile/dirty vs restore-listening action selection
     - this now covers `UpdateGrow()`
+  - engine-owned formulacell recalc planning now also covers the first
+    dependency/group-evaluation fallback seam:
+    - `CheckComputeDependencies()` preflight cycle rejection
+    - post-dependency-check outcome planning for:
+      - recursion-limit fallback
+      - cycle fallback after dependency expansion
+      - multi-group independence failure
+      - dependency-calculation / parallelization failure
+    - `Interpret()` group-evaluation preflight planning for:
+      - dependency-computation abort short-circuit
+      - formula-group independence rejection
+      - global group-independence rejection
+      - cycle-detected dependency-abort planning
+    - `Interpret()` post-group-failure fallback planning for:
+      - multi-group-dependency tail skip
+      - parent-cycle tail skip
+    - shared backend dependency-stage planning for:
+      - OpenCL/threading reuse of previously computed dependency state
+      - backend skip after an earlier dependency-check failure
+      - mark-computed / mark-failed transitions after backend dependency checks
+    - shared backend preflight planning for:
+      - threading skip classification for environment, opcode, and config gates
+      - OpenCL vector-state classification and message routing
+      - OpenCL skip classification for non-vectorizable, disabled, table-op,
+        and prior-dependency-failure cases
   - Calc now consumes those helpers from `refupdat.cxx`, while still owning:
     - `ScBigRange` update handling
-    - the remaining `ScFormulaCell::UpdateReference*()` orchestration beyond
-      the shift/copy/move and tab-update planner seams
+    - the remaining deeper dependency/recalc orchestration beyond the initial
+      `CheckComputeDependencies()`, `Interpret()`, and backend dependency-stage
+      planner seams
     - undo-document writes, listening, and recompilation side effects
   - validation is green for the first pass-6 checkpoint:
     - standalone: `ctest` passes `18/18`
