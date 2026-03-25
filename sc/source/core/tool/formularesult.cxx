@@ -14,6 +14,12 @@
 #include <sal/log.hxx>
 #include <utility>
 
+#include <spreadsheetengine/api/FormulaResult.hxx>
+#include <spreadsheetengine/compat/libreoffice/Error.hxx>
+#include <spreadsheetengine/compat/libreoffice/String.hxx>
+
+namespace seformula = spreadsheetengine::api::formulavalue;
+
 namespace sc {
 
 FormulaResultValue::FormulaResultValue() : mfValue(0.0), meType(Invalid), mnError(FormulaError::NONE) {}
@@ -300,51 +306,73 @@ bool ScFormulaResult::IsEmptyDisplayedAsString() const
 
 namespace {
 
-bool isValue( formula::StackVar sv )
-{
-    return sv == formula::svDouble || sv == formula::svError
-        || sv == formula::svEmptyCell
-        // The initial uninitialized result value is double 0.0, even if the type
-        // is unknown, so the interpreter asking for it gets that double
-        // instead of having to convert a string which may result in #VALUE!
-        // (otherwise the unknown would be neither error nor double nor string)
-        || sv == formula::svUnknown;
-}
-
-bool isString( formula::StackVar sv )
+seformula::CarrierType toCarrierType(formula::StackVar sv)
 {
     switch (sv)
     {
+        case formula::svEmptyCell:
+            return seformula::CarrierType::EmptyCell;
+        case formula::svDouble:
+            return seformula::CarrierType::Double;
+        case formula::svError:
+            return seformula::CarrierType::Error;
         case formula::svString:
+            return seformula::CarrierType::String;
         case formula::svHybridCell:
-            return true;
+            return seformula::CarrierType::HybridCell;
+        case formula::svMatrixCell:
+            return seformula::CarrierType::MatrixCell;
+        case formula::svUnknown:
         default:
-            break;
+            return seformula::CarrierType::Unknown;
     }
+}
 
-    return false;
+bool isValue(formula::StackVar sv, bool bEmptyDisplayedAsString)
+{
+    return seformula::isValueCarrierType(toCarrierType(sv), bEmptyDisplayedAsString);
+}
+
+bool isValueNoError(formula::StackVar sv)
+{
+    return seformula::isValueCarrierTypeNoError(toCarrierType(sv));
+}
+
+bool isString(formula::StackVar sv)
+{
+    return seformula::isStringCarrierType(toCarrierType(sv));
+}
+
+sc::FormulaResultValue toScFormulaResultValue(const seformula::FormulaResultValue& rValue)
+{
+    switch (rValue.meType)
+    {
+        case seformula::ValueType::Value:
+            return sc::FormulaResultValue(rValue.mfValue);
+        case seformula::ValueType::String:
+            return sc::FormulaResultValue(
+                svl::SharedString(spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                    rValue.maString)),
+                rValue.mbMultiLine);
+        case seformula::ValueType::Error:
+            return sc::FormulaResultValue(
+                spreadsheetengine::compat::libreoffice::toFormulaError(rValue.meError));
+        case seformula::ValueType::Invalid:
+        default:
+            return sc::FormulaResultValue();
+    }
 }
 
 }
 
 bool ScFormulaResult::IsValue() const
 {
-    if (IsEmptyDisplayedAsString())
-        return true;
-
-    return isValue(GetCellResultType());
+    return isValue(GetCellResultType(), IsEmptyDisplayedAsString());
 }
 
 bool ScFormulaResult::IsValueNoError() const
 {
-    switch (GetCellResultType())
-    {
-        case formula::svDouble:
-        case formula::svEmptyCell:
-            return true;
-        default:
-            return false;
-    }
+    return isValueNoError(GetCellResultType());
 }
 
 bool ScFormulaResult::IsMultiline() const
@@ -392,7 +420,7 @@ bool ScFormulaResult::GetErrorOrDouble( FormulaError& rErr, double& rVal ) const
     if (rErr != FormulaError::NONE)
         return true;
 
-    if (!isValue(sv))
+    if (!isValue(sv, IsEmptyDisplayedAsString()))
         return false;
 
     rVal = GetDouble();
@@ -402,10 +430,11 @@ bool ScFormulaResult::GetErrorOrDouble( FormulaError& rErr, double& rVal ) const
 sc::FormulaResultValue ScFormulaResult::GetResult() const
 {
     if (mbValueCached)
-        return sc::FormulaResultValue(mfValue);
+        return toScFormulaResultValue(seformula::makeValueResult(mfValue));
 
     if (mnError != FormulaError::NONE)
-        return sc::FormulaResultValue(mnError);
+        return toScFormulaResultValue(
+            seformula::makeErrorResult(spreadsheetengine::compat::libreoffice::toApiError(mnError)));
 
     formula::StackVar sv = GetCellResultType();
     FormulaError nErr = FormulaError::NONE;
@@ -424,20 +453,23 @@ sc::FormulaResultValue ScFormulaResult::GetResult() const
     }
 
     if (nErr != FormulaError::NONE)
-        return sc::FormulaResultValue(nErr);
+        return toScFormulaResultValue(
+            seformula::makeErrorResult(spreadsheetengine::compat::libreoffice::toApiError(nErr)));
 
-    if (isValue(sv))
-        return sc::FormulaResultValue(GetDouble());
+    if (isValue(sv, IsEmptyDisplayedAsString()))
+        return toScFormulaResultValue(seformula::makeValueResult(GetDouble()));
 
     if (!mbToken)
         // String result type needs token.
-        return sc::FormulaResultValue();
+        return toScFormulaResultValue(seformula::makeInvalidResult());
 
     if (isString(sv))
-        return sc::FormulaResultValue(GetString(), IsMultiline());
+        return toScFormulaResultValue(seformula::makeStringResult(
+            spreadsheetengine::compat::libreoffice::toApiString(GetString().getString()),
+            IsMultiline()));
 
     // Invalid
-    return sc::FormulaResultValue();
+    return toScFormulaResultValue(seformula::makeInvalidResult());
 }
 
 FormulaError ScFormulaResult::GetResultError() const

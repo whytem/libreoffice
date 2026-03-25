@@ -185,6 +185,29 @@ bool ScSingleRefData::ValidExternal(const ScDocument& rDoc) const
     return ColValid(rDoc) && RowValid(rDoc) && mnTab >= -1;
 }
 
+spreadsheetengine::api::refdata::SingleRefData ScSingleRefData::toApiSingleRefData() const
+{
+    return { mnCol, mnRow, mnTab,
+        { Flags.bColRel, Flags.bColDeleted, Flags.bRowRel, Flags.bRowDeleted, Flags.bTabRel,
+            Flags.bTabDeleted, Flags.bFlag3D, Flags.bRelName } };
+}
+
+void ScSingleRefData::assignFromApiSingleRefData(
+    const spreadsheetengine::api::refdata::SingleRefData& rData )
+{
+    mnCol = rData.mnColumn;
+    mnRow = rData.mnRow;
+    mnTab = rData.mnSheet;
+    Flags.bColRel = rData.maFlags.mbColumnRelative;
+    Flags.bColDeleted = rData.maFlags.mbColumnDeleted;
+    Flags.bRowRel = rData.maFlags.mbRowRelative;
+    Flags.bRowDeleted = rData.maFlags.mbRowDeleted;
+    Flags.bTabRel = rData.maFlags.mbSheetRelative;
+    Flags.bTabDeleted = rData.maFlags.mbSheetDeleted;
+    Flags.bFlag3D = rData.maFlags.mbFlag3D;
+    Flags.bRelName = rData.maFlags.mbRelativeName;
+}
+
 ScAddress ScSingleRefData::toAbs( const ScDocument& rDoc, const ScAddress& rPos ) const
 {
     return toAbs(rDoc.GetSheetLimits(), rPos);
@@ -391,6 +414,19 @@ void ScComplexRefData::InitFromRefAddresses( const ScDocument& rDoc, const ScRef
     SetRange( rDoc.GetSheetLimits(), ScRange( rRef1.GetAddress(), rRef2.GetAddress()), rPos);
 }
 
+spreadsheetengine::api::refdata::ComplexRefData ScComplexRefData::toApiComplexRefData() const
+{
+    return { Ref1.toApiSingleRefData(), Ref2.toApiSingleRefData(), bTrimToData };
+}
+
+void ScComplexRefData::assignFromApiComplexRefData(
+    const spreadsheetengine::api::refdata::ComplexRefData& rData )
+{
+    Ref1.assignFromApiSingleRefData(rData.maRef1);
+    Ref2.assignFromApiSingleRefData(rData.maRef2);
+    bTrimToData = rData.mbTrimToData;
+}
+
 ScComplexRefData& ScComplexRefData::Extend( const ScSheetLimits& rLimits, const ScSingleRefData & rRef, const ScAddress & rPos )
 {
     bool bInherit3D = (Ref1.IsFlag3D() && !Ref2.IsFlag3D() && !rRef.IsFlag3D());
@@ -466,7 +502,6 @@ ScComplexRefData& ScComplexRefData::Extend( const ScSheetLimits& rLimits, const 
         Ref2.SetRelName(true);
 
     SetRange(rLimits, aAbsRange, rPos);
-
     return *this;
 }
 

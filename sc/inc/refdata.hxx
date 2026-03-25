@@ -22,6 +22,7 @@
 #include "address.hxx"
 #include "scdllapi.h"
 #include "calcmacros.hxx"
+#include <spreadsheetengine/api/ReferenceData.hxx>
 
 struct ScSheetLimits;
 
@@ -106,6 +107,9 @@ public:
     SC_DLLPUBLIC SCROW Row() const;
     SC_DLLPUBLIC SCCOL Col() const;
     SC_DLLPUBLIC SCTAB Tab() const;
+    SC_DLLPUBLIC spreadsheetengine::api::refdata::SingleRefData toApiSingleRefData() const;
+    SC_DLLPUBLIC void assignFromApiSingleRefData(
+        const spreadsheetengine::api::refdata::SingleRefData& rData );
 
     /** Adjust ordering (front-top-left/rear-bottom-right) to a new position. */
     static void PutInOrder( ScSingleRefData& rRef1, ScSingleRefData& rRef2, const ScAddress& rPos );
@@ -162,6 +166,9 @@ struct ScComplexRefData
 
     SC_DLLPUBLIC ScRange toAbs( const ScSheetLimits& rLimits, const ScAddress& rPos ) const;
     SC_DLLPUBLIC ScRange toAbs( const ScDocument& rDoc, const ScAddress& rPos ) const;
+    SC_DLLPUBLIC spreadsheetengine::api::refdata::ComplexRefData toApiComplexRefData() const;
+    SC_DLLPUBLIC void assignFromApiComplexRefData(
+        const spreadsheetengine::api::refdata::ComplexRefData& rData );
 
     /** Set a new range, assuming that the ordering of the range matches the
         ordering of the reference data flags already set. */

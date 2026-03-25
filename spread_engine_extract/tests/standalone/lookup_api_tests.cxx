@@ -1,8 +1,10 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
 #include <iostream>
+#include <unordered_map>
 
 #include <spreadsheetengine/api/Lookup.hxx>
+#include <spreadsheetengine/api/LookupCache.hxx>
 
 #include "TestSupport.hxx"
 
@@ -17,6 +19,11 @@ int main()
     using spreadsheetengine::api::lookup::PatternMode;
     using spreadsheetengine::api::lookup::SearchMode;
     using spreadsheetengine::api::lookup::VectorOrientation;
+    using spreadsheetengine::api::lookupcache::CacheEntry;
+    using spreadsheetengine::api::lookupcache::QueryCriteria;
+    using spreadsheetengine::api::lookupcache::QueryKey;
+    using spreadsheetengine::api::lookupcache::QueryOp;
+    using spreadsheetengine::api::lookupcache::Result;
     using spreadsheetengine::standalone::test::fail;
 
     const auto aMatchDefault = spreadsheetengine::api::lookup::normalizeMatchType(1.0);
@@ -151,6 +158,61 @@ int main()
         || aXLookupSliceRow.maValue.maDimensions.mnRows != 2)
     {
         return fail("spreadsheetengine_lookup_tests", "XLOOKUP slice planning mismatch");
+    }
+
+    const auto aNumericCriteria
+        = QueryCriteria::fromDouble(QueryOp::Equal, SearchMode::Forward, 42.0);
+    const auto aStringCriteria
+        = QueryCriteria::fromString(QueryOp::Equal, SearchMode::BinaryAscending, u"needle");
+    const auto aEmptyCriteria
+        = QueryCriteria::fromString(QueryOp::Equal, SearchMode::Forward, u"");
+    if (!(aNumericCriteria == QueryCriteria::fromDouble(QueryOp::Equal, SearchMode::Forward, 42.0))
+        || aNumericCriteria == aStringCriteria || !aEmptyCriteria.isEmptyStringQuery()
+        || aStringCriteria.isEmptyStringQuery())
+    {
+        return fail("spreadsheetengine_lookup_tests", "lookup cache criteria mismatch");
+    }
+
+    const auto aKey
+        = spreadsheetengine::api::lookupcache::makeQueryKey({ 3, 2, 9 }, QueryOp::LessEqual,
+            SearchMode::BinaryDescending);
+    std::unordered_map<QueryKey, CacheEntry, QueryKey::Hash> aCache;
+    aCache.emplace(aKey, spreadsheetengine::api::lookupcache::makeCacheEntry(
+                             aNumericCriteria, { 3, 7, 11 }, true));
+    if (aCache.find(aKey) == aCache.end())
+    {
+        return fail("spreadsheetengine_lookup_tests", "lookup cache key hashing mismatch");
+    }
+
+    const auto nCachedRow
+        = spreadsheetengine::api::lookupcache::findCachedRowForCriteria(
+            aCache.begin(), aCache.end(), aNumericCriteria);
+    const auto nMissingRow
+        = spreadsheetengine::api::lookupcache::findCachedRowForCriteria(
+            aCache.begin(), aCache.end(), aStringCriteria);
+    if (nCachedRow != 9 || nMissingRow != -1)
+    {
+        return fail("spreadsheetengine_lookup_tests", "lookup cache row search mismatch");
+    }
+
+    spreadsheetengine::api::CellAddress aFoundAddress;
+    const auto eFound
+        = spreadsheetengine::api::lookupcache::classifyLookup(aFoundAddress, aNumericCriteria,
+            &aCache.find(aKey)->second);
+    const auto eDifferent
+        = spreadsheetengine::api::lookupcache::classifyLookup(aFoundAddress, aStringCriteria,
+            &aCache.find(aKey)->second);
+    const auto aMissingEntry = spreadsheetengine::api::lookupcache::makeCacheEntry(
+        aStringCriteria, { 3, 0, 0 }, false);
+    const auto eMissing = spreadsheetengine::api::lookupcache::classifyLookup(
+        aFoundAddress, aStringCriteria, &aMissingEntry);
+    const auto eNotCached = spreadsheetengine::api::lookupcache::classifyLookup(
+        aFoundAddress, aStringCriteria, nullptr);
+    if (eFound != Result::Found || aFoundAddress.mnSheet != 3 || aFoundAddress.mnColumn != 7
+        || aFoundAddress.mnRow != 11 || eDifferent != Result::CriteriaDifferent
+        || eMissing != Result::NotAvailable || eNotCached != Result::NotCached)
+    {
+        return fail("spreadsheetengine_lookup_tests", "lookup cache result mismatch");
     }
 
     std::cout << "spreadsheetengine lookup api tests passed\n";

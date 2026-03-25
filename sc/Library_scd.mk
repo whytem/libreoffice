@@ -12,6 +12,7 @@ $(eval $(call gb_Library_Library,scd))
 $(eval $(call gb_Library_set_componentfile,scd,sc/util/scd,services))
 
 $(eval $(call gb_Library_set_include,scd,\
+	-I$(SRCDIR)/spread_engine_extract/inc \
 	-I$(SRCDIR)/sc/inc \
 	$$(INCLUDE) \
 ))

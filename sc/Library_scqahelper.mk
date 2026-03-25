@@ -10,6 +10,7 @@
 $(eval $(call gb_Library_Library,scqahelper))
 
 $(eval $(call gb_Library_set_include,scqahelper,\
+	-I$(SRCDIR)/spread_engine_extract/inc \
 	-I$(SRCDIR)/sc/inc \
 	-I$(SRCDIR)/sc/source/ui/inc \
 	$$(INCLUDE) \

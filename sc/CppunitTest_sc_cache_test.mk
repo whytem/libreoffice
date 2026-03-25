@@ -62,6 +62,7 @@ $(eval $(call gb_CppunitTest_use_libraries,sc_cache_test, \
 ))
 
 $(eval $(call gb_CppunitTest_set_include,sc_cache_test,\
+    -I$(SRCDIR)/spread_engine_extract/inc \
     -I$(SRCDIR)/sc/source/ui/inc \
     -I$(SRCDIR)/sc/inc \
     $$(INCLUDE) \

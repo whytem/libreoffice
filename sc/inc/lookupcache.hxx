@@ -22,6 +22,8 @@
 #include "address.hxx"
 #include <svl/listener.hxx>
 
+#include <spreadsheetengine/api/LookupCache.hxx>
+
 #include <memory>
 #include <unordered_map>
 
@@ -99,16 +101,12 @@ public:
             mpStr = new OUString( rStr);
         }
 
-        bool operator==( const QueryCriteria & r ) const
-        {
-            return meOp == r.meOp && meSearchMode == r.meSearchMode && mbString == r.mbString &&
-                (mbString ? (*mpStr == *r.mpStr) : (mfVal == r.mfVal));
-        }
+        bool operator==( const QueryCriteria & r ) const;
 
-        bool isEmptyStringQuery() const
-        {
-            return (getQueryOp() == QueryOp::EQUAL) && mbString && mpStr && mpStr->isEmpty();
-        }
+        bool isEmptyStringQuery() const;
+        bool isStringQuery() const { return mbString; }
+        double getDoubleValue() const { return mfVal; }
+        const OUString* getStringValue() const { return mbString ? mpStr : nullptr; }
     };
 
     /// MUST be new'd because Notify() deletes.
@@ -157,40 +155,23 @@ private:
         QueryOp         meOp;
         LookupSearchMode meSearchMode;
 
-        QueryKey( const ScAddress & rAddress, const QueryOp eOp, LookupSearchMode eSearchMode ) :
-            mnRow( rAddress.Row()),
-            mnTab( rAddress.Tab()),
-            meOp( eOp),
-            meSearchMode( eSearchMode)
-        {
-        }
+        QueryKey( const ScAddress & rAddress, const QueryOp eOp, LookupSearchMode eSearchMode );
 
-        bool operator==( const QueryKey & r ) const
-        {
-            return mnRow == r.mnRow && mnTab == r.mnTab && meOp == r.meOp && meOp != UNKNOWN &&
-                meSearchMode == r.meSearchMode;
-        }
+        bool operator==( const QueryKey & r ) const;
 
         struct Hash
         {
-            size_t operator()( const QueryKey & r ) const
-            {
-                return (static_cast<size_t>(r.mnTab) << 24) ^
-                    (static_cast<size_t>(r.meOp) << 22) ^
-                    (static_cast<size_t>(r.meSearchMode) << 20) ^
-                    static_cast<size_t>(r.mnRow);
-            }
+            size_t operator()( const QueryKey & r ) const;
         };
     };
 
     struct QueryCriteriaAndResult
     {
-        QueryCriteria   maCriteria;
-        ScAddress       maAddress;
+        spreadsheetengine::api::lookupcache::CacheEntry maEntry;
 
-        QueryCriteriaAndResult( const QueryCriteria & rCriteria, const ScAddress & rAddress ) :
-            maCriteria( rCriteria),
-            maAddress( rAddress)
+        QueryCriteriaAndResult(
+            const spreadsheetengine::api::lookupcache::CacheEntry& rEntry )
+            : maEntry(rEntry)
         {
         }
     };

@@ -986,18 +986,181 @@ Work:
 - extract shared-formula and group-evaluation helpers as engine services where
   feasible
 
+Implementation approach:
+
+- execute Phase 10 in passes that keep ownership changes low-risk and easy to
+  validate, rather than trying to move `ScFormulaCell` or dependency listeners
+  wholesale
+- pass 1: pure reference and result carriers
+  - move the lowest-coupling data containers first:
+    - `ScFormulaResult`
+    - `sc::FormulaResultValue`
+    - `ScSingleRefData`
+    - `ScComplexRefData`
+  - copy these into engine-owned headers and implementations under
+    `spread_engine_extract`, then turn the Calc-facing versions into thin
+    compatibility wrappers or consumers of the relocated code
+  - do not move broadcaster/listener integration or document lookups in this
+    pass; keep anything that still needs `ScDocument` as an adapter seam
+- pass 2: lookup cache vocabulary and cache-entry ownership
+  - split `lookupcache` into:
+    - engine-owned query key / criteria / cached-result records
+    - Calc-owned invalidation, document listeners, and cache-map attachment
+  - keep `ScLookupCache::Notify()` and document registration in Calc until the
+    dependency layer is ready
+  - extract only the cache semantics and query-key behavior needed to make the
+    cache testable outside Calc
+- pass 3: query evaluator pure policy
+  - carve out the policy-heavy but host-neutral parts of `queryevaluator`:
+    - operator classification
+    - whole-cell vs partial-match policy
+    - query-by-value vs query-by-string classification
+    - sorted-item/cache helper state that does not require table iterators
+  - keep table iteration, string-pool ownership, transliteration setup, and
+    number-format lookups behind host adapters for now
+- pass 4: shared-formula grouping helpers
+  - move the structural shared-formula operations in `sharedformula.cxx` behind
+    engine-owned services:
+    - group / split / join planning
+    - group metadata and range-bound calculations
+  - keep cell-store mutation, listener teardown/restart, and document-specific
+    block traversal in Calc adapters until the `ScFormulaCell` seam is thinner
+- pass 5: `ScFormulaCell` result/dependency helpers
+  - relocate reusable non-UI orchestration out of `ScFormulaCell`:
+    - result-token handling
+    - matrix/result-state transitions
+    - portions of dirty / compile / recalc state that do not directly touch
+      broadcasters or persistence
+  - keep document insertion/removal, shell-facing behavior, and persistence
+    hooks in Calc
+- pass 6: reference update and recalculation algorithms
+  - extract the algorithms that update references, dirty dependents, and manage
+    recalc/group evaluation once the lower-level value/reference types are
+    already engine-owned
+  - this is where listener/query/cache integration and the remaining
+    `ScFormulaCell` ownership changes should converge
+
+What not to do early:
+
+- do not start Phase 10 by moving all of `formulacell.cxx`
+- do not pull document broadcaster ownership or listener registration into the
+  engine before the carrier and cache types are already stable
+- do not couple the first slice to OpenCL, UI, persistence, or import/export
+  behaviors
+
+First logical slice:
+
+- extract `ScFormulaResult` and `ScSingleRefData` / `ScComplexRefData` first
+- wire Calc to consume the relocated logic through compatibility headers
+- add standalone unit coverage for:
+  - formula-result type transitions
+  - reference relative/absolute conversion behavior
+  - reference ordering / validity rules
+- validate against Calc tests that are sensitive to formula results and
+  reference motion before touching caches or `ScFormulaCell`
+
+Why this order:
+
+- `formularesult` and `refdata` are already identified in the audit as central
+  engine primitives, but they are much less coupled than caches, listeners, or
+  formula-cell orchestration
+- getting those two types engine-owned first reduces the amount of Calc
+  vocabulary leaked into later Phase 10 slices
+- it also gives the later cache/query/shared-formula work stable engine-native
+  building blocks instead of having to extract everything at once
+
+Recommended next implementation slice:
+
+- start with Phase 10 pass 1 by relocating `formularesult` and `refdata`
+- defer `lookupcache`, `queryevaluator`, and `sharedformula` until those core
+  result/reference primitives are in place
+
 Validation:
 
 - standalone:
   - reference/update/dependency tests against the minimal host
   - parity cases for caches and lookup behavior
 - LibreOffice:
+  - `CppunitTest_sc_ucalc_shared_cases`
   - `CppunitTest_sc_ucalc_sharedformula`
   - `CppunitTest_sc_cache_test`
   - `CppunitTest_sc_parallelism`
   - `CppunitTest_sc_ucalc`
   - `CppunitTest_sc_ucalc_copypaste`
   - `CppunitTest_sc_ucalc_sort`
+  - `CppunitTest_sc_ucalc_formula2`
+
+Current status:
+
+- pass 1 is now substantially complete:
+  - the engine owns standalone-facing carrier headers for formula results and
+    references in:
+    - `spread_engine_extract/inc/spreadsheetengine/api/FormulaResult.hxx`
+    - `spread_engine_extract/inc/spreadsheetengine/api/ReferenceData.hxx`
+  - Calc now consumes engine-owned formula-result carrier logic for:
+    - carrier-type classification
+    - value-vs-string detection
+    - error-or-double result construction
+  - Calc reference carriers now expose explicit conversion seams to and from
+    engine-owned reference types through `ScSingleRefData` and
+    `ScComplexRefData`, while the exact Calc semantics for range ordering and
+    reference normalization remain local adapters for now
+  - standalone coverage now includes direct carrier tests for:
+    - formula-result state transitions
+    - reference ordering and normalization helpers
+    - range extension and entire-row/column checks
+  - the Calc build graph now consistently propagates
+    `spread_engine_extract/inc` into the targets that include `sc/inc/refdata.hxx`
+- validation is green for the carrier-sensitive gates:
+  - standalone: `ctest` passes `15/15`
+  - LibreOffice:
+    - `CppunitTest_sc_ucalc`
+    - `CppunitTest_sc_ucalc_formula2`
+    - `CppunitTest_sc_ucalc_sharedformula`
+    - `CppunitTest_sc_ucalc_shared_cases`
+    - `CppunitTest_sc_ucalc_copypaste`
+    - `CppunitTest_sc_ucalc_sort`
+- the remaining planned validation targets are currently environment- or
+  infrastructure-limited in this Ubuntu 24.04 WSL setup rather than exposing a
+  clear pass-1 carrier regression:
+  - `CppunitTest_sc_parallelism` is failing during test document load before it
+    reaches the relocated carrier logic
+- after installing baseline and CJK Noto fonts, `CppunitTest_sc_cache_test`
+  now passes in this environment
+- the main pass-1 remainder is not another broad carrier move:
+  - exact `refdata` behavioral ownership can advance later together with the
+    dependency/reference-update work in subsequent Phase 10 passes
+  - the next meaningful implementation step is Phase 10 pass 2
+    (`lookupcache` semantics and cache-entry ownership), not more standalone
+    carrier scaffolding
+- pass 2 is now substantially complete for the low-coupling lookup-cache seam:
+  - engine-owned cache semantics now cover:
+    - query operations
+    - query criteria
+    - query keys
+    - cached lookup-result records
+    - cache-hit classification semantics
+    - cached-row search by criteria
+  - `ScLookupCache` now stores engine-owned cache entries instead of a Calc-local
+    criteria/result pair
+  - Calc still owns the parts that are intentionally host-bound for later
+    phases:
+    - `ScLookupCache` lifetime
+    - document listener wiring
+    - invalidation through `Notify()`
+    - document cache-map ownership
+  - validation is green for the cache-sensitive lanes:
+    - standalone: `ctest` passes `15/15`
+    - LibreOffice:
+      - `CppunitTest_sc_cache_test`
+      - `CppunitTest_sc_ucalc_sort`
+      - `CppunitTest_sc_ucalc_formula2`
+      - `CppunitTest_sc_ucalc`
+      - `CppunitTest_sc_ucalc_shared_cases`
+  - the remaining cache work is no longer another low-risk vocabulary slice:
+    - broader query-policy extraction fits better with Phase 10 pass 3
+    - listener and invalidation ownership stays Calc-side until the later
+      dependency/recalc passes
 
 Exit criteria:
 
