@@ -4683,67 +4683,59 @@ bool ScFormulaCell::InterpretFormulaGroup(SCROW nStartOffset, SCROW nEndOffset)
 
     auto aScope = sc::FormulaLogger::get().enterGroup(rDocument, *this);
     ScRecursionHelper& rRecursionHelper = rDocument.GetRecursionHelper();
-
-    if (mxGroup->mbPartOfCycle)
-    {
-        aScope.addMessage(u"This formula-group is part of a cycle"_ustr);
-        return false;
-    }
-
-    if (mxGroup->meCalcState == sc::GroupCalcDisabled)
-    {
-        static constexpr OUStringLiteral MESSAGE = u"group calc disabled";
-        aScope.addMessage(MESSAGE);
-        return false;
-    }
-
     // Use SC_FORCE_CALCULATION=opencl/threads to force calculation e.g. for unittests
     static ForceCalculationType forceType = ScCalcConfig::getForceCalculationType();
-    if (forceType == ForceCalculationCore
-        || ( GetWeight() < ScInterpreter::GetGlobalConfig().mnOpenCLMinimumFormulaGroupSize
-            && forceType != ForceCalculationOpenCL
-            && forceType != ForceCalculationThreads))
-    {
-        mxGroup->meCalcState = sc::GroupCalcDisabled;
-        aScope.addGroupSizeThresholdMessage(*this);
-        return false;
-    }
-
-    if (cMatrixFlag != ScMatrixMode::NONE)
-    {
-        mxGroup->meCalcState = sc::GroupCalcDisabled;
-        aScope.addMessage(u"matrix skipped"_ustr);
-        return false;
-    }
-
-    if( forceType != ForceCalculationNone )
-    {
-        // ScConditionEntry::Interpret() creates a temporary cell and interprets it
-        // without it actually being in the document at the specified position.
-        // That would confuse opencl/threading code, as they refer to the cell group
-        // also using the position. This is normally not triggered (single cells
-        // are normally not in a cell group), but if forced, check for this explicitly.
-        if( rDocument.GetFormulaCell( aPos ) != this )
-        {
+    const auto applyPreflightPlan = [this, &aScope](
+                                        const spreadsheetengine::core::formulacell::
+                                            FormulaGroupPreflightPlan& rPlan) {
+        if (rPlan.mbDisableGroupCalc)
             mxGroup->meCalcState = sc::GroupCalcDisabled;
-            aScope.addMessage(u"cell not in document"_ustr);
-            return false;
+
+        switch (rPlan.meFailure)
+        {
+            case spreadsheetengine::core::formulacell::FormulaGroupPreflightFailure::None:
+            case spreadsheetengine::core::formulacell::FormulaGroupPreflightFailure::SingleRowWithoutForce:
+                return false;
+            case spreadsheetengine::core::formulacell::FormulaGroupPreflightFailure::PartOfCycle:
+                aScope.addMessage(u"This formula-group is part of a cycle"_ustr);
+                return false;
+            case spreadsheetengine::core::formulacell::FormulaGroupPreflightFailure::GroupCalcDisabled:
+                aScope.addMessage(u"group calc disabled"_ustr);
+                return false;
+            case spreadsheetengine::core::formulacell::FormulaGroupPreflightFailure::GroupSizeThreshold:
+                aScope.addGroupSizeThresholdMessage(*this);
+                return false;
+            case spreadsheetengine::core::formulacell::FormulaGroupPreflightFailure::MatrixSkipped:
+                aScope.addMessage(u"matrix skipped"_ustr);
+                return false;
+            case spreadsheetengine::core::formulacell::FormulaGroupPreflightFailure::CellNotInDocument:
+                aScope.addMessage(u"cell not in document"_ustr);
+                return false;
         }
-    }
 
-    // Get rid of -1's in offsets (defaults) or any invalid offsets.
-    SCROW nMaxOffset = mxGroup->mnLength - 1;
-    nStartOffset = nStartOffset < 0 ? 0 : std::min(nStartOffset, nMaxOffset);
-    nEndOffset = nEndOffset < 0 ? nMaxOffset : std::min(nEndOffset, nMaxOffset);
+        return false;
+    };
 
-    if (nEndOffset < nStartOffset)
+    const auto aPreflightPlan
+        = spreadsheetengine::core::formulacell::makeFormulaGroupPreflightPlan(
+            mxGroup->mbPartOfCycle, mxGroup->meCalcState == sc::GroupCalcDisabled,
+            forceType == ForceCalculationCore,
+            GetWeight() < ScInterpreter::GetGlobalConfig().mnOpenCLMinimumFormulaGroupSize,
+            forceType == ForceCalculationOpenCL, forceType == ForceCalculationThreads,
+            cMatrixFlag != ScMatrixMode::NONE, forceType != ForceCalculationNone,
+            rDocument.GetFormulaCell(aPos) == this);
+    if (!aPreflightPlan.mbCanProceed)
+        return applyPreflightPlan(aPreflightPlan);
+
+    const auto aOffsetPlan = spreadsheetengine::core::formulacell::makeFormulaGroupOffsetPlan(
+        static_cast<sal_Int32>(nStartOffset), static_cast<sal_Int32>(nEndOffset),
+        static_cast<sal_Int32>(mxGroup->mnLength - 1), forceType == ForceCalculationNone);
+    nStartOffset = static_cast<SCROW>(aOffsetPlan.mnStartOffset);
+    nEndOffset = static_cast<SCROW>(aOffsetPlan.mnEndOffset);
+    if (aOffsetPlan.mbSkipInterpretation)
     {
-        nStartOffset = 0;
-        nEndOffset = nMaxOffset;
+        return false;
     }
-
-    if (nEndOffset == nStartOffset && forceType == ForceCalculationNone)
-        return false; // Do not use threads for a single row.
 
     // Guard against endless recursion of Interpret() calls, for this to work
     // ScFormulaCell::InterpretFormulaGroup() must never be called through

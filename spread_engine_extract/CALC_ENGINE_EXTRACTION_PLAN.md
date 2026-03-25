@@ -1424,6 +1424,13 @@ Current status:
       - OpenCL vector-state classification and message routing
       - OpenCL skip classification for non-vectorizable, disabled, table-op,
         and prior-dependency-failure cases
+    - top-level `InterpretFormulaGroup()` preflight planning for:
+      - part-of-cycle rejection
+      - group-calc-disabled rejection
+      - force-core / below-threshold rejection with group-calc disable
+      - matrix rejection with group-calc disable
+      - forced-calculation cell-not-in-document rejection
+      - offset normalization and single-row skip without forced calculation
   - Calc now consumes those helpers from `refupdat.cxx`, while still owning:
     - `ScBigRange` update handling
     - the remaining deeper dependency/recalc orchestration beyond the initial

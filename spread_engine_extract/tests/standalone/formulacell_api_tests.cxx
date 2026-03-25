@@ -18,6 +18,9 @@ int main()
     using spreadsheetengine::core::formulacell::GroupInterpretFailure;
     using spreadsheetengine::core::formulacell::GroupBackendDependencyPlan;
     using spreadsheetengine::core::formulacell::GroupBackendPreflightPlan;
+    using spreadsheetengine::core::formulacell::FormulaGroupOffsetPlan;
+    using spreadsheetengine::core::formulacell::FormulaGroupPreflightFailure;
+    using spreadsheetengine::core::formulacell::FormulaGroupPreflightPlan;
     using spreadsheetengine::core::formulacell::GroupInterpretFallbackPlan;
     using spreadsheetengine::core::formulacell::GroupInterpretPreflightPlan;
     using spreadsheetengine::core::formulacell::LoadTrackingPlan;
@@ -306,6 +309,59 @@ int main()
     {
         return fail("spreadsheetengine_formulacell_tests",
                     "group backend preflight plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacell::makeFormulaGroupPreflightPlan(
+            false, false, false, false, false, false, false, false, true)
+            != FormulaGroupPreflightPlan { true, false, FormulaGroupPreflightFailure::None }
+        || spreadsheetengine::core::formulacell::makeFormulaGroupPreflightPlan(
+               true, false, false, false, false, false, false, false, true)
+               != FormulaGroupPreflightPlan { false, false,
+                   FormulaGroupPreflightFailure::PartOfCycle }
+        || spreadsheetengine::core::formulacell::makeFormulaGroupPreflightPlan(
+               false, true, false, false, false, false, false, false, true)
+               != FormulaGroupPreflightPlan { false, false,
+                   FormulaGroupPreflightFailure::GroupCalcDisabled }
+        || spreadsheetengine::core::formulacell::makeFormulaGroupPreflightPlan(
+               false, false, true, false, false, false, false, false, true)
+               != FormulaGroupPreflightPlan { false, true,
+                   FormulaGroupPreflightFailure::GroupSizeThreshold }
+        || spreadsheetengine::core::formulacell::makeFormulaGroupPreflightPlan(
+               false, false, false, true, false, false, false, false, true)
+               != FormulaGroupPreflightPlan { false, true,
+                   FormulaGroupPreflightFailure::GroupSizeThreshold }
+        || spreadsheetengine::core::formulacell::makeFormulaGroupPreflightPlan(
+               false, false, false, true, true, false, false, false, true)
+               != FormulaGroupPreflightPlan { true, false,
+                   FormulaGroupPreflightFailure::None }
+        || spreadsheetengine::core::formulacell::makeFormulaGroupPreflightPlan(
+               false, false, false, false, false, false, true, false, true)
+               != FormulaGroupPreflightPlan { false, true,
+                   FormulaGroupPreflightFailure::MatrixSkipped }
+        || spreadsheetengine::core::formulacell::makeFormulaGroupPreflightPlan(
+               false, false, false, false, false, false, false, true, false)
+               != FormulaGroupPreflightPlan { false, true,
+                   FormulaGroupPreflightFailure::CellNotInDocument })
+    {
+        return fail("spreadsheetengine_formulacell_tests",
+                    "formula-group preflight plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacell::makeFormulaGroupOffsetPlan(-1, -1, 9, true)
+            != FormulaGroupOffsetPlan { 0, 9, false, FormulaGroupPreflightFailure::None }
+        || spreadsheetengine::core::formulacell::makeFormulaGroupOffsetPlan(12, 14, 9, true)
+               != FormulaGroupOffsetPlan { 9, 9, true,
+                   FormulaGroupPreflightFailure::SingleRowWithoutForce }
+        || spreadsheetengine::core::formulacell::makeFormulaGroupOffsetPlan(7, 3, 9, true)
+               != FormulaGroupOffsetPlan { 0, 9, false, FormulaGroupPreflightFailure::None }
+        || spreadsheetengine::core::formulacell::makeFormulaGroupOffsetPlan(5, 5, 9, true)
+               != FormulaGroupOffsetPlan { 5, 5, true,
+                   FormulaGroupPreflightFailure::SingleRowWithoutForce }
+        || spreadsheetengine::core::formulacell::makeFormulaGroupOffsetPlan(5, 5, 9, false)
+               != FormulaGroupOffsetPlan { 5, 5, false, FormulaGroupPreflightFailure::None })
+    {
+        return fail("spreadsheetengine_formulacell_tests",
+                    "formula-group offset plan mismatch");
     }
 
     if (spreadsheetengine::core::formulacellrefupdate::computePreviousPosition(

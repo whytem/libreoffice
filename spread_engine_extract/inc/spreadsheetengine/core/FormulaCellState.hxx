@@ -73,6 +73,17 @@ enum class OpenCLVectorStateClass : sal_uInt8
     DisabledOrUnknown
 };
 
+enum class FormulaGroupPreflightFailure : sal_uInt8
+{
+    None,
+    PartOfCycle,
+    GroupCalcDisabled,
+    GroupSizeThreshold,
+    MatrixSkipped,
+    CellNotInDocument,
+    SingleRowWithoutForce
+};
+
 struct DirtyPlan
 {
     bool mbSkip = false;
@@ -186,6 +197,26 @@ struct GroupBackendPreflightPlan
 
     [[nodiscard]] constexpr bool operator==(const GroupBackendPreflightPlan& rOther) const
         = default;
+};
+
+struct FormulaGroupPreflightPlan
+{
+    bool mbCanProceed = true;
+    bool mbDisableGroupCalc = false;
+    FormulaGroupPreflightFailure meFailure = FormulaGroupPreflightFailure::None;
+
+    [[nodiscard]] constexpr bool operator==(const FormulaGroupPreflightPlan& rOther) const
+        = default;
+};
+
+struct FormulaGroupOffsetPlan
+{
+    sal_Int32 mnStartOffset = 0;
+    sal_Int32 mnEndOffset = 0;
+    bool mbSkipInterpretation = false;
+    FormulaGroupPreflightFailure meFailure = FormulaGroupPreflightFailure::None;
+
+    [[nodiscard]] constexpr bool operator==(const FormulaGroupOffsetPlan& rOther) const = default;
 };
 
 [[nodiscard]] constexpr DirtyPlan makeSetDirtyPlan(
@@ -452,6 +483,51 @@ struct GroupBackendPreflightPlan
         return { false, false, GroupBackendFailure::DependencyCheckFailedPreviously };
 
     return {};
+}
+
+[[nodiscard]] constexpr FormulaGroupPreflightPlan makeFormulaGroupPreflightPlan(
+    bool bPartOfCycle, bool bGroupCalcDisabled, bool bForceCalculationCore,
+    bool bBelowMinimumGroupSize, bool bForceCalculationOpenCL, bool bForceCalculationThreads,
+    bool bMatrixMode, bool bForceCalculationRequested, bool bCellInDocument)
+{
+    if (bPartOfCycle)
+        return { false, false, FormulaGroupPreflightFailure::PartOfCycle };
+
+    if (bGroupCalcDisabled)
+        return { false, false, FormulaGroupPreflightFailure::GroupCalcDisabled };
+
+    if (bForceCalculationCore
+        || (bBelowMinimumGroupSize && !bForceCalculationOpenCL && !bForceCalculationThreads))
+    {
+        return { false, true, FormulaGroupPreflightFailure::GroupSizeThreshold };
+    }
+
+    if (bMatrixMode)
+        return { false, true, FormulaGroupPreflightFailure::MatrixSkipped };
+
+    if (bForceCalculationRequested && !bCellInDocument)
+        return { false, true, FormulaGroupPreflightFailure::CellNotInDocument };
+
+    return {};
+}
+
+[[nodiscard]] constexpr FormulaGroupOffsetPlan makeFormulaGroupOffsetPlan(
+    sal_Int32 nStartOffset, sal_Int32 nEndOffset, sal_Int32 nMaxOffset, bool bForceCalculationNone)
+{
+    sal_Int32 nNormalizedStart = nStartOffset < 0 ? 0 : (nStartOffset > nMaxOffset ? nMaxOffset : nStartOffset);
+    sal_Int32 nNormalizedEnd = nEndOffset < 0 ? nMaxOffset : (nEndOffset > nMaxOffset ? nMaxOffset : nEndOffset);
+
+    if (nNormalizedEnd < nNormalizedStart)
+    {
+        nNormalizedStart = 0;
+        nNormalizedEnd = nMaxOffset;
+    }
+
+    if (nNormalizedEnd == nNormalizedStart && bForceCalculationNone)
+        return { nNormalizedStart, nNormalizedEnd, true,
+            FormulaGroupPreflightFailure::SingleRowWithoutForce };
+
+    return { nNormalizedStart, nNormalizedEnd, false, FormulaGroupPreflightFailure::None };
 }
 
 } // namespace spreadsheetengine::core::formulacell
