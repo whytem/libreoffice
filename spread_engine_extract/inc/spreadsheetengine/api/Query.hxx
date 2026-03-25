@@ -51,6 +51,16 @@ enum class SearchType : sal_uInt8
     Regex
 };
 
+enum class ComparisonRoute : sal_uInt8
+{
+    None,
+    Value,
+    String,
+    RangeLookup,
+    TextColor,
+    BackgroundColor
+};
+
 struct CellClass
 {
     bool mbHasNumeric = false;
@@ -61,6 +71,14 @@ struct CellClass
 };
 
 using StringIdentity = const void*;
+
+struct QueryResult
+{
+    bool mbMatch = false;
+    bool mbTestEqual = false;
+
+    [[nodiscard]] constexpr bool operator==(const QueryResult& rOther) const = default;
+};
 
 [[nodiscard]] constexpr bool isPartialTextMatchOp(Operator eOp)
 {
@@ -134,6 +152,48 @@ using StringIdentity = const void*;
     return rCell.mbHasString;
 }
 
+[[nodiscard]] constexpr ComparisonRoute classifyComparisonRoute(
+    Operator eOp, OperandKind eType, const CellClass& rCell, bool bRangeLookupEnabled)
+{
+    if (eType == OperandKind::TextColor)
+        return ComparisonRoute::TextColor;
+
+    if (eType == OperandKind::BackgroundColor)
+        return ComparisonRoute::BackgroundColor;
+
+    if (isQueryByValue(eOp, eType, rCell))
+        return ComparisonRoute::Value;
+
+    if (isQueryByString(eOp, eType, rCell))
+        return ComparisonRoute::String;
+
+    if (bRangeLookupEnabled)
+        return ComparisonRoute::RangeLookup;
+
+    return ComparisonRoute::None;
+}
+
+[[nodiscard]] constexpr bool shouldStopAfterItemResult(
+    const QueryResult& rResult, bool bNeedTestEqualCondition)
+{
+    return rResult.mbMatch && (rResult.mbTestEqual || !bNeedTestEqualCondition);
+}
+
+[[nodiscard]] constexpr bool shouldShortCircuitAndEntry(
+    bool bAndConnection, bool bNeedTestEqualCondition, bool bHasPriorResult, bool bPriorPass)
+{
+    return bAndConnection && !bNeedTestEqualCondition && bHasPriorResult && !bPriorPass;
+}
+
+[[nodiscard]] constexpr QueryResult combineConnectedResult(
+    bool bAndConnection, const QueryResult& rLeft, const QueryResult& rRight)
+{
+    if (bAndConnection)
+        return { rLeft.mbMatch && rRight.mbMatch, rLeft.mbTestEqual && rRight.mbTestEqual };
+
+    return { rLeft.mbMatch || rRight.mbMatch, rLeft.mbTestEqual || rRight.mbTestEqual };
+}
+
 [[nodiscard]] constexpr bool shouldTryMultiEqualityFastPath(
     Operator eOp, std::size_t nItemCount)
 {
@@ -151,6 +211,24 @@ using StringIdentity = const void*;
     bool bFastPath, bool bMatchWholeCell)
 {
     return bFastPath || bMatchWholeCell;
+}
+
+[[nodiscard]] constexpr bool shouldRunPatternSearchPrepass(
+    bool bFastPath, bool bRealWildOrRegExp, bool bTestWildOrRegExp)
+{
+    return !bFastPath && (bRealWildOrRegExp || bTestWildOrRegExp);
+}
+
+[[nodiscard]] constexpr bool shouldRunPostPatternStringComparison(
+    bool bFastPath, bool bRealWildOrRegExp)
+{
+    return bFastPath || !bRealWildOrRegExp;
+}
+
+[[nodiscard]] constexpr bool shouldUseTextMatchComparisonPath(
+    bool bFastPath, Operator eOp)
+{
+    return bFastPath || isTextMatchOp(eOp);
 }
 
 [[nodiscard]] constexpr bool isWholeCellSearchMatch(
@@ -250,6 +328,45 @@ struct OrderedCompareResult
         default:
             return {};
     }
+}
+
+struct PatternSearchPlan
+{
+    bool mbSearchBackward = false;
+    sal_Int32 mnStart = 0;
+    sal_Int32 mnEnd = 0;
+
+    [[nodiscard]] constexpr bool operator==(const PatternSearchPlan& rOther) const = default;
+};
+
+[[nodiscard]] constexpr PatternSearchPlan makePatternSearchPlan(
+    Operator eOp, sal_Int32 nTextLength)
+{
+    if (isEndsWithOp(eOp))
+        return { true, nTextLength, 0 };
+
+    return { false, 0, nTextLength };
+}
+
+struct PatternSearchOutcome
+{
+    bool mbMatch = false;
+    bool mbTestEqual = false;
+
+    [[nodiscard]] constexpr bool operator==(const PatternSearchOutcome& rOther) const = default;
+};
+
+[[nodiscard]] constexpr PatternSearchOutcome evaluatePatternSearchOutcome(
+    Operator eOp, bool bRealWildOrRegExp, bool bMatchWholeCell, bool bMatch,
+    sal_Int32 nStart, sal_Int32 nEnd, sal_Int32 nTextLength)
+{
+    const bool bWholeCellMatch = isWholeCellSearchMatch(
+        bMatchWholeCell, bMatch, nStart, nEnd, nTextLength);
+
+    if (bRealWildOrRegExp)
+        return { evaluatePatternSearchMatch(eOp, bWholeCellMatch, nStart, nEnd, nTextLength), false };
+
+    return { false, bWholeCellMatch };
 }
 
 [[nodiscard]] constexpr bool isRangeLookupStringOperand(OperandKind eType)

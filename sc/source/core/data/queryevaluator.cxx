@@ -462,20 +462,21 @@ std::pair<bool, bool> ScQueryEvaluator::compareByString(const ScQueryEntry& rEnt
     const bool bRealWildOrRegExp = !bFast && isRealWildOrRegExp(rEntry);
     const bool bTestWildOrRegExp = !bFast && isTestWildOrRegExp(rEntry);
 
-    if (!bFast && (bRealWildOrRegExp || bTestWildOrRegExp))
+    if (sequery::shouldRunPatternSearchPrepass(bFast, bRealWildOrRegExp, bTestWildOrRegExp))
     {
         svl::SharedString rValueSource = getCellSharedString(rCell, nRow, rEntry.nField);
         const OUString& rValue = rValueSource.getString();
 
-        sal_Int32 nStart = 0;
-        sal_Int32 nEnd = rValue.getLength();
+        const sequery::PatternSearchPlan aPlan
+            = sequery::makePatternSearchPlan(
+                toApiQueryOperator(rEntry.eOp), rValue.getLength());
+        sal_Int32 nStart = aPlan.mnStart;
+        sal_Int32 nEnd = aPlan.mnEnd;
 
         // from 614 on, nEnd is behind the found text
         bool bMatch = false;
-        if (sequery::isEndsWithOp(toApiQueryOperator(rEntry.eOp)))
+        if (aPlan.mbSearchBackward)
         {
-            nEnd = 0;
-            nStart = rValue.getLength();
             bMatch
                 = rEntry.GetSearchTextPtr(mrParam.eSearchType, mrParam.bCaseSens, bMatchWholeCell)
                       ->SearchBackward(rValue, &nStart, &nEnd);
@@ -486,20 +487,18 @@ std::pair<bool, bool> ScQueryEvaluator::compareByString(const ScQueryEntry& rEnt
                 = rEntry.GetSearchTextPtr(mrParam.eSearchType, mrParam.bCaseSens, bMatchWholeCell)
                       ->SearchForward(rValue, &nStart, &nEnd);
         }
-        bMatch = sequery::isWholeCellSearchMatch(bMatchWholeCell, bMatch, nStart, nEnd,
-            rValue.getLength());
-        if (bRealWildOrRegExp)
-        {
-            bOk = sequery::evaluatePatternSearchMatch(
-                toApiQueryOperator(rEntry.eOp), bMatch, nStart, nEnd, rValue.getLength());
-        }
-        else
-            bTestEqual = bMatch;
+        const sequery::PatternSearchOutcome aOutcome
+            = sequery::evaluatePatternSearchOutcome(
+                toApiQueryOperator(rEntry.eOp), bRealWildOrRegExp, bMatchWholeCell,
+                bMatch, nStart, nEnd, rValue.getLength());
+        bOk = aOutcome.mbMatch;
+        bTestEqual = aOutcome.mbTestEqual;
     }
-    if (bFast || !bRealWildOrRegExp)
+    if (sequery::shouldRunPostPatternStringComparison(bFast, bRealWildOrRegExp))
     {
         // Simple string matching i.e. no regexp match.
-        if (bFast || isTextMatchOp(rEntry.eOp))
+        if (sequery::shouldUseTextMatchComparisonPath(
+                bFast, toApiQueryOperator(rEntry.eOp)))
         {
             // Check this even with bFast.
             if (sequery::shouldRejectAssignedEmptyStringQuery(
@@ -768,42 +767,38 @@ std::pair<bool, bool> ScQueryEvaluator::processEntry(SCROW nRow, SCCOL nCol,
     // Generic handling.
     for (const auto& rItem : rItems)
     {
-        if (rItem.meType == ScQueryEntry::ByTextColor)
+        std::pair<bool, bool> aThisRes(false, false);
+        switch (sequery::classifyComparisonRoute(
+            toApiQueryOperator(rEntry.eOp), toApiOperandKind(rItem.meType),
+            toApiCellClass(aCell), mrParam.mbRangeLookup))
         {
-            std::pair<bool, bool> aThisRes = compareByTextColor(nCol, nRow, rItem);
-            aRes.first |= aThisRes.first;
-            aRes.second |= aThisRes.second;
-        }
-        else if (rItem.meType == ScQueryEntry::ByBackgroundColor)
-        {
-            std::pair<bool, bool> aThisRes = compareByBackgroundColor(nCol, nRow, rItem);
-            aRes.first |= aThisRes.first;
-            aRes.second |= aThisRes.second;
-        }
-        else if (isQueryByValue(rEntry.eOp, rItem.meType, aCell))
-        {
-            std::pair<bool, bool> aThisRes = compareByValue(aCell, nCol, nRow, rEntry, rItem);
-            aRes.first |= aThisRes.first;
-            aRes.second |= aThisRes.second;
-        }
-        else if (isQueryByString(rEntry.eOp, rItem.meType, aCell))
-        {
-            std::pair<bool, bool> aThisRes;
-            if (bFastCompareByString) // fast
-                aThisRes = compareByString<true>(rEntry, rItem, aCell, nRow);
-            else
-                aThisRes = compareByString(rEntry, rItem, aCell, nRow);
-            aRes.first |= aThisRes.first;
-            aRes.second |= aThisRes.second;
-        }
-        else if (mrParam.mbRangeLookup)
-        {
-            std::pair<bool, bool> aThisRes = compareByRangeLookup(aCell, rEntry, rItem);
-            aRes.first |= aThisRes.first;
-            aRes.second |= aThisRes.second;
+            case sequery::ComparisonRoute::TextColor:
+                aThisRes = compareByTextColor(nCol, nRow, rItem);
+                break;
+            case sequery::ComparisonRoute::BackgroundColor:
+                aThisRes = compareByBackgroundColor(nCol, nRow, rItem);
+                break;
+            case sequery::ComparisonRoute::Value:
+                aThisRes = compareByValue(aCell, nCol, nRow, rEntry, rItem);
+                break;
+            case sequery::ComparisonRoute::String:
+                if (bFastCompareByString) // fast
+                    aThisRes = compareByString<true>(rEntry, rItem, aCell, nRow);
+                else
+                    aThisRes = compareByString(rEntry, rItem, aCell, nRow);
+                break;
+            case sequery::ComparisonRoute::RangeLookup:
+                aThisRes = compareByRangeLookup(aCell, rEntry, rItem);
+                break;
+            case sequery::ComparisonRoute::None:
+                break;
         }
 
-        if (aRes.first && (aRes.second || mpTestEqualCondition == nullptr))
+        aRes.first |= aThisRes.first;
+        aRes.second |= aThisRes.second;
+
+        if (sequery::shouldStopAfterItemResult(
+                { aRes.first, aRes.second }, mpTestEqualCondition != nullptr))
             break;
     }
     return aRes;
@@ -826,8 +821,9 @@ bool ScQueryEvaluator::ValidQuery(SCROW nRow, const ScRefCellValue* pCell,
         // Disable this if pbTestEqualCondition is present as that one may get set
         // even if the result is false (that also means pTest doesn't need to be
         // handled here).
-        if (rEntry.eConnect == SC_AND && mpTestEqualCondition == nullptr && nPos != -1
-            && !mpPasst[nPos])
+        if (sequery::shouldShortCircuitAndEntry(
+                rEntry.eConnect == SC_AND, mpTestEqualCondition != nullptr,
+                nPos != -1, nPos != -1 ? mpPasst[nPos] : false))
         {
             continue;
         }
@@ -848,33 +844,38 @@ bool ScQueryEvaluator::ValidQuery(SCROW nRow, const ScRefCellValue* pCell,
             aCell = mrTab.GetCellValue(nCol, nRow);
 
         std::pair<bool, bool> aRes = processEntry(nRow, nCol, aCell, rEntry, it - itBeg);
+        const sequery::QueryResult aThisResult { aRes.first, aRes.second };
 
         if (nPos == -1)
         {
             nPos++;
-            mpPasst[nPos] = aRes.first;
-            mpTest[nPos] = aRes.second;
+            mpPasst[nPos] = aThisResult.mbMatch;
+            mpTest[nPos] = aThisResult.mbTestEqual;
         }
         else
         {
             if (rEntry.eConnect == SC_AND)
             {
-                mpPasst[nPos] = mpPasst[nPos] && aRes.first;
-                mpTest[nPos] = mpTest[nPos] && aRes.second;
+                const sequery::QueryResult aCombined = sequery::combineConnectedResult(
+                    true, { mpPasst[nPos], mpTest[nPos] }, aThisResult);
+                mpPasst[nPos] = aCombined.mbMatch;
+                mpTest[nPos] = aCombined.mbTestEqual;
             }
             else
             {
                 nPos++;
-                mpPasst[nPos] = aRes.first;
-                mpTest[nPos] = aRes.second;
+                mpPasst[nPos] = aThisResult.mbMatch;
+                mpTest[nPos] = aThisResult.mbTestEqual;
             }
         }
     }
 
     for (tools::Long j = 1; j <= nPos; j++)
     {
-        mpPasst[0] = mpPasst[0] || mpPasst[j];
-        mpTest[0] = mpTest[0] || mpTest[j];
+        const sequery::QueryResult aCombined = sequery::combineConnectedResult(
+            false, { mpPasst[0], mpTest[0] }, { mpPasst[j], mpTest[j] });
+        mpPasst[0] = aCombined.mbMatch;
+        mpTest[0] = aCombined.mbTestEqual;
     }
 
     bool bRet = mpPasst[0];

@@ -1175,6 +1175,10 @@ Current status:
     - fast string-equality path selection
     - exact shared-string equality path selection
     - operator-driven wildcard and substring match evaluation rules
+    - wildcard / regexp search-direction and start/end planning
+    - post-search result routing for wildcard / regexp vs test-equality paths
+    - branch-selection policy for pattern prepass, post-pattern comparison, and
+      text-match vs ordered-compare paths
     - substring search-start planning for contains vs ends-with checks
     - ordered string-compare result policy for the `<`, `>`, `<=`, and `>=`
       family
@@ -1183,6 +1187,10 @@ Current status:
     - string-identity multi-item fast-path gating and operand eligibility
       rules, including when `ByValue` operands are treated as string
       candidates
+    - top-level comparison-route classification for value, string,
+      range-lookup, text-color, and background-color items
+    - evaluator short-circuit and result-aggregation policy for per-item
+      matches and AND/OR-connected query entries
   - Calc now adapts `ScQueryOp`, `ScQueryEntry::QueryType`, search type, and
     cell-class facts into that engine-owned policy layer from
     `queryevaluator.cxx`

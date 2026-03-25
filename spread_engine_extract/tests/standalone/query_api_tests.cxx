@@ -9,6 +9,7 @@
 int main()
 {
     using spreadsheetengine::api::query::CellClass;
+    using spreadsheetengine::api::query::ComparisonRoute;
     using spreadsheetengine::api::query::OperandKind;
     using spreadsheetengine::api::query::Operator;
     using spreadsheetengine::api::query::SearchType;
@@ -91,6 +92,50 @@ int main()
         return fail("spreadsheetengine_query_tests", "query-by-string policy mismatch");
     }
 
+    if (spreadsheetengine::api::query::classifyComparisonRoute(
+            Operator::Equal, OperandKind::TextColor, aNumericCell, true)
+            != ComparisonRoute::TextColor
+        || spreadsheetengine::api::query::classifyComparisonRoute(
+               Operator::Equal, OperandKind::BackgroundColor, aNumericCell, true)
+               != ComparisonRoute::BackgroundColor
+        || spreadsheetengine::api::query::classifyComparisonRoute(
+               Operator::LessEqual, OperandKind::Value, aNumericCell, true)
+               != ComparisonRoute::Value
+        || spreadsheetengine::api::query::classifyComparisonRoute(
+               Operator::Equal, OperandKind::Value, aEmptyCell, false)
+               != ComparisonRoute::String
+        || spreadsheetengine::api::query::classifyComparisonRoute(
+               Operator::GreaterEqual, OperandKind::Value, aStringCell, true)
+               != ComparisonRoute::RangeLookup
+        || spreadsheetengine::api::query::classifyComparisonRoute(
+               Operator::GreaterEqual, OperandKind::Value, aStringCell, false)
+               != ComparisonRoute::None)
+    {
+        return fail("spreadsheetengine_query_tests", "comparison route classification mismatch");
+    }
+
+    if (!spreadsheetengine::api::query::shouldStopAfterItemResult(
+            { true, true }, true)
+        || spreadsheetengine::api::query::shouldStopAfterItemResult(
+            { true, false }, true)
+        || !spreadsheetengine::api::query::shouldStopAfterItemResult(
+            { true, false }, false)
+        || !spreadsheetengine::api::query::shouldShortCircuitAndEntry(
+            true, false, true, false)
+        || spreadsheetengine::api::query::shouldShortCircuitAndEntry(
+            true, true, true, false)
+        || spreadsheetengine::api::query::shouldShortCircuitAndEntry(
+            false, false, true, false)
+        || spreadsheetengine::api::query::combineConnectedResult(
+               true, { true, true }, { false, true })
+               != spreadsheetengine::api::query::QueryResult { false, true }
+        || spreadsheetengine::api::query::combineConnectedResult(
+               false, { false, false }, { true, false })
+               != spreadsheetengine::api::query::QueryResult { true, false })
+    {
+        return fail("spreadsheetengine_query_tests", "query result aggregation mismatch");
+    }
+
     if (!spreadsheetengine::api::query::shouldTryMultiEqualityFastPath(Operator::Equal, 10)
         || spreadsheetengine::api::query::shouldTryMultiEqualityFastPath(Operator::Greater, 10)
         || spreadsheetengine::api::query::shouldTryMultiEqualityFastPath(Operator::Equal, 9)
@@ -105,6 +150,20 @@ int main()
         || !spreadsheetengine::api::query::shouldUseExactStringEqualityPath(true, false)
         || !spreadsheetengine::api::query::shouldUseExactStringEqualityPath(false, true)
         || spreadsheetengine::api::query::shouldUseExactStringEqualityPath(false, false)
+        || !spreadsheetengine::api::query::shouldRunPatternSearchPrepass(
+            false, true, false)
+        || !spreadsheetengine::api::query::shouldRunPatternSearchPrepass(
+            false, false, true)
+        || spreadsheetengine::api::query::shouldRunPatternSearchPrepass(
+            true, true, true)
+        || !spreadsheetengine::api::query::shouldRunPostPatternStringComparison(
+            false, false)
+        || spreadsheetengine::api::query::shouldRunPostPatternStringComparison(
+            false, true)
+        || !spreadsheetengine::api::query::shouldUseTextMatchComparisonPath(
+            false, Operator::Equal)
+        || spreadsheetengine::api::query::shouldUseTextMatchComparisonPath(
+            false, Operator::Less)
         || !spreadsheetengine::api::query::shouldUseSortedItemCache(100)
         || spreadsheetengine::api::query::shouldUseSortedItemCache(99))
     {
@@ -132,6 +191,10 @@ int main()
 
     if (!spreadsheetengine::api::query::isWholeCellSearchMatch(true, true, 0, 4, 4)
         || spreadsheetengine::api::query::isWholeCellSearchMatch(true, true, 1, 4, 4)
+        || spreadsheetengine::api::query::makePatternSearchPlan(Operator::Contains, 6)
+               != spreadsheetengine::api::query::PatternSearchPlan { false, 0, 6 }
+        || spreadsheetengine::api::query::makePatternSearchPlan(Operator::EndsWith, 6)
+               != spreadsheetengine::api::query::PatternSearchPlan { true, 6, 0 }
         || !spreadsheetengine::api::query::shouldRejectAssignedEmptyStringQuery(
                OperandKind::Value, true)
         || spreadsheetengine::api::query::shouldRejectAssignedEmptyStringQuery(
@@ -156,6 +219,12 @@ int main()
         || !spreadsheetengine::api::query::evaluateSubstringMatch(Operator::DoesNotContain, -1)
         || !spreadsheetengine::api::query::evaluateSubstringMatch(Operator::BeginsWith, 0)
         || !spreadsheetengine::api::query::evaluateSubstringMatch(Operator::EndsWith, 2)
+        || spreadsheetengine::api::query::evaluatePatternSearchOutcome(
+               Operator::Contains, true, false, true, 2, 4, 6)
+               != spreadsheetengine::api::query::PatternSearchOutcome { true, false }
+        || spreadsheetengine::api::query::evaluatePatternSearchOutcome(
+               Operator::LessEqual, false, true, true, 0, 6, 6)
+               != spreadsheetengine::api::query::PatternSearchOutcome { false, true }
         || spreadsheetengine::api::query::evaluateOrderedStringCompare(Operator::Less, -1)
                    != spreadsheetengine::api::query::OrderedCompareResult { true, false }
         || spreadsheetengine::api::query::evaluateOrderedStringCompare(Operator::GreaterEqual, 0)
