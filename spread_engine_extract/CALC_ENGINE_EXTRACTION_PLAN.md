@@ -1236,8 +1236,10 @@ Current status:
     - split eligibility and upper/lower group-length planning
     - unshare position classification for top, bottom, and middle cases
     - unshare reshaping plans for adjacent unshare vs lower-group creation
+    - shared-formula row-bound normalization for split and unshare bulk passes
     - shared-top retrieval and join-above eligibility checks
     - group-run planning for `groupFormulaCells()`
+    - grouped double-reference listened-range planning for listener setup
   - Calc now consumes those helpers from `sharedformula.cxx` and
     `sharedformula.hxx`, while still owning:
     - actual group object mutation
@@ -1257,6 +1259,8 @@ Current status:
     - `SetTableOpDirty()` planning
     - group-calc-state reset eligibility when marking dirty
     - recalc-mode dirtying policy
+    - import/load tracking policy for formula-tree vs formula-track placement
+    - `CalcAfterLoad()` listening-and-dirty planning
   - Calc still owns the actual document-side mutations:
     - formula-tree and formula-track operations
     - table-op cell registration

@@ -1354,17 +1354,21 @@ void ScFormulaCell::CompileXML( sc::CompileFormulaContext& rCxt, ScProgress& rPr
     //  (for external links warning, CompileXML is called at the end of loading XML file)
     rDocument.CheckLinkFormulaNeedingCheck(*pCode);
 
+    const auto aLoadTrackingPlan = spreadsheetengine::core::formulacell::makeLoadTrackingPlan(
+        pCode->IsRecalcModeNormal(), pCode->IsRecalcModeForced(), bWasInFormulaTree);
+
     //volatile cells must be added here for import
-    if( !pCode->IsRecalcModeNormal() || pCode->IsRecalcModeForced())
+    if (aLoadTrackingPlan.mbAppendToTrack)
     {
         // During load, only those cells that are marked explicitly dirty get
         // recalculated.  So we need to set it dirty here.
-        SetDirtyVar();
+        if (aLoadTrackingPlan.mbSetDirtyVar)
+            SetDirtyVar();
         rDocument.AppendToFormulaTrack(this);
         // Do not call TrackFormulas() here, not all listeners may have been
         // established, postponed until ScDocument::CompileXML() finishes.
     }
-    else if (bWasInFormulaTree)
+    else if (aLoadTrackingPlan.mbPutInFormulaTree)
         rDocument.PutInFormulaTree(this);
 }
 
@@ -1413,17 +1417,17 @@ void ScFormulaCell::CalcAfterLoad( sc::CompileFormulaContext& rCxt, bool bStartL
         SetMatColsRows( 1, 1);
     }
 
+    const auto aCalcAfterLoadPlan
+        = spreadsheetengine::core::formulacell::makeCalcAfterLoadPlan(
+            bNewCompiled, pCode->GetCodeError() == FormulaError::NONE, bStartListening,
+            pCode->IsRecalcModeNormal(), pCode->IsRecalcModeAlways());
+
     // Do the cells need to be calculated? After Load cells can contain an error code, and then start
     // the listener and Recalculate (if needed) if not ScRecalcMode::NORMAL
-    if( !bNewCompiled || pCode->GetCodeError() == FormulaError::NONE )
-    {
-        if (bStartListening)
-            StartListeningTo(rDocument);
+    if (aCalcAfterLoadPlan.mbStartListening)
+        StartListeningTo(rDocument);
 
-        if( !pCode->IsRecalcModeNormal() )
-            bDirty = true;
-    }
-    if ( pCode->IsRecalcModeAlways() )
+    if (aCalcAfterLoadPlan.mbMarkDirty)
     {   // random(), today(), now() always stay in the FormulaTree, so that they are calculated
         // for each F9
         bDirty = true;

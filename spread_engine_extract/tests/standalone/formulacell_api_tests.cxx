@@ -8,7 +8,9 @@
 
 int main()
 {
+    using spreadsheetengine::core::formulacell::CalcAfterLoadPlan;
     using spreadsheetengine::core::formulacell::DirtyPlan;
+    using spreadsheetengine::core::formulacell::LoadTrackingPlan;
     using spreadsheetengine::core::formulacell::TableOpDirtyPlan;
     using spreadsheetengine::standalone::test::fail;
 
@@ -38,6 +40,34 @@ int main()
         || spreadsheetengine::core::formulacell::shouldMarkDirtyForRecalcMode(true))
     {
         return fail("spreadsheetengine_formulacell_tests", "group or recalc policy mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacell::makeLoadTrackingPlan(false, false, false)
+            != LoadTrackingPlan { true, true, false }
+        || spreadsheetengine::core::formulacell::makeLoadTrackingPlan(true, true, false)
+               != LoadTrackingPlan { true, true, false }
+        || spreadsheetengine::core::formulacell::makeLoadTrackingPlan(true, false, true)
+               != LoadTrackingPlan { false, false, true }
+        || spreadsheetengine::core::formulacell::makeLoadTrackingPlan(true, false, false)
+               != LoadTrackingPlan { false, false, false })
+    {
+        return fail("spreadsheetengine_formulacell_tests", "load tracking plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacell::makeCalcAfterLoadPlan(
+            false, false, true, true, false)
+            != CalcAfterLoadPlan { true, false }
+        || spreadsheetengine::core::formulacell::makeCalcAfterLoadPlan(
+               true, false, true, false, false)
+               != CalcAfterLoadPlan { false, false }
+        || spreadsheetengine::core::formulacell::makeCalcAfterLoadPlan(
+               true, true, true, false, false)
+               != CalcAfterLoadPlan { true, true }
+        || spreadsheetengine::core::formulacell::makeCalcAfterLoadPlan(
+               false, true, false, true, true)
+               != CalcAfterLoadPlan { false, true })
+    {
+        return fail("spreadsheetengine_formulacell_tests", "calc-after-load plan mismatch");
     }
 
     if (spreadsheetengine::core::formulacell::makeSetTableOpDirtyPlan(

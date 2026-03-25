@@ -34,6 +34,23 @@ struct TableOpDirtyPlan
     [[nodiscard]] constexpr bool operator==(const TableOpDirtyPlan& rOther) const = default;
 };
 
+struct LoadTrackingPlan
+{
+    bool mbSetDirtyVar = false;
+    bool mbAppendToTrack = false;
+    bool mbPutInFormulaTree = false;
+
+    [[nodiscard]] constexpr bool operator==(const LoadTrackingPlan& rOther) const = default;
+};
+
+struct CalcAfterLoadPlan
+{
+    bool mbStartListening = false;
+    bool mbMarkDirty = false;
+
+    [[nodiscard]] constexpr bool operator==(const CalcAfterLoadPlan& rOther) const = default;
+};
+
 [[nodiscard]] constexpr DirtyPlan makeSetDirtyPlan(
     bool bInChangeTrack, bool bHardRecalcEnabled, bool bCurrentDirty,
     bool bPostponedDirty, bool bInFormulaTree, bool bRequestDirtyFlag,
@@ -62,6 +79,24 @@ struct TableOpDirtyPlan
 [[nodiscard]] constexpr bool shouldMarkDirtyForRecalcMode(bool bRecalcModeNormal)
 {
     return !bRecalcModeNormal;
+}
+
+[[nodiscard]] constexpr LoadTrackingPlan makeLoadTrackingPlan(
+    bool bRecalcModeNormal, bool bRecalcModeForced, bool bWasInFormulaTree)
+{
+    if (!bRecalcModeNormal || bRecalcModeForced)
+        return { true, true, false };
+
+    return { false, false, bWasInFormulaTree };
+}
+
+[[nodiscard]] constexpr CalcAfterLoadPlan makeCalcAfterLoadPlan(
+    bool bNewCompiled, bool bCodeErrorNone, bool bStartListening, bool bRecalcModeNormal,
+    bool bRecalcModeAlways)
+{
+    const bool bCanUsePostLoadState = !bNewCompiled || bCodeErrorNone;
+    return { bCanUsePostLoadState && bStartListening,
+             (bCanUsePostLoadState && !bRecalcModeNormal) || bRecalcModeAlways };
 }
 
 [[nodiscard]] constexpr TableOpDirtyPlan makeSetTableOpDirtyPlan(

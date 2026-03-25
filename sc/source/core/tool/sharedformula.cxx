@@ -16,6 +16,7 @@
 #include <refdata.hxx>
 #include <table.hxx>
 #include <spreadsheetengine/api/SharedFormula.hxx>
+#include <spreadsheetengine/compat/libreoffice/Host.hxx>
 
 namespace sc {
 
@@ -141,12 +142,9 @@ bool SharedFormulaUtil::splitFormulaCellGroups(const ScDocument& rDoc, CellStore
     if (rBounds.empty())
         return false;
 
-    // Sort and remove duplicates.
-    std::sort(rBounds.begin(), rBounds.end());
-    std::vector<SCROW>::iterator it = std::unique(rBounds.begin(), rBounds.end());
-    rBounds.erase(it, rBounds.end());
+    seshared::sortAndUniqueRows(rBounds);
 
-    it = rBounds.begin();
+    std::vector<SCROW>::iterator it = rBounds.begin();
     SCROW nRow = *it;
     CellStoreType::position_type aPos = rCells.position(nRow);
     if (aPos.first == rCells.end())
@@ -336,25 +334,7 @@ void SharedFormulaUtil::unshareFormulaCells(const ScDocument& rDoc, CellStoreTyp
     if (rRows.empty())
         return;
 
-    // Sort and remove duplicates.
-    std::sort(rRows.begin(), rRows.end());
-    rRows.erase(std::unique(rRows.begin(), rRows.end()), rRows.end());
-
-    // Add next cell positions to the list (to ensure that each position becomes a single cell).
-    std::vector<SCROW> aRows2;
-    for (const auto& rRow : rRows)
-    {
-        if (rRow > rDoc.MaxRow())
-            break;
-
-        aRows2.push_back(rRow);
-
-        if (rRow < rDoc.MaxRow())
-            aRows2.push_back(rRow+1);
-    }
-
-    // Remove duplicates again (the vector should still be sorted).
-    aRows2.erase(std::unique(aRows2.begin(), aRows2.end()), aRows2.end());
+    std::vector<SCROW> aRows2 = seshared::makeUnshareBoundaryRows(rRows, rDoc.MaxRow());
 
     splitFormulaCellGroups(rDoc, rCells, aRows2);
 }
@@ -404,15 +384,22 @@ void SharedFormulaUtil::startListeningAsGroup( sc::StartListeningContext& rCxt, 
                 ScAddress aPos2 = rRef2.toAbs(rDoc, rTopCell.aPos);
 
                 ScRange aOrigRange(aPos1, aPos2);
-                ScRange aListenedRange = aOrigRange;
-                if (rRef2.IsRowRel())
-                    aListenedRange.aEnd.IncRow(xGroup->mnLength-1);
+                const seshared::GroupDoubleRefListenPlan aListenPlan
+                    = seshared::makeGroupDoubleRefListenPlan(
+                        spreadsheetengine::compat::libreoffice::toApiCellRange(aOrigRange),
+                        rRef1.IsRowRel(), rRef2.IsRowRel(), xGroup->mnLength);
 
                 if (aPos1.IsValid() && aPos2.IsValid())
                 {
                     rDoc.StartListeningArea(
-                        aListenedRange, true,
-                        xGroup->getAreaListener(ppSharedTop, aOrigRange, !rRef1.IsRowRel(), !rRef2.IsRowRel()));
+                        spreadsheetengine::compat::libreoffice::toLibreOfficeRange(
+                            aListenPlan.maListenedRange),
+                        true,
+                        xGroup->getAreaListener(
+                            ppSharedTop,
+                            spreadsheetengine::compat::libreoffice::toLibreOfficeRange(
+                                aListenPlan.maOriginalRange),
+                            aListenPlan.mbRef1RowFixed, aListenPlan.mbRef2RowFixed));
                 }
             }
             break;

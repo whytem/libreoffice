@@ -9,6 +9,11 @@
 
 #pragma once
 
+#include <algorithm>
+#include <vector>
+
+#include <spreadsheetengine/api/Host.hxx>
+
 #include <sal/types.h>
 
 namespace spreadsheetengine::api::sharedformula
@@ -84,6 +89,16 @@ struct GroupRunPlan
     [[nodiscard]] constexpr bool operator==(const GroupRunPlan& rOther) const = default;
 };
 
+struct GroupDoubleRefListenPlan
+{
+    CellRange maOriginalRange;
+    CellRange maListenedRange;
+    bool mbRef1RowFixed = false;
+    bool mbRef2RowFixed = false;
+
+    [[nodiscard]] constexpr bool operator==(const GroupDoubleRefListenPlan& rOther) const = default;
+};
+
 [[nodiscard]] constexpr bool shouldJoinFormulaCells(TokenCompareState eState)
 {
     return eState != TokenCompareState::NotEqual;
@@ -131,6 +146,17 @@ struct GroupRunPlan
         return { GroupRunAction::ExtendExistingGroup, false };
 
     return { GroupRunAction::CreateGroup, eState == TokenCompareState::EqualInvariant };
+}
+
+[[nodiscard]] constexpr GroupDoubleRefListenPlan makeGroupDoubleRefListenPlan(
+    const CellRange& rAbsoluteRange, bool bRef1RowRelative, bool bRef2RowRelative,
+    sal_Int32 nGroupLength)
+{
+    CellRange aListenedRange = rAbsoluteRange;
+    if (bRef2RowRelative && nGroupLength > 1)
+        aListenedRange.maEnd.mnRow += nGroupLength - 1;
+
+    return { rAbsoluteRange, aListenedRange, !bRef1RowRelative, !bRef2RowRelative };
 }
 
 [[nodiscard]] constexpr bool canSplitSharedFormulaGroup(
@@ -185,6 +211,32 @@ struct GroupRunPlan
     }
 
     return {};
+}
+
+inline void sortAndUniqueRows(std::vector<sal_Int32>& rRows)
+{
+    std::sort(rRows.begin(), rRows.end());
+    rRows.erase(std::unique(rRows.begin(), rRows.end()), rRows.end());
+}
+
+[[nodiscard]] inline std::vector<sal_Int32> makeUnshareBoundaryRows(
+    std::vector<sal_Int32> aRows, sal_Int32 nMaxRow)
+{
+    sortAndUniqueRows(aRows);
+
+    std::vector<sal_Int32> aBounds;
+    for (sal_Int32 nRow : aRows)
+    {
+        if (nRow > nMaxRow)
+            break;
+
+        aBounds.push_back(nRow);
+        if (nRow < nMaxRow)
+            aBounds.push_back(nRow + 1);
+    }
+
+    sortAndUniqueRows(aBounds);
+    return aBounds;
 }
 
 } // namespace spreadsheetengine::api::sharedformula

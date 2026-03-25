@@ -38,6 +38,8 @@ struct CellRange
     CellAddress maStart;
     CellAddress maEnd;
 
+    [[nodiscard]] constexpr bool operator==(const CellRange& rOther) const = default;
+
     [[nodiscard]] constexpr bool isSingleCell() const
     {
         return maStart == maEnd;

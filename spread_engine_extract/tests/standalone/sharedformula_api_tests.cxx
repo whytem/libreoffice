@@ -1,6 +1,7 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
 #include <iostream>
+#include <vector>
 
 #include <spreadsheetengine/api/SharedFormula.hxx>
 
@@ -42,6 +43,23 @@ int main()
                != GroupRunPlan { GroupRunAction::CreateGroup, true })
     {
         return fail("spreadsheetengine_sharedformula_tests", "group run plan mismatch");
+    }
+
+    if (spreadsheetengine::api::sharedformula::makeGroupDoubleRefListenPlan(
+            { { 0, 1, 2 }, { 0, 3, 4 } }, true, true, 5)
+            != spreadsheetengine::api::sharedformula::GroupDoubleRefListenPlan {
+                { { 0, 1, 2 }, { 0, 3, 4 } },
+                { { 0, 1, 2 }, { 0, 3, 8 } },
+                false, false }
+        || spreadsheetengine::api::sharedformula::makeGroupDoubleRefListenPlan(
+               { { 1, 5, 6 }, { 1, 7, 8 } }, false, false, 3)
+               != spreadsheetengine::api::sharedformula::GroupDoubleRefListenPlan {
+                   { { 1, 5, 6 }, { 1, 7, 8 } },
+                   { { 1, 5, 6 }, { 1, 7, 8 } },
+                   true, true })
+    {
+        return fail("spreadsheetengine_sharedformula_tests",
+                    "double-ref listening plan mismatch");
     }
 
     if (spreadsheetengine::api::sharedformula::makeJoinPlan(
@@ -115,6 +133,22 @@ int main()
                    true, true, false, 1, 1 })
     {
         return fail("spreadsheetengine_sharedformula_tests", "unshare plan mismatch");
+    }
+
+    std::vector<sal_Int32> aRows { 7, 3, 3, 5, 7, 1 };
+    spreadsheetengine::api::sharedformula::sortAndUniqueRows(aRows);
+    if (aRows != std::vector<sal_Int32>({ 1, 3, 5, 7 }))
+    {
+        return fail("spreadsheetengine_sharedformula_tests", "sort/unique rows mismatch");
+    }
+
+    const std::vector<sal_Int32> aBounds
+        = spreadsheetengine::api::sharedformula::makeUnshareBoundaryRows(
+            std::vector<sal_Int32> { 8, 2, 2, 10, 11 }, 10);
+    if (aBounds != std::vector<sal_Int32>({ 2, 3, 8, 9, 10 }))
+    {
+        return fail("spreadsheetengine_sharedformula_tests",
+                    "unshare boundary row planning mismatch");
     }
 
     std::cout << "spreadsheetengine sharedformula api tests passed\n";
