@@ -219,6 +219,26 @@ struct FormulaGroupOffsetPlan
     [[nodiscard]] constexpr bool operator==(const FormulaGroupOffsetPlan& rOther) const = default;
 };
 
+struct ThreadingProbeWindowPlan
+{
+    sal_Int32 mnStartColumn = 0;
+    sal_Int32 mnEndColumn = 0;
+    bool mbProbeNeighbors = false;
+
+    [[nodiscard]] constexpr bool operator==(const ThreadingProbeWindowPlan& rOther) const
+        = default;
+};
+
+struct ThreadingProbeFallbackPlan
+{
+    sal_Int32 mnStartColumn = 0;
+    sal_Int32 mnEndColumn = 0;
+    bool mbRedoOriginalDependencyCheck = false;
+
+    [[nodiscard]] constexpr bool operator==(const ThreadingProbeFallbackPlan& rOther) const
+        = default;
+};
+
 [[nodiscard]] constexpr DirtyPlan makeSetDirtyPlan(
     bool bInChangeTrack, bool bHardRecalcEnabled, bool bCurrentDirty,
     bool bPostponedDirty, bool bInFormulaTree, bool bRequestDirtyFlag,
@@ -528,6 +548,22 @@ struct FormulaGroupOffsetPlan
             FormulaGroupPreflightFailure::SingleRowWithoutForce };
 
     return { nNormalizedStart, nNormalizedEnd, false, FormulaGroupPreflightFailure::None };
+}
+
+[[nodiscard]] constexpr ThreadingProbeWindowPlan makeThreadingProbeWindowPlan(
+    bool bHasFormulaGroupSet, bool bInDocShellRecalc, sal_Int32 nCurrentColumn)
+{
+    return { nCurrentColumn, nCurrentColumn, !bHasFormulaGroupSet && bInDocShellRecalc };
+}
+
+[[nodiscard]] constexpr ThreadingProbeFallbackPlan makeThreadingProbeFallbackPlan(
+    sal_Int32 nCurrentColumn, sal_Int32 nStartColumn, sal_Int32 nEndColumn,
+    bool bSpeculativeProbeSucceeded, bool bGroupsIndependent, bool bRedoOriginalDependencyCheck)
+{
+    if (!bSpeculativeProbeSucceeded || !bGroupsIndependent)
+        return { nCurrentColumn, nCurrentColumn, bRedoOriginalDependencyCheck };
+
+    return { nStartColumn, nEndColumn, false };
 }
 
 } // namespace spreadsheetengine::core::formulacell

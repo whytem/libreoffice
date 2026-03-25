@@ -4983,15 +4983,19 @@ bool ScFormulaCell::InterpretFormulaGroupThreading(sc::FormulaLogger::GroupScope
         aFGSet.insert(mxGroup.get());
 
         ScRecursionHelper& rRecursionHelper = rDocument.GetRecursionHelper();
-        SCCOL nColStart = aPos.Col();
-        SCCOL nColEnd = nColStart;
-        if (!rRecursionHelper.HasFormulaGroupSet() && rDocument.IsInDocShellRecalc())
+        const auto aProbeWindowPlan
+            = spreadsheetengine::core::formulacell::makeThreadingProbeWindowPlan(
+                rRecursionHelper.HasFormulaGroupSet(), rDocument.IsInDocShellRecalc(), aPos.Col());
+        SCCOL nColStart = static_cast<SCCOL>(aProbeWindowPlan.mnStartColumn);
+        SCCOL nColEnd = static_cast<SCCOL>(aProbeWindowPlan.mnEndColumn);
+        if (aProbeWindowPlan.mbProbeNeighbors)
         {
             nColStart = lcl_probeLeftOrRightFGs(mxGroup, rDocument, aFGSet, aFGMap, true);
             nColEnd = lcl_probeLeftOrRightFGs(mxGroup, rDocument, aFGSet, aFGMap, false);
         }
 
         bool bFGOK = true;
+        bool bProbeGroupsIndependent = true;
         ScAddress aDirtiedAddress(ScAddress::INITIALIZE_INVALID);
         if (nColStart != nColEnd)
         {
@@ -5003,18 +5007,27 @@ bool ScFormulaCell::InterpretFormulaGroupThreading(sc::FormulaLogger::GroupScope
 
                 bFGOK = aFGMap[nCurrCol]->CheckComputeDependencies(aScope, false, nStartOffset, nEndOffset,
                                                                    true, nullptr, &aDirtiedAddress);
-                if (!bFGOK || !aGuard.AreGroupsIndependent())
+                bProbeGroupsIndependent = aGuard.AreGroupsIndependent();
+                if (!bFGOK || !bProbeGroupsIndependent)
                 {
-                    nColEnd = nColStart = aPos.Col();
                     break;
                 }
             }
         }
 
+        const bool bRedoOriginalDependencyCheck = !bFGOK && aDirtiedAddress.IsValid()
+                                                  && aOrigDependencies.Find(aDirtiedAddress);
+        const auto aProbeFallbackPlan
+            = spreadsheetengine::core::formulacell::makeThreadingProbeFallbackPlan(
+                aPos.Col(), nColStart, nColEnd, bFGOK, bProbeGroupsIndependent,
+                bRedoOriginalDependencyCheck);
+        nColStart = static_cast<SCCOL>(aProbeFallbackPlan.mnStartColumn);
+        nColEnd = static_cast<SCCOL>(aProbeFallbackPlan.mnEndColumn);
+
         // tdf#156677 it is possible that if a check of a column in the new range fails that the check has
         // now left a cell that the original range depended on in a Dirty state. So if the dirtied cell
         // was part of the original dependencies re-run the initial CheckComputeDependencies to fix it.
-        if (!bFGOK && aDirtiedAddress.IsValid() && aOrigDependencies.Find(aDirtiedAddress))
+        if (aProbeFallbackPlan.mbRedoOriginalDependencyCheck)
         {
             SAL_WARN("sc.core.formulacell", "rechecking dependencies due to a dirtied cell during speculative probe");
             const bool bRedoEntryCheckSucceeded = CheckComputeDependencies(aScope, false, nStartOffset, nEndOffset);

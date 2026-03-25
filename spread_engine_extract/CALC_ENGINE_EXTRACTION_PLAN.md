@@ -1431,6 +1431,10 @@ Current status:
       - matrix rejection with group-calc disable
       - forced-calculation cell-not-in-document rejection
       - offset normalization and single-row skip without forced calculation
+    - threaded speculative-probe planning for:
+      - whether neighbor-group probing should run at all
+      - collapse-back-to-current-column fallback after failed speculative probe
+      - redo of the original dependency check after probe-time dirtying
   - Calc now consumes those helpers from `refupdat.cxx`, while still owning:
     - `ScBigRange` update handling
     - the remaining deeper dependency/recalc orchestration beyond the initial

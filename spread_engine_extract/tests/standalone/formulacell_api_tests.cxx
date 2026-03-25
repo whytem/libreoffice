@@ -28,6 +28,8 @@ int main()
     using spreadsheetengine::core::formulacell::NotifyPlan;
     using spreadsheetengine::core::formulacell::ParallelCalculationPlan;
     using spreadsheetengine::core::formulacell::TableOpDirtyPlan;
+    using spreadsheetengine::core::formulacell::ThreadingProbeFallbackPlan;
+    using spreadsheetengine::core::formulacell::ThreadingProbeWindowPlan;
     using spreadsheetengine::core::formulacell::VolatileKind;
     using spreadsheetengine::core::formulacellrefupdate::CopyUpdatePlan;
     using spreadsheetengine::core::formulacellrefupdate::InsertDeleteTabUpdatePlan;
@@ -362,6 +364,29 @@ int main()
     {
         return fail("spreadsheetengine_formulacell_tests",
                     "formula-group offset plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacell::makeThreadingProbeWindowPlan(false, true, 7)
+            != ThreadingProbeWindowPlan { 7, 7, true }
+        || spreadsheetengine::core::formulacell::makeThreadingProbeWindowPlan(true, true, 7)
+               != ThreadingProbeWindowPlan { 7, 7, false }
+        || spreadsheetengine::core::formulacell::makeThreadingProbeWindowPlan(false, false, 7)
+               != ThreadingProbeWindowPlan { 7, 7, false }
+        || spreadsheetengine::core::formulacell::makeThreadingProbeFallbackPlan(
+               7, 5, 9, true, true, false)
+               != ThreadingProbeFallbackPlan { 5, 9, false }
+        || spreadsheetengine::core::formulacell::makeThreadingProbeFallbackPlan(
+               7, 5, 9, false, true, false)
+               != ThreadingProbeFallbackPlan { 7, 7, false }
+        || spreadsheetengine::core::formulacell::makeThreadingProbeFallbackPlan(
+               7, 5, 9, true, false, false)
+               != ThreadingProbeFallbackPlan { 7, 7, false }
+        || spreadsheetengine::core::formulacell::makeThreadingProbeFallbackPlan(
+               7, 5, 9, false, true, true)
+               != ThreadingProbeFallbackPlan { 7, 7, true })
+    {
+        return fail("spreadsheetengine_formulacell_tests",
+                    "threading probe plan mismatch");
     }
 
     if (spreadsheetengine::core::formulacellrefupdate::computePreviousPosition(
