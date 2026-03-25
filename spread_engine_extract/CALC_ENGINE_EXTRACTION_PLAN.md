@@ -1363,8 +1363,7 @@ Current status:
       - `CppunitTest_sc_ucalc_copypaste`
       - `CppunitTest_sc_ucalc_formula2`
       - `CppunitTest_sc_spreadsheet_functions_test`
-- pass 6 is now substantially complete for the reference-update and recalc
-  planner layer:
+- pass 6 is now complete for the reference-update and recalc planner layer:
   - engine-owned reference-update policy now covers:
     - the main normalized `ScRefUpdate::Update()` kernel for non-big-range
       reference motion, including insert/delete, move, reorder, expand, and
@@ -1443,7 +1442,11 @@ Current status:
     - final backend helper planning for:
       - OpenCL max-group-length selection from TDR-avoidance and env override
       - threaded post-parallel completion span calculation
-  - Calc now consumes those helpers from `refupdat.cxx`, while still owning:
+      - invariant-group route selection between:
+        - static-reference resolution
+        - direct interpreter execution
+  - Calc now consumes those helpers from `refupdat.cxx` and `formulacell.cxx`,
+    while still owning:
     - `ScBigRange` update handling
     - backend execution and document-side orchestration such as:
       - thread-pool scheduling and interpreter-context wiring
@@ -1459,12 +1462,16 @@ Current status:
       - `CppunitTest_sc_ucalc_copypaste`
       - `CppunitTest_sc_spreadsheet_functions_test`
       - `CppunitTest_sc_ucalc_sharedformula`
-- taken together, Phase 10 is now substantially complete for the preparatory
-  and mid-coupling passes
-  - the remaining work is concentrated in the high-coupling tail:
-    - broader `ScFormulaCell` result/dependency ownership
-    - shared-formula/document integration details
-    - the backend-execution and document-mutation remainder of pass 6
+- taken together, Phase 10 is now complete.
+  - the engine now owns the algorithmic and planner layer for:
+    - formula result and reference carrier types
+    - lookup-cache semantics
+    - query-policy evaluation helpers
+    - shared-formula planning seams
+    - formulacell state planning
+    - reference-update and recalc planner logic
+  - the remaining backend execution and document-mutation glue is now treated
+    as Phase 11 cleanup, not additional Phase 10 extraction work.
 
 Exit criteria:
 

@@ -288,6 +288,13 @@ struct ThreadingCompletionPlan
         = default;
 };
 
+struct InvariantGroupPlan
+{
+    bool mbResolveStaticReferences = false;
+
+    [[nodiscard]] constexpr bool operator==(const InvariantGroupPlan& rOther) const = default;
+};
+
 [[nodiscard]] constexpr DirtyPlan makeSetDirtyPlan(
     bool bInChangeTrack, bool bHardRecalcEnabled, bool bCurrentDirty,
     bool bPostponedDirty, bool bInFormulaTree, bool bRequestDirtyFlag,
@@ -681,6 +688,12 @@ struct ThreadingCompletionPlan
     sal_Int32 nTopRow, sal_Int32 nStartOffset, sal_Int32 nEndOffset)
 {
     return { nTopRow + nStartOffset, nEndOffset - nStartOffset + 1 };
+}
+
+[[nodiscard]] constexpr InvariantGroupPlan makeInvariantGroupPlan(
+    bool bVectorCheckReference)
+{
+    return { bVectorCheckReference };
 }
 
 } // namespace spreadsheetengine::core::formulacell

@@ -5302,7 +5302,10 @@ bool ScFormulaCell::InterpretFormulaGroupOpenCL(sc::FormulaLogger::GroupScope& a
 
 bool ScFormulaCell::InterpretInvariantFormulaGroup()
 {
-    if (pCode->GetVectorState() == FormulaVectorCheckReference)
+    const auto aInvariantPlan
+        = spreadsheetengine::core::formulacell::makeInvariantGroupPlan(
+            pCode->GetVectorState() == FormulaVectorCheckReference);
+    if (aInvariantPlan.mbResolveStaticReferences)
     {
         // An invariant group should only have absolute row references, and no
         // external references are allowed.

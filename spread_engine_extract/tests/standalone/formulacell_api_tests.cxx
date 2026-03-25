@@ -23,6 +23,7 @@ int main()
     using spreadsheetengine::core::formulacell::FormulaGroupPreflightPlan;
     using spreadsheetengine::core::formulacell::GroupInterpretFallbackPlan;
     using spreadsheetengine::core::formulacell::GroupInterpretPreflightPlan;
+    using spreadsheetengine::core::formulacell::InvariantGroupPlan;
     using spreadsheetengine::core::formulacell::LoadTrackingPlan;
     using spreadsheetengine::core::formulacell::NotifyKind;
     using spreadsheetengine::core::formulacell::NotifyPlan;
@@ -438,6 +439,15 @@ int main()
     {
         return fail("spreadsheetengine_formulacell_tests",
                     "final backend plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacell::makeInvariantGroupPlan(false)
+            != InvariantGroupPlan { false }
+        || spreadsheetengine::core::formulacell::makeInvariantGroupPlan(true)
+               != InvariantGroupPlan { true })
+    {
+        return fail("spreadsheetengine_formulacell_tests",
+                    "invariant-group plan mismatch");
     }
 
     if (spreadsheetengine::core::formulacellrefupdate::computePreviousPosition(
