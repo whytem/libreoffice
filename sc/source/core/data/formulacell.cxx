@@ -1441,6 +1441,35 @@ bool ScFormulaCell::MarkUsedExternalReferences()
 }
 
 namespace {
+spreadsheetengine::core::formulacell::NotifyKind toApiNotifyKind(SfxHintId nHint)
+{
+    switch (nHint)
+    {
+        case SfxHintId::ScDataChanged:
+            return spreadsheetengine::core::formulacell::NotifyKind::DataChanged;
+        case SfxHintId::ScTableOpDirty:
+            return spreadsheetengine::core::formulacell::NotifyKind::TableOpDirty;
+        case SfxHintId::ScHiddenRowsChanged:
+            return spreadsheetengine::core::formulacell::NotifyKind::HiddenRowsChanged;
+        default:
+            return spreadsheetengine::core::formulacell::NotifyKind::Other;
+    }
+}
+
+spreadsheetengine::core::formulacell::VolatileKind toApiVolatileKind(
+    ScInterpreter::VolatileType eType)
+{
+    switch (eType)
+    {
+        case ScInterpreter::VOLATILE_MACRO:
+            return spreadsheetengine::core::formulacell::VolatileKind::VolatileMacro;
+        case ScInterpreter::NOT_VOLATILE:
+            return spreadsheetengine::core::formulacell::VolatileKind::NotVolatile;
+        default:
+            return spreadsheetengine::core::formulacell::VolatileKind::Other;
+    }
+}
+
 class RecursionCounter
 {
     ScRecursionHelper&  rRec;
@@ -2349,12 +2378,6 @@ void ScFormulaCell::HandleStuffAfterParallelCalculation(ScInterpreter* pInterpre
 {
     aResult.HandleStuffAfterParallelCalculation();
 
-    if( !pCode->GetCodeLen() )
-        return;
-
-    if ( !pCode->IsRecalcModeAlways() )
-        rDocument.RemoveFromFormulaTree( this );
-
     std::unique_ptr<ScInterpreter> pScopedInterpreter;
     if (pInterpreter)
         pInterpreter->Init(this, aPos, *pCode);
@@ -2364,28 +2387,42 @@ void ScFormulaCell::HandleStuffAfterParallelCalculation(ScInterpreter* pInterpre
         pInterpreter = pScopedInterpreter.get();
     }
 
+    const auto aPlan = spreadsheetengine::core::formulacell::makeParallelCalculationPlan(
+        pCode->GetCodeLen() != 0, pCode->IsRecalcModeAlways(),
+        toApiVolatileKind(pInterpreter->GetVolatileType()));
+
+    if (aPlan.mbSkip)
+        return;
+
+    if (aPlan.mbRemoveFromFormulaTreeBeforeVolatileCheck)
+        rDocument.RemoveFromFormulaTree(this);
+
+    if (aPlan.mbSetRecalcModeAlways)
+        pCode->SetExclusiveRecalcModeAlways();
+
+    if (aPlan.mbSetRecalcModeNormal)
+        pCode->SetExclusiveRecalcModeNormal();
+
+    if (aPlan.mbPutInFormulaTree)
+        rDocument.PutInFormulaTree(this);
+
+    if (aPlan.mbStartListening)
+        StartListeningTo(rDocument);
+
+    if (aPlan.mbEndListening)
+        EndListeningTo(rDocument);
+
+    if (aPlan.mbEndAlwaysListeningArea)
+        rDocument.EndListeningArea(BCA_LISTEN_ALWAYS, false, this);
+
+    if (aPlan.mbRemoveFromFormulaTree)
+        rDocument.RemoveFromFormulaTree(this);
+
     switch (pInterpreter->GetVolatileType())
     {
         case ScInterpreter::VOLATILE_MACRO:
-            // The formula contains a volatile macro.
-            pCode->SetExclusiveRecalcModeAlways();
-            rDocument.PutInFormulaTree(this);
-            StartListeningTo(rDocument);
         break;
         case ScInterpreter::NOT_VOLATILE:
-            if (pCode->IsRecalcModeAlways())
-            {
-                // The formula was previously volatile, but no more.
-                EndListeningTo(rDocument);
-                pCode->SetExclusiveRecalcModeNormal();
-            }
-            else
-            {
-                // non-volatile formula.  End listening to the area in case
-                // it's listening due to macro module change.
-                rDocument.EndListeningArea(BCA_LISTEN_ALWAYS, false, this);
-            }
-            rDocument.RemoveFromFormulaTree(this);
         break;
         default:
             ;
@@ -2481,27 +2518,24 @@ void ScFormulaCell::Notify( const SfxHint& rHint )
         return;
     }
 
-    if ( rDocument.GetHardRecalcState() != ScDocument::HardRecalcState::OFF )
+    const auto aNotifyPlan = spreadsheetengine::core::formulacell::makeNotifyPlan(
+        rDocument.GetHardRecalcState() != ScDocument::HardRecalcState::OFF,
+        toApiNotifyKind(nHint), bSubTotal, bTableOpDirty, bDirty,
+        rDocument.IsInFormulaTree(this), pCode->IsRecalcModeAlways(),
+        rDocument.IsInFormulaTrack(this));
+
+    if (aNotifyPlan.mbIgnore)
         return;
 
-    if (!(nHint == SfxHintId::ScDataChanged || nHint == SfxHintId::ScTableOpDirty || (bSubTotal && nHint == SfxHintId::ScHiddenRowsChanged)))
-        return;
-
-    bool bForceTrack = false;
-    if ( nHint == SfxHintId::ScTableOpDirty )
+    if (aNotifyPlan.mbSetTableOpDirty)
     {
-        bForceTrack = !bTableOpDirty;
-        if ( !bTableOpDirty )
-        {
+        if (aNotifyPlan.mbAddTableOpCell)
             rDocument.AddTableOpFormulaCell( this );
-            bTableOpDirty = true;
-        }
+        bTableOpDirty = true;
     }
     else
-    {
-        bForceTrack = !bDirty;
         SetDirtyVar();
-    }
+
     // Don't remove from FormulaTree to put in FormulaTrack to
     // put in FormulaTree again and again, only if necessary.
     // Any other means except ScRecalcMode::ALWAYS by which a cell could
@@ -2510,9 +2544,7 @@ void ScFormulaCell::Notify( const SfxHint& rHint )
     // Yes. The new TableOpDirty made it necessary to have a
     // forced mode where formulas may still be in FormulaTree from
     // TableOpDirty but have to notify dependents for normal dirty.
-    if ( (bForceTrack || !rDocument.IsInFormulaTree( this )
-            || pCode->IsRecalcModeAlways())
-            && !rDocument.IsInFormulaTrack( this ) )
+    if (aNotifyPlan.mbAppendToTrack)
         rDocument.AppendToFormulaTrack( this );
 }
 

@@ -9,8 +9,25 @@
 
 #pragma once
 
+#include <sal/types.h>
+
 namespace spreadsheetengine::core::formulacell
 {
+
+enum class NotifyKind : sal_uInt8
+{
+    Other,
+    DataChanged,
+    TableOpDirty,
+    HiddenRowsChanged
+};
+
+enum class VolatileKind : sal_uInt8
+{
+    Other,
+    VolatileMacro,
+    NotVolatile
+};
 
 struct DirtyPlan
 {
@@ -49,6 +66,32 @@ struct CalcAfterLoadPlan
     bool mbMarkDirty = false;
 
     [[nodiscard]] constexpr bool operator==(const CalcAfterLoadPlan& rOther) const = default;
+};
+
+struct NotifyPlan
+{
+    bool mbIgnore = false;
+    bool mbSetDirtyVar = false;
+    bool mbSetTableOpDirty = false;
+    bool mbAddTableOpCell = false;
+    bool mbAppendToTrack = false;
+
+    [[nodiscard]] constexpr bool operator==(const NotifyPlan& rOther) const = default;
+};
+
+struct ParallelCalculationPlan
+{
+    bool mbSkip = false;
+    bool mbRemoveFromFormulaTreeBeforeVolatileCheck = false;
+    bool mbSetRecalcModeAlways = false;
+    bool mbSetRecalcModeNormal = false;
+    bool mbPutInFormulaTree = false;
+    bool mbRemoveFromFormulaTree = false;
+    bool mbStartListening = false;
+    bool mbEndListening = false;
+    bool mbEndAlwaysListeningArea = false;
+
+    [[nodiscard]] constexpr bool operator==(const ParallelCalculationPlan& rOther) const = default;
 };
 
 [[nodiscard]] constexpr DirtyPlan makeSetDirtyPlan(
@@ -97,6 +140,65 @@ struct CalcAfterLoadPlan
     const bool bCanUsePostLoadState = !bNewCompiled || bCodeErrorNone;
     return { bCanUsePostLoadState && bStartListening,
              (bCanUsePostLoadState && !bRecalcModeNormal) || bRecalcModeAlways };
+}
+
+[[nodiscard]] constexpr NotifyPlan makeNotifyPlan(
+    bool bHardRecalcEnabled, NotifyKind eKind, bool bSubTotal, bool bCurrentTableOpDirty,
+    bool bCurrentDirty, bool bInFormulaTree, bool bRecalcModeAlways, bool bInFormulaTrack)
+{
+    if (bHardRecalcEnabled)
+        return { true, false, false, false, false };
+
+    const bool bRelevant = eKind == NotifyKind::DataChanged
+                           || eKind == NotifyKind::TableOpDirty
+                           || (bSubTotal && eKind == NotifyKind::HiddenRowsChanged);
+    if (!bRelevant)
+        return { true, false, false, false, false };
+
+    if (eKind == NotifyKind::TableOpDirty)
+    {
+        const bool bForceTrack = !bCurrentTableOpDirty;
+        return { false, false, bForceTrack, bForceTrack,
+                 (bForceTrack || !bInFormulaTree || bRecalcModeAlways) && !bInFormulaTrack };
+    }
+
+    const bool bForceTrack = !bCurrentDirty;
+    return { false, true, false, false,
+             (bForceTrack || !bInFormulaTree || bRecalcModeAlways) && !bInFormulaTrack };
+}
+
+[[nodiscard]] constexpr ParallelCalculationPlan makeParallelCalculationPlan(
+    bool bHasCode, bool bRecalcModeAlways, VolatileKind eVolatileKind)
+{
+    if (!bHasCode)
+        return { true, false, false, false, false, false, false, false, false };
+
+    ParallelCalculationPlan aPlan;
+    aPlan.mbRemoveFromFormulaTreeBeforeVolatileCheck = !bRecalcModeAlways;
+
+    switch (eVolatileKind)
+    {
+        case VolatileKind::VolatileMacro:
+            aPlan.mbSetRecalcModeAlways = true;
+            aPlan.mbPutInFormulaTree = true;
+            aPlan.mbStartListening = true;
+            break;
+        case VolatileKind::NotVolatile:
+            if (bRecalcModeAlways)
+            {
+                aPlan.mbEndListening = true;
+                aPlan.mbSetRecalcModeNormal = true;
+            }
+            else
+                aPlan.mbEndAlwaysListeningArea = true;
+
+            aPlan.mbRemoveFromFormulaTree = true;
+            break;
+        case VolatileKind::Other:
+            break;
+    }
+
+    return aPlan;
 }
 
 [[nodiscard]] constexpr TableOpDirtyPlan makeSetTableOpDirtyPlan(

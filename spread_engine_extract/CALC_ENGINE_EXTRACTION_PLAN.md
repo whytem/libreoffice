@@ -1261,11 +1261,14 @@ Current status:
     - recalc-mode dirtying policy
     - import/load tracking policy for formula-tree vs formula-track placement
     - `CalcAfterLoad()` listening-and-dirty planning
+    - `Notify()` dirty/table-op/track routing policy
+    - post-parallel-calculation volatile-mode transition planning
   - Calc still owns the actual document-side mutations:
     - formula-tree and formula-track operations
     - table-op cell registration
     - stream invalidation
     - group object mutation
+    - listener attachment and detachment
   - validation is green for the first pass-5 checkpoint:
     - standalone: `ctest` passes `18/18`
     - LibreOffice:

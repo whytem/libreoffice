@@ -11,7 +11,11 @@ int main()
     using spreadsheetengine::core::formulacell::CalcAfterLoadPlan;
     using spreadsheetengine::core::formulacell::DirtyPlan;
     using spreadsheetengine::core::formulacell::LoadTrackingPlan;
+    using spreadsheetengine::core::formulacell::NotifyKind;
+    using spreadsheetengine::core::formulacell::NotifyPlan;
+    using spreadsheetengine::core::formulacell::ParallelCalculationPlan;
     using spreadsheetengine::core::formulacell::TableOpDirtyPlan;
+    using spreadsheetengine::core::formulacell::VolatileKind;
     using spreadsheetengine::standalone::test::fail;
 
     if (spreadsheetengine::core::formulacell::makeSetDirtyPlan(
@@ -68,6 +72,54 @@ int main()
                != CalcAfterLoadPlan { false, true })
     {
         return fail("spreadsheetengine_formulacell_tests", "calc-after-load plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacell::makeNotifyPlan(
+            true, NotifyKind::DataChanged, false, false, false, false, false, false)
+            != NotifyPlan { true, false, false, false, false }
+        || spreadsheetengine::core::formulacell::makeNotifyPlan(
+               false, NotifyKind::Other, false, false, false, false, false, false)
+               != NotifyPlan { true, false, false, false, false }
+        || spreadsheetengine::core::formulacell::makeNotifyPlan(
+               false, NotifyKind::HiddenRowsChanged, false, false, false, false, false, false)
+               != NotifyPlan { true, false, false, false, false }
+        || spreadsheetengine::core::formulacell::makeNotifyPlan(
+               false, NotifyKind::HiddenRowsChanged, true, false, true, true, false, false)
+               != NotifyPlan { false, true, false, false, false }
+        || spreadsheetengine::core::formulacell::makeNotifyPlan(
+               false, NotifyKind::DataChanged, false, false, false, true, false, false)
+               != NotifyPlan { false, true, false, false, true }
+        || spreadsheetengine::core::formulacell::makeNotifyPlan(
+               false, NotifyKind::TableOpDirty, false, false, false, true, false, false)
+               != NotifyPlan { false, false, true, true, true }
+        || spreadsheetengine::core::formulacell::makeNotifyPlan(
+               false, NotifyKind::TableOpDirty, false, true, false, true, false, false)
+               != NotifyPlan { false, false, false, false, false }
+        || spreadsheetengine::core::formulacell::makeNotifyPlan(
+               false, NotifyKind::DataChanged, false, true, true, false, true, true)
+               != NotifyPlan { false, true, false, false, false })
+    {
+        return fail("spreadsheetengine_formulacell_tests", "notify plan mismatch");
+    }
+
+    if (spreadsheetengine::core::formulacell::makeParallelCalculationPlan(
+            false, false, VolatileKind::Other)
+            != ParallelCalculationPlan { true, false, false, false, false, false, false, false, false }
+        || spreadsheetengine::core::formulacell::makeParallelCalculationPlan(
+               true, false, VolatileKind::VolatileMacro)
+               != ParallelCalculationPlan { false, true, true, false, true, false, true, false, false }
+        || spreadsheetengine::core::formulacell::makeParallelCalculationPlan(
+               true, true, VolatileKind::NotVolatile)
+               != ParallelCalculationPlan { false, false, false, true, false, true, false, true, false }
+        || spreadsheetengine::core::formulacell::makeParallelCalculationPlan(
+               true, false, VolatileKind::NotVolatile)
+               != ParallelCalculationPlan { false, true, false, false, false, true, false, false, true }
+        || spreadsheetengine::core::formulacell::makeParallelCalculationPlan(
+               true, true, VolatileKind::Other)
+               != ParallelCalculationPlan { false, false, false, false, false, false, false, false, false })
+    {
+        return fail("spreadsheetengine_formulacell_tests",
+                    "parallel calculation plan mismatch");
     }
 
     if (spreadsheetengine::core::formulacell::makeSetTableOpDirtyPlan(
