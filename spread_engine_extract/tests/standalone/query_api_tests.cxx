@@ -56,10 +56,10 @@ int main()
         return fail("spreadsheetengine_query_tests", "wildcard or regexp policy mismatch");
     }
 
-    const CellClass aNumericCell { true, false };
-    const CellClass aStringCell { false, true };
-    const CellClass aFormulaErrorCell { false, true };
-    const CellClass aEmptyCell { false, false };
+    const CellClass aNumericCell { true, false, false };
+    const CellClass aStringCell { false, true, false };
+    const CellClass aFormulaErrorCell { true, false, true };
+    const CellClass aEmptyCell { false, false, false };
 
     if (!spreadsheetengine::api::query::isQueryByValueForCell(aNumericCell)
         || spreadsheetengine::api::query::isQueryByValueForCell(aFormulaErrorCell))
@@ -83,7 +83,7 @@ int main()
                Operator::Contains, OperandKind::Value, aEmptyCell)
         || !spreadsheetengine::api::query::isQueryByString(
                Operator::LessEqual, OperandKind::Text, aStringCell)
-        || !spreadsheetengine::api::query::isQueryByString(
+        || spreadsheetengine::api::query::isQueryByString(
                Operator::Greater, OperandKind::Text, aFormulaErrorCell)
         || spreadsheetengine::api::query::isQueryByString(
                Operator::Greater, OperandKind::Value, aNumericCell))
@@ -102,14 +102,46 @@ int main()
                Operator::Equal, false, true, true)
         || spreadsheetengine::api::query::shouldUseFastStringEqualityPath(
                Operator::Equal, false, false, false)
+        || !spreadsheetengine::api::query::shouldUseExactStringEqualityPath(true, false)
+        || !spreadsheetengine::api::query::shouldUseExactStringEqualityPath(false, true)
+        || spreadsheetengine::api::query::shouldUseExactStringEqualityPath(false, false)
         || !spreadsheetengine::api::query::shouldUseSortedItemCache(100)
         || spreadsheetengine::api::query::shouldUseSortedItemCache(99))
     {
         return fail("spreadsheetengine_query_tests", "query cache threshold mismatch");
     }
 
+    if (!spreadsheetengine::api::query::shouldUseStringIdentityMultiEqualityFastPath(
+            true, Operator::Equal, 10)
+        || spreadsheetengine::api::query::shouldUseStringIdentityMultiEqualityFastPath(
+            false, Operator::Equal, 10)
+        || spreadsheetengine::api::query::shouldUseStringIdentityMultiEqualityFastPath(
+            true, Operator::Equal, 9)
+        || !spreadsheetengine::api::query::shouldCompareValueOperandAsString(aStringCell)
+        || spreadsheetengine::api::query::shouldCompareValueOperandAsString(aNumericCell)
+        || !spreadsheetengine::api::query::shouldCompareValueOperandAsString(aFormulaErrorCell)
+        || !spreadsheetengine::api::query::shouldIncludeOperandInStringIdentityCache(
+            OperandKind::Text, false)
+        || spreadsheetengine::api::query::shouldIncludeOperandInStringIdentityCache(
+            OperandKind::Value, false)
+        || !spreadsheetengine::api::query::shouldIncludeOperandInStringIdentityCache(
+            OperandKind::Value, true))
+    {
+        return fail("spreadsheetengine_query_tests", "string identity fast path policy mismatch");
+    }
+
     if (!spreadsheetengine::api::query::isWholeCellSearchMatch(true, true, 0, 4, 4)
         || spreadsheetengine::api::query::isWholeCellSearchMatch(true, true, 1, 4, 4)
+        || !spreadsheetengine::api::query::shouldRejectAssignedEmptyStringQuery(
+               OperandKind::Value, true)
+        || spreadsheetengine::api::query::shouldRejectAssignedEmptyStringQuery(
+               OperandKind::Text, true)
+        || spreadsheetengine::api::query::computeSubstringSearchStart(
+               Operator::Contains, 6, 2)
+               != 0
+        || spreadsheetengine::api::query::computeSubstringSearchStart(
+               Operator::EndsWith, 6, 2)
+               != 4
         || !spreadsheetengine::api::query::evaluatePatternSearchMatch(
                Operator::Contains, true, 2, 4, 6)
         || !spreadsheetengine::api::query::evaluatePatternSearchMatch(
@@ -123,9 +155,35 @@ int main()
         || !spreadsheetengine::api::query::evaluateSubstringMatch(Operator::Contains, 3)
         || !spreadsheetengine::api::query::evaluateSubstringMatch(Operator::DoesNotContain, -1)
         || !spreadsheetengine::api::query::evaluateSubstringMatch(Operator::BeginsWith, 0)
-        || !spreadsheetengine::api::query::evaluateSubstringMatch(Operator::EndsWith, 2))
+        || !spreadsheetengine::api::query::evaluateSubstringMatch(Operator::EndsWith, 2)
+        || spreadsheetengine::api::query::evaluateOrderedStringCompare(Operator::Less, -1)
+                   != spreadsheetengine::api::query::OrderedCompareResult { true, false }
+        || spreadsheetengine::api::query::evaluateOrderedStringCompare(Operator::GreaterEqual, 0)
+                   != spreadsheetengine::api::query::OrderedCompareResult { true, true })
     {
         return fail("spreadsheetengine_query_tests", "string match policy mismatch");
+    }
+
+    if (!spreadsheetengine::api::query::isRangeLookupStringOperand(OperandKind::Text)
+        || spreadsheetengine::api::query::isRangeLookupStringOperand(OperandKind::Value)
+        || !spreadsheetengine::api::query::isRangeLookupComparisonSupported(
+               Operator::LessEqual, OperandKind::Text)
+        || spreadsheetengine::api::query::isRangeLookupComparisonSupported(
+               Operator::GreaterEqual, OperandKind::Text)
+        || !spreadsheetengine::api::query::isRangeLookupComparisonSupported(
+               Operator::GreaterEqual, OperandKind::Value)
+        || spreadsheetengine::api::query::isRangeLookupComparisonSupported(
+               Operator::LessEqual, OperandKind::Value)
+        || !spreadsheetengine::api::query::evaluateRangeLookupMatch(
+               Operator::LessEqual, OperandKind::Text, aNumericCell)
+        || spreadsheetengine::api::query::evaluateRangeLookupMatch(
+               Operator::LessEqual, OperandKind::Text, aFormulaErrorCell)
+        || !spreadsheetengine::api::query::evaluateRangeLookupMatch(
+               Operator::GreaterEqual, OperandKind::Value, aStringCell)
+        || spreadsheetengine::api::query::evaluateRangeLookupMatch(
+               Operator::GreaterEqual, OperandKind::Value, aNumericCell))
+    {
+        return fail("spreadsheetengine_query_tests", "range lookup policy mismatch");
     }
 
     struct NumericItem

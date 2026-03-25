@@ -55,6 +55,7 @@ struct CellClass
 {
     bool mbHasNumeric = false;
     bool mbHasString = false;
+    bool mbFormulaError = false;
 
     [[nodiscard]] constexpr bool operator==(const CellClass& rOther) const = default;
 };
@@ -109,7 +110,7 @@ using StringIdentity = const void*;
 
 [[nodiscard]] constexpr bool isQueryByValueForCell(const CellClass& rCell)
 {
-    return rCell.mbHasNumeric;
+    return !rCell.mbFormulaError && rCell.mbHasNumeric;
 }
 
 [[nodiscard]] constexpr bool isQueryByValue(
@@ -144,6 +145,12 @@ using StringIdentity = const void*;
 {
     return eOp == Operator::Equal && !bRealWildOrRegExp && !bTestWildOrRegExp
            && bMatchWholeCell;
+}
+
+[[nodiscard]] constexpr bool shouldUseExactStringEqualityPath(
+    bool bFastPath, bool bMatchWholeCell)
+{
+    return bFastPath || bMatchWholeCell;
 }
 
 [[nodiscard]] constexpr bool isWholeCellSearchMatch(
@@ -207,9 +214,96 @@ using StringIdentity = const void*;
     }
 }
 
+[[nodiscard]] constexpr bool shouldRejectAssignedEmptyStringQuery(
+    OperandKind eType, bool bQueryStringEmpty)
+{
+    return eType != OperandKind::Text && bQueryStringEmpty;
+}
+
+[[nodiscard]] constexpr sal_Int32 computeSubstringSearchStart(
+    Operator eOp, sal_Int32 nTextLength, sal_Int32 nPatternLength)
+{
+    return isEndsWithOp(eOp) ? (nTextLength - nPatternLength) : 0;
+}
+
+struct OrderedCompareResult
+{
+    bool mbMatch = false;
+    bool mbEqual = false;
+
+    [[nodiscard]] constexpr bool operator==(const OrderedCompareResult& rOther) const = default;
+};
+
+[[nodiscard]] constexpr OrderedCompareResult evaluateOrderedStringCompare(
+    Operator eOp, sal_Int32 nCompare)
+{
+    switch (eOp)
+    {
+        case Operator::Less:
+            return { nCompare < 0, false };
+        case Operator::Greater:
+            return { nCompare > 0, false };
+        case Operator::LessEqual:
+            return { nCompare <= 0, nCompare == 0 };
+        case Operator::GreaterEqual:
+            return { nCompare >= 0, nCompare == 0 };
+        default:
+            return {};
+    }
+}
+
+[[nodiscard]] constexpr bool isRangeLookupStringOperand(OperandKind eType)
+{
+    return eType == OperandKind::Text;
+}
+
+[[nodiscard]] constexpr bool isRangeLookupComparisonSupported(
+    Operator eOp, OperandKind eType)
+{
+    if (isRangeLookupStringOperand(eType))
+        return eOp == Operator::Less || eOp == Operator::LessEqual;
+
+    return eOp == Operator::Greater || eOp == Operator::GreaterEqual;
+}
+
+[[nodiscard]] constexpr bool evaluateRangeLookupMatch(
+    Operator eOp, OperandKind eType, const CellClass& rCell)
+{
+    if (!isRangeLookupComparisonSupported(eOp, eType))
+        return false;
+
+    if (isRangeLookupStringOperand(eType))
+    {
+        if (rCell.mbFormulaError)
+            return false;
+
+        return rCell.mbHasNumeric;
+    }
+
+    return !rCell.mbHasNumeric;
+}
+
 [[nodiscard]] constexpr bool shouldUseSortedItemCache(std::size_t nItemCount)
 {
     return nItemCount >= 100;
+}
+
+[[nodiscard]] constexpr bool shouldUseStringIdentityMultiEqualityFastPath(
+    bool bFastCompareByString, Operator eOp, std::size_t nItemCount)
+{
+    return bFastCompareByString && shouldTryMultiEqualityFastPath(eOp, nItemCount);
+}
+
+[[nodiscard]] constexpr bool shouldCompareValueOperandAsString(const CellClass& rCell)
+{
+    return !isQueryByValueForCell(rCell);
+}
+
+[[nodiscard]] constexpr bool shouldIncludeOperandInStringIdentityCache(
+    OperandKind eType, bool bCompareValueOperandAsString)
+{
+    return eType == OperandKind::Text
+           || (bCompareValueOperandAsString && eType == OperandKind::Value);
 }
 
 template <typename Iterator, typename Predicate, typename Projection>

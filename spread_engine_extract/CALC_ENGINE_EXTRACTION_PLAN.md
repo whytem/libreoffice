@@ -1168,11 +1168,21 @@ Current status:
     - whole-cell vs partial-match policy
     - wildcard / regexp gate checks
     - query-by-value vs query-by-string classification
+    - assigned-empty-string rejection used by function-style query callers
     - multi-item equality fast-path thresholds
     - sorted-cache collection and probe helpers for numeric and string identity
       caches
     - fast string-equality path selection
+    - exact shared-string equality path selection
     - operator-driven wildcard and substring match evaluation rules
+    - substring search-start planning for contains vs ends-with checks
+    - ordered string-compare result policy for the `<`, `>`, `<=`, and `>=`
+      family
+    - range-lookup comparison policy, including the formula-error exclusion
+      used when deciding whether a cell can match a numeric query
+    - string-identity multi-item fast-path gating and operand eligibility
+      rules, including when `ByValue` operands are treated as string
+      candidates
   - Calc now adapts `ScQueryOp`, `ScQueryEntry::QueryType`, search type, and
     cell-class facts into that engine-owned policy layer from
     `queryevaluator.cxx`
@@ -1184,6 +1194,11 @@ Current status:
     - collator setup
     - string materialization from cells
     - wildcard / regexp search execution
+  - Calc still owns the broader query-evaluation orchestration around those
+    helpers:
+    - table iteration
+    - evaluator-local cache vectors and query items
+    - number-format-sensitive comparison
   - table iteration, string-pool ownership, transliteration, collator setup,
     and number-format-sensitive comparison remain in Calc for now
   - validation is green for the first pass-3 slice:
@@ -1192,6 +1207,8 @@ Current status:
       - `CppunitTest_sc_ucalc_sort`
       - `CppunitTest_sc_ucalc`
       - `CppunitTest_sc_ucalc_copypaste`
+      - `CppunitTest_sc_ucalc_formula2`
+      - `CppunitTest_sc_spreadsheet_functions_test`
 
 Exit criteria:
 

@@ -118,7 +118,9 @@ sequery::SearchType toApiSearchType(utl::SearchParam::SearchType eType)
 
 sequery::CellClass toApiCellClass(const ScRefCellValue& rCell)
 {
-    return { rCell.hasNumeric(), rCell.hasString() };
+    return { rCell.hasNumeric(), rCell.hasString(),
+        rCell.getType() == CELLTYPE_FORMULA
+            && rCell.getFormula()->GetErrCode() != FormulaError::NONE };
 }
 
 } // namespace
@@ -500,7 +502,8 @@ std::pair<bool, bool> ScQueryEvaluator::compareByString(const ScQueryEntry& rEnt
         if (bFast || isTextMatchOp(rEntry.eOp))
         {
             // Check this even with bFast.
-            if (rItem.meType != ScQueryEntry::ByString && rItem.maString.isEmpty())
+            if (sequery::shouldRejectAssignedEmptyStringQuery(
+                    toApiOperandKind(rItem.meType), rItem.maString.isEmpty()))
             {
                 // #i18374# When used from functions (match, countif, sumif, vlookup, hlookup, lookup),
                 // the query value is assigned directly, and the string is empty. In that case,
@@ -511,7 +514,7 @@ std::pair<bool, bool> ScQueryEvaluator::compareByString(const ScQueryEntry& rEnt
             }
             else
             {
-                if (bFast || bMatchWholeCell)
+                if (sequery::shouldUseExactStringEqualityPath(bFast, bMatchWholeCell))
                 {
                     bOk = equalCellSharedString(rCell, nRow, rEntry.nField, mrParam.bCaseSens,
                                                 rItem.maString);
@@ -537,10 +540,8 @@ std::pair<bool, bool> ScQueryEvaluator::compareByString(const ScQueryEntry& rEnt
                         if (pQuer == nullptr)
                             pQuer = svl::SharedString::getEmptyString().getDataIgnoreCase();
 
-                        const sal_Int32 nIndex
-                            = sequery::isEndsWithOp(toApiQueryOperator(rEntry.eOp))
-                                  ? (pCellStr->length - pQuer->length)
-                                  : 0;
+                        const sal_Int32 nIndex = sequery::computeSubstringSearchStart(
+                            toApiQueryOperator(rEntry.eOp), pCellStr->length, pQuer->length);
 
                         if (nIndex < 0)
                             nStrPos = -1;
@@ -567,10 +568,9 @@ std::pair<bool, bool> ScQueryEvaluator::compareByString(const ScQueryEntry& rEnt
                         const OUString aQuer(mpTransliteration->transliterate(
                             aQueryStr, nLang, 0, aQueryStr.getLength(), nullptr));
 
-                        const sal_Int32 nIndex
-                            = sequery::isEndsWithOp(toApiQueryOperator(rEntry.eOp))
-                                  ? (aCell.getLength() - aQuer.getLength())
-                                  : 0;
+                        const sal_Int32 nIndex = sequery::computeSubstringSearchStart(
+                            toApiQueryOperator(rEntry.eOp), aCell.getLength(),
+                            aQuer.getLength());
                         nStrPos = ((nIndex < 0) ? -1 : aCell.indexOf(aQuer, nIndex));
                     }
                     bOk = sequery::evaluateSubstringMatch(
@@ -584,28 +584,12 @@ std::pair<bool, bool> ScQueryEvaluator::compareByString(const ScQueryEntry& rEnt
             const OUString& rValue = rValueSource.getString();
             setupCollatorIfNeeded();
             sal_Int32 nCompare = mpCollator->compareString(rValue, rItem.maString.getString());
-            switch (rEntry.eOp)
-            {
-                case SC_LESS:
-                    bOk = (nCompare < 0);
-                    break;
-                case SC_GREATER:
-                    bOk = (nCompare > 0);
-                    break;
-                case SC_LESS_EQUAL:
-                    bOk = (nCompare <= 0);
-                    if (bOk && mpTestEqualCondition && !bTestEqual)
-                        bTestEqual = (nCompare == 0);
-                    break;
-                case SC_GREATER_EQUAL:
-                    bOk = (nCompare >= 0);
-                    if (bOk && mpTestEqualCondition && !bTestEqual)
-                        bTestEqual = (nCompare == 0);
-                    break;
-                default:
-                    assert(false);
-                    break;
-            }
+            const sequery::OrderedCompareResult aCompare
+                = sequery::evaluateOrderedStringCompare(
+                    toApiQueryOperator(rEntry.eOp), nCompare);
+            bOk = aCompare.mbMatch;
+            if (bOk && mpTestEqualCondition && !bTestEqual)
+                bTestEqual = aCompare.mbEqual;
         }
     }
 
@@ -640,26 +624,10 @@ std::pair<bool, bool> ScQueryEvaluator::compareByRangeLookup(const ScRefCellValu
                                                              const ScQueryEntry::Item& rItem)
 {
     bool bTestEqual = false;
-
-    if (rItem.meType == ScQueryEntry::ByString && rEntry.eOp != SC_LESS
-        && rEntry.eOp != SC_LESS_EQUAL)
-        return std::pair<bool, bool>(false, bTestEqual);
-
-    if (rItem.meType != ScQueryEntry::ByString && rEntry.eOp != SC_GREATER
-        && rEntry.eOp != SC_GREATER_EQUAL)
-        return std::pair<bool, bool>(false, bTestEqual);
-
-    if (rItem.meType == ScQueryEntry::ByString)
-    {
-        if (rCell.getType() == CELLTYPE_FORMULA
-            && rCell.getFormula()->GetErrCode() != FormulaError::NONE)
-            // Error values are compared as string.
-            return std::pair<bool, bool>(false, bTestEqual);
-
-        return std::pair<bool, bool>(rCell.hasNumeric(), bTestEqual);
-    }
-
-    return std::pair<bool, bool>(!rCell.hasNumeric(), bTestEqual);
+    return std::pair<bool, bool>(
+        sequery::evaluateRangeLookupMatch(toApiQueryOperator(rEntry.eOp),
+            toApiOperandKind(rItem.meType), toApiCellClass(rCell)),
+        bTestEqual);
 }
 
 std::pair<bool, bool> ScQueryEvaluator::processEntry(SCROW nRow, SCCOL nCol,
@@ -735,8 +703,8 @@ std::pair<bool, bool> ScQueryEvaluator::processEntry(SCROW nRow, SCCOL nCol,
         }
     }
     const bool bFastCompareByString = isFastCompareByString(rEntry);
-    if (sequery::shouldTryMultiEqualityFastPath(toApiQueryOperator(rEntry.eOp), rItems.size())
-        && bFastCompareByString)
+    if (sequery::shouldUseStringIdentityMultiEqualityFastPath(
+            bFastCompareByString, toApiQueryOperator(rEntry.eOp), rItems.size()))
     {
         // The same as above but for strings. Try to optimize the case when
         // it's a svl::SharedString comparison. That happens when SC_EQUAL is used
@@ -745,7 +713,8 @@ std::pair<bool, bool> ScQueryEvaluator::processEntry(SCROW nRow, SCCOL nCol,
         // Allow also checking ScQueryEntry::ByValue if the cell is not numeric,
         // as in that case isQueryByNumeric() would be false and isQueryByString() would
         // be true because of SC_EQUAL making isTextMatchOp() true.
-        bool compareByValue = !isQueryByValueForCell(aCell);
+        const bool bCompareValueOperandAsString
+            = sequery::shouldCompareValueOperandAsString(toApiCellClass(aCell));
         // For ScQueryEntry::ByString check that the cell is represented by a shared string,
         // which means it's either a string cell or a formula error. This is not as
         // generous as isQueryByString() but it should be enough and better be safe.
@@ -760,9 +729,9 @@ std::pair<bool, bool> ScQueryEvaluator::processEntry(SCROW nRow, SCCOL nCol,
                 mCachedSortedItemStrings[nEntryIndex]
                     = sequery::collectSortedStringIdentities(
                         rItems.begin(), rItems.end(),
-                        [compareByValue](const ScQueryEntry::Item& rItem) {
-                            return rItem.meType == ScQueryEntry::ByString
-                                   || (compareByValue && rItem.meType == ScQueryEntry::ByValue);
+                        [bCompareValueOperandAsString](const ScQueryEntry::Item& rItem) {
+                            return sequery::shouldIncludeOperandInStringIdentityCache(
+                                toApiOperandKind(rItem.meType), bCompareValueOperandAsString);
                         },
                         [this](const ScQueryEntry::Item& rItem) {
                             return mrParam.bCaseSens
@@ -784,9 +753,9 @@ std::pair<bool, bool> ScQueryEvaluator::processEntry(SCROW nRow, SCCOL nCol,
                                     : cellSharedString.getDataIgnoreCase();
             if (sequery::containsLinearStringIdentity(
                     rItems.begin(), rItems.end(), pStringIdentity,
-                    [compareByValue](const ScQueryEntry::Item& rItem) {
-                        return rItem.meType == ScQueryEntry::ByString
-                               || (compareByValue && rItem.meType == ScQueryEntry::ByValue);
+                    [bCompareValueOperandAsString](const ScQueryEntry::Item& rItem) {
+                        return sequery::shouldIncludeOperandInStringIdentityCache(
+                            toApiOperandKind(rItem.meType), bCompareValueOperandAsString);
                     },
                     [this](const ScQueryEntry::Item& rItem) {
                         return mrParam.bCaseSens
