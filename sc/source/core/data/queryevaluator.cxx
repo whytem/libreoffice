@@ -635,40 +635,34 @@ std::pair<bool, bool> ScQueryEvaluator::processEntry(SCROW nRow, SCCOL nCol,
 {
     std::pair<bool, bool> aRes(false, false);
     const ScQueryEntry::QueryItemsType& rItems = rEntry.GetQueryItems();
-    if (rItems.size() == 1 && rItems.front().meType == ScQueryEntry::ByEmpty)
+    if (sequery::isSingleEmptyQueryItem(
+            rItems.size(), toApiOperandKind(rItems.front().meType)))
     {
-        if (rEntry.IsQueryByEmpty())
-            aRes.first = aCell.isEmpty();
-        else
-        {
-            assert(rEntry.IsQueryByNonEmpty());
-            aRes.first = !aCell.isEmpty();
-        }
+        aRes.first = sequery::evaluateEmptyQueryMatch(
+            rEntry.IsQueryByEmpty(), aCell.isEmpty());
         return aRes;
     }
-    if (sequery::shouldTryMultiEqualityFastPath(toApiQueryOperator(rEntry.eOp), rItems.size()))
+    const sequery::MultiEqualityFastPathPlan aNumericFastPathPlan
+        = sequery::makeNumericMultiEqualityFastPathPlan(
+            toApiQueryOperator(rEntry.eOp), rItems.size());
+    if (aNumericFastPathPlan.mbEnabled)
     {
         // If there are many items to query for (autofilter does this), then try to search
         // efficiently in those items. So first search all the items of the relevant type,
         // If that does not find anything, fall back to the generic code.
         double value = 0;
-        bool valid = true;
-        // For ScQueryEntry::ByValue check that the cell either is a value or is a formula
-        // that has a value and is not an error (those are compared as strings). This
-        // is basically simplified isQueryByValue().
-        if (aCell.getType() == CELLTYPE_VALUE)
-            value = aCell.getDouble();
-        else if (aCell.getType() == CELLTYPE_FORMULA
-                 && aCell.getFormula()->GetErrCode() != FormulaError::NONE
-                 && aCell.getFormula()->IsValue())
+        const bool bDirectNumericCell = aCell.getType() == CELLTYPE_VALUE;
+        const bool bFormulaCell = aCell.getType() == CELLTYPE_FORMULA;
+        const sequery::NumericFastPathCell aFastPathCell
+            = sequery::classifyNumericFastPathCell(
+                bDirectNumericCell,
+                bFormulaCell && aCell.getFormula()->IsValue(),
+                bFormulaCell && aCell.getFormula()->GetErrCode() != FormulaError::NONE);
+        if (aFastPathCell.mbCanUseFastPath)
         {
-            value = aCell.getFormula()->GetValue();
-        }
-        else
-            valid = false;
-        if (valid)
-        {
-            if (sequery::shouldUseSortedItemCache(rItems.size()))
+            value = aFastPathCell.mbUseFormulaValue ? aCell.getFormula()->GetValue()
+                                                    : aCell.getDouble();
+            if (aNumericFastPathPlan.mbUseSortedCache)
             {
                 // Sort, cache and binary search for the value in items.
                 // Don't bother comparing approximately.
@@ -679,7 +673,8 @@ std::pair<bool, bool> ScQueryEvaluator::processEntry(SCROW nRow, SCCOL nCol,
                         = sequery::collectSortedNumericValues(
                             rItems.begin(), rItems.end(),
                             [](const ScQueryEntry::Item& rItem) {
-                                return rItem.meType == ScQueryEntry::ByValue;
+                                return sequery::shouldIncludeOperandInNumericFastPathCache(
+                                    toApiOperandKind(rItem.meType));
                             },
                             [](const ScQueryEntry::Item& rItem) { return rItem.mfVal; });
                 }
@@ -694,7 +689,8 @@ std::pair<bool, bool> ScQueryEvaluator::processEntry(SCROW nRow, SCCOL nCol,
                 if (sequery::containsLinearNumericValue(
                         rItems.begin(), rItems.end(), value,
                         [](const ScQueryEntry::Item& rItem) {
-                            return rItem.meType == ScQueryEntry::ByValue;
+                            return sequery::shouldIncludeOperandInNumericFastPathCache(
+                                toApiOperandKind(rItem.meType));
                         },
                         [](const ScQueryEntry::Item& rItem) { return rItem.mfVal; }))
                     return std::make_pair(true, true);
@@ -702,8 +698,10 @@ std::pair<bool, bool> ScQueryEvaluator::processEntry(SCROW nRow, SCCOL nCol,
         }
     }
     const bool bFastCompareByString = isFastCompareByString(rEntry);
-    if (sequery::shouldUseStringIdentityMultiEqualityFastPath(
-            bFastCompareByString, toApiQueryOperator(rEntry.eOp), rItems.size()))
+    const sequery::MultiEqualityFastPathPlan aStringFastPathPlan
+        = sequery::makeStringIdentityMultiEqualityFastPathPlan(
+            bFastCompareByString, toApiQueryOperator(rEntry.eOp), rItems.size());
+    if (aStringFastPathPlan.mbEnabled)
     {
         // The same as above but for strings. Try to optimize the case when
         // it's a svl::SharedString comparison. That happens when SC_EQUAL is used
@@ -717,7 +715,7 @@ std::pair<bool, bool> ScQueryEvaluator::processEntry(SCROW nRow, SCCOL nCol,
         // For ScQueryEntry::ByString check that the cell is represented by a shared string,
         // which means it's either a string cell or a formula error. This is not as
         // generous as isQueryByString() but it should be enough and better be safe.
-        if (sequery::shouldUseSortedItemCache(rItems.size()))
+        if (aStringFastPathPlan.mbUseSortedCache)
         {
             // Sort, cache and binary search for the string in items.
             // Since each SharedString is identified by pointer value,

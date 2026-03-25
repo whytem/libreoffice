@@ -1161,7 +1161,7 @@ Current status:
     - broader query-policy extraction fits better with Phase 10 pass 3
     - listener and invalidation ownership stays Calc-side until the later
       dependency/recalc passes
-- pass 3 is now started with the first pure query-policy slice:
+- pass 3 is now substantially complete for the pure query-policy lane:
   - engine-owned query policy now covers:
     - operator classification for text and partial-text matches
     - ends-with operator detection
@@ -1191,6 +1191,11 @@ Current status:
       range-lookup, text-color, and background-color items
     - evaluator short-circuit and result-aggregation policy for per-item
       matches and AND/OR-connected query entries
+    - numeric multi-item fast-path cell eligibility and operand-inclusion
+      policy, including the formula-error exclusion for numeric formula cells
+    - numeric and string fast-path plan selection, including the shared
+      sorted-cache vs linear-scan decision
+    - single-item empty/non-empty special-case policy
   - Calc now adapts `ScQueryOp`, `ScQueryEntry::QueryType`, search type, and
     cell-class facts into that engine-owned policy layer from
     `queryevaluator.cxx`
@@ -1207,16 +1212,70 @@ Current status:
     - table iteration
     - evaluator-local cache vectors and query items
     - number-format-sensitive comparison
-  - table iteration, string-pool ownership, transliteration, collator setup,
-    and number-format-sensitive comparison remain in Calc for now
-  - validation is green for the first pass-3 slice:
-    - standalone: `ctest` passes `16/16`
+  - the main remaining pass-3 work is now the heavyweight host-bound tail:
+    - table iteration
+    - string-pool ownership
+    - transliteration and collator setup
+    - wildcard / regexp execution
+    - number-format-sensitive comparison
+  - validation is green for the pass-3 checkpoint:
+    - standalone: `ctest` passes `18/18`
     - LibreOffice:
       - `CppunitTest_sc_ucalc_sort`
       - `CppunitTest_sc_ucalc`
       - `CppunitTest_sc_ucalc_copypaste`
       - `CppunitTest_sc_ucalc_formula2`
       - `CppunitTest_sc_spreadsheet_functions_test`
+  - this is far enough along that additional pass-3 work should now be driven
+    only by clearly isolated helpers; the remaining bulk of Phase 10 lies in
+    the later passes
+- pass 4 is now started with the first shared-formula grouping helper slices:
+  - engine-owned shared-formula policy now covers:
+    - join candidate classification from token-compare state
+    - join action planning for merge, extend, adopt, and create-group cases
+    - split eligibility and upper/lower group-length planning
+    - unshare position classification for top, bottom, and middle cases
+    - unshare reshaping plans for adjacent unshare vs lower-group creation
+    - shared-top retrieval and join-above eligibility checks
+    - group-run planning for `groupFormulaCells()`
+  - Calc now consumes those helpers from `sharedformula.cxx` and
+    `sharedformula.hxx`, while still owning:
+    - actual group object mutation
+    - token-array cloning
+    - listener and document integration
+    - cell-store iteration and rewiring
+  - validation is green for the first pass-4 checkpoint:
+    - standalone: `ctest` passes `18/18`
+    - LibreOffice:
+      - `CppunitTest_sc_ucalc_sharedformula`
+      - `CppunitTest_sc_ucalc`
+      - `CppunitTest_sc_ucalc_copypaste`
+      - `CppunitTest_sc_ucalc_formula2`
+- pass 5 is now started with the first `ScFormulaCell` state-transition slice:
+  - engine-owned formulacell state policy now covers:
+    - `SetDirty()` planning
+    - `SetTableOpDirty()` planning
+    - group-calc-state reset eligibility when marking dirty
+    - recalc-mode dirtying policy
+  - Calc still owns the actual document-side mutations:
+    - formula-tree and formula-track operations
+    - table-op cell registration
+    - stream invalidation
+    - group object mutation
+  - validation is green for the first pass-5 checkpoint:
+    - standalone: `ctest` passes `18/18`
+    - LibreOffice:
+      - `CppunitTest_sc_ucalc_sharedformula`
+      - `CppunitTest_sc_ucalc`
+      - `CppunitTest_sc_ucalc_copypaste`
+      - `CppunitTest_sc_ucalc_formula2`
+      - `CppunitTest_sc_spreadsheet_functions_test`
+- taken together, Phase 10 is now substantially complete for the preparatory
+  and mid-coupling passes
+  - the remaining work is concentrated in the high-coupling tail:
+    - broader `ScFormulaCell` result/dependency ownership
+    - shared-formula/document integration details
+    - reference update and recalculation algorithms from pass 6
 
 Exit criteria:
 

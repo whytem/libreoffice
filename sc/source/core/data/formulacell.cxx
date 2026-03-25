@@ -65,6 +65,7 @@
 #include <listenerqueryids.hxx>
 #include <grouparealistener.hxx>
 #include <formulalogger.hxx>
+#include <spreadsheetengine/core/FormulaCellState.hxx>
 #include <com/sun/star/sheet/FormulaLanguage.hpp>
 
 #if HAVE_FEATURE_OPENCL
@@ -2530,23 +2531,25 @@ void ScFormulaCell::Query( SvtListener::QueryBase& rQuery ) const
 
 void ScFormulaCell::SetDirty( bool bDirtyFlag )
 {
-    if (IsInChangeTrack())
+    const auto aPlan = spreadsheetengine::core::formulacell::makeSetDirtyPlan(
+        IsInChangeTrack(),
+        rDocument.GetHardRecalcState() != ScDocument::HardRecalcState::OFF,
+        bDirty, mbPostponedDirty, rDocument.IsInFormulaTree(this), bDirtyFlag,
+        rDocument.IsImportingXML(), rDocument.IsInsertingFromOtherDoc());
+
+    if (aPlan.mbSkip)
         return;
 
-    if ( rDocument.GetHardRecalcState() != ScDocument::HardRecalcState::OFF )
-    {
+    if (!aPlan.mbAppendToTrack && aPlan.mbSetDirtyVar)
         SetDirtyVar();
-        rDocument.SetStreamValid(aPos.Tab(), false);
-        return;
-    }
 
     // Avoid multiple formula tracking in Load() and in CompileAll()
     // after CopyScenario() and CopyBlockFromClip().
     // If unconditional formula tracking is needed, set bDirty=false
     // before calling SetDirty(), for example in CompileTokenArray().
-    if ( !bDirty || mbPostponedDirty || !rDocument.IsInFormulaTree( this ) )
+    if (aPlan.mbAppendToTrack)
     {
-        if( bDirtyFlag )
+        if (aPlan.mbSetDirtyVar)
             SetDirtyVar();
         rDocument.AppendToFormulaTrack( this );
 
@@ -2555,18 +2558,20 @@ void ScFormulaCell::SetDirty( bool bDirtyFlag )
         // the FormulaTree, once in there it would be assumed that its
         // dependents already had been tracked and it would be skipped on a
         // subsequent notify. Postpone tracking until all listeners are set.
-        if (!rDocument.IsImportingXML() && !rDocument.IsInsertingFromOtherDoc())
+        if (aPlan.mbTrackFormulas)
             rDocument.TrackFormulas();
     }
 
-    rDocument.SetStreamValid(aPos.Tab(), false);
+    if (aPlan.mbInvalidateStream)
+        rDocument.SetStreamValid(aPos.Tab(), false);
 }
 
 void ScFormulaCell::SetDirtyVar()
 {
     bDirty = true;
     mbPostponedDirty = false;
-    if (mxGroup && mxGroup->meCalcState == sc::GroupCalcRunning)
+    if (spreadsheetengine::core::formulacell::shouldResetGroupCalcState(
+            bool(mxGroup), mxGroup && mxGroup->meCalcState == sc::GroupCalcRunning))
     {
         mxGroup->meCalcState = sc::GroupCalcEnabled;
         mxGroup->mbPartOfCycle = false;
@@ -2590,23 +2595,26 @@ void ScFormulaCell::ResetTableOpDirtyVar()
 
 void ScFormulaCell::SetTableOpDirty()
 {
-    if ( IsInChangeTrack() )
+    const auto aPlan = spreadsheetengine::core::formulacell::makeSetTableOpDirtyPlan(
+        IsInChangeTrack(),
+        rDocument.GetHardRecalcState() != ScDocument::HardRecalcState::OFF,
+        bTableOpDirty, rDocument.IsInFormulaTree(this));
+
+    if (aPlan.mbSkip)
         return;
 
-    if ( rDocument.GetHardRecalcState() != ScDocument::HardRecalcState::OFF )
+    if (!aPlan.mbAppendToTrack && aPlan.mbSetTableOpDirty)
         bTableOpDirty = true;
-    else
+
+    if (aPlan.mbAppendToTrack)
     {
-        if ( !bTableOpDirty || !rDocument.IsInFormulaTree( this ) )
-        {
-            if ( !bTableOpDirty )
-            {
-                rDocument.AddTableOpFormulaCell( this );
-                bTableOpDirty = true;
-            }
-            rDocument.AppendToFormulaTrack( this );
+        if (aPlan.mbAddTableOpCell)
+            rDocument.AddTableOpFormulaCell( this );
+        if (aPlan.mbSetTableOpDirty)
+            bTableOpDirty = true;
+        rDocument.AppendToFormulaTrack( this );
+        if (aPlan.mbTrackFormulas)
             rDocument.TrackFormulas( SfxHintId::ScTableOpDirty );
-        }
     }
 }
 
@@ -2654,7 +2662,8 @@ void ScFormulaCell::SetResultError( FormulaError n )
 
 void ScFormulaCell::AddRecalcMode( ScRecalcMode nBits )
 {
-    if ( (nBits & ScRecalcMode::EMask) != ScRecalcMode::NORMAL )
+    if (spreadsheetengine::core::formulacell::shouldMarkDirtyForRecalcMode(
+            (nBits & ScRecalcMode::EMask) == ScRecalcMode::NORMAL))
         SetDirtyVar();
     pCode->AddRecalcMode( nBits );
 }

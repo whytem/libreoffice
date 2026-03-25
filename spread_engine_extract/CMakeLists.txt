@@ -106,6 +106,14 @@ add_spreadsheetengine_test(spreadsheetengine_query_tests
     ${SPREADSHEETENGINE_STANDALONE_QUERY_TEST_SOURCES}
 )
 
+add_spreadsheetengine_test(spreadsheetengine_sharedformula_tests
+    ${SPREADSHEETENGINE_STANDALONE_SHAREDFORMULA_TEST_SOURCES}
+)
+
+add_spreadsheetengine_test(spreadsheetengine_formulacell_tests
+    ${SPREADSHEETENGINE_STANDALONE_FORMULACELL_TEST_SOURCES}
+)
+
 if(BUILD_TESTING)
     add_test(NAME spreadsheetengine_smoke COMMAND spreadsheetengine_smoke)
 endif()

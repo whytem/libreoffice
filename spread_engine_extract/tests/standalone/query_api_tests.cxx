@@ -114,6 +114,17 @@ int main()
         return fail("spreadsheetengine_query_tests", "comparison route classification mismatch");
     }
 
+    if (!spreadsheetengine::api::query::isSingleEmptyQueryItem(1, OperandKind::Empty)
+        || spreadsheetengine::api::query::isSingleEmptyQueryItem(2, OperandKind::Empty)
+        || spreadsheetengine::api::query::isSingleEmptyQueryItem(1, OperandKind::Value)
+        || !spreadsheetengine::api::query::evaluateEmptyQueryMatch(true, true)
+        || spreadsheetengine::api::query::evaluateEmptyQueryMatch(true, false)
+        || !spreadsheetengine::api::query::evaluateEmptyQueryMatch(false, false)
+        || spreadsheetengine::api::query::evaluateEmptyQueryMatch(false, true))
+    {
+        return fail("spreadsheetengine_query_tests", "empty query special-case mismatch");
+    }
+
     if (!spreadsheetengine::api::query::shouldStopAfterItemResult(
             { true, true }, true)
         || spreadsheetengine::api::query::shouldStopAfterItemResult(
@@ -139,6 +150,25 @@ int main()
     if (!spreadsheetengine::api::query::shouldTryMultiEqualityFastPath(Operator::Equal, 10)
         || spreadsheetengine::api::query::shouldTryMultiEqualityFastPath(Operator::Greater, 10)
         || spreadsheetengine::api::query::shouldTryMultiEqualityFastPath(Operator::Equal, 9)
+        || spreadsheetengine::api::query::makeNumericMultiEqualityFastPathPlan(
+               Operator::Equal, 10)
+               != spreadsheetengine::api::query::MultiEqualityFastPathPlan { true, false }
+        || spreadsheetengine::api::query::makeNumericMultiEqualityFastPathPlan(
+               Operator::Equal, 100)
+               != spreadsheetengine::api::query::MultiEqualityFastPathPlan { true, true }
+        || spreadsheetengine::api::query::makeNumericMultiEqualityFastPathPlan(
+               Operator::Greater, 100)
+               != spreadsheetengine::api::query::MultiEqualityFastPathPlan { false, false }
+        || spreadsheetengine::api::query::classifyNumericFastPathCell(true, false, false)
+               != spreadsheetengine::api::query::NumericFastPathCell { true, false }
+        || spreadsheetengine::api::query::classifyNumericFastPathCell(false, true, false)
+               != spreadsheetengine::api::query::NumericFastPathCell { true, true }
+        || spreadsheetengine::api::query::classifyNumericFastPathCell(false, true, true)
+               != spreadsheetengine::api::query::NumericFastPathCell { false, false }
+        || !spreadsheetengine::api::query::shouldIncludeOperandInNumericFastPathCache(
+               OperandKind::Value)
+        || spreadsheetengine::api::query::shouldIncludeOperandInNumericFastPathCache(
+               OperandKind::Text)
         || !spreadsheetengine::api::query::shouldUseFastStringEqualityPath(
                Operator::Equal, false, false, true)
         || spreadsheetengine::api::query::shouldUseFastStringEqualityPath(
@@ -176,6 +206,15 @@ int main()
             false, Operator::Equal, 10)
         || spreadsheetengine::api::query::shouldUseStringIdentityMultiEqualityFastPath(
             true, Operator::Equal, 9)
+        || spreadsheetengine::api::query::makeStringIdentityMultiEqualityFastPathPlan(
+               true, Operator::Equal, 10)
+               != spreadsheetengine::api::query::MultiEqualityFastPathPlan { true, false }
+        || spreadsheetengine::api::query::makeStringIdentityMultiEqualityFastPathPlan(
+               true, Operator::Equal, 100)
+               != spreadsheetengine::api::query::MultiEqualityFastPathPlan { true, true }
+        || spreadsheetengine::api::query::makeStringIdentityMultiEqualityFastPathPlan(
+               false, Operator::Equal, 100)
+               != spreadsheetengine::api::query::MultiEqualityFastPathPlan { false, false }
         || !spreadsheetengine::api::query::shouldCompareValueOperandAsString(aStringCell)
         || spreadsheetengine::api::query::shouldCompareValueOperandAsString(aNumericCell)
         || !spreadsheetengine::api::query::shouldCompareValueOperandAsString(aFormulaErrorCell)

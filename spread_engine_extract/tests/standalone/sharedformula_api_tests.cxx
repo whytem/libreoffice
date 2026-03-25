@@ -1,0 +1,124 @@
+/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+
+#include <iostream>
+
+#include <spreadsheetengine/api/SharedFormula.hxx>
+
+#include "TestSupport.hxx"
+
+int main()
+{
+    using spreadsheetengine::api::sharedformula::GroupRunAction;
+    using spreadsheetengine::api::sharedformula::GroupRunPlan;
+    using spreadsheetengine::api::sharedformula::JoinAction;
+    using spreadsheetengine::api::sharedformula::JoinPlan;
+    using spreadsheetengine::api::sharedformula::TokenCompareState;
+    using spreadsheetengine::standalone::test::fail;
+
+    if (!spreadsheetengine::api::sharedformula::shouldJoinFormulaCells(
+            TokenCompareState::EqualInvariant)
+        || !spreadsheetengine::api::sharedformula::shouldJoinFormulaCells(
+            TokenCompareState::EqualRelativeRef)
+        || !spreadsheetengine::api::sharedformula::shouldReturnSharedTopFormulaCell(true, true)
+        || spreadsheetengine::api::sharedformula::shouldReturnSharedTopFormulaCell(false, true)
+        || spreadsheetengine::api::sharedformula::shouldReturnSharedTopFormulaCell(true, false)
+        || !spreadsheetengine::api::sharedformula::canJoinFormulaCellAbove(true, 1)
+        || spreadsheetengine::api::sharedformula::canJoinFormulaCellAbove(true, 0)
+        || spreadsheetengine::api::sharedformula::canJoinFormulaCellAbove(false, 1)
+        || spreadsheetengine::api::sharedformula::shouldJoinFormulaCells(
+            TokenCompareState::NotEqual))
+    {
+        return fail("spreadsheetengine_sharedformula_tests", "join candidate policy mismatch");
+    }
+
+    if (spreadsheetengine::api::sharedformula::makeGroupRunPlan(
+            TokenCompareState::NotEqual, false)
+            != GroupRunPlan { GroupRunAction::None, false }
+        || spreadsheetengine::api::sharedformula::makeGroupRunPlan(
+               TokenCompareState::EqualRelativeRef, true)
+               != GroupRunPlan { GroupRunAction::ExtendExistingGroup, false }
+        || spreadsheetengine::api::sharedformula::makeGroupRunPlan(
+               TokenCompareState::EqualInvariant, false)
+               != GroupRunPlan { GroupRunAction::CreateGroup, true })
+    {
+        return fail("spreadsheetengine_sharedformula_tests", "group run plan mismatch");
+    }
+
+    if (spreadsheetengine::api::sharedformula::makeJoinPlan(
+            TokenCompareState::NotEqual, false, false, false)
+            != JoinPlan { JoinAction::None, false }
+        || spreadsheetengine::api::sharedformula::makeJoinPlan(
+               TokenCompareState::EqualRelativeRef, true, true, true)
+               != JoinPlan { JoinAction::None, false }
+        || spreadsheetengine::api::sharedformula::makeJoinPlan(
+               TokenCompareState::EqualRelativeRef, true, true, false)
+               != JoinPlan { JoinAction::MergeGroups, false }
+        || spreadsheetengine::api::sharedformula::makeJoinPlan(
+               TokenCompareState::EqualRelativeRef, true, false, false)
+               != JoinPlan { JoinAction::ExtendUpperGroup, false }
+        || spreadsheetengine::api::sharedformula::makeJoinPlan(
+               TokenCompareState::EqualRelativeRef, false, true, false)
+               != JoinPlan { JoinAction::AdoptLowerGroup, false }
+        || spreadsheetengine::api::sharedformula::makeJoinPlan(
+               TokenCompareState::EqualInvariant, false, false, false)
+               != JoinPlan { JoinAction::CreateGroup, true }
+        || spreadsheetengine::api::sharedformula::makeJoinPlan(
+               TokenCompareState::EqualRelativeRef, false, false, false)
+               != JoinPlan { JoinAction::CreateGroup, false })
+    {
+        return fail("spreadsheetengine_sharedformula_tests", "join plan mismatch");
+    }
+
+    if (!spreadsheetengine::api::sharedformula::canSplitSharedFormulaGroup(
+            true, 1, true, 12, 10)
+        || spreadsheetengine::api::sharedformula::canSplitSharedFormulaGroup(
+            false, 1, true, 12, 10)
+        || spreadsheetengine::api::sharedformula::canSplitSharedFormulaGroup(
+            true, 0, true, 12, 10)
+        || spreadsheetengine::api::sharedformula::canSplitSharedFormulaGroup(
+            true, 1, false, 12, 10)
+        || spreadsheetengine::api::sharedformula::canSplitSharedFormulaGroup(
+            true, 1, true, 10, 10)
+        || spreadsheetengine::api::sharedformula::makeSplitPlan(10, 5, 12)
+               != spreadsheetengine::api::sharedformula::SplitPlan { true, true, false, 2, 3 }
+        || spreadsheetengine::api::sharedformula::makeSplitPlan(10, 3, 11)
+               != spreadsheetengine::api::sharedformula::SplitPlan { true, true, true, 1, 2 }
+        || spreadsheetengine::api::sharedformula::makeSplitPlan(10, 2, 11)
+               != spreadsheetengine::api::sharedformula::SplitPlan { true, false, true, 1, 1 })
+    {
+        return fail("spreadsheetengine_sharedformula_tests", "split plan mismatch");
+    }
+
+    if (spreadsheetengine::api::sharedformula::classifyUnsharePosition(0, 0, 0)
+            != spreadsheetengine::api::sharedformula::UnsharePosition::None
+        || spreadsheetengine::api::sharedformula::classifyUnsharePosition(10, 10, 3)
+               != spreadsheetengine::api::sharedformula::UnsharePosition::Top
+        || spreadsheetengine::api::sharedformula::classifyUnsharePosition(12, 10, 3)
+               != spreadsheetengine::api::sharedformula::UnsharePosition::Bottom
+        || spreadsheetengine::api::sharedformula::classifyUnsharePosition(11, 10, 3)
+               != spreadsheetengine::api::sharedformula::UnsharePosition::Middle
+        || spreadsheetengine::api::sharedformula::makeUnsharePlan(10, 10, 2)
+               != spreadsheetengine::api::sharedformula::UnsharePlan {
+                   spreadsheetengine::api::sharedformula::UnsharePosition::Top,
+                   false, true, false, 1, 0 }
+        || spreadsheetengine::api::sharedformula::makeUnsharePlan(12, 10, 3)
+               != spreadsheetengine::api::sharedformula::UnsharePlan {
+                   spreadsheetengine::api::sharedformula::UnsharePosition::Bottom,
+                   false, false, false, 2, 0 }
+        || spreadsheetengine::api::sharedformula::makeUnsharePlan(11, 10, 4)
+               != spreadsheetengine::api::sharedformula::UnsharePlan {
+                   spreadsheetengine::api::sharedformula::UnsharePosition::Middle,
+                   true, false, true, 1, 2 }
+        || spreadsheetengine::api::sharedformula::makeUnsharePlan(11, 10, 3)
+               != spreadsheetengine::api::sharedformula::UnsharePlan {
+                   spreadsheetengine::api::sharedformula::UnsharePosition::Middle,
+                   true, true, false, 1, 1 })
+    {
+        return fail("spreadsheetengine_sharedformula_tests", "unshare plan mismatch");
+    }
+
+    std::cout << "spreadsheetengine sharedformula api tests passed\n";
+    return EXIT_SUCCESS;
+}
+
+/* vim:set shiftwidth=4 softtabstop=4 expandtab: */

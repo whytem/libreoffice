@@ -15,20 +15,44 @@
 #include <grouparealistener.hxx>
 #include <refdata.hxx>
 #include <table.hxx>
+#include <spreadsheetengine/api/SharedFormula.hxx>
 
 namespace sc {
 
+namespace seshared = spreadsheetengine::api::sharedformula;
+
+namespace {
+
+seshared::TokenCompareState toApiTokenCompareState(ScFormulaCell::CompareState eState)
+{
+    switch (eState)
+    {
+        case ScFormulaCell::NotEqual:
+            return seshared::TokenCompareState::NotEqual;
+        case ScFormulaCell::EqualInvariant:
+            return seshared::TokenCompareState::EqualInvariant;
+        case ScFormulaCell::EqualRelativeRef:
+            return seshared::TokenCompareState::EqualRelativeRef;
+    }
+
+    return seshared::TokenCompareState::NotEqual;
+}
+
+} // end anonymous namespace
+
 const ScFormulaCell* SharedFormulaUtil::getSharedTopFormulaCell(const CellStoreType::position_type& aPos)
 {
-    if (aPos.first->type != sc::element_type_formula)
-        // Not a formula cell block.
-        return nullptr;
+    const bool bFormulaBlock = aPos.first->type == sc::element_type_formula;
+    const ScFormulaCell* pCell = nullptr;
+    if (bFormulaBlock)
+    {
+        sc::formula_block::iterator it = sc::formula_block::begin(*aPos.first->data);
+        std::advance(it, aPos.second);
+        pCell = *it;
+    }
 
-    sc::formula_block::iterator it = sc::formula_block::begin(*aPos.first->data);
-    std::advance(it, aPos.second);
-    const ScFormulaCell* pCell = *it;
-    if (!pCell->IsShared())
-        // Not a shared formula.
+    if (!pCell
+        || !seshared::shouldReturnSharedTopFormulaCell(bFormulaBlock, pCell->IsShared()))
         return nullptr;
 
     return pCell->GetCellGroup()->mpTopCell;
@@ -38,46 +62,43 @@ bool SharedFormulaUtil::splitFormulaCellGroup(const CellStoreType::position_type
 {
     SCROW nRow = aPos.first->position + aPos.second;
 
-    if (aPos.first->type != sc::element_type_formula)
-        // Not a formula cell block.
+    const bool bFormulaBlock = aPos.first->type == sc::element_type_formula;
+    sc::formula_block::iterator it;
+    ScFormulaCell* pTop = nullptr;
+    if (bFormulaBlock)
+    {
+        it = sc::formula_block::begin(*aPos.first->data);
+        std::advance(it, aPos.second);
+        pTop = *it;
+    }
+
+    if (!pTop
+        || !seshared::canSplitSharedFormulaGroup(
+            bFormulaBlock, aPos.second, pTop->IsShared(), nRow, pTop->GetSharedTopRow()))
         return false;
 
-    if (aPos.second == 0)
-        // Split position coincides with the block border. Nothing to do.
-        return false;
-
-    sc::formula_block::iterator it = sc::formula_block::begin(*aPos.first->data);
-    std::advance(it, aPos.second);
-    ScFormulaCell& rTop = **it;
-    if (!rTop.IsShared())
-        // Not a shared formula.
-        return false;
-
-    if (nRow == rTop.GetSharedTopRow())
-        // Already the top cell of a shared group.
-        return false;
-
+    ScFormulaCell& rTop = *pTop;
     ScFormulaCellGroupRef xGroup = rTop.GetCellGroup();
-
-    SCROW nLength2 = xGroup->mpTopCell->aPos.Row() + xGroup->mnLength - nRow;
+    const seshared::SplitPlan aSplitPlan = seshared::makeSplitPlan(
+        xGroup->mpTopCell->aPos.Row(), xGroup->mnLength, nRow);
     ScFormulaCellGroupRef xGroup2;
-    if (nLength2 > 1)
+    if (aSplitPlan.mbCreateLowerGroup)
     {
         xGroup2.reset(new ScFormulaCellGroup);
         xGroup2->mbInvariant = xGroup->mbInvariant;
         xGroup2->mpTopCell = &rTop;
-        xGroup2->mnLength = nLength2;
+        xGroup2->mnLength = aSplitPlan.mnLowerLength;
         xGroup2->mpCode = xGroup->mpCode->CloneValue();
     }
 
-    xGroup->mnLength = nRow - xGroup->mpTopCell->aPos.Row();
+    xGroup->mnLength = aSplitPlan.mnUpperLength;
     ScFormulaCell& rPrevTop = *sc::formula_block::at(*aPos.first->data, aPos.second - xGroup->mnLength);
 
 #if USE_FORMULA_GROUP_LISTENER
     // At least group area listeners will have to be adapted. As long as
     // there's no update mechanism and no separated handling of group area and
     // other listeners, all listeners of this group's top cell are to be reset.
-    if (nLength2)
+    if (aSplitPlan.mnLowerLength)
     {
         // If a context exists it has to be used to not interfere with
         // ScColumn::maBroadcasters iterators, which the EndListeningTo()
@@ -94,7 +115,7 @@ bool SharedFormulaUtil::splitFormulaCellGroup(const CellStoreType::position_type
     }
 #endif
 
-    if (xGroup->mnLength == 1)
+    if (aSplitPlan.mbUnshareUpperGroup)
     {
         // The top group consists of only one cell. Ungroup this.
         ScFormulaCellGroupRef xNone;
@@ -105,7 +126,7 @@ bool SharedFormulaUtil::splitFormulaCellGroup(const CellStoreType::position_type
     assert ((xGroup2 == nullptr || xGroup2->mpTopCell->aPos.Row() + size_t(xGroup2->mnLength) <= aPos.first->position + aPos.first->size)
         && "Shared formula region goes beyond the formula block.");
     sc::formula_block::iterator itEnd = it;
-    std::advance(itEnd, nLength2);
+    std::advance(itEnd, aSplitPlan.mnLowerLength);
     for (; it != itEnd; ++it)
     {
         ScFormulaCell& rCell = **it;
@@ -158,21 +179,18 @@ bool SharedFormulaUtil::joinFormulaCells(
     }
 
     ScFormulaCell::CompareState eState = rCell1.CompareByTokenArray(rCell2);
-    if (eState == ScFormulaCell::NotEqual)
-        return false;
-
-    // Formula tokens equal those of the previous formula cell.
     ScFormulaCellGroupRef xGroup1 = rCell1.GetCellGroup();
     ScFormulaCellGroupRef xGroup2 = rCell2.GetCellGroup();
-    if (xGroup1)
-    {
-        if (xGroup2)
-        {
-            // Both cell 1 and cell 2 are shared. Merge them together.
-            if (xGroup1.get() == xGroup2.get())
-                // They belong to the same group.
-                return false;
+    const seshared::JoinPlan aJoinPlan = seshared::makeJoinPlan(
+        toApiTokenCompareState(eState), bool(xGroup1), bool(xGroup2),
+        xGroup1 && xGroup2 && xGroup1.get() == xGroup2.get());
 
+    switch (aJoinPlan.meAction)
+    {
+        case seshared::JoinAction::None:
+            return false;
+        case seshared::JoinAction::MergeGroups:
+        {
             // Set the group object from cell 1 to all cells in group 2.
             xGroup1->mnLength += xGroup2->mnLength;
             size_t nOffset = rPos.second + 1; // position of cell 2
@@ -181,30 +199,25 @@ bool SharedFormulaUtil::joinFormulaCells(
                 ScFormulaCell& rCell = *sc::formula_block::at(*rPos.first->data, nOffset+i);
                 rCell.SetCellGroup(xGroup1);
             }
+            break;
         }
-        else
-        {
+        case seshared::JoinAction::ExtendUpperGroup:
             // cell 1 is shared but cell 2 is not.
             rCell2.SetCellGroup(xGroup1);
             ++xGroup1->mnLength;
-        }
-    }
-    else
-    {
-        if (xGroup2)
-        {
+            break;
+        case seshared::JoinAction::AdoptLowerGroup:
             // cell 1 is not shared, but cell 2 is already shared.
             rCell1.SetCellGroup(xGroup2);
             xGroup2->mpTopCell = &rCell1;
             ++xGroup2->mnLength;
-        }
-        else
-        {
+            break;
+        case seshared::JoinAction::CreateGroup:
             // neither cells are shared.
             assert(rCell1.aPos.Row() == static_cast<SCROW>(rPos.first->position + rPos.second));
-            xGroup1 = rCell1.CreateCellGroup(2, eState == ScFormulaCell::EqualInvariant);
+            xGroup1 = rCell1.CreateCellGroup(2, aJoinPlan.mbInvariant);
             rCell2.SetCellGroup(xGroup1);
-        }
+            break;
     }
 
     return true;
@@ -212,13 +225,8 @@ bool SharedFormulaUtil::joinFormulaCells(
 
 bool SharedFormulaUtil::joinFormulaCellAbove( const CellStoreType::position_type& aPos )
 {
-    if (aPos.first->type != sc::element_type_formula)
-        // This is not a formula cell.
-        return false;
-
-    if (aPos.second == 0)
-        // This cell is already the top cell in a formula block; the previous
-        // cell is not a formula cell.
+    if (!seshared::canJoinFormulaCellAbove(
+            aPos.first->type == sc::element_type_formula, aPos.second))
         return false;
 
     ScFormulaCell& rPrev = *sc::formula_block::at(*aPos.first->data, aPos.second-1);
@@ -235,13 +243,15 @@ void SharedFormulaUtil::unshareFormulaCell(const CellStoreType::position_type& a
 
     ScFormulaCellGroupRef xNone;
     sc::CellStoreType::iterator it = aPos.first;
+    const seshared::UnsharePlan aUnsharePlan = seshared::makeUnsharePlan(
+        rCell.aPos.Row(), rCell.GetSharedTopRow(), rCell.GetSharedLength());
 
     // This formula cell is shared. Adjust the shared group.
-    if (rCell.aPos.Row() == rCell.GetSharedTopRow())
+    if (aUnsharePlan.mePosition == seshared::UnsharePosition::Top)
     {
         // Top of the shared range.
         const ScFormulaCellGroupRef& xGroup = rCell.GetCellGroup();
-        if (xGroup->mnLength == 2)
+        if (aUnsharePlan.mbUnshareAdjacentLower)
         {
             // Group consists of only two cells. Mark the second one non-shared.
             assert (aPos.second+1 < aPos.first->size
@@ -255,13 +265,13 @@ void SharedFormulaUtil::unshareFormulaCell(const CellStoreType::position_type& a
             ScFormulaCell& rNext = *sc::formula_block::at(*it->data, aPos.second+1);
             xGroup->mpTopCell = &rNext;
         }
-        --xGroup->mnLength;
+        xGroup->mnLength = aUnsharePlan.mnUpperLength;
     }
-    else if (rCell.aPos.Row() == rCell.GetSharedTopRow() + rCell.GetSharedLength() - 1)
+    else if (aUnsharePlan.mePosition == seshared::UnsharePosition::Bottom)
     {
         // Bottom of the shared range.
         const ScFormulaCellGroupRef& xGroup = rCell.GetCellGroup();
-        if (xGroup->mnLength == 2)
+        if (aUnsharePlan.mbUnshareAdjacentUpper)
         {
             // Mark the top cell non-shared.
             assert(aPos.second != 0 && "There is no previous formula cell but there should be!");
@@ -271,16 +281,15 @@ void SharedFormulaUtil::unshareFormulaCell(const CellStoreType::position_type& a
         else
         {
             // Just shorten the shared range length by one.
-            --xGroup->mnLength;
+            xGroup->mnLength = aUnsharePlan.mnUpperLength;
         }
     }
     else
     {
         // In the middle of the shared range. Split it into two groups.
         const ScFormulaCellGroupRef& xGroup = rCell.GetCellGroup();
-        SCROW nEndRow = xGroup->mpTopCell->aPos.Row() + xGroup->mnLength - 1;
-        xGroup->mnLength = rCell.aPos.Row() - xGroup->mpTopCell->aPos.Row(); // Shorten the top group.
-        if (xGroup->mnLength == 1)
+        xGroup->mnLength = aUnsharePlan.mnUpperLength; // Shorten the top group.
+        if (aUnsharePlan.mbUnshareAdjacentUpper)
         {
             // Make the top cell non-shared.
             assert(aPos.second != 0 && "There is no previous formula cell but there should be!");
@@ -288,14 +297,13 @@ void SharedFormulaUtil::unshareFormulaCell(const CellStoreType::position_type& a
             rPrev.SetCellGroup(xNone);
         }
 
-        SCROW nLength2 = nEndRow - rCell.aPos.Row();
-        if (nLength2 >= 2)
+        if (aUnsharePlan.mbCreateLowerGroup)
         {
             ScFormulaCellGroupRef xGroup2;
             xGroup2.reset(new ScFormulaCellGroup);
             ScFormulaCell& rNext = *sc::formula_block::at(*it->data, aPos.second+1);
             xGroup2->mpTopCell = &rNext;
-            xGroup2->mnLength = nLength2;
+            xGroup2->mnLength = aUnsharePlan.mnLowerLength;
             xGroup2->mbInvariant = xGroup->mbInvariant;
             xGroup2->mpCode = xGroup->mpCode->CloneValue();
             assert(xGroup2->mpTopCell->aPos.Row() + size_t(xGroup2->mnLength) <= it->position + it->size

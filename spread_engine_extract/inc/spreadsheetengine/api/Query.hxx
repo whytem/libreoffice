@@ -80,6 +80,22 @@ struct QueryResult
     [[nodiscard]] constexpr bool operator==(const QueryResult& rOther) const = default;
 };
 
+struct NumericFastPathCell
+{
+    bool mbCanUseFastPath = false;
+    bool mbUseFormulaValue = false;
+
+    [[nodiscard]] constexpr bool operator==(const NumericFastPathCell& rOther) const = default;
+};
+
+struct MultiEqualityFastPathPlan
+{
+    bool mbEnabled = false;
+    bool mbUseSortedCache = false;
+
+    [[nodiscard]] constexpr bool operator==(const MultiEqualityFastPathPlan& rOther) const = default;
+};
+
 [[nodiscard]] constexpr bool isPartialTextMatchOp(Operator eOp)
 {
     switch (eOp)
@@ -173,6 +189,18 @@ struct QueryResult
     return ComparisonRoute::None;
 }
 
+[[nodiscard]] constexpr bool isSingleEmptyQueryItem(
+    std::size_t nItemCount, OperandKind eType)
+{
+    return nItemCount == 1 && eType == OperandKind::Empty;
+}
+
+[[nodiscard]] constexpr bool evaluateEmptyQueryMatch(
+    bool bQueryByEmpty, bool bCellEmpty)
+{
+    return bQueryByEmpty ? bCellEmpty : !bCellEmpty;
+}
+
 [[nodiscard]] constexpr bool shouldStopAfterItemResult(
     const QueryResult& rResult, bool bNeedTestEqualCondition)
 {
@@ -198,6 +226,24 @@ struct QueryResult
     Operator eOp, std::size_t nItemCount)
 {
     return eOp == Operator::Equal && nItemCount >= 10;
+}
+
+[[nodiscard]] constexpr NumericFastPathCell classifyNumericFastPathCell(
+    bool bDirectNumericCell, bool bFormulaValueCell, bool bFormulaError)
+{
+    if (bDirectNumericCell)
+        return { true, false };
+
+    if (bFormulaValueCell && !bFormulaError)
+        return { true, true };
+
+    return {};
+}
+
+[[nodiscard]] constexpr bool shouldIncludeOperandInNumericFastPathCache(
+    OperandKind eType)
+{
+    return eType == OperandKind::Value;
 }
 
 [[nodiscard]] constexpr bool shouldUseFastStringEqualityPath(
@@ -405,10 +451,29 @@ struct PatternSearchOutcome
     return nItemCount >= 100;
 }
 
+[[nodiscard]] constexpr MultiEqualityFastPathPlan makeNumericMultiEqualityFastPathPlan(
+    Operator eOp, std::size_t nItemCount)
+{
+    if (!shouldTryMultiEqualityFastPath(eOp, nItemCount))
+        return {};
+
+    return { true, shouldUseSortedItemCache(nItemCount) };
+}
+
 [[nodiscard]] constexpr bool shouldUseStringIdentityMultiEqualityFastPath(
     bool bFastCompareByString, Operator eOp, std::size_t nItemCount)
 {
     return bFastCompareByString && shouldTryMultiEqualityFastPath(eOp, nItemCount);
+}
+
+[[nodiscard]] constexpr MultiEqualityFastPathPlan makeStringIdentityMultiEqualityFastPathPlan(
+    bool bFastCompareByString, Operator eOp, std::size_t nItemCount)
+{
+    if (!shouldUseStringIdentityMultiEqualityFastPath(
+            bFastCompareByString, eOp, nItemCount))
+        return {};
+
+    return { true, shouldUseSortedItemCache(nItemCount) };
 }
 
 [[nodiscard]] constexpr bool shouldCompareValueOperandAsString(const CellClass& rCell)

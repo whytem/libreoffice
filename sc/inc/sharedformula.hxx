@@ -11,6 +11,7 @@
 
 #include "formulacell.hxx"
 #include "mtvelements.hxx"
+#include <spreadsheetengine/api/SharedFormula.hxx>
 
 #include <vector>
 
@@ -38,11 +39,29 @@ public:
         {
             pCur = *it;
             ScFormulaCell::CompareState eState = pCur->CompareByTokenArray(*pPrev);
-            if (eState == ScFormulaCell::NotEqual)
+            spreadsheetengine::api::sharedformula::TokenCompareState eApiState
+                = spreadsheetengine::api::sharedformula::TokenCompareState::NotEqual;
+            switch (eState)
+            {
+                case ScFormulaCell::NotEqual:
+                    eApiState = spreadsheetengine::api::sharedformula::TokenCompareState::NotEqual;
+                    break;
+                case ScFormulaCell::EqualInvariant:
+                    eApiState = spreadsheetengine::api::sharedformula::TokenCompareState::EqualInvariant;
+                    break;
+                case ScFormulaCell::EqualRelativeRef:
+                    eApiState = spreadsheetengine::api::sharedformula::TokenCompareState::EqualRelativeRef;
+                    break;
+            }
+            auto aPlan = spreadsheetengine::api::sharedformula::makeGroupRunPlan(
+                eApiState, bool(pPrev->GetCellGroup()));
+            if (aPlan.meAction
+                == spreadsheetengine::api::sharedformula::GroupRunAction::None)
                 continue;
 
             ScFormulaCellGroupRef xGroup = pPrev->GetCellGroup();
-            if (xGroup)
+            if (aPlan.meAction
+                == spreadsheetengine::api::sharedformula::GroupRunAction::ExtendExistingGroup)
             {
                 // Extend the group.
                 ++xGroup->mnLength;
@@ -51,7 +70,7 @@ public:
             }
 
             // Create a new group.
-            xGroup = pPrev->CreateCellGroup(2, eState == ScFormulaCell::EqualInvariant);
+            xGroup = pPrev->CreateCellGroup(2, aPlan.mbInvariant);
             pCur->SetCellGroup(xGroup);
         }
     }
