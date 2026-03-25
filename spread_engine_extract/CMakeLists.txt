@@ -94,6 +94,10 @@ add_spreadsheetengine_test(spreadsheetengine_array_tests
     ${SPREADSHEETENGINE_STANDALONE_ARRAY_TEST_SOURCES}
 )
 
+add_spreadsheetengine_test(spreadsheetengine_reference_tests
+    ${SPREADSHEETENGINE_STANDALONE_REFERENCE_TEST_SOURCES}
+)
+
 if(BUILD_TESTING)
     add_test(NAME spreadsheetengine_smoke COMMAND spreadsheetengine_smoke)
 endif()

@@ -907,19 +907,27 @@ Current status:
   - Calc-side coverage now includes direct dynamic-array formula cases in
     `CppunitTest_sc_ucalc_shared_cases`, in addition to the broader `ucalc`
     and smoke gates
-- the main remaining pass 6 leftovers are the more document-coupled evaluator
-  pieces:
-  - `INDEX` / `OFFSET` / `INDIRECT` reference semantics
-  - ref-list and reference-generator behaviors that still depend on Calc
-    document ownership
-  - matrix/reference-producing evaluator paths that are closer to Phase 10's
-    dependency/reference work than to the already-extracted array planner layer
-- the next meaningful work should move beyond the low-coupling pass-6 array
-  layer:
-  - either finish the remaining document-coupled reference helpers in a narrow
-    follow-up slice
-  - or begin the Phase 10 dependency/reference extraction if we want to tackle
-    those heavier seams in their more natural home
+- a narrow document-coupled follow-up slice is now also in place:
+  - engine-owned reference helpers in `Reference.hxx` now cover reusable
+    planning for:
+    - `OFFSET` reference-window relocation and resize behavior
+    - `INDEX` area normalization for ref-list inputs
+    - `INDEX` matrix-shape selection planning
+    - `INDEX` reference-shape selection planning
+  - Calc now consumes that reference planner layer in `ScOffset()` and
+    `ScIndex()` while still owning stack movement, token/reference materialization,
+    and external/name-based orchestration
+  - standalone coverage now includes `spreadsheetengine_reference_tests`
+  - Calc validation for the reference-producing slice now includes
+    `CppunitTest_sc_ucalc_formula2` in addition to shared-case and smoke gates
+- Phase 9 is now substantially complete:
+  - the remaining document-coupled evaluator work is no longer mainly about
+    introducing a host/runtime model or extracting reusable evaluator policy
+  - the main leftovers are the compiler/name-resolution-heavy parts of
+    `INDIRECT`, ref-list/reference-generator ownership details, and the broader
+    reference/dependency behavior that fits more naturally with Phase 10
+  - any additional Phase 9 work should be opportunistic cleanup, not a new
+    major extraction lane
 
 Validation:
 
@@ -929,6 +937,7 @@ Validation:
   - shared-case TSV runner where the rows are spreadsheet-facing
   - `spreadsheetengine_lookup_tests`
   - `spreadsheetengine_array_tests`
+  - `spreadsheetengine_reference_tests`
 - LibreOffice:
   - `CppunitTest_sc_ucalc_shared_cases`
   - `CppunitTest_sc_logical_functions_test`

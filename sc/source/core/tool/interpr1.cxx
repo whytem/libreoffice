@@ -62,6 +62,7 @@
 #include <spreadsheetengine/api/Logic.hxx>
 #include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Parsing.hxx>
+#include <spreadsheetengine/api/Reference.hxx>
 #include <spreadsheetengine/core/MathBitwise.hxx>
 #include <spreadsheetengine/core/MathTranscendental.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
@@ -98,6 +99,7 @@ namespace semath = spreadsheetengine::core::math;
 namespace searray = spreadsheetengine::api::array;
 namespace selogic = spreadsheetengine::api::logic;
 namespace selookup = spreadsheetengine::api::lookup;
+namespace seref = spreadsheetengine::api::reference;
 namespace setext = spreadsheetengine::core::text;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 
@@ -11038,31 +11040,28 @@ void ScInterpreter::ScOffset()
     SCCOL nCol2(0);
     SCROW nRow2(0);
     SCTAB nTab2(0);
+    const auto oNewHeight
+        = bNewHeight ? std::optional<spreadsheetengine::api::RowIndex>(nRowNew) : std::nullopt;
+    const auto oNewWidth
+        = bNewWidth ? std::optional<spreadsheetengine::api::ColumnIndex>(nColNew) : std::nullopt;
     switch (GetStackType())
     {
     case svSingleRef:
     {
         PopSingleRef(nCol1, nRow1, nTab1);
-        if (!bNewWidth && !bNewHeight)
-        {
-            nCol1 = static_cast<SCCOL>(static_cast<tools::Long>(nCol1) + nColPlus);
-            nRow1 = static_cast<SCROW>(static_cast<tools::Long>(nRow1) + nRowPlus);
-            if (!mrDoc.ValidCol(nCol1) || !mrDoc.ValidRow(nRow1))
-                PushIllegalArgument();
-            else
-                PushSingleRef(nCol1, nRow1, nTab1);
-        }
+        const auto aOffset = seref::planOffsetRange(
+            selibreoffice::toApiCellRange(ScRange(nCol1, nRow1, nTab1, nCol1, nRow1, nTab1)),
+            nRowPlus, nColPlus, oNewHeight, oNewWidth, mrDoc.MaxCol(), mrDoc.MaxRow());
+        if (!aOffset)
+            PushIllegalArgument();
         else
         {
-            nCol1 = static_cast<SCCOL>(static_cast<tools::Long>(nCol1)+nColPlus);
-            nRow1 = static_cast<SCROW>(static_cast<tools::Long>(nRow1)+nRowPlus);
-            nCol2 = static_cast<SCCOL>(static_cast<tools::Long>(nCol1)+nColNew-1);
-            nRow2 = static_cast<SCROW>(static_cast<tools::Long>(nRow1)+nRowNew-1);
-            if (!mrDoc.ValidCol(nCol1) || !mrDoc.ValidRow(nRow1) ||
-                !mrDoc.ValidCol(nCol2) || !mrDoc.ValidRow(nRow2))
-                PushIllegalArgument();
+            const ScRange aResult = selibreoffice::toLibreOfficeRange(aOffset.maValue);
+            if (aOffset.maValue.isSingleCell())
+                PushSingleRef(aResult.aStart.Col(), aResult.aStart.Row(), aResult.aStart.Tab());
             else
-                PushDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab1);
+                PushDoubleRef(aResult.aStart.Col(), aResult.aStart.Row(), aResult.aStart.Tab(),
+                              aResult.aEnd.Col(), aResult.aEnd.Row(), aResult.aEnd.Tab());
         }
         break;
     }
@@ -11076,47 +11075,45 @@ void ScInterpreter::ScOffset()
         nCol1 = aAbsRef.Col();
         nRow1 = aAbsRef.Row();
         nTab1 = aAbsRef.Tab();
-
-        if (!bNewWidth && !bNewHeight)
-        {
-            nCol1 = static_cast<SCCOL>(static_cast<tools::Long>(nCol1) + nColPlus);
-            nRow1 = static_cast<SCROW>(static_cast<tools::Long>(nRow1) + nRowPlus);
-            if (!mrDoc.ValidCol(nCol1) || !mrDoc.ValidRow(nRow1))
-                PushIllegalArgument();
-            else
-                PushExternalSingleRef(nFileId, aTabName, nCol1, nRow1, nTab1);
-        }
+        const auto aOffset = seref::planOffsetRange(
+            selibreoffice::toApiCellRange(ScRange(nCol1, nRow1, nTab1, nCol1, nRow1, nTab1)),
+            nRowPlus, nColPlus, oNewHeight, oNewWidth, mrDoc.MaxCol(), mrDoc.MaxRow());
+        if (!aOffset)
+            PushIllegalArgument();
         else
         {
-            nCol1 = static_cast<SCCOL>(static_cast<tools::Long>(nCol1)+nColPlus);
-            nRow1 = static_cast<SCROW>(static_cast<tools::Long>(nRow1)+nRowPlus);
-            nCol2 = static_cast<SCCOL>(static_cast<tools::Long>(nCol1)+nColNew-1);
-            nRow2 = static_cast<SCROW>(static_cast<tools::Long>(nRow1)+nRowNew-1);
-            nTab2 = nTab1;
-            if (!mrDoc.ValidCol(nCol1) || !mrDoc.ValidRow(nRow1) ||
-                !mrDoc.ValidCol(nCol2) || !mrDoc.ValidRow(nRow2))
-                PushIllegalArgument();
+            const ScRange aResult = selibreoffice::toLibreOfficeRange(aOffset.maValue);
+            if (aOffset.maValue.isSingleCell())
+            {
+                PushExternalSingleRef(nFileId, aTabName, aResult.aStart.Col(), aResult.aStart.Row(),
+                                      aResult.aStart.Tab());
+            }
             else
-                PushExternalDoubleRef(nFileId, aTabName, nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+            {
+                PushExternalDoubleRef(nFileId, aTabName, aResult.aStart.Col(), aResult.aStart.Row(),
+                                      aResult.aStart.Tab(), aResult.aEnd.Col(), aResult.aEnd.Row(),
+                                      aResult.aEnd.Tab());
+            }
         }
         break;
     }
     case svDoubleRef:
     {
         PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
-        if (!bNewWidth)
-            nColNew = nCol2 - nCol1 + 1;
-        if (!bNewHeight)
-            nRowNew = nRow2 - nRow1 + 1;
-        nCol1 = static_cast<SCCOL>(static_cast<tools::Long>(nCol1)+nColPlus);
-        nRow1 = static_cast<SCROW>(static_cast<tools::Long>(nRow1)+nRowPlus);
-        nCol2 = static_cast<SCCOL>(static_cast<tools::Long>(nCol1)+nColNew-1);
-        nRow2 = static_cast<SCROW>(static_cast<tools::Long>(nRow1)+nRowNew-1);
-        if (!mrDoc.ValidCol(nCol1) || !mrDoc.ValidRow(nRow1) ||
-            !mrDoc.ValidCol(nCol2) || !mrDoc.ValidRow(nRow2) || nTab1 != nTab2)
+        const auto aOffset = seref::planOffsetRange(
+            selibreoffice::toApiCellRange(ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2)),
+            nRowPlus, nColPlus, oNewHeight, oNewWidth, mrDoc.MaxCol(), mrDoc.MaxRow());
+        if (!aOffset)
             PushIllegalArgument();
         else
-            PushDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab1);
+        {
+            const ScRange aResult = selibreoffice::toLibreOfficeRange(aOffset.maValue);
+            if (aOffset.maValue.isSingleCell())
+                PushSingleRef(aResult.aStart.Col(), aResult.aStart.Row(), aResult.aStart.Tab());
+            else
+                PushDoubleRef(aResult.aStart.Col(), aResult.aStart.Row(), aResult.aStart.Tab(),
+                              aResult.aEnd.Col(), aResult.aEnd.Row(), aResult.aEnd.Tab());
+        }
         break;
     }
     case svExternalDoubleRef:
@@ -11132,19 +11129,26 @@ void ScInterpreter::ScOffset()
         nCol2 = aAbs.aEnd.Col();
         nRow2 = aAbs.aEnd.Row();
         nTab2 = aAbs.aEnd.Tab();
-        if (!bNewWidth)
-            nColNew = nCol2 - nCol1 + 1;
-        if (!bNewHeight)
-            nRowNew = nRow2 - nRow1 + 1;
-        nCol1 = static_cast<SCCOL>(static_cast<tools::Long>(nCol1)+nColPlus);
-        nRow1 = static_cast<SCROW>(static_cast<tools::Long>(nRow1)+nRowPlus);
-        nCol2 = static_cast<SCCOL>(static_cast<tools::Long>(nCol1)+nColNew-1);
-        nRow2 = static_cast<SCROW>(static_cast<tools::Long>(nRow1)+nRowNew-1);
-        if (!mrDoc.ValidCol(nCol1) || !mrDoc.ValidRow(nRow1) ||
-            !mrDoc.ValidCol(nCol2) || !mrDoc.ValidRow(nRow2) || nTab1 != nTab2)
+        const auto aOffset = seref::planOffsetRange(
+            selibreoffice::toApiCellRange(ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2)),
+            nRowPlus, nColPlus, oNewHeight, oNewWidth, mrDoc.MaxCol(), mrDoc.MaxRow());
+        if (!aOffset)
             PushIllegalArgument();
         else
-            PushExternalDoubleRef(nFileId, aTabName, nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+        {
+            const ScRange aResult = selibreoffice::toLibreOfficeRange(aOffset.maValue);
+            if (aOffset.maValue.isSingleCell())
+            {
+                PushExternalSingleRef(nFileId, aTabName, aResult.aStart.Col(), aResult.aStart.Row(),
+                                      aResult.aStart.Tab());
+            }
+            else
+            {
+                PushExternalDoubleRef(nFileId, aTabName, aResult.aStart.Col(), aResult.aStart.Row(),
+                                      aResult.aStart.Tab(), aResult.aEnd.Col(), aResult.aEnd.Row(),
+                                      aResult.aEnd.Tab());
+            }
+        }
         break;
     }
     default:
@@ -11191,7 +11195,8 @@ void ScInterpreter::ScIndex()
         nAreaCount = (sp ? pStack[sp-1]->GetRefList()->size() : 0);
     else
         nAreaCount = 1;     // one reference or array or whatever
-    if (nGlobalError != FormulaError::NONE || nAreaCount == 0 || o3tl::make_unsigned(nArea) > nAreaCount)
+    const auto aAreaSelection = seref::normalizeAreaSelection(nArea, nAreaCount);
+    if (nGlobalError != FormulaError::NONE || !aAreaSelection)
     {
         PushError( FormulaError::NoRef);
         return;
@@ -11211,104 +11216,63 @@ void ScInterpreter::ScIndex()
                 {
                     SCSIZE nC, nR;
                     pMat->GetDimensions(nC, nR);
-
-                    // Access one element of a vector independent of col/row
-                    // orientation. Excel documentation does not mention, but
-                    // i62850 had a .xls example of a row vector accessed by
-                    // row number returning one element. This
-                    // INDEX(row_vector;element) behaves the same as
-                    // INDEX(row_vector;0;element) and thus contradicts Excel
-                    // documentation where the second parameter is always
-                    // row_num.
-                    //
-                    // ODFF v1.3 in 6.14.6 INDEX states "If DataSource is a
-                    // one-dimensional row vector, Row is optional, which
-                    // effectively makes Row act as the column offset into the
-                    // vector". Guess the first Row is a typo and should read
-                    // Column instead.
-
-                    const bool bRowVectorSpecial = (nParamCount == 2 || bColMissing);
-                    const bool bRowVectorElement = (nR == 1 && (nCol != 0 || (bRowVectorSpecial && nRow != 0)));
-                    const bool bVectorElement = (bRowVectorElement || (nC == 1 && nRow != 0));
-
-                    if (nC == 0 || nR == 0 ||
-                            (!bVectorElement && (o3tl::make_unsigned(nCol) > nC ||
-                                                 o3tl::make_unsigned(nRow) > nR)))
-                        PushError( FormulaError::NoRef);
-                    else if (nCol == 0 && nRow == 0)
+                    const auto aSelection = seref::planIndexMatrixSelection(
+                        { static_cast<sal_Int32>(nC), static_cast<sal_Int32>(nR) }, nRow, nCol,
+                        bColMissing, nParamCount);
+                    if (!aSelection)
+                        PushError(FormulaError::NoRef);
+                    else if (aSelection.maValue.meKind == seref::IndexSelectionKind::KeepSource)
                         sp = nOldSp;
-                    else if (bVectorElement)
+                    else if (aSelection.maValue.meKind == seref::IndexSelectionKind::Scalar)
                     {
-                        // Vectors here don't replicate to the other dimension.
-                        SCSIZE nElement, nOtherDimension;
-                        if (bRowVectorElement && !bRowVectorSpecial)
-                        {
-                            nElement = o3tl::make_unsigned(nCol);
-                            nOtherDimension = o3tl::make_unsigned(nRow);
-                        }
+                        const SCSIZE nMatrixColumn
+                            = static_cast<SCSIZE>(aSelection.maValue.maStart.mnColumn);
+                        const SCSIZE nMatrixRow
+                            = static_cast<SCSIZE>(aSelection.maValue.maStart.mnRow);
+                        if (pMat->IsStringOrEmpty(nMatrixColumn, nMatrixRow))
+                            PushString(pMat->GetString(nMatrixColumn, nMatrixRow).getString());
                         else
-                        {
-                            nElement = o3tl::make_unsigned(nRow);
-                            nOtherDimension = o3tl::make_unsigned(nCol);
-                        }
-
-                        if (nElement == 0 || nElement > nC * nR || nOtherDimension > 1)
-                            PushError( FormulaError::NoRef);
-                        else
-                        {
-                            --nElement;
-                            if (pMat->IsStringOrEmpty( nElement))
-                                PushString( pMat->GetString(nElement).getString());
-                            else
-                                PushDouble( pMat->GetDouble( nElement));
-                        }
-                    }
-                    else if (nCol == 0)
-                    {
-                        ScMatrixRef pResMat = GetNewMat(nC, 1, /*bEmpty*/true);
-                        if (pResMat)
-                        {
-                            SCSIZE nRowMinus1 = static_cast<SCSIZE>(nRow - 1);
-                            for (SCSIZE i = 0; i < nC; i++)
-                                if (!pMat->IsStringOrEmpty(i, nRowMinus1))
-                                    pResMat->PutDouble(pMat->GetDouble(i,
-                                                nRowMinus1), i, 0);
-                                else
-                                    pResMat->PutString(pMat->GetString(i, nRowMinus1), i, 0);
-
-                            PushMatrix(pResMat);
-                        }
-                        else
-                            PushError( FormulaError::NoRef);
-                    }
-                    else if (nRow == 0)
-                    {
-                        ScMatrixRef pResMat = GetNewMat(1, nR, /*bEmpty*/true);
-                        if (pResMat)
-                        {
-                            SCSIZE nColMinus1 = static_cast<SCSIZE>(nCol - 1);
-                            for (SCSIZE i = 0; i < nR; i++)
-                                if (!pMat->IsStringOrEmpty(nColMinus1, i))
-                                    pResMat->PutDouble(pMat->GetDouble(nColMinus1,
-                                                i), i);
-                                else
-                                    pResMat->PutString(pMat->GetString(nColMinus1, i), i);
-                            PushMatrix(pResMat);
-                        }
-                        else
-                            PushError( FormulaError::NoRef);
+                            PushDouble(pMat->GetDouble(nMatrixColumn, nMatrixRow));
                     }
                     else
                     {
-                        if (!pMat->IsStringOrEmpty( static_cast<SCSIZE>(nCol-1),
-                                    static_cast<SCSIZE>(nRow-1)))
-                            PushDouble( pMat->GetDouble(
-                                        static_cast<SCSIZE>(nCol-1),
-                                        static_cast<SCSIZE>(nRow-1)));
+                        const auto& rSelection = aSelection.maValue;
+                        ScMatrixRef pResMat = GetNewMat(
+                            rSelection.maDimensions.mnColumns, rSelection.maDimensions.mnRows,
+                            /*bEmpty*/true);
+                        if (pResMat)
+                        {
+                            for (SCSIZE nResultRow = 0;
+                                 nResultRow < static_cast<SCSIZE>(rSelection.maDimensions.mnRows);
+                                 ++nResultRow)
+                            {
+                                for (SCSIZE nResultCol = 0;
+                                     nResultCol
+                                     < static_cast<SCSIZE>(rSelection.maDimensions.mnColumns);
+                                     ++nResultCol)
+                                {
+                                    const SCSIZE nMatrixColumn = static_cast<SCSIZE>(
+                                        rSelection.maStart.mnColumn + nResultCol);
+                                    const SCSIZE nMatrixRow = static_cast<SCSIZE>(
+                                        rSelection.maStart.mnRow + nResultRow);
+                                    if (!pMat->IsStringOrEmpty(nMatrixColumn, nMatrixRow))
+                                    {
+                                        pResMat->PutDouble(
+                                            pMat->GetDouble(nMatrixColumn, nMatrixRow), nResultCol,
+                                            nResultRow);
+                                    }
+                                    else
+                                    {
+                                        pResMat->PutString(
+                                            pMat->GetString(nMatrixColumn, nMatrixRow), nResultCol,
+                                            nResultRow);
+                                    }
+                                }
+                            }
+                            PushMatrix(pResMat);
+                        }
                         else
-                            PushString( pMat->GetString(
-                                        static_cast<SCSIZE>(nCol-1),
-                                        static_cast<SCSIZE>(nRow-1)).getString());
+                            PushError( FormulaError::NoRef);
                     }
                 }
             }
@@ -11319,10 +11283,16 @@ void ScInterpreter::ScIndex()
                 SCROW nRow1 = 0;
                 SCTAB nTab1 = 0;
                 PopSingleRef( nCol1, nRow1, nTab1);
-                if (nCol > 1 || nRow > 1)
-                    PushError( FormulaError::NoRef);
+                const auto aSelection = seref::planIndexReferenceSelection(
+                    selibreoffice::toApiCellRange(ScRange(nCol1, nRow1, nTab1, nCol1, nRow1, nTab1)),
+                    nRow, nCol, nParamCount);
+                if (!aSelection)
+                    PushError(FormulaError::NoRef);
                 else
-                    PushSingleRef( nCol1, nRow1, nTab1);
+                {
+                    const ScRange aRange = selibreoffice::toLibreOfficeRange(aSelection.maValue.maRange);
+                    PushSingleRef(aRange.aStart.Col(), aRange.aStart.Row(), aRange.aStart.Tab());
+                }
             }
             break;
         case svDoubleRef:
@@ -11334,7 +11304,6 @@ void ScInterpreter::ScIndex()
                 SCCOL nCol2 = 0;
                 SCROW nRow2 = 0;
                 SCTAB nTab2 = 0;
-                bool bRowArray = false;
                 if (GetStackType() == svRefList)
                 {
                     FormulaConstTokenRef xRef = PopToken();
@@ -11344,53 +11313,27 @@ void ScInterpreter::ScIndex()
                         return;
                     }
                     ScRange aRange( ScAddress::UNINITIALIZED);
-                    DoubleRefToRange( (*(xRef->GetRefList()))[nArea-1], aRange);
+                    DoubleRefToRange((*(xRef->GetRefList()))[aAreaSelection.maValue], aRange);
                     aRange.GetVars( nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
-                    if ( nParamCount == 2 && nRow1 == nRow2 )
-                        bRowArray = true;
                 }
-                else
-                {
+                else {
                     PopDoubleRef( nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
-                    if ( nParamCount == 2 && nRow1 == nRow2 )
-                        bRowArray = true;
                 }
-                if ( nTab1 != nTab2 ||
-                        (nCol > 0 && nCol1+nCol-1 > nCol2) ||
-                        (nRow > 0 && nRow1+nRow-1 > nRow2 && !bRowArray ) ||
-                        ( nRow > nCol2 - nCol1 + 1 && bRowArray ))
+                const auto aSelection = seref::planIndexReferenceSelection(
+                    selibreoffice::toApiCellRange(ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2)),
+                    nRow, nCol, nParamCount);
+                if (!aSelection)
                     PushError( FormulaError::NoRef);
-                else if (nCol == 0 && nRow == 0)
-                {
-                    if ( nCol1 == nCol2 && nRow1 == nRow2 )
-                        PushSingleRef( nCol1, nRow1, nTab1 );
-                    else
-                        PushDoubleRef( nCol1, nRow1, nTab1, nCol2, nRow2, nTab1 );
-                }
-                else if (nRow == 0)
-                {
-                    if ( nRow1 == nRow2 )
-                        PushSingleRef( nCol1+nCol-1, nRow1, nTab1 );
-                    else
-                        PushDoubleRef( nCol1+nCol-1, nRow1, nTab1,
-                                nCol1+nCol-1, nRow2, nTab1 );
-                }
-                else if (nCol == 0)
-                {
-                    if ( nCol1 == nCol2 )
-                        PushSingleRef( nCol1, nRow1+nRow-1, nTab1 );
-                    else if ( bRowArray )
-                    {
-                        nCol =static_cast<SCCOL>(nRow);
-                        nRow = 1;
-                        PushSingleRef( nCol1+nCol-1, nRow1+nRow-1, nTab1);
-                    }
-                    else
-                        PushDoubleRef( nCol1, nRow1+nRow-1, nTab1,
-                                nCol2, nRow1+nRow-1, nTab1);
-                }
                 else
-                    PushSingleRef( nCol1+nCol-1, nRow1+nRow-1, nTab1);
+                {
+                    const ScRange aRange
+                        = selibreoffice::toLibreOfficeRange(aSelection.maValue.maRange);
+                    if (aSelection.maValue.maRange.isSingleCell())
+                        PushSingleRef(aRange.aStart.Col(), aRange.aStart.Row(), aRange.aStart.Tab());
+                    else
+                        PushDoubleRef(aRange.aStart.Col(), aRange.aStart.Row(), aRange.aStart.Tab(),
+                                      aRange.aEnd.Col(), aRange.aEnd.Row(), aRange.aEnd.Tab());
+                }
             }
             break;
         default:

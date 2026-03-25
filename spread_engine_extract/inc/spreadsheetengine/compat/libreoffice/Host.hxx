@@ -32,6 +32,16 @@ inline ScAddress toLibreOfficeAddress(const spreadsheetengine::api::CellAddress&
     return ScAddress(rAddress.mnColumn, rAddress.mnRow, rAddress.mnSheet);
 }
 
+inline spreadsheetengine::api::CellRange toApiCellRange(const ScRange& rRange)
+{
+    return { toApiCellAddress(rRange.aStart), toApiCellAddress(rRange.aEnd) };
+}
+
+inline ScRange toLibreOfficeRange(const spreadsheetengine::api::CellRange& rRange)
+{
+    return ScRange(toLibreOfficeAddress(rRange.maStart), toLibreOfficeAddress(rRange.maEnd));
+}
+
 inline spreadsheetengine::api::NumberParseResult::Kind toApiParseKind(SvNumFormatType eType)
 {
     const auto eMaskedType = eType & ~SvNumFormatType::DEFINED;
