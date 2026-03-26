@@ -181,19 +181,8 @@ std::vector<std::filesystem::path> collectDefaultReplayCorpus()
 
     const std::filesystem::path aMathRoot
         = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions" / "mathematical" / "fods";
-    for (const char* pWorkbook : { "add.fods", "aggregate.fods", "product.fods",
-             "rawsubtract.fods", "round.fods", "rounddown.fods", "roundup.fods",
-             "sub.fods", "sum.fods", "trunc.fods",
-             "mod.fods", "abs.fods", "int.fods", "sign.fods", "even.fods", "odd.fods",
-             "pi.fods", "ln.fods", "exp.fods", "log10.fods", "power.fods", "quotient.fods",
-             "gcd.fods", "lcm.fods", "radians.fods", "degrees.fods", "sqrt.fods",
-             "log.fods", "fact.fods", "combin.fods", "combina.fods", "multinomial.fods",
-             "floor.precise.fods", "ceiling.precise.fods", "sqrtpi.fods", "mround.fods",
-             "floor.xcl.fods", "ceiling.xcl.fods", "iso.ceiling.fods", "roundsig.fods",
-             "sec.fods", "sech.fods" })
-    {
-        aFiles.push_back(aMathRoot / pWorkbook);
-    }
+    const auto aMathFiles = collectFodsFiles(aMathRoot);
+    aFiles.insert(aFiles.end(), aMathFiles.begin(), aMathFiles.end());
 
     return aFiles;
 }

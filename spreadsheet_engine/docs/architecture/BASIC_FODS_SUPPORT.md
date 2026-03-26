@@ -244,19 +244,12 @@ Secondary target families:
 - [x] Implement the workbook scaffolding functions that the harness itself uses
       for the initial logical-family replay path.
 - [x] Enable the logical FODS family.
-- [ ] Enable the mathematical FODS family.
-      Initial curated replay support is now in place for lightweight arithmetic
-      and scalar workbooks (`add`, `sub`, `rawsubtract`, `sum`, `product`,
-      `round`, `rounddown`, `roundup`, `trunc`, `mod`, `abs`, `int`, `sign`,
-      `even`, `odd`, `pi`, `ln`, `exp`, `log10`, `power`, `quotient`, `gcd`,
-      `lcm`, `radians`, `degrees`, `sqrt`, `log`, `fact`, `combin`,
-      `combina`, `multinomial`, `floor.precise`, `ceiling.precise`, `sqrtpi`,
-      `mround`, `floor.xcl`, `ceiling.xcl`, `iso.ceiling`, `roundsig`, `sec`,
-      `sech`). Raw replay for `aggregate.fods` is also green now: the live
-      evaluator covers prefixed one-range forms with function codes `1-11`,
-      hidden/error option filtering, and nested `SUBTOTAL`/`AGGREGATE` skipping
-      for options `0-3`. Heavier mathematical workbooks outside this curated
-      set still need broader function dispatch.
+- [x] Enable the mathematical FODS family.
+      The default standalone replay lane now scans the full raw mathematical
+      FODS directory. That includes the earlier scalar/arithmetic workbooks and
+      `aggregate.fods`, with live evaluator support for prefixed one-range
+      `AGGREGATE` forms, hidden/error option filtering, and nested
+      `SUBTOTAL`/`AGGREGATE` skipping for options `0-3`.
 - [ ] Enable the text FODS family.
 - [ ] Enable the date_time FODS family.
 - [ ] Expand to selected spreadsheet lookup/reference workbooks.
