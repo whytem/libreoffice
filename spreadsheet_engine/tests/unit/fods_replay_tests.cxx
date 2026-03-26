@@ -185,7 +185,11 @@ std::vector<std::filesystem::path> collectDefaultReplayCorpus()
              "rounddown.fods", "roundup.fods", "sub.fods", "sum.fods", "trunc.fods",
              "mod.fods", "abs.fods", "int.fods", "sign.fods", "even.fods", "odd.fods",
              "pi.fods", "ln.fods", "exp.fods", "log10.fods", "power.fods", "quotient.fods",
-             "gcd.fods", "lcm.fods", "radians.fods", "degrees.fods" })
+             "gcd.fods", "lcm.fods", "radians.fods", "degrees.fods", "sqrt.fods",
+             "log.fods", "fact.fods", "combin.fods", "combina.fods", "multinomial.fods",
+             "floor.precise.fods", "ceiling.precise.fods", "sqrtpi.fods", "mround.fods",
+             "floor.xcl.fods", "ceiling.xcl.fods", "iso.ceiling.fods", "roundsig.fods",
+             "sec.fods", "sech.fods" })
     {
         aFiles.push_back(aMathRoot / pWorkbook);
     }

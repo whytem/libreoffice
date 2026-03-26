@@ -249,8 +249,11 @@ Secondary target families:
       and scalar workbooks (`add`, `sub`, `rawsubtract`, `sum`, `product`,
       `round`, `rounddown`, `roundup`, `trunc`, `mod`, `abs`, `int`, `sign`,
       `even`, `odd`, `pi`, `ln`, `exp`, `log10`, `power`, `quotient`, `gcd`,
-      `lcm`, `radians`, `degrees`), while heavier workbooks like `aggregate`
-      still need broader function dispatch.
+      `lcm`, `radians`, `degrees`, `sqrt`, `log`, `fact`, `combin`,
+      `combina`, `multinomial`, `floor.precise`, `ceiling.precise`, `sqrtpi`,
+      `mround`, `floor.xcl`, `ceiling.xcl`, `iso.ceiling`, `roundsig`, `sec`,
+      `sech`), while heavier workbooks like `aggregate` still need broader
+      function dispatch.
 - [ ] Enable the text FODS family.
 - [ ] Enable the date_time FODS family.
 - [ ] Expand to selected spreadsheet lookup/reference workbooks.
