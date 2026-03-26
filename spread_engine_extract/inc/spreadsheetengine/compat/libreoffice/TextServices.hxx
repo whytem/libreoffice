@@ -18,8 +18,12 @@
 #include <unotools/charclass.hxx>
 #include <unotools/transliterationwrapper.hxx>
 
+#include <spreadsheetengine/api/Error.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
+#include <spreadsheetengine/core/TextCase.hxx>
+#include <spreadsheetengine/core/TextScalar.hxx>
 #include <spreadsheetengine/core/TextServices.hxx>
+#include <spreadsheetengine/core/TextWidth.hxx>
 
 namespace spreadsheetengine::compat::libreoffice
 {
@@ -119,6 +123,118 @@ public:
         return toApiString(OUString(&cEncodedChar, 1, osl_getThreadTextEncoding(), nConvertFlags));
     }
 };
+
+inline SystemTextEncodingService& getSystemTextEncodingService()
+{
+    static SystemTextEncodingService aService;
+    return aService;
+}
+
+inline TransliterationWidthConversionService& getWidthConversionService()
+{
+    static TransliterationWidthConversionService aService;
+    return aService;
+}
+
+inline OUString trimRepeatedSpaces(const OUString& rInput)
+{
+    return toLibreOfficeString(spreadsheetengine::core::text::trimRepeatedSpaces(toApiString(rInput)));
+}
+
+inline OUString uppercase(const CharClass& rCharClass, const OUString& rInput)
+{
+    const CharClassCaseMappingService aCaseService(rCharClass);
+    return toLibreOfficeString(
+        spreadsheetengine::core::text::uppercase(aCaseService, toApiString(rInput)));
+}
+
+inline OUString propercase(const CharClass& rCharClass, const OUString& rInput)
+{
+    const CharClassCaseMappingService aCaseService(rCharClass);
+    return toLibreOfficeString(
+        spreadsheetengine::core::text::propercase(aCaseService, toApiString(rInput)));
+}
+
+inline OUString lowercase(const CharClass& rCharClass, const OUString& rInput)
+{
+    const CharClassCaseMappingService aCaseService(rCharClass);
+    return toLibreOfficeString(
+        spreadsheetengine::core::text::lowercase(aCaseService, toApiString(rInput)));
+}
+
+inline sal_Int32 countCodePoints(const OUString& rInput)
+{
+    return spreadsheetengine::core::text::countCodePoints(toApiString(rInput));
+}
+
+inline spreadsheetengine::api::ValueResult<double> parseNumberValue(const OUString& rInput,
+    const std::optional<OUString>& roDecimalSeparator,
+    const std::optional<OUString>& roGroupSeparator, bool bEmptyStringAsZero)
+{
+    const auto aResult = spreadsheetengine::core::text::parseNumberValue(toApiString(rInput),
+        roDecimalSeparator ? std::optional(toApiString(*roDecimalSeparator)) : std::nullopt,
+        roGroupSeparator ? std::optional(toApiString(*roGroupSeparator)) : std::nullopt,
+        bEmptyStringAsZero);
+    switch (aResult.meStatus)
+    {
+        case spreadsheetengine::core::text::NumberValueStatus::Ok:
+            return spreadsheetengine::api::ValueResult<double>::success(aResult.mfValue);
+        case spreadsheetengine::core::text::NumberValueStatus::NoValue:
+            return spreadsheetengine::api::ValueResult<double>::failure(
+                spreadsheetengine::api::Error::NoValue);
+        case spreadsheetengine::core::text::NumberValueStatus::IllegalArgument:
+            return spreadsheetengine::api::ValueResult<double>::failure(
+                spreadsheetengine::api::Error::IllegalArgument);
+    }
+
+    return spreadsheetengine::api::ValueResult<double>::failure(
+        spreadsheetengine::api::Error::IllegalArgument);
+}
+
+inline OUString cleanPrintable(const OUString& rInput)
+{
+    return toLibreOfficeString(spreadsheetengine::core::text::cleanPrintable(toApiString(rInput)));
+}
+
+inline sal_Int32 codeFromText(const OUString& rInput)
+{
+    return spreadsheetengine::core::text::codeFromText(
+        getSystemTextEncodingService(), toApiString(rInput));
+}
+
+inline std::optional<OUString> charFromValue(double fValue)
+{
+    if (auto oValue = spreadsheetengine::core::text::charFromValue(
+            getSystemTextEncodingService(), fValue))
+    {
+        return toLibreOfficeString(*oValue);
+    }
+    return std::nullopt;
+}
+
+inline OUString convertIntoFullWidth(const OUString& rInput)
+{
+    return toLibreOfficeString(spreadsheetengine::core::text::convertIntoFullWidth(
+        getWidthConversionService(), toApiString(rInput)));
+}
+
+inline OUString convertIntoHalfWidth(const OUString& rInput)
+{
+    return toLibreOfficeString(spreadsheetengine::core::text::convertIntoHalfWidth(
+        getWidthConversionService(), toApiString(rInput)));
+}
+
+inline std::optional<double> unicodeFromText(const OUString& rInput)
+{
+    return spreadsheetengine::core::text::unicodeFromText(toApiString(rInput));
+}
+
+inline std::optional<OUString> unicharFromCodePoint(sal_uInt32 nCodePoint)
+{
+    if (auto oValue = spreadsheetengine::core::text::unicharFromCodePoint(nCodePoint))
+        return toLibreOfficeString(*oValue);
+    return std::nullopt;
+}
 
 } // namespace spreadsheetengine::compat::libreoffice
 

@@ -1,0 +1,9 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+find_dependency(ICU REQUIRED COMPONENTS uc)
+
+include("${CMAKE_CURRENT_LIST_DIR}/spreadsheetengineTargets.cmake")
+
+check_required_components(spreadsheetengine)

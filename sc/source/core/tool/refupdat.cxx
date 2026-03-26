@@ -21,47 +21,10 @@
 #include <document.hxx>
 #include <bigrange.hxx>
 #include <refdata.hxx>
-#include <spreadsheetengine/api/ReferenceUpdate.hxx>
-#include <spreadsheetengine/compat/libreoffice/Host.hxx>
+#include <spreadsheetengine/compat/libreoffice/ReferenceUpdate.hxx>
 
 #include <osl/diagnose.h>
-
-namespace
-{
-
-spreadsheetengine::api::refupdate::UpdateMode toApiUpdateMode(UpdateRefMode eMode)
-{
-    switch (eMode)
-    {
-        case URM_INSDEL:
-            return spreadsheetengine::api::refupdate::UpdateMode::InsertDelete;
-        case URM_MOVE:
-            return spreadsheetengine::api::refupdate::UpdateMode::Move;
-        case URM_REORDER:
-            return spreadsheetengine::api::refupdate::UpdateMode::Reorder;
-        default:
-            return spreadsheetengine::api::refupdate::UpdateMode::InsertDelete;
-    }
-}
-
-ScRefUpdateRes fromApiUpdateResult(spreadsheetengine::api::refupdate::UpdateResult eResult)
-{
-    switch (eResult)
-    {
-        case spreadsheetengine::api::refupdate::UpdateResult::Nothing:
-            return UR_NOTHING;
-        case spreadsheetengine::api::refupdate::UpdateResult::Updated:
-            return UR_UPDATED;
-        case spreadsheetengine::api::refupdate::UpdateResult::Invalid:
-            return UR_INVALID;
-        case spreadsheetengine::api::refupdate::UpdateResult::Sticky:
-            return UR_STICKY;
-    }
-
-    return UR_NOTHING;
-}
-
-}
+namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 
 static bool lcl_IsWrapBig( sal_Int64 nRef, sal_Int32 nDelta )
 {
@@ -102,24 +65,8 @@ ScRefUpdateRes ScRefUpdate::Update( const ScDocument& rDoc, UpdateRefMode eUpdat
 {
     if (eUpdateRefMode == URM_REORDER)
         OSL_ENSURE(!nDx && !nDy, "URM_REORDER for x and y not yet implemented");
-
-    spreadsheetengine::api::CellRange aWhere {
-        { nTab1, nCol1, nRow1 }, { nTab2, nCol2, nRow2 }
-    };
-    spreadsheetengine::api::CellRange aRef {
-        { theTab1, theCol1, theRow1 }, { theTab2, theCol2, theRow2 }
-    };
-    const auto eResult = spreadsheetengine::api::refupdate::updateReference(
-        toApiUpdateMode(eUpdateRefMode), aWhere, nDx, nDy, nDz, rDoc.MaxCol(),
-        rDoc.MaxRow(), static_cast<SCTAB>(rDoc.GetTableCount() - 1),
-        rDoc.IsExpandRefs(), aRef);
-    theTab1 = static_cast<SCTAB>(aRef.maStart.mnSheet);
-    theCol1 = static_cast<SCCOL>(aRef.maStart.mnColumn);
-    theRow1 = static_cast<SCROW>(aRef.maStart.mnRow);
-    theTab2 = static_cast<SCTAB>(aRef.maEnd.mnSheet);
-    theCol2 = static_cast<SCCOL>(aRef.maEnd.mnColumn);
-    theRow2 = static_cast<SCROW>(aRef.maEnd.mnRow);
-    return fromApiUpdateResult(eResult);
+    return selibreoffice::updateReference(rDoc, eUpdateRefMode, nCol1, nRow1, nTab1, nCol2,
+        nRow2, nTab2, nDx, nDy, nDz, theCol1, theRow1, theTab1, theCol2, theRow2, theTab2);
 }
 
 // simple UpdateReference for ScBigRange (ScChangeAction/ScChangeTrack)
@@ -218,13 +165,7 @@ ScRefUpdateRes ScRefUpdate::Update( UpdateRefMode eUpdateRefMode,
 void ScRefUpdate::MoveRelWrap( const ScDocument& rDoc, const ScAddress& rPos,
                                SCCOL nMaxCol, SCROW nMaxRow, ScComplexRefData& rRef )
 {
-    auto aApiRef = rRef.toApiComplexRefData();
-    spreadsheetengine::api::refupdate::moveRelativeWrap(
-        aApiRef,
-        { rDoc.MaxCol(), rDoc.MaxRow(), static_cast<SCTAB>(rDoc.GetTableCount() - 1) },
-        spreadsheetengine::compat::libreoffice::toApiCellAddress(rPos), nMaxCol, nMaxRow,
-        static_cast<SCTAB>(rDoc.GetTableCount() - 1));
-    rRef.assignFromApiComplexRefData(aApiRef);
+    selibreoffice::moveRelativeWrap(rDoc, rPos, nMaxCol, nMaxRow, rRef);
 }
 
 void ScRefUpdate::DoTranspose( SCCOL& rCol, SCROW& rRow, SCTAB& rTab,
@@ -232,31 +173,13 @@ void ScRefUpdate::DoTranspose( SCCOL& rCol, SCROW& rRow, SCTAB& rTab,
 {
     OSL_ENSURE( rCol>=rSource.aStart.Col() && rRow>=rSource.aStart.Row(),
                 "UpdateTranspose: pos. wrong" );
-
-    spreadsheetengine::api::ColumnIndex nApiCol = rCol;
-    spreadsheetengine::api::RowIndex nApiRow = rRow;
-    spreadsheetengine::api::SheetId nApiTab = rTab;
-    spreadsheetengine::api::refupdate::doTranspose(
-        nApiCol, nApiRow, nApiTab, rDoc.GetTableCount(),
-        spreadsheetengine::compat::libreoffice::toApiCellRange(rSource),
-        spreadsheetengine::compat::libreoffice::toApiCellAddress(rDest));
-    rCol = static_cast<SCCOL>(nApiCol);
-    rRow = static_cast<SCROW>(nApiRow);
-    rTab = static_cast<SCTAB>(nApiTab);
+    selibreoffice::doTranspose(rCol, rRow, rTab, rDoc, rSource, rDest);
 }
 
 ScRefUpdateRes ScRefUpdate::UpdateTranspose(
     const ScDocument& rDoc, const ScRange& rSource, const ScAddress& rDest, ScRange& rRef )
 {
-    auto aApiRef = spreadsheetengine::compat::libreoffice::toApiCellRange(rRef);
-    const bool bUpdated = spreadsheetengine::api::refupdate::updateTranspose(
-        rDoc.GetTableCount(), spreadsheetengine::compat::libreoffice::toApiCellRange(rSource),
-        spreadsheetengine::compat::libreoffice::toApiCellAddress(rDest), aApiRef);
-    if (!bUpdated)
-        return UR_NOTHING;
-
-    rRef = spreadsheetengine::compat::libreoffice::toLibreOfficeRange(aApiRef);
-    return UR_UPDATED;
+    return selibreoffice::updateTranspose(rDoc, rSource, rDest, rRef);
 }
 
 //  UpdateGrow - expands references which point exactly to the area
@@ -265,14 +188,7 @@ ScRefUpdateRes ScRefUpdate::UpdateTranspose(
 ScRefUpdateRes ScRefUpdate::UpdateGrow(
     const ScRange& rArea, SCCOL nGrowX, SCROW nGrowY, ScRange& rRef )
 {
-    auto aApiRef = spreadsheetengine::compat::libreoffice::toApiCellRange(rRef);
-    const bool bUpdated = spreadsheetengine::api::refupdate::updateGrow(
-        spreadsheetengine::compat::libreoffice::toApiCellRange(rArea), nGrowX, nGrowY, aApiRef);
-    if (!bUpdated)
-        return UR_NOTHING;
-
-    rRef = spreadsheetengine::compat::libreoffice::toLibreOfficeRange(aApiRef);
-    return UR_UPDATED;
+    return selibreoffice::updateGrow(rArea, nGrowX, nGrowY, rRef);
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

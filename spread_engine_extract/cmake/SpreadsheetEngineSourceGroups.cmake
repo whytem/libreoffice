@@ -5,6 +5,63 @@
 # vocabulary. As extraction progresses, sources should move from the deferred
 # list into the standalone-ready core list.
 
+set(SPREADSHEETENGINE_STANDALONE_PUBLIC_API_HEADERS
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Array.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Calendar.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Compiler.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Config.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Date.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Error.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/FormulaResult.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Grammar.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Host.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Logic.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Lookup.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/LookupCache.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Math.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Matrix.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Numeral.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Parsing.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Query.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Reference.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/ReferenceData.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/ReferenceUpdate.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Rounding.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/SharedFormula.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/String.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/StringReference.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Text.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Workday.hxx"
+)
+
+set(SPREADSHEETENGINE_STANDALONE_PUBLIC_SUPPORT_HEADERS
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/spreadsheetenginedllapi.h"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/DateTimeParts.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/DateTimeWeek.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/DateTimeWorkday.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/MathBitwise.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/MathFinancial.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/MathRounding.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/MathScalar.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/MathTranscendental.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/NumeralConversion.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/TextCase.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/TextScalar.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/TextServices.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/TextWidth.hxx"
+)
+
+set(SPREADSHEETENGINE_STANDALONE_PUBLIC_SHIM_HEADERS
+    "${SPREADSHEETENGINE_ROOT}/standalone/include/rtl/math.hxx"
+    "${SPREADSHEETENGINE_ROOT}/standalone/include/sal/types.h"
+)
+
+set(SPREADSHEETENGINE_STANDALONE_PUBLIC_HEADERS
+    ${SPREADSHEETENGINE_STANDALONE_PUBLIC_API_HEADERS}
+    ${SPREADSHEETENGINE_STANDALONE_PUBLIC_SUPPORT_HEADERS}
+    ${SPREADSHEETENGINE_STANDALONE_PUBLIC_SHIM_HEADERS}
+)
+
 set(SPREADSHEETENGINE_STANDALONE_CORE_SOURCES
     "${SPREADSHEETENGINE_ROOT}/source/compat/formula/FormulaGrammar.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/CalcConfig.cxx"

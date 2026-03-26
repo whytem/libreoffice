@@ -23,87 +23,12 @@
 #include <queryentry.hxx>
 #include <brdcst.hxx>
 
-#include <spreadsheetengine/api/LookupCache.hxx>
-#include <spreadsheetengine/compat/libreoffice/Host.hxx>
-#include <spreadsheetengine/compat/libreoffice/String.hxx>
+#include <spreadsheetengine/compat/libreoffice/LookupCache.hxx>
 
 #include <sal/log.hxx>
 
-namespace selookup = spreadsheetengine::api::lookup;
 namespace selookupcache = spreadsheetengine::api::lookupcache;
-
-namespace
-{
-
-selookup::SearchMode toApiSearchMode(LookupSearchMode eSearchMode)
-{
-    switch (eSearchMode)
-    {
-        case LookupSearchMode::Forward:
-            return selookup::SearchMode::Forward;
-        case LookupSearchMode::Reverse:
-            return selookup::SearchMode::Reverse;
-        case LookupSearchMode::BinaryAscending:
-            return selookup::SearchMode::BinaryAscending;
-        case LookupSearchMode::BinaryDescending:
-            return selookup::SearchMode::BinaryDescending;
-    }
-
-    return selookup::SearchMode::Forward;
-}
-
-selookupcache::QueryOp toApiQueryOp(ScLookupCache::QueryOp eOp)
-{
-    switch (eOp)
-    {
-        case ScLookupCache::EQUAL:
-            return selookupcache::QueryOp::Equal;
-        case ScLookupCache::LESS_EQUAL:
-            return selookupcache::QueryOp::LessEqual;
-        case ScLookupCache::GREATER_EQUAL:
-            return selookupcache::QueryOp::GreaterEqual;
-        case ScLookupCache::UNKNOWN:
-            break;
-    }
-
-    return selookupcache::QueryOp::Unknown;
-}
-
-selookupcache::QueryCriteria toApiQueryCriteria(const ScLookupCache::QueryCriteria& rCriteria)
-{
-    const auto eOp = toApiQueryOp(rCriteria.getQueryOp());
-    const auto eSearchMode = toApiSearchMode(rCriteria.getSearchMode());
-    if (rCriteria.isStringQuery())
-    {
-        const OUString* pString = rCriteria.getStringValue();
-        return selookupcache::QueryCriteria::fromString(
-            eOp, eSearchMode,
-            pString ? spreadsheetengine::compat::libreoffice::toApiString(*pString)
-                    : spreadsheetengine::api::StringView {});
-    }
-
-    return selookupcache::QueryCriteria::fromDouble(
-        eOp, eSearchMode, rCriteria.getDoubleValue());
-}
-
-ScLookupCache::Result toCalcLookupResult(selookupcache::Result eResult)
-{
-    switch (eResult)
-    {
-        case selookupcache::Result::NotCached:
-            return ScLookupCache::NOT_CACHED;
-        case selookupcache::Result::CriteriaDifferent:
-            return ScLookupCache::CRITERIA_DIFFERENT;
-        case selookupcache::Result::NotAvailable:
-            return ScLookupCache::NOT_AVAILABLE;
-        case selookupcache::Result::Found:
-            return ScLookupCache::FOUND;
-    }
-
-    return ScLookupCache::NOT_CACHED;
-}
-
-} // end anonymous namespace
+namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 
 ScLookupCache::QueryCriteria::QueryCriteria( const ScQueryEntry& rEntry, LookupSearchMode nSearchMode ) :
     mfVal(0.0), mbAlloc(false), mbString(false), meSearchMode(nSearchMode)
@@ -152,12 +77,12 @@ ScLookupCache::QueryCriteria::~QueryCriteria()
 
 bool ScLookupCache::QueryCriteria::operator==( const QueryCriteria & r ) const
 {
-    return toApiQueryCriteria(*this) == toApiQueryCriteria(r);
+    return selibreoffice::toApiQueryCriteria(*this) == selibreoffice::toApiQueryCriteria(r);
 }
 
 bool ScLookupCache::QueryCriteria::isEmptyStringQuery() const
 {
-    return toApiQueryCriteria(*this).isEmptyStringQuery();
+    return selibreoffice::toApiQueryCriteria(*this).isEmptyStringQuery();
 }
 
 ScLookupCache::QueryKey::QueryKey(
@@ -174,20 +99,17 @@ bool ScLookupCache::QueryKey::operator==( const QueryKey & r ) const
     if (meOp == UNKNOWN || r.meOp == UNKNOWN)
         return false;
 
-    const auto aLeft = selookupcache::makeQueryKey(
-        spreadsheetengine::api::CellAddress { mnTab, 0, mnRow }, toApiQueryOp(meOp),
-        toApiSearchMode(meSearchMode));
-    const auto aRight = selookupcache::makeQueryKey(
-        spreadsheetengine::api::CellAddress { r.mnTab, 0, r.mnRow }, toApiQueryOp(r.meOp),
-        toApiSearchMode(r.meSearchMode));
+    const auto aLeft
+        = selibreoffice::makeLookupQueryKey(mnRow, mnTab, meOp, meSearchMode);
+    const auto aRight
+        = selibreoffice::makeLookupQueryKey(r.mnRow, r.mnTab, r.meOp, r.meSearchMode);
     return aLeft == aRight;
 }
 
 size_t ScLookupCache::QueryKey::Hash::operator()( const QueryKey & r ) const
 {
-    const auto aKey = selookupcache::makeQueryKey(
-        spreadsheetengine::api::CellAddress { r.mnTab, 0, r.mnRow }, toApiQueryOp(r.meOp),
-        toApiSearchMode(r.meSearchMode));
+    const auto aKey
+        = selibreoffice::makeLookupQueryKey(r.mnRow, r.mnTab, r.meOp, r.meSearchMode);
     return selookupcache::QueryKey::Hash {}(aKey);
 }
 
@@ -199,18 +121,13 @@ ScLookupCache::Result ScLookupCache::lookup( ScAddress & o_rResultAddress,
     if (it == maQueryMap.end())
         return NOT_CACHED;
 
-    spreadsheetengine::api::CellAddress aResultAddress;
-    const auto eResult
-        = selookupcache::classifyLookup(aResultAddress, toApiQueryCriteria(rCriteria), &it->second.maEntry);
-    if (eResult == selookupcache::Result::Found)
-        o_rResultAddress = spreadsheetengine::compat::libreoffice::toLibreOfficeAddress(aResultAddress);
-    return toCalcLookupResult(eResult);
+    return selibreoffice::classifyLookup(o_rResultAddress, rCriteria, &it->second.maEntry);
 }
 
 SCROW ScLookupCache::lookup( const QueryCriteria & rCriteria ) const
 {
-    return selookupcache::findCachedRowForCriteria(
-        maQueryMap.begin(), maQueryMap.end(), toApiQueryCriteria(rCriteria));
+    return selibreoffice::findCachedRowForCriteria(
+        maQueryMap.begin(), maQueryMap.end(), rCriteria);
 }
 
 bool ScLookupCache::insert( const ScAddress & rResultAddress,
@@ -218,8 +135,8 @@ bool ScLookupCache::insert( const ScAddress & rResultAddress,
         const bool bAvailable )
 {
     QueryKey aKey( rQueryAddress, rCriteria.getQueryOp(), rCriteria.getSearchMode() );
-    QueryCriteriaAndResult aResult(selookupcache::makeCacheEntry(toApiQueryCriteria(rCriteria),
-        spreadsheetengine::compat::libreoffice::toApiCellAddress(rResultAddress), bAvailable));
+    QueryCriteriaAndResult aResult(
+        selibreoffice::makeLookupCacheEntry(rCriteria, rResultAddress, bAvailable));
     bool bInserted = maQueryMap.insert( ::std::pair< const QueryKey,
             QueryCriteriaAndResult>( aKey, aResult)).second;
 

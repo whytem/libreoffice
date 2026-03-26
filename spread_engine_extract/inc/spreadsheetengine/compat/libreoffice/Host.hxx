@@ -15,6 +15,7 @@
 #include <interpretercontext.hxx>
 
 #include <spreadsheetengine/api/Host.hxx>
+#include <spreadsheetengine/api/Parsing.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
@@ -220,6 +221,27 @@ public:
             toApiString(aFormatted));
     }
 };
+
+inline spreadsheetengine::api::ValueResult<double> parseValueFromText(
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const OUString& rValue)
+{
+    DocumentEvaluationHost aHost(rDoc, rContext);
+    return spreadsheetengine::api::parsing::valueFromText(aHost, toApiString(rValue));
+}
+
+inline spreadsheetengine::api::ValueResult<double> parseDateValueFromText(
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const OUString& rValue)
+{
+    DocumentEvaluationHost aHost(rDoc, rContext);
+    return spreadsheetengine::api::parsing::dateValueFromText(aHost, toApiString(rValue));
+}
+
+inline spreadsheetengine::api::ValueResult<double> parseTimeValueFromText(
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const OUString& rValue)
+{
+    DocumentEvaluationHost aHost(rDoc, rContext);
+    return spreadsheetengine::api::parsing::timeValueFromText(aHost, toApiString(rValue));
+}
 
 } // namespace spreadsheetengine::compat::libreoffice
 

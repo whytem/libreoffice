@@ -9,6 +9,9 @@
 
 #pragma once
 
+#include <algorithm>
+#include <vector>
+
 #include <tools/date.hxx>
 
 #include <spreadsheetengine/api/Date.hxx>
@@ -20,6 +23,29 @@ inline spreadsheetengine::api::DateParts toApiDateParts(const Date& rDate)
 {
     return { rDate.GetYear(), static_cast<std::int16_t>(rDate.GetMonth()),
         static_cast<std::int16_t>(rDate.GetDay()) };
+}
+
+inline spreadsheetengine::api::WeekendMask toApiWeekendMask(const bool bWeekendMask[7])
+{
+    spreadsheetengine::api::WeekendMask aWeekendMask {};
+    std::copy_n(bWeekendMask, aWeekendMask.size(), aWeekendMask.begin());
+    return aWeekendMask;
+}
+
+inline void toLibreOfficeWeekendMask(
+    const spreadsheetengine::api::WeekendMask& rWeekendMask, bool bDestination[7])
+{
+    std::copy(rWeekendMask.begin(), rWeekendMask.end(), bDestination);
+}
+
+inline std::vector<spreadsheetengine::api::DateSerial> toApiDateSerials(
+    const std::vector<double>& rSerials)
+{
+    std::vector<spreadsheetengine::api::DateSerial> aDateSerials;
+    aDateSerials.reserve(rSerials.size());
+    for (double fDate : rSerials)
+        aDateSerials.push_back(static_cast<spreadsheetengine::api::DateSerial>(fDate));
+    return aDateSerials;
 }
 
 } // namespace spreadsheetengine::compat::libreoffice

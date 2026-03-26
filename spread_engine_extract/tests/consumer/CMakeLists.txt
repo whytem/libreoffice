@@ -1,0 +1,9 @@
+cmake_minimum_required(VERSION 3.20)
+
+project(spreadsheetengine_consumer LANGUAGES CXX)
+
+find_package(spreadsheetengine REQUIRED CONFIG)
+
+add_executable(spreadsheetengine_consumer_smoke consumer_smoke.cxx)
+target_compile_features(spreadsheetengine_consumer_smoke PRIVATE cxx_std_20)
+target_link_libraries(spreadsheetengine_consumer_smoke PRIVATE spreadsheetengine::core)

@@ -16,30 +16,12 @@
 #include <refdata.hxx>
 #include <table.hxx>
 #include <spreadsheetengine/api/SharedFormula.hxx>
-#include <spreadsheetengine/compat/libreoffice/Host.hxx>
+#include <spreadsheetengine/compat/libreoffice/SharedFormula.hxx>
 
 namespace sc {
 
 namespace seshared = spreadsheetengine::api::sharedformula;
-
-namespace {
-
-seshared::TokenCompareState toApiTokenCompareState(ScFormulaCell::CompareState eState)
-{
-    switch (eState)
-    {
-        case ScFormulaCell::NotEqual:
-            return seshared::TokenCompareState::NotEqual;
-        case ScFormulaCell::EqualInvariant:
-            return seshared::TokenCompareState::EqualInvariant;
-        case ScFormulaCell::EqualRelativeRef:
-            return seshared::TokenCompareState::EqualRelativeRef;
-    }
-
-    return seshared::TokenCompareState::NotEqual;
-}
-
-} // end anonymous namespace
+namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 
 const ScFormulaCell* SharedFormulaUtil::getSharedTopFormulaCell(const CellStoreType::position_type& aPos)
 {
@@ -180,7 +162,7 @@ bool SharedFormulaUtil::joinFormulaCells(
     ScFormulaCellGroupRef xGroup1 = rCell1.GetCellGroup();
     ScFormulaCellGroupRef xGroup2 = rCell2.GetCellGroup();
     const seshared::JoinPlan aJoinPlan = seshared::makeJoinPlan(
-        toApiTokenCompareState(eState), bool(xGroup1), bool(xGroup2),
+        selibreoffice::toApiTokenCompareState(eState), bool(xGroup1), bool(xGroup2),
         xGroup1 && xGroup2 && xGroup1.get() == xGroup2.get());
 
     switch (aJoinPlan.meAction)
@@ -370,8 +352,7 @@ void SharedFormulaUtil::startListeningAsGroup( sc::StartListeningContext& rCxt, 
                 const ScSingleRefData* pRef = t->GetSingleRef();
                 ScAddress aPos = pRef->toAbs(rDoc, rTopCell.aPos);
                 const seshared::GroupSingleRefListenPlan aListenPlan
-                    = seshared::makeGroupSingleRefListenPlan(
-                        spreadsheetengine::compat::libreoffice::toApiCellAddress(aPos));
+                    = selibreoffice::makeGroupSingleRefListenPlan(aPos);
                 ScFormulaCell** pp = ppSharedTop;
                 ScFormulaCell** ppEnd = ppSharedTop + xGroup->mnLength;
                 if (aListenPlan.mbListen)
@@ -388,20 +369,17 @@ void SharedFormulaUtil::startListeningAsGroup( sc::StartListeningContext& rCxt, 
 
                 ScRange aOrigRange(aPos1, aPos2);
                 const seshared::GroupDoubleRefListenPlan aListenPlan
-                    = seshared::makeGroupDoubleRefListenPlan(
-                        spreadsheetengine::compat::libreoffice::toApiCellRange(aOrigRange),
-                        rRef1.IsRowRel(), rRef2.IsRowRel(), xGroup->mnLength);
+                    = selibreoffice::makeGroupDoubleRefListenPlan(
+                        aOrigRange, rRef1.IsRowRel(), rRef2.IsRowRel(), xGroup->mnLength);
 
                 if (aPos1.IsValid() && aPos2.IsValid())
                 {
                     rDoc.StartListeningArea(
-                        spreadsheetengine::compat::libreoffice::toLibreOfficeRange(
-                            aListenPlan.maListenedRange),
+                        selibreoffice::toLibreOfficeListenedRange(aListenPlan),
                         true,
                         xGroup->getAreaListener(
                             ppSharedTop,
-                            spreadsheetengine::compat::libreoffice::toLibreOfficeRange(
-                                aListenPlan.maOriginalRange),
+                            selibreoffice::toLibreOfficeOriginalRange(aListenPlan),
                             aListenPlan.mbRef1RowFixed, aListenPlan.mbRef2RowFixed));
                 }
             }

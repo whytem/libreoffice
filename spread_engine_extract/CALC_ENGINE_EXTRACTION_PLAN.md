@@ -1488,24 +1488,128 @@ Objective:
 
 Work:
 
-- reduce remaining Calc-side wrappers to host and adapter code
-- collapse transitional compatibility layers that are no longer needed
-- formalize the standalone package surface:
-  - public headers
-  - documented build entry points
-  - standalone test commands
-  - explicit external dependencies
-- decide whether copied `formula/` code stays duplicated or can be cleaned up
-  after Calc is fully isolated
+- pass 1: formalize the standalone package boundary
+  - define the supported public header surface
+  - separate public vs internal include paths in the standalone build
+  - add install/export rules for a real consumer-facing package target
+  - document canonical build, test, and install commands
+- pass 2: finish Calc host-adapter cleanup
+  - reduce remaining Calc-side wrappers to narrow host interfaces
+  - keep document mutation, token compilation, interpreter-context wiring, and
+    listener orchestration explicitly on the host side
+  - remove any remaining direct engine leaks back into `sc/` internals where a
+    host adapter should exist instead
+- pass 3: collapse transitional compatibility layers
+  - remove adapter code that only existed to bridge earlier extraction passes
+  - consolidate duplicated LibreOffice/string/error/grammar conversions
+  - decide which copied `formula/` compatibility pieces remain intentionally
+    duplicated and which can be retired
+- pass 4: harden the standalone runtime story
+  - extend the in-memory host and standalone runners enough to exercise the
+    engine in a small end-to-end configuration
+  - add at least one consumer-style smoke target that links the standalone
+    package the way an external project would
+  - make the dual-build model routine instead of experimental
+- pass 5: close the loop on routine maintenance
+  - add or tighten scripts so standalone and Calc validation are easy to run
+    together
+  - keep shared parity datasets and both runners in sync
+  - trim dead compatibility shims and stale roadmap assumptions
+
+First implementation slice:
+
+- start with pass 1, not more engine extraction
+- make the standalone CMake target behave like a real package:
+  - declare the public API surface explicitly
+  - add install/export support
+  - add a tiny consumer smoke build against the installed/exported target
+- only after that should we start shrinking Calc-side host glue in pass 2
+
+Current status:
+
+- pass 1 is now started and the first package-boundary slice is complete:
+  - the standalone build now declares an explicit public header manifest
+  - install/export rules now produce a consumer-facing
+    `spreadsheetengine::core` package target
+  - an installed-package consumer smoke build now runs in the standalone test
+    suite
+  - canonical standalone build, test, install, and consumer commands are now
+    documented in `README.md`
+- the next meaningful Phase 11 step is pass 2:
+  - reduce remaining Calc-side glue to narrower host adapters
+  - start deleting transitional wrappers once the package boundary is stable
+- pass 2 is now started with the first Calc host-adapter cleanup slice:
+  - Calc-to-engine date/workday marshaling moved out of `interpr2.cxx` and into
+    the LibreOffice adapter layer in `compat/libreoffice/Date.hxx`
+  - `interpr2.cxx` now consumes weekend-mask, holiday-serial, and null-date
+    conversion helpers through the adapter instead of owning duplicate local
+    marshalling code
+  - Calc text-service marshaling also moved out of `interpr1.cxx` and into the
+    LibreOffice adapter layer in `compat/libreoffice/TextServices.hxx`
+  - `interpr1.cxx` now consumes trim/case/clean/code/char/width/unicode and
+    number-value conversion helpers through the adapter instead of wiring
+    service objects and LibreOffice-to-engine string conversions directly
+  - host-backed parsing entry points also moved behind the LibreOffice adapter
+    layer in `compat/libreoffice/Host.hxx`
+  - `interpr1.cxx` and `interpr2.cxx` now consume `VALUE`, `DATEVALUE`, and
+    `TIMEVALUE` parsing through host adapter helpers instead of constructing
+    `DocumentEvaluationHost` and calling engine parsing APIs directly
+  - validation is green for this checkpoint:
+    - standalone: `ctest` passes `19/19`
+    - LibreOffice:
+      - `CppunitTest_sc_datetime_functions_test`
+      - `CppunitTest_sc_text_functions_test`
+      - `CppunitTest_sc_spreadsheet_functions_test`
+      - `CppunitTest_sc_ucalc_shared_cases`
+      - `CppunitTest_sc_ucalc`
+  - the remaining low-coupling Calc glue seams are now also pushed behind
+    dedicated LibreOffice adapters:
+    - `refupdat.cxx` now uses `compat/libreoffice/ReferenceUpdate.hxx` for
+      update-mode/result mapping, address/range conversion, and the extracted
+      reference-update kernel entry points
+    - `lookupcache.cxx` now uses `compat/libreoffice/LookupCache.hxx` for
+      query/search-mode mapping, cache-entry construction, lookup
+      classification, and cached-row criteria lookup
+    - `sharedformula.cxx` now uses `compat/libreoffice/SharedFormula.hxx` for
+      shared-group listener-plan marshaling instead of direct engine
+      address/range conversion at the call site
+  - pass 2 is now substantially complete:
+    - the remaining direct engine-facing glue in `sc/` is mostly cleanup-grade
+      call-site conversion rather than structural host-adapter work
+    - validation is green for the broader pass-2 closeout gate:
+      - standalone: `ctest` passes `19/19`
+      - LibreOffice:
+        - `CppunitTest_sc_cache_test`
+        - `CppunitTest_sc_datetime_functions_test`
+        - `CppunitTest_sc_text_functions_test`
+        - `CppunitTest_sc_ucalc_sort`
+        - `CppunitTest_sc_ucalc_sharedformula`
+        - `CppunitTest_sc_spreadsheet_functions_test`
+        - `CppunitTest_sc_ucalc_shared_cases`
+        - `CppunitTest_sc_ucalc`
+    - the next meaningful Phase 11 step after validating this batch is pass 3,
+      where we start collapsing transitional compatibility layers instead of
+      adding more host wrappers
+
+Guardrails:
+
+- do not reopen Phase 10 by pulling more backend execution into the engine
+  unless it clearly reduces host-side glue without widening dependencies
+- keep OpenCL optional; Phase 11 is about packaging and host cleanup, not
+  making acceleration mandatory
+- prefer deleting transitional wrappers over perfecting them once a cleaner
+  host/package boundary exists
 
 Validation:
 
 - standalone:
   - clean standalone build from `spread_engine_extract/` alone
+  - install/export smoke build from a fresh build directory
   - full standalone test suite and parity suite
 - LibreOffice:
   - full spreadsheet engine gate
   - milestone builds of `spreadsheetengine` and `sc`
+  - keep `sc_ucalc_shared_cases` in the regular validation loop
 
 Exit criteria:
 
