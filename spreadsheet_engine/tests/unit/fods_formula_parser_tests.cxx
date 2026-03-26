@@ -103,6 +103,19 @@ int main()
     }
 
     {
+        const auto aResult = parseFormula(u"of:=IFERROR(;\"A\")");
+        if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
+            || aResult.mpRoot->maPrimaryText != u"IFERROR"
+            || aResult.mpRoot->maChildren.size() != 2
+            || aResult.mpRoot->maChildren[0]->meKind != NodeKind::EmptyArgument
+            || aResult.mpRoot->maChildren[1]->meKind != NodeKind::StringLiteral
+            || aResult.mpRoot->maChildren[1]->maPrimaryText != u"A")
+        {
+            return fail("spreadsheetengine_fods_parser_tests", "leading empty IFERROR parse mismatch");
+        }
+    }
+
+    {
         const auto aResult = parseFormula(u"of:=IF(\"FOO\"=\"FOO\";-[.F17];[.F17])");
         if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
             || aResult.mpRoot->maChildren.size() != 3

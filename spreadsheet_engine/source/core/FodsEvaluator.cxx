@@ -9,6 +9,11 @@
 
 #include <spreadsheetengine/detail/FodsEvaluator.hxx>
 
+#include <rtl/math.hxx>
+
+#include <spreadsheetengine/api/Logic.hxx>
+#include <spreadsheetengine/api/Math.hxx>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -721,6 +726,50 @@ EvaluationResult Evaluator::evaluateFunction(
         return makeScalarResult(api::CellValue::text(aFormula));
     }
 
+    if (aFunctionName == u"IF")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aCondition
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        bool bCondition = false;
+        bool bConditionError = false;
+        api::Error eConditionError = api::Error::None;
+        if (!aCondition)
+        {
+            bConditionError = true;
+            eConditionError = aCondition.meError;
+        }
+        else
+        {
+            const auto aBool = coerceToBoolean(aCondition.maValue.maValue);
+            if (!aBool)
+            {
+                bConditionError = true;
+                eConditionError = aBool.meError;
+            }
+            else
+                bCondition = aBool.maValue;
+        }
+
+        const auto eAction = api::logic::selectIfBranch(
+            bCondition, bConditionError, rNode.maChildren.size() >= 2, rNode.maChildren.size() >= 3);
+        switch (eAction)
+        {
+            case api::logic::IfBranchAction::PropagateError:
+                return makeFailure(eConditionError);
+            case api::logic::IfBranchAction::ThenPath:
+                return evaluateNode(*rNode.maChildren[1], rCurrentAddress);
+            case api::logic::IfBranchAction::ElsePath:
+                return evaluateNode(*rNode.maChildren[2], rCurrentAddress);
+            case api::logic::IfBranchAction::ReturnTrue:
+                return makeScalarResult(api::CellValue::boolean(true));
+            case api::logic::IfBranchAction::ReturnFalse:
+                return makeScalarResult(api::CellValue::boolean(false));
+        }
+    }
+
     if (aFunctionName == u"ISERROR")
     {
         if (rNode.maChildren.size() != 1)
@@ -744,6 +793,66 @@ EvaluationResult Evaluator::evaluateFunction(
         return makeScalarResult(api::CellValue::boolean(
             aArgument.maValue.maValue.isError()
             && aArgument.maValue.maValue.meError == api::Error::NotAvailable));
+    }
+
+    if (aFunctionName == u"IFERROR" || aFunctionName == u"IFNA")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeFailure(api::Error::IllegalArgument);
+        if (rNode.maChildren[0]->meKind == formula::NodeKind::EmptyArgument)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const bool bNAOnly = aFunctionName == u"IFNA";
+        EvaluationResult aPrimary = evaluateNode(*rNode.maChildren[0], rCurrentAddress);
+        if (!aPrimary)
+        {
+            const auto eAction
+                = api::logic::selectIfErrorAction(aPrimary.meError, bNAOnly);
+            if (eAction == api::logic::IfErrorAction::KeepPrimary)
+                return aPrimary;
+            return evaluateNode(*rNode.maChildren[1], rCurrentAddress);
+        }
+
+        if (aPrimary.maValue.isScalar() && aPrimary.maValue.maValue.isError())
+        {
+            const auto eAction = api::logic::selectIfErrorAction(
+                aPrimary.maValue.maValue.meError, bNAOnly);
+            if (eAction == api::logic::IfErrorAction::EvaluateAlternate)
+                return evaluateNode(*rNode.maChildren[1], rCurrentAddress);
+        }
+
+        return aPrimary;
+    }
+
+    if (aFunctionName == u"MOD")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aNumerator
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aNumerator)
+            return aNumerator;
+
+        EvaluationResult aDenominator
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
+        if (!aDenominator)
+            return aDenominator;
+
+        const auto aLeftNumber = coerceToNumber(aNumerator.maValue.maValue);
+        if (!aLeftNumber)
+            return makeFailure(aLeftNumber.meError);
+        const auto aRightNumber = coerceToNumber(aDenominator.maValue.maValue);
+        if (!aRightNumber)
+            return makeFailure(aRightNumber.meError);
+
+        if (aRightNumber.maValue == 0.0)
+            return makeFailure(api::Error::DivisionByZero);
+
+        const auto aModResult = api::math::modulo(aLeftNumber.maValue, aRightNumber.maValue);
+        if (!aModResult)
+            return makeFailure(aModResult.meError);
+        return makeScalarResult(api::CellValue::number(aModResult.maValue));
     }
 
     if (aFunctionName == u"AND")
@@ -915,11 +1024,11 @@ EvaluationResult Evaluator::evaluateNode(
             switch (rNode.meBinaryOperator)
             {
                 case formula::BinaryOperator::Add:
-                    return makeScalarResult(
-                        api::CellValue::number(aLeftNumber.maValue + aRightNumber.maValue));
+                    return makeScalarResult(api::CellValue::number(
+                        ::rtl::math::approxAdd(aLeftNumber.maValue, aRightNumber.maValue)));
                 case formula::BinaryOperator::Subtract:
-                    return makeScalarResult(
-                        api::CellValue::number(aLeftNumber.maValue - aRightNumber.maValue));
+                    return makeScalarResult(api::CellValue::number(
+                        ::rtl::math::approxSub(aLeftNumber.maValue, aRightNumber.maValue)));
                 case formula::BinaryOperator::Multiply:
                     return makeScalarResult(
                         api::CellValue::number(aLeftNumber.maValue * aRightNumber.maValue));

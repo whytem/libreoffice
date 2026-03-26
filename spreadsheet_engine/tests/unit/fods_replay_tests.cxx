@@ -89,11 +89,11 @@ std::string formatError(Error eError)
         case Error::None:
             return "";
         case Error::IllegalArgument:
+        case Error::NoValue:
             return "#VALUE!";
         case Error::DivisionByZero:
             return "#DIV/0!";
         case Error::Domain:
-        case Error::NoValue:
         case Error::NoConvergence:
             return "#NUM!";
         case Error::StringOverflow:
@@ -167,6 +167,29 @@ std::vector<std::filesystem::path> collectFodsFiles(const std::filesystem::path&
     }
 
     std::sort(aFiles.begin(), aFiles.end());
+    return aFiles;
+}
+
+std::vector<std::filesystem::path> collectDefaultReplayCorpus()
+{
+    const std::filesystem::path aRepoRoot
+        = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
+
+    std::vector<std::filesystem::path> aFiles
+        = collectFodsFiles(aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions" / "logical"
+                           / "fods");
+
+    const std::filesystem::path aMathRoot
+        = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions" / "mathematical" / "fods";
+    for (const char* pWorkbook : { "add.fods", "product.fods", "rawsubtract.fods", "round.fods",
+             "rounddown.fods", "roundup.fods", "sub.fods", "sum.fods", "trunc.fods",
+             "mod.fods", "abs.fods", "int.fods", "sign.fods", "even.fods", "odd.fods",
+             "pi.fods", "ln.fods", "exp.fods", "log10.fods", "power.fods", "quotient.fods",
+             "gcd.fods", "lcm.fods", "radians.fods", "degrees.fods" })
+    {
+        aFiles.push_back(aMathRoot / pWorkbook);
+    }
+
     return aFiles;
 }
 
@@ -320,10 +343,7 @@ int main(int argc, char** argv)
     }
     else
     {
-        const auto aDefaultRoot
-            = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path() / "sc" / "qa"
-              / "unit" / "data" / "functions" / "logical" / "fods";
-        aWorkbooks = collectFodsFiles(aDefaultRoot);
+        aWorkbooks = collectDefaultReplayCorpus();
     }
 
     if (aWorkbooks.empty())

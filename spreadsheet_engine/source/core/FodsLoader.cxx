@@ -144,6 +144,32 @@ using XmlString = std::unique_ptr<xmlChar, decltype(xmlFree)>;
         return api::Error::NoConvergence;
     if (rText == u"#NAME?" || rText == u"#REF!" || rText == u"#NULL!")
         return api::Error::IllegalArgument;
+    if (rText.substr(0, 4) == u"Err:")
+    {
+        const api::StringView aCode = rText.substr(4);
+        bool bDigitsOnly = !aCode.empty();
+        for (const char16_t cChar : aCode)
+        {
+            if (cChar < u'0' || cChar > u'9')
+            {
+                bDigitsOnly = false;
+                break;
+            }
+        }
+
+        if (bDigitsOnly)
+        {
+            if (aCode == u"503" || aCode == u"523")
+                return api::Error::NoConvergence;
+            if (aCode == u"513")
+                return api::Error::StringOverflow;
+            if (aCode == u"519")
+                return api::Error::NoValue;
+            if (aCode == u"532")
+                return api::Error::DivisionByZero;
+            return api::Error::IllegalArgument;
+        }
+    }
 
     return api::Error::NoValue;
 }
@@ -160,6 +186,8 @@ using XmlString = std::unique_ptr<xmlChar, decltype(xmlFree)>;
         return api::Error::NoConvergence;
     if (rText == u"#NAME?" || rText == u"#REF!" || rText == u"#NULL!")
         return api::Error::IllegalArgument;
+    if (rText.substr(0, 4) == u"Err:")
+        return mapDisplayedError(rText);
     return std::nullopt;
 }
 

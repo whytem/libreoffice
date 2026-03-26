@@ -112,13 +112,59 @@ inline double approxFloor(double fValue) { return std::floor(fValue); }
 
 inline double approxCeil(double fValue) { return std::ceil(fValue); }
 
-inline double approxSub(double fLeft, double fRight) { return fLeft - fRight; }
+inline bool isRepresentableInteger(double fValue)
+{
+    return std::isfinite(fValue) && std::trunc(fValue) == fValue
+           && std::fabs(fValue) <= 0x1p53;
+}
 
 inline bool approxEqual(double fLeft, double fRight)
 {
+    static const double e48 = 0x1p-48;
+    static const double half15thSignificand = 5E-15;
+
+    if (fLeft == fRight)
+        return true;
+
+    if (fLeft == 0.0 || fRight == 0.0 || std::signbit(fLeft) != std::signbit(fRight))
+        return false;
+
     const double fDiff = std::fabs(fLeft - fRight);
-    const double fScale = std::max({ 1.0, std::fabs(fLeft), std::fabs(fRight) });
-    return fDiff <= (1.0e-12 * fScale);
+    if (!std::isfinite(fDiff))
+        return false;
+
+    const double fLeftAbs = std::fabs(fLeft);
+    const double fRightAbs = std::fabs(fRight);
+    const double fMin = std::min(fLeftAbs, fRightAbs);
+    const double fThreshold1 = fMin * e48;
+    const double fThreshold2 = std::pow(10.0, std::floor(std::log10(fMin))) * half15thSignificand;
+    if (fDiff >= std::max(fThreshold1, fThreshold2))
+        return false;
+
+    if (isRepresentableInteger(fLeftAbs) && isRepresentableInteger(fRightAbs))
+        return false;
+
+    return true;
+}
+
+inline double approxAdd(double fLeft, double fRight)
+{
+    if (((fLeft < 0.0 && fRight > 0.0) || (fRight < 0.0 && fLeft > 0.0))
+        && approxEqual(fLeft, -fRight))
+    {
+        return 0.0;
+    }
+    return fLeft + fRight;
+}
+
+inline double approxSub(double fLeft, double fRight)
+{
+    if (((fLeft < 0.0 && fRight < 0.0) || (fLeft > 0.0 && fRight > 0.0))
+        && approxEqual(fLeft, fRight))
+    {
+        return 0.0;
+    }
+    return fLeft - fRight;
 }
 
 inline double round(double fValue) { return std::round(fValue); }

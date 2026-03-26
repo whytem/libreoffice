@@ -52,6 +52,12 @@
               office:string-value="">
             <text:p>#N/A</text:p>
           </table:table-cell>
+          <table:table-cell table:formula="of:=IFERROR(;&quot;A&quot;)"
+              office:value-type="string"
+              office:string-value=""
+              calcext:value-type="error">
+            <text:p>Err:511</text:p>
+          </table:table-cell>
         </table:table-row>
         <table:table-row table:number-rows-repeated="2">
           <table:table-cell office:value-type="string" office:string-value="rep">

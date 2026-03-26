@@ -36,13 +36,26 @@ Workbook makeWorkbook()
     aSheet1.setCell(6, 0, Cell { CellValue::number(42.0), u"of:=UNKNOWN(1)" });
     aSheet1.setCell(7, 0, Cell { CellValue::number(1.0), u"of:=[.I1]" });
     aSheet1.setCell(8, 0, Cell { CellValue::number(1.0), u"of:=[.H1]" });
+    aSheet1.setCell(9, 0, Cell { CellValue::number(0.0), u"of:=-0.3+0.2+0.1" });
+    aSheet1.setCell(10, 0, Cell { CellValue::number(1.0), u"of:=MOD(11;2)" });
+    aSheet1.setCell(11, 0, Cell { CellValue::number(9.0), u"of:=IFERROR([Sheet3.A1];9)" });
+    aSheet1.setCell(12, 0, Cell { CellValue::number(4.0), u"of:=IFERROR(3;4)" });
+    aSheet1.setCell(13, 0, Cell { CellValue::number(8.0), u"of:=IFNA([Sheet3.B1];8)" });
+    aSheet1.setCell(14, 0, Cell { CellValue::number(2.0), u"of:=IF(0;1;2)" });
+    aSheet1.setCell(15, 0, Cell { CellValue::number(7.0), u"of:=IF(1;7;[Sheet3.A1])" });
 
     Sheet aSheet2;
     aSheet2.maName = u"Sheet2";
     aSheet2.setCell(0, 0, Cell { CellValue::number(3.0) });
 
+    Sheet aSheet3;
+    aSheet3.maName = u"Sheet3";
+    aSheet3.setCell(0, 0, Cell { CellValue::error(spreadsheetengine::api::Error::DivisionByZero) });
+    aSheet3.setCell(1, 0, Cell { CellValue::error(spreadsheetengine::api::Error::NotAvailable) });
+
     aWorkbook.maSheets.push_back(std::move(aSheet1));
     aWorkbook.maSheets.push_back(std::move(aSheet2));
+    aWorkbook.maSheets.push_back(std::move(aSheet3));
 
     aWorkbook.maNamedRanges.push_back(
         NamedRange { u"GlobalRange", {}, u"$Sheet1.$A$1", u"$Sheet1.$A$1:.$A$2" });
@@ -139,6 +152,70 @@ int main()
     }
 
     {
+        const auto aResult = aEvaluator.evaluateCell({ 0, 9, 0 });
+        if (!aResult || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 0.0))
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests", "approximate add mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCell({ 0, 10, 0 });
+        if (!aResult || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 1.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "MOD() mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCell({ 0, 11, 0 });
+        if (!aResult || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 9.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "IFERROR() alternate mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCell({ 0, 12, 0 });
+        if (!aResult || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 3.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "IFERROR() keep-primary mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCell({ 0, 13, 0 });
+        if (!aResult || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 8.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "IFNA() alternate mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCell({ 0, 14, 0 });
+        if (!aResult || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 2.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "IF() false-branch mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCell({ 0, 15, 0 });
+        if (!aResult || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 7.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "IF() lazy branch mismatch");
+        }
+    }
+
+    {
         const auto aResult = aEvaluator.evaluateFormula(u"of:=GlobalRange", { 0, 0, 0 });
         if (!aResult || !aResult.maValue.isMatrixReference()
             || aResult.maValue.maReference.matrixDimensions().mnColumns != 1
@@ -193,6 +270,14 @@ int main()
         {
             return fail(
                 "spreadsheetengine_fods_evaluator_tests", "imported sheet evaluation mismatch");
+        }
+
+        const auto aErr511Result = aFixtureEvaluator.evaluateCell({ 0, 7, 0 });
+        if (!aErr511Result || !aErr511Result.mbUsedCachedValue
+            || !aErr511Result.maValue.maValue.isError())
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests", "Err:511 cached fallback mismatch");
         }
     }
 
