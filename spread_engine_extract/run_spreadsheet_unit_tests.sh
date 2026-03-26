@@ -13,6 +13,18 @@ DEFAULT_TARGETS=(
     CppunitTest_sc_spreadsheet_functions_test
 )
 
+MILESTONE_TARGETS=(
+    CppunitTest_sc_ucalc
+    CppunitTest_sc_ucalc_formula2
+    CppunitTest_sc_ucalc_shared_cases
+    CppunitTest_sc_ucalc_sharedformula
+    CppunitTest_sc_ucalc_sort
+    CppunitTest_sc_cache_test
+    CppunitTest_sc_datetime_functions_test
+    CppunitTest_sc_text_functions_test
+    CppunitTest_sc_spreadsheet_functions_test
+)
+
 ENGINE_TARGETS=(
     CppunitTest_sc_ucalc
     CppunitTest_sc_ucalc_nanpayload
@@ -52,13 +64,15 @@ provided. Pass explicit make targets to override the profile list.
 
 Examples:
   spread_engine_extract/run_spreadsheet_unit_tests.sh
+  spread_engine_extract/run_spreadsheet_unit_tests.sh --milestone
   spread_engine_extract/run_spreadsheet_unit_tests.sh --engine
   spread_engine_extract/run_spreadsheet_unit_tests.sh CppunitTest_sc_ucalc
 
 Options:
   --smoke         Run the default fast validation subset
+  --milestone     Run the broader stable milestone subset
   --engine        Run a broader non-rendering Calc engine suite
-  --profile NAME  Select 'smoke' or 'engine'
+  --profile NAME  Select 'smoke', 'milestone', or 'engine'
   --help, -h      Show this help text
 
 Environment:
@@ -78,6 +92,9 @@ while (($# > 0)); do
             ;;
         --smoke)
             PROFILE=smoke
+            ;;
+        --milestone)
+            PROFILE=milestone
             ;;
         --engine|--full-engine)
             PROFILE=engine
@@ -111,9 +128,12 @@ done
 if ((${#EXPLICIT_TARGETS[@]} > 0)); then
     TARGETS=("${EXPLICIT_TARGETS[@]}")
 else
-    case "${PROFILE}" in
+        case "${PROFILE}" in
         smoke)
             TARGETS=("${DEFAULT_TARGETS[@]}")
+            ;;
+        milestone)
+            TARGETS=("${MILESTONE_TARGETS[@]}")
             ;;
         engine)
             TARGETS=("${ENGINE_TARGETS[@]}")

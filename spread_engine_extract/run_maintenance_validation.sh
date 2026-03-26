@@ -24,6 +24,7 @@ Runs the routine spreadsheet-engine maintenance gate:
 
 Examples:
   spread_engine_extract/run_maintenance_validation.sh
+  spread_engine_extract/run_maintenance_validation.sh --milestone
   spread_engine_extract/run_maintenance_validation.sh --engine
   spread_engine_extract/run_maintenance_validation.sh --calc-only --engine
   spread_engine_extract/run_maintenance_validation.sh --build-dir /tmp/se-build
@@ -35,6 +36,7 @@ Options:
   --no-configure      Skip the standalone cmake configure step
   --build-dir DIR     Override the standalone build directory
   --smoke             Run the Calc smoke profile (default)
+  --milestone         Run the broader stable Calc milestone profile
   --engine            Run the broader Calc engine profile
   --profile NAME      Forward a named Calc profile to run_spreadsheet_unit_tests.sh
   --help, -h          Show this help text
@@ -75,6 +77,9 @@ while (($# > 0)); do
             ;;
         --smoke)
             CALC_PROFILE=smoke
+            ;;
+        --milestone)
+            CALC_PROFILE=milestone
             ;;
         --engine|--full-engine)
             CALC_PROFILE=engine

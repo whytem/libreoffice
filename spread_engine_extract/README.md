@@ -23,6 +23,13 @@ default smoke lane:
 ./spread_engine_extract/run_maintenance_validation.sh --engine
 ```
 
+Use `--milestone` for the broader stable maintenance subset that sits between
+the fast smoke gate and the full engine profile:
+
+```bash
+./spread_engine_extract/run_maintenance_validation.sh --milestone
+```
+
 ## Standalone Build
 
 ```bash

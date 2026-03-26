@@ -1658,13 +1658,24 @@ Current status:
     - standalone configure/build/test, including the installed-package
       consumer smoke path
     - Calc validation through `run_spreadsheet_unit_tests.sh`, with smoke and
-      broader engine profiles still available
+      milestone, smoke, and broader engine profiles available
   - the Calc smoke lane has also been tightened into a more reliable routine
     maintenance subset:
     - it keeps `sc_ucalc`, `sc_ucalc_formula2`, `sc_ucalc_shared_cases`,
       `sc_ucalc_sharedformula`, and
       `sc_spreadsheet_functions_test` in the fast path
-    - the broader engine profile still retains the wider non-rendering Calc
+    - the new milestone profile now carries the broader stable Calc closeout
+      gate:
+      - `sc_ucalc`
+      - `sc_ucalc_formula2`
+      - `sc_ucalc_shared_cases`
+      - `sc_ucalc_sharedformula`
+      - `sc_ucalc_sort`
+      - `sc_cache_test`
+      - `sc_datetime_functions_test`
+      - `sc_text_functions_test`
+      - `sc_spreadsheet_functions_test`
+    - the broader engine profile still retains the widest non-rendering Calc
       coverage, including `sc_ucalc_formula`
   - the standalone and Calc parity lanes are now documented as one regular
     maintenance flow in:
@@ -1682,7 +1693,12 @@ Current status:
       - `ctest --test-dir /tmp/spreadsheetengine-standalone-build --output-on-failure`
     - LibreOffice:
       - `./spread_engine_extract/run_maintenance_validation.sh`
-  - Phase 11 is now substantially complete:
+  - a final closeout sweep is now complete:
+    - the stale near-term roadmap assumptions have been retired in favor of a
+      post-Phase-11 maintenance stance
+    - a broader stable milestone gate now exists alongside the fast smoke lane
+      and the wider engine lane
+  - Phase 11 is now complete:
     - `spread_engine_extract/` builds and installs as a real standalone package
     - Calc-side glue has been reduced to narrow host adapters and intentional
       compatibility bridges
@@ -1731,23 +1747,19 @@ Every implementation slice should do all of the following:
 6. Run the relevant LibreOffice and standalone gates before moving to the next
    slice.
 
-## Recommended Near-Term Sequence
+## Post-Phase 11 Status
 
-The most practical next path is:
+The extraction track described in Phases 6 through 11 is now complete enough
+to treat this repository as being in routine maintenance mode rather than in a
+major extraction sequence.
 
-1. Phase 6:
-   - closed enough to treat as a maintained validation lane rather than the
-     main implementation focus
-2. Phase 7:
-   - own the remaining formula/compiler/config primitives that still leak
-     `formula/` and Calc vocabulary
-3. Phase 8:
-   - continue the matrix/runtime substrate extraction on top of the existing
-     `MatrixOperators` move
-4. Phase 9:
-   - introduce the minimal host runtime and resume the more coupled
-     interpreter-family extraction
+The most practical ongoing workflow is:
 
-That order keeps both tracks moving in the same direction: each extraction
-slice becomes easier to test in standalone mode, and each standalone milestone
-reduces the risk of the next Calc extraction slice.
+1. Use `./spread_engine_extract/run_maintenance_validation.sh` for the default
+   dual-run maintenance gate.
+2. Use `./spread_engine_extract/run_maintenance_validation.sh --milestone` for
+   the broader stable Calc closeout subset.
+3. Use `./spread_engine_extract/run_spreadsheet_unit_tests.sh --engine` when a
+   change needs the wider non-rendering Calc engine suite.
+4. Treat any further work as package polish, downstream consumption hardening,
+   or normal engine maintenance instead of another staged extraction phase.
