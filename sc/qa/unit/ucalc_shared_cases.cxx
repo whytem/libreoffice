@@ -16,7 +16,7 @@
 #include <spreadsheetengine/compat/libreoffice/Host.hxx>
 #include <spreadsheetengine/api/Host.hxx>
 #include <spreadsheetengine/api/Parsing.hxx>
-#include <spreadsheetengine/core/HostValueAccess.hxx>
+#include <spreadsheetengine/detail/HostValueAccess.hxx>
 
 #include <cmath>
 #include <cstdint>

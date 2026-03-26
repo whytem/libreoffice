@@ -1,0 +1,58 @@
+set(SPREADSHEETENGINE_STANDALONE_PUBLIC_API_HEADERS
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Array.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Calendar.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Compiler.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Config.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Date.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Error.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/FormulaResult.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Grammar.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Host.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Logic.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Lookup.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/LookupCache.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Math.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Matrix.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Numeral.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Parsing.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Query.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Reference.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/ReferenceData.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/ReferenceUpdate.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Rounding.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/SharedFormula.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/String.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/StringReference.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Text.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Workday.hxx"
+)
+
+set(SPREADSHEETENGINE_STANDALONE_PUBLIC_RUNTIME_HEADERS
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/spreadsheetenginedllapi.h"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/DateTimeParts.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/DateTimeWeek.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/DateTimeWorkday.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/InMemoryHost.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/LibraryProbe.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/MathBitwise.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/MathFinancial.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/MathRounding.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/MathScalar.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/MathTranscendental.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/NumeralConversion.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/TextCase.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/TextScalar.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/TextServices.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/TextWidth.hxx"
+)
+
+set(SPREADSHEETENGINE_STANDALONE_PUBLIC_SHIM_HEADERS
+    "${SPREADSHEETENGINE_ROOT}/shims/include/rtl/math.hxx"
+    "${SPREADSHEETENGINE_ROOT}/shims/include/sal/types.h"
+)
+
+set(SPREADSHEETENGINE_STANDALONE_PUBLIC_HEADERS
+    ${SPREADSHEETENGINE_STANDALONE_PUBLIC_API_HEADERS}
+    ${SPREADSHEETENGINE_STANDALONE_PUBLIC_RUNTIME_HEADERS}
+    ${SPREADSHEETENGINE_STANDALONE_PUBLIC_SHIM_HEADERS}
+)

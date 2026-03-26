@@ -33,7 +33,7 @@
 #include <basic/sbxobj.hxx>
 #include <basic/sbuno.hxx>
 #include <osl/thread.h>
-#include <spreadsheetengine/core/ExecutionContext.hxx>
+#include <spreadsheetengine/detail/ExecutionContext.hxx>
 #include <svl/numformat.hxx>
 #include <svl/zforlist.hxx>
 #include <svl/sharedstringpool.hxx>

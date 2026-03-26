@@ -80,7 +80,7 @@
 #include <spreadsheetengine/api/Grammar.hxx>
 #include <spreadsheetengine/compat/libreoffice/Grammar.hxx>
 #include <spreadsheetengine/compat/formula/FormulaGrammar.hxx>
-#include <spreadsheetengine/core/CompilerSupport.hxx>
+#include <spreadsheetengine/detail/CompilerSupport.hxx>
 
 using namespace formula;
 namespace seapi = spreadsheetengine::api;

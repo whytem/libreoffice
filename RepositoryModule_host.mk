@@ -134,7 +134,7 @@ $(eval $(call gb_Module_add_moduledirs,libreoffice,\
 	sc \
 	scaddins \
 	sccomp \
-	spread_engine_extract \
+	spreadsheet_engine \
 	) \
 	$(call gb_Helper_optional,DESKTOP,scp2) \
 	scripting \

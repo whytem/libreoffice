@@ -63,8 +63,8 @@
 #include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Reference.hxx>
 #include <spreadsheetengine/api/StringReference.hxx>
-#include <spreadsheetengine/core/MathBitwise.hxx>
-#include <spreadsheetengine/core/MathTranscendental.hxx>
+#include <spreadsheetengine/runtime/MathBitwise.hxx>
+#include <spreadsheetengine/runtime/MathTranscendental.hxx>
 #include <spreadsheetengine/compat/libreoffice/Address.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <spreadsheetengine/compat/libreoffice/Grammar.hxx>

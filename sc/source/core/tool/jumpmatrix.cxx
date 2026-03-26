@@ -19,7 +19,7 @@
 
 #include <jumpmatrix.hxx>
 #include <scmatrix.hxx>
-#include <spreadsheetengine/core/JumpMatrixRuntime.hxx>
+#include <spreadsheetengine/detail/JumpMatrixRuntime.hxx>
 #include <osl/diagnose.h>
 
 namespace {

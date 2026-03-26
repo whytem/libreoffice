@@ -60,7 +60,7 @@ $(eval $(call gb_CppunitTest_use_libraries,sc_$(1)_functions_test, \
 ))
 
 $(eval $(call gb_CppunitTest_set_include,sc_$(1)_functions_test,\
-    -I$(SRCDIR)/spread_engine_extract/inc \
+    -I$(SRCDIR)/spreadsheet_engine/inc \
     -I$(SRCDIR)/sc/source/ui/inc \
     -I$(SRCDIR)/sc/inc \
     $$(INCLUDE) \

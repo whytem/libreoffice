@@ -12,7 +12,7 @@ $(eval $(call gb_Library_Library,scfilt))
 $(eval $(call gb_Library_set_componentfile,scfilt,sc/util/scfilt,services))
 
 $(eval $(call gb_Library_set_include,scfilt,\
-	-I$(SRCDIR)/spread_engine_extract/inc \
+	-I$(SRCDIR)/spreadsheet_engine/inc \
 	-I$(SRCDIR)/sc/source/core/inc \
 	-I$(SRCDIR)/sc/source/filter/inc \
 	-I$(SRCDIR)/sc/source/ui/inc \

@@ -18,7 +18,7 @@
  */
 
 #include <interpretercontext.hxx>
-#include <spreadsheetengine/core/ExecutionContext.hxx>
+#include <spreadsheetengine/detail/ExecutionContext.hxx>
 #include <svl/numformat.hxx>
 #include <svl/zforlist.hxx>
 

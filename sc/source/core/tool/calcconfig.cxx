@@ -15,10 +15,10 @@
 #include <formula/FormulaCompiler.hxx>
 #include <sal/log.hxx>
 #include <rtl/ustring.hxx>
-#include <spreadsheetengine/bridge/CalcPhase0Bridge.hxx>
+#include <spreadsheetengine/compat/libreoffice/LibraryProbe.hxx>
 #include <spreadsheetengine/compat/libreoffice/Config.hxx>
-#include <spreadsheetengine/core/ForceCalculation.hxx>
-#include <spreadsheetengine/core/CalcConfig.hxx>
+#include <spreadsheetengine/detail/ForceCalculation.hxx>
+#include <spreadsheetengine/detail/CalcConfig.hxx>
 #include <comphelper/configuration.hxx>
 
 #include <calcconfig.hxx>

@@ -20,8 +20,8 @@
 #include <scmatrix.hxx>
 #include <global.hxx>
 #include <address.hxx>
-#include <spreadsheetengine/core/MatrixGeometry.hxx>
-#include <spreadsheetengine/core/MatrixRuntime.hxx>
+#include <spreadsheetengine/detail/MatrixGeometry.hxx>
+#include <spreadsheetengine/detail/MatrixRuntime.hxx>
 #include <formula/errorcodes.hxx>
 #include <interpre.hxx>
 #include <mtvelements.hxx>

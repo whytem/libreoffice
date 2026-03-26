@@ -12,7 +12,7 @@ $(eval $(call gb_Library_Library,scui))
 $(eval $(call gb_Library_set_componentfile,scui,sc/util/scui,services))
 
 $(eval $(call gb_Library_set_include,scui,\
-	-I$(SRCDIR)/spread_engine_extract/inc \
+	-I$(SRCDIR)/spreadsheet_engine/inc \
 	-I$(SRCDIR)/sc/source/core/inc \
 	-I$(SRCDIR)/sc/source/filter/inc \
 	-I$(SRCDIR)/sc/source/ui/inc \

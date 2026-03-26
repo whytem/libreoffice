@@ -65,8 +65,8 @@
 #include <listenerqueryids.hxx>
 #include <grouparealistener.hxx>
 #include <formulalogger.hxx>
-#include <spreadsheetengine/core/FormulaCellReferenceUpdate.hxx>
-#include <spreadsheetengine/core/FormulaCellState.hxx>
+#include <spreadsheetengine/detail/FormulaCellReferenceUpdate.hxx>
+#include <spreadsheetengine/detail/FormulaCellState.hxx>
 #include <com/sun/star/sheet/FormulaLanguage.hpp>
 
 #if HAVE_FEATURE_OPENCL

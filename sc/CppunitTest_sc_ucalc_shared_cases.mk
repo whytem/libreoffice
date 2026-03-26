@@ -12,7 +12,7 @@
 $(eval $(call sc_ucalc_test,_shared_cases))
 
 $(eval $(call gb_CppunitTest_add_defs,sc_ucalc_shared_cases,\
-    -DSPREADSHEETENGINE_SHARED_CASE_ROOT=\"$(SRCDIR)/spread_engine_extract/tests/shared_cases\" \
+    -DSPREADSHEETENGINE_SHARED_CASE_ROOT=\"$(SRCDIR)/spreadsheet_engine/tests/parity\" \
 ))
 
 # vim: set noet sw=4 ts=4:
