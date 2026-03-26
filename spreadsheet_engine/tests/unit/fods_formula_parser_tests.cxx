@@ -170,6 +170,34 @@ int main()
     }
 
     {
+        const auto aResult = parseFormula(u"of:=EXACT(1;{1})");
+        if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
+            || aResult.mpRoot->maChildren.size() != 2
+            || aResult.mpRoot->maChildren[1]->meKind != NodeKind::ArrayConstant
+            || aResult.mpRoot->maChildren[1]->mnArrayRows != 1
+            || aResult.mpRoot->maChildren[1]->mnArrayColumns != 1
+            || aResult.mpRoot->maChildren[1]->maChildren.size() != 1
+            || aResult.mpRoot->maChildren[1]->maChildren[0]->meKind != NodeKind::NumberLiteral
+            || !almostEqual(aResult.mpRoot->maChildren[1]->maChildren[0]->mfNumber, 1.0))
+        {
+            return fail("spreadsheetengine_fods_parser_tests", "scalar array constant parse mismatch");
+        }
+    }
+
+    {
+        const auto aResult = parseFormula(u"of:=SUM({1|2;3|4})");
+        if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
+            || aResult.mpRoot->maChildren.size() != 1
+            || aResult.mpRoot->maChildren[0]->meKind != NodeKind::ArrayConstant
+            || aResult.mpRoot->maChildren[0]->mnArrayRows != 2
+            || aResult.mpRoot->maChildren[0]->mnArrayColumns != 2
+            || aResult.mpRoot->maChildren[0]->maChildren.size() != 4)
+        {
+            return fail("spreadsheetengine_fods_parser_tests", "matrix array constant parse mismatch");
+        }
+    }
+
+    {
         const auto aResult = parseFormula(u"of:=ABS(");
         if (aResult)
             return fail("spreadsheetengine_fods_parser_tests", "invalid formula unexpectedly parsed");

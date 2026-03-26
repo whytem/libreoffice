@@ -31,6 +31,7 @@ namespace
 
 constexpr const char* pOfficeNs = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 constexpr const char* pTableNs = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+constexpr const char* pTextNs = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 constexpr const char* pChartNs = "urn:oasis:names:tc:opendocument:xmlns:chart:1.0";
 constexpr const char* pDrawNs = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 constexpr const char* pXLinkNs = "http://www.w3.org/1999/xlink";
@@ -69,6 +70,68 @@ using XmlString = std::unique_ptr<xmlChar, decltype(xmlFree)>;
     u_strFromUTF8(reinterpret_cast<UChar*>(aResult.data()), nLength, nullptr, pUtf8, -1, &eStatus);
     if (U_FAILURE(eStatus))
         return {};
+
+    return aResult;
+}
+
+[[nodiscard]] std::optional<unsigned char> decodeCp1252Byte(char16_t cChar)
+{
+    if (cChar >= 0x0080 && cChar <= 0x00BF)
+        return static_cast<unsigned char>(cChar);
+
+    switch (cChar)
+    {
+        case 0x20AC: return 0x80;
+        case 0x201A: return 0x82;
+        case 0x0192: return 0x83;
+        case 0x201E: return 0x84;
+        case 0x2026: return 0x85;
+        case 0x2020: return 0x86;
+        case 0x2021: return 0x87;
+        case 0x02C6: return 0x88;
+        case 0x2030: return 0x89;
+        case 0x0160: return 0x8A;
+        case 0x2039: return 0x8B;
+        case 0x0152: return 0x8C;
+        case 0x017D: return 0x8E;
+        case 0x2018: return 0x91;
+        case 0x2019: return 0x92;
+        case 0x201C: return 0x93;
+        case 0x201D: return 0x94;
+        case 0x2022: return 0x95;
+        case 0x2013: return 0x96;
+        case 0x2014: return 0x97;
+        case 0x02DC: return 0x98;
+        case 0x2122: return 0x99;
+        case 0x0161: return 0x9A;
+        case 0x203A: return 0x9B;
+        case 0x0153: return 0x9C;
+        case 0x017E: return 0x9E;
+        case 0x0178: return 0x9F;
+        default:
+            return std::nullopt;
+    }
+}
+
+[[nodiscard]] api::String repairC2Mojibake(api::StringView rText)
+{
+    api::String aResult;
+    aResult.reserve(rText.size());
+
+    for (std::size_t nIndex = 0; nIndex < rText.size(); ++nIndex)
+    {
+        if (rText[nIndex] == u'\u00C2' && nIndex + 1 < rText.size())
+        {
+            if (const auto oByte = decodeCp1252Byte(rText[nIndex + 1]))
+            {
+                aResult.push_back(static_cast<char16_t>(*oByte));
+                ++nIndex;
+                continue;
+            }
+        }
+
+        aResult.push_back(rText[nIndex]);
+    }
 
     return aResult;
 }
@@ -197,9 +260,46 @@ using XmlString = std::unique_ptr<xmlChar, decltype(xmlFree)>;
     return std::nullopt;
 }
 
+void appendNodeText(const xmlNode* pNode, api::String& rText)
+{
+    for (const xmlNode* pCurrent = pNode; pCurrent; pCurrent = pCurrent->next)
+    {
+        if (pCurrent->type == XML_TEXT_NODE || pCurrent->type == XML_CDATA_SECTION_NODE)
+        {
+            rText += toApiString(pCurrent->content);
+            continue;
+        }
+
+        if (pCurrent->type != XML_ELEMENT_NODE)
+            continue;
+
+        if (matchesNode(pCurrent, pTextNs, "s"))
+        {
+            rText.append(parseRepeatCount(pCurrent, pTextNs, "c"), u' ');
+            continue;
+        }
+
+        if (matchesNode(pCurrent, pTextNs, "tab"))
+        {
+            rText.push_back(u'\t');
+            continue;
+        }
+
+        if (matchesNode(pCurrent, pTextNs, "line-break"))
+        {
+            rText.push_back(u'\n');
+            continue;
+        }
+
+        appendNodeText(pCurrent->children, rText);
+    }
+}
+
 [[nodiscard]] api::String getNodeText(const xmlNode* pNode)
 {
-    return toApiString(XmlString(xmlNodeGetContent(const_cast<xmlNode*>(pNode)), xmlFree).get());
+    api::String aText;
+    appendNodeText(pNode ? pNode->children : nullptr, aText);
+    return aText;
 }
 
 void countIgnoredFeatures(const xmlNode* pNode, IgnoredFeatureSummary& rSummary)
@@ -293,7 +393,8 @@ void countIgnoredFeatures(const xmlNode* pNode, IgnoredFeatureSummary& rSummary)
                 return aCell;
             }
         }
-        aCell.maRawValue = !aStringValue.empty() ? aStringValue : aDisplayedText;
+        aCell.maRawValue = repairC2Mojibake(
+            !aStringValue.empty() ? aStringValue : aDisplayedText);
         aCell.maValue = api::CellValue::text(aCell.maRawValue);
         return aCell;
     }

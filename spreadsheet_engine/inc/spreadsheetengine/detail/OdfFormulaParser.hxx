@@ -29,6 +29,7 @@ enum class NodeKind : sal_uInt8
     CellReference,
     RangeReference,
     NamedReference,
+    ArrayConstant,
     UnaryOperation,
     BinaryOperation,
     FunctionCall
@@ -63,6 +64,8 @@ struct Node
     api::String maSecondaryText;
     double mfNumber = 0.0;
     bool mbBoolean = false;
+    sal_Int32 mnArrayRows = 0;
+    sal_Int32 mnArrayColumns = 0;
     UnaryOperator meUnaryOperator = UnaryOperator::Plus;
     BinaryOperator meBinaryOperator = BinaryOperator::Add;
     std::vector<std::unique_ptr<Node>> maChildren;

@@ -287,6 +287,77 @@ class Parser
         return nullptr;
     }
 
+    [[nodiscard]] std::unique_ptr<Node> parseArrayConstant()
+    {
+        if (!consume(u'{'))
+            return nullptr;
+
+        auto pNode = makeNode(NodeKind::ArrayConstant);
+        sal_Int32 nRows = 1;
+        sal_Int32 nCurrentColumns = 0;
+        sal_Int32 nExpectedColumns = -1;
+
+        skipSpaces();
+        if (consume(u'}'))
+        {
+            fail(u"empty array constant");
+            return nullptr;
+        }
+
+        while (!atEnd())
+        {
+            auto pElement = parseComparison();
+            if (!pElement)
+                return nullptr;
+            pNode->maChildren.push_back(std::move(pElement));
+            ++nCurrentColumns;
+
+            skipSpaces();
+            if (consume(u'}'))
+            {
+                if (nExpectedColumns < 0)
+                    nExpectedColumns = nCurrentColumns;
+                else if (nCurrentColumns != nExpectedColumns)
+                {
+                    fail(u"ragged array constant");
+                    return nullptr;
+                }
+
+                pNode->mnArrayRows = nRows;
+                pNode->mnArrayColumns = nExpectedColumns;
+                return pNode;
+            }
+
+            if (consume(u'|'))
+            {
+                skipSpaces();
+                continue;
+            }
+
+            if (consume(u';'))
+            {
+                if (nExpectedColumns < 0)
+                    nExpectedColumns = nCurrentColumns;
+                else if (nCurrentColumns != nExpectedColumns)
+                {
+                    fail(u"ragged array constant");
+                    return nullptr;
+                }
+
+                ++nRows;
+                nCurrentColumns = 0;
+                skipSpaces();
+                continue;
+            }
+
+            fail(u"expected array separator");
+            return nullptr;
+        }
+
+        fail(u"unterminated array constant");
+        return nullptr;
+    }
+
     [[nodiscard]] std::unique_ptr<Node> parseIdentifierLike()
     {
         const auto aToken = parseIdentifierToken();
@@ -343,6 +414,9 @@ class Parser
 
         if (peek() == u'[')
             return parseBracketReference();
+
+        if (peek() == u'{')
+            return parseArrayConstant();
 
         if (peek() == u'"')
             return parseStringLiteral();

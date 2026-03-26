@@ -57,6 +57,10 @@ Workbook makeWorkbook()
     aSheet1.setCell(1, 6, Cell { CellValue::number(30.0) });
     aSheet1.setCell(18, 0, Cell { CellValue::number(20.0),
         u"of:=COM.MICROSOFT.AGGREGATE(1;2;[.B4:.B7])" });
+    aSheet1.setCell(19, 0, Cell { CellValue::text(u"AB"), u"of:=CLEAN(\"A\u0001B\")" });
+    aSheet1.setCell(20, 0, Cell { CellValue::text(u"AB"), u"of:=CLEAN(UNICHAR(128)&\"AB\")" });
+    aSheet1.setCell(21, 0, Cell { CellValue::boolean(true), u"of:=EXACT(1;1)" });
+    aSheet1.setCell(22, 0, Cell { CellValue::boolean(true), u"of:=EXACT(1;{1})" });
 
     Sheet aSheet2;
     aSheet2.maName = u"Sheet2";
@@ -248,6 +252,43 @@ int main()
         {
             return fail(
                 "spreadsheetengine_fods_evaluator_tests", "AGGREGATE() nested-skip mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCell({ 0, 19, 0 });
+        if (!aResult || !aResult.maValue.maValue.isText()
+            || aResult.maValue.maValue.maString != u"AB")
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "CLEAN() mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCell({ 0, 20, 0 });
+        if (!aResult || !aResult.maValue.maValue.isText()
+            || aResult.maValue.maValue.maString != u"AB")
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "UNICHAR() mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCell({ 0, 21, 0 });
+        if (!aResult || !aResult.maValue.maValue.isBoolean()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 1.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "EXACT() mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCell({ 0, 22, 0 });
+        if (!aResult || !aResult.maValue.maValue.isBoolean()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 1.0))
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests", "scalar array constant evaluation mismatch");
         }
     }
 

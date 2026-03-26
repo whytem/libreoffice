@@ -250,7 +250,14 @@ Secondary target families:
       `aggregate.fods`, with live evaluator support for prefixed one-range
       `AGGREGATE` forms, hidden/error option filtering, and nested
       `SUBTOTAL`/`AGGREGATE` skipping for options `0-3`.
-- [ ] Enable the text FODS family.
+- [x] Enable the text FODS family.
+      The default standalone replay lane now also scans the full raw text FODS
+      directory. The text-family enablement work added live standalone support
+      for `CLEAN()`, `UNICHAR()`, scalar and first-element range `EXACT()`, and
+      `1x1` array-constant parsing/evaluation, plus loader support for ODF text
+      markup like `text:s` and `text:tab` so raw expected cells replay
+      correctly. It also keeps the narrow `Â`+`C2 xx` cached-string mojibake
+      repair used by the Calc FODS corpus for `UNICHAR(128..191)`.
 - [ ] Enable the date_time FODS family.
 - [ ] Expand to selected spreadsheet lookup/reference workbooks.
 

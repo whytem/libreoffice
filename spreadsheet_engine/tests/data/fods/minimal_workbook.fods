@@ -58,9 +58,18 @@
               calcext:value-type="error">
             <text:p>Err:511</text:p>
           </table:table-cell>
+          <table:table-cell office:value-type="string" office:string-value="Â ">
+            <text:p>Â </text:p>
+          </table:table-cell>
           <table:table-cell office:value-type="boolean"
               office:boolean-value="2.5">
             <text:p>TRUE</text:p>
+          </table:table-cell>
+          <table:table-cell office:value-type="string">
+            <text:p><text:s text:c="2"/>lead</text:p>
+          </table:table-cell>
+          <table:table-cell office:value-type="string">
+            <text:p>a<text:tab/>b</text:p>
           </table:table-cell>
         </table:table-row>
         <table:table-row>

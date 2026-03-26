@@ -68,6 +68,9 @@ int main()
     const auto* pG1 = pSheet1->findCell(6, 0);
     const auto* pH1 = pSheet1->findCell(7, 0);
     const auto* pI1 = pSheet1->findCell(8, 0);
+    const auto* pJ1 = pSheet1->findCell(9, 0);
+    const auto* pK1 = pSheet1->findCell(10, 0);
+    const auto* pL1 = pSheet1->findCell(11, 0);
 
     if (!pA1 || !pA1->maValue.isNumber() || pA1->maValue.mfNumber != 1.0 || !pB1
         || !pB1->maValue.isText() || pB1->maValue.maString != u"hello" || !pC1
@@ -77,7 +80,10 @@ int main()
         || pE1->maValue.mfNumber != 1.0 || !pF1 || !pF1->maValue.isError()
         || pF1->maValue.meError != Error::NotAvailable || !pG1 || !pG1->maValue.isError()
         || pG1->maValue.meError != Error::NotAvailable || !pH1 || !pH1->maValue.isError()
-        || !pI1 || !pI1->maValue.isNumber() || pI1->maValue.mfNumber != 2.5
+        || !pI1 || !pI1->maValue.isText() || pI1->maValue.maString != u"\u00A0"
+        || !pJ1 || !pJ1->maValue.isNumber() || pJ1->maValue.mfNumber != 2.5
+        || !pK1 || !pK1->maValue.isText() || pK1->maValue.maString != u"  lead"
+        || !pL1 || !pL1->maValue.isText() || pL1->maValue.maString != u"a\tb"
         || pSheet1->isRowHidden(1) || !pSheet1->isRowHidden(2)
         || !pA2 || !pA3
         || pA2->maValue.maString != u"rep" || pA3->maValue.maString != u"rep"

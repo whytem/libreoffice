@@ -13,6 +13,7 @@
 
 #include <spreadsheetengine/api/Logic.hxx>
 #include <spreadsheetengine/api/Math.hxx>
+#include <spreadsheetengine/api/Text.hxx>
 
 #include <algorithm>
 #include <cmath>
@@ -540,6 +541,28 @@ struct AggregateScan
         }
         case formula::NodeKind::NamedReference:
             return api::String(rNode.maPrimaryText);
+        case formula::NodeKind::ArrayConstant:
+        {
+            api::String aResult = u"{";
+            for (sal_Int32 nRow = 0; nRow < rNode.mnArrayRows; ++nRow)
+            {
+                for (sal_Int32 nColumn = 0; nColumn < rNode.mnArrayColumns; ++nColumn)
+                {
+                    const std::size_t nIndex
+                        = static_cast<std::size_t>(nRow * rNode.mnArrayColumns + nColumn);
+                    const auto oElement = formatChildForDisplay(*rNode.maChildren[nIndex], 0);
+                    if (!oElement)
+                        return std::nullopt;
+                    aResult += *oElement;
+                    if (nColumn + 1 < rNode.mnArrayColumns)
+                        aResult.push_back(u',');
+                }
+                if (nRow + 1 < rNode.mnArrayRows)
+                    aResult.push_back(u';');
+            }
+            aResult.push_back(u'}');
+            return aResult;
+        }
         case formula::NodeKind::UnaryOperation:
         {
             const auto oChild = formatChildForDisplay(*rNode.maChildren[0], 6);
@@ -979,6 +1002,84 @@ EvaluationResult Evaluator::evaluateFunction(
         return aPrimary;
     }
 
+    if (aFunctionName == u"CLEAN")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aArgument
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aArgument)
+            return aArgument;
+
+        const auto aText = coerceToString(aArgument.maValue.maValue);
+        if (!aText)
+            return makeFailure(aText.meError);
+
+        return makeScalarResult(api::CellValue::text(
+            api::text::cleanPrintable(aText.maValue)));
+    }
+
+    if (aFunctionName == u"UNICHAR")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aArgument
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aArgument)
+            return aArgument;
+
+        const auto aCodePoint = coerceToNumber(aArgument.maValue.maValue);
+        if (!aCodePoint)
+            return makeFailure(aCodePoint.meError);
+
+        const auto oWholeNumber = toWholeNumber(aCodePoint.maValue);
+        if (!oWholeNumber || *oWholeNumber < 0)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aCharacter
+            = api::text::unicharFromCodePoint(static_cast<sal_uInt32>(*oWholeNumber));
+        if (!aCharacter)
+            return makeFailure(aCharacter.meError);
+
+        return makeScalarResult(api::CellValue::text(aCharacter.maValue));
+    }
+
+    if (aFunctionName == u"EXACT")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeFailure(api::Error::IllegalArgument);
+
+        auto materializeFirstValue = [&](const formula::Node& rArgument) -> EvaluationResult {
+            EvaluationResult aValue = evaluateNode(rArgument, rCurrentAddress);
+            if (!aValue)
+                return aValue;
+            if (aValue.maValue.isScalar())
+                return aValue;
+            return materializeReferenceValue(aValue.maValue.maReference, 0, 0);
+        };
+
+        EvaluationResult aLeft = materializeFirstValue(*rNode.maChildren[0]);
+        if (!aLeft)
+            return aLeft;
+
+        EvaluationResult aRight = materializeFirstValue(*rNode.maChildren[1]);
+        if (!aRight)
+            return aRight;
+
+        const auto aLeftText = coerceToString(aLeft.maValue.maValue);
+        if (!aLeftText)
+            return makeFailure(aLeftText.meError);
+
+        const auto aRightText = coerceToString(aRight.maValue.maValue);
+        if (!aRightText)
+            return makeFailure(aRightText.meError);
+
+        return makeScalarResult(api::CellValue::boolean(
+            aLeftText.maValue == aRightText.maValue));
+    }
+
     if (aFunctionName == u"MOD")
     {
         if (rNode.maChildren.size() != 2)
@@ -1214,6 +1315,12 @@ EvaluationResult Evaluator::evaluateNode(
             if (aRange.maValue.isSingleCell())
                 return materializeReferenceValue(aRange.maValue, 0, 0);
             return makeReferenceResult(aRange.maValue);
+        }
+        case formula::NodeKind::ArrayConstant:
+        {
+            if (rNode.mnArrayRows != 1 || rNode.mnArrayColumns != 1 || rNode.maChildren.empty())
+                return makeFailure(api::Error::IllegalArgument);
+            return evaluateNode(*rNode.maChildren[0], rCurrentAddress);
         }
         case formula::NodeKind::UnaryOperation:
         {
