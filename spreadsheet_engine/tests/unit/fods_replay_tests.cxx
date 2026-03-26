@@ -189,6 +189,11 @@ std::vector<std::filesystem::path> collectDefaultReplayCorpus()
     const auto aTextFiles = collectFodsFiles(aTextRoot);
     aFiles.insert(aFiles.end(), aTextFiles.begin(), aTextFiles.end());
 
+    const std::filesystem::path aDateTimeRoot
+        = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions" / "date_time" / "fods";
+    const auto aDateTimeFiles = collectFodsFiles(aDateTimeRoot);
+    aFiles.insert(aFiles.end(), aDateTimeFiles.begin(), aDateTimeFiles.end());
+
     return aFiles;
 }
 

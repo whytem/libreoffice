@@ -11,9 +11,13 @@
 
 #include <rtl/math.hxx>
 
+#include <spreadsheetengine/api/Calendar.hxx>
 #include <spreadsheetengine/api/Logic.hxx>
 #include <spreadsheetengine/api/Math.hxx>
 #include <spreadsheetengine/api/Text.hxx>
+#include <spreadsheetengine/runtime/DateTimeParts.hxx>
+
+#include "DateAlgorithms.hxx"
 
 #include <algorithm>
 #include <cmath>
@@ -78,9 +82,12 @@ namespace
 [[nodiscard]] api::String normalizeDisplayFunctionName(api::StringView rName)
 {
     const api::StringView aMicrosoftPrefix = u"COM.MICROSOFT.";
+    const api::StringView aLibreOfficePrefix = u"ORG.LIBREOFFICE.";
     const api::StringView aOpenOfficePrefix = u"ORG.OPENOFFICE.";
     if (rName.substr(0, aMicrosoftPrefix.size()) == aMicrosoftPrefix)
         return api::String(rName.substr(aMicrosoftPrefix.size()));
+    if (rName.substr(0, aLibreOfficePrefix.size()) == aLibreOfficePrefix)
+        return api::String(rName.substr(aLibreOfficePrefix.size()));
     if (rName.substr(0, aOpenOfficePrefix.size()) == aOpenOfficePrefix)
         return api::String(rName.substr(aOpenOfficePrefix.size()));
     return api::String(rName);
@@ -122,6 +129,481 @@ namespace
         return std::nullopt;
 
     return fValue;
+}
+
+[[nodiscard]] bool isAsciiWhitespace(char16_t cChar)
+{
+    return cChar == u' ' || cChar == u'\t' || cChar == u'\r' || cChar == u'\n';
+}
+
+[[nodiscard]] api::StringView trimAsciiWhitespace(api::StringView rValue)
+{
+    while (!rValue.empty() && isAsciiWhitespace(rValue.front()))
+        rValue.remove_prefix(1);
+    while (!rValue.empty() && isAsciiWhitespace(rValue.back()))
+        rValue.remove_suffix(1);
+    return rValue;
+}
+
+[[nodiscard]] std::optional<sal_Int16> parseAsciiInt16(api::StringView rValue)
+{
+    if (rValue.empty())
+        return std::nullopt;
+
+    sal_Int32 nValue = 0;
+    for (const char16_t cChar : rValue)
+    {
+        if (cChar < u'0' || cChar > u'9')
+            return std::nullopt;
+        nValue = (nValue * 10) + (cChar - u'0');
+    }
+    return static_cast<sal_Int16>(nValue);
+}
+
+[[nodiscard]] std::optional<sal_Int16> parseMonthName(api::StringView rValue)
+{
+    const api::String aUpper = uppercaseAscii(rValue);
+    if (aUpper == u"JAN" || aUpper == u"JANUARY")
+        return 1;
+    if (aUpper == u"FEB" || aUpper == u"FEBRUARY")
+        return 2;
+    if (aUpper == u"MAR" || aUpper == u"MARCH")
+        return 3;
+    if (aUpper == u"APR" || aUpper == u"APRIL")
+        return 4;
+    if (aUpper == u"MAY")
+        return 5;
+    if (aUpper == u"JUN" || aUpper == u"JUNE")
+        return 6;
+    if (aUpper == u"JUL" || aUpper == u"JULY")
+        return 7;
+    if (aUpper == u"AUG" || aUpper == u"AUGUST")
+        return 8;
+    if (aUpper == u"SEP" || aUpper == u"SEPT" || aUpper == u"SEPTEMBER")
+        return 9;
+    if (aUpper == u"OCT" || aUpper == u"OCTOBER")
+        return 10;
+    if (aUpper == u"NOV" || aUpper == u"NOVEMBER")
+        return 11;
+    if (aUpper == u"DEC" || aUpper == u"DECEMBER")
+        return 12;
+    return std::nullopt;
+}
+
+[[nodiscard]] bool splitThreePartNumericDate(api::StringView rValue, char16_t cSeparator,
+    sal_Int16& rnFirst, sal_Int16& rnSecond, sal_Int16& rnThird)
+{
+    const std::size_t nFirstSep = rValue.find(cSeparator);
+    if (nFirstSep == api::StringView::npos)
+        return false;
+    const std::size_t nSecondSep = rValue.find(cSeparator, nFirstSep + 1);
+    if (nSecondSep == api::StringView::npos)
+        return false;
+
+    const auto oFirst = parseAsciiInt16(rValue.substr(0, nFirstSep));
+    const auto oSecond
+        = parseAsciiInt16(rValue.substr(nFirstSep + 1, nSecondSep - nFirstSep - 1));
+    const auto oThird = parseAsciiInt16(rValue.substr(nSecondSep + 1));
+    if (!oFirst || !oSecond || !oThird)
+        return false;
+
+    rnFirst = *oFirst;
+    rnSecond = *oSecond;
+    rnThird = *oThird;
+    return true;
+}
+
+[[nodiscard]] bool parseDateText(
+    api::StringView rValue, sal_Int16& rnYear, sal_Int16& rnMonth, sal_Int16& rnDay)
+{
+    rValue = trimAsciiWhitespace(rValue);
+    if (rValue.empty())
+        return false;
+
+    sal_Int16 nFirst = 0;
+    sal_Int16 nSecond = 0;
+    sal_Int16 nThird = 0;
+    if (splitThreePartNumericDate(rValue, u'-', nFirst, nSecond, nThird))
+    {
+        rnYear = nFirst;
+        rnMonth = nSecond;
+        rnDay = nThird;
+        return true;
+    }
+
+    if (splitThreePartNumericDate(rValue, u'/', nFirst, nSecond, nThird))
+    {
+        rnMonth = nFirst;
+        rnDay = nSecond;
+        rnYear = nThird;
+        return true;
+    }
+
+    std::size_t nMonthEnd = 0;
+    while (nMonthEnd < rValue.size()
+           && ((rValue[nMonthEnd] >= u'A' && rValue[nMonthEnd] <= u'Z')
+               || (rValue[nMonthEnd] >= u'a' && rValue[nMonthEnd] <= u'z')))
+    {
+        ++nMonthEnd;
+    }
+
+    if (nMonthEnd == 0)
+        return false;
+
+    const auto oMonth = parseMonthName(rValue.substr(0, nMonthEnd));
+    if (!oMonth)
+        return false;
+    rnMonth = *oMonth;
+
+    api::StringView aTail = trimAsciiWhitespace(rValue.substr(nMonthEnd));
+    std::size_t nDayEnd = 0;
+    while (nDayEnd < aTail.size() && aTail[nDayEnd] >= u'0' && aTail[nDayEnd] <= u'9')
+        ++nDayEnd;
+    if (nDayEnd == 0)
+        return false;
+
+    const auto oDay = parseAsciiInt16(aTail.substr(0, nDayEnd));
+    if (!oDay)
+        return false;
+    rnDay = *oDay;
+
+    aTail = trimAsciiWhitespace(aTail.substr(nDayEnd));
+    if (!aTail.empty() && aTail.front() == u',')
+        aTail.remove_prefix(1);
+    aTail = trimAsciiWhitespace(aTail);
+
+    const auto oYear = parseAsciiInt16(aTail);
+    if (!oYear)
+        return false;
+    rnYear = *oYear;
+    return true;
+}
+
+[[nodiscard]] std::optional<double> parseTimeText(api::StringView rValue)
+{
+    rValue = trimAsciiWhitespace(rValue);
+    if (rValue.empty())
+        return std::nullopt;
+
+    bool bHasMeridiem = false;
+    bool bPM = false;
+    if (rValue.size() >= 2)
+    {
+        const api::String aSuffix = uppercaseAscii(rValue.substr(rValue.size() - 2));
+        if (aSuffix == u"AM" || aSuffix == u"PM")
+        {
+            bHasMeridiem = true;
+            bPM = aSuffix == u"PM";
+            rValue = trimAsciiWhitespace(rValue.substr(0, rValue.size() - 2));
+        }
+    }
+
+    const std::size_t nFirstColon = rValue.find(u':');
+    if (!bHasMeridiem && nFirstColon == api::StringView::npos)
+        return std::nullopt;
+
+    sal_Int16 nHour = 0;
+    sal_Int16 nMinute = 0;
+    sal_Int16 nSecond = 0;
+    if (nFirstColon == api::StringView::npos)
+    {
+        const auto oHour = parseAsciiInt16(rValue);
+        if (!oHour)
+            return std::nullopt;
+        nHour = *oHour;
+    }
+    else
+    {
+        const auto oHour = parseAsciiInt16(rValue.substr(0, nFirstColon));
+        if (!oHour)
+            return std::nullopt;
+        nHour = *oHour;
+
+        const std::size_t nSecondColon = rValue.find(u':', nFirstColon + 1);
+        if (nSecondColon == api::StringView::npos)
+        {
+            const auto oMinute = parseAsciiInt16(rValue.substr(nFirstColon + 1));
+            if (!oMinute)
+                return std::nullopt;
+            nMinute = *oMinute;
+        }
+        else
+        {
+            const auto oMinute
+                = parseAsciiInt16(rValue.substr(nFirstColon + 1, nSecondColon - nFirstColon - 1));
+            const auto oSecond = parseAsciiInt16(rValue.substr(nSecondColon + 1));
+            if (!oMinute || !oSecond)
+                return std::nullopt;
+            nMinute = *oMinute;
+            nSecond = *oSecond;
+        }
+    }
+
+    if (bHasMeridiem)
+    {
+        if (nHour < 1 || nHour > 12)
+            return std::nullopt;
+        if (bPM)
+            nHour = nHour == 12 ? 12 : static_cast<sal_Int16>(nHour + 12);
+        else
+            nHour = nHour == 12 ? 0 : nHour;
+    }
+
+    const auto aTimeSerial = api::calendar::makeTimeSerial(nHour, nMinute, nSecond);
+    if (!aTimeSerial)
+        return std::nullopt;
+    return aTimeSerial.maValue;
+}
+
+[[nodiscard]] std::optional<double> parseOdfTimeDuration(api::StringView rValue)
+{
+    if (rValue.empty())
+        return std::nullopt;
+
+    bool bNegative = false;
+    if (rValue.front() == u'-')
+    {
+        bNegative = true;
+        rValue.remove_prefix(1);
+    }
+
+    if (rValue.size() < 2 || rValue[0] != u'P' || rValue[1] != u'T')
+        return std::nullopt;
+
+    rValue.remove_prefix(2);
+    if (rValue.empty())
+        return std::nullopt;
+
+    double fHour = 0.0;
+    double fMinute = 0.0;
+    double fSecond = 0.0;
+    bool bSawField = false;
+    while (!rValue.empty())
+    {
+        std::size_t nFieldEnd = 0;
+        while (nFieldEnd < rValue.size()
+               && ((rValue[nFieldEnd] >= u'0' && rValue[nFieldEnd] <= u'9')
+                   || rValue[nFieldEnd] == u'.'))
+        {
+            ++nFieldEnd;
+        }
+        if (nFieldEnd == 0 || nFieldEnd >= rValue.size())
+            return std::nullopt;
+
+        const auto oNumber = parseAsciiDouble(rValue.substr(0, nFieldEnd));
+        if (!oNumber)
+            return std::nullopt;
+
+        switch (rValue[nFieldEnd])
+        {
+            case u'H':
+                fHour = *oNumber;
+                break;
+            case u'M':
+                fMinute = *oNumber;
+                break;
+            case u'S':
+                fSecond = *oNumber;
+                break;
+            default:
+                return std::nullopt;
+        }
+
+        bSawField = true;
+        rValue.remove_prefix(nFieldEnd + 1);
+    }
+
+    if (!bSawField)
+        return std::nullopt;
+
+    if (bNegative)
+    {
+        fHour = -fHour;
+        fMinute = -fMinute;
+        fSecond = -fSecond;
+    }
+
+    const auto aTimeSerial = api::calendar::makeTimeSerial(fHour, fMinute, fSecond);
+    if (!aTimeSerial)
+        return std::nullopt;
+    return aTimeSerial.maValue;
+}
+
+[[nodiscard]] std::optional<api::NumberParseResult> parseStandaloneNumberText(
+    api::StringView rValue)
+{
+    constexpr api::DateParts aDefaultNullDate { 1899, 12, 30 };
+
+    const api::StringView aTrimmed = trimAsciiWhitespace(rValue);
+    if (aTrimmed.empty())
+        return std::nullopt;
+
+    if (const auto oNumber = parseAsciiDouble(aTrimmed))
+        return api::NumberParseResult { *oNumber, 0, api::NumberParseResult::Kind::Number };
+
+    if (const auto oTime = parseTimeText(aTrimmed))
+        return api::NumberParseResult { *oTime, 0, api::NumberParseResult::Kind::Time };
+
+    sal_Int16 nYear = 0;
+    sal_Int16 nMonth = 0;
+    sal_Int16 nDay = 0;
+    if (parseDateText(aTrimmed, nYear, nMonth, nDay))
+    {
+        const auto aDateSerial
+            = api::calendar::makeDateSerial(aDefaultNullDate, nYear, nMonth, nDay, true);
+        if (!aDateSerial)
+            return std::nullopt;
+
+        return api::NumberParseResult {
+            aDateSerial.maValue, 0, api::NumberParseResult::Kind::Date
+        };
+    }
+
+    const std::size_t nSplitPos = aTrimmed.find_last_of(u' ');
+    if (nSplitPos == api::StringView::npos)
+        return std::nullopt;
+    const api::StringView aDatePart = trimAsciiWhitespace(aTrimmed.substr(0, nSplitPos));
+    const api::StringView aTimePart = trimAsciiWhitespace(aTrimmed.substr(nSplitPos + 1));
+    if (!parseDateText(aDatePart, nYear, nMonth, nDay) || aTimePart.empty())
+        return std::nullopt;
+
+    const auto aDateSerial = api::calendar::makeDateSerial(aDefaultNullDate, nYear, nMonth, nDay, true);
+    if (!aDateSerial)
+        return std::nullopt;
+
+    const auto oTimeSerial = parseTimeText(aTimePart);
+    if (!oTimeSerial)
+        return std::nullopt;
+
+    return api::NumberParseResult {
+        aDateSerial.maValue + *oTimeSerial, 0, api::NumberParseResult::Kind::DateTime
+    };
+}
+
+[[nodiscard]] constexpr api::DateParts defaultFodsNullDate()
+{
+    return { 1899, 12, 30 };
+}
+
+[[nodiscard]] std::optional<api::CellValue> parseTypedStoredCellValue(
+    const workbook::Cell& rCell)
+{
+    if (!rCell.maValue.isText())
+        return std::nullopt;
+
+    const api::StringView aLexical = !rCell.maRawValue.empty() ? api::StringView(rCell.maRawValue)
+                                                               : api::StringView(rCell.maValue.maString);
+    if (rCell.maRawValueType == u"date")
+    {
+        if (const auto oParsed = parseStandaloneNumberText(aLexical))
+        {
+            if (oParsed->meKind == api::NumberParseResult::Kind::Date
+                || oParsed->meKind == api::NumberParseResult::Kind::DateTime)
+            {
+                return api::CellValue::number(oParsed->mfValue);
+            }
+        }
+    }
+
+    if (rCell.maRawValueType == u"time")
+    {
+        if (const auto oDuration = parseOdfTimeDuration(aLexical))
+        {
+            return api::CellValue::number(
+                spreadsheetengine::core::datetime::normalizeTimeFraction(*oDuration));
+        }
+
+        if (const auto oParsed = parseStandaloneNumberText(aLexical))
+        {
+            if (oParsed->meKind == api::NumberParseResult::Kind::Time
+                || oParsed->meKind == api::NumberParseResult::Kind::DateTime)
+            {
+                return api::CellValue::number(
+                    spreadsheetengine::core::datetime::normalizeTimeFraction(oParsed->mfValue));
+            }
+        }
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<api::DateSerial> coerceToDateSerial(
+    const api::CellValue& rValue)
+{
+    switch (rValue.meKind)
+    {
+        case api::CellValueKind::Empty:
+            return static_cast<api::DateSerial>(0);
+        case api::CellValueKind::Number:
+        case api::CellValueKind::Boolean:
+            return static_cast<api::DateSerial>(rtl::math::approxFloor(rValue.mfNumber));
+        case api::CellValueKind::Text:
+        {
+            const auto oParsed = parseStandaloneNumberText(rValue.maString);
+            if (!oParsed)
+                return std::nullopt;
+            return static_cast<api::DateSerial>(rtl::math::approxFloor(oParsed->mfValue));
+        }
+        case api::CellValueKind::Error:
+            return std::nullopt;
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<double> shiftMonthSerial(
+    api::DateSerial nDateSerial, sal_Int32 nMonthOffset, bool bEndOfMonth)
+{
+    constexpr api::DateParts aNullDate = defaultFodsNullDate();
+
+    const sal_Int16 nYear = static_cast<sal_Int16>(
+        spreadsheetengine::core::datetime::extractYear(aNullDate, nDateSerial));
+    const sal_Int16 nMonth = static_cast<sal_Int16>(
+        spreadsheetengine::core::datetime::extractMonth(aNullDate, nDateSerial));
+    const auto aDayResult = spreadsheetengine::api::calendar::dayFromSerial(aNullDate, nDateSerial);
+    if (!aDayResult)
+        return std::nullopt;
+
+    const sal_Int32 nZeroBasedMonth
+        = static_cast<sal_Int32>(nYear) * 12 + static_cast<sal_Int32>(nMonth - 1) + nMonthOffset;
+    if (nZeroBasedMonth < 12)
+        return std::nullopt;
+
+    const sal_Int16 nTargetYear = static_cast<sal_Int16>(nZeroBasedMonth / 12);
+    const sal_Int16 nTargetMonth = static_cast<sal_Int16>((nZeroBasedMonth % 12) + 1);
+    const sal_uInt16 nDaysInTargetMonth = spreadsheetengine::core::detail::date::getDaysInMonth(
+        static_cast<sal_uInt16>(nTargetMonth), nTargetYear);
+    const sal_Int16 nTargetDay = bEndOfMonth
+                                     ? static_cast<sal_Int16>(nDaysInTargetMonth)
+                                     : static_cast<sal_Int16>(std::min<double>(
+                                           aDayResult.maValue, nDaysInTargetMonth));
+
+    const auto aShifted = spreadsheetengine::api::calendar::makeDateSerial(
+        aNullDate, nTargetYear, nTargetMonth, nTargetDay, true);
+    if (!aShifted)
+        return std::nullopt;
+    return aShifted.maValue;
+}
+
+[[nodiscard]] std::optional<double> computeWeeksDifference(
+    api::DateSerial nStartDate, api::DateSerial nEndDate, sal_Int16 nMode)
+{
+    if (nMode == 0)
+        return static_cast<double>((nEndDate - nStartDate) / 7);
+
+    if (nMode != 1)
+        return std::nullopt;
+
+    constexpr api::DateParts aEpoch { 1, 1, 1 };
+    constexpr api::DateParts aNullDate = defaultFodsNullDate();
+    const auto aOffset = api::calendar::makeDateSerial(
+        aEpoch, aNullDate.mnYear, aNullDate.mnMonth, aNullDate.mnDay, true);
+    if (!aOffset)
+        return std::nullopt;
+
+    const double fStartWeek = std::floor((nStartDate + aOffset.maValue) / 7.0);
+    const double fEndWeek = std::floor((nEndDate + aOffset.maValue) / 7.0);
+    return fEndWeek - fStartWeek;
 }
 
 [[nodiscard]] api::String formatNumber(double fValue)
@@ -1020,6 +1502,245 @@ EvaluationResult Evaluator::evaluateFunction(
             api::text::cleanPrintable(aText.maValue)));
     }
 
+    if (aFunctionName == u"VALUE" || aFunctionName == u"DATEVALUE" || aFunctionName == u"TIMEVALUE")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aArgument
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aArgument)
+            return aArgument;
+
+        const auto aText = coerceToString(aArgument.maValue.maValue);
+        if (!aText)
+            return makeFailure(aText.meError);
+
+        const auto oParsed = parseStandaloneNumberText(aText.maValue);
+        if (!oParsed)
+            return makeFailure(api::Error::IllegalArgument);
+
+        if (aFunctionName == u"VALUE")
+            return makeScalarResult(api::CellValue::number(oParsed->mfValue));
+
+        if (aFunctionName == u"DATEVALUE")
+        {
+            if (oParsed->meKind != api::NumberParseResult::Kind::Date
+                && oParsed->meKind != api::NumberParseResult::Kind::DateTime)
+            {
+                return makeFailure(api::Error::IllegalArgument);
+            }
+
+            return makeScalarResult(api::CellValue::number(
+                rtl::math::approxFloor(oParsed->mfValue)));
+        }
+
+        if (oParsed->meKind != api::NumberParseResult::Kind::Time
+            && oParsed->meKind != api::NumberParseResult::Kind::DateTime)
+        {
+            return makeFailure(api::Error::IllegalArgument);
+        }
+
+        return makeScalarResult(api::CellValue::number(
+            spreadsheetengine::core::datetime::normalizeTimeFraction(oParsed->mfValue)));
+    }
+
+    if (aFunctionName == u"TIME")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aHour
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aHour)
+            return aHour;
+        EvaluationResult aMinute
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
+        if (!aMinute)
+            return aMinute;
+        EvaluationResult aSecond
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[2], rCurrentAddress));
+        if (!aSecond)
+            return aSecond;
+
+        const auto aHourNumber = coerceToNumber(aHour.maValue.maValue);
+        if (!aHourNumber)
+            return makeFailure(aHourNumber.meError);
+        const auto aMinuteNumber = coerceToNumber(aMinute.maValue.maValue);
+        if (!aMinuteNumber)
+            return makeFailure(aMinuteNumber.meError);
+        const auto aSecondNumber = coerceToNumber(aSecond.maValue.maValue);
+        if (!aSecondNumber)
+            return makeFailure(aSecondNumber.meError);
+
+        const auto aTimeSerial = api::calendar::makeTimeSerial(
+            aHourNumber.maValue, aMinuteNumber.maValue, aSecondNumber.maValue);
+        if (!aTimeSerial)
+            return makeFailure(api::Error::IllegalArgument);
+
+        return makeScalarResult(api::CellValue::number(aTimeSerial.maValue));
+    }
+
+    if (aFunctionName == u"DATE")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aYear
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aYear)
+            return aYear;
+        EvaluationResult aMonth
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
+        if (!aMonth)
+            return aMonth;
+        EvaluationResult aDay
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[2], rCurrentAddress));
+        if (!aDay)
+            return aDay;
+
+        if (aYear.maValue.maValue.isEmpty() || aMonth.maValue.maValue.isEmpty()
+            || aDay.maValue.maValue.isEmpty())
+        {
+            return makeFailure(api::Error::IllegalArgument);
+        }
+
+        const auto aYearNumber = coerceToNumber(aYear.maValue.maValue);
+        if (!aYearNumber)
+            return makeFailure(aYearNumber.meError);
+        const auto aMonthNumber = coerceToNumber(aMonth.maValue.maValue);
+        if (!aMonthNumber)
+            return makeFailure(aMonthNumber.meError);
+        const auto aDayNumber = coerceToNumber(aDay.maValue.maValue);
+        if (!aDayNumber)
+            return makeFailure(aDayNumber.meError);
+
+        const sal_Int16 nYear = static_cast<sal_Int16>(std::trunc(aYearNumber.maValue));
+        const sal_Int16 nMonth = static_cast<sal_Int16>(std::trunc(aMonthNumber.maValue));
+        const sal_Int16 nDay = static_cast<sal_Int16>(std::trunc(aDayNumber.maValue));
+        if (nYear < 0)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aDateSerial
+            = api::calendar::makeDateSerial(defaultFodsNullDate(), nYear, nMonth, nDay, false);
+        if (!aDateSerial)
+            return makeFailure(api::Error::IllegalArgument);
+
+        return makeScalarResult(api::CellValue::number(aDateSerial.maValue));
+    }
+
+    if (aFunctionName == u"DAYSINMONTH" || aFunctionName == u"DAYSINYEAR"
+        || aFunctionName == u"ISLEAPYEAR" || aFunctionName == u"ISOWEEKNUM")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aArgument
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aArgument)
+            return aArgument;
+
+        const auto oDateSerial = coerceToDateSerial(aArgument.maValue.maValue);
+        if (!oDateSerial)
+            return makeFailure(api::Error::IllegalArgument);
+
+        constexpr api::DateParts aNullDate = defaultFodsNullDate();
+        const sal_Int16 nYear = static_cast<sal_Int16>(
+            spreadsheetengine::core::datetime::extractYear(aNullDate, *oDateSerial));
+        const sal_Int16 nMonth = static_cast<sal_Int16>(
+            spreadsheetengine::core::datetime::extractMonth(aNullDate, *oDateSerial));
+
+        if (aFunctionName == u"DAYSINMONTH")
+        {
+            return makeScalarResult(api::CellValue::number(
+                static_cast<double>(spreadsheetengine::core::detail::date::getDaysInMonth(
+                    static_cast<sal_uInt16>(nMonth), nYear))));
+        }
+
+        const bool bLeapYear = spreadsheetengine::core::detail::date::isLeapYear(nYear);
+        if (aFunctionName == u"DAYSINYEAR")
+            return makeScalarResult(api::CellValue::number(bLeapYear ? 366.0 : 365.0));
+
+        if (aFunctionName == u"ISOWEEKNUM")
+        {
+            return makeScalarResult(api::CellValue::number(
+                static_cast<double>(spreadsheetengine::api::calendar::isoWeekOfYear(
+                    aNullDate, *oDateSerial))));
+        }
+
+        return makeScalarResult(api::CellValue::boolean(bLeapYear));
+    }
+
+    if (aFunctionName == u"EDATE" || aFunctionName == u"EOMONTH")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aStart
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aStart)
+            return aStart;
+        EvaluationResult aMonths
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
+        if (!aMonths)
+            return aMonths;
+
+        const auto oDateSerial = coerceToDateSerial(aStart.maValue.maValue);
+        if (!oDateSerial)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aMonthNumber = coerceToNumber(aMonths.maValue.maValue);
+        if (!aMonthNumber || !std::isfinite(aMonthNumber.maValue))
+            return makeFailure(api::Error::IllegalArgument);
+
+        const sal_Int32 nMonthOffset = static_cast<sal_Int32>(std::trunc(aMonthNumber.maValue));
+        const auto oShifted = shiftMonthSerial(
+            *oDateSerial, nMonthOffset, aFunctionName == u"EOMONTH");
+        if (!oShifted)
+            return makeFailure(api::Error::IllegalArgument);
+
+        return makeScalarResult(api::CellValue::number(*oShifted));
+    }
+
+    if (aFunctionName == u"WEEKS")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aStart
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aStart)
+            return aStart;
+        EvaluationResult aEnd
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
+        if (!aEnd)
+            return aEnd;
+        EvaluationResult aMode
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[2], rCurrentAddress));
+        if (!aMode)
+            return aMode;
+
+        const auto oStartDate = coerceToDateSerial(aStart.maValue.maValue);
+        const auto oEndDate = coerceToDateSerial(aEnd.maValue.maValue);
+        if (!oStartDate || !oEndDate || aMode.maValue.maValue.isEmpty())
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aModeNumber = coerceToNumber(aMode.maValue.maValue);
+        if (!aModeNumber)
+            return makeFailure(aModeNumber.meError);
+
+        const auto oWholeMode = toWholeNumber(aModeNumber.maValue);
+        if (!oWholeMode)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto oWeeks = computeWeeksDifference(
+            *oStartDate, *oEndDate, static_cast<sal_Int16>(*oWholeMode));
+        if (!oWeeks)
+            return makeFailure(api::Error::IllegalArgument);
+
+        return makeScalarResult(api::CellValue::number(*oWeeks));
+    }
+
     if (aFunctionName == u"UNICHAR")
     {
         if (rNode.maChildren.size() != 1)
@@ -1109,6 +1830,35 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aModResult)
             return makeFailure(aModResult.meError);
         return makeScalarResult(api::CellValue::number(aModResult.maValue));
+    }
+
+    if (aFunctionName == u"RAWSUBTRACT")
+    {
+        if (rNode.maChildren.size() < 2)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aFirst
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aFirst)
+            return aFirst;
+        const auto aFirstNumber = coerceToNumber(aFirst.maValue.maValue);
+        if (!aFirstNumber)
+            return makeFailure(aFirstNumber.meError);
+
+        double fResult = aFirstNumber.maValue;
+        for (std::size_t nIndex = 1; nIndex < rNode.maChildren.size(); ++nIndex)
+        {
+            EvaluationResult aNext
+                = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[nIndex], rCurrentAddress));
+            if (!aNext)
+                return aNext;
+            const auto aNextNumber = coerceToNumber(aNext.maValue.maValue);
+            if (!aNextNumber)
+                return makeFailure(aNextNumber.meError);
+            fResult -= aNextNumber.maValue;
+        }
+
+        return makeScalarResult(api::CellValue::number(fResult));
     }
 
     if (aFunctionName == u"AND")
@@ -1436,7 +2186,11 @@ EvaluationResult Evaluator::evaluateCell(const api::CellAddress& rAddress)
     if (!pCell)
         return makeScalarResult(api::CellValue::empty());
     if (!pCell->hasFormula())
+    {
+        if (const auto oTypedValue = parseTypedStoredCellValue(*pCell))
+            return makeScalarResult(*oTypedValue);
         return makeScalarResult(pCell->maValue);
+    }
 
     CacheEntry& rEntry = maCellCache[makeAddressKey(rAddress)];
     if (rEntry.meState == CacheState::Complete)
@@ -1472,7 +2226,11 @@ EvaluationResult Evaluator::evaluateCell(const api::CellAddress& rAddress)
     }
 
     if (!aResult && aResult.maCyclePath.empty() && hasCachedFallbackValue(*pCell))
+    {
+        if (const auto oTypedValue = parseTypedStoredCellValue(*pCell))
+            return finalize(makeScalarResult(*oTypedValue, true));
         return finalize(makeScalarResult(pCell->maValue, true));
+    }
 
     return finalize(aResult);
 }

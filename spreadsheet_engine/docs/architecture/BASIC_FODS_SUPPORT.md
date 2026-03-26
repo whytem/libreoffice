@@ -258,7 +258,17 @@ Secondary target families:
       markup like `text:s` and `text:tab` so raw expected cells replay
       correctly. It also keeps the narrow `Â`+`C2 xx` cached-string mojibake
       repair used by the Calc FODS corpus for `UNICHAR(128..191)`.
-- [ ] Enable the date_time FODS family.
+- [x] Enable the date_time FODS family.
+      The default standalone replay lane now also scans the full raw date-time
+      FODS directory. The date-time enablement work added live standalone
+      support for `DATE()`, `TIME()`, `VALUE()`, `DATEVALUE()`, `TIMEVALUE()`,
+      `ORG.OPENOFFICE.DAYSINMONTH()`, `ORG.OPENOFFICE.DAYSINYEAR()`,
+      `ORG.OPENOFFICE.ISLEAPYEAR()`, `ISOWEEKNUM()`, `EDATE()`, `EOMONTH()`,
+      and `ORG.OPENOFFICE.WEEKS()`, plus the narrow
+      `ORG.LIBREOFFICE.RAWSUBTRACT()` helper used by some workbook self-checks.
+      The evaluator now also materializes stored typed date cells as numeric
+      serials and understands ODF `office:time-value="PT..."` durations for
+      typed stored time cells.
 - [ ] Expand to selected spreadsheet lookup/reference workbooks.
 
 #### Replay harness
