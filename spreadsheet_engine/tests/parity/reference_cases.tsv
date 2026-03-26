@@ -1,0 +1,5 @@
+# function	input_a	input_b	input_c	input_d	expected	error
+INDEX	3	2			8	
+INDEX_ROWVECTOR	2				20	
+OFFSET_VALUE	1	1			5	
+OFFSET_SUM	1	1	2	2	28	

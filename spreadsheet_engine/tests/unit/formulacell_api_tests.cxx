@@ -1,6 +1,7 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
 #include <iostream>
+#include <vector>
 
 #include <spreadsheetengine/detail/FormulaCellReferenceUpdate.hxx>
 #include <spreadsheetengine/detail/FormulaCellState.hxx>
@@ -597,6 +598,85 @@ int main()
                != GrowFinishPlan { true, true, false })
     {
         return fail("spreadsheetengine_formulacell_tests", "grow update plan mismatch");
+    }
+
+    struct BackendScenario
+    {
+        FormulaGroupPreflightPlan maPreflight;
+        GroupInterpretPreflightPlan maInterpret;
+        GroupBackendPreflightPlan maBackend;
+    };
+    const std::vector<BackendScenario> aBackendScenarios
+        = { { spreadsheetengine::core::formulacell::makeFormulaGroupPreflightPlan(
+                  false, false, false, false, false, false, false, false, true),
+                spreadsheetengine::core::formulacell::makeGroupInterpretPreflightPlan(
+                    false, false, true, true),
+                spreadsheetengine::core::formulacell::makeThreadingBackendPreflightPlan(
+                    false, false, true, true) },
+            { spreadsheetengine::core::formulacell::makeFormulaGroupPreflightPlan(
+                  false, true, false, false, false, false, false, false, true),
+                spreadsheetengine::core::formulacell::makeGroupInterpretPreflightPlan(
+                    true, true, true, true),
+                spreadsheetengine::core::formulacell::makeOpenCLBackendPreflightPlan(
+                    spreadsheetengine::core::formulacell::OpenCLVectorStateClass::Enabled, true,
+                    false, false, false) } };
+    if (aBackendScenarios[0].maPreflight
+            != FormulaGroupPreflightPlan { true, false, FormulaGroupPreflightFailure::None }
+        || aBackendScenarios[0].maInterpret
+               != GroupInterpretPreflightPlan { true, false, false, GroupInterpretFailure::None }
+        || aBackendScenarios[0].maBackend
+               != GroupBackendPreflightPlan { true, false, GroupBackendFailure::None }
+        || aBackendScenarios[1].maPreflight
+               != FormulaGroupPreflightPlan { false, false,
+                   FormulaGroupPreflightFailure::GroupCalcDisabled }
+        || aBackendScenarios[1].maInterpret
+               != GroupInterpretPreflightPlan { false, false, false,
+                   GroupInterpretFailure::DependencyComputationAborted }
+        || aBackendScenarios[1].maBackend
+               != GroupBackendPreflightPlan { false, true, GroupBackendFailure::OpenCLDisabled })
+    {
+        return fail("spreadsheetengine_formulacell_tests",
+                    "table-driven backend scenario mismatch");
+    }
+
+    struct ReferenceUpdateScenario
+    {
+        CopyUpdatePlan maCopy;
+        MoveUpdatePlan maMove;
+        ShiftUpdatePlan maShift;
+    };
+    const std::vector<ReferenceUpdateScenario> aReferenceUpdateScenarios
+        = { { spreadsheetengine::core::formulacellrefupdate::makeCopyUpdatePlan(
+                  { 5, 11, 19 }, true, 2, 3, 1, false, false, true, false),
+                spreadsheetengine::core::formulacellrefupdate::makeMoveUpdatePlan(
+                    { 5, 11, 19 }, true, 2, 3, 1, true, false, true, false, true, false,
+                    false, false, false, false),
+                spreadsheetengine::core::formulacellrefupdate::makeShiftUpdatePlan(
+                    { 5, 11, 19 }, { 5, 11, 20 }, false, true, false, true, false, true,
+                    false, false, false, false) },
+            { spreadsheetengine::core::formulacellrefupdate::makeCopyUpdatePlan(
+                  { 5, 11, 19 }, false, 2, 3, 1, false, true, false, true),
+                spreadsheetengine::core::formulacellrefupdate::makeMoveUpdatePlan(
+                    { 5, 11, 19 }, false, 2, 3, 1, true, false, false, false, false, true,
+                    false, false, false, false),
+                spreadsheetengine::core::formulacellrefupdate::makeShiftUpdatePlan(
+                    { 5, 11, 19 }, { 5, 14, 19 }, true, true, false, true, false, false, true,
+                    true, true, false) } };
+    if (aReferenceUpdateScenarios[0].maCopy
+            != CopyUpdatePlan { { 4, 9, 16 }, true, true, true, false }
+        || aReferenceUpdateScenarios[0].maMove
+               != MoveUpdatePlan { { 4, 9, 16 }, true, true, false, true, false, true, true }
+        || aReferenceUpdateScenarios[0].maShift
+               != ShiftUpdatePlan { true, true, true, true, false, true, true }
+        || aReferenceUpdateScenarios[1].maCopy
+               != CopyUpdatePlan { { 5, 11, 19 }, true, false, true, true }
+        || aReferenceUpdateScenarios[1].maMove
+               != MoveUpdatePlan { { 5, 11, 19 }, true, false, false, true, true, true, true }
+        || aReferenceUpdateScenarios[1].maShift
+               != ShiftUpdatePlan { true, true, true, true, true, true, true })
+    {
+        return fail("spreadsheetengine_formulacell_tests",
+                    "table-driven reference update scenario mismatch");
     }
 
     std::cout << "spreadsheetengine formulacell api tests passed\n";

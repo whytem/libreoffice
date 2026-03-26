@@ -1,0 +1,16 @@
+# function	input_a	input_b	input_c	expected	error
+MOD	10	3		1	
+LN	2.718281828459045			1	
+LOG10	1000			3	
+LOG	81	3		4	
+EVEN	3.2			4	
+ODD	-2.2			-3	
+BITAND	6	3		2	
+BITOR	10	6		14	
+BITXOR	10	6		12	
+BITLSHIFT	3	4		48	
+BITRSHIFT	16	2		4	
+CEILING.MATH	4.1	2		6	
+FLOOR.MATH	5.9	2		4	
+SQRT	81			9	
+LOG	-1	10			IllegalArgument

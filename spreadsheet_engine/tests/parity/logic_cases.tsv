@@ -1,0 +1,13 @@
+# function	input_a	input_b	input_c	input_d	input_e	expected	error
+IF	TRUE	then	else			then	
+IF	FALSE	then	else			else	
+IF2	TRUE	then				then	
+IF2	FALSE	then				FALSE	
+IFERROR		ok	alternate			ok	
+IFERROR	DivisionByZero		alternate			alternate	
+IFNA	NotAvailable		alternate			alternate	
+IFNA	DivisionByZero		alternate				DivisionByZero
+CHOOSE	2.9	one	two	three		two	
+IFS	1	1	one	2	two	one	
+IFS	2	1	one	2	two	two	
+IFS	3	1	one	2	two		NotAvailable

@@ -1,0 +1,9 @@
+# function	input_a	input_b	input_c	expected	error
+MATCH	20	0		2	
+MATCH	25	1		2	
+XMATCH	20	0	-1	2	
+LOOKUP	25			200	
+VLOOKUP	20	2	0	200	
+HLOOKUP	20	2	0	200	
+XLOOKUP	30			300	
+XLOOKUP_ROW	20			200	

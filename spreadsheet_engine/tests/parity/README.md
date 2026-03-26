@@ -16,6 +16,18 @@ Current usage:
   standalone suite and the Calc shared-cases lane together
 - locale-aware spreadsheet parsing parity currently lives in
   `locale_parsing_cases.tsv` and runs in both lanes
+- logical spreadsheet parity now also lives in `logic_cases.tsv` and runs in
+  both lanes
+- lookup spreadsheet parity now also lives in `lookup_cases.tsv` and runs in
+  both lanes
+- reference spreadsheet parity now also lives in `reference_cases.tsv` and runs
+  in both lanes
+- dynamic-array spreadsheet parity now also lives in `array_cases.tsv` and runs
+  in both lanes
+- scalar math spreadsheet parity now also lives in `math_scalar_cases.tsv` and
+  runs in both lanes
+- financial spreadsheet parity now also lives in `financial_cases.tsv` and runs
+  in both lanes
 
 Some rows may temporarily remain standalone-only when they exercise
 helper-layer contracts that do not yet map 1:1 onto spreadsheet-facing Calc

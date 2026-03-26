@@ -1,11 +1,13 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
 #include <iostream>
+#include <vector>
 
 #include <spreadsheetengine/api/Reference.hxx>
 #include <spreadsheetengine/api/ReferenceData.hxx>
 #include <spreadsheetengine/api/ReferenceUpdate.hxx>
 
+#include "SharedCaseSupport.hxx"
 #include "TestSupport.hxx"
 
 int main()
@@ -14,8 +16,18 @@ int main()
     using spreadsheetengine::api::CellRange;
     using spreadsheetengine::api::Error;
     using spreadsheetengine::api::MatrixDimensions;
+    using spreadsheetengine::api::RowIndex;
+    using spreadsheetengine::api::ColumnIndex;
     using spreadsheetengine::api::reference::IndexSelectionKind;
+    using spreadsheetengine::standalone::test::almostEqual;
+    using spreadsheetengine::standalone::test::loadSharedCaseRows;
+    using spreadsheetengine::standalone::test::parseDouble;
+    using spreadsheetengine::standalone::test::parseExpectedError;
     using spreadsheetengine::standalone::test::fail;
+
+    const std::vector<std::vector<double>> aMatrix
+        = { { 1.0, 2.0, 3.0 }, { 4.0, 5.0, 6.0 }, { 7.0, 8.0, 9.0 } };
+    const std::vector<double> aRowVector { 10.0, 20.0, 30.0 };
 
     const auto aArea = spreadsheetengine::api::reference::normalizeAreaSelection(2, 3);
     const auto aBadArea = spreadsheetengine::api::reference::normalizeAreaSelection(4, 3);
@@ -194,6 +206,91 @@ int main()
         || aReorderedRef != CellRange { { 4, 3, 1 }, { 4, 5, 2 } })
     {
         return fail("spreadsheetengine_reference_tests", "reorder update mismatch");
+    }
+
+    for (const auto& rRow : loadSharedCaseRows("reference_cases.tsv"))
+    {
+        if (rRow.maColumns.size() < 7)
+            return failSharedCase(
+                "spreadsheetengine_reference_tests", rRow,
+                "reference shared case column mismatch");
+
+        const auto& rFunction = rRow.maColumns[0];
+        const Error eExpectedError = parseExpectedError(rRow.maColumns[6]);
+        const double fExpected = parseDouble(rRow.maColumns[5]);
+
+        if (rFunction == "INDEX")
+        {
+            const auto aSelection = spreadsheetengine::api::reference::planIndexMatrixSelection(
+                MatrixDimensions { 3, 3 }, static_cast<RowIndex>(parseDouble(rRow.maColumns[1])),
+                static_cast<ColumnIndex>(parseDouble(rRow.maColumns[2])), false, 3);
+            if (eExpectedError != Error::None)
+            {
+                if (aSelection || aSelection.meError != eExpectedError)
+                {
+                    return failSharedCase(
+                        "spreadsheetengine_reference_tests", rRow, "INDEX error mismatch");
+                }
+            }
+            else if (!aSelection
+                     || !almostEqual(aMatrix[aSelection.maValue.maStart.mnRow]
+                                                [aSelection.maValue.maStart.mnColumn],
+                         fExpected))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_reference_tests", rRow, "INDEX value mismatch");
+            }
+        }
+        else if (rFunction == "INDEX_ROWVECTOR")
+        {
+            const auto aSelection = spreadsheetengine::api::reference::planIndexReferenceSelection(
+                CellRange { CellAddress { 0, 0, 0 }, CellAddress { 0, 2, 0 } },
+                0, static_cast<ColumnIndex>(parseDouble(rRow.maColumns[1])), 3);
+            if (!aSelection
+                || !almostEqual(aRowVector[aSelection.maValue.maRange.maStart.mnColumn], fExpected))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_reference_tests", rRow, "INDEX row-vector mismatch");
+            }
+        }
+        else if (rFunction == "OFFSET_VALUE" || rFunction == "OFFSET_SUM")
+        {
+            const auto aRange = spreadsheetengine::api::reference::planOffsetRange(
+                CellRange { CellAddress { 0, 0, 0 }, CellAddress { 0, 0, 0 } },
+                static_cast<RowIndex>(parseDouble(rRow.maColumns[1])),
+                static_cast<ColumnIndex>(parseDouble(rRow.maColumns[2])),
+                rFunction == "OFFSET_SUM"
+                    ? std::optional<RowIndex>(static_cast<RowIndex>(parseDouble(rRow.maColumns[3])))
+                    : std::nullopt,
+                rFunction == "OFFSET_SUM"
+                    ? std::optional<ColumnIndex>(static_cast<ColumnIndex>(parseDouble(rRow.maColumns[4])))
+                    : std::nullopt,
+                1023, 65535);
+            if (!aRange)
+                return failSharedCase(
+                    "spreadsheetengine_reference_tests", rRow, "OFFSET range mismatch");
+
+            double fActual = 0.0;
+            for (RowIndex nRow = aRange.maValue.maStart.mnRow; nRow <= aRange.maValue.maEnd.mnRow;
+                 ++nRow)
+            {
+                for (ColumnIndex nCol = aRange.maValue.maStart.mnColumn;
+                     nCol <= aRange.maValue.maEnd.mnColumn; ++nCol)
+                {
+                    fActual += aMatrix[nRow][nCol];
+                }
+            }
+
+            if (!almostEqual(fActual, fExpected))
+                return failSharedCase(
+                    "spreadsheetengine_reference_tests", rRow, "OFFSET value mismatch");
+        }
+        else
+        {
+            return failSharedCase(
+                "spreadsheetengine_reference_tests", rRow,
+                "unknown reference shared-case function");
+        }
     }
 
     std::cout << "spreadsheetengine reference api tests passed\n";

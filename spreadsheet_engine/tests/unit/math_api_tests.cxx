@@ -105,6 +105,303 @@ int main()
         return fail("spreadsheetengine_math_tests", "fromRoman() mismatch");
 
     for (const auto& rRow : spreadsheetengine::standalone::test::loadSharedCaseRows(
+             "math_scalar_cases.tsv"))
+    {
+        if (rRow.maColumns.size() < 6)
+            return failSharedCase(
+                "spreadsheetengine_math_tests", rRow, "math shared case column mismatch");
+
+        const auto& rFunction = rRow.maColumns[0];
+        const auto eExpectedError
+            = spreadsheetengine::standalone::test::parseExpectedError(rRow.maColumns[5]);
+
+        auto checkValueResult = [&](const auto& rResult, const char* pMismatch) -> int {
+            if (eExpectedError != Error::None)
+            {
+                if (rResult || rResult.meError != eExpectedError)
+                    return failSharedCase("spreadsheetengine_math_tests", rRow, pMismatch);
+            }
+            else if (!rResult
+                     || !almostEqual(
+                         rResult.maValue,
+                         spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[4])))
+            {
+                return failSharedCase("spreadsheetengine_math_tests", rRow, pMismatch);
+            }
+            return EXIT_SUCCESS;
+        };
+
+        if (rFunction == "MOD")
+        {
+            if (const int nFailure = checkValueResult(
+                    modulo(spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])),
+                    "MOD mismatch"))
+            {
+                return nFailure;
+            }
+        }
+        else if (rFunction == "LN")
+        {
+            if (const int nFailure = checkValueResult(
+                    naturalLogarithm(
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1])),
+                    "LN mismatch"))
+            {
+                return nFailure;
+            }
+        }
+        else if (rFunction == "LOG10")
+        {
+            if (const int nFailure = checkValueResult(
+                    logarithmBase10(
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1])),
+                    "LOG10 mismatch"))
+            {
+                return nFailure;
+            }
+        }
+        else if (rFunction == "LOG")
+        {
+            if (const int nFailure = checkValueResult(
+                    logarithm(spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])),
+                    "LOG mismatch"))
+            {
+                return nFailure;
+            }
+        }
+        else if (rFunction == "SQRT")
+        {
+            if (const int nFailure = checkValueResult(
+                    squareRoot(
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1])),
+                    "SQRT mismatch"))
+            {
+                return nFailure;
+            }
+        }
+        else if (rFunction == "BITAND")
+        {
+            if (const int nFailure = checkValueResult(
+                    bitAnd(spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])),
+                    "BITAND mismatch"))
+            {
+                return nFailure;
+            }
+        }
+        else if (rFunction == "BITOR")
+        {
+            if (const int nFailure = checkValueResult(
+                    bitOr(spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])),
+                    "BITOR mismatch"))
+            {
+                return nFailure;
+            }
+        }
+        else if (rFunction == "BITXOR")
+        {
+            if (const int nFailure = checkValueResult(
+                    bitXor(spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])),
+                    "BITXOR mismatch"))
+            {
+                return nFailure;
+            }
+        }
+        else if (rFunction == "BITLSHIFT")
+        {
+            if (const int nFailure = checkValueResult(
+                    bitLeftShift(
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])),
+                    "BITLSHIFT mismatch"))
+            {
+                return nFailure;
+            }
+        }
+        else if (rFunction == "BITRSHIFT")
+        {
+            if (const int nFailure = checkValueResult(
+                    bitRightShift(
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])),
+                    "BITRSHIFT mismatch"))
+            {
+                return nFailure;
+            }
+        }
+        else if (rFunction == "CEILING.MATH")
+        {
+            if (const int nFailure = checkValueResult(
+                    ceilingMs(spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])),
+                    "CEILING.MATH mismatch"))
+            {
+                return nFailure;
+            }
+        }
+        else if (rFunction == "FLOOR.MATH")
+        {
+            if (const int nFailure = checkValueResult(
+                    floorMs(spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                        spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])),
+                    "FLOOR.MATH mismatch"))
+            {
+                return nFailure;
+            }
+        }
+        else if (rFunction == "EVEN")
+        {
+            if (eExpectedError != Error::None
+                || !almostEqual(even(spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1])),
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[4])))
+            {
+                return failSharedCase("spreadsheetengine_math_tests", rRow, "EVEN mismatch");
+            }
+        }
+        else if (rFunction == "ODD")
+        {
+            if (eExpectedError != Error::None
+                || !almostEqual(odd(spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1])),
+                    spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[4])))
+            {
+                return failSharedCase("spreadsheetengine_math_tests", rRow, "ODD mismatch");
+            }
+        }
+        else
+        {
+            return failSharedCase(
+                "spreadsheetengine_math_tests", rRow, "unknown math shared-case function");
+        }
+    }
+
+    for (const auto& rRow : spreadsheetengine::standalone::test::loadSharedCaseRows(
+             "financial_cases.tsv"))
+    {
+        if (rRow.maColumns.size() < 9)
+            return failSharedCase(
+                "spreadsheetengine_math_tests", rRow, "financial shared case column mismatch");
+
+        const auto& rFunction = rRow.maColumns[0];
+        const double fExpected = spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[7]);
+
+        if (rFunction == "PMT")
+        {
+            if (!almostEqual(payment(spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[3]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[4]),
+                                 spreadsheetengine::standalone::test::parseBool(rRow.maColumns[5])),
+                    fExpected))
+            {
+                return failSharedCase("spreadsheetengine_math_tests", rRow, "PMT mismatch");
+            }
+        }
+        else if (rFunction == "FV")
+        {
+            if (!almostEqual(futureValue(
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[3]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[4]),
+                                 spreadsheetengine::standalone::test::parseBool(rRow.maColumns[5])),
+                    fExpected))
+            {
+                return failSharedCase("spreadsheetengine_math_tests", rRow, "FV mismatch");
+            }
+        }
+        else if (rFunction == "PV")
+        {
+            if (!almostEqual(presentValue(
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[3]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[4]),
+                                 spreadsheetengine::standalone::test::parseBool(rRow.maColumns[5])),
+                    fExpected))
+            {
+                return failSharedCase("spreadsheetengine_math_tests", rRow, "PV mismatch");
+            }
+        }
+        else if (rFunction == "EFFECT")
+        {
+            if (!almostEqual(effectiveAnnualRate(
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])),
+                    fExpected))
+            {
+                return failSharedCase("spreadsheetengine_math_tests", rRow, "EFFECT mismatch");
+            }
+        }
+        else if (rFunction == "NOMINAL")
+        {
+            if (!almostEqual(nominalAnnualRate(
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])),
+                    fExpected))
+            {
+                return failSharedCase("spreadsheetengine_math_tests", rRow, "NOMINAL mismatch");
+            }
+        }
+        else if (rFunction == "SLN")
+        {
+            if (!almostEqual(straightLineDepreciation(
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[3])),
+                    fExpected))
+            {
+                return failSharedCase("spreadsheetengine_math_tests", rRow, "SLN mismatch");
+            }
+        }
+        else if (rFunction == "SYD")
+        {
+            if (!almostEqual(sumOfYearsDepreciation(
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[3]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[4])),
+                    fExpected))
+            {
+                return failSharedCase("spreadsheetengine_math_tests", rRow, "SYD mismatch");
+            }
+        }
+        else if (rFunction == "RRI")
+        {
+            if (!almostEqual(growthRateOverPeriods(
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2]),
+                                 spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[3])),
+                    fExpected))
+            {
+                return failSharedCase("spreadsheetengine_math_tests", rRow, "RRI mismatch");
+            }
+        }
+        else if (rFunction == "RATE")
+        {
+            const auto aRateResult = solveRate(
+                spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1]),
+                spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2]),
+                spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[3]),
+                spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[4]),
+                spreadsheetengine::standalone::test::parseBool(rRow.maColumns[5]),
+                spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[6]), true);
+            if (!aRateResult || !aRateResult.mbConverged || !almostEqual(aRateResult.mfRate, fExpected))
+            {
+                return failSharedCase("spreadsheetengine_math_tests", rRow, "RATE mismatch");
+            }
+        }
+        else
+        {
+            return failSharedCase(
+                "spreadsheetengine_math_tests", rRow, "unknown financial shared-case function");
+        }
+    }
+
+    for (const auto& rRow : spreadsheetengine::standalone::test::loadSharedCaseRows(
              "numeral_conversion_cases.tsv"))
     {
         if (rRow.maColumns.size() < 6)

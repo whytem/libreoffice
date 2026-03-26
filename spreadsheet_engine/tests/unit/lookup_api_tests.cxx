@@ -2,10 +2,12 @@
 
 #include <iostream>
 #include <unordered_map>
+#include <vector>
 
 #include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/LookupCache.hxx>
 
+#include "SharedCaseSupport.hxx"
 #include "TestSupport.hxx"
 
 int main()
@@ -19,12 +21,41 @@ int main()
     using spreadsheetengine::api::lookup::PatternMode;
     using spreadsheetengine::api::lookup::SearchMode;
     using spreadsheetengine::api::lookup::VectorOrientation;
+    using spreadsheetengine::api::MatrixSize;
     using spreadsheetengine::api::lookupcache::CacheEntry;
     using spreadsheetengine::api::lookupcache::QueryCriteria;
     using spreadsheetengine::api::lookupcache::QueryKey;
     using spreadsheetengine::api::lookupcache::QueryOp;
     using spreadsheetengine::api::lookupcache::Result;
+    using spreadsheetengine::standalone::test::almostEqual;
+    using spreadsheetengine::standalone::test::loadSharedCaseRows;
+    using spreadsheetengine::standalone::test::parseDouble;
+    using spreadsheetengine::standalone::test::parseExpectedError;
     using spreadsheetengine::standalone::test::fail;
+
+    const std::vector<double> aLookupKeys { 10.0, 20.0, 30.0 };
+    const std::vector<double> aLookupValues { 100.0, 200.0, 300.0 };
+    const MatrixDimensions aVerticalTableDimensions { 2, 3 };
+    const MatrixDimensions aHorizontalTableDimensions { 3, 2 };
+
+    auto findExactHitOneBased = [&aLookupKeys](double fLookup) -> MatrixSize {
+        for (std::size_t i = 0; i < aLookupKeys.size(); ++i)
+        {
+            if (almostEqual(aLookupKeys[i], fLookup))
+                return static_cast<MatrixSize>(i + 1);
+        }
+        return 0;
+    };
+
+    auto findBestFitAscendingZeroBased = [&aLookupKeys](double fLookup) -> std::optional<MatrixSize> {
+        std::optional<MatrixSize> oBestFit;
+        for (std::size_t i = 0; i < aLookupKeys.size(); ++i)
+        {
+            if (aLookupKeys[i] <= fLookup)
+                oBestFit = static_cast<MatrixSize>(i);
+        }
+        return oBestFit;
+    };
 
     const auto aMatchDefault = spreadsheetengine::api::lookup::normalizeMatchType(1.0);
     const auto aMatchLower = spreadsheetengine::api::lookup::normalizeMatchType(-1.0);
@@ -213,6 +244,134 @@ int main()
         || eMissing != Result::NotAvailable || eNotCached != Result::NotCached)
     {
         return fail("spreadsheetengine_lookup_tests", "lookup cache result mismatch");
+    }
+
+    for (const auto& rRow : loadSharedCaseRows("lookup_cases.tsv"))
+    {
+        if (rRow.maColumns.size() < 6)
+            return failSharedCase(
+                "spreadsheetengine_lookup_tests", rRow, "lookup shared case column mismatch");
+
+        const auto& rFunction = rRow.maColumns[0];
+        const double fLookup = parseDouble(rRow.maColumns[1]);
+        const Error eExpectedError = parseExpectedError(rRow.maColumns[5]);
+        const double fExpected = parseDouble(rRow.maColumns[4]);
+
+        if (rFunction == "MATCH")
+        {
+            const auto aModes = spreadsheetengine::api::lookup::normalizeMatchType(
+                parseDouble(rRow.maColumns[2]));
+            if (!aModes)
+                return failSharedCase("spreadsheetengine_lookup_tests", rRow, "MATCH mode mismatch");
+
+            const MatrixSize nHitIndex
+                = aModes.maValue.meMatchMode == MatchMode::ExactOrNotAvailable
+                      ? findExactHitOneBased(fLookup)
+                      : 0;
+            const auto aResult = spreadsheetengine::api::lookup::resolveSearchResultIndex(
+                Operation::Match, nHitIndex, findBestFitAscendingZeroBased(fLookup));
+            if (eExpectedError != Error::None)
+            {
+                if (aResult || aResult.meError != eExpectedError)
+                    return failSharedCase(
+                        "spreadsheetengine_lookup_tests", rRow, "MATCH error mismatch");
+            }
+            else if (!aResult || !almostEqual(static_cast<double>(aResult.maValue), fExpected))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_lookup_tests", rRow, "MATCH value mismatch");
+            }
+        }
+        else if (rFunction == "XMATCH")
+        {
+            const auto aMatchMode = spreadsheetengine::api::lookup::normalizeExtendedMatchMode(
+                static_cast<sal_Int16>(parseDouble(rRow.maColumns[2])));
+            const auto aSearchMode = spreadsheetengine::api::lookup::normalizeSearchMode(
+                static_cast<sal_Int16>(parseDouble(rRow.maColumns[3])));
+            if (!aMatchMode || !aSearchMode)
+            {
+                return failSharedCase(
+                    "spreadsheetengine_lookup_tests", rRow, "XMATCH mode mismatch");
+            }
+
+            const auto aResult = spreadsheetengine::api::lookup::resolveSearchResultIndex(
+                Operation::XMatch, findExactHitOneBased(fLookup), std::nullopt);
+            if (!aResult || !almostEqual(static_cast<double>(aResult.maValue), fExpected))
+                return failSharedCase("spreadsheetengine_lookup_tests", rRow, "XMATCH mismatch");
+        }
+        else if (rFunction == "LOOKUP")
+        {
+            const auto aIndex = spreadsheetengine::api::lookup::resolveSearchResultIndex(
+                Operation::Lookup, 0, findBestFitAscendingZeroBased(fLookup));
+            if (!aIndex)
+                return failSharedCase("spreadsheetengine_lookup_tests", rRow, "LOOKUP index mismatch");
+
+            const auto aCoordinate = spreadsheetengine::api::lookup::planVectorElement(
+                VectorOrientation::Column, aIndex.maValue - 1, MatrixDimensions { 1, 3 });
+            if (!aCoordinate
+                || !almostEqual(aLookupValues[aCoordinate.maValue.mnRow], fExpected))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_lookup_tests", rRow, "LOOKUP value mismatch");
+            }
+        }
+        else if (rFunction == "VLOOKUP")
+        {
+            const auto aCoordinate = spreadsheetengine::api::lookup::planTabularLookupResult(
+                VectorOrientation::Column, findExactHitOneBased(fLookup) - 1,
+                static_cast<MatrixSize>(parseDouble(rRow.maColumns[2]) - 1),
+                aVerticalTableDimensions);
+            if (!aCoordinate
+                || !almostEqual(aLookupValues[aCoordinate.maValue.mnRow], fExpected))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_lookup_tests", rRow, "VLOOKUP value mismatch");
+            }
+        }
+        else if (rFunction == "HLOOKUP")
+        {
+            const auto aCoordinate = spreadsheetengine::api::lookup::planTabularLookupResult(
+                VectorOrientation::Row, findExactHitOneBased(fLookup) - 1,
+                static_cast<MatrixSize>(parseDouble(rRow.maColumns[2]) - 1),
+                aHorizontalTableDimensions);
+            if (!aCoordinate
+                || !almostEqual(aLookupValues[aCoordinate.maValue.mnColumn], fExpected))
+            {
+                return failSharedCase(
+                    "spreadsheetengine_lookup_tests", rRow, "HLOOKUP value mismatch");
+            }
+        }
+        else if (rFunction == "XLOOKUP" || rFunction == "XLOOKUP_ROW")
+        {
+            const MatrixSize nHitIndex = findExactHitOneBased(fLookup) - 1;
+            const bool bVertical = rFunction == "XLOOKUP";
+            const auto aShape = spreadsheetengine::api::lookup::validateXLookupResultShape(
+                bVertical ? MatrixDimensions { 1, 3 } : MatrixDimensions { 3, 1 },
+                bVertical ? MatrixDimensions { 1, 3 } : MatrixDimensions { 3, 1 });
+            if (!aShape)
+            {
+                return failSharedCase(
+                    "spreadsheetengine_lookup_tests", rRow, "XLOOKUP shape mismatch");
+            }
+
+            const auto aSlice = spreadsheetengine::api::lookup::planXLookupResultSlice(
+                aShape.maValue, nHitIndex,
+                bVertical ? MatrixDimensions { 1, 3 } : MatrixDimensions { 3, 1 });
+            if (!aSlice)
+                return failSharedCase(
+                    "spreadsheetengine_lookup_tests", rRow, "XLOOKUP slice mismatch");
+
+            const MatrixSize nValueIndex
+                = bVertical ? aSlice.maValue.maStart.mnRow : aSlice.maValue.maStart.mnColumn;
+            if (!almostEqual(aLookupValues[nValueIndex], fExpected))
+                return failSharedCase(
+                    "spreadsheetengine_lookup_tests", rRow, "XLOOKUP value mismatch");
+        }
+        else
+        {
+            return failSharedCase(
+                "spreadsheetengine_lookup_tests", rRow, "unknown lookup shared-case function");
+        }
     }
 
     std::cout << "spreadsheetengine lookup api tests passed\n";

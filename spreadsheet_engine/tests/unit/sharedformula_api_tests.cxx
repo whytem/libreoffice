@@ -164,6 +164,65 @@ int main()
                     "unshare boundary row planning mismatch");
     }
 
+    struct JoinScenario
+    {
+        TokenCompareState meState;
+        bool mbUpperShared = false;
+        bool mbLowerShared = false;
+        bool mbStickyBoundary = false;
+        JoinPlan maExpected;
+    };
+    const std::vector<JoinScenario> aJoinScenarios
+        = { { TokenCompareState::EqualInvariant, false, false, false,
+                { JoinAction::CreateGroup, true } },
+            { TokenCompareState::EqualRelativeRef, true, false, false,
+                { JoinAction::ExtendUpperGroup, false } },
+            { TokenCompareState::EqualRelativeRef, false, true, false,
+                { JoinAction::AdoptLowerGroup, false } },
+            { TokenCompareState::EqualRelativeRef, true, true, false,
+                { JoinAction::MergeGroups, false } },
+            { TokenCompareState::EqualRelativeRef, true, true, true,
+                { JoinAction::None, false } } };
+    for (const auto& rScenario : aJoinScenarios)
+    {
+        if (spreadsheetengine::api::sharedformula::makeJoinPlan(
+                rScenario.meState, rScenario.mbUpperShared, rScenario.mbLowerShared,
+                rScenario.mbStickyBoundary)
+            != rScenario.maExpected)
+        {
+            return fail("spreadsheetengine_sharedformula_tests",
+                        "table-driven join scenario mismatch");
+        }
+    }
+
+    struct UnshareScenario
+    {
+        sal_Int32 mnRow = 0;
+        sal_Int32 mnTopRow = 0;
+        sal_Int32 mnLength = 0;
+        spreadsheetengine::api::sharedformula::UnsharePlan maExpected;
+    };
+    const std::vector<UnshareScenario> aUnshareScenarios
+        = { { 10, 10, 2,
+                { spreadsheetengine::api::sharedformula::UnsharePosition::Top,
+                    false, true, false, 1, 0 } },
+            { 12, 10, 3,
+                { spreadsheetengine::api::sharedformula::UnsharePosition::Bottom,
+                    false, false, false, 2, 0 } },
+            { 11, 10, 4,
+                { spreadsheetengine::api::sharedformula::UnsharePosition::Middle,
+                    true, false, true, 1, 2 } } };
+    for (const auto& rScenario : aUnshareScenarios)
+    {
+        if (spreadsheetengine::api::sharedformula::makeUnsharePlan(
+                rScenario.mnRow, rScenario.mnTopRow, rScenario.mnLength)
+            != rScenario.maExpected)
+        {
+            return fail("spreadsheetengine_sharedformula_tests",
+                        "table-driven unshare scenario mismatch");
+        }
+    }
+
     std::cout << "spreadsheetengine sharedformula api tests passed\n";
     return EXIT_SUCCESS;
 }

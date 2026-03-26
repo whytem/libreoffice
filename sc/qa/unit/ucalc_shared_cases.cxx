@@ -210,12 +210,22 @@ double parseDouble(std::string_view rValue)
     return std::stod(aString);
 }
 
+bool parseBool(std::string_view rValue)
+{
+    std::string aUpper(rValue);
+    for (char& rChar : aUpper)
+        rChar = static_cast<char>(std::toupper(static_cast<unsigned char>(rChar)));
+    return aUpper == "TRUE" || aUpper == "1" || aUpper == "YES";
+}
+
 FormulaError parseExpectedError(std::string_view rValue)
 {
     if (rValue.empty())
         return FormulaError::NONE;
     if (rValue == "IllegalArgument")
         return FormulaError::IllegalArgument;
+    if (rValue == "DivisionByZero")
+        return FormulaError::DivisionByZero;
     if (rValue == "StringOverflow")
         return FormulaError::StringOverflow;
     if (rValue == "NoValue")
@@ -224,6 +234,8 @@ FormulaError parseExpectedError(std::string_view rValue)
         return FormulaError::IllegalFPOperation;
     if (rValue == "NoConvergence")
         return FormulaError::NoConvergence;
+    if (rValue == "NotAvailable")
+        return FormulaError::NotAvailable;
 
     CPPUNIT_FAIL("unknown expected error token in shared case");
     return FormulaError::NONE;
@@ -250,6 +262,17 @@ OUString makeDateFormula(std::string_view rToken)
            + OUString::number(std::stoi(aToken.substr(0, nDash1))) + u";"_ustr
            + OUString::number(std::stoi(aToken.substr(nDash1 + 1, nDash2 - nDash1 - 1)))
            + u";"_ustr + OUString::number(std::stoi(aToken.substr(nDash2 + 1))) + u")"_ustr;
+}
+
+OUString makeSharedCaseErrorFormula(std::string_view rToken)
+{
+    if (rToken == "DivisionByZero")
+        return u"1/0"_ustr;
+    if (rToken == "NotAvailable")
+        return u"NA()"_ustr;
+
+    CPPUNIT_FAIL("unknown shared-case error token");
+    return OUString();
 }
 
 void setTextCell(ScDocument* pDoc, SCCOL nCol, const OUString& rValue)
@@ -295,6 +318,82 @@ double encodeDateTokenAsYmdNumber(std::string_view rToken)
     return static_cast<double>(std::stoi(aToken.substr(0, nDash1)) * 10000
                                + std::stoi(aToken.substr(nDash1 + 1, nDash2 - nDash1 - 1)) * 100
                                + std::stoi(aToken.substr(nDash2 + 1)));
+}
+
+std::vector<std::vector<double>> parseNumericMatrixSpec(std::string_view rSpec)
+{
+    std::vector<std::vector<double>> aMatrix;
+    std::size_t nRowStart = 0;
+    while (nRowStart <= rSpec.size())
+    {
+        const std::size_t nRowEnd = rSpec.find('|', nRowStart);
+        const std::string_view aRowToken = nRowEnd == std::string_view::npos
+                                               ? rSpec.substr(nRowStart)
+                                               : rSpec.substr(nRowStart, nRowEnd - nRowStart);
+
+        std::vector<double> aRow;
+        std::size_t nValueStart = 0;
+        while (nValueStart <= aRowToken.size())
+        {
+            const std::size_t nValueEnd = aRowToken.find(',', nValueStart);
+            const std::string_view aValueToken
+                = nValueEnd == std::string_view::npos
+                      ? aRowToken.substr(nValueStart)
+                      : aRowToken.substr(nValueStart, nValueEnd - nValueStart);
+            if (!aValueToken.empty())
+                aRow.push_back(parseDouble(aValueToken));
+
+            if (nValueEnd == std::string_view::npos)
+                break;
+
+            nValueStart = nValueEnd + 1;
+        }
+
+        if (!aRow.empty())
+            aMatrix.push_back(std::move(aRow));
+
+        if (nRowEnd == std::string_view::npos)
+            break;
+
+        nRowStart = nRowEnd + 1;
+    }
+
+    return aMatrix;
+}
+
+void setNumberBlock(ScDocument* pDoc, SCCOL nStartCol, SCROW nStartRow,
+                    std::initializer_list<std::initializer_list<double>> aRows)
+{
+    SCROW nRow = nStartRow;
+    for (const auto& rRow : aRows)
+    {
+        SCCOL nCol = nStartCol;
+        for (double fValue : rRow)
+        {
+            pDoc->SetValue(ScAddress(nCol, nRow, 0), fValue);
+            ++nCol;
+        }
+        ++nRow;
+    }
+}
+
+void assertNumericMatrixResult(ScDocument* pDoc, SCCOL nStartCol, SCROW nStartRow,
+                               const std::vector<std::vector<double>>& rExpected,
+                               const SharedCaseRow& rRow, const char* pMismatch)
+{
+    for (std::size_t nRow = 0; nRow < rExpected.size(); ++nRow)
+    {
+        for (std::size_t nCol = 0; nCol < rExpected[nRow].size(); ++nCol)
+        {
+            const ScAddress aAddress(static_cast<SCCOL>(nStartCol + nCol),
+                                     static_cast<SCROW>(nStartRow + nRow), 0);
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(failSharedCase(rRow, pMismatch).c_str(), FormulaError::NONE,
+                                         pDoc->GetErrCode(aAddress));
+            CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(failSharedCase(rRow, pMismatch).c_str(),
+                                                 rExpected[nRow][nCol], pDoc->GetValue(aAddress),
+                                                 1e-9);
+        }
+    }
 }
 
 class TestSharedCases : public ScUcalcTestBase
@@ -502,6 +601,304 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testLocaleParsingSharedCases)
     }
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testLogicSharedCases)
+{
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"SharedCases"_ustr);
+
+    for (const auto& rRow : loadSharedCaseRows("logic_cases.tsv"))
+    {
+        clearRange(m_pDoc, ScRange(0, 0, 0, 5, 5, 0));
+        CPPUNIT_ASSERT_MESSAGE(
+            failSharedCase(rRow, "logic shared case column mismatch").c_str(),
+            rRow.maColumns.size() >= 8);
+
+        const auto& rFunction = rRow.maColumns[0];
+        const auto aExpectedValue = decodeUtf8TestString(rRow.maColumns[6]);
+        const FormulaError eExpectedError = parseExpectedError(rRow.maColumns[7]);
+        OUString aFormula;
+
+        if (rFunction == "IF")
+        {
+            setTextCell(m_pDoc, 1, decodeUtf8TestString(rRow.maColumns[2]));
+            setTextCell(m_pDoc, 2, decodeUtf8TestString(rRow.maColumns[3]));
+            aFormula = parseBool(rRow.maColumns[1]) ? u"=IF(TRUE;B1;C1)"_ustr
+                                                    : u"=IF(FALSE;B1;C1)"_ustr;
+        }
+        else if (rFunction == "IF2")
+        {
+            setTextCell(m_pDoc, 1, decodeUtf8TestString(rRow.maColumns[2]));
+            aFormula = parseBool(rRow.maColumns[1]) ? u"=IF(TRUE;B1)"_ustr
+                                                    : u"=IF(FALSE;B1)"_ustr;
+        }
+        else if (rFunction == "IFERROR" || rFunction == "IFNA")
+        {
+            setTextCell(m_pDoc, 2, decodeUtf8TestString(rRow.maColumns[3]));
+            const OUString aPrimaryExpr = rRow.maColumns[1].empty()
+                                              ? (setTextCell(
+                                                     m_pDoc, 1,
+                                                     decodeUtf8TestString(rRow.maColumns[2])),
+                                                  u"B1"_ustr)
+                                              : makeSharedCaseErrorFormula(rRow.maColumns[1]);
+
+            aFormula = OUString::Concat(u"=")
+                       + (rFunction == "IFNA" ? u"IFNA("_ustr : u"IFERROR("_ustr) + aPrimaryExpr
+                       + u";C1)"_ustr;
+        }
+        else if (rFunction == "CHOOSE")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            setTextCell(m_pDoc, 1, decodeUtf8TestString(rRow.maColumns[2]));
+            setTextCell(m_pDoc, 2, decodeUtf8TestString(rRow.maColumns[3]));
+            setTextCell(m_pDoc, 3, decodeUtf8TestString(rRow.maColumns[4]));
+            aFormula = u"=CHOOSE(A1;B1;C1;D1)"_ustr;
+        }
+        else if (rFunction == "IFS")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 1, parseDouble(rRow.maColumns[2]));
+            setTextCell(m_pDoc, 2, decodeUtf8TestString(rRow.maColumns[3]));
+            setValueCell(m_pDoc, 3, parseDouble(rRow.maColumns[4]));
+            setTextCell(m_pDoc, 4, decodeUtf8TestString(rRow.maColumns[5]));
+            aFormula = u"=IFS(A1=B1;C1;A1=D1;E1)"_ustr;
+        }
+        else
+        {
+            CPPUNIT_FAIL(failSharedCase(rRow, "unknown logic shared-case function").c_str());
+        }
+
+        if (eExpectedError != FormulaError::NONE)
+        {
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                failSharedCase(rRow, "logic error mismatch").c_str(), eExpectedError,
+                evaluateFormulaError(m_pDoc, aFormula));
+        }
+        else
+        {
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                failSharedCase(rRow, "logic value mismatch").c_str(), aExpectedValue,
+                evaluateFormulaString(m_pDoc, aFormula));
+        }
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testLookupSharedCases)
+{
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"SharedCases"_ustr);
+
+    for (const auto& rRow : loadSharedCaseRows("lookup_cases.tsv"))
+    {
+        clearRange(m_pDoc, ScRange(0, 0, 0, 16, 8, 0));
+        CPPUNIT_ASSERT_MESSAGE(
+            failSharedCase(rRow, "lookup shared case column mismatch").c_str(),
+            rRow.maColumns.size() >= 6);
+
+        const auto& rFunction = rRow.maColumns[0];
+        const FormulaError eExpectedError = parseExpectedError(rRow.maColumns[5]);
+
+        setNumberBlock(m_pDoc, 1, 0, { { 10, 100 }, { 20, 200 }, { 30, 300 } });
+        setNumberBlock(m_pDoc, 1, 4, { { 10, 20, 30 }, { 100, 200, 300 } });
+
+        OUString aFormula;
+        if (rFunction == "MATCH")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 3, parseDouble(rRow.maColumns[2]));
+            aFormula = u"=MATCH(A1;B1:B3;D1)"_ustr;
+        }
+        else if (rFunction == "XMATCH")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 3, parseDouble(rRow.maColumns[2]));
+            setValueCell(m_pDoc, 4, parseDouble(rRow.maColumns[3]));
+            aFormula = u"=XMATCH(A1;B1:B3;D1;E1)"_ustr;
+        }
+        else if (rFunction == "LOOKUP")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            aFormula = u"=LOOKUP(A1;B1:B3;C1:C3)"_ustr;
+        }
+        else if (rFunction == "VLOOKUP")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 3, parseDouble(rRow.maColumns[2]));
+            setValueCell(m_pDoc, 4, parseDouble(rRow.maColumns[3]));
+            aFormula = u"=VLOOKUP(A1;B1:C3;D1;E1)"_ustr;
+        }
+        else if (rFunction == "HLOOKUP")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 3, parseDouble(rRow.maColumns[2]));
+            setValueCell(m_pDoc, 4, parseDouble(rRow.maColumns[3]));
+            aFormula = u"=HLOOKUP(A1;B5:D6;D1;E1)"_ustr;
+        }
+        else if (rFunction == "XLOOKUP")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            aFormula = u"=XLOOKUP(A1;B1:B3;C1:C3)"_ustr;
+        }
+        else if (rFunction == "XLOOKUP_ROW")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            aFormula = u"=XLOOKUP(A1;B5:D5;B6:D6)"_ustr;
+        }
+        else
+        {
+            CPPUNIT_FAIL(failSharedCase(rRow, "unknown lookup shared-case function").c_str());
+        }
+
+        if (eExpectedError != FormulaError::NONE)
+        {
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                failSharedCase(rRow, "lookup error mismatch").c_str(), eExpectedError,
+                evaluateFormulaError(m_pDoc, aFormula));
+        }
+        else
+        {
+            CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(
+                failSharedCase(rRow, "lookup value mismatch").c_str(),
+                parseDouble(rRow.maColumns[4]), evaluateFormulaValue(m_pDoc, aFormula), 1e-9);
+        }
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testReferenceSharedCases)
+{
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"SharedCases"_ustr);
+
+    for (const auto& rRow : loadSharedCaseRows("reference_cases.tsv"))
+    {
+        clearRange(m_pDoc, ScRange(0, 0, 0, 8, 8, 0));
+        CPPUNIT_ASSERT_MESSAGE(
+            failSharedCase(rRow, "reference shared case column mismatch").c_str(),
+            rRow.maColumns.size() >= 7);
+
+        setNumberBlock(m_pDoc, 0, 0, { { 1, 2, 3 }, { 4, 5, 6 }, { 7, 8, 9 } });
+        setNumberBlock(m_pDoc, 12, 0, { { 10, 20, 30 } });
+
+        const auto& rFunction = rRow.maColumns[0];
+        OUString aFormula;
+        if (rFunction == "INDEX")
+        {
+            setValueCell(m_pDoc, 7, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 8, parseDouble(rRow.maColumns[2]));
+            aFormula = u"=INDEX(A1:C3;H1;I1)"_ustr;
+        }
+        else if (rFunction == "INDEX_ROWVECTOR")
+        {
+            setValueCell(m_pDoc, 7, parseDouble(rRow.maColumns[1]));
+            aFormula = u"=INDEX(M1:O1;0;H1)"_ustr;
+        }
+        else if (rFunction == "OFFSET_VALUE")
+        {
+            setValueCell(m_pDoc, 7, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 8, parseDouble(rRow.maColumns[2]));
+            aFormula = u"=OFFSET(A1;H1;I1)"_ustr;
+        }
+        else if (rFunction == "OFFSET_SUM")
+        {
+            setValueCell(m_pDoc, 7, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 8, parseDouble(rRow.maColumns[2]));
+            setValueCell(m_pDoc, 9, parseDouble(rRow.maColumns[3]));
+            setValueCell(m_pDoc, 10, parseDouble(rRow.maColumns[4]));
+            aFormula = u"=SUM(OFFSET(A1;H1;I1;J1;K1))"_ustr;
+        }
+        else
+        {
+            CPPUNIT_FAIL(failSharedCase(rRow, "unknown reference shared-case function").c_str());
+        }
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(
+            failSharedCase(rRow, "reference value mismatch").c_str(), parseDouble(rRow.maColumns[5]),
+            evaluateFormulaValue(m_pDoc, aFormula), 1e-9);
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testArraySharedCases)
+{
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"SharedCases"_ustr);
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+
+    for (const auto& rRow : loadSharedCaseRows("array_cases.tsv"))
+    {
+        clearRange(m_pDoc, ScRange(0, 0, 0, 40, 20, 0));
+        CPPUNIT_ASSERT_MESSAGE(
+            failSharedCase(rRow, "array shared case column mismatch").c_str(),
+            rRow.maColumns.size() >= 6);
+
+        setNumberBlock(m_pDoc, 0, 0, { { 1, 2, 3 }, { 4, 5, 6 }, { 7, 8, 9 } });
+        setNumberBlock(m_pDoc, 3, 0, { { 1 }, { 2 }, { 3 }, { 4 }, { 5 } });
+        setNumberBlock(m_pDoc, 20, 0, { { 10, 11 }, { 12, 13 } });
+        setNumberBlock(m_pDoc, 23, 0, { { 20, 21 }, { 22, 23 } });
+
+        const auto& rFunction = rRow.maColumns[0];
+        const auto aExpected = parseNumericMatrixSpec(rRow.maColumns[4]);
+        CPPUNIT_ASSERT(!aExpected.empty());
+        const SCCOL nStartCol = 30;
+        const SCROW nStartRow = 0;
+        const SCCOL nEndCol = static_cast<SCCOL>(nStartCol + aExpected[0].size() - 1);
+        const SCROW nEndRow = static_cast<SCROW>(nStartRow + aExpected.size() - 1);
+
+        OUString aFormula;
+        if (rFunction == "TAKE")
+        {
+            aFormula = u"=TAKE(A1:C3;"_ustr + OUString::number(parseDouble(rRow.maColumns[1]))
+                       + u";"_ustr + OUString::number(parseDouble(rRow.maColumns[2])) + u")"_ustr;
+        }
+        else if (rFunction == "DROP")
+        {
+            aFormula = u"=DROP(A1:C3;"_ustr + OUString::number(parseDouble(rRow.maColumns[1]))
+                       + u";"_ustr + OUString::number(parseDouble(rRow.maColumns[2])) + u")"_ustr;
+        }
+        else if (rFunction == "EXPAND")
+        {
+            aFormula = u"=EXPAND(A1:B2;"_ustr + OUString::number(parseDouble(rRow.maColumns[1]))
+                       + u";"_ustr + OUString::number(parseDouble(rRow.maColumns[2])) + u";"_ustr
+                       + OUString::number(parseDouble(rRow.maColumns[3])) + u")"_ustr;
+        }
+        else if (rFunction == "CHOOSECOLS")
+        {
+            aFormula = u"=CHOOSECOLS(A1:C3;"_ustr
+                       + OUString::number(parseDouble(rRow.maColumns[1])) + u";"_ustr
+                       + OUString::number(parseDouble(rRow.maColumns[2])) + u")"_ustr;
+        }
+        else if (rFunction == "CHOOSEROWS")
+        {
+            aFormula = u"=CHOOSEROWS(A1:C3;"_ustr
+                       + OUString::number(parseDouble(rRow.maColumns[1])) + u";"_ustr
+                       + OUString::number(parseDouble(rRow.maColumns[2])) + u")"_ustr;
+        }
+        else if (rFunction == "TOCOL")
+            aFormula = u"=TOCOL(A1:B2)"_ustr;
+        else if (rFunction == "TOROW")
+            aFormula = u"=TOROW(A1:B2)"_ustr;
+        else if (rFunction == "WRAPROWS")
+        {
+            aFormula = u"=WRAPROWS(D1:D5;"_ustr + OUString::number(parseDouble(rRow.maColumns[1]))
+                       + u";"_ustr + OUString::number(parseDouble(rRow.maColumns[2])) + u")"_ustr;
+        }
+        else if (rFunction == "WRAPCOLS")
+        {
+            aFormula = u"=WRAPCOLS(D1:D5;"_ustr + OUString::number(parseDouble(rRow.maColumns[1]))
+                       + u";"_ustr + OUString::number(parseDouble(rRow.maColumns[2])) + u")"_ustr;
+        }
+        else if (rFunction == "HSTACK")
+            aFormula = u"=HSTACK(U1:V2;X1:Y2)"_ustr;
+        else if (rFunction == "VSTACK")
+            aFormula = u"=VSTACK(U1:V2;X1:Y2)"_ustr;
+        else
+            CPPUNIT_FAIL(failSharedCase(rRow, "unknown array shared-case function").c_str());
+
+        m_pDoc->InsertMatrixFormula(nStartCol, nStartRow, nEndCol, nEndRow, aMark, aFormula);
+        assertNumericMatrixResult(m_pDoc, nStartCol, nStartRow, aExpected, rRow,
+                                  "array value mismatch");
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testDynamicArrayHelperFunctions)
 {
     sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
@@ -610,6 +1007,195 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testDynamicArrayHelperFunctions)
     assertValueCell(6, 19, 13);
     assertValueCell(5, 20, 20);
     assertValueCell(6, 21, 23);
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testMathScalarSharedCases)
+{
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"SharedCases"_ustr);
+
+    for (const auto& rRow : loadSharedCaseRows("math_scalar_cases.tsv"))
+    {
+        clearRange(m_pDoc, ScRange(0, 0, 0, 5, 5, 0));
+        CPPUNIT_ASSERT_MESSAGE(
+            failSharedCase(rRow, "math shared case column mismatch").c_str(),
+            rRow.maColumns.size() >= 6);
+
+        const auto& rFunction = rRow.maColumns[0];
+        const FormulaError eExpectedError = parseExpectedError(rRow.maColumns[5]);
+        OUString aFormula;
+
+        if (rFunction == "MOD")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 1, parseDouble(rRow.maColumns[2]));
+            aFormula = u"=MOD(A1;B1)"_ustr;
+        }
+        else if (rFunction == "LN")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            aFormula = u"=LN(A1)"_ustr;
+        }
+        else if (rFunction == "LOG10")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            aFormula = u"=LOG10(A1)"_ustr;
+        }
+        else if (rFunction == "LOG")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 1, parseDouble(rRow.maColumns[2]));
+            aFormula = u"=LOG(A1;B1)"_ustr;
+        }
+        else if (rFunction == "EVEN")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            aFormula = u"=EVEN(A1)"_ustr;
+        }
+        else if (rFunction == "ODD")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            aFormula = u"=ODD(A1)"_ustr;
+        }
+        else if (rFunction == "BITAND")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 1, parseDouble(rRow.maColumns[2]));
+            aFormula = u"=BITAND(A1;B1)"_ustr;
+        }
+        else if (rFunction == "BITOR")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 1, parseDouble(rRow.maColumns[2]));
+            aFormula = u"=BITOR(A1;B1)"_ustr;
+        }
+        else if (rFunction == "BITXOR")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 1, parseDouble(rRow.maColumns[2]));
+            aFormula = u"=BITXOR(A1;B1)"_ustr;
+        }
+        else if (rFunction == "BITLSHIFT")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 1, parseDouble(rRow.maColumns[2]));
+            aFormula = u"=BITLSHIFT(A1;B1)"_ustr;
+        }
+        else if (rFunction == "BITRSHIFT")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 1, parseDouble(rRow.maColumns[2]));
+            aFormula = u"=BITRSHIFT(A1;B1)"_ustr;
+        }
+        else if (rFunction == "CEILING.MATH")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 1, parseDouble(rRow.maColumns[2]));
+            aFormula = u"=CEILING.MATH(A1;B1)"_ustr;
+        }
+        else if (rFunction == "FLOOR.MATH")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 1, parseDouble(rRow.maColumns[2]));
+            aFormula = u"=FLOOR.MATH(A1;B1)"_ustr;
+        }
+        else if (rFunction == "SQRT")
+        {
+            setValueCell(m_pDoc, 0, parseDouble(rRow.maColumns[1]));
+            aFormula = u"=SQRT(A1)"_ustr;
+        }
+        else
+        {
+            CPPUNIT_FAIL(failSharedCase(rRow, "unknown math shared-case function").c_str());
+        }
+
+        if (eExpectedError != FormulaError::NONE)
+        {
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                failSharedCase(rRow, "math error mismatch").c_str(), eExpectedError,
+                evaluateFormulaError(m_pDoc, aFormula));
+        }
+        else
+        {
+            CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(
+                failSharedCase(rRow, "math value mismatch").c_str(),
+                parseDouble(rRow.maColumns[4]), evaluateFormulaValue(m_pDoc, aFormula), 1e-9);
+        }
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testFinancialSharedCases)
+{
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"SharedCases"_ustr);
+
+    for (const auto& rRow : loadSharedCaseRows("financial_cases.tsv"))
+    {
+        clearRange(m_pDoc, ScRange(0, 0, 0, 13, 5, 0));
+        CPPUNIT_ASSERT_MESSAGE(
+            failSharedCase(rRow, "financial shared case column mismatch").c_str(),
+            rRow.maColumns.size() >= 9);
+
+        const auto& rFunction = rRow.maColumns[0];
+        OUString aFormula;
+
+        if (rFunction == "PMT" || rFunction == "FV" || rFunction == "PV")
+        {
+            setValueCell(m_pDoc, 7, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 8, parseDouble(rRow.maColumns[2]));
+            setValueCell(m_pDoc, 9, parseDouble(rRow.maColumns[3]));
+            setValueCell(m_pDoc, 10, parseDouble(rRow.maColumns[4]));
+            setValueCell(m_pDoc, 11, parseDouble(rRow.maColumns[5]));
+            aFormula = OUString::Concat(u"=") + decodeUtf8TestString(rFunction)
+                       + u"(H1;I1;J1;K1;L1)"_ustr;
+        }
+        else if (rFunction == "EFFECT" || rFunction == "NOMINAL")
+        {
+            setValueCell(m_pDoc, 7, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 8, parseDouble(rRow.maColumns[2]));
+            aFormula = OUString::Concat(u"=") + decodeUtf8TestString(rFunction) + u"(H1;I1)"_ustr;
+        }
+        else if (rFunction == "SLN")
+        {
+            setValueCell(m_pDoc, 7, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 8, parseDouble(rRow.maColumns[2]));
+            setValueCell(m_pDoc, 9, parseDouble(rRow.maColumns[3]));
+            aFormula = u"=SLN(H1;I1;J1)"_ustr;
+        }
+        else if (rFunction == "SYD")
+        {
+            setValueCell(m_pDoc, 7, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 8, parseDouble(rRow.maColumns[2]));
+            setValueCell(m_pDoc, 9, parseDouble(rRow.maColumns[3]));
+            setValueCell(m_pDoc, 10, parseDouble(rRow.maColumns[4]));
+            aFormula = u"=SYD(H1;I1;J1;K1)"_ustr;
+        }
+        else if (rFunction == "RRI")
+        {
+            setValueCell(m_pDoc, 7, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 8, parseDouble(rRow.maColumns[2]));
+            setValueCell(m_pDoc, 9, parseDouble(rRow.maColumns[3]));
+            aFormula = u"=RRI(H1;I1;J1)"_ustr;
+        }
+        else if (rFunction == "RATE")
+        {
+            setValueCell(m_pDoc, 7, parseDouble(rRow.maColumns[1]));
+            setValueCell(m_pDoc, 8, parseDouble(rRow.maColumns[2]));
+            setValueCell(m_pDoc, 9, parseDouble(rRow.maColumns[3]));
+            setValueCell(m_pDoc, 10, parseDouble(rRow.maColumns[4]));
+            setValueCell(m_pDoc, 11, parseDouble(rRow.maColumns[5]));
+            setValueCell(m_pDoc, 12, parseDouble(rRow.maColumns[6]));
+            aFormula = u"=RATE(H1;I1;J1;K1;L1;M1)"_ustr;
+        }
+        else
+        {
+            CPPUNIT_FAIL(failSharedCase(rRow, "unknown financial shared-case function").c_str());
+        }
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(
+            failSharedCase(rRow, "financial value mismatch").c_str(),
+            parseDouble(rRow.maColumns[7]), evaluateFormulaValue(m_pDoc, aFormula), 1e-9);
+    }
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testNumeralSharedCases)

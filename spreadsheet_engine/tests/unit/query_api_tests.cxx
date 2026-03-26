@@ -1,6 +1,8 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
 #include <iostream>
+#include <string_view>
+#include <vector>
 
 #include <spreadsheetengine/api/Query.hxx>
 
@@ -345,6 +347,49 @@ int main()
                [](const StringItem& rItem) { return rItem.mpIdentity; }))
     {
         return fail("spreadsheetengine_query_tests", "string query cache helper mismatch");
+    }
+
+    struct TextQueryScenario
+    {
+        const char* mpName = "";
+        std::string_view maHaystack;
+        std::string_view maNeedle;
+        Operator meOperator = Operator::Equal;
+        bool mbExpectMatch = false;
+    };
+    const std::vector<TextQueryScenario> aTextScenarios
+        = { { "contains", "banana", "ana", Operator::Contains, true },
+            { "does-not-contain", "banana", "xyz", Operator::DoesNotContain, true },
+            { "begins-with", "banana", "ban", Operator::BeginsWith, true },
+            { "ends-with", "banana", "ana", Operator::EndsWith, true },
+            { "not-equal", "banana", "apple", Operator::NotEqual, true } };
+    for (const auto& rScenario : aTextScenarios)
+    {
+        const sal_Int32 nStart = spreadsheetengine::api::query::computeSubstringSearchStart(
+            rScenario.meOperator, rScenario.maHaystack.size(), rScenario.maNeedle.size());
+        const std::size_t nMatchPos
+            = spreadsheetengine::api::query::isEndsWithOp(rScenario.meOperator)
+                  ? rScenario.maHaystack.rfind(rScenario.maNeedle)
+                  : rScenario.maHaystack.find(rScenario.maNeedle, static_cast<std::size_t>(nStart));
+        const bool bFound = nMatchPos != std::string_view::npos;
+
+        bool bMatched = false;
+        if (spreadsheetengine::api::query::isPartialTextMatchOp(rScenario.meOperator))
+        {
+            bMatched = spreadsheetengine::api::query::evaluatePatternSearchMatch(
+                rScenario.meOperator, bFound, static_cast<sal_Int32>(bFound ? nMatchPos : 0),
+                static_cast<sal_Int32>(bFound ? nMatchPos + rScenario.maNeedle.size() : 0),
+                rScenario.maHaystack.size());
+        }
+        else
+        {
+            const int nCompare = rScenario.maHaystack == rScenario.maNeedle ? 0 : 1;
+            bMatched = spreadsheetengine::api::query::evaluateEqualityMatch(
+                rScenario.meOperator, nCompare == 0);
+        }
+
+        if (bMatched != rScenario.mbExpectMatch)
+            return fail("spreadsheetengine_query_tests", "table-driven text query mismatch");
     }
 
     std::cout << "spreadsheetengine query api tests passed\n";
