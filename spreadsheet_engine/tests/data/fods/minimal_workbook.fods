@@ -58,8 +58,18 @@
               calcext:value-type="error">
             <text:p>Err:511</text:p>
           </table:table-cell>
+          <table:table-cell office:value-type="boolean"
+              office:boolean-value="2.5">
+            <text:p>TRUE</text:p>
+          </table:table-cell>
         </table:table-row>
-        <table:table-row table:number-rows-repeated="2">
+        <table:table-row>
+          <table:table-cell office:value-type="string" office:string-value="rep">
+            <text:p>rep</text:p>
+          </table:table-cell>
+          <table:covered-table-cell table:number-columns-repeated="2"/>
+        </table:table-row>
+        <table:table-row table:visibility="collapse">
           <table:table-cell office:value-type="string" office:string-value="rep">
             <text:p>rep</text:p>
           </table:table-cell>

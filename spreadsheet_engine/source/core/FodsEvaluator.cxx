@@ -226,6 +226,161 @@ namespace
     return api::ValueResult<api::String>::failure(api::Error::IllegalArgument);
 }
 
+struct AggregateOptions
+{
+    bool mbIgnoreHiddenRows = false;
+    bool mbIgnoreErrors = false;
+    bool mbIgnoreNestedAggregates = false;
+};
+
+struct AggregateScan
+{
+    std::vector<double> maNumbers;
+    sal_Int32 mnNonEmptyCount = 0;
+};
+
+[[nodiscard]] std::optional<sal_Int32> toWholeNumber(double fValue)
+{
+    if (!std::isfinite(fValue))
+        return std::nullopt;
+
+    const double fRounded = std::round(fValue);
+    if (std::abs(fValue - fRounded) > 1e-9)
+        return std::nullopt;
+
+    return static_cast<sal_Int32>(fRounded);
+}
+
+[[nodiscard]] std::optional<AggregateOptions> decodeAggregateOptions(sal_Int32 nOption)
+{
+    switch (nOption)
+    {
+        case 0:
+            return AggregateOptions { false, false, true };
+        case 1:
+            return AggregateOptions { true, false, true };
+        case 2:
+            return AggregateOptions { false, true, true };
+        case 3:
+            return AggregateOptions { true, true, true };
+        case 4:
+            return AggregateOptions { false, false, false };
+        case 5:
+            return AggregateOptions { true, false, false };
+        case 6:
+            return AggregateOptions { false, true, false };
+        case 7:
+            return AggregateOptions { true, true, false };
+        default:
+            return std::nullopt;
+    }
+}
+
+[[nodiscard]] api::String normalizeFunctionName(api::StringView rName)
+{
+    return uppercaseAscii(normalizeDisplayFunctionName(rName));
+}
+
+[[nodiscard]] bool formulaContainsAggregateLike(const formula::Node& rNode)
+{
+    if (rNode.meKind == formula::NodeKind::FunctionCall)
+    {
+        const api::String aName = normalizeFunctionName(rNode.maPrimaryText);
+        if (aName == u"AGGREGATE" || aName == u"SUBTOTAL")
+            return true;
+    }
+
+    for (const auto& pChild : rNode.maChildren)
+    {
+        if (formulaContainsAggregateLike(*pChild))
+            return true;
+    }
+
+    return false;
+}
+
+[[nodiscard]] bool cellContainsAggregateLike(const workbook::Cell& rCell)
+{
+    if (!rCell.hasFormula())
+        return false;
+
+    const formula::ParseResult aParsed = formula::parseFormula(rCell.maFormula);
+    return aParsed && formulaContainsAggregateLike(*aParsed.mpRoot);
+}
+
+[[nodiscard]] double sumNumbers(const std::vector<double>& rNumbers)
+{
+    double fSum = 0.0;
+    for (const double fValue : rNumbers)
+        fSum = ::rtl::math::approxAdd(fSum, fValue);
+    return fSum;
+}
+
+[[nodiscard]] api::ValueResult<double> evaluateAggregateNumbers(
+    sal_Int32 nFunction, const AggregateScan& rScan)
+{
+    switch (nFunction)
+    {
+        case 1:
+            if (rScan.maNumbers.empty())
+                return api::ValueResult<double>::failure(api::Error::DivisionByZero);
+            return api::ValueResult<double>::success(
+                sumNumbers(rScan.maNumbers) / static_cast<double>(rScan.maNumbers.size()));
+        case 2:
+            return api::ValueResult<double>::success(static_cast<double>(rScan.maNumbers.size()));
+        case 3:
+            return api::ValueResult<double>::success(static_cast<double>(rScan.mnNonEmptyCount));
+        case 4:
+            if (rScan.maNumbers.empty())
+                return api::ValueResult<double>::success(0.0);
+            return api::ValueResult<double>::success(
+                *std::max_element(rScan.maNumbers.begin(), rScan.maNumbers.end()));
+        case 5:
+            if (rScan.maNumbers.empty())
+                return api::ValueResult<double>::success(0.0);
+            return api::ValueResult<double>::success(
+                *std::min_element(rScan.maNumbers.begin(), rScan.maNumbers.end()));
+        case 6:
+        {
+            if (rScan.maNumbers.empty())
+                return api::ValueResult<double>::success(0.0);
+
+            double fProduct = 1.0;
+            for (const double fValue : rScan.maNumbers)
+                fProduct *= fValue;
+            return api::ValueResult<double>::success(fProduct);
+        }
+        case 7:
+        case 8:
+        case 10:
+        case 11:
+        {
+            const bool bSample = nFunction == 7 || nFunction == 10;
+            const sal_Int32 nCount = static_cast<sal_Int32>(rScan.maNumbers.size());
+            if (nCount == 0 || (bSample && nCount < 2))
+                return api::ValueResult<double>::failure(api::Error::DivisionByZero);
+
+            const double fMean = sumNumbers(rScan.maNumbers) / static_cast<double>(nCount);
+            double fSquaredDeviation = 0.0;
+            for (const double fValue : rScan.maNumbers)
+            {
+                const double fDelta = fValue - fMean;
+                fSquaredDeviation += fDelta * fDelta;
+            }
+
+            const double fVariance = fSquaredDeviation
+                                     / static_cast<double>(bSample ? (nCount - 1) : nCount);
+            if (nFunction == 7 || nFunction == 8)
+                return api::ValueResult<double>::success(std::sqrt(fVariance));
+            return api::ValueResult<double>::success(fVariance);
+        }
+        case 9:
+            return api::ValueResult<double>::success(sumNumbers(rScan.maNumbers));
+        default:
+            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+}
+
 [[nodiscard]] std::optional<api::ColumnIndex> parseColumnName(api::StringView rColumnName)
 {
     if (rColumnName.empty())
@@ -520,17 +675,17 @@ namespace
     switch (eOperator)
     {
         case formula::BinaryOperator::Equal:
-            return fLeft == fRight;
+            return ::rtl::math::approxEqual(fLeft, fRight);
         case formula::BinaryOperator::NotEqual:
-            return fLeft != fRight;
+            return !::rtl::math::approxEqual(fLeft, fRight);
         case formula::BinaryOperator::Less:
             return fLeft < fRight;
         case formula::BinaryOperator::LessEqual:
-            return fLeft <= fRight;
+            return fLeft < fRight || ::rtl::math::approxEqual(fLeft, fRight);
         case formula::BinaryOperator::Greater:
             return fLeft > fRight;
         case formula::BinaryOperator::GreaterEqual:
-            return fLeft >= fRight;
+            return fLeft > fRight || ::rtl::math::approxEqual(fLeft, fRight);
         default:
             return false;
     }
@@ -675,7 +830,7 @@ EvaluationResult Evaluator::evaluateReferenceNode(
 EvaluationResult Evaluator::evaluateFunction(
     const formula::Node& rNode, const api::CellAddress& rCurrentAddress)
 {
-    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    const api::String aFunctionName = normalizeFunctionName(rNode.maPrimaryText);
 
     if (aFunctionName == u"TRUE")
     {
@@ -907,6 +1062,111 @@ EvaluationResult Evaluator::evaluateFunction(
             return makeFailure(api::Error::IllegalArgument);
 
         return makeScalarResult(api::CellValue::boolean(bResult));
+    }
+
+    if (aFunctionName == u"AGGREGATE")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aFunctionCode
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aFunctionCode)
+            return aFunctionCode;
+
+        EvaluationResult aOptionCode
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
+        if (!aOptionCode)
+            return aOptionCode;
+
+        const auto aFunctionNumber = coerceToNumber(aFunctionCode.maValue.maValue);
+        if (!aFunctionNumber)
+            return makeFailure(aFunctionNumber.meError);
+        const auto aOptionNumber = coerceToNumber(aOptionCode.maValue.maValue);
+        if (!aOptionNumber)
+            return makeFailure(aOptionNumber.meError);
+
+        const auto oFunction = toWholeNumber(aFunctionNumber.maValue);
+        const auto oOption = toWholeNumber(aOptionNumber.maValue);
+        if (!oFunction || !oOption || *oFunction < 1 || *oFunction > 11)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto oOptions = decodeAggregateOptions(*oOption);
+        if (!oOptions)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aReference = evaluateReferenceNode(*rNode.maChildren[2], rCurrentAddress);
+        if (!aReference)
+            return aReference;
+        if (!aReference.maValue.isMatrixReference())
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto& rReference = aReference.maValue.maReference;
+        const workbook::Sheet* pSheet = getSheet(rReference.maRange.maStart.mnSheet);
+        if (!pSheet)
+            return makeFailure(api::Error::IllegalArgument);
+
+        AggregateScan aScan;
+        for (api::RowIndex nRow = 0; nRow < rReference.maRange.rowCount(); ++nRow)
+        {
+            for (api::ColumnIndex nCol = 0; nCol < rReference.maRange.columnCount(); ++nCol)
+            {
+                const api::CellAddress aAddress = rReference.addressAt(nCol, nRow);
+                if (oOptions->mbIgnoreHiddenRows && pSheet->isRowHidden(aAddress.mnRow))
+                    continue;
+
+                const workbook::Cell* pReferencedCell = getCell(aAddress);
+                if (pReferencedCell && oOptions->mbIgnoreNestedAggregates
+                    && cellContainsAggregateLike(*pReferencedCell))
+                {
+                    continue;
+                }
+
+                EvaluationResult aCell = materializeReferenceValue(rReference, nCol, nRow);
+                if (!aCell)
+                {
+                    if (oOptions->mbIgnoreErrors && aCell.maCyclePath.empty())
+                        continue;
+                    if (*oFunction == 2)
+                        continue;
+                    if (*oFunction == 3)
+                    {
+                        ++aScan.mnNonEmptyCount;
+                        continue;
+                    }
+                    return aCell;
+                }
+
+                if (!aCell.maValue.isScalar())
+                    return makeFailure(api::Error::IllegalArgument);
+
+                const api::CellValue& rValue = aCell.maValue.maValue;
+                if (rValue.isError())
+                {
+                    if (oOptions->mbIgnoreErrors)
+                        continue;
+                    if (*oFunction == 2)
+                        continue;
+                    if (*oFunction == 3)
+                    {
+                        ++aScan.mnNonEmptyCount;
+                        continue;
+                    }
+                    return makeFailure(rValue.meError);
+                }
+
+                if (!rValue.isEmpty())
+                    ++aScan.mnNonEmptyCount;
+
+                if (rValue.isNumber())
+                    aScan.maNumbers.push_back(rValue.mfNumber);
+            }
+        }
+
+        const auto aAggregate = evaluateAggregateNumbers(*oFunction, aScan);
+        if (!aAggregate)
+            return makeFailure(aAggregate.meError);
+        return makeScalarResult(api::CellValue::number(aAggregate.maValue));
     }
 
     return makeFailure(api::Error::IllegalArgument);

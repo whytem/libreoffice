@@ -43,6 +43,20 @@ Workbook makeWorkbook()
     aSheet1.setCell(13, 0, Cell { CellValue::number(8.0), u"of:=IFNA([Sheet3.B1];8)" });
     aSheet1.setCell(14, 0, Cell { CellValue::number(2.0), u"of:=IF(0;1;2)" });
     aSheet1.setCell(15, 0, Cell { CellValue::number(7.0), u"of:=IF(1;7;[Sheet3.A1])" });
+    aSheet1.setCell(0, 3, Cell { CellValue::number(10.0) });
+    aSheet1.setCell(0, 4, Cell { CellValue::number(100.0) });
+    aSheet1.setCell(0, 5, Cell { CellValue::number(30.0) });
+    aSheet1.setRowHidden(4);
+    aSheet1.setCell(16, 0, Cell { CellValue::number(40.0),
+        u"of:=COM.MICROSOFT.AGGREGATE(9;5;[.A4:.A6])" });
+    aSheet1.setCell(17, 0, Cell { CellValue::number(20.0),
+        u"of:=COM.MICROSOFT.AGGREGATE(1;5;[.A4:.A6])" });
+    aSheet1.setCell(1, 3, Cell { CellValue::number(10.0) });
+    aSheet1.setCell(1, 4, Cell { CellValue::error(spreadsheetengine::api::Error::NotAvailable) });
+    aSheet1.setCell(1, 5, Cell { CellValue::number(999.0), u"of:=SUBTOTAL(9;[.B4:.B5])" });
+    aSheet1.setCell(1, 6, Cell { CellValue::number(30.0) });
+    aSheet1.setCell(18, 0, Cell { CellValue::number(20.0),
+        u"of:=COM.MICROSOFT.AGGREGATE(1;2;[.B4:.B7])" });
 
     Sheet aSheet2;
     aSheet2.maName = u"Sheet2";
@@ -216,6 +230,28 @@ int main()
     }
 
     {
+        const auto aSumResult = aEvaluator.evaluateCell({ 0, 16, 0 });
+        const auto aAverageResult = aEvaluator.evaluateCell({ 0, 17, 0 });
+        if (!aSumResult || aSumResult.mbUsedCachedValue || !aSumResult.maValue.maValue.isNumber()
+            || !almostEqual(aSumResult.maValue.maValue.mfNumber, 40.0) || !aAverageResult
+            || aAverageResult.mbUsedCachedValue || !aAverageResult.maValue.maValue.isNumber()
+            || !almostEqual(aAverageResult.maValue.maValue.mfNumber, 20.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "AGGREGATE() hidden-row mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCell({ 0, 18, 0 });
+        if (!aResult || aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 20.0))
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests", "AGGREGATE() nested-skip mismatch");
+        }
+    }
+
+    {
         const auto aResult = aEvaluator.evaluateFormula(u"of:=GlobalRange", { 0, 0, 0 });
         if (!aResult || !aResult.maValue.isMatrixReference()
             || aResult.maValue.maReference.matrixDimensions().mnColumns != 1
@@ -278,6 +314,57 @@ int main()
         {
             return fail(
                 "spreadsheetengine_fods_evaluator_tests", "Err:511 cached fallback mismatch");
+        }
+    }
+
+    {
+        const auto aRepoRoot = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
+        const auto aAggregatePath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                    / "mathematical" / "fods" / "aggregate.fods";
+        const auto aLoadResult = spreadsheetengine::core::fods::loadWorkbook(aAggregatePath.string());
+        if (!aLoadResult)
+            return fail("spreadsheetengine_fods_evaluator_tests", "aggregate.fods load failed");
+
+        const auto* pSheet2 = aLoadResult.maValue.maWorkbook.findSheet(u"Sheet2");
+        if (!pSheet2)
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "aggregate sheet lookup mismatch");
+        }
+
+        Evaluator aAggregateEvaluator(aLoadResult.maValue.maWorkbook);
+        for (int nRow = 8; nRow <= 18; ++nRow)
+        {
+            const auto aResult = aAggregateEvaluator.evaluateCell({ 1, 0, nRow });
+            const auto* pExpected = pSheet2->findCell(1, nRow);
+            if (!aResult || aResult.mbUsedCachedValue || !pExpected || !pExpected->maValue.isNumber()
+                || !aResult.maValue.maValue.isNumber()
+                || !almostEqual(aResult.maValue.maValue.mfNumber, pExpected->maValue.mfNumber))
+            {
+                return fail(
+                    "spreadsheetengine_fods_evaluator_tests", "aggregate.fods live evaluation mismatch");
+            }
+        }
+
+        const auto oCompleteSheetId
+            = aLoadResult.maValue.maWorkbook.findSheetId(u"winfrieds_testCase");
+        if (!oCompleteSheetId)
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests", "aggregate complete-variation sheet lookup failed");
+        }
+
+        const auto aCompleteResult = aAggregateEvaluator.evaluateCell({ *oCompleteSheetId, 0, 15 });
+        const auto* pCompleteSheet
+            = aLoadResult.maValue.maWorkbook.findSheet(u"winfrieds_testCase");
+        const auto* pCompleteExpected = pCompleteSheet ? pCompleteSheet->findCell(1, 15) : nullptr;
+        if (!aCompleteResult || aCompleteResult.mbUsedCachedValue || !pCompleteExpected
+            || !pCompleteExpected->maValue.isNumber()
+            || !aCompleteResult.maValue.maValue.isNumber()
+            || !almostEqual(aCompleteResult.maValue.maValue.mfNumber,
+                pCompleteExpected->maValue.mfNumber))
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests", "aggregate.fods nested-option mismatch");
         }
     }
 

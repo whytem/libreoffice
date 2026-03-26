@@ -123,6 +123,12 @@ using XmlString = std::unique_ptr<xmlChar, decltype(xmlFree)>;
     return rValue == u"true" || rValue == u"TRUE" || rValue == u"1";
 }
 
+[[nodiscard]] bool isCanonicalBoolean(api::StringView rValue)
+{
+    return rValue == u"true" || rValue == u"TRUE" || rValue == u"false" || rValue == u"FALSE"
+           || rValue == u"1" || rValue == u"0";
+}
+
 [[nodiscard]] double parseAsciiDouble(api::StringView rValue)
 {
     std::string aAscii;
@@ -230,6 +236,11 @@ void countIgnoredFeatures(const xmlNode* pNode, IgnoredFeatureSummary& rSummary)
                                          : workbook::SheetSourceMode::Unknown;
 }
 
+[[nodiscard]] bool isCollapsedRow(api::StringView rVisibility)
+{
+    return rVisibility == u"collapse";
+}
+
 [[nodiscard]] workbook::Cell parseCell(const xmlNode* pCellNode)
 {
     workbook::Cell aCell;
@@ -261,7 +272,10 @@ void countIgnoredFeatures(const xmlNode* pNode, IgnoredFeatureSummary& rSummary)
     if (aOfficeValueType == u"boolean")
     {
         aCell.maRawValue = getPropString(pCellNode, pOfficeNs, "boolean-value");
-        aCell.maValue = api::CellValue::boolean(parseBoolean(aCell.maRawValue));
+        if (isCanonicalBoolean(aCell.maRawValue))
+            aCell.maValue = api::CellValue::boolean(parseBoolean(aCell.maRawValue));
+        else
+            aCell.maValue = api::CellValue::number(parseAsciiDouble(aCell.maRawValue));
         return aCell;
     }
 
@@ -352,9 +366,16 @@ void parseSheet(const xmlNode* pTableNode, workbook::Workbook& rWorkbook)
         const std::size_t nRowRepeat
             = parseRepeatCount(pChild, pTableNs, "number-rows-repeated");
         const api::RowIndex nBaseRow = nRow;
+        const bool bCollapsedRow = isCollapsedRow(getPropString(pChild, pTableNs, "visibility"));
 
         for (std::size_t nRowOffset = 0; nRowOffset < nRowRepeat; ++nRowOffset)
         {
+            if (bCollapsedRow)
+            {
+                aSheet.setRowHidden(
+                    nBaseRow + static_cast<api::RowIndex>(nRowOffset));
+            }
+
             api::ColumnIndex nColumn = 0;
             for (const xmlNode* pCellNode = pChild->children; pCellNode; pCellNode = pCellNode->next)
             {
@@ -480,6 +501,7 @@ void resolveImportedSheets(LoadResult& rResult, const std::filesystem::path& rPa
             continue;
 
         rSheet.maCells = pSourceSheet->maCells;
+        rSheet.maHiddenRows = pSourceSheet->maHiddenRows;
     }
 }
 

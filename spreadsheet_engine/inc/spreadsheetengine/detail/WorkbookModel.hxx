@@ -11,6 +11,7 @@
 
 #include <map>
 #include <optional>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -52,6 +53,7 @@ struct Sheet
 {
     api::String maName;
     std::map<std::pair<api::ColumnIndex, api::RowIndex>, Cell> maCells;
+    std::set<api::RowIndex> maHiddenRows;
     std::optional<SheetSource> moSource;
 
     void setCell(api::ColumnIndex nColumn, api::RowIndex nRow, const Cell& rCell)
@@ -59,10 +61,23 @@ struct Sheet
         maCells[{ nColumn, nRow }] = rCell;
     }
 
+    void setRowHidden(api::RowIndex nRow, bool bHidden = true)
+    {
+        if (bHidden)
+            maHiddenRows.insert(nRow);
+        else
+            maHiddenRows.erase(nRow);
+    }
+
     [[nodiscard]] const Cell* findCell(api::ColumnIndex nColumn, api::RowIndex nRow) const
     {
         const auto aIt = maCells.find({ nColumn, nRow });
         return aIt == maCells.end() ? nullptr : &aIt->second;
+    }
+
+    [[nodiscard]] bool isRowHidden(api::RowIndex nRow) const
+    {
+        return maHiddenRows.contains(nRow);
     }
 };
 

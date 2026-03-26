@@ -67,6 +67,7 @@ int main()
     const auto* pCovered = pSheet1->findCell(1, 1);
     const auto* pG1 = pSheet1->findCell(6, 0);
     const auto* pH1 = pSheet1->findCell(7, 0);
+    const auto* pI1 = pSheet1->findCell(8, 0);
 
     if (!pA1 || !pA1->maValue.isNumber() || pA1->maValue.mfNumber != 1.0 || !pB1
         || !pB1->maValue.isText() || pB1->maValue.maString != u"hello" || !pC1
@@ -76,6 +77,8 @@ int main()
         || pE1->maValue.mfNumber != 1.0 || !pF1 || !pF1->maValue.isError()
         || pF1->maValue.meError != Error::NotAvailable || !pG1 || !pG1->maValue.isError()
         || pG1->maValue.meError != Error::NotAvailable || !pH1 || !pH1->maValue.isError()
+        || !pI1 || !pI1->maValue.isNumber() || pI1->maValue.mfNumber != 2.5
+        || pSheet1->isRowHidden(1) || !pSheet1->isRowHidden(2)
         || !pA2 || !pA3
         || pA2->maValue.maString != u"rep" || pA3->maValue.maString != u"rep"
         || !pCovered || !pCovered->mbCovered)

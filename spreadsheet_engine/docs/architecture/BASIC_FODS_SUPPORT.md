@@ -252,8 +252,11 @@ Secondary target families:
       `lcm`, `radians`, `degrees`, `sqrt`, `log`, `fact`, `combin`,
       `combina`, `multinomial`, `floor.precise`, `ceiling.precise`, `sqrtpi`,
       `mround`, `floor.xcl`, `ceiling.xcl`, `iso.ceiling`, `roundsig`, `sec`,
-      `sech`), while heavier workbooks like `aggregate` still need broader
-      function dispatch.
+      `sech`). Raw replay for `aggregate.fods` is also green now: the live
+      evaluator covers prefixed one-range forms with function codes `1-11`,
+      hidden/error option filtering, and nested `SUBTOTAL`/`AGGREGATE` skipping
+      for options `0-3`. Heavier mathematical workbooks outside this curated
+      set still need broader function dispatch.
 - [ ] Enable the text FODS family.
 - [ ] Enable the date_time FODS family.
 - [ ] Expand to selected spreadsheet lookup/reference workbooks.
