@@ -6,6 +6,7 @@ include(CTest)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 find_package(ICU REQUIRED COMPONENTS uc)
+find_package(LibXml2 REQUIRED)
 
 set(SPREADSHEETENGINE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 set(SPREADSHEETENGINE_PACKAGE_NAME "spreadsheetengine")
@@ -29,8 +30,11 @@ target_include_directories(spreadsheetengine_core
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/shims/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    PRIVATE
+        ${LIBXML2_INCLUDE_DIR}
+        ${LIBXML2_INCLUDE_DIRS}
 )
-target_link_libraries(spreadsheetengine_core PUBLIC ICU::uc)
+target_link_libraries(spreadsheetengine_core PUBLIC ICU::uc ${LIBXML2_LIBRARIES})
 
 add_executable(spreadsheetengine_smoke
     ${SPREADSHEETENGINE_STANDALONE_SMOKE_SOURCES}
@@ -128,6 +132,22 @@ add_spreadsheetengine_test(spreadsheetengine_sharedformula_tests
 
 add_spreadsheetengine_test(spreadsheetengine_formulacell_tests
     ${SPREADSHEETENGINE_STANDALONE_FORMULACELL_TEST_SOURCES}
+)
+
+add_spreadsheetengine_test(spreadsheetengine_fods_tests
+    ${SPREADSHEETENGINE_STANDALONE_FODS_TEST_SOURCES}
+)
+
+add_spreadsheetengine_test(spreadsheetengine_fods_parser_tests
+    ${SPREADSHEETENGINE_STANDALONE_FODS_PARSER_TEST_SOURCES}
+)
+
+add_spreadsheetengine_test(spreadsheetengine_fods_evaluator_tests
+    ${SPREADSHEETENGINE_STANDALONE_FODS_EVALUATOR_TEST_SOURCES}
+)
+
+add_spreadsheetengine_test(spreadsheetengine_fods_replay_tests
+    ${SPREADSHEETENGINE_STANDALONE_FODS_REPLAY_TEST_SOURCES}
 )
 
 configure_package_config_file(
