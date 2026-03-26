@@ -1650,6 +1650,44 @@ Current status:
       - `make -j 32 -rs -f Makefile.gbuild Library_spreadsheetengine`
   - the next meaningful Phase 11 step is now pass 5:
     - close the loop on routine maintenance and dual-run ergonomics
+- pass 5 is now substantially complete:
+  - a combined maintenance runner now lives at
+    `spread_engine_extract/run_maintenance_validation.sh`
+  - the routine validation path now makes the dual-build and dual-test model
+    easy to run together:
+    - standalone configure/build/test, including the installed-package
+      consumer smoke path
+    - Calc validation through `run_spreadsheet_unit_tests.sh`, with smoke and
+      broader engine profiles still available
+  - the Calc smoke lane has also been tightened into a more reliable routine
+    maintenance subset:
+    - it keeps `sc_ucalc`, `sc_ucalc_formula2`, `sc_ucalc_shared_cases`,
+      `sc_ucalc_sharedformula`, and
+      `sc_spreadsheet_functions_test` in the fast path
+    - the broader engine profile still retains the wider non-rendering Calc
+      coverage, including `sc_ucalc_formula`
+  - the standalone and Calc parity lanes are now documented as one regular
+    maintenance flow in:
+    - `README.md`
+    - `tests/shared_cases/README.md`
+  - the pass-5 closeout trims stale “experimental” assumptions from the
+    standalone package story:
+    - the package/runtime validation flow is now documented as the routine
+      maintenance entry point
+    - the shared parity datasets are explicitly tied to that combined gate
+  - validation is green for this pass-5 checkpoint:
+    - standalone:
+      - `cmake -S spread_engine_extract -B /tmp/spreadsheetengine-standalone-build`
+      - `cmake --build /tmp/spreadsheetengine-standalone-build`
+      - `ctest --test-dir /tmp/spreadsheetengine-standalone-build --output-on-failure`
+    - LibreOffice:
+      - `./spread_engine_extract/run_maintenance_validation.sh`
+  - Phase 11 is now substantially complete:
+    - `spread_engine_extract/` builds and installs as a real standalone package
+    - Calc-side glue has been reduced to narrow host adapters and intentional
+      compatibility bridges
+    - the combined standalone + Calc validation loop is now routine instead of
+      exceptional
 
 Guardrails:
 
