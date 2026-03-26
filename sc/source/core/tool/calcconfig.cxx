@@ -16,7 +16,7 @@
 #include <sal/log.hxx>
 #include <rtl/ustring.hxx>
 #include <spreadsheetengine/bridge/CalcPhase0Bridge.hxx>
-#include <spreadsheetengine/compat/libreoffice/String.hxx>
+#include <spreadsheetengine/compat/libreoffice/Config.hxx>
 #include <spreadsheetengine/core/ForceCalculation.hxx>
 #include <spreadsheetengine/core/CalcConfig.hxx>
 #include <comphelper/configuration.hxx>
@@ -1124,7 +1124,7 @@ OUString ScOpCodeSetToSymbolicString(const ScCalcConfig::OpCodeSet& rOpCodes)
         {
             if (!pOpCodeMap)
                 pOpCodeMap = aCompiler.GetOpCodeMap(css::sheet::FormulaLanguage::ENGLISH);
-            aSymbols.push_back(selibreoffice::toApiString(pOpCodeMap->getSymbol(*i)));
+            aSymbols.push_back(selibreoffice::toApiConfigOpCodeSymbol(*pOpCodeMap, *i));
         }
     }
 
@@ -1151,22 +1151,14 @@ ScCalcConfig::OpCodeSet ScStringToOpCodeSet(std::u16string_view rOpCodes)
             }
         }
 
-        const OUString aElement = selibreoffice::toLibreOfficeString(rToken);
-        const sal_Int32 nValue = aElement.toInt32();
-        if (nValue > 0 || (nValue == 0 && aElement == "0"))
-        {
-            aResult->insert(static_cast<OpCode>(nValue));
-            continue;
-        }
-
         if (!pOpCodeMap)
             pOpCodeMap = aCompiler.GetOpCodeMap(css::sheet::FormulaLanguage::ENGLISH);
-        const formula::OpCodeHashMap& rHashMap(pOpCodeMap->getHashMap());
-        auto it = rHashMap.find(aElement);
-        if (it != rHashMap.end())
-            aResult->insert(it->second);
+        if (const auto eOpCode = selibreoffice::findCalcEnglishOpCode(*pOpCodeMap, rToken))
+            aResult->insert(*eOpCode);
         else
-            SAL_WARN("sc.opencl", "Unrecognized OpCode " << aElement << " in OpCode set string");
+            SAL_WARN("sc.opencl",
+                "Unrecognized OpCode " << selibreoffice::toLibreOfficeString(rToken)
+                                        << " in OpCode set string");
     }
 
     if (aResult->find(ocSub) != aResult->end())

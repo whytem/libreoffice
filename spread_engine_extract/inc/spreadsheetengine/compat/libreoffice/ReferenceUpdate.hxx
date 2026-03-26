@@ -14,7 +14,7 @@
 #include <refupdat.hxx>
 
 #include <spreadsheetengine/api/ReferenceUpdate.hxx>
-#include <spreadsheetengine/compat/libreoffice/Host.hxx>
+#include <spreadsheetengine/compat/libreoffice/Address.hxx>
 
 namespace spreadsheetengine::compat::libreoffice
 {

@@ -65,9 +65,10 @@
 #include <spreadsheetengine/api/StringReference.hxx>
 #include <spreadsheetengine/core/MathBitwise.hxx>
 #include <spreadsheetengine/core/MathTranscendental.hxx>
+#include <spreadsheetengine/compat/libreoffice/Address.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <spreadsheetengine/compat/libreoffice/Grammar.hxx>
-#include <spreadsheetengine/compat/libreoffice/Host.hxx>
+#include <spreadsheetengine/compat/libreoffice/Parsing.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextServices.hxx>
 #include <rangeutl.hxx>

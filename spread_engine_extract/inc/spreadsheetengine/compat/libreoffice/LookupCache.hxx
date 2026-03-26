@@ -12,7 +12,7 @@
 #include <lookupcache.hxx>
 
 #include <spreadsheetengine/api/LookupCache.hxx>
-#include <spreadsheetengine/compat/libreoffice/Host.hxx>
+#include <spreadsheetengine/compat/libreoffice/Address.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 
 namespace spreadsheetengine::compat::libreoffice

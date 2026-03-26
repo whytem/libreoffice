@@ -12,7 +12,7 @@
 #include <formulacell.hxx>
 
 #include <spreadsheetengine/api/SharedFormula.hxx>
-#include <spreadsheetengine/compat/libreoffice/Host.hxx>
+#include <spreadsheetengine/compat/libreoffice/Address.hxx>
 
 namespace spreadsheetengine::compat::libreoffice
 {

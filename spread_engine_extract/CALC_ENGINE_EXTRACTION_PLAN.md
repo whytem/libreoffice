@@ -1590,6 +1590,38 @@ Current status:
     - the next meaningful Phase 11 step after validating this batch is pass 3,
       where we start collapsing transitional compatibility layers instead of
       adding more host wrappers
+- pass 3 is now substantially complete:
+  - generic Calc address/range conversion moved out of the catch-all host layer
+    into `compat/libreoffice/Address.hxx`
+  - the remaining parsing entry points moved out of `compat/libreoffice/Host.hxx`
+    into `compat/libreoffice/Parsing.hxx`, so the interpreters no longer depend
+    on the full host class header for simple parse helpers
+  - the remaining `formularesult` bridge code now lives in
+    `compat/libreoffice/FormulaResult.hxx` instead of being open-coded in
+    `formularesult.cxx`
+  - the remaining Calc config English-opcode fallback/string bridge code now
+    lives in `compat/libreoffice/Config.hxx` instead of being open-coded in
+    `calcconfig.cxx`
+  - the copied `compat/formula/FormulaGrammar.hxx` layer remains intentionally
+    duplicated:
+    - it still carries standalone-buildable formula grammar helper semantics
+    - the thin Calc/LibreOffice enum bridge remains separately housed in
+      `compat/libreoffice/Grammar.hxx`
+  - validation is green for this pass-3 checkpoint:
+    - standalone: `ctest` passes `19/19`
+    - LibreOffice:
+      - `CppunitTest_sc_cache_test`
+      - `CppunitTest_sc_datetime_functions_test`
+      - `CppunitTest_sc_text_functions_test`
+      - `CppunitTest_sc_ucalc_sort`
+      - `CppunitTest_sc_ucalc_sharedformula`
+      - `CppunitTest_sc_spreadsheet_functions_test`
+      - `CppunitTest_sc_ucalc_shared_cases`
+      - `CppunitTest_sc_ucalc_formula2`
+      - `CppunitTest_sc_ucalc`
+  - the next meaningful Phase 11 step is now pass 4:
+    - harden the standalone runtime story instead of continuing to polish
+      already-narrow compatibility wrappers
 
 Guardrails:
 

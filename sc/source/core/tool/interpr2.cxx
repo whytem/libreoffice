@@ -49,12 +49,12 @@
 #include <spreadsheetengine/core/DateTimeParts.hxx>
 #include <spreadsheetengine/core/DateTimeWeek.hxx>
 #include <spreadsheetengine/core/DateTimeWorkday.hxx>
-#include <spreadsheetengine/compat/libreoffice/Host.hxx>
 #include <spreadsheetengine/core/MathFinancial.hxx>
 #include <spreadsheetengine/core/MathRounding.hxx>
 #include <spreadsheetengine/core/MathScalar.hxx>
 #include <spreadsheetengine/core/NumeralConversion.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
+#include <spreadsheetengine/compat/libreoffice/Parsing.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 
 #include <com/sun/star/sheet/DataPilotFieldFilter.hpp>

@@ -15,33 +15,13 @@
 #include <interpretercontext.hxx>
 
 #include <spreadsheetengine/api/Host.hxx>
-#include <spreadsheetengine/api/Parsing.hxx>
+#include <spreadsheetengine/compat/libreoffice/Address.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 
 namespace spreadsheetengine::compat::libreoffice
 {
-
-inline spreadsheetengine::api::CellAddress toApiCellAddress(const ScAddress& rAddress)
-{
-    return { rAddress.Tab(), rAddress.Col(), rAddress.Row() };
-}
-
-inline ScAddress toLibreOfficeAddress(const spreadsheetengine::api::CellAddress& rAddress)
-{
-    return ScAddress(rAddress.mnColumn, rAddress.mnRow, rAddress.mnSheet);
-}
-
-inline spreadsheetengine::api::CellRange toApiCellRange(const ScRange& rRange)
-{
-    return { toApiCellAddress(rRange.aStart), toApiCellAddress(rRange.aEnd) };
-}
-
-inline ScRange toLibreOfficeRange(const spreadsheetengine::api::CellRange& rRange)
-{
-    return ScRange(toLibreOfficeAddress(rRange.maStart), toLibreOfficeAddress(rRange.maEnd));
-}
 
 inline spreadsheetengine::api::NumberParseResult::Kind toApiParseKind(SvNumFormatType eType)
 {
@@ -221,27 +201,6 @@ public:
             toApiString(aFormatted));
     }
 };
-
-inline spreadsheetengine::api::ValueResult<double> parseValueFromText(
-    const ScDocument& rDoc, ScInterpreterContext& rContext, const OUString& rValue)
-{
-    DocumentEvaluationHost aHost(rDoc, rContext);
-    return spreadsheetengine::api::parsing::valueFromText(aHost, toApiString(rValue));
-}
-
-inline spreadsheetengine::api::ValueResult<double> parseDateValueFromText(
-    const ScDocument& rDoc, ScInterpreterContext& rContext, const OUString& rValue)
-{
-    DocumentEvaluationHost aHost(rDoc, rContext);
-    return spreadsheetengine::api::parsing::dateValueFromText(aHost, toApiString(rValue));
-}
-
-inline spreadsheetengine::api::ValueResult<double> parseTimeValueFromText(
-    const ScDocument& rDoc, ScInterpreterContext& rContext, const OUString& rValue)
-{
-    DocumentEvaluationHost aHost(rDoc, rContext);
-    return spreadsheetengine::api::parsing::timeValueFromText(aHost, toApiString(rValue));
-}
 
 } // namespace spreadsheetengine::compat::libreoffice
 
