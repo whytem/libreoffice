@@ -39,6 +39,7 @@ set(SPREADSHEETENGINE_STANDALONE_PUBLIC_SUPPORT_HEADERS
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/DateTimeParts.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/DateTimeWeek.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/DateTimeWorkday.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/InMemoryHost.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/MathBitwise.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/MathFinancial.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/core/MathRounding.hxx"

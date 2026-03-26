@@ -18,7 +18,8 @@ cmake --install /tmp/spreadsheetengine-build --prefix /tmp/spreadsheetengine-ins
 ```
 
 This installs the `spreadsheetengine::core` package target plus the current
-public header surface.
+public header surface, including the lightweight `InMemoryEvaluationHost`
+runtime helper for standalone scenarios.
 
 ## Consumer Smoke Build
 
@@ -28,6 +29,10 @@ cmake -S spread_engine_extract/tests/consumer -B /tmp/spreadsheetengine-consumer
 cmake --build /tmp/spreadsheetengine-consumer
 /tmp/spreadsheetengine-consumer/spreadsheetengine_consumer_smoke
 ```
+
+The installed consumer smoke now exercises a small spreadsheet-style flow:
+host-backed parsing, reference planning, cached lookup routing, and formatting
+through `InMemoryEvaluationHost`.
 
 ## LibreOffice Validation
 

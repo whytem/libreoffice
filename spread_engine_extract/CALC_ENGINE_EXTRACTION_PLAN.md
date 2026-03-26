@@ -1622,6 +1622,34 @@ Current status:
   - the next meaningful Phase 11 step is now pass 4:
     - harden the standalone runtime story instead of continuing to polish
       already-narrow compatibility wrappers
+- pass 4 is now substantially complete:
+  - `InMemoryHost.hxx` is now part of the standalone public support surface, so
+    the installed package exposes a small host implementation suitable for
+    runtime-style standalone scenarios
+  - the standalone smoke runner now exercises a small end-to-end spreadsheet
+    flow on top of `InMemoryEvaluationHost`:
+    - host-backed parsing
+    - `IF` branch selection policy
+    - `INDEX` reference planning
+    - cached lookup result routing
+    - host-backed formatting
+  - the installed-package consumer smoke target now exercises that same style
+    of host-backed runtime scenario instead of only isolated math/text helper
+    calls
+  - the standalone package story is now much closer to routine use than an
+    experimental build artifact:
+    - the installed package exports both the engine target and a lightweight
+      runtime host utility
+    - the in-tree and installed smoke paths both validate a real spreadsheet-ish
+      workflow
+  - validation is green for this pass-4 checkpoint:
+    - standalone:
+      - `cmake --build /tmp/spreadsheetengine-standalone-build`
+      - `ctest --test-dir /tmp/spreadsheetengine-standalone-build --output-on-failure`
+    - LibreOffice:
+      - `make -j 32 -rs -f Makefile.gbuild Library_spreadsheetengine`
+  - the next meaningful Phase 11 step is now pass 5:
+    - close the loop on routine maintenance and dual-run ergonomics
 
 Guardrails:
 
