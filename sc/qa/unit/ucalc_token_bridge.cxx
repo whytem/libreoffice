@@ -58,71 +58,6 @@ ScMatrixRef makeMatrix()
     return xMatrix;
 }
 
-bool matricesEqual(const ScMatrix* pLeft, const ScMatrix* pRight)
-{
-    if (!pLeft || !pRight)
-        return pLeft == pRight;
-
-    SCSIZE nLeftCols = 0;
-    SCSIZE nLeftRows = 0;
-    SCSIZE nRightCols = 0;
-    SCSIZE nRightRows = 0;
-    pLeft->GetDimensions(nLeftCols, nLeftRows);
-    pRight->GetDimensions(nRightCols, nRightRows);
-    if (nLeftCols != nRightCols || nLeftRows != nRightRows)
-        return false;
-
-    for (SCSIZE nRow = 0; nRow < nLeftRows; ++nRow)
-    {
-        for (SCSIZE nCol = 0; nCol < nLeftCols; ++nCol)
-        {
-            if (pLeft->IsValue(nCol, nRow) != pRight->IsValue(nCol, nRow))
-                return false;
-            if (pLeft->IsStringOrEmpty(nCol, nRow) != pRight->IsStringOrEmpty(nCol, nRow))
-                return false;
-            if (pLeft->IsEmpty(nCol, nRow) != pRight->IsEmpty(nCol, nRow))
-                return false;
-            if (pLeft->IsEmptyCell(nCol, nRow) != pRight->IsEmptyCell(nCol, nRow))
-                return false;
-            if (pLeft->IsEmptyResult(nCol, nRow) != pRight->IsEmptyResult(nCol, nRow))
-                return false;
-            if (pLeft->IsEmptyPath(nCol, nRow) != pRight->IsEmptyPath(nCol, nRow))
-                return false;
-
-            if (pLeft->IsValue(nCol, nRow))
-            {
-                if (pLeft->GetError(nCol, nRow) != pRight->GetError(nCol, nRow))
-                    return false;
-                if (pLeft->GetError(nCol, nRow) == FormulaError::NONE
-                    && pLeft->GetDouble(nCol, nRow) != pRight->GetDouble(nCol, nRow))
-                {
-                    return false;
-                }
-                continue;
-            }
-
-            if (pLeft->GetString(nCol, nRow) != pRight->GetString(nCol, nRow))
-                return false;
-        }
-    }
-
-    return true;
-}
-
-bool tokensEqualForBridge(const formula::FormulaToken& rLeft, const formula::FormulaToken& rRight)
-{
-    if (&rLeft == &rRight || rLeft == rRight)
-        return true;
-
-    if (rLeft.GetType() == formula::svMatrix && rRight.GetType() == formula::svMatrix
-        && rLeft.GetOpCode() == rRight.GetOpCode())
-    {
-        return matricesEqual(rLeft.GetMatrix(), rRight.GetMatrix());
-    }
-
-    return false;
-}
-
 } // namespace
 
 CPPUNIT_TEST_FIXTURE(TestTokenBridge, testImportExportRoundTrip)
@@ -193,27 +128,8 @@ CPPUNIT_TEST_FIXTURE(TestTokenBridge, testImportExportRoundTrip)
                                     + aExported.maFailureMessage;
     CPPUNIT_ASSERT_MESSAGE(aExportMessage.toUtf8().getStr(), static_cast<bool>(aExported));
     CPPUNIT_ASSERT(aExported.mxTokenArray);
-    if (aOriginal.GetLen() != aExported.mxTokenArray->GetLen())
-        CPPUNIT_FAIL("roundtrip token length changed");
-
-    for (sal_uInt16 nIndex = 0; nIndex < aOriginal.GetLen(); ++nIndex)
-    {
-        formula::FormulaToken* pOriginal = aOriginal.TokenAt(nIndex);
-        formula::FormulaToken* pRoundTrip = aExported.mxTokenArray->TokenAt(nIndex);
-        if (!tokensEqualForBridge(*pOriginal, *pRoundTrip))
-        {
-            const OUString aMismatch = u"token mismatch at index "_ustr
-                                       + OUString::number(nIndex) + u": original type/op="_ustr
-                                       + OUString::number(static_cast<int>(pOriginal->GetType()))
-                                       + u"/"_ustr
-                                       + OUString::number(static_cast<int>(pOriginal->GetOpCode()))
-                                       + u", roundtrip type/op="_ustr
-                                       + OUString::number(static_cast<int>(pRoundTrip->GetType()))
-                                       + u"/"_ustr
-                                       + OUString::number(static_cast<int>(pRoundTrip->GetOpCode()));
-            CPPUNIT_FAIL(aMismatch.toUtf8().getStr());
-        }
-    }
+    CPPUNIT_ASSERT(spreadsheetengine::compat::libreoffice::tokenArraysEqualForBridge(
+        aOriginal, *aExported.mxTokenArray));
     CPPUNIT_ASSERT_EQUAL(aOriginal.GetCodeError(), aExported.mxTokenArray->GetCodeError());
     CPPUNIT_ASSERT_EQUAL(aOriginal.GetRecalcMode(), aExported.mxTokenArray->GetRecalcMode());
     CPPUNIT_ASSERT_EQUAL(aOriginal.IsHyperLink(), aExported.mxTokenArray->IsHyperLink());

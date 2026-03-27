@@ -56,12 +56,44 @@ inline setoken::VectorState toEngineVectorState(ScFormulaVectorState eState)
 
 inline setoken::TableRefItem toEngineTableRefItem(ScTableRefToken::Item eItem)
 {
-    return static_cast<setoken::TableRefItem>(static_cast<sal_uInt16>(eItem));
+    using setoken::TableRefItem;
+
+    if (eItem == ScTableRefToken::TABLE)
+        return TableRefItem::Table;
+
+    TableRefItem eResult = TableRefItem::None;
+    const auto nItem = static_cast<sal_uInt16>(eItem);
+    if (nItem & ScTableRefToken::ALL)
+        eResult |= TableRefItem::All;
+    if (nItem & ScTableRefToken::HEADERS)
+        eResult |= TableRefItem::Headers;
+    if (nItem & ScTableRefToken::DATA)
+        eResult |= TableRefItem::Data;
+    if (nItem & ScTableRefToken::TOTALS)
+        eResult |= TableRefItem::Totals;
+    if (nItem & ScTableRefToken::THIS_ROW)
+        eResult |= TableRefItem::ThisRow;
+    return eResult;
 }
 
 inline ScTableRefToken::Item toLibreOfficeTableRefItem(setoken::TableRefItem eItem)
 {
-    return static_cast<ScTableRefToken::Item>(static_cast<sal_uInt16>(eItem));
+    if (eItem == setoken::TableRefItem::None || eItem == setoken::TableRefItem::Table)
+        return ScTableRefToken::TABLE;
+
+    sal_uInt16 nItem = 0;
+    const auto nEngineItem = static_cast<sal_uInt16>(eItem);
+    if (nEngineItem & static_cast<sal_uInt16>(setoken::TableRefItem::All))
+        nItem |= ScTableRefToken::ALL;
+    if (nEngineItem & static_cast<sal_uInt16>(setoken::TableRefItem::Headers))
+        nItem |= ScTableRefToken::HEADERS;
+    if (nEngineItem & static_cast<sal_uInt16>(setoken::TableRefItem::Data))
+        nItem |= ScTableRefToken::DATA;
+    if (nEngineItem & static_cast<sal_uInt16>(setoken::TableRefItem::Totals))
+        nItem |= ScTableRefToken::TOTALS;
+    if (nEngineItem & static_cast<sal_uInt16>(setoken::TableRefItem::ThisRow))
+        nItem |= ScTableRefToken::THIS_ROW;
+    return static_cast<ScTableRefToken::Item>(nItem);
 }
 
 inline setoken::ParamClassValue toEngineParamClass(formula::ParamClass eClass)
@@ -554,6 +586,71 @@ inline void applyFormulaMetadata(ScTokenArray& rArray, const setoken::CompiledFo
     rArray.SetCombinedBitsRecalcMode(static_cast<ScRecalcMode>(nCombinedBits));
 }
 
+inline bool matricesEqualForBridge(const ScMatrix* pLeft, const ScMatrix* pRight)
+{
+    if (!pLeft || !pRight)
+        return pLeft == pRight;
+
+    SCSIZE nLeftColumns = 0;
+    SCSIZE nLeftRows = 0;
+    SCSIZE nRightColumns = 0;
+    SCSIZE nRightRows = 0;
+    pLeft->GetDimensions(nLeftColumns, nLeftRows);
+    pRight->GetDimensions(nRightColumns, nRightRows);
+    if (nLeftColumns != nRightColumns || nLeftRows != nRightRows)
+        return false;
+
+    for (SCSIZE nRow = 0; nRow < nLeftRows; ++nRow)
+    {
+        for (SCSIZE nColumn = 0; nColumn < nLeftColumns; ++nColumn)
+        {
+            if (pLeft->IsValue(nColumn, nRow) != pRight->IsValue(nColumn, nRow))
+                return false;
+            if (pLeft->IsStringOrEmpty(nColumn, nRow) != pRight->IsStringOrEmpty(nColumn, nRow))
+                return false;
+            if (pLeft->IsEmpty(nColumn, nRow) != pRight->IsEmpty(nColumn, nRow))
+                return false;
+            if (pLeft->IsEmptyCell(nColumn, nRow) != pRight->IsEmptyCell(nColumn, nRow))
+                return false;
+            if (pLeft->IsEmptyResult(nColumn, nRow) != pRight->IsEmptyResult(nColumn, nRow))
+                return false;
+            if (pLeft->IsEmptyPath(nColumn, nRow) != pRight->IsEmptyPath(nColumn, nRow))
+                return false;
+
+            if (pLeft->IsValue(nColumn, nRow))
+            {
+                if (pLeft->GetError(nColumn, nRow) != pRight->GetError(nColumn, nRow))
+                    return false;
+                if (pLeft->GetError(nColumn, nRow) == FormulaError::NONE
+                    && pLeft->GetDouble(nColumn, nRow) != pRight->GetDouble(nColumn, nRow))
+                {
+                    return false;
+                }
+                continue;
+            }
+
+            if (pLeft->GetString(nColumn, nRow) != pRight->GetString(nColumn, nRow))
+                return false;
+        }
+    }
+
+    return true;
+}
+
+inline bool tokensEqualForBridge(const formula::FormulaToken& rLeft, const formula::FormulaToken& rRight)
+{
+    if (&rLeft == &rRight || rLeft == rRight)
+        return true;
+
+    if (rLeft.GetType() == formula::svMatrix && rRight.GetType() == formula::svMatrix
+        && rLeft.GetOpCode() == rRight.GetOpCode())
+    {
+        return matricesEqualForBridge(rLeft.GetMatrix(), rRight.GetMatrix());
+    }
+
+    return false;
+}
+
 } // namespace detail
 
 inline TokenImportStatus importCompiledFormula(const ScTokenArray& rTokenArray)
@@ -627,6 +724,24 @@ inline TokenExportStatus exportCompiledFormula(
 
     detail::applyFormulaMetadata(*aStatus.mxTokenArray, rFormula);
     return aStatus;
+}
+
+inline bool tokenArraysEqualForBridge(const ScTokenArray& rLeft, const ScTokenArray& rRight)
+{
+    if (rLeft.GetLen() != rRight.GetLen())
+        return false;
+
+    for (sal_uInt16 nIndex = 0; nIndex < rLeft.GetLen(); ++nIndex)
+    {
+        formula::FormulaToken* pLeft = rLeft.TokenAt(nIndex);
+        formula::FormulaToken* pRight = rRight.TokenAt(nIndex);
+        if (!pLeft || !pRight)
+            return pLeft == pRight;
+        if (!detail::tokensEqualForBridge(*pLeft, *pRight))
+            return false;
+    }
+
+    return true;
 }
 
 } // namespace spreadsheetengine::compat::libreoffice

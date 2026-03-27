@@ -663,9 +663,9 @@ This section is the working task list for the implementation effort.
 - [x] Phase 2 start: add a Calc-side `ScTokenArray <-> CompiledFormula` bridge scaffold for the core compiler-emitted token repertoire
 - [x] Phase 2 start: add focused Calc roundtrip validation in `CppunitTest_sc_ucalc_token_bridge`
 - [x] Phase 2 substantial-complete checkpoint: bridge scaffolding exists for the main compiler-emitted token categories with focused standalone and Calc validation
-- [ ] Phase 3: implement Calc compile-host adapters
-- [ ] Phase 4: add engine compiler skeleton in shadow mode
-- [ ] Phase 5: add compile-diff validation harness
+- [x] Phase 3: implement Calc compile-host adapters
+- [x] Phase 4: add engine compiler skeleton in shadow mode
+- [x] Phase 5: add compile-diff validation harness
 - [ ] Phase 6: migrate first low-risk native consumers
 - [ ] Phase 7: bridge-based Calc compiler adoption
 - [ ] Phase 8: milestone closeout
@@ -718,9 +718,9 @@ The planned validation corpus for this milestone remains:
 
 That corpus is broad enough to support the bridge-and-shadow-compiler milestone without requiring immediate consumer migration.
 
-## Current Phase 2 Status
+## Current Phase 5 Status
 
-Phase 2 is now substantially complete.
+Phase 5 is now substantially complete.
 
 The current checkpoint now includes:
 
@@ -729,11 +729,34 @@ The current checkpoint now includes:
 - native token hashing and equality support
 - a split compiler-host interface bundle built around narrower resolver roles
 - a LibreOffice bridge scaffold in `spreadsheetengine/compat/libreoffice/TokenBridge.hxx`
+- Calc-backed compile-host adapters in `spreadsheetengine/compat/libreoffice/CompileHost.hxx`
+- an engine-owned compile request / status layer in `spreadsheetengine/detail/CompilerPipeline.hxx`
+- a Calc-backed shadow compiler wrapper in `spreadsheetengine/compat/libreoffice/ShadowCompiler.hxx`
+- a Calc-side compile-diff harness in `spreadsheetengine/compat/libreoffice/CompilerDiff.hxx`
 - bridge roundtrip coverage in `CppunitTest_sc_ucalc_token_bridge`
+- focused Calc compile-host validation in `CppunitTest_sc_ucalc_compile_host`
+- focused Calc shadow-compiler validation in `CppunitTest_sc_ucalc_shadow_compiler`
+- focused Calc compile-diff validation in `CppunitTest_sc_ucalc_compile_diff`
 - focused validation covering:
   - standalone schema/hash/host tests
+  - standalone compile-pipeline shape tests
   - Calc import/export roundtrips for mixed core token arrays
+  - Calc document-backed name / db-range / table-ref / col-row-name / external-name lookup checks
+  - Calc shadow compilation into the canonical token model for:
+    - range names
+    - database ranges
+    - table refs
+    - col/row names
+    - external names
+  - Calc synthetic compile-diff checks comparing:
+    - canonical token streams
+    - compile-status metadata
+    - bridge roundtrips back to `ScTokenArray`
+    - whitespace-sensitive and array-literal formulas
+    - db-range and table-reference lowering
   - XML placeholder bridge handling via `AssignXMLString()`
+  - structured-reference bridge fidelity for `ScTableRefToken::Item` values
+  - bridge-semantic matrix equality for roundtrip comparisons, instead of pointer-identity `ScMatrixToken` equality
 
 The current bridge scaffold covers the main compiler-emitted token categories that matter for the first milestone checkpoint:
 
@@ -750,16 +773,44 @@ The current bridge scaffold covers the main compiler-emitted token categories th
 - whitespace tokens
 - pure XML placeholder arrays via `AssignXMLString()`
 
-What Phase 2 still does **not** include is also intentional:
+Phase 5 still compiles through the legacy Calc compiler backend in shadow mode and then lowers the resulting `ScTokenArray` through the engine bridge. That remains intentional at this stage: Calc can now execute a compiler-shaped request against an engine-owned compile request / status contract, lower the result into canonical tokens, and compare those artifacts in a stable diff harness before any live production ownership changes.
+
+The current compile-diff harness is deliberately **synthetic-first**. The green validated corpus today is:
+
+- standalone compiler / token-model tests
+- Calc token-bridge roundtrip cases
+- Calc compile-host lookup cases
+- Calc shadow-compiler cases
+- Calc compile-diff cases covering:
+  - plain arithmetic
+  - whitespace-preserving function syntax
+  - matrix / array literals
+  - named database ranges
+  - Excel-style structured table references
+
+That is enough to make Phase 5 substantially complete because the project now has:
+
+- an engine-owned canonical token model
+- a lossless bridge for the primary compiler-emitted repertoire
+- Calc-backed host adapters
+- shadow compilation into canonical artifacts
+- a stable differential harness that can compare legacy-vs-shadow compile output end to end
+
+What Phase 5 still does **not** include is also intentional:
 
 - `svExternal` / plain external-string tokens
 - interpreter-only carriers such as jump-matrix, ref-list, matrix-cell, hybrid-cell, and vector-ref tokens
 - broader special-opcode reference variants beyond the initial bridge path
 - explicit export-side preservation of vector/OpenCL/threading flags beyond whatever Calc recomputes while rebuilding the token array
-- engine compiler shadow execution
-- Calc compile-host adapters
+- corpus-scale compile-diff execution across the full milestone validation set
+- raw workbook / FODS compile-diff replay
+- stable compile-diff coverage yet for the more fragile corners of:
+  - col/row-name lookup formulas
+  - external-name formulas
+  - XML namespaced formula placeholders
+- native compiler lowering that no longer depends on `ScCompiler`
 
-Those are Phase 3 and later.
+Those are the closeout items for later Phase 5 expansion or the first work inside Phase 6.
 
 ## Recommendation
 

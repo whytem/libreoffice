@@ -5,6 +5,7 @@
 #include <optional>
 
 #include <spreadsheetengine/detail/CompileHost.hxx>
+#include <spreadsheetengine/detail/CompilerPipeline.hxx>
 #include <spreadsheetengine/detail/TokenModel.hxx>
 
 #include "TestSupport.hxx"
@@ -204,6 +205,53 @@ int testCompileHostShape()
     return EXIT_SUCCESS;
 }
 
+int testCompilePipelineShape()
+{
+    using spreadsheetengine::detail::compiler::CompileContext;
+    using spreadsheetengine::detail::compiler::CompileHosts;
+    using spreadsheetengine::detail::compiler::CompileRequest;
+    using spreadsheetengine::detail::compiler::CompileStatus;
+    using spreadsheetengine::detail::compiler::FormulaSource;
+    using spreadsheetengine::detail::compiler::hasCompleteHostBundle;
+
+    DummyCompileHost aHost;
+    CompileHosts aIncompleteHosts;
+    CompileHosts aCompleteHosts { &aHost, &aHost, &aHost, &aHost, &aHost };
+
+    if (hasCompleteHostBundle(aIncompleteHosts))
+        return fail("spreadsheetengine_token_compiler_host_tests", "incomplete host bundle accepted");
+    if (!hasCompleteHostBundle(aCompleteHosts))
+        return fail("spreadsheetengine_token_compiler_host_tests", "complete host bundle rejected");
+
+    CompileContext aContext;
+    aContext.maGrammar = { spreadsheetengine::api::FormulaLanguage::English,
+        spreadsheetengine::api::AddressConvention::OooA1, true };
+    aContext.maBaseAddress = { 1, 2, 3 };
+
+    CompileRequest aRequest {
+        FormulaSource { u"=SUM(A1:A3)", u"" },
+        aContext,
+        aCompleteHosts,
+    };
+
+    if (aRequest.maSource.hasNamespace())
+        return fail("spreadsheetengine_token_compiler_host_tests", "unexpected compile namespace state");
+
+    aRequest.maSource.maNamespace = u"of";
+    if (!aRequest.maSource.hasNamespace())
+        return fail("spreadsheetengine_token_compiler_host_tests", "compile namespace state mismatch");
+
+    CompileStatus aStatus;
+    if (!static_cast<bool>(aStatus))
+        return fail("spreadsheetengine_token_compiler_host_tests", "fresh compile status should be truthy");
+
+    aStatus.maFailureMessage = u"failed";
+    if (static_cast<bool>(aStatus))
+        return fail("spreadsheetengine_token_compiler_host_tests", "failed compile status should be falsy");
+
+    return EXIT_SUCCESS;
+}
+
 } // namespace
 
 int main()
@@ -212,6 +260,9 @@ int main()
         return nResult;
 
     if (int nResult = testCompileHostShape(); nResult != EXIT_SUCCESS)
+        return nResult;
+
+    if (int nResult = testCompilePipelineShape(); nResult != EXIT_SUCCESS)
         return nResult;
 
     std::cout << "spreadsheetengine token/compiler host tests passed\n";

@@ -46,6 +46,8 @@ $(eval $(call gb_Module_add_check_targets,sc,\
 	CppunitTest_sc_ucalc_nanpayload \
 	CppunitTest_sc_ucalc_condformat \
 	CppunitTest_sc_ucalc_copypaste \
+	CppunitTest_sc_ucalc_compile_diff \
+	CppunitTest_sc_ucalc_compile_host \
 	CppunitTest_sc_ucalc_datatransformation \
 	CppunitTest_sc_ucalc_document_themes \
 	CppunitTest_sc_ucalc_formula \
@@ -54,6 +56,7 @@ $(eval $(call gb_Module_add_check_targets,sc,\
 	CppunitTest_sc_ucalc_pivottable \
 	CppunitTest_sc_ucalc_rangelst \
 	CppunitTest_sc_ucalc_range \
+	CppunitTest_sc_ucalc_shadow_compiler \
 	CppunitTest_sc_ucalc_shared_cases \
 	CppunitTest_sc_ucalc_sharedformula \
 	CppunitTest_sc_ucalc_sparkline \
