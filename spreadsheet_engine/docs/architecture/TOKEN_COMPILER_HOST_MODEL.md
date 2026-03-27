@@ -653,7 +653,7 @@ This section is the working task list for the implementation effort.
 
 - [x] Phase 0 kickoff: confirm milestone boundary and treat `ScTokenArray` replacement as a staged migration program rather than a full first-pass consumer rewrite
 - [x] Phase 0 initial inventory snapshot: identify compiler-emitted token repertoire and main consumer categories
-- [ ] Phase 0 closeout: produce the fuller token-kind coverage matrix from the milestone validation corpus
+- [x] Phase 0 closeout: produce the fuller token-kind coverage matrix from the milestone validation corpus
 - [x] Phase 1 start: add initial canonical token schema scaffolding in `spreadsheet_engine`
 - [x] Phase 1 start: add initial compiler host interface scaffolding in `spreadsheet_engine`
 - [x] Phase 1 start: add first standalone schema/interface validation tests
@@ -667,18 +667,21 @@ This section is the working task list for the implementation effort.
 - [x] Phase 4: add engine compiler skeleton in shadow mode
 - [x] Phase 5: add compile-diff validation harness
 - [x] Phase 5 closeout sprint: extend compile-diff coverage for col/row-name and external-name formulas, add richer whitespace-sensitive cases, strengthen XML placeholder roundtrips, and add a small real-FODS-sourced formula smoke on enabled families
-- [ ] Phase 6: migrate first low-risk native consumers
+- [x] Phase 6: migrate first low-risk native consumers
 - [x] Phase 6 first slice: route shared-formula token comparison through canonical engine token services with Calc fallback for unsupported bridge cases
 - [x] Phase 6 second slice: route `ScTokenArray::EqualTokens()` through canonical lexical token equality with Calc fallback for unsupported bridge cases
 - [x] Phase 6 third slice: route `ScTokenArray::GenHash()` through canonical lexical hashing with Calc fallback for unsupported bridge cases
 - [x] Phase 6 fourth slice: add engine-owned diagnostic token stringification and consume it from Calc compile-diff diagnostics
 - [x] Phase 6 substantial-complete checkpoint: hashing, equality, shared-formula comparison, and basic diagnostic stringification now operate on canonical tokens in live Calc or standalone paths
-- [ ] Phase 7: bridge-based Calc compiler adoption
+- [x] Phase 7: bridge-based Calc compiler adoption
 - [x] Phase 7 first slice: route `ScSimpleFormulaCalculator` through engine compile request/status + bridge export, with legacy fallback preserved for unsupported bridge corners
 - [x] Phase 7 second slice: route `ScRangeData::CompileRangeData()` through engine compile request/status + bridge export, preserving extended-error-detection and RPN follow-up behavior
 - [x] Phase 7 third slice: route `ScRefTokenHelper::compileRangeRepresentation()` through engine compile request/status + bridge export, preserving the existing reference-shape validation and fallback behavior
 - [x] Phase 7 substantial-complete checkpoint: multiple real Calc compile flows now use the engine compile request/host model plus bridge export, with legacy fallback retained for unsupported corners
-- [ ] Phase 8: milestone closeout
+- [x] Phase 8: milestone closeout
+- [x] Phase 8 start: document the remaining bridge-only and explicitly deferred compile consumers for this milestone boundary
+- [x] Phase 8 start: freeze the canonical token / compile-host contract surface for the milestone
+- [x] Phase 8 start: record the next consumer programs after milestone closeout (reference update, named-range storage, execution backend)
 
 ## Phase 0 Snapshot
 
@@ -700,6 +703,40 @@ The current compiler-facing repertoire is effectively the `ScRawToken` repertoir
 - jump payloads
 - error constants
 - whitespace / XML placeholder preservation
+
+### Token kind coverage matrix
+
+The fuller milestone matrix from the validated bridge / shadow / diff corpus is:
+
+| Token kind / sidecar | Canonical schema | Bridge roundtrip | Shadow / diff corpus | Live milestone consumer | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `PlainOpcode` | yes | yes | yes | yes | arithmetic and function pipelines |
+| `Missing` | yes | yes | no | indirect | covered by bridge fidelity rather than compile corpus |
+| `Byte` | yes | yes | no | indirect | byte-param payload preserved losslessly |
+| `Value` | yes | yes | yes | yes | arithmetic and scalar formulas |
+| `String` | yes | yes | yes | yes | string literals and whitespace-sensitive formulas |
+| `StringName` | yes | yes | no | indirect | preserved for bridge parity, not yet promoted to shadow corpus |
+| `SingleRef` | yes | yes | yes | yes | hashing, equality, shared-formula comparison, and compile adoption |
+| `DoubleRef` | yes | yes | yes | yes | range formulas and structured compile smoke |
+| `RangeName` | yes | yes | yes | yes | shadow compile and bridged `ScRangeData` adoption |
+| `DatabaseRange` | yes | yes | yes | yes | compile host and diff corpus |
+| `ExternalSingleRef` | yes | yes | no | bridge-only | lossless bridge coverage only in this milestone |
+| `ExternalDoubleRef` | yes | yes | no | bridge-only | lossless bridge coverage only in this milestone |
+| `ExternalName` | yes | yes | yes | yes | compile host, shadow compile, and diff corpus |
+| `Matrix` | yes | yes | yes | yes | array literal diff smoke and canonical equality / hashing |
+| `ColRowName` | yes | yes | yes | yes | compile host and adopted compile flows |
+| `TableRef` | yes | yes | yes | yes | structured-reference bridge, shadow compile, and diff corpus |
+| `Error` | yes | yes | partial | indirect | bridge fidelity plus array / error payload preservation |
+| `Jump` | yes | yes | no | bridge-only | preserved for future interpreter-facing work |
+| `Whitespace` | yes | yes | yes | yes | whitespace-sensitive diff corpus and diagnostics |
+| XML formula source sidecar | yes | yes | partial | yes | `AssignXMLString()` roundtrip and placeholder preservation |
+
+This matrix is enough for the milestone because every canonical token kind in
+`spreadsheetengine/detail/TokenModel.hxx` is either:
+
+- covered by bridge roundtrip validation, or
+- covered by both bridge roundtrip and shadow / diff corpus validation, or
+- explicitly marked bridge-only for a later consumer program.
 
 ### Main `ScTokenArray` consumer categories
 
@@ -930,6 +967,113 @@ closeout-grade breadth, not missing core milestone behavior:
 - more compile call sites such as conditional-format and validation-specific formula compilation
 - broader workbook-driven adoption coverage beyond the current focused compile consumers
 - eventual reduction of legacy fallback reliance in the adopted paths
+
+## Current Phase 8 Status
+
+Phase 8 is now complete.
+
+The important boundary decision for this closeout is that the milestone is considered complete once
+the canonical token model, compile-host model, bridge, differential harness, first native
+consumers, and first real bridged compile adopters are all in place and green. Phase 8 therefore
+does **not** try to absorb additional production migration just because more compile entry points
+exist.
+
+### Frozen contract surface for this milestone
+
+The canonical contracts that should now be treated as the milestone boundary are:
+
+- canonical token schema and compiled-formula container in:
+  - `spreadsheetengine/detail/TokenModel.hxx`
+- canonical compile-host model in:
+  - `spreadsheetengine/detail/CompileHost.hxx`
+  - `spreadsheetengine/compat/libreoffice/CompileHost.hxx`
+- compile request / status pipeline contract in:
+  - `spreadsheetengine/detail/CompilerPipeline.hxx`
+- compatibility bridge and adoption helpers in:
+  - `spreadsheetengine/compat/libreoffice/TokenBridge.hxx`
+  - `spreadsheetengine/compat/libreoffice/ShadowCompiler.hxx`
+  - `spreadsheetengine/compat/libreoffice/CompilerDiff.hxx`
+- first native token services in:
+  - `spreadsheetengine/detail/SharedFormulaToken.hxx`
+  - `spreadsheetengine/detail/TokenStringifier.hxx`
+
+Those files define the canonical token/compiler-host milestone surface. Later work can extend them,
+but should not casually reshape them without deliberate follow-up planning.
+
+### Remaining bridge-only or explicitly deferred consumers
+
+The following areas are intentionally **not** part of this milestone’s production adoption set and
+should remain bridge-only or deferred for the next program:
+
+- interpreter-facing token carriers and execution input
+  - `ScInterpreter`
+  - group evaluation / vector backends
+  - interpreter-only token variants such as jump-matrix, ref-list, matrix-cell, hybrid-cell, and
+    vector-ref tokens
+- reference-update and token mutation ownership
+  - `ScTokenArray` mutation-heavy reference-update methods
+  - copy / move / tab / transpose / grow token-rewrite behavior
+- broad persistence, filter, and UNO token paths
+  - import/export pipelines
+  - UNO token exposure
+  - persistence-format ownership
+- additional compile entry points that were intentionally not adopted in Phase 7
+  - `ScConditionEntry::Compile()` in `sc/source/core/data/conditio.cxx`
+  - validation-specific compile flows that share similar semantics
+
+The conditional-format compile consumer is still intentionally deferred, but the
+`CppunitTest_sc_ucalc_condformat` copy/paste range regressions that showed up during this branch
+have now been fixed in Calc's conditional-format copy/update path. That removes the closeout risk
+without expanding the milestone into another production compile-adoption slice.
+
+### Next consumer programs after closeout
+
+Once this milestone is formally closed, the recommended next consumer programs are:
+
+1. reference-update ownership
+   - move token rewrite / reference-adjustment algorithms onto canonical tokens instead of bridged
+     `ScTokenArray`
+2. named-range storage ownership
+   - move from “bridged compile at creation time” toward engine-owned storage and comparison
+3. execution-backend extraction
+   - connect the canonical token/compiler-host model to the later dependency-graph, recalc, and
+     execution-backend extraction work
+
+### Closeout validation stance
+
+The milestone closeout gate should continue to rely on:
+
+- standalone compiler / token-host tests
+- `CppunitTest_sc_ucalc_token_bridge`
+- `CppunitTest_sc_ucalc_compile_host`
+- `CppunitTest_sc_ucalc_shadow_compiler`
+- `CppunitTest_sc_ucalc_compile_diff`
+- `CppunitTest_sc_ucalc_sharedformula`
+- `CppunitTest_sc_ucalc_formula2`
+- `CppunitTest_sc_ucalc`
+
+That gate is sufficient to close the milestone without broadening it into unrelated conditional
+format, interpreter, or dependency-graph migration work.
+
+### Milestone-complete summary
+
+The token / compiler-host milestone is now complete against the completion criteria from the start
+of this document:
+
+- the canonical token model and compiled-formula container exist and are stable enough for bridging
+  and diffing
+- the Calc-backed compile-host model exists and resolves the milestone name / db-range /
+  structured-reference / col-row-name / external-name cases
+- the `ScTokenArray` bridge is lossless for the milestone corpus
+- the differential harness is in place and green
+- first native token consumers are live in Calc
+- first real bridged compile adopters are live in Calc with legacy fallback preserved
+
+What remains after this closeout is next-program work, not unfinished milestone work:
+
+- deeper compile-call-site adoption such as conditional-format / validation compilation
+- token mutation and reference-update ownership
+- interpreter / dependency-graph / execution-backend extraction
 
 ## Recommendation
 

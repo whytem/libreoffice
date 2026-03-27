@@ -565,6 +565,7 @@ class ScConditionalFormat
 
     std::vector<std::unique_ptr<ScFormatEntry>> maEntries;
     ScRangeList maRanges;            // Ranges for conditional format
+    bool mbSkipNextCopyRangeUpdate = false;
 
     mutable std::unique_ptr<ScColorFormatCache> mpCache;
 
@@ -588,6 +589,7 @@ public:
     SC_DLLPUBLIC size_t size() const;
 
     ScDocument& GetDocument();
+    void MarkCopiedAsMoved() { mbSkipNextCopyRangeUpdate = true; }
 
     void            CompileAll();
     void            CompileXML();

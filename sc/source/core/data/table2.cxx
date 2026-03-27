@@ -635,6 +635,17 @@ bool isRangeDependentFormatNeedDeduplication(const ScRangeList& rOld, const ScRa
     return true; // New is completely inside old -> merge (in fact, this means "nothing to do")
 }
 
+void normalizeCondFormatRanges(ScRangeList& rRanges)
+{
+    if (rRanges.size() < 2)
+        return;
+
+    ScRangeList aNormalized;
+    for (size_t i = 0; i < rRanges.size(); ++i)
+        aNormalized.Join(rRanges[i]);
+    rRanges.swap(aNormalized);
+}
+
 bool CheckAndDeduplicateCondFormat(ScDocument& rDocument, ScConditionalFormat* pOldFormat, const ScConditionalFormat* pNewFormat, SCTAB nTab)
 {
     if (!pOldFormat)
@@ -653,6 +664,8 @@ bool CheckAndDeduplicateCondFormat(ScDocument& rDocument, ScConditionalFormat* p
         {
             rDstRangeList.Join(rNewRangeList[i]);
         }
+        normalizeCondFormatRanges(rDstRangeList);
+        pOldFormat->MarkCopiedAsMoved();
         rDocument.AddCondFormatData(rNewRangeList, nTab, pOldFormat->GetKey());
         return true;
     }
@@ -689,6 +702,7 @@ void ScTable::CopyConditionalFormat( SCCOL nCol1, SCROW nRow1, SCCOL nCol2, SCRO
         aRefCxt.mnRowDelta = nDy;
         aRefCxt.mnTabDelta = nTab - pTable->nTab;
         pNewFormat->UpdateReference(aRefCxt, true);
+        normalizeCondFormatRanges(pNewFormat->GetRangeList());
 
         if (!bUndoContext && bSameDoc && pTable->nTab == nTab && CheckAndDeduplicateCondFormat(rDocument, mpCondFormatList->GetFormat(rxCondFormat->GetKey()), pNewFormat.get(), nTab))
         {

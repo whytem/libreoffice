@@ -1950,8 +1950,17 @@ void ScConditionalFormat::UpdateReference( sc::RefUpdateContext& rCxt, bool bCop
     {
         // ScConditionEntry::UpdateReference() obtains its aSrcPos from
         // maRanges and does not update it on URM_COPY, but it's needed later
-        // for the moved position, so update maRanges beforehand.
-        maRanges.UpdateReference(URM_MOVE, mrDoc, rCxt.maRange, rCxt.mnColDelta, rCxt.mnRowDelta, rCxt.mnTabDelta);
+        // for the moved position, so translate maRanges beforehand without
+        // repurposing rCxt.maRange away from the copied destination.
+        for (auto& rRange : maRanges)
+        {
+            ScRange aErrorRange(rRange);
+            if (!rRange.Move(rCxt.mnColDelta, rCxt.mnRowDelta, rCxt.mnTabDelta, aErrorRange, mrDoc))
+            {
+                assert(!"can't move ScConditionalFormat range");
+            }
+        }
+        MarkCopiedAsMoved();
         for (auto& rxEntry : maEntries)
             rxEntry->UpdateReference(rCxt);
     }
@@ -1959,7 +1968,11 @@ void ScConditionalFormat::UpdateReference( sc::RefUpdateContext& rCxt, bool bCop
     {
         for (auto& rxEntry : maEntries)
             rxEntry->UpdateReference(rCxt);
-        maRanges.UpdateReference(rCxt.meMode, mrDoc, rCxt.maRange, rCxt.mnColDelta, rCxt.mnRowDelta, rCxt.mnTabDelta);
+        if (rCxt.meMode == URM_COPY && mbSkipNextCopyRangeUpdate)
+            mbSkipNextCopyRangeUpdate = false;
+        else
+            maRanges.UpdateReference(rCxt.meMode, mrDoc, rCxt.maRange, rCxt.mnColDelta,
+                                     rCxt.mnRowDelta, rCxt.mnTabDelta);
     }
 
     ResetCache();
