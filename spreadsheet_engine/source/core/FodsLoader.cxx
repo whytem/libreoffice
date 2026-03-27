@@ -341,6 +341,21 @@ void countIgnoredFeatures(const xmlNode* pNode, IgnoredFeatureSummary& rSummary)
     return rVisibility == u"collapse";
 }
 
+void parseCalculationSettings(const xmlNode* pSettingsNode, workbook::Workbook& rWorkbook)
+{
+    // Calc's XML import defaults missing formula-search settings to regex mode.
+    rWorkbook.meFormulaSearchType = workbook::FormulaSearchType::Regex;
+
+    const api::String aUseRegex
+        = getPropString(pSettingsNode, pTableNs, "use-regular-expressions");
+    if (aUseRegex == u"false" || aUseRegex == u"FALSE")
+        rWorkbook.meFormulaSearchType = workbook::FormulaSearchType::Normal;
+
+    const api::String aUseWildcards = getPropString(pSettingsNode, pTableNs, "use-wildcards");
+    if (aUseWildcards == u"true" || aUseWildcards == u"TRUE")
+        rWorkbook.meFormulaSearchType = workbook::FormulaSearchType::Wildcard;
+}
+
 [[nodiscard]] workbook::Cell parseCell(const xmlNode* pCellNode)
 {
     workbook::Cell aCell;
@@ -664,6 +679,12 @@ api::ValueResult<LoadResult> loadWorkbookRecursive(
 
     for (const xmlNode* pChild = pSpreadsheet->children; pChild; pChild = pChild->next)
     {
+        if (matchesNode(pChild, pTableNs, "calculation-settings"))
+        {
+            parseCalculationSettings(pChild, aResult.maWorkbook);
+            continue;
+        }
+
         if (matchesNode(pChild, pTableNs, "named-expressions"))
         {
             parseNamedExpressions(pChild, {}, aResult.maWorkbook);

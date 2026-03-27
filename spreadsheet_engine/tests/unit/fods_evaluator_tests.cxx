@@ -316,6 +316,11 @@ int main()
         const auto aWeeks = aEvaluator.evaluateFormula(
             u"of:=ORG.OPENOFFICE.WEEKS(DATEVALUE(\"2021-11-14\");DATEVALUE(\"2021-11-15\");1)",
             { 0, 0, 0 });
+        const auto aExactVLookup = aEvaluator.evaluateFormula(
+            u"of:=VLOOKUP(7;{5|21;6|22;8|24};2;0)", { 0, 0, 0 });
+        const auto aIsNaMax = aEvaluator.evaluateFormula(u"of:=ISNA(MAX(NA()))", { 0, 0, 0 });
+        const auto aMaxValue = aEvaluator.evaluateFormula(u"of:=MAX(3;7;2)", { 0, 0, 0 });
+        const auto aMinValue = aEvaluator.evaluateFormula(u"of:=MIN(3;7;2)", { 0, 0, 0 });
         const auto aDaysInMonth
             = aEvaluator.evaluateFormula(u"of:=ORG.OPENOFFICE.DAYSINMONTH(\"Jan1, 2015\")", { 0, 0, 0 });
         const auto aDaysInYear
@@ -345,6 +350,13 @@ int main()
             || !almostEqual(aRawSubtract.maValue.maValue.mfNumber, 0.25)
             || !aWeeks || !aWeeks.maValue.maValue.isNumber()
             || !almostEqual(aWeeks.maValue.maValue.mfNumber, 1.0)
+            || aExactVLookup || aExactVLookup.meError != spreadsheetengine::api::Error::IllegalArgument
+            || !aIsNaMax || !aIsNaMax.maValue.maValue.isBoolean()
+            || !almostEqual(aIsNaMax.maValue.maValue.mfNumber, 1.0)
+            || !aMaxValue || !aMaxValue.maValue.maValue.isNumber()
+            || !almostEqual(aMaxValue.maValue.maValue.mfNumber, 7.0)
+            || !aMinValue || !aMinValue.maValue.maValue.isNumber()
+            || !almostEqual(aMinValue.maValue.maValue.mfNumber, 2.0)
             || !aDaysInMonth || !aDaysInMonth.maValue.maValue.isNumber()
             || !almostEqual(aDaysInMonth.maValue.maValue.mfNumber, 31.0) || !aDaysInYear
             || !aDaysInYear.maValue.maValue.isNumber()
@@ -429,6 +441,92 @@ int main()
         {
             return fail(
                 "spreadsheetengine_fods_evaluator_tests", "Err:511 cached fallback mismatch");
+        }
+    }
+
+    {
+        const auto aRepoRoot = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
+        const auto aVlookupPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                  / "spreadsheet" / "fods" / "vlookup.fods";
+        const auto aLoadResult = spreadsheetengine::core::fods::loadWorkbook(aVlookupPath.string());
+        if (!aLoadResult)
+            return fail("spreadsheetengine_fods_evaluator_tests", "vlookup.fods load failed");
+
+        Evaluator aVlookupEvaluator(aLoadResult.maValue.maWorkbook);
+        const auto aPatternResult = aVlookupEvaluator.evaluateCell({ 1, 0, 7 });
+        if (!aPatternResult || aPatternResult.mbUsedCachedValue
+            || !aPatternResult.maValue.maValue.isNumber()
+            || !almostEqual(aPatternResult.maValue.maValue.mfNumber, 4.0))
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests", "vlookup.fods regex match mismatch");
+        }
+
+        const auto aApproximateTextResult = aVlookupEvaluator.evaluateCell({ 1, 0, 55 });
+        if (!aApproximateTextResult || aApproximateTextResult.mbUsedCachedValue
+            || !aApproximateTextResult.maValue.maValue.isText()
+            || aApproximateTextResult.maValue.maValue.maString != u"abcd")
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "vlookup.fods approximate text best-fit mismatch");
+        }
+
+        const auto aTypeMismatchSortedResult = aVlookupEvaluator.evaluateCell({ 1, 0, 18 });
+        if (!aTypeMismatchSortedResult || aTypeMismatchSortedResult.mbUsedCachedValue
+            || !aTypeMismatchSortedResult.maValue.maValue.isError()
+            || aTypeMismatchSortedResult.maValue.maValue.meError
+                   != spreadsheetengine::api::Error::NotAvailable)
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "vlookup.fods sorted text over numeric keys mismatch");
+        }
+
+        const auto aNotFoundResult = aVlookupEvaluator.evaluateCell({ 1, 0, 72 });
+        if (!aNotFoundResult || aNotFoundResult.mbUsedCachedValue
+            || !aNotFoundResult.maValue.maValue.isError()
+            || aNotFoundResult.maValue.maValue.meError != spreadsheetengine::api::Error::NotAvailable)
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests", "vlookup.fods not-found mismatch");
+        }
+    }
+
+    {
+        const auto aRepoRoot = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
+        const auto aFormulaPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                  / "information" / "fods" / "formula.fods";
+        const auto aLoadResult = spreadsheetengine::core::fods::loadWorkbook(aFormulaPath.string());
+        if (!aLoadResult)
+            return fail("spreadsheetengine_fods_evaluator_tests", "formula.fods load failed");
+
+        Evaluator aFormulaEvaluator(aLoadResult.maValue.maWorkbook);
+        const auto aMissingFormulaResult = aFormulaEvaluator.evaluateCell({ 1, 0, 2 });
+        if (!aMissingFormulaResult || aMissingFormulaResult.mbUsedCachedValue
+            || !aMissingFormulaResult.maValue.maValue.isError()
+            || aMissingFormulaResult.maValue.maValue.meError
+                   != spreadsheetengine::api::Error::NotAvailable)
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "formula.fods missing-formula FORMULA() mismatch");
+        }
+    }
+
+    {
+        const auto aRepoRoot = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
+        const auto aIsLogicalPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                    / "information" / "fods" / "islogical.fods";
+        const auto aLoadResult = spreadsheetengine::core::fods::loadWorkbook(aIsLogicalPath.string());
+        if (!aLoadResult)
+            return fail("spreadsheetengine_fods_evaluator_tests", "islogical.fods load failed");
+
+        Evaluator aIsLogicalEvaluator(aLoadResult.maValue.maWorkbook);
+        const auto aIsNaMaxResult = aIsLogicalEvaluator.evaluateCell({ 1, 0, 8 });
+        if (!aIsNaMaxResult || aIsNaMaxResult.mbUsedCachedValue
+            || !aIsNaMaxResult.maValue.maValue.isBoolean()
+            || !almostEqual(aIsNaMaxResult.maValue.maValue.mfNumber, 1.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "islogical.fods ISNA(MAX(NA())) mismatch");
         }
     }
 
@@ -588,11 +686,14 @@ int main()
                                / "date_time" / "fods" / "time.fods";
         const auto aWeeksPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
                                 / "date_time" / "fods" / "weeks.fods";
+        const auto aVlookupPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                  / "spreadsheet" / "fods" / "vlookup.fods";
         const auto aEomonthLoad = spreadsheetengine::core::fods::loadWorkbook(aEomonthPath.string());
         const auto aEdateLoad = spreadsheetengine::core::fods::loadWorkbook(aEdatePath.string());
         const auto aTimeLoad = spreadsheetengine::core::fods::loadWorkbook(aTimePath.string());
         const auto aWeeksLoad = spreadsheetengine::core::fods::loadWorkbook(aWeeksPath.string());
-        if (!aEomonthLoad || !aEdateLoad || !aTimeLoad || !aWeeksLoad)
+        const auto aVlookupLoad = spreadsheetengine::core::fods::loadWorkbook(aVlookupPath.string());
+        if (!aEomonthLoad || !aEdateLoad || !aTimeLoad || !aWeeksLoad || !aVlookupLoad)
             return fail("spreadsheetengine_fods_evaluator_tests", "month-shift FODS load failed");
 
         Evaluator aEomonthEvaluator(aEomonthLoad.maValue.maWorkbook);
@@ -631,6 +732,14 @@ int main()
             || !almostEqual(aWeeksResult.maValue.maValue.mfNumber, 1.0))
         {
             return fail("spreadsheetengine_fods_evaluator_tests", "weeks.fods live evaluation mismatch");
+        }
+
+        Evaluator aVlookupEvaluator(aVlookupLoad.maValue.maWorkbook);
+        const auto aVlookupResult = aVlookupEvaluator.evaluateCell({ 1, 0, 72 });
+        if (!aVlookupResult || !aVlookupResult.maValue.maValue.isError()
+            || aVlookupResult.maValue.maValue.meError != spreadsheetengine::api::Error::NotAvailable)
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "vlookup.fods live evaluation mismatch");
         }
     }
 

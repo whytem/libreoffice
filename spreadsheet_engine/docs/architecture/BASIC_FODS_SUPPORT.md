@@ -269,7 +269,24 @@ Secondary target families:
       The evaluator now also materializes stored typed date cells as numeric
       serials and understands ODF `office:time-value="PT..."` durations for
       typed stored time cells.
-- [ ] Expand to selected spreadsheet lookup/reference workbooks.
+- [x] Enable the spreadsheet FODS family.
+      The default standalone replay lane now also scans the full raw
+      spreadsheet FODS directory. The spreadsheet-family enablement work added
+      workbook-level formula-search import defaults that match Calc's XML
+      loader (`Regexp` when the FODS file omits the setting), live standalone
+      `VLOOKUP()` / `HLOOKUP()` exact-match evaluation for regex-escaped lookup
+      strings and proper live `#N/A` results, plus Calc-style sorted matrix
+      lookup semantics for approximate text and numeric searches. That includes
+      collation-based string ordering for the classic sorted `VLOOKUP()` path
+      and the final type guard that returns `#N/A` when a sorted text lookup
+      would otherwise land on a numeric key.
+- [x] Enable the information FODS family.
+      The information FODS family is now enabled. The default standalone replay
+      lane also scans the full raw information FODS directory. The enablement
+      work added live `FORMULA()` handling for missing or non-formula target
+      cells (`#N/A` instead of empty text) and a small live `MAX()` / `MIN()`
+      extrema path so `ISNA(MAX(NA()))` and the related information-family
+      workbook checks execute without falling back to cached values.
 
 #### Replay harness
 

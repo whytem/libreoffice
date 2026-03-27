@@ -194,6 +194,16 @@ std::vector<std::filesystem::path> collectDefaultReplayCorpus()
     const auto aDateTimeFiles = collectFodsFiles(aDateTimeRoot);
     aFiles.insert(aFiles.end(), aDateTimeFiles.begin(), aDateTimeFiles.end());
 
+    const std::filesystem::path aSpreadsheetRoot
+        = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions" / "spreadsheet" / "fods";
+    const auto aSpreadsheetFiles = collectFodsFiles(aSpreadsheetRoot);
+    aFiles.insert(aFiles.end(), aSpreadsheetFiles.begin(), aSpreadsheetFiles.end());
+
+    const std::filesystem::path aInformationRoot
+        = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions" / "information" / "fods";
+    const auto aInformationFiles = collectFodsFiles(aInformationRoot);
+    aFiles.insert(aFiles.end(), aInformationFiles.begin(), aInformationFiles.end());
+
     return aFiles;
 }
 

@@ -5,7 +5,7 @@ project(spreadsheetengine_standalone VERSION 0.1.0 LANGUAGES CXX)
 include(CTest)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
-find_package(ICU REQUIRED COMPONENTS uc)
+find_package(ICU REQUIRED COMPONENTS uc i18n)
 find_package(LibXml2 REQUIRED)
 
 set(SPREADSHEETENGINE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -34,7 +34,7 @@ target_include_directories(spreadsheetengine_core
         ${LIBXML2_INCLUDE_DIR}
         ${LIBXML2_INCLUDE_DIRS}
 )
-target_link_libraries(spreadsheetengine_core PUBLIC ICU::uc ${LIBXML2_LIBRARIES})
+target_link_libraries(spreadsheetengine_core PUBLIC ICU::uc ICU::i18n ${LIBXML2_LIBRARIES})
 
 add_executable(spreadsheetengine_smoke
     ${SPREADSHEETENGINE_STANDALONE_SMOKE_SOURCES}

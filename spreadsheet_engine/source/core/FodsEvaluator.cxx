@@ -13,6 +13,7 @@
 
 #include <spreadsheetengine/api/Calendar.hxx>
 #include <spreadsheetengine/api/Logic.hxx>
+#include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Math.hxx>
 #include <spreadsheetengine/api/Text.hxx>
 #include <spreadsheetengine/runtime/DateTimeParts.hxx>
@@ -22,8 +23,13 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <memory>
 #include <optional>
+#include <regex>
 #include <string>
+
+#include <unicode/coll.h>
+#include <unicode/ustring.h>
 
 namespace spreadsheetengine::core::fods
 {
@@ -77,6 +83,188 @@ namespace
             aResult.push_back(cChar);
     }
     return aResult;
+}
+
+[[nodiscard]] bool mayBeRegExp(api::StringView rValue)
+{
+    if (rValue.empty() || (rValue.size() == 1 && rValue.front() != u'.'))
+        return false;
+
+    return rValue.find_first_of(u"?*+.[]^$\\<>()|") != api::StringView::npos;
+}
+
+[[nodiscard]] bool mayBeWildcard(api::StringView rValue)
+{
+    return rValue.find_first_of(u"*?~") != api::StringView::npos;
+}
+
+[[nodiscard]] std::string toUtf8String(api::StringView rText)
+{
+    if (rText.empty())
+        return {};
+
+    UErrorCode eStatus = U_ZERO_ERROR;
+    int32_t nLength = 0;
+    u_strToUTF8(nullptr, 0, &nLength, reinterpret_cast<const UChar*>(rText.data()),
+        static_cast<int32_t>(rText.size()), &eStatus);
+    if (eStatus != U_BUFFER_OVERFLOW_ERROR && U_FAILURE(eStatus))
+        return {};
+
+    std::string aResult(static_cast<std::size_t>(nLength), '\0');
+    eStatus = U_ZERO_ERROR;
+    u_strToUTF8(aResult.data(), nLength, nullptr, reinterpret_cast<const UChar*>(rText.data()),
+        static_cast<int32_t>(rText.size()), &eStatus);
+    if (U_FAILURE(eStatus))
+        return {};
+
+    return aResult;
+}
+
+[[nodiscard]] sal_Int32 compareFoldedText(api::StringView rLeft, api::StringView rRight)
+{
+    UErrorCode eStatus = U_ZERO_ERROR;
+    return u_strCaseCompare(reinterpret_cast<const UChar*>(rLeft.data()),
+        static_cast<int32_t>(rLeft.size()), reinterpret_cast<const UChar*>(rRight.data()),
+        static_cast<int32_t>(rRight.size()), 0, &eStatus);
+}
+
+[[nodiscard]] api::ValueResult<int> compareLookupText(
+    api::StringView rLeft, api::StringView rRight)
+{
+    static std::unique_ptr<icu::Collator> xCollator = [] {
+        UErrorCode eStatus = U_ZERO_ERROR;
+        std::unique_ptr<icu::Collator> xInstance(
+            icu::Collator::createInstance(icu::Locale(), eStatus));
+        if (!xInstance || U_FAILURE(eStatus))
+            return std::unique_ptr<icu::Collator>();
+        xInstance->setStrength(icu::Collator::SECONDARY);
+        return xInstance;
+    }();
+
+    if (!xCollator)
+        return api::ValueResult<int>::failure(api::Error::IllegalArgument);
+
+    UErrorCode eStatus = U_ZERO_ERROR;
+    const icu::UnicodeString aLeft(
+        reinterpret_cast<const UChar*>(rLeft.data()), static_cast<int32_t>(rLeft.size()));
+    const icu::UnicodeString aRight(
+        reinterpret_cast<const UChar*>(rRight.data()), static_cast<int32_t>(rRight.size()));
+    const UCollationResult eCompare = xCollator->compare(aLeft, aRight, eStatus);
+    if (U_FAILURE(eStatus))
+        return api::ValueResult<int>::failure(api::Error::IllegalArgument);
+
+    if (eCompare == UCOL_EQUAL)
+        return api::ValueResult<int>::success(0);
+    return api::ValueResult<int>::success(eCompare == UCOL_LESS ? -1 : 1);
+}
+
+[[nodiscard]] bool isRegexMetaCharacter(char16_t cChar)
+{
+    switch (cChar)
+    {
+        case u'.':
+        case u'^':
+        case u'$':
+        case u'|':
+        case u'(':
+        case u')':
+        case u'[':
+        case u']':
+        case u'{':
+        case u'}':
+        case u'+':
+        case u'?':
+        case u'*':
+        case u'\\':
+            return true;
+        default:
+            return false;
+    }
+}
+
+[[nodiscard]] std::string makeWholeCellRegexPattern(
+    api::StringView rPattern, workbook::FormulaSearchType eSearchType)
+{
+    std::string aPattern;
+    aPattern.reserve(rPattern.size() * 2 + 2);
+    aPattern.push_back('^');
+
+    if (eSearchType == workbook::FormulaSearchType::Wildcard)
+    {
+        bool bEscapeNext = false;
+        for (const char16_t cChar : rPattern)
+        {
+            if (bEscapeNext)
+            {
+                if (isRegexMetaCharacter(cChar))
+                    aPattern.push_back('\\');
+                aPattern += toUtf8String(api::StringView(&cChar, 1));
+                bEscapeNext = false;
+                continue;
+            }
+
+            if (cChar == u'~')
+            {
+                bEscapeNext = true;
+                continue;
+            }
+
+            if (cChar == u'*')
+            {
+                aPattern += ".*";
+                continue;
+            }
+
+            if (cChar == u'?')
+            {
+                aPattern.push_back('.');
+                continue;
+            }
+
+            if (isRegexMetaCharacter(cChar))
+                aPattern.push_back('\\');
+            aPattern += toUtf8String(api::StringView(&cChar, 1));
+        }
+
+        if (bEscapeNext)
+            aPattern += "~";
+    }
+    else
+    {
+        aPattern += toUtf8String(rPattern);
+    }
+
+    aPattern.push_back('$');
+    return aPattern;
+}
+
+[[nodiscard]] bool matchesWholeCellLookupText(api::StringView rLookupText,
+    api::StringView rCandidateText, workbook::FormulaSearchType eSearchType)
+{
+    switch (eSearchType)
+    {
+        case workbook::FormulaSearchType::Regex:
+            if (!mayBeRegExp(rLookupText))
+                return compareFoldedText(rCandidateText, rLookupText) == 0;
+            break;
+        case workbook::FormulaSearchType::Wildcard:
+            if (!mayBeWildcard(rLookupText))
+                return compareFoldedText(rCandidateText, rLookupText) == 0;
+            break;
+        case workbook::FormulaSearchType::Normal:
+            return compareFoldedText(rCandidateText, rLookupText) == 0;
+    }
+
+    try
+    {
+        const std::regex aPattern(
+            makeWholeCellRegexPattern(rLookupText, eSearchType), std::regex::ECMAScript | std::regex::icase);
+        return std::regex_match(toUtf8String(rCandidateText), aPattern);
+    }
+    catch (const std::regex_error&)
+    {
+        return false;
+    }
 }
 
 [[nodiscard]] api::String normalizeDisplayFunctionName(api::StringView rName)
@@ -1371,7 +1559,7 @@ EvaluationResult Evaluator::evaluateFunction(
 
         const workbook::Cell* pCell = getCell(aReference.maValue.maReference.maRange.maStart);
         if (!pCell || !pCell->hasFormula())
-            return makeScalarResult(api::CellValue::text({}));
+            return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
 
         const formula::ParseResult aParsed = formula::parseFormula(pCell->maFormula);
         if (!aParsed)
@@ -1741,6 +1929,222 @@ EvaluationResult Evaluator::evaluateFunction(
         return makeScalarResult(api::CellValue::number(*oWeeks));
     }
 
+    if (aFunctionName == u"VLOOKUP" || aFunctionName == u"HLOOKUP")
+    {
+        if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 4)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aLookupValue
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aLookupValue)
+            return aLookupValue;
+
+        EvaluationResult aTable = evaluateNode(*rNode.maChildren[1], rCurrentAddress);
+        if (!aTable)
+            return aTable;
+        if (!aTable.maValue.isMatrixReference())
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aIndex
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[2], rCurrentAddress));
+        if (!aIndex)
+            return aIndex;
+        if (aIndex.maValue.maValue.isEmpty())
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aIndexNumber = coerceToNumber(aIndex.maValue.maValue);
+        if (!aIndexNumber)
+            return makeFailure(aIndexNumber.meError);
+        const auto oWholeIndex = toWholeNumber(aIndexNumber.maValue);
+        if (!oWholeIndex || *oWholeIndex <= 0)
+            return makeFailure(api::Error::IllegalArgument);
+
+        bool bApproximate = true;
+        if (rNode.maChildren.size() == 4)
+        {
+            EvaluationResult aMode
+                = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[3], rCurrentAddress));
+            if (!aMode)
+                return aMode;
+
+            const auto aModeNumber = coerceToNumber(aMode.maValue.maValue);
+            if (!aModeNumber)
+                return makeFailure(aModeNumber.meError);
+            bApproximate = !rtl::math::approxEqual(aModeNumber.maValue, 0.0);
+        }
+
+        const auto& rReference = aTable.maValue.maReference;
+        const auto aDimensions = rReference.matrixDimensions();
+        const auto eOrientation = aFunctionName == u"VLOOKUP"
+                                      ? api::lookup::VectorOrientation::Column
+                                      : api::lookup::VectorOrientation::Row;
+
+        const api::MatrixSize nSearchLength
+            = eOrientation == api::lookup::VectorOrientation::Column ? aDimensions.mnRows
+                                                                     : aDimensions.mnColumns;
+        const api::MatrixSize nResultIndex = *oWholeIndex - 1;
+        if (nSearchLength <= 0)
+            return makeFailure(api::Error::IllegalArgument);
+        if (eOrientation == api::lookup::VectorOrientation::Column
+            && nResultIndex >= aDimensions.mnColumns)
+        {
+            return makeFailure(api::Error::IllegalArgument);
+        }
+        if (eOrientation == api::lookup::VectorOrientation::Row && nResultIndex >= aDimensions.mnRows)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const api::CellValue& rLookup = aLookupValue.maValue.maValue;
+        if (rLookup.isError())
+            return makeFailure(rLookup.meError);
+
+        auto loadCandidateAt = [&](api::MatrixSize nSearchIndex) -> EvaluationResult {
+            const api::MatrixCoordinate aSearchCoordinate
+                = eOrientation == api::lookup::VectorOrientation::Column
+                      ? api::MatrixCoordinate { 0, nSearchIndex }
+                      : api::MatrixCoordinate { nSearchIndex, 0 };
+            return materializeReferenceValue(
+                rReference, aSearchCoordinate.mnColumn, aSearchCoordinate.mnRow);
+        };
+
+        auto compareForExactLookup = [&](const api::CellValue& rCandidate)
+            -> api::ValueResult<int> {
+            if (rCandidate.isError())
+                return api::ValueResult<int>::failure(rCandidate.meError);
+
+            if (rLookup.isText())
+            {
+                if (!rCandidate.isText())
+                    return api::ValueResult<int>::failure(api::Error::IllegalArgument);
+
+                return api::ValueResult<int>::success(matchesWholeCellLookupText(
+                    rLookup.maString, rCandidate.maString, mrWorkbook.meFormulaSearchType)
+                        ? 0
+                        : 1);
+            }
+
+            if (rCandidate.isText())
+                return api::ValueResult<int>::failure(api::Error::IllegalArgument);
+
+            const auto aCandidateNumber = coerceToNumber(rCandidate);
+            if (!aCandidateNumber)
+                return api::ValueResult<int>::failure(aCandidateNumber.meError);
+            const auto aLookupNumber = coerceToNumber(rLookup);
+            if (!aLookupNumber)
+                return api::ValueResult<int>::failure(aLookupNumber.meError);
+
+            if (rtl::math::approxEqual(aCandidateNumber.maValue, aLookupNumber.maValue))
+                return api::ValueResult<int>::success(0);
+            return api::ValueResult<int>::success(1);
+        };
+
+        std::optional<api::MatrixSize> oResolvedIndex;
+        if (bApproximate)
+        {
+            if (rLookup.isText())
+            {
+                for (api::MatrixSize nSearchIndex = 0; nSearchIndex < nSearchLength; ++nSearchIndex)
+                {
+                    EvaluationResult aCandidate = loadCandidateAt(nSearchIndex);
+                    if (!aCandidate)
+                        continue;
+
+                    const api::CellValue& rCandidate = aCandidate.maValue.maValue;
+                    if (rCandidate.isText() || rCandidate.isEmpty())
+                    {
+                        const api::StringView aCandidateText
+                            = rCandidate.isText() ? api::StringView(rCandidate.maString)
+                                                  : api::StringView();
+                        const auto aTextCompare = compareLookupText(aCandidateText, rLookup.maString);
+                        if (!aTextCompare)
+                            continue;
+                        if (aTextCompare.maValue <= 0)
+                        {
+                            oResolvedIndex = nSearchIndex;
+                        }
+                        else if (nSearchIndex > 0)
+                        {
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        oResolvedIndex = nSearchIndex;
+                    }
+                }
+            }
+            else
+            {
+                const auto aLookupNumber = coerceToNumber(rLookup);
+                if (!aLookupNumber)
+                    return makeFailure(aLookupNumber.meError);
+
+                for (api::MatrixSize nSearchIndex = 0; nSearchIndex < nSearchLength; ++nSearchIndex)
+                {
+                    EvaluationResult aCandidate = loadCandidateAt(nSearchIndex);
+                    if (!aCandidate)
+                        continue;
+
+                    const api::CellValue& rCandidate = aCandidate.maValue.maValue;
+                    if (rCandidate.isText() || rCandidate.isEmpty())
+                        continue;
+
+                    const auto aCandidateNumber = coerceToNumber(rCandidate);
+                    if (!aCandidateNumber)
+                        continue;
+
+                    if (aCandidateNumber.maValue < aLookupNumber.maValue
+                        || rtl::math::approxEqual(
+                            aCandidateNumber.maValue, aLookupNumber.maValue))
+                    {
+                        oResolvedIndex = nSearchIndex;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+        else
+        {
+            for (api::MatrixSize nSearchIndex = 0; nSearchIndex < nSearchLength; ++nSearchIndex)
+            {
+                EvaluationResult aCandidate = loadCandidateAt(nSearchIndex);
+                if (!aCandidate)
+                    continue;
+
+                const auto aComparison = compareForExactLookup(aCandidate.maValue.maValue);
+                if (!aComparison)
+                    continue;
+                if (aComparison.maValue == 0)
+                {
+                    oResolvedIndex = nSearchIndex;
+                    break;
+                }
+            }
+        }
+
+        if (!oResolvedIndex)
+            return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
+
+        EvaluationResult aMatchedSearchValue = loadCandidateAt(*oResolvedIndex);
+        if (!aMatchedSearchValue)
+            return aMatchedSearchValue;
+        if (rLookup.isText() && (aMatchedSearchValue.maValue.maValue.isNumber()
+                                 || aMatchedSearchValue.maValue.maValue.isBoolean()))
+        {
+            return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
+        }
+
+        const auto aResultCoordinate = api::lookup::planTabularLookupResult(
+            eOrientation, *oResolvedIndex, nResultIndex, aDimensions);
+        if (!aResultCoordinate)
+            return makeFailure(aResultCoordinate.meError);
+
+        return materializeReferenceValue(
+            rReference, aResultCoordinate.maValue.mnColumn, aResultCoordinate.maValue.mnRow);
+    }
+
     if (aFunctionName == u"UNICHAR")
     {
         if (rNode.maChildren.size() != 1)
@@ -1913,6 +2317,77 @@ EvaluationResult Evaluator::evaluateFunction(
             return makeFailure(api::Error::IllegalArgument);
 
         return makeScalarResult(api::CellValue::boolean(bResult));
+    }
+
+    if (aFunctionName == u"MAX" || aFunctionName == u"MIN")
+    {
+        if (rNode.maChildren.empty())
+            return makeFailure(api::Error::IllegalArgument);
+
+        std::optional<double> oBestValue;
+        const bool bFindMaximum = aFunctionName == u"MAX";
+        for (const auto& pChild : rNode.maChildren)
+        {
+            const bool bReferenceLike = pChild->meKind == formula::NodeKind::CellReference
+                                        || pChild->meKind == formula::NodeKind::RangeReference
+                                        || pChild->meKind == formula::NodeKind::NamedReference;
+
+            EvaluationResult aArgument = bReferenceLike
+                                             ? evaluateReferenceNode(*pChild, rCurrentAddress)
+                                             : evaluateNode(*pChild, rCurrentAddress);
+            if (!aArgument)
+                return aArgument;
+
+            auto considerValue = [&](const api::CellValue& rValue) -> api::ValueResult<bool> {
+                if (rValue.isError())
+                    return api::ValueResult<bool>::failure(rValue.meError);
+
+                if (rValue.isNumber())
+                {
+                    if (!oBestValue
+                        || (bFindMaximum ? rValue.mfNumber > *oBestValue
+                                         : rValue.mfNumber < *oBestValue))
+                    {
+                        oBestValue = rValue.mfNumber;
+                    }
+                    return api::ValueResult<bool>::success(true);
+                }
+
+                return api::ValueResult<bool>::success(false);
+            };
+
+            if (aArgument.maValue.isMatrixReference())
+            {
+                const auto& rReference = aArgument.maValue.maReference;
+                for (api::RowIndex nRow = 0; nRow < rReference.maRange.rowCount(); ++nRow)
+                {
+                    for (api::ColumnIndex nCol = 0; nCol < rReference.maRange.columnCount(); ++nCol)
+                    {
+                        EvaluationResult aCell = materializeReferenceValue(rReference, nCol, nRow);
+                        if (!aCell)
+                            return aCell;
+
+                        const auto aConsidered = considerValue(aCell.maValue.maValue);
+                        if (!aConsidered)
+                            return makeFailure(aConsidered.meError);
+                    }
+                }
+                continue;
+            }
+
+            const auto aNumber = coerceToNumber(aArgument.maValue.maValue);
+            if (!aNumber)
+                return makeFailure(aNumber.meError);
+
+            if (!oBestValue
+                || (bFindMaximum ? aNumber.maValue > *oBestValue
+                                 : aNumber.maValue < *oBestValue))
+            {
+                oBestValue = aNumber.maValue;
+            }
+        }
+
+        return makeScalarResult(api::CellValue::number(oBestValue.value_or(0.0)));
     }
 
     if (aFunctionName == u"AGGREGATE")

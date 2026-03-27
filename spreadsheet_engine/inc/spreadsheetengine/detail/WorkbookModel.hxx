@@ -20,6 +20,13 @@
 namespace spreadsheetengine::core::workbook
 {
 
+enum class FormulaSearchType : sal_uInt8
+{
+    Normal,
+    Wildcard,
+    Regex
+};
+
 struct Cell
 {
     api::CellValue maValue;
@@ -95,6 +102,7 @@ struct Workbook
 {
     std::vector<Sheet> maSheets;
     std::vector<NamedRange> maNamedRanges;
+    FormulaSearchType meFormulaSearchType = FormulaSearchType::Regex;
 
     [[nodiscard]] std::optional<api::SheetId> findSheetId(api::StringView rName) const
     {

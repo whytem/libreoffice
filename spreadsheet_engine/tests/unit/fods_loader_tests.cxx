@@ -33,6 +33,12 @@ int main()
     if (rWorkbook.maSheets.size() != 2 || rWorkbook.maNamedRanges.size() != 2)
         return fail("spreadsheetengine_fods_tests", "workbook structure mismatch");
 
+    if (rWorkbook.meFormulaSearchType
+        != spreadsheetengine::core::workbook::FormulaSearchType::Regex)
+    {
+        return fail("spreadsheetengine_fods_tests", "formula search type default mismatch");
+    }
+
     const auto* pSheet1 = rWorkbook.findSheet(u"Sheet1");
     const auto* pImported = rWorkbook.findSheet(u"ImportedResults");
     if (!pSheet1 || !pImported || !pImported->moSource
