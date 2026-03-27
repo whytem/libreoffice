@@ -420,6 +420,23 @@ int testWorkbookCompilerPreflight()
             "workbook compiler preflight array mismatch");
     }
 
+    const auto aSignedArray
+        = secompiler::preflightFormulaSource(u"of:=SUM({0.7;1;-0.4;0.04;-0.002388})", aHost, *oContext);
+    if (!aSignedArray || !aSignedArray.mbUsesArrayConstant)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler preflight signed-array mismatch");
+    }
+
+    const auto aBareRange
+        = secompiler::preflightFormulaSource(u"of:=COM.MICROSOFT.TEXTJOIN(\"-\";1;I13:K13)",
+            aHost, *oContext);
+    if (!aBareRange || !aBareRange.mbUsesFunctionCall || !aBareRange.mbUsesRangeReference)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler preflight bare-range mismatch");
+    }
+
     const auto aParseFailure = secompiler::preflightFormulaSource(u"of:=ABS(", aHost, *oContext);
     if (aParseFailure || aParseFailure.meReason != secompiler::FormulaPreflightReason::ParseFailure)
     {

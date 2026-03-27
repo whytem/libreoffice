@@ -46,6 +46,14 @@ namespace
            || cChar == u'?' || cChar == u'_' || cChar == u'.';
 }
 
+[[nodiscard]] constexpr bool isReferenceTerminator(char16_t cChar)
+{
+    return cChar == u'\0' || isAsciiSpace(cChar) || cChar == u')' || cChar == u'}'
+           || cChar == u';' || cChar == u',' || cChar == u':' || cChar == u'+'
+           || cChar == u'-' || cChar == u'*' || cChar == u'/' || cChar == u'^'
+           || cChar == u'&' || cChar == u'=' || cChar == u'<' || cChar == u'>';
+}
+
 [[nodiscard]] std::unique_ptr<Node> makeNode(NodeKind eKind)
 {
     auto pNode = std::make_unique<Node>();
@@ -114,6 +122,97 @@ class Parser
             ++mnPos;
 
         return mrInput.substr(nStart, mnPos - nStart);
+    }
+
+    [[nodiscard]] bool consumeBareCellAddressRemainder()
+    {
+        if (peek() == u'$')
+            ++mnPos;
+
+        std::size_t nColumnCount = 0;
+        while (true)
+        {
+            const char16_t cChar = peek();
+            const bool bAlpha
+                = (cChar >= u'A' && cChar <= u'Z') || (cChar >= u'a' && cChar <= u'z');
+            if (!bAlpha)
+                break;
+            ++mnPos;
+            ++nColumnCount;
+        }
+
+        if (nColumnCount == 0 || nColumnCount > 3)
+            return false;
+
+        if (peek() == u'$')
+            ++mnPos;
+
+        std::size_t nRowCount = 0;
+        while (isDigit(peek()))
+        {
+            ++mnPos;
+            ++nRowCount;
+        }
+
+        return nRowCount > 0;
+    }
+
+    [[nodiscard]] std::unique_ptr<Node> parseBareReference()
+    {
+        const std::size_t nStart = mnPos;
+
+        bool bParsedAddress = consumeBareCellAddressRemainder();
+        if (!bParsedAddress)
+        {
+            mnPos = nStart;
+
+            const auto aSheetToken = parseIdentifierToken();
+            if (aSheetToken.empty() || !consume(u'.') || !consumeBareCellAddressRemainder())
+            {
+                mnPos = nStart;
+                return nullptr;
+            }
+            bParsedAddress = true;
+        }
+
+        if (!bParsedAddress)
+            return nullptr;
+
+        const auto aPrimaryToken = mrInput.substr(nStart, mnPos - nStart);
+        if (peek() == u'(')
+        {
+            mnPos = nStart;
+            return nullptr;
+        }
+        if (peek() != u':' && !isReferenceTerminator(peek()))
+        {
+            mnPos = nStart;
+            return nullptr;
+        }
+        if (peek() != u':')
+        {
+            auto pNode = makeNode(NodeKind::CellReference);
+            pNode->maPrimaryText = api::String(aPrimaryToken);
+            return pNode;
+        }
+
+        ++mnPos;
+        const std::size_t nSecondStart = mnPos;
+        if (!consumeBareCellAddressRemainder())
+        {
+            mnPos = nStart;
+            return nullptr;
+        }
+        if (!isReferenceTerminator(peek()))
+        {
+            mnPos = nStart;
+            return nullptr;
+        }
+
+        auto pNode = makeNode(NodeKind::RangeReference);
+        pNode->maPrimaryText = api::String(aPrimaryToken);
+        pNode->maSecondaryText = api::String(mrInput.substr(nSecondStart, mnPos - nSecondStart));
+        return pNode;
     }
 
     [[nodiscard]] std::unique_ptr<Node> parseNumberLiteral()
@@ -427,6 +526,12 @@ class Parser
         if (isDigit(peek()) || (peek() == u'.' && isDigit(peekAhead(1))))
             return parseNumberLiteral();
 
+        if (peek() == u'$' || isIdentifierStart(peek()))
+        {
+            if (auto pReference = parseBareReference())
+                return pReference;
+        }
+
         if (isIdentifierStart(peek()))
             return parseIdentifierLike();
 
@@ -613,7 +718,8 @@ public:
     [[nodiscard]] ParseResult parse()
     {
         skipSpaces();
-        (void)consumeIfPresent(u"of:=");
+        if (!consumeIfPresent(u"of:="))
+            (void)consumeIfPresent(u"of:");
         if (!mrInput.substr(mnPos).empty() && mrInput[mnPos] == u'=')
             ++mnPos;
         skipSpaces();

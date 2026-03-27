@@ -62,8 +62,11 @@ struct PreflightSummary
 {
     std::size_t mnFormulaCells = 0;
     std::size_t mnReady = 0;
+    std::size_t mnExpectedError = 0;
     std::map<std::string, std::size_t> maReasonCounts;
     std::map<std::string, std::string> maReasonExamples;
+    std::map<std::string, std::size_t> maExpectedErrorReasonCounts;
+    std::map<std::string, std::string> maExpectedErrorReasonExamples;
 };
 
 std::string toUtf8(StringView rText)
@@ -149,6 +152,20 @@ std::string formatScalarValue(const CellValue& rValue)
     if (rValue.isError())
         return formatError(rValue.meError);
     return "";
+}
+
+bool cellCachesError(const spreadsheetengine::core::workbook::Cell& rCell)
+{
+    return rCell.maValue.isError() || rCell.maRawValueType == u"error";
+}
+
+std::string preflightBucketName(
+    FormulaPreflightReason eReason, bool bExpectedErrorPath)
+{
+    std::string aReason = toUtf8(preflightReasonName(eReason));
+    if (bExpectedErrorPath)
+        aReason = "expected_error_" + aReason;
+    return aReason;
 }
 
 bool isSuccessLike(const EvaluationResult& rResult)
@@ -420,15 +437,27 @@ PreflightSummary preflightWorkbook(
                 continue;
             }
 
-            const std::string aReason = toUtf8(preflightReasonName(aResult.meReason));
-            ++aSummary.maReasonCounts[aReason];
+            const bool bExpectedErrorPath = cellCachesError(rCell);
+            const std::string aReason
+                = preflightBucketName(aResult.meReason, bExpectedErrorPath);
+            auto& rReasonCounts = bExpectedErrorPath ? aSummary.maExpectedErrorReasonCounts
+                                                     : aSummary.maReasonCounts;
+            auto& rReasonExamples = bExpectedErrorPath ? aSummary.maExpectedErrorReasonExamples
+                                                       : aSummary.maReasonExamples;
 
-            if (!aSummary.maReasonExamples.contains(aReason))
+            if (bExpectedErrorPath)
+                ++aSummary.mnExpectedError;
+            ++rReasonCounts[aReason];
+
+            if (!rReasonExamples.contains(aReason))
             {
-                aSummary.maReasonExamples[aReason]
+                std::string aExample
                     = rWorkbookPath.filename().string() + " " + toUtf8(rSheet.maName) + "."
                       + columnLabel(rKey.first) + std::to_string(rKey.second + 1) + " "
                       + toUtf8(rCell.maFormula);
+                if (bExpectedErrorPath)
+                    aExample += " => " + formatScalarValue(rCell.maValue);
+                rReasonExamples[aReason] = std::move(aExample);
             }
         }
     }
@@ -440,6 +469,7 @@ void mergePreflightSummary(PreflightSummary& rInto, const PreflightSummary& rFro
 {
     rInto.mnFormulaCells += rFrom.mnFormulaCells;
     rInto.mnReady += rFrom.mnReady;
+    rInto.mnExpectedError += rFrom.mnExpectedError;
     for (const auto& [rReason, nCount] : rFrom.maReasonCounts)
         rInto.maReasonCounts[rReason] += nCount;
     for (const auto& [rReason, rExample] : rFrom.maReasonExamples)
@@ -447,16 +477,33 @@ void mergePreflightSummary(PreflightSummary& rInto, const PreflightSummary& rFro
         if (!rInto.maReasonExamples.contains(rReason))
             rInto.maReasonExamples[rReason] = rExample;
     }
+    for (const auto& [rReason, nCount] : rFrom.maExpectedErrorReasonCounts)
+        rInto.maExpectedErrorReasonCounts[rReason] += nCount;
+    for (const auto& [rReason, rExample] : rFrom.maExpectedErrorReasonExamples)
+    {
+        if (!rInto.maExpectedErrorReasonExamples.contains(rReason))
+            rInto.maExpectedErrorReasonExamples[rReason] = rExample;
+    }
 }
 
 void printPreflightSummary(const PreflightSummary& rSummary)
 {
+    const std::size_t nHardBlockers
+        = rSummary.mnFormulaCells - rSummary.mnReady - rSummary.mnExpectedError;
     std::cout << "preflight_formula_cells=" << rSummary.mnFormulaCells << '\n';
     std::cout << "preflight_ready=" << rSummary.mnReady << '\n';
+    std::cout << "preflight_expected_error=" << rSummary.mnExpectedError << '\n';
     std::cout << "preflight_not_ready=" << (rSummary.mnFormulaCells - rSummary.mnReady) << '\n';
+    std::cout << "preflight_hard_blockers=" << nHardBlockers << '\n';
     std::cout << "preflight_ready_rate="
               << (rSummary.mnFormulaCells
                       ? (100.0 * static_cast<double>(rSummary.mnReady)
+                            / static_cast<double>(rSummary.mnFormulaCells))
+                      : 0.0)
+              << '\n';
+    std::cout << "preflight_effective_ready_rate="
+              << (rSummary.mnFormulaCells
+                      ? (100.0 * static_cast<double>(rSummary.mnReady + rSummary.mnExpectedError)
                             / static_cast<double>(rSummary.mnFormulaCells))
                       : 0.0)
               << '\n';
@@ -472,9 +519,31 @@ void printPreflightSummary(const PreflightSummary& rSummary)
     }
     std::cout << '\n';
 
+    std::cout << "preflight_expected_error_reasons=";
+    bFirst = true;
+    for (const auto& [rReason, nCount] : rSummary.maExpectedErrorReasonCounts)
+    {
+        if (!bFirst)
+            std::cout << ",";
+        bFirst = false;
+        std::cout << rReason << ":" << nCount;
+    }
+    std::cout << '\n';
+
     std::cout << "preflight_examples=";
     bFirst = true;
     for (const auto& [rReason, rExample] : rSummary.maReasonExamples)
+    {
+        if (!bFirst)
+            std::cout << " | ";
+        bFirst = false;
+        std::cout << rReason << ":" << rExample;
+    }
+    std::cout << '\n';
+
+    std::cout << "preflight_expected_error_examples=";
+    bFirst = true;
+    for (const auto& [rReason, rExample] : rSummary.maExpectedErrorReasonExamples)
     {
         if (!bFirst)
             std::cout << " | ";

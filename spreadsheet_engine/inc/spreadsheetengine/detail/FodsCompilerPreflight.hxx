@@ -106,6 +106,32 @@ inline void setFailure(
     rResult.mnFailureOffset = nFailureOffset;
 }
 
+[[nodiscard]] inline bool isSupportedArrayElement(
+    const core::formula::Node& rNode, const WorkbookCompileHost& rHost,
+    const CompileContext& rContext, FormulaPreflightResult& rResult)
+{
+    using core::formula::NodeKind;
+    (void)rHost;
+    (void)rContext;
+    (void)rResult;
+
+    switch (rNode.meKind)
+    {
+        case NodeKind::NumberLiteral:
+        case NodeKind::StringLiteral:
+        case NodeKind::BooleanLiteral:
+        case NodeKind::ErrorLiteral:
+        case NodeKind::EmptyArgument:
+            return true;
+        case NodeKind::UnaryOperation:
+            if (rNode.maChildren.size() != 1 || !rNode.maChildren.front())
+                return false;
+            return isSupportedArrayElement(*rNode.maChildren.front(), rHost, rContext, rResult);
+        default:
+            return false;
+    }
+}
+
 [[nodiscard]] inline bool preflightNode(
     const core::formula::Node& rNode, const WorkbookCompileHost& rHost,
     const CompileContext& rContext, FormulaPreflightResult& rResult)
@@ -151,21 +177,12 @@ inline void setFailure(
                 if (!pChild)
                     continue;
 
-                switch (pChild->meKind)
-                {
-                    case NodeKind::NumberLiteral:
-                    case NodeKind::StringLiteral:
-                    case NodeKind::BooleanLiteral:
-                    case NodeKind::ErrorLiteral:
-                    case NodeKind::EmptyArgument:
-                        if (!preflightNode(*pChild, rHost, rContext, rResult))
-                            return false;
-                        break;
-                    default:
-                        setFailure(rResult, FormulaPreflightReason::UnsupportedArrayElement,
-                            api::String(nodeKindName(pChild->meKind)));
-                        return false;
-                }
+                if (isSupportedArrayElement(*pChild, rHost, rContext, rResult))
+                    continue;
+
+                setFailure(rResult, FormulaPreflightReason::UnsupportedArrayElement,
+                    api::String(nodeKindName(pChild->meKind)));
+                return false;
             }
             return true;
 

@@ -161,6 +161,16 @@ int main()
     }
 
     {
+        const auto aResult = parseFormula(u"of:#ERR502!");
+        if (!aResult || aResult.mpRoot->meKind != NodeKind::ErrorLiteral
+            || aResult.mpRoot->maPrimaryText != u"#ERR502!")
+        {
+            return fail("spreadsheetengine_fods_parser_tests",
+                "namespace error literal parse mismatch");
+        }
+    }
+
+    {
         const auto aResult = parseFormula(u"TRUE");
         if (!aResult || aResult.mpRoot->meKind != NodeKind::BooleanLiteral
             || !aResult.mpRoot->mbBoolean)
@@ -194,6 +204,33 @@ int main()
             || aResult.mpRoot->maChildren[0]->maChildren.size() != 4)
         {
             return fail("spreadsheetengine_fods_parser_tests", "matrix array constant parse mismatch");
+        }
+    }
+
+    {
+        const auto aResult = parseFormula(u"of:=COM.MICROSOFT.TEXTJOIN(\"-\";1;I13:K13)");
+        if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
+            || aResult.mpRoot->maPrimaryText != u"COM.MICROSOFT.TEXTJOIN"
+            || aResult.mpRoot->maChildren.size() != 3
+            || aResult.mpRoot->maChildren[2]->meKind != NodeKind::RangeReference
+            || aResult.mpRoot->maChildren[2]->maPrimaryText != u"I13"
+            || aResult.mpRoot->maChildren[2]->maSecondaryText != u"K13")
+        {
+            return fail("spreadsheetengine_fods_parser_tests",
+                "bare range parse mismatch");
+        }
+    }
+
+    {
+        const auto aResult = parseFormula(u"of:=SUM($A$1:$B2)");
+        if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
+            || aResult.mpRoot->maChildren.size() != 1
+            || aResult.mpRoot->maChildren[0]->meKind != NodeKind::RangeReference
+            || aResult.mpRoot->maChildren[0]->maPrimaryText != u"$A$1"
+            || aResult.mpRoot->maChildren[0]->maSecondaryText != u"$B2")
+        {
+            return fail("spreadsheetengine_fods_parser_tests",
+                "absolute bare range parse mismatch");
         }
     }
 

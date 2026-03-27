@@ -214,18 +214,25 @@ Current milestone pass/fail thresholds:
 
 Current manual compiler-preflight baseline on the same corpus:
 
-- preflight-ready formula cells: `18932 / 19930` (about `95.0%`)
-- preflight-not-ready formula cells: `998`
-- first blocked categories:
-  - parse failure: `939`
-  - missing named reference: `39`
-  - unsupported array element: `20`
+- preflight-ready formula cells: `19045 / 19930` (about `95.56%`)
+- preflight-expected-error formula cells: `42`
+  - these are formulas that the current preflight cannot compile, but whose
+    workbook cells already cache an expected error result
+- preflight-not-ready formula cells: `885`
+- preflight-hard-blocker formula cells: `843`
+- current blocked categories:
+  - parse failure: `807`
+  - missing named reference: `36`
+- current expected-error categories:
+  - expected-error parse failure: `41`
+  - expected-error missing named reference: `1`
 - first representative examples:
-  - parse failure: `ifs.fods Sheet2.B15 of:#N/A`
-  - missing named reference:
-    `substitute.fods Sheet2.K8 of:=SUBSTITUTE([.K1:.K4];a;f)`
-  - unsupported array element:
-    `seriessum.fods Sheet2.A6 of:=SERIESSUM([.I10];0;2;{0.7;1;-0.4;0.04;-0.002388})`
+  - parse failure: `areas.fods Sheet2.A2 of:=AREAS(([.A1:.B3]~[.F2]~[.G1]))`
+  - missing named reference: `error.type.fods Sheet2.A15 of:=ERROR.TYPE(ahoj)`
+  - expected-error parse failure:
+    `not.fods Sheet2.A11 of:=NOT(0)NOT(0) => #VALUE!`
+  - expected-error missing named reference:
+    `substitute.fods Sheet2.K8 of:=SUBSTITUTE([.K1:.K4];a;f) => #VALUE!`
 
 ### Phase 1: Standalone Workbook Compile Host
 
@@ -578,18 +585,26 @@ The third implementation slice is now in place:
 - `tests/unit/fods_replay_tests.cxx` now has a manual `--preflight` mode that
   reports:
   - preflight-ready vs blocked formula counts
+  - expected-error vs hard-blocker split
   - grouped reason counts
   - first representative blocking examples
-- the first full-corpus readiness baseline is now frozen in this document:
-  - ready: `18932`
-  - blocked: `998`
-  - parse failures dominate the current gap
+- parser/preflight burn-down work now also covers:
+  - namespace-prefixed error literals like `of:#ERR502!`
+  - signed array-constant elements like `-0.4`
+  - bare `A1` / `A1:B2` references such as `I13:K13`
+- the current full-corpus readiness baseline is now:
+  - ready: `19045`
+  - expected-error: `42`
+  - hard blockers: `843`
+  - parse failures still dominate the remaining gap
 
 The next implementation slice should move from measurement into execution:
 
 1. close the highest-volume preflight blockers first:
    - parse failures
-   - unsupported array-element lowering
+   - unresolved workbook names that should remain explicit host/compiler gaps
+   - the next parser-construct bucket after the current `~`/reference-list
+     frontier
 2. promote the manual preflight from classifier-only to first native-lowering
    attempts on the FODS-safe subset
 3. keep that preflight manual and corpus-scoped before promoting it into the
