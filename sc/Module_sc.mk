@@ -59,6 +59,7 @@ $(eval $(call gb_Module_add_check_targets,sc,\
 	CppunitTest_sc_ucalc_sparkline \
 	CppunitTest_sc_ucalc_solver \
 	CppunitTest_sc_ucalc_sort \
+	CppunitTest_sc_ucalc_token_bridge \
 	CppunitTest_sc_filters_test \
 	CppunitTest_sc_mark_test \
 	CppunitTest_sc_core \

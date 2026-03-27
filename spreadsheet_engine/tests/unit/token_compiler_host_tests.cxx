@@ -117,6 +117,11 @@ int testTokenHashAndEquality()
             { token::Kind::Value, 1, 12.5 },
         },
         token::XmlFormulaSource { u"of:=SUM([.A1:.A3])", u"of" },
+        502,
+        0x10,
+        true,
+        true,
+        false,
         token::VectorState::Enabled,
         true,
         true,
@@ -133,6 +138,11 @@ int testTokenHashAndEquality()
     if (token::hashCompiledFormula(aFormula) == token::hashCompiledFormula(aFormulaDifferent))
         return fail("spreadsheetengine_token_compiler_host_tests",
             "compiled formula hash failed to distinguish payload change");
+    aFormulaDifferent = aFormula;
+    aFormulaDifferent.mnCodeError = 0;
+    if (token::hashCompiledFormula(aFormula) == token::hashCompiledFormula(aFormulaDifferent))
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "compiled formula hash failed to distinguish metadata change");
     if (token::kindName(token::Kind::TableRef) != u"TableRef")
         return fail(
             "spreadsheetengine_token_compiler_host_tests", "token kind name mismatch");

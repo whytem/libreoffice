@@ -214,6 +214,7 @@ struct TableRefData
 struct JumpData
 {
     std::vector<short> maJumps;
+    ParamClassValue mnInForceArray = kParamClassUnknown;
 
     [[nodiscard]] constexpr bool operator==(const JumpData& rOther) const = default;
 };
@@ -252,6 +253,11 @@ struct CompiledFormula
 {
     std::vector<Token> maTokens;
     std::optional<XmlFormulaSource> moXmlFormulaSource;
+    ErrorCode mnCodeError = kErrorCodeNone;
+    sal_uInt8 mnRecalcModeBits = 0;
+    bool mbHyperLink = false;
+    bool mbFromRangeName = false;
+    bool mbShareable = true;
     VectorState meVectorState = VectorState::Unknown;
     bool mbOpenCLEnabled = false;
     bool mbThreadingEnabled = false;
@@ -413,6 +419,7 @@ template <typename T>
                 std::size_t nHash = 0;
                 for (short nJump : rValue.maJumps)
                     hashCombine(nHash, hashIntegralLike(nJump));
+                hashCombine(nHash, hashIntegralLike(rValue.mnInForceArray));
                 return nHash;
             }
             else
@@ -437,7 +444,12 @@ template <typename T>
 
 [[nodiscard]] inline std::size_t hashCompiledFormula(const CompiledFormula& rFormula)
 {
-    std::size_t nHash = detail::hashIntegralLike(rFormula.meVectorState);
+    std::size_t nHash = detail::hashIntegralLike(rFormula.mnCodeError);
+    detail::hashCombine(nHash, detail::hashIntegralLike(rFormula.mnRecalcModeBits));
+    detail::hashCombine(nHash, detail::hashIntegralLike(rFormula.mbHyperLink));
+    detail::hashCombine(nHash, detail::hashIntegralLike(rFormula.mbFromRangeName));
+    detail::hashCombine(nHash, detail::hashIntegralLike(rFormula.mbShareable));
+    detail::hashCombine(nHash, detail::hashIntegralLike(rFormula.meVectorState));
     detail::hashCombine(nHash, detail::hashIntegralLike(rFormula.mbOpenCLEnabled));
     detail::hashCombine(nHash, detail::hashIntegralLike(rFormula.mbThreadingEnabled));
     if (rFormula.moXmlFormulaSource)

@@ -659,7 +659,10 @@ This section is the working task list for the implementation effort.
 - [x] Phase 1 start: add first standalone schema/interface validation tests
 - [x] Phase 1 expansion: add compile-result metadata for XML formula source and split the host surface into narrower resolver interfaces
 - [x] Phase 1 substantial-complete checkpoint: canonical compiler-emitted token schema, compile-result container, and compile-host interface bundle exist with focused standalone validation
-- [ ] Phase 2: implement `ScTokenArray` bridge scaffolding
+- [x] Phase 2 start: extend the canonical model with bridge-relevant metadata (`code error`, recalc bits, hyperlink/range-name/shareable flags, jump param-class payload)
+- [x] Phase 2 start: add a Calc-side `ScTokenArray <-> CompiledFormula` bridge scaffold for the core compiler-emitted token repertoire
+- [x] Phase 2 start: add focused Calc roundtrip validation in `CppunitTest_sc_ucalc_token_bridge`
+- [x] Phase 2 substantial-complete checkpoint: bridge scaffolding exists for the main compiler-emitted token categories with focused standalone and Calc validation
 - [ ] Phase 3: implement Calc compile-host adapters
 - [ ] Phase 4: add engine compiler skeleton in shadow mode
 - [ ] Phase 5: add compile-diff validation harness
@@ -715,25 +718,48 @@ The planned validation corpus for this milestone remains:
 
 That corpus is broad enough to support the bridge-and-shadow-compiler milestone without requiring immediate consumer migration.
 
-## Current Phase 1 Status
+## Current Phase 2 Status
 
-Phase 1 is now substantially complete.
+Phase 2 is now substantially complete.
 
-The current implementation checkpoint in `spreadsheet_engine` includes:
+The current checkpoint now includes:
 
 - a canonical compiler-emitted token schema
 - a compile-result container with vector/backend metadata and XML formula source preservation
 - native token hashing and equality support
 - a split compiler-host interface bundle built around narrower resolver roles
-- a focused standalone validation lane covering token payloads, compile-result metadata, kind naming, and host bundle wiring
+- a LibreOffice bridge scaffold in `spreadsheetengine/compat/libreoffice/TokenBridge.hxx`
+- bridge roundtrip coverage in `CppunitTest_sc_ucalc_token_bridge`
+- focused validation covering:
+  - standalone schema/hash/host tests
+  - Calc import/export roundtrips for mixed core token arrays
+  - XML placeholder bridge handling via `AssignXMLString()`
 
-What Phase 1 still does **not** include is intentional:
+The current bridge scaffold covers the main compiler-emitted token categories that matter for the first milestone checkpoint:
 
-- `ScTokenArray` bridge code
-- Calc compile-host adapters
+- plain opcode / separator tokens
+- missing tokens
+- byte-param tokens, including in-force-array param class
+- doubles, strings, and string-name tokens
+- single refs, double refs, range names, db ranges, and col/row-name refs
+- external single refs, double refs, and names
+- matrix literals containing numeric, string, and error elements
+- table refs
+- jump tokens
+- error constants
+- whitespace tokens
+- pure XML placeholder arrays via `AssignXMLString()`
+
+What Phase 2 still does **not** include is also intentional:
+
+- `svExternal` / plain external-string tokens
+- interpreter-only carriers such as jump-matrix, ref-list, matrix-cell, hybrid-cell, and vector-ref tokens
+- broader special-opcode reference variants beyond the initial bridge path
+- explicit export-side preservation of vector/OpenCL/threading flags beyond whatever Calc recomputes while rebuilding the token array
 - engine compiler shadow execution
+- Calc compile-host adapters
 
-Those are Phase 2 and later.
+Those are Phase 3 and later.
 
 ## Recommendation
 
