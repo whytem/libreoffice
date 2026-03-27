@@ -221,22 +221,32 @@ Current manual compiler-preflight baseline on the same corpus:
 - preflight-not-ready formula cells: `92`
 - preflight-hard-blocker formula cells: `51`
 - current blocked categories:
-  - parse failure: `12`
+  - parse failure: `14`
   - missing named reference: `37`
-  - unsupported range-constructor operand: `2`
 - current expected-error categories:
-  - expected-error parse failure: `9`
+  - expected-error parse failure: `40`
   - expected-error missing named reference: `1`
-  - expected-error unsupported range-constructor operand: `31`
 - first representative examples:
   - parse failure: `columns.fods Sheet2.A19 of:=COLUMNS({1;2;3;4|5;6;7;8})`
   - missing named reference: `error.type.fods Sheet2.A15 of:=ERROR.TYPE(ahoj)`
-  - unsupported range-constructor operand:
-    `error.type.fods Sheet2.A12 of:=ERROR.TYPE(err:7)`
   - expected-error parse failure:
     `not.fods Sheet2.A11 of:=NOT(0)NOT(0) => #VALUE!`
   - expected-error missing named reference:
     `substitute.fods Sheet2.K8 of:=SUBSTITUTE([.K1:.K4];a;f) => #VALUE!`
+
+Current manual native-lowering smoke baseline on the same corpus:
+
+- formula cells scanned: `19930`
+- preflight-ready formula cells: `19838`
+- successfully lowered formula cells: `19838`
+- lowering failures on preflight-ready formulas: `0`
+- ready-to-lowered rate: `100%`
+- overall lowered rate: about `99.54%`
+- implication:
+  - the remaining `51` hard blockers no longer stop the first native-lowering
+    smoke path
+  - they are now strictly a preflight/parser/host tail, not a live lowering
+    failure bucket
 
 ### Phase 1: Standalone Workbook Compile Host
 
@@ -455,8 +465,8 @@ Exit criteria:
 ### Phase 2
 
 - [x] Inventory the exact formula constructs used by the enabled FODS corpus.
-- [ ] Implement native engine lowering for the FODS-safe subset.
-- [ ] Add standalone compiler tests for raw FODS formulas.
+- [x] Implement native engine lowering for the FODS-safe subset.
+- [x] Add standalone compiler tests for raw FODS formulas.
 - [ ] Keep Calc shadow/diff comparisons green for the same subset.
 
 ### Phase 3

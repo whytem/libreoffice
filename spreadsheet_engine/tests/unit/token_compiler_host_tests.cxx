@@ -10,6 +10,7 @@
 #include <spreadsheetengine/detail/SharedFormulaToken.hxx>
 #include <spreadsheetengine/detail/TokenStringifier.hxx>
 #include <spreadsheetengine/detail/TokenModel.hxx>
+#include <spreadsheetengine/detail/WorkbookCompilerLowering.hxx>
 #include <spreadsheetengine/detail/WorkbookCompileHost.hxx>
 
 #include "TestSupport.hxx"
@@ -18,6 +19,47 @@ namespace
 {
 
 using spreadsheetengine::standalone::test::fail;
+
+std::string toUtf8(spreadsheetengine::api::StringView rText)
+{
+    std::string aUtf8;
+    aUtf8.reserve(rText.size());
+    for (std::size_t nIndex = 0; nIndex < rText.size(); ++nIndex)
+    {
+        char32_t nCodePoint = rText[nIndex];
+        if (0xD800 <= nCodePoint && nCodePoint <= 0xDBFF && nIndex + 1 < rText.size())
+        {
+            const char32_t nTrail = rText[nIndex + 1];
+            if (0xDC00 <= nTrail && nTrail <= 0xDFFF)
+            {
+                nCodePoint = 0x10000 + ((nCodePoint - 0xD800) << 10) + (nTrail - 0xDC00);
+                ++nIndex;
+            }
+        }
+
+        if (nCodePoint <= 0x7F)
+            aUtf8.push_back(static_cast<char>(nCodePoint));
+        else if (nCodePoint <= 0x7FF)
+        {
+            aUtf8.push_back(static_cast<char>(0xC0 | (nCodePoint >> 6)));
+            aUtf8.push_back(static_cast<char>(0x80 | (nCodePoint & 0x3F)));
+        }
+        else if (nCodePoint <= 0xFFFF)
+        {
+            aUtf8.push_back(static_cast<char>(0xE0 | (nCodePoint >> 12)));
+            aUtf8.push_back(static_cast<char>(0x80 | ((nCodePoint >> 6) & 0x3F)));
+            aUtf8.push_back(static_cast<char>(0x80 | (nCodePoint & 0x3F)));
+        }
+        else
+        {
+            aUtf8.push_back(static_cast<char>(0xF0 | (nCodePoint >> 18)));
+            aUtf8.push_back(static_cast<char>(0x80 | ((nCodePoint >> 12) & 0x3F)));
+            aUtf8.push_back(static_cast<char>(0x80 | ((nCodePoint >> 6) & 0x3F)));
+            aUtf8.push_back(static_cast<char>(0x80 | (nCodePoint & 0x3F)));
+        }
+    }
+    return aUtf8;
+}
 
 class DummyCompileHost final : public spreadsheetengine::detail::compiler::NameResolver
     , public spreadsheetengine::detail::compiler::DatabaseRangeResolver
@@ -264,6 +306,7 @@ int testWorkbookCompileHost()
     seworkbook::Workbook aWorkbook;
     aWorkbook.maSheets.push_back(seworkbook::Sheet { u"Sheet1" });
     aWorkbook.maSheets.push_back(seworkbook::Sheet { u"Lookup" });
+    aWorkbook.maSheets.push_back(seworkbook::Sheet { u"AOO #117989" });
     aWorkbook.maNamedRanges.push_back(
         seworkbook::NamedRange { u"GlobalRange", {}, u"$Sheet1.$A$1", u"$Sheet1.$A$1:.$A$2" });
     aWorkbook.maNamedRanges.push_back(seworkbook::NamedRange { u"ShadowedName", u"Lookup",
@@ -469,12 +512,18 @@ int testWorkbookCompilerPreflight()
     const auto aBadRangeConstructor
         = secompiler::preflightFormulaSource(u"of:=SUM([.$O6]:ABS(1))", aHost, *oContext);
     if (aBadRangeConstructor
-        || aBadRangeConstructor.meReason
-               != secompiler::FormulaPreflightReason::UnsupportedRangeConstructorOperand
-        || aBadRangeConstructor.maDetail != u"FunctionCall")
+        || aBadRangeConstructor.meReason != secompiler::FormulaPreflightReason::ParseFailure)
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook compiler preflight bad range-constructor mismatch");
+    }
+
+    const auto aErrColon
+        = secompiler::preflightFormulaSource(u"of:=ERROR.TYPE(err:7)", aHost, *oContext);
+    if (aErrColon || aErrColon.meReason != secompiler::FormulaPreflightReason::ParseFailure)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler preflight err-colon mismatch");
     }
 
     const auto aAdjacentAnd = secompiler::preflightFormulaSource(
@@ -490,6 +539,194 @@ int testWorkbookCompilerPreflight()
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook compiler preflight parse-failure mismatch");
+    }
+
+    return EXIT_SUCCESS;
+}
+
+int testWorkbookCompilerLowering()
+{
+    namespace secompiler = spreadsheetengine::detail::compiler;
+    namespace seworkbook = spreadsheetengine::core::workbook;
+    namespace setoken = spreadsheetengine::detail::token;
+
+    seworkbook::Workbook aWorkbook;
+    aWorkbook.maSheets.push_back(seworkbook::Sheet { u"Sheet1" });
+    aWorkbook.maSheets.push_back(seworkbook::Sheet { u"Lookup" });
+    aWorkbook.maNamedRanges.push_back(
+        seworkbook::NamedRange { u"GlobalRange", {}, u"$Sheet1.$A$1", u"$Sheet1.$A$1:.$A$2" });
+    aWorkbook.maNamedRanges.push_back(
+        seworkbook::NamedRange { u"LocalOnly", u"Lookup", u"$Lookup.$B$2", u"$Lookup.$B$2:.$B$4" });
+
+    secompiler::WorkbookCompileHost aHost(aWorkbook);
+    const auto oContext = secompiler::makeWorkbookCompileContext(aWorkbook, u"Lookup", 1, 1);
+    if (!oContext)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering context mismatch");
+    }
+
+    const auto aBasic = secompiler::lowerFormulaSource(
+        u"of:=SUM([.A1:.A3];LocalOnly;GlobalRange)", aHost, *oContext);
+    if (!aBasic || !aBasic.maFormula.moXmlFormulaSource || aBasic.maFormula.maTokens.size() != 6)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering basic formula mismatch");
+    }
+    if (aBasic.maFormula.moXmlFormulaSource->maNamespace != u"of"
+        || aBasic.maFormula.maTokens[0].meKind != setoken::Kind::DoubleRef
+        || aBasic.maFormula.maTokens[1].meKind != setoken::Kind::RangeName
+        || aBasic.maFormula.maTokens[2].meKind != setoken::Kind::RangeName
+        || aBasic.maFormula.maTokens[3].meKind != setoken::Kind::StringName
+        || aBasic.maFormula.maTokens[4].meKind != setoken::Kind::Byte
+        || aBasic.maFormula.maTokens[5].mnOpCode != secompiler::detail::kLoweredOpFunctionCall)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering token shape mismatch");
+    }
+    const auto& rLocalName = std::get<setoken::NameData>(aBasic.maFormula.maTokens[1].maPayload);
+    const auto& rGlobalName = std::get<setoken::NameData>(aBasic.maFormula.maTokens[2].maPayload);
+    if (rLocalName.mnSheet != 1 || rLocalName.mnIndex != 2 || rGlobalName.mnSheet != -1
+        || rGlobalName.mnIndex != 1)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering named-range payload mismatch");
+    }
+
+    const auto aReferenceList = secompiler::lowerFormulaSource(
+        u"of:=AREAS(([.A1:.B3]~[.F2]~[.G1]))", aHost, *oContext);
+    if (!aReferenceList || aReferenceList.maFormula.maTokens.empty())
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering reference-list mismatch");
+    }
+    bool bSawReferenceList = false;
+    for (const auto& rToken : aReferenceList.maFormula.maTokens)
+    {
+        if (rToken.mnOpCode == secompiler::detail::kLoweredOpReferenceList)
+            bSawReferenceList = true;
+    }
+    if (!bSawReferenceList)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering did not emit reference-list marker");
+    }
+
+    const auto aRangeConstructor = secompiler::lowerFormulaSource(
+        u"of:=SUM([.$O6]:CHOOSE(([.$H$2]-1);[.$O6];[.$P6];[.$Q6]))", aHost, *oContext);
+    if (!aRangeConstructor || aRangeConstructor.maFormula.maTokens.empty())
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering range-constructor mismatch");
+    }
+    bool bSawRangeConstructor = false;
+    for (const auto& rToken : aRangeConstructor.maFormula.maTokens)
+    {
+        if (rToken.mnOpCode == secompiler::detail::kLoweredOpRangeConstructor)
+            bSawRangeConstructor = true;
+    }
+    if (!bSawRangeConstructor)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering did not emit range-constructor marker");
+    }
+
+    const auto aAdjacentAnd = secompiler::lowerFormulaSource(
+        u"of:=([.A3]=[.D3])AND([.B3]=[.E3])AND([.C3]=[.F3])", aHost, *oContext);
+    if (!aAdjacentAnd || aAdjacentAnd.maFormula.maTokens.empty()
+        || aAdjacentAnd.maFormula.maTokens.back().mnOpCode
+               != secompiler::detail::kLoweredOpFunctionCall)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering adjacent-AND mismatch");
+    }
+
+    const auto aExternalReference = secompiler::lowerFormulaSource(
+        u"of:=COLUMN(['file:///fake_path/filename'#$Sheet3.B3:.D8])", aHost, *oContext);
+    if (!aExternalReference || aExternalReference.maFormula.maTokens.empty()
+        || aExternalReference.maFormula.maTokens.front().meKind
+               != setoken::Kind::ExternalDoubleRef)
+    {
+        std::string aDetail = "workbook compiler lowering external-reference mismatch";
+        if (!aExternalReference)
+        {
+            aDetail += " (reason=";
+            aDetail += std::to_string(static_cast<int>(aExternalReference.meReason));
+            if (!aExternalReference.maDetail.empty())
+            {
+                aDetail += ", detail=";
+                aDetail += toUtf8(aExternalReference.maDetail);
+            }
+            aDetail += ")";
+        }
+        else if (!aExternalReference.maFormula.maTokens.empty())
+        {
+            aDetail += " (kind=";
+            aDetail += std::to_string(
+                static_cast<int>(aExternalReference.maFormula.maTokens.front().meKind));
+            aDetail += ")";
+        }
+        return fail("spreadsheetengine_token_compiler_host_tests", aDetail.c_str());
+    }
+
+    const auto aQuotedSheetHash = secompiler::lowerFormulaSource(
+        u"of:=AND(['AOO #117989'.D2:.D26])", aHost, *oContext);
+    if (!aQuotedSheetHash || aQuotedSheetHash.maFormula.maTokens.empty()
+        || aQuotedSheetHash.maFormula.maTokens.front().meKind != setoken::Kind::DoubleRef)
+    {
+        std::string aDetail = "workbook compiler lowering quoted-sheet-hash mismatch";
+        if (!aQuotedSheetHash)
+        {
+            aDetail += " (reason=";
+            aDetail += std::to_string(static_cast<int>(aQuotedSheetHash.meReason));
+            if (!aQuotedSheetHash.maDetail.empty())
+            {
+                aDetail += ", detail=";
+                aDetail += toUtf8(aQuotedSheetHash.maDetail);
+            }
+            aDetail += ")";
+        }
+        else if (!aQuotedSheetHash.maFormula.maTokens.empty())
+        {
+            aDetail += " (kind=";
+            aDetail += std::to_string(
+                static_cast<int>(aQuotedSheetHash.maFormula.maTokens.front().meKind));
+            aDetail += ")";
+        }
+        return fail("spreadsheetengine_token_compiler_host_tests", aDetail.c_str());
+    }
+
+    const auto aWholeRowRange = secompiler::lowerFormulaSource(
+        u"of:=MATCH([.$A$150];[.$150:.$150];0)", aHost, *oContext);
+    if (!aWholeRowRange || aWholeRowRange.maFormula.maTokens.size() < 2
+        || aWholeRowRange.maFormula.maTokens[1].meKind != setoken::Kind::DoubleRef)
+    {
+        std::string aDetail = "workbook compiler lowering whole-row range mismatch";
+        if (!aWholeRowRange)
+        {
+            aDetail += " (reason=";
+            aDetail += std::to_string(static_cast<int>(aWholeRowRange.meReason));
+            if (!aWholeRowRange.maDetail.empty())
+            {
+                aDetail += ", detail=";
+                aDetail += toUtf8(aWholeRowRange.maDetail);
+            }
+            aDetail += ")";
+        }
+        else
+        {
+            aDetail += " (size=";
+            aDetail += std::to_string(aWholeRowRange.maFormula.maTokens.size());
+            aDetail += ")";
+        }
+        return fail("spreadsheetengine_token_compiler_host_tests", aDetail.c_str());
+    }
+
+    const auto aErrColon = secompiler::lowerFormulaSource(u"of:=ERROR.TYPE(err:7)", aHost, *oContext);
+    if (aErrColon || aErrColon.meReason != secompiler::FormulaLoweringReason::ParseFailure)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering err-colon mismatch");
     }
 
     return EXIT_SUCCESS;
@@ -645,6 +882,9 @@ int main()
         return nResult;
 
     if (int nResult = testWorkbookCompilerPreflight(); nResult != EXIT_SUCCESS)
+        return nResult;
+
+    if (int nResult = testWorkbookCompilerLowering(); nResult != EXIT_SUCCESS)
         return nResult;
 
     if (int nResult = testSharedFormulaTokenServices(); nResult != EXIT_SUCCESS)

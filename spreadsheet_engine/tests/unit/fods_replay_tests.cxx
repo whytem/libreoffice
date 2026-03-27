@@ -13,6 +13,7 @@
 #include <spreadsheetengine/detail/FodsCompilerPreflight.hxx>
 #include <spreadsheetengine/detail/FodsLoader.hxx>
 #include <spreadsheetengine/detail/OdfFormulaParser.hxx>
+#include <spreadsheetengine/detail/WorkbookCompilerLowering.hxx>
 
 #include "TestSupport.hxx"
 
@@ -67,6 +68,18 @@ struct PreflightSummary
     std::map<std::string, std::string> maReasonExamples;
     std::map<std::string, std::size_t> maExpectedErrorReasonCounts;
     std::map<std::string, std::string> maExpectedErrorReasonExamples;
+};
+
+struct NativeLoweringSummary
+{
+    std::size_t mnFormulaCells = 0;
+    std::size_t mnPreflightReady = 0;
+    std::size_t mnPreflightExpectedError = 0;
+    std::size_t mnLowered = 0;
+    std::map<std::string, std::size_t> maPreflightReasonCounts;
+    std::map<std::string, std::string> maPreflightReasonExamples;
+    std::map<std::string, std::size_t> maLoweringReasonCounts;
+    std::map<std::string, std::string> maLoweringReasonExamples;
 };
 
 std::string toUtf8(StringView rText)
@@ -553,6 +566,172 @@ void printPreflightSummary(const PreflightSummary& rSummary)
     std::cout << '\n';
 }
 
+NativeLoweringSummary nativeLowerWorkbook(
+    const std::filesystem::path& rWorkbookPath, const Workbook& rWorkbook)
+{
+    NativeLoweringSummary aSummary;
+    spreadsheetengine::detail::compiler::WorkbookCompileHost aHost(rWorkbook);
+
+    for (SheetId nSheet = 0; nSheet < static_cast<SheetId>(rWorkbook.maSheets.size()); ++nSheet)
+    {
+        const Sheet& rSheet = rWorkbook.maSheets[nSheet];
+        for (const auto& [rKey, rCell] : rSheet.maCells)
+        {
+            if (!rCell.hasFormula())
+                continue;
+
+            ++aSummary.mnFormulaCells;
+            const auto aContext = spreadsheetengine::detail::compiler::makeWorkbookCompileContext(
+                { nSheet, rKey.first, rKey.second });
+            const auto aPreflight = spreadsheetengine::detail::compiler::preflightFormulaSource(
+                rCell.maFormula, aHost, aContext);
+            if (!aPreflight)
+            {
+                const bool bExpectedErrorPath = cellCachesError(rCell);
+                if (bExpectedErrorPath)
+                    ++aSummary.mnPreflightExpectedError;
+
+                const std::string aReason
+                    = preflightBucketName(aPreflight.meReason, bExpectedErrorPath);
+                auto& rReasonCounts = aSummary.maPreflightReasonCounts;
+                auto& rReasonExamples = aSummary.maPreflightReasonExamples;
+                ++rReasonCounts[aReason];
+                if (!rReasonExamples.contains(aReason))
+                {
+                    std::string aExample
+                        = rWorkbookPath.filename().string() + " " + toUtf8(rSheet.maName) + "."
+                          + columnLabel(rKey.first) + std::to_string(rKey.second + 1) + " "
+                          + toUtf8(rCell.maFormula);
+                    if (bExpectedErrorPath)
+                        aExample += " => " + formatScalarValue(rCell.maValue);
+                    rReasonExamples[aReason] = std::move(aExample);
+                }
+                continue;
+            }
+
+            ++aSummary.mnPreflightReady;
+            const auto aLowering = spreadsheetengine::detail::compiler::lowerFormulaSource(
+                rCell.maFormula, aHost, aContext);
+            if (aLowering)
+            {
+                ++aSummary.mnLowered;
+                continue;
+            }
+
+            const std::string aReason
+                = toUtf8(spreadsheetengine::detail::compiler::loweringReasonName(aLowering.meReason));
+            ++aSummary.maLoweringReasonCounts[aReason];
+            if (!aSummary.maLoweringReasonExamples.contains(aReason))
+            {
+                std::string aExample
+                    = rWorkbookPath.filename().string() + " " + toUtf8(rSheet.maName) + "."
+                      + columnLabel(rKey.first) + std::to_string(rKey.second + 1) + " "
+                      + toUtf8(rCell.maFormula);
+                if (!aLowering.maDetail.empty())
+                    aExample += " => " + toUtf8(aLowering.maDetail);
+                aSummary.maLoweringReasonExamples[aReason] = std::move(aExample);
+            }
+        }
+    }
+
+    return aSummary;
+}
+
+void mergeNativeLoweringSummary(NativeLoweringSummary& rInto, const NativeLoweringSummary& rFrom)
+{
+    rInto.mnFormulaCells += rFrom.mnFormulaCells;
+    rInto.mnPreflightReady += rFrom.mnPreflightReady;
+    rInto.mnPreflightExpectedError += rFrom.mnPreflightExpectedError;
+    rInto.mnLowered += rFrom.mnLowered;
+
+    for (const auto& [rReason, nCount] : rFrom.maPreflightReasonCounts)
+        rInto.maPreflightReasonCounts[rReason] += nCount;
+    for (const auto& [rReason, rExample] : rFrom.maPreflightReasonExamples)
+    {
+        if (!rInto.maPreflightReasonExamples.contains(rReason))
+            rInto.maPreflightReasonExamples[rReason] = rExample;
+    }
+
+    for (const auto& [rReason, nCount] : rFrom.maLoweringReasonCounts)
+        rInto.maLoweringReasonCounts[rReason] += nCount;
+    for (const auto& [rReason, rExample] : rFrom.maLoweringReasonExamples)
+    {
+        if (!rInto.maLoweringReasonExamples.contains(rReason))
+            rInto.maLoweringReasonExamples[rReason] = rExample;
+    }
+}
+
+void printNativeLoweringSummary(const NativeLoweringSummary& rSummary)
+{
+    const std::size_t nPreflightHardBlockers
+        = rSummary.mnFormulaCells - rSummary.mnPreflightReady - rSummary.mnPreflightExpectedError;
+    const std::size_t nLoweringFailures = rSummary.mnPreflightReady - rSummary.mnLowered;
+
+    std::cout << "native_lower_formula_cells=" << rSummary.mnFormulaCells << '\n';
+    std::cout << "native_lower_preflight_ready=" << rSummary.mnPreflightReady << '\n';
+    std::cout << "native_lower_preflight_expected_error=" << rSummary.mnPreflightExpectedError
+              << '\n';
+    std::cout << "native_lower_preflight_hard_blockers=" << nPreflightHardBlockers << '\n';
+    std::cout << "native_lower_lowered=" << rSummary.mnLowered << '\n';
+    std::cout << "native_lower_lowering_failures=" << nLoweringFailures << '\n';
+    std::cout << "native_lower_ready_lowered_rate="
+              << (rSummary.mnPreflightReady
+                      ? (100.0 * static_cast<double>(rSummary.mnLowered)
+                            / static_cast<double>(rSummary.mnPreflightReady))
+                      : 0.0)
+              << '\n';
+    std::cout << "native_lower_overall_rate="
+              << (rSummary.mnFormulaCells
+                      ? (100.0 * static_cast<double>(rSummary.mnLowered)
+                            / static_cast<double>(rSummary.mnFormulaCells))
+                      : 0.0)
+              << '\n';
+
+    std::cout << "native_lower_preflight_reasons=";
+    bool bFirst = true;
+    for (const auto& [rReason, nCount] : rSummary.maPreflightReasonCounts)
+    {
+        if (!bFirst)
+            std::cout << ",";
+        bFirst = false;
+        std::cout << rReason << ":" << nCount;
+    }
+    std::cout << '\n';
+
+    std::cout << "native_lower_lowering_reasons=";
+    bFirst = true;
+    for (const auto& [rReason, nCount] : rSummary.maLoweringReasonCounts)
+    {
+        if (!bFirst)
+            std::cout << ",";
+        bFirst = false;
+        std::cout << rReason << ":" << nCount;
+    }
+    std::cout << '\n';
+
+    std::cout << "native_lower_preflight_examples=";
+    bFirst = true;
+    for (const auto& [rReason, rExample] : rSummary.maPreflightReasonExamples)
+    {
+        if (!bFirst)
+            std::cout << " | ";
+        bFirst = false;
+        std::cout << rReason << ":" << rExample;
+    }
+    std::cout << '\n';
+
+    std::cout << "native_lower_lowering_examples=";
+    bFirst = true;
+    for (const auto& [rReason, rExample] : rSummary.maLoweringReasonExamples)
+    {
+        if (!bFirst)
+            std::cout << " | ";
+        bFirst = false;
+        std::cout << rReason << ":" << rExample;
+    }
+    std::cout << '\n';
+}
+
 std::optional<ColumnIndex> findHeaderColumn(const Sheet& rSheet, StringView rHeader)
 {
     for (const auto& [rKey, rCell] : rSheet.maCells)
@@ -695,6 +874,7 @@ int main(int argc, char** argv)
     std::vector<std::filesystem::path> aWorkbooks;
     bool bSummary = false;
     bool bPreflight = false;
+    bool bNativeLowerSmoke = false;
     bool bSawPathArgument = false;
     if (argc > 1)
     {
@@ -708,6 +888,11 @@ int main(int argc, char** argv)
             if (std::string_view(argv[nIndex]) == "--preflight")
             {
                 bPreflight = true;
+                continue;
+            }
+            if (std::string_view(argv[nIndex]) == "--native-lower-smoke")
+            {
+                bNativeLowerSmoke = true;
                 continue;
             }
 
@@ -725,6 +910,8 @@ int main(int argc, char** argv)
     if (aWorkbooks.empty() && bSummary)
         aWorkbooks = collectDefaultReplayCorpus();
     if (aWorkbooks.empty() && bPreflight)
+        aWorkbooks = collectDefaultReplayCorpus();
+    if (aWorkbooks.empty() && bNativeLowerSmoke)
         aWorkbooks = collectDefaultReplayCorpus();
 
     if (aWorkbooks.empty())
@@ -760,6 +947,26 @@ int main(int argc, char** argv)
         }
 
         printPreflightSummary(aSummary);
+        return EXIT_SUCCESS;
+    }
+
+    if (bNativeLowerSmoke)
+    {
+        NativeLoweringSummary aSummary;
+        for (const auto& rWorkbookPath : aWorkbooks)
+        {
+            const auto aLoadResult = loadWorkbook(rWorkbookPath.string());
+            if (!aLoadResult)
+            {
+                return fail("spreadsheetengine_fods_replay_tests",
+                    "failed to load workbook for native lower smoke");
+            }
+
+            mergeNativeLoweringSummary(
+                aSummary, nativeLowerWorkbook(rWorkbookPath, aLoadResult.maValue.maWorkbook));
+        }
+
+        printNativeLoweringSummary(aSummary);
         return EXIT_SUCCESS;
     }
 

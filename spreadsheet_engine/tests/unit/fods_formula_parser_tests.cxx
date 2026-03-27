@@ -235,6 +235,21 @@ int main()
     }
 
     {
+        const auto aResult = parseFormula(
+            u"of:=COLUMN(['file:///fake_path/filename'#$Sheet3.B3:.D8])");
+        if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
+            || aResult.mpRoot->maChildren.size() != 1
+            || aResult.mpRoot->maChildren[0]->meKind != NodeKind::RangeReference
+            || aResult.mpRoot->maChildren[0]->maPrimaryText
+                   != u"'file:///fake_path/filename'#$Sheet3.B3"
+            || aResult.mpRoot->maChildren[0]->maSecondaryText != u".D8")
+        {
+            return fail("spreadsheetengine_fods_parser_tests",
+                "external range parse mismatch");
+        }
+    }
+
+    {
         const auto aResult = parseFormula(u"of:=AREAS(([.A1:.B3]~[.F2]~[.G1]))");
         if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
             || aResult.mpRoot->maChildren.size() != 1

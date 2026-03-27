@@ -119,6 +119,11 @@ public:
         return maSupport;
     }
 
+    [[nodiscard]] constexpr const core::workbook::Workbook& workbook() const
+    {
+        return mrWorkbook;
+    }
+
     [[nodiscard]] std::optional<token::NameData> lookupRangeName(
         api::StringView rName, std::optional<api::SheetId> onSheet,
         const CompileContext&) const override

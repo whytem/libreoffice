@@ -54,6 +54,37 @@ namespace
            || cChar == u'&' || cChar == u'=' || cChar == u'<' || cChar == u'>';
 }
 
+[[nodiscard]] constexpr api::StringView normalizeRangeOperandFunction(api::StringView rName)
+{
+    if (rName == u"COM.MICROSOFT.XLOOKUP")
+        return u"XLOOKUP";
+    return rName;
+}
+
+[[nodiscard]] std::size_t findReferenceSeparator(api::StringView rToken)
+{
+    bool bInQuotes = false;
+    for (std::size_t nIndex = 0; nIndex < rToken.size(); ++nIndex)
+    {
+        if (rToken[nIndex] == u'\'')
+        {
+            if (bInQuotes && nIndex + 1 < rToken.size() && rToken[nIndex + 1] == u'\'')
+            {
+                ++nIndex;
+                continue;
+            }
+
+            bInQuotes = !bInQuotes;
+            continue;
+        }
+
+        if (!bInQuotes && rToken[nIndex] == u':')
+            return nIndex;
+    }
+
+    return api::StringView::npos;
+}
+
 [[nodiscard]] std::unique_ptr<Node> makeNode(NodeKind eKind)
 {
     auto pNode = std::make_unique<Node>();
@@ -313,7 +344,7 @@ class Parser
         }
 
         const auto aToken = mrInput.substr(nStart, (mnPos - 1) - nStart);
-        const std::size_t nColonPos = aToken.find(u':');
+        const std::size_t nColonPos = findReferenceSeparator(aToken);
 
         if (nColonPos == api::StringView::npos)
         {
@@ -574,6 +605,7 @@ class Parser
         if (!pLeft)
             return nullptr;
 
+        const std::size_t nAfterLeft = mnPos;
         skipSpaces();
         if (!consume(u':'))
             return pLeft;
@@ -581,6 +613,31 @@ class Parser
         auto pRight = parsePrimary();
         if (!pRight)
             return nullptr;
+
+        const auto isRangeOperand = [](const Node& rNode) {
+            switch (rNode.meKind)
+            {
+                case NodeKind::CellReference:
+                case NodeKind::RangeReference:
+                case NodeKind::RangeConstructor:
+                case NodeKind::ReferenceList:
+                    return true;
+                case NodeKind::FunctionCall:
+                {
+                    const api::StringView aName
+                        = normalizeRangeOperandFunction(rNode.maPrimaryText);
+                    return aName == u"CHOOSE" || aName == u"INDEX" || aName == u"XLOOKUP";
+                }
+                default:
+                    return false;
+            }
+        };
+
+        if (!isRangeOperand(*pLeft) || !isRangeOperand(*pRight))
+        {
+            mnPos = nAfterLeft;
+            return pLeft;
+        }
 
         auto pNode = makeNode(NodeKind::RangeConstructor);
         pNode->maChildren.push_back(std::move(pLeft));
