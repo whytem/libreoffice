@@ -172,6 +172,68 @@ CPPUNIT_TEST_FIXTURE(TestTokenBridge, testXmlPlaceholderRoundTrip)
     CPPUNIT_ASSERT_EQUAL(aOriginal.GetRecalcMode(), aExported.mxTokenArray->GetRecalcMode());
 }
 
+CPPUNIT_TEST_FIXTURE(TestTokenBridge, testCanonicalLexicalEquality)
+{
+    m_pDoc->InsertTab(0, u"Equality"_ustr);
+
+    ScTokenArray aLeft(*m_pDoc);
+    aLeft.AddMatrix(makeMatrix());
+
+    ScTokenArray aRight(*m_pDoc);
+    aRight.AddMatrix(makeMatrix());
+
+    CPPUNIT_ASSERT(aLeft.EqualTokens(&aRight));
+
+    ScMatrixRef xDifferent(new ScMatrix(2, 2));
+    xDifferent->PutDouble(42.5, 0, 0);
+    xDifferent->PutString(svl::SharedString(u"matrix"_ustr), 1, 0);
+    xDifferent->PutError(FormulaError::DivisionByZero, 0, 1);
+    xDifferent->PutDouble(-4.0, 1, 1);
+
+    ScTokenArray aDifferent(*m_pDoc);
+    aDifferent.AddMatrix(xDifferent);
+
+    CPPUNIT_ASSERT(!aLeft.EqualTokens(&aDifferent));
+}
+
+CPPUNIT_TEST_FIXTURE(TestTokenBridge, testCanonicalLexicalHashing)
+{
+    m_pDoc->InsertTab(0, u"Hashing"_ustr);
+
+    ScSingleRefData aRelativeRef;
+    aRelativeRef.InitFlags();
+    aRelativeRef.SetRelCol(1);
+    aRelativeRef.SetRelRow(5);
+    aRelativeRef.SetRelTab(0);
+
+    ScTokenArray aLeft(*m_pDoc);
+    aLeft.AddSingleReference(aRelativeRef);
+    aLeft.AddOpCode(ocAdd);
+    aLeft.GenHash();
+
+    ScSingleRefData aShiftedRef = aRelativeRef;
+    aShiftedRef.SetRelCol(7);
+    aShiftedRef.SetRelRow(99);
+
+    ScTokenArray aShifted(*m_pDoc);
+    aShifted.AddSingleReference(aShiftedRef);
+    aShifted.AddOpCode(ocAdd);
+    aShifted.GenHash();
+
+    CPPUNIT_ASSERT_EQUAL(aLeft.GetHash(), aShifted.GetHash());
+
+    ScSingleRefData aAbsoluteRef = aRelativeRef;
+    aAbsoluteRef.SetRowRel(false);
+    aAbsoluteRef.SetAbsRow(5);
+
+    ScTokenArray aAbsolute(*m_pDoc);
+    aAbsolute.AddSingleReference(aAbsoluteRef);
+    aAbsolute.AddOpCode(ocAdd);
+    aAbsolute.GenHash();
+
+    CPPUNIT_ASSERT(aLeft.GetHash() != aAbsolute.GetHash());
+}
+
 CPPUNIT_PLUGIN_IMPLEMENT();
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

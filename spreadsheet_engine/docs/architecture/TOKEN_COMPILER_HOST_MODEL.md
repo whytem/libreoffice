@@ -667,6 +667,11 @@ This section is the working task list for the implementation effort.
 - [x] Phase 4: add engine compiler skeleton in shadow mode
 - [x] Phase 5: add compile-diff validation harness
 - [ ] Phase 6: migrate first low-risk native consumers
+- [x] Phase 6 first slice: route shared-formula token comparison through canonical engine token services with Calc fallback for unsupported bridge cases
+- [x] Phase 6 second slice: route `ScTokenArray::EqualTokens()` through canonical lexical token equality with Calc fallback for unsupported bridge cases
+- [x] Phase 6 third slice: route `ScTokenArray::GenHash()` through canonical lexical hashing with Calc fallback for unsupported bridge cases
+- [x] Phase 6 fourth slice: add engine-owned diagnostic token stringification and consume it from Calc compile-diff diagnostics
+- [x] Phase 6 substantial-complete checkpoint: hashing, equality, shared-formula comparison, and basic diagnostic stringification now operate on canonical tokens in live Calc or standalone paths
 - [ ] Phase 7: bridge-based Calc compiler adoption
 - [ ] Phase 8: milestone closeout
 
@@ -811,6 +816,57 @@ What Phase 5 still does **not** include is also intentional:
 - native compiler lowering that no longer depends on `ScCompiler`
 
 Those are the closeout items for later Phase 5 expansion or the first work inside Phase 6.
+
+## Current Phase 6 Status
+
+Phase 6 is now substantially complete.
+
+The milestone now has the recommended first native consumers operating on the canonical token model:
+
+- shared-formula equivalence in `ScFormulaCell::CompareByTokenArray()`
+- lexical equality in `ScTokenArray::EqualTokens()`
+- lexical hashing in `ScTokenArray::GenHash()`
+- basic diagnostic stringification in Calc compile-diff reporting
+
+The adoption pattern is intentionally conservative:
+
+- Calc imports legacy lexical and RPN streams through the engine bridge
+- canonical token services perform hashing / equality / relative-reference classification
+- Calc keeps the old handwritten implementations as fallbacks when import hits an unsupported bridge corner
+- surrounding Calc consumers still receive the same compare states, hashes, and diagnostics they expect
+
+That means the milestone has now crossed from pure infrastructure into live low-risk consumer ownership without touching interpreter execution, persistence, or reference-update ownership.
+
+The current Phase 6 checkpoint specifically covers:
+
+- engine-owned shared-formula token hashing for lexical token streams
+- engine-owned shared-formula token comparison for lexical and RPN token streams
+- engine-owned canonical lexical-token equality reused by `ScTokenArray::EqualTokens()`
+- engine-owned canonical lexical hashing reused by `ScTokenArray::GenHash()`
+- engine-owned diagnostic token / compiled-formula stringification reused by Calc compile-diff diagnostics
+- Calc adapter plumbing in:
+  - `spreadsheetengine/compat/libreoffice/SharedFormula.hxx`
+  - `spreadsheetengine/compat/libreoffice/TokenBridge.hxx`
+  - `spreadsheetengine/compat/libreoffice/CompilerDiff.hxx`
+- live adoption in:
+  - `ScFormulaCell::CompareByTokenArray()`
+  - `ScTokenArray::EqualTokens()`
+  - `ScTokenArray::GenHash()`
+- focused validation for:
+  - standalone compiler / token-host / shared-formula tests
+  - full standalone suite including raw FODS replay
+  - Calc shared-formula grouping cases
+  - Calc token-bridge equality / hashing regressions
+  - Calc compile-diff diagnostics staying buildable and green
+
+What Phase 6 still does **not** include yet:
+
+- eliminating fallback-to-legacy behavior for every unsupported bridge corner
+- broader production consumers beyond hashing / equality / shared-formula helpers
+- user-facing or persistence-grade formula pretty-printing beyond basic diagnostics
+- wider token-service adoption in reference-update, named-range storage, or interpreter-facing paths
+
+That is enough to make Phase 6 substantially complete. The remaining work is closeout-grade expansion or later-phase adoption, not missing milestone scaffolding.
 
 ## Recommendation
 

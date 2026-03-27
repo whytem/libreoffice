@@ -10,9 +10,12 @@
 #pragma once
 
 #include <formulacell.hxx>
+#include <optional>
 
 #include <spreadsheetengine/api/SharedFormula.hxx>
 #include <spreadsheetengine/compat/libreoffice/Address.hxx>
+#include <spreadsheetengine/compat/libreoffice/TokenBridge.hxx>
+#include <spreadsheetengine/detail/SharedFormulaToken.hxx>
 
 namespace spreadsheetengine::compat::libreoffice
 {
@@ -31,6 +34,79 @@ inline spreadsheetengine::api::sharedformula::TokenCompareState toApiTokenCompar
     }
 
     return spreadsheetengine::api::sharedformula::TokenCompareState::NotEqual;
+}
+
+inline ScFormulaCell::CompareState toLibreOfficeTokenCompareState(
+    spreadsheetengine::api::sharedformula::TokenCompareState eState)
+{
+    switch (eState)
+    {
+        case spreadsheetengine::api::sharedformula::TokenCompareState::NotEqual:
+            return ScFormulaCell::NotEqual;
+        case spreadsheetengine::api::sharedformula::TokenCompareState::EqualInvariant:
+            return ScFormulaCell::EqualInvariant;
+        case spreadsheetengine::api::sharedformula::TokenCompareState::EqualRelativeRef:
+            return ScFormulaCell::EqualRelativeRef;
+    }
+
+    return ScFormulaCell::NotEqual;
+}
+
+inline std::optional<ScFormulaCell::CompareState> compareSharedFormulaTokenArrays(
+    const ScTokenArray& rLeft, const ScTokenArray& rRight)
+{
+    namespace sesharedtoken = spreadsheetengine::detail::sharedformulatoken;
+
+    if (!rLeft.IsShareable() || !rRight.IsShareable())
+        return ScFormulaCell::NotEqual;
+    if (rLeft.GetCodeError() != rRight.GetCodeError())
+        return ScFormulaCell::NotEqual;
+
+    const auto aLeftLexical = importTokenSequence(rLeft.Tokens());
+    if (!aLeftLexical)
+        return std::nullopt;
+    const auto aRightLexical = importTokenSequence(rRight.Tokens());
+    if (!aRightLexical)
+        return std::nullopt;
+
+    if (sesharedtoken::hashSharedFormulaLexicalTokens(aLeftLexical.maTokens)
+        != sesharedtoken::hashSharedFormulaLexicalTokens(aRightLexical.maTokens))
+    {
+        return ScFormulaCell::NotEqual;
+    }
+
+    const auto aLeftRpn = importTokenSequence(rLeft.RPNTokens());
+    if (!aLeftRpn)
+        return std::nullopt;
+    const auto aRightRpn = importTokenSequence(rRight.RPNTokens());
+    if (!aRightRpn)
+        return std::nullopt;
+
+    const auto eRpnState = sesharedtoken::compareSharedFormulaTokenStreams(
+        sesharedtoken::StreamKind::Rpn, aLeftRpn.maTokens, aRightRpn.maTokens);
+    if (eRpnState == spreadsheetengine::api::sharedformula::TokenCompareState::NotEqual)
+        return ScFormulaCell::NotEqual;
+
+    const auto eLexicalState = sesharedtoken::compareSharedFormulaTokenStreams(
+        sesharedtoken::StreamKind::Lexical, aLeftLexical.maTokens, aRightLexical.maTokens);
+    if (eLexicalState == spreadsheetengine::api::sharedformula::TokenCompareState::NotEqual)
+        return ScFormulaCell::NotEqual;
+
+    return eRpnState == spreadsheetengine::api::sharedformula::TokenCompareState::EqualRelativeRef
+                   || eLexicalState
+                          == spreadsheetengine::api::sharedformula::TokenCompareState::EqualRelativeRef
+               ? ScFormulaCell::EqualRelativeRef
+               : ScFormulaCell::EqualInvariant;
+}
+
+inline std::optional<std::size_t> computeSharedFormulaLexicalHash(const ScTokenArray& rArray)
+{
+    const auto aLexicalTokens = importTokenSequence(rArray.Tokens());
+    if (!aLexicalTokens)
+        return std::nullopt;
+
+    return spreadsheetengine::detail::sharedformulatoken::hashSharedFormulaLexicalTokens(
+        aLexicalTokens.maTokens);
 }
 
 inline spreadsheetengine::api::sharedformula::GroupSingleRefListenPlan makeGroupSingleRefListenPlan(

@@ -115,6 +115,15 @@ struct TokenImportStatus
     explicit operator bool() const { return maFailureMessage.isEmpty(); }
 };
 
+struct TokenSequenceImportStatus
+{
+    std::vector<setoken::Token> maTokens;
+    sal_uInt16 mnFailureIndex = 0;
+    OUString maFailureMessage;
+
+    explicit operator bool() const { return maFailureMessage.isEmpty(); }
+};
+
 struct TokenExportStatus
 {
     std::unique_ptr<ScTokenArray> mxTokenArray;
@@ -128,6 +137,12 @@ namespace detail
 {
 
 inline void setFailure(TokenImportStatus& rStatus, sal_uInt16 nIndex, OUString aMessage)
+{
+    rStatus.mnFailureIndex = nIndex;
+    rStatus.maFailureMessage = std::move(aMessage);
+}
+
+inline void setFailure(TokenSequenceImportStatus& rStatus, sal_uInt16 nIndex, OUString aMessage)
 {
     rStatus.mnFailureIndex = nIndex;
     rStatus.maFailureMessage = std::move(aMessage);
@@ -653,6 +668,52 @@ inline bool tokensEqualForBridge(const formula::FormulaToken& rLeft, const formu
 
 } // namespace detail
 
+inline TokenSequenceImportStatus importTokenSequence(formula::FormulaTokenArrayStandardRange aTokens)
+{
+    TokenSequenceImportStatus aStatus;
+    formula::FormulaToken** pBegin = aTokens.begin();
+    formula::FormulaToken** pEnd = aTokens.end();
+    if (pBegin && pEnd)
+        aStatus.maTokens.reserve(static_cast<std::size_t>(pEnd - pBegin));
+    sal_uInt16 nTokenIndex = 0;
+    for (formula::FormulaToken* pToken : aTokens)
+    {
+        if (!pToken)
+        {
+            detail::setFailure(aStatus, nTokenIndex, u"token array contains null token"_ustr);
+            return aStatus;
+        }
+
+        TokenImportStatus aTokenStatus;
+        setoken::Token aToken = detail::importSingleToken(*pToken, nTokenIndex, aTokenStatus);
+        if (!aTokenStatus)
+        {
+            detail::setFailure(aStatus, aTokenStatus.mnFailureIndex, aTokenStatus.maFailureMessage);
+            return aStatus;
+        }
+
+        aStatus.maTokens.push_back(std::move(aToken));
+        ++nTokenIndex;
+    }
+
+    return aStatus;
+}
+
+inline std::optional<bool> tokenSequencesEqualCanonical(
+    formula::FormulaTokenArrayStandardRange aLeft,
+    formula::FormulaTokenArrayStandardRange aRight)
+{
+    const auto aImportedLeft = importTokenSequence(aLeft);
+    if (!aImportedLeft)
+        return std::nullopt;
+
+    const auto aImportedRight = importTokenSequence(aRight);
+    if (!aImportedRight)
+        return std::nullopt;
+
+    return aImportedLeft.maTokens == aImportedRight.maTokens;
+}
+
 inline TokenImportStatus importCompiledFormula(const ScTokenArray& rTokenArray)
 {
     TokenImportStatus aStatus;
@@ -672,22 +733,13 @@ inline TokenImportStatus importCompiledFormula(const ScTokenArray& rTokenArray)
         return aStatus;
     }
 
-    aStatus.maFormula.maTokens.reserve(rTokenArray.GetLen());
-    sal_uInt16 nTokenIndex = 0;
-    for (formula::FormulaToken* pToken : rTokenArray.Tokens())
+    const auto aTokens = importTokenSequence(rTokenArray.Tokens());
+    if (!aTokens)
     {
-        if (!pToken)
-        {
-            detail::setFailure(aStatus, nTokenIndex, u"token array contains null token"_ustr);
-            return aStatus;
-        }
-
-        setoken::Token aToken = detail::importSingleToken(*pToken, nTokenIndex, aStatus);
-        if (!aStatus)
-            return aStatus;
-        aStatus.maFormula.maTokens.push_back(std::move(aToken));
-        ++nTokenIndex;
+        detail::setFailure(aStatus, aTokens.mnFailureIndex, aTokens.maFailureMessage);
+        return aStatus;
     }
+    aStatus.maFormula.maTokens = aTokens.maTokens;
 
     return aStatus;
 }

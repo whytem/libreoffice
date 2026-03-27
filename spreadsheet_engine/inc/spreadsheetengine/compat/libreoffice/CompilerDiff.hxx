@@ -21,6 +21,7 @@
 #include <spreadsheetengine/compat/libreoffice/ShadowCompiler.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/TokenBridge.hxx>
+#include <spreadsheetengine/detail/TokenStringifier.hxx>
 
 namespace spreadsheetengine::compat::libreoffice
 {
@@ -119,7 +120,15 @@ inline CompilerDiffArtifacts diffShadowCompileAgainstLegacy(
         = aArtifacts.maLegacy.maImported.maFormula == aArtifacts.maShadow.maStatus.maFormula;
     if (!aArtifacts.mbCanonicalMatch)
     {
-        aArtifacts.maMismatchMessage = u"canonical compiled formula mismatch"_ustr;
+        aArtifacts.maMismatchMessage
+            = u"canonical compiled formula mismatch: legacy="_ustr
+              + toLibreOfficeString(
+                  spreadsheetengine::detail::tokenstringifier::compiledFormulaToDiagnosticString(
+                      aArtifacts.maLegacy.maImported.maFormula))
+              + u" shadow="_ustr
+              + toLibreOfficeString(
+                  spreadsheetengine::detail::tokenstringifier::compiledFormulaToDiagnosticString(
+                      aArtifacts.maShadow.maStatus.maFormula));
         return aArtifacts;
     }
 
@@ -177,7 +186,15 @@ inline CompilerDiffArtifacts diffShadowCompileAgainstLegacy(
 
     if (!(aArtifacts.maRoundTripImport.maFormula == aArtifacts.maShadow.maStatus.maFormula))
     {
-        aArtifacts.maMismatchMessage = u"roundtrip canonical import mismatch"_ustr;
+        aArtifacts.maMismatchMessage
+            = u"roundtrip canonical import mismatch: shadow="_ustr
+              + toLibreOfficeString(
+                  spreadsheetengine::detail::tokenstringifier::compiledFormulaToDiagnosticString(
+                      aArtifacts.maShadow.maStatus.maFormula))
+              + u" roundtrip="_ustr
+              + toLibreOfficeString(
+                  spreadsheetengine::detail::tokenstringifier::compiledFormulaToDiagnosticString(
+                      aArtifacts.maRoundTripImport.maFormula));
         return aArtifacts;
     }
 

@@ -6,6 +6,8 @@
 
 #include <spreadsheetengine/detail/CompileHost.hxx>
 #include <spreadsheetengine/detail/CompilerPipeline.hxx>
+#include <spreadsheetengine/detail/SharedFormulaToken.hxx>
+#include <spreadsheetengine/detail/TokenStringifier.hxx>
 #include <spreadsheetengine/detail/TokenModel.hxx>
 
 #include "TestSupport.hxx"
@@ -252,6 +254,139 @@ int testCompilePipelineShape()
     return EXIT_SUCCESS;
 }
 
+int testSharedFormulaTokenServices()
+{
+    namespace setoken = spreadsheetengine::detail::token;
+    namespace seshared = spreadsheetengine::api::sharedformula;
+    namespace sesharedtoken = spreadsheetengine::detail::sharedformulatoken;
+
+    spreadsheetengine::api::refdata::SingleRefData aRelativeRef;
+    aRelativeRef.mnColumn = 1;
+    aRelativeRef.mnRow = 10;
+    aRelativeRef.mnSheet = 0;
+    aRelativeRef.maFlags.mbColumnRelative = true;
+    aRelativeRef.maFlags.mbRowRelative = true;
+
+    auto aShiftedRelativeRef = aRelativeRef;
+    aShiftedRelativeRef.mnColumn = 4;
+    aShiftedRelativeRef.mnRow = 99;
+
+    auto aAbsoluteRef = aRelativeRef;
+    aAbsoluteRef.maFlags.mbRowRelative = false;
+
+    std::vector<setoken::Token> aHashLeft {
+        { setoken::Kind::SingleRef, setoken::kOpCodePush, aRelativeRef },
+        { setoken::Kind::PlainOpcode, setoken::kOpCodeAdd, {} },
+    };
+    std::vector<setoken::Token> aHashShifted {
+        { setoken::Kind::SingleRef, setoken::kOpCodePush, aShiftedRelativeRef },
+        { setoken::Kind::PlainOpcode, setoken::kOpCodeAdd, {} },
+    };
+    std::vector<setoken::Token> aHashAbsolute {
+        { setoken::Kind::SingleRef, setoken::kOpCodePush, aAbsoluteRef },
+        { setoken::Kind::PlainOpcode, setoken::kOpCodeAdd, {} },
+    };
+    if (sesharedtoken::hashSharedFormulaLexicalTokens(aHashLeft)
+        != sesharedtoken::hashSharedFormulaLexicalTokens(aHashShifted))
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "shared-formula lexical hash should ignore absolute positions");
+    }
+    if (sesharedtoken::hashSharedFormulaLexicalTokens(aHashLeft)
+        == sesharedtoken::hashSharedFormulaLexicalTokens(aHashAbsolute))
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "shared-formula lexical hash should distinguish row-relative flags");
+    }
+
+    std::vector<setoken::Token> aRelativeCompareLeft {
+        { setoken::Kind::SingleRef, setoken::kOpCodePush, aRelativeRef },
+        { setoken::Kind::PlainOpcode, setoken::kOpCodeAdd, {} },
+    };
+    std::vector<setoken::Token> aRelativeCompareRight = aRelativeCompareLeft;
+    const auto eLexicalRelative = sesharedtoken::compareSharedFormulaTokenStreams(
+        sesharedtoken::StreamKind::Lexical, aRelativeCompareLeft, aRelativeCompareRight);
+    if (eLexicalRelative != seshared::TokenCompareState::EqualRelativeRef)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "shared-formula lexical comparison should keep relative refs variant");
+    }
+
+    std::vector<setoken::Token> aLexicalInvariant {
+        { setoken::Kind::RangeName, setoken::kOpCodeName,
+            setoken::NameData { 0, 7 } },
+        { setoken::Kind::PlainOpcode, setoken::kOpCodeAdd, {} },
+    };
+    if (sesharedtoken::compareSharedFormulaTokenStreams(
+            sesharedtoken::StreamKind::Lexical, aLexicalInvariant, aLexicalInvariant)
+        != seshared::TokenCompareState::EqualInvariant)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "shared-formula lexical invariant comparison mismatch");
+    }
+
+    std::vector<setoken::Token> aRpnMatrix {
+        { setoken::Kind::Matrix, setoken::kOpCodePush, setoken::MatrixData {} },
+    };
+    if (sesharedtoken::compareSharedFormulaTokenStreams(
+            sesharedtoken::StreamKind::Rpn, aRpnMatrix, aRpnMatrix)
+        != seshared::TokenCompareState::NotEqual)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "shared-formula RPN matrix comparison should refuse grouping");
+    }
+
+    return EXIT_SUCCESS;
+}
+
+int testTokenStringifier()
+{
+    namespace setoken = spreadsheetengine::detail::token;
+    namespace setokenstring = spreadsheetengine::detail::tokenstringifier;
+
+    spreadsheetengine::api::refdata::SingleRefData aReference;
+    aReference.mnColumn = 2;
+    aReference.mnRow = 4;
+    aReference.mnSheet = 0;
+    aReference.maFlags.mbColumnRelative = true;
+    aReference.maFlags.mbRowRelative = true;
+
+    setoken::CompiledFormula aFormula {
+        {
+            { setoken::Kind::SingleRef, setoken::kOpCodePush, aReference },
+            { setoken::Kind::PlainOpcode, setoken::kOpCodeAdd, {} },
+            { setoken::Kind::Value, setoken::kOpCodePush, 12.5 },
+        },
+        std::nullopt,
+        0,
+        0,
+        false,
+        false,
+        true,
+        setoken::VectorState::Unknown,
+        false,
+        false,
+    };
+
+    const auto aTokenText = setokenstring::tokenToDiagnosticString(aFormula.maTokens.front());
+    if (aTokenText.find(u"SingleRef") == std::u16string::npos
+        || aTokenText.find(u"rel=[true,true,false]") == std::u16string::npos)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "token diagnostic stringifier mismatch");
+    }
+
+    const auto aFormulaText = setokenstring::compiledFormulaToDiagnosticString(aFormula);
+    if (aFormulaText.find(u"tokens=[") == std::u16string::npos
+        || aFormulaText.find(u"Value(op=0)") == std::u16string::npos)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "compiled formula diagnostic stringifier mismatch");
+    }
+
+    return EXIT_SUCCESS;
+}
+
 } // namespace
 
 int main()
@@ -263,6 +398,12 @@ int main()
         return nResult;
 
     if (int nResult = testCompilePipelineShape(); nResult != EXIT_SUCCESS)
+        return nResult;
+
+    if (int nResult = testSharedFormulaTokenServices(); nResult != EXIT_SUCCESS)
+        return nResult;
+
+    if (int nResult = testTokenStringifier(); nResult != EXIT_SUCCESS)
         return nResult;
 
     std::cout << "spreadsheetengine token/compiler host tests passed\n";

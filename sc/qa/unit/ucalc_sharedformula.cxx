@@ -30,6 +30,35 @@ class TestSharedFormula : public ScUcalcTestBase
 {
 };
 
+CPPUNIT_TEST_FIXTURE(TestSharedFormula, testNativeSharedFormulaTokenComparison)
+{
+    m_pDoc->InsertTab(0, u"NativeCompare"_ustr);
+
+    auto pDbData = std::make_unique<ScDBData>(u"SalesTable"_ustr, 0, 0, 0, 1, 2);
+    pDbData->SetTableColumnNames({ u"Amount"_ustr, u"Delta"_ustr });
+    CPPUNIT_ASSERT(m_pDoc->GetDBCollection()->getNamedDBs().insert(std::move(pDbData)));
+
+    ScAddress aPos(1, 0, 0); // B1
+    m_pDoc->SetString(aPos, u"=SUM(SalesTable)"_ustr);
+    aPos.IncRow(); // B2
+    m_pDoc->SetString(aPos, u"=SUM(SalesTable)"_ustr);
+
+    const ScFormulaCell* pCell = m_pDoc->GetFormulaCell(aPos);
+    CPPUNIT_ASSERT_MESSAGE("B2 should be a formula cell.", pCell);
+    CPPUNIT_ASSERT_MESSAGE("database-range formulas should share.", pCell->IsShared());
+    CPPUNIT_ASSERT_EQUAL(static_cast<SCROW>(0), pCell->GetSharedTopRow());
+    CPPUNIT_ASSERT_EQUAL(static_cast<SCROW>(2), pCell->GetSharedLength());
+
+    ScAddress aArrayPos(2, 0, 0); // C1
+    m_pDoc->SetString(aArrayPos, u"=SUM({1;2;3})"_ustr);
+    aArrayPos.IncRow(); // C2
+    m_pDoc->SetString(aArrayPos, u"=SUM({1;2;3})"_ustr);
+
+    pCell = m_pDoc->GetFormulaCell(aArrayPos);
+    CPPUNIT_ASSERT_MESSAGE("C2 should be a formula cell.", pCell);
+    CPPUNIT_ASSERT_MESSAGE("array-literal formulas should stay non-shared.", !pCell->IsShared());
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedFormula, testSharedFormulas)
 {
     m_pDoc->InsertTab(0, u"Test"_ustr);

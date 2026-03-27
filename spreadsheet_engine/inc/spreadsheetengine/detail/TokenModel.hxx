@@ -29,6 +29,9 @@ using ParamClassValue = sal_uInt8;
 using ErrorCode = sal_uInt16;
 
 constexpr OpCodeValue kOpCodeNone = 0;
+constexpr OpCodeValue kOpCodePush = 0;
+constexpr OpCodeValue kOpCodeName = 4;
+constexpr OpCodeValue kOpCodeAdd = 50;
 constexpr ParamClassValue kParamClassUnknown = 0;
 constexpr ErrorCode kErrorCodeNone = 0;
 

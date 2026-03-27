@@ -38,6 +38,8 @@
 #include <externalrefmgr.hxx>
 #include <document.hxx>
 #include <refupdatecontext.hxx>
+#include <spreadsheetengine/compat/libreoffice/SharedFormula.hxx>
+#include <spreadsheetengine/compat/libreoffice/TokenBridge.hxx>
 #include <tokenstringcontext.hxx>
 #include <types.hxx>
 #include <addincol.hxx>
@@ -1784,6 +1786,13 @@ size_t HashSingleRef( const ScSingleRefData& rRef )
 
 void ScTokenArray::GenHash()
 {
+    if (const auto oCanonicalHash
+        = spreadsheetengine::compat::libreoffice::computeSharedFormulaLexicalHash(*this))
+    {
+        mnHashValue = *oCanonicalHash;
+        return;
+    }
+
     static const OUStringHash aHasher;
 
     size_t nHash = 1;
@@ -1964,6 +1973,13 @@ bool ScTokenArray::EqualTokens( const ScTokenArray* pArr2) const
     // We only compare the non-RPN array
     if ( pArr2->nLen != nLen )
         return false;
+
+    if (const auto oCanonicalEqual
+        = spreadsheetengine::compat::libreoffice::tokenSequencesEqualCanonical(
+            Tokens(), pArr2->Tokens()))
+    {
+        return *oCanonicalEqual;
+    }
 
     FormulaToken** ppToken1 = GetArray();
     FormulaToken** ppToken2 = pArr2->GetArray();

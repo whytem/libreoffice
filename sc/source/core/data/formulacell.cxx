@@ -67,6 +67,7 @@
 #include <formulalogger.hxx>
 #include <spreadsheetengine/detail/FormulaCellReferenceUpdate.hxx>
 #include <spreadsheetengine/detail/FormulaCellState.hxx>
+#include <spreadsheetengine/compat/libreoffice/SharedFormula.hxx>
 #include <com/sun/star/sheet/FormulaLanguage.hpp>
 
 #if HAVE_FEATURE_OPENCL
@@ -4044,6 +4045,8 @@ void ScFormulaCell::SetCellGroup( const ScFormulaCellGroupRef &xRef )
 
 ScFormulaCell::CompareState ScFormulaCell::CompareByTokenArray( const ScFormulaCell& rOther ) const
 {
+    namespace selibreoffice = spreadsheetengine::compat::libreoffice;
+
     // no Matrix formulae yet.
     if ( GetMatrixFlag() != ScMatrixMode::NONE )
         return NotEqual;
@@ -4054,6 +4057,12 @@ ScFormulaCell::CompareState ScFormulaCell::CompareByTokenArray( const ScFormulaC
 
     if (!pCode->IsShareable() || !rOther.pCode->IsShareable())
         return NotEqual;
+
+    if (const auto oNativeState
+        = selibreoffice::compareSharedFormulaTokenArrays(*pCode, *rOther.pCode))
+    {
+        return *oNativeState;
+    }
 
     FormulaToken **pThis = pCode->GetCode();
     sal_uInt16     nThisLen = pCode->GetCodeLen();
