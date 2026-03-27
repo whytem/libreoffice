@@ -28,6 +28,33 @@ Calc engine code into a self-contained library that:
 extraction plan have all been finished. The project is now in routine
 maintenance mode rather than an active extraction sequence.
 
+### Current State in Practice
+
+The extracted engine now owns a large share of Calc's pure spreadsheet
+calculation logic, and LibreOffice Calc has been retargeted to use that
+engine-owned code through the `compat/libreoffice/` adapter layer.
+
+Calc still owns the full document-backed runtime:
+
+- the `ScDocument` / `ScFormulaCell` in-memory spreadsheet representation
+- the main formula compiler/parser used for ordinary Calc documents
+- dependency-graph ownership and listener/broadcaster wiring
+- recalculation orchestration and backend execution
+
+The standalone project now also has its own narrow workbook runtime for raw
+FODS replay:
+
+- a sparse in-memory workbook model
+- a read-only FODS loader
+- a small ODF formula parser
+- a lazy evaluator with memoization and cycle detection
+
+That standalone runtime is intentionally narrower than Calc. It can evaluate
+supported formulas live across cell, range, and named-range references, but it
+does not yet implement Calc's full persistent dependency graph or full
+document-level recalculation engine. For unsupported formula paths, the FODS
+replay flow can still fall back to cached workbook results where needed.
+
 ### Completed Extraction Phases
 
 | Phase | Name | Status |
@@ -56,7 +83,11 @@ status:
 - **Mathematical family:** fully enabled (including AGGREGATE, SUBTOTAL)
 - **Text family:** fully enabled (CLEAN, UNICHAR, EXACT, array constants)
 - **Date/time family:** fully enabled
-- **Lookup/reference family:** not yet started
+- **Spreadsheet family:** fully enabled (including live VLOOKUP/HLOOKUP exact
+  and sorted lookup behavior)
+- **Information family:** fully enabled (including live FORMULA and the small
+  MAX/MIN path needed by the corpus)
+- **Next frontier:** add-in family
 
 ## Architecture Overview
 
@@ -73,7 +104,7 @@ spreadsheet_engine/
 │   ├── detail/                 #   Internal implementation headers
 │   └── runtime/                #   Standalone runtime helpers
 ├── shims/include/              # SAL/RTL type replacements for standalone
-├── source/core/                # Implementation files (21 .cxx)
+├── source/core/                # Implementation files
 ├── tests/
 │   ├── unit/                   #   22 test files (18 API + 4 FODS)
 │   ├── consumer/               #   Installed-package consumer smoke test
@@ -128,7 +159,8 @@ A self-contained subsystem for loading and evaluating Flat ODS workbooks:
 - **OdfFormulaParser** — tokenizer and AST for ODF `of:=` formula syntax
 - **FodsEvaluator** — lazy formula evaluator with memoization and cycle
   detection, supporting scalar arithmetic, comparisons, range references,
-  named ranges, and a growing set of spreadsheet functions
+  named ranges, and a growing set of spreadsheet functions, while still using
+  cached workbook values as a fallback for unsupported paths
 
 #### 4. LibreOffice Compatibility (`compat/libreoffice/`)
 
@@ -204,8 +236,8 @@ with memoization and cycle detection, named ranges, external sheet imports
 
 ### Host-Dependent (Requires EvaluationHost Implementation)
 
-These features work in standalone mode through `InMemoryEvaluationHost` but need
-a host implementation for full behavior:
+These features work in standalone mode through `InMemoryHost` but need a host
+implementation for full behavior:
 
 - Number parsing with locale awareness
 - Number formatting
@@ -277,8 +309,9 @@ layer.
 
 ## Test Suite
 
-The standalone test suite contains 22 test executables covering all major
-subsystems:
+The standalone test suite currently exposes 23 CTest entries: 22 unit/smoke
+executables plus 1 installed-package consumer smoke check. The executable-based
+suite covers all major subsystems:
 
 | Test Target | Coverage |
 |-------------|----------|
@@ -304,6 +337,7 @@ subsystems:
 | `spreadsheetengine_fods_parser_tests` | ODF formula AST parsing |
 | `spreadsheetengine_fods_evaluator_tests` | FODS formula evaluation |
 | `spreadsheetengine_fods_replay_tests` | Raw FODS workbook replay harness |
+| `spreadsheetengine_installed_package_smoke` | Installed-package downstream-consumer smoke |
 
 **Shared parity datasets** (TSV files under `tests/parity/`) allow the same
 test cases to run in both the standalone suite and LibreOffice's
@@ -357,27 +391,33 @@ This is not currently a goal — the dual-mode build is the intended architectur
 - **No charts or drawing objects:** entirely out of scope
 - **No macros:** no BASIC, Python, or UNO macro execution
 - **Evaluation host required:** standalone formula evaluation needs an
-  `EvaluationHost` implementation; the built-in `InMemoryEvaluationHost` covers
+  `EvaluationHost` implementation; the built-in `InMemoryHost` covers
   basic scenarios but not full locale-aware formatting or collation
-- **FODS date/time coverage incomplete:** the date_time family replay is
-  partially done (frontier: `isoweeknum.fods`)
-- **FODS lookup/reference not started:** lookup and reference function families
-  have not yet been wired into the FODS replay harness
+- **FODS workbook execution is still partial overall:** the replay subsystem is
+  live and green for the currently enabled families, but it is not yet a full
+  Calc-equivalent workbook runtime
+- **No full dependency graph in standalone FODS mode:** workbook evaluation is
+  lazy and memoized with cycle detection, but there is no persistent
+  Calc-style dependency graph or full document recalc orchestration
+- **Family coverage is still expanding:** raw FODS replay is currently enabled
+  for logical, mathematical, text, date_time, spreadsheet, and information;
+  other families such as add-in remain future work
 
 ## Roadmap / Future Directions
 
 The extraction track (Phases 6-11) is complete. The project is now in
 maintenance mode. Practical next steps include:
 
-1. **Complete FODS date/time family** — finish the remaining date/time workbook
-   replays (ISOWEEKNUM and beyond)
-2. **Enable FODS lookup/reference family** — wire VLOOKUP, MATCH, INDEX, etc.
-   into the FODS evaluator
+1. **Continue FODS family expansion** — extend raw replay beyond the currently
+   enabled logical, mathematical, text, date_time, spreadsheet, and
+   information families
+2. **Deepen standalone workbook execution** — gradually replace cached-result
+   fallback paths with more live evaluator coverage
 3. **Package polish** — improve downstream consumption ergonomics, add more
    consumer examples
 4. **Broaden parity coverage** — expand shared TSV parity datasets to cover
    more function families
-5. **Optional runtime enrichment** — extend `InMemoryEvaluationHost` with
+5. **Optional runtime enrichment** — extend `InMemoryHost` with
    richer locale support if standalone use cases demand it
 
 ## Key Documentation
