@@ -82,6 +82,18 @@ struct NativeLoweringSummary
     std::map<std::string, std::string> maLoweringReasonExamples;
 };
 
+struct CompiledDiffSummary
+{
+    std::size_t mnFormulaCells = 0;
+    std::size_t mnEligibleFormulaCells = 0;
+    std::size_t mnSkippedFormulaCells = 0;
+    std::size_t mnMatchedFormulaCells = 0;
+    std::size_t mnCachedFallbackOnly = 0;
+    std::string maCachedFallbackExample;
+};
+
+std::string columnLabel(ColumnIndex nColumn);
+
 std::string toUtf8(StringView rText)
 {
     std::string aUtf8;
@@ -165,6 +177,66 @@ std::string formatScalarValue(const CellValue& rValue)
     if (rValue.isError())
         return formatError(rValue.meError);
     return "";
+}
+
+std::string formatEvaluationResult(const EvaluationResult& rResult)
+{
+    if (!rResult)
+    {
+        std::string aResult = "error:" + formatError(rResult.meError);
+        if (!rResult.maCyclePath.empty())
+        {
+            aResult += " cycle=";
+            for (std::size_t nIndex = 0; nIndex < rResult.maCyclePath.size(); ++nIndex)
+            {
+                if (nIndex > 0)
+                    aResult += "->";
+                aResult += columnLabel(rResult.maCyclePath[nIndex].mnColumn)
+                           + std::to_string(rResult.maCyclePath[nIndex].mnRow + 1);
+            }
+        }
+        return aResult;
+    }
+
+    std::string aPrefix = rResult.mbUsedCachedValue ? "cached:" : "live:";
+    if (!rResult.maValue.isScalar())
+    {
+        const auto aDims = rResult.maValue.maReference.matrixDimensions();
+        return aPrefix + "range:" + std::to_string(aDims.mnColumns) + "x"
+               + std::to_string(aDims.mnRows);
+    }
+
+    return aPrefix + formatScalarValue(rResult.maValue.maValue);
+}
+
+bool evaluationResultsEqual(const EvaluationResult& rLeft, const EvaluationResult& rRight)
+{
+    if (rLeft.ok() != rRight.ok())
+        return false;
+    if (!rLeft)
+        return rLeft.meError == rRight.meError && rLeft.maCyclePath == rRight.maCyclePath;
+    if (rLeft.maValue.isScalar() != rRight.maValue.isScalar())
+        return false;
+    if (!rLeft.maValue.isScalar())
+        return rLeft.maValue.maReference.maRange == rRight.maValue.maReference.maRange;
+
+    const auto& rLeftValue = rLeft.maValue.maValue;
+    const auto& rRightValue = rRight.maValue.maValue;
+    if (rLeftValue.meKind != rRightValue.meKind)
+        return false;
+    if (rLeftValue.isNumber() || rLeftValue.isBoolean())
+        return spreadsheetengine::standalone::test::almostEqual(rLeftValue.mfNumber, rRightValue.mfNumber);
+    if (rLeftValue.isText())
+        return rLeftValue.maString == rRightValue.maString;
+    if (rLeftValue.isError())
+        return rLeftValue.meError == rRightValue.meError;
+    return true;
+}
+
+bool isCachedFallbackOnlyMismatch(const EvaluationResult& rLeft, const EvaluationResult& rRight)
+{
+    return evaluationResultsEqual(rLeft, rRight) && rLeft.ok() == rRight.ok()
+           && rLeft.mbUsedCachedValue != rRight.mbUsedCachedValue;
 }
 
 bool cellCachesError(const spreadsheetengine::core::workbook::Cell& rCell)
@@ -732,6 +804,82 @@ void printNativeLoweringSummary(const NativeLoweringSummary& rSummary)
     std::cout << '\n';
 }
 
+std::optional<std::string> diffCompiledWorkbook(const std::filesystem::path& rWorkbookPath,
+    const Workbook& rWorkbook, CompiledDiffSummary& rSummary)
+{
+    Evaluator aAstEvaluator(rWorkbook);
+    Evaluator aCompiledEvaluator(rWorkbook);
+    spreadsheetengine::detail::compiler::WorkbookCompileHost aHost(rWorkbook);
+
+    for (SheetId nSheet = 0; nSheet < static_cast<SheetId>(rWorkbook.maSheets.size()); ++nSheet)
+    {
+        const Sheet& rSheet = rWorkbook.maSheets[nSheet];
+        for (const auto& [rKey, rCell] : rSheet.maCells)
+        {
+            if (!rCell.hasFormula())
+                continue;
+
+            ++rSummary.mnFormulaCells;
+            const auto aContext = spreadsheetengine::detail::compiler::makeWorkbookCompileContext(
+                { nSheet, rKey.first, rKey.second });
+            const auto aPreflight = spreadsheetengine::detail::compiler::preflightFormulaSource(
+                rCell.maFormula, aHost, aContext);
+            if (!aPreflight)
+            {
+                ++rSummary.mnSkippedFormulaCells;
+                continue;
+            }
+
+            ++rSummary.mnEligibleFormulaCells;
+            const CellAddress aAddress { nSheet, rKey.first, rKey.second };
+            const EvaluationResult aAstResult = aAstEvaluator.evaluateCell(aAddress);
+            const EvaluationResult aCompiledResult = aCompiledEvaluator.evaluateCellViaCompiledTokens(aAddress);
+            if (!evaluationResultsEqual(aAstResult, aCompiledResult))
+            {
+                return rWorkbookPath.filename().string() + " " + toUtf8(rSheet.maName) + "."
+                       + columnLabel(rKey.first) + std::to_string(rKey.second + 1) + " "
+                       + toUtf8(rCell.maFormula) + " AST='" + formatEvaluationResult(aAstResult)
+                       + "' compiled='" + formatEvaluationResult(aCompiledResult) + "'";
+            }
+
+            if (isCachedFallbackOnlyMismatch(aAstResult, aCompiledResult))
+            {
+                ++rSummary.mnCachedFallbackOnly;
+                if (rSummary.maCachedFallbackExample.empty())
+                {
+                    rSummary.maCachedFallbackExample
+                        = rWorkbookPath.filename().string() + " " + toUtf8(rSheet.maName) + "."
+                          + columnLabel(rKey.first) + std::to_string(rKey.second + 1) + " "
+                          + toUtf8(rCell.maFormula) + " AST='"
+                          + formatEvaluationResult(aAstResult) + "' compiled='"
+                          + formatEvaluationResult(aCompiledResult) + "'";
+                }
+            }
+
+            ++rSummary.mnMatchedFormulaCells;
+        }
+    }
+
+    return std::nullopt;
+}
+
+void printCompiledDiffSummary(const CompiledDiffSummary& rSummary)
+{
+    std::cout << "compiled_diff_formula_cells=" << rSummary.mnFormulaCells << '\n';
+    std::cout << "compiled_diff_eligible=" << rSummary.mnEligibleFormulaCells << '\n';
+    std::cout << "compiled_diff_skipped=" << rSummary.mnSkippedFormulaCells << '\n';
+    std::cout << "compiled_diff_matched=" << rSummary.mnMatchedFormulaCells << '\n';
+    std::cout << "compiled_diff_cached_fallback_only=" << rSummary.mnCachedFallbackOnly << '\n';
+    std::cout << "compiled_diff_match_rate="
+              << (rSummary.mnEligibleFormulaCells
+                      ? (100.0 * static_cast<double>(rSummary.mnMatchedFormulaCells)
+                            / static_cast<double>(rSummary.mnEligibleFormulaCells))
+                      : 0.0)
+              << '\n';
+    std::cout << "compiled_diff_cached_fallback_example=" << rSummary.maCachedFallbackExample
+              << '\n';
+}
+
 std::optional<ColumnIndex> findHeaderColumn(const Sheet& rSheet, StringView rHeader)
 {
     for (const auto& [rKey, rCell] : rSheet.maCells)
@@ -875,6 +1023,7 @@ int main(int argc, char** argv)
     bool bSummary = false;
     bool bPreflight = false;
     bool bNativeLowerSmoke = false;
+    bool bCompiledDiff = false;
     bool bSawPathArgument = false;
     if (argc > 1)
     {
@@ -895,6 +1044,11 @@ int main(int argc, char** argv)
                 bNativeLowerSmoke = true;
                 continue;
             }
+            if (std::string_view(argv[nIndex]) == "--compiled-diff")
+            {
+                bCompiledDiff = true;
+                continue;
+            }
 
             const auto aMatches = collectFodsFiles(argv[nIndex]);
             aWorkbooks.insert(aWorkbooks.end(), aMatches.begin(), aMatches.end());
@@ -912,6 +1066,8 @@ int main(int argc, char** argv)
     if (aWorkbooks.empty() && bPreflight)
         aWorkbooks = collectDefaultReplayCorpus();
     if (aWorkbooks.empty() && bNativeLowerSmoke)
+        aWorkbooks = collectDefaultReplayCorpus();
+    if (aWorkbooks.empty() && bCompiledDiff)
         aWorkbooks = collectDefaultReplayCorpus();
 
     if (aWorkbooks.empty())
@@ -967,6 +1123,29 @@ int main(int argc, char** argv)
         }
 
         printNativeLoweringSummary(aSummary);
+        return EXIT_SUCCESS;
+    }
+
+    if (bCompiledDiff)
+    {
+        CompiledDiffSummary aSummary;
+        for (const auto& rWorkbookPath : aWorkbooks)
+        {
+            const auto aLoadResult = loadWorkbook(rWorkbookPath.string());
+            if (!aLoadResult)
+            {
+                return fail("spreadsheetengine_fods_replay_tests",
+                    "failed to load workbook for compiled diff");
+            }
+
+            if (const auto oFailure = diffCompiledWorkbook(
+                    rWorkbookPath, aLoadResult.maValue.maWorkbook, aSummary))
+            {
+                return fail("spreadsheetengine_fods_replay_tests", oFailure->c_str());
+            }
+        }
+
+        printCompiledDiffSummary(aSummary);
         return EXIT_SUCCESS;
     }
 

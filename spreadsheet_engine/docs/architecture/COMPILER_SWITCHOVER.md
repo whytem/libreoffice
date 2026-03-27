@@ -335,9 +335,8 @@ Current checkpoint:
 
 Current limitation:
 
-- this slice proves the execution adapter on focused standalone scenarios, but
-  it is not yet wired into the raw FODS replay harness as a family-scale
-  diff/default path
+- this slice now reaches the replay harness in manual diff mode, but it is not
+  yet the default replay path for any family
 
 Tasks:
 
@@ -366,6 +365,35 @@ Exit criteria:
 Goal:
 
 - compare old and new standalone execution paths before switching families
+
+Current checkpoint:
+
+- the raw FODS replay binary now has a manual `--compiled-diff` mode
+- that mode compares AST vs compiled-token execution only on preflight-ready
+  formulas, so the remaining parser/host tail does not drown the signal
+- current real-corpus baselines are:
+  - logical family:
+    - formula cells: `517`
+    - eligible: `513`
+    - skipped: `4`
+    - matched: `513`
+    - cached-fallback-only mismatches: `0`
+  - full default corpus:
+    - formula cells: `19930`
+    - eligible: `19838`
+    - skipped: `92`
+    - matched: `19838`
+    - cached-fallback-only mismatches: `1`
+    - first cached-fallback-only example:
+      `let.fods Sheet2.I49 of:=([.A49]=[.E49])`
+      `AST='cached:1'` vs `compiled='live:1'`
+
+Interpretation:
+
+- the first dual-path replay slice is now proving value parity on the entire
+  currently eligible corpus
+- the remaining signal has narrowed to fallback-behavior differences rather
+  than value mismatches
 
 Tasks:
 
@@ -499,9 +527,9 @@ Exit criteria:
 
 ### Phase 4
 
-- [ ] Extend the raw FODS replay binary with dual-path execution modes.
+- [x] Extend the raw FODS replay binary with dual-path execution modes.
 - [ ] Add per-workbook mismatch diagnostics.
-- [ ] Add family-scoped diff execution options.
+- [x] Add family-scoped diff execution options.
 - [ ] Add maintenance-lane support for shared-compiler diff mode.
 
 ### Phase 5
