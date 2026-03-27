@@ -29,6 +29,8 @@ enum class NodeKind : sal_uInt8
     CellReference,
     RangeReference,
     NamedReference,
+    RangeConstructor,
+    ReferenceList,
     ArrayConstant,
     UnaryOperation,
     BinaryOperation,

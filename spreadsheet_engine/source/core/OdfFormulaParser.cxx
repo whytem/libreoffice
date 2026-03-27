@@ -361,7 +361,7 @@ class Parser
                     continue;
                 }
 
-                auto pArgument = parseComparison();
+                auto pArgument = parseLogicalChain();
                 if (!pArgument)
                     return nullptr;
                 pNode->maChildren.push_back(std::move(pArgument));
@@ -405,7 +405,7 @@ class Parser
 
         while (!atEnd())
         {
-            auto pElement = parseComparison();
+            auto pElement = parseLogicalChain();
             if (!pElement)
                 return nullptr;
             pNode->maChildren.push_back(std::move(pElement));
@@ -501,7 +501,7 @@ class Parser
         if (peek() == u'(')
         {
             ++mnPos;
-            auto pNode = parseComparison();
+            auto pNode = parseLogicalChain();
             skipSpaces();
             if (!consume(u')'))
             {
@@ -539,6 +539,55 @@ class Parser
         return nullptr;
     }
 
+    [[nodiscard]] std::unique_ptr<Node> parseReferenceList()
+    {
+        auto pLeft = parseRangeConstructor();
+        if (!pLeft)
+            return nullptr;
+
+        while (true)
+        {
+            skipSpaces();
+            if (!consume(u'~'))
+                return pLeft;
+
+            auto pRight = parseRangeConstructor();
+            if (!pRight)
+                return nullptr;
+
+            if (pLeft->meKind == NodeKind::ReferenceList)
+            {
+                pLeft->maChildren.push_back(std::move(pRight));
+                continue;
+            }
+
+            auto pNode = makeNode(NodeKind::ReferenceList);
+            pNode->maChildren.push_back(std::move(pLeft));
+            pNode->maChildren.push_back(std::move(pRight));
+            pLeft = std::move(pNode);
+        }
+    }
+
+    [[nodiscard]] std::unique_ptr<Node> parseRangeConstructor()
+    {
+        auto pLeft = parsePrimary();
+        if (!pLeft)
+            return nullptr;
+
+        skipSpaces();
+        if (!consume(u':'))
+            return pLeft;
+
+        auto pRight = parsePrimary();
+        if (!pRight)
+            return nullptr;
+
+        auto pNode = makeNode(NodeKind::RangeConstructor);
+        pNode->maChildren.push_back(std::move(pLeft));
+        pNode->maChildren.push_back(std::move(pRight));
+        return pNode;
+    }
+
     [[nodiscard]] std::unique_ptr<Node> parseUnary()
     {
         skipSpaces();
@@ -566,7 +615,7 @@ class Parser
             return pNode;
         }
 
-        return parsePrimary();
+        return parseReferenceList();
     }
 
     [[nodiscard]] std::unique_ptr<Node> parsePower()
@@ -715,6 +764,43 @@ public:
         }
     }
 
+    [[nodiscard]] std::unique_ptr<Node> parseLogicalChain()
+    {
+        auto pLeft = parseComparison();
+        if (!pLeft)
+            return nullptr;
+
+        while (true)
+        {
+            skipSpaces();
+            const std::size_t nStart = mnPos;
+            const auto aToken = parseIdentifierToken();
+            if ((aToken != u"AND" && aToken != u"OR") || peek() != u'(')
+            {
+                mnPos = nStart;
+                return pLeft;
+            }
+
+            auto pRightCall = parseFunctionCall(aToken);
+            if (!pRightCall)
+                return nullptr;
+
+            if (pLeft->meKind == NodeKind::FunctionCall && pLeft->maPrimaryText == aToken)
+            {
+                for (auto& pChild : pRightCall->maChildren)
+                    pLeft->maChildren.push_back(std::move(pChild));
+                continue;
+            }
+
+            auto pNode = makeNode(NodeKind::FunctionCall);
+            pNode->maPrimaryText = api::String(aToken);
+            pNode->maChildren.push_back(std::move(pLeft));
+            for (auto& pChild : pRightCall->maChildren)
+                pNode->maChildren.push_back(std::move(pChild));
+            pLeft = std::move(pNode);
+        }
+    }
+
     [[nodiscard]] ParseResult parse()
     {
         skipSpaces();
@@ -724,7 +810,7 @@ public:
             ++mnPos;
         skipSpaces();
 
-        auto pRoot = parseComparison();
+        auto pRoot = parseLogicalChain();
         if (!pRoot)
             return { nullptr, maError, false };
 

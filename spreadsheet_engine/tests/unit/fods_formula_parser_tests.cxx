@@ -235,6 +235,48 @@ int main()
     }
 
     {
+        const auto aResult = parseFormula(u"of:=AREAS(([.A1:.B3]~[.F2]~[.G1]))");
+        if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
+            || aResult.mpRoot->maChildren.size() != 1
+            || aResult.mpRoot->maChildren[0]->meKind != NodeKind::ReferenceList
+            || aResult.mpRoot->maChildren[0]->maChildren.size() != 3
+            || aResult.mpRoot->maChildren[0]->maChildren[0]->meKind != NodeKind::RangeReference
+            || aResult.mpRoot->maChildren[0]->maChildren[1]->meKind != NodeKind::CellReference
+            || aResult.mpRoot->maChildren[0]->maChildren[2]->meKind != NodeKind::CellReference)
+        {
+            return fail("spreadsheetengine_fods_parser_tests",
+                "reference list parse mismatch");
+        }
+    }
+
+    {
+        const auto aResult = parseFormula(u"of:=SUM([.$O6]:CHOOSE(([.$H$2]-1);[.$O6];[.$P6]))");
+        if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
+            || aResult.mpRoot->maChildren.size() != 1
+            || aResult.mpRoot->maChildren[0]->meKind != NodeKind::RangeConstructor
+            || aResult.mpRoot->maChildren[0]->maChildren.size() != 2
+            || aResult.mpRoot->maChildren[0]->maChildren[0]->meKind != NodeKind::CellReference
+            || aResult.mpRoot->maChildren[0]->maChildren[1]->meKind != NodeKind::FunctionCall
+            || aResult.mpRoot->maChildren[0]->maChildren[1]->maPrimaryText != u"CHOOSE")
+        {
+            return fail("spreadsheetengine_fods_parser_tests",
+                "range constructor parse mismatch");
+        }
+    }
+
+    {
+        const auto aResult = parseFormula(
+            u"of:=([.A3]=[.D3])AND([.B3]=[.E3])AND([.C3]=[.F3])");
+        if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
+            || aResult.mpRoot->maPrimaryText != u"AND"
+            || aResult.mpRoot->maChildren.size() != 3)
+        {
+            return fail("spreadsheetengine_fods_parser_tests",
+                "adjacent AND parse mismatch");
+        }
+    }
+
+    {
         const auto aResult = parseFormula(u"of:=ABS(");
         if (aResult)
             return fail("spreadsheetengine_fods_parser_tests", "invalid formula unexpectedly parsed");

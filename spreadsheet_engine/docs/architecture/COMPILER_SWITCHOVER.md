@@ -214,21 +214,25 @@ Current milestone pass/fail thresholds:
 
 Current manual compiler-preflight baseline on the same corpus:
 
-- preflight-ready formula cells: `19045 / 19930` (about `95.56%`)
-- preflight-expected-error formula cells: `42`
+- preflight-ready formula cells: `19838 / 19930` (about `99.54%`)
+- preflight-expected-error formula cells: `41`
   - these are formulas that the current preflight cannot compile, but whose
     workbook cells already cache an expected error result
-- preflight-not-ready formula cells: `885`
-- preflight-hard-blocker formula cells: `843`
+- preflight-not-ready formula cells: `92`
+- preflight-hard-blocker formula cells: `51`
 - current blocked categories:
-  - parse failure: `807`
-  - missing named reference: `36`
+  - parse failure: `12`
+  - missing named reference: `37`
+  - unsupported range-constructor operand: `2`
 - current expected-error categories:
-  - expected-error parse failure: `41`
+  - expected-error parse failure: `9`
   - expected-error missing named reference: `1`
+  - expected-error unsupported range-constructor operand: `31`
 - first representative examples:
-  - parse failure: `areas.fods Sheet2.A2 of:=AREAS(([.A1:.B3]~[.F2]~[.G1]))`
+  - parse failure: `columns.fods Sheet2.A19 of:=COLUMNS({1;2;3;4|5;6;7;8})`
   - missing named reference: `error.type.fods Sheet2.A15 of:=ERROR.TYPE(ahoj)`
+  - unsupported range-constructor operand:
+    `error.type.fods Sheet2.A12 of:=ERROR.TYPE(err:7)`
   - expected-error parse failure:
     `not.fods Sheet2.A11 of:=NOT(0)NOT(0) => #VALUE!`
   - expected-error missing named reference:
@@ -592,19 +596,25 @@ The third implementation slice is now in place:
   - namespace-prefixed error literals like `of:#ERR502!`
   - signed array-constant elements like `-0.4`
   - bare `A1` / `A1:B2` references such as `I13:K13`
+  - reference-list / union syntax like `([.A1:.B3]~[.F2]~[.G1])`
+  - range-constructor formulas like:
+    - `[.$O6]:CHOOSE(...)`
+    - `INDEX(...):INDEX(...)`
+    - `XLOOKUP(...):XLOOKUP(...)`
+  - adjacent logical-function chains like:
+    - `([.A3]=[.D3])AND([.B3]=[.E3])AND([.C3]=[.F3])`
 - the current full-corpus readiness baseline is now:
-  - ready: `19045`
-  - expected-error: `42`
-  - hard blockers: `843`
-  - parse failures still dominate the remaining gap
+  - ready: `19838`
+  - expected-error: `41`
+  - hard blockers: `51`
+  - the remaining gap is now a small tail rather than a dominant parser wall
 
 The next implementation slice should move from measurement into execution:
 
 1. close the highest-volume preflight blockers first:
-   - parse failures
+   - remaining parser tail items like ragged-array constructs
    - unresolved workbook names that should remain explicit host/compiler gaps
-   - the next parser-construct bucket after the current `~`/reference-list
-     frontier
+   - cleanup of false-positive range-constructor cases like `err:7`
 2. promote the manual preflight from classifier-only to first native-lowering
    attempts on the FODS-safe subset
 3. keep that preflight manual and corpus-scoped before promoting it into the

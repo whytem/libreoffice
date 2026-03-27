@@ -437,6 +437,54 @@ int testWorkbookCompilerPreflight()
             "workbook compiler preflight bare-range mismatch");
     }
 
+    const auto aReferenceList = secompiler::preflightFormulaSource(
+        u"of:=AREAS(([.A1:.B3]~[.F2]~[.G1]))", aHost, *oContext);
+    if (!aReferenceList || !aReferenceList.mbUsesFunctionCall
+        || !aReferenceList.mbUsesRangeReference || !aReferenceList.mbUsesCellReference)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler preflight reference-list mismatch");
+    }
+
+    const auto aBadReferenceList
+        = secompiler::preflightFormulaSource(u"of:=AREAS(([.A1]~1))", aHost, *oContext);
+    if (aBadReferenceList
+        || aBadReferenceList.meReason
+               != secompiler::FormulaPreflightReason::UnsupportedReferenceListElement
+        || aBadReferenceList.maDetail != u"NumberLiteral")
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler preflight bad reference-list mismatch");
+    }
+
+    const auto aRangeConstructor = secompiler::preflightFormulaSource(
+        u"of:=SUM([.$O6]:CHOOSE(([.$H$2]-1);[.$O6];[.$P6];[.$Q6];[.$R6]))", aHost, *oContext);
+    if (!aRangeConstructor || !aRangeConstructor.mbUsesFunctionCall
+        || !aRangeConstructor.mbUsesCellReference)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler preflight range-constructor mismatch");
+    }
+
+    const auto aBadRangeConstructor
+        = secompiler::preflightFormulaSource(u"of:=SUM([.$O6]:ABS(1))", aHost, *oContext);
+    if (aBadRangeConstructor
+        || aBadRangeConstructor.meReason
+               != secompiler::FormulaPreflightReason::UnsupportedRangeConstructorOperand
+        || aBadRangeConstructor.maDetail != u"FunctionCall")
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler preflight bad range-constructor mismatch");
+    }
+
+    const auto aAdjacentAnd = secompiler::preflightFormulaSource(
+        u"of:=([.A3]=[.D3])AND([.B3]=[.E3])AND([.C3]=[.F3])", aHost, *oContext);
+    if (!aAdjacentAnd || !aAdjacentAnd.mbUsesFunctionCall || !aAdjacentAnd.mbUsesCellReference)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler preflight adjacent-AND mismatch");
+    }
+
     const auto aParseFailure = secompiler::preflightFormulaSource(u"of:=ABS(", aHost, *oContext);
     if (aParseFailure || aParseFailure.meReason != secompiler::FormulaPreflightReason::ParseFailure)
     {

@@ -22,7 +22,9 @@ enum class FormulaPreflightReason : sal_uInt8
     Ready = 0,
     ParseFailure,
     MissingNamedReference,
-    UnsupportedArrayElement
+    UnsupportedArrayElement,
+    UnsupportedRangeConstructorOperand,
+    UnsupportedReferenceListElement
 };
 
 [[nodiscard]] constexpr api::StringView preflightReasonName(FormulaPreflightReason eReason)
@@ -37,6 +39,10 @@ enum class FormulaPreflightReason : sal_uInt8
             return u"missing_named_reference";
         case FormulaPreflightReason::UnsupportedArrayElement:
             return u"unsupported_array_element";
+        case FormulaPreflightReason::UnsupportedRangeConstructorOperand:
+            return u"unsupported_range_constructor_operand";
+        case FormulaPreflightReason::UnsupportedReferenceListElement:
+            return u"unsupported_reference_list_element";
     }
 
     return u"unknown";
@@ -84,6 +90,10 @@ namespace detail
             return u"RangeReference";
         case NodeKind::NamedReference:
             return u"NamedReference";
+        case NodeKind::RangeConstructor:
+            return u"RangeConstructor";
+        case NodeKind::ReferenceList:
+            return u"ReferenceList";
         case NodeKind::ArrayConstant:
             return u"ArrayConstant";
         case NodeKind::UnaryOperation:
@@ -104,6 +114,17 @@ inline void setFailure(
     rResult.meReason = eReason;
     rResult.maDetail = std::move(aDetail);
     rResult.mnFailureOffset = nFailureOffset;
+}
+
+[[nodiscard]] inline bool preflightNode(
+    const core::formula::Node& rNode, const WorkbookCompileHost& rHost,
+    const CompileContext& rContext, FormulaPreflightResult& rResult);
+
+[[nodiscard]] inline api::StringView normalizeReferenceFunctionName(api::StringView rName)
+{
+    if (rName == u"COM.MICROSOFT.XLOOKUP")
+        return u"XLOOKUP";
+    return rName;
 }
 
 [[nodiscard]] inline bool isSupportedArrayElement(
@@ -127,6 +148,127 @@ inline void setFailure(
             if (rNode.maChildren.size() != 1 || !rNode.maChildren.front())
                 return false;
             return isSupportedArrayElement(*rNode.maChildren.front(), rHost, rContext, rResult);
+        default:
+            return false;
+    }
+}
+
+[[nodiscard]] inline bool isReferenceLikeNode(
+    const core::formula::Node& rNode, const WorkbookCompileHost& rHost,
+    const CompileContext& rContext, FormulaPreflightResult& rResult);
+
+[[nodiscard]] inline bool isReferenceReturningFunction(
+    const core::formula::Node& rNode, const WorkbookCompileHost& rHost,
+    const CompileContext& rContext, FormulaPreflightResult& rResult)
+{
+    using core::formula::NodeKind;
+
+    if (rNode.meKind != NodeKind::FunctionCall)
+        return false;
+
+    rResult.mbUsesFunctionCall = true;
+    const api::StringView aFunctionName = normalizeReferenceFunctionName(rNode.maPrimaryText);
+
+    if (aFunctionName == u"CHOOSE")
+    {
+        if (rNode.maChildren.size() < 2 || !rNode.maChildren[0]
+            || !preflightNode(*rNode.maChildren[0], rHost, rContext, rResult))
+        {
+            return false;
+        }
+
+        for (std::size_t nIndex = 1; nIndex < rNode.maChildren.size(); ++nIndex)
+        {
+            if (!rNode.maChildren[nIndex]
+                || !isReferenceLikeNode(*rNode.maChildren[nIndex], rHost, rContext, rResult))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    if (aFunctionName == u"INDEX")
+    {
+        if (rNode.maChildren.empty() || !rNode.maChildren[0]
+            || !isReferenceLikeNode(*rNode.maChildren[0], rHost, rContext, rResult))
+        {
+            return false;
+        }
+
+        for (std::size_t nIndex = 1; nIndex < rNode.maChildren.size(); ++nIndex)
+        {
+            if (rNode.maChildren[nIndex]
+                && !preflightNode(*rNode.maChildren[nIndex], rHost, rContext, rResult))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    if (aFunctionName == u"XLOOKUP")
+    {
+        if (rNode.maChildren.size() < 3 || !rNode.maChildren[0] || !rNode.maChildren[1]
+            || !rNode.maChildren[2]
+            || !preflightNode(*rNode.maChildren[0], rHost, rContext, rResult)
+            || !isReferenceLikeNode(*rNode.maChildren[1], rHost, rContext, rResult)
+            || !isReferenceLikeNode(*rNode.maChildren[2], rHost, rContext, rResult))
+        {
+            return false;
+        }
+
+        for (std::size_t nIndex = 3; nIndex < rNode.maChildren.size(); ++nIndex)
+        {
+            if (rNode.maChildren[nIndex]
+                && !preflightNode(*rNode.maChildren[nIndex], rHost, rContext, rResult))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    return false;
+}
+
+[[nodiscard]] inline bool isReferenceLikeNode(
+    const core::formula::Node& rNode, const WorkbookCompileHost& rHost,
+    const CompileContext& rContext, FormulaPreflightResult& rResult)
+{
+    using core::formula::NodeKind;
+
+    switch (rNode.meKind)
+    {
+        case NodeKind::CellReference:
+        case NodeKind::RangeReference:
+            return true;
+
+        case NodeKind::NamedReference:
+        {
+            std::optional<api::SheetId> oScopeSheet;
+            if (rContext.maBaseAddress.mnSheet >= 0)
+                oScopeSheet = rContext.maBaseAddress.mnSheet;
+            return rHost.lookupRangeName(rNode.maPrimaryText, oScopeSheet, rContext).has_value();
+        }
+
+        case NodeKind::RangeConstructor:
+            if (rNode.maChildren.size() != 2 || !rNode.maChildren[0] || !rNode.maChildren[1])
+                return false;
+            return isReferenceLikeNode(*rNode.maChildren[0], rHost, rContext, rResult)
+                   && isReferenceLikeNode(*rNode.maChildren[1], rHost, rContext, rResult);
+
+        case NodeKind::ReferenceList:
+            for (const auto& pChild : rNode.maChildren)
+            {
+                if (!pChild || !isReferenceLikeNode(*pChild, rHost, rContext, rResult))
+                    return false;
+            }
+            return true;
+
+        case NodeKind::FunctionCall:
+            return isReferenceReturningFunction(rNode, rHost, rContext, rResult);
+
         default:
             return false;
     }
@@ -169,6 +311,55 @@ inline void setFailure(
                 api::String(rNode.maPrimaryText));
             return false;
         }
+
+        case NodeKind::RangeConstructor:
+            if (rNode.maChildren.size() != 2 || !rNode.maChildren[0] || !rNode.maChildren[1])
+            {
+                setFailure(rResult, FormulaPreflightReason::UnsupportedRangeConstructorOperand);
+                return false;
+            }
+
+            for (const auto& pChild : rNode.maChildren)
+            {
+                if (pChild->meKind == NodeKind::CellReference)
+                    rResult.mbUsesCellReference = true;
+                else if (pChild->meKind == NodeKind::RangeReference)
+                    rResult.mbUsesRangeReference = true;
+                else if (pChild->meKind == NodeKind::NamedReference)
+                    rResult.mbUsesNamedReference = true;
+                else if (pChild->meKind == NodeKind::FunctionCall)
+                    rResult.mbUsesFunctionCall = true;
+
+                if (!isReferenceLikeNode(*pChild, rHost, rContext, rResult))
+                {
+                    setFailure(rResult, FormulaPreflightReason::UnsupportedRangeConstructorOperand,
+                        api::String(nodeKindName(pChild->meKind)));
+                    return false;
+                }
+            }
+            return true;
+
+        case NodeKind::ReferenceList:
+            for (const auto& pChild : rNode.maChildren)
+            {
+                if (!pChild)
+                    continue;
+
+                if (pChild->meKind == NodeKind::CellReference)
+                    rResult.mbUsesCellReference = true;
+                else if (pChild->meKind == NodeKind::RangeReference)
+                    rResult.mbUsesRangeReference = true;
+                else if (pChild->meKind == NodeKind::NamedReference)
+                    rResult.mbUsesNamedReference = true;
+
+                if (isReferenceLikeNode(*pChild, rHost, rContext, rResult))
+                    continue;
+
+                setFailure(rResult, FormulaPreflightReason::UnsupportedReferenceListElement,
+                    api::String(nodeKindName(pChild->meKind)));
+                return false;
+            }
+            return true;
 
         case NodeKind::ArrayConstant:
             rResult.mbUsesArrayConstant = true;

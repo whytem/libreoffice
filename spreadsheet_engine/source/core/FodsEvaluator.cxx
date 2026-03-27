@@ -1211,6 +1211,31 @@ struct AggregateScan
         }
         case formula::NodeKind::NamedReference:
             return api::String(rNode.maPrimaryText);
+        case formula::NodeKind::RangeConstructor:
+        {
+            const auto oLeft = formatChildForDisplay(*rNode.maChildren[0], 0);
+            const auto oRight = formatChildForDisplay(*rNode.maChildren[1], 0);
+            if (!oLeft || !oRight)
+                return std::nullopt;
+            api::String aResult = *oLeft;
+            aResult.push_back(u':');
+            aResult += *oRight;
+            return aResult;
+        }
+        case formula::NodeKind::ReferenceList:
+        {
+            api::String aResult;
+            for (std::size_t nIndex = 0; nIndex < rNode.maChildren.size(); ++nIndex)
+            {
+                const auto oChild = formatChildForDisplay(*rNode.maChildren[nIndex], 0);
+                if (!oChild)
+                    return std::nullopt;
+                aResult += *oChild;
+                if (nIndex + 1 < rNode.maChildren.size())
+                    aResult.push_back(u'~');
+            }
+            return aResult;
+        }
         case formula::NodeKind::ArrayConstant:
         {
             api::String aResult = u"{";
@@ -1508,6 +1533,10 @@ EvaluationResult Evaluator::evaluateReferenceNode(
                 return makeFailure(aRange.meError);
             return makeReferenceResult(aRange.maValue);
         }
+        case formula::NodeKind::RangeConstructor:
+            return makeFailure(api::Error::IllegalArgument);
+        case formula::NodeKind::ReferenceList:
+            return makeFailure(api::Error::IllegalArgument);
         default:
         {
             EvaluationResult aValue = evaluateNode(rNode, rCurrentAddress);
@@ -2541,6 +2570,10 @@ EvaluationResult Evaluator::evaluateNode(
                 return materializeReferenceValue(aRange.maValue, 0, 0);
             return makeReferenceResult(aRange.maValue);
         }
+        case formula::NodeKind::RangeConstructor:
+            return makeFailure(api::Error::IllegalArgument);
+        case formula::NodeKind::ReferenceList:
+            return makeFailure(api::Error::IllegalArgument);
         case formula::NodeKind::ArrayConstant:
         {
             if (rNode.mnArrayRows != 1 || rNode.mnArrayColumns != 1 || rNode.maChildren.empty())
