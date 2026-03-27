@@ -172,6 +172,35 @@ CPPUNIT_TEST_FIXTURE(TestTokenBridge, testXmlPlaceholderRoundTrip)
     CPPUNIT_ASSERT_EQUAL(aOriginal.GetRecalcMode(), aExported.mxTokenArray->GetRecalcMode());
 }
 
+CPPUNIT_TEST_FIXTURE(TestTokenBridge, testXmlPlaceholderWhitespaceRoundTrip)
+{
+    using spreadsheetengine::compat::libreoffice::exportCompiledFormula;
+    using spreadsheetengine::compat::libreoffice::importCompiledFormula;
+
+    m_pDoc->InsertTab(0, u"XMLWhitespace"_ustr);
+
+    ScTokenArray aOriginal(*m_pDoc);
+    aOriginal.AssignXMLString(u"of:=SUM(  [.A1:.A3] ; [.$B$1]  )"_ustr, u"of"_ustr);
+    aOriginal.ClearRecalcMode();
+    aOriginal.SetMaskedRecalcMode(ScRecalcMode::ALWAYS);
+
+    const auto aImported = importCompiledFormula(aOriginal);
+    CPPUNIT_ASSERT_MESSAGE(aImported.maFailureMessage.toUtf8().getStr(), static_cast<bool>(aImported));
+    CPPUNIT_ASSERT(aImported.maFormula.moXmlFormulaSource.has_value());
+    CPPUNIT_ASSERT(
+        aImported.maFormula.moXmlFormulaSource->maFormula
+        == spreadsheetengine::api::String(u"of:=SUM(  [.A1:.A3] ; [.$B$1]  )"));
+    CPPUNIT_ASSERT(
+        aImported.maFormula.moXmlFormulaSource->maNamespace
+        == spreadsheetengine::api::String(u"of"));
+
+    const auto aExported = exportCompiledFormula(aImported.maFormula, *m_pDoc);
+    CPPUNIT_ASSERT_MESSAGE(aExported.maFailureMessage.toUtf8().getStr(), static_cast<bool>(aExported));
+    CPPUNIT_ASSERT(aExported.mxTokenArray);
+    CPPUNIT_ASSERT(aOriginal.EqualTokens(aExported.mxTokenArray.get()));
+    CPPUNIT_ASSERT_EQUAL(aOriginal.GetRecalcMode(), aExported.mxTokenArray->GetRecalcMode());
+}
+
 CPPUNIT_TEST_FIXTURE(TestTokenBridge, testCanonicalLexicalEquality)
 {
     m_pDoc->InsertTab(0, u"Equality"_ustr);

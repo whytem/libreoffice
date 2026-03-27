@@ -666,6 +666,7 @@ This section is the working task list for the implementation effort.
 - [x] Phase 3: implement Calc compile-host adapters
 - [x] Phase 4: add engine compiler skeleton in shadow mode
 - [x] Phase 5: add compile-diff validation harness
+- [x] Phase 5 closeout sprint: extend compile-diff coverage for col/row-name and external-name formulas, add richer whitespace-sensitive cases, strengthen XML placeholder roundtrips, and add a small real-FODS-sourced formula smoke on enabled families
 - [ ] Phase 6: migrate first low-risk native consumers
 - [x] Phase 6 first slice: route shared-formula token comparison through canonical engine token services with Calc fallback for unsupported bridge cases
 - [x] Phase 6 second slice: route `ScTokenArray::EqualTokens()` through canonical lexical token equality with Calc fallback for unsupported bridge cases
@@ -789,9 +790,19 @@ The current compile-diff harness is deliberately **synthetic-first**. The green 
 - Calc compile-diff cases covering:
   - plain arithmetic
   - whitespace-preserving function syntax
+  - whitespace-preserving array literals
   - matrix / array literals
   - named database ranges
+  - col/row-name lookup formulas
+  - external-name formulas
   - Excel-style structured table references
+- a small real-FODS-sourced smoke compiled from already-enabled raw FODS families:
+  - logical
+  - mathematical
+  - text
+  - date_time
+- strengthened XML placeholder roundtrip checks in the Calc token-bridge lane, including
+  whitespace-preserving placeholder text
 
 That is enough to make Phase 5 substantially complete because the project now has:
 
@@ -808,14 +819,13 @@ What Phase 5 still does **not** include is also intentional:
 - broader special-opcode reference variants beyond the initial bridge path
 - explicit export-side preservation of vector/OpenCL/threading flags beyond whatever Calc recomputes while rebuilding the token array
 - corpus-scale compile-diff execution across the full milestone validation set
-- raw workbook / FODS compile-diff replay
-- stable compile-diff coverage yet for the more fragile corners of:
-  - col/row-name lookup formulas
-  - external-name formulas
-  - XML namespaced formula placeholders
+- full raw workbook / FODS compile-diff replay beyond the current small formula-smoke subset
+- true compile-diff coverage for external-grammar XML-placeholder parses, as opposed to the current
+  bridge/roundtrip validation for stored XML placeholder arrays
 - native compiler lowering that no longer depends on `ScCompiler`
 
-Those are the closeout items for later Phase 5 expansion or the first work inside Phase 6.
+Those are now later Phase 5 expansion items or future hardening work around Phase 7 adoption, not
+missing core closeout coverage.
 
 ## Current Phase 6 Status
 

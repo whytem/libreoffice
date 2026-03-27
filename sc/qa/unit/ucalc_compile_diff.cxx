@@ -11,6 +11,7 @@
 
 #include <dbdata.hxx>
 #include <docoptio.hxx>
+#include <externalrefmgr.hxx>
 #include <formula/grammar.hxx>
 #include <spreadsheetengine/compat/libreoffice/CompileHost.hxx>
 #include <spreadsheetengine/compat/libreoffice/CompilerDiff.hxx>
@@ -79,6 +80,8 @@ CPPUNIT_TEST_FIXTURE(TestCompileDiff, testSyntheticCompilerDiffCorpus)
 {
     ScDocument* pDoc = m_pDoc;
     CPPUNIT_ASSERT(pDoc);
+    if (pDoc->GetTableCount() == 0)
+        CPPUNIT_ASSERT(pDoc->InsertTab(0, u"Sheet1"_ustr));
 
     auto pDbData = std::make_unique<ScDBData>(u"SalesTable"_ustr, 0, 0, 0, 3, 5);
     pDbData->SetTableColumnNames({ u"Region"_ustr, u"Amount"_ustr, u"Delta"_ustr, u"Flag"_ustr });
@@ -93,6 +96,19 @@ CPPUNIT_TEST_FIXTURE(TestCompileDiff, testSyntheticCompilerDiffCorpus)
     aOptions.SetLookUpColRowNames(true);
     pDoc->SetDocOptions(aOptions);
 
+    static OUString constexpr aExternalFile(u"file:///compile-diff-external.fake"_ustr);
+    ScExternalRefManager* pRefMgr = pDoc->GetExternalRefManager();
+    CPPUNIT_ASSERT(pRefMgr);
+    const sal_uInt16 nFileId = pRefMgr->getExternalFileId(aExternalFile);
+    ScTokenArray aRangeTokens(*pDoc);
+    aRangeTokens.AddDouble(42.0);
+    pRefMgr->storeRangeNameTokens(nFileId, u"ExternalMetric"_ustr, aRangeTokens);
+    const ScCompiler::Convention* pConvention
+        = ScCompiler::GetRefConvention(formula::FormulaGrammar::CONV_OOO);
+    CPPUNIT_ASSERT(pConvention);
+    const OUString aExternalSymbol
+        = pConvention->makeExternalNameStr(nFileId, aExternalFile, u"ExternalMetric"_ustr);
+
     spreadsheetengine::compat::libreoffice::DocumentCompileHost aHost(*pDoc);
 
     assertShadowDiff(*pDoc, makeRequest(aHost, ScAddress(0, 0, 0), u"=1+2"_ustr, getEnglishOooGrammar()),
@@ -104,12 +120,57 @@ CPPUNIT_TEST_FIXTURE(TestCompileDiff, testSyntheticCompilerDiffCorpus)
         makeRequest(aHost, ScAddress(0, 0, 0), u"=SUM({1;2;3})"_ustr, getEnglishOooGrammar()),
         u"array literal");
     assertShadowDiff(*pDoc,
+        makeRequest(aHost, ScAddress(0, 0, 0), u"=SUM( { 1 ; 2 ; 3 } )"_ustr,
+                    getEnglishOooGrammar()),
+        u"whitespace-sensitive array literal");
+    assertShadowDiff(*pDoc,
         makeRequest(aHost, ScAddress(1, 1, 0), u"=SUM(SalesTable)"_ustr, getEnglishOooGrammar()),
         u"database range");
     assertShadowDiff(*pDoc,
         makeRequest(aHost, ScAddress(1, 1, 0), u"=SUM(SalesTable[#Data])"_ustr,
                     formula::FormulaGrammar::GRAM_ENGLISH_XL_A1),
         u"table reference");
+    assertShadowDiff(*pDoc,
+        makeRequest(aHost, ScAddress(2, 2, 0), u"='Revenue'"_ustr, getEnglishOooGrammar()),
+        u"col-row name");
+    assertShadowDiff(*pDoc,
+        makeRequest(aHost, ScAddress(1, 1, 0), aExternalSymbol, getEnglishOooGrammar()),
+        u"external name");
+}
+
+CPPUNIT_TEST_FIXTURE(TestCompileDiff, testEnabledFodsFormulaSmoke)
+{
+    ScDocument* pDoc = m_pDoc;
+    CPPUNIT_ASSERT(pDoc);
+    if (pDoc->GetTableCount() == 0)
+        CPPUNIT_ASSERT(pDoc->InsertTab(0, u"Sheet1"_ustr));
+
+    spreadsheetengine::compat::libreoffice::DocumentCompileHost aHost(*pDoc);
+
+    const struct
+    {
+        std::u16string_view maLabel;
+        ScAddress maPosition;
+        formula::FormulaGrammar::Grammar meGrammar;
+        std::u16string_view maFormula;
+    } aSamples[] = {
+        { u"logical/and.fods :: of:=AND(1;1)", ScAddress(0, 0, 0),
+            getEnglishOooGrammar(), u"=AND(1;1)" },
+        { u"mathematical/add.fods :: of:=-0.3+0.2+0.1", ScAddress(0, 0, 0),
+            getEnglishOooGrammar(), u"=-0.3+0.2+0.1" },
+        { u"text/concat.fods :: of:=COM.MICROSOFT.CONCAT(\"Good \";\"Morning \";\"Mrs. \";\"Doe\")",
+            ScAddress(0, 0, 0), getEnglishOooGrammar(),
+            u"=COM.MICROSOFT.CONCAT(\"Good \";\"Morning \";\"Mrs. \";\"Doe\")" },
+        { u"date_time/datevalue.fods :: of:=DATEVALUE(\"Jan1, 2015\")", ScAddress(0, 0, 0),
+            getEnglishOooGrammar(), u"=DATEVALUE(\"Jan1, 2015\")" },
+    };
+
+    for (const auto& rSample : aSamples)
+    {
+        assertShadowDiff(*pDoc,
+            makeRequest(aHost, rSample.maPosition, OUString(rSample.maFormula), rSample.meGrammar),
+            rSample.maLabel);
+    }
 }
 
 CPPUNIT_PLUGIN_IMPLEMENT();
