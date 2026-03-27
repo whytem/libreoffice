@@ -3,13 +3,16 @@
 #include <algorithm>
 #include <cstdio>
 #include <filesystem>
+#include <map>
 #include <iostream>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include <spreadsheetengine/detail/FodsEvaluator.hxx>
+#include <spreadsheetengine/detail/FodsCompilerPreflight.hxx>
 #include <spreadsheetengine/detail/FodsLoader.hxx>
+#include <spreadsheetengine/detail/OdfFormulaParser.hxx>
 
 #include "TestSupport.hxx"
 
@@ -24,14 +27,44 @@ using spreadsheetengine::api::RowIndex;
 using spreadsheetengine::api::SheetId;
 using spreadsheetengine::api::String;
 using spreadsheetengine::api::StringView;
+using spreadsheetengine::detail::compiler::FormulaPreflightReason;
+using spreadsheetengine::detail::compiler::preflightReasonName;
 using spreadsheetengine::core::fods::EvaluationResult;
 using spreadsheetengine::core::fods::Evaluator;
+using spreadsheetengine::core::formula::Node;
+using spreadsheetengine::core::formula::NodeKind;
 using spreadsheetengine::core::fods::loadWorkbook;
 using spreadsheetengine::core::workbook::Sheet;
 using spreadsheetengine::core::workbook::Workbook;
 
 constexpr ColumnIndex SUCCESS_COLUMN = 1; // B
 constexpr RowIndex SUCCESS_ROW = 2; // 3rd row
+
+struct ReplaySummary
+{
+    std::size_t mnWorkbooks = 0;
+    std::size_t mnFormulaCells = 0;
+    std::size_t mnParsedFormulas = 0;
+    std::size_t mnCachedFallbackCells = 0;
+    std::size_t mnCellReferenceNodes = 0;
+    std::size_t mnRangeReferenceNodes = 0;
+    std::size_t mnNamedReferenceNodes = 0;
+    std::size_t mnArrayConstantNodes = 0;
+    std::size_t mnFunctionCallNodes = 0;
+    std::size_t mnUnaryOperationNodes = 0;
+    std::size_t mnBinaryOperationNodes = 0;
+    std::size_t mnLiteralNodes = 0;
+    std::map<std::string, std::size_t> maFamilyWorkbookCounts;
+    std::map<std::string, std::size_t> maFunctionCallCounts;
+};
+
+struct PreflightSummary
+{
+    std::size_t mnFormulaCells = 0;
+    std::size_t mnReady = 0;
+    std::map<std::string, std::size_t> maReasonCounts;
+    std::map<std::string, std::string> maReasonExamples;
+};
 
 std::string toUtf8(StringView rText)
 {
@@ -207,6 +240,250 @@ std::vector<std::filesystem::path> collectDefaultReplayCorpus()
     return aFiles;
 }
 
+std::string familyNameForWorkbook(const std::filesystem::path& rWorkbookPath)
+{
+    const auto aFodsDir = rWorkbookPath.parent_path();
+    if (aFodsDir.filename() != "fods")
+        return "custom";
+
+    const auto aFamilyDir = aFodsDir.parent_path();
+    if (aFamilyDir.empty())
+        return "custom";
+
+    return aFamilyDir.filename().string();
+}
+
+void accumulateFormulaNodeSummary(const Node& rNode, ReplaySummary& rSummary)
+{
+    switch (rNode.meKind)
+    {
+        case NodeKind::NumberLiteral:
+        case NodeKind::StringLiteral:
+        case NodeKind::BooleanLiteral:
+        case NodeKind::ErrorLiteral:
+        case NodeKind::EmptyArgument:
+            ++rSummary.mnLiteralNodes;
+            break;
+        case NodeKind::CellReference:
+            ++rSummary.mnCellReferenceNodes;
+            break;
+        case NodeKind::RangeReference:
+            ++rSummary.mnRangeReferenceNodes;
+            break;
+        case NodeKind::NamedReference:
+            ++rSummary.mnNamedReferenceNodes;
+            break;
+        case NodeKind::ArrayConstant:
+            ++rSummary.mnArrayConstantNodes;
+            break;
+        case NodeKind::UnaryOperation:
+            ++rSummary.mnUnaryOperationNodes;
+            break;
+        case NodeKind::BinaryOperation:
+            ++rSummary.mnBinaryOperationNodes;
+            break;
+        case NodeKind::FunctionCall:
+            ++rSummary.mnFunctionCallNodes;
+            ++rSummary.maFunctionCallCounts[toUtf8(rNode.maPrimaryText)];
+            break;
+    }
+
+    for (const auto& pChild : rNode.maChildren)
+    {
+        if (pChild)
+            accumulateFormulaNodeSummary(*pChild, rSummary);
+    }
+}
+
+ReplaySummary summarizeWorkbook(
+    const std::filesystem::path& rWorkbookPath, const Workbook& rWorkbook)
+{
+    ReplaySummary aSummary;
+    ++aSummary.mnWorkbooks;
+    ++aSummary.maFamilyWorkbookCounts[familyNameForWorkbook(rWorkbookPath)];
+
+    Evaluator aEvaluator(rWorkbook);
+    for (SheetId nSheet = 0; nSheet < static_cast<SheetId>(rWorkbook.maSheets.size()); ++nSheet)
+    {
+        const Sheet& rSheet = rWorkbook.maSheets[nSheet];
+        for (const auto& [rKey, rCell] : rSheet.maCells)
+        {
+            if (!rCell.hasFormula())
+                continue;
+
+            ++aSummary.mnFormulaCells;
+
+            const auto aParse = spreadsheetengine::core::formula::parseFormula(rCell.maFormula);
+            if (aParse)
+            {
+                ++aSummary.mnParsedFormulas;
+                accumulateFormulaNodeSummary(*aParse.mpRoot, aSummary);
+            }
+
+            const auto aResult = aEvaluator.evaluateCell({ nSheet, rKey.first, rKey.second });
+            if (aResult.mbUsedCachedValue)
+                ++aSummary.mnCachedFallbackCells;
+        }
+    }
+
+    return aSummary;
+}
+
+void mergeSummary(ReplaySummary& rInto, const ReplaySummary& rFrom)
+{
+    rInto.mnWorkbooks += rFrom.mnWorkbooks;
+    rInto.mnFormulaCells += rFrom.mnFormulaCells;
+    rInto.mnParsedFormulas += rFrom.mnParsedFormulas;
+    rInto.mnCachedFallbackCells += rFrom.mnCachedFallbackCells;
+    rInto.mnCellReferenceNodes += rFrom.mnCellReferenceNodes;
+    rInto.mnRangeReferenceNodes += rFrom.mnRangeReferenceNodes;
+    rInto.mnNamedReferenceNodes += rFrom.mnNamedReferenceNodes;
+    rInto.mnArrayConstantNodes += rFrom.mnArrayConstantNodes;
+    rInto.mnFunctionCallNodes += rFrom.mnFunctionCallNodes;
+    rInto.mnUnaryOperationNodes += rFrom.mnUnaryOperationNodes;
+    rInto.mnBinaryOperationNodes += rFrom.mnBinaryOperationNodes;
+    rInto.mnLiteralNodes += rFrom.mnLiteralNodes;
+
+    for (const auto& [rKey, nValue] : rFrom.maFamilyWorkbookCounts)
+        rInto.maFamilyWorkbookCounts[rKey] += nValue;
+    for (const auto& [rKey, nValue] : rFrom.maFunctionCallCounts)
+        rInto.maFunctionCallCounts[rKey] += nValue;
+}
+
+void printSummary(const ReplaySummary& rSummary)
+{
+    std::cout << "workbooks=" << rSummary.mnWorkbooks << '\n';
+    std::cout << "formula_cells=" << rSummary.mnFormulaCells << '\n';
+    std::cout << "parsed_formulas=" << rSummary.mnParsedFormulas << '\n';
+    std::cout << "cached_fallback_cells=" << rSummary.mnCachedFallbackCells << '\n';
+    std::cout << "cell_reference_nodes=" << rSummary.mnCellReferenceNodes << '\n';
+    std::cout << "range_reference_nodes=" << rSummary.mnRangeReferenceNodes << '\n';
+    std::cout << "named_reference_nodes=" << rSummary.mnNamedReferenceNodes << '\n';
+    std::cout << "array_constant_nodes=" << rSummary.mnArrayConstantNodes << '\n';
+    std::cout << "function_call_nodes=" << rSummary.mnFunctionCallNodes << '\n';
+    std::cout << "unary_operation_nodes=" << rSummary.mnUnaryOperationNodes << '\n';
+    std::cout << "binary_operation_nodes=" << rSummary.mnBinaryOperationNodes << '\n';
+    std::cout << "literal_nodes=" << rSummary.mnLiteralNodes << '\n';
+
+    std::cout << "family_workbooks=";
+    bool bFirst = true;
+    for (const auto& [rFamily, nCount] : rSummary.maFamilyWorkbookCounts)
+    {
+        if (!bFirst)
+            std::cout << ",";
+        bFirst = false;
+        std::cout << rFamily << ":" << nCount;
+    }
+    std::cout << '\n';
+
+    std::vector<std::pair<std::string, std::size_t>> aTopFunctions(
+        rSummary.maFunctionCallCounts.begin(), rSummary.maFunctionCallCounts.end());
+    std::sort(aTopFunctions.begin(), aTopFunctions.end(),
+        [](const auto& rLeft, const auto& rRight) {
+            if (rLeft.second != rRight.second)
+                return rLeft.second > rRight.second;
+            return rLeft.first < rRight.first;
+        });
+
+    std::cout << "top_functions=";
+    for (std::size_t nIndex = 0; nIndex < std::min<std::size_t>(10, aTopFunctions.size()); ++nIndex)
+    {
+        if (nIndex > 0)
+            std::cout << ",";
+        std::cout << aTopFunctions[nIndex].first << ":" << aTopFunctions[nIndex].second;
+    }
+    std::cout << '\n';
+}
+
+PreflightSummary preflightWorkbook(
+    const std::filesystem::path& rWorkbookPath, const Workbook& rWorkbook)
+{
+    PreflightSummary aSummary;
+    spreadsheetengine::detail::compiler::WorkbookCompileHost aHost(rWorkbook);
+
+    for (SheetId nSheet = 0; nSheet < static_cast<SheetId>(rWorkbook.maSheets.size()); ++nSheet)
+    {
+        const Sheet& rSheet = rWorkbook.maSheets[nSheet];
+        for (const auto& [rKey, rCell] : rSheet.maCells)
+        {
+            if (!rCell.hasFormula())
+                continue;
+
+            ++aSummary.mnFormulaCells;
+            const auto aContext = spreadsheetengine::detail::compiler::makeWorkbookCompileContext(
+                { nSheet, rKey.first, rKey.second });
+            const auto aResult = spreadsheetengine::detail::compiler::preflightFormulaSource(
+                rCell.maFormula, aHost, aContext);
+            if (aResult)
+            {
+                ++aSummary.mnReady;
+                continue;
+            }
+
+            const std::string aReason = toUtf8(preflightReasonName(aResult.meReason));
+            ++aSummary.maReasonCounts[aReason];
+
+            if (!aSummary.maReasonExamples.contains(aReason))
+            {
+                aSummary.maReasonExamples[aReason]
+                    = rWorkbookPath.filename().string() + " " + toUtf8(rSheet.maName) + "."
+                      + columnLabel(rKey.first) + std::to_string(rKey.second + 1) + " "
+                      + toUtf8(rCell.maFormula);
+            }
+        }
+    }
+
+    return aSummary;
+}
+
+void mergePreflightSummary(PreflightSummary& rInto, const PreflightSummary& rFrom)
+{
+    rInto.mnFormulaCells += rFrom.mnFormulaCells;
+    rInto.mnReady += rFrom.mnReady;
+    for (const auto& [rReason, nCount] : rFrom.maReasonCounts)
+        rInto.maReasonCounts[rReason] += nCount;
+    for (const auto& [rReason, rExample] : rFrom.maReasonExamples)
+    {
+        if (!rInto.maReasonExamples.contains(rReason))
+            rInto.maReasonExamples[rReason] = rExample;
+    }
+}
+
+void printPreflightSummary(const PreflightSummary& rSummary)
+{
+    std::cout << "preflight_formula_cells=" << rSummary.mnFormulaCells << '\n';
+    std::cout << "preflight_ready=" << rSummary.mnReady << '\n';
+    std::cout << "preflight_not_ready=" << (rSummary.mnFormulaCells - rSummary.mnReady) << '\n';
+    std::cout << "preflight_ready_rate="
+              << (rSummary.mnFormulaCells
+                      ? (100.0 * static_cast<double>(rSummary.mnReady)
+                            / static_cast<double>(rSummary.mnFormulaCells))
+                      : 0.0)
+              << '\n';
+
+    std::cout << "preflight_reasons=";
+    bool bFirst = true;
+    for (const auto& [rReason, nCount] : rSummary.maReasonCounts)
+    {
+        if (!bFirst)
+            std::cout << ",";
+        bFirst = false;
+        std::cout << rReason << ":" << nCount;
+    }
+    std::cout << '\n';
+
+    std::cout << "preflight_examples=";
+    bFirst = true;
+    for (const auto& [rReason, rExample] : rSummary.maReasonExamples)
+    {
+        if (!bFirst)
+            std::cout << " | ";
+        bFirst = false;
+        std::cout << rReason << ":" << rExample;
+    }
+    std::cout << '\n';
+}
+
 std::optional<ColumnIndex> findHeaderColumn(const Sheet& rSheet, StringView rHeader)
 {
     for (const auto& [rKey, rCell] : rSheet.maCells)
@@ -347,21 +624,75 @@ int main(int argc, char** argv)
     using spreadsheetengine::standalone::test::fail;
 
     std::vector<std::filesystem::path> aWorkbooks;
+    bool bSummary = false;
+    bool bPreflight = false;
+    bool bSawPathArgument = false;
     if (argc > 1)
     {
         for (int nIndex = 1; nIndex < argc; ++nIndex)
         {
+            if (std::string_view(argv[nIndex]) == "--summary")
+            {
+                bSummary = true;
+                continue;
+            }
+            if (std::string_view(argv[nIndex]) == "--preflight")
+            {
+                bPreflight = true;
+                continue;
+            }
+
             const auto aMatches = collectFodsFiles(argv[nIndex]);
             aWorkbooks.insert(aWorkbooks.end(), aMatches.begin(), aMatches.end());
+            bSawPathArgument = true;
         }
     }
-    else
+
+    if (argc == 1 || !bSawPathArgument)
     {
         aWorkbooks = collectDefaultReplayCorpus();
     }
 
+    if (aWorkbooks.empty() && bSummary)
+        aWorkbooks = collectDefaultReplayCorpus();
+    if (aWorkbooks.empty() && bPreflight)
+        aWorkbooks = collectDefaultReplayCorpus();
+
     if (aWorkbooks.empty())
         return fail("spreadsheetengine_fods_replay_tests", "no FODS workbooks found");
+
+    if (bSummary)
+    {
+        ReplaySummary aSummary;
+        for (const auto& rWorkbookPath : aWorkbooks)
+        {
+            const auto aLoadResult = loadWorkbook(rWorkbookPath.string());
+            if (!aLoadResult)
+                return fail("spreadsheetengine_fods_replay_tests", "failed to load workbook for summary");
+
+            mergeSummary(aSummary, summarizeWorkbook(rWorkbookPath, aLoadResult.maValue.maWorkbook));
+        }
+
+        printSummary(aSummary);
+        return EXIT_SUCCESS;
+    }
+
+    if (bPreflight)
+    {
+        PreflightSummary aSummary;
+        for (const auto& rWorkbookPath : aWorkbooks)
+        {
+            const auto aLoadResult = loadWorkbook(rWorkbookPath.string());
+            if (!aLoadResult)
+                return fail("spreadsheetengine_fods_replay_tests", "failed to load workbook for preflight");
+
+            mergePreflightSummary(
+                aSummary, preflightWorkbook(rWorkbookPath, aLoadResult.maValue.maWorkbook));
+        }
+
+        printPreflightSummary(aSummary);
+        return EXIT_SUCCESS;
+    }
 
     for (const auto& rWorkbook : aWorkbooks)
     {

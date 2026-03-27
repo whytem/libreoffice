@@ -6,9 +6,11 @@
 
 #include <spreadsheetengine/detail/CompileHost.hxx>
 #include <spreadsheetengine/detail/CompilerPipeline.hxx>
+#include <spreadsheetengine/detail/FodsCompilerPreflight.hxx>
 #include <spreadsheetengine/detail/SharedFormulaToken.hxx>
 #include <spreadsheetengine/detail/TokenStringifier.hxx>
 #include <spreadsheetengine/detail/TokenModel.hxx>
+#include <spreadsheetengine/detail/WorkbookCompileHost.hxx>
 
 #include "TestSupport.hxx"
 
@@ -254,6 +256,180 @@ int testCompilePipelineShape()
     return EXIT_SUCCESS;
 }
 
+int testWorkbookCompileHost()
+{
+    namespace secompiler = spreadsheetengine::detail::compiler;
+    namespace seworkbook = spreadsheetengine::core::workbook;
+
+    seworkbook::Workbook aWorkbook;
+    aWorkbook.maSheets.push_back(seworkbook::Sheet { u"Sheet1" });
+    aWorkbook.maSheets.push_back(seworkbook::Sheet { u"Lookup" });
+    aWorkbook.maNamedRanges.push_back(
+        seworkbook::NamedRange { u"GlobalRange", {}, u"$Sheet1.$A$1", u"$Sheet1.$A$1:.$A$2" });
+    aWorkbook.maNamedRanges.push_back(seworkbook::NamedRange { u"ShadowedName", u"Lookup",
+        u"$Lookup.$B$2", u"$Lookup.$B$2:.$B$4" });
+    aWorkbook.maNamedRanges.push_back(
+        seworkbook::NamedRange { u"ShadowedName", {}, u"$Sheet1.$C$1", u"$Sheet1.$C$1:.$C$2" });
+    aWorkbook.maNamedRanges.push_back(
+        seworkbook::NamedRange { u"MixedCase", u"Lookup", u"$Lookup.$D$1", u"$Lookup.$D$1:.$D$1" });
+
+    secompiler::WorkbookCompileHost aHost(aWorkbook);
+    const auto aHosts = aHost.hosts();
+    if (!secompiler::hasCompleteHostBundle(aHosts))
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compile host bundle should be complete");
+    }
+
+    const auto& rSupport = aHost.support();
+    if (rSupport.meRangeNames != secompiler::LookupSupport::Supported
+        || rSupport.meDatabaseRanges != secompiler::LookupSupport::Unsupported
+        || rSupport.meTableRefs != secompiler::LookupSupport::Unsupported
+        || rSupport.meColRowNames != secompiler::LookupSupport::Unsupported
+        || rSupport.meExternalNames != secompiler::LookupSupport::Unsupported)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compile host support contract mismatch");
+    }
+
+    const auto oContext = secompiler::makeWorkbookCompileContext(aWorkbook, u"Lookup", 3, 4);
+    if (!oContext)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compile context creation failed");
+    }
+
+    if (oContext->maGrammar.meLanguage
+               != secompiler::kDefaultWorkbookCompileGrammar.meLanguage
+        || oContext->maGrammar.meAddressConvention
+               != secompiler::kDefaultWorkbookCompileGrammar.meAddressConvention
+        || oContext->maGrammar.mbEnglish
+               != secompiler::kDefaultWorkbookCompileGrammar.mbEnglish
+        || oContext->maBaseAddress != spreadsheetengine::api::CellAddress { 1, 3, 4 }
+        || oContext->mbAllowExternalReferences || oContext->mbForPersistence
+        || oContext->mbComputeImplicitIntersection || oContext->mbMatrixFormula)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compile context defaults mismatch");
+    }
+
+    const auto oMissingContext
+        = secompiler::makeWorkbookCompileContext(aWorkbook, u"Missing", 0, 0);
+    if (oMissingContext)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compile context unexpectedly resolved missing sheet");
+    }
+
+    const auto aLocal = aHosts.mpNameResolver->lookupRangeName(u"ShadowedName", 1, *oContext);
+    const auto aGlobalOnOtherSheet
+        = aHosts.mpNameResolver->lookupRangeName(u"ShadowedName", 0, *oContext);
+    const auto aGlobalWithoutScope
+        = aHosts.mpNameResolver->lookupRangeName(u"ShadowedName", std::nullopt, *oContext);
+    const auto aCaseFolded = aHosts.mpNameResolver->lookupRangeName(u"mixedcase", 1, *oContext);
+    const auto aMissingName
+        = aHosts.mpNameResolver->lookupRangeName(u"UnknownName", 1, *oContext);
+
+    if (!aLocal || aLocal->mnSheet != 1 || aLocal->mnIndex != 2)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook local range name lookup mismatch");
+    }
+    if (!aGlobalOnOtherSheet || aGlobalOnOtherSheet->mnSheet != -1
+        || aGlobalOnOtherSheet->mnIndex != 3)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook global fallback lookup mismatch");
+    }
+    if (!aGlobalWithoutScope || aGlobalWithoutScope->mnSheet != -1
+        || aGlobalWithoutScope->mnIndex != 3)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook unscope range name lookup mismatch");
+    }
+    if (!aCaseFolded || aCaseFolded->mnSheet != 1 || aCaseFolded->mnIndex != 4)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook case-folded range name lookup mismatch");
+    }
+    if (aMissingName)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook missing range name unexpectedly resolved");
+    }
+
+    if (aHosts.mpDatabaseRangeResolver->lookupDatabaseRange(u"DB", *oContext)
+        || aHosts.mpTableRefResolver->lookupTableReference(u"Table1", u"#Data", *oContext)
+        || aHosts.mpColRowNameResolver->lookupColRowName(u"Heading", *oContext)
+        || aHosts.mpExternalNameResolver->lookupExternalName(u"'file.ods'#$Name", *oContext))
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compile host unexpectedly resolved unsupported lookup");
+    }
+
+    return EXIT_SUCCESS;
+}
+
+int testWorkbookCompilerPreflight()
+{
+    namespace secompiler = spreadsheetengine::detail::compiler;
+    namespace seworkbook = spreadsheetengine::core::workbook;
+
+    seworkbook::Workbook aWorkbook;
+    aWorkbook.maSheets.push_back(seworkbook::Sheet { u"Sheet1" });
+    aWorkbook.maSheets.push_back(seworkbook::Sheet { u"Lookup" });
+    aWorkbook.maNamedRanges.push_back(
+        seworkbook::NamedRange { u"GlobalRange", {}, u"$Sheet1.$A$1", u"$Sheet1.$A$1:.$A$2" });
+    aWorkbook.maNamedRanges.push_back(
+        seworkbook::NamedRange { u"LocalOnly", u"Lookup", u"$Lookup.$B$2", u"$Lookup.$B$2:.$B$4" });
+
+    secompiler::WorkbookCompileHost aHost(aWorkbook);
+    const auto oContext = secompiler::makeWorkbookCompileContext(aWorkbook, u"Lookup", 1, 1);
+    if (!oContext)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler preflight context mismatch");
+    }
+
+    const auto aReady = secompiler::preflightFormulaSource(
+        u"of:=SUM([.A1:.A3];LocalOnly;GlobalRange)", aHost, *oContext);
+    if (!aReady || !aReady.mbUsesFunctionCall || !aReady.mbUsesRangeReference
+        || !aReady.mbUsesNamedReference)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler preflight ready-path mismatch");
+    }
+
+    const auto aMissingName
+        = secompiler::preflightFormulaSource(u"of:=SUM(MissingName)", aHost, *oContext);
+    if (aMissingName
+        || aMissingName.meReason != secompiler::FormulaPreflightReason::MissingNamedReference
+        || aMissingName.maDetail != u"MissingName")
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler preflight missing-name mismatch");
+    }
+
+    const auto aBadArray
+        = secompiler::preflightFormulaSource(u"of:=SUM({[.A1]})", aHost, *oContext);
+    if (aBadArray
+        || aBadArray.meReason != secompiler::FormulaPreflightReason::UnsupportedArrayElement
+        || aBadArray.maDetail != u"CellReference")
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler preflight array mismatch");
+    }
+
+    const auto aParseFailure = secompiler::preflightFormulaSource(u"of:=ABS(", aHost, *oContext);
+    if (aParseFailure || aParseFailure.meReason != secompiler::FormulaPreflightReason::ParseFailure)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler preflight parse-failure mismatch");
+    }
+
+    return EXIT_SUCCESS;
+}
+
 int testSharedFormulaTokenServices()
 {
     namespace setoken = spreadsheetengine::detail::token;
@@ -398,6 +574,12 @@ int main()
         return nResult;
 
     if (int nResult = testCompilePipelineShape(); nResult != EXIT_SUCCESS)
+        return nResult;
+
+    if (int nResult = testWorkbookCompileHost(); nResult != EXIT_SUCCESS)
+        return nResult;
+
+    if (int nResult = testWorkbookCompilerPreflight(); nResult != EXIT_SUCCESS)
         return nResult;
 
     if (int nResult = testSharedFormulaTokenServices(); nResult != EXIT_SUCCESS)
