@@ -11,6 +11,9 @@
 
 #include <rtl/math.hxx>
 
+#include <spreadsheetengine/detail/WorkbookCompileHost.hxx>
+#include <spreadsheetengine/detail/WorkbookCompilerLowering.hxx>
+
 #include <spreadsheetengine/api/Calendar.hxx>
 #include <spreadsheetengine/api/Logic.hxx>
 #include <spreadsheetengine/api/Lookup.hxx>
@@ -35,6 +38,9 @@ namespace spreadsheetengine::core::fods
 {
 namespace
 {
+
+namespace secompiler = spreadsheetengine::detail::compiler;
+namespace setoken = spreadsheetengine::detail::token;
 
 [[nodiscard]] std::tuple<api::SheetId, api::ColumnIndex, api::RowIndex> makeAddressKey(
     const api::CellAddress& rAddress)
@@ -1119,6 +1125,427 @@ struct AggregateScan
     return aResult;
 }
 
+[[nodiscard]] constexpr api::refdata::SheetLimits runtimeSheetLimits(
+    const workbook::Workbook& rWorkbook)
+{
+    return { secompiler::detail::kSmokeMaxColumn, secompiler::detail::kSmokeMaxRow,
+        static_cast<api::SheetId>(rWorkbook.maSheets.empty() ? 0 : rWorkbook.maSheets.size() - 1) };
+}
+
+[[nodiscard]] bool needsQuotedSheetName(api::StringView rSheetName)
+{
+    if (rSheetName.empty())
+        return false;
+
+    for (const char16_t cChar : rSheetName)
+    {
+        const bool bAlphaNum = (cChar >= u'0' && cChar <= u'9')
+                               || (cChar >= u'A' && cChar <= u'Z')
+                               || (cChar >= u'a' && cChar <= u'z') || cChar == u'_';
+        if (!bAlphaNum)
+            return true;
+    }
+
+    return false;
+}
+
+[[nodiscard]] api::String quoteSheetNameForFormula(api::StringView rSheetName)
+{
+    if (!needsQuotedSheetName(rSheetName))
+        return api::String(rSheetName);
+
+    api::String aQuoted;
+    aQuoted.reserve(rSheetName.size() + 2);
+    aQuoted.push_back(u'\'');
+    for (const char16_t cChar : rSheetName)
+    {
+        if (cChar == u'\'')
+            aQuoted.push_back(u'\'');
+        aQuoted.push_back(cChar);
+    }
+    aQuoted.push_back(u'\'');
+    return aQuoted;
+}
+
+[[nodiscard]] api::String columnNameFromIndex(api::ColumnIndex nColumn)
+{
+    api::String aName;
+    api::ColumnIndex nCurrent = nColumn;
+    do
+    {
+        const api::ColumnIndex nRemainder = nCurrent % 26;
+        aName.insert(aName.begin(), static_cast<char16_t>(u'A' + nRemainder));
+        nCurrent = (nCurrent / 26) - 1;
+    } while (nCurrent >= 0);
+    return aName;
+}
+
+[[nodiscard]] api::String formatAbsoluteCellReferenceToken(
+    const api::CellAddress& rAddress, const workbook::Workbook& rWorkbook, api::SheetId nCurrentSheet)
+{
+    api::String aToken;
+    if (rAddress.mnSheet == nCurrentSheet)
+    {
+        aToken = u".";
+    }
+    else
+    {
+        if (rAddress.mnSheet < 0 || static_cast<std::size_t>(rAddress.mnSheet) >= rWorkbook.maSheets.size())
+            return {};
+        aToken = quoteSheetNameForFormula(rWorkbook.maSheets[static_cast<std::size_t>(rAddress.mnSheet)].maName);
+        aToken.push_back(u'.');
+    }
+
+    aToken += columnNameFromIndex(rAddress.mnColumn);
+    aToken += formatNumber(static_cast<double>(rAddress.mnRow + 1));
+    return aToken;
+}
+
+[[nodiscard]] api::String formatSingleReferenceToken(
+    const api::refdata::SingleRefData& rReference, const workbook::Workbook& rWorkbook,
+    const api::CellAddress& rCurrentAddress)
+{
+    const auto aAbsolute
+        = api::refdata::toAbsoluteAddress(rReference, runtimeSheetLimits(rWorkbook), rCurrentAddress);
+    return formatAbsoluteCellReferenceToken(aAbsolute, rWorkbook, rCurrentAddress.mnSheet);
+}
+
+[[nodiscard]] api::String errorCodeToLiteral(setoken::ErrorCode nErrorCode)
+{
+    switch (nErrorCode)
+    {
+        case 2042:
+            return u"#N/A";
+        case 2007:
+            return u"#DIV/0!";
+        case 2015:
+            return u"#VALUE!";
+        case 2023:
+            return u"#REF!";
+        case 2029:
+            return u"#NAME?";
+        case 2036:
+            return u"#NUM!";
+        case 2000:
+            return u"#NULL!";
+        default:
+        {
+            api::String aLiteral = u"#ERR";
+            aLiteral += formatNumber(static_cast<double>(nErrorCode));
+            aLiteral.push_back(u'!');
+            return aLiteral;
+        }
+    }
+}
+
+struct InflatedStackItem
+{
+    enum class Kind : sal_uInt8
+    {
+        Node = 0,
+        FunctionName,
+        Byte
+    };
+
+    Kind meKind = Kind::Node;
+    std::unique_ptr<formula::Node> mpNode;
+    api::String maText;
+    setoken::ByteData maByte;
+};
+
+[[nodiscard]] std::unique_ptr<formula::Node> makeSimpleNode(formula::NodeKind eKind)
+{
+    auto pNode = std::make_unique<formula::Node>();
+    pNode->meKind = eKind;
+    return pNode;
+}
+
+[[nodiscard]] std::unique_ptr<formula::Node> inflateMatrixScalarNode(const setoken::MatrixScalar& rScalar)
+{
+    auto pNode = std::make_unique<formula::Node>();
+    if (const auto* pNumber = std::get_if<double>(&rScalar))
+    {
+        pNode->meKind = formula::NodeKind::NumberLiteral;
+        pNode->mfNumber = *pNumber;
+        return pNode;
+    }
+    if (const auto* pString = std::get_if<api::String>(&rScalar))
+    {
+        pNode->meKind = formula::NodeKind::StringLiteral;
+        pNode->maPrimaryText = *pString;
+        return pNode;
+    }
+
+    pNode->meKind = formula::NodeKind::ErrorLiteral;
+    pNode->maPrimaryText = errorCodeToLiteral(std::get<setoken::ErrorCode>(rScalar));
+    return pNode;
+}
+
+[[nodiscard]] bool popNode(
+    std::vector<InflatedStackItem>& rStack, std::unique_ptr<formula::Node>& rpNode)
+{
+    if (rStack.empty() || rStack.back().meKind != InflatedStackItem::Kind::Node)
+        return false;
+    rpNode = std::move(rStack.back().mpNode);
+    rStack.pop_back();
+    return true;
+}
+
+[[nodiscard]] bool popByte(std::vector<InflatedStackItem>& rStack, setoken::ByteData& rByte)
+{
+    if (rStack.empty() || rStack.back().meKind != InflatedStackItem::Kind::Byte)
+        return false;
+    rByte = rStack.back().maByte;
+    rStack.pop_back();
+    return true;
+}
+
+[[nodiscard]] bool popFunctionName(std::vector<InflatedStackItem>& rStack, api::String& rName)
+{
+    if (rStack.empty() || rStack.back().meKind != InflatedStackItem::Kind::FunctionName)
+        return false;
+    rName = std::move(rStack.back().maText);
+    rStack.pop_back();
+    return true;
+}
+
+[[nodiscard]] std::optional<std::unique_ptr<formula::Node>> inflateCompiledFormulaNode(
+    const setoken::CompiledFormula& rFormula, const workbook::Workbook& rWorkbook,
+    const api::CellAddress& rCurrentAddress)
+{
+    std::vector<InflatedStackItem> aStack;
+    aStack.reserve(rFormula.maTokens.size());
+
+    for (const auto& rToken : rFormula.maTokens)
+    {
+        switch (rToken.meKind)
+        {
+            case setoken::Kind::Missing:
+                aStack.push_back({ InflatedStackItem::Kind::Node,
+                    makeSimpleNode(formula::NodeKind::EmptyArgument), {}, {} });
+                break;
+            case setoken::Kind::Value:
+            {
+                auto pNode = makeSimpleNode(formula::NodeKind::NumberLiteral);
+                pNode->mfNumber = std::get<double>(rToken.maPayload);
+                aStack.push_back({ InflatedStackItem::Kind::Node, std::move(pNode), {}, {} });
+                break;
+            }
+            case setoken::Kind::String:
+            {
+                auto pNode = makeSimpleNode(formula::NodeKind::StringLiteral);
+                pNode->maPrimaryText = std::get<setoken::StringData>(rToken.maPayload).maText;
+                aStack.push_back({ InflatedStackItem::Kind::Node, std::move(pNode), {}, {} });
+                break;
+            }
+            case setoken::Kind::StringName:
+                aStack.push_back({ InflatedStackItem::Kind::FunctionName, nullptr,
+                    std::get<setoken::StringData>(rToken.maPayload).maText, {} });
+                break;
+            case setoken::Kind::Byte:
+                aStack.push_back(
+                    { InflatedStackItem::Kind::Byte, nullptr, {}, std::get<setoken::ByteData>(rToken.maPayload) });
+                break;
+            case setoken::Kind::Error:
+            {
+                auto pNode = makeSimpleNode(formula::NodeKind::ErrorLiteral);
+                pNode->maPrimaryText = errorCodeToLiteral(std::get<setoken::ErrorCode>(rToken.maPayload));
+                aStack.push_back({ InflatedStackItem::Kind::Node, std::move(pNode), {}, {} });
+                break;
+            }
+            case setoken::Kind::SingleRef:
+            {
+                auto pNode = makeSimpleNode(formula::NodeKind::CellReference);
+                pNode->maPrimaryText = formatSingleReferenceToken(
+                    std::get<api::refdata::SingleRefData>(rToken.maPayload), rWorkbook, rCurrentAddress);
+                if (pNode->maPrimaryText.empty())
+                    return std::nullopt;
+                aStack.push_back({ InflatedStackItem::Kind::Node, std::move(pNode), {}, {} });
+                break;
+            }
+            case setoken::Kind::DoubleRef:
+            {
+                const auto& rReference = std::get<api::refdata::ComplexRefData>(rToken.maPayload);
+                auto pNode = makeSimpleNode(formula::NodeKind::RangeReference);
+                pNode->maPrimaryText = formatSingleReferenceToken(rReference.maRef1, rWorkbook, rCurrentAddress);
+                pNode->maSecondaryText = formatSingleReferenceToken(rReference.maRef2, rWorkbook, rCurrentAddress);
+                if (pNode->maPrimaryText.empty() || pNode->maSecondaryText.empty())
+                    return std::nullopt;
+                aStack.push_back({ InflatedStackItem::Kind::Node, std::move(pNode), {}, {} });
+                break;
+            }
+            case setoken::Kind::RangeName:
+            {
+                const auto& rName = std::get<setoken::NameData>(rToken.maPayload);
+                if (rName.mnIndex == 0
+                    || static_cast<std::size_t>(rName.mnIndex - 1) >= rWorkbook.maNamedRanges.size())
+                {
+                    return std::nullopt;
+                }
+                auto pNode = makeSimpleNode(formula::NodeKind::NamedReference);
+                pNode->maPrimaryText = rWorkbook.maNamedRanges[static_cast<std::size_t>(rName.mnIndex - 1)].maName;
+                aStack.push_back({ InflatedStackItem::Kind::Node, std::move(pNode), {}, {} });
+                break;
+            }
+            case setoken::Kind::Matrix:
+            {
+                const auto& rMatrix = std::get<setoken::MatrixData>(rToken.maPayload);
+                auto pNode = makeSimpleNode(formula::NodeKind::ArrayConstant);
+                pNode->mnArrayRows = rMatrix.mnRows;
+                pNode->mnArrayColumns = rMatrix.mnColumns;
+                for (const auto& rScalar : rMatrix.maValues)
+                    pNode->maChildren.push_back(inflateMatrixScalarNode(rScalar));
+                aStack.push_back({ InflatedStackItem::Kind::Node, std::move(pNode), {}, {} });
+                break;
+            }
+            case setoken::Kind::PlainOpcode:
+            {
+                auto makeUnary = [&](formula::UnaryOperator eOperator) -> bool {
+                    std::unique_ptr<formula::Node> pChild;
+                    if (!popNode(aStack, pChild))
+                        return false;
+                    auto pNode = makeSimpleNode(formula::NodeKind::UnaryOperation);
+                    pNode->meUnaryOperator = eOperator;
+                    pNode->maChildren.push_back(std::move(pChild));
+                    aStack.push_back({ InflatedStackItem::Kind::Node, std::move(pNode), {}, {} });
+                    return true;
+                };
+
+                auto makeBinary = [&](formula::BinaryOperator eOperator) -> bool {
+                    std::unique_ptr<formula::Node> pRight;
+                    std::unique_ptr<formula::Node> pLeft;
+                    if (!popNode(aStack, pRight) || !popNode(aStack, pLeft))
+                        return false;
+                    auto pNode = makeSimpleNode(formula::NodeKind::BinaryOperation);
+                    pNode->meBinaryOperator = eOperator;
+                    pNode->maChildren.push_back(std::move(pLeft));
+                    pNode->maChildren.push_back(std::move(pRight));
+                    aStack.push_back({ InflatedStackItem::Kind::Node, std::move(pNode), {}, {} });
+                    return true;
+                };
+
+                switch (rToken.mnOpCode)
+                {
+                    case secompiler::detail::kLoweredOpUnaryPlus:
+                        if (!makeUnary(formula::UnaryOperator::Plus))
+                            return std::nullopt;
+                        break;
+                    case secompiler::detail::kLoweredOpUnaryMinus:
+                        if (!makeUnary(formula::UnaryOperator::Minus))
+                            return std::nullopt;
+                        break;
+                    case secompiler::detail::kLoweredOpBinaryAdd:
+                        if (!makeBinary(formula::BinaryOperator::Add))
+                            return std::nullopt;
+                        break;
+                    case secompiler::detail::kLoweredOpBinarySubtract:
+                        if (!makeBinary(formula::BinaryOperator::Subtract))
+                            return std::nullopt;
+                        break;
+                    case secompiler::detail::kLoweredOpBinaryMultiply:
+                        if (!makeBinary(formula::BinaryOperator::Multiply))
+                            return std::nullopt;
+                        break;
+                    case secompiler::detail::kLoweredOpBinaryDivide:
+                        if (!makeBinary(formula::BinaryOperator::Divide))
+                            return std::nullopt;
+                        break;
+                    case secompiler::detail::kLoweredOpBinaryPower:
+                        if (!makeBinary(formula::BinaryOperator::Power))
+                            return std::nullopt;
+                        break;
+                    case secompiler::detail::kLoweredOpBinaryConcat:
+                        if (!makeBinary(formula::BinaryOperator::Concat))
+                            return std::nullopt;
+                        break;
+                    case secompiler::detail::kLoweredOpBinaryEqual:
+                        if (!makeBinary(formula::BinaryOperator::Equal))
+                            return std::nullopt;
+                        break;
+                    case secompiler::detail::kLoweredOpBinaryNotEqual:
+                        if (!makeBinary(formula::BinaryOperator::NotEqual))
+                            return std::nullopt;
+                        break;
+                    case secompiler::detail::kLoweredOpBinaryLess:
+                        if (!makeBinary(formula::BinaryOperator::Less))
+                            return std::nullopt;
+                        break;
+                    case secompiler::detail::kLoweredOpBinaryLessEqual:
+                        if (!makeBinary(formula::BinaryOperator::LessEqual))
+                            return std::nullopt;
+                        break;
+                    case secompiler::detail::kLoweredOpBinaryGreater:
+                        if (!makeBinary(formula::BinaryOperator::Greater))
+                            return std::nullopt;
+                        break;
+                    case secompiler::detail::kLoweredOpBinaryGreaterEqual:
+                        if (!makeBinary(formula::BinaryOperator::GreaterEqual))
+                            return std::nullopt;
+                        break;
+                    case secompiler::detail::kLoweredOpRangeConstructor:
+                    {
+                        std::unique_ptr<formula::Node> pRight;
+                        std::unique_ptr<formula::Node> pLeft;
+                        if (!popNode(aStack, pRight) || !popNode(aStack, pLeft))
+                            return std::nullopt;
+                        auto pNode = makeSimpleNode(formula::NodeKind::RangeConstructor);
+                        pNode->maChildren.push_back(std::move(pLeft));
+                        pNode->maChildren.push_back(std::move(pRight));
+                        aStack.push_back({ InflatedStackItem::Kind::Node, std::move(pNode), {}, {} });
+                        break;
+                    }
+                    case secompiler::detail::kLoweredOpReferenceList:
+                    {
+                        setoken::ByteData aCount;
+                        if (!popByte(aStack, aCount))
+                            return std::nullopt;
+                        auto pNode = makeSimpleNode(formula::NodeKind::ReferenceList);
+                        std::vector<std::unique_ptr<formula::Node>> aChildren(
+                            static_cast<std::size_t>(aCount.mnByte));
+                        for (std::size_t nIndex = aChildren.size(); nIndex-- > 0;)
+                        {
+                            if (!popNode(aStack, aChildren[nIndex]))
+                                return std::nullopt;
+                        }
+                        pNode->maChildren = std::move(aChildren);
+                        aStack.push_back({ InflatedStackItem::Kind::Node, std::move(pNode), {}, {} });
+                        break;
+                    }
+                    case secompiler::detail::kLoweredOpFunctionCall:
+                    {
+                        setoken::ByteData aCount;
+                        api::String aName;
+                        if (!popByte(aStack, aCount) || !popFunctionName(aStack, aName))
+                            return std::nullopt;
+                        auto pNode = makeSimpleNode(formula::NodeKind::FunctionCall);
+                        pNode->maPrimaryText = aName;
+                        std::vector<std::unique_ptr<formula::Node>> aChildren(
+                            static_cast<std::size_t>(aCount.mnByte));
+                        for (std::size_t nIndex = aChildren.size(); nIndex-- > 0;)
+                        {
+                            if (!popNode(aStack, aChildren[nIndex]))
+                                return std::nullopt;
+                        }
+                        pNode->maChildren = std::move(aChildren);
+                        aStack.push_back({ InflatedStackItem::Kind::Node, std::move(pNode), {}, {} });
+                        break;
+                    }
+                    default:
+                        return std::nullopt;
+                }
+                break;
+            }
+            default:
+                return std::nullopt;
+        }
+    }
+
+    if (aStack.size() != 1 || aStack.back().meKind != InflatedStackItem::Kind::Node)
+        return std::nullopt;
+
+    return std::move(aStack.back().mpNode);
+}
+
 [[nodiscard]] int binaryPrecedence(formula::BinaryOperator eOperator)
 {
     switch (eOperator)
@@ -1446,6 +1873,11 @@ const workbook::Cell* Evaluator::getCell(const api::CellAddress& rAddress) const
     return pSheet ? pSheet->findCell(rAddress.mnColumn, rAddress.mnRow) : nullptr;
 }
 
+std::map<Evaluator::AddressKey, Evaluator::CacheEntry>& Evaluator::cacheForMode(ExecutionMode eMode)
+{
+    return eMode == ExecutionMode::CompiledToken ? maCompiledCellCache : maAstCellCache;
+}
+
 EvaluationResult Evaluator::materializeReferenceValue(
     const api::ResolvedReference& rReference, api::ColumnIndex nColumnOffset,
     api::RowIndex nRowOffset)
@@ -1453,7 +1885,7 @@ EvaluationResult Evaluator::materializeReferenceValue(
     if (!rReference.isNormalized() || !rReference.containsOffset(nColumnOffset, nRowOffset))
         return makeFailure(api::Error::IllegalArgument);
 
-    return evaluateCell(rReference.addressAt(nColumnOffset, nRowOffset));
+    return evaluateCellInternal(rReference.addressAt(nColumnOffset, nRowOffset), meActiveExecutionMode);
 }
 
 api::ValueResult<api::ResolvedReference> Evaluator::resolveReferenceText(
@@ -2685,7 +3117,40 @@ EvaluationResult Evaluator::evaluateFormula(
     return evaluateNode(*aParse.mpRoot, rCurrentAddress);
 }
 
-EvaluationResult Evaluator::evaluateCell(const api::CellAddress& rAddress)
+EvaluationResult Evaluator::evaluateCompiledFormula(
+    const spreadsheetengine::detail::token::CompiledFormula& rFormula,
+    const api::CellAddress& rCurrentAddress)
+{
+    const auto oInflated = inflateCompiledFormulaNode(rFormula, mrWorkbook, rCurrentAddress);
+    if (!oInflated)
+        return makeFailure(api::Error::IllegalArgument);
+    return evaluateNode(**oInflated, rCurrentAddress);
+}
+
+EvaluationResult Evaluator::evaluateFormulaViaCompiledTokens(
+    api::StringView rFormula, const api::CellAddress& rCurrentAddress)
+{
+    if (rCurrentAddress.mnSheet < 0
+        || static_cast<std::size_t>(rCurrentAddress.mnSheet) >= mrWorkbook.maSheets.size())
+    {
+        return makeFailure(api::Error::IllegalArgument);
+    }
+
+    secompiler::WorkbookCompileHost aHost(mrWorkbook);
+    const auto oContext = secompiler::makeWorkbookCompileContext(mrWorkbook,
+        mrWorkbook.maSheets[static_cast<std::size_t>(rCurrentAddress.mnSheet)].maName,
+        rCurrentAddress.mnColumn, rCurrentAddress.mnRow);
+    if (!oContext)
+        return makeFailure(api::Error::IllegalArgument);
+
+    const auto aLowered = secompiler::lowerFormulaSource(rFormula, aHost, *oContext);
+    if (!aLowered)
+        return makeFailure(api::Error::IllegalArgument);
+    return evaluateCompiledFormula(aLowered.maFormula, rCurrentAddress);
+}
+
+EvaluationResult Evaluator::evaluateCellInternal(
+    const api::CellAddress& rAddress, ExecutionMode eMode)
 {
     if (!getSheet(rAddress.mnSheet))
         return makeFailure(api::Error::IllegalArgument);
@@ -2700,7 +3165,7 @@ EvaluationResult Evaluator::evaluateCell(const api::CellAddress& rAddress)
         return makeScalarResult(pCell->maValue);
     }
 
-    CacheEntry& rEntry = maCellCache[makeAddressKey(rAddress)];
+    CacheEntry& rEntry = cacheForMode(eMode)[makeAddressKey(rAddress)];
     if (rEntry.meState == CacheState::Complete)
         return rEntry.maResult;
 
@@ -2724,7 +3189,11 @@ EvaluationResult Evaluator::evaluateCell(const api::CellAddress& rAddress)
         return aResult;
     };
 
-    EvaluationResult aResult = evaluateFormula(pCell->maFormula, rAddress);
+    const ExecutionMode ePreviousMode = meActiveExecutionMode;
+    meActiveExecutionMode = eMode;
+    EvaluationResult aResult = eMode == ExecutionMode::CompiledToken
+                                   ? evaluateFormulaViaCompiledTokens(pCell->maFormula, rAddress)
+                                   : evaluateFormula(pCell->maFormula, rAddress);
     if (aResult && aResult.maValue.isMatrixReference())
     {
         if (aResult.maValue.maReference.isSingleCell())
@@ -2735,12 +3204,24 @@ EvaluationResult Evaluator::evaluateCell(const api::CellAddress& rAddress)
 
     if (!aResult && aResult.maCyclePath.empty() && hasCachedFallbackValue(*pCell))
     {
+        meActiveExecutionMode = ePreviousMode;
         if (const auto oTypedValue = parseTypedStoredCellValue(*pCell))
             return finalize(makeScalarResult(*oTypedValue, true));
         return finalize(makeScalarResult(pCell->maValue, true));
     }
 
+    meActiveExecutionMode = ePreviousMode;
     return finalize(aResult);
+}
+
+EvaluationResult Evaluator::evaluateCell(const api::CellAddress& rAddress)
+{
+    return evaluateCellInternal(rAddress, ExecutionMode::Ast);
+}
+
+EvaluationResult Evaluator::evaluateCellViaCompiledTokens(const api::CellAddress& rAddress)
+{
+    return evaluateCellInternal(rAddress, ExecutionMode::CompiledToken);
 }
 
 } // namespace spreadsheetengine::core::fods

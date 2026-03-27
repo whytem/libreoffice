@@ -98,7 +98,7 @@ inline void setFailure(
     return (cChar >= u'A' && cChar <= u'Z') || (cChar >= u'a' && cChar <= u'z');
 }
 
-[[nodiscard]] api::String foldAsciiCase(api::StringView rText)
+[[nodiscard]] inline api::String foldAsciiCase(api::StringView rText)
 {
     api::String aFolded;
     aFolded.reserve(rText.size());
@@ -112,7 +112,7 @@ inline void setFailure(
     return aFolded;
 }
 
-[[nodiscard]] std::optional<api::ColumnIndex> parseColumnName(api::StringView rColumnName)
+[[nodiscard]] inline std::optional<api::ColumnIndex> parseColumnName(api::StringView rColumnName)
 {
     if (rColumnName.empty())
         return std::nullopt;
@@ -130,7 +130,7 @@ inline void setFailure(
     return static_cast<api::ColumnIndex>(nColumn - 1);
 }
 
-[[nodiscard]] api::String unquoteSheetName(api::StringView rSheetName)
+[[nodiscard]] inline api::String unquoteSheetName(api::StringView rSheetName)
 {
     if (rSheetName.size() < 2 || rSheetName.front() != u'\'' || rSheetName.back() != u'\'')
         return api::String(rSheetName);
@@ -248,7 +248,7 @@ struct ExternalReferenceContext
     return std::nullopt;
 }
 
-[[nodiscard]] std::optional<ParsedSingleReference> parseSingleReference(
+[[nodiscard]] inline std::optional<ParsedSingleReference> parseSingleReference(
     api::StringView rToken, const WorkbookCompileHost& rHost, const CompileContext& rContext,
     api::SheetId nImplicitSheet, std::optional<ExternalReferenceContext> oImplicitExternal = {})
 {

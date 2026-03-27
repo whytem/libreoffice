@@ -318,6 +318,27 @@ Goal:
 - let standalone workbook replay execute compiled tokens instead of the bespoke
   AST
 
+Current checkpoint:
+
+- the standalone evaluator now has an initial compiled-token execution lane
+  over canonical lowered formulas
+- the first implementation inflates canonical tokens back into executable
+  formula nodes and then reuses the existing evaluator semantics
+- execution modes now keep separate AST vs compiled-token caches, preserve
+  recursive evaluation mode, and keep cycle detection intact
+- focused standalone side-by-side tests now cover:
+  - recursive compiled cell evaluation
+  - cached fallback in compiled mode
+  - cycle detection in compiled mode
+  - direct compiled-token formula execution
+  - named-range execution in compiled mode
+
+Current limitation:
+
+- this slice proves the execution adapter on focused standalone scenarios, but
+  it is not yet wired into the raw FODS replay harness as a family-scale
+  diff/default path
+
 Tasks:
 
 - choose the first execution strategy:
@@ -471,10 +492,10 @@ Exit criteria:
 
 ### Phase 3
 
-- [ ] Add a compiled-token execution path in standalone.
-- [ ] Preserve lazy evaluation, memoization, and cycle detection.
-- [ ] Add standalone parity tests between AST execution and token execution.
-- [ ] Ensure cached fallback still works for unsupported formulas.
+- [x] Add a compiled-token execution path in standalone.
+- [x] Preserve lazy evaluation, memoization, and cycle detection.
+- [x] Add standalone parity tests between AST execution and token execution.
+- [x] Ensure cached fallback still works for unsupported formulas.
 
 ### Phase 4
 

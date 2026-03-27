@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <spreadsheetengine/detail/OdfFormulaParser.hxx>
+#include <spreadsheetengine/detail/TokenModel.hxx>
 #include <spreadsheetengine/detail/WorkbookModel.hxx>
 
 namespace spreadsheetengine::core::fods
@@ -42,6 +43,12 @@ class Evaluator
         Complete
     };
 
+    enum class ExecutionMode : sal_uInt8
+    {
+        Ast = 0,
+        CompiledToken
+    };
+
     struct CacheEntry
     {
         CacheState meState = CacheState::Unseen;
@@ -49,11 +56,16 @@ class Evaluator
     };
 
     const workbook::Workbook& mrWorkbook;
-    std::map<AddressKey, CacheEntry> maCellCache;
+    std::map<AddressKey, CacheEntry> maAstCellCache;
+    std::map<AddressKey, CacheEntry> maCompiledCellCache;
     std::vector<api::CellAddress> maEvaluationStack;
+    ExecutionMode meActiveExecutionMode = ExecutionMode::Ast;
 
     [[nodiscard]] const workbook::Sheet* getSheet(api::SheetId nSheet) const;
     [[nodiscard]] const workbook::Cell* getCell(const api::CellAddress& rAddress) const;
+    [[nodiscard]] std::map<AddressKey, CacheEntry>& cacheForMode(ExecutionMode eMode);
+    [[nodiscard]] EvaluationResult evaluateCellInternal(
+        const api::CellAddress& rAddress, ExecutionMode eMode);
 
     [[nodiscard]] EvaluationResult evaluateNode(
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
@@ -73,6 +85,12 @@ public:
     [[nodiscard]] EvaluationResult evaluateFormula(
         api::StringView rFormula, const api::CellAddress& rCurrentAddress);
 
+    [[nodiscard]] EvaluationResult evaluateCompiledFormula(
+        const detail::token::CompiledFormula& rFormula, const api::CellAddress& rCurrentAddress);
+
+    [[nodiscard]] EvaluationResult evaluateFormulaViaCompiledTokens(
+        api::StringView rFormula, const api::CellAddress& rCurrentAddress);
+
     [[nodiscard]] api::ValueResult<api::ResolvedReference> resolveReferenceText(
         api::StringView rReference, api::SheetId nCurrentSheet) const;
 
@@ -82,6 +100,9 @@ public:
     [[nodiscard]] EvaluationResult materializeReferenceValue(
         const api::ResolvedReference& rReference, api::ColumnIndex nColumnOffset,
         api::RowIndex nRowOffset);
+
+    [[nodiscard]] EvaluationResult evaluateCellViaCompiledTokens(
+        const api::CellAddress& rAddress);
 };
 
 } // namespace spreadsheetengine::core::fods

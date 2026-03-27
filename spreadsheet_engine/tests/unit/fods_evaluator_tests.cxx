@@ -108,11 +108,31 @@ int main()
     }
 
     {
+        const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 1, 0 });
+        if (!aResult || !aResult.maValue.isScalar() || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 12.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "compiled basic arithmetic mismatch");
+        }
+    }
+
+    {
         const auto aResult = aEvaluator.evaluateCell({ 0, 1, 1 });
         if (!aResult || !aResult.maValue.maValue.isNumber()
             || !almostEqual(aResult.maValue.maValue.mfNumber, 24.0))
         {
             return fail("spreadsheetengine_fods_evaluator_tests", "dependency evaluation mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 1, 1 });
+        if (!aResult || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 24.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "compiled dependency evaluation mismatch");
         }
     }
 
@@ -162,6 +182,16 @@ int main()
     }
 
     {
+        const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 6, 0 });
+        if (!aResult || !aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 42.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "compiled cached fallback mismatch");
+        }
+    }
+
+    {
         const auto aResult = aEvaluator.evaluateCell({ 0, 7, 0 });
         if (aResult || aResult.maCyclePath.size() != 3
             || !(aResult.maCyclePath[0] == CellAddress { 0, 7, 0 })
@@ -169,6 +199,18 @@ int main()
             || !(aResult.maCyclePath[2] == CellAddress { 0, 7, 0 }))
         {
             return fail("spreadsheetengine_fods_evaluator_tests", "cycle detection mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 7, 0 });
+        if (aResult || aResult.maCyclePath.size() != 3
+            || !(aResult.maCyclePath[0] == CellAddress { 0, 7, 0 })
+            || !(aResult.maCyclePath[1] == CellAddress { 0, 8, 0 })
+            || !(aResult.maCyclePath[2] == CellAddress { 0, 7, 0 }))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "compiled cycle detection mismatch");
         }
     }
 
@@ -296,6 +338,17 @@ int main()
     }
 
     {
+        const auto aResult = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=EXACT(1;{1})", { 0, 0, 0 });
+        if (!aResult || !aResult.maValue.maValue.isBoolean()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 1.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "compiled formula execution mismatch");
+        }
+    }
+
+    {
         constexpr DateParts aNullDate { 1899, 12, 30 };
         const auto aExpectedEomonth = makeDateSerial(aNullDate, 2015, 2, 28, true);
         const auto aExpectedEdate = makeDateSerial(aNullDate, 2001, 4, 30, true);
@@ -398,6 +451,18 @@ int main()
     }
 
     {
+        const auto aResult = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=GlobalRange", { 0, 0, 0 });
+        if (!aResult || !aResult.maValue.isMatrixReference()
+            || aResult.maValue.maReference.matrixDimensions().mnColumns != 1
+            || aResult.maValue.maReference.matrixDimensions().mnRows != 2)
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "compiled named range view mismatch");
+        }
+    }
+
+    {
         const auto aLocal = aEvaluator.evaluateFormula(u"of:=One+1", { 0, 0, 0 });
         const auto aGlobal = aEvaluator.evaluateFormula(u"of:=One+1", { 1, 0, 0 });
         if (!aLocal || !aGlobal || !aLocal.maValue.maValue.isNumber()
@@ -407,6 +472,19 @@ int main()
         {
             return fail(
                 "spreadsheetengine_fods_evaluator_tests", "named-range scope mismatch");
+        }
+    }
+
+    {
+        const auto aLocal = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=One+1", { 0, 0, 0 });
+        const auto aGlobal = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=One+1", { 1, 0, 0 });
+        if (!aLocal || !aGlobal || !aLocal.maValue.maValue.isNumber()
+            || !aGlobal.maValue.maValue.isNumber()
+            || !almostEqual(aLocal.maValue.maValue.mfNumber, 8.0)
+            || !almostEqual(aGlobal.maValue.maValue.mfNumber, 6.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "compiled named-range scope mismatch");
         }
     }
 
