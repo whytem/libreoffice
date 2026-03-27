@@ -70,6 +70,10 @@ add_spreadsheetengine_test(spreadsheetengine_compiler_tests
     ${SPREADSHEETENGINE_STANDALONE_COMPILER_TEST_SOURCES}
 )
 
+add_spreadsheetengine_test(spreadsheetengine_token_compiler_host_tests
+    ${SPREADSHEETENGINE_STANDALONE_TOKEN_COMPILER_HOST_TEST_SOURCES}
+)
+
 add_spreadsheetengine_test(spreadsheetengine_matrix_tests
     ${SPREADSHEETENGINE_STANDALONE_MATRIX_TEST_SOURCES}
 )
