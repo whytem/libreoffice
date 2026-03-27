@@ -15,6 +15,8 @@
 #include <interpre.hxx>
 #include <compiler.hxx>
 #include <sfx2/linkmgr.hxx>
+#include <spreadsheetengine/compat/libreoffice/CompileHost.hxx>
+#include <spreadsheetengine/compat/libreoffice/ShadowCompiler.hxx>
 
 #define DISPLAY_LEN 66
 
@@ -29,11 +31,33 @@ ScSimpleFormulaCalculator::ScSimpleFormulaCalculator( ScDocument& rDoc, const Sc
     , mbLimitString(false)
     , mbMatrixFormula(bMatrixFormula)
 {
-    // compile already here
-    ScCompiler aComp(mrDoc, maAddr, eGram, true, bMatrixFormula);
-    mpCode = aComp.CompileString(rFormula);
-    if(mpCode->GetCodeError() == FormulaError::NONE && mpCode->GetLen())
-        aComp.CompileTokenArray();
+    spreadsheetengine::compat::libreoffice::DocumentCompileHost aHost(mrDoc);
+    spreadsheetengine::detail::compiler::CompileRequest aRequest;
+    aRequest.maSource.maFormula
+        = std::u16string_view(rFormula.getStr(), rFormula.getLength());
+    aRequest.maContext
+        = spreadsheetengine::compat::libreoffice::makeCompileContext(
+            maAddr, eGram, false, true, true, bMatrixFormula);
+    aRequest.maHosts = aHost.hosts();
+
+    auto aBridgedCompile
+        = spreadsheetengine::compat::libreoffice::compileFormulaToTokenArray(mrDoc, aRequest);
+    if (aBridgedCompile)
+        mpCode = std::move(aBridgedCompile.mxTokenArray);
+
+    if (!mpCode)
+    {
+        // Preserve the historical direct Calc compiler path as a fallback while Phase 7 adoption
+        // is still expanding to more compile consumers.
+        ScCompiler aFallbackCompiler(mrDoc, maAddr, eGram, true, bMatrixFormula);
+        mpCode = aFallbackCompiler.CompileString(rFormula);
+    }
+
+    if (mpCode && mpCode->GetCodeError() == FormulaError::NONE && mpCode->GetLen())
+    {
+        ScCompiler aRpnCompiler(mrDoc, maAddr, *mpCode, eGram, true, bMatrixFormula);
+        aRpnCompiler.CompileTokenArray();
+    }
 }
 
 ScSimpleFormulaCalculator::~ScSimpleFormulaCalculator()

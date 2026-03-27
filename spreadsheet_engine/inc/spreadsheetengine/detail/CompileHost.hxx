@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <sal/types.h>
+
 #include <optional>
 
 #include <spreadsheetengine/api/Grammar.hxx>
@@ -19,12 +21,22 @@
 namespace spreadsheetengine::detail::compiler
 {
 
+enum class ExtendedErrorDetection : sal_uInt8
+{
+    None = 0,
+    NameBreak,
+    NameNoBreak,
+};
+
 struct CompileContext
 {
     api::Grammar maGrammar;
     api::CellAddress maBaseAddress;
     bool mbForPersistence = false;
     bool mbAllowExternalReferences = true;
+    bool mbComputeImplicitIntersection = false;
+    bool mbMatrixFormula = false;
+    ExtendedErrorDetection meExtendedErrorDetection = ExtendedErrorDetection::None;
 
     [[nodiscard]] constexpr bool operator==(const CompileContext& rOther) const = default;
 };

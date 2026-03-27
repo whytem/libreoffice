@@ -14,6 +14,7 @@
 #include <docoptio.hxx>
 #include <externalrefmgr.hxx>
 #include <formula/grammar.hxx>
+#include <reftokenhelper.hxx>
 #include <rangelst.hxx>
 #include <rangenam.hxx>
 #include <spreadsheetengine/compat/libreoffice/CompileHost.hxx>
@@ -142,6 +143,7 @@ CPPUNIT_TEST_FIXTURE(TestShadowCompiler, testShadowCompileNamesAndDbRanges)
 CPPUNIT_TEST_FIXTURE(TestShadowCompiler, testShadowCompileLookupSpecialCases)
 {
     using spreadsheetengine::compat::libreoffice::DocumentCompileHost;
+    using spreadsheetengine::compat::libreoffice::compileFormulaToTokenArray;
     using spreadsheetengine::compat::libreoffice::shadowCompileFormula;
     using spreadsheetengine::detail::token::ExternalNameData;
     using spreadsheetengine::detail::token::Kind;
@@ -208,6 +210,62 @@ CPPUNIT_TEST_FIXTURE(TestShadowCompiler, testShadowCompileLookupSpecialCases)
     CPPUNIT_ASSERT(pExternalToken);
     const auto& rExternalData = std::get<ExternalNameData>(pExternalToken->maPayload);
     CPPUNIT_ASSERT_EQUAL(nFileId, rExternalData.mnFileId);
+
+    const auto aBridgedArtifacts
+        = compileFormulaToTokenArray(*m_pDoc, makeRequest(aHost, ScAddress(1, 1, 0), u"='Revenue'"_ustr,
+                                            getEnglishOooGrammar()));
+    CPPUNIT_ASSERT(aBridgedArtifacts);
+    CPPUNIT_ASSERT(aBridgedArtifacts.mxTokenArray);
+    ScCompiler aLegacyCompiler(*m_pDoc, ScAddress(1, 1, 0), getEnglishOooGrammar());
+    std::unique_ptr<ScTokenArray> xLegacyTokenArray(aLegacyCompiler.CompileString(u"='Revenue'"_ustr));
+    CPPUNIT_ASSERT(xLegacyTokenArray);
+    CPPUNIT_ASSERT(spreadsheetengine::compat::libreoffice::tokenArraysEqualForBridge(
+        *xLegacyTokenArray, *aBridgedArtifacts.mxTokenArray));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestShadowCompiler, testRangeDataCompileUsesBridgedTokenArray)
+{
+    m_pDoc->InsertTab(0, u"Sheet1"_ustr);
+
+    const OUString aSymbol(u"$Sheet1.$A$1:$B$2"_ustr);
+    ScRangeData aRangeData(*m_pDoc, u"BridgeName"_ustr, aSymbol, ScAddress(0, 0, 0),
+                           ScRangeData::Type::Name, getEnglishOooGrammar());
+
+    CPPUNIT_ASSERT(aRangeData.GetCode());
+    CPPUNIT_ASSERT_EQUAL(FormulaError::NONE, aRangeData.GetCode()->GetCodeError());
+
+    ScCompiler aLegacyCompiler(*m_pDoc, ScAddress(0, 0, 0), getEnglishOooGrammar());
+    std::unique_ptr<ScTokenArray> xLegacyTokenArray(aLegacyCompiler.CompileString(aSymbol));
+    CPPUNIT_ASSERT(xLegacyTokenArray);
+    CPPUNIT_ASSERT(spreadsheetengine::compat::libreoffice::tokenArraysEqualForBridge(
+        *xLegacyTokenArray, *aRangeData.GetCode()));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestShadowCompiler, testRefTokenHelperCompileRangeRepresentation)
+{
+    m_pDoc->InsertTab(0, u"Sheet1"_ustr);
+
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"HelperName"_ustr, u"$Sheet1.$A$1:$A$2"_ustr)));
+
+    std::vector<ScTokenRef> aTokens;
+    ScRefTokenHelper::compileRangeRepresentation(
+        aTokens, u"HelperName;$Sheet1.$B$1:$C$2"_ustr, *m_pDoc, ';', getEnglishOooGrammar());
+
+    CPPUNIT_ASSERT_EQUAL(size_t(2), aTokens.size());
+    ScRange aNamedRange;
+    CPPUNIT_ASSERT(ScRefTokenHelper::getRangeFromToken(
+        m_pDoc, aNamedRange, aTokens[0], ScAddress(0, 0, 0)));
+    CPPUNIT_ASSERT_EQUAL(ScRange(0, 0, 0, 0, 1, 0), aNamedRange);
+
+    ScRange aExplicitRange;
+    CPPUNIT_ASSERT(ScRefTokenHelper::getRangeFromToken(
+        m_pDoc, aExplicitRange, aTokens[1], ScAddress(0, 0, 0)));
+    CPPUNIT_ASSERT_EQUAL(ScRange(1, 0, 0, 2, 1, 0), aExplicitRange);
 
     m_pDoc->DeleteTab(0);
 }

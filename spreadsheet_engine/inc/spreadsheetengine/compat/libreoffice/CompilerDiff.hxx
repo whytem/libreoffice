@@ -71,17 +71,7 @@ inline LegacyCompileArtifacts compileLegacyFormula(
         return aArtifacts;
     }
 
-    const ScAddress aBaseAddress = toLibreOfficeAddress(rRequest.maContext.maBaseAddress);
-    ScCompiler aCompiler(rDocument, aBaseAddress, eGrammar);
-    if (rExternalLinks.hasElements())
-        aCompiler.SetExternalLinks(rExternalLinks);
-
-    aArtifacts.mxTokenArray
-        = rRequest.maSource.hasNamespace()
-              ? aCompiler.CompileString(
-                    toLibreOfficeString(rRequest.maSource.maFormula),
-                    toLibreOfficeString(rRequest.maSource.maNamespace))
-              : aCompiler.CompileString(toLibreOfficeString(rRequest.maSource.maFormula));
+    aArtifacts.mxTokenArray = detail::compileLegacyString(rDocument, rRequest, rExternalLinks);
 
     if (!aArtifacts.mxTokenArray)
     {

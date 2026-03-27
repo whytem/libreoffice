@@ -674,6 +674,10 @@ This section is the working task list for the implementation effort.
 - [x] Phase 6 fourth slice: add engine-owned diagnostic token stringification and consume it from Calc compile-diff diagnostics
 - [x] Phase 6 substantial-complete checkpoint: hashing, equality, shared-formula comparison, and basic diagnostic stringification now operate on canonical tokens in live Calc or standalone paths
 - [ ] Phase 7: bridge-based Calc compiler adoption
+- [x] Phase 7 first slice: route `ScSimpleFormulaCalculator` through engine compile request/status + bridge export, with legacy fallback preserved for unsupported bridge corners
+- [x] Phase 7 second slice: route `ScRangeData::CompileRangeData()` through engine compile request/status + bridge export, preserving extended-error-detection and RPN follow-up behavior
+- [x] Phase 7 third slice: route `ScRefTokenHelper::compileRangeRepresentation()` through engine compile request/status + bridge export, preserving the existing reference-shape validation and fallback behavior
+- [x] Phase 7 substantial-complete checkpoint: multiple real Calc compile flows now use the engine compile request/host model plus bridge export, with legacy fallback retained for unsupported corners
 - [ ] Phase 8: milestone closeout
 
 ## Phase 0 Snapshot
@@ -877,6 +881,55 @@ What Phase 6 still does **not** include yet:
 - wider token-service adoption in reference-update, named-range storage, or interpreter-facing paths
 
 That is enough to make Phase 6 substantially complete. The remaining work is closeout-grade expansion or later-phase adoption, not missing milestone scaffolding.
+
+## Current Phase 7 Status
+
+Phase 7 is now substantially complete.
+
+The bridge-based adoption work now covers multiple real Calc compile flows that still hand broad
+downstream consumers plain `ScTokenArray` instances:
+
+- `ScSimpleFormulaCalculator`
+- `ScRangeData::CompileRangeData()`
+- `ScRefTokenHelper::compileRangeRepresentation()`
+
+Those paths now compile through the engine compile request / host bundle and then export the
+canonical compiled formula back to `ScTokenArray` for existing Calc consumers. The legacy direct
+`ScCompiler::CompileString()` path is still retained as a fallback when the bridge cannot yet
+service a corner case, which keeps the rollout low-risk while still making the engine compiler path
+operational in real production compile flows.
+
+The current Phase 7 checkpoint specifically covers:
+
+- engine compile + bridge-export helper support in `spreadsheetengine/compat/libreoffice/ShadowCompiler.hxx`
+- a widened compile-context contract carrying:
+  - implicit-intersection behavior
+  - matrix-formula mode
+  - extended-error-detection mode
+- corresponding legacy-backend reuse in:
+  - `spreadsheetengine/compat/libreoffice/CompilerDiff.hxx`
+  - `spreadsheetengine/compat/libreoffice/ShadowCompiler.hxx`
+- live adoption in:
+  - `sc/source/core/data/simpleformulacalc.cxx`
+  - `sc/source/core/tool/rangenam.cxx`
+  - `sc/source/core/tool/reftokenhelper.cxx`
+- focused Calc validation in `CppunitTest_sc_ucalc_shadow_compiler` covering:
+  - bridged lexical-token-array roundtrip for a real col/row-name formula
+  - real `ScRangeData` bridge-export parity against a legacy named-range compile
+  - real `ScRefTokenHelper` range-token compilation over named-range and explicit 3D-range inputs
+- broader behavioral safety via:
+  - `CppunitTest_sc_ucalc_formula2`
+  - `CppunitTest_sc_ucalc`
+  - `CppunitTest_sc_ucalc_compile_diff`
+  - `CppunitTest_sc_ucalc_token_bridge`
+  - standalone compiler / token-host tests
+
+That is enough to make Phase 7 substantially complete. What remains for later adoption work is
+closeout-grade breadth, not missing core milestone behavior:
+
+- more compile call sites such as conditional-format and validation-specific formula compilation
+- broader workbook-driven adoption coverage beyond the current focused compile consumers
+- eventual reduction of legacy fallback reliance in the adopted paths
 
 ## Recommendation
 

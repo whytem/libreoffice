@@ -33,13 +33,19 @@ namespace spreadsheetengine::compat::libreoffice
 
 inline spreadsheetengine::detail::compiler::CompileContext makeCompileContext(
     const ScAddress& rBaseAddress, formula::FormulaGrammar::Grammar eGrammar,
-    bool bForPersistence = false, bool bAllowExternalReferences = true)
+    bool bForPersistence = false, bool bAllowExternalReferences = true,
+    bool bComputeImplicitIntersection = false, bool bMatrixFormula = false,
+    spreadsheetengine::detail::compiler::ExtendedErrorDetection eExtendedErrorDetection
+        = spreadsheetengine::detail::compiler::ExtendedErrorDetection::None)
 {
     spreadsheetengine::detail::compiler::CompileContext aContext;
     aContext.maGrammar = toApiGrammar(eGrammar);
     aContext.maBaseAddress = toApiCellAddress(rBaseAddress);
     aContext.mbForPersistence = bForPersistence;
     aContext.mbAllowExternalReferences = bAllowExternalReferences;
+    aContext.mbComputeImplicitIntersection = bComputeImplicitIntersection;
+    aContext.mbMatrixFormula = bMatrixFormula;
+    aContext.meExtendedErrorDetection = eExtendedErrorDetection;
     return aContext;
 }
 

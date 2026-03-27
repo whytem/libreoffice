@@ -34,6 +34,8 @@
 #include <document.hxx>
 #include <refupdatecontext.hxx>
 #include <tokenstringcontext.hxx>
+#include <spreadsheetengine/compat/libreoffice/CompileHost.hxx>
+#include <spreadsheetengine/compat/libreoffice/ShadowCompiler.hxx>
 
 #include <formula/errorcodes.hxx>
 
@@ -147,10 +149,28 @@ void ScRangeData::CompileRangeData( const OUString& rSymbol, bool bSetError )
         eTempGrammar = FormulaGrammar::GRAM_NATIVE;
     }
 
-    ScCompiler aComp( rDoc, aPos, eTempGrammar );
-    if (bSetError)
-        aComp.SetExtendedErrorDetection( ScCompiler::EXTENDED_ERROR_DETECTION_NAME_NO_BREAK);
-    pCode = aComp.CompileString( rSymbol );
+    spreadsheetengine::compat::libreoffice::DocumentCompileHost aHost(rDoc);
+    spreadsheetengine::detail::compiler::CompileRequest aRequest;
+    aRequest.maSource.maFormula = std::u16string_view(rSymbol.getStr(), rSymbol.getLength());
+    aRequest.maContext = spreadsheetengine::compat::libreoffice::makeCompileContext(
+        aPos, eTempGrammar, false, true, false, false,
+        bSetError ? spreadsheetengine::detail::compiler::ExtendedErrorDetection::NameNoBreak
+                  : spreadsheetengine::detail::compiler::ExtendedErrorDetection::None);
+    aRequest.maHosts = aHost.hosts();
+
+    auto aBridgedCompile
+        = spreadsheetengine::compat::libreoffice::compileFormulaToTokenArray(rDoc, aRequest);
+    if (aBridgedCompile)
+        pCode = std::move(aBridgedCompile.mxTokenArray);
+
+    if (!pCode)
+    {
+        ScCompiler aFallbackCompiler( rDoc, aPos, eTempGrammar );
+        if (bSetError)
+            aFallbackCompiler.SetExtendedErrorDetection(
+                ScCompiler::EXTENDED_ERROR_DETECTION_NAME_NO_BREAK);
+        pCode = aFallbackCompiler.CompileString( rSymbol );
+    }
     pCode->SetFromRangeName(true);
     if( pCode->GetCodeError() != FormulaError::NONE )
         return;
@@ -169,7 +189,11 @@ void ScRangeData::CompileRangeData( const OUString& rSymbol, bool bSetError )
     // For manual input set an error for an incomplete formula.
     if (!rDoc.IsImportingXML())
     {
-        aComp.CompileTokenArray();
+        ScCompiler aRpnCompiler( rDoc, aPos, *pCode, eTempGrammar );
+        if (bSetError)
+            aRpnCompiler.SetExtendedErrorDetection(
+                ScCompiler::EXTENDED_ERROR_DETECTION_NAME_NO_BREAK);
+        aRpnCompiler.CompileTokenArray();
         pCode->DelRPN();
     }
 }

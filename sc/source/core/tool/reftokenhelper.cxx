@@ -21,6 +21,8 @@
 #include <document.hxx>
 #include <rangeutl.hxx>
 #include <compiler.hxx>
+#include <spreadsheetengine/compat/libreoffice/CompileHost.hxx>
+#include <spreadsheetengine/compat/libreoffice/ShadowCompiler.hxx>
 #include <tokenarray.hxx>
 
 #include <rtl/ustring.hxx>
@@ -41,6 +43,7 @@ void ScRefTokenHelper::compileRangeRepresentation(
         aRangeStr = aRangeStr.copy( 1, aRangeStr.getLength() - 2 );
 
     bool bFailure = false;
+    spreadsheetengine::compat::libreoffice::DocumentCompileHost aHost(rDoc);
     sal_Int32 nOffset = 0;
     while (nOffset >= 0 && !bFailure)
     {
@@ -49,8 +52,23 @@ void ScRefTokenHelper::compileRangeRepresentation(
         if (nOffset < 0)
             break;
 
-        ScCompiler aCompiler(rDoc, ScAddress(0,0,0), eGrammar);
-        std::unique_ptr<ScTokenArray> pArray(aCompiler.CompileString(aToken));
+        spreadsheetengine::detail::compiler::CompileRequest aRequest;
+        aRequest.maSource.maFormula = std::u16string_view(aToken.getStr(), aToken.getLength());
+        aRequest.maContext = spreadsheetengine::compat::libreoffice::makeCompileContext(
+            ScAddress(0, 0, 0), eGrammar);
+        aRequest.maHosts = aHost.hosts();
+
+        auto aBridgedCompile
+            = spreadsheetengine::compat::libreoffice::compileFormulaToTokenArray(rDoc, aRequest);
+        std::unique_ptr<ScTokenArray> pArray;
+        if (aBridgedCompile)
+            pArray = std::move(aBridgedCompile.mxTokenArray);
+
+        if (!pArray)
+        {
+            ScCompiler aFallbackCompiler(rDoc, ScAddress(0, 0, 0), eGrammar);
+            pArray = aFallbackCompiler.CompileString(aToken);
+        }
 
         // There MUST be exactly one reference per range token and nothing
         // else, and it MUST be a valid reference, not some #REF!
