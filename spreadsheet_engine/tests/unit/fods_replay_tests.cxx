@@ -6,6 +6,7 @@
 #include <map>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -93,6 +94,9 @@ struct CompiledDiffSummary
 };
 
 std::string columnLabel(ColumnIndex nColumn);
+
+using FormulaAddressKey = std::tuple<SheetId, ColumnIndex, RowIndex>;
+using ReadyFormulaSet = std::set<FormulaAddressKey>;
 
 std::string toUtf8(StringView rText)
 {
@@ -353,6 +357,12 @@ std::string familyNameForWorkbook(const std::filesystem::path& rWorkbookPath)
         return "custom";
 
     return aFamilyDir.filename().string();
+}
+
+bool isCompiledReplayPromotedFamily(const std::string& rFamily)
+{
+    return rFamily == "logical" || rFamily == "mathematical" || rFamily == "text"
+           || rFamily == "date_time" || rFamily == "information" || rFamily == "spreadsheet";
 }
 
 void accumulateFormulaNodeSummary(const Node& rNode, ReplaySummary& rSummary)
@@ -880,6 +890,39 @@ void printCompiledDiffSummary(const CompiledDiffSummary& rSummary)
               << '\n';
 }
 
+ReadyFormulaSet collectPreflightReadyCells(const Workbook& rWorkbook)
+{
+    ReadyFormulaSet aReady;
+    spreadsheetengine::detail::compiler::WorkbookCompileHost aHost(rWorkbook);
+
+    for (SheetId nSheet = 0; nSheet < static_cast<SheetId>(rWorkbook.maSheets.size()); ++nSheet)
+    {
+        const Sheet& rSheet = rWorkbook.maSheets[nSheet];
+        for (const auto& [rKey, rCell] : rSheet.maCells)
+        {
+            if (!rCell.hasFormula())
+                continue;
+
+            const auto aContext = spreadsheetengine::detail::compiler::makeWorkbookCompileContext(
+                { nSheet, rKey.first, rKey.second });
+            const auto aPreflight = spreadsheetengine::detail::compiler::preflightFormulaSource(
+                rCell.maFormula, aHost, aContext);
+            if (aPreflight)
+                aReady.emplace(nSheet, rKey.first, rKey.second);
+        }
+    }
+
+    return aReady;
+}
+
+EvaluationResult evaluateReplayCell(Evaluator& rAstEvaluator, Evaluator& rCompiledEvaluator,
+    const ReadyFormulaSet* pReadyCells, const CellAddress& rAddress)
+{
+    if (pReadyCells && pReadyCells->contains({ rAddress.mnSheet, rAddress.mnColumn, rAddress.mnRow }))
+        return rCompiledEvaluator.evaluateCellViaCompiledTokens(rAddress);
+    return rAstEvaluator.evaluateCell(rAddress);
+}
+
 std::optional<ColumnIndex> findHeaderColumn(const Sheet& rSheet, StringView rHeader)
 {
     for (const auto& [rKey, rCell] : rSheet.maCells)
@@ -904,13 +947,15 @@ RowIndex findLastDataRow(const Sheet& rSheet, ColumnIndex nColumn)
     return nLast;
 }
 
-std::string readEvaluatedCell(
-    Evaluator& rEvaluator, const Sheet& rSheet, SheetId nSheet, ColumnIndex nColumn, RowIndex nRow)
+std::string readEvaluatedCell(Evaluator& rAstEvaluator, Evaluator& rCompiledEvaluator,
+    const ReadyFormulaSet* pReadyCells, const Sheet& rSheet, SheetId nSheet, ColumnIndex nColumn,
+    RowIndex nRow)
 {
     if (!rSheet.findCell(nColumn, nRow))
         return "";
 
-    const EvaluationResult aResult = rEvaluator.evaluateCell({ nSheet, nColumn, nRow });
+    const EvaluationResult aResult
+        = evaluateReplayCell(rAstEvaluator, rCompiledEvaluator, pReadyCells, { nSheet, nColumn, nRow });
     if (!aResult)
         return formatError(aResult.meError);
     if (!aResult.maValue.isScalar())
@@ -926,22 +971,24 @@ std::string readRawCell(const Sheet& rSheet, ColumnIndex nColumn, RowIndex nRow)
     return formatScalarValue(pCell->maValue);
 }
 
-std::string collectColumnGroup(
-    Evaluator& rEvaluator, const Sheet& rSheet, SheetId nSheet, ColumnIndex nStartColumn,
-    ColumnIndex nCount, RowIndex nRow)
+std::string collectColumnGroup(Evaluator& rAstEvaluator, Evaluator& rCompiledEvaluator,
+    const ReadyFormulaSet* pReadyCells, const Sheet& rSheet, SheetId nSheet,
+    ColumnIndex nStartColumn, ColumnIndex nCount, RowIndex nRow)
 {
     std::string aJoined;
     for (ColumnIndex nOffset = 0; nOffset < nCount; ++nOffset)
     {
         if (nOffset > 0)
             aJoined += ", ";
-        aJoined += readEvaluatedCell(rEvaluator, rSheet, nSheet, nStartColumn + nOffset, nRow);
+        aJoined += readEvaluatedCell(
+            rAstEvaluator, rCompiledEvaluator, pReadyCells, rSheet, nSheet, nStartColumn + nOffset, nRow);
     }
     return aJoined;
 }
 
 std::optional<std::string> findFirstFailure(
-    const std::filesystem::path& rWorkbookPath, const Workbook& rWorkbook, Evaluator& rEvaluator)
+    const std::filesystem::path& rWorkbookPath, const Workbook& rWorkbook, Evaluator& rAstEvaluator,
+    Evaluator& rCompiledEvaluator, const ReadyFormulaSet* pReadyCells)
 {
     for (SheetId nSheet = 1; nSheet < static_cast<SheetId>(rWorkbook.maSheets.size()); ++nSheet)
     {
@@ -958,8 +1005,8 @@ std::optional<std::string> findFirstFailure(
             if (!rSheet.findCell(*oCorrect, nRow))
                 continue;
 
-            const EvaluationResult aCorrect
-                = rEvaluator.evaluateCell({ nSheet, *oCorrect, nRow });
+            const EvaluationResult aCorrect = evaluateReplayCell(
+                rAstEvaluator, rCompiledEvaluator, pReadyCells, { nSheet, *oCorrect, nRow });
             if (isSuccessLike(aCorrect))
                 continue;
 
@@ -972,9 +1019,9 @@ std::optional<std::string> findFirstFailure(
             }
 
             const std::string aResult = collectColumnGroup(
-                rEvaluator, rSheet, nSheet, 0, nResultColumnCount, nRow);
-            const std::string aExpected = collectColumnGroup(
-                rEvaluator, rSheet, nSheet, *oExpected, nExpectedColumnCount, nRow);
+                rAstEvaluator, rCompiledEvaluator, pReadyCells, rSheet, nSheet, 0, nResultColumnCount, nRow);
+            const std::string aExpected = collectColumnGroup(rAstEvaluator, rCompiledEvaluator,
+                pReadyCells, rSheet, nSheet, *oExpected, nExpectedColumnCount, nRow);
             const std::string aFunctionString = readRawCell(rSheet, *oFunction, nRow);
 
             return "Testing " + rWorkbookPath.filename().string() + " failed, "
@@ -993,13 +1040,25 @@ std::optional<std::string> replayWorkbook(const std::filesystem::path& rWorkbook
     if (!aLoadResult)
         return "Failed to load " + rWorkbookPath.string();
 
-    Evaluator aEvaluator(aLoadResult.maValue.maWorkbook);
-    const EvaluationResult aSuccess = aEvaluator.evaluateCell({ 0, SUCCESS_COLUMN, SUCCESS_ROW });
+    const bool bPreferCompiled = isCompiledReplayPromotedFamily(familyNameForWorkbook(rWorkbookPath));
+    ReadyFormulaSet aReadyCells;
+    const ReadyFormulaSet* pReadyCells = nullptr;
+    if (bPreferCompiled)
+    {
+        aReadyCells = collectPreflightReadyCells(aLoadResult.maValue.maWorkbook);
+        pReadyCells = &aReadyCells;
+    }
+
+    Evaluator aAstEvaluator(aLoadResult.maValue.maWorkbook);
+    Evaluator aCompiledEvaluator(aLoadResult.maValue.maWorkbook);
+    const EvaluationResult aSuccess = evaluateReplayCell(
+        aAstEvaluator, aCompiledEvaluator, pReadyCells, { 0, SUCCESS_COLUMN, SUCCESS_ROW });
     if (isSuccessLike(aSuccess))
         return std::nullopt;
 
     if (const auto oFailure
-        = findFirstFailure(rWorkbookPath, aLoadResult.maValue.maWorkbook, aEvaluator))
+        = findFirstFailure(rWorkbookPath, aLoadResult.maValue.maWorkbook, aAstEvaluator,
+            aCompiledEvaluator, pReadyCells))
     {
         return oFailure;
     }
