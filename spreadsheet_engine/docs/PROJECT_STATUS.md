@@ -30,13 +30,15 @@ against Calc.
 
 ## Current State At A Glance
 
-The project has completed two major programs and is actively working on a third:
+The project has now closed out five major programs. Compiler switchover is no
+longer an active extraction stream; it has moved into maintenance mode with the
+shared compiler path established as the default standalone replay path.
 
 | Program | Status | Summary |
 |---------|--------|---------|
 | Initial extraction (Phases 0-11) | **Complete** | Pure calculation logic, function families, matrix/execution substrate, host runtime, reference/dependency planning, and standalone packaging all extracted |
 | Token and compiler host model | **Complete** | Canonical token schema, compile-host interfaces, Calc bridge, shadow compiler, differential validation, first native consumers, and first bridged Calc compile adopters all in place |
-| Compiler switchover | **Active** | Standalone FODS replay now defaults to shared compiler path for all six enabled families; convergence hardening and broader lexical parity in progress |
+| Compiler switchover | **Complete** | Shared compiler plus compiled-token execution is now the default standalone replay path for all six enabled families, with zero hard preflight blockers remaining on the promoted corpus |
 | Calc-backed workbook facade | **Complete** | Engine-owned workbook facade contract with Calc-backed and in-memory implementations, richer named-range mutation payloads, dedicated standalone/Calc validation lanes, and first live consumption through dependency-shadow runtime auditing |
 | Dependency and invalidation extraction | **Complete** | Engine-owned dependency snapshots, reverse dependency indexing, invalidation planning, structural rebuild scopes, workbook-scale Calc shadow corpus, maintenance-lane integration, and an opt-in runtime shadow audit are all in place |
 
@@ -273,19 +275,20 @@ standalone replay:
 
 ---
 
-## Active Work: Compiler Switchover
+## Completed Program: Compiler Switchover
 
 The compiler switchover program moves standalone FODS replay from the bespoke
 `OdfFormulaParser` onto the shared production compiler pipeline. This is the
 bridge between "standalone has its own parser" and "Calc and standalone share
 one authoritative compiler."
 
-### Current state
+### Closeout state
 
 **All six families are promoted.** The default standalone replay lane now
-prefers the shared compiler plus compiled-token execution for every
-preflight-ready formula. The legacy parser path is retained only as a
-`--legacy-only` debug escape hatch.
+prefers the shared compiler plus compiled-token execution for every promoted
+formula that is eligible for shared compilation. The legacy parser path remains
+available only as a `--legacy-only` debug escape hatch and is no longer part of
+the standard maintenance path.
 
 **Switchover phases completed:**
 
@@ -297,14 +300,10 @@ preflight-ready formula. The legacy parser path is retained only as a
 | 3 | Token execution adapter in standalone | Complete |
 | 4 | Dual-path FODS replay harness | Complete |
 | 5 | Family-by-family switchover | Complete (all 6 families) |
-| 6 | Calc/standalone compiler convergence hardening | In progress |
-| 7 | Switchover completion and retirement | Partially complete |
+| 6 | Calc/standalone compiler convergence hardening | Complete |
+| 7 | Switchover completion and retirement | Complete |
 
-**Phase 7 progress:** The default replay path is switched. The legacy parser
-mode remains as `--legacy-only`. The standard maintenance path keeps the
-compiled-default replay lane in the hot path.
-
-**Phase 6 progress (convergence hardening):**
+**Closeout summary:**
 
 The Calc compile-diff smoke now covers formulas from all six enabled FODS
 families. A standalone-vs-Calc artifact smoke is in place for a mixed lexical
@@ -324,25 +323,31 @@ a curated built-in add-in subset (`CONVERT`, `DEC2HEX`, `MROUND`,
 `SQRTPI`) shared with Calc's `DocumentCompileHost`, including alias
 normalization for `ORG.OPENOFFICE.CONVERT`.
 
-**Remaining convergence gap:** The main remaining work is broader
-function-catalog coverage and full-stream lexical parity. Standalone execution
-lowering still carries a separate RPN-oriented execution path alongside the
-Calc-shaped lexical lowering used for parity checks. The preflight tail stands
-at 51 hard blockers and 41 expected-error formulas out of 19,930 total.
+The promoted replay corpus now has **zero hard compiler blockers**. The only
+remaining skips are **6 intentionally invalid expected-error formulas**, all of
+which already cache the expected workbook error result. Standalone native
+lowering succeeds on `19,924 / 19,924` eligible formulas, and compiled-token
+execution matches AST execution on `19,924 / 19,924` eligible formulas with
+`0` cached-fallback-only differences.
+
+Exact lexical token-stream parity is still maintained on a representative mixed
+subset rather than asserted on the full corpus, and the standalone execution
+path still lowers into a separate RPN-oriented carrier before inflating back to
+nodes. Those are now maintenance/hardening concerns, not open milestone
+blockers for the switchover program.
 
 ### Preflight and lowering baselines
 
-- Preflight-ready: 19,838 / 19,930 (99.54%)
-- Successfully lowered: 19,838 / 19,838 (100% of preflight-ready)
-- Hard blockers: 51 (parse failures: 14, missing named references: 37)
-- Expected-error formulas: 41 (expected-error parse failures: 40,
-  expected-error missing named references: 1)
+- Preflight-ready: `19,924 / 19,930` (`99.97%`)
+- Successfully lowered: `19,924 / 19,924` (`100%` of eligible formulas)
+- Hard blockers: `0`
+- Expected-error formulas skipped by preflight: `6`
+  - all six are expected-error parse failures from intentionally invalid inputs
 
 ### Dual-path replay baselines
 
-- Full corpus: 19,838 eligible, 19,838 matched, 0 execution mismatches
-- One cached-fallback-only difference (`let.fods Sheet2.I49` where AST uses
-  cached value but compiled path evaluates live)
+- Full corpus: `19,924` eligible, `19,924` matched, `0` execution mismatches
+- Cached-fallback-only differences: `0`
 
 ---
 
@@ -478,22 +483,25 @@ internals. This coupling is by design:
   than running a direct token interpreter
 - **Family coverage still expanding:** add-in and other families remain future
   work for FODS replay
-- **Lexical parity is not yet corpus-wide:** exact canonical token-stream parity
-  between standalone lowering and Calc's canonical tokens is proven on a
-  representative mixed subset but not yet the full corpus
+- **Lexical parity is representative, not corpus-wide:** exact canonical
+  token-stream parity between standalone lowering and Calc's canonical tokens
+  is proven on a representative mixed subset, while corpus-wide value parity is
+  already green on every eligible promoted formula
 
 ---
 
 ## Forward Roadmap
 
-### Near-term: Complete compiler switchover convergence
+### Near-term: Broaden Standalone Replay Coverage
 
-- Close the remaining Phase 6 lexical parity gaps: broader function-catalog
-  coverage, add-in/external-name handling, edge-form normalization
-- Reduce the 51 hard preflight blockers (ragged-array constructs, unresolved
-  workbook names)
-- Formally close Phase 7 once the legacy parser is fully retired from the
-  standard execution path
+- Enable the add-in family for FODS replay
+- Continue expanding standalone live evaluation to reduce the ~33.6%
+  cached-fallback rate
+- Keep the compiler-switchover maintenance lanes green:
+  - representative Calc lexical parity smoke
+  - compiled replay diff smoke
+  - `--legacy-only` escape hatch until we make an explicit long-term keep/remove
+    decision
 
 ### Medium-term: Expand FODS family coverage
 

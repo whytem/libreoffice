@@ -214,39 +214,31 @@ Current milestone pass/fail thresholds:
 
 Current manual compiler-preflight baseline on the same corpus:
 
-- preflight-ready formula cells: `19838 / 19930` (about `99.54%`)
-- preflight-expected-error formula cells: `41`
-  - these are formulas that the current preflight cannot compile, but whose
-    workbook cells already cache an expected error result
-- preflight-not-ready formula cells: `92`
-- preflight-hard-blocker formula cells: `51`
+- preflight-ready formula cells: `19924 / 19930` (about `99.97%`)
+- preflight-expected-error formula cells: `6`
+  - these are intentionally invalid formulas whose workbook cells already
+    cache the expected error result
+- preflight-not-ready formula cells: `6`
+- preflight-hard-blocker formula cells: `0`
 - current blocked categories:
-  - parse failure: `14`
-  - missing named reference: `37`
+  - none
 - current expected-error categories:
-  - expected-error parse failure: `40`
-  - expected-error missing named reference: `1`
-- first representative examples:
-  - parse failure: `columns.fods Sheet2.A19 of:=COLUMNS({1;2;3;4|5;6;7;8})`
-  - missing named reference: `error.type.fods Sheet2.A15 of:=ERROR.TYPE(ahoj)`
-  - expected-error parse failure:
-    `not.fods Sheet2.A11 of:=NOT(0)NOT(0) => #VALUE!`
-  - expected-error missing named reference:
-    `substitute.fods Sheet2.K8 of:=SUBSTITUTE([.K1:.K4];a;f) => #VALUE!`
+  - expected-error parse failure: `6`
+- representative expected-error example:
+  - `not.fods Sheet2.A11 of:=NOT(0)NOT(0) => #VALUE!`
 
 Current manual native-lowering smoke baseline on the same corpus:
 
 - formula cells scanned: `19930`
-- preflight-ready formula cells: `19838`
-- successfully lowered formula cells: `19838`
+- preflight-ready formula cells: `19924`
+- successfully lowered formula cells: `19924`
 - lowering failures on preflight-ready formulas: `0`
 - ready-to-lowered rate: `100%`
-- overall lowered rate: about `99.54%`
+- overall lowered rate: about `99.97%`
 - implication:
-  - the remaining `51` hard blockers no longer stop the first native-lowering
-    smoke path
-  - they are now strictly a preflight/parser/host tail, not a live lowering
-    failure bucket
+  - the promoted corpus now has no hard compiler blockers
+  - all remaining skips are expected-error formulas outside the compiled-ready
+    set by design
 
 ### Phase 1: Standalone Workbook Compile Host
 
@@ -390,20 +382,17 @@ Current checkpoint:
     - workbook outcomes: `matched:9`
   - full default corpus:
     - formula cells: `19930`
-    - eligible: `19838`
-    - skipped: `92`
-    - matched: `19838`
-    - cached-fallback-only mismatches: `1`
-    - first cached-fallback-only example:
-      `let.fods Sheet2.I49 of:=([.A49]=[.E49])`
-      `AST='cached:1'` vs `compiled='live:1'`
+    - eligible: `19924`
+    - skipped: `6`
+    - matched: `19924`
+    - cached-fallback-only mismatches: `0`
 
 Interpretation:
 
 - the first dual-path replay slice is now proving value parity on the entire
   currently eligible corpus
-- the remaining signal has narrowed to fallback-behavior differences rather
-  than value mismatches
+- the promoted replay families are now fully switched onto the shared compiler
+  path for standard validation and replay
 
 Tasks:
 
@@ -561,12 +550,11 @@ Current checkpoint:
     undefined trailing payload bytes produced by `FormulaTokenArray::AddOpCode()`
     for `ocIf*`/`ocChoose`/`ocLet`, so exact parity checks compare stable
     canonical content rather than stack garbage
-  - the remaining gap is broader lexical function-catalog coverage and full
-    stream parity: standalone execution lowering still uses a separate
-    RPN-oriented execution path, lexical lowering still needs more
-    add-in/external-name coverage and edge-form handling before corpus-wide
-    exact parity can be asserted, and the new non-lexical external-name path
-    still needs convergence with Calc-backed canonical external-name shapes
+  - the remaining follow-up is maintenance-grade rather than milestone-blocking:
+    exact lexical token-stream parity is still asserted on a representative
+    mixed subset rather than the full corpus, and standalone execution lowering
+    still uses a separate RPN-oriented carrier before inflating back into the
+    shared evaluator semantics
 - the maintained Calc profiles now keep the adopted compiler/bridge call-site
   targets in the regular loop:
   - `CppunitTest_sc_ucalc_token_bridge`
@@ -604,6 +592,11 @@ Current checkpoint:
   legacy parser/evaluator escape hatch for stabilization and debugging
 - the standard maintenance path now keeps the compiled-default replay lane in
   the hot path, with optional `--compiler-diff` coverage for dual-path smoke
+- Phase 7 exit criteria are met:
+  - the shared compiler is the default standalone production compiler
+  - the legacy parser is no longer part of the standard execution path
+  - the retained `--legacy-only` mode is now a deliberate debug tool, not a
+    switchover blocker
 
 ## Detailed Execution Checklist
 
@@ -774,20 +767,20 @@ The third implementation slice is now in place:
     - `XLOOKUP(...):XLOOKUP(...)`
   - adjacent logical-function chains like:
     - `([.A3]=[.D3])AND([.B3]=[.E3])AND([.C3]=[.F3])`
-- the current full-corpus readiness baseline is now:
-  - ready: `19838`
-  - expected-error: `41`
-  - hard blockers: `51`
-  - the remaining gap is now a small tail rather than a dominant parser wall
+- the current full-corpus closeout baseline is now:
+  - ready: `19924`
+  - expected-error: `6`
+  - hard blockers: `0`
+  - native lowering: `19924 / 19924`
+  - compiled diff: `19924 / 19924`, `0` cached-fallback-only mismatches
 
-The next implementation slice should move from measurement into execution:
+Compiler switchover is therefore complete for the promoted standalone replay
+corpus. Remaining work from here is maintenance-only:
 
-1. close the highest-volume preflight blockers first:
-   - remaining parser tail items like ragged-array constructs
-   - unresolved workbook names that should remain explicit host/compiler gaps
-   - cleanup of false-positive range-constructor cases like `err:7`
-2. promote the manual preflight from classifier-only to first native-lowering
-   attempts on the FODS-safe subset
+1. keep the representative Calc lexical-parity subset green
+2. decide later whether `--legacy-only` remains permanently as a debug tool
+3. widen the replay program into new workbook families rather than reopening
+   the six-family switchover milestone
 3. keep that preflight manual and corpus-scoped before promoting it into the
    default maintenance lane
 

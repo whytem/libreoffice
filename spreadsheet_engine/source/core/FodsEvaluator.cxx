@@ -1339,9 +1339,21 @@ struct InflatedStackItem
                 break;
             }
             case setoken::Kind::StringName:
-                aStack.push_back({ InflatedStackItem::Kind::FunctionName, nullptr,
-                    std::get<setoken::StringData>(rToken.maPayload).maText, {} });
+            {
+                if (rToken.mnOpCode == setoken::kOpCodeName)
+                {
+                    auto pNode = makeSimpleNode(formula::NodeKind::NamedReference);
+                    pNode->maPrimaryText = std::get<setoken::StringData>(rToken.maPayload).maText;
+                    aStack.push_back(
+                        { InflatedStackItem::Kind::Node, std::move(pNode), {}, {} });
+                }
+                else
+                {
+                    aStack.push_back({ InflatedStackItem::Kind::FunctionName, nullptr,
+                        std::get<setoken::StringData>(rToken.maPayload).maText, {} });
+                }
                 break;
+            }
             case setoken::Kind::ExternalName:
                 aStack.push_back({ InflatedStackItem::Kind::FunctionName, nullptr,
                     std::get<setoken::ExternalNameData>(rToken.maPayload).maName, {} });

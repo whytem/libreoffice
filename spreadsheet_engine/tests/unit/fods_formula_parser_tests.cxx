@@ -153,6 +153,18 @@ int main()
     }
 
     {
+        const auto aResult = parseFormula(u"of:=SUM(err:7)");
+        if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
+            || aResult.mpRoot->maChildren.size() != 1
+            || aResult.mpRoot->maChildren[0]->meKind != NodeKind::NamedReference
+            || aResult.mpRoot->maChildren[0]->maPrimaryText != u"err:7")
+        {
+            return fail("spreadsheetengine_fods_parser_tests",
+                "namespaced named-reference parse mismatch");
+        }
+    }
+
+    {
         const auto aResult = parseFormula(u"=#N/A");
         if (!aResult || aResult.mpRoot->meKind != NodeKind::ErrorLiteral
             || aResult.mpRoot->maPrimaryText != u"#N/A")
@@ -205,15 +217,32 @@ int main()
     }
 
     {
-        const auto aResult = parseFormula(u"of:=SUM({1|2;3|4})");
+        const auto aResult = parseFormula(u"of:=SUM({1;2;3;4|5;6;7;8})");
         if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
             || aResult.mpRoot->maChildren.size() != 1
             || aResult.mpRoot->maChildren[0]->meKind != NodeKind::ArrayConstant
             || aResult.mpRoot->maChildren[0]->mnArrayRows != 2
-            || aResult.mpRoot->maChildren[0]->mnArrayColumns != 2
-            || aResult.mpRoot->maChildren[0]->maChildren.size() != 4)
+            || aResult.mpRoot->maChildren[0]->mnArrayColumns != 4
+            || aResult.mpRoot->maChildren[0]->maChildren.size() != 8)
         {
             return fail("spreadsheetengine_fods_parser_tests", "matrix array constant parse mismatch");
+        }
+    }
+
+    {
+        const auto aResult = parseFormula(u"of:=SUM({1|||})");
+        if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
+            || aResult.mpRoot->maChildren.size() != 1
+            || aResult.mpRoot->maChildren[0]->meKind != NodeKind::ArrayConstant
+            || aResult.mpRoot->maChildren[0]->mnArrayRows != 4
+            || aResult.mpRoot->maChildren[0]->mnArrayColumns != 1
+            || aResult.mpRoot->maChildren[0]->maChildren.size() != 4
+            || aResult.mpRoot->maChildren[0]->maChildren[1]->meKind != NodeKind::EmptyArgument
+            || aResult.mpRoot->maChildren[0]->maChildren[2]->meKind != NodeKind::EmptyArgument
+            || aResult.mpRoot->maChildren[0]->maChildren[3]->meKind != NodeKind::EmptyArgument)
+        {
+            return fail("spreadsheetengine_fods_parser_tests",
+                "empty array element parse mismatch");
         }
     }
 

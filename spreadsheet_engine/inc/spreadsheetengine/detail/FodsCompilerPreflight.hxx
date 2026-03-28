@@ -246,10 +246,9 @@ inline void setFailure(
 
         case NodeKind::NamedReference:
         {
-            std::optional<api::SheetId> oScopeSheet;
-            if (rContext.maBaseAddress.mnSheet >= 0)
-                oScopeSheet = rContext.maBaseAddress.mnSheet;
-            return rHost.lookupRangeName(rNode.maPrimaryText, oScopeSheet, rContext).has_value();
+            // Standalone lowering preserves unresolved names too, so keep them eligible
+            // inside reference-returning constructs such as LET-local unions.
+            return true;
         }
 
         case NodeKind::RangeConstructor:
@@ -313,9 +312,10 @@ inline void setFailure(
                 return true;
             }
 
-            setFailure(rResult, FormulaPreflightReason::MissingNamedReference,
-                api::String(rNode.maPrimaryText));
-            return false;
+            // Calc still compiles unresolved bare names and lets evaluation produce the
+            // eventual #NAME? / cached-error behavior. Keep those formulas on the shared
+            // compiler path instead of classifying them as host-lookup blockers.
+            return true;
         }
 
         case NodeKind::RangeConstructor:

@@ -537,9 +537,7 @@ int testWorkbookCompilerPreflight()
 
     const auto aMissingName
         = secompiler::preflightFormulaSource(u"of:=SUM(MissingName)", aHost, *oContext);
-    if (aMissingName
-        || aMissingName.meReason != secompiler::FormulaPreflightReason::MissingNamedReference
-        || aMissingName.maDetail != u"MissingName")
+    if (!aMissingName || !aMissingName.mbUsesFunctionCall || !aMissingName.mbUsesNamedReference)
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook compiler preflight missing-name mismatch");
@@ -620,7 +618,7 @@ int testWorkbookCompilerPreflight()
 
     const auto aErrColon
         = secompiler::preflightFormulaSource(u"of:=ERROR.TYPE(err:7)", aHost, *oContext);
-    if (aErrColon || aErrColon.meReason != secompiler::FormulaPreflightReason::ParseFailure)
+    if (!aErrColon || !aErrColon.mbUsesFunctionCall || !aErrColon.mbUsesNamedReference)
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook compiler preflight err-colon mismatch");
@@ -714,6 +712,26 @@ int testWorkbookCompilerLowering()
             "workbook compiler lowering external-name payload mismatch");
     }
 
+    const auto aMissingName = secompiler::lowerFormulaSource(u"of:=SUM(MissingName)", aHost, *oContext);
+    if (!aMissingName || aMissingName.maFormula.maTokens.size() != 4
+        || aMissingName.maFormula.maTokens[0].meKind != setoken::Kind::StringName
+        || aMissingName.maFormula.maTokens[0].mnOpCode != setoken::kOpCodeName
+        || aMissingName.maFormula.maTokens[1].meKind != setoken::Kind::StringName
+        || aMissingName.maFormula.maTokens[2].meKind != setoken::Kind::Byte
+        || aMissingName.maFormula.maTokens[3].mnOpCode
+               != secompiler::detail::kLoweredOpFunctionCall)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering unresolved-name mismatch");
+    }
+    const auto& rMissingName
+        = std::get<setoken::StringData>(aMissingName.maFormula.maTokens[0].maPayload);
+    if (rMissingName.maText != u"MissingName")
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering unresolved-name payload mismatch");
+    }
+
     const struct
     {
         std::u16string_view maLabel;
@@ -791,6 +809,31 @@ int testWorkbookCompilerLowering()
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook compiler lexical IFERROR lowering mismatch");
+    }
+
+    const auto aLexicalMissingName
+        = secompiler::lowerFormulaSourceLexical(u"of:=SUM(MissingName)", aHost, *oContext);
+    if (!aLexicalMissingName || aLexicalMissingName.maFormula.maTokens.size() < 4
+        || aLexicalMissingName.maFormula.maTokens.front().mnOpCode != setoken::kOpCodeSum
+        || aLexicalMissingName.maFormula.maTokens[1].mnOpCode != setoken::kOpCodeOpen
+        || aLexicalMissingName.maFormula.maTokens.back().mnOpCode != setoken::kOpCodeClose)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lexical unresolved-name mismatch");
+    }
+    bool bSawBadNameToken = false;
+    for (const auto& rToken : aLexicalMissingName.maFormula.maTokens)
+    {
+        if (rToken.meKind == setoken::Kind::String && rToken.mnOpCode == setoken::kOpCodeBad)
+        {
+            bSawBadNameToken = true;
+            break;
+        }
+    }
+    if (!bSawBadNameToken)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lexical unresolved-name bad-token mismatch");
     }
 
     const auto expectLexicalOpcode = [&](std::u16string_view rFormula, setoken::OpCodeValue nOpCode) {
@@ -1055,7 +1098,9 @@ int testWorkbookCompilerLowering()
     }
 
     const auto aErrColon = secompiler::lowerFormulaSource(u"of:=ERROR.TYPE(err:7)", aHost, *oContext);
-    if (aErrColon || aErrColon.meReason != secompiler::FormulaLoweringReason::ParseFailure)
+    if (!aErrColon || aErrColon.maFormula.maTokens.size() != 4
+        || aErrColon.maFormula.maTokens[0].meKind != setoken::Kind::StringName
+        || aErrColon.maFormula.maTokens[0].mnOpCode != setoken::kOpCodeName)
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook compiler lowering err-colon mismatch");

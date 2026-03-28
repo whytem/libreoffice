@@ -471,6 +471,7 @@ CPPUNIT_TEST_FIXTURE(TestCompileDiff, testStandaloneLoweringOperatorTokenParityS
         { u"searchb_function", u"=SEARCHB(\"cd\";\"abcdefg\";1)" },
         { u"subtotal_function", u"=SUBTOTAL(9;A1:A2)" },
         { u"aggregate_function", u"=AGGREGATE(9;0;A1:A2)" },
+        { u"unresolved_name_argument", u"=SUM(ahoj)" },
     };
 
     for (const auto& rSample : aSamples)

@@ -483,7 +483,11 @@ class Parser
 
         while (!atEnd())
         {
-            auto pElement = parseLogicalChain();
+            std::unique_ptr<Node> pElement;
+            if (peek() == u';' || peek() == u'|' || peek() == u'}')
+                pElement = makeNode(NodeKind::EmptyArgument);
+            else
+                pElement = parseLogicalChain();
             if (!pElement)
                 return nullptr;
             pNode->maChildren.push_back(std::move(pElement));
@@ -505,13 +509,13 @@ class Parser
                 return pNode;
             }
 
-            if (consume(u'|'))
+            if (consume(u';'))
             {
                 skipSpaces();
                 continue;
             }
 
-            if (consume(u';'))
+            if (consume(u'|'))
             {
                 if (nExpectedColumns < 0)
                     nExpectedColumns = nCurrentColumns;
@@ -537,9 +541,24 @@ class Parser
 
     [[nodiscard]] std::unique_ptr<Node> parseIdentifierLike()
     {
+        const std::size_t nStart = mnPos;
         const auto aToken = parseIdentifierToken();
         if (aToken.empty())
             return nullptr;
+
+        if (peek() == u':' && isDigit(peekAhead(1)))
+        {
+            ++mnPos;
+            while (isDigit(peek()))
+                ++mnPos;
+
+            if (isReferenceTerminator(peek()))
+            {
+                auto pNode = makeNode(NodeKind::NamedReference);
+                pNode->maPrimaryText = api::String(mrInput.substr(nStart, mnPos - nStart));
+                return pNode;
+            }
+        }
 
         skipSpaces();
         if (peek() == u'(')

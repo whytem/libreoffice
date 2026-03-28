@@ -951,9 +951,9 @@ template <typename Host>
                 }
             }
 
-            setFailure(rResult, FormulaLoweringReason::MissingNamedReference,
-                api::String(rNode.maPrimaryText));
-            return false;
+            pushToken(rResult, token::Kind::StringName, token::kOpCodeName,
+                StringData { api::String(rNode.maPrimaryText), foldAsciiCase(rNode.maPrimaryText) });
+            return true;
         }
 
         case NodeKind::ArrayConstant:
@@ -1101,9 +1101,64 @@ template <typename Host>
 
         case NodeKind::CellReference:
         case NodeKind::RangeReference:
-        case NodeKind::NamedReference:
         case NodeKind::ArrayConstant:
             return pushNodeTokens(rNode, rHost, rContext, rResult);
+
+        case NodeKind::NamedReference:
+        {
+            std::optional<api::SheetId> oScopeSheet;
+            if (rContext.maBaseAddress.mnSheet >= 0)
+                oScopeSheet = rContext.maBaseAddress.mnSheet;
+            if (const auto oName = rHost.lookupRangeName(rNode.maPrimaryText, oScopeSheet, rContext))
+            {
+                pushToken(rResult, token::Kind::RangeName, token::kOpCodeName, *oName);
+                return true;
+            }
+
+            if (rContext.mbAllowExternalReferences)
+            {
+                if (const auto oExternal = rHost.lookupExternalName(rNode.maPrimaryText, rContext))
+                {
+                    pushToken(rResult, token::Kind::ExternalName, token::kOpCodePush, *oExternal);
+                    return true;
+                }
+            }
+
+            const std::size_t nColonPos = rNode.maPrimaryText.find(u':');
+            if (nColonPos != api::String::npos && nColonPos > 0
+                && nColonPos + 1 < rNode.maPrimaryText.size())
+            {
+                const api::StringView aHead = rNode.maPrimaryText.substr(0, nColonPos);
+                const api::StringView aTail = rNode.maPrimaryText.substr(nColonPos + 1);
+                bool bTailNumeric = true;
+                sal_Int64 nTailValue = 0;
+                for (const char16_t cChar : aTail)
+                {
+                    if (cChar < u'0' || cChar > u'9')
+                    {
+                        bTailNumeric = false;
+                        break;
+                    }
+                    nTailValue = (nTailValue * 10) + (cChar - u'0');
+                }
+                if (bTailNumeric)
+                {
+                    const api::String aHeadText(aHead);
+                    const api::String aFoldedHead = foldAsciiCase(aHeadText);
+                    pushToken(rResult, token::Kind::String, token::kOpCodeBad,
+                        StringData { aHeadText, aFoldedHead });
+                    pushOperatorByteToken(rResult, token::kOpCodeRange);
+                    pushToken(rResult, token::Kind::Value, token::kOpCodePush,
+                        static_cast<double>(nTailValue));
+                    return true;
+                }
+            }
+
+            const api::String aFoldedName = foldAsciiCase(rNode.maPrimaryText);
+            pushToken(rResult, token::Kind::String, token::kOpCodeBad,
+                StringData { aFoldedName, aFoldedName });
+            return true;
+        }
 
         case NodeKind::UnaryOperation:
             if (rNode.maChildren.size() != 1 || !rNode.maChildren.front())
