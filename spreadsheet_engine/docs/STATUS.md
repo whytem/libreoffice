@@ -122,14 +122,17 @@ operators, references, range names, a wider representative function subset
 `MMULT`, `T`, `N`, `TODAY`, `WEEKNUM`, `WEEKDAY`, `ROUNDDOWN`, `ROUNDUP`,
 `OFFSET`, `INDIRECT`, `HYPERLINK`, `LENB`, `FINDB`, `SEARCHB`, `SEARCH`,
 `XOR`, `ACOT`, `ISBLANK`, `ISEVEN`, `ISODD`, `LOG`, `DAYS360`, `LEFT`,
-`BASE`, `MAX`, `MOD`), and
-dotted compatibility-name preservation.
+`BASE`, `NETWORKDAYS`, `NETWORKDAYS.INTL`, `GETPIVOTDATA`, `EUROCONVERT`,
+`MAX`, `MOD`), plus exact lexical bad-name parity for preserved function heads
+like `COM.MICROSOFT.CONCAT`, `ORG.OPENOFFICE.CONVERT`, `CONVERT`, `DEC2HEX`,
+`MROUND`, `MULTINOMIAL`, and `YEARFRAC`.
 Lexical jump tokens imported from Calc are also normalized now so parity checks
 ignore the undefined trailing payload bytes that Calc’s lexical `ocIf*` jump
 construction leaves uninitialized. The remaining gap is broader function-catalog
-and full-stream lexical parity, because standalone execution lowering still
-carries an RPN-oriented function-call path alongside the Calc-shaped lexical
-lowering used for parity checks.
+and full-stream lexical parity, especially around richer add-in/external-name
+catalog coverage, because standalone execution lowering still carries an
+RPN-oriented function-call path alongside the Calc-shaped lexical lowering used
+for parity checks.
 
 ## Architecture Overview
 

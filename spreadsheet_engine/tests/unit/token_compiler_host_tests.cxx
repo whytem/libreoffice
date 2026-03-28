@@ -665,6 +665,9 @@ int testWorkbookCompilerLowering()
         { u"DATE", u"of:=DATE(2015;1;11)", setoken::kOpCodeGetDate },
         { u"TIME", u"of:=TIME(1;23;0)", setoken::kOpCodeGetTime },
         { u"DAYS360", u"of:=DAYS360([.G1];[.G2])", setoken::kOpCodeGetDiffDate360 },
+        { u"NETWORKDAYS", u"of:=NETWORKDAYS([.K2];[.K3];[.K4:.K6])", setoken::kOpCodeNetWorkdays },
+        { u"NETWORKDAYS.INTL", u"of:=COM.MICROSOFT.NETWORKDAYS.INTL([.K2];[.K3];;[.K4:.K6])",
+            setoken::kOpCodeNetWorkdaysMs },
         { u"WEEKNUM", u"of:=WEEKNUM(\"2000-06-14\")", setoken::kOpCodeWeek },
         { u"WEEKDAY", u"of:=WEEKDAY(\"2000-06-14\")", setoken::kOpCodeGetDayOfWeek },
         { u"DATEDIF", u"of:=DATEDIF([.$K2];[.$L2];[.K$1])", setoken::kOpCodeDateDif },
@@ -690,6 +693,8 @@ int testWorkbookCompilerLowering()
         { u"MMULT", u"of:=MMULT([.A1:.B2];[.C1:.D2])", setoken::kOpCodeMatMult },
         { u"BASE", u"of:=BASE(17;10;4)", setoken::kOpCodeBase },
         { u"DECIMAL", u"of:=DECIMAL(\"10\";2)", setoken::kOpCodeDecimal },
+        { u"GETPIVOTDATA", u"of:=GETPIVOTDATA(\"quantity\";[.M1])", setoken::kOpCodeGetPivotData },
+        { u"EUROCONVERT", u"of:=EUROCONVERT(100;\"ATS\";\"EUR\")", setoken::kOpCodeEuroConvert },
         { u"HYPERLINK", u"of:=HYPERLINK(\"http://www.example.com\";\"Hyperlink\")", setoken::kOpCodeHyperLink },
         { u"LENB", u"of:=LENB(\"abc\")", setoken::kOpCodeLenB },
         { u"FINDB", u"of:=FINDB(\"cd\";\"abcdefg\";1)", setoken::kOpCodeFindB },
@@ -706,14 +711,32 @@ int testWorkbookCompilerLowering()
         }
     }
 
-    const auto aLexicalCompatName = secompiler::lowerFormulaSourceLexical(
-        u"of:=COM.MICROSOFT.CONCAT(\"a\";\"b\")", aHost, *oContext);
-    if (!aLexicalCompatName || aLexicalCompatName.maFormula.maTokens.size() != 6
-        || aLexicalCompatName.maFormula.maTokens[0].meKind != setoken::Kind::String
-        || aLexicalCompatName.maFormula.maTokens[0].mnOpCode != setoken::kOpCodeBad)
+    const struct
     {
-        return fail("spreadsheetengine_token_compiler_host_tests",
-            "workbook compiler lexical compat-name lowering mismatch");
+        std::u16string_view maLabel;
+        std::u16string_view maFormula;
+    } aLexicalBadNameSamples[] = {
+        { u"COM.MICROSOFT.CONCAT", u"of:=COM.MICROSOFT.CONCAT(\"a\";\"b\")" },
+        { u"ORG.OPENOFFICE.CONVERT", u"of:=ORG.OPENOFFICE.CONVERT(100;\"ATS\";\"EUR\")" },
+        { u"DEC2HEX", u"of:=DEC2HEX(10)" },
+        { u"MROUND", u"of:=MROUND(10;3)" },
+        { u"MULTINOMIAL", u"of:=MULTINOMIAL(1;2;3)" },
+        { u"YEARFRAC", u"of:=YEARFRAC(DATE(2014;1;1);DATE(2015;1;1);0)" },
+    };
+
+    for (const auto& rSample : aLexicalBadNameSamples)
+    {
+        const auto aLexicalCompatName
+            = secompiler::lowerFormulaSourceLexical(rSample.maFormula, aHost, *oContext);
+        if (!aLexicalCompatName || aLexicalCompatName.maFormula.maTokens.size() < 4
+            || aLexicalCompatName.maFormula.maTokens[0].meKind != setoken::Kind::String
+            || aLexicalCompatName.maFormula.maTokens[0].mnOpCode != setoken::kOpCodeBad)
+        {
+            const std::string aDetail
+                = "workbook compiler lexical bad-name lowering mismatch: "
+                  + toUtf8(rSample.maLabel);
+            return fail("spreadsheetengine_token_compiler_host_tests", aDetail.c_str());
+        }
     }
 
     const auto aNegSub = secompiler::lowerFormulaSource(u"of:=-[.A1]", aHost, *oContext);

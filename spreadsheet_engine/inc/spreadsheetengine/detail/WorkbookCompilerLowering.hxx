@@ -193,6 +193,10 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeGetTime;
     if (aNormalized == u"DAYS360")
         return token::kOpCodeGetDiffDate360;
+    if (aNormalized == u"NETWORKDAYS")
+        return token::kOpCodeNetWorkdays;
+    if (aNormalized == u"NETWORKDAYS.INTL" || aNormalized == u"COM.MICROSOFT.NETWORKDAYS.INTL")
+        return token::kOpCodeNetWorkdaysMs;
     if (aNormalized == u"WEEKNUM")
         return token::kOpCodeWeek;
     if (aNormalized == u"WEEKDAY")
@@ -251,6 +255,10 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeHyperLink;
     if (aNormalized == u"BASE")
         return token::kOpCodeBase;
+    if (aNormalized == u"GETPIVOTDATA")
+        return token::kOpCodeGetPivotData;
+    if (aNormalized == u"EUROCONVERT")
+        return token::kOpCodeEuroConvert;
     if (aNormalized == u"DATEDIF")
         return token::kOpCodeDateDif;
     if (aNormalized == u"AGGREGATE")
@@ -1104,7 +1112,7 @@ inline void pushJumpToken(
             const auto oOpcode = lookupLexicalFunctionOpcode(rNode.maPrimaryText);
             if (!oOpcode)
             {
-                if (rNode.maPrimaryText.find(u'.') != api::StringView::npos)
+                if (!rNode.maPrimaryText.empty())
                 {
                     const api::String aFoldedName = foldAsciiCase(rNode.maPrimaryText);
                     pushToken(rResult, token::Kind::String, token::kOpCodeBad,

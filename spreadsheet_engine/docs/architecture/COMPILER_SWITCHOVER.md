@@ -532,17 +532,21 @@ Current checkpoint:
       `WEEKDAY`, `ROUNDDOWN`, `ROUNDUP`, `OFFSET`, `INDIRECT`,
       `HYPERLINK`, `LENB`, `FINDB`, `SEARCHB`, `SEARCH`, `XOR`, `ACOT`,
       `ISBLANK`, `ISEVEN`, `ISODD`, `LOG`, `DAYS360`, `LEFT`, `BASE`,
+      `NETWORKDAYS`, `NETWORKDAYS.INTL`, `GETPIVOTDATA`, `EUROCONVERT`,
       `MAX`, and `MOD`
-    - dotted compatibility-name preservation like `COM.MICROSOFT.CONCAT(...)`
+    - bad-name lexical preservation for compatibility/add-in heads like
+      `COM.MICROSOFT.CONCAT(...)`, `ORG.OPENOFFICE.CONVERT(...)`,
+      `CONVERT(...)`, `DEC2HEX(...)`, `MROUND(...)`, `MULTINOMIAL(...)`,
+      and `YEARFRAC(...)`
   - lexical jump tokens imported from Calc are now canonicalized to ignore the
     undefined trailing payload bytes produced by `FormulaTokenArray::AddOpCode()`
     for `ocIf*`/`ocChoose`/`ocLet`, so exact parity checks compare stable
     canonical content rather than stack garbage
   - the remaining gap is broader lexical function-catalog coverage and full
     stream parity: standalone execution lowering still uses a separate
-    RPN-oriented execution path, and lexical lowering still needs more function
-    opcodes and edge-form handling before corpus-wide exact parity can be
-    asserted
+    RPN-oriented execution path, and lexical lowering still needs more
+    add-in/external-name coverage and edge-form handling before corpus-wide
+    exact parity can be asserted
 - the maintained Calc profiles now keep the adopted compiler/bridge call-site
   targets in the regular loop:
   - `CppunitTest_sc_ucalc_token_bridge`
