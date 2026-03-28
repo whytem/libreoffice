@@ -4,9 +4,6 @@ This document is the single consolidated reference for the `spreadsheet_engine/`
 project. It describes what has been built, what works today, what is actively
 being worked on, and what the forward roadmap looks like.
 
-It replaces and consolidates the content previously spread across `STATUS.md`,
-`NEXT_STEPS.md`, `TOKEN_COMPILER_HOST_MODEL.md`, and `COMPILER_SWITCHOVER.md`.
-
 ## What Is This Project?
 
 `spreadsheet_engine/` is an incremental extraction of LibreOffice Calc's core
@@ -20,7 +17,7 @@ broader LibreOffice application stack so that:
   module through a narrow adapter layer
 - the engine uses its own API types and does not leak LibreOffice internals
   into its public interface
-- the engine can load and evaluate real spreadsheet workbooks (FODS format)
+- the engine can load and evaluate real spreadsheet workbooks 
   without any LibreOffice runtime
 - Calc and standalone share the same authoritative compiler, token model, and
   function implementations
