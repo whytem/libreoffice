@@ -936,14 +936,24 @@ template <typename Host>
             if (rContext.maBaseAddress.mnSheet >= 0)
                 oScopeSheet = rContext.maBaseAddress.mnSheet;
             const auto oName = rHost.lookupRangeName(rNode.maPrimaryText, oScopeSheet, rContext);
-            if (!oName)
+            if (oName)
             {
-                setFailure(rResult, FormulaLoweringReason::MissingNamedReference,
-                    api::String(rNode.maPrimaryText));
-                return false;
+                pushToken(rResult, token::Kind::RangeName, token::kOpCodeName, *oName);
+                return true;
             }
-            pushToken(rResult, token::Kind::RangeName, token::kOpCodeName, *oName);
-            return true;
+
+            if (rContext.mbAllowExternalReferences)
+            {
+                if (const auto oExternal = rHost.lookupExternalName(rNode.maPrimaryText, rContext))
+                {
+                    pushToken(rResult, token::Kind::ExternalName, token::kOpCodePush, *oExternal);
+                    return true;
+                }
+            }
+
+            setFailure(rResult, FormulaLoweringReason::MissingNamedReference,
+                api::String(rNode.maPrimaryText));
+            return false;
         }
 
         case NodeKind::ArrayConstant:

@@ -130,6 +130,11 @@ That built-in add-in catalog is now shared between the standalone workbook
 compile host and Calc’s `DocumentCompileHost`, including alias normalization
 for `ORG.OPENOFFICE.CONVERT`, so both hosts resolve the same canonical
 `ExternalName` payloads and built-in catalog ID for that subset.
+The standalone workbook compile host can also now carry a small configured
+external-name catalog for exact non-lexical lowered-token parity smoke against
+Calc’s real external-name/file-id tokens, which closes another gap between the
+host models without yet requiring full external-link document support in the
+standalone workbook runtime.
 Lexical jump tokens imported from Calc are also normalized now so parity checks
 ignore the undefined trailing payload bytes that Calc’s lexical `ocIf*` jump
 construction leaves uninitialized. The remaining gap is broader function-catalog

@@ -90,6 +90,16 @@ int main()
     }
 
     {
+        const auto aResult = parseFormula(u"='file:///metrics.fake'#ExternalMetric");
+        if (!aResult || aResult.mpRoot->meKind != NodeKind::NamedReference
+            || aResult.mpRoot->maPrimaryText != u"'file:///metrics.fake'#ExternalMetric")
+        {
+            return fail("spreadsheetengine_fods_parser_tests",
+                "quoted external-name parse mismatch");
+        }
+    }
+
+    {
         const auto aResult = parseFormula(u"of:=IF([.J2];;2)");
         if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
             || aResult.mpRoot->maPrimaryText != u"IF" || aResult.mpRoot->maChildren.size() != 3

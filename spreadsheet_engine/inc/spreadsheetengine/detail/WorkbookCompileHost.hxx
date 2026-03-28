@@ -11,6 +11,7 @@
 
 #include <limits>
 #include <optional>
+#include <vector>
 
 #include <spreadsheetengine/detail/BuiltinExternalNames.hxx>
 #include <spreadsheetengine/detail/CompileHost.hxx>
@@ -32,6 +33,18 @@ struct WorkbookCompileHostSupport
     LookupSupport meTableRefs = LookupSupport::Unsupported;
     LookupSupport meColRowNames = LookupSupport::Unsupported;
     LookupSupport meExternalNames = LookupSupport::Supported;
+};
+
+struct WorkbookExternalNameBinding
+{
+    api::String maSymbol;
+    token::ExternalNameData maData;
+};
+
+struct WorkbookCompileHostOptions
+{
+    WorkbookCompileHostSupport maSupport;
+    std::vector<WorkbookExternalNameBinding> maExternalNames;
 };
 
 inline constexpr api::Grammar kDefaultWorkbookCompileGrammar {
@@ -81,8 +94,11 @@ class WorkbookCompileHost final : public NameResolver
     , public ExternalNameResolver
 {
 public:
-    explicit WorkbookCompileHost(const core::workbook::Workbook& rWorkbook)
+    explicit WorkbookCompileHost(
+        const core::workbook::Workbook& rWorkbook, WorkbookCompileHostOptions aOptions = {})
         : mrWorkbook(rWorkbook)
+        , maSupport(aOptions.maSupport)
+        , maExternalNames(std::move(aOptions.maExternalNames))
     {
     }
 
@@ -153,12 +169,20 @@ public:
     {
         if (const auto oBuiltin = lookupBuiltinExternalName(rSymbol))
             return token::ExternalNameData { kBuiltinExternalNameCatalogId, *oBuiltin };
+
+        for (const auto& rBinding : maExternalNames)
+        {
+            if (equalLookupText(rBinding.maSymbol, rSymbol))
+                return rBinding.maData;
+        }
+
         return std::nullopt;
     }
 
 private:
     const core::workbook::Workbook& mrWorkbook;
     WorkbookCompileHostSupport maSupport;
+    std::vector<WorkbookExternalNameBinding> maExternalNames;
 
     [[nodiscard]] api::String localScopeName(api::SheetId nSheet) const
     {

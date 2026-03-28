@@ -547,6 +547,10 @@ Current checkpoint:
       Calc-backed compile hosts, including `ORG.OPENOFFICE.CONVERT` alias
       normalization, so both hosts resolve the same canonical built-in
       `ExternalName` payloads and catalog ID for that subset
+    - the workbook-backed compile host can now also carry a configured
+      external-name catalog, and targeted lowered-token parity smoke is green
+      against Calc’s real external-name/file-id tokens for a synthetic
+      external range-name symbol
     - targeted compiled-diff coverage is green on the newly widened add-in
       workbook slice (`workday`, `clean`, `quotient`, `sqrtpi`,
       `seriessum`), with `699 / 699` eligible formulas matched

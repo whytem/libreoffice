@@ -307,6 +307,12 @@ inline void setFailure(
             if (rHost.lookupRangeName(rNode.maPrimaryText, oScopeSheet, rContext))
                 return true;
 
+            if (rContext.mbAllowExternalReferences
+                && rHost.lookupExternalName(rNode.maPrimaryText, rContext))
+            {
+                return true;
+            }
+
             setFailure(rResult, FormulaPreflightReason::MissingNamedReference,
                 api::String(rNode.maPrimaryText));
             return false;

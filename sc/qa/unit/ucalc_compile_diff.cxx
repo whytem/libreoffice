@@ -155,7 +155,9 @@ void assertStandaloneLowerTokensExactlyMatchCalc(ScDocument& rDoc,
 void assertNonLexicalLowerTokensMatchAcrossHosts(
     spreadsheetengine::compat::libreoffice::DocumentCompileHost& rCalcHost,
     const spreadsheetengine::core::workbook::Workbook& rWorkbook, const ScAddress& rPos,
-    std::u16string_view rFormula, std::u16string_view rExpectedName, std::u16string_view rLabel)
+    std::u16string_view rFormula, std::u16string_view rExpectedName, std::u16string_view rLabel,
+    const spreadsheetengine::detail::compiler::WorkbookCompileHostOptions& rWorkbookOptions = {},
+    bool bAllowWorkbookExternalReferences = false)
 {
     using spreadsheetengine::detail::compiler::WorkbookCompileHost;
     using spreadsheetengine::detail::compiler::lowerFormulaSource;
@@ -168,11 +170,13 @@ void assertNonLexicalLowerTokensMatchAcrossHosts(
     const auto aCalcLowered = lowerFormulaSource(rFormula, rCalcHost, aCalcContext);
     CPPUNIT_ASSERT_MESSAGE(OUString(rLabel).toUtf8().getStr(), static_cast<bool>(aCalcLowered));
 
-    WorkbookCompileHost aWorkbookHost(rWorkbook);
+    WorkbookCompileHost aWorkbookHost(rWorkbook, rWorkbookOptions);
     const auto aWorkbookContext = spreadsheetengine::detail::compiler::makeWorkbookCompileContext(
         { static_cast<spreadsheetengine::api::SheetId>(rPos.Tab()),
           static_cast<spreadsheetengine::api::ColumnIndex>(rPos.Col()),
-          static_cast<spreadsheetengine::api::RowIndex>(rPos.Row()) });
+          static_cast<spreadsheetengine::api::RowIndex>(rPos.Row()) },
+        spreadsheetengine::detail::compiler::kDefaultWorkbookCompileGrammar, false,
+        bAllowWorkbookExternalReferences);
     const auto aWorkbookLowered = lowerFormulaSource(rFormula, aWorkbookHost, aWorkbookContext);
     CPPUNIT_ASSERT_MESSAGE(OUString(rLabel).toUtf8().getStr(),
         static_cast<bool>(aWorkbookLowered));
@@ -510,6 +514,41 @@ CPPUNIT_TEST_FIXTURE(TestCompileDiff, testBuiltinExternalNameLoweringParitySmoke
             aHost, aWorkbook, ScAddress(0, 0, 0), rSample.maFormula,
             rSample.maExpectedName, rSample.maLabel);
     }
+}
+
+CPPUNIT_TEST_FIXTURE(TestCompileDiff, testConfiguredExternalNameLoweringParitySmoke)
+{
+    ScDocument* pDoc = m_pDoc;
+    CPPUNIT_ASSERT(pDoc);
+    if (pDoc->GetTableCount() == 0)
+        CPPUNIT_ASSERT(pDoc->InsertTab(0, u"Sheet1"_ustr));
+
+    static OUString constexpr aExternalFile(u"file:///compile-diff-external.fake"_ustr);
+    ScExternalRefManager* pRefMgr = pDoc->GetExternalRefManager();
+    CPPUNIT_ASSERT(pRefMgr);
+    const sal_uInt16 nFileId = pRefMgr->getExternalFileId(aExternalFile);
+    ScTokenArray aRangeTokens(*pDoc);
+    aRangeTokens.AddDouble(42.0);
+    pRefMgr->storeRangeNameTokens(nFileId, u"ExternalMetric"_ustr, aRangeTokens);
+    const ScCompiler::Convention* pConvention
+        = ScCompiler::GetRefConvention(formula::FormulaGrammar::CONV_OOO);
+    CPPUNIT_ASSERT(pConvention);
+    const OUString aExternalSymbol
+        = pConvention->makeExternalNameStr(nFileId, aExternalFile, u"ExternalMetric"_ustr);
+
+    auto aWorkbook = makeStandaloneWorkbook();
+    spreadsheetengine::detail::compiler::WorkbookCompileHostOptions aWorkbookOptions;
+    spreadsheetengine::detail::compiler::WorkbookExternalNameBinding aBinding;
+    aBinding.maSymbol.assign(aExternalSymbol.getStr(), aExternalSymbol.getLength());
+    aBinding.maData = { nFileId, u"ExternalMetric" };
+    aWorkbookOptions.maExternalNames.push_back(std::move(aBinding));
+
+    spreadsheetengine::compat::libreoffice::DocumentCompileHost aHost(*pDoc);
+
+    std::u16string aFormula = u"=";
+    aFormula.append(aExternalSymbol.getStr(), aExternalSymbol.getLength());
+    assertNonLexicalLowerTokensMatchAcrossHosts(aHost, aWorkbook, ScAddress(0, 0, 0), aFormula,
+        u"ExternalMetric", u"configured_external_name", aWorkbookOptions, true);
 }
 
 CPPUNIT_PLUGIN_IMPLEMENT();

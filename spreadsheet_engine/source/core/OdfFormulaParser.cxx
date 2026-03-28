@@ -314,6 +314,53 @@ class Parser
         return nullptr;
     }
 
+    [[nodiscard]] std::unique_ptr<Node> parseQuotedExternalName()
+    {
+        const std::size_t nStart = mnPos;
+        if (!consume(u'\''))
+            return nullptr;
+
+        while (!atEnd())
+        {
+            if (peek() != u'\'')
+            {
+                ++mnPos;
+                continue;
+            }
+
+            ++mnPos;
+            if (peek() == u'\'')
+            {
+                ++mnPos;
+                continue;
+            }
+            break;
+        }
+
+        if (!consume(u'#'))
+        {
+            mnPos = nStart;
+            return nullptr;
+        }
+
+        if (peek() == u'$')
+            ++mnPos;
+
+        const std::size_t nNameStart = mnPos;
+        while (!isReferenceTerminator(peek()))
+            ++mnPos;
+
+        if (mnPos == nNameStart)
+        {
+            mnPos = nStart;
+            return nullptr;
+        }
+
+        auto pNode = makeNode(NodeKind::NamedReference);
+        pNode->maPrimaryText = api::String(mrInput.substr(nStart, mnPos - nStart));
+        return pNode;
+    }
+
     [[nodiscard]] std::unique_ptr<Node> parseErrorLiteral()
     {
         const std::size_t nStart = mnPos;
@@ -553,6 +600,9 @@ class Parser
 
         if (peek() == u'#')
             return parseErrorLiteral();
+
+        if (peek() == u'\'')
+            return parseQuotedExternalName();
 
         if (isDigit(peek()) || (peek() == u'.' && isDigit(peekAhead(1))))
             return parseNumberLiteral();

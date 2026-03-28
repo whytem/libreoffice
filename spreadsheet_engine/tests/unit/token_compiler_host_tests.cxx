@@ -317,7 +317,11 @@ int testWorkbookCompileHost()
     aWorkbook.maNamedRanges.push_back(
         seworkbook::NamedRange { u"MixedCase", u"Lookup", u"$Lookup.$D$1", u"$Lookup.$D$1:.$D$1" });
 
-    secompiler::WorkbookCompileHost aHost(aWorkbook);
+    secompiler::WorkbookCompileHostOptions aOptions;
+    aOptions.maExternalNames.push_back({ u"'file:///metrics.fake'#ExternalMetric",
+        { 42, u"ExternalMetric" } });
+
+    secompiler::WorkbookCompileHost aHost(aWorkbook, std::move(aOptions));
     const auto aHosts = aHost.hosts();
     if (!secompiler::hasCompleteHostBundle(aHosts))
     {
@@ -365,6 +369,14 @@ int testWorkbookCompileHost()
             "workbook compile context unexpectedly resolved missing sheet");
     }
 
+    const auto oExternalContext = secompiler::makeWorkbookCompileContext(aWorkbook, u"Lookup", 3, 4,
+        secompiler::kDefaultWorkbookCompileGrammar, false, true);
+    if (!oExternalContext || !oExternalContext->mbAllowExternalReferences)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook external compile context mismatch");
+    }
+
     const auto aLocal = aHosts.mpNameResolver->lookupRangeName(u"ShadowedName", 1, *oContext);
     const auto aGlobalOnOtherSheet
         = aHosts.mpNameResolver->lookupRangeName(u"ShadowedName", 0, *oContext);
@@ -381,6 +393,8 @@ int testWorkbookCompileHost()
         = aHosts.mpExternalNameResolver->lookupExternalName(u"dec2hex", *oContext);
     const auto aSqrtPi
         = aHosts.mpExternalNameResolver->lookupExternalName(u"SQRTPI", *oContext);
+    const auto aConfiguredExternal = aHosts.mpExternalNameResolver->lookupExternalName(
+        u"'file:///metrics.fake'#ExternalMetric", *oContext);
 
     if (!aLocal || aLocal->mnSheet != 1 || aLocal->mnIndex != 2)
     {
@@ -433,6 +447,30 @@ int testWorkbookCompileHost()
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook external SQRTPI lookup mismatch");
     }
+    if (!aConfiguredExternal || aConfiguredExternal->mnFileId != 42
+        || aConfiguredExternal->maName != u"ExternalMetric")
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook configured external lookup mismatch");
+    }
+    const auto aConfiguredExternalLowered
+        = secompiler::lowerFormulaSource(u"='file:///metrics.fake'#ExternalMetric", aHost,
+            *oExternalContext);
+    if (!aConfiguredExternalLowered || aConfiguredExternalLowered.maFormula.maTokens.size() != 1
+        || aConfiguredExternalLowered.maFormula.maTokens[0].meKind
+               != spreadsheetengine::detail::token::Kind::ExternalName)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook configured external lowering mismatch");
+    }
+    const auto& rConfiguredExternalName = std::get<spreadsheetengine::detail::token::ExternalNameData>(
+        aConfiguredExternalLowered.maFormula.maTokens[0].maPayload);
+    if (rConfiguredExternalName.mnFileId != 42
+        || rConfiguredExternalName.maName != u"ExternalMetric")
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook configured external lowering payload mismatch");
+    }
     const auto aConvertAlias
         = aHosts.mpExternalNameResolver->lookupExternalName(u"org.openoffice.convert", *oContext);
     if (!aConvertAlias
@@ -447,7 +485,7 @@ int testWorkbookCompileHost()
     if (aHosts.mpDatabaseRangeResolver->lookupDatabaseRange(u"DB", *oContext)
         || aHosts.mpTableRefResolver->lookupTableReference(u"Table1", u"#Data", *oContext)
         || aHosts.mpColRowNameResolver->lookupColRowName(u"Heading", *oContext)
-        || aHosts.mpExternalNameResolver->lookupExternalName(u"'file.ods'#$Name", *oContext))
+        || aHosts.mpExternalNameResolver->lookupExternalName(u"'file.ods'#$Unknown", *oContext))
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook compile host unexpectedly resolved unsupported lookup");
@@ -469,12 +507,23 @@ int testWorkbookCompilerPreflight()
     aWorkbook.maNamedRanges.push_back(
         seworkbook::NamedRange { u"LocalOnly", u"Lookup", u"$Lookup.$B$2", u"$Lookup.$B$2:.$B$4" });
 
-    secompiler::WorkbookCompileHost aHost(aWorkbook);
+    secompiler::WorkbookCompileHostOptions aOptions;
+    aOptions.maExternalNames.push_back({ u"'file:///metrics.fake'#ExternalMetric",
+        { 42, u"ExternalMetric" } });
+
+    secompiler::WorkbookCompileHost aHost(aWorkbook, std::move(aOptions));
     const auto oContext = secompiler::makeWorkbookCompileContext(aWorkbook, u"Lookup", 1, 1);
+    const auto oExternalContext = secompiler::makeWorkbookCompileContext(aWorkbook, u"Lookup", 1, 1,
+        secompiler::kDefaultWorkbookCompileGrammar, false, true);
     if (!oContext)
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook compiler preflight context mismatch");
+    }
+    if (!oExternalContext || !oExternalContext->mbAllowExternalReferences)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler preflight external context mismatch");
     }
 
     const auto aReady = secompiler::preflightFormulaSource(
@@ -521,6 +570,14 @@ int testWorkbookCompilerPreflight()
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook compiler preflight bare-range mismatch");
+    }
+
+    const auto aExternalName = secompiler::preflightFormulaSource(
+        u"='file:///metrics.fake'#ExternalMetric", aHost, *oExternalContext);
+    if (!aExternalName || !aExternalName.mbUsesNamedReference)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler preflight external-name mismatch");
     }
 
     const auto aReferenceList = secompiler::preflightFormulaSource(
