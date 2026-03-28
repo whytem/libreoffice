@@ -529,8 +529,10 @@ Current checkpoint:
       `SUMIF`, `ADDRESS`, `CHAR`, `CODE`, `JIS`, `ASC`, `COLUMNS`,
       `AREAS`, `REPLACE`, `REPLACEB`, `RIGHT`, `MID`, `TEXT`,
       `CONCATENATE`, `DECIMAL`, `MMULT`, `T`, `N`, `TODAY`, `WEEKNUM`,
-      `WEEKDAY`, `ROUNDDOWN`, `OFFSET`, `INDIRECT`, `HYPERLINK`,
-      `LENB`, `FINDB`, `SEARCHB`, `MAX`, and `MOD`
+      `WEEKDAY`, `ROUNDDOWN`, `ROUNDUP`, `OFFSET`, `INDIRECT`,
+      `HYPERLINK`, `LENB`, `FINDB`, `SEARCHB`, `SEARCH`, `XOR`, `ACOT`,
+      `ISBLANK`, `ISEVEN`, `ISODD`, `LOG`, `DAYS360`, `LEFT`, `BASE`,
+      `MAX`, and `MOD`
     - dotted compatibility-name preservation like `COM.MICROSOFT.CONCAT(...)`
   - lexical jump tokens imported from Calc are now canonicalized to ignore the
     undefined trailing payload bytes produced by `FormulaTokenArray::AddOpCode()`

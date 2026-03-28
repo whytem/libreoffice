@@ -119,8 +119,10 @@ operators, references, range names, a wider representative function subset
 `GCD`, `LCM`, `DEGREES`, `ATANH`, `DATE`, `TIME`, `DATEDIF`, `MATCH`,
 `SUMIF`, `ADDRESS`, `CHAR`, `CODE`, `JIS`, `ASC`, `COLUMNS`, `AREAS`,
 `REPLACE`, `REPLACEB`, `RIGHT`, `MID`, `TEXT`, `CONCATENATE`, `DECIMAL`,
-`MMULT`, `T`, `N`, `TODAY`, `WEEKNUM`, `WEEKDAY`, `ROUNDDOWN`, `OFFSET`,
-`INDIRECT`, `HYPERLINK`, `LENB`, `FINDB`, `SEARCHB`, `MAX`, `MOD`), and
+`MMULT`, `T`, `N`, `TODAY`, `WEEKNUM`, `WEEKDAY`, `ROUNDDOWN`, `ROUNDUP`,
+`OFFSET`, `INDIRECT`, `HYPERLINK`, `LENB`, `FINDB`, `SEARCHB`, `SEARCH`,
+`XOR`, `ACOT`, `ISBLANK`, `ISEVEN`, `ISODD`, `LOG`, `DAYS360`, `LEFT`,
+`BASE`, `MAX`, `MOD`), and
 dotted compatibility-name preservation.
 Lexical jump tokens imported from Calc are also normalized now so parity checks
 ignore the undefined trailing payload bytes that Calc’s lexical `ocIf*` jump
