@@ -18,6 +18,7 @@
 #include <rangenam.hxx>
 #include <spreadsheetengine/api/ReferenceData.hxx>
 #include <spreadsheetengine/compat/libreoffice/CompileHost.hxx>
+#include <spreadsheetengine/detail/BuiltinExternalNames.hxx>
 
 namespace
 {
@@ -152,6 +153,24 @@ CPPUNIT_TEST_FIXTURE(TestCompileHost, testTableReferenceAndExternalNameLookup)
     CPPUNIT_ASSERT_EQUAL(
         u"ExternalMetric"_ustr,
         OUString(aExternalName->maName.data(), static_cast<sal_Int32>(aExternalName->maName.size())));
+
+    const auto aBuiltinWorkday = aHost.lookupExternalName(u"WORKDAY", aContext);
+    CPPUNIT_ASSERT(aBuiltinWorkday);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::detail::compiler::kBuiltinExternalNameCatalogId,
+        aBuiltinWorkday->mnFileId);
+    CPPUNIT_ASSERT_EQUAL(
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETWORKDAY"_ustr,
+        OUString(aBuiltinWorkday->maName.data(),
+            static_cast<sal_Int32>(aBuiltinWorkday->maName.size())));
+
+    const auto aBuiltinConvertAlias = aHost.lookupExternalName(u"org.openoffice.convert", aContext);
+    CPPUNIT_ASSERT(aBuiltinConvertAlias);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::detail::compiler::kBuiltinExternalNameCatalogId,
+        aBuiltinConvertAlias->mnFileId);
+    CPPUNIT_ASSERT_EQUAL(
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCONVERT"_ustr,
+        OUString(aBuiltinConvertAlias->maName.data(),
+            static_cast<sal_Int32>(aBuiltinConvertAlias->maName.size())));
 
     m_pDoc->DeleteTab(0);
 }

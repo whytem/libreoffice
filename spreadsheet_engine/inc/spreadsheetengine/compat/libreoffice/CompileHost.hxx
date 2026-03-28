@@ -26,6 +26,7 @@
 #include <spreadsheetengine/compat/libreoffice/Address.hxx>
 #include <spreadsheetengine/compat/libreoffice/Grammar.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
+#include <spreadsheetengine/detail/BuiltinExternalNames.hxx>
 #include <spreadsheetengine/detail/CompileHost.hxx>
 
 namespace spreadsheetengine::compat::libreoffice
@@ -442,6 +443,14 @@ public:
     lookupExternalName(spreadsheetengine::api::StringView rSymbol,
         const spreadsheetengine::detail::compiler::CompileContext& rContext) const override
     {
+        if (const auto oBuiltin
+            = spreadsheetengine::detail::compiler::lookupBuiltinExternalName(rSymbol))
+        {
+            return spreadsheetengine::detail::token::ExternalNameData {
+                spreadsheetengine::detail::compiler::kBuiltinExternalNameCatalogId, *oBuiltin
+            };
+        }
+
         if (!rContext.mbAllowExternalReferences || !mrDoc.HasExternalRefManager())
             return std::nullopt;
 

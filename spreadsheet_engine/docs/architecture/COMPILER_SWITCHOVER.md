@@ -543,9 +543,16 @@ Current checkpoint:
       `MULTINOMIAL`, `YEARFRAC`, `WORKDAY`, `RANDBETWEEN`, `SERIESSUM`,
       `QUOTIENT`, `SQRTPI`) instead of collapsing every unsupported
       function head into the generic `StringName` call carrier
+    - the built-in add-in catalog is now shared by the workbook-backed and
+      Calc-backed compile hosts, including `ORG.OPENOFFICE.CONVERT` alias
+      normalization, so both hosts resolve the same canonical built-in
+      `ExternalName` payloads and catalog ID for that subset
     - targeted compiled-diff coverage is green on the newly widened add-in
       workbook slice (`workday`, `clean`, `quotient`, `sqrtpi`,
       `seriessum`), with `699 / 699` eligible formulas matched
+    - targeted compiled-diff is also green on `convert_ooo.fods`, with
+      `82 / 82` eligible formulas matched after the shared built-in add-in
+      catalog and alias-normalization pass
   - lexical jump tokens imported from Calc are now canonicalized to ignore the
     undefined trailing payload bytes produced by `FormulaTokenArray::AddOpCode()`
     for `ocIf*`/`ocChoose`/`ocLet`, so exact parity checks compare stable

@@ -152,6 +152,36 @@ void assertStandaloneLowerTokensExactlyMatchCalc(ScDocument& rDoc,
     CPPUNIT_ASSERT_MESSAGE(aMessage.toUtf8().getStr(), bEqual);
 }
 
+void assertBuiltinExternalNameLookupMatchesAcrossHosts(
+    spreadsheetengine::compat::libreoffice::DocumentCompileHost& rCalcHost,
+    const spreadsheetengine::core::workbook::Workbook& rWorkbook, const ScAddress& rPos,
+    std::u16string_view rSymbol, std::u16string_view rExpectedName, std::u16string_view rLabel)
+{
+    using spreadsheetengine::detail::compiler::WorkbookCompileHost;
+
+    const auto aCalcContext
+        = spreadsheetengine::compat::libreoffice::makeCompileContext(rPos, getEnglishOooGrammar());
+    const auto aCalcLookup = rCalcHost.lookupExternalName(rSymbol, aCalcContext);
+    CPPUNIT_ASSERT_MESSAGE(OUString(rLabel).toUtf8().getStr(), static_cast<bool>(aCalcLookup));
+
+    WorkbookCompileHost aWorkbookHost(rWorkbook);
+    const auto aWorkbookContext = spreadsheetengine::detail::compiler::makeWorkbookCompileContext(
+        { static_cast<spreadsheetengine::api::SheetId>(rPos.Tab()),
+          static_cast<spreadsheetengine::api::ColumnIndex>(rPos.Col()),
+          static_cast<spreadsheetengine::api::RowIndex>(rPos.Row()) });
+    const auto aWorkbookLookup = aWorkbookHost.lookupExternalName(rSymbol, aWorkbookContext);
+    CPPUNIT_ASSERT_MESSAGE(OUString(rLabel).toUtf8().getStr(),
+        static_cast<bool>(aWorkbookLookup));
+
+    CPPUNIT_ASSERT_EQUAL(aCalcLookup->mnFileId, aWorkbookLookup->mnFileId);
+    CPPUNIT_ASSERT_EQUAL(
+        OUString(rExpectedName),
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aCalcLookup->maName));
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aCalcLookup->maName),
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aWorkbookLookup->maName));
+}
+
 void assertShadowDiff(
     ScDocument& rDoc, const spreadsheetengine::detail::compiler::CompileRequest& rRequest,
     std::u16string_view rLabel,
@@ -423,6 +453,42 @@ CPPUNIT_TEST_FIXTURE(TestCompileDiff, testStandaloneLoweringOperatorTokenParityS
     {
         assertStandaloneLowerTokensExactlyMatchCalc(*pDoc, aHost, aWorkbook, ScAddress(0, 0, 0),
             rSample.maFormula, getEnglishOooGrammar(), rSample.maLabel);
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(TestCompileDiff, testBuiltinExternalNameHostParitySmoke)
+{
+    ScDocument* pDoc = m_pDoc;
+    CPPUNIT_ASSERT(pDoc);
+    if (pDoc->GetTableCount() == 0)
+        CPPUNIT_ASSERT(pDoc->InsertTab(0, u"Sheet1"_ustr));
+
+    auto aWorkbook = makeStandaloneWorkbook();
+    spreadsheetengine::compat::libreoffice::DocumentCompileHost aHost(*pDoc);
+
+    const struct
+    {
+        std::u16string_view maLabel;
+        std::u16string_view maSymbol;
+        std::u16string_view maExpectedName;
+    } aSamples[] = {
+        { u"workday_external_name", u"WORKDAY",
+            u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETWORKDAY" },
+        { u"convert_ooo_external_name", u"ORG.OPENOFFICE.CONVERT",
+            u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCONVERT" },
+        { u"quotient_external_name", u"QUOTIENT",
+            u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETQUOTIENT" },
+        { u"seriessum_external_name", u"SERIESSUM",
+            u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSERIESSUM" },
+        { u"sqrtpi_external_name", u"SQRTPI",
+            u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSQRTPI" },
+    };
+
+    for (const auto& rSample : aSamples)
+    {
+        assertBuiltinExternalNameLookupMatchesAcrossHosts(
+            aHost, aWorkbook, ScAddress(0, 0, 0), rSample.maSymbol,
+            rSample.maExpectedName, rSample.maLabel);
     }
 }
 

@@ -132,6 +132,10 @@ On the standalone compiled-token path, workbook lowering also now emits real
 `SERIESSUM`, `QUOTIENT`, `SQRTPI`) instead of flattening them to the generic
 `StringName` call carrier, and compiled-token evaluation preserves safe
 cached-result fallback for those unsupported add-in bodies.
+That built-in add-in catalog is now shared between the standalone workbook
+compile host and Calc’s `DocumentCompileHost`, including alias normalization
+for `ORG.OPENOFFICE.CONVERT`, so both hosts resolve the same canonical
+`ExternalName` payloads and built-in catalog ID for that subset.
 Lexical jump tokens imported from Calc are also normalized now so parity checks
 ignore the undefined trailing payload bytes that Calc’s lexical `ocIf*` jump
 construction leaves uninitialized. The remaining gap is broader function-catalog

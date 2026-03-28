@@ -5,6 +5,7 @@
 #include <optional>
 
 #include <spreadsheetengine/detail/CompileHost.hxx>
+#include <spreadsheetengine/detail/BuiltinExternalNames.hxx>
 #include <spreadsheetengine/detail/CompilerPipeline.hxx>
 #include <spreadsheetengine/detail/FodsCompilerPreflight.hxx>
 #include <spreadsheetengine/detail/SharedFormulaToken.hxx>
@@ -408,29 +409,39 @@ int testWorkbookCompileHost()
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook missing range name unexpectedly resolved");
     }
-    if (!aWorkday || aWorkday->mnFileId != 1
+    if (!aWorkday || aWorkday->mnFileId != spreadsheetengine::detail::compiler::kBuiltinExternalNameCatalogId
         || aWorkday->maName != u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETWORKDAY")
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook external WORKDAY lookup mismatch");
     }
-    if (!aYearFrac || aYearFrac->mnFileId != 1
+    if (!aYearFrac || aYearFrac->mnFileId != spreadsheetengine::detail::compiler::kBuiltinExternalNameCatalogId
         || aYearFrac->maName != u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYEARFRAC")
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook external YEARFRAC lookup mismatch");
     }
-    if (!aDec2Hex || aDec2Hex->mnFileId != 1
+    if (!aDec2Hex || aDec2Hex->mnFileId != spreadsheetengine::detail::compiler::kBuiltinExternalNameCatalogId
         || aDec2Hex->maName != u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDEC2HEX")
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook external DEC2HEX lookup mismatch");
     }
-    if (!aSqrtPi || aSqrtPi->mnFileId != 1
+    if (!aSqrtPi || aSqrtPi->mnFileId != spreadsheetengine::detail::compiler::kBuiltinExternalNameCatalogId
         || aSqrtPi->maName != u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSQRTPI")
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook external SQRTPI lookup mismatch");
+    }
+    const auto aConvertAlias
+        = aHosts.mpExternalNameResolver->lookupExternalName(u"org.openoffice.convert", *oContext);
+    if (!aConvertAlias
+        || aConvertAlias->mnFileId
+               != spreadsheetengine::detail::compiler::kBuiltinExternalNameCatalogId
+        || aConvertAlias->maName != u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCONVERT")
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook external CONVERT alias lookup mismatch");
     }
 
     if (aHosts.mpDatabaseRangeResolver->lookupDatabaseRange(u"DB", *oContext)
@@ -639,7 +650,7 @@ int testWorkbookCompilerLowering()
     }
     const auto& rExternalName
         = std::get<setoken::ExternalNameData>(aExternalFunction.maFormula.maTokens[3].maPayload);
-    if (rExternalName.mnFileId != 1
+    if (rExternalName.mnFileId != spreadsheetengine::detail::compiler::kBuiltinExternalNameCatalogId
         || rExternalName.maName != u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYEARFRAC")
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
@@ -657,6 +668,8 @@ int testWorkbookCompilerLowering()
         { u"SERIESSUM", u"of:=SERIESSUM(1;0;2;{1;2;3})", u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSERIESSUM" },
         { u"SQRTPI", u"of:=SQRTPI(16.2)", u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSQRTPI" },
         { u"RANDBETWEEN", u"of:=RANDBETWEEN(1;10)", u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETRANDBETWEEN" },
+        { u"ORG.OPENOFFICE.CONVERT", u"of:=ORG.OPENOFFICE.CONVERT(100;\"ATS\";\"EUR\")",
+            u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCONVERT" },
     };
 
     for (const auto& rSample : aExternalSamples)
@@ -680,7 +693,8 @@ int testWorkbookCompilerLowering()
         const auto& rSampleExternalName = std::get<setoken::ExternalNameData>(
             aExternalLowered.maFormula.maTokens[aExternalLowered.maFormula.maTokens.size() - 3]
                 .maPayload);
-        if (rSampleExternalName.mnFileId != 1
+        if (rSampleExternalName.mnFileId
+            != spreadsheetengine::detail::compiler::kBuiltinExternalNameCatalogId
             || rSampleExternalName.maName != rSample.maExpectedName)
         {
             const std::string aDetail

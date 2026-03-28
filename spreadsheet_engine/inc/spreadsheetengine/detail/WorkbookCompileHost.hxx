@@ -12,6 +12,7 @@
 #include <limits>
 #include <optional>
 
+#include <spreadsheetengine/detail/BuiltinExternalNames.hxx>
 #include <spreadsheetengine/detail/CompileHost.hxx>
 #include <spreadsheetengine/detail/WorkbookModel.hxx>
 
@@ -72,58 +73,6 @@ inline constexpr api::Grammar kDefaultWorkbookCompileGrammar {
         bAllowExternalReferences, bComputeImplicitIntersection, bMatrixFormula,
         eExtendedErrorDetection);
 }
-
-namespace detail
-{
-
-constexpr sal_uInt16 kBuiltinAddInCatalogId = 1;
-
-[[nodiscard]] constexpr sal_Unicode foldAscii(sal_Unicode c)
-{
-    return (c >= u'A' && c <= u'Z') ? static_cast<sal_Unicode>(c - u'A' + u'a') : c;
-}
-
-[[nodiscard]] inline bool equalLookupText(api::StringView rLeft, api::StringView rRight)
-{
-    if (rLeft.size() != rRight.size())
-        return false;
-
-    for (std::size_t nIndex = 0; nIndex < rLeft.size(); ++nIndex)
-    {
-        if (foldAscii(rLeft[nIndex]) != foldAscii(rRight[nIndex]))
-            return false;
-    }
-
-    return true;
-}
-
-[[nodiscard]] inline std::optional<api::String> lookupBuiltinExternalName(api::StringView rSymbol)
-{
-    if (equalLookupText(rSymbol, u"WORKDAY"))
-        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETWORKDAY");
-    if (equalLookupText(rSymbol, u"YEARFRAC"))
-        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYEARFRAC");
-    if (equalLookupText(rSymbol, u"SERIESSUM"))
-        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSERIESSUM");
-    if (equalLookupText(rSymbol, u"QUOTIENT"))
-        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETQUOTIENT");
-    if (equalLookupText(rSymbol, u"CONVERT"))
-        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCONVERT");
-    if (equalLookupText(rSymbol, u"DEC2HEX"))
-        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDEC2HEX");
-    if (equalLookupText(rSymbol, u"MROUND"))
-        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETMROUND");
-    if (equalLookupText(rSymbol, u"MULTINOMIAL"))
-        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETMULTINOMIAL");
-    if (equalLookupText(rSymbol, u"SQRTPI"))
-        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSQRTPI");
-    if (equalLookupText(rSymbol, u"RANDBETWEEN"))
-        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETRANDBETWEEN");
-
-    return std::nullopt;
-}
-
-} // namespace detail
 
 class WorkbookCompileHost final : public NameResolver
     , public DatabaseRangeResolver
@@ -197,8 +146,8 @@ public:
     [[nodiscard]] std::optional<token::ExternalNameData> lookupExternalName(
         api::StringView rSymbol, const CompileContext&) const override
     {
-        if (const auto oBuiltin = detail::lookupBuiltinExternalName(rSymbol))
-            return token::ExternalNameData { detail::kBuiltinAddInCatalogId, *oBuiltin };
+        if (const auto oBuiltin = lookupBuiltinExternalName(rSymbol))
+            return token::ExternalNameData { kBuiltinExternalNameCatalogId, *oBuiltin };
         return std::nullopt;
     }
 
@@ -219,8 +168,8 @@ private:
         for (std::size_t nIndex = 0; nIndex < mrWorkbook.maNamedRanges.size(); ++nIndex)
         {
             const auto& rRange = mrWorkbook.maNamedRanges[nIndex];
-            if (!detail::equalLookupText(rRange.maName, rName)
-                || !detail::equalLookupText(rRange.maScopeSheetName, rScopeSheetName))
+            if (!equalLookupText(rRange.maName, rName)
+                || !equalLookupText(rRange.maScopeSheetName, rScopeSheetName))
             {
                 continue;
             }
