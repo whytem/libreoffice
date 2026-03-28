@@ -15,6 +15,12 @@
 #include <formula/grammar.hxx>
 #include <spreadsheetengine/compat/libreoffice/CompileHost.hxx>
 #include <spreadsheetengine/compat/libreoffice/CompilerDiff.hxx>
+#include <spreadsheetengine/compat/libreoffice/Grammar.hxx>
+#include <spreadsheetengine/compat/libreoffice/ShadowCompiler.hxx>
+#include <spreadsheetengine/detail/TokenStringifier.hxx>
+#include <spreadsheetengine/detail/WorkbookCompileHost.hxx>
+#include <spreadsheetengine/detail/WorkbookCompilerLowering.hxx>
+#include <spreadsheetengine/detail/WorkbookModel.hxx>
 
 namespace
 {
@@ -61,6 +67,53 @@ OUString describeDiffFailure(const spreadsheetengine::compat::libreoffice::Compi
     if (!rArtifacts.maRoundTripImport)
         return u"roundtrip import failed: "_ustr + rArtifacts.maRoundTripImport.maFailureMessage;
     return u"compiler diff failed"_ustr;
+}
+
+spreadsheetengine::core::workbook::Workbook makeStandaloneWorkbook()
+{
+    spreadsheetengine::core::workbook::Workbook aWorkbook;
+    spreadsheetengine::core::workbook::Sheet aSheet;
+    aSheet.maName = u"Sheet1";
+    aWorkbook.maSheets.push_back(std::move(aSheet));
+    return aWorkbook;
+}
+
+void addStandaloneNamedRange(spreadsheetengine::core::workbook::Workbook& rWorkbook,
+    std::u16string_view rName, std::u16string_view rRange)
+{
+    spreadsheetengine::core::workbook::NamedRange aRange;
+    aRange.maName = rName;
+    aRange.maCellRangeAddress = rRange;
+    rWorkbook.maNamedRanges.push_back(std::move(aRange));
+}
+
+void assertStandaloneLowerMetadataMatchesCalc(ScDocument& rDoc,
+    spreadsheetengine::compat::libreoffice::DocumentCompileHost& rCalcHost,
+    const spreadsheetengine::core::workbook::Workbook& rWorkbook, const ScAddress& rPos,
+    std::u16string_view rFormula, formula::FormulaGrammar::Grammar eGrammar,
+    std::u16string_view rLabel)
+{
+    using spreadsheetengine::compat::libreoffice::shadowCompileFormula;
+    using spreadsheetengine::detail::compiler::WorkbookCompileHost;
+    using spreadsheetengine::detail::compiler::lowerFormulaSource;
+
+    const auto aShadow = shadowCompileFormula(
+        rDoc, makeRequest(rCalcHost, rPos, OUString(rFormula), eGrammar));
+    CPPUNIT_ASSERT_MESSAGE(OUString(rLabel).toUtf8().getStr(), static_cast<bool>(aShadow));
+
+    WorkbookCompileHost aWorkbookHost(rWorkbook);
+    const auto aContext = spreadsheetengine::detail::compiler::makeWorkbookCompileContext(
+        { static_cast<spreadsheetengine::api::SheetId>(rPos.Tab()),
+          static_cast<spreadsheetengine::api::ColumnIndex>(rPos.Col()),
+          static_cast<spreadsheetengine::api::RowIndex>(rPos.Row()) },
+        spreadsheetengine::compat::libreoffice::toApiGrammar(eGrammar));
+    const auto aLowered
+        = lowerFormulaSource(rFormula, aWorkbookHost, aContext);
+    CPPUNIT_ASSERT_MESSAGE(OUString(rLabel).toUtf8().getStr(), static_cast<bool>(aLowered));
+    CPPUNIT_ASSERT_EQUAL(
+        aShadow.maStatus.maFormula.mnCodeError, aLowered.maFormula.mnCodeError);
+    CPPUNIT_ASSERT(!aShadow.maStatus.maFormula.maTokens.empty());
+    CPPUNIT_ASSERT(!aLowered.maFormula.maTokens.empty());
 }
 
 void assertShadowDiff(
@@ -163,6 +216,10 @@ CPPUNIT_TEST_FIXTURE(TestCompileDiff, testEnabledFodsFormulaSmoke)
             u"=COM.MICROSOFT.CONCAT(\"Good \";\"Morning \";\"Mrs. \";\"Doe\")" },
         { u"date_time/datevalue.fods :: of:=DATEVALUE(\"Jan1, 2015\")", ScAddress(0, 0, 0),
             getEnglishOooGrammar(), u"=DATEVALUE(\"Jan1, 2015\")" },
+        { u"information/formula.fods :: of:=FORMULA(A1)", ScAddress(0, 0, 0),
+            getEnglishOooGrammar(), u"=FORMULA(A1)" },
+        { u"spreadsheet/vlookup.fods :: of:=VLOOKUP(\"Cat\";A1:B2;2;0)", ScAddress(0, 0, 0),
+            getEnglishOooGrammar(), u"=VLOOKUP(\"Cat\";A1:B2;2;0)" },
     };
 
     for (const auto& rSample : aSamples)
@@ -170,6 +227,41 @@ CPPUNIT_TEST_FIXTURE(TestCompileDiff, testEnabledFodsFormulaSmoke)
         assertShadowDiff(*pDoc,
             makeRequest(aHost, rSample.maPosition, OUString(rSample.maFormula), rSample.meGrammar),
             rSample.maLabel);
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(TestCompileDiff, testStandaloneLoweringMetadataSmoke)
+{
+    ScDocument* pDoc = m_pDoc;
+    CPPUNIT_ASSERT(pDoc);
+    if (pDoc->GetTableCount() == 0)
+        CPPUNIT_ASSERT(pDoc->InsertTab(0, u"Sheet1"_ustr));
+
+    CPPUNIT_ASSERT(pDoc->GetRangeName()->insert(
+        new ScRangeData(*pDoc, u"GlobalMetric"_ustr, u"$Sheet1.$A$1"_ustr)));
+
+    auto aWorkbook = makeStandaloneWorkbook();
+    addStandaloneNamedRange(aWorkbook, u"GlobalMetric", u"Sheet1.A1");
+
+    spreadsheetengine::compat::libreoffice::DocumentCompileHost aHost(*pDoc);
+
+    const struct
+    {
+        std::u16string_view maLabel;
+        std::u16string_view maFormula;
+    } aSamples[] = {
+        { u"arithmetic", u"=-0.3+0.2+0.1" },
+        { u"concat_operator", u"=\"Good \"&\"Morning\"" },
+        { u"single_refs", u"=A1+B1" },
+        { u"array_literal", u"={1;2;3}" },
+        { u"error_literal", u"=#N/A" },
+        { u"range_name", u"=GlobalMetric+1" },
+    };
+
+    for (const auto& rSample : aSamples)
+    {
+        assertStandaloneLowerMetadataMatchesCalc(*pDoc, aHost, aWorkbook, ScAddress(0, 0, 0),
+            rSample.maFormula, getEnglishOooGrammar(), rSample.maLabel);
     }
 }
 

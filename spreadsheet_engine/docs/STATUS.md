@@ -89,6 +89,31 @@ status:
   MAX/MIN path needed by the corpus)
 - **Next frontier:** add-in family
 
+### Active Work: Shared-Compiler Switchover
+
+The next active track is switching standalone replay off the bespoke parser hot
+path and onto the shared compiler/token pipeline.
+
+Current state:
+
+- the default standalone replay lane now prefers the shared compiler plus
+  compiled-token execution for all six enabled families
+- the remaining preflight tail is small:
+  - `51` hard blockers
+  - `41` expected-error formulas
+- the replay harness has:
+  - `--compiled-diff` for AST-vs-compiled comparison
+  - `--legacy-only` as an explicit stabilization/debug escape hatch
+- the maintenance runner now has `--compiler-diff`, which adds a fast logical
+  family compiled-diff smoke without changing the default Calc profile
+- Calc-side compile-diff smoke now covers formulas sourced from all six enabled
+  FODS families
+
+The main remaining convergence gap is exact canonical token-stream parity
+between standalone lowering and Calc-imported canonical tokens. The standalone
+lowerer still uses synthetic operator/function encodings and does not yet
+preserve XML formula-source metadata the same way Calc does.
+
 ## Architecture Overview
 
 ### Directory Layout
@@ -106,7 +131,7 @@ spreadsheet_engine/
 ├── shims/include/              # SAL/RTL type replacements for standalone
 ├── source/core/                # Implementation files
 ├── tests/
-│   ├── unit/                   #   22 test files (18 API + 4 FODS)
+│   ├── unit/                   #   23 test files (19 API/compiler + 4 FODS)
 │   ├── consumer/               #   Installed-package consumer smoke test
 │   ├── data/fods/              #   FODS test fixture workbooks
 │   └── parity/                 #   Shared parity TSV datasets
@@ -305,11 +330,14 @@ layer.
 
 # Full non-rendering Calc engine suite
 ./spreadsheet_engine/tools/run_maintenance_validation.sh --engine
+
+# Standalone compiled-vs-legacy diff smoke
+./spreadsheet_engine/tools/run_maintenance_validation.sh --standalone-only --compiler-diff
 ```
 
 ## Test Suite
 
-The standalone test suite currently exposes 23 CTest entries: 22 unit/smoke
+The standalone test suite currently exposes 24 CTest entries: 23 unit/smoke
 executables plus 1 installed-package consumer smoke check. The executable-based
 suite covers all major subsystems:
 
@@ -320,6 +348,7 @@ suite covers all major subsystems:
 | `spreadsheetengine_calendar_tests` | Date parts, week logic, workday/networkdays |
 | `spreadsheetengine_text_tests` | Case, scalar text, width |
 | `spreadsheetengine_compiler_tests` | Compiler char tables, grammar helpers |
+| `spreadsheetengine_token_compiler_host_tests` | Canonical token schema, compile-host contracts, workbook compile host |
 | `spreadsheetengine_config_tests` | Config opcode vocabulary, OpenCL subset |
 | `spreadsheetengine_execution_tests` | Execution context scratch and cache |
 | `spreadsheetengine_matrix_tests` | Matrix geometry, allocation, dimension |

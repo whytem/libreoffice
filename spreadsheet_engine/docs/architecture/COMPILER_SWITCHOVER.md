@@ -335,8 +335,10 @@ Current checkpoint:
 
 Current limitation:
 
-- this slice now reaches the replay harness in manual diff mode, but it is not
-  yet the default replay path for any family
+- preflight-blocked formulas still fall back to the legacy AST path
+- compiled-token execution currently reuses the AST evaluator semantics by
+  inflating canonical lowered tokens back into executable nodes rather than
+  running a direct token interpreter
 
 Tasks:
 
@@ -371,6 +373,13 @@ Current checkpoint:
 - the raw FODS replay binary now has a manual `--compiled-diff` mode
 - that mode compares AST vs compiled-token execution only on preflight-ready
   formulas, so the remaining parser/host tail does not drown the signal
+- the diff output now records per-workbook outcomes instead of only a single
+  corpus-wide count:
+  - `matched`
+  - `cached_fallback_only`
+  - `execution_mismatch`
+- the combined maintenance runner now has `--compiler-diff`, which exercises a
+  fast logical-family diff smoke by default
 - current real-corpus baselines are:
   - logical family:
     - formula cells: `517`
@@ -378,6 +387,7 @@ Current checkpoint:
     - skipped: `4`
     - matched: `513`
     - cached-fallback-only mismatches: `0`
+    - workbook outcomes: `matched:9`
   - full default corpus:
     - formula cells: `19930`
     - eligible: `19838`
@@ -443,6 +453,23 @@ Exit criteria:
 - the entire initial corpus runs through the shared production compiler path in
   standalone replay
 
+Current checkpoint:
+
+- all six enabled replay families are now promoted into the default standalone
+  replay path:
+  - logical
+  - mathematical
+  - text
+  - date_time
+  - information
+  - spreadsheet
+- the default replay lane now prefers shared compiler plus compiled-token
+  execution for every preflight-ready formula in those families
+- the remaining `51` hard preflight blockers are no longer on the hot path for
+  family promotion; they remain a fallback-only tail
+- the default standalone replay lane remains green for the full `228` workbook
+  corpus with that promoted execution path
+
 ### Phase 6: Calc/Standalone Compiler Convergence Hardening
 
 Goal:
@@ -471,6 +498,31 @@ Exit criteria:
 - the shared compiler has proven parity across both Calc and standalone
   contexts for the initial FODS corpus
 
+Current checkpoint:
+
+- Calc compile-diff smoke now includes formulas sourced from all six enabled
+  FODS families, including:
+  - logical
+  - mathematical
+  - text
+  - date_time
+  - information
+  - spreadsheet
+- a first standalone-vs-Calc artifact smoke is now in place for the currently
+  lowerer-safe subset:
+  - arithmetic / operator formulas
+  - concat-operator formulas
+  - reference formulas
+  - array literals
+  - error literals
+  - range-name formulas
+- current limitation:
+  - exact canonical token-stream parity is not yet asserted here because the
+    standalone lowerer still uses synthetic operator/function encodings that
+    intentionally differ from Calc's imported canonical stream
+  - XML formula-source preservation also still diverges between the two paths
+    on representative formulas
+
 ### Phase 7: Switchover Completion And Retirement
 
 Goal:
@@ -492,6 +544,15 @@ Exit criteria:
 
 - standalone FODS replay uses the shared production compiler by default
 - the legacy standalone parser is no longer part of the standard execution path
+
+Current checkpoint:
+
+- default standalone replay now uses the shared compiler path for all promoted
+  families
+- `spreadsheetengine_fods_replay_tests --legacy-only` provides the explicit
+  legacy parser/evaluator escape hatch for stabilization and debugging
+- the standard maintenance path now keeps the compiled-default replay lane in
+  the hot path, with optional `--compiler-diff` coverage for dual-path smoke
 
 ## Detailed Execution Checklist
 
@@ -516,7 +577,7 @@ Exit criteria:
 - [x] Inventory the exact formula constructs used by the enabled FODS corpus.
 - [x] Implement native engine lowering for the FODS-safe subset.
 - [x] Add standalone compiler tests for raw FODS formulas.
-- [ ] Keep Calc shadow/diff comparisons green for the same subset.
+- [x] Keep Calc shadow/diff comparisons green for the same subset.
 
 ### Phase 3
 
@@ -528,34 +589,34 @@ Exit criteria:
 ### Phase 4
 
 - [x] Extend the raw FODS replay binary with dual-path execution modes.
-- [ ] Add per-workbook mismatch diagnostics.
+- [x] Add per-workbook mismatch diagnostics.
 - [x] Add family-scoped diff execution options.
-- [ ] Add maintenance-lane support for shared-compiler diff mode.
+- [x] Add maintenance-lane support for shared-compiler diff mode.
 
 ### Phase 5
 
-- [ ] Switch `logical` in diff mode, then promote it.
-- [ ] Switch `mathematical` in diff mode, then promote it.
-- [ ] Switch `text` in diff mode, then promote it.
-- [ ] Switch `date_time` in diff mode, then promote it.
-- [ ] Switch `information` in diff mode, then promote it.
-- [ ] Switch `spreadsheet` in diff mode, then promote it.
+- [x] Switch `logical` in diff mode, then promote it.
+- [x] Switch `mathematical` in diff mode, then promote it.
+- [x] Switch `text` in diff mode, then promote it.
+- [x] Switch `date_time` in diff mode, then promote it.
+- [x] Switch `information` in diff mode, then promote it.
+- [x] Switch `spreadsheet` in diff mode, then promote it.
 
 ### Phase 6
 
-- [ ] Expand Calc compile-diff coverage with formulas sourced from enabled FODS
+- [x] Expand Calc compile-diff coverage with formulas sourced from enabled FODS
       families.
-- [ ] Add standalone-vs-Calc compile artifact comparisons for representative
+- [x] Add standalone-vs-Calc compile artifact comparisons for representative
       formulas.
 - [ ] Keep adopted Calc compile call sites green with legacy fallback retained.
 
 ### Phase 7
 
-- [ ] Flip standalone replay to shared compiler by default.
-- [ ] Retain legacy parser mode only as a debug/escape hatch during
+- [x] Flip standalone replay to shared compiler by default.
+- [x] Retain legacy parser mode only as a debug/escape hatch during
       stabilization.
-- [ ] Remove legacy parser from the standard maintenance path.
-- [ ] Update architecture docs, status docs, and maintenance scripts.
+- [x] Remove legacy parser from the standard maintenance path.
+- [x] Update architecture docs, status docs, and maintenance scripts.
 
 ## Validation Strategy
 

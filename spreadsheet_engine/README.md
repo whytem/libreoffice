@@ -36,6 +36,23 @@ the fast smoke gate and the full engine profile:
 ./spreadsheet_engine/tools/run_maintenance_validation.sh --milestone
 ```
 
+Use `--compiler-diff` when you want the standalone maintenance lane to also run
+the compiled-vs-legacy replay diff smoke. By default that targets the logical
+FODS family for fast iteration:
+
+```bash
+./spreadsheet_engine/tools/run_maintenance_validation.sh --compiler-diff
+```
+
+You can point that diff smoke at a different replay family or workbook path
+with `--compiler-diff-target`:
+
+```bash
+./spreadsheet_engine/tools/run_maintenance_validation.sh \
+  --compiler-diff \
+  --compiler-diff-target sc/qa/unit/data/functions/text/fods
+```
+
 ## Standalone Build
 
 ```bash

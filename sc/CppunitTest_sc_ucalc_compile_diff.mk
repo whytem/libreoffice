@@ -11,4 +11,8 @@
 
 $(eval $(call sc_ucalc_test,_compile_diff))
 
+$(eval $(call gb_CppunitTest_add_exception_objects,sc_ucalc_compile_diff,\
+    spreadsheet_engine/source/core/OdfFormulaParser \
+))
+
 # vim: set noet sw=4 ts=4:

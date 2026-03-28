@@ -178,7 +178,7 @@ private:
 
     [[nodiscard]] api::String localScopeName(api::SheetId nSheet) const
     {
-        if (nSheet >= mrWorkbook.maSheets.size())
+        if (nSheet < 0 || static_cast<std::size_t>(nSheet) >= mrWorkbook.maSheets.size())
             return {};
         return mrWorkbook.maSheets[nSheet].maName;
     }
