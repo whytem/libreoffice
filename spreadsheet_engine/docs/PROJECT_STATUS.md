@@ -40,6 +40,7 @@ The project has completed two major programs and is actively working on a third:
 | Initial extraction (Phases 0-11) | **Complete** | Pure calculation logic, function families, matrix/execution substrate, host runtime, reference/dependency planning, and standalone packaging all extracted |
 | Token and compiler host model | **Complete** | Canonical token schema, compile-host interfaces, Calc bridge, shadow compiler, differential validation, first native consumers, and first bridged Calc compile adopters all in place |
 | Compiler switchover | **Active** | Standalone FODS replay now defaults to shared compiler path for all six enabled families; convergence hardening and broader lexical parity in progress |
+| Calc-backed workbook facade | **Validated foundation** | Engine-owned workbook facade contract with Calc-backed and in-memory implementations, richer named-range mutation payloads, and dedicated standalone/Calc validation lanes; first live low-risk Calc consumer adoption still pending |
 
 ### What the engine owns today
 
@@ -56,6 +57,13 @@ The project has completed two major programs and is actively working on a third:
   names, and grammar/locale settings
 - **Compiler pipeline:** compile request/status contract, Calc-backed shadow
   compiler, standalone workbook-backed compile host, compile-diff harness
+- **Workbook facade:** engine-owned calculation-facing workbook contract with
+  Calc-backed and in-memory implementations, formula-cell iteration, named-range
+  queries, shared-formula group metadata, mutation event vocabulary (14 kinds)
+  with before/after named-range descriptors, first shadow consumers
+  (formula-cell enumeration, group summary, named-range inventory, snapshot
+  comparison, formula corpus collection), and dedicated Calc-backed validation
+  via `CppunitTest_sc_ucalc_workbook_facade`
 - **Standalone FODS runtime:** sparse workbook model, read-only FODS loader,
   ODF formula parser, lazy evaluator with memoization and cycle detection
 - **Raw FODS replay:** six function families fully enabled (logical,
@@ -90,13 +98,14 @@ spreadsheet_engine/
 │   ├── api/                    #   Engine-owned public API types
 │   ├── compat/                 #   LibreOffice adapter headers
 │   │   ├── formula/            #     Copied formula grammar helpers
-│   │   └── libreoffice/        #     Calc-specific integration adapters (19 headers)
+│   │   └── libreoffice/        #     Calc-specific integration adapters (21 headers)
 │   ├── detail/                 #   Internal implementation headers
+│   │   └── workbook/           #     Workbook facade contract and implementations
 │   └── runtime/                #   Standalone runtime helpers
 ├── shims/include/              # SAL/RTL type replacements for standalone
 ├── source/core/                # Implementation files
 ├── tests/
-│   ├── unit/                   #   23 test files (19 API/compiler + 4 FODS)
+│   ├── unit/                   #   24 test files (19 API/compiler + 4 FODS + 1 facade)
 │   ├── consumer/               #   Installed-package consumer smoke test
 │   ├── data/fods/              #   FODS test fixture workbooks
 │   └── parity/                 #   Shared parity TSV datasets
@@ -137,11 +146,11 @@ Standalone function implementations: `MathScalar`, `MathTranscendental`,
 `DateTimeWorkday`, `NumeralConversion`, `InMemoryHost`, `LibraryProbe`.
 
 **Layer 5: LibreOffice Adapters** (`compat/libreoffice/`)
-Nineteen thin adapter headers bridging engine types to Calc internals:
+Twenty-one thin adapter headers bridging engine types to Calc internals:
 `Host`, `Address`, `Error`, `String`, `Grammar`, `Config`, `Rounding`, `Date`,
 `LookupCache`, `SharedFormula`, `ReferenceUpdate`, `FormulaResult`, `Parsing`,
 `TextServices`, `LibraryProbe`, `TokenBridge`, `CompileHost`,
-`ShadowCompiler`, `CompilerDiff`.
+`ShadowCompiler`, `CompilerDiff`, `WorkbookFacade`, `MutationTranslator`.
 
 **Layer 6: Shims** (`shims/include/`)
 Minimal SAL/RTL replacements for standalone builds: `sal/types.h`,
@@ -376,7 +385,7 @@ target_link_libraries(myapp PRIVATE spreadsheetengine::core)
 
 ### Test Suite
 
-24 CTest entries: 23 executables plus 1 installed-package consumer smoke.
+25 CTest entries: 24 executables plus 1 installed-package consumer smoke.
 
 | Test Target | Coverage |
 |-------------|----------|
@@ -403,6 +412,7 @@ target_link_libraries(myapp PRIVATE spreadsheetengine::core)
 | `spreadsheetengine_fods_parser_tests` | ODF formula AST parsing |
 | `spreadsheetengine_fods_evaluator_tests` | FODS formula evaluation |
 | `spreadsheetengine_fods_replay_tests` | Raw FODS workbook replay harness |
+| `spreadsheetengine_workbook_facade_tests` | Workbook facade types, contract, consumers |
 | `spreadsheetengine_installed_package_smoke` | Installed-package downstream-consumer smoke |
 
 Calc-side validation targets for the token/compiler work:
@@ -504,9 +514,14 @@ recommended sequencing:
 1. **Make the engine compiler authoritative** (extend current switchover work)
    - Native engine lowering that no longer depends on `ScCompiler`
    - Calc becomes a pure host adapter for compiler lookups
-2. **Introduce an engine workbook facade backed by Calc**
-   - Engine-owned workbook interface that abstracts over `ScDocument`
-   - Calc-backed and standalone adapters
+2. **Introduce an engine workbook facade backed by Calc** (**Validated foundation**)
+   - Engine-owned workbook facade contract with read queries, identity
+     types, mutation event vocabulary, first shadow consumers, and dedicated
+     standalone/Calc validation
+   - `CalcWorkbookFacade` (Calc adapter) and `InMemoryWorkbookFacade`
+     (standalone) implementations
+   - First live low-risk Calc consumer adoption still pending before full
+     milestone closeout
 3. **Extract dependency analysis and invalidation planning**
    - Separate dependency relationships from listener/broadcaster side effects
    - Engine-owned dirty-set and invalidation planner
@@ -576,5 +591,7 @@ The engine should not absorb:
   token model and compiler-host milestone plan with execution tracker
 - [COMPILER_SWITCHOVER.md](architecture/COMPILER_SWITCHOVER.md) — compiler
   switchover plan with phased execution checklist
+- [CALC_BACKED_WORKBOOK_FACADE.md](architecture/CALC_BACKED_WORKBOOK_FACADE.md) —
+  workbook facade milestone plan with phased execution checklist
 - [CALC_ENGINE_AUDIT.md](extraction-history/CALC_ENGINE_AUDIT.md) — audit of
   original Calc engine source files

@@ -154,6 +154,10 @@ add_spreadsheetengine_test(spreadsheetengine_fods_replay_tests
     ${SPREADSHEETENGINE_STANDALONE_FODS_REPLAY_TEST_SOURCES}
 )
 
+add_spreadsheetengine_test(spreadsheetengine_workbook_facade_tests
+    ${SPREADSHEETENGINE_STANDALONE_WORKBOOK_FACADE_TEST_SOURCES}
+)
+
 configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/spreadsheetengine-config.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/${SPREADSHEETENGINE_PACKAGE_NAME}-config.cmake"

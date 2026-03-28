@@ -575,49 +575,108 @@ These should stay deferred until the facade proves itself:
 
 ### Phase 0
 
-- [ ] freeze the v1 facade contract
-- [ ] freeze the first consumer set
-- [ ] freeze the first validation lanes
+- [x] freeze the v1 facade contract
+- [x] freeze the first consumer set
+- [x] freeze the first validation lanes
 
 ### Phase 1
 
-- [ ] add engine-owned facade headers and types
-- [ ] add type-level standalone tests
+- [x] add engine-owned facade headers and types
+- [x] add type-level standalone tests
 
 ### Phase 2
 
-- [ ] add Calc-backed workbook facade
-- [ ] add sheet lookup support
-- [ ] add cell and formula-cell read support
-- [ ] add Calc tests for the read surface
+- [x] add Calc-backed workbook facade
+- [x] add sheet lookup support
+- [x] add cell and formula-cell read support
+- [x] add Calc tests for the read surface
 
 ### Phase 3
 
-- [ ] add named-range enumeration and lookup
-- [ ] add formula metadata descriptors
-- [ ] add shared-formula/group descriptors
-- [ ] add Calc tests for range-name and group metadata
+- [x] add named-range enumeration and lookup
+- [x] add formula metadata descriptors
+- [x] add shared-formula/group descriptors
+- [x] add Calc tests for range-name and group metadata
 
 ### Phase 4
 
-- [ ] add first facade-driven shadow consumer
+- [x] add first facade-driven shadow consumer
 - [ ] adopt first low-risk direct consumer
-- [ ] keep fallback path green
+- [x] keep fallback path green
 
 ### Phase 5
 
-- [ ] add mutation event types
-- [ ] add Calc translation for representative mutation kinds
-- [ ] add mutation-event validation tests
+- [x] add mutation event types
+- [x] add Calc translation for representative mutation kinds
+- [x] add mutation-event validation tests
 
 ### Phase 6
 
-- [ ] document the stable facade subset
-- [ ] record deferred surfaces
-- [ ] wire the first dependency/invalidation plan to consume the facade
+- [x] document the stable facade subset
+- [x] record deferred surfaces
+- [x] wire the first dependency/invalidation plan to consume the facade
 - [ ] close out the milestone
 
 ## Current Status
 
-Not started.
+Phases 0-5 are implemented and now validated in both standalone and Calc.
+The milestone is not formally closed yet because the first live low-risk Calc
+consumer adoption is still pending.
 
+### Stable Facade Subset (Phase 6 Record)
+
+The following facade surface is stable and ready for dependency/invalidation
+consumption:
+
+**Read queries (stable):**
+- `getSheetCount()`, `findSheetId()`, `getSheetDescriptor()`, `getSheetDescriptors()`
+- `getGrammar()`, `getSnapshotInfo()`
+- `hasCell()`, `getCellDescriptor()`, `getFormulaCellDescriptor()`
+- `visitFormulaCells()`, `visitAllFormulaCells()`
+- `getNamedRangeCount()`, `findNamedRange()`, `getNamedRangeDescriptors()`
+- `getFormulaGroupDescriptor()`
+
+**Identity types (stable):**
+- `FormulaCellId`, `NamedRangeId`, `SheetId`
+
+**Mutation event vocabulary (stable, 14 kinds):**
+- `SetScalarValue`, `SetFormula`, `ClearCell`, `ClearRange`
+- `InsertRows`, `DeleteRows`, `InsertColumns`, `DeleteColumns`
+- `MoveRange`, `CopyRange`, `RenameSheet`
+- `AddNamedRange`, `RemoveNamedRange`, `RenameNamedRange`
+
+Named-range mutations now carry full before/after descriptors instead of only
+name text, so invalidation work can distinguish scope, base address, target
+expression, and rename old/new state without re-querying Calc.
+
+**Consumer utilities (stable):**
+- `consumers::enumerateFormulaCells()` — shadow formula-cell inventory
+- `consumers::summarizeFormulaGroups()` — shared-formula group summary
+- `consumers::inventoryNamedRanges()` — named-range inventory
+- `consumers::compareSnapshots()` — differential snapshot comparison
+- `consumers::collectFormulaCorpus()` — corpus collection for compile-diff
+
+**Deferred surfaces (not yet in facade):**
+- Conditional formatting state
+- Validation rules
+- Pivot/runtime caches
+- Listener graph ownership
+- Interpreter-specific runtime context
+- Rendering/import/export metadata
+- Full dependency graph structures
+- Recalculation scheduling state
+
+**Implementations:**
+- `InMemoryWorkbookFacade` — standalone testing implementation
+- `CalcWorkbookFacade` — Calc-backed adapter over `ScDocument`
+- `MutationTranslator` — Calc-side operation→event translation
+
+### Validation Status
+
+Validated lanes now include:
+
+- standalone `spreadsheetengine_workbook_facade_tests`
+- standalone full `ctest` suite
+- Calc `CppunitTest_sc_ucalc_workbook_facade`
+- Calc `CppunitTest_sc_ucalc_sharedformula`
+- Calc `CppunitTest_sc_ucalc`
