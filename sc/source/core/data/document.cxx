@@ -87,6 +87,9 @@
 #include <SparklineGroup.hxx>
 #include <SparklineList.hxx>
 #include <undomanager.hxx>
+#include <spreadsheetengine/compat/libreoffice/DependencyShadow.hxx>
+#include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
+#include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
 
 #include <formula/vectortoken.hxx>
 
@@ -3469,9 +3472,14 @@ void ScDocument::FillTabMarked( SCTAB nSrcTab, const ScMarkData& rMark,
 bool ScDocument::SetString( SCCOL nCol, SCROW nRow, SCTAB nTab, const OUString& rString,
                             const ScSetStringParam* pParam )
 {
+    using spreadsheetengine::compat::libreoffice::dependencyshadow::ScopedInvalidationShadow;
+
     ScTable* pTab = FetchTable(nTab);
     if (!pTab)
         return false;
+
+    const ScAddress aAddress(nCol, nRow, nTab);
+    const auto aShadow = ScopedInvalidationShadow::captureIfRuntimeEnabled(*this);
 
     const ScFormulaCell* pCurCellFormula = pTab->GetFormulaCell(nCol, nRow);
     if (pCurCellFormula && pCurCellFormula->IsShared())
@@ -3483,12 +3491,39 @@ bool ScDocument::SetString( SCCOL nCol, SCROW nRow, SCTAB nTab, const OUString& 
         // ScColumn::StartListeningUnshared().
 
         sc::EndListeningContext aCxt(*this);
-        ScAddress aPos(nCol, nRow, nTab);
-        EndListeningIntersectedGroup(aCxt, aPos, nullptr);
+        EndListeningIntersectedGroup(aCxt, aAddress, nullptr);
         aCxt.purgeEmptyBroadcasters();
     }
 
-    return pTab->SetString(nCol, nRow, nTab, rString, pParam);
+    const bool bChanged = pTab->SetString(nCol, nRow, nTab, rString, pParam);
+    if (bChanged)
+    {
+        aShadow.log(*this,
+            [&aAddress, &rString](const spreadsheetengine::compat::libreoffice::CalcWorkbookFacade&
+                                      rAfterFacade) {
+                const auto aApiAddress
+                    = spreadsheetengine::compat::libreoffice::toApiCellAddress(aAddress);
+                if (rAfterFacade.getFormulaCellDescriptor(aApiAddress))
+                {
+                    return spreadsheetengine::compat::libreoffice::mutation::translateSetFormula(
+                        aAddress, rString);
+                }
+
+                const auto aCell = rAfterFacade.getCellDescriptor(aApiAddress);
+                if (aCell.meKind
+                    == spreadsheetengine::detail::facade::CellKind::Empty)
+                {
+                    return spreadsheetengine::compat::libreoffice::mutation::translateClearCell(
+                        aAddress);
+                }
+
+                return spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue(
+                    aAddress);
+            },
+            "ScDocument::SetString");
+    }
+
+    return bChanged;
 }
 
 bool ScDocument::SetString(
@@ -3555,8 +3590,16 @@ void ScDocument::SetTextCell(const ScAddress& rPos, const OUString& rStr,
 
 void ScDocument::SetEmptyCell( const ScAddress& rPos )
 {
+    const auto aShadow
+        = spreadsheetengine::compat::libreoffice::dependencyshadow::ScopedInvalidationShadow::
+            captureIfRuntimeEnabled(*this);
     if (ScTable* pTable = FetchTable(rPos.Tab()))
+    {
         pTable->SetEmptyCell(rPos.Col(), rPos.Row());
+        aShadow.log(*this,
+            spreadsheetengine::compat::libreoffice::mutation::translateClearCell(rPos),
+            "ScDocument::SetEmptyCell");
+    }
 }
 
 void ScDocument::SetValue( SCCOL nCol, SCROW nRow, SCTAB nTab, const double& rVal )
@@ -3566,6 +3609,9 @@ void ScDocument::SetValue( SCCOL nCol, SCROW nRow, SCTAB nTab, const double& rVa
 
 void ScDocument::SetValue( const ScAddress& rPos, double fVal )
 {
+    const auto aShadow
+        = spreadsheetengine::compat::libreoffice::dependencyshadow::ScopedInvalidationShadow::
+            captureIfRuntimeEnabled(*this);
     ScTable* pTab = FetchTable(rPos.Tab());
     if (!pTab)
         return;
@@ -3585,6 +3631,9 @@ void ScDocument::SetValue( const ScAddress& rPos, double fVal )
     }
 
     pTab->SetValue(rPos.Col(), rPos.Row(), fVal);
+    aShadow.log(*this,
+        spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue(rPos),
+        "ScDocument::SetValue");
 }
 
 OUString ScDocument::GetString( SCCOL nCol, SCROW nRow, SCTAB nTab, ScInterpreterContext* pContext ) const

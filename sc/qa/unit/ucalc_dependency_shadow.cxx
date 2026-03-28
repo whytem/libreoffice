@@ -1,0 +1,310 @@
+/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/*
+ * This file is part of the LibreOffice project.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+#include "helper/qahelper.hxx"
+
+#include <algorithm>
+#include <set>
+
+#include <document.hxx>
+#include <rangenam.hxx>
+#include <scopetools.hxx>
+#include <spreadsheetengine/compat/libreoffice/DependencyShadow.hxx>
+#include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
+#include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
+#include <spreadsheetengine/detail/dependency/DependencySnapshot.hxx>
+#include <spreadsheetengine/detail/dependency/InvalidationPlanner.hxx>
+
+namespace
+{
+
+class TestDependencyShadow : public ScUcalcTestBase
+{
+};
+
+using spreadsheetengine::api::CellAddress;
+using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+using spreadsheetengine::compat::libreoffice::dependencyshadow::ScopedInvalidationShadow;
+using spreadsheetengine::compat::libreoffice::dependencyshadow::ShadowComparisonKind;
+using spreadsheetengine::detail::dependency::DirtyFormulaCell;
+
+struct AddressLess
+{
+    [[nodiscard]] bool operator()(const CellAddress& rLeft, const CellAddress& rRight) const
+    {
+        if (rLeft.mnSheet != rRight.mnSheet)
+            return rLeft.mnSheet < rRight.mnSheet;
+        if (rLeft.mnColumn != rRight.mnColumn)
+            return rLeft.mnColumn < rRight.mnColumn;
+        return rLeft.mnRow < rRight.mnRow;
+    }
+};
+
+[[nodiscard]] std::set<CellAddress, AddressLess> collectDirtyFormulaAddresses(
+    const CalcWorkbookFacade& rFacade)
+{
+    std::set<CellAddress, AddressLess> aResult;
+    rFacade.visitAllFormulaCells([&aResult](const spreadsheetengine::detail::facade::FormulaCellDescriptor& rDesc) {
+        if (rDesc.mbDirty || rDesc.mbNeedsRecalc)
+            aResult.insert(rDesc.maId.maAddress);
+        return true;
+    });
+    return aResult;
+}
+
+[[nodiscard]] std::set<CellAddress, AddressLess> collectDirtyFormulaAddresses(
+    const std::vector<DirtyFormulaCell>& rEntries)
+{
+    std::set<CellAddress, AddressLess> aResult;
+    for (const auto& rEntry : rEntries)
+        aResult.insert(rEntry.maAddress);
+    return aResult;
+}
+
+[[nodiscard]] bool isSubsetOf(const std::set<CellAddress, AddressLess>& rSubset,
+    const std::set<CellAddress, AddressLess>& rSuperset)
+{
+    return std::includes(rSuperset.begin(), rSuperset.end(), rSubset.begin(), rSubset.end(),
+        AddressLess {});
+}
+
+void assertConservativeSuperset(const std::set<CellAddress, AddressLess>& rActual,
+    const std::set<CellAddress, AddressLess>& rPredicted)
+{
+    CPPUNIT_ASSERT(isSubsetOf(rActual, rPredicted));
+}
+
+void assertNotUnderInvalidation(
+    const std::optional<spreadsheetengine::compat::libreoffice::dependencyshadow::ShadowComparison>&
+        oComparison)
+{
+    CPPUNIT_ASSERT(oComparison.has_value());
+    CPPUNIT_ASSERT(oComparison->meKind != ShadowComparisonKind::UnderInvalidation);
+}
+
+} // namespace
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testDirectAndTransitiveScalarInvalidationShadow)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+    using spreadsheetengine::detail::dependency::buildDependencySnapshot;
+    using spreadsheetengine::detail::dependency::planInvalidation;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetValue(0, 0, 1, 2.0); // A2
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr); // B1
+    m_pDoc->SetString(2, 0, 0, u"=B1"_ustr); // C1
+    m_pDoc->SetString(3, 0, 0, u"=SUM(A1:A2)"_ustr); // D1
+
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 1);
+    const auto aSnapshot = buildDependencySnapshot(aBeforeFacade);
+    const auto aPlan = planInvalidation(aSnapshot, translateSetScalarValue(ScAddress(0, 0, 0)));
+
+    m_pDoc->SetValue(0, 0, 0, 99.0);
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 2);
+    const auto aActual = collectDirtyFormulaAddresses(aAfterFacade);
+    const auto aPredicted = collectDirtyFormulaAddresses(aPlan.maDirtyFormulaCells);
+
+    CPPUNIT_ASSERT(aActual == aPredicted);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testNamedRangeInvalidationShadow)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+    using spreadsheetengine::detail::dependency::buildDependencySnapshot;
+    using spreadsheetengine::detail::dependency::planInvalidation;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetValue(0, 0, 1, 2.0); // A2
+
+    auto* pGlobalName = new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(pGlobalName));
+
+    m_pDoc->SetString(1, 0, 0, u"=SUM(Metrics)"_ustr); // B1
+    m_pDoc->SetString(2, 0, 0, u"=B1"_ustr); // C1
+
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 1);
+    const auto aSnapshot = buildDependencySnapshot(aBeforeFacade);
+    const auto aPlan = planInvalidation(aSnapshot, translateSetScalarValue(ScAddress(0, 1, 0)));
+
+    m_pDoc->SetValue(0, 1, 0, 9.0);
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 2);
+    const auto aActual = collectDirtyFormulaAddresses(aAfterFacade);
+    const auto aPredicted = collectDirtyFormulaAddresses(aPlan.maDirtyFormulaCells);
+
+    CPPUNIT_ASSERT(aActual == aPredicted);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testStructuralRowInsertShadow)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+    using spreadsheetengine::detail::dependency::buildDependencySnapshot;
+    using spreadsheetengine::detail::dependency::planInvalidation;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    m_pDoc->InsertTab(1, u"Summary"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // Data.A1
+    m_pDoc->SetValue(0, 1, 0, 2.0); // Data.A2
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr); // Data.B1
+    m_pDoc->SetString(2, 0, 0, u"=SUM(A1:A2)"_ustr); // Data.C1
+    m_pDoc->SetString(0, 0, 1, u"=Data.B1"_ustr); // Summary.A1
+
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 1);
+    const auto aSnapshot = buildDependencySnapshot(aBeforeFacade);
+    const auto aPlan = planInvalidation(aSnapshot, translateInsertRows(0, 1, 1));
+
+    m_pDoc->InsertRow(ScRange(0, 1, 0, m_pDoc->MaxCol(), 1, 0));
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 2);
+    const auto aActual = collectDirtyFormulaAddresses(aAfterFacade);
+    const auto aPredicted = collectDirtyFormulaAddresses(aPlan.maDirtyFormulaCells);
+
+    CPPUNIT_ASSERT(aPlan.mbRequiresSnapshotRebuild);
+    CPPUNIT_ASSERT(!aPlan.maRebuildScopes.empty());
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::detail::dependency::RebuildScopeKind::Workbook,
+        aPlan.maRebuildScopes.front().meKind);
+    assertConservativeSuperset(aActual, aPredicted);
+
+    m_pDoc->DeleteTab(1);
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testStructuralDeleteColumnShadow)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateDeleteColumns;
+    using spreadsheetengine::detail::dependency::buildDependencySnapshot;
+    using spreadsheetengine::detail::dependency::planInvalidation;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetValue(1, 0, 0, 2.0); // B1
+    m_pDoc->SetString(2, 0, 0, u"=A1+B1"_ustr); // C1
+    m_pDoc->SetString(3, 0, 0, u"=C1"_ustr); // D1
+
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 1);
+    const auto aSnapshot = buildDependencySnapshot(aBeforeFacade);
+    const auto aPlan = planInvalidation(aSnapshot, translateDeleteColumns(0, 1, 1));
+
+    m_pDoc->DeleteCol(0, 0, m_pDoc->MaxRow(), 0, 1, 1);
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 2);
+    const auto aActual = collectDirtyFormulaAddresses(aAfterFacade);
+
+    CPPUNIT_ASSERT(aPlan.mbRequiresSnapshotRebuild);
+    CPPUNIT_ASSERT(!aPlan.maRebuildScopes.empty());
+    CPPUNIT_ASSERT(static_cast<sal_Int32>(aActual.size())
+                   <= static_cast<sal_Int32>(aPlan.maDirtyFormulaCells.size()));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testWorkbookScaleShadowCorpus)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    using spreadsheetengine::detail::dependency::buildDependencySnapshot;
+    using spreadsheetengine::detail::dependency::planInvalidation;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    m_pDoc->InsertTab(1, u"Summary"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 5.0); // Data.A1
+    m_pDoc->SetValue(0, 1, 0, 7.0); // Data.A2
+
+    auto* pGlobalName = new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(pGlobalName));
+
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr); // Data.B1
+    m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr); // Data.B2
+    m_pDoc->SetString(2, 0, 0, u"=SUM(A1:A2)"_ustr); // Data.C1
+    m_pDoc->SetString(0, 0, 1, u"=Data.C1"_ustr); // Summary.A1
+    m_pDoc->SetString(1, 0, 1, u"=SUM(Metrics)"_ustr); // Summary.B1
+    m_pDoc->SetString(2, 0, 1, u"=B1"_ustr); // Summary.C1
+
+    m_pDoc->CalcAll();
+
+    {
+        const ScopedInvalidationShadow aShadow(*m_pDoc, true);
+
+        m_pDoc->SetValue(0, 0, 0, 9.0);
+
+        assertNotUnderInvalidation(
+            aShadow.compare(*m_pDoc, translateSetScalarValue(ScAddress(0, 0, 0))));
+    }
+
+    m_pDoc->CalcAll();
+
+    {
+        const ScopedInvalidationShadow aShadow(*m_pDoc, true);
+
+        m_pDoc->SetString(2, 0, 1, u"=IF(B1>0;B1;0)"_ustr);
+
+        assertNotUnderInvalidation(
+            aShadow.compare(*m_pDoc,
+                translateSetFormula(ScAddress(2, 0, 1), u"=IF(B1>0;B1;0)"_ustr)));
+    }
+
+    m_pDoc->DeleteTab(1);
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testRuntimeDependencyShadowAudit)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=B1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedInvalidationShadow aShadow(*m_pDoc, true);
+    CPPUNIT_ASSERT(aShadow.isCaptured());
+
+    m_pDoc->SetValue(0, 0, 0, 99.0);
+
+    const auto oComparison
+        = aShadow.compare(*m_pDoc, translateSetScalarValue(ScAddress(0, 0, 0)));
+    CPPUNIT_ASSERT(oComparison.has_value());
+    CPPUNIT_ASSERT_EQUAL(ShadowComparisonKind::Exact, oComparison->meKind);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_PLUGIN_IMPLEMENT();
+
+/* vim:set shiftwidth=4 softtabstop=4 expandtab: */

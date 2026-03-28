@@ -48,6 +48,7 @@ $(eval $(call gb_Module_add_check_targets,sc,\
 	CppunitTest_sc_ucalc_copypaste \
 	CppunitTest_sc_ucalc_compile_diff \
 	CppunitTest_sc_ucalc_compile_host \
+	CppunitTest_sc_ucalc_dependency_shadow \
 	CppunitTest_sc_ucalc_datatransformation \
 	CppunitTest_sc_ucalc_document_themes \
 	CppunitTest_sc_ucalc_formula \

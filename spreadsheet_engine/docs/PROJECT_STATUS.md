@@ -37,7 +37,8 @@ The project has completed two major programs and is actively working on a third:
 | Initial extraction (Phases 0-11) | **Complete** | Pure calculation logic, function families, matrix/execution substrate, host runtime, reference/dependency planning, and standalone packaging all extracted |
 | Token and compiler host model | **Complete** | Canonical token schema, compile-host interfaces, Calc bridge, shadow compiler, differential validation, first native consumers, and first bridged Calc compile adopters all in place |
 | Compiler switchover | **Active** | Standalone FODS replay now defaults to shared compiler path for all six enabled families; convergence hardening and broader lexical parity in progress |
-| Calc-backed workbook facade | **Validated foundation** | Engine-owned workbook facade contract with Calc-backed and in-memory implementations, richer named-range mutation payloads, and dedicated standalone/Calc validation lanes; first live low-risk Calc consumer adoption still pending |
+| Calc-backed workbook facade | **Complete** | Engine-owned workbook facade contract with Calc-backed and in-memory implementations, richer named-range mutation payloads, dedicated standalone/Calc validation lanes, and first live consumption through dependency-shadow runtime auditing |
+| Dependency and invalidation extraction | **Complete** | Engine-owned dependency snapshots, reverse dependency indexing, invalidation planning, structural rebuild scopes, workbook-scale Calc shadow corpus, maintenance-lane integration, and an opt-in runtime shadow audit are all in place |
 
 ### What the engine owns today
 
@@ -59,8 +60,15 @@ The project has completed two major programs and is actively working on a third:
   queries, shared-formula group metadata, mutation event vocabulary (14 kinds)
   with before/after named-range descriptors, first shadow consumers
   (formula-cell enumeration, group summary, named-range inventory, snapshot
-  comparison, formula corpus collection), and dedicated Calc-backed validation
-  via `CppunitTest_sc_ucalc_workbook_facade`
+  comparison, formula corpus collection), dedicated Calc-backed validation via
+  `CppunitTest_sc_ucalc_workbook_facade`, and first live runtime consumption
+  through dependency-shadow auditing
+- **Dependency and invalidation planning:** engine-owned dependency node/edge
+  model, workbook-facade snapshot builder, reverse-dependency index, named-range
+  and shared-group normalization, mutation-to-dirty planning, rebuild-scope
+  modeling, standalone dependency tests, workbook-scale Calc shadow validation
+  via `CppunitTest_sc_ucalc_dependency_shadow`, and opt-in runtime auditing of
+  `ScDocument::SetValue()`, `SetString()`, and `SetEmptyCell()`
 - **Standalone FODS runtime:** sparse workbook model, read-only FODS loader,
   ODF formula parser, lazy evaluator with memoization and cycle detection
 - **Raw FODS replay:** six function families fully enabled (logical,
@@ -95,14 +103,14 @@ spreadsheet_engine/
 │   ├── api/                    #   Engine-owned public API types
 │   ├── compat/                 #   LibreOffice adapter headers
 │   │   ├── formula/            #     Copied formula grammar helpers
-│   │   └── libreoffice/        #     Calc-specific integration adapters (21 headers)
+│   │   └── libreoffice/        #     Calc-specific integration adapters (22 headers)
 │   ├── detail/                 #   Internal implementation headers
 │   │   └── workbook/           #     Workbook facade contract and implementations
 │   └── runtime/                #   Standalone runtime helpers
 ├── shims/include/              # SAL/RTL type replacements for standalone
 ├── source/core/                # Implementation files
 ├── tests/
-│   ├── unit/                   #   24 test files (19 API/compiler + 4 FODS + 1 facade)
+│   ├── unit/                   #   25 test files (19 API/compiler + 4 FODS + 1 facade + 1 dependency)
 │   ├── consumer/               #   Installed-package consumer smoke test
 │   ├── data/fods/              #   FODS test fixture workbooks
 │   └── parity/                 #   Shared parity TSV datasets
@@ -143,11 +151,12 @@ Standalone function implementations: `MathScalar`, `MathTranscendental`,
 `DateTimeWorkday`, `NumeralConversion`, `InMemoryHost`, `LibraryProbe`.
 
 **Layer 5: LibreOffice Adapters** (`compat/libreoffice/`)
-Twenty-one thin adapter headers bridging engine types to Calc internals:
+Twenty-two thin adapter headers bridging engine types to Calc internals:
 `Host`, `Address`, `Error`, `String`, `Grammar`, `Config`, `Rounding`, `Date`,
 `LookupCache`, `SharedFormula`, `ReferenceUpdate`, `FormulaResult`, `Parsing`,
 `TextServices`, `LibraryProbe`, `TokenBridge`, `CompileHost`,
-`ShadowCompiler`, `CompilerDiff`, `WorkbookFacade`, `MutationTranslator`.
+`ShadowCompiler`, `CompilerDiff`, `WorkbookFacade`, `MutationTranslator`,
+`DependencyShadow`.
 
 **Layer 6: Shims** (`shims/include/`)
 Minimal SAL/RTL replacements for standalone builds: `sal/types.h`,
@@ -511,18 +520,21 @@ recommended sequencing:
 1. **Make the engine compiler authoritative** (extend current switchover work)
    - Native engine lowering that no longer depends on `ScCompiler`
    - Calc becomes a pure host adapter for compiler lookups
-2. **Introduce an engine workbook facade backed by Calc** (**Validated foundation**)
+2. **Introduce an engine workbook facade backed by Calc** (**Complete**)
    - Engine-owned workbook facade contract with read queries, identity
      types, mutation event vocabulary, first shadow consumers, and dedicated
      standalone/Calc validation
    - `CalcWorkbookFacade` (Calc adapter) and `InMemoryWorkbookFacade`
      (standalone) implementations
-   - First live low-risk Calc consumer adoption still pending before full
-     milestone closeout
-3. **Extract dependency analysis and invalidation planning**
+   - First live low-risk Calc consumer now present through dependency-shadow
+     runtime auditing
+3. **Extract dependency analysis and invalidation planning** (**Complete in shadow mode**)
    - Separate dependency relationships from listener/broadcaster side effects
-   - Engine-owned dirty-set and invalidation planner
-   - Calc continues executing side effects
+   - Engine-owned dirty-set and invalidation planner, reverse-dependency index,
+     structural rebuild scopes, workbook-scale shadow corpus, and maintenance
+     profile integration
+   - Calc continues executing side effects; engine audit remains opt-in and
+     non-authoritative
 4. **Extract recalculation scheduler**
    - Engine-owned recalc queue and scheduling policy
    - Calc uses engine planner output to drive execution

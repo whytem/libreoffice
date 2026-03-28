@@ -15,6 +15,7 @@
 #include <sal/types.h>
 
 #include <spreadsheetengine/api/String.hxx>
+#include <spreadsheetengine/spreadsheetenginedllapi.h>
 
 namespace spreadsheetengine::core::formula
 {
@@ -88,7 +89,7 @@ struct ParseResult
     constexpr explicit operator bool() const { return mbOk; }
 };
 
-[[nodiscard]] ParseResult parseFormula(api::StringView rFormula);
+[[nodiscard]] SPREADSHEETENGINE_DLLPUBLIC ParseResult parseFormula(api::StringView rFormula);
 
 } // namespace spreadsheetengine::core::formula
 

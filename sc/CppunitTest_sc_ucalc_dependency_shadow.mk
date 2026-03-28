@@ -9,6 +9,6 @@
 #
 #*************************************************************************
 
-$(eval $(call sc_ucalc_test,_compile_diff))
+$(eval $(call sc_ucalc_test,_dependency_shadow))
 
 # vim: set noet sw=4 ts=4:

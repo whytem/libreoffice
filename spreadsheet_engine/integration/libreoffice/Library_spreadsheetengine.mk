@@ -44,6 +44,7 @@ $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spreadsheet_engine/source/core/DateTimeWeek \
     spreadsheet_engine/source/core/DateTimeWorkday \
     spreadsheet_engine/source/core/ForceCalculation \
+    spreadsheet_engine/source/core/OdfFormulaParser \
     spreadsheet_engine/source/core/MathFinancial \
     spreadsheet_engine/source/core/MathRounding \
     spreadsheet_engine/source/core/MathScalar \

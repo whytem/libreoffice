@@ -43,6 +43,93 @@ snapshot and invalidation-planning layer that is validated in shadow against
 Calc for representative mutations and is ready to become the foundation for
 later scheduler extraction.
 
+## Current Implementation Status
+
+The first substantial extraction slice is now in the tree.
+
+Implemented:
+
+- engine-owned dependency contracts in
+  `detail/dependency/DependencyTypes.hxx`
+- workbook-facade snapshot building in
+  `detail/dependency/DependencySnapshot.hxx`
+- reverse-dependency indexing for formula-bearing nodes inside the snapshot
+- invalidation planning in
+  `detail/dependency/InvalidationPlanner.hxx`
+- opt-in Calc runtime auditing in
+  `compat/libreoffice/DependencyShadow.hxx`
+- standalone validation in
+  `tests/unit/dependency_invalidation_tests.cxx`
+- Calc shadow validation in
+  `sc/qa/unit/ucalc_dependency_shadow.cxx`
+- maintenance-profile integration via
+  `integration/libreoffice/run_spreadsheet_unit_tests.sh`
+
+Current promoted coverage:
+
+- direct single-cell dependencies
+- direct range dependencies
+- named-range dependencies
+- shared-formula group anchor normalization
+- non-structural mutations:
+  - `SetScalarValue`
+  - `SetFormula`
+  - `ClearCell`
+  - `ClearRange`
+- named-range mutations with rebuild signaling
+- structural mutations with conservative workbook rebuild scopes
+- Calc shadow comparison for representative structural edits
+- workbook-scale multi-sheet shadow corpus
+- first live runtime shadow consumer on:
+  - `ScDocument::SetValue()`
+  - `ScDocument::SetString()`
+  - `ScDocument::SetEmptyCell()`
+
+Current explicit limitations:
+
+- unsupported/dynamic constructs such as `INDIRECT`, `OFFSET`, parse failures,
+  and range constructors widen invalidation conservatively
+- structural edits still rely on workbook rebuild scopes rather than precise
+  address-stable parity after coordinate-shifting mutations
+- the runtime audit is opt-in (`SPREADSHEET_ENGINE_DEPENDENCY_SHADOW`) and
+  remains non-authoritative; Calc still owns actual dirty-bit side effects
+
+## Milestone Closeout Status
+
+The milestone is now closed out.
+
+Stable promoted mutation families:
+
+- `SetScalarValue`
+- `SetFormula`
+- named-range-dependent invalidation via value changes
+- representative structural rebuild mutations:
+  - insert rows
+  - delete columns
+
+Deferred unsupported or intentionally conservative areas:
+
+- precise post-shift structural address parity for all row/column mutations
+- runtime auditing for named-range mutations and structural edits
+- dynamic reference constructs (`INDIRECT`, `OFFSET`) and parse failures,
+  which still widen conservatively
+- authoritative dirty-bit ownership and recalc scheduling, which remain the
+  next extraction program
+
+Validation closeout summary:
+
+- standalone full suite: `26/26` passing
+- Calc dedicated lanes:
+  - `CppunitTest_sc_ucalc_dependency_shadow`
+  - `CppunitTest_sc_ucalc_workbook_facade`
+  - `CppunitTest_sc_ucalc_sharedformula`
+  - `CppunitTest_sc_ucalc_compile_diff`
+  - `CppunitTest_sc_ucalc`
+- Calc smoke profile now includes `CppunitTest_sc_ucalc_dependency_shadow`
+- the smoke profile still shares an unrelated pre-existing blocker:
+  `CppunitTest_sc_spreadsheet_functions_test` aborts during `address.fods`
+  import in `ScFormulaCell::CompileXML`
+
 ## Problem Statement
 
 Today Calc still owns:
@@ -671,55 +758,55 @@ These should remain deferred until this milestone proves itself:
 
 ### Phase 0
 
-- [ ] freeze first node kinds
-- [ ] freeze first mutation families
-- [ ] freeze acceptance policy for conservative widening
-- [ ] freeze first shadow corpus
+- [x] freeze first node kinds
+- [x] freeze first mutation families
+- [x] freeze acceptance policy for conservative widening
+- [x] freeze first shadow corpus
 
 ### Phase 1
 
-- [ ] add engine-owned dependency and invalidation types
-- [ ] add standalone type/report tests
+- [x] add engine-owned dependency and invalidation types
+- [x] add standalone type/report tests
 
 ### Phase 2
 
-- [ ] add dependency snapshot builder for direct refs
-- [ ] add reverse-dependency indexing
-- [ ] add Calc snapshot smoke tests
+- [x] add dependency snapshot builder for direct refs
+- [x] add reverse-dependency indexing
+- [x] add Calc snapshot smoke tests
 
 ### Phase 3
 
-- [ ] add non-structural invalidation planning
-- [ ] add dirty-reason reporting
-- [ ] add Calc shadow comparison for non-structural mutations
+- [x] add non-structural invalidation planning
+- [x] add dirty-reason reporting
+- [x] add Calc shadow comparison for non-structural mutations
 
 ### Phase 4
 
-- [ ] add named-range dependency support
-- [ ] add shared-formula group normalization
-- [ ] add named-range mutation invalidation planning
+- [x] add named-range dependency support
+- [x] add shared-formula group normalization
+- [x] add named-range mutation invalidation planning
 
 ### Phase 5
 
-- [ ] add rebuild-scope modeling
-- [ ] add structural mutation planning
-- [ ] add Calc shadow comparison for structural mutations
+- [x] add rebuild-scope modeling
+- [x] add structural mutation planning
+- [x] add Calc shadow comparison for structural mutations
 
 ### Phase 6
 
-- [ ] add workbook-scale shadow corpus
-- [ ] add summary diagnostics and maintenance-lane integration
+- [x] add workbook-scale shadow corpus
+- [x] add summary diagnostics and maintenance-lane integration
 
 ### Phase 7
 
-- [ ] add first real shadow invalidation consumer in Calc
-- [ ] keep fallback and safety lanes green
+- [x] add first real shadow invalidation consumer in Calc
+- [x] keep fallback and safety lanes green
 
 ### Phase 8
 
-- [ ] document stable promoted mutation families
-- [ ] document deferred unsupported areas
-- [ ] close out the milestone
+- [x] document stable promoted mutation families
+- [x] document deferred unsupported areas
+- [x] close out the milestone
 
 ## Recommended First Implementation Slice
 
