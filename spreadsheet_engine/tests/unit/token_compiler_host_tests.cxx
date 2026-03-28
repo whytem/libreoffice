@@ -329,7 +329,7 @@ int testWorkbookCompileHost()
         || rSupport.meDatabaseRanges != secompiler::LookupSupport::Unsupported
         || rSupport.meTableRefs != secompiler::LookupSupport::Unsupported
         || rSupport.meColRowNames != secompiler::LookupSupport::Unsupported
-        || rSupport.meExternalNames != secompiler::LookupSupport::Unsupported)
+        || rSupport.meExternalNames != secompiler::LookupSupport::Supported)
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook compile host support contract mismatch");
@@ -372,6 +372,10 @@ int testWorkbookCompileHost()
     const auto aCaseFolded = aHosts.mpNameResolver->lookupRangeName(u"mixedcase", 1, *oContext);
     const auto aMissingName
         = aHosts.mpNameResolver->lookupRangeName(u"UnknownName", 1, *oContext);
+    const auto aYearFrac
+        = aHosts.mpExternalNameResolver->lookupExternalName(u"YEARFRAC", *oContext);
+    const auto aDec2Hex
+        = aHosts.mpExternalNameResolver->lookupExternalName(u"dec2hex", *oContext);
 
     if (!aLocal || aLocal->mnSheet != 1 || aLocal->mnIndex != 2)
     {
@@ -399,6 +403,18 @@ int testWorkbookCompileHost()
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook missing range name unexpectedly resolved");
+    }
+    if (!aYearFrac || aYearFrac->mnFileId != 1
+        || aYearFrac->maName != u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYEARFRAC")
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook external YEARFRAC lookup mismatch");
+    }
+    if (!aDec2Hex || aDec2Hex->mnFileId != 1
+        || aDec2Hex->maName != u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDEC2HEX")
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook external DEC2HEX lookup mismatch");
     }
 
     if (aHosts.mpDatabaseRangeResolver->lookupDatabaseRange(u"DB", *oContext)
@@ -590,6 +606,28 @@ int testWorkbookCompilerLowering()
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook compiler lowering named-range payload mismatch");
+    }
+
+    const auto aExternalFunction = secompiler::lowerFormulaSource(u"of:=YEARFRAC(1;2;0)", aHost, *oContext);
+    if (!aExternalFunction || aExternalFunction.maFormula.maTokens.size() != 6
+        || aExternalFunction.maFormula.maTokens[0].meKind != setoken::Kind::Value
+        || aExternalFunction.maFormula.maTokens[1].meKind != setoken::Kind::Value
+        || aExternalFunction.maFormula.maTokens[2].meKind != setoken::Kind::Value
+        || aExternalFunction.maFormula.maTokens[3].meKind != setoken::Kind::ExternalName
+        || aExternalFunction.maFormula.maTokens[4].meKind != setoken::Kind::Byte
+        || aExternalFunction.maFormula.maTokens[5].mnOpCode
+               != secompiler::detail::kLoweredOpFunctionCall)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering external-name token shape mismatch");
+    }
+    const auto& rExternalName
+        = std::get<setoken::ExternalNameData>(aExternalFunction.maFormula.maTokens[3].maPayload);
+    if (rExternalName.mnFileId != 1
+        || rExternalName.maName != u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYEARFRAC")
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering external-name payload mismatch");
     }
 
     const auto aAdd = secompiler::lowerFormulaSource(u"of:=[.A1]+[.B1]", aHost, *oContext);

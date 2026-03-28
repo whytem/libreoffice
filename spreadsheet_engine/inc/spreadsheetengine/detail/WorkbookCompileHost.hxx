@@ -30,7 +30,7 @@ struct WorkbookCompileHostSupport
     LookupSupport meDatabaseRanges = LookupSupport::Unsupported;
     LookupSupport meTableRefs = LookupSupport::Unsupported;
     LookupSupport meColRowNames = LookupSupport::Unsupported;
-    LookupSupport meExternalNames = LookupSupport::Unsupported;
+    LookupSupport meExternalNames = LookupSupport::Supported;
 };
 
 inline constexpr api::Grammar kDefaultWorkbookCompileGrammar {
@@ -76,6 +76,8 @@ inline constexpr api::Grammar kDefaultWorkbookCompileGrammar {
 namespace detail
 {
 
+constexpr sal_uInt16 kBuiltinAddInCatalogId = 1;
+
 [[nodiscard]] constexpr sal_Unicode foldAscii(sal_Unicode c)
 {
     return (c >= u'A' && c <= u'Z') ? static_cast<sal_Unicode>(c - u'A' + u'a') : c;
@@ -93,6 +95,22 @@ namespace detail
     }
 
     return true;
+}
+
+[[nodiscard]] inline std::optional<api::String> lookupBuiltinExternalName(api::StringView rSymbol)
+{
+    if (equalLookupText(rSymbol, u"YEARFRAC"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYEARFRAC");
+    if (equalLookupText(rSymbol, u"CONVERT"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCONVERT");
+    if (equalLookupText(rSymbol, u"DEC2HEX"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDEC2HEX");
+    if (equalLookupText(rSymbol, u"MROUND"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETMROUND");
+    if (equalLookupText(rSymbol, u"MULTINOMIAL"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETMULTINOMIAL");
+
+    return std::nullopt;
 }
 
 } // namespace detail
@@ -167,8 +185,10 @@ public:
     }
 
     [[nodiscard]] std::optional<token::ExternalNameData> lookupExternalName(
-        api::StringView, const CompileContext&) const override
+        api::StringView rSymbol, const CompileContext&) const override
     {
+        if (const auto oBuiltin = detail::lookupBuiltinExternalName(rSymbol))
+            return token::ExternalNameData { detail::kBuiltinAddInCatalogId, *oBuiltin };
         return std::nullopt;
     }
 

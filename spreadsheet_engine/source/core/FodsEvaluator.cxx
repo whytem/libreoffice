@@ -1342,6 +1342,10 @@ struct InflatedStackItem
                 aStack.push_back({ InflatedStackItem::Kind::FunctionName, nullptr,
                     std::get<setoken::StringData>(rToken.maPayload).maText, {} });
                 break;
+            case setoken::Kind::ExternalName:
+                aStack.push_back({ InflatedStackItem::Kind::FunctionName, nullptr,
+                    std::get<setoken::ExternalNameData>(rToken.maPayload).maName, {} });
+                break;
             case setoken::Kind::Byte:
                 aStack.push_back(
                     { InflatedStackItem::Kind::Byte, nullptr, {}, std::get<setoken::ByteData>(rToken.maPayload) });

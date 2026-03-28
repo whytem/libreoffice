@@ -1001,8 +1001,15 @@ inline void pushJumpToken(
                 if (!pChild || !pushNodeTokens(*pChild, rHost, rContext, rResult))
                     return false;
             }
-            pushToken(rResult, token::Kind::StringName, token::kOpCodePush,
-                StringData { api::String(rNode.maPrimaryText), foldAsciiCase(rNode.maPrimaryText) });
+            if (const auto oExternal = rHost.lookupExternalName(rNode.maPrimaryText, rContext))
+            {
+                pushToken(rResult, token::Kind::ExternalName, token::kOpCodePush, *oExternal);
+            }
+            else
+            {
+                pushToken(rResult, token::Kind::StringName, token::kOpCodePush,
+                    StringData { api::String(rNode.maPrimaryText), foldAsciiCase(rNode.maPrimaryText) });
+            }
             pushToken(rResult, token::Kind::Byte, kLoweredOpArgumentCount,
                 ByteData { static_cast<sal_uInt8>(rNode.maChildren.size()),
                     token::kParamClassUnknown });

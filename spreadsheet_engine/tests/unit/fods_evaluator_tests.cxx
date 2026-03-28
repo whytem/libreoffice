@@ -64,6 +64,9 @@ Workbook makeWorkbook()
     aSheet1.setCell(20, 0, Cell { CellValue::text(u"AB"), u"of:=CLEAN(UNICHAR(128)&\"AB\")" });
     aSheet1.setCell(21, 0, Cell { CellValue::boolean(true), u"of:=EXACT(1;1)" });
     aSheet1.setCell(22, 0, Cell { CellValue::boolean(true), u"of:=EXACT(1;{1})" });
+    aSheet1.setCell(
+        23, 0,
+        Cell { CellValue::number(1.0), u"of:=YEARFRAC(DATE(2014;1;1);DATE(2015;1;1);0)" });
 
     Sheet aSheet2;
     aSheet2.maName = u"Sheet2";
@@ -188,6 +191,16 @@ int main()
         {
             return fail("spreadsheetengine_fods_evaluator_tests",
                 "compiled cached fallback mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 23, 0 });
+        if (!aResult || !aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 1.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "compiled external-name cached fallback mismatch");
         }
     }
 

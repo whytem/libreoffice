@@ -538,15 +538,20 @@ Current checkpoint:
       `COM.MICROSOFT.CONCAT(...)`, `ORG.OPENOFFICE.CONVERT(...)`,
       `CONVERT(...)`, `DEC2HEX(...)`, `MROUND(...)`, `MULTINOMIAL(...)`,
       and `YEARFRAC(...)`
+    - non-lexical standalone lowering now emits real `ExternalName` tokens for
+      a first curated add-in subset (`CONVERT`, `DEC2HEX`, `MROUND`,
+      `MULTINOMIAL`, `YEARFRAC`) instead of collapsing every unsupported
+      function head into the generic `StringName` call carrier
   - lexical jump tokens imported from Calc are now canonicalized to ignore the
     undefined trailing payload bytes produced by `FormulaTokenArray::AddOpCode()`
     for `ocIf*`/`ocChoose`/`ocLet`, so exact parity checks compare stable
     canonical content rather than stack garbage
   - the remaining gap is broader lexical function-catalog coverage and full
     stream parity: standalone execution lowering still uses a separate
-    RPN-oriented execution path, and lexical lowering still needs more
+    RPN-oriented execution path, lexical lowering still needs more
     add-in/external-name coverage and edge-form handling before corpus-wide
-    exact parity can be asserted
+    exact parity can be asserted, and the new non-lexical external-name path
+    still needs convergence with Calc-backed canonical external-name shapes
 - the maintained Calc profiles now keep the adopted compiler/bridge call-site
   targets in the regular loop:
   - `CppunitTest_sc_ucalc_token_bridge`
