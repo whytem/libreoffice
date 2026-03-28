@@ -230,6 +230,38 @@ inline formula::ParamClass extractInForceArray(const formula::FormulaToken& rTok
     return rToken.GetInForceArray();
 }
 
+inline bool isLexicalSeparatorToken(const formula::FormulaToken& rToken)
+{
+    switch (rToken.GetOpCode())
+    {
+        case ocOpen:
+        case ocClose:
+        case ocSep:
+        case ocArrayOpen:
+        case ocArrayClose:
+        case ocArrayRowSep:
+        case ocArrayColSep:
+            return true;
+        default:
+            return false;
+    }
+}
+
+inline bool usesUndefinedLexicalJumpPayload(OpCode eOpCode)
+{
+    switch (eOpCode)
+    {
+        case ocIf:
+        case ocIfError:
+        case ocIfNA:
+        case ocChoose:
+        case ocLet:
+            return true;
+        default:
+            return false;
+    }
+}
+
 inline bool exportMatrix(
     const setoken::MatrixData& rData, ScTokenArray& rArray, sal_uInt16 nTokenIndex,
     TokenExportStatus& rStatus)
@@ -276,8 +308,8 @@ inline bool exportMatrix(
     return true;
 }
 
-inline setoken::Token importSingleToken(
-    const formula::FormulaToken& rToken, sal_uInt16 nTokenIndex, TokenImportStatus& rStatus)
+inline setoken::Token importSingleToken(const formula::FormulaToken& rToken, sal_uInt16 nTokenIndex,
+    bool bNormalizeLexicalJumpPayloads, TokenImportStatus& rStatus)
 {
     using namespace spreadsheetengine::detail::token;
 
@@ -379,6 +411,11 @@ inline setoken::Token importSingleToken(
 
             JumpData aData;
             aData.maJumps.assign(pJump, pJump + pJump[0] + 1);
+            if (bNormalizeLexicalJumpPayloads && usesUndefinedLexicalJumpPayload(rToken.GetOpCode()))
+            {
+                for (std::size_t nIndex = 1; nIndex < aData.maJumps.size(); ++nIndex)
+                    aData.maJumps[nIndex] = 0;
+            }
             aData.mnInForceArray = toEngineParamClass(extractInForceArray(rToken));
             return { Kind::Jump, nOpCode, std::move(aData) };
         }
@@ -675,6 +712,15 @@ inline TokenSequenceImportStatus importTokenSequence(formula::FormulaTokenArrayS
     formula::FormulaToken** pEnd = aTokens.end();
     if (pBegin && pEnd)
         aStatus.maTokens.reserve(static_cast<std::size_t>(pEnd - pBegin));
+    bool bNormalizeLexicalJumpPayloads = false;
+    for (formula::FormulaToken* pToken : aTokens)
+    {
+        if (pToken && detail::isLexicalSeparatorToken(*pToken))
+        {
+            bNormalizeLexicalJumpPayloads = true;
+            break;
+        }
+    }
     sal_uInt16 nTokenIndex = 0;
     for (formula::FormulaToken* pToken : aTokens)
     {
@@ -685,7 +731,8 @@ inline TokenSequenceImportStatus importTokenSequence(formula::FormulaTokenArrayS
         }
 
         TokenImportStatus aTokenStatus;
-        setoken::Token aToken = detail::importSingleToken(*pToken, nTokenIndex, aTokenStatus);
+        setoken::Token aToken = detail::importSingleToken(
+            *pToken, nTokenIndex, bNormalizeLexicalJumpPayloads, aTokenStatus);
         if (!aTokenStatus)
         {
             detail::setFailure(aStatus, aTokenStatus.mnFailureIndex, aTokenStatus.maFailureMessage);

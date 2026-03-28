@@ -624,6 +624,30 @@ int testWorkbookCompilerLowering()
             "workbook compiler lexical IFERROR lowering mismatch");
     }
 
+    const auto expectLexicalOpcode = [&](std::u16string_view rFormula, setoken::OpCodeValue nOpCode) {
+        const auto aLexical = secompiler::lowerFormulaSourceLexical(rFormula, aHost, *oContext);
+        return aLexical && !aLexical.maFormula.maTokens.empty()
+               && aLexical.maFormula.maTokens.front().mnOpCode == nOpCode
+               && aLexical.maFormula.maTokens[0].meKind != setoken::Kind::PlainOpcode;
+    };
+
+    if (!expectLexicalOpcode(u"of:=FALSE()", setoken::kOpCodeFalse)
+        || !expectLexicalOpcode(u"of:=AND([.A1];[.B1])", setoken::kOpCodeAnd)
+        || !expectLexicalOpcode(u"of:=ISERROR([.A1]/0)", setoken::kOpCodeIsError)
+        || !expectLexicalOpcode(u"of:=ROUND(1.234;2)", setoken::kOpCodeRound)
+        || !expectLexicalOpcode(u"of:=DATE(2015;1;11)", setoken::kOpCodeGetDate)
+        || !expectLexicalOpcode(u"of:=TIME(1;23;0)", setoken::kOpCodeGetTime)
+        || !expectLexicalOpcode(u"of:=CHAR(65)", setoken::kOpCodeChar)
+        || !expectLexicalOpcode(u"of:=CODE(\"A\")", setoken::kOpCodeCode)
+        || !expectLexicalOpcode(u"of:=COLUMNS([.A1:.B2])", setoken::kOpCodeColumns)
+        || !expectLexicalOpcode(u"of:=AREAS([.A1:.B2])", setoken::kOpCodeAreas)
+        || !expectLexicalOpcode(u"of:=MMULT([.A1:.B2];[.C1:.D2])", setoken::kOpCodeMatMult)
+        || !expectLexicalOpcode(u"of:=DECIMAL(\"10\";2)", setoken::kOpCodeDecimal))
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lexical extended opcode lowering mismatch");
+    }
+
     const auto aLexicalCompatName = secompiler::lowerFormulaSourceLexical(
         u"of:=COM.MICROSOFT.CONCAT(\"a\";\"b\")", aHost, *oContext);
     if (!aLexicalCompatName || aLexicalCompatName.maFormula.maTokens.size() != 6

@@ -129,12 +129,18 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeGetTimeValue;
     if (aNormalized == u"CLEAN")
         return token::kOpCodeClean;
+    if (aNormalized == u"CHAR")
+        return token::kOpCodeChar;
+    if (aNormalized == u"CODE")
+        return token::kOpCodeCode;
     if (aNormalized == u"FORMULA")
         return token::kOpCodeFormula;
     if (aNormalized == u"UNICHAR")
         return token::kOpCodeUnichar;
     if (aNormalized == u"ISOWEEKNUM")
         return token::kOpCodeIsoWeeknum;
+    if (aNormalized == u"ROUND")
+        return token::kOpCodeRound;
     if (aNormalized == u"DATE")
         return token::kOpCodeGetDate;
     if (aNormalized == u"TIME")
@@ -147,6 +153,8 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeMax;
     if (aNormalized == u"SUM")
         return token::kOpCodeSum;
+    if (aNormalized == u"COLUMNS")
+        return token::kOpCodeColumns;
     if (aNormalized == u"SUBTOTAL")
         return token::kOpCodeSubTotal;
     if (aNormalized == u"LOOKUP")
@@ -155,8 +163,14 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeVLookup;
     if (aNormalized == u"HLOOKUP")
         return token::kOpCodeHLookup;
+    if (aNormalized == u"AREAS")
+        return token::kOpCodeAreas;
     if (aNormalized == u"EXACT")
         return token::kOpCodeExact;
+    if (aNormalized == u"MMULT")
+        return token::kOpCodeMatMult;
+    if (aNormalized == u"DECIMAL")
+        return token::kOpCodeDecimal;
     if (aNormalized == u"AGGREGATE")
         return token::kOpCodeAggregate;
     if (aNormalized == u"RAWSUBTRACT")

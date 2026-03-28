@@ -523,12 +523,19 @@ Current checkpoint:
     - operators and comparisons
     - references and range names
     - representative function calls like `SUM`, `DATEVALUE`, `FORMULA`,
-      `VLOOKUP`, `IFERROR`, `MAX`, and `MOD`
+      `VLOOKUP`, `IFERROR`, `IFNA`, `FALSE`, `AND`, `ISERROR`, `ROUND`,
+      `DATE`, `TIME`, `CHAR`, `CODE`, `COLUMNS`, `AREAS`, `DECIMAL`,
+      `MMULT`, `MAX`, and `MOD`
     - dotted compatibility-name preservation like `COM.MICROSOFT.CONCAT(...)`
-  - the remaining gap is broader lexical function-catalog and special-form
-    coverage: standalone execution lowering still uses a separate RPN-oriented
-    execution path, and lexical lowering still needs more function opcodes and
-    edge-form handling before full-stream parity can be asserted corpus-wide
+  - lexical jump tokens imported from Calc are now canonicalized to ignore the
+    undefined trailing payload bytes produced by `FormulaTokenArray::AddOpCode()`
+    for `ocIf*`/`ocChoose`/`ocLet`, so exact parity checks compare stable
+    canonical content rather than stack garbage
+  - the remaining gap is broader lexical function-catalog coverage and full
+    stream parity: standalone execution lowering still uses a separate
+    RPN-oriented execution path, and lexical lowering still needs more function
+    opcodes and edge-form handling before corpus-wide exact parity can be
+    asserted
 - the maintained Calc profiles now keep the adopted compiler/bridge call-site
   targets in the regular loop:
   - `CppunitTest_sc_ucalc_token_bridge`

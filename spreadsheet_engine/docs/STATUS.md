@@ -113,8 +113,13 @@ The main remaining convergence gap is exact canonical token-stream parity
 between standalone lowering and Calc-imported canonical tokens outside the new
 mixed lexical smoke subset. Ordinary-formula XML formula-source preservation is
 now aligned, and focused Calc smoke now covers exact lexical parity for
-operators, references, range names, representative function calls, and dotted
-compatibility-name preservation. The remaining gap is broader function-catalog
+operators, references, range names, a wider representative function subset
+(`SUM`, `DATEVALUE`, `FORMULA`, `VLOOKUP`, `IFERROR`, `IFNA`, `FALSE`, `AND`,
+`ISERROR`, `ROUND`, `DATE`, `TIME`, `CHAR`, `CODE`, `COLUMNS`, `AREAS`,
+`DECIMAL`, `MMULT`, `MAX`, `MOD`), and dotted compatibility-name preservation.
+Lexical jump tokens imported from Calc are also normalized now so parity checks
+ignore the undefined trailing payload bytes that Calc’s lexical `ocIf*` jump
+construction leaves uninitialized. The remaining gap is broader function-catalog
 and full-stream lexical parity, because standalone execution lowering still
 carries an RPN-oriented function-call path alongside the Calc-shaped lexical
 lowering used for parity checks.
