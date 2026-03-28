@@ -112,8 +112,44 @@ void assertStandaloneLowerMetadataMatchesCalc(ScDocument& rDoc,
     CPPUNIT_ASSERT_MESSAGE(OUString(rLabel).toUtf8().getStr(), static_cast<bool>(aLowered));
     CPPUNIT_ASSERT_EQUAL(
         aShadow.maStatus.maFormula.mnCodeError, aLowered.maFormula.mnCodeError);
+    CPPUNIT_ASSERT_EQUAL(aShadow.maStatus.maFormula.moXmlFormulaSource.has_value(),
+        aLowered.maFormula.moXmlFormulaSource.has_value());
     CPPUNIT_ASSERT(!aShadow.maStatus.maFormula.maTokens.empty());
     CPPUNIT_ASSERT(!aLowered.maFormula.maTokens.empty());
+}
+
+void assertStandaloneLowerTokensExactlyMatchCalc(ScDocument& rDoc,
+    spreadsheetengine::compat::libreoffice::DocumentCompileHost& rCalcHost,
+    const spreadsheetengine::core::workbook::Workbook& rWorkbook, const ScAddress& rPos,
+    std::u16string_view rFormula, formula::FormulaGrammar::Grammar eGrammar,
+    std::u16string_view rLabel)
+{
+    using spreadsheetengine::compat::libreoffice::shadowCompileFormula;
+    using spreadsheetengine::detail::compiler::WorkbookCompileHost;
+    using spreadsheetengine::detail::compiler::lowerFormulaSourceLexical;
+    using spreadsheetengine::detail::tokenstringifier::compiledFormulaToDiagnosticString;
+
+    const auto aShadow = shadowCompileFormula(
+        rDoc, makeRequest(rCalcHost, rPos, OUString(rFormula), eGrammar));
+    CPPUNIT_ASSERT_MESSAGE(OUString(rLabel).toUtf8().getStr(), static_cast<bool>(aShadow));
+
+    WorkbookCompileHost aWorkbookHost(rWorkbook);
+    const auto aContext = spreadsheetengine::detail::compiler::makeWorkbookCompileContext(
+        { static_cast<spreadsheetengine::api::SheetId>(rPos.Tab()),
+          static_cast<spreadsheetengine::api::ColumnIndex>(rPos.Col()),
+          static_cast<spreadsheetengine::api::RowIndex>(rPos.Row()) },
+        spreadsheetengine::compat::libreoffice::toApiGrammar(eGrammar));
+    const auto aLowered = lowerFormulaSourceLexical(rFormula, aWorkbookHost, aContext);
+    CPPUNIT_ASSERT_MESSAGE(OUString(rLabel).toUtf8().getStr(), static_cast<bool>(aLowered));
+
+    const bool bEqual = aShadow.maStatus.maFormula.maTokens == aLowered.maFormula.maTokens;
+    const OUString aMessage = OUString(rLabel) + u"\ncalc="_ustr
+                              + spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                                  compiledFormulaToDiagnosticString(aShadow.maStatus.maFormula))
+                              + u"\nstandalone="_ustr
+                              + spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                                  compiledFormulaToDiagnosticString(aLowered.maFormula));
+    CPPUNIT_ASSERT_MESSAGE(aMessage.toUtf8().getStr(), bEqual);
 }
 
 void assertShadowDiff(
@@ -261,6 +297,42 @@ CPPUNIT_TEST_FIXTURE(TestCompileDiff, testStandaloneLoweringMetadataSmoke)
     for (const auto& rSample : aSamples)
     {
         assertStandaloneLowerMetadataMatchesCalc(*pDoc, aHost, aWorkbook, ScAddress(0, 0, 0),
+            rSample.maFormula, getEnglishOooGrammar(), rSample.maLabel);
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(TestCompileDiff, testStandaloneLoweringOperatorTokenParitySmoke)
+{
+    ScDocument* pDoc = m_pDoc;
+    CPPUNIT_ASSERT(pDoc);
+    if (pDoc->GetTableCount() == 0)
+        CPPUNIT_ASSERT(pDoc->InsertTab(0, u"Sheet1"_ustr));
+
+    CPPUNIT_ASSERT(pDoc->GetRangeName()->insert(
+        new ScRangeData(*pDoc, u"GlobalMetric"_ustr, u"$Sheet1.$A$1"_ustr)));
+
+    auto aWorkbook = makeStandaloneWorkbook();
+    addStandaloneNamedRange(aWorkbook, u"GlobalMetric", u"Sheet1.A1");
+
+    spreadsheetengine::compat::libreoffice::DocumentCompileHost aHost(*pDoc);
+
+    const struct
+    {
+        std::u16string_view maLabel;
+        std::u16string_view maFormula;
+    } aSamples[] = {
+        { u"single_ref_add", u"=A1+B1" },
+        { u"concat_operator", u"=A1&B1" },
+        { u"compare_equal", u"=A1=B1" },
+        { u"compare_less_equal", u"=A1<=B1" },
+        { u"unary_minus", u"=-A1" },
+        { u"double_ref_push", u"=A1:B2" },
+        { u"range_name_add", u"=GlobalMetric+1" },
+    };
+
+    for (const auto& rSample : aSamples)
+    {
+        assertStandaloneLowerTokensExactlyMatchCalc(*pDoc, aHost, aWorkbook, ScAddress(0, 0, 0),
             rSample.maFormula, getEnglishOooGrammar(), rSample.maLabel);
     }
 }

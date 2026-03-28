@@ -517,11 +517,12 @@ Current checkpoint:
   - error literals
   - range-name formulas
 - current limitation:
-  - exact canonical token-stream parity is not yet asserted here because the
-    standalone lowerer still uses synthetic operator/function encodings that
-    intentionally differ from Calc's imported canonical stream
-  - XML formula-source preservation also still diverges between the two paths
-    on representative formulas
+  - XML formula-source preservation is now aligned for ordinary lowered formulas
+  - exact canonical token-stream parity is now asserted on a small operator-only
+    lexical smoke subset
+  - the remaining gap is broader lexical/function-call token parity: standalone
+    execution lowering still uses a separate RPN-oriented function-call encoding,
+    while Calc's imported canonical stream carries lexical function/opcode tokens
 - the maintained Calc profiles now keep the adopted compiler/bridge call-site
   targets in the regular loop:
   - `CppunitTest_sc_ucalc_token_bridge`

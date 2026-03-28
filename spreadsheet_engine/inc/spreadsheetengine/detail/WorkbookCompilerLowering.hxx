@@ -66,19 +66,6 @@ namespace detail
 {
 
 constexpr token::OpCodeValue kLoweredOpUnaryPlus = 0x8001;
-constexpr token::OpCodeValue kLoweredOpUnaryMinus = 0x8002;
-constexpr token::OpCodeValue kLoweredOpBinaryAdd = 0x8003;
-constexpr token::OpCodeValue kLoweredOpBinarySubtract = 0x8004;
-constexpr token::OpCodeValue kLoweredOpBinaryMultiply = 0x8005;
-constexpr token::OpCodeValue kLoweredOpBinaryDivide = 0x8006;
-constexpr token::OpCodeValue kLoweredOpBinaryPower = 0x8007;
-constexpr token::OpCodeValue kLoweredOpBinaryConcat = 0x8008;
-constexpr token::OpCodeValue kLoweredOpBinaryEqual = 0x8009;
-constexpr token::OpCodeValue kLoweredOpBinaryNotEqual = 0x800a;
-constexpr token::OpCodeValue kLoweredOpBinaryLess = 0x800b;
-constexpr token::OpCodeValue kLoweredOpBinaryLessEqual = 0x800c;
-constexpr token::OpCodeValue kLoweredOpBinaryGreater = 0x800d;
-constexpr token::OpCodeValue kLoweredOpBinaryGreaterEqual = 0x800e;
 constexpr token::OpCodeValue kLoweredOpFunctionCall = 0x800f;
 constexpr token::OpCodeValue kLoweredOpRangeConstructor = 0x8010;
 constexpr token::OpCodeValue kLoweredOpReferenceList = 0x8011;
@@ -531,7 +518,7 @@ constexpr api::RowIndex kSmokeMaxRow = 1048575;
         case core::formula::UnaryOperator::Plus:
             return kLoweredOpUnaryPlus;
         case core::formula::UnaryOperator::Minus:
-            return kLoweredOpUnaryMinus;
+            return token::kOpCodeNegSub;
     }
     return kLoweredOpUnaryPlus;
 }
@@ -541,31 +528,31 @@ constexpr api::RowIndex kSmokeMaxRow = 1048575;
     switch (eOperator)
     {
         case core::formula::BinaryOperator::Add:
-            return kLoweredOpBinaryAdd;
+            return token::kOpCodeAdd;
         case core::formula::BinaryOperator::Subtract:
-            return kLoweredOpBinarySubtract;
+            return token::kOpCodeSub;
         case core::formula::BinaryOperator::Multiply:
-            return kLoweredOpBinaryMultiply;
+            return token::kOpCodeMul;
         case core::formula::BinaryOperator::Divide:
-            return kLoweredOpBinaryDivide;
+            return token::kOpCodeDiv;
         case core::formula::BinaryOperator::Power:
-            return kLoweredOpBinaryPower;
+            return token::kOpCodePow;
         case core::formula::BinaryOperator::Concat:
-            return kLoweredOpBinaryConcat;
+            return token::kOpCodeAmpersand;
         case core::formula::BinaryOperator::Equal:
-            return kLoweredOpBinaryEqual;
+            return token::kOpCodeEqual;
         case core::formula::BinaryOperator::NotEqual:
-            return kLoweredOpBinaryNotEqual;
+            return token::kOpCodeNotEqual;
         case core::formula::BinaryOperator::Less:
-            return kLoweredOpBinaryLess;
+            return token::kOpCodeLess;
         case core::formula::BinaryOperator::LessEqual:
-            return kLoweredOpBinaryLessEqual;
+            return token::kOpCodeLessEqual;
         case core::formula::BinaryOperator::Greater:
-            return kLoweredOpBinaryGreater;
+            return token::kOpCodeGreater;
         case core::formula::BinaryOperator::GreaterEqual:
-            return kLoweredOpBinaryGreaterEqual;
+            return token::kOpCodeGreaterEqual;
     }
-    return kLoweredOpBinaryAdd;
+    return token::kOpCodeAdd;
 }
 
 inline void pushToken(
@@ -573,6 +560,12 @@ inline void pushToken(
     token::Payload aPayload = {})
 {
     rResult.maFormula.maTokens.push_back({ eKind, nOpCode, std::move(aPayload) });
+}
+
+inline void pushOperatorByteToken(FormulaLoweringResult& rResult, token::OpCodeValue nOpCode)
+{
+    pushToken(rResult, token::Kind::Byte, nOpCode,
+        token::ByteData { 0, token::kParamClassUnknown });
 }
 
 [[nodiscard]] inline bool pushNodeTokens(
@@ -797,24 +790,97 @@ inline void pushToken(
             {
                 return false;
             }
-            pushToken(rResult, token::Kind::PlainOpcode, kLoweredOpRangeConstructor, {});
+            pushToken(rResult, token::Kind::PlainOpcode, token::kOpCodeRange, {});
             return true;
 
         case NodeKind::ReferenceList:
-            for (const auto& pChild : rNode.maChildren)
+            if (rNode.maChildren.size() < 2)
             {
-                if (!pChild || !pushNodeTokens(*pChild, rHost, rContext, rResult))
-                    return false;
+                setFailure(rResult, FormulaLoweringReason::UnsupportedNodeKind, u"ReferenceList");
+                return false;
             }
-            pushToken(rResult, token::Kind::Byte, kLoweredOpArgumentCount,
-                ByteData { static_cast<sal_uInt8>(rNode.maChildren.size()),
-                    token::kParamClassUnknown });
-            pushToken(rResult, token::Kind::PlainOpcode, kLoweredOpReferenceList, {});
+            if (!rNode.maChildren[0] || !pushNodeTokens(*rNode.maChildren[0], rHost, rContext, rResult))
+                return false;
+            for (std::size_t nIndex = 1; nIndex < rNode.maChildren.size(); ++nIndex)
+            {
+                if (!rNode.maChildren[nIndex]
+                    || !pushNodeTokens(*rNode.maChildren[nIndex], rHost, rContext, rResult))
+                {
+                    return false;
+                }
+                pushToken(rResult, token::Kind::PlainOpcode, token::kOpCodeUnion, {});
+            }
             return true;
     }
 
     setFailure(rResult, FormulaLoweringReason::UnsupportedNodeKind);
     return false;
+}
+
+[[nodiscard]] inline bool pushNodeTokensLexical(
+    const core::formula::Node& rNode, const WorkbookCompileHost& rHost,
+    const CompileContext& rContext, FormulaLoweringResult& rResult)
+{
+    using core::formula::NodeKind;
+    using spreadsheetengine::detail::token::StringData;
+
+    switch (rNode.meKind)
+    {
+        case NodeKind::NumberLiteral:
+            pushToken(rResult, token::Kind::Value, token::kOpCodePush, rNode.mfNumber);
+            return true;
+
+        case NodeKind::StringLiteral:
+            pushToken(rResult, token::Kind::String, token::kOpCodePush,
+                StringData { api::String(rNode.maPrimaryText), api::String(rNode.maPrimaryText) });
+            return true;
+
+        case NodeKind::BooleanLiteral:
+            pushToken(rResult, token::Kind::Value, token::kOpCodePush, rNode.mbBoolean ? 1.0 : 0.0);
+            return true;
+
+        case NodeKind::ErrorLiteral:
+            pushToken(rResult, token::Kind::Error, token::kOpCodePush,
+                mapErrorLiteral(rNode.maPrimaryText));
+            return true;
+
+        case NodeKind::EmptyArgument:
+            pushToken(rResult, token::Kind::Missing, token::kOpCodePush, {});
+            return true;
+
+        case NodeKind::CellReference:
+        case NodeKind::RangeReference:
+        case NodeKind::NamedReference:
+        case NodeKind::ArrayConstant:
+            return pushNodeTokens(rNode, rHost, rContext, rResult);
+
+        case NodeKind::UnaryOperation:
+            if (rNode.maChildren.size() != 1 || !rNode.maChildren.front())
+            {
+                setFailure(rResult, FormulaLoweringReason::UnsupportedNodeKind, u"UnaryOperation");
+                return false;
+            }
+            if (rNode.meUnaryOperator == core::formula::UnaryOperator::Plus)
+                pushOperatorByteToken(rResult, kLoweredOpUnaryPlus);
+            else
+                pushOperatorByteToken(rResult, unaryOpcode(rNode.meUnaryOperator));
+            return pushNodeTokensLexical(*rNode.maChildren.front(), rHost, rContext, rResult);
+
+        case NodeKind::BinaryOperation:
+            if (rNode.maChildren.size() != 2 || !rNode.maChildren[0] || !rNode.maChildren[1])
+            {
+                setFailure(rResult, FormulaLoweringReason::UnsupportedNodeKind, u"BinaryOperation");
+                return false;
+            }
+            if (!pushNodeTokensLexical(*rNode.maChildren[0], rHost, rContext, rResult))
+                return false;
+            pushOperatorByteToken(rResult, binaryOpcode(rNode.meBinaryOperator));
+            return pushNodeTokensLexical(*rNode.maChildren[1], rHost, rContext, rResult);
+
+        default:
+            setFailure(rResult, FormulaLoweringReason::UnsupportedNodeKind, u"LexicalUnsupported");
+            return false;
+    }
 }
 
 } // namespace detail
@@ -834,11 +900,24 @@ inline void pushToken(
     if (!detail::pushNodeTokens(*aParsed.mpRoot, rHost, rContext, aResult))
         return aResult;
 
-    api::String aNamespace;
-    if (rFormula.starts_with(u"of:="))
-        aNamespace = u"of";
-    aResult.maFormula.moXmlFormulaSource
-        = token::XmlFormulaSource { api::String(rFormula), std::move(aNamespace) };
+    return aResult;
+}
+
+[[nodiscard]] inline FormulaLoweringResult lowerFormulaSourceLexical(
+    api::StringView rFormula, const WorkbookCompileHost& rHost, const CompileContext& rContext)
+{
+    FormulaLoweringResult aResult;
+    const auto aParsed = core::formula::parseFormula(rFormula);
+    if (!aParsed)
+    {
+        detail::setFailure(aResult, FormulaLoweringReason::ParseFailure,
+            api::String(aParsed.maError.maMessage), aParsed.maError.mnOffset);
+        return aResult;
+    }
+
+    if (!detail::pushNodeTokensLexical(*aParsed.mpRoot, rHost, rContext, aResult))
+        return aResult;
+
     return aResult;
 }
 

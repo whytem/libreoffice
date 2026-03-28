@@ -1430,59 +1430,59 @@ struct InflatedStackItem
                         if (!makeUnary(formula::UnaryOperator::Plus))
                             return std::nullopt;
                         break;
-                    case secompiler::detail::kLoweredOpUnaryMinus:
+                    case setoken::kOpCodeNegSub:
                         if (!makeUnary(formula::UnaryOperator::Minus))
                             return std::nullopt;
                         break;
-                    case secompiler::detail::kLoweredOpBinaryAdd:
+                    case setoken::kOpCodeAdd:
                         if (!makeBinary(formula::BinaryOperator::Add))
                             return std::nullopt;
                         break;
-                    case secompiler::detail::kLoweredOpBinarySubtract:
+                    case setoken::kOpCodeSub:
                         if (!makeBinary(formula::BinaryOperator::Subtract))
                             return std::nullopt;
                         break;
-                    case secompiler::detail::kLoweredOpBinaryMultiply:
+                    case setoken::kOpCodeMul:
                         if (!makeBinary(formula::BinaryOperator::Multiply))
                             return std::nullopt;
                         break;
-                    case secompiler::detail::kLoweredOpBinaryDivide:
+                    case setoken::kOpCodeDiv:
                         if (!makeBinary(formula::BinaryOperator::Divide))
                             return std::nullopt;
                         break;
-                    case secompiler::detail::kLoweredOpBinaryPower:
+                    case setoken::kOpCodePow:
                         if (!makeBinary(formula::BinaryOperator::Power))
                             return std::nullopt;
                         break;
-                    case secompiler::detail::kLoweredOpBinaryConcat:
+                    case setoken::kOpCodeAmpersand:
                         if (!makeBinary(formula::BinaryOperator::Concat))
                             return std::nullopt;
                         break;
-                    case secompiler::detail::kLoweredOpBinaryEqual:
+                    case setoken::kOpCodeEqual:
                         if (!makeBinary(formula::BinaryOperator::Equal))
                             return std::nullopt;
                         break;
-                    case secompiler::detail::kLoweredOpBinaryNotEqual:
+                    case setoken::kOpCodeNotEqual:
                         if (!makeBinary(formula::BinaryOperator::NotEqual))
                             return std::nullopt;
                         break;
-                    case secompiler::detail::kLoweredOpBinaryLess:
+                    case setoken::kOpCodeLess:
                         if (!makeBinary(formula::BinaryOperator::Less))
                             return std::nullopt;
                         break;
-                    case secompiler::detail::kLoweredOpBinaryLessEqual:
+                    case setoken::kOpCodeLessEqual:
                         if (!makeBinary(formula::BinaryOperator::LessEqual))
                             return std::nullopt;
                         break;
-                    case secompiler::detail::kLoweredOpBinaryGreater:
+                    case setoken::kOpCodeGreater:
                         if (!makeBinary(formula::BinaryOperator::Greater))
                             return std::nullopt;
                         break;
-                    case secompiler::detail::kLoweredOpBinaryGreaterEqual:
+                    case setoken::kOpCodeGreaterEqual:
                         if (!makeBinary(formula::BinaryOperator::GreaterEqual))
                             return std::nullopt;
                         break;
-                    case secompiler::detail::kLoweredOpRangeConstructor:
+                    case setoken::kOpCodeRange:
                     {
                         std::unique_ptr<formula::Node> pRight;
                         std::unique_ptr<formula::Node> pLeft;
@@ -1491,6 +1491,27 @@ struct InflatedStackItem
                         auto pNode = makeSimpleNode(formula::NodeKind::RangeConstructor);
                         pNode->maChildren.push_back(std::move(pLeft));
                         pNode->maChildren.push_back(std::move(pRight));
+                        aStack.push_back({ InflatedStackItem::Kind::Node, std::move(pNode), {}, {} });
+                        break;
+                    }
+                    case setoken::kOpCodeUnion:
+                    {
+                        std::unique_ptr<formula::Node> pRight;
+                        std::unique_ptr<formula::Node> pLeft;
+                        if (!popNode(aStack, pRight) || !popNode(aStack, pLeft))
+                            return std::nullopt;
+                        auto pNode = makeSimpleNode(formula::NodeKind::ReferenceList);
+                        auto appendChild = [&](std::unique_ptr<formula::Node> pChild) {
+                            if (pChild->meKind == formula::NodeKind::ReferenceList)
+                            {
+                                for (auto& pGrandChild : pChild->maChildren)
+                                    pNode->maChildren.push_back(std::move(pGrandChild));
+                                return;
+                            }
+                            pNode->maChildren.push_back(std::move(pChild));
+                        };
+                        appendChild(std::move(pLeft));
+                        appendChild(std::move(pRight));
                         aStack.push_back({ InflatedStackItem::Kind::Node, std::move(pNode), {}, {} });
                         break;
                     }

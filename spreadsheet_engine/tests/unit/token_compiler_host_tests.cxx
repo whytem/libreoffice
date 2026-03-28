@@ -568,13 +568,12 @@ int testWorkbookCompilerLowering()
 
     const auto aBasic = secompiler::lowerFormulaSource(
         u"of:=SUM([.A1:.A3];LocalOnly;GlobalRange)", aHost, *oContext);
-    if (!aBasic || !aBasic.maFormula.moXmlFormulaSource || aBasic.maFormula.maTokens.size() != 6)
+    if (!aBasic || aBasic.maFormula.moXmlFormulaSource || aBasic.maFormula.maTokens.size() != 6)
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook compiler lowering basic formula mismatch");
     }
-    if (aBasic.maFormula.moXmlFormulaSource->maNamespace != u"of"
-        || aBasic.maFormula.maTokens[0].meKind != setoken::Kind::DoubleRef
+    if (aBasic.maFormula.maTokens[0].meKind != setoken::Kind::DoubleRef
         || aBasic.maFormula.maTokens[1].meKind != setoken::Kind::RangeName
         || aBasic.maFormula.maTokens[2].meKind != setoken::Kind::RangeName
         || aBasic.maFormula.maTokens[3].meKind != setoken::Kind::StringName
@@ -593,6 +592,22 @@ int testWorkbookCompilerLowering()
             "workbook compiler lowering named-range payload mismatch");
     }
 
+    const auto aAdd = secompiler::lowerFormulaSource(u"of:=[.A1]+[.B1]", aHost, *oContext);
+    if (!aAdd || aAdd.maFormula.maTokens.size() != 3
+        || aAdd.maFormula.maTokens.back().mnOpCode != setoken::kOpCodeAdd)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering add-opcode mismatch");
+    }
+
+    const auto aNegSub = secompiler::lowerFormulaSource(u"of:=-[.A1]", aHost, *oContext);
+    if (!aNegSub || aNegSub.maFormula.maTokens.size() != 2
+        || aNegSub.maFormula.maTokens.back().mnOpCode != setoken::kOpCodeNegSub)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lowering negsub-opcode mismatch");
+    }
+
     const auto aReferenceList = secompiler::lowerFormulaSource(
         u"of:=AREAS(([.A1:.B3]~[.F2]~[.G1]))", aHost, *oContext);
     if (!aReferenceList || aReferenceList.maFormula.maTokens.empty())
@@ -601,15 +616,19 @@ int testWorkbookCompilerLowering()
             "workbook compiler lowering reference-list mismatch");
     }
     bool bSawReferenceList = false;
+    int nUnionCount = 0;
     for (const auto& rToken : aReferenceList.maFormula.maTokens)
     {
-        if (rToken.mnOpCode == secompiler::detail::kLoweredOpReferenceList)
+        if (rToken.mnOpCode == setoken::kOpCodeUnion)
+        {
             bSawReferenceList = true;
+            ++nUnionCount;
+        }
     }
-    if (!bSawReferenceList)
+    if (!bSawReferenceList || nUnionCount != 2)
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
-            "workbook compiler lowering did not emit reference-list marker");
+            "workbook compiler lowering did not emit reference-list unions");
     }
 
     const auto aRangeConstructor = secompiler::lowerFormulaSource(
@@ -622,13 +641,13 @@ int testWorkbookCompilerLowering()
     bool bSawRangeConstructor = false;
     for (const auto& rToken : aRangeConstructor.maFormula.maTokens)
     {
-        if (rToken.mnOpCode == secompiler::detail::kLoweredOpRangeConstructor)
+        if (rToken.mnOpCode == setoken::kOpCodeRange)
             bSawRangeConstructor = true;
     }
     if (!bSawRangeConstructor)
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
-            "workbook compiler lowering did not emit range-constructor marker");
+            "workbook compiler lowering did not emit range-constructor opcode");
     }
 
     const auto aAdjacentAnd = secompiler::lowerFormulaSource(
