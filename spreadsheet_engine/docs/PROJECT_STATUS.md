@@ -42,6 +42,15 @@ shared compiler path established as the default standalone replay path.
 | Calc-backed workbook facade | **Complete** | Engine-owned workbook facade contract with Calc-backed and in-memory implementations, richer named-range mutation payloads, dedicated standalone/Calc validation lanes, and first live consumption through dependency-shadow runtime auditing |
 | Dependency and invalidation extraction | **Complete** | Engine-owned dependency snapshots, reverse dependency indexing, invalidation planning, structural rebuild scopes, workbook-scale Calc shadow corpus, maintenance-lane integration, and an opt-in runtime shadow audit are all in place |
 
+The immediate active frontier is now narrower and more practical:
+
+- broaden standalone replay beyond the six promoted families, starting with the
+  add-in family
+- reduce cached-fallback usage on the promoted corpus by turning more formulas
+  into live standalone execution
+- use the completed workbook facade plus dependency/invalidation planner as the
+  substrate for recalculation-orchestration extraction
+
 ### What the engine owns today
 
 - **Extracted function logic:** math, text, date/time, logical, lookup/query,
@@ -86,8 +95,10 @@ shared compiler path established as the default standalone replay path.
   is adopted in selected flows with legacy fallback)
 - `ScTokenArray` as the pervasive token container (engine canonical model is
   used by first native consumers with bridge adapters)
-- Listener/broadcaster wiring and dependency graph ownership
-- Formula trees, dirty tracking, and recalculation orchestration
+- Listener/broadcaster wiring and authoritative dependency-graph side effects
+- Authoritative dirty-bit setting, formula-tree ownership, and recalculation
+  orchestration (the engine now owns shadow dependency snapshots and
+  invalidation planning, but Calc still owns production side effects)
 - `ScInterpreter` CPU evaluator
 - Threaded and OpenCL backend execution
 - UI, shell, persistence, import/export, UNO, rendering
@@ -396,7 +407,7 @@ target_link_libraries(myapp PRIVATE spreadsheetengine::core)
 
 ### Test Suite
 
-25 CTest entries: 24 executables plus 1 installed-package consumer smoke.
+26 CTest entries: 25 executables plus 1 installed-package consumer smoke.
 
 | Test Target | Coverage |
 |-------------|----------|
@@ -424,14 +435,18 @@ target_link_libraries(myapp PRIVATE spreadsheetengine::core)
 | `spreadsheetengine_fods_evaluator_tests` | FODS formula evaluation |
 | `spreadsheetengine_fods_replay_tests` | Raw FODS workbook replay harness |
 | `spreadsheetengine_workbook_facade_tests` | Workbook facade types, contract, consumers |
+| `spreadsheetengine_dependency_invalidation_tests` | Dependency snapshots, reverse edges, invalidation planning |
 | `spreadsheetengine_installed_package_smoke` | Installed-package downstream-consumer smoke |
 
-Calc-side validation targets for the token/compiler work:
+Calc-side validation targets for the currently completed facade/compiler/
+dependency work:
 
 - `CppunitTest_sc_ucalc_token_bridge`
 - `CppunitTest_sc_ucalc_compile_host`
 - `CppunitTest_sc_ucalc_shadow_compiler`
 - `CppunitTest_sc_ucalc_compile_diff`
+- `CppunitTest_sc_ucalc_workbook_facade`
+- `CppunitTest_sc_ucalc_dependency_shadow`
 
 ---
 
@@ -439,7 +454,7 @@ Calc-side validation targets for the token/compiler work:
 
 ### Intentional Coupling (Adapter Layer)
 
-The 19 adapter headers under `compat/libreoffice/` bridge engine types to Calc
+The 22 adapter headers under `compat/libreoffice/` bridge engine types to Calc
 internals. This coupling is by design:
 
 - **`DocumentEvaluationHost`** wraps `ScDocument` for cell/reference access
@@ -492,70 +507,67 @@ internals. This coupling is by design:
 
 ## Forward Roadmap
 
-### Near-term: Broaden Standalone Replay Coverage
+### Near-term: Broaden Standalone Replay And Reduce Fallback
 
 - Enable the add-in family for FODS replay
-- Continue expanding standalone live evaluation to reduce the ~33.6%
-  cached-fallback rate
+- Continue expanding standalone live evaluation to reduce the cached-fallback
+  footprint on the promoted six-family corpus
 - Keep the compiler-switchover maintenance lanes green:
   - representative Calc lexical parity smoke
   - compiled replay diff smoke
-  - `--legacy-only` escape hatch until we make an explicit long-term keep/remove
-    decision
+  - `--legacy-only` escape hatch until we make an explicit long-term
+    keep/remove decision
+- Broaden the shared built-in external/add-in catalog and standalone evaluator
+  coverage only where it advances replay-family enablement or removes
+  high-volume fallback paths
 
-### Medium-term: Expand FODS family coverage
+### Medium-term: Extract Recalculation Orchestration On Top Of The Planner
 
-- Enable the add-in family for FODS replay
-- Continue expanding standalone live evaluation to reduce the ~33.6%
-  cached-fallback rate
-- Broaden shared parity TSV datasets
+- Promote the engine invalidation planner from shadow auditing toward
+  authoritative dirty-set ownership for selected safe mutation families
+- Extract recalc queue/scheduling policy on top of the completed workbook
+  facade and dependency planner
+- Expand Calc runtime consumers beyond the current opt-in dependency-shadow
+  auditing hooks
+- Tighten structural-mutation and named-range mutation parity where scheduler
+  extraction exposes gaps
 
-### Long-term: Extract remaining Calc calculation core
+### Long-term: Shift More Execution Authority Out Of Calc
 
-The feasibility assessment for the remaining major extraction work is complete
-(originally documented in NEXT_STEPS.md). The four remaining areas and their
-recommended sequencing:
+The major extraction prerequisites are now in place: initial function/runtime
+extraction, token/compiler-host modeling, standalone compiler switchover,
+Calc-backed workbook facade, and dependency/invalidation planning. The
+remaining long-horizon work is now concentrated in three areas plus one later
+authority decision:
 
-| Area | Difficulty | Notes |
-|------|-----------|-------|
-| Formula compiler/parser authority | Moderate-high | Token model and compile-host contracts already exist; need native engine lowering instead of Calc shadow backend |
-| Dependency graph and invalidation | High | Currently distributed across `ScDocument`, broadcasters, formula trees, dirty flags; requires separating planning from side effects |
-| Recalculation orchestration | High | Planner seams exist from Phase 10; actual scheduling still flows through Calc document mutation |
-| Execution backend | Very high | `ScInterpreter` deeply coupled to `ScDocument`, `ScFormulaCell`, `ScTokenArray`; must be staged incrementally |
+| Area | Current state | Next step |
+|------|---------------|-----------|
+| Compiler authority inside Calc | Standalone switchover is complete; Calc still uses `ScCompiler` for most production paths | Keep engine-first compile adoption expanding only where the bridge/diff lanes make it safe |
+| Recalculation orchestration | Workbook facade plus dependency/invalidation planner are complete in shadow mode | Move dirty-set ownership and recalc scheduling onto engine-owned planner outputs |
+| Execution backend | `ScInterpreter` and execution backends are still Calc-owned | Incrementally extract CPU execution logic behind strong differential validation |
+| Workbook/storage authority | Calc-backed facade exists and is validated | Defer any authority shift until scheduler and execution layers are stable |
 
 **Recommended sequencing:**
 
-1. **Make the engine compiler authoritative** (extend current switchover work)
-   - Native engine lowering that no longer depends on `ScCompiler`
-   - Calc becomes a pure host adapter for compiler lookups
-2. **Introduce an engine workbook facade backed by Calc** (**Complete**)
-   - Engine-owned workbook facade contract with read queries, identity
-     types, mutation event vocabulary, first shadow consumers, and dedicated
-     standalone/Calc validation
-   - `CalcWorkbookFacade` (Calc adapter) and `InMemoryWorkbookFacade`
-     (standalone) implementations
-   - First live low-risk Calc consumer now present through dependency-shadow
-     runtime auditing
-3. **Extract dependency analysis and invalidation planning** (**Complete in shadow mode**)
-   - Separate dependency relationships from listener/broadcaster side effects
-   - Engine-owned dirty-set and invalidation planner, reverse-dependency index,
-     structural rebuild scopes, workbook-scale shadow corpus, and maintenance
-     profile integration
-   - Calc continues executing side effects; engine audit remains opt-in and
-     non-authoritative
-4. **Extract recalculation scheduler**
-   - Engine-owned recalc queue and scheduling policy
-   - Calc uses engine planner output to drive execution
-5. **Incrementally extract the CPU execution backend**
-   - Move token walking and operand coercion
-   - Grow function-family coverage against Calc differential validation
-6. **Keep threading and OpenCL as backend adapters**
-   - Engine batch-execution contract
-   - Calc-side resource management
-7. **Decide authority shift timing**
-   - Whether `ScDocument` adapts to engine workbook, or engine workbook becomes
-     authoritative, should be decided only after compiler/dependency/scheduler
-     layers are stable
+1. **Broaden standalone replay coverage**
+   - Enable the add-in family
+   - Reduce cached-fallback-heavy paths on the promoted corpus
+   - Keep compiled replay and lexical parity maintenance lanes green
+2. **Extract recalculation orchestration**
+   - Promote the current planner from shadow auditing to authoritative dirty
+     planning for selected safe edits
+   - Move recalc queue/scheduling policy onto engine-owned planner outputs
+3. **Incrementally extract the CPU execution backend**
+   - Move token walking, coercion, and evaluation mechanics out of Calc in
+     small validated slices
+   - Continue broadening live function coverage as part of that extraction
+4. **Keep threading and OpenCL as backend adapters**
+   - Let Calc continue owning resource/runtime concerns while the engine owns
+     more calculation semantics
+5. **Decide authority shift timing last**
+   - Whether `ScDocument` remains a Calc-backed host or the engine workbook
+     becomes more authoritative should only be decided after scheduler and
+     execution layers stabilize
 
 **Key architectural principle:** use a sidecar and adapter model first, then
 converge on shared workbook authority later. Do not attempt to replace
@@ -610,5 +622,8 @@ The engine should not absorb:
   switchover plan with phased execution checklist
 - [CALC_BACKED_WORKBOOK_FACADE.md](architecture/CALC_BACKED_WORKBOOK_FACADE.md) —
   workbook facade milestone plan with phased execution checklist
+- [DEPENDENCY_INVALIDATION_EXTRACTION.md](architecture/DEPENDENCY_INVALIDATION_EXTRACTION.md) —
+  dependency snapshot and invalidation-planner milestone plan with closeout
+  status
 - [CALC_ENGINE_AUDIT.md](extraction-history/CALC_ENGINE_AUDIT.md) — audit of
   original Calc engine source files
