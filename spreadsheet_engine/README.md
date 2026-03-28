@@ -22,6 +22,13 @@ That combined maintenance gate now runs:
 - Calc spreadsheet-engine validation through
   [run_spreadsheet_unit_tests.sh](/home/ubuntu/repos/libreoffice/spreadsheet_engine/integration/libreoffice/run_spreadsheet_unit_tests.sh)
 
+The default Calc smoke profile now also keeps the compiler-switchover bridge
+targets in the regular loop:
+- `CppunitTest_sc_ucalc_token_bridge`
+- `CppunitTest_sc_ucalc_compile_host`
+- `CppunitTest_sc_ucalc_shadow_compiler`
+- `CppunitTest_sc_ucalc_compile_diff`
+
 Use `--engine` when you want the broader Calc engine profile instead of the
 default smoke lane:
 

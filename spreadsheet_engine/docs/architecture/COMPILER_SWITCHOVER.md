@@ -522,6 +522,12 @@ Current checkpoint:
     intentionally differ from Calc's imported canonical stream
   - XML formula-source preservation also still diverges between the two paths
     on representative formulas
+- the maintained Calc profiles now keep the adopted compiler/bridge call-site
+  targets in the regular loop:
+  - `CppunitTest_sc_ucalc_token_bridge`
+  - `CppunitTest_sc_ucalc_compile_host`
+  - `CppunitTest_sc_ucalc_shadow_compiler`
+  - `CppunitTest_sc_ucalc_compile_diff`
 
 ### Phase 7: Switchover Completion And Retirement
 
@@ -608,7 +614,7 @@ Current checkpoint:
       families.
 - [x] Add standalone-vs-Calc compile artifact comparisons for representative
       formulas.
-- [ ] Keep adopted Calc compile call sites green with legacy fallback retained.
+- [x] Keep adopted Calc compile call sites green with legacy fallback retained.
 
 ### Phase 7
 

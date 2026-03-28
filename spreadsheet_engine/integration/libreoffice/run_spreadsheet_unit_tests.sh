@@ -8,6 +8,10 @@ REPO_ROOT=$(cd -- "${PACKAGE_ROOT}/.." && pwd)
 
 DEFAULT_TARGETS=(
     CppunitTest_sc_ucalc
+    CppunitTest_sc_ucalc_token_bridge
+    CppunitTest_sc_ucalc_compile_host
+    CppunitTest_sc_ucalc_shadow_compiler
+    CppunitTest_sc_ucalc_compile_diff
     CppunitTest_sc_ucalc_formula2
     CppunitTest_sc_ucalc_shared_cases
     CppunitTest_sc_ucalc_sharedformula
@@ -16,6 +20,10 @@ DEFAULT_TARGETS=(
 
 MILESTONE_TARGETS=(
     CppunitTest_sc_ucalc
+    CppunitTest_sc_ucalc_token_bridge
+    CppunitTest_sc_ucalc_compile_host
+    CppunitTest_sc_ucalc_shadow_compiler
+    CppunitTest_sc_ucalc_compile_diff
     CppunitTest_sc_ucalc_formula2
     CppunitTest_sc_ucalc_shared_cases
     CppunitTest_sc_ucalc_sharedformula
@@ -28,6 +36,10 @@ MILESTONE_TARGETS=(
 
 ENGINE_TARGETS=(
     CppunitTest_sc_ucalc
+    CppunitTest_sc_ucalc_token_bridge
+    CppunitTest_sc_ucalc_compile_host
+    CppunitTest_sc_ucalc_shadow_compiler
+    CppunitTest_sc_ucalc_compile_diff
     CppunitTest_sc_ucalc_nanpayload
     CppunitTest_sc_ucalc_condformat
     CppunitTest_sc_ucalc_copypaste
