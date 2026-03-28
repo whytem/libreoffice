@@ -119,7 +119,9 @@ operators, references, range names, a wider representative function subset
 `GCD`, `LCM`, `DEGREES`, `ATANH`, `DATE`, `TIME`, `DATEDIF`, `MATCH`,
 `SUMIF`, `ADDRESS`, `CHAR`, `CODE`, `JIS`, `ASC`, `COLUMNS`, `AREAS`,
 `REPLACE`, `REPLACEB`, `RIGHT`, `MID`, `TEXT`, `CONCATENATE`, `DECIMAL`,
-`MMULT`, `MAX`, `MOD`), and dotted compatibility-name preservation.
+`MMULT`, `T`, `N`, `TODAY`, `WEEKNUM`, `WEEKDAY`, `ROUNDDOWN`, `OFFSET`,
+`INDIRECT`, `HYPERLINK`, `LENB`, `FINDB`, `SEARCHB`, `MAX`, `MOD`), and
+dotted compatibility-name preservation.
 Lexical jump tokens imported from Calc are also normalized now so parity checks
 ignore the undefined trailing payload bytes that Calc’s lexical `ocIf*` jump
 construction leaves uninitialized. The remaining gap is broader function-catalog

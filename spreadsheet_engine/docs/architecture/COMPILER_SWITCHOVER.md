@@ -528,7 +528,9 @@ Current checkpoint:
       `LCM`, `DEGREES`, `ATANH`, `DATE`, `TIME`, `DATEDIF`, `MATCH`,
       `SUMIF`, `ADDRESS`, `CHAR`, `CODE`, `JIS`, `ASC`, `COLUMNS`,
       `AREAS`, `REPLACE`, `REPLACEB`, `RIGHT`, `MID`, `TEXT`,
-      `CONCATENATE`, `DECIMAL`, `MMULT`, `MAX`, and `MOD`
+      `CONCATENATE`, `DECIMAL`, `MMULT`, `T`, `N`, `TODAY`, `WEEKNUM`,
+      `WEEKDAY`, `ROUNDDOWN`, `OFFSET`, `INDIRECT`, `HYPERLINK`,
+      `LENB`, `FINDB`, `SEARCHB`, `MAX`, and `MOD`
     - dotted compatibility-name preservation like `COM.MICROSOFT.CONCAT(...)`
   - lexical jump tokens imported from Calc are now canonicalized to ignore the
     undefined trailing payload bytes produced by `FormulaTokenArray::AddOpCode()`

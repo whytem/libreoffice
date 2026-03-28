@@ -113,6 +113,8 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodePi;
     if (aNormalized == u"DEGREES")
         return token::kOpCodeDegrees;
+    if (aNormalized == u"TODAY")
+        return token::kOpCodeGetActDate;
     if (aNormalized == u"NA")
         return token::kOpCodeNoValue;
     if (aNormalized == u"IF")
@@ -125,6 +127,8 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeIsError;
     if (aNormalized == u"ISNA")
         return token::kOpCodeIsNv;
+    if (aNormalized == u"N")
+        return token::kOpCodeN;
     if (aNormalized == u"ATANH")
         return token::kOpCodeAtanh;
     if (aNormalized == u"VALUE")
@@ -145,6 +149,8 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeLower;
     if (aNormalized == u"LEN")
         return token::kOpCodeLen;
+    if (aNormalized == u"T")
+        return token::kOpCodeT;
     if (aNormalized == u"FORMULA")
         return token::kOpCodeFormula;
     if (aNormalized == u"JIS")
@@ -157,6 +163,8 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeIsoWeeknum;
     if (aNormalized == u"ROUND")
         return token::kOpCodeRound;
+    if (aNormalized == u"ROUNDDOWN")
+        return token::kOpCodeRoundDown;
     if (aNormalized == u"CEILING")
         return token::kOpCodeCeil;
     if (aNormalized == u"FLOOR")
@@ -169,6 +177,10 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeGetDate;
     if (aNormalized == u"TIME")
         return token::kOpCodeGetTime;
+    if (aNormalized == u"WEEKNUM")
+        return token::kOpCodeWeek;
+    if (aNormalized == u"WEEKDAY")
+        return token::kOpCodeGetDayOfWeek;
     if (aNormalized == u"MOD")
         return token::kOpCodeMod;
     if (aNormalized == u"MIN")
@@ -181,6 +193,8 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeColumns;
     if (aNormalized == u"SUBTOTAL")
         return token::kOpCodeSubTotal;
+    if (aNormalized == u"INDIRECT")
+        return token::kOpCodeIndirect;
     if (aNormalized == u"ADDRESS")
         return token::kOpCodeAddress;
     if (aNormalized == u"MATCH")
@@ -193,6 +207,8 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeVLookup;
     if (aNormalized == u"HLOOKUP")
         return token::kOpCodeHLookup;
+    if (aNormalized == u"OFFSET")
+        return token::kOpCodeOffset;
     if (aNormalized == u"AREAS")
         return token::kOpCodeAreas;
     if (aNormalized == u"REPLACE")
@@ -211,6 +227,8 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeMatMult;
     if (aNormalized == u"DECIMAL")
         return token::kOpCodeDecimal;
+    if (aNormalized == u"HYPERLINK")
+        return token::kOpCodeHyperLink;
     if (aNormalized == u"DATEDIF")
         return token::kOpCodeDateDif;
     if (aNormalized == u"AGGREGATE")
@@ -223,6 +241,12 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeTextJoinMs;
     if (aNormalized == u"REPLACEB")
         return token::kOpCodeReplaceB;
+    if (aNormalized == u"LENB")
+        return token::kOpCodeLenB;
+    if (aNormalized == u"FINDB")
+        return token::kOpCodeFindB;
+    if (aNormalized == u"SEARCHB")
+        return token::kOpCodeSearchB;
     if (aNormalized == u"AND")
         return token::kOpCodeAnd;
 
