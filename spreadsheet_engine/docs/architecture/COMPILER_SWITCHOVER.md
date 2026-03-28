@@ -518,11 +518,17 @@ Current checkpoint:
   - range-name formulas
 - current limitation:
   - XML formula-source preservation is now aligned for ordinary lowered formulas
-  - exact canonical token-stream parity is now asserted on a small operator-only
-    lexical smoke subset
-  - the remaining gap is broader lexical/function-call token parity: standalone
-    execution lowering still uses a separate RPN-oriented function-call encoding,
-    while Calc's imported canonical stream carries lexical function/opcode tokens
+  - exact canonical token-stream parity is now asserted on a mixed lexical smoke
+    subset covering:
+    - operators and comparisons
+    - references and range names
+    - representative function calls like `SUM`, `DATEVALUE`, `FORMULA`,
+      `VLOOKUP`, `IFERROR`, `MAX`, and `MOD`
+    - dotted compatibility-name preservation like `COM.MICROSOFT.CONCAT(...)`
+  - the remaining gap is broader lexical function-catalog and special-form
+    coverage: standalone execution lowering still uses a separate RPN-oriented
+    execution path, and lexical lowering still needs more function opcodes and
+    edge-form handling before full-stream parity can be asserted corpus-wide
 - the maintained Calc profiles now keep the adopted compiler/bridge call-site
   targets in the regular loop:
   - `CppunitTest_sc_ucalc_token_bridge`

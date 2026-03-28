@@ -600,6 +600,40 @@ int testWorkbookCompilerLowering()
             "workbook compiler lowering add-opcode mismatch");
     }
 
+    const auto aLexicalSum = secompiler::lowerFormulaSourceLexical(
+        u"of:=SUM([.A1:.A3];LocalOnly)", aHost, *oContext);
+    if (!aLexicalSum || aLexicalSum.maFormula.maTokens.size() != 6
+        || aLexicalSum.maFormula.maTokens[0].meKind != setoken::Kind::Byte
+        || aLexicalSum.maFormula.maTokens[0].mnOpCode != setoken::kOpCodeSum
+        || aLexicalSum.maFormula.maTokens[1].meKind != setoken::Kind::PlainOpcode
+        || aLexicalSum.maFormula.maTokens[1].mnOpCode != setoken::kOpCodeOpen
+        || aLexicalSum.maFormula.maTokens[3].mnOpCode != setoken::kOpCodeSep
+        || aLexicalSum.maFormula.maTokens[5].mnOpCode != setoken::kOpCodeClose)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lexical SUM lowering mismatch");
+    }
+
+    const auto aLexicalIfError = secompiler::lowerFormulaSourceLexical(
+        u"of:=IFERROR([.A1]/[.B1];0)", aHost, *oContext);
+    if (!aLexicalIfError || aLexicalIfError.maFormula.maTokens.size() != 8
+        || aLexicalIfError.maFormula.maTokens[0].meKind != setoken::Kind::Jump
+        || aLexicalIfError.maFormula.maTokens[0].mnOpCode != setoken::kOpCodeIfError)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lexical IFERROR lowering mismatch");
+    }
+
+    const auto aLexicalCompatName = secompiler::lowerFormulaSourceLexical(
+        u"of:=COM.MICROSOFT.CONCAT(\"a\";\"b\")", aHost, *oContext);
+    if (!aLexicalCompatName || aLexicalCompatName.maFormula.maTokens.size() != 6
+        || aLexicalCompatName.maFormula.maTokens[0].meKind != setoken::Kind::String
+        || aLexicalCompatName.maFormula.maTokens[0].mnOpCode != setoken::kOpCodeBad)
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook compiler lexical compat-name lowering mismatch");
+    }
+
     const auto aNegSub = secompiler::lowerFormulaSource(u"of:=-[.A1]", aHost, *oContext);
     if (!aNegSub || aNegSub.maFormula.maTokens.size() != 2
         || aNegSub.maFormula.maTokens.back().mnOpCode != setoken::kOpCodeNegSub)

@@ -12,6 +12,7 @@
 #include <optional>
 
 #include <spreadsheetengine/api/ReferenceData.hxx>
+#include <spreadsheetengine/detail/CalcConfig.hxx>
 #include <spreadsheetengine/detail/OdfFormulaParser.hxx>
 #include <spreadsheetengine/detail/WorkbookCompileHost.hxx>
 
@@ -97,6 +98,114 @@ inline void setFailure(
             aFolded.push_back(cChar);
     }
     return aFolded;
+}
+
+[[nodiscard]] inline std::optional<token::OpCodeValue>
+lookupLexicalFunctionOpcode(api::StringView rName)
+{
+    const api::String aNormalized = api::String(rName);
+
+    if (aNormalized == u"TRUE")
+        return token::kOpCodeTrue;
+    if (aNormalized == u"FALSE")
+        return token::kOpCodeFalse;
+    if (aNormalized == u"NA")
+        return token::kOpCodeNoValue;
+    if (aNormalized == u"IF")
+        return token::kOpCodeIf;
+    if (aNormalized == u"IFERROR")
+        return token::kOpCodeIfError;
+    if (aNormalized == u"IFNA")
+        return token::kOpCodeIfNa;
+    if (aNormalized == u"ISERROR")
+        return token::kOpCodeIsError;
+    if (aNormalized == u"ISNA")
+        return token::kOpCodeIsNv;
+    if (aNormalized == u"VALUE")
+        return token::kOpCodeValue;
+    if (aNormalized == u"DATEVALUE")
+        return token::kOpCodeGetDateValue;
+    if (aNormalized == u"TIMEVALUE")
+        return token::kOpCodeGetTimeValue;
+    if (aNormalized == u"CLEAN")
+        return token::kOpCodeClean;
+    if (aNormalized == u"FORMULA")
+        return token::kOpCodeFormula;
+    if (aNormalized == u"UNICHAR")
+        return token::kOpCodeUnichar;
+    if (aNormalized == u"ISOWEEKNUM")
+        return token::kOpCodeIsoWeeknum;
+    if (aNormalized == u"DATE")
+        return token::kOpCodeGetDate;
+    if (aNormalized == u"TIME")
+        return token::kOpCodeGetTime;
+    if (aNormalized == u"MOD")
+        return token::kOpCodeMod;
+    if (aNormalized == u"MIN")
+        return token::kOpCodeMin;
+    if (aNormalized == u"MAX")
+        return token::kOpCodeMax;
+    if (aNormalized == u"SUM")
+        return token::kOpCodeSum;
+    if (aNormalized == u"SUBTOTAL")
+        return token::kOpCodeSubTotal;
+    if (aNormalized == u"LOOKUP")
+        return token::kOpCodeLookup;
+    if (aNormalized == u"VLOOKUP")
+        return token::kOpCodeVLookup;
+    if (aNormalized == u"HLOOKUP")
+        return token::kOpCodeHLookup;
+    if (aNormalized == u"EXACT")
+        return token::kOpCodeExact;
+    if (aNormalized == u"AGGREGATE")
+        return token::kOpCodeAggregate;
+    if (aNormalized == u"RAWSUBTRACT")
+        return token::kOpCodeRawSubtract;
+    if (aNormalized == u"CONCAT")
+        return token::kOpCodeConcatMs;
+    if (aNormalized == u"TEXTJOIN")
+        return token::kOpCodeTextJoinMs;
+    if (aNormalized == u"AND")
+        return token::kOpCodeAnd;
+
+    if (const auto eSymbol = spreadsheetengine::core::findConfigOpCodeSymbol(aNormalized))
+    {
+        switch (*eSymbol)
+        {
+            case spreadsheetengine::api::ConfigOpCodeSymbol::Add:
+                return token::kOpCodeAdd;
+            case spreadsheetengine::api::ConfigOpCodeSymbol::Sub:
+                return token::kOpCodeSub;
+            case spreadsheetengine::api::ConfigOpCodeSymbol::Mul:
+                return token::kOpCodeMul;
+            case spreadsheetengine::api::ConfigOpCodeSymbol::Div:
+                return token::kOpCodeDiv;
+            case spreadsheetengine::api::ConfigOpCodeSymbol::Pow:
+                return token::kOpCodePow;
+            case spreadsheetengine::api::ConfigOpCodeSymbol::And:
+                return token::kOpCodeAnd;
+            case spreadsheetengine::api::ConfigOpCodeSymbol::Min:
+                return token::kOpCodeMin;
+            case spreadsheetengine::api::ConfigOpCodeSymbol::Max:
+                return token::kOpCodeMax;
+            case spreadsheetengine::api::ConfigOpCodeSymbol::Sum:
+                return token::kOpCodeSum;
+            case spreadsheetengine::api::ConfigOpCodeSymbol::Lookup:
+                return token::kOpCodeLookup;
+            case spreadsheetengine::api::ConfigOpCodeSymbol::VLookup:
+                return token::kOpCodeVLookup;
+            case spreadsheetengine::api::ConfigOpCodeSymbol::HLookup:
+                return token::kOpCodeHLookup;
+            case spreadsheetengine::api::ConfigOpCodeSymbol::Mod:
+                return token::kOpCodeMod;
+            case spreadsheetengine::api::ConfigOpCodeSymbol::Na:
+                return token::kOpCodeNoValue;
+            default:
+                break;
+        }
+    }
+
+    return std::nullopt;
 }
 
 [[nodiscard]] inline std::optional<api::ColumnIndex> parseColumnName(api::StringView rColumnName)
@@ -568,6 +677,15 @@ inline void pushOperatorByteToken(FormulaLoweringResult& rResult, token::OpCodeV
         token::ByteData { 0, token::kParamClassUnknown });
 }
 
+inline void pushJumpToken(
+    FormulaLoweringResult& rResult, token::OpCodeValue nOpCode, std::initializer_list<short> aJumps)
+{
+    token::JumpData aData;
+    aData.maJumps.assign(aJumps.begin(), aJumps.end());
+    aData.mnInForceArray = token::kParamClassUnknown;
+    pushToken(rResult, token::Kind::Jump, nOpCode, std::move(aData));
+}
+
 [[nodiscard]] inline bool pushNodeTokens(
     const core::formula::Node& rNode, const WorkbookCompileHost& rHost,
     const CompileContext& rContext, FormulaLoweringResult& rResult)
@@ -876,6 +994,55 @@ inline void pushOperatorByteToken(FormulaLoweringResult& rResult, token::OpCodeV
                 return false;
             pushOperatorByteToken(rResult, binaryOpcode(rNode.meBinaryOperator));
             return pushNodeTokensLexical(*rNode.maChildren[1], rHost, rContext, rResult);
+
+        case NodeKind::FunctionCall:
+        {
+            const auto oOpcode = lookupLexicalFunctionOpcode(rNode.maPrimaryText);
+            if (!oOpcode)
+            {
+                if (rNode.maPrimaryText.find(u'.') != api::StringView::npos)
+                {
+                    const api::String aFoldedName = foldAsciiCase(rNode.maPrimaryText);
+                    pushToken(rResult, token::Kind::String, token::kOpCodeBad,
+                        StringData { aFoldedName, aFoldedName });
+                }
+                else
+                {
+                    setFailure(rResult, FormulaLoweringReason::UnsupportedNodeKind,
+                        api::String(rNode.maPrimaryText));
+                    return false;
+                }
+            }
+            else
+            {
+                switch (*oOpcode)
+                {
+                    case token::kOpCodeIf:
+                        pushJumpToken(rResult, *oOpcode, { 3, 0, 0, 0 });
+                        break;
+                    case token::kOpCodeIfError:
+                    case token::kOpCodeIfNa:
+                        pushJumpToken(rResult, *oOpcode, { 2, 0, 0 });
+                        break;
+                    default:
+                        pushOperatorByteToken(rResult, *oOpcode);
+                        break;
+                }
+            }
+            pushToken(rResult, token::Kind::PlainOpcode, token::kOpCodeOpen, {});
+            for (std::size_t nIndex = 0; nIndex < rNode.maChildren.size(); ++nIndex)
+            {
+                if (nIndex != 0)
+                    pushToken(rResult, token::Kind::PlainOpcode, token::kOpCodeSep, {});
+                if (!rNode.maChildren[nIndex]
+                    || !pushNodeTokensLexical(*rNode.maChildren[nIndex], rHost, rContext, rResult))
+                {
+                    return false;
+                }
+            }
+            pushToken(rResult, token::Kind::PlainOpcode, token::kOpCodeClose, {});
+            return true;
+        }
 
         default:
             setFailure(rResult, FormulaLoweringReason::UnsupportedNodeKind, u"LexicalUnsupported");

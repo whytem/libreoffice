@@ -111,12 +111,13 @@ Current state:
 
 The main remaining convergence gap is exact canonical token-stream parity
 between standalone lowering and Calc-imported canonical tokens outside the new
-operator-only lexical smoke subset. Ordinary-formula XML formula-source
-preservation is now aligned, and operator/reference lexical token parity is
-covered by focused Calc smoke. The remaining gap is broader function-call and
-full-stream lexical parity, because standalone execution lowering still carries
-an RPN-oriented function-call path alongside the Calc-shaped lexical lowering
-used for parity checks.
+mixed lexical smoke subset. Ordinary-formula XML formula-source preservation is
+now aligned, and focused Calc smoke now covers exact lexical parity for
+operators, references, range names, representative function calls, and dotted
+compatibility-name preservation. The remaining gap is broader function-catalog
+and full-stream lexical parity, because standalone execution lowering still
+carries an RPN-oriented function-call path alongside the Calc-shaped lexical
+lowering used for parity checks.
 
 ## Architecture Overview
 

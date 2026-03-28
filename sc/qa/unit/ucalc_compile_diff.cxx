@@ -328,6 +328,14 @@ CPPUNIT_TEST_FIXTURE(TestCompileDiff, testStandaloneLoweringOperatorTokenParityS
         { u"unary_minus", u"=-A1" },
         { u"double_ref_push", u"=A1:B2" },
         { u"range_name_add", u"=GlobalMetric+1" },
+        { u"simple_function", u"=SUM(A1:B2)" },
+        { u"datevalue_function", u"=DATEVALUE(\"Jan1, 2015\")" },
+        { u"formula_function", u"=FORMULA(A1)" },
+        { u"vlookup_function", u"=VLOOKUP(\"Cat\";A1:B2;2;0)" },
+        { u"concat_ms_function", u"=COM.MICROSOFT.CONCAT(\"Good \";\"Morning \";\"Mrs. \";\"Doe\")" },
+        { u"iferror_function", u"=IFERROR(A1/B1;0)" },
+        { u"max_function", u"=MAX(A1;B1)" },
+        { u"mod_function", u"=MOD(5;2)" },
     };
 
     for (const auto& rSample : aSamples)

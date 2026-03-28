@@ -177,7 +177,14 @@ inline api::String tokenPayloadToDiagnosticString(const setoken::Token& rToken)
             const auto& rData = std::get<setoken::JumpData>(rToken.maPayload);
             appendAscii(aText, " jump(count=");
             appendNumber(aText, rData.maJumps.size());
-            appendAscii(aText, ")");
+            appendAscii(aText, ",values=[");
+            for (std::size_t nIndex = 0; nIndex < rData.maJumps.size(); ++nIndex)
+            {
+                if (nIndex)
+                    appendAscii(aText, ",");
+                appendNumber(aText, rData.maJumps[nIndex]);
+            }
+            appendAscii(aText, "])");
             break;
         }
         case Kind::Whitespace:
