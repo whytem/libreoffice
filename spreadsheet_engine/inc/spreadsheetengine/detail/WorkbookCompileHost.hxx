@@ -99,8 +99,14 @@ constexpr sal_uInt16 kBuiltinAddInCatalogId = 1;
 
 [[nodiscard]] inline std::optional<api::String> lookupBuiltinExternalName(api::StringView rSymbol)
 {
+    if (equalLookupText(rSymbol, u"WORKDAY"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETWORKDAY");
     if (equalLookupText(rSymbol, u"YEARFRAC"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYEARFRAC");
+    if (equalLookupText(rSymbol, u"SERIESSUM"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSERIESSUM");
+    if (equalLookupText(rSymbol, u"QUOTIENT"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETQUOTIENT");
     if (equalLookupText(rSymbol, u"CONVERT"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCONVERT");
     if (equalLookupText(rSymbol, u"DEC2HEX"))
@@ -109,6 +115,10 @@ constexpr sal_uInt16 kBuiltinAddInCatalogId = 1;
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETMROUND");
     if (equalLookupText(rSymbol, u"MULTINOMIAL"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETMULTINOMIAL");
+    if (equalLookupText(rSymbol, u"SQRTPI"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSQRTPI");
+    if (equalLookupText(rSymbol, u"RANDBETWEEN"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETRANDBETWEEN");
 
     return std::nullopt;
 }

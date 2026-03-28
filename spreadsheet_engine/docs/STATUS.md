@@ -127,10 +127,11 @@ operators, references, range names, a wider representative function subset
 like `COM.MICROSOFT.CONCAT`, `ORG.OPENOFFICE.CONVERT`, `CONVERT`, `DEC2HEX`,
 `MROUND`, `MULTINOMIAL`, and `YEARFRAC`.
 On the standalone compiled-token path, workbook lowering also now emits real
-`ExternalName` carriers for a first curated add-in subset (`CONVERT`,
-`DEC2HEX`, `MROUND`, `MULTINOMIAL`, `YEARFRAC`) instead of flattening them to
-the generic `StringName` call carrier, and compiled-token evaluation preserves
-safe cached-result fallback for those unsupported add-in bodies.
+`ExternalName` carriers for a broader curated add-in subset (`CONVERT`,
+`DEC2HEX`, `MROUND`, `MULTINOMIAL`, `YEARFRAC`, `WORKDAY`, `RANDBETWEEN`,
+`SERIESSUM`, `QUOTIENT`, `SQRTPI`) instead of flattening them to the generic
+`StringName` call carrier, and compiled-token evaluation preserves safe
+cached-result fallback for those unsupported add-in bodies.
 Lexical jump tokens imported from Calc are also normalized now so parity checks
 ignore the undefined trailing payload bytes that Calc’s lexical `ocIf*` jump
 construction leaves uninitialized. The remaining gap is broader function-catalog

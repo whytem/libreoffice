@@ -372,10 +372,14 @@ int testWorkbookCompileHost()
     const auto aCaseFolded = aHosts.mpNameResolver->lookupRangeName(u"mixedcase", 1, *oContext);
     const auto aMissingName
         = aHosts.mpNameResolver->lookupRangeName(u"UnknownName", 1, *oContext);
+    const auto aWorkday
+        = aHosts.mpExternalNameResolver->lookupExternalName(u"workday", *oContext);
     const auto aYearFrac
         = aHosts.mpExternalNameResolver->lookupExternalName(u"YEARFRAC", *oContext);
     const auto aDec2Hex
         = aHosts.mpExternalNameResolver->lookupExternalName(u"dec2hex", *oContext);
+    const auto aSqrtPi
+        = aHosts.mpExternalNameResolver->lookupExternalName(u"SQRTPI", *oContext);
 
     if (!aLocal || aLocal->mnSheet != 1 || aLocal->mnIndex != 2)
     {
@@ -404,6 +408,12 @@ int testWorkbookCompileHost()
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook missing range name unexpectedly resolved");
     }
+    if (!aWorkday || aWorkday->mnFileId != 1
+        || aWorkday->maName != u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETWORKDAY")
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook external WORKDAY lookup mismatch");
+    }
     if (!aYearFrac || aYearFrac->mnFileId != 1
         || aYearFrac->maName != u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYEARFRAC")
     {
@@ -415,6 +425,12 @@ int testWorkbookCompileHost()
     {
         return fail("spreadsheetengine_token_compiler_host_tests",
             "workbook external DEC2HEX lookup mismatch");
+    }
+    if (!aSqrtPi || aSqrtPi->mnFileId != 1
+        || aSqrtPi->maName != u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSQRTPI")
+    {
+        return fail("spreadsheetengine_token_compiler_host_tests",
+            "workbook external SQRTPI lookup mismatch");
     }
 
     if (aHosts.mpDatabaseRangeResolver->lookupDatabaseRange(u"DB", *oContext)
@@ -630,6 +646,50 @@ int testWorkbookCompilerLowering()
             "workbook compiler lowering external-name payload mismatch");
     }
 
+    const struct
+    {
+        std::u16string_view maLabel;
+        std::u16string_view maFormula;
+        std::u16string_view maExpectedName;
+    } aExternalSamples[] = {
+        { u"WORKDAY", u"of:=WORKDAY(DATE(2014;11;1);5)", u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETWORKDAY" },
+        { u"QUOTIENT", u"of:=QUOTIENT(5;2)", u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETQUOTIENT" },
+        { u"SERIESSUM", u"of:=SERIESSUM(1;0;2;{1;2;3})", u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSERIESSUM" },
+        { u"SQRTPI", u"of:=SQRTPI(16.2)", u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSQRTPI" },
+        { u"RANDBETWEEN", u"of:=RANDBETWEEN(1;10)", u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETRANDBETWEEN" },
+    };
+
+    for (const auto& rSample : aExternalSamples)
+    {
+        const auto aExternalLowered
+            = secompiler::lowerFormulaSource(rSample.maFormula, aHost, *oContext);
+        if (!aExternalLowered || aExternalLowered.maFormula.maTokens.size() < 3
+            || aExternalLowered.maFormula.maTokens[aExternalLowered.maFormula.maTokens.size() - 3].meKind
+                   != setoken::Kind::ExternalName
+            || aExternalLowered.maFormula.maTokens[aExternalLowered.maFormula.maTokens.size() - 2].meKind
+                   != setoken::Kind::Byte
+            || aExternalLowered.maFormula.maTokens.back().mnOpCode
+                   != secompiler::detail::kLoweredOpFunctionCall)
+        {
+            const std::string aDetail
+                = "workbook compiler lowering external-name sample mismatch: "
+                  + toUtf8(rSample.maLabel);
+            return fail("spreadsheetengine_token_compiler_host_tests", aDetail.c_str());
+        }
+
+        const auto& rSampleExternalName = std::get<setoken::ExternalNameData>(
+            aExternalLowered.maFormula.maTokens[aExternalLowered.maFormula.maTokens.size() - 3]
+                .maPayload);
+        if (rSampleExternalName.mnFileId != 1
+            || rSampleExternalName.maName != rSample.maExpectedName)
+        {
+            const std::string aDetail
+                = "workbook compiler lowering external-name sample payload mismatch: "
+                  + toUtf8(rSample.maLabel);
+            return fail("spreadsheetengine_token_compiler_host_tests", aDetail.c_str());
+        }
+    }
+
     const auto aAdd = secompiler::lowerFormulaSource(u"of:=[.A1]+[.B1]", aHost, *oContext);
     if (!aAdd || aAdd.maFormula.maTokens.size() != 3
         || aAdd.maFormula.maTokens.back().mnOpCode != setoken::kOpCodeAdd)
@@ -759,6 +819,11 @@ int testWorkbookCompilerLowering()
         { u"DEC2HEX", u"of:=DEC2HEX(10)" },
         { u"MROUND", u"of:=MROUND(10;3)" },
         { u"MULTINOMIAL", u"of:=MULTINOMIAL(1;2;3)" },
+        { u"WORKDAY", u"of:=WORKDAY(DATE(2014;11;1);5)" },
+        { u"RANDBETWEEN", u"of:=RANDBETWEEN(1;10)" },
+        { u"SERIESSUM", u"of:=SERIESSUM(1;0;2;{1;2;3})" },
+        { u"QUOTIENT", u"of:=QUOTIENT(5;2)" },
+        { u"SQRTPI", u"of:=SQRTPI(16.2)" },
         { u"YEARFRAC", u"of:=YEARFRAC(DATE(2014;1;1);DATE(2015;1;1);0)" },
     };
 

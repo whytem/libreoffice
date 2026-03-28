@@ -539,9 +539,13 @@ Current checkpoint:
       `CONVERT(...)`, `DEC2HEX(...)`, `MROUND(...)`, `MULTINOMIAL(...)`,
       and `YEARFRAC(...)`
     - non-lexical standalone lowering now emits real `ExternalName` tokens for
-      a first curated add-in subset (`CONVERT`, `DEC2HEX`, `MROUND`,
-      `MULTINOMIAL`, `YEARFRAC`) instead of collapsing every unsupported
+      a broader curated add-in subset (`CONVERT`, `DEC2HEX`, `MROUND`,
+      `MULTINOMIAL`, `YEARFRAC`, `WORKDAY`, `RANDBETWEEN`, `SERIESSUM`,
+      `QUOTIENT`, `SQRTPI`) instead of collapsing every unsupported
       function head into the generic `StringName` call carrier
+    - targeted compiled-diff coverage is green on the newly widened add-in
+      workbook slice (`workday`, `clean`, `quotient`, `sqrtpi`,
+      `seriessum`), with `699 / 699` eligible formulas matched
   - lexical jump tokens imported from Calc are now canonicalized to ignore the
     undefined trailing payload bytes produced by `FormulaTokenArray::AddOpCode()`
     for `ocIf*`/`ocChoose`/`ocLet`, so exact parity checks compare stable
