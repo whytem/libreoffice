@@ -456,8 +456,9 @@ struct ExternalReferenceContext
     return std::nullopt;
 }
 
+template <typename Host>
 [[nodiscard]] inline std::optional<ParsedSingleReference> parseSingleReference(
-    api::StringView rToken, const WorkbookCompileHost& rHost, const CompileContext& rContext,
+    api::StringView rToken, const Host& rHost, const CompileContext& rContext,
     api::SheetId nImplicitSheet, std::optional<ExternalReferenceContext> oImplicitExternal = {})
 {
     api::StringView aToken = rToken;
@@ -579,7 +580,7 @@ struct ExternalReferenceContext
         else
         {
             const api::String aSheetName = unquoteSheetName(aSheetToken);
-            const auto oSheetId = rHost.workbook().findSheetId(aSheetName);
+            const auto oSheetId = rHost.lookupSheetId(aSheetName);
             if (!oSheetId)
             {
                 nAbsoluteSheet = 0;
@@ -689,8 +690,9 @@ constexpr api::RowIndex kSmokeMaxRow = 1048575;
     return aMerged;
 }
 
+template <typename Host>
 [[nodiscard]] inline bool pushNodeTokens(
-    const core::formula::Node& rNode, const WorkbookCompileHost& rHost,
+    const core::formula::Node& rNode, const Host& rHost,
     const CompileContext& rContext, FormulaLoweringResult& rResult);
 
 [[nodiscard]] inline bool pushScalarArrayElement(
@@ -798,8 +800,9 @@ inline void pushJumpToken(
     pushToken(rResult, token::Kind::Jump, nOpCode, std::move(aData));
 }
 
+template <typename Host>
 [[nodiscard]] inline bool pushNodeTokens(
-    const core::formula::Node& rNode, const WorkbookCompileHost& rHost,
+    const core::formula::Node& rNode, const Host& rHost,
     const CompileContext& rContext, FormulaLoweringResult& rResult)
 {
     using core::formula::NodeKind;
@@ -1054,8 +1057,9 @@ inline void pushJumpToken(
     return false;
 }
 
+template <typename Host>
 [[nodiscard]] inline bool pushNodeTokensLexical(
-    const core::formula::Node& rNode, const WorkbookCompileHost& rHost,
+    const core::formula::Node& rNode, const Host& rHost,
     const CompileContext& rContext, FormulaLoweringResult& rResult)
 {
     using core::formula::NodeKind;
@@ -1171,8 +1175,9 @@ inline void pushJumpToken(
 
 } // namespace detail
 
+template <typename Host>
 [[nodiscard]] inline FormulaLoweringResult lowerFormulaSource(
-    api::StringView rFormula, const WorkbookCompileHost& rHost, const CompileContext& rContext)
+    api::StringView rFormula, const Host& rHost, const CompileContext& rContext)
 {
     FormulaLoweringResult aResult;
     const auto aParsed = core::formula::parseFormula(rFormula);
@@ -1189,8 +1194,9 @@ inline void pushJumpToken(
     return aResult;
 }
 
+template <typename Host>
 [[nodiscard]] inline FormulaLoweringResult lowerFormulaSourceLexical(
-    api::StringView rFormula, const WorkbookCompileHost& rHost, const CompileContext& rContext)
+    api::StringView rFormula, const Host& rHost, const CompileContext& rContext)
 {
     FormulaLoweringResult aResult;
     const auto aParsed = core::formula::parseFormula(rFormula);

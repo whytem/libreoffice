@@ -152,34 +152,54 @@ void assertStandaloneLowerTokensExactlyMatchCalc(ScDocument& rDoc,
     CPPUNIT_ASSERT_MESSAGE(aMessage.toUtf8().getStr(), bEqual);
 }
 
-void assertBuiltinExternalNameLookupMatchesAcrossHosts(
+void assertNonLexicalLowerTokensMatchAcrossHosts(
     spreadsheetengine::compat::libreoffice::DocumentCompileHost& rCalcHost,
     const spreadsheetengine::core::workbook::Workbook& rWorkbook, const ScAddress& rPos,
-    std::u16string_view rSymbol, std::u16string_view rExpectedName, std::u16string_view rLabel)
+    std::u16string_view rFormula, std::u16string_view rExpectedName, std::u16string_view rLabel)
 {
     using spreadsheetengine::detail::compiler::WorkbookCompileHost;
+    using spreadsheetengine::detail::compiler::lowerFormulaSource;
+    using spreadsheetengine::detail::token::ExternalNameData;
+    using spreadsheetengine::detail::token::Kind;
+    using spreadsheetengine::detail::tokenstringifier::compiledFormulaToDiagnosticString;
 
     const auto aCalcContext
         = spreadsheetengine::compat::libreoffice::makeCompileContext(rPos, getEnglishOooGrammar());
-    const auto aCalcLookup = rCalcHost.lookupExternalName(rSymbol, aCalcContext);
-    CPPUNIT_ASSERT_MESSAGE(OUString(rLabel).toUtf8().getStr(), static_cast<bool>(aCalcLookup));
+    const auto aCalcLowered = lowerFormulaSource(rFormula, rCalcHost, aCalcContext);
+    CPPUNIT_ASSERT_MESSAGE(OUString(rLabel).toUtf8().getStr(), static_cast<bool>(aCalcLowered));
 
     WorkbookCompileHost aWorkbookHost(rWorkbook);
     const auto aWorkbookContext = spreadsheetengine::detail::compiler::makeWorkbookCompileContext(
         { static_cast<spreadsheetengine::api::SheetId>(rPos.Tab()),
           static_cast<spreadsheetengine::api::ColumnIndex>(rPos.Col()),
           static_cast<spreadsheetengine::api::RowIndex>(rPos.Row()) });
-    const auto aWorkbookLookup = aWorkbookHost.lookupExternalName(rSymbol, aWorkbookContext);
+    const auto aWorkbookLowered = lowerFormulaSource(rFormula, aWorkbookHost, aWorkbookContext);
     CPPUNIT_ASSERT_MESSAGE(OUString(rLabel).toUtf8().getStr(),
-        static_cast<bool>(aWorkbookLookup));
+        static_cast<bool>(aWorkbookLowered));
 
-    CPPUNIT_ASSERT_EQUAL(aCalcLookup->mnFileId, aWorkbookLookup->mnFileId);
+    const bool bEqual = aCalcLowered.maFormula.maTokens == aWorkbookLowered.maFormula.maTokens;
+    const OUString aMessage = OUString(rLabel) + u"\ncalc_host="_ustr
+                              + spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                                  compiledFormulaToDiagnosticString(aCalcLowered.maFormula))
+                              + u"\nworkbook_host="_ustr
+                              + spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                                  compiledFormulaToDiagnosticString(aWorkbookLowered.maFormula));
+    CPPUNIT_ASSERT_MESSAGE(aMessage.toUtf8().getStr(), bEqual);
+
+    auto findExternalName = [](const auto& rFormulaTokens) -> const ExternalNameData* {
+        for (const auto& rToken : rFormulaTokens.maTokens)
+        {
+            if (rToken.meKind == Kind::ExternalName)
+                return &std::get<ExternalNameData>(rToken.maPayload);
+        }
+        return nullptr;
+    };
+
+    const ExternalNameData* pCalcExternal = findExternalName(aCalcLowered.maFormula);
+    CPPUNIT_ASSERT(pCalcExternal);
     CPPUNIT_ASSERT_EQUAL(
         OUString(rExpectedName),
-        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aCalcLookup->maName));
-    CPPUNIT_ASSERT_EQUAL(
-        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aCalcLookup->maName),
-        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aWorkbookLookup->maName));
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(pCalcExternal->maName));
 }
 
 void assertShadowDiff(
@@ -456,7 +476,7 @@ CPPUNIT_TEST_FIXTURE(TestCompileDiff, testStandaloneLoweringOperatorTokenParityS
     }
 }
 
-CPPUNIT_TEST_FIXTURE(TestCompileDiff, testBuiltinExternalNameHostParitySmoke)
+CPPUNIT_TEST_FIXTURE(TestCompileDiff, testBuiltinExternalNameLoweringParitySmoke)
 {
     ScDocument* pDoc = m_pDoc;
     CPPUNIT_ASSERT(pDoc);
@@ -469,25 +489,25 @@ CPPUNIT_TEST_FIXTURE(TestCompileDiff, testBuiltinExternalNameHostParitySmoke)
     const struct
     {
         std::u16string_view maLabel;
-        std::u16string_view maSymbol;
+        std::u16string_view maFormula;
         std::u16string_view maExpectedName;
     } aSamples[] = {
-        { u"workday_external_name", u"WORKDAY",
+        { u"workday_external_name", u"=WORKDAY(DATE(2014;11;1);5)",
             u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETWORKDAY" },
-        { u"convert_ooo_external_name", u"ORG.OPENOFFICE.CONVERT",
+        { u"convert_ooo_external_name", u"=ORG.OPENOFFICE.CONVERT(100;\"ATS\";\"EUR\")",
             u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCONVERT" },
-        { u"quotient_external_name", u"QUOTIENT",
+        { u"quotient_external_name", u"=QUOTIENT(5;2)",
             u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETQUOTIENT" },
-        { u"seriessum_external_name", u"SERIESSUM",
+        { u"seriessum_external_name", u"=SERIESSUM(1;0;2;{1;2;3})",
             u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSERIESSUM" },
-        { u"sqrtpi_external_name", u"SQRTPI",
+        { u"sqrtpi_external_name", u"=SQRTPI(16.2)",
             u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSQRTPI" },
     };
 
     for (const auto& rSample : aSamples)
     {
-        assertBuiltinExternalNameLookupMatchesAcrossHosts(
-            aHost, aWorkbook, ScAddress(0, 0, 0), rSample.maSymbol,
+        assertNonLexicalLowerTokensMatchAcrossHosts(
+            aHost, aWorkbook, ScAddress(0, 0, 0), rSample.maFormula,
             rSample.maExpectedName, rSample.maLabel);
     }
 }

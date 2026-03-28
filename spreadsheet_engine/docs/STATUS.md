@@ -22,12 +22,6 @@ Calc engine code into a self-contained library that:
 - provides a lightweight in-memory host for standalone use without a full Calc
   document model
 
-## Current Extraction Status
-
-**The extraction is substantially complete.** Phases 6 through 11 of the
-extraction plan have all been finished. The project is now in routine
-maintenance mode rather than an active extraction sequence.
-
 ### Current State in Practice
 
 The extracted engine now owns a large share of Calc's pure spreadsheet

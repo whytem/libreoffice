@@ -365,6 +365,15 @@ public:
         return { this, this, this, this, this };
     }
 
+    [[nodiscard]] std::optional<spreadsheetengine::api::SheetId> lookupSheetId(
+        spreadsheetengine::api::StringView rSheetName) const
+    {
+        SCTAB nSheet = -1;
+        if (!mrDoc.GetTable(toLibreOfficeString(spreadsheetengine::api::String(rSheetName)), nSheet))
+            return std::nullopt;
+        return static_cast<spreadsheetengine::api::SheetId>(nSheet);
+    }
+
     [[nodiscard]] std::optional<spreadsheetengine::detail::token::NameData> lookupRangeName(
         spreadsheetengine::api::StringView rName,
         std::optional<spreadsheetengine::api::SheetId> onSheet,

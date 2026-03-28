@@ -101,6 +101,11 @@ public:
         return mrWorkbook;
     }
 
+    [[nodiscard]] std::optional<api::SheetId> lookupSheetId(api::StringView rSheetName) const
+    {
+        return mrWorkbook.findSheetId(rSheetName);
+    }
+
     [[nodiscard]] std::optional<token::NameData> lookupRangeName(
         api::StringView rName, std::optional<api::SheetId> onSheet,
         const CompileContext&) const override
