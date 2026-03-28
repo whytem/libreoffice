@@ -116,8 +116,9 @@ now aligned, and focused Calc smoke now covers exact lexical parity for
 operators, references, range names, a wider representative function subset
 (`SUM`, `DATEVALUE`, `FORMULA`, `VLOOKUP`, `IFERROR`, `IFNA`, `FALSE`, `PI`,
 `AND`, `ISERROR`, `UPPER`, `LOWER`, `LEN`, `ROUND`, `CEILING`, `FLOOR`,
-`GCD`, `LCM`, `DATE`, `TIME`, `MATCH`, `SUMIF`, `CHAR`, `CODE`, `COLUMNS`,
-`AREAS`, `REPLACE`, `RIGHT`, `MID`, `TEXT`, `CONCATENATE`, `DECIMAL`,
+`GCD`, `LCM`, `DEGREES`, `ATANH`, `DATE`, `TIME`, `DATEDIF`, `MATCH`,
+`SUMIF`, `ADDRESS`, `CHAR`, `CODE`, `JIS`, `ASC`, `COLUMNS`, `AREAS`,
+`REPLACE`, `REPLACEB`, `RIGHT`, `MID`, `TEXT`, `CONCATENATE`, `DECIMAL`,
 `MMULT`, `MAX`, `MOD`), and dotted compatibility-name preservation.
 Lexical jump tokens imported from Calc are also normalized now so parity checks
 ignore the undefined trailing payload bytes that Calc’s lexical `ocIf*` jump

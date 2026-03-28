@@ -111,6 +111,8 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeFalse;
     if (aNormalized == u"PI")
         return token::kOpCodePi;
+    if (aNormalized == u"DEGREES")
+        return token::kOpCodeDegrees;
     if (aNormalized == u"NA")
         return token::kOpCodeNoValue;
     if (aNormalized == u"IF")
@@ -123,6 +125,8 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeIsError;
     if (aNormalized == u"ISNA")
         return token::kOpCodeIsNv;
+    if (aNormalized == u"ATANH")
+        return token::kOpCodeAtanh;
     if (aNormalized == u"VALUE")
         return token::kOpCodeValue;
     if (aNormalized == u"DATEVALUE")
@@ -143,6 +147,10 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeLen;
     if (aNormalized == u"FORMULA")
         return token::kOpCodeFormula;
+    if (aNormalized == u"JIS")
+        return token::kOpCodeJis;
+    if (aNormalized == u"ASC")
+        return token::kOpCodeAsc;
     if (aNormalized == u"UNICHAR")
         return token::kOpCodeUnichar;
     if (aNormalized == u"ISOWEEKNUM")
@@ -173,6 +181,8 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeColumns;
     if (aNormalized == u"SUBTOTAL")
         return token::kOpCodeSubTotal;
+    if (aNormalized == u"ADDRESS")
+        return token::kOpCodeAddress;
     if (aNormalized == u"MATCH")
         return token::kOpCodeMatch;
     if (aNormalized == u"SUMIF")
@@ -201,6 +211,8 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeMatMult;
     if (aNormalized == u"DECIMAL")
         return token::kOpCodeDecimal;
+    if (aNormalized == u"DATEDIF")
+        return token::kOpCodeDateDif;
     if (aNormalized == u"AGGREGATE")
         return token::kOpCodeAggregate;
     if (aNormalized == u"RAWSUBTRACT")
@@ -209,6 +221,8 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeConcatMs;
     if (aNormalized == u"TEXTJOIN")
         return token::kOpCodeTextJoinMs;
+    if (aNormalized == u"REPLACEB")
+        return token::kOpCodeReplaceB;
     if (aNormalized == u"AND")
         return token::kOpCodeAnd;
 
@@ -760,7 +774,7 @@ inline void pushJumpToken(
             return true;
 
         case NodeKind::EmptyArgument:
-            pushToken(rResult, token::Kind::Missing, token::kOpCodePush, {});
+            pushToken(rResult, token::Kind::Missing, token::kOpCodeMissing, {});
             return true;
 
         case NodeKind::CellReference:
@@ -1007,7 +1021,7 @@ inline void pushJumpToken(
             return true;
 
         case NodeKind::EmptyArgument:
-            pushToken(rResult, token::Kind::Missing, token::kOpCodePush, {});
+            pushToken(rResult, token::Kind::Missing, token::kOpCodeMissing, {});
             return true;
 
         case NodeKind::CellReference:

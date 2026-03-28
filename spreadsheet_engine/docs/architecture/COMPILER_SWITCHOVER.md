@@ -525,8 +525,9 @@ Current checkpoint:
     - representative function calls like `SUM`, `DATEVALUE`, `FORMULA`,
       `VLOOKUP`, `IFERROR`, `IFNA`, `FALSE`, `PI`, `AND`, `ISERROR`,
       `UPPER`, `LOWER`, `LEN`, `ROUND`, `CEILING`, `FLOOR`, `GCD`,
-      `LCM`, `DATE`, `TIME`, `MATCH`, `SUMIF`, `CHAR`, `CODE`,
-      `COLUMNS`, `AREAS`, `REPLACE`, `RIGHT`, `MID`, `TEXT`,
+      `LCM`, `DEGREES`, `ATANH`, `DATE`, `TIME`, `DATEDIF`, `MATCH`,
+      `SUMIF`, `ADDRESS`, `CHAR`, `CODE`, `JIS`, `ASC`, `COLUMNS`,
+      `AREAS`, `REPLACE`, `REPLACEB`, `RIGHT`, `MID`, `TEXT`,
       `CONCATENATE`, `DECIMAL`, `MMULT`, `MAX`, and `MOD`
     - dotted compatibility-name preservation like `COM.MICROSOFT.CONCAT(...)`
   - lexical jump tokens imported from Calc are now canonicalized to ignore the

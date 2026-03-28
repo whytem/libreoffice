@@ -631,36 +631,56 @@ int testWorkbookCompilerLowering()
                && aLexical.maFormula.maTokens[0].meKind != setoken::Kind::PlainOpcode;
     };
 
-    if (!expectLexicalOpcode(u"of:=FALSE()", setoken::kOpCodeFalse)
-        || !expectLexicalOpcode(u"of:=PI()", setoken::kOpCodePi)
-        || !expectLexicalOpcode(u"of:=AND([.A1];[.B1])", setoken::kOpCodeAnd)
-        || !expectLexicalOpcode(u"of:=ISERROR([.A1]/0)", setoken::kOpCodeIsError)
-        || !expectLexicalOpcode(u"of:=UPPER(\"a\")", setoken::kOpCodeUpper)
-        || !expectLexicalOpcode(u"of:=LOWER(\"A\")", setoken::kOpCodeLower)
-        || !expectLexicalOpcode(u"of:=LEN(\"abc\")", setoken::kOpCodeLen)
-        || !expectLexicalOpcode(u"of:=ROUND(1.234;2)", setoken::kOpCodeRound)
-        || !expectLexicalOpcode(u"of:=CEILING(-11;-2)", setoken::kOpCodeCeil)
-        || !expectLexicalOpcode(u"of:=FLOOR(-11;-2)", setoken::kOpCodeFloor)
-        || !expectLexicalOpcode(u"of:=GCD(16;32;24)", setoken::kOpCodeGcd)
-        || !expectLexicalOpcode(u"of:=LCM(16;32;24)", setoken::kOpCodeLcm)
-        || !expectLexicalOpcode(u"of:=DATE(2015;1;11)", setoken::kOpCodeGetDate)
-        || !expectLexicalOpcode(u"of:=TIME(1;23;0)", setoken::kOpCodeGetTime)
-        || !expectLexicalOpcode(u"of:=MATCH(\"a\";[.A1:.A3];0)", setoken::kOpCodeMatch)
-        || !expectLexicalOpcode(u"of:=SUMIF([.A1:.A5];\"unpaid\";[.B1:.B5])", setoken::kOpCodeSumIf)
-        || !expectLexicalOpcode(u"of:=CHAR(65)", setoken::kOpCodeChar)
-        || !expectLexicalOpcode(u"of:=CODE(\"A\")", setoken::kOpCodeCode)
-        || !expectLexicalOpcode(u"of:=COLUMNS([.A1:.B2])", setoken::kOpCodeColumns)
-        || !expectLexicalOpcode(u"of:=AREAS([.A1:.B2])", setoken::kOpCodeAreas)
-        || !expectLexicalOpcode(u"of:=REPLACE(\"1234567\";1;1;\"444\")", setoken::kOpCodeReplace)
-        || !expectLexicalOpcode(u"of:=RIGHT(\"abc\";2)", setoken::kOpCodeRight)
-        || !expectLexicalOpcode(u"of:=MID(\"abc\";2;1)", setoken::kOpCodeMid)
-        || !expectLexicalOpcode(u"of:=TEXT(12.34567;\"###.##\")", setoken::kOpCodeText)
-        || !expectLexicalOpcode(u"of:=CONCATENATE(\"a\";\"b\")", setoken::kOpCodeConcat)
-        || !expectLexicalOpcode(u"of:=MMULT([.A1:.B2];[.C1:.D2])", setoken::kOpCodeMatMult)
-        || !expectLexicalOpcode(u"of:=DECIMAL(\"10\";2)", setoken::kOpCodeDecimal))
+    const struct
     {
-        return fail("spreadsheetengine_token_compiler_host_tests",
-            "workbook compiler lexical extended opcode lowering mismatch");
+        std::u16string_view maLabel;
+        std::u16string_view maFormula;
+        setoken::OpCodeValue mnOpCode;
+    } aLexicalSamples[] = {
+        { u"FALSE", u"of:=FALSE()", setoken::kOpCodeFalse },
+        { u"PI", u"of:=PI()", setoken::kOpCodePi },
+        { u"DEGREES", u"of:=DEGREES(1)", setoken::kOpCodeDegrees },
+        { u"AND", u"of:=AND([.A1];[.B1])", setoken::kOpCodeAnd },
+        { u"ISERROR", u"of:=ISERROR([.A1]/0)", setoken::kOpCodeIsError },
+        { u"ATANH", u"of:=ATANH(0)/PI()", setoken::kOpCodeAtanh },
+        { u"UPPER", u"of:=UPPER(\"a\")", setoken::kOpCodeUpper },
+        { u"LOWER", u"of:=LOWER(\"A\")", setoken::kOpCodeLower },
+        { u"LEN", u"of:=LEN(\"abc\")", setoken::kOpCodeLen },
+        { u"ROUND", u"of:=ROUND(1.234;2)", setoken::kOpCodeRound },
+        { u"CEILING", u"of:=CEILING(-11;-2)", setoken::kOpCodeCeil },
+        { u"FLOOR", u"of:=FLOOR(-11;-2)", setoken::kOpCodeFloor },
+        { u"GCD", u"of:=GCD(16;32;24)", setoken::kOpCodeGcd },
+        { u"LCM", u"of:=LCM(16;32;24)", setoken::kOpCodeLcm },
+        { u"DATE", u"of:=DATE(2015;1;11)", setoken::kOpCodeGetDate },
+        { u"TIME", u"of:=TIME(1;23;0)", setoken::kOpCodeGetTime },
+        { u"DATEDIF", u"of:=DATEDIF([.$K2];[.$L2];[.K$1])", setoken::kOpCodeDateDif },
+        { u"MATCH", u"of:=MATCH(\"a\";[.A1:.A3];0)", setoken::kOpCodeMatch },
+        { u"SUMIF", u"of:=SUMIF([.A1:.A5];\"unpaid\";[.B1:.B5])", setoken::kOpCodeSumIf },
+        { u"ADDRESS", u"of:=ADDRESS(1;1;2;;\"Sheet2\")", setoken::kOpCodeAddress },
+        { u"CHAR", u"of:=CHAR(65)", setoken::kOpCodeChar },
+        { u"CODE", u"of:=CODE(\"A\")", setoken::kOpCodeCode },
+        { u"JIS", u"of:=JIS(\"Libre Office\")", setoken::kOpCodeJis },
+        { u"ASC", u"of:=ASC(\"Libre Office\")", setoken::kOpCodeAsc },
+        { u"COLUMNS", u"of:=COLUMNS([.A1:.B2])", setoken::kOpCodeColumns },
+        { u"AREAS", u"of:=AREAS([.A1:.B2])", setoken::kOpCodeAreas },
+        { u"REPLACE", u"of:=REPLACE(\"1234567\";1;1;\"444\")", setoken::kOpCodeReplace },
+        { u"REPLACEB", u"of:=REPLACEB([.$K$1];[.K2];[.L2];\"ab\")", setoken::kOpCodeReplaceB },
+        { u"RIGHT", u"of:=RIGHT(\"abc\";2)", setoken::kOpCodeRight },
+        { u"MID", u"of:=MID(\"abc\";2;1)", setoken::kOpCodeMid },
+        { u"TEXT", u"of:=TEXT(12.34567;\"###.##\")", setoken::kOpCodeText },
+        { u"CONCATENATE", u"of:=CONCATENATE(\"a\";\"b\")", setoken::kOpCodeConcat },
+        { u"MMULT", u"of:=MMULT([.A1:.B2];[.C1:.D2])", setoken::kOpCodeMatMult },
+        { u"DECIMAL", u"of:=DECIMAL(\"10\";2)", setoken::kOpCodeDecimal },
+    };
+
+    for (const auto& rSample : aLexicalSamples)
+    {
+        if (!expectLexicalOpcode(rSample.maFormula, rSample.mnOpCode))
+        {
+            const std::string aDetail = "workbook compiler lexical extended opcode lowering mismatch: "
+                                        + toUtf8(rSample.maLabel);
+            return fail("spreadsheetengine_token_compiler_host_tests", aDetail.c_str());
+        }
     }
 
     const auto aLexicalCompatName = secompiler::lowerFormulaSourceLexical(
