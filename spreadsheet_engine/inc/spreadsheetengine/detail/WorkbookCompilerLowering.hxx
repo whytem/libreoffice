@@ -109,6 +109,8 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeTrue;
     if (aNormalized == u"FALSE")
         return token::kOpCodeFalse;
+    if (aNormalized == u"PI")
+        return token::kOpCodePi;
     if (aNormalized == u"NA")
         return token::kOpCodeNoValue;
     if (aNormalized == u"IF")
@@ -133,6 +135,12 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeChar;
     if (aNormalized == u"CODE")
         return token::kOpCodeCode;
+    if (aNormalized == u"UPPER")
+        return token::kOpCodeUpper;
+    if (aNormalized == u"LOWER")
+        return token::kOpCodeLower;
+    if (aNormalized == u"LEN")
+        return token::kOpCodeLen;
     if (aNormalized == u"FORMULA")
         return token::kOpCodeFormula;
     if (aNormalized == u"UNICHAR")
@@ -141,6 +149,14 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeIsoWeeknum;
     if (aNormalized == u"ROUND")
         return token::kOpCodeRound;
+    if (aNormalized == u"CEILING")
+        return token::kOpCodeCeil;
+    if (aNormalized == u"FLOOR")
+        return token::kOpCodeFloor;
+    if (aNormalized == u"GCD")
+        return token::kOpCodeGcd;
+    if (aNormalized == u"LCM")
+        return token::kOpCodeLcm;
     if (aNormalized == u"DATE")
         return token::kOpCodeGetDate;
     if (aNormalized == u"TIME")
@@ -157,6 +173,10 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeColumns;
     if (aNormalized == u"SUBTOTAL")
         return token::kOpCodeSubTotal;
+    if (aNormalized == u"MATCH")
+        return token::kOpCodeMatch;
+    if (aNormalized == u"SUMIF")
+        return token::kOpCodeSumIf;
     if (aNormalized == u"LOOKUP")
         return token::kOpCodeLookup;
     if (aNormalized == u"VLOOKUP")
@@ -165,8 +185,18 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeHLookup;
     if (aNormalized == u"AREAS")
         return token::kOpCodeAreas;
+    if (aNormalized == u"REPLACE")
+        return token::kOpCodeReplace;
     if (aNormalized == u"EXACT")
         return token::kOpCodeExact;
+    if (aNormalized == u"RIGHT")
+        return token::kOpCodeRight;
+    if (aNormalized == u"MID")
+        return token::kOpCodeMid;
+    if (aNormalized == u"TEXT")
+        return token::kOpCodeText;
+    if (aNormalized == u"CONCATENATE")
+        return token::kOpCodeConcat;
     if (aNormalized == u"MMULT")
         return token::kOpCodeMatMult;
     if (aNormalized == u"DECIMAL")

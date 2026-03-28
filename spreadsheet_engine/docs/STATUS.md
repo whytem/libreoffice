@@ -114,9 +114,11 @@ between standalone lowering and Calc-imported canonical tokens outside the new
 mixed lexical smoke subset. Ordinary-formula XML formula-source preservation is
 now aligned, and focused Calc smoke now covers exact lexical parity for
 operators, references, range names, a wider representative function subset
-(`SUM`, `DATEVALUE`, `FORMULA`, `VLOOKUP`, `IFERROR`, `IFNA`, `FALSE`, `AND`,
-`ISERROR`, `ROUND`, `DATE`, `TIME`, `CHAR`, `CODE`, `COLUMNS`, `AREAS`,
-`DECIMAL`, `MMULT`, `MAX`, `MOD`), and dotted compatibility-name preservation.
+(`SUM`, `DATEVALUE`, `FORMULA`, `VLOOKUP`, `IFERROR`, `IFNA`, `FALSE`, `PI`,
+`AND`, `ISERROR`, `UPPER`, `LOWER`, `LEN`, `ROUND`, `CEILING`, `FLOOR`,
+`GCD`, `LCM`, `DATE`, `TIME`, `MATCH`, `SUMIF`, `CHAR`, `CODE`, `COLUMNS`,
+`AREAS`, `REPLACE`, `RIGHT`, `MID`, `TEXT`, `CONCATENATE`, `DECIMAL`,
+`MMULT`, `MAX`, `MOD`), and dotted compatibility-name preservation.
 Lexical jump tokens imported from Calc are also normalized now so parity checks
 ignore the undefined trailing payload bytes that Calc’s lexical `ocIf*` jump
 construction leaves uninitialized. The remaining gap is broader function-catalog

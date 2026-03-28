@@ -523,9 +523,11 @@ Current checkpoint:
     - operators and comparisons
     - references and range names
     - representative function calls like `SUM`, `DATEVALUE`, `FORMULA`,
-      `VLOOKUP`, `IFERROR`, `IFNA`, `FALSE`, `AND`, `ISERROR`, `ROUND`,
-      `DATE`, `TIME`, `CHAR`, `CODE`, `COLUMNS`, `AREAS`, `DECIMAL`,
-      `MMULT`, `MAX`, and `MOD`
+      `VLOOKUP`, `IFERROR`, `IFNA`, `FALSE`, `PI`, `AND`, `ISERROR`,
+      `UPPER`, `LOWER`, `LEN`, `ROUND`, `CEILING`, `FLOOR`, `GCD`,
+      `LCM`, `DATE`, `TIME`, `MATCH`, `SUMIF`, `CHAR`, `CODE`,
+      `COLUMNS`, `AREAS`, `REPLACE`, `RIGHT`, `MID`, `TEXT`,
+      `CONCATENATE`, `DECIMAL`, `MMULT`, `MAX`, and `MOD`
     - dotted compatibility-name preservation like `COM.MICROSOFT.CONCAT(...)`
   - lexical jump tokens imported from Calc are now canonicalized to ignore the
     undefined trailing payload bytes produced by `FormulaTokenArray::AddOpCode()`
