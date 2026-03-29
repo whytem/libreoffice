@@ -68,6 +68,22 @@ Workbook makeWorkbook()
         23, 0,
         Cell { CellValue::number(1.0), u"of:=YEARFRAC(DATE(2014;1;1);DATE(2015;1;1);0)" });
     aSheet1.setCell(24, 0, Cell { CellValue::text(u"A"), u"of:=DEC2HEX(10)" });
+    aSheet1.setCell(6, 25, Cell { CellValue::number(0.5) });
+    aSheet1.setCell(8, 1, Cell { CellValue::text(u"one") });
+    aSheet1.setCell(8, 2, Cell { CellValue::text(u"oneone") });
+    aSheet1.setCell(8, 3, Cell { CellValue::text(u"two") });
+    aSheet1.setCell(9, 1, Cell { CellValue::text(u"A2") });
+    aSheet1.setCell(9, 2, Cell { CellValue::number(2.0) });
+    aSheet1.setCell(9, 3, Cell { CellValue::number(3.0) });
+    Cell aTypedTimeCell { CellValue::text(u"PT00H01M26.47S") };
+    aTypedTimeCell.maRawValueType = u"time";
+    aTypedTimeCell.maRawValue = u"PT00H01M26.47S";
+    aSheet1.setCell(10, 1, aTypedTimeCell);
+    aSheet1.setCell(
+        11, 1, Cell { CellValue::number(1.0), u"of:=COUNTIF([.K2:.K2];\"=\"&[.K2])" });
+    aSheet1.setCell(12, 2, Cell { CellValue::text(u"A") });
+    aSheet1.setCell(12, 3, Cell { CellValue::text(u"B") });
+    aSheet1.setCell(12, 4, Cell { CellValue::text(u"C") });
 
     Sheet aSheet2;
     aSheet2.maName = u"Sheet2";
@@ -88,6 +104,7 @@ Workbook makeWorkbook()
         NamedRange { u"One", {}, u"$Sheet1.$A$1", u"$Sheet1.$A$1:.$A$1" });
     aWorkbook.maNamedRanges.push_back(
         NamedRange { u"One", u"Sheet1", u"$Sheet1.$A$2", u"$Sheet1.$A$2:.$A$2" });
+    aWorkbook.mbSearchCriteriaMustApplyToWholeCell = false;
 
     return aWorkbook;
 }
@@ -358,6 +375,125 @@ int main()
         {
             return fail(
                 "spreadsheetengine_fods_evaluator_tests", "scalar array constant evaluation mismatch");
+        }
+    }
+
+    {
+        const auto aCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.G26:.G26];\"=\"&[.G26])", { 0, 0, 0 });
+        const auto aCountIfs = aEvaluator.evaluateFormula(
+            u"of:=COUNTIFS([.A1:.A2];\">=5\";[.A1:.A2];\"<=7\")", { 0, 0, 0 });
+        const auto aAverageIf
+            = aEvaluator.evaluateFormula(u"of:=AVERAGEIF([.A1:.A2];\">=5\";[.A1:.A2])", { 0, 0, 0 });
+        const auto aMaxIfs
+            = aEvaluator.evaluateFormula(u"of:=MAXIFS([.A1:.A2];[.A1:.A2];\">5\")", { 0, 0, 0 });
+        const auto aMinIfs
+            = aEvaluator.evaluateFormula(u"of:=MINIFS([.A1:.A2];[.A1:.A2];\">=5\")", { 0, 0, 0 });
+        const auto aPartialCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.I2:.I4];\"one\")", { 0, 0, 0 });
+        const auto aNumericStringCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.J2:.J4];\"=2\")", { 0, 0, 0 });
+        const auto aNumericOrderedCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.J2:.J4];\">2\")", { 0, 0, 0 });
+        const auto aOrderedTextCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.M2:.M6];\"<B\")", { 0, 0, 0 });
+        const auto aBareLessCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.M2:.M6];\"<\")", { 0, 0, 0 });
+        const auto aBareGreaterCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.M2:.M6];\">\")", { 0, 0, 0 });
+        const auto aTypedTimeCountIf
+            = aEvaluator.evaluateCell({ 0, 11, 1 });
+        const auto aCompiledCountIf = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUNTIF([.G26:.G26];\"=\"&[.G26])", { 0, 0, 0 });
+        const auto aCompiledCountIfs = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUNTIFS([.A1:.A2];\">=5\";[.A1:.A2];\"<=7\")", { 0, 0, 0 });
+        const auto aCompiledPartialCountIf = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUNTIF([.I2:.I4];\"one\")", { 0, 0, 0 });
+        const auto aCompiledNumericStringCountIf = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUNTIF([.J2:.J4];\"=2\")", { 0, 0, 0 });
+        const auto aCompiledNumericOrderedCountIf = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUNTIF([.J2:.J4];\">2\")", { 0, 0, 0 });
+        const auto aCompiledOrderedTextCountIf = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUNTIF([.M2:.M6];\"<B\")", { 0, 0, 0 });
+        const auto aCompiledBareLessCountIf = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUNTIF([.M2:.M6];\"<\")", { 0, 0, 0 });
+        const auto aCompiledBareGreaterCountIf = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUNTIF([.M2:.M6];\">\")", { 0, 0, 0 });
+        const auto aCompiledTypedTimeCountIf = aEvaluator.evaluateCellViaCompiledTokens(
+            { 0, 11, 1 });
+        if (!aCountIf || !aCountIf.maValue.maValue.isNumber()
+            || aCountIf.mbUsedCachedValue
+            || !almostEqual(aCountIf.maValue.maValue.mfNumber, 1.0) || !aCountIfs
+            || !aCountIfs.maValue.maValue.isNumber()
+            || aCountIfs.mbUsedCachedValue
+            || !almostEqual(aCountIfs.maValue.maValue.mfNumber, 2.0) || !aAverageIf
+            || !aAverageIf.maValue.maValue.isNumber()
+            || aAverageIf.mbUsedCachedValue
+            || !almostEqual(aAverageIf.maValue.maValue.mfNumber, 6.0) || !aMaxIfs
+            || !aMaxIfs.maValue.maValue.isNumber()
+            || aMaxIfs.mbUsedCachedValue
+            || !almostEqual(aMaxIfs.maValue.maValue.mfNumber, 7.0) || !aMinIfs
+            || !aMinIfs.maValue.maValue.isNumber()
+            || aMinIfs.mbUsedCachedValue
+            || !almostEqual(aMinIfs.maValue.maValue.mfNumber, 5.0) || !aPartialCountIf
+            || !aPartialCountIf.maValue.maValue.isNumber()
+            || aPartialCountIf.mbUsedCachedValue
+            || !almostEqual(aPartialCountIf.maValue.maValue.mfNumber, 2.0)
+            || !aNumericStringCountIf || !aNumericStringCountIf.maValue.maValue.isNumber()
+            || aNumericStringCountIf.mbUsedCachedValue
+            || !almostEqual(aNumericStringCountIf.maValue.maValue.mfNumber, 2.0)
+            || !aNumericOrderedCountIf || !aNumericOrderedCountIf.maValue.maValue.isNumber()
+            || aNumericOrderedCountIf.mbUsedCachedValue
+            || !almostEqual(aNumericOrderedCountIf.maValue.maValue.mfNumber, 1.0)
+            || !aOrderedTextCountIf || !aOrderedTextCountIf.maValue.maValue.isNumber()
+            || aOrderedTextCountIf.mbUsedCachedValue
+            || !almostEqual(aOrderedTextCountIf.maValue.maValue.mfNumber, 1.0)
+            || !aBareLessCountIf || !aBareLessCountIf.maValue.maValue.isNumber()
+            || aBareLessCountIf.mbUsedCachedValue
+            || !almostEqual(aBareLessCountIf.maValue.maValue.mfNumber, 0.0)
+            || !aBareGreaterCountIf || !aBareGreaterCountIf.maValue.maValue.isNumber()
+            || aBareGreaterCountIf.mbUsedCachedValue
+            || !almostEqual(aBareGreaterCountIf.maValue.maValue.mfNumber, 3.0)
+            || !aTypedTimeCountIf || !aTypedTimeCountIf.maValue.maValue.isNumber()
+            || aTypedTimeCountIf.mbUsedCachedValue
+            || !almostEqual(aTypedTimeCountIf.maValue.maValue.mfNumber, 1.0)
+            || !aCompiledCountIf
+            || !aCompiledCountIf.maValue.maValue.isNumber()
+            || aCompiledCountIf.mbUsedCachedValue
+            || !almostEqual(aCompiledCountIf.maValue.maValue.mfNumber, 1.0)
+            || !aCompiledCountIfs || !aCompiledCountIfs.maValue.maValue.isNumber()
+            || aCompiledCountIfs.mbUsedCachedValue
+            || !almostEqual(aCompiledCountIfs.maValue.maValue.mfNumber, 2.0)
+            || !aCompiledPartialCountIf
+            || !aCompiledPartialCountIf.maValue.maValue.isNumber()
+            || aCompiledPartialCountIf.mbUsedCachedValue
+            || !almostEqual(aCompiledPartialCountIf.maValue.maValue.mfNumber, 2.0)
+            || !aCompiledNumericStringCountIf
+            || !aCompiledNumericStringCountIf.maValue.maValue.isNumber()
+            || aCompiledNumericStringCountIf.mbUsedCachedValue
+            || !almostEqual(aCompiledNumericStringCountIf.maValue.maValue.mfNumber, 2.0)
+            || !aCompiledNumericOrderedCountIf
+            || !aCompiledNumericOrderedCountIf.maValue.maValue.isNumber()
+            || aCompiledNumericOrderedCountIf.mbUsedCachedValue
+            || !almostEqual(aCompiledNumericOrderedCountIf.maValue.maValue.mfNumber, 1.0)
+            || !aCompiledOrderedTextCountIf
+            || !aCompiledOrderedTextCountIf.maValue.maValue.isNumber()
+            || aCompiledOrderedTextCountIf.mbUsedCachedValue
+            || !almostEqual(aCompiledOrderedTextCountIf.maValue.maValue.mfNumber, 1.0)
+            || !aCompiledBareLessCountIf
+            || !aCompiledBareLessCountIf.maValue.maValue.isNumber()
+            || aCompiledBareLessCountIf.mbUsedCachedValue
+            || !almostEqual(aCompiledBareLessCountIf.maValue.maValue.mfNumber, 0.0)
+            || !aCompiledBareGreaterCountIf
+            || !aCompiledBareGreaterCountIf.maValue.maValue.isNumber()
+            || aCompiledBareGreaterCountIf.mbUsedCachedValue
+            || !almostEqual(aCompiledBareGreaterCountIf.maValue.maValue.mfNumber, 3.0)
+            || !aCompiledTypedTimeCountIf
+            || !aCompiledTypedTimeCountIf.maValue.maValue.isNumber()
+            || aCompiledTypedTimeCountIf.mbUsedCachedValue
+            || !almostEqual(aCompiledTypedTimeCountIf.maValue.maValue.mfNumber, 1.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "criteria aggregate mismatch");
         }
     }
 
@@ -634,11 +770,27 @@ int main()
 
     {
         const auto aRepoRoot = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
+        const auto aTTestPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                / "statistical" / "fods" / "t.test.fods";
         const auto aAggregatePath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
                                     / "mathematical" / "fods" / "aggregate.fods";
+        const auto aTTestLoad = spreadsheetengine::core::fods::loadWorkbook(aTTestPath.string());
         const auto aLoadResult = spreadsheetengine::core::fods::loadWorkbook(aAggregatePath.string());
+        if (!aTTestLoad)
+            return fail("spreadsheetengine_fods_evaluator_tests", "t.test.fods load failed");
         if (!aLoadResult)
             return fail("spreadsheetengine_fods_evaluator_tests", "aggregate.fods load failed");
+
+        Evaluator aTTestEvaluator(aTTestLoad.maValue.maWorkbook);
+        const auto aTTestInvalidResult = aTTestEvaluator.evaluateCell({ 1, 0, 1 });
+        if (!aTTestInvalidResult || aTTestInvalidResult.mbUsedCachedValue
+            || !aTTestInvalidResult.maValue.maValue.isError()
+            || aTTestInvalidResult.maValue.maValue.meError
+                   != spreadsheetengine::api::Error::NoValue)
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests", "t.test.fods invalid-mode mismatch");
+        }
 
         const auto* pSheet2 = aLoadResult.maValue.maWorkbook.findSheet(u"Sheet2");
         if (!pSheet2)

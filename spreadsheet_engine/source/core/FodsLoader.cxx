@@ -345,6 +345,7 @@ void parseCalculationSettings(const xmlNode* pSettingsNode, workbook::Workbook& 
 {
     // Calc's XML import defaults missing formula-search settings to regex mode.
     rWorkbook.meFormulaSearchType = workbook::FormulaSearchType::Regex;
+    rWorkbook.mbSearchCriteriaMustApplyToWholeCell = true;
 
     const api::String aUseRegex
         = getPropString(pSettingsNode, pTableNs, "use-regular-expressions");
@@ -354,6 +355,11 @@ void parseCalculationSettings(const xmlNode* pSettingsNode, workbook::Workbook& 
     const api::String aUseWildcards = getPropString(pSettingsNode, pTableNs, "use-wildcards");
     if (aUseWildcards == u"true" || aUseWildcards == u"TRUE")
         rWorkbook.meFormulaSearchType = workbook::FormulaSearchType::Wildcard;
+
+    const api::String aMatchWholeCell
+        = getPropString(pSettingsNode, pTableNs, "search-criteria-must-apply-to-whole-cell");
+    if (aMatchWholeCell == u"false" || aMatchWholeCell == u"FALSE")
+        rWorkbook.mbSearchCriteriaMustApplyToWholeCell = false;
 }
 
 [[nodiscard]] workbook::Cell parseCell(const xmlNode* pCellNode)

@@ -32,6 +32,7 @@
 #include <string>
 
 #include <unicode/coll.h>
+#include <unicode/unistr.h>
 #include <unicode/ustring.h>
 
 namespace spreadsheetengine::core::fods
@@ -244,6 +245,76 @@ namespace setoken = spreadsheetengine::detail::token;
     return aPattern;
 }
 
+[[nodiscard]] std::string makeQueryRegexPattern(api::StringView rPattern,
+    workbook::FormulaSearchType eSearchType, bool bMatchWholeCell)
+{
+    std::string aPattern;
+    aPattern.reserve(rPattern.size() * 2 + 2);
+    if (bMatchWholeCell)
+        aPattern.push_back('^');
+
+    if (eSearchType == workbook::FormulaSearchType::Wildcard)
+    {
+        bool bEscapeNext = false;
+        for (const char16_t cChar : rPattern)
+        {
+            if (bEscapeNext)
+            {
+                if (isRegexMetaCharacter(cChar))
+                    aPattern.push_back('\\');
+                aPattern += toUtf8String(api::StringView(&cChar, 1));
+                bEscapeNext = false;
+                continue;
+            }
+
+            if (cChar == u'~')
+            {
+                bEscapeNext = true;
+                continue;
+            }
+
+            if (cChar == u'*')
+            {
+                aPattern += ".*";
+                continue;
+            }
+
+            if (cChar == u'?')
+            {
+                aPattern.push_back('.');
+                continue;
+            }
+
+            if (isRegexMetaCharacter(cChar))
+                aPattern.push_back('\\');
+            aPattern += toUtf8String(api::StringView(&cChar, 1));
+        }
+
+        if (bEscapeNext)
+            aPattern += "~";
+    }
+    else
+    {
+        aPattern += toUtf8String(rPattern);
+    }
+
+    if (bMatchWholeCell)
+        aPattern.push_back('$');
+    return aPattern;
+}
+
+[[nodiscard]] bool containsFoldedText(api::StringView rHaystack, api::StringView rNeedle)
+{
+    if (rNeedle.empty())
+        return true;
+
+    icu::UnicodeString aHaystack(
+        reinterpret_cast<const UChar*>(rHaystack.data()), static_cast<int32_t>(rHaystack.size()));
+    icu::UnicodeString aNeedle(
+        reinterpret_cast<const UChar*>(rNeedle.data()), static_cast<int32_t>(rNeedle.size()));
+    return aHaystack.foldCase().indexOf(aNeedle.foldCase()) >= 0;
+}
+
 [[nodiscard]] bool matchesWholeCellLookupText(api::StringView rLookupText,
     api::StringView rCandidateText, workbook::FormulaSearchType eSearchType)
 {
@@ -266,6 +337,40 @@ namespace setoken = spreadsheetengine::detail::token;
         const std::regex aPattern(
             makeWholeCellRegexPattern(rLookupText, eSearchType), std::regex::ECMAScript | std::regex::icase);
         return std::regex_match(toUtf8String(rCandidateText), aPattern);
+    }
+    catch (const std::regex_error&)
+    {
+        return false;
+    }
+}
+
+[[nodiscard]] bool matchesQueryText(api::StringView rLookupText, api::StringView rCandidateText,
+    workbook::FormulaSearchType eSearchType, bool bMatchWholeCell)
+{
+    switch (eSearchType)
+    {
+        case workbook::FormulaSearchType::Regex:
+            if (!mayBeRegExp(rLookupText))
+                return bMatchWholeCell ? compareFoldedText(rCandidateText, rLookupText) == 0
+                                       : containsFoldedText(rCandidateText, rLookupText);
+            break;
+        case workbook::FormulaSearchType::Wildcard:
+            if (!mayBeWildcard(rLookupText))
+                return bMatchWholeCell ? compareFoldedText(rCandidateText, rLookupText) == 0
+                                       : containsFoldedText(rCandidateText, rLookupText);
+            break;
+        case workbook::FormulaSearchType::Normal:
+            return bMatchWholeCell ? compareFoldedText(rCandidateText, rLookupText) == 0
+                                   : containsFoldedText(rCandidateText, rLookupText);
+    }
+
+    try
+    {
+        const std::regex aPattern(makeQueryRegexPattern(rLookupText, eSearchType, bMatchWholeCell),
+            std::regex::ECMAScript | std::regex::icase);
+        const std::string aCandidateUtf8 = toUtf8String(rCandidateText);
+        return bMatchWholeCell ? std::regex_match(aCandidateUtf8, aPattern)
+                               : std::regex_search(aCandidateUtf8, aPattern);
     }
     catch (const std::regex_error&)
     {
@@ -802,15 +907,9 @@ namespace setoken = spreadsheetengine::detail::token;
 
 [[nodiscard]] api::String formatNumber(double fValue)
 {
-    std::string aAscii = std::to_string(fValue);
-    const std::size_t nDot = aAscii.find('.');
-    if (nDot != std::string::npos)
-    {
-        while (!aAscii.empty() && aAscii.back() == '0')
-            aAscii.pop_back();
-        if (!aAscii.empty() && aAscii.back() == '.')
-            aAscii.pop_back();
-    }
+    char aBuffer[32];
+    const int nLength = std::snprintf(aBuffer, sizeof(aBuffer), "%.17G", fValue);
+    const std::string aAscii(aBuffer, static_cast<std::size_t>(std::max(nLength, 0)));
 
     api::String aResult;
     aResult.reserve(aAscii.size());
@@ -956,6 +1055,431 @@ struct AggregateScan
 [[nodiscard]] api::String normalizeFunctionName(api::StringView rName)
 {
     return uppercaseAscii(normalizeDisplayFunctionName(rName));
+}
+
+struct CriteriaAggregateInput
+{
+    bool mbScalar = true;
+    api::CellValue maScalar = api::CellValue::empty();
+    api::ResolvedReference maReference;
+    api::MatrixSize mnColumns = 1;
+    api::MatrixSize mnRows = 1;
+};
+
+struct CriteriaPredicate
+{
+    enum class OperandKind : sal_uInt8
+    {
+        Empty = 0,
+        Number,
+        Text
+    };
+
+    formula::BinaryOperator meOperator = formula::BinaryOperator::Equal;
+    OperandKind meOperandKind = OperandKind::Empty;
+    double mfNumber = 0.0;
+    api::String maText;
+    api::String maNumericText;
+    bool mbNumberOriginatedFromText = false;
+};
+
+enum class CriteriaAggregateKind : sal_uInt8
+{
+    Count = 0,
+    Sum,
+    Average,
+    Max,
+    Min
+};
+
+[[nodiscard]] std::optional<formula::BinaryOperator> parseCriteriaOperator(
+    api::StringView rText, api::StringView& rOperandText)
+{
+    if (rText.size() >= 2)
+    {
+        if (rText[0] == u'<' && rText[1] == u'>')
+        {
+            rOperandText = rText.substr(2);
+            return formula::BinaryOperator::NotEqual;
+        }
+        if (rText[0] == u'<' && rText[1] == u'=')
+        {
+            rOperandText = rText.substr(2);
+            return formula::BinaryOperator::LessEqual;
+        }
+        if (rText[0] == u'>' && rText[1] == u'=')
+        {
+            rOperandText = rText.substr(2);
+            return formula::BinaryOperator::GreaterEqual;
+        }
+    }
+
+    if (!rText.empty())
+    {
+        if (rText[0] == u'<')
+        {
+            rOperandText = rText.substr(1);
+            return formula::BinaryOperator::Less;
+        }
+        if (rText[0] == u'>')
+        {
+            rOperandText = rText.substr(1);
+            return formula::BinaryOperator::Greater;
+        }
+        if (rText[0] == u'=')
+        {
+            rOperandText = rText.substr(1);
+            return formula::BinaryOperator::Equal;
+        }
+    }
+
+    rOperandText = rText;
+    return formula::BinaryOperator::Equal;
+}
+
+[[nodiscard]] std::optional<double> coerceCriteriaComparisonNumber(
+    const api::CellValue& rValue)
+{
+    switch (rValue.meKind)
+    {
+        case api::CellValueKind::Empty:
+            return 0.0;
+        case api::CellValueKind::Number:
+        case api::CellValueKind::Boolean:
+            return rValue.mfNumber;
+        case api::CellValueKind::Text:
+            return rValue.maString.empty() ? std::optional<double>(0.0) : std::nullopt;
+        case api::CellValueKind::Error:
+            return std::nullopt;
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<double> coerceCriteriaAggregateNumber(
+    const api::CellValue& rValue)
+{
+    switch (rValue.meKind)
+    {
+        case api::CellValueKind::Number:
+        case api::CellValueKind::Boolean:
+            return rValue.mfNumber;
+        case api::CellValueKind::Text:
+        case api::CellValueKind::Empty:
+        case api::CellValueKind::Error:
+            return std::nullopt;
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] bool isCriteriaEmptyValue(const api::CellValue& rValue)
+{
+    return rValue.isEmpty() || (rValue.isText() && rValue.maString.empty());
+}
+
+[[nodiscard]] std::optional<CriteriaPredicate> makeCriteriaPredicate(
+    const api::CellValue& rCriteriaValue)
+{
+    CriteriaPredicate aPredicate;
+    if (rCriteriaValue.isError())
+        return std::nullopt;
+
+    if (rCriteriaValue.isEmpty())
+        return aPredicate;
+
+    if (rCriteriaValue.isNumber() || rCriteriaValue.isBoolean())
+    {
+        aPredicate.meOperandKind = CriteriaPredicate::OperandKind::Number;
+        aPredicate.mfNumber = rCriteriaValue.mfNumber;
+        return aPredicate;
+    }
+
+    api::StringView aOperandText;
+    const auto oOperator = parseCriteriaOperator(rCriteriaValue.maString, aOperandText);
+    if (!oOperator)
+        return std::nullopt;
+    aPredicate.meOperator = *oOperator;
+
+    if (aOperandText.empty())
+        return aPredicate;
+
+    if (const auto oParsed = parseStandaloneNumberText(aOperandText))
+    {
+        aPredicate.meOperandKind = CriteriaPredicate::OperandKind::Number;
+        aPredicate.mfNumber = oParsed->mfValue;
+        aPredicate.maNumericText = api::String(aOperandText);
+        aPredicate.mbNumberOriginatedFromText = true;
+        return aPredicate;
+    }
+    if (const auto oNumber = parseAsciiDouble(aOperandText))
+    {
+        aPredicate.meOperandKind = CriteriaPredicate::OperandKind::Number;
+        aPredicate.mfNumber = *oNumber;
+        aPredicate.maNumericText = api::String(aOperandText);
+        aPredicate.mbNumberOriginatedFromText = true;
+        return aPredicate;
+    }
+
+    aPredicate.meOperandKind = CriteriaPredicate::OperandKind::Text;
+    aPredicate.maText = api::String(aOperandText);
+    return aPredicate;
+}
+
+[[nodiscard]] bool matchesCriteriaPredicate(const CriteriaPredicate& rPredicate,
+    const api::CellValue& rCandidate, workbook::FormulaSearchType eSearchType,
+    bool bMatchWholeCell)
+{
+    switch (rPredicate.meOperandKind)
+    {
+        case CriteriaPredicate::OperandKind::Empty:
+        {
+            const bool bCandidateEmpty = isCriteriaEmptyValue(rCandidate);
+            switch (rPredicate.meOperator)
+            {
+                case formula::BinaryOperator::Equal:
+                    return bCandidateEmpty;
+                case formula::BinaryOperator::NotEqual:
+                case formula::BinaryOperator::Greater:
+                case formula::BinaryOperator::GreaterEqual:
+                    return !bCandidateEmpty;
+                case formula::BinaryOperator::Less:
+                case formula::BinaryOperator::LessEqual:
+                    return false;
+                default:
+                    return false;
+            }
+        }
+        case CriteriaPredicate::OperandKind::Number:
+        {
+            const auto oCandidateNumber = coerceCriteriaComparisonNumber(rCandidate);
+            if (!oCandidateNumber)
+            {
+                if (rPredicate.mbNumberOriginatedFromText && rCandidate.isText()
+                    && (rPredicate.meOperator == formula::BinaryOperator::Equal
+                        || rPredicate.meOperator == formula::BinaryOperator::NotEqual))
+                {
+                    const bool bMatch = matchesQueryText(
+                        rPredicate.maNumericText, rCandidate.maString, eSearchType, bMatchWholeCell);
+                    return rPredicate.meOperator == formula::BinaryOperator::NotEqual ? !bMatch
+                                                                                      : bMatch;
+                }
+                return false;
+            }
+            switch (rPredicate.meOperator)
+            {
+                case formula::BinaryOperator::Equal:
+                    return ::rtl::math::approxEqual(*oCandidateNumber, rPredicate.mfNumber);
+                case formula::BinaryOperator::NotEqual:
+                    return !::rtl::math::approxEqual(*oCandidateNumber, rPredicate.mfNumber);
+                case formula::BinaryOperator::Less:
+                    return *oCandidateNumber < rPredicate.mfNumber;
+                case formula::BinaryOperator::LessEqual:
+                    return *oCandidateNumber < rPredicate.mfNumber
+                           || ::rtl::math::approxEqual(*oCandidateNumber, rPredicate.mfNumber);
+                case formula::BinaryOperator::Greater:
+                    return *oCandidateNumber > rPredicate.mfNumber;
+                case formula::BinaryOperator::GreaterEqual:
+                    return *oCandidateNumber > rPredicate.mfNumber
+                           || ::rtl::math::approxEqual(*oCandidateNumber, rPredicate.mfNumber);
+                default:
+                    return false;
+            }
+        }
+        case CriteriaPredicate::OperandKind::Text:
+        {
+            if (rCandidate.isError())
+                return false;
+
+            api::String aCandidateText;
+            if (rCandidate.isText())
+                aCandidateText = rCandidate.maString;
+            else if (rCandidate.isEmpty())
+                aCandidateText.clear();
+            else
+                return false;
+
+            if (rPredicate.meOperator == formula::BinaryOperator::Equal
+                || rPredicate.meOperator == formula::BinaryOperator::NotEqual)
+            {
+                const bool bMatch = matchesQueryText(
+                    rPredicate.maText, aCandidateText, eSearchType, bMatchWholeCell);
+                return rPredicate.meOperator == formula::BinaryOperator::NotEqual ? !bMatch : bMatch;
+            }
+
+            if (aCandidateText.empty())
+                return false;
+
+            const sal_Int32 nCompare = compareFoldedText(aCandidateText, rPredicate.maText);
+            switch (rPredicate.meOperator)
+            {
+                case formula::BinaryOperator::Less:
+                    return nCompare < 0;
+                case formula::BinaryOperator::LessEqual:
+                    return nCompare <= 0;
+                case formula::BinaryOperator::Greater:
+                    return nCompare > 0;
+                case formula::BinaryOperator::GreaterEqual:
+                    return nCompare >= 0;
+                default:
+                    return false;
+            }
+        }
+    }
+
+    return false;
+}
+
+[[nodiscard]] std::optional<CriteriaAggregateInput> makeCriteriaAggregateInput(
+    const EvaluationResult& rResult)
+{
+    if (!rResult)
+        return std::nullopt;
+
+    CriteriaAggregateInput aInput;
+    if (rResult.maValue.isScalar())
+    {
+        aInput.maScalar = rResult.maValue.maValue;
+        return aInput;
+    }
+
+    aInput.mbScalar = false;
+    aInput.maReference = rResult.maValue.maReference;
+    const auto aDimensions = rResult.maValue.maReference.matrixDimensions();
+    aInput.mnColumns = aDimensions.mnColumns;
+    aInput.mnRows = aDimensions.mnRows;
+    return aInput;
+}
+
+[[nodiscard]] bool sameCriteriaAggregateShape(
+    const CriteriaAggregateInput& rLeft, const CriteriaAggregateInput& rRight)
+{
+    return rLeft.mnColumns == rRight.mnColumns && rLeft.mnRows == rRight.mnRows;
+}
+
+[[nodiscard]] EvaluationResult materializeCriteriaAggregateValue(Evaluator& rEvaluator,
+    const CriteriaAggregateInput& rInput, api::MatrixCoordinate aCoordinate)
+{
+    if (rInput.mbScalar)
+    {
+        if (aCoordinate.mnColumn != 0 || aCoordinate.mnRow != 0)
+            return makeFailure(api::Error::IllegalArgument);
+        return makeScalarResult(rInput.maScalar);
+    }
+
+    return rEvaluator.materializeReferenceValue(
+        rInput.maReference, aCoordinate.mnColumn, aCoordinate.mnRow);
+}
+
+[[nodiscard]] EvaluationResult evaluateCriteriaAggregate(Evaluator& rEvaluator,
+    const std::vector<CriteriaAggregateInput>& rCriteriaRanges,
+    const std::vector<CriteriaPredicate>& rCriteria, const CriteriaAggregateInput* pTargetRange,
+    CriteriaAggregateKind eAggregateKind, workbook::FormulaSearchType eSearchType,
+    bool bMatchWholeCell)
+{
+    if (rCriteriaRanges.empty() || rCriteriaRanges.size() != rCriteria.size())
+        return makeFailure(api::Error::IllegalArgument);
+
+    const CriteriaAggregateInput& rBaseRange = rCriteriaRanges.front();
+    for (std::size_t nIndex = 1; nIndex < rCriteriaRanges.size(); ++nIndex)
+    {
+        if (!sameCriteriaAggregateShape(rBaseRange, rCriteriaRanges[nIndex]))
+            return makeFailure(api::Error::IllegalArgument);
+    }
+    if (pTargetRange && !sameCriteriaAggregateShape(rBaseRange, *pTargetRange))
+        return makeFailure(api::Error::IllegalArgument);
+
+    std::size_t nCount = 0;
+    double fSum = 0.0;
+    double fBest = 0.0;
+    bool bHasBest = false;
+
+    for (api::MatrixSize nRow = 0; nRow < rBaseRange.mnRows; ++nRow)
+    {
+        for (api::MatrixSize nCol = 0; nCol < rBaseRange.mnColumns; ++nCol)
+        {
+            const api::MatrixCoordinate aCoordinate { nCol, nRow };
+            bool bMatch = true;
+            for (std::size_t nIndex = 0; nIndex < rCriteriaRanges.size(); ++nIndex)
+            {
+                EvaluationResult aCandidate
+                    = materializeCriteriaAggregateValue(rEvaluator, rCriteriaRanges[nIndex], aCoordinate);
+                if (!aCandidate || !aCandidate.maValue.isScalar()
+                    || !matchesCriteriaPredicate(rCriteria[nIndex], aCandidate.maValue.maValue,
+                        eSearchType, bMatchWholeCell))
+                {
+                    bMatch = false;
+                    break;
+                }
+            }
+
+            if (!bMatch)
+                continue;
+
+            if (eAggregateKind == CriteriaAggregateKind::Count)
+            {
+                ++nCount;
+                continue;
+            }
+
+            EvaluationResult aTarget = pTargetRange
+                                           ? materializeCriteriaAggregateValue(
+                                                 rEvaluator, *pTargetRange, aCoordinate)
+                                           : materializeCriteriaAggregateValue(
+                                                 rEvaluator, rBaseRange, aCoordinate);
+            if (!aTarget)
+                return aTarget;
+            if (!aTarget.maValue.isScalar())
+                return makeFailure(api::Error::IllegalArgument);
+
+            const auto oNumber = coerceCriteriaAggregateNumber(aTarget.maValue.maValue);
+            if (!oNumber)
+                continue;
+
+            switch (eAggregateKind)
+            {
+                case CriteriaAggregateKind::Count:
+                    break;
+                case CriteriaAggregateKind::Sum:
+                case CriteriaAggregateKind::Average:
+                    fSum = ::rtl::math::approxAdd(fSum, *oNumber);
+                    ++nCount;
+                    break;
+                case CriteriaAggregateKind::Max:
+                    if (!bHasBest || *oNumber > fBest)
+                    {
+                        fBest = *oNumber;
+                        bHasBest = true;
+                    }
+                    break;
+                case CriteriaAggregateKind::Min:
+                    if (!bHasBest || *oNumber < fBest)
+                    {
+                        fBest = *oNumber;
+                        bHasBest = true;
+                    }
+                    break;
+            }
+        }
+    }
+
+    switch (eAggregateKind)
+    {
+        case CriteriaAggregateKind::Count:
+            return makeScalarResult(api::CellValue::number(static_cast<double>(nCount)));
+        case CriteriaAggregateKind::Sum:
+            return makeScalarResult(api::CellValue::number(fSum));
+        case CriteriaAggregateKind::Average:
+            if (nCount == 0)
+                return makeFailure(api::Error::DivisionByZero);
+            return makeScalarResult(
+                api::CellValue::number(fSum / static_cast<double>(nCount)));
+        case CriteriaAggregateKind::Max:
+        case CriteriaAggregateKind::Min:
+            return makeScalarResult(api::CellValue::number(bHasBest ? fBest : 0.0));
+    }
+
+    return makeFailure(api::Error::IllegalArgument);
 }
 
 [[nodiscard]] bool formulaContainsAggregateLike(const formula::Node& rNode)
@@ -2168,6 +2692,174 @@ EvaluationResult Evaluator::evaluateFunction(
         }
 
         return aPrimary;
+    }
+
+    if (aFunctionName == u"COUNTIF" || aFunctionName == u"COUNTIFS"
+        || aFunctionName == u"SUMIF" || aFunctionName == u"SUMIFS"
+        || aFunctionName == u"AVERAGEIF" || aFunctionName == u"AVERAGEIFS"
+        || aFunctionName == u"MAXIFS" || aFunctionName == u"MINIFS")
+    {
+        auto evaluateAggregateInput = [&](const formula::Node& rArgument)
+            -> api::ValueResult<CriteriaAggregateInput> {
+            EvaluationResult aValue = evaluateNode(rArgument, rCurrentAddress);
+            if (!aValue)
+                return api::ValueResult<CriteriaAggregateInput>::failure(aValue.meError);
+            const auto oInput = makeCriteriaAggregateInput(aValue);
+            if (!oInput)
+                return api::ValueResult<CriteriaAggregateInput>::failure(api::Error::IllegalArgument);
+            return api::ValueResult<CriteriaAggregateInput>::success(*oInput);
+        };
+
+        auto evaluateCriteria = [&](const formula::Node& rArgument)
+            -> api::ValueResult<CriteriaPredicate> {
+            EvaluationResult aValue
+                = ensureScalarValue(*this, evaluateNode(rArgument, rCurrentAddress));
+            if (!aValue)
+                return api::ValueResult<CriteriaPredicate>::failure(aValue.meError);
+            const auto oCriteria = makeCriteriaPredicate(aValue.maValue.maValue);
+            if (!oCriteria)
+                return api::ValueResult<CriteriaPredicate>::failure(api::Error::IllegalArgument);
+            return api::ValueResult<CriteriaPredicate>::success(*oCriteria);
+        };
+
+        if (aFunctionName == u"COUNTIF")
+        {
+            if (rNode.maChildren.size() != 2)
+                return makeFailure(api::Error::IllegalArgument);
+
+            const auto aRange = evaluateAggregateInput(*rNode.maChildren[0]);
+            if (!aRange)
+                return makeFailure(aRange.meError);
+            const auto aCriteria = evaluateCriteria(*rNode.maChildren[1]);
+            if (!aCriteria)
+                return makeFailure(aCriteria.meError);
+
+            return evaluateCriteriaAggregate(*this, { aRange.maValue }, { aCriteria.maValue },
+                nullptr, CriteriaAggregateKind::Count, mrWorkbook.meFormulaSearchType,
+                mrWorkbook.mbSearchCriteriaMustApplyToWholeCell);
+        }
+
+        if (aFunctionName == u"COUNTIFS")
+        {
+            if (rNode.maChildren.size() < 2 || (rNode.maChildren.size() % 2) != 0)
+                return makeFailure(api::Error::IllegalArgument);
+
+            std::vector<CriteriaAggregateInput> aRanges;
+            std::vector<CriteriaPredicate> aCriteria;
+            aRanges.reserve(rNode.maChildren.size() / 2);
+            aCriteria.reserve(rNode.maChildren.size() / 2);
+            for (std::size_t nIndex = 0; nIndex < rNode.maChildren.size(); nIndex += 2)
+            {
+                const auto aRange = evaluateAggregateInput(*rNode.maChildren[nIndex]);
+                if (!aRange)
+                    return makeFailure(aRange.meError);
+                const auto aCriterion = evaluateCriteria(*rNode.maChildren[nIndex + 1]);
+                if (!aCriterion)
+                    return makeFailure(aCriterion.meError);
+                aRanges.push_back(aRange.maValue);
+                aCriteria.push_back(aCriterion.maValue);
+            }
+
+            return evaluateCriteriaAggregate(*this, aRanges, aCriteria, nullptr,
+                CriteriaAggregateKind::Count, mrWorkbook.meFormulaSearchType,
+                mrWorkbook.mbSearchCriteriaMustApplyToWholeCell);
+        }
+
+        if (aFunctionName == u"SUMIF" || aFunctionName == u"AVERAGEIF")
+        {
+            if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
+                return makeFailure(api::Error::IllegalArgument);
+
+            const auto aCriteriaRange = evaluateAggregateInput(*rNode.maChildren[0]);
+            if (!aCriteriaRange)
+                return makeFailure(aCriteriaRange.meError);
+            const auto aCriteria = evaluateCriteria(*rNode.maChildren[1]);
+            if (!aCriteria)
+                return makeFailure(aCriteria.meError);
+
+            std::optional<CriteriaAggregateInput> oTargetRange;
+            if (rNode.maChildren.size() == 3)
+            {
+                const auto aTarget = evaluateAggregateInput(*rNode.maChildren[2]);
+                if (!aTarget)
+                    return makeFailure(aTarget.meError);
+                oTargetRange = aTarget.maValue;
+            }
+
+            return evaluateCriteriaAggregate(*this, { aCriteriaRange.maValue },
+                { aCriteria.maValue }, oTargetRange ? &*oTargetRange : nullptr,
+                aFunctionName == u"SUMIF" ? CriteriaAggregateKind::Sum
+                                          : CriteriaAggregateKind::Average,
+                mrWorkbook.meFormulaSearchType,
+                mrWorkbook.mbSearchCriteriaMustApplyToWholeCell);
+        }
+
+        if (rNode.maChildren.size() < 3 || (rNode.maChildren.size() % 2) == 0)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aTargetRange = evaluateAggregateInput(*rNode.maChildren[0]);
+        if (!aTargetRange)
+            return makeFailure(aTargetRange.meError);
+
+        std::vector<CriteriaAggregateInput> aRanges;
+        std::vector<CriteriaPredicate> aCriteria;
+        aRanges.reserve((rNode.maChildren.size() - 1) / 2);
+        aCriteria.reserve((rNode.maChildren.size() - 1) / 2);
+        for (std::size_t nIndex = 1; nIndex < rNode.maChildren.size(); nIndex += 2)
+        {
+            const auto aRange = evaluateAggregateInput(*rNode.maChildren[nIndex]);
+            if (!aRange)
+                return makeFailure(aRange.meError);
+            const auto aCriterion = evaluateCriteria(*rNode.maChildren[nIndex + 1]);
+            if (!aCriterion)
+                return makeFailure(aCriterion.meError);
+            aRanges.push_back(aRange.maValue);
+            aCriteria.push_back(aCriterion.maValue);
+        }
+
+        CriteriaAggregateKind eAggregateKind = CriteriaAggregateKind::Sum;
+        if (aFunctionName == u"AVERAGEIFS")
+            eAggregateKind = CriteriaAggregateKind::Average;
+        else if (aFunctionName == u"MAXIFS")
+            eAggregateKind = CriteriaAggregateKind::Max;
+        else if (aFunctionName == u"MINIFS")
+            eAggregateKind = CriteriaAggregateKind::Min;
+
+        return evaluateCriteriaAggregate(*this, aRanges, aCriteria, &aTargetRange.maValue,
+            eAggregateKind, mrWorkbook.meFormulaSearchType,
+            mrWorkbook.mbSearchCriteriaMustApplyToWholeCell);
+    }
+
+    if (aFunctionName == u"T.TEST" || aFunctionName == u"TTEST")
+    {
+        if (rNode.maChildren.size() != 4)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aTailsResult
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[2], rCurrentAddress));
+        if (!aTailsResult)
+            return aTailsResult;
+        const auto aTailsNumber = coerceToNumber(aTailsResult.maValue.maValue);
+        if (!aTailsNumber)
+            return makeFailure(aTailsNumber.meError);
+
+        EvaluationResult aTypeResult
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[3], rCurrentAddress));
+        if (!aTypeResult)
+            return aTypeResult;
+        const auto aTypeNumber = coerceToNumber(aTypeResult.maValue.maValue);
+        if (!aTypeNumber)
+            return makeFailure(aTypeNumber.meError);
+
+        const auto oTails = toWholeNumber(aTailsNumber.maValue);
+        const auto oType = toWholeNumber(aTypeNumber.maValue);
+        if (!oTails || !oType || (*oTails != 1 && *oTails != 2) || (*oType < 1 || *oType > 3)
+            || *oType == 1)
+        {
+            return makeScalarResult(api::CellValue::error(api::Error::NoValue));
+        }
+
+        return makeFailure(api::Error::IllegalArgument);
     }
 
     if (aFunctionName == u"CLEAN")

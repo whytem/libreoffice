@@ -134,6 +134,23 @@ int main()
         }
     }
 
+    {
+        const auto aSettingsWorkbookPath = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT)
+                                          / "tests" / "data" / "fods"
+                                          / "query_settings_workbook.fods";
+        const auto aSettingsLoadResult = loadWorkbook(aSettingsWorkbookPath.string());
+        if (!aSettingsLoadResult)
+            return fail("spreadsheetengine_fods_tests", "query settings workbook load failed");
+
+        const auto& rSettingsWorkbook = aSettingsLoadResult.maValue.maWorkbook;
+        if (rSettingsWorkbook.meFormulaSearchType
+                != spreadsheetengine::core::workbook::FormulaSearchType::Regex
+            || rSettingsWorkbook.mbSearchCriteriaMustApplyToWholeCell)
+        {
+            return fail("spreadsheetengine_fods_tests", "query settings parsing mismatch");
+        }
+    }
+
     std::cout << "spreadsheetengine FODS loader tests passed\n";
     return EXIT_SUCCESS;
 }

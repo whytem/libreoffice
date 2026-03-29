@@ -103,6 +103,7 @@ struct Workbook
     std::vector<Sheet> maSheets;
     std::vector<NamedRange> maNamedRanges;
     FormulaSearchType meFormulaSearchType = FormulaSearchType::Regex;
+    bool mbSearchCriteriaMustApplyToWholeCell = true;
 
     [[nodiscard]] std::optional<api::SheetId> findSheetId(api::StringView rName) const
     {

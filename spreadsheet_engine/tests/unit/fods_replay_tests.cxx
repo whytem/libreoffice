@@ -387,6 +387,16 @@ std::vector<std::filesystem::path> collectDefaultReplayCorpus()
     const auto aInformationFiles = collectFodsFiles(aInformationRoot);
     aFiles.insert(aFiles.end(), aInformationFiles.begin(), aInformationFiles.end());
 
+    const std::filesystem::path aFinancialRoot
+        = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions" / "financial" / "fods";
+    const auto aFinancialFiles = collectFodsFiles(aFinancialRoot);
+    aFiles.insert(aFiles.end(), aFinancialFiles.begin(), aFinancialFiles.end());
+
+    const std::filesystem::path aStatisticalRoot
+        = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions" / "statistical" / "fods";
+    const auto aStatisticalFiles = collectFodsFiles(aStatisticalRoot);
+    aFiles.insert(aFiles.end(), aStatisticalFiles.begin(), aStatisticalFiles.end());
+
     return aFiles;
 }
 
@@ -406,7 +416,8 @@ std::string familyNameForWorkbook(const std::filesystem::path& rWorkbookPath)
 bool isCompiledReplayPromotedFamily(const std::string& rFamily)
 {
     return rFamily == "logical" || rFamily == "mathematical" || rFamily == "text"
-           || rFamily == "date_time" || rFamily == "information" || rFamily == "spreadsheet";
+           || rFamily == "date_time" || rFamily == "information" || rFamily == "spreadsheet"
+           || rFamily == "financial" || rFamily == "statistical";
 }
 
 void accumulateFormulaNodeSummary(const Node& rNode, ReplaySummary& rSummary)
