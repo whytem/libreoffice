@@ -1,7 +1,9 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
+#include <cstdio>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 
 #include <spreadsheetengine/api/Calendar.hxx>
 #include <spreadsheetengine/detail/FodsEvaluator.hxx>
@@ -68,6 +70,17 @@ Workbook makeWorkbook()
         23, 0,
         Cell { CellValue::number(1.0), u"of:=YEARFRAC(DATE(2014;1;1);DATE(2015;1;1);0)" });
     aSheet1.setCell(24, 0, Cell { CellValue::text(u"A"), u"of:=DEC2HEX(10)" });
+    aSheet1.setCell(25, 0, Cell { CellValue::number(1.23), u"of:=ROUND(1.2345;2)" });
+    aSheet1.setCell(26, 0, Cell { CellValue::number(1.24), u"of:=ROUNDUP(1.231;2)" });
+    aSheet1.setCell(27, 0, Cell { CellValue::number(1.23), u"of:=ROUNDDOWN(1.239;2)" });
+    aSheet1.setCell(
+        28, 0, Cell { CellValue::number(1230.0), u"of:=ORG.LIBREOFFICE.ROUNDSIG(1234.567;3)" });
+    aSheet1.setCell(29, 0, Cell { CellValue::boolean(true), u"of:=ROUND(1.2345;2)=1.23" });
+    aSheet1.setCell(
+        30, 0,
+        Cell { CellValue::boolean(true),
+            u"of:=ORG.LIBREOFFICE.ROUNDSIG(1234.567;3)=1230" });
+    aSheet1.setCell(31, 0, Cell { CellValue::number(-45.0), u"of:=ROUNDDOWN(-45.67)" });
     aSheet1.setCell(6, 25, Cell { CellValue::number(0.5) });
     aSheet1.setCell(8, 1, Cell { CellValue::text(u"one") });
     aSheet1.setCell(8, 2, Cell { CellValue::text(u"oneone") });
@@ -84,6 +97,21 @@ Workbook makeWorkbook()
     aSheet1.setCell(12, 2, Cell { CellValue::text(u"A") });
     aSheet1.setCell(12, 3, Cell { CellValue::text(u"B") });
     aSheet1.setCell(12, 4, Cell { CellValue::text(u"C") });
+    aSheet1.setCell(40, 0, Cell { CellValue::number(0.0) });
+    aSheet1.setCell(40, 1, Cell { CellValue::number(0.0) });
+    aSheet1.setCell(40, 2, Cell { CellValue::number(0.0) });
+    aSheet1.setCell(44, 1, Cell { CellValue::number(7.0) });
+    aSheet1.setCell(44, 2, Cell { CellValue::number(8.0) });
+    aSheet1.setCell(46, 0, Cell { CellValue::text(u"abc") });
+    aSheet1.setCell(46, 1, Cell { CellValue::text(u"ABC") });
+    aSheet1.setCell(46, 2, Cell { CellValue::text(u"Abc") });
+    aSheet1.setCell(46, 3, Cell { CellValue::text(u"aBc") });
+    aSheet1.setCell(46, 4, Cell { CellValue::text(u"Abc") });
+    aSheet1.setCell(46, 5, Cell { CellValue::text(u"a") });
+    aSheet1.setCell(46, 6, Cell { CellValue::text(u"A") });
+    aSheet1.setCell(46, 7, Cell { CellValue::text(u"A") });
+    aSheet1.setCell(46, 8, Cell { CellValue::text(u"A") });
+    aSheet1.setCell(47, 0, Cell { CellValue::text(u""), u"of:=\"\"" });
 
     Sheet aSheet2;
     aSheet2.maName = u"Sheet2";
@@ -229,6 +257,72 @@ int main()
         {
             return fail("spreadsheetengine_fods_evaluator_tests",
                 "compiled external-name text cached fallback mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 25, 0 });
+        if (!aResult || aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 1.23))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "compiled ROUND() mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 26, 0 });
+        if (!aResult || aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 1.24))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "compiled ROUNDUP() mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 27, 0 });
+        if (!aResult || aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 1.23))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "compiled ROUNDDOWN() mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 28, 0 });
+        if (!aResult || aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 1230.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "compiled ROUNDSIG() mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 29, 0 });
+        if (!aResult || aResult.mbUsedCachedValue || !aResult.maValue.maValue.isBoolean()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 1.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "compiled ROUND() equality mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 30, 0 });
+        if (!aResult || aResult.mbUsedCachedValue || !aResult.maValue.maValue.isBoolean()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, 1.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "compiled ROUNDSIG() equality mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 31, 0 });
+        if (!aResult || aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, -45.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "compiled one-arg ROUNDDOWN() mismatch");
         }
     }
 
@@ -403,6 +497,26 @@ int main()
             = aEvaluator.evaluateFormula(u"of:=COUNTIF([.M2:.M6];\">\")", { 0, 0, 0 });
         const auto aTypedTimeCountIf
             = aEvaluator.evaluateCell({ 0, 11, 1 });
+        const auto aBlankZeroCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.AO1:.AO3];\"\")", { 0, 0, 0 });
+        const auto aExplicitZeroCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.AO1:.AO3];0)", { 0, 0, 0 });
+        const auto aEmptyZeroCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.AP1:.AP3];0)", { 0, 0, 0 });
+        const auto aEmptyReferenceCriteriaCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.AO1:.AO3];[.AR1])", { 0, 0, 0 });
+        const auto aBlankOrderedCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.AP1:.AP3];\"<1\")", { 0, 0, 0 });
+        const auto aNotEqualWithEmptyCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.AS1:.AS3];\"<>7\")", { 0, 0, 0 });
+        const auto aRegexCaseSensitiveCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.AU1:.AU9];\"(?-i)abc\")", { 0, 0, 0 });
+        const auto aRegexMixedFlagCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.AU1:.AU9];\"a(?-i)B(?i)c\")", { 0, 0, 0 });
+        const auto aBareEqualsCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.AV1:.AY1];\"=\")", { 0, 0, 0 });
+        const auto aBareNotEqualsCountIf
+            = aEvaluator.evaluateFormula(u"of:=COUNTIF([.AV1:.AY1];\"<>\")", { 0, 0, 0 });
         const auto aCompiledCountIf = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=COUNTIF([.G26:.G26];\"=\"&[.G26])", { 0, 0, 0 });
         const auto aCompiledCountIfs = aEvaluator.evaluateFormulaViaCompiledTokens(
@@ -421,77 +535,90 @@ int main()
             u"of:=COUNTIF([.M2:.M6];\">\")", { 0, 0, 0 });
         const auto aCompiledTypedTimeCountIf = aEvaluator.evaluateCellViaCompiledTokens(
             { 0, 11, 1 });
-        if (!aCountIf || !aCountIf.maValue.maValue.isNumber()
-            || aCountIf.mbUsedCachedValue
-            || !almostEqual(aCountIf.maValue.maValue.mfNumber, 1.0) || !aCountIfs
-            || !aCountIfs.maValue.maValue.isNumber()
-            || aCountIfs.mbUsedCachedValue
-            || !almostEqual(aCountIfs.maValue.maValue.mfNumber, 2.0) || !aAverageIf
-            || !aAverageIf.maValue.maValue.isNumber()
-            || aAverageIf.mbUsedCachedValue
-            || !almostEqual(aAverageIf.maValue.maValue.mfNumber, 6.0) || !aMaxIfs
-            || !aMaxIfs.maValue.maValue.isNumber()
-            || aMaxIfs.mbUsedCachedValue
-            || !almostEqual(aMaxIfs.maValue.maValue.mfNumber, 7.0) || !aMinIfs
-            || !aMinIfs.maValue.maValue.isNumber()
-            || aMinIfs.mbUsedCachedValue
-            || !almostEqual(aMinIfs.maValue.maValue.mfNumber, 5.0) || !aPartialCountIf
-            || !aPartialCountIf.maValue.maValue.isNumber()
-            || aPartialCountIf.mbUsedCachedValue
-            || !almostEqual(aPartialCountIf.maValue.maValue.mfNumber, 2.0)
-            || !aNumericStringCountIf || !aNumericStringCountIf.maValue.maValue.isNumber()
-            || aNumericStringCountIf.mbUsedCachedValue
-            || !almostEqual(aNumericStringCountIf.maValue.maValue.mfNumber, 2.0)
-            || !aNumericOrderedCountIf || !aNumericOrderedCountIf.maValue.maValue.isNumber()
-            || aNumericOrderedCountIf.mbUsedCachedValue
-            || !almostEqual(aNumericOrderedCountIf.maValue.maValue.mfNumber, 1.0)
-            || !aOrderedTextCountIf || !aOrderedTextCountIf.maValue.maValue.isNumber()
-            || aOrderedTextCountIf.mbUsedCachedValue
-            || !almostEqual(aOrderedTextCountIf.maValue.maValue.mfNumber, 1.0)
-            || !aBareLessCountIf || !aBareLessCountIf.maValue.maValue.isNumber()
-            || aBareLessCountIf.mbUsedCachedValue
-            || !almostEqual(aBareLessCountIf.maValue.maValue.mfNumber, 0.0)
-            || !aBareGreaterCountIf || !aBareGreaterCountIf.maValue.maValue.isNumber()
-            || aBareGreaterCountIf.mbUsedCachedValue
-            || !almostEqual(aBareGreaterCountIf.maValue.maValue.mfNumber, 3.0)
-            || !aTypedTimeCountIf || !aTypedTimeCountIf.maValue.maValue.isNumber()
-            || aTypedTimeCountIf.mbUsedCachedValue
-            || !almostEqual(aTypedTimeCountIf.maValue.maValue.mfNumber, 1.0)
-            || !aCompiledCountIf
-            || !aCompiledCountIf.maValue.maValue.isNumber()
-            || aCompiledCountIf.mbUsedCachedValue
-            || !almostEqual(aCompiledCountIf.maValue.maValue.mfNumber, 1.0)
-            || !aCompiledCountIfs || !aCompiledCountIfs.maValue.maValue.isNumber()
-            || aCompiledCountIfs.mbUsedCachedValue
-            || !almostEqual(aCompiledCountIfs.maValue.maValue.mfNumber, 2.0)
-            || !aCompiledPartialCountIf
-            || !aCompiledPartialCountIf.maValue.maValue.isNumber()
-            || aCompiledPartialCountIf.mbUsedCachedValue
-            || !almostEqual(aCompiledPartialCountIf.maValue.maValue.mfNumber, 2.0)
-            || !aCompiledNumericStringCountIf
-            || !aCompiledNumericStringCountIf.maValue.maValue.isNumber()
-            || aCompiledNumericStringCountIf.mbUsedCachedValue
-            || !almostEqual(aCompiledNumericStringCountIf.maValue.maValue.mfNumber, 2.0)
-            || !aCompiledNumericOrderedCountIf
-            || !aCompiledNumericOrderedCountIf.maValue.maValue.isNumber()
-            || aCompiledNumericOrderedCountIf.mbUsedCachedValue
-            || !almostEqual(aCompiledNumericOrderedCountIf.maValue.maValue.mfNumber, 1.0)
-            || !aCompiledOrderedTextCountIf
-            || !aCompiledOrderedTextCountIf.maValue.maValue.isNumber()
-            || aCompiledOrderedTextCountIf.mbUsedCachedValue
-            || !almostEqual(aCompiledOrderedTextCountIf.maValue.maValue.mfNumber, 1.0)
-            || !aCompiledBareLessCountIf
-            || !aCompiledBareLessCountIf.maValue.maValue.isNumber()
-            || aCompiledBareLessCountIf.mbUsedCachedValue
-            || !almostEqual(aCompiledBareLessCountIf.maValue.maValue.mfNumber, 0.0)
-            || !aCompiledBareGreaterCountIf
-            || !aCompiledBareGreaterCountIf.maValue.maValue.isNumber()
-            || aCompiledBareGreaterCountIf.mbUsedCachedValue
-            || !almostEqual(aCompiledBareGreaterCountIf.maValue.maValue.mfNumber, 3.0)
-            || !aCompiledTypedTimeCountIf
-            || !aCompiledTypedTimeCountIf.maValue.maValue.isNumber()
-            || aCompiledTypedTimeCountIf.mbUsedCachedValue
-            || !almostEqual(aCompiledTypedTimeCountIf.maValue.maValue.mfNumber, 1.0))
+        const auto aCompiledBlankZeroCountIf = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUNTIF([.AO1:.AO3];\"\")", { 0, 0, 0 });
+        const auto aCompiledExplicitZeroCountIf = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUNTIF([.AO1:.AO3];0)", { 0, 0, 0 });
+        const auto aCompiledEmptyZeroCountIf = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUNTIF([.AP1:.AP3];0)", { 0, 0, 0 });
+        const auto aCompiledEmptyReferenceCriteriaCountIf
+            = aEvaluator.evaluateFormulaViaCompiledTokens(
+                u"of:=COUNTIF([.AO1:.AO3];[.AR1])", { 0, 0, 0 });
+        const auto aCompiledBlankOrderedCountIf = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUNTIF([.AP1:.AP3];\"<1\")", { 0, 0, 0 });
+        const auto aCompiledNotEqualWithEmptyCountIf
+            = aEvaluator.evaluateFormulaViaCompiledTokens(
+                u"of:=COUNTIF([.AS1:.AS3];\"<>7\")", { 0, 0, 0 });
+        const auto aCompiledRegexCaseSensitiveCountIf
+            = aEvaluator.evaluateFormulaViaCompiledTokens(
+                u"of:=COUNTIF([.AU1:.AU9];\"(?-i)abc\")", { 0, 0, 0 });
+        const auto aCompiledRegexMixedFlagCountIf
+            = aEvaluator.evaluateFormulaViaCompiledTokens(
+                u"of:=COUNTIF([.AU1:.AU9];\"a(?-i)B(?i)c\")", { 0, 0, 0 });
+        const auto aCompiledBareEqualsCountIf
+            = aEvaluator.evaluateFormulaViaCompiledTokens(
+                u"of:=COUNTIF([.AV1:.AY1];\"=\")", { 0, 0, 0 });
+        const auto aCompiledBareNotEqualsCountIf
+            = aEvaluator.evaluateFormulaViaCompiledTokens(
+                u"of:=COUNTIF([.AV1:.AY1];\"<>\")", { 0, 0, 0 });
+        const auto checkCriteriaNumber = [&](const char* pLabel, const auto& rResult,
+                                             double fExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isNumber() || rResult.mbUsedCachedValue
+                || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+            {
+                const double fActual
+                    = (rResult && rResult.maValue.maValue.isNumber()) ? rResult.maValue.maValue.mfNumber
+                                                                      : std::numeric_limits<double>::quiet_NaN();
+                std::fprintf(stderr,
+                    "%s: criteria aggregate mismatch in %s (actual=%g expected=%g cached=%d)\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel, fActual, fExpected,
+                    rResult ? static_cast<int>(rResult.mbUsedCachedValue) : -1);
+                return false;
+            }
+            return true;
+        };
+
+        if (!checkCriteriaNumber("COUNTIF typed time", aCountIf, 1.0)
+            || !checkCriteriaNumber("COUNTIFS range criteria", aCountIfs, 2.0)
+            || !checkCriteriaNumber("AVERAGEIF", aAverageIf, 6.0)
+            || !checkCriteriaNumber("MAXIFS", aMaxIfs, 7.0)
+            || !checkCriteriaNumber("MINIFS", aMinIfs, 5.0)
+            || !checkCriteriaNumber("COUNTIF partial text", aPartialCountIf, 2.0)
+            || !checkCriteriaNumber("COUNTIF numeric string equality", aNumericStringCountIf, 2.0)
+            || !checkCriteriaNumber("COUNTIF ordered numeric", aNumericOrderedCountIf, 1.0)
+            || !checkCriteriaNumber("COUNTIF ordered text", aOrderedTextCountIf, 1.0)
+            || !checkCriteriaNumber("COUNTIF bare less", aBareLessCountIf, 0.0)
+            || !checkCriteriaNumber("COUNTIF bare greater", aBareGreaterCountIf, 3.0)
+            || !checkCriteriaNumber("COUNTIF typed time cell", aTypedTimeCountIf, 1.0)
+            || !checkCriteriaNumber("COUNTIF blank literal zero-like", aBlankZeroCountIf, 3.0)
+            || !checkCriteriaNumber("COUNTIF numeric zero", aExplicitZeroCountIf, 3.0)
+            || !checkCriteriaNumber("COUNTIF numeric zero on empty cells", aEmptyZeroCountIf, 0.0)
+            || !checkCriteriaNumber("COUNTIF empty reference criteria", aEmptyReferenceCriteriaCountIf, 3.0)
+            || !checkCriteriaNumber("COUNTIF ordered numeric on empty cells", aBlankOrderedCountIf, 0.0)
+            || !checkCriteriaNumber("COUNTIF numeric not-equal with empty", aNotEqualWithEmptyCountIf, 2.0)
+            || !checkCriteriaNumber("COUNTIF regex case-sensitive inline flag", aRegexCaseSensitiveCountIf, 1.0)
+            || !checkCriteriaNumber("COUNTIF regex mixed inline flags", aRegexMixedFlagCountIf, 2.0)
+            || !checkCriteriaNumber("COUNTIF bare equals with formula empty string", aBareEqualsCountIf, 3.0)
+            || !checkCriteriaNumber("COUNTIF bare not-equals with formula empty string", aBareNotEqualsCountIf, 1.0)
+            || !checkCriteriaNumber("compiled COUNTIF typed time", aCompiledCountIf, 1.0)
+            || !checkCriteriaNumber("compiled COUNTIFS range criteria", aCompiledCountIfs, 2.0)
+            || !checkCriteriaNumber("compiled COUNTIF partial text", aCompiledPartialCountIf, 2.0)
+            || !checkCriteriaNumber("compiled COUNTIF numeric string equality", aCompiledNumericStringCountIf, 2.0)
+            || !checkCriteriaNumber("compiled COUNTIF ordered numeric", aCompiledNumericOrderedCountIf, 1.0)
+            || !checkCriteriaNumber("compiled COUNTIF ordered text", aCompiledOrderedTextCountIf, 1.0)
+            || !checkCriteriaNumber("compiled COUNTIF bare less", aCompiledBareLessCountIf, 0.0)
+            || !checkCriteriaNumber("compiled COUNTIF bare greater", aCompiledBareGreaterCountIf, 3.0)
+            || !checkCriteriaNumber("compiled COUNTIF typed time cell", aCompiledTypedTimeCountIf, 1.0)
+            || !checkCriteriaNumber("compiled COUNTIF blank literal zero-like", aCompiledBlankZeroCountIf, 3.0)
+            || !checkCriteriaNumber("compiled COUNTIF numeric zero", aCompiledExplicitZeroCountIf, 3.0)
+            || !checkCriteriaNumber("compiled COUNTIF numeric zero on empty cells", aCompiledEmptyZeroCountIf, 0.0)
+            || !checkCriteriaNumber("compiled COUNTIF empty reference criteria", aCompiledEmptyReferenceCriteriaCountIf, 3.0)
+            || !checkCriteriaNumber("compiled COUNTIF ordered numeric on empty cells", aCompiledBlankOrderedCountIf, 0.0)
+            || !checkCriteriaNumber("compiled COUNTIF numeric not-equal with empty", aCompiledNotEqualWithEmptyCountIf, 2.0)
+            || !checkCriteriaNumber("compiled COUNTIF regex case-sensitive inline flag", aCompiledRegexCaseSensitiveCountIf, 1.0)
+            || !checkCriteriaNumber("compiled COUNTIF regex mixed inline flags", aCompiledRegexMixedFlagCountIf, 2.0)
+            || !checkCriteriaNumber("compiled COUNTIF bare equals with formula empty string", aCompiledBareEqualsCountIf, 3.0)
+            || !checkCriteriaNumber("compiled COUNTIF bare not-equals with formula empty string", aCompiledBareNotEqualsCountIf, 1.0))
         {
             return fail("spreadsheetengine_fods_evaluator_tests", "criteria aggregate mismatch");
         }

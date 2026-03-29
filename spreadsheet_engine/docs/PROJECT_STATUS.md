@@ -82,9 +82,13 @@ The immediate active frontier is now narrower and more practical:
   `ScDocument::SetValue()`, `SetString()`, and `SetEmptyCell()`
 - **Standalone FODS runtime:** sparse workbook model, read-only FODS loader,
   ODF formula parser, lazy evaluator with memoization and cycle detection
-- **Raw FODS replay:** six function families fully enabled (logical,
-  mathematical, text, date_time, spreadsheet, information) across 228
-  workbooks
+  (`OdfFormulaParser` still serves as the engine's ODF formula frontend for
+  standalone lowering, dependency snapshotting, diagnostics, and the retained
+  debug/legacy AST path; it is no longer the authority boundary for promoted
+  replay-family compilation decisions)
+- **Raw FODS replay:** eight function families fully enabled (logical,
+  mathematical, text, date_time, spreadsheet, information, financial,
+  statistical) across 426 workbooks
 - **Parity infrastructure:** shared TSV datasets, dual-mode validation scripts,
   compile-diff harness, compiler preflight classifier
 
@@ -287,10 +291,23 @@ broader than the currently promoted replay lane.
 - 426 workbooks across 8 families
 - 40,068 formula cells
 - 40,059 parsed formulas
-- 15,891 cached-fallback cells (`39.7%` of formula cells)
+- 15,891 cached-fallback cells on the default promoted replay policy
+  (`39.66%` of formula cells)
+- cached-fallback family split:
+  `statistical:8381`, `mathematical:2029`, `spreadsheet:1925`,
+  `financial:1763`, `text:1065`, `date_time:479`, `information:138`,
+  `logical:111`
+- cached-fallback top categories:
+  `binary_op:eq:fn:ROUND:4968`, `LOOKUP:815`, `IF:724`,
+  `binary_op:eq:fn:ROUNDSIG:399`, `POISSON:329`, `POISSON.DIST:329`,
+  `ROUND:219`, `BINOMDIST:207`, `CONVERT:166`, `BINOM.DIST.RANGE:164`
 - 43,165 function-call nodes
 - 55,552 cell-reference nodes, 5,219 range-reference nodes, 340 named-reference nodes
 - 394 array-constant nodes
+
+The replay summary now measures fallback through the same compiled replay path
+used by the promoted families and emits per-family plus top-category fallback
+breakdowns for reduction work.
 
 ---
 
@@ -534,6 +551,51 @@ internals. This coupling is by design:
 - Broaden the shared built-in external/add-in catalog and standalone evaluator
   coverage only where it advances replay-family enablement or removes
   high-volume fallback paths
+
+### Active Fallback Reduction Task List
+
+1. **Refine fallback diagnostics**
+   - Initial child-head splitting is now in place for `binary_op` and
+     `unary_op` wrappers
+   - Next, keep drilling the dominant wrapper buckets down far enough that
+     they map cleanly to missing semantics, starting with
+     `binary_op:eq:fn:ROUND` and `binary_op:eq:fn:ROUNDSIG`
+   - Keep the replay `--summary` and `--compiled-diff` outputs aligned with the
+     promoted compiled replay path
+2. **Burn down the highest-volume statistical buckets**
+   - Prioritize `POISSON`, `POISSON.DIST`, `BINOMDIST`,
+     `BINOM.DIST.RANGE`, and adjacent distribution/statistics helpers
+   - Re-freeze the family split after each cluster lands so the statistical
+     bucket trend is visible
+3. **Burn down the high-volume promoted-corpus wrapper buckets**
+   - Reduce `LOOKUP`, `IF`, and `ROUND` fallback-heavy cases where live
+     execution still exits early to cached workbook results
+   - Use the new category breakdown to separate “supported function, unsupported
+     shape” from “function not yet implemented” paths
+4. **Clean up text/financial compatibility tails**
+   - Target `CONVERT`, `CHAR`, and the remaining financial-family scalar
+     helpers that are large enough to materially move the promoted-corpus rate
+5. **Re-baseline before the next family promotion**
+   - Record the new compiled-path fallback rate
+   - Confirm raw replay and compiled-diff stay green
+   - Only then move on to the next promotion candidate, starting with `addin`
+
+### Promotion Gate For The Next Families
+
+Before promoting any additional Calc FODS family into the default standalone
+replay corpus:
+
+1. The family must have **zero hard preflight blockers**.
+2. Full raw standalone replay for the family must be **green**.
+3. Family compiled-diff must be **green**, with no execution mismatches.
+4. The replay summary must capture the family's **compiled-path fallback**
+   counts and top categories.
+5. The family must either:
+   - land below the current compiled-path fallback threshold agreed for
+     promotion, or
+   - carry an explicit reviewed waiver list for the remaining cached paths.
+6. The broader promoted corpus must remain green after the family is added to
+   the default replay lane.
 
 ### Medium-term: Extract Recalculation Orchestration On Top Of The Planner
 

@@ -26,12 +26,13 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <memory>
 #include <optional>
-#include <regex>
 #include <string>
 
 #include <unicode/coll.h>
+#include <unicode/regex.h>
 #include <unicode/unistr.h>
 #include <unicode/ustring.h>
 
@@ -303,6 +304,33 @@ namespace setoken = spreadsheetengine::detail::token;
     return aPattern;
 }
 
+[[nodiscard]] bool matchesIcuRegexPattern(
+    std::string_view rPatternUtf8, api::StringView rCandidateText, bool bMatchWholeCell)
+{
+    UErrorCode eStatus = U_ZERO_ERROR;
+    UParseError aParseError {};
+    const icu::UnicodeString aPattern
+        = icu::UnicodeString::fromUTF8(icu::StringPiece(rPatternUtf8.data(),
+            static_cast<int32_t>(rPatternUtf8.size())));
+    std::unique_ptr<icu::RegexPattern> xPattern(
+        icu::RegexPattern::compile(aPattern, UREGEX_CASE_INSENSITIVE, aParseError, eStatus));
+    if (!xPattern || U_FAILURE(eStatus))
+        return false;
+
+    const icu::UnicodeString aCandidate(false, reinterpret_cast<const UChar*>(rCandidateText.data()),
+        static_cast<int32_t>(rCandidateText.size()));
+    std::unique_ptr<icu::RegexMatcher> xMatcher(xPattern->matcher(aCandidate, eStatus));
+    if (!xMatcher || U_FAILURE(eStatus))
+        return false;
+
+    xMatcher->setTimeLimit(23 * 1000, eStatus);
+    if (U_FAILURE(eStatus))
+        return false;
+
+    const bool bMatched = bMatchWholeCell ? xMatcher->matches(eStatus) : xMatcher->find(eStatus);
+    return U_SUCCESS(eStatus) && bMatched;
+}
+
 [[nodiscard]] bool containsFoldedText(api::StringView rHaystack, api::StringView rNeedle)
 {
     if (rNeedle.empty())
@@ -332,16 +360,8 @@ namespace setoken = spreadsheetengine::detail::token;
             return compareFoldedText(rCandidateText, rLookupText) == 0;
     }
 
-    try
-    {
-        const std::regex aPattern(
-            makeWholeCellRegexPattern(rLookupText, eSearchType), std::regex::ECMAScript | std::regex::icase);
-        return std::regex_match(toUtf8String(rCandidateText), aPattern);
-    }
-    catch (const std::regex_error&)
-    {
-        return false;
-    }
+    return matchesIcuRegexPattern(makeWholeCellRegexPattern(rLookupText, eSearchType),
+        rCandidateText, true);
 }
 
 [[nodiscard]] bool matchesQueryText(api::StringView rLookupText, api::StringView rCandidateText,
@@ -364,18 +384,9 @@ namespace setoken = spreadsheetengine::detail::token;
                                    : containsFoldedText(rCandidateText, rLookupText);
     }
 
-    try
-    {
-        const std::regex aPattern(makeQueryRegexPattern(rLookupText, eSearchType, bMatchWholeCell),
-            std::regex::ECMAScript | std::regex::icase);
-        const std::string aCandidateUtf8 = toUtf8String(rCandidateText);
-        return bMatchWholeCell ? std::regex_match(aCandidateUtf8, aPattern)
-                               : std::regex_search(aCandidateUtf8, aPattern);
-    }
-    catch (const std::regex_error&)
-    {
-        return false;
-    }
+    return matchesIcuRegexPattern(
+        makeQueryRegexPattern(rLookupText, eSearchType, bMatchWholeCell), rCandidateText,
+        bMatchWholeCell);
 }
 
 [[nodiscard]] api::String normalizeDisplayFunctionName(api::StringView rName)
@@ -1081,6 +1092,7 @@ struct CriteriaPredicate
     api::String maText;
     api::String maNumericText;
     bool mbNumberOriginatedFromText = false;
+    bool mbOperatorOnlyTextCriterion = false;
 };
 
 enum class CriteriaAggregateKind : sal_uInt8
@@ -1143,12 +1155,12 @@ enum class CriteriaAggregateKind : sal_uInt8
     switch (rValue.meKind)
     {
         case api::CellValueKind::Empty:
-            return 0.0;
+            return std::nullopt;
         case api::CellValueKind::Number:
         case api::CellValueKind::Boolean:
             return rValue.mfNumber;
         case api::CellValueKind::Text:
-            return rValue.maString.empty() ? std::optional<double>(0.0) : std::nullopt;
+            return std::nullopt;
         case api::CellValueKind::Error:
             return std::nullopt;
     }
@@ -1202,7 +1214,10 @@ enum class CriteriaAggregateKind : sal_uInt8
     aPredicate.meOperator = *oOperator;
 
     if (aOperandText.empty())
+    {
+        aPredicate.mbOperatorOnlyTextCriterion = !rCriteriaValue.maString.empty();
         return aPredicate;
+    }
 
     if (const auto oParsed = parseStandaloneNumberText(aOperandText))
     {
@@ -1235,14 +1250,22 @@ enum class CriteriaAggregateKind : sal_uInt8
         case CriteriaPredicate::OperandKind::Empty:
         {
             const bool bCandidateEmpty = isCriteriaEmptyValue(rCandidate);
+            const bool bCandidateBlankCell = rCandidate.isEmpty();
+            const bool bCandidateZeroLike
+                = (rCandidate.isNumber() || rCandidate.isBoolean())
+                  && ::rtl::math::approxEqual(rCandidate.mfNumber, 0.0);
             switch (rPredicate.meOperator)
             {
                 case formula::BinaryOperator::Equal:
-                    return bCandidateEmpty;
+                    if (rPredicate.mbOperatorOnlyTextCriterion)
+                        return bCandidateBlankCell;
+                    return bCandidateEmpty || bCandidateZeroLike;
                 case formula::BinaryOperator::NotEqual:
+                    if (rPredicate.mbOperatorOnlyTextCriterion)
+                        return !bCandidateBlankCell;
                 case formula::BinaryOperator::Greater:
                 case formula::BinaryOperator::GreaterEqual:
-                    return !bCandidateEmpty;
+                    return !(bCandidateEmpty || bCandidateZeroLike);
                 case formula::BinaryOperator::Less:
                 case formula::BinaryOperator::LessEqual:
                     return false;
@@ -1252,6 +1275,15 @@ enum class CriteriaAggregateKind : sal_uInt8
         }
         case CriteriaPredicate::OperandKind::Number:
         {
+            const bool bCandidateEmpty = isCriteriaEmptyValue(rCandidate);
+            if (bCandidateEmpty)
+            {
+                if (rPredicate.meOperator == formula::BinaryOperator::NotEqual)
+                    return true;
+                if (rPredicate.meOperator != formula::BinaryOperator::Equal)
+                    return false;
+            }
+
             const auto oCandidateNumber = coerceCriteriaComparisonNumber(rCandidate);
             if (!oCandidateNumber)
             {
@@ -2419,6 +2451,29 @@ struct InflatedStackItem
     }
 }
 
+[[nodiscard]] double roundMagnitudeDirectional(
+    double fValue, int nDecimals, api::RoundingMode eMode)
+{
+    double fRoundedMagnitude = api::math::roundToDecimals(std::abs(fValue), nDecimals, eMode);
+
+    const double fScale = std::pow(10.0, static_cast<double>(std::abs(nDecimals)));
+    if (!std::isfinite(fScale) || fScale == 0.0)
+        return fValue;
+
+    double fScaled = nDecimals >= 0 ? std::abs(fValue) * fScale : std::abs(fValue) / fScale;
+    if (nDecimals < 12)
+    {
+        const double fRoundedInteger = ::rtl::math::round(fScaled);
+        if (std::abs(fScaled - fRoundedInteger) <= 1e-12)
+        {
+            fRoundedMagnitude
+                = nDecimals >= 0 ? fRoundedInteger / fScale : fRoundedInteger * fScale;
+        }
+    }
+
+    return std::signbit(fValue) ? -fRoundedMagnitude : fRoundedMagnitude;
+}
+
 } // namespace
 
 const workbook::Sheet* Evaluator::getSheet(api::SheetId nSheet) const
@@ -2716,7 +2771,15 @@ EvaluationResult Evaluator::evaluateFunction(
                 = ensureScalarValue(*this, evaluateNode(rArgument, rCurrentAddress));
             if (!aValue)
                 return api::ValueResult<CriteriaPredicate>::failure(aValue.meError);
-            const auto oCriteria = makeCriteriaPredicate(aValue.maValue.maValue);
+
+            api::CellValue aCriteriaValue = aValue.maValue.maValue;
+            const bool bReferenceLikeArgument = rArgument.meKind == formula::NodeKind::CellReference
+                                                || rArgument.meKind == formula::NodeKind::RangeReference
+                                                || rArgument.meKind == formula::NodeKind::NamedReference;
+            if (bReferenceLikeArgument && aCriteriaValue.isEmpty())
+                aCriteriaValue = api::CellValue::number(0.0);
+
+            const auto oCriteria = makeCriteriaPredicate(aCriteriaValue);
             if (!oCriteria)
                 return api::ValueResult<CriteriaPredicate>::failure(api::Error::IllegalArgument);
             return api::ValueResult<CriteriaPredicate>::success(*oCriteria);
@@ -3005,6 +3068,95 @@ EvaluationResult Evaluator::evaluateFunction(
             return makeFailure(api::Error::IllegalArgument);
 
         return makeScalarResult(api::CellValue::number(aDateSerial.maValue));
+    }
+
+    if (aFunctionName == u"ROUND" || aFunctionName == u"ROUNDUP" || aFunctionName == u"ROUNDDOWN")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aValue
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aValue)
+            return aValue;
+
+        const auto aValueNumber = coerceToNumber(aValue.maValue.maValue);
+        if (!aValueNumber)
+            return makeFailure(aValueNumber.meError);
+
+        int nDecimals = 0;
+        if (rNode.maChildren.size() == 2)
+        {
+            EvaluationResult aDecimals
+                = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
+            if (!aDecimals)
+                return aDecimals;
+
+            const auto aDigitsNumber = coerceToNumber(aDecimals.maValue.maValue);
+            if (!aDigitsNumber || !std::isfinite(aDigitsNumber.maValue))
+                return makeFailure(api::Error::IllegalArgument);
+
+            const double fTruncatedDigits = std::trunc(aDigitsNumber.maValue);
+            if (fTruncatedDigits < static_cast<double>(std::numeric_limits<int>::min())
+                || fTruncatedDigits > static_cast<double>(std::numeric_limits<int>::max()))
+            {
+                return makeFailure(api::Error::IllegalArgument);
+            }
+
+            nDecimals = static_cast<int>(fTruncatedDigits);
+        }
+
+        api::RoundingMode eMode = api::RoundingMode::Corrected;
+        if (aFunctionName == u"ROUNDUP")
+            eMode = api::RoundingMode::Up;
+        else if (aFunctionName == u"ROUNDDOWN")
+            eMode = api::RoundingMode::Down;
+
+        if (aFunctionName == u"ROUNDUP" || aFunctionName == u"ROUNDDOWN")
+        {
+            return makeScalarResult(api::CellValue::number(roundMagnitudeDirectional(
+                aValueNumber.maValue, nDecimals, eMode)));
+        }
+
+        if (rNode.maChildren.size() == 1)
+        {
+            return makeScalarResult(api::CellValue::number(::rtl::math::round(
+                aValueNumber.maValue, 0, api::math::toCoreRoundingMode(eMode))));
+        }
+
+        return makeScalarResult(api::CellValue::number(
+            api::math::roundToDecimals(aValueNumber.maValue, nDecimals, eMode)));
+    }
+
+    if (aFunctionName == u"ROUNDSIG")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aValue
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aValue)
+            return aValue;
+        EvaluationResult aDigits
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
+        if (!aDigits)
+            return aDigits;
+
+        const auto aValueNumber = coerceToNumber(aValue.maValue.maValue);
+        if (!aValueNumber)
+            return makeFailure(aValueNumber.meError);
+        const auto aDigitsNumber = coerceToNumber(aDigits.maValue.maValue);
+        if (!aDigitsNumber || !std::isfinite(aDigitsNumber.maValue))
+            return makeFailure(api::Error::IllegalArgument);
+
+        const double fDigits = ::rtl::math::approxFloor(aDigitsNumber.maValue);
+        if (fDigits < 1.0)
+            return makeFailure(api::Error::IllegalArgument);
+        if (aValueNumber.maValue == 0.0)
+            return makeScalarResult(api::CellValue::number(0.0));
+
+        return makeScalarResult(api::CellValue::number(api::math::roundToSignificantDigits(
+            aValueNumber.maValue, fDigits)));
     }
 
     if (aFunctionName == u"DAYSINMONTH" || aFunctionName == u"DAYSINYEAR"

@@ -58,6 +58,8 @@ struct ReplaySummary
     std::size_t mnLiteralNodes = 0;
     std::map<std::string, std::size_t> maFamilyWorkbookCounts;
     std::map<std::string, std::size_t> maFunctionCallCounts;
+    std::map<std::string, std::size_t> maCachedFallbackFamilyCounts;
+    std::map<std::string, std::size_t> maCachedFallbackCategoryCounts;
 };
 
 struct PreflightSummary
@@ -420,6 +422,189 @@ bool isCompiledReplayPromotedFamily(const std::string& rFamily)
            || rFamily == "financial" || rFamily == "statistical";
 }
 
+std::string stripFunctionNamespacePrefix(StringView rName)
+{
+    constexpr StringView aMicrosoftPrefix = u"COM.MICROSOFT.";
+    constexpr StringView aLibreOfficePrefix = u"ORG.LIBREOFFICE.";
+    constexpr StringView aOpenOfficePrefix = u"ORG.OPENOFFICE.";
+
+    if (rName.substr(0, aMicrosoftPrefix.size()) == aMicrosoftPrefix)
+        return toUtf8(rName.substr(aMicrosoftPrefix.size()));
+    if (rName.substr(0, aLibreOfficePrefix.size()) == aLibreOfficePrefix)
+        return toUtf8(rName.substr(aLibreOfficePrefix.size()));
+    if (rName.substr(0, aOpenOfficePrefix.size()) == aOpenOfficePrefix)
+        return toUtf8(rName.substr(aOpenOfficePrefix.size()));
+    return toUtf8(rName);
+}
+
+const char* nodeKindBucketName(NodeKind eKind)
+{
+    switch (eKind)
+    {
+        case NodeKind::NumberLiteral:
+        case NodeKind::StringLiteral:
+        case NodeKind::BooleanLiteral:
+        case NodeKind::ErrorLiteral:
+            return "literal";
+        case NodeKind::EmptyArgument:
+            return "empty";
+        case NodeKind::CellReference:
+            return "cell";
+        case NodeKind::RangeReference:
+            return "range";
+        case NodeKind::NamedReference:
+            return "named_ref";
+        case NodeKind::RangeConstructor:
+            return "range_ctor";
+        case NodeKind::ReferenceList:
+            return "ref_list";
+        case NodeKind::ArrayConstant:
+            return "array";
+        case NodeKind::UnaryOperation:
+            return "unary";
+        case NodeKind::BinaryOperation:
+            return "binary";
+        case NodeKind::FunctionCall:
+            return "fn";
+    }
+
+    return "other";
+}
+
+const char* binaryOperatorBucketName(spreadsheetengine::core::formula::BinaryOperator eOperator)
+{
+    using spreadsheetengine::core::formula::BinaryOperator;
+    switch (eOperator)
+    {
+        case BinaryOperator::Add:
+            return "add";
+        case BinaryOperator::Subtract:
+            return "sub";
+        case BinaryOperator::Multiply:
+            return "mul";
+        case BinaryOperator::Divide:
+            return "div";
+        case BinaryOperator::Power:
+            return "pow";
+        case BinaryOperator::Concat:
+            return "concat";
+        case BinaryOperator::Equal:
+            return "eq";
+        case BinaryOperator::NotEqual:
+            return "ne";
+        case BinaryOperator::Less:
+            return "lt";
+        case BinaryOperator::LessEqual:
+            return "le";
+        case BinaryOperator::Greater:
+            return "gt";
+        case BinaryOperator::GreaterEqual:
+            return "ge";
+    }
+
+    return "other";
+}
+
+const char* unaryOperatorBucketName(spreadsheetengine::core::formula::UnaryOperator eOperator)
+{
+    using spreadsheetengine::core::formula::UnaryOperator;
+    switch (eOperator)
+    {
+        case UnaryOperator::Plus:
+            return "plus";
+        case UnaryOperator::Minus:
+            return "minus";
+    }
+
+    return "other";
+}
+
+std::optional<std::string> firstFunctionHead(const Node& rNode)
+{
+    if (rNode.meKind == NodeKind::FunctionCall)
+        return stripFunctionNamespacePrefix(rNode.maPrimaryText);
+
+    for (const auto& pChild : rNode.maChildren)
+    {
+        if (!pChild)
+            continue;
+        const auto aHead = firstFunctionHead(*pChild);
+        if (aHead)
+            return aHead;
+    }
+
+    return std::nullopt;
+}
+
+std::string childFallbackBucket(const std::unique_ptr<Node>& pChild)
+{
+    if (!pChild)
+        return "missing";
+
+    if (const auto aHead = firstFunctionHead(*pChild))
+        return "fn:" + *aHead;
+
+    return nodeKindBucketName(pChild->meKind);
+}
+
+std::string cachedFallbackCategoryForNode(const Node& rNode)
+{
+    switch (rNode.meKind)
+    {
+        case NodeKind::FunctionCall:
+            return "fn:" + stripFunctionNamespacePrefix(rNode.maPrimaryText);
+        case NodeKind::BinaryOperation:
+        {
+            std::string aCategory
+                = std::string("binary_op:") + binaryOperatorBucketName(rNode.meBinaryOperator);
+            const std::string aLeft = rNode.maChildren.size() > 0 ? childFallbackBucket(rNode.maChildren[0])
+                                                                  : "missing";
+            const std::string aRight = rNode.maChildren.size() > 1 ? childFallbackBucket(rNode.maChildren[1])
+                                                                   : "missing";
+            if (aLeft == aRight)
+                return aCategory + ":" + aLeft;
+            return aCategory + ":" + aLeft + "+" + aRight;
+        }
+        case NodeKind::UnaryOperation:
+        {
+            std::string aCategory
+                = std::string("unary_op:") + unaryOperatorBucketName(rNode.meUnaryOperator);
+            const std::string aOperand
+                = rNode.maChildren.empty() ? "missing" : childFallbackBucket(rNode.maChildren[0]);
+            return aCategory + ":" + aOperand;
+        }
+        case NodeKind::CellReference:
+            return "cell_ref";
+        case NodeKind::RangeReference:
+            return "range_ref";
+        case NodeKind::NamedReference:
+            return "named_ref";
+        case NodeKind::RangeConstructor:
+            return "range_constructor";
+        case NodeKind::ReferenceList:
+            return "reference_list";
+        case NodeKind::ArrayConstant:
+            return "array_constant";
+        case NodeKind::NumberLiteral:
+        case NodeKind::StringLiteral:
+        case NodeKind::BooleanLiteral:
+        case NodeKind::ErrorLiteral:
+        case NodeKind::EmptyArgument:
+            return "literal_or_empty";
+    }
+
+    return "other";
+}
+
+std::string cachedFallbackCategoryForFormula(const spreadsheetengine::core::workbook::Cell& rCell)
+{
+    const auto aParse = spreadsheetengine::core::formula::parseFormula(rCell.maFormula);
+    if (!aParse || !aParse.mpRoot)
+        return "parse_failure";
+
+    return cachedFallbackCategoryForNode(*aParse.mpRoot);
+}
+
 void accumulateFormulaNodeSummary(const Node& rNode, ReplaySummary& rSummary)
 {
     switch (rNode.meKind)
@@ -467,7 +652,9 @@ ReplaySummary summarizeWorkbook(
 {
     ReplaySummary aSummary;
     ++aSummary.mnWorkbooks;
-    ++aSummary.maFamilyWorkbookCounts[familyNameForWorkbook(rWorkbookPath)];
+    const std::string aFamily = familyNameForWorkbook(rWorkbookPath);
+    ++aSummary.maFamilyWorkbookCounts[aFamily];
+    const bool bUseCompiledSummary = isCompiledReplayPromotedFamily(aFamily);
 
     Evaluator aEvaluator(rWorkbook);
     for (SheetId nSheet = 0; nSheet < static_cast<SheetId>(rWorkbook.maSheets.size()); ++nSheet)
@@ -487,9 +674,15 @@ ReplaySummary summarizeWorkbook(
                 accumulateFormulaNodeSummary(*aParse.mpRoot, aSummary);
             }
 
-            const auto aResult = aEvaluator.evaluateCell({ nSheet, rKey.first, rKey.second });
+            const auto aAddress = CellAddress { nSheet, rKey.first, rKey.second };
+            const auto aResult = bUseCompiledSummary ? aEvaluator.evaluateCellViaCompiledTokens(aAddress)
+                                                     : aEvaluator.evaluateCell(aAddress);
             if (aResult.mbUsedCachedValue)
+            {
                 ++aSummary.mnCachedFallbackCells;
+                ++aSummary.maCachedFallbackFamilyCounts[aFamily];
+                ++aSummary.maCachedFallbackCategoryCounts[cachedFallbackCategoryForFormula(rCell)];
+            }
         }
     }
 
@@ -515,6 +708,10 @@ void mergeSummary(ReplaySummary& rInto, const ReplaySummary& rFrom)
         rInto.maFamilyWorkbookCounts[rKey] += nValue;
     for (const auto& [rKey, nValue] : rFrom.maFunctionCallCounts)
         rInto.maFunctionCallCounts[rKey] += nValue;
+    for (const auto& [rKey, nValue] : rFrom.maCachedFallbackFamilyCounts)
+        rInto.maCachedFallbackFamilyCounts[rKey] += nValue;
+    for (const auto& [rKey, nValue] : rFrom.maCachedFallbackCategoryCounts)
+        rInto.maCachedFallbackCategoryCounts[rKey] += nValue;
 }
 
 void printSummary(const ReplaySummary& rSummary)
@@ -523,6 +720,12 @@ void printSummary(const ReplaySummary& rSummary)
     std::cout << "formula_cells=" << rSummary.mnFormulaCells << '\n';
     std::cout << "parsed_formulas=" << rSummary.mnParsedFormulas << '\n';
     std::cout << "cached_fallback_cells=" << rSummary.mnCachedFallbackCells << '\n';
+    std::cout << "cached_fallback_rate="
+              << (rSummary.mnFormulaCells
+                      ? (100.0 * static_cast<double>(rSummary.mnCachedFallbackCells)
+                            / static_cast<double>(rSummary.mnFormulaCells))
+                      : 0.0)
+              << '\n';
     std::cout << "cell_reference_nodes=" << rSummary.mnCellReferenceNodes << '\n';
     std::cout << "range_reference_nodes=" << rSummary.mnRangeReferenceNodes << '\n';
     std::cout << "named_reference_nodes=" << rSummary.mnNamedReferenceNodes << '\n';
@@ -540,6 +743,36 @@ void printSummary(const ReplaySummary& rSummary)
             std::cout << ",";
         bFirst = false;
         std::cout << rFamily << ":" << nCount;
+    }
+    std::cout << '\n';
+
+    std::cout << "cached_fallback_families=";
+    bFirst = true;
+    for (const auto& [rFamily, nCount] : rSummary.maCachedFallbackFamilyCounts)
+    {
+        if (!bFirst)
+            std::cout << ",";
+        bFirst = false;
+        std::cout << rFamily << ":" << nCount;
+    }
+    std::cout << '\n';
+
+    std::vector<std::pair<std::string, std::size_t>> aFallbackCategories(
+        rSummary.maCachedFallbackCategoryCounts.begin(), rSummary.maCachedFallbackCategoryCounts.end());
+    std::sort(aFallbackCategories.begin(), aFallbackCategories.end(),
+        [](const auto& rLeft, const auto& rRight) {
+            if (rLeft.second != rRight.second)
+                return rLeft.second > rRight.second;
+            return rLeft.first < rRight.first;
+        });
+
+    std::cout << "cached_fallback_top_categories=";
+    for (std::size_t nIndex = 0;
+         nIndex < std::min<std::size_t>(10, aFallbackCategories.size()); ++nIndex)
+    {
+        if (nIndex > 0)
+            std::cout << ",";
+        std::cout << aFallbackCategories[nIndex].first << ":" << aFallbackCategories[nIndex].second;
     }
     std::cout << '\n';
 
