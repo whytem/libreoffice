@@ -366,6 +366,44 @@ template <typename DistributionFn>
     return api::ValueResult<double>::success(0.5 * (fLow + fHigh));
 }
 
+template <typename DistributionFn>
+[[nodiscard]] api::ValueResult<double> invertMonotonicBoundedDistribution(
+    double fTarget, double fLow, double fHigh, bool bIncreasing, const DistributionFn& rDistribution)
+{
+    auto aLow = rDistribution(fLow);
+    if (!aLow)
+        return aLow;
+    auto aHigh = rDistribution(fHigh);
+    if (!aHigh)
+        return aHigh;
+
+    if (::rtl::math::approxEqual(aLow.maValue, fTarget))
+        return api::ValueResult<double>::success(fLow);
+    if (::rtl::math::approxEqual(aHigh.maValue, fTarget))
+        return api::ValueResult<double>::success(fHigh);
+
+    const bool bBracketed = bIncreasing
+                                ? (aLow.maValue <= fTarget && fTarget <= aHigh.maValue)
+                                : (aLow.maValue >= fTarget && fTarget >= aHigh.maValue);
+    if (!bBracketed)
+        return api::ValueResult<double>::failure(api::Error::NoConvergence);
+
+    for (int nIter = 0; nIter < 160; ++nIter)
+    {
+        const double fMid = 0.5 * (fLow + fHigh);
+        const auto aMid = rDistribution(fMid);
+        if (!aMid)
+            return aMid;
+
+        if (bIncreasing ? (aMid.maValue < fTarget) : (aMid.maValue > fTarget))
+            fLow = fMid;
+        else
+            fHigh = fMid;
+    }
+
+    return api::ValueResult<double>::success(0.5 * (fLow + fHigh));
+}
+
 } // namespace
 
 api::ValueResult<double> fisherTransform(double fValue)
@@ -506,6 +544,117 @@ double gaussValue(double fValue)
     return fValue < 0.0 ? -fResult : fResult;
 }
 
+api::ValueResult<double> evaluateStandardNormalInverse(double fProbability)
+{
+    if (fProbability < 0.0 || fProbability > 1.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    if (::rtl::math::approxEqual(fProbability, 0.0)
+        || ::rtl::math::approxEqual(fProbability, 1.0))
+    {
+        return api::ValueResult<double>::failure(api::Error::NoValue);
+    }
+
+    const double fQ = fProbability - 0.5;
+    double fT = 0.0;
+    double fZ = 0.0;
+
+    if (std::abs(fQ) <= 0.425)
+    {
+        fT = 0.180625 - fQ * fQ;
+        fZ = fQ
+             * (((((((fT * 2509.0809287301226727 + 33430.575583588128105) * fT
+                         + 67265.770927008700853)
+                        * fT
+                    + 45921.953931549871457)
+                       * fT
+                   + 13731.693765509461125)
+                      * fT
+                  + 1971.5909503065514427)
+                     * fT
+                 + 133.14166789178437745)
+                    * fT
+                + 3.387132872796366608)
+               / (((((((fT * 5226.495278852854561 + 28729.085735721942674) * fT
+                            + 39307.89580009271061)
+                           * fT
+                       + 21213.794301586595867)
+                          * fT
+                      + 5394.1960214247511077)
+                         * fT
+                     + 687.1870074920579083)
+                        * fT
+                    + 42.313330701600911252)
+                       * fT
+                   + 1.0);
+    }
+    else
+    {
+        fT = fQ > 0.0 ? 1.0 - fProbability : fProbability;
+        fT = std::sqrt(-std::log(fT));
+        if (fT <= 5.0)
+        {
+            fT -= 1.6;
+            fZ = (((((((fT * 7.7454501427834140764e-4 + 0.0227238449892691845833) * fT
+                            + 0.24178072517745061177)
+                           * fT
+                       + 1.27045825245236838258)
+                          * fT
+                      + 3.64784832476320460504)
+                         * fT
+                     + 5.7694972214606914055)
+                        * fT
+                    + 4.6303378461565452959)
+                       * fT
+                   + 1.42343711074968357734)
+                  / (((((((fT * 1.05075007164441684324e-9 + 5.475938084995344946e-4) * fT
+                               + 0.0151986665636164571966)
+                              * fT
+                          + 0.14810397642748007459)
+                             * fT
+                         + 0.68976733498510000455)
+                            * fT
+                        + 1.6763848301838038494)
+                           * fT
+                       + 2.05319162663775882187)
+                          * fT
+                      + 1.0);
+        }
+        else
+        {
+            fT -= 5.0;
+            fZ = (((((((fT * 2.01033439929228813265e-7 + 2.71155556874348757815e-5) * fT
+                            + 0.0012426609473880784386)
+                           * fT
+                       + 0.026532189526576123093)
+                          * fT
+                      + 0.29656057182850489123)
+                         * fT
+                     + 1.7848265399172913358)
+                        * fT
+                    + 5.4637849111641143699)
+                       * fT
+                   + 6.6579046435011037772)
+                  / (((((((fT * 2.04426310338993978564e-15 + 1.4215117583164458887e-7) * fT
+                               + 1.8463183175100546818e-5)
+                              * fT
+                          + 7.868691311456132591e-4)
+                             * fT
+                         + 0.0148753612908506148525)
+                            * fT
+                        + 0.13692988092273580531)
+                           * fT
+                       + 0.59983220655588793769)
+                          * fT
+                      + 1.0);
+        }
+
+        if (fQ < 0.0)
+            fZ = -fZ;
+    }
+
+    return api::ValueResult<double>::success(fZ);
+}
+
 api::ValueResult<double> lowRegularizedIncompleteGamma(double fAlpha, double fX)
 {
     const double fLnFactor = fAlpha * std::log(fX) - fX - std::lgamma(fAlpha);
@@ -610,6 +759,18 @@ api::ValueResult<double> evaluateNormalDistribution(
         std::exp(-0.5 * fZ * fZ) * fInvSqrtTwoPi / fSigma);
 }
 
+api::ValueResult<double> evaluateNormalInverse(
+    double fProbability, double fMean, double fSigma)
+{
+    if (!(fSigma > 0.0) || fProbability < 0.0 || fProbability > 1.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const auto aStandard = evaluateStandardNormalInverse(fProbability);
+    if (!aStandard)
+        return aStandard;
+    return api::ValueResult<double>::success(aStandard.maValue * fSigma + fMean);
+}
+
 api::ValueResult<double> evaluateLogNormalDistribution(
     double fX, double fMean, double fSigma, bool bCumulative)
 {
@@ -632,6 +793,18 @@ api::ValueResult<double> evaluateLogNormalDistribution(
         std::exp(-0.5 * fZ * fZ) * fInvSqrtTwoPi / (fSigma * fX));
 }
 
+api::ValueResult<double> evaluateLogNormalInverse(
+    double fProbability, double fMean, double fSigma)
+{
+    if (!(fSigma > 0.0) || !(fProbability > 0.0) || !(fProbability < 1.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const auto aStandard = evaluateStandardNormalInverse(fProbability);
+    if (!aStandard)
+        return aStandard;
+    return api::ValueResult<double>::success(std::exp(fMean + fSigma * aStandard.maValue));
+}
+
 api::ValueResult<double> evaluateChiSquareDistribution(
     double fX, double fDegreesFreedom, bool bCumulative, bool bMicrosoftSyntax)
 {
@@ -652,6 +825,19 @@ api::ValueResult<double> evaluateChiSquareDistribution(
     const double fLogValue = (fHalfDf - 1.0) * std::log(fX * 0.5) - (fX / 2.0)
                              - std::log(2.0) - std::lgamma(fHalfDf);
     return api::ValueResult<double>::success(std::exp(fLogValue));
+}
+
+api::ValueResult<double> evaluateChiSquareInverse(double fProbability, double fDegreesFreedom)
+{
+    if (fDegreesFreedom < 1.0 || fProbability < 0.0 || fProbability >= 1.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    if (::rtl::math::approxEqual(fProbability, 0.0))
+        return api::ValueResult<double>::success(0.0);
+
+    return invertMonotonicPositiveDistribution(fProbability, fDegreesFreedom, true,
+        [fDegreesFreedom](double fX) {
+            return evaluateChiSquareDistribution(fX, fDegreesFreedom, true, false);
+        });
 }
 
 api::ValueResult<double> evaluateGammaDistribution(
@@ -683,6 +869,20 @@ api::ValueResult<double> evaluateGammaDistribution(
     const double fLogValue = (fAlpha - 1.0) * std::log(fScaledX) - fScaledX - std::log(fBeta)
                              - std::lgamma(fAlpha);
     return api::ValueResult<double>::success(std::exp(fLogValue));
+}
+
+api::ValueResult<double> evaluateGammaInverse(
+    double fProbability, double fAlpha, double fBeta)
+{
+    if (fAlpha <= 0.0 || fBeta <= 0.0 || fProbability < 0.0 || fProbability >= 1.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    if (::rtl::math::approxEqual(fProbability, 0.0))
+        return api::ValueResult<double>::success(0.0);
+
+    return invertMonotonicPositiveDistribution(fProbability, std::max(1.0, fAlpha * fBeta), true,
+        [fAlpha, fBeta](double fX) {
+            return evaluateGammaDistribution(fX, fAlpha, fBeta, true, false);
+        });
 }
 
 api::ValueResult<double> evaluateGammaValue(double fX)
@@ -799,6 +999,20 @@ api::ValueResult<double> evaluateFInverseRightTail(
         });
 }
 
+api::ValueResult<double> evaluateLegacyChiInverse(
+    double fProbability, double fDegreesFreedom)
+{
+    if (fDegreesFreedom < 1.0 || fProbability <= 0.0 || fProbability > 1.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    if (::rtl::math::approxEqual(fProbability, 1.0))
+        return api::ValueResult<double>::success(0.0);
+
+    return invertMonotonicPositiveDistribution(fProbability, fDegreesFreedom, false,
+        [fDegreesFreedom](double fX) {
+            return evaluateLegacyChiDist(fX, fDegreesFreedom);
+        });
+}
+
 api::ValueResult<double> evaluateBetaDistribution(
     double fX, double fAlpha, double fBeta, double fLowerBound, double fUpperBound,
     bool bCumulative, bool bMicrosoftOrder)
@@ -839,6 +1053,31 @@ api::ValueResult<double> evaluateBetaDistribution(
     }
 
     return api::ValueResult<double>::success(betaPdf(fStandardX, fAlpha, fBeta) / fScale);
+}
+
+api::ValueResult<double> evaluateBetaInverse(
+    double fProbability, double fAlpha, double fBeta, double fLowerBound, double fUpperBound)
+{
+    if (fProbability < 0.0 || fProbability > 1.0 || !(fLowerBound < fUpperBound)
+        || fAlpha <= 0.0 || fBeta <= 0.0)
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+    if (::rtl::math::approxEqual(fProbability, 0.0))
+        return api::ValueResult<double>::success(fLowerBound);
+    if (::rtl::math::approxEqual(fProbability, 1.0))
+        return api::ValueResult<double>::success(fUpperBound);
+
+    const auto aStandard = invertMonotonicBoundedDistribution(
+        fProbability, 0.0, 1.0, true,
+        [fAlpha, fBeta](double fX) {
+            return evaluateBetaDistribution(fX, fAlpha, fBeta, 0.0, 1.0, true, false);
+        });
+    if (!aStandard)
+        return aStandard;
+
+    return api::ValueResult<double>::success(
+        fLowerBound + aStandard.maValue * (fUpperBound - fLowerBound));
 }
 
 api::ValueResult<double> evaluatePoissonDistribution(
@@ -980,6 +1219,34 @@ api::ValueResult<double> evaluateBinomialRangeDistribution(
         return binomialLogPmf(static_cast<double>(nValue), fN, fProbability);
     };
     return api::ValueResult<double>::success(sumExpProbabilityRange(nStart, nEnd, logProbability));
+}
+
+api::ValueResult<double> evaluateConfidence(
+    double fAlpha, double fSigma, double fSampleSize)
+{
+    const double fN = ::rtl::math::approxFloor(fSampleSize);
+    if (!(fSigma > 0.0) || !(fAlpha > 0.0) || !(fAlpha < 1.0) || !(fN >= 1.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const auto aStandard = evaluateStandardNormalInverse(1.0 - fAlpha / 2.0);
+    if (!aStandard)
+        return aStandard;
+    return api::ValueResult<double>::success(aStandard.maValue * fSigma / std::sqrt(fN));
+}
+
+api::ValueResult<double> evaluateConfidenceT(
+    double fAlpha, double fSigma, double fSampleSize)
+{
+    const double fN = ::rtl::math::approxFloor(fSampleSize);
+    if (!(fSigma > 0.0) || !(fAlpha > 0.0) || !(fAlpha < 1.0) || !(fN >= 1.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    if (::rtl::math::approxEqual(fN, 1.0))
+        return api::ValueResult<double>::failure(api::Error::DivisionByZero);
+
+    const auto aInverse = evaluateTInverse(fAlpha, fN - 1.0, 2);
+    if (!aInverse)
+        return aInverse;
+    return api::ValueResult<double>::success(aInverse.maValue * fSigma / std::sqrt(fN));
 }
 
 } // namespace spreadsheetengine::core::math

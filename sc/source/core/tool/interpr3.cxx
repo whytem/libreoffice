@@ -64,127 +64,6 @@ FormulaError lcl_ToCalcMathFormulaError(spreadsheetengine::api::Error eError)
     return selibreoffice::toFormulaError(eError);
 }
 
-class ScDistFunc
-{
-public:
-    virtual double GetValue(double x) const = 0;
-
-protected:
-    ~ScDistFunc() {}
-};
-
-}
-
-//  iteration for inverse distributions
-
-//template< class T > double lcl_IterateInverse( const T& rFunction, double x0, double x1, bool& rConvError )
-
-/** u*w<0.0 fails for values near zero */
-static bool lcl_HasChangeOfSign( double u, double w )
-{
-    return (u < 0.0 && w > 0.0) || (u > 0.0 && w < 0.0);
-}
-
-static double lcl_IterateInverse( const ScDistFunc& rFunction, double fAx, double fBx, bool& rConvError )
-{
-    rConvError = false;
-    const double fYEps = 1.0E-307;
-    const double fXEps = ::std::numeric_limits<double>::epsilon();
-
-    OSL_ENSURE(fAx<fBx, "IterateInverse: wrong interval");
-
-    //  find enclosing interval
-
-    KahanSum fkAx = fAx;
-    KahanSum fkBx = fBx;
-    double fAy = rFunction.GetValue(fAx);
-    double fBy = rFunction.GetValue(fBx);
-    KahanSum fTemp;
-    unsigned short nCount;
-    for (nCount = 0; nCount < 1000 && !lcl_HasChangeOfSign(fAy,fBy); nCount++)
-    {
-        if (std::abs(fAy) <= std::abs(fBy))
-        {
-            fTemp = fkAx;
-            fkAx += (fkAx - fkBx) * 2.0;
-            if (fkAx < 0.0)
-                fkAx = 0.0;
-            fkBx = fTemp;
-            fBy = fAy;
-            fAy = rFunction.GetValue(fkAx.get());
-        }
-        else
-        {
-            fTemp = fkBx;
-            fkBx += (fkBx - fkAx) * 2.0;
-            fkAx = fTemp;
-            fAy = fBy;
-            fBy = rFunction.GetValue(fkBx.get());
-        }
-    }
-
-    fAx = fkAx.get();
-    fBx = fkBx.get();
-    if (fAy == 0.0)
-        return fAx;
-    if (fBy == 0.0)
-        return fBx;
-    if (!lcl_HasChangeOfSign( fAy, fBy))
-    {
-        rConvError = true;
-        return 0.0;
-    }
-    // inverse quadric interpolation with additional brackets
-    // set three points
-    double fPx = fAx;
-    double fPy = fAy;
-    double fQx = fBx;
-    double fQy = fBy;
-    double fRx = fAx;
-    double fRy = fAy;
-    double fSx = 0.5 * (fAx + fBx); // potential next point
-    bool bHasToInterpolate = true;
-    nCount = 0;
-    while ( nCount < 500 && std::abs(fRy) > fYEps &&
-            (fBx-fAx) > ::std::max( std::abs(fAx), std::abs(fBx)) * fXEps )
-    {
-        if (bHasToInterpolate)
-        {
-            if (fPy!=fQy && fQy!=fRy && fRy!=fPy)
-            {
-                fSx = fPx * fRy * fQy / (fRy-fPy) / (fQy-fPy)
-                    + fRx * fQy * fPy / (fQy-fRy) / (fPy-fRy)
-                    + fQx * fPy * fRy / (fPy-fQy) / (fRy-fQy);
-                bHasToInterpolate = (fAx < fSx) && (fSx < fBx); // inside the brackets?
-            }
-            else
-                bHasToInterpolate = false;
-        }
-        if(!bHasToInterpolate)
-        {
-            fSx = 0.5 * (fAx + fBx);
-            // reset points
-            fQx = fBx; fQy = fBy;
-            bHasToInterpolate = true;
-        }
-        // shift points for next interpolation
-        fPx = fQx; fQx = fRx; fRx = fSx;
-        fPy = fQy; fQy = fRy; fRy = rFunction.GetValue(fSx);
-        // update brackets
-        if (lcl_HasChangeOfSign( fAy, fRy))
-        {
-            fBx = fRx; fBy = fRy;
-        }
-        else
-        {
-            fAx = fRx; fAy = fRy;
-        }
-        // if last iteration brought too small advance, then do bisection next
-        // time, for safety
-        bHasToInterpolate = bHasToInterpolate && (std::abs(fRy) * 2.0 <= std::abs(fQy));
-        ++nCount;
-    }
-    return fRx;
 }
 
 // General functions
@@ -279,173 +158,8 @@ double ScInterpreter::gauss(double x)
 
 double ScInterpreter::gaussinv(double x)
 {
-    double q,t,z;
-
-    q=x-0.5;
-
-    if(std::abs(q)<=.425)
-    {
-        t=0.180625-q*q;
-
-        z=
-        q*
-        (
-            (
-                (
-                    (
-                        (
-                            (
-                                (
-                                    t*2509.0809287301226727+33430.575583588128105
-                                )
-                                *t+67265.770927008700853
-                            )
-                            *t+45921.953931549871457
-                        )
-                        *t+13731.693765509461125
-                    )
-                    *t+1971.5909503065514427
-                )
-                *t+133.14166789178437745
-            )
-            *t+3.387132872796366608
-        )
-        /
-        (
-            (
-                (
-                    (
-                        (
-                            (
-                                (
-                                    t*5226.495278852854561+28729.085735721942674
-                                )
-                                *t+39307.89580009271061
-                            )
-                            *t+21213.794301586595867
-                        )
-                        *t+5394.1960214247511077
-                    )
-                    *t+687.1870074920579083
-                )
-                *t+42.313330701600911252
-            )
-            *t+1.0
-        );
-
-    }
-    else
-    {
-        if(q>0) t=1-x;
-        else        t=x;
-
-        t=sqrt(-log(t));
-
-        if(t<=5.0)
-        {
-            t+=-1.6;
-
-            z=
-            (
-                (
-                    (
-                        (
-                            (
-                                (
-                                    (
-                                        t*7.7454501427834140764e-4+0.0227238449892691845833
-                                    )
-                                    *t+0.24178072517745061177
-                                )
-                                *t+1.27045825245236838258
-                            )
-                            *t+3.64784832476320460504
-                        )
-                        *t+5.7694972214606914055
-                    )
-                    *t+4.6303378461565452959
-                )
-                *t+1.42343711074968357734
-            )
-            /
-            (
-                (
-                    (
-                        (
-                            (
-                                (
-                                    (
-                                        t*1.05075007164441684324e-9+5.475938084995344946e-4
-                                    )
-                                    *t+0.0151986665636164571966
-                                )
-                                *t+0.14810397642748007459
-                            )
-                            *t+0.68976733498510000455
-                        )
-                        *t+1.6763848301838038494
-                    )
-                    *t+2.05319162663775882187
-                )
-                *t+1.0
-            );
-
-        }
-        else
-        {
-            t+=-5.0;
-
-            z=
-            (
-                (
-                    (
-                        (
-                            (
-                                (
-                                    (
-                                        t*2.01033439929228813265e-7+2.71155556874348757815e-5
-                                    )
-                                    *t+0.0012426609473880784386
-                                )
-                                *t+0.026532189526576123093
-                            )
-                            *t+0.29656057182850489123
-                        )
-                        *t+1.7848265399172913358
-                    )
-                    *t+5.4637849111641143699
-                )
-                *t+6.6579046435011037772
-            )
-            /
-            (
-                (
-                    (
-                        (
-                            (
-                                (
-                                    (
-                                        t*2.04426310338993978564e-15+1.4215117583164458887e-7
-                                    )
-                                    *t+1.8463183175100546818e-5
-                                )
-                                *t+7.868691311456132591e-4
-                            )
-                            *t+0.0148753612908506148525
-                        )
-                        *t+0.13692988092273580531
-                    )
-                    *t+0.59983220655588793769
-                )
-                *t+1.0
-            );
-
-        }
-
-        if(q<0.0) z=-z;
-    }
-
-    return z;
+    const auto aResult = semath::evaluateStandardNormalInverse(x);
+    return aResult ? aResult.maValue : HUGE_VAL;
 }
 
 double ScInterpreter::Fakultaet(double x)
@@ -1722,24 +1436,26 @@ void ScInterpreter::ScNormInv()
         double sigma = GetDouble();
         double mue   = GetDouble();
         double x     = GetDouble();
-        if (sigma <= 0.0 || x < 0.0 || x > 1.0)
-            PushIllegalArgument();
-        else if (x == 0.0 || x == 1.0)
-            PushNoValue();
-        else
-            PushDouble(gaussinv(x)*sigma + mue);
+        const auto aResult = semath::evaluateNormalInverse(x, mue, sigma);
+        if (!aResult)
+        {
+            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+            return;
+        }
+        PushDouble(aResult.maValue);
     }
 }
 
 void ScInterpreter::ScSNormInv()
 {
     double x = GetDouble();
-    if (x < 0.0 || x > 1.0)
-        PushIllegalArgument();
-    else if (x == 0.0 || x == 1.0)
-        PushNoValue();
-    else
-        PushDouble(gaussinv(x));
+    const auto aResult = semath::evaluateStandardNormalInverse(x);
+    if (!aResult)
+    {
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScLogNormInv()
@@ -1750,26 +1466,15 @@ void ScInterpreter::ScLogNormInv()
         double fSigma = ( nParamCount == 3 ? GetDouble() : 1.0 );  // Stddev
         double fMue = ( nParamCount >= 2 ? GetDouble() : 0.0 );    // Mean
         double fP = GetDouble();                                   // p
-        if ( fSigma <= 0.0 || fP <= 0.0 || fP >= 1.0 )
-            PushIllegalArgument();
-        else
-            PushDouble( exp( fMue + fSigma * gaussinv( fP ) ) );
+        const auto aResult = semath::evaluateLogNormalInverse(fP, fMue, fSigma);
+        if (!aResult)
+        {
+            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+            return;
+        }
+        PushDouble(aResult.maValue);
     }
 }
-
-class ScGammaDistFunction : public ScDistFunc
-{
-    ScInterpreter&  rInt;
-    double          fp, fAlpha, fBeta;
-
-public:
-            ScGammaDistFunction( ScInterpreter& rI, double fpVal, double fAlphaVal, double fBetaVal ) :
-                rInt(rI), fp(fpVal), fAlpha(fAlphaVal), fBeta(fBetaVal) {}
-
-    virtual ~ScGammaDistFunction() {}
-
-    double  GetValue( double x ) const override  { return fp - rInt.GetGammaDist(x, fAlpha, fBeta); }
-};
 
 void ScInterpreter::ScGammaInv()
 {
@@ -1778,38 +1483,14 @@ void ScInterpreter::ScGammaInv()
     double fBeta  = GetDouble();
     double fAlpha = GetDouble();
     double fP = GetDouble();
-    if (fAlpha <= 0.0 || fBeta <= 0.0 || fP < 0.0 || fP >= 1.0 )
+    const auto aResult = semath::evaluateGammaInverse(fP, fAlpha, fBeta);
+    if (!aResult)
     {
-        PushIllegalArgument();
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
         return;
     }
-    if (fP == 0.0)
-        PushInt(0);
-    else
-    {
-        bool bConvError;
-        ScGammaDistFunction aFunc( *this, fP, fAlpha, fBeta );
-        double fStart = fAlpha * fBeta;
-        double fVal = lcl_IterateInverse( aFunc, fStart*0.5, fStart, bConvError );
-        if (bConvError)
-            SetError(FormulaError::NoConvergence);
-        PushDouble(fVal);
-    }
+    PushDouble(aResult.maValue);
 }
-
-class ScBetaDistFunction : public ScDistFunc
-{
-    ScInterpreter&  rInt;
-    double          fp, fAlpha, fBeta;
-
-public:
-            ScBetaDistFunction( ScInterpreter& rI, double fpVal, double fAlphaVal, double fBetaVal ) :
-                rInt(rI), fp(fpVal), fAlpha(fAlphaVal), fBeta(fBetaVal) {}
-
-    virtual ~ScBetaDistFunction() {}
-
-    double  GetValue( double x ) const override  { return fp - rInt.GetBetaDist(x, fAlpha, fBeta); }
-};
 
 void ScInterpreter::ScBetaInv()
 {
@@ -1828,20 +1509,13 @@ void ScInterpreter::ScBetaInv()
     fBeta  = GetDouble();
     fAlpha = GetDouble();
     fP     = GetDouble();
-    if (fP < 0.0 || fP > 1.0 || fA >= fB || fAlpha <= 0.0 || fBeta <= 0.0)
+    const auto aResult = semath::evaluateBetaInverse(fP, fAlpha, fBeta, fA, fB);
+    if (!aResult)
     {
-        PushIllegalArgument();
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
         return;
     }
-
-    bool bConvError;
-    ScBetaDistFunction aFunc( *this, fP, fAlpha, fBeta );
-    // 0..1 as range for iteration so it isn't extended beyond the valid range
-    double fVal = lcl_IterateInverse( aFunc, 0.0, 1.0, bConvError );
-    if (bConvError)
-        PushError( FormulaError::NoConvergence);
-    else
-        PushDouble(fA + fVal*(fB-fA));                  // scale to (A,B)
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScTInv( int nType )
@@ -1923,54 +1597,20 @@ void ScInterpreter::ScFInv_LT()
     PushDouble(aResult.maValue);
 }
 
-class ScChiDistFunction : public ScDistFunc
-{
-    ScInterpreter&  rInt;
-    double          fp, fDF;
-
-public:
-            ScChiDistFunction( ScInterpreter& rI, double fpVal, double fDFVal ) :
-                rInt(rI), fp(fpVal), fDF(fDFVal) {}
-
-    virtual ~ScChiDistFunction() {}
-
-    double  GetValue( double x ) const override  { return fp - rInt.GetChiDist(x, fDF); }
-};
-
 void ScInterpreter::ScChiInv()
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
     double fDF  = ::rtl::math::approxFloor(GetDouble());
     double fP = GetDouble();
-    if (fDF < 1.0 || fP <= 0.0 || fP > 1.0 )
+    const auto aResult = semath::evaluateLegacyChiInverse(fP, fDF);
+    if (!aResult)
     {
-        PushIllegalArgument();
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
         return;
     }
-
-    bool bConvError;
-    ScChiDistFunction aFunc( *this, fP, fDF );
-    double fVal = lcl_IterateInverse( aFunc, fDF*0.5, fDF, bConvError );
-    if (bConvError)
-        SetError(FormulaError::NoConvergence);
-    PushDouble(fVal);
+    PushDouble(aResult.maValue);
 }
-
-/***********************************************/
-class ScChiSqDistFunction : public ScDistFunc
-{
-    ScInterpreter&  rInt;
-    double          fp, fDF;
-
-public:
-            ScChiSqDistFunction( ScInterpreter& rI, double fpVal, double fDFVal ) :
-                rInt(rI), fp(fpVal), fDF(fDFVal) {}
-
-    virtual ~ScChiSqDistFunction() {}
-
-    double  GetValue( double x ) const override  { return fp - rInt.GetChiSqDistCDF(x, fDF); }
-};
 
 void ScInterpreter::ScChiSqInv()
 {
@@ -1978,18 +1618,13 @@ void ScInterpreter::ScChiSqInv()
         return;
     double fDF  = ::rtl::math::approxFloor(GetDouble());
     double fP = GetDouble();
-    if (fDF < 1.0 || fP < 0.0 || fP >= 1.0 )
+    const auto aResult = semath::evaluateChiSquareInverse(fP, fDF);
+    if (!aResult)
     {
-        PushIllegalArgument();
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
         return;
     }
-
-    bool bConvError;
-    ScChiSqDistFunction aFunc( *this, fP, fDF );
-    double fVal = lcl_IterateInverse( aFunc, fDF*0.5, fDF, bConvError );
-    if (bConvError)
-        SetError(FormulaError::NoConvergence);
-    PushDouble(fVal);
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScConfidence()
@@ -1999,10 +1634,13 @@ void ScInterpreter::ScConfidence()
         double n     = ::rtl::math::approxFloor(GetDouble());
         double sigma = GetDouble();
         double alpha = GetDouble();
-        if (sigma <= 0.0 || alpha <= 0.0 || alpha >= 1.0 || n < 1.0)
-            PushIllegalArgument();
-        else
-            PushDouble( gaussinv(1.0-alpha/2.0) * sigma/sqrt(n) );
+        const auto aResult = semath::evaluateConfidence(alpha, sigma, n);
+        if (!aResult)
+        {
+            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+            return;
+        }
+        PushDouble(aResult.maValue);
     }
 }
 
@@ -2013,12 +1651,13 @@ void ScInterpreter::ScConfidenceT()
         double n     = ::rtl::math::approxFloor(GetDouble());
         double sigma = GetDouble();
         double alpha = GetDouble();
-        if (sigma <= 0.0 || alpha <= 0.0 || alpha >= 1.0 || n < 1.0)
-            PushIllegalArgument();
-        else if (n == 1.0) // for interoperability with Excel
-            PushError(FormulaError::DivisionByZero);
-        else
-            PushDouble( sigma * GetTInv( alpha, n - 1, 2 ) / sqrt( n ) );
+        const auto aResult = semath::evaluateConfidenceT(alpha, sigma, n);
+        if (!aResult)
+        {
+            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+            return;
+        }
+        PushDouble(aResult.maValue);
     }
 }
 

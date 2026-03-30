@@ -653,18 +653,29 @@ Status as of 2026-03-30:
 
 ### Phase C: New runtime implementations
 
-These exist in Calc but do not yet have evaluator/runtime counterparts and
-should be treated as new shared-runtime work items if we decide they belong in
-the shared engine:
+These exist in Calc but did not have stable runtime counterparts when the plan
+started. The first shared-runtime wave is now complete and lives in
+`spreadsheet_engine/runtime/MathStatistical.hxx` with Calc delegation in
+`sc/source/core/tool/interpr3.cxx`.
+
+Status as of 2026-03-30:
+- Completed for the inverse-distribution and confidence wave below
+- New shared runtime APIs now cover `gaussinv` / standard-normal inverse,
+  normal inverse, log-normal inverse, gamma inverse, beta inverse, legacy chi
+  inverse, chi-square inverse, `CONFIDENCE`, and `CONFIDENCE.T`
+- Calc-side validation for this wave lives in `sc/qa/unit/ucalc_formula2.cxx`
+- Standalone validation passes in `spreadsheetengine_fods_evaluator_tests` and
+  `spreadsheetengine_fods_replay_tests`
 
 - inverse distributions such as `ScNormInv`, `ScGammaInv`, `ScBetaInv`,
   `ScChiSqInv`
 - confidence-interval functions
+
+Remaining Phase C backlog:
 - exponential / Weibull / negative-binomial families
 - additional descriptive-statistics helpers
 - combinatorics not yet shared
 - `Erf` / `Erfc`
-- `gaussinv`
 
 ## Functions That Should Not Be Extracted Into Shared Runtime
 
