@@ -955,7 +955,6 @@ public:
     void ScSumXMY2();
     void ScGrowth();
     bool CalculateSkew(KahanSum& fSum, double& fCount, std::vector<double>& values);
-    void CalculateSkewOrSkewp( bool bSkewp );
     void CalculateSlopeIntercept(bool bSlope);
     void CalculateSmallLarge(bool bSmall);
     void CalculatePearsonCovar( bool _bPearson, bool _bStexy, bool _bSample );  //fdo#70000 argument _bSample is ignored if _bPearson == true
@@ -997,12 +996,9 @@ private:
     static double GetChiSqDistPDF(double fX, double fDF);  // probability density function
     double GetFDist(double x, double fF1, double fF2);
     double GetTDist( double T, double fDF, int nType );
-    double Fakultaet(double x);
-    static double BinomCoeff(double n, double k);
     double GetBeta(double fAlpha, double fBeta);
     static double GetLogBeta(double fAlpha, double fBeta);
     double GetBinomDistPMF(double x, double n, double p); //probability mass function
-    double GetHypGeomDist( double x, double n, double M, double N );
     void ScLogGamma();
     void ScGamma();
     void ScPhi();
@@ -1053,8 +1049,6 @@ private:
     void ScSkew();
     void ScSkewp();
     void ScMedian();
-    double GetMedian( ::std::vector<double> & rArray );
-    double GetPercentileExclusive( ::std::vector<double> & rArray, double fPercentile );
     std::vector<double> GetRankNumberArray( SCSIZE& rCol, SCSIZE& rRow );
     void GetNumberSequenceArray( sal_uInt8 nParamCount, ::std::vector<double>& rArray, bool bConvertTextInArray );
     void GetSortArray( sal_uInt8 nParamCount, ::std::vector<double>& rSortArray, ::std::vector<tools::Long>* pIndexOrder, bool bConvertTextInArray, bool bAllowEmptyArray );

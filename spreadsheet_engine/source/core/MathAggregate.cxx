@@ -127,35 +127,71 @@ api::ValueResult<double> evaluateTrimmean(std::vector<double> aValues, double fP
 
 api::ValueResult<double> evaluateModeSingle(const std::vector<double>& rValues)
 {
-    std::vector<std::pair<double, sal_Int32>> aCounts;
-    aCounts.reserve(rValues.size());
+    const auto aModes = evaluateModeValues(rValues);
+    if (!aModes)
+    {
+        if (aModes.meError == api::Error::NoValue)
+            return api::ValueResult<double>::failure(api::Error::NotAvailable);
+        return api::ValueResult<double>::failure(aModes.meError);
+    }
+    return api::ValueResult<double>::success(aModes.maValue.front());
+}
 
+api::ValueResult<std::vector<double>> evaluateModeValues(const std::vector<double>& rValues)
+{
+    if (rValues.empty())
+        return api::ValueResult<std::vector<double>>::failure(api::Error::NoValue);
+
+    std::vector<double> aSorted = rValues;
+    std::sort(aSorted.begin(), aSorted.end());
+
+    std::vector<double> aModes;
+    sal_Int32 nMaxCount = 1;
+    sal_Int32 nCurrentCount = 1;
+    double fCurrentValue = aSorted.front();
+    for (std::size_t nIndex = 1; nIndex <= aSorted.size(); ++nIndex)
+    {
+        if (nIndex < aSorted.size() && aSorted[nIndex] == fCurrentValue)
+        {
+            ++nCurrentCount;
+            continue;
+        }
+
+        if (nCurrentCount > 1)
+        {
+            if (nCurrentCount > nMaxCount)
+            {
+                nMaxCount = nCurrentCount;
+                aModes.assign(1, fCurrentValue);
+            }
+            else if (nCurrentCount == nMaxCount)
+            {
+                aModes.push_back(fCurrentValue);
+            }
+        }
+
+        if (nIndex < aSorted.size())
+        {
+            fCurrentValue = aSorted[nIndex];
+            nCurrentCount = 1;
+        }
+    }
+
+    if (aModes.empty())
+        return api::ValueResult<std::vector<double>>::failure(api::Error::NoValue);
+
+    std::vector<double> aOrderedModes;
+    aOrderedModes.reserve(aModes.size());
     for (const double fValue : rValues)
     {
-        auto it = std::find_if(aCounts.begin(), aCounts.end(), [fValue](const auto& rEntry) {
-            return ::rtl::math::approxEqual(rEntry.first, fValue);
-        });
-        if (it == aCounts.end())
-        {
-            aCounts.emplace_back(fValue, 1);
-            it = std::prev(aCounts.end());
-        }
-        else
-        {
-            ++it->second;
-        }
+        const auto itMode = std::find(aModes.begin(), aModes.end(), fValue);
+        if (itMode == aModes.end())
+            continue;
+        if (std::find(aOrderedModes.begin(), aOrderedModes.end(), fValue) == aOrderedModes.end())
+            aOrderedModes.push_back(fValue);
     }
 
-    auto itBest = aCounts.end();
-    for (auto it = aCounts.begin(); it != aCounts.end(); ++it)
-    {
-        if (itBest == aCounts.end() || it->second > itBest->second)
-            itBest = it;
-    }
-
-    if (itBest == aCounts.end() || itBest->second < 2)
-        return api::ValueResult<double>::failure(api::Error::NotAvailable);
-    return api::ValueResult<double>::success(itBest->first);
+    return api::ValueResult<std::vector<double>>::success(aOrderedModes);
 }
 
 api::ValueResult<double> evaluateHypergeometricDistribution(
@@ -281,6 +317,41 @@ api::ValueResult<double> evaluatePercentrank(
     }
 
     return api::ValueResult<double>::success(fResult);
+}
+
+api::ValueResult<double> evaluateSkewNumbers(const std::vector<double>& rValues, bool bPopulation)
+{
+    if (rValues.size() < 3)
+        return api::ValueResult<double>::failure(api::Error::DivisionByZero);
+
+    KahanSum fSum = 0.0;
+    for (const double fValue : rValues)
+        fSum += fValue;
+
+    const double fCount = static_cast<double>(rValues.size());
+    const double fMean = fSum.get() / fCount;
+
+    KahanSum fVarianceSum = 0.0;
+    for (const double fValue : rValues)
+        fVarianceSum += (fValue - fMean) * (fValue - fMean);
+
+    const double fStdDev
+        = std::sqrt(fVarianceSum.get() / (bPopulation ? fCount : (fCount - 1.0)));
+    if (fStdDev == 0.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    KahanSum fCubeSum = 0.0;
+    for (const double fValue : rValues)
+    {
+        const double fDelta = (fValue - fMean) / fStdDev;
+        fCubeSum += fDelta * fDelta * fDelta;
+    }
+
+    if (bPopulation)
+        return api::ValueResult<double>::success(fCubeSum.get() / fCount);
+
+    return api::ValueResult<double>::success(
+        ((fCubeSum.get() * fCount) / (fCount - 1.0)) / (fCount - 2.0));
 }
 
 api::ValueResult<double> evaluateAggregateNumbers(sal_Int32 nFunction, const AggregateScan& rScan)

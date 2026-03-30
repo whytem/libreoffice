@@ -28,6 +28,8 @@
 #include <scmatrix.hxx>
 #include <columniterator.hxx>
 #include <unotools/collatorwrapper.hxx>
+#include <spreadsheetengine/runtime/MathAggregate.hxx>
+#include <spreadsheetengine/runtime/MathFunctionRuntime.hxx>
 #include <spreadsheetengine/runtime/MathStatistical.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
 
@@ -158,54 +160,6 @@ double ScInterpreter::gaussinv(double x)
 {
     const auto aResult = semath::evaluateStandardNormalInverse(x);
     return aResult ? aResult.maValue : HUGE_VAL;
-}
-
-double ScInterpreter::Fakultaet(double x)
-{
-    x = ::rtl::math::approxFloor(x);
-    if (x < 0.0)
-        return 0.0;
-    else if (x == 0.0)
-        return 1.0;
-    else if (x <= 170.0)
-    {
-        double fTemp = x;
-        while (fTemp > 2.0)
-        {
-            fTemp--;
-            x *= fTemp;
-        }
-    }
-    else
-        SetError(FormulaError::NoValue);
-    return x;
-}
-
-double ScInterpreter::BinomCoeff(double n, double k)
-{
-    // this method has been duplicated as BinomialCoefficient()
-    // in scaddins/source/analysis/analysishelper.cxx
-
-    double nVal = 0.0;
-    k = ::rtl::math::approxFloor(k);
-    if (n < k)
-        nVal = 0.0;
-    else if (k == 0.0)
-        nVal = 1.0;
-    else
-    {
-        nVal = n/k;
-        n--;
-        k--;
-        while (k > 0.0)
-        {
-            nVal *= n/k;
-            k--;
-            n--;
-        }
-
-    }
-    return nVal;
 }
 
 double ScInterpreter::GetFDist(double x, double fF1, double fF2)
@@ -515,23 +469,28 @@ void ScInterpreter::ScFisherInv()
 
 void ScInterpreter::ScFact()
 {
-    double nVal = GetDouble();
-    if (nVal < 0.0)
-        PushIllegalArgument();
-    else
-        PushDouble(Fakultaet(nVal));
+    const auto aResult = semath::evaluateFactorialValue(GetDouble());
+    if (!aResult)
+    {
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScCombin()
 {
     if ( MustHaveParamCount( GetByte(), 2 ) )
     {
-        double k = ::rtl::math::approxFloor(GetDouble());
-        double n = ::rtl::math::approxFloor(GetDouble());
-        if (k < 0.0 || n < 0.0 || k > n)
-            PushIllegalArgument();
-        else
-            PushDouble(BinomCoeff(n, k));
+        const double k = GetDouble();
+        const double n = GetDouble();
+        const auto aResult = semath::evaluateCombinValue(n, k, false);
+        if (!aResult)
+        {
+            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+            return;
+        }
+        PushDouble(aResult.maValue);
     }
 }
 
@@ -539,12 +498,15 @@ void ScInterpreter::ScCombinA()
 {
     if ( MustHaveParamCount( GetByte(), 2 ) )
     {
-        double k = ::rtl::math::approxFloor(GetDouble());
-        double n = ::rtl::math::approxFloor(GetDouble());
-        if (k < 0.0 || n < 0.0 || k > n)
-            PushIllegalArgument();
-        else
-            PushDouble(BinomCoeff(n + k - 1, k));
+        const double k = GetDouble();
+        const double n = GetDouble();
+        const auto aResult = semath::evaluateCombinValue(n, k, true);
+        if (!aResult)
+        {
+            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+            return;
+        }
+        PushDouble(aResult.maValue);
     }
 }
 
@@ -553,31 +515,30 @@ void ScInterpreter::ScPermut()
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
 
-    double k = ::rtl::math::approxFloor(GetDouble());
-    double n = ::rtl::math::approxFloor(GetDouble());
-    if (n < 0.0 || k < 0.0 || k > n)
-        PushIllegalArgument();
-    else if (k == 0.0)
-        PushInt(1);     // (n! / (n - 0)!) == 1
-    else
+    const double k = GetDouble();
+    const double n = GetDouble();
+    const auto aResult = semath::evaluatePermutationValue(n, k);
+    if (!aResult)
     {
-        double nVal = n;
-        for (sal_uLong i = static_cast<sal_uLong>(k)-1; i >= 1; i--)
-            nVal *= n-static_cast<double>(i);
-        PushDouble(nVal);
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
     }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScPermutationA()
 {
     if ( MustHaveParamCount( GetByte(), 2 ) )
     {
-        double k = ::rtl::math::approxFloor(GetDouble());
-        double n = ::rtl::math::approxFloor(GetDouble());
-        if (n < 0.0 || k < 0.0)
-            PushIllegalArgument();
-        else
-            PushDouble(pow(n,k));
+        const double k = GetDouble();
+        const double n = GetDouble();
+        const auto aResult = semath::evaluatePermutationAValue(n, k);
+        if (!aResult)
+        {
+            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+            return;
+        }
+        PushDouble(aResult.maValue);
     }
 }
 
@@ -683,19 +644,16 @@ void ScInterpreter::ScNegBinomDist()
     if ( !MustHaveParamCount( GetByte(), 3 ) )
         return;
 
-    double p = GetDouble();                            // probability
-    double s = ::rtl::math::approxFloor(GetDouble());  // No of successes
-    double f = ::rtl::math::approxFloor(GetDouble());  // No of failures
-    if ((f + s) <= 1.0 || p < 0.0 || p > 1.0)
-        PushIllegalArgument();
-    else
+    const double p = GetDouble();
+    const double s = GetDouble();
+    const double f = GetDouble();
+    const auto aResult = semath::evaluateNegativeBinomialDistribution(f, s, p, false, false);
+    if (!aResult)
     {
-        double q = 1.0 - p;
-        double fFactor = pow(p,s);
-        for (double i = 0.0; i < f; i++)
-            fFactor *= (i+s)/(i+1.0)*q;
-        PushDouble(fFactor);
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
     }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScNegBinomDist_MS()
@@ -703,25 +661,18 @@ void ScInterpreter::ScNegBinomDist_MS()
     if ( !MustHaveParamCount( GetByte(), 4 ) )
         return;
 
-    bool bCumulative = GetBool();
-    double p = GetDouble();                            // probability
-    double s = ::rtl::math::approxFloor(GetDouble());  // No of successes
-    double f = ::rtl::math::approxFloor(GetDouble());  // No of failures
-    if ( s < 1.0 || f < 0.0 || p < 0.0 || p > 1.0 )
-        PushIllegalArgument();
-    else
+    const bool bCumulative = GetBool();
+    const double p = GetDouble();
+    const double s = GetDouble();
+    const double f = GetDouble();
+    const auto aResult = semath::evaluateNegativeBinomialDistribution(
+        f, s, p, bCumulative, true);
+    if (!aResult)
     {
-        double q = 1.0 - p;
-        if ( bCumulative )
-            PushDouble( 1.0 - GetBetaDist( q, f + 1, s ) );
-        else
-        {
-            double fFactor = pow( p, s );
-            for ( double i = 0.0; i < f; i++ )
-                fFactor *= ( i + s ) / ( i + 1.0 ) * q;
-            PushDouble( fFactor );
-        }
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
     }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScNormDist( int nMinParamCount )
@@ -784,25 +735,16 @@ void ScInterpreter::ScExpDist()
     if ( !MustHaveParamCount( GetByte(), 3 ) )
         return;
 
-    double kum    = GetDouble();                    // 0 or 1
-    double lambda = GetDouble();                    // lambda
-    double x      = GetDouble();                    // x
-    if (lambda <= 0.0)
-        PushIllegalArgument();
-    else if (kum == 0.0)                        // density
+    const bool bCumulative = GetDouble() != 0.0;
+    const double lambda = GetDouble();
+    const double x = GetDouble();
+    const auto aResult = semath::evaluateExponentialDistribution(x, lambda, bCumulative);
+    if (!aResult)
     {
-        if (x >= 0.0)
-            PushDouble(lambda * exp(-lambda*x));
-        else
-            PushInt(0);
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
     }
-    else                                        // distribution
-    {
-        if (x > 0.0)
-            PushDouble(1.0 - exp(-lambda*x));
-        else
-            PushInt(0);
-    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScTDist()
@@ -932,17 +874,17 @@ void ScInterpreter::ScWeibull()
     if ( !MustHaveParamCount( GetByte(), 4 ) )
         return;
 
-    double kum   = GetDouble();                 // 0 or 1
-    double beta  = GetDouble();                 // beta
-    double alpha = GetDouble();                 // alpha
-    double x     = GetDouble();                 // x
-    if (alpha <= 0.0 || beta <= 0.0 || x < 0.0)
-        PushIllegalArgument();
-    else if (kum == 0.0)                        // Density
-        PushDouble(alpha/pow(beta,alpha)*pow(x,alpha-1.0)*
-                   exp(-pow(x/beta,alpha)));
-    else                                        // Distribution
-        PushDouble(1.0 - exp(-pow(x/beta,alpha)));
+    const bool bCumulative = GetDouble() != 0.0;
+    const double beta = GetDouble();
+    const double alpha = GetDouble();
+    const double x = GetDouble();
+    const auto aResult = semath::evaluateWeibullDistribution(x, alpha, beta, bCumulative);
+    if (!aResult)
+    {
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScPoissonDist( bool bODFF )
@@ -963,30 +905,6 @@ void ScInterpreter::ScPoissonDist( bool bODFF )
     PushDouble(aResult.maValue);
 }
 
-/** Local function used in the calculation of the hypergeometric distribution.
- */
-static void lcl_PutFactorialElements(std::vector< double >& cn, double fLower, double fUpper, double fBase )
-{
-    for ( double i = fLower; i <= fUpper; ++i )
-    {
-        double fVal = fBase - i;
-        if ( fVal > 1.0 )
-            cn.push_back( fVal );
-    }
-}
-
-/** Calculates a value of the hypergeometric distribution.
-
-    @see #i47296#
-
-    This function has an extra argument bCumulative,
-    which only calculates the non-cumulative distribution and
-    which is optional in Calc and mandatory with Excel's HYPGEOM.DIST()
-
-    @see fdo#71722
-    @see tdf#102948, make Calc function ODFF1.2-compliant
-    @see tdf#117041, implement note at bottom of ODFF1.2 par.6.18.37
- */
 void ScInterpreter::ScHypGeomDist( int nMinParamCount )
 {
     sal_uInt8 nParamCount = GetByte();
@@ -1005,221 +923,13 @@ void ScInterpreter::ScHypGeomDist( int nMinParamCount )
         return;
     }
 
-    KahanSum fVal = 0.0;
-
-    for ( int i = ( bCumulative ? 0 : x ); i <= x && nGlobalError == FormulaError::NONE; i++ )
+    const auto aResult = semath::evaluateHypergeometricDistribution(x, n, M, N, bCumulative);
+    if (!aResult)
     {
-        if ( (n - i <= N - M) && (i <= M) )
-            fVal +=  GetHypGeomDist( i, n, M, N );
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
     }
-
-    PushDouble( fVal.get() );
-}
-
-/** Calculates a value of the hypergeometric distribution.
-
-    The algorithm is designed to avoid unnecessary multiplications and division
-    by expanding all factorial elements (9 of them).  It is done by excluding
-    those ranges that overlap in the numerator and the denominator.  This allows
-    for a fast calculation for large values which would otherwise cause an overflow
-    in the intermediate values.
-
-    @see #i47296#
- */
-double ScInterpreter::GetHypGeomDist( double x, double n, double M, double N )
-{
-    const size_t nMaxArraySize = 500000; // arbitrary max array size
-
-    std::vector<double> cnNumer, cnDenom;
-
-    size_t nEstContainerSize = static_cast<size_t>( x + ::std::min( n, M ) );
-    size_t nMaxSize = ::std::min( cnNumer.max_size(), nMaxArraySize );
-    if ( nEstContainerSize > nMaxSize )
-    {
-        PushNoValue();
-        return 0;
-    }
-    cnNumer.reserve( nEstContainerSize + 10 );
-    cnDenom.reserve( nEstContainerSize + 10 );
-
-    // Trim coefficient C first
-    double fCNumVarUpper = N - n - M + x - 1.0;
-    double fCDenomVarLower = 1.0;
-    if ( N - n - M + x >= M - x + 1.0 )
-    {
-        fCNumVarUpper = M - x - 1.0;
-        fCDenomVarLower = N - n - 2.0*(M - x) + 1.0;
-    }
-
-    double fCNumLower = N - n - fCNumVarUpper;
-    double fCDenomUpper = N - n - M + x + 1.0 - fCDenomVarLower;
-
-    double fDNumVarLower = n - M;
-
-    if ( n >= M + 1.0 )
-    {
-        if ( N - M < n + 1.0 )
-        {
-            // Case 1
-
-            if ( N - n < n + 1.0 )
-            {
-                // no overlap
-                lcl_PutFactorialElements( cnNumer, 0.0, fCNumVarUpper, N - n );
-                lcl_PutFactorialElements( cnDenom, 0.0, N - n - 1.0, N );
-            }
-            else
-            {
-                // overlap
-                OSL_ENSURE( fCNumLower < n + 1.0, "ScHypGeomDist: wrong assertion" );
-                lcl_PutFactorialElements( cnNumer, N - 2.0*n, fCNumVarUpper, N - n );
-                lcl_PutFactorialElements( cnDenom, 0.0, n - 1.0, N );
-            }
-
-            OSL_ENSURE( fCDenomUpper <= N - M, "ScHypGeomDist: wrong assertion" );
-
-            if ( fCDenomUpper < n - x + 1.0 )
-                // no overlap
-                lcl_PutFactorialElements( cnNumer, 1.0, N - M - n + x, N - M + 1.0 );
-            else
-            {
-                // overlap
-                lcl_PutFactorialElements( cnNumer, 1.0, N - M - fCDenomUpper, N - M + 1.0 );
-
-                fCDenomUpper = n - x;
-                fCDenomVarLower = N - M - 2.0*(n - x) + 1.0;
-            }
-        }
-        else
-        {
-            // Case 2
-
-            if ( n > M - 1.0 )
-            {
-                // no overlap
-                lcl_PutFactorialElements( cnNumer, 0.0, fCNumVarUpper, N - n );
-                lcl_PutFactorialElements( cnDenom, 0.0, M - 1.0, N );
-            }
-            else
-            {
-                lcl_PutFactorialElements( cnNumer, M - n, fCNumVarUpper, N - n );
-                lcl_PutFactorialElements( cnDenom, 0.0, n - 1.0, N );
-            }
-
-            OSL_ENSURE( fCDenomUpper <= n, "ScHypGeomDist: wrong assertion" );
-
-            if ( fCDenomUpper < n - x + 1.0 )
-                // no overlap
-                lcl_PutFactorialElements( cnNumer, N - M - n + 1.0, N - M - n + x, N - M + 1.0 );
-            else
-            {
-                lcl_PutFactorialElements( cnNumer, N - M - n + 1.0, N - M - fCDenomUpper, N - M + 1.0 );
-                fCDenomUpper = n - x;
-                fCDenomVarLower = N - M - 2.0*(n - x) + 1.0;
-            }
-        }
-
-        OSL_ENSURE( fCDenomUpper <= M, "ScHypGeomDist: wrong assertion" );
-    }
-    else
-    {
-        if ( N - M < M + 1.0 )
-        {
-            // Case 3
-
-            if ( N - n < M + 1.0 )
-            {
-                // No overlap
-                lcl_PutFactorialElements( cnNumer, 0.0, fCNumVarUpper, N - n );
-                lcl_PutFactorialElements( cnDenom, 0.0, N - M - 1.0, N );
-            }
-            else
-            {
-                lcl_PutFactorialElements( cnNumer, N - n - M, fCNumVarUpper, N - n );
-                lcl_PutFactorialElements( cnDenom, 0.0, n - 1.0, N );
-            }
-
-            if ( n - x + 1.0 > fCDenomUpper )
-                // No overlap
-                lcl_PutFactorialElements( cnNumer, 1.0, N - M - n + x, N - M + 1.0 );
-            else
-            {
-                // Overlap
-                lcl_PutFactorialElements( cnNumer, 1.0, N - M - fCDenomUpper, N - M + 1.0 );
-
-                fCDenomVarLower = N - M - 2.0*(n - x) + 1.0;
-                fCDenomUpper = n - x;
-            }
-        }
-        else
-        {
-            // Case 4
-
-            OSL_ENSURE( M >= n - x, "ScHypGeomDist: wrong assertion" );
-            OSL_ENSURE( M - x <= N - M + 1.0, "ScHypGeomDist: wrong assertion" );
-
-            if ( N - n < N - M + 1.0 )
-            {
-                // No overlap
-                lcl_PutFactorialElements( cnNumer, 0.0, fCNumVarUpper, N - n );
-                lcl_PutFactorialElements( cnDenom, 0.0, M - 1.0, N );
-            }
-            else
-            {
-                // Overlap
-                OSL_ENSURE( fCNumLower <= N - M + 1.0, "ScHypGeomDist: wrong assertion" );
-                lcl_PutFactorialElements( cnNumer, M - n, fCNumVarUpper, N - n );
-                lcl_PutFactorialElements( cnDenom, 0.0, n - 1.0, N );
-            }
-
-            if ( n - x + 1.0 > fCDenomUpper )
-                // No overlap
-                lcl_PutFactorialElements( cnNumer, N - 2.0*M + 1.0, N - M - n + x, N - M + 1.0 );
-            else if ( M >= fCDenomUpper )
-            {
-                lcl_PutFactorialElements( cnNumer, N - 2.0*M + 1.0, N - M - fCDenomUpper, N - M + 1.0 );
-
-                fCDenomUpper = n - x;
-                fCDenomVarLower = N - M - 2.0*(n - x) + 1.0;
-            }
-            else
-            {
-                OSL_ENSURE( M <= fCDenomUpper, "ScHypGeomDist: wrong assertion" );
-                lcl_PutFactorialElements( cnDenom, fCDenomVarLower, N - n - 2.0*M + x,
-                        N - n - M + x + 1.0 );
-
-                fCDenomUpper = n - x;
-                fCDenomVarLower = N - M - 2.0*(n - x) + 1.0;
-            }
-        }
-
-        OSL_ENSURE( fCDenomUpper <= n, "ScHypGeomDist: wrong assertion" );
-
-        fDNumVarLower = 0.0;
-    }
-
-    double nDNumVarUpper   = fCDenomUpper < x + 1.0 ? n - x - 1.0     : n - fCDenomUpper - 1.0;
-    double nDDenomVarLower = fCDenomUpper < x + 1.0 ? fCDenomVarLower : N - n - M + 1.0;
-    lcl_PutFactorialElements( cnNumer, fDNumVarLower, nDNumVarUpper, n );
-    lcl_PutFactorialElements( cnDenom, nDDenomVarLower, N - n - M + x, N - n - M + x + 1.0 );
-
-    ::std::sort( cnNumer.begin(), cnNumer.end() );
-    ::std::sort( cnDenom.begin(), cnDenom.end() );
-    auto it1 = cnNumer.rbegin(), it1End = cnNumer.rend();
-    auto it2 = cnDenom.rbegin(), it2End = cnDenom.rend();
-
-    double fFactor = 1.0;
-    for ( ; it1 != it1End || it2 != it2End; )
-    {
-        double fEnum = 1.0, fDenom = 1.0;
-        if ( it1 != it1End )
-            fEnum  = *it1++;
-        if ( it2 != it2End )
-            fDenom = *it2++;
-        fFactor *= fEnum / fDenom;
-    }
-
-    return fFactor;
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScGammaDist( bool bODFF )
@@ -2342,78 +2052,38 @@ bool ScInterpreter::CalculateSkew(KahanSum& fSum, double& fCount, std::vector<do
     return true;
 }
 
-void ScInterpreter::CalculateSkewOrSkewp( bool bSkewp )
-{
-    KahanSum fSum;
-    double fCount;
-    std::vector<double> values;
-    if (!CalculateSkew( fSum, fCount, values))
-        return;
-     // SKEW/SKEWP's constraints: they require at least three numbers
-    if (fCount < 3.0)
-    {
-        // for interoperability with Excel
-        PushError(FormulaError::DivisionByZero);
-        return;
-    }
-
-    KahanSum vSum;
-    double fMean = fSum.get() / fCount;
-    for (double v : values)
-        vSum += (v - fMean) * (v - fMean);
-
-    double fStdDev = sqrt( vSum.get() / (bSkewp ? fCount : (fCount - 1.0)));
-    if (fStdDev == 0)
-    {
-        PushIllegalArgument();
-        return;
-    }
-
-    KahanSum xcube = 0.0;
-    for (double v : values)
-    {
-        double dx = (v - fMean) / fStdDev;
-        xcube += dx * dx * dx;
-    }
-
-    if (bSkewp)
-        PushDouble( xcube.get() / fCount );
-    else
-        PushDouble( ((xcube.get() * fCount) / (fCount - 1.0)) / (fCount - 2.0) );
-}
-
 void ScInterpreter::ScSkew()
 {
-    CalculateSkewOrSkewp( false );
+    KahanSum fSum;
+    double fCount = 0.0;
+    std::vector<double> aValues;
+    if (!CalculateSkew(fSum, fCount, aValues))
+        return;
+
+    const auto aResult = semath::evaluateSkewNumbers(aValues, false);
+    if (!aResult)
+    {
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScSkewp()
 {
-    CalculateSkewOrSkewp( true );
-}
+    KahanSum fSum;
+    double fCount = 0.0;
+    std::vector<double> aValues;
+    if (!CalculateSkew(fSum, fCount, aValues))
+        return;
 
-double ScInterpreter::GetMedian( std::vector<double> & rArray )
-{
-    size_t nSize = rArray.size();
-    if (nSize == 0 || nGlobalError != FormulaError::NONE)
+    const auto aResult = semath::evaluateSkewNumbers(aValues, true);
+    if (!aResult)
     {
-        SetError( FormulaError::NoValue);
-        return 0.0;
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
     }
-
-    // Upper median.
-    size_t nMid = nSize / 2;
-    std::vector<double>::iterator iMid = rArray.begin() + nMid;
-    ::std::nth_element( rArray.begin(), iMid, rArray.end());
-    if (nSize & 1)
-        return *iMid;   // Lower and upper median are equal.
-    else
-    {
-        double fUp = *iMid;
-        // Lower median.
-        iMid = ::std::max_element( rArray.begin(), rArray.begin() + nMid);
-        return (fUp + *iMid) / 2;
-    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScMedian()
@@ -2423,66 +2093,29 @@ void ScInterpreter::ScMedian()
         return;
     std::vector<double> aArray;
     GetNumberSequenceArray( nParamCount, aArray, false );
-    PushDouble( GetMedian( aArray));
+    if (aArray.empty() || nGlobalError != FormulaError::NONE)
+    {
+        PushNoValue();
+        return;
+    }
+
+    semath::AggregateScan aScan;
+    aScan.maNumbers = std::move(aArray);
+    const auto aResult = semath::evaluateAggregateNumbers(12, aScan);
+    if (!aResult)
+    {
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 double ScInterpreter::GetPercentile(std::vector<double> & rArray, double fPercentile )
 {
-    size_t nSize = rArray.size();
-    if (nSize == 1)
-        return rArray[0];
-    else
-    {
-        size_t nIndex = static_cast<size_t>(::rtl::math::approxFloor( fPercentile * (nSize-1)));
-        double fDiff = fPercentile * (nSize-1) - ::rtl::math::approxFloor( fPercentile * (nSize-1));
-        OSL_ENSURE(nIndex < nSize, "GetPercentile: wrong index(1)");
-        std::vector<double>::iterator iter = rArray.begin() + nIndex;
-        ::std::nth_element( rArray.begin(), iter, rArray.end());
-        if (fDiff <= 0.0)
-        {
-            // Note: neg fDiff seen with forum-mso-en4-719754.xlsx with
-            // fPercentile of near 1 where approxFloor gave nIndex of nSize-1
-            // resulting in a non-zero tiny negative fDiff.
-            return *iter;
-        }
-        else
-        {
-            OSL_ENSURE(nIndex < nSize-1, "GetPercentile: wrong index(2)");
-            double fVal = *iter;
-            iter = ::std::min_element( rArray.begin() + nIndex + 1, rArray.end());
-            return fVal + fDiff * (*iter - fVal);
-        }
-    }
-}
-
-double ScInterpreter::GetPercentileExclusive(std::vector<double> & rArray, double fPercentile )
-{
-    size_t nSize1 = rArray.size() + 1;
-    if ( rArray.empty() || nSize1 == 1 || nGlobalError != FormulaError::NONE)
-    {
-        SetError( FormulaError::NoValue );
-        return 0.0;
-    }
-    if ( fPercentile * nSize1 < 1.0 || fPercentile * nSize1 > static_cast<double>( nSize1 - 1 ) )
-    {
-        SetError( FormulaError::IllegalParameter );
-        return 0.0;
-    }
-
-    size_t nIndex = static_cast<size_t>(::rtl::math::approxFloor( fPercentile * nSize1 - 1 ));
-    double fDiff = fPercentile *  nSize1 - 1 - ::rtl::math::approxFloor( fPercentile * nSize1 - 1 );
-    OSL_ENSURE(nIndex < ( nSize1 - 1 ), "GetPercentile: wrong index(1)");
-    std::vector<double>::iterator iter = rArray.begin() + nIndex;
-    ::std::nth_element( rArray.begin(), iter, rArray.end());
-    if (fDiff == 0.0)
-        return *iter;
-    else
-    {
-        OSL_ENSURE(nIndex < nSize1, "GetPercentile: wrong index(2)");
-        double fVal = *iter;
-        iter = ::std::min_element( rArray.begin() + nIndex + 1, rArray.end());
-        return fVal + fDiff * (*iter - fVal);
-    }
+    semath::AggregateScan aScan;
+    aScan.maNumbers = rArray;
+    const auto aResult = semath::evaluateAggregateRankedNumbers(16, aScan, fPercentile);
+    return aResult ? aResult.maValue : 0.0;
 }
 
 void ScInterpreter::ScPercentile( bool bInclusive )
@@ -2502,10 +2135,16 @@ void ScInterpreter::ScPercentile( bool bInclusive )
         PushNoValue();
         return;
     }
-    if ( bInclusive )
-        PushDouble( GetPercentile( aArray, alpha ));
-    else
-        PushDouble( GetPercentileExclusive( aArray, alpha ));
+    semath::AggregateScan aScan;
+    aScan.maNumbers = std::move(aArray);
+    const auto aResult = semath::evaluateAggregateRankedNumbers(
+        bInclusive ? 16 : 18, aScan, alpha);
+    if (!aResult)
+    {
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScQuartile( bool bInclusive )
@@ -2525,10 +2164,16 @@ void ScInterpreter::ScQuartile( bool bInclusive )
         PushNoValue();
         return;
     }
-    if ( bInclusive )
-        PushDouble( fFlag == 2.0 ? GetMedian( aArray ) : GetPercentile( aArray, 0.25 * fFlag ) );
-    else
-        PushDouble( fFlag == 2.0 ? GetMedian( aArray ) : GetPercentileExclusive( aArray, 0.25 * fFlag ) );
+    semath::AggregateScan aScan;
+    aScan.maNumbers = std::move(aArray);
+    const auto aResult = semath::evaluateAggregateRankedNumbers(
+        bInclusive ? 17 : 19, aScan, fFlag);
+    if (!aResult)
+    {
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScModalValue()
@@ -2536,43 +2181,21 @@ void ScInterpreter::ScModalValue()
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCountMin( nParamCount, 1 ) )
         return;
-    std::vector<double> aSortArray;
-    GetSortArray( nParamCount, aSortArray, nullptr, false, false );
-    SCSIZE nSize = aSortArray.size();
-    if (nSize == 0 || nGlobalError != FormulaError::NONE)
-        PushNoValue();
-    else
+    std::vector<double> aArray;
+    GetNumberSequenceArray( nParamCount, aArray, false );
+    if (aArray.empty() || nGlobalError != FormulaError::NONE)
     {
-        SCSIZE nMaxIndex = 0, nMax = 1, nCount = 1;
-        double nOldVal = aSortArray[0];
-        SCSIZE i;
-        for ( i = 1; i < nSize; i++)
-        {
-            if (aSortArray[i] == nOldVal)
-                nCount++;
-            else
-            {
-                nOldVal = aSortArray[i];
-                if (nCount > nMax)
-                {
-                    nMax = nCount;
-                    nMaxIndex = i-1;
-                }
-                nCount = 1;
-            }
-        }
-        if (nCount > nMax)
-        {
-            nMax = nCount;
-            nMaxIndex = i-1;
-        }
-        if (nMax == 1 && nCount == 1)
-            PushNoValue();
-        else if (nMax == 1)
-            PushDouble(nOldVal);
-        else
-            PushDouble(aSortArray[nMaxIndex]);
+        PushNoValue();
+        return;
     }
+
+    const auto aModes = semath::evaluateModeValues(aArray);
+    if (!aModes)
+    {
+        PushError(lcl_ToCalcMathFormulaError(aModes.meError));
+        return;
+    }
+    PushDouble(*std::min_element(aModes.maValue.begin(), aModes.maValue.end()));
 }
 
 void ScInterpreter::ScModalValue_MS( bool bSingle )
@@ -2582,81 +2205,24 @@ void ScInterpreter::ScModalValue_MS( bool bSingle )
         return;
     std::vector<double> aArray;
     GetNumberSequenceArray( nParamCount, aArray, false );
-    std::vector< double > aSortArray( aArray );
-    QuickSort( aSortArray, nullptr );
-    SCSIZE nSize = aSortArray.size();
-    if ( nSize == 0 || nGlobalError != FormulaError::NONE )
+    if ( aArray.empty() || nGlobalError != FormulaError::NONE )
         PushNoValue();
     else
     {
-        SCSIZE nMax = 1, nCount = 1;
-        double nOldVal = aSortArray[ 0 ];
-        std::vector< double > aResultArray( 1 );
-        SCSIZE i;
-        for ( i = 1; i < nSize; i++ )
+        const auto aModes = semath::evaluateModeValues(aArray);
+        if (!aModes)
         {
-            if ( aSortArray[ i ] == nOldVal )
-                nCount++;
-            else
-            {
-                if ( nCount >= nMax && nCount > 1 )
-                {
-                    if ( nCount > nMax )
-                    {
-                        nMax = nCount;
-                        if ( aResultArray.size() != 1 )
-                            std::vector< double >( 1 ).swap( aResultArray );
-                        aResultArray[ 0 ] = nOldVal;
-                    }
-                    else
-                        aResultArray.emplace_back( nOldVal );
-                }
-                nOldVal = aSortArray[ i ];
-                nCount = 1;
-            }
+            PushError(lcl_ToCalcMathFormulaError(aModes.meError));
+            return;
         }
-        if ( nCount >= nMax && nCount > 1 )
-        {
-            if ( nCount > nMax )
-                std::vector< double >().swap( aResultArray );
-            aResultArray.emplace_back( nOldVal );
-        }
-        if ( nMax == 1 && nCount == 1 )
-            PushNoValue();
-        else if ( nMax == 1 )
-            PushDouble( nOldVal ); // there is only 1 result, no reordering needed
+
+        if ( bSingle )
+            PushDouble( aModes.maValue.front() );
         else
         {
-            // sort resultArray according to ordering of aArray
-            std::vector<std::vector<double>> aOrder;
-            aOrder.resize( aResultArray.size(), std::vector< double >( 2 ) );
-            for ( i = 0; i < aResultArray.size(); i++ )
-            {
-                for ( SCSIZE j = 0; j < nSize; j++ )
-                {
-                    if ( aArray[ j ] == aResultArray[ i ] )
-                    {
-                        aOrder[ i ][ 0 ] = aResultArray[ i ];
-                        aOrder[ i ][ 1 ] = j;
-                        break;
-                    }
-                }
-            }
-            sort( aOrder.begin(), aOrder.end(), []( const std::vector< double >& lhs,
-                                                    const std::vector< double >& rhs )
-                                                    { return lhs[ 1 ] < rhs[ 1 ]; } );
-
-            if ( bSingle )
-                PushDouble( aOrder[ 0 ][ 0 ] );
-            else
-            {
-                // put result in correct order in aResultArray
-                for ( i = 0; i < aResultArray.size(); i++ )
-                    aResultArray[ i ] = aOrder[ i ][ 0 ];
-                ScMatrixRef pResMatrix = GetNewMat( 1, aResultArray.size(), true );
-                pResMatrix->PutDoubleVector( aResultArray, 0, 0 );
-                PushMatrix( pResMatrix );
-            }
+            ScMatrixRef pResMatrix = GetNewMat( 1, aModes.maValue.size(), true );
+            pResMatrix->PutDoubleVector( aModes.maValue, 0, 0 );
+            PushMatrix( pResMatrix );
         }
     }
 }

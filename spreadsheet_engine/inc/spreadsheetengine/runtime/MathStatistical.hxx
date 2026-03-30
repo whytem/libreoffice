@@ -99,8 +99,23 @@ SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluatePoissonDistribution
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateBinomialDistribution(
     double fSuccesses, double fTrials, double fProbability, bool bCumulative);
 
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateNegativeBinomialDistribution(
+    double fFailures, double fSuccesses, double fProbability, bool bCumulative,
+    bool bMicrosoftSyntax);
+
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateBinomialRangeDistribution(
     double fTrials, double fProbability, double fSuccessStart, double fSuccessEnd);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateExponentialDistribution(
+    double fX, double fLambda, bool bCumulative);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateWeibullDistribution(
+    double fX, double fAlpha, double fBeta, bool bCumulative);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateErrorFunction(double fValue);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateComplementaryErrorFunction(
+    double fValue);
 
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateConfidence(
     double fAlpha, double fSigma, double fSampleSize);

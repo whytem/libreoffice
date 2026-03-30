@@ -325,6 +325,86 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedStatisticalDelegations)
     m_pDoc->SetString(ScAddress(0, 31, 0), u"=NORMINV(0;0;1)"_ustr);
     CPPUNIT_ASSERT_EQUAL(FormulaError::NoValue, m_pDoc->GetErrCode(ScAddress(0, 31, 0)));
 
+    m_pDoc->SetString(ScAddress(0, 32, 0), u"=FACT(5.9)"_ustr);
+    ASSERT_DOUBLES_EQUAL(120.0, m_pDoc->GetValue(ScAddress(0, 32, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 33, 0), u"=COMBIN(5.9;2.1)"_ustr);
+    ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(ScAddress(0, 33, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 34, 0), u"=COMBINA(5.9;2.1)"_ustr);
+    ASSERT_DOUBLES_EQUAL(15.0, m_pDoc->GetValue(ScAddress(0, 34, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 35, 0), u"=PERMUT(5.9;2.1)"_ustr);
+    ASSERT_DOUBLES_EQUAL(20.0, m_pDoc->GetValue(ScAddress(0, 35, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 36, 0), u"=PERMUTATIONA(2.9;3.2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(8.0, m_pDoc->GetValue(ScAddress(0, 36, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 37, 0), u"=HYPGEOM.DIST(2;2;90;100;1)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 37, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 38, 0), u"=MEDIAN({1;4;2;8})"_ustr);
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(0, 38, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 39, 0), u"=PERCENTILE({1;2;3;4};0.25)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.75, m_pDoc->GetValue(ScAddress(0, 39, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 40, 0), u"=PERCENTILE.EXC({1;2;3;4};0.25)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.25, m_pDoc->GetValue(ScAddress(0, 40, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 41, 0), u"=QUARTILE({7;8;9;10};3)"_ustr);
+    ASSERT_DOUBLES_EQUAL(9.25, m_pDoc->GetValue(ScAddress(0, 41, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 42, 0), u"=QUARTILE.EXC({7;8;9;10};3)"_ustr);
+    ASSERT_DOUBLES_EQUAL(9.75, m_pDoc->GetValue(ScAddress(0, 42, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 43, 0), u"=SKEW({1;2;2;3;9})"_ustr);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.9693601762387922, m_pDoc->GetValue(ScAddress(0, 43, 0)),
+                                 1e-12);
+
+    m_pDoc->SetString(ScAddress(0, 44, 0), u"=SKEWP({1;2;2;3;9})"_ustr);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.3210869678752712, m_pDoc->GetValue(ScAddress(0, 44, 0)),
+                                 1e-12);
+
+    m_pDoc->SetString(ScAddress(0, 45, 0), u"=MODE({3;2;2;1;1})"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 45, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 46, 0), u"=MODE.SNGL({3;2;2;1;1})"_ustr);
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(0, 46, 0)));
+
+    {
+        ScMarkData aMark(m_pDoc->GetSheetLimits());
+        aMark.SelectOneTable(0);
+        m_pDoc->InsertMatrixFormula(1, 45, 1, 46, aMark, u"=MODE.MULT({3;2;2;1;1})"_ustr);
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(1, 45, 0)));
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(1, 46, 0)));
+    }
+
+    m_pDoc->SetString(ScAddress(0, 47, 0), u"=EXPON.DIST(1;1;1)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.6321205588285577, m_pDoc->GetValue(ScAddress(0, 47, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 48, 0), u"=WEIBULL.DIST(2.5;3;4;1)"_ustr);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.216622535939182, m_pDoc->GetValue(ScAddress(0, 48, 0)),
+                                 1e-12);
+
+    m_pDoc->SetString(ScAddress(0, 49, 0), u"=WEIBULL.DIST(2.5;3;4;0)"_ustr);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.229505116424068, m_pDoc->GetValue(ScAddress(0, 49, 0)),
+                                 1e-12);
+
+    m_pDoc->SetString(ScAddress(0, 50, 0), u"=NEGBINOMDIST(1;1;0.5)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.25, m_pDoc->GetValue(ScAddress(0, 50, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 51, 0), u"=NEGBINOM.DIST(0;1;0.5;1)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(ScAddress(0, 51, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 52, 0), u"=ERF.PRECISE(1)"_ustr);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.8427007929497149, m_pDoc->GetValue(ScAddress(0, 52, 0)),
+                                 1e-12);
+
+    m_pDoc->SetString(ScAddress(0, 53, 0), u"=ERFC.PRECISE(1)"_ustr);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.15729920705028513, m_pDoc->GetValue(ScAddress(0, 53, 0)),
+                                 1e-12);
+
     m_pDoc->DeleteTab(0);
 }
 

@@ -44,8 +44,16 @@ SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateMroundValue(
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateModValue(
     double fNumerator, double fDenominator);
 
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateFactorialValue(double fValue);
+
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateCombinValue(
     double fN, double fK, bool bAllowRepetition);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluatePermutationValue(
+    double fN, double fK);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluatePermutationAValue(
+    double fN, double fK);
 
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateMultinomialValue(
     const std::vector<double>& rValues);

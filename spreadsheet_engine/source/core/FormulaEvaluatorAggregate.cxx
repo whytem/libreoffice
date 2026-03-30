@@ -48,14 +48,6 @@ namespace semath = spreadsheetengine::core::math;
     return aParsed && formulaContainsAggregateLike(*aParsed.mpRoot);
 }
 
-[[nodiscard]] double sumNumbers(const std::vector<double>& rNumbers)
-{
-    double fSum = 0.0;
-    for (const double fValue : rNumbers)
-        fSum = ::rtl::math::approxAdd(fSum, fValue);
-    return fSum;
-}
-
 } // namespace
 
 std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
@@ -638,47 +630,10 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
             aCollected.maValue.maNumbers.end());
     }
 
-    const std::size_t nCount = aScan.maNumbers.size();
-    if (rFunctionName == u"SKEW")
-    {
-        if (nCount < 3)
-            return detail::makeFailure(api::Error::DivisionByZero);
-    }
-    else if (nCount == 0)
-        return detail::makeFailure(api::Error::DivisionByZero);
-
-    const double fMean = sumNumbers(aScan.maNumbers) / static_cast<double>(nCount);
-    double fSumSquares = 0.0;
-    double fSumCubes = 0.0;
-    for (const double fValue : aScan.maNumbers)
-    {
-        const double fDelta = fValue - fMean;
-        fSumSquares += fDelta * fDelta;
-        fSumCubes += fDelta * fDelta * fDelta;
-    }
-
-    if (fSumSquares == 0.0)
-        return detail::makeFailure(api::Error::DivisionByZero);
-
-    if (rFunctionName == u"SKEW")
-    {
-        const double fSampleVariance = fSumSquares / static_cast<double>(nCount - 1);
-        const double fSampleDeviation = std::sqrt(fSampleVariance);
-        if (fSampleDeviation == 0.0)
-            return detail::makeFailure(api::Error::DivisionByZero);
-        const double fResult = (static_cast<double>(nCount) * fSumCubes)
-                               / (static_cast<double>((nCount - 1) * (nCount - 2))
-                                  * std::pow(fSampleDeviation, 3));
-        return detail::makeScalarResult(api::CellValue::number(fResult));
-    }
-
-    const double fPopulationVariance = fSumSquares / static_cast<double>(nCount);
-    const double fPopulationDeviation = std::sqrt(fPopulationVariance);
-    if (fPopulationDeviation == 0.0)
-        return detail::makeFailure(api::Error::DivisionByZero);
-    const double fResult
-        = (fSumCubes / static_cast<double>(nCount)) / std::pow(fPopulationDeviation, 3);
-    return detail::makeScalarResult(api::CellValue::number(fResult));
+    const auto aSkew = semath::evaluateSkewNumbers(aScan.maNumbers, rFunctionName == u"SKEWP");
+    if (!aSkew)
+        return detail::makeFailure(aSkew.meError);
+    return detail::makeScalarResult(api::CellValue::number(aSkew.maValue));
 }
 
 } // namespace spreadsheetengine::core::eval

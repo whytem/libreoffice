@@ -23,6 +23,8 @@
 #include <datastreamgettime.hxx>
 #include <dpobject.hxx>
 #include <document.hxx>
+#include <spreadsheetengine/runtime/MathStatistical.hxx>
+#include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <tokenarray.hxx>
 #include <webservicelink.hxx>
 
@@ -34,6 +36,8 @@
 #include <libxml/parser.h>
 
 using namespace com::sun::star;
+namespace semath = spreadsheetengine::core::math;
+namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 
 // TODO: Add new methods for ScInterpreter here.
 
@@ -500,14 +504,30 @@ void ScInterpreter::ScErf()
 {
     sal_uInt8 nParamCount = GetByte();
     if (MustHaveParamCount( nParamCount, 1 ) )
-        PushDouble( std::erf( GetDouble() ) );
+    {
+        const auto aResult = semath::evaluateErrorFunction(GetDouble());
+        if (!aResult)
+        {
+            PushError(selibreoffice::toFormulaError(aResult.meError));
+            return;
+        }
+        PushDouble(aResult.maValue);
+    }
 }
 
 void ScInterpreter::ScErfc()
 {
     sal_uInt8 nParamCount = GetByte();
     if (MustHaveParamCount( nParamCount, 1 ) )
-        PushDouble( std::erfc( GetDouble() ) );
+    {
+        const auto aResult = semath::evaluateComplementaryErrorFunction(GetDouble());
+        if (!aResult)
+        {
+            PushError(selibreoffice::toFormulaError(aResult.meError));
+            return;
+        }
+        PushDouble(aResult.maValue);
+    }
 }
 
 void ScInterpreter::ScColor()

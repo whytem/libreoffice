@@ -48,11 +48,17 @@ SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateTrimmean(
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateModeSingle(
     const std::vector<double>& rValues);
 
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<std::vector<double>> evaluateModeValues(
+    const std::vector<double>& rValues);
+
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateHypergeometricDistribution(
     double fX, double fTrials, double fSuccesses, double fPopulation, bool bCumulative);
 
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluatePercentrank(
     std::vector<double> aValues, double fValue, bool bInclusive, sal_Int32 nSignificance);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateSkewNumbers(
+    const std::vector<double>& rValues, bool bPopulation);
 
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateAggregateNumbers(
     sal_Int32 nFunction, const AggregateScan& rScan);

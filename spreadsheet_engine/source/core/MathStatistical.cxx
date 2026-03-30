@@ -1301,6 +1301,39 @@ api::ValueResult<double> evaluateBinomialDistribution(
         std::min(1.0, sumExpProbabilityRange(0, nX, logProbability)));
 }
 
+api::ValueResult<double> evaluateNegativeBinomialDistribution(
+    double fFailures, double fSuccesses, double fProbability, bool bCumulative,
+    bool bMicrosoftSyntax)
+{
+    const double fWholeFailures = ::rtl::math::approxFloor(fFailures);
+    const double fWholeSuccesses = ::rtl::math::approxFloor(fSuccesses);
+    if (bMicrosoftSyntax)
+    {
+        if (fWholeSuccesses < 1.0 || fWholeFailures < 0.0 || fProbability < 0.0
+            || fProbability > 1.0)
+        {
+            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+        }
+    }
+    else if ((fWholeFailures + fWholeSuccesses) <= 1.0 || fProbability < 0.0
+             || fProbability > 1.0)
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    const double fQ = 1.0 - fProbability;
+    if (bMicrosoftSyntax && bCumulative)
+    {
+        return api::ValueResult<double>::success(
+            1.0 - betaCdf(fQ, fWholeFailures + 1.0, fWholeSuccesses));
+    }
+
+    double fFactor = std::pow(fProbability, fWholeSuccesses);
+    for (double fIndex = 0.0; fIndex < fWholeFailures; ++fIndex)
+        fFactor *= (fIndex + fWholeSuccesses) / (fIndex + 1.0) * fQ;
+    return api::ValueResult<double>::success(fFactor);
+}
+
 api::ValueResult<double> evaluateBinomialRangeDistribution(
     double fTrials, double fProbability, double fSuccessStart, double fSuccessEnd)
 {
@@ -1357,6 +1390,45 @@ api::ValueResult<double> evaluateBinomialRangeDistribution(
         return binomialLogPmf(static_cast<double>(nValue), fN, fProbability);
     };
     return api::ValueResult<double>::success(sumExpProbabilityRange(nStart, nEnd, logProbability));
+}
+
+api::ValueResult<double> evaluateExponentialDistribution(
+    double fX, double fLambda, bool bCumulative)
+{
+    if (fLambda <= 0.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    if (!bCumulative)
+        return api::ValueResult<double>::success(
+            fX >= 0.0 ? fLambda * std::exp(-fLambda * fX) : 0.0);
+
+    return api::ValueResult<double>::success(fX > 0.0 ? 1.0 - std::exp(-fLambda * fX) : 0.0);
+}
+
+api::ValueResult<double> evaluateWeibullDistribution(
+    double fX, double fAlpha, double fBeta, bool bCumulative)
+{
+    if (fAlpha <= 0.0 || fBeta <= 0.0 || fX < 0.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    if (!bCumulative)
+    {
+        return api::ValueResult<double>::success(
+            fAlpha / std::pow(fBeta, fAlpha) * std::pow(fX, fAlpha - 1.0)
+            * std::exp(-std::pow(fX / fBeta, fAlpha)));
+    }
+
+    return api::ValueResult<double>::success(1.0 - std::exp(-std::pow(fX / fBeta, fAlpha)));
+}
+
+api::ValueResult<double> evaluateErrorFunction(double fValue)
+{
+    return api::ValueResult<double>::success(std::erf(fValue));
+}
+
+api::ValueResult<double> evaluateComplementaryErrorFunction(double fValue)
+{
+    return api::ValueResult<double>::success(std::erfc(fValue));
 }
 
 api::ValueResult<double> evaluateConfidence(

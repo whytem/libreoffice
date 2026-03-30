@@ -22,17 +22,23 @@ namespace spreadsheetengine::core::math
 {
 namespace
 {
-
-[[nodiscard]] std::optional<sal_Int32> toWholeNumber(double fValue)
+[[nodiscard]] double binomialCoefficient(double fN, double fK)
 {
-    if (!std::isfinite(fValue))
-        return std::nullopt;
+    if (fN < fK)
+        return 0.0;
+    if (fK == 0.0)
+        return 1.0;
 
-    const double fRounded = std::round(fValue);
-    if (std::abs(fValue - fRounded) > 1e-9)
-        return std::nullopt;
-
-    return static_cast<sal_Int32>(fRounded);
+    double fValue = fN / fK;
+    fN -= 1.0;
+    fK -= 1.0;
+    while (fK > 0.0)
+    {
+        fValue *= fN / fK;
+        fK -= 1.0;
+        fN -= 1.0;
+    }
+    return fValue;
 }
 
 [[nodiscard]] double roundMagnitudeDirectional(
@@ -173,39 +179,72 @@ api::ValueResult<double> evaluateModValue(double fNumerator, double fDenominator
     return api::ValueResult<double>::success(aModResult.maValue);
 }
 
+api::ValueResult<double> evaluateFactorialValue(double fValue)
+{
+    double fWhole = ::rtl::math::approxFloor(fValue);
+    if (fWhole < 0.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    if (fWhole == 0.0)
+        return api::ValueResult<double>::success(1.0);
+    if (fWhole > 170.0)
+        return api::ValueResult<double>::failure(api::Error::NoValue);
+
+    double fResult = fWhole;
+    while (fWhole > 2.0)
+    {
+        fWhole -= 1.0;
+        fResult *= fWhole;
+    }
+    return api::ValueResult<double>::success(fResult);
+}
+
 api::ValueResult<double> evaluateCombinValue(double fN, double fK, bool bAllowRepetition)
 {
-    const auto oWholeN = toWholeNumber(fN);
-    const auto oWholeK = toWholeNumber(fK);
-    if (!oWholeN || !oWholeK || *oWholeN < 0 || *oWholeK < 0)
+    const double fWholeN = ::rtl::math::approxFloor(fN);
+    const double fWholeK = ::rtl::math::approxFloor(fK);
+    if (fWholeN < 0.0 || fWholeK < 0.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
     if (bAllowRepetition)
     {
-        if (*oWholeN == 0 && *oWholeK == 0)
+        if (fWholeN == 0.0 && fWholeK == 0.0)
             return api::ValueResult<double>::success(0.0);
-        if (*oWholeK == 0)
+        if (fWholeK == 0.0)
             return api::ValueResult<double>::success(1.0);
-        if (*oWholeN < *oWholeK)
+        if (fWholeN < fWholeK)
             return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-        const sal_Int32 n = *oWholeN + *oWholeK - 1;
-        const sal_Int32 nChoose = std::min(*oWholeK, static_cast<sal_Int32>(n - *oWholeK));
-        double fResult = 1.0;
-        for (sal_Int32 i = 1; i <= nChoose; ++i)
-            fResult = fResult * static_cast<double>(n - nChoose + i) / static_cast<double>(i);
-        return api::ValueResult<double>::success(fResult);
+        return api::ValueResult<double>::success(
+            binomialCoefficient(fWholeN + fWholeK - 1.0, fWholeK));
     }
 
-    if (*oWholeK > *oWholeN)
+    if (fWholeK > fWholeN)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    sal_Int32 n = *oWholeN;
-    const sal_Int32 nChoose = std::min(*oWholeK, static_cast<sal_Int32>(*oWholeN - *oWholeK));
-    double fResult = 1.0;
-    for (sal_Int32 i = 1; i <= nChoose; ++i)
-        fResult = fResult * static_cast<double>(n - nChoose + i) / static_cast<double>(i);
+    return api::ValueResult<double>::success(binomialCoefficient(fWholeN, fWholeK));
+}
+
+api::ValueResult<double> evaluatePermutationValue(double fN, double fK)
+{
+    const double fWholeN = ::rtl::math::approxFloor(fN);
+    const double fWholeK = ::rtl::math::approxFloor(fK);
+    if (fWholeN < 0.0 || fWholeK < 0.0 || fWholeK > fWholeN)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    if (fWholeK == 0.0)
+        return api::ValueResult<double>::success(1.0);
+
+    double fResult = fWholeN;
+    for (double fIndex = fWholeK - 1.0; fIndex >= 1.0; --fIndex)
+        fResult *= fWholeN - fIndex;
     return api::ValueResult<double>::success(fResult);
+}
+
+api::ValueResult<double> evaluatePermutationAValue(double fN, double fK)
+{
+    const double fWholeN = ::rtl::math::approxFloor(fN);
+    const double fWholeK = ::rtl::math::approxFloor(fK);
+    if (fWholeN < 0.0 || fWholeK < 0.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    return api::ValueResult<double>::success(std::pow(fWholeN, fWholeK));
 }
 
 api::ValueResult<double> evaluateMultinomialValue(const std::vector<double>& rValues)
