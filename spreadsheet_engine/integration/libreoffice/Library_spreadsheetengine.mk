@@ -39,6 +39,7 @@ $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spreadsheet_engine/source/compat/formula/FormulaGrammar \
     spreadsheet_engine/source/core/MathBitwise \
     spreadsheet_engine/source/core/CalcConfig \
+    spreadsheet_engine/source/core/CompiledFormulaInflation \
     spreadsheet_engine/source/core/CompilerSupport \
     spreadsheet_engine/source/core/ConversionRuntime \
     spreadsheet_engine/source/core/DateTimeParse \
@@ -47,6 +48,8 @@ $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spreadsheet_engine/source/core/DateTimeWorkday \
     spreadsheet_engine/source/core/FinancialRuntime \
     spreadsheet_engine/source/core/ForceCalculation \
+    spreadsheet_engine/source/core/FormulaEvaluatorAggregate \
+    spreadsheet_engine/source/core/FormulaEvaluatorSpecialForms \
     spreadsheet_engine/source/core/LookupRuntime \
     spreadsheet_engine/source/core/OdfFormulaParser \
     spreadsheet_engine/source/core/MathAggregate \

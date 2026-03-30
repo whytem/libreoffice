@@ -8,6 +8,7 @@
  */
 
 #include <spreadsheetengine/detail/FormulaEvaluator.hxx>
+#include <spreadsheetengine/runtime/MathAggregate.hxx>
 
 #include "FormulaEvaluatorUtils.hxx"
 
@@ -17,6 +18,8 @@ namespace spreadsheetengine::core::eval
 {
 namespace
 {
+
+namespace semath = spreadsheetengine::core::math;
 
 [[nodiscard]] bool formulaContainsAggregateLike(const formula::Node& rNode)
 {

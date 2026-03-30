@@ -14,6 +14,7 @@
 #include <spreadsheetengine/detail/BuiltinExternalNames.hxx>
 #include <spreadsheetengine/detail/WorkbookCompileHost.hxx>
 #include <spreadsheetengine/detail/WorkbookCompilerLowering.hxx>
+#include <spreadsheetengine/detail/compiler/CompiledFormulaInflation.hxx>
 
 #include <spreadsheetengine/api/Calendar.hxx>
 #include <spreadsheetengine/api/Logic.hxx>
@@ -40,6 +41,7 @@
 
 #include "DateAlgorithms.hxx"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -1874,6 +1876,16 @@ EvaluationResult Evaluator::evaluateFunction(
     const formula::Node& rNode, const api::CellAddress& rCurrentAddress)
 {
     const api::String aFunctionName = normalizeFunctionName(rNode.maPrimaryText);
+
+    constexpr std::array aStructuredDispatchers{
+        &Evaluator::tryEvaluateSpecialForm,
+        &Evaluator::tryEvaluateAggregateFamily,
+    };
+    for (const auto pDispatch : aStructuredDispatchers)
+    {
+        if (const auto oDispatched = (this->*pDispatch)(aFunctionName, rNode, rCurrentAddress))
+            return *oDispatched;
+    }
 
     auto visitFlattenedValues
         = [&](const auto& self, const formula::Node& rArgument,
@@ -7549,7 +7561,9 @@ EvaluationResult Evaluator::evaluateCompiledFormula(
     const spreadsheetengine::detail::token::CompiledFormula& rFormula,
     const api::CellAddress& rCurrentAddress)
 {
-    const auto oInflated = inflateCompiledFormulaNode(rFormula, mrWorkbook, rCurrentAddress);
+    const auto oInflated
+        = spreadsheetengine::detail::compiler::inflateCompiledFormulaNode(
+            rFormula, mrWorkbook, rCurrentAddress);
     if (!oInflated)
         return makeFailure(api::Error::IllegalArgument);
     return evaluateNode(**oInflated, rCurrentAddress);

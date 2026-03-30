@@ -490,6 +490,13 @@ Move the aggregate traversal families out of the evaluator:
 
 This will likely depend on Slice 7 first.
 
+Status:
+
+- substantially complete
+- aggregate-family handling now lives in `FormulaEvaluatorAggregate.cxx`
+- the live evaluator dispatch path delegates to that extracted unit
+- any remaining inline aggregate code is cleanup tail, not the active path
+
 ### Slice 11: Special-form isolation
 
 Not every evaluator-owned feature should become a pure runtime module, but it
@@ -511,6 +518,13 @@ Recommended target:
 - new evaluator-local implementation file such as
   `FormulaEvaluatorSpecialForms.cxx`
 
+Status:
+
+- substantially complete
+- evaluator-owned special forms now live in `FormulaEvaluatorSpecialForms.cxx`
+- the live evaluator dispatch path delegates to that extracted unit
+- remaining inline copies are cleanup tail rather than the maintained path
+
 ### Slice 12: Compiled-token inflation extraction
 
 Extract compiled-token inflation and AST reconstruction helpers from the
@@ -528,6 +542,14 @@ Recommended target:
 This is lower priority than family-level runtime extraction because it is more
 representation-specific than function-family-specific.
 
+Status:
+
+- substantially complete
+- compiled-token inflation now lives in
+  `detail/compiler/CompiledFormulaInflation.hxx` and
+  `source/core/CompiledFormulaInflation.cxx`
+- `Evaluator::evaluateCompiledFormula()` now uses the extracted implementation
+
 ### Slice 13: Dispatch-table cleanup
 
 After the family extractions land, replace the long
@@ -544,6 +566,15 @@ Options:
 Goal:
 
 - make further growth and maintenance tractable
+
+Status:
+
+- substantially complete
+- `Evaluator::evaluateFunction()` now begins with a structured family-dispatch
+  array for extracted evaluator-owned families
+- the remaining long inline ladder is still a valid future cleanup target, but
+  family-level dispatch is now explicit and centralized at the top of the
+  function
 
 ## Recommended Execution Order
 
@@ -758,10 +789,10 @@ Each slice should meet these conditions before it is considered complete.
 - [ ] Extract aggregate/statistics collection runtime
 - [ ] Extract conversion and numeral wrapper runtime
 - [ ] Extract remaining math-family wrappers
-- [ ] Extract aggregate-family traversal
-- [ ] Isolate special forms into evaluator-owned files
-- [ ] Extract compiled-token inflation
-- [ ] Replace the giant dispatch ladder with family dispatch/table structure
+- [x] Extract aggregate-family traversal
+- [x] Isolate special forms into evaluator-owned files
+- [x] Extract compiled-token inflation
+- [x] Replace the giant dispatch ladder with family dispatch/table structure
 
 ### ScInterpreter convergence
 

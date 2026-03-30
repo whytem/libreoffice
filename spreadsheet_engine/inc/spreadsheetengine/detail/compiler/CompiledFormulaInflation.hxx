@@ -21,7 +21,7 @@ namespace spreadsheetengine::detail::compiler
 
 [[nodiscard]] std::optional<std::unique_ptr<spreadsheetengine::core::formula::Node>>
 inflateCompiledFormulaNode(const spreadsheetengine::detail::token::CompiledFormula& rFormula,
-    const spreadsheetengine::workbook::Workbook& rWorkbook,
+    const spreadsheetengine::core::workbook::Workbook& rWorkbook,
     const spreadsheetengine::api::CellAddress& rCurrentAddress);
 
 } // namespace spreadsheetengine::detail::compiler

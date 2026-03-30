@@ -28,7 +28,7 @@ namespace setoken = spreadsheetengine::detail::token;
 using spreadsheetengine::core::eval::detail::formatNumber;
 
 [[nodiscard]] constexpr spreadsheetengine::api::refdata::SheetLimits runtimeSheetLimits(
-    const spreadsheetengine::workbook::Workbook& rWorkbook)
+    const spreadsheetengine::core::workbook::Workbook& rWorkbook)
 {
     return { spreadsheetengine::detail::compiler::detail::kSmokeMaxColumn,
         spreadsheetengine::detail::compiler::detail::kSmokeMaxRow,
@@ -88,7 +88,7 @@ using spreadsheetengine::core::eval::detail::formatNumber;
 
 [[nodiscard]] spreadsheetengine::api::String formatAbsoluteCellReferenceToken(
     const spreadsheetengine::api::CellAddress& rAddress,
-    const spreadsheetengine::workbook::Workbook& rWorkbook,
+    const spreadsheetengine::core::workbook::Workbook& rWorkbook,
     spreadsheetengine::api::SheetId nCurrentSheet)
 {
     spreadsheetengine::api::String aToken;
@@ -115,7 +115,7 @@ using spreadsheetengine::core::eval::detail::formatNumber;
 
 [[nodiscard]] spreadsheetengine::api::String formatSingleReferenceToken(
     const spreadsheetengine::api::refdata::SingleRefData& rReference,
-    const spreadsheetengine::workbook::Workbook& rWorkbook,
+    const spreadsheetengine::core::workbook::Workbook& rWorkbook,
     const spreadsheetengine::api::CellAddress& rCurrentAddress)
 {
     const auto aAbsolute = spreadsheetengine::api::refdata::toAbsoluteAddress(
@@ -228,7 +228,7 @@ struct InflatedStackItem
 
 std::optional<std::unique_ptr<spreadsheetengine::core::formula::Node>> inflateCompiledFormulaNode(
     const setoken::CompiledFormula& rFormula,
-    const spreadsheetengine::workbook::Workbook& rWorkbook,
+    const spreadsheetengine::core::workbook::Workbook& rWorkbook,
     const spreadsheetengine::api::CellAddress& rCurrentAddress)
 {
     std::vector<InflatedStackItem> aStack;
