@@ -2,9 +2,8 @@
 
 ## Purpose
 
-This document turns the next sequencing step from
-[NEXT_STEPS.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/NEXT_STEPS.md)
-into an implementation-ready plan:
+This document turns the next sequencing step from the former
+`NEXT_STEPS.md` roadmap into an implementation-ready plan:
 
 - introduce an engine-side workbook facade
 - keep Calc as the storage authority for now
@@ -499,7 +498,7 @@ Tasks:
 - document the stable facade subset
 - record deferred surface areas
 - wire the first dependency shadow plan to consume the facade
-- update `NEXT_STEPS.md` / status docs if needed
+- update the roadmap / status docs if needed
 
 Exit criteria:
 

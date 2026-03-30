@@ -12,9 +12,9 @@ This document turns the next compiler milestone into an execution-ready plan:
 
 This plan builds directly on:
 
-- [TOKEN_COMPILER_HOST_MODEL.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/TOKEN_COMPILER_HOST_MODEL.md)
-- [BASIC_FODS_SUPPORT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/BASIC_FODS_SUPPORT.md)
-- [NEXT_STEPS.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/NEXT_STEPS.md)
+- [TOKEN_COMPILER_HOST_MODEL.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/archive/TOKEN_COMPILER_HOST_MODEL.md)
+- [BASIC_FODS_SUPPORT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/archive/BASIC_FODS_SUPPORT.md)
+- the former `NEXT_STEPS.md` roadmap
 
 ## Executive Summary
 

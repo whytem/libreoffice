@@ -2,7 +2,8 @@
 
 ## Purpose
 
-This document turns the first major item from [NEXT_STEPS.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/NEXT_STEPS.md) into an implementation-ready plan:
+This document turns the first major item from the former `NEXT_STEPS.md`
+roadmap into an implementation-ready plan:
 
 - extract an engine-owned token model
 - extract the compiler host model

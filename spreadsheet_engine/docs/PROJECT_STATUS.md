@@ -30,9 +30,11 @@ against Calc.
 
 ## Current State At A Glance
 
-The project has now closed out five major programs. Compiler switchover is no
+The project has now closed out seven major programs. Compiler switchover is no
 longer an active extraction stream; it has moved into maintenance mode with the
-shared compiler path established as the default standalone replay path.
+shared compiler path established as the default standalone replay path, and the
+large `FormulaEvaluator`/`ScInterpreter` pure-computation convergence program
+is now also in closeout status.
 
 | Program | Status | Summary |
 |---------|--------|---------|
@@ -41,15 +43,20 @@ shared compiler path established as the default standalone replay path.
 | Compiler switchover | **Complete** | Shared compiler plus compiled-token execution is now the default standalone replay path for all eight enabled families, with zero hard compiler blockers remaining on the original switchover corpus |
 | Calc-backed workbook facade | **Complete** | Engine-owned workbook facade contract with Calc-backed and in-memory implementations, richer named-range mutation payloads, dedicated standalone/Calc validation lanes, and first live consumption through dependency-shadow runtime auditing |
 | Dependency and invalidation extraction | **Complete** | Engine-owned dependency snapshots, reverse dependency indexing, invalidation planning, structural rebuild scopes, workbook-scale Calc shadow corpus, maintenance-lane integration, and an opt-in runtime shadow audit are all in place |
+| FormulaEvaluator runtime modularization | **Complete** | The old evaluator monolith has been split across focused runtime and support modules such as `LookupRuntime`, `QueryRuntime`, `TextFunctionRuntime`, `DateTimeParse`, `FinancialRuntime`, `MathAggregate`, `MathFunctionRuntime`, and `ConversionRuntime` |
+| Calc pure-computation convergence | **Complete** | Calc now delegates the in-scope pure-computation statistical, aggregate, inverse-distribution, combinatoric, and error-function families to the same shared runtime modules used by standalone, with Calc-aligned algorithms adopted where behavior risk existed |
 
 The immediate active frontier is now narrower and more practical:
 
 - broaden standalone replay beyond the eight promoted families, starting with the
   add-in family
-- reduce cached-fallback usage on the promoted corpus by turning more formulas
-  into live standalone execution
+- reduce cached-fallback usage on the promoted corpus from the current compiled
+  baseline of `3,990 / 40,068` formula cells (`9.95807%`) by turning more
+  formulas into live standalone execution
 - use the completed workbook facade plus dependency/invalidation planner as the
   substrate for recalculation-orchestration extraction
+- keep expanding engine-first adoption inside Calc only where differential
+  validation keeps compiler/runtime behavior safe
 
 ### What the engine owns today
 
@@ -86,6 +93,11 @@ The immediate active frontier is now narrower and more practical:
   standalone lowering, dependency snapshotting, diagnostics, and the retained
   debug/legacy AST path; it is no longer the authority boundary for promoted
   replay-family compilation decisions)
+- **Runtime modularization and shared adoption:** extracted runtime families now
+  cover lookup/query, text/search, date parsing, financial dispatch,
+  aggregate/statistics kernels, conversion/combinatorics, and focused evaluator
+  support helpers; those same shared modules now serve both standalone replay
+  and selected Calc `ScInterpreter` entry points
 - **Raw FODS replay:** eight function families fully enabled (logical,
   mathematical, text, date_time, spreadsheet, information, financial,
   statistical) across 426 workbooks
@@ -103,7 +115,10 @@ The immediate active frontier is now narrower and more practical:
 - Authoritative dirty-bit setting, formula-tree ownership, and recalculation
   orchestration (the engine now owns shadow dependency snapshots and
   invalidation planning, but Calc still owns production side effects)
-- `ScInterpreter` CPU evaluator
+- The production `ScInterpreter` evaluator shell for most runtime execution,
+  especially reference/scheduling/database/matrix/storage-sensitive behavior;
+  selected pure-computation statistical and aggregate kernels now delegate to
+  shared engine runtime modules
 - Threaded and OpenCL backend execution
 - UI, shell, persistence, import/export, UNO, rendering
 
@@ -127,7 +142,7 @@ spreadsheet_engine/
 ├── shims/include/              # SAL/RTL type replacements for standalone
 ├── source/core/                # Implementation files
 ├── tests/
-│   ├── unit/                   #   25 test files (19 API/compiler + 4 FODS + 1 facade + 1 dependency)
+│   ├── unit/                   #   25 test sources + 3 shared support headers
 │   ├── consumer/               #   Installed-package consumer smoke test
 │   ├── data/fods/              #   FODS test fixture workbooks
 │   └── parity/                 #   Shared parity TSV datasets
@@ -162,10 +177,14 @@ ranges and imported-sheet metadata), `FodsLoader` (libxml2-backed XML parser),
 execution support).
 
 **Layer 4: Runtime Helpers** (`runtime/`)
-Standalone function implementations: `MathScalar`, `MathTranscendental`,
-`MathBitwise`, `MathFinancial`, `MathRounding`, `MathStatistical`,
-`TextCase`, `TextScalar`, `TextWidth`, `TextServices`, `DateTimeParts`, `DateTimeWeek`,
-`DateTimeWorkday`, `NumeralConversion`, `InMemoryHost`, `LibraryProbe`.
+Standalone and shared pure-computation helpers: `MathScalar`,
+`MathTranscendental`, `MathBitwise`, `MathFinancial`, `MathRounding`,
+`MathStatistical`, `MathAggregate`, `MathFunctionRuntime`,
+`ConversionRuntime`, `FinancialRuntime`, `QueryRuntime`, `LookupRuntime`,
+`TextCase`, `TextScalar`, `TextFunctionRuntime`, `TextRuntimeSupport`,
+`TextWidth`, `TextServices`, `DateTimeParse`, `DateTimeParts`,
+`DateTimeWeek`, `DateTimeWorkday`, `NumeralConversion`, `InMemoryHost`,
+`LibraryProbe`.
 
 **Layer 5: LibreOffice Adapters** (`compat/libreoffice/`)
 Twenty-two thin adapter headers bridging engine types to Calc internals:
@@ -265,6 +284,33 @@ standalone engine. It was executed in 8 phases, all now complete.
 | ExternalDoubleRef | yes | yes | no | bridge-only |
 | Jump | yes | yes | no | bridge-only |
 
+### FormulaEvaluator Runtime Modularization And Calc Convergence
+
+This program is now closed out. The standalone evaluator is no longer a
+single-purpose monolith, and the in-scope pure-computation convergence work
+with Calc has been completed on top of the extracted runtime surface.
+
+**Closeout summary:**
+
+- `FormulaEvaluator` has been split across focused helpers such as
+  `FormulaEvaluatorAggregate`, `FormulaEvaluatorSpecialForms`, and
+  `CompiledFormulaInflation`
+- lookup/query, text/search, date parsing, financial dispatch, aggregate math,
+  conversion/combinatorics, and other pure-computation helpers now live in
+  dedicated runtime modules
+- shared runtime modules now serve both standalone replay and selected Calc
+  `ScInterpreter` entry points
+- Calc now delegates the in-scope pure-computation statistical, aggregate,
+  inverse-distribution, combinatoric, and error-function families to shared
+  runtime
+- behavior-sensitive shared algorithms adopt Calc's original implementation
+  where that was necessary to avoid divergence
+
+The remaining execution-backend work is no longer "modularize the evaluator"
+or "extract pure-computation kernels." It is the harder next layer:
+authoritative production execution ownership, reference-sensitive behavior, and
+recalculation orchestration.
+
 ### FODS Workbook Support
 
 All foundation passes complete. Eight function families are fully enabled for
@@ -291,16 +337,16 @@ broader than the currently promoted replay lane.
 - 426 workbooks across 8 families
 - 40,068 formula cells
 - 40,059 parsed formulas
-- 15,891 cached-fallback cells on the default promoted replay policy
-  (`39.66%` of formula cells)
+- 3,990 cached-fallback cells on the default promoted replay policy
+  (`9.95807%` of formula cells)
 - cached-fallback family split:
-  `statistical:8381`, `mathematical:2029`, `spreadsheet:1925`,
-  `financial:1763`, `text:1065`, `date_time:479`, `information:138`,
-  `logical:111`
+  `statistical:1241`, `financial:680`, `spreadsheet:665`,
+  `mathematical:589`, `date_time:305`, `text:280`, `information:126`,
+  `logical:104`
 - cached-fallback top categories:
-  `binary_op:eq:fn:ROUND:4968`, `LOOKUP:815`, `IF:724`,
-  `binary_op:eq:fn:ROUNDSIG:399`, `POISSON:329`, `POISSON.DIST:329`,
-  `ROUND:219`, `BINOMDIST:207`, `CONVERT:166`, `BINOM.DIST.RANGE:164`
+  `named_ref:87`, `binary_op:eq:cell:57`, `PRICE:53`,
+  `binary_op:div:literal:49`, `SUM:48`, `GETPIVOTDATA:40`,
+  `cell_ref:33`, `CHOOSECOLS:31`, `CHOOSEROWS:31`, `CONVERT:31`
 - 43,165 function-call nodes
 - 55,552 cell-reference nodes, 5,219 range-reference nodes, 340 named-reference nodes
 - 394 array-constant nodes
@@ -470,7 +516,7 @@ target_link_libraries(myapp PRIVATE spreadsheetengine::core)
 | `spreadsheetengine_installed_package_smoke` | Installed-package downstream-consumer smoke |
 
 Calc-side validation targets for the currently completed facade/compiler/
-dependency work:
+dependency/runtime-convergence work:
 
 - `CppunitTest_sc_ucalc_token_bridge`
 - `CppunitTest_sc_ucalc_compile_host`
@@ -478,6 +524,7 @@ dependency work:
 - `CppunitTest_sc_ucalc_compile_diff`
 - `CppunitTest_sc_ucalc_workbook_facade`
 - `CppunitTest_sc_ucalc_dependency_shadow`
+- `CppunitTest_sc_ucalc_formula2`
 
 ---
 
@@ -542,39 +589,39 @@ internals. This coupling is by design:
 
 - Enable the add-in family for FODS replay
 - Continue expanding standalone live evaluation to reduce the cached-fallback
-  footprint on the promoted eight-family corpus
+  footprint on the promoted eight-family corpus from the current `9.95807%`
+  compiled-path baseline
 - Keep the compiler-switchover maintenance lanes green:
   - representative Calc lexical parity smoke
   - compiled replay diff smoke
-  - `--legacy-only` escape hatch until we make an explicit long-term
+  - the `--legacy-only` escape hatch until we make an explicit long-term
     keep/remove decision
 - Broaden the shared built-in external/add-in catalog and standalone evaluator
   coverage only where it advances replay-family enablement or removes
   high-volume fallback paths
+- Use the now-completed pure-computation convergence work as the stable base
+  for later execution-backend extraction, not as an active backlog of its own
 
 ### Active Fallback Reduction Task List
 
-1. **Refine fallback diagnostics**
-   - Initial child-head splitting is now in place for `binary_op` and
-     `unary_op` wrappers
-   - Next, keep drilling the dominant wrapper buckets down far enough that
-     they map cleanly to missing semantics, starting with
-     `binary_op:eq:fn:ROUND` and `binary_op:eq:fn:ROUNDSIG`
-   - Keep the replay `--summary` and `--compiled-diff` outputs aligned with the
-     promoted compiled replay path
-2. **Burn down the highest-volume statistical buckets**
-   - Prioritize `POISSON`, `POISSON.DIST`, `BINOMDIST`,
-     `BINOM.DIST.RANGE`, and adjacent distribution/statistics helpers
-   - Re-freeze the family split after each cluster lands so the statistical
-     bucket trend is visible
-3. **Burn down the high-volume promoted-corpus wrapper buckets**
-   - Reduce `LOOKUP`, `IF`, and `ROUND` fallback-heavy cases where live
-     execution still exits early to cached workbook results
-   - Use the new category breakdown to separate “supported function, unsupported
-     shape” from “function not yet implemented” paths
-4. **Clean up text/financial compatibility tails**
-   - Target `CONVERT`, `CHAR`, and the remaining financial-family scalar
-     helpers that are large enough to materially move the promoted-corpus rate
+1. **Keep the fallback summary authoritative**
+   - Use the compiled-path `--summary` output as the single published fallback
+     metric for promoted families
+   - Re-freeze the family split and top-category list after each reduction
+     cluster lands
+2. **Burn down the current named/reference-heavy tail**
+   - Prioritize `named_ref`, `cell_ref`, and the remaining
+     `binary_op:eq:cell` / `binary_op:div:literal` wrappers that still exit to
+     cached results
+3. **Reduce the highest remaining function buckets**
+   - Target the current leaders from the live summary: `PRICE`, `SUM`,
+     `GETPIVOTDATA`, `CHOOSECOLS`, `CHOOSEROWS`, and `CONVERT`
+   - Separate "supported function, unsupported shape" from "function not yet
+     implemented" so each category gets the right follow-up work
+4. **Align add-in promotion with fallback work**
+   - Expand the built-in external-name catalog and standalone evaluator only
+     where it helps `addin` promotion or removes current high-volume fallback
+     categories
 5. **Re-baseline before the next family promotion**
    - Record the new compiled-path fallback rate
    - Confirm raw replay and compiled-diff stay green
@@ -607,11 +654,14 @@ replay corpus:
   auditing hooks
 - Tighten structural-mutation and named-range mutation parity where scheduler
   extraction exposes gaps
+- Use the completed shared-runtime convergence work as a prerequisite, not as a
+  competing roadmap stream
 
 ### Long-term: Shift More Execution Authority Out Of Calc
 
 The major extraction prerequisites are now in place: initial function/runtime
 extraction, token/compiler-host modeling, standalone compiler switchover,
+FormulaEvaluator runtime modularization, Calc pure-computation convergence,
 Calc-backed workbook facade, and dependency/invalidation planning. The
 remaining long-horizon work is now concentrated in three areas plus one later
 authority decision:
@@ -620,7 +670,7 @@ authority decision:
 |------|---------------|-----------|
 | Compiler authority inside Calc | Standalone switchover is complete; Calc still uses `ScCompiler` for most production paths | Keep engine-first compile adoption expanding only where the bridge/diff lanes make it safe |
 | Recalculation orchestration | Workbook facade plus dependency/invalidation planner are complete in shadow mode | Move dirty-set ownership and recalc scheduling onto engine-owned planner outputs |
-| Execution backend | `ScInterpreter` and execution backends are still Calc-owned | Incrementally extract CPU execution logic behind strong differential validation |
+| Execution backend | `ScInterpreter` and execution backends are still Calc-owned, although the pure-computation runtime kernels are now substantially shared | Incrementally extract the remaining evaluator shell, coercion, and reference-sensitive execution logic behind strong differential validation |
 | Workbook/storage authority | Calc-backed facade exists and is validated | Defer any authority shift until scheduler and execution layers are stable |
 
 **Recommended sequencing:**
@@ -690,16 +740,19 @@ The engine should not absorb:
 - [README.md](../README.md) — build, test, and install instructions
 - [CALC_ENGINE_EXTRACTION_PLAN.md](extraction-history/CALC_ENGINE_EXTRACTION_PLAN.md) —
   master extraction roadmap with detailed per-phase status (Phases 0-11)
-- [BASIC_FODS_SUPPORT.md](architecture/BASIC_FODS_SUPPORT.md) — FODS loader/
-  evaluator architecture and implementation checklist
-- [TOKEN_COMPILER_HOST_MODEL.md](architecture/TOKEN_COMPILER_HOST_MODEL.md) —
-  token model and compiler-host milestone plan with execution tracker
-- [COMPILER_SWITCHOVER.md](architecture/COMPILER_SWITCHOVER.md) — compiler
-  switchover plan with phased execution checklist
-- [CALC_BACKED_WORKBOOK_FACADE.md](architecture/CALC_BACKED_WORKBOOK_FACADE.md) —
-  workbook facade milestone plan with phased execution checklist
-- [DEPENDENCY_INVALIDATION_EXTRACTION.md](architecture/DEPENDENCY_INVALIDATION_EXTRACTION.md) —
-  dependency snapshot and invalidation-planner milestone plan with closeout
-  status
+- [docs/architecture/README.md](architecture/README.md) — pointer for active
+  living architecture notes vs archived milestone plans
+- [BASIC_FODS_SUPPORT.md](archive/BASIC_FODS_SUPPORT.md) — archived FODS loader/
+  evaluator milestone plan
+- [TOKEN_COMPILER_HOST_MODEL.md](archive/TOKEN_COMPILER_HOST_MODEL.md) —
+  archived token model and compiler-host milestone plan
+- [COMPILER_SWITCHOVER.md](archive/COMPILER_SWITCHOVER.md) — archived compiler
+  switchover milestone plan
+- [CALC_BACKED_WORKBOOK_FACADE.md](archive/CALC_BACKED_WORKBOOK_FACADE.md) —
+  archived workbook-facade milestone plan
+- [DEPENDENCY_INVALIDATION_EXTRACTION.md](archive/DEPENDENCY_INVALIDATION_EXTRACTION.md) —
+  archived dependency/invalidation extraction plan and closeout record
+- [FORMULA_EVALUATOR_SCINTERPRETER_CONVERGENCE.md](archive/FORMULA_EVALUATOR_SCINTERPRETER_CONVERGENCE.md) —
+  archived FormulaEvaluator/ScInterpreter convergence closeout record
 - [CALC_ENGINE_AUDIT.md](extraction-history/CALC_ENGINE_AUDIT.md) — audit of
   original Calc engine source files

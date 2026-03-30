@@ -6,7 +6,7 @@ instead of an extraction staging area.
 Completed items:
 
 - move extraction-history documents under `docs/extraction-history/`
-- add this architecture/checklist note under `docs/architecture/`
+- add this architecture/checklist note under `docs/archive/`
 - move LibreOffice validation tooling under `integration/libreoffice/`
 - move the combined maintenance runner under `tools/`
 - keep thin root gbuild wrappers so LibreOffice module discovery still works
