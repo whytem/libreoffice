@@ -10,6 +10,7 @@
 #pragma once
 
 #include <map>
+#include <optional>
 #include <tuple>
 #include <vector>
 
@@ -75,6 +76,12 @@ class Evaluator
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
     [[nodiscard]] EvaluationResult evaluateFunction(
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] std::optional<EvaluationResult> tryEvaluateAggregateFamily(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] std::optional<EvaluationResult> tryEvaluateSpecialForm(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
     [[nodiscard]] const EvaluationResult* lookupLocalBinding(api::StringView rName) const;
 
 public:
