@@ -405,6 +405,39 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedStatisticalDelegations)
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.15729920705028513, m_pDoc->GetValue(ScAddress(0, 53, 0)),
                                  1e-12);
 
+    m_pDoc->SetString(ScAddress(0, 54, 0), u"=GEOMEAN(4;1;0.03125)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(ScAddress(0, 54, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 55, 0), u"=GEOMEAN(4;0;8)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(ScAddress(0, 55, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 56, 0), u"=HARMEAN(1;2;4)"_ustr);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.7142857142857142, m_pDoc->GetValue(ScAddress(0, 56, 0)),
+                                 1e-12);
+
+    m_pDoc->SetString(ScAddress(0, 57, 0), u"=HARMEAN(1;0;4)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(0, 57, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 58, 0), u"=NORM.S.DIST(1;TRUE())"_ustr);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.841344746068543, m_pDoc->GetValue(ScAddress(0, 58, 0)),
+                                 1e-12);
+
+    m_pDoc->SetString(ScAddress(0, 59, 0), u"=NORM.S.DIST(1;FALSE())"_ustr);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.241970724519143, m_pDoc->GetValue(ScAddress(0, 59, 0)),
+                                 1e-12);
+
+    m_pDoc->SetString(ScAddress(0, 60, 0), u"=PHI(0)"_ustr);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.398942280401433, m_pDoc->GetValue(ScAddress(0, 60, 0)),
+                                 1e-12);
+
+    m_pDoc->SetString(ScAddress(0, 61, 0), u"=GAUSS(1)"_ustr);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.341344746068543, m_pDoc->GetValue(ScAddress(0, 61, 0)),
+                                 1e-12);
+
+    m_pDoc->SetString(ScAddress(0, 62, 0), u"=KURT({1;2;3;4};{10;11;12;13})"_ustr);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-2.33547863710114, m_pDoc->GetValue(ScAddress(0, 62, 0)),
+                                 1e-12);
+
     m_pDoc->DeleteTab(0);
 }
 

@@ -83,77 +83,6 @@ void ScInterpreter::ScBadName()
     PushError( FormulaError::NoName);
 }
 
-double ScInterpreter::phi(double x)
-{
-    return  0.39894228040143268 * exp(-(x * x) / 2.0);
-}
-
-double ScInterpreter::integralPhi(double x)
-{ // Using gauss(x)+0.5 has severe cancellation errors for x<-4
-    return 0.5 * std::erfc(-x * M_SQRT1_2);
-}
-
-double ScInterpreter::taylor(const double* pPolynom, sal_uInt16 nMax, double x)
-{
-    KahanSum nVal = pPolynom[nMax];
-    for (short i = nMax-1; i >= 0; i--)
-    {
-        nVal = (nVal * x) + pPolynom[i];
-    }
-    return nVal.get();
-}
-
-double ScInterpreter::gauss(double x)
-{
-
-    double xAbs = std::abs(x);
-    sal_uInt16 xShort = static_cast<sal_uInt16>(::rtl::math::approxFloor(xAbs));
-    double nVal = 0.0;
-    if (xShort == 0)
-    {
-        static const double t0[] =
-        { 0.39894228040143268, -0.06649038006690545,  0.00997355701003582,
-         -0.00118732821548045,  0.00011543468761616, -0.00000944465625950,
-          0.00000066596935163, -0.00000004122667415,  0.00000000227352982,
-          0.00000000011301172,  0.00000000000511243, -0.00000000000021218 };
-        nVal = taylor(t0, 11, (xAbs * xAbs)) * xAbs;
-    }
-    else if (xShort <= 2)
-    {
-        static const double t2[] =
-        { 0.47724986805182079,  0.05399096651318805, -0.05399096651318805,
-          0.02699548325659403, -0.00449924720943234, -0.00224962360471617,
-          0.00134977416282970, -0.00011783742691370, -0.00011515930357476,
-          0.00003704737285544,  0.00000282690796889, -0.00000354513195524,
-          0.00000037669563126,  0.00000019202407921, -0.00000005226908590,
-         -0.00000000491799345,  0.00000000366377919, -0.00000000015981997,
-         -0.00000000017381238,  0.00000000002624031,  0.00000000000560919,
-         -0.00000000000172127, -0.00000000000008634,  0.00000000000007894 };
-        nVal = taylor(t2, 23, (xAbs - 2.0));
-    }
-    else if (xShort <= 4)
-    {
-        static const double t4[] =
-       { 0.49996832875816688,  0.00013383022576489, -0.00026766045152977,
-         0.00033457556441221, -0.00028996548915725,  0.00018178605666397,
-        -0.00008252863922168,  0.00002551802519049, -0.00000391665839292,
-        -0.00000074018205222,  0.00000064422023359, -0.00000017370155340,
-         0.00000000909595465,  0.00000000944943118, -0.00000000329957075,
-         0.00000000029492075,  0.00000000011874477, -0.00000000004420396,
-         0.00000000000361422,  0.00000000000143638, -0.00000000000045848 };
-        nVal = taylor(t4, 20, (xAbs - 4.0));
-    }
-    else
-    {
-        static const double asympt[] = { -1.0, 1.0, -3.0, 15.0, -105.0 };
-        nVal = 0.5 + phi(xAbs) * o3tl::div_allow_zero(taylor(asympt, 4, o3tl::div_allow_zero(1.0, xAbs * xAbs)), xAbs);
-    }
-    if (x < 0.0)
-        return -nVal;
-    else
-        return nVal;
-}
-
 //  #i26836# new gaussinv implementation by Martin Eitzenberger <m.eitzenberger@unix.net>
 
 double ScInterpreter::gaussinv(double x)
@@ -295,77 +224,6 @@ double ScInterpreter::GetLogBeta(double fAlpha, double fBeta)
     return semath::logBetaValue(fAlpha, fBeta);
 }
 
-// beta distribution probability density function
-double ScInterpreter::GetBetaDistPDF(double fX, double fA, double fB)
-{
-    // special cases
-    if (fA == 1.0) // result b*(1-x)^(b-1)
-    {
-        if (fB == 1.0)
-            return 1.0;
-        if (fB == 2.0)
-            return -2.0*fX + 2.0;
-        if (fX == 1.0 && fB < 1.0)
-        {
-            SetError(FormulaError::IllegalArgument);
-            return HUGE_VAL;
-        }
-        if (fX <= 0.01)
-            return fB + fB * std::expm1((fB-1.0) * std::log1p(-fX));
-        else
-            return fB * pow(0.5-fX+0.5,fB-1.0);
-    }
-    if (fB == 1.0) // result a*x^(a-1)
-    {
-        if (fA == 2.0)
-            return fA * fX;
-        if (fX == 0.0 && fA < 1.0)
-        {
-            SetError(FormulaError::IllegalArgument);
-            return HUGE_VAL;
-        }
-        return fA * pow(fX,fA-1);
-    }
-    if (fX <= 0.0)
-    {
-        if (fA < 1.0 && fX == 0.0)
-        {
-            SetError(FormulaError::IllegalArgument);
-            return HUGE_VAL;
-        }
-        else
-            return 0.0;
-    }
-    if (fX >= 1.0)
-    {
-        if (fB < 1.0 && fX == 1.0)
-        {
-            SetError(FormulaError::IllegalArgument);
-            return HUGE_VAL;
-        }
-        else
-            return 0.0;
-    }
-
-    // normal cases; result x^(a-1)*(1-x)^(b-1)/Beta(a,b)
-    const double fLogDblMax = log( ::std::numeric_limits<double>::max());
-    const double fLogDblMin = log( ::std::numeric_limits<double>::min());
-    double fLogY = (fX < 0.1) ? std::log1p(-fX) : log(0.5-fX+0.5);
-    double fLogX = log(fX);
-    double fAm1LogX = (fA-1.0) * fLogX;
-    double fBm1LogY = (fB-1.0) * fLogY;
-    double fLogBeta = GetLogBeta(fA,fB);
-    // check whether parts over- or underflow
-    if (   fAm1LogX < fLogDblMax  && fAm1LogX > fLogDblMin
-        && fBm1LogY < fLogDblMax  && fBm1LogY > fLogDblMin
-        && fLogBeta < fLogDblMax  && fLogBeta > fLogDblMin
-        && fAm1LogX + fBm1LogY < fLogDblMax && fAm1LogX + fBm1LogY > fLogDblMin)
-        return pow(fX,fA-1.0) * pow(0.5-fX+0.5,fB-1.0) / GetBeta(fA,fB);
-    else // need logarithm;
-        // might overflow as a whole, but seldom, not worth to pre-detect it
-        return exp( fAm1LogX + fBm1LogY - fLogBeta);
-}
-
 // cumulative distribution function, normalized
 double ScInterpreter::GetBetaDist(double fXin, double fAlpha, double fBeta)
 {
@@ -443,12 +301,12 @@ void ScInterpreter::ScBetaDist_MS()
 
 void ScInterpreter::ScPhi()
 {
-    PushDouble(phi(GetDouble()));
+    PushDouble(semath::evaluateNormalDistribution(GetDouble(), 0.0, 1.0, false).maValue);
 }
 
 void ScInterpreter::ScGauss()
 {
-    PushDouble(gauss(GetDouble()));
+    PushDouble(semath::gaussValue(GetDouble()));
 }
 
 void ScInterpreter::ScFisher()
@@ -539,34 +397,6 @@ void ScInterpreter::ScPermutationA()
             return;
         }
         PushDouble(aResult.maValue);
-    }
-}
-
-double ScInterpreter::GetBinomDistPMF(double x, double n, double p)
-// used in ScB and ScBinomDist
-// preconditions: 0.0 <= x <= n, 0.0 < p < 1.0;  x,n integral although double
-{
-    double q = (0.5 - p) + 0.5;
-    double fFactor = pow(q, n);
-    if (fFactor <=::std::numeric_limits<double>::min())
-    {
-        fFactor = pow(p, n);
-        if (fFactor <= ::std::numeric_limits<double>::min())
-            return GetBetaDistPDF(p, x+1.0, n-x+1.0)/(n+1.0);
-        else
-        {
-            sal_uInt32 max = static_cast<sal_uInt32>(n - x);
-            for (sal_uInt32 i = 0; i < max && fFactor > 0.0; i++)
-                fFactor *= (n-i)/(i+1)*q/p;
-            return fFactor;
-        }
-    }
-    else
-    {
-        sal_uInt32 max = static_cast<sal_uInt32>(x);
-        for (sal_uInt32 i = 0; i < max && fFactor > 0.0; i++)
-            fFactor *= (n-i)/(i+1)*p/q;
-        return fFactor;
     }
 }
 
@@ -713,7 +543,7 @@ void ScInterpreter::ScLogNormDist( int nMinParamCount ) //expanded, see #i100119
 
 void ScInterpreter::ScStdNormDist()
 {
-    PushDouble(integralPhi(GetDouble()));
+    PushDouble(semath::evaluateNormalDistribution(GetDouble(), 0.0, 1.0, true).maValue);
 }
 
 void ScInterpreter::ScStdNormDist_MS()
@@ -724,10 +554,10 @@ void ScInterpreter::ScStdNormDist_MS()
     bool bCumulative = GetBool();                        // cumulative
     double x = GetDouble();                              // x
 
-    if ( bCumulative )
-        PushDouble( integralPhi( x ) );
+    if (bCumulative)
+        PushDouble(semath::evaluateNormalDistribution(x, 0.0, 1.0, true).maValue);
     else
-        PushDouble( exp( - pow( x, 2 ) / 2 ) / sqrt( 2 * M_PI ) );
+        PushDouble(semath::evaluateNormalDistribution(x, 0.0, 1.0, false).maValue);
 }
 
 void ScInterpreter::ScExpDist()
@@ -1309,10 +1139,10 @@ void ScInterpreter::ScZTest()
                 PushError(FormulaError::DivisionByZero);
                 return;
             }
-            PushDouble(0.5 - gauss((mue-x)/sqrt(sigma/rValCount)));
+            PushDouble(0.5 - semath::gaussValue((mue-x) / sqrt(sigma / rValCount)));
         }
         else
-            PushDouble(0.5 - gauss((mue-x)*sqrt(rValCount)/sigma));
+            PushDouble(0.5 - semath::gaussValue((mue-x) * sqrt(rValCount) / sigma));
     }
 }
 
@@ -1605,45 +1435,19 @@ void ScInterpreter::ScKurt()
     if ( !CalculateSkew(fSum, fCount, values) )
         return;
 
-    // ODF 1.2 constraints: # of numbers >= 4
-    if (fCount < 4.0)
+    const auto aResult = semath::evaluateKurtosisNumbers(values);
+    if (!aResult)
     {
-        // for interoperability with Excel
-        PushError( FormulaError::DivisionByZero);
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
         return;
     }
-
-    KahanSum vSum;
-    double fMean = fSum.get() / fCount;
-    for (double v : values)
-        vSum += (v - fMean) * (v - fMean);
-
-    double fStdDev = sqrt(vSum.get() / (fCount - 1.0));
-    if (fStdDev == 0.0)
-    {
-        PushError( FormulaError::DivisionByZero);
-        return;
-    }
-
-    KahanSum xpower4 = 0.0;
-    for (double v : values)
-    {
-        double dx = (v - fMean) / fStdDev;
-        xpower4 += (dx * dx) * (dx * dx);
-    }
-
-    double k_d = (fCount - 2.0) * (fCount - 3.0);
-    double k_l = fCount * (fCount + 1.0) / ((fCount - 1.0) * k_d);
-    double k_t = 3.0 * (fCount - 1.0) * (fCount - 1.0) / k_d;
-
-    PushDouble(xpower4.get() * k_l - k_t);
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScHarMean()
 {
     short nParamCount = GetByte();
-    KahanSum nVal = 0.0;
-    double nValCount = 0.0;
+    std::vector<double> aValues;
     ScAddress aAdr;
     ScRange aRange;
     size_t nRefInList = 0;
@@ -1655,10 +1459,7 @@ void ScInterpreter::ScHarMean()
             {
                 double x = GetDouble();
                 if (x > 0.0)
-                {
-                    nVal += 1.0/x;
-                    nValCount++;
-                }
+                    aValues.push_back(x);
                 else
                     SetError( FormulaError::IllegalArgument);
                 break;
@@ -1671,10 +1472,7 @@ void ScInterpreter::ScHarMean()
                 {
                     double x = GetCellValue(aAdr, aCell);
                     if (x > 0.0)
-                    {
-                        nVal += 1.0/x;
-                        nValCount++;
-                    }
+                        aValues.push_back(x);
                     else
                         SetError( FormulaError::IllegalArgument);
                 }
@@ -1690,20 +1488,14 @@ void ScInterpreter::ScHarMean()
                 if (aValIter.GetFirst(nCellVal, nErr))
                 {
                     if (nCellVal > 0.0)
-                    {
-                        nVal += 1.0/nCellVal;
-                        nValCount++;
-                    }
+                        aValues.push_back(nCellVal);
                     else
                         SetError( FormulaError::IllegalArgument);
                     SetError(nErr);
                     while ((nErr == FormulaError::NONE) && aValIter.GetNext(nCellVal, nErr))
                     {
                         if (nCellVal > 0.0)
-                        {
-                            nVal += 1.0/nCellVal;
-                            nValCount++;
-                        }
+                            aValues.push_back(nCellVal);
                         else
                             SetError( FormulaError::IllegalArgument);
                     }
@@ -1725,10 +1517,7 @@ void ScInterpreter::ScHarMean()
                         {
                             double x = pMat->GetDouble(nElem);
                             if (x > 0.0)
-                            {
-                                nVal += 1.0/x;
-                                nValCount++;
-                            }
+                                aValues.push_back(x);
                             else
                                 SetError( FormulaError::IllegalArgument);
                         }
@@ -1740,10 +1529,7 @@ void ScInterpreter::ScHarMean()
                             {
                                 double x = pMat->GetDouble(nElem);
                                 if (x > 0.0)
-                                {
-                                    nVal += 1.0/x;
-                                    nValCount++;
-                                }
+                                    aValues.push_back(x);
                                 else
                                     SetError( FormulaError::IllegalArgument);
                             }
@@ -1754,17 +1540,25 @@ void ScInterpreter::ScHarMean()
             default : SetError(FormulaError::IllegalParameter); break;
         }
     }
-    if (nGlobalError == FormulaError::NONE)
-        PushDouble( o3tl::div_allow_zero(nValCount, nVal.get()) );
-    else
+    if (nGlobalError != FormulaError::NONE)
+    {
         PushError( nGlobalError);
+        return;
+    }
+
+    const auto aResult = semath::evaluateHarmonicMeanNumbers(aValues);
+    if (!aResult)
+    {
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScGeoMean()
 {
     short nParamCount = GetByte();
-    KahanSum nVal = 0.0;
-    double nValCount = 0.0;
+    std::vector<double> aValues;
     ScAddress aAdr;
     ScRange aRange;
 
@@ -1777,10 +1571,7 @@ void ScInterpreter::ScGeoMean()
             {
                 double x = GetDouble();
                 if (x > 0.0)
-                {
-                    nVal += log(x);
-                    nValCount++;
-                }
+                    aValues.push_back(x);
                 else if ( x == 0.0 )
                 {
                     // value of 0 means that function result will be 0
@@ -1801,10 +1592,7 @@ void ScInterpreter::ScGeoMean()
                 {
                     double x = GetCellValue(aAdr, aCell);
                     if (x > 0.0)
-                    {
-                        nVal += log(x);
-                        nValCount++;
-                    }
+                        aValues.push_back(x);
                     else if ( x == 0.0 )
                     {
                         // value of 0 means that function result will be 0
@@ -1828,10 +1616,7 @@ void ScInterpreter::ScGeoMean()
                 if (aValIter.GetFirst(nCellVal, nErr))
                 {
                     if (nCellVal > 0.0)
-                    {
-                        nVal += log(nCellVal);
-                        nValCount++;
-                    }
+                        aValues.push_back(nCellVal);
                     else if ( nCellVal == 0.0 )
                     {
                         // value of 0 means that function result will be 0
@@ -1846,10 +1631,7 @@ void ScInterpreter::ScGeoMean()
                     while ((nErr == FormulaError::NONE) && aValIter.GetNext(nCellVal, nErr))
                     {
                         if (nCellVal > 0.0)
-                        {
-                            nVal += log(nCellVal);
-                            nValCount++;
-                        }
+                            aValues.push_back(nCellVal);
                         else if ( nCellVal == 0.0 )
                         {
                             // value of 0 means that function result will be 0
@@ -1879,10 +1661,7 @@ void ScInterpreter::ScGeoMean()
                         {
                             double x = pMat->GetDouble(ui);
                             if (x > 0.0)
-                            {
-                                nVal += log(x);
-                                nValCount++;
-                            }
+                                aValues.push_back(x);
                             else if ( x == 0.0 )
                             {
                                 // value of 0 means that function result will be 0
@@ -1903,10 +1682,7 @@ void ScInterpreter::ScGeoMean()
                             {
                                 double x = pMat->GetDouble(ui);
                                 if (x > 0.0)
-                                {
-                                    nVal += log(x);
-                                    nValCount++;
-                                }
+                                    aValues.push_back(x);
                                 else if ( x == 0.0 )
                                 {
                                     // value of 0 means that function result will be 0
@@ -1926,10 +1702,19 @@ void ScInterpreter::ScGeoMean()
             default : SetError(FormulaError::IllegalParameter); break;
         }
     }
-    if (nGlobalError == FormulaError::NONE)
-        PushDouble(exp(o3tl::div_allow_zero(nVal.get(), nValCount)));
-    else
+    if (nGlobalError != FormulaError::NONE)
+    {
         PushError( nGlobalError);
+        return;
+    }
+
+    const auto aResult = semath::evaluateGeometricMeanNumbers(aValues);
+    if (!aResult)
+    {
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScStandard()

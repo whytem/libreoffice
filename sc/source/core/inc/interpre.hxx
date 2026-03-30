@@ -978,19 +978,13 @@ public:
     void ScNoName();
     void ScBadName();
     // Statistics:
-    static double taylor(const double* pPolynom, sal_uInt16 nMax, double x);
-    static double gauss(double x);
-
 public:
-    static double phi(double x);
-    static double integralPhi(double x);
     static double gaussinv(double x);
     static double GetPercentile( ::std::vector<double> & rArray, double fPercentile );
 
 
 private:
     double GetBetaDist(double x, double alpha, double beta);  //cumulative distribution function
-    double GetBetaDistPDF(double fX, double fA, double fB); //probability density function)
     double GetChiDist(double fChi, double fDF);     // for LEGACY.CHIDIST, returns right tail
     double GetChiSqDistCDF(double fX, double fDF);  // for CHISQDIST, returns left tail
     static double GetChiSqDistPDF(double fX, double fDF);  // probability density function
@@ -998,7 +992,6 @@ private:
     double GetTDist( double T, double fDF, int nType );
     double GetBeta(double fAlpha, double fBeta);
     static double GetLogBeta(double fAlpha, double fBeta);
-    double GetBinomDistPMF(double x, double n, double p); //probability mass function
     void ScLogGamma();
     void ScGamma();
     void ScPhi();

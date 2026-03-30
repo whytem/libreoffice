@@ -125,6 +125,45 @@ api::ValueResult<double> evaluateTrimmean(std::vector<double> aValues, double fP
     return api::ValueResult<double>::success(fSum.get() / static_cast<double>(nRemaining));
 }
 
+api::ValueResult<double> evaluateGeometricMeanNumbers(const std::vector<double>& rValues)
+{
+    if (rValues.empty())
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    KahanSum fLogSum = 0.0;
+    for (const double fValue : rValues)
+    {
+        if (fValue < 0.0 || !std::isfinite(fValue))
+            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+        if (::rtl::math::approxEqual(fValue, 0.0))
+            return api::ValueResult<double>::success(0.0);
+        fLogSum += std::log(fValue);
+    }
+
+    return api::ValueResult<double>::success(
+        std::exp(fLogSum.get() / static_cast<double>(rValues.size())));
+}
+
+api::ValueResult<double> evaluateHarmonicMeanNumbers(const std::vector<double>& rValues)
+{
+    if (rValues.empty())
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    KahanSum fInverseSum = 0.0;
+    for (const double fValue : rValues)
+    {
+        if (!(fValue > 0.0) || !std::isfinite(fValue))
+            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+        fInverseSum += 1.0 / fValue;
+    }
+
+    if (::rtl::math::approxEqual(fInverseSum.get(), 0.0))
+        return api::ValueResult<double>::failure(api::Error::DivisionByZero);
+
+    return api::ValueResult<double>::success(
+        static_cast<double>(rValues.size()) / fInverseSum.get());
+}
+
 api::ValueResult<double> evaluateModeSingle(const std::vector<double>& rValues)
 {
     const auto aModes = evaluateModeValues(rValues);
@@ -352,6 +391,40 @@ api::ValueResult<double> evaluateSkewNumbers(const std::vector<double>& rValues,
 
     return api::ValueResult<double>::success(
         ((fCubeSum.get() * fCount) / (fCount - 1.0)) / (fCount - 2.0));
+}
+
+api::ValueResult<double> evaluateKurtosisNumbers(const std::vector<double>& rValues)
+{
+    const double fCount = static_cast<double>(rValues.size());
+    if (fCount < 4.0)
+        return api::ValueResult<double>::failure(api::Error::DivisionByZero);
+
+    KahanSum fSum = 0.0;
+    for (const double fValue : rValues)
+        fSum += fValue;
+
+    const double fMean = fSum.get() / fCount;
+
+    KahanSum fVarianceSum = 0.0;
+    for (const double fValue : rValues)
+        fVarianceSum += (fValue - fMean) * (fValue - fMean);
+
+    const double fStdDev = std::sqrt(fVarianceSum.get() / (fCount - 1.0));
+    if (fStdDev == 0.0)
+        return api::ValueResult<double>::failure(api::Error::DivisionByZero);
+
+    KahanSum fFourthMoment = 0.0;
+    for (const double fValue : rValues)
+    {
+        const double fDelta = (fValue - fMean) / fStdDev;
+        fFourthMoment += (fDelta * fDelta) * (fDelta * fDelta);
+    }
+
+    const double fDenominator = (fCount - 2.0) * (fCount - 3.0);
+    const double fLeading
+        = fCount * (fCount + 1.0) / ((fCount - 1.0) * fDenominator);
+    const double fTrailing = 3.0 * (fCount - 1.0) * (fCount - 1.0) / fDenominator;
+    return api::ValueResult<double>::success(fFourthMoment.get() * fLeading - fTrailing);
 }
 
 api::ValueResult<double> evaluateAggregateNumbers(sal_Int32 nFunction, const AggregateScan& rScan)

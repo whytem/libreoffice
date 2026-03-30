@@ -1544,7 +1544,11 @@ int main()
         const auto aLcm = aEvaluator.evaluateFormula(u"of:=LCM({4|6|10})", { 0, 0, 0 });
         const auto aGeoMean
             = aEvaluator.evaluateFormula(u"of:=GEOMEAN({4|1|0.03125})", { 0, 0, 0 });
+        const auto aGeoMeanZero
+            = aEvaluator.evaluateFormula(u"of:=GEOMEAN({4|0|8})", { 0, 0, 0 });
         const auto aHarMean = aEvaluator.evaluateFormula(u"of:=HARMEAN({1|2|4})", { 0, 0, 0 });
+        const auto aHarMeanError
+            = aEvaluator.evaluateFormula(u"of:=HARMEAN({1|0|4})", { 0, 0, 0 });
         const auto aDateDif = aEvaluator.evaluateFormula(
             u"of:=DATEDIF(DATE(2020;1;1);DATE(2021;3;15);\"ym\")", { 0, 0, 0 });
         const auto aFloor = aEvaluator.evaluateFormula(u"of:=FLOOR(-11;-2)", { 0, 0, 0 });
@@ -1757,8 +1761,12 @@ int main()
             u"of:=LCM({4|6|10})", { 0, 0, 0 });
         const auto aCompiledGeoMean = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=GEOMEAN({4|1|0.03125})", { 0, 0, 0 });
+        const auto aCompiledGeoMeanZero = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=GEOMEAN({4|0|8})", { 0, 0, 0 });
         const auto aCompiledHarMean = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=HARMEAN({1|2|4})", { 0, 0, 0 });
+        const auto aCompiledHarMeanError = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=HARMEAN({1|0|4})", { 0, 0, 0 });
         const auto aCompiledDateDif = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=DATEDIF(DATE(2020;1;1);DATE(2021;3;15);\"ym\")", { 0, 0, 0 });
         const auto aCompiledFloor
@@ -2049,7 +2057,10 @@ int main()
             || !checkNumber("GCD", aGcd, 8.0)
             || !checkNumber("LCM", aLcm, 60.0)
             || !checkNumber("GEOMEAN", aGeoMean, 0.5)
+            || !checkNumber("GEOMEAN zero", aGeoMeanZero, 0.0)
             || !checkNumber("HARMEAN", aHarMean, 1.71428571428571)
+            || !checkError(
+                "HARMEAN error", aHarMeanError, spreadsheetengine::api::Error::IllegalArgument)
             || !checkNumber("DATEDIF", aDateDif, 2.0)
             || !checkNumber("FLOOR", aFloor, -12.0)
             || !checkNumber("FLOOR mode", aFloorMode, -7.0)
@@ -2189,7 +2200,10 @@ int main()
             || !checkNumber("compiled GCD", aCompiledGcd, 8.0)
             || !checkNumber("compiled LCM", aCompiledLcm, 60.0)
             || !checkNumber("compiled GEOMEAN", aCompiledGeoMean, 0.5)
+            || !checkNumber("compiled GEOMEAN zero", aCompiledGeoMeanZero, 0.0)
             || !checkNumber("compiled HARMEAN", aCompiledHarMean, 1.71428571428571)
+            || !checkError("compiled HARMEAN error", aCompiledHarMeanError,
+                spreadsheetengine::api::Error::IllegalArgument)
             || !checkNumber("compiled DATEDIF", aCompiledDateDif, 2.0)
             || !checkNumber("compiled FLOOR", aCompiledFloor, -12.0)
             || !checkNumber("compiled FLOOR mode", aCompiledFloorMode, -7.0)

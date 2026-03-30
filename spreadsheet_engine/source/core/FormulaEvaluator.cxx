@@ -2106,33 +2106,12 @@ EvaluationResult Evaluator::evaluateFunction(
         if (aNumbers.maValue.empty())
             return makeFailure(api::Error::IllegalArgument);
 
-        if (aFunctionName == u"GEOMEAN")
-        {
-            KahanSum fLogSum = 0.0;
-            for (const double fValue : aNumbers.maValue)
-            {
-                if (!(fValue > 0.0))
-                    return makeFailure(api::Error::IllegalArgument);
-                fLogSum += std::log(fValue);
-            }
-
-            return makeScalarResult(api::CellValue::number(
-                std::exp(fLogSum.get() / static_cast<double>(aNumbers.maValue.size()))));
-        }
-
-        KahanSum fInverseSum = 0.0;
-        for (const double fValue : aNumbers.maValue)
-        {
-            if (!(fValue > 0.0))
-                return makeFailure(api::Error::IllegalArgument);
-            fInverseSum += 1.0 / fValue;
-        }
-
-        if (::rtl::math::approxEqual(fInverseSum.get(), 0.0))
-            return makeFailure(api::Error::DivisionByZero);
-
-        return makeScalarResult(api::CellValue::number(
-            static_cast<double>(aNumbers.maValue.size()) / fInverseSum.get()));
+        const auto aResult = (aFunctionName == u"GEOMEAN")
+                                 ? semath::evaluateGeometricMeanNumbers(aNumbers.maValue)
+                                 : semath::evaluateHarmonicMeanNumbers(aNumbers.maValue);
+        if (!aResult)
+            return makeFailure(aResult.meError);
+        return makeScalarResult(api::CellValue::number(aResult.maValue));
     }
 
     if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")

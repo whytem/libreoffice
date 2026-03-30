@@ -45,6 +45,12 @@ SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateVarianceNumbers(
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateTrimmean(
     std::vector<double> aValues, double fPercent);
 
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateGeometricMeanNumbers(
+    const std::vector<double>& rValues);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateHarmonicMeanNumbers(
+    const std::vector<double>& rValues);
+
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateModeSingle(
     const std::vector<double>& rValues);
 
@@ -59,6 +65,9 @@ SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluatePercentrank(
 
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateSkewNumbers(
     const std::vector<double>& rValues, bool bPopulation);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateKurtosisNumbers(
+    const std::vector<double>& rValues);
 
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateAggregateNumbers(
     sal_Int32 nFunction, const AggregateScan& rScan);
