@@ -222,6 +222,48 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncCHOOSE)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedStatisticalDelegations)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+
+    m_pDoc->InsertTab(0, u"Stats"_ustr);
+
+    m_pDoc->SetString(ScAddress(0, 0, 0), u"=FISHER(0.5)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.5493061443340549, m_pDoc->GetValue(ScAddress(0, 0, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 1, 0), u"=FISHERINV(0.5)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.46211715726000974, m_pDoc->GetValue(ScAddress(0, 1, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 2, 0), u"=POISSON(1;1;FALSE)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.36787944117144233, m_pDoc->GetValue(ScAddress(0, 2, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 3, 0), u"=POISSON.DIST(1;1;TRUE)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.7357588823428847, m_pDoc->GetValue(ScAddress(0, 3, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 4, 0), u"=BINOMDIST(2;5;0.5;FALSE)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.3125, m_pDoc->GetValue(ScAddress(0, 4, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 5, 0), u"=BINOM.DIST(2;5;0.5;TRUE)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(ScAddress(0, 5, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 6, 0), u"=B(5;0.5;1;2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.46875, m_pDoc->GetValue(ScAddress(0, 6, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 7, 0), u"=BETADIST(0.5;2;3)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.6875, m_pDoc->GetValue(ScAddress(0, 7, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 8, 0), u"=BETA.DIST(0.5;2;3;FALSE)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.5, m_pDoc->GetValue(ScAddress(0, 8, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 9, 0), u"=FISHER(1)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(0, 9, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 10, 0), u"=BETA.DIST(-0.1;2;3;TRUE)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(0, 10, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncIFERROR)
 {
     // IFERROR/IFNA (fdo#56124)

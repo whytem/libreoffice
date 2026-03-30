@@ -610,6 +610,13 @@ convergence in three phases.
 Functions that can delegate immediately once runtime APIs are stable and LO
 adapter plumbing is added:
 
+Status as of 2026-03-30:
+- Completed for the initial batch below in `sc/source/core/tool/interpr3.cxx`
+- Calc-side validation added in `sc/qa/unit/ucalc_formula2.cxx`
+- LibreOffice integration wiring updated in
+  `spreadsheet_engine/integration/libreoffice/Library_spreadsheetengine.mk`
+  so the shared runtime links cleanly in Calc builds
+
 | ScInterpreter Function | Current Runtime Equivalent |
 | --- | --- |
 | `ScFisher` | `fisherTransform()` |

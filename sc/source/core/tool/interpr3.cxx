@@ -28,6 +28,8 @@
 #include <scmatrix.hxx>
 #include <columniterator.hxx>
 #include <unotools/collatorwrapper.hxx>
+#include <spreadsheetengine/runtime/MathStatistical.hxx>
+#include <spreadsheetengine/compat/libreoffice/Error.hxx>
 
 #include <cassert>
 #include <cmath>
@@ -40,6 +42,8 @@
 #include <osl/diagnose.h>
 
 using namespace formula;
+namespace semath = spreadsheetengine::core::math;
+namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 
 /// Two columns of data should be sortable with GetSortArray() and QuickSort()
 // This is an arbitrary limit.
@@ -49,9 +53,16 @@ static size_t MAX_COUNT_DOUBLE_FOR_SORT(const ScSheetLimits& rSheetLimits)
 }
 
 const double ScInterpreter::fMaxGammaArgument = 171.624376956302;  // found experimental
-const double fMachEps = ::std::numeric_limits<double>::epsilon();
 
 namespace {
+
+FormulaError lcl_ToCalcMathFormulaError(spreadsheetengine::api::Error eError)
+{
+    // Preserve Calc's existing statistical-function contract for domain failures.
+    if (eError == spreadsheetengine::api::Error::Domain)
+        return FormulaError::IllegalArgument;
+    return selibreoffice::toFormulaError(eError);
+}
 
 class ScDistFunc
 {
@@ -800,34 +811,7 @@ void ScInterpreter::ScLogGamma()
 
 double ScInterpreter::GetBeta(double fAlpha, double fBeta)
 {
-    double fA;
-    double fB;
-    if (fAlpha > fBeta)
-    {
-        fA = fAlpha; fB = fBeta;
-    }
-    else
-    {
-        fA = fBeta; fB = fAlpha;
-    }
-    if (fA+fB < fMaxGammaArgument) // simple case
-        return o3tl::div_allow_zero(GetGamma(fA), GetGamma(fA+fB)) * GetGamma(fB);
-    // need logarithm
-    // GetLogGamma is not accurate enough, back to Lanczos for all three
-    // GetGamma and arrange factors newly.
-    const double fg = 6.024680040776729583740234375; //see GetGamma
-    double fgm = fg - 0.5;
-    double fLanczos = lcl_getLanczosSum(fA);
-    fLanczos /= lcl_getLanczosSum(fA+fB);
-    fLanczos *= lcl_getLanczosSum(fB);
-    double fABgm = fA+fB+fgm;
-    fLanczos *= sqrt((fABgm/(fA+fgm))/(fB+fgm));
-    double fTempA = fB/(fA+fgm); // (fA+fgm)/fABgm = 1 / ( 1 + fB/(fA+fgm))
-    double fTempB = fA/(fB+fgm);
-    double fResult = exp(-fA * std::log1p(fTempA)
-                            -fB * std::log1p(fTempB)-fgm);
-    fResult *= fLanczos;
-    return fResult;
+    return semath::betaValue(fAlpha, fBeta);
 }
 
 // Same as GetBeta but with logarithm
@@ -930,108 +914,10 @@ double ScInterpreter::GetBetaDistPDF(double fX, double fA, double fB)
         return exp( fAm1LogX + fBm1LogY - fLogBeta);
 }
 
-/*
-                x^a * (1-x)^b
-    I_x(a,b) = ----------------  * result of ContFrac
-                a * Beta(a,b)
-*/
-static double lcl_GetBetaHelperContFrac(double fX, double fA, double fB)
-{   // like old version
-    double a1, b1, a2, b2, fnorm, cfnew, cf;
-    a1 = 1.0; b1 = 1.0;
-    b2 = 1.0 - (fA+fB)/(fA+1.0)*fX;
-    if (b2 == 0.0)
-    {
-        a2 = 0.0;
-        fnorm = 1.0;
-        cf = 1.0;
-    }
-    else
-    {
-        a2 = 1.0;
-        fnorm = 1.0/b2;
-        cf = a2*fnorm;
-    }
-    cfnew = 1.0;
-    double rm = 1.0;
-
-    const double fMaxIter = 50000.0;
-    // loop security, normal cases converge in less than 100 iterations.
-    // FIXME: You will get so much iterations for fX near mean,
-    // I do not know a better algorithm.
-    bool bfinished = false;
-    do
-    {
-        const double apl2m = fA + 2.0*rm;
-        const double d2m = rm*(fB-rm)*fX/((apl2m-1.0)*apl2m);
-        const double d2m1 = -(fA+rm)*(fA+fB+rm)*fX/(apl2m*(apl2m+1.0));
-        a1 = (a2+d2m*a1)*fnorm;
-        b1 = (b2+d2m*b1)*fnorm;
-        a2 = a1 + d2m1*a2*fnorm;
-        b2 = b1 + d2m1*b2*fnorm;
-        if (b2 != 0.0)
-        {
-            fnorm = 1.0/b2;
-            cfnew = a2*fnorm;
-            bfinished = (std::abs(cf-cfnew) < std::abs(cf)*fMachEps);
-        }
-        cf = cfnew;
-        rm += 1.0;
-    }
-    while (rm < fMaxIter && !bfinished);
-    return cf;
-}
-
 // cumulative distribution function, normalized
 double ScInterpreter::GetBetaDist(double fXin, double fAlpha, double fBeta)
 {
-// special cases
-    if (fXin <= 0.0)  // values are valid, see spec
-        return 0.0;
-    if (fXin >= 1.0)  // values are valid, see spec
-        return 1.0;
-    if (fBeta == 1.0)
-        return pow(fXin, fAlpha);
-    if (fAlpha == 1.0)
-    //            1.0 - pow(1.0-fX,fBeta) is not accurate enough
-        return -std::expm1(fBeta * std::log1p(-fXin));
-    //FIXME: need special algorithm for fX near fP for large fA,fB
-    double fResult;
-    // I use always continued fraction, power series are neither
-    // faster nor more accurate.
-    double fY = (0.5-fXin)+0.5;
-    double flnY = std::log1p(-fXin);
-    double fX = fXin;
-    double flnX = log(fXin);
-    double fA = fAlpha;
-    double fB = fBeta;
-    bool bReflect = fXin > fAlpha/(fAlpha+fBeta);
-    if (bReflect)
-    {
-        fA = fBeta;
-        fB = fAlpha;
-        fX = fY;
-        fY = fXin;
-        flnX = flnY;
-        flnY = log(fXin);
-    }
-    fResult = lcl_GetBetaHelperContFrac(fX,fA,fB);
-    fResult = fResult/fA;
-    double fP = fA/(fA+fB);
-    double fQ = fB/(fA+fB);
-    double fTemp;
-    if (fA > 1.0 && fB > 1.0 && fP < 0.97 && fQ < 0.97) //found experimental
-        fTemp = GetBetaDistPDF(fX,fA,fB)*fX*fY;
-    else
-        fTemp = exp(fA*flnX + fB*flnY - GetLogBeta(fA,fB));
-    fResult *= fTemp;
-    if (bReflect)
-        fResult = 0.5 - fResult + 0.5;
-    if (fResult > 1.0) // ensure valid range
-        fResult = 1.0;
-    if (fResult < 0.0)
-        fResult = 0.0;
-    return fResult;
+    return semath::betaCdf(fXin, fAlpha, fBeta);
 }
 
 void ScInterpreter::ScBetaDist()
@@ -1057,39 +943,14 @@ void ScInterpreter::ScBetaDist()
     beta = GetDouble();
     alpha = GetDouble();
     x = GetDouble();
-    double fScale = fUpperBound - fLowerBound;
-    if (fScale <= 0.0 || alpha <= 0.0 || beta <= 0.0)
+    const auto aResult = semath::evaluateBetaDistribution(
+        x, alpha, beta, fLowerBound, fUpperBound, bIsCumulative, false);
+    if (!aResult)
     {
-        PushIllegalArgument();
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
         return;
     }
-    if (bIsCumulative) // cumulative distribution function
-    {
-        // special cases
-        if (x < fLowerBound)
-        {
-            PushDouble(0.0); return; //see spec
-        }
-        if (x > fUpperBound)
-        {
-            PushDouble(1.0); return; //see spec
-        }
-        // normal cases
-        x = (x-fLowerBound)/fScale;  // convert to standard form
-        PushDouble(GetBetaDist(x, alpha, beta));
-        return;
-    }
-    else // probability density function
-    {
-        if (x < fLowerBound || x > fUpperBound)
-        {
-            PushDouble(0.0);
-            return;
-        }
-        x = (x-fLowerBound)/fScale;
-        PushDouble(GetBetaDistPDF(x, alpha, beta)/fScale);
-        return;
-    }
+    PushDouble(aResult.maValue);
 }
 
 /**
@@ -1118,24 +979,14 @@ void ScInterpreter::ScBetaDist_MS()
     beta = GetDouble();
     alpha = GetDouble();
     x = GetDouble();
-    if (alpha <= 0.0 || beta <= 0.0 || x < fLowerBound || x > fUpperBound)
+    const auto aResult = semath::evaluateBetaDistribution(
+        x, alpha, beta, fLowerBound, fUpperBound, bIsCumulative, true);
+    if (!aResult)
     {
-        PushIllegalArgument();
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
         return;
     }
-    double fScale = fUpperBound - fLowerBound;
-    if (bIsCumulative) // cumulative distribution function
-    {
-        x = (x-fLowerBound)/fScale;  // convert to standard form
-        PushDouble(GetBetaDist(x, alpha, beta));
-        return;
-    }
-    else // probability density function
-    {
-        x = (x-fLowerBound)/fScale;
-        PushDouble(GetBetaDistPDF(x, alpha, beta)/fScale);
-        return;
-    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScPhi()
@@ -1150,16 +1001,18 @@ void ScInterpreter::ScGauss()
 
 void ScInterpreter::ScFisher()
 {
-    double fVal = GetDouble();
-    if (std::abs(fVal) >= 1.0)
-        PushIllegalArgument();
-    else
-        PushDouble(::atanh(fVal));
+    const auto aResult = semath::fisherTransform(GetDouble());
+    if (!aResult)
+    {
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScFisherInv()
 {
-    PushDouble( tanh( GetDouble()));
+    PushDouble(semath::inverseFisherTransform(GetDouble()));
 }
 
 void ScInterpreter::ScFact()
@@ -1258,25 +1111,6 @@ double ScInterpreter::GetBinomDistPMF(double x, double n, double p)
     }
 }
 
-static double lcl_GetBinomDistRange(double n, double xs,double xe,
-            double fFactor /* q^n */, double p, double q)
-//preconditions: 0.0 <= xs < xe <= n; xs,xe,n integral although double
-{
-    sal_uInt32 i;
-    // skip summands index 0 to xs-1, start sum with index xs
-    sal_uInt32 nXs = static_cast<sal_uInt32>( xs );
-    for (i = 1; i <= nXs && fFactor > 0.0; i++)
-        fFactor *= (n-i+1)/i * p/q;
-    KahanSum fSum = fFactor; // Summand xs
-    sal_uInt32 nXe = static_cast<sal_uInt32>(xe);
-    for (i = nXs+1; i <= nXe && fFactor > 0.0; i++)
-    {
-        fFactor *= (n-i+1)/i * p/q;
-        fSum += fFactor;
-    }
-    return std::min(fSum.get(), 1.0);
-}
-
 void ScInterpreter::ScB()
 {
     sal_uInt8 nParamCount = GetByte();
@@ -1284,63 +1118,30 @@ void ScInterpreter::ScB()
         return ;
     if (nParamCount == 3)   // mass function
     {
-        double x = ::rtl::math::approxFloor(GetDouble());
-        double p = GetDouble();
-        double n = ::rtl::math::approxFloor(GetDouble());
-        if (n < 0.0 || x < 0.0 || x > n || p < 0.0 || p > 1.0)
-            PushIllegalArgument();
-        else if (p == 0.0)
-            PushDouble( (x == 0.0) ? 1.0 : 0.0 );
-        else if ( p == 1.0)
-            PushDouble( (x == n) ? 1.0 : 0.0);
-        else
-            PushDouble(GetBinomDistPMF(x,n,p));
+        const double x = GetDouble();
+        const double p = GetDouble();
+        const double n = GetDouble();
+        const auto aResult = semath::evaluateBinomialDistribution(x, n, p, false);
+        if (!aResult)
+        {
+            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+            return;
+        }
+        PushDouble(aResult.maValue);
     }
     else
     {   // nParamCount == 4
-        double xe = ::rtl::math::approxFloor(GetDouble());
-        double xs = ::rtl::math::approxFloor(GetDouble());
-        double p = GetDouble();
-        double n = ::rtl::math::approxFloor(GetDouble());
-        double q = (0.5 - p) + 0.5;
-        bool bIsValidX = ( 0.0 <= xs && xs <= xe && xe <= n);
-        if ( bIsValidX && 0.0 < p && p < 1.0)
+        const double xe = GetDouble();
+        const double xs = GetDouble();
+        const double p = GetDouble();
+        const double n = GetDouble();
+        const auto aResult = semath::evaluateBinomialRangeDistribution(n, p, xs, xe);
+        if (!aResult)
         {
-            if (xs == xe)       // mass function
-                PushDouble(GetBinomDistPMF(xs,n,p));
-            else
-            {
-                double fFactor = pow(q, n);
-                if (fFactor > ::std::numeric_limits<double>::min())
-                    PushDouble(lcl_GetBinomDistRange(n,xs,xe,fFactor,p,q));
-                else
-                {
-                    fFactor = pow(p, n);
-                    if (fFactor > ::std::numeric_limits<double>::min())
-                    {
-                        // sum from j=xs to xe {(n choose j) * p^j * q^(n-j)}
-                        // = sum from i = n-xe to n-xs { (n choose i) * q^i * p^(n-i)}
-                        PushDouble(lcl_GetBinomDistRange(n,n-xe,n-xs,fFactor,q,p));
-                    }
-                    else
-                        PushDouble(GetBetaDist(q,n-xe,xe+1.0)-GetBetaDist(q,n-xs+1,xs) );
-                }
-            }
+            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+            return;
         }
-        else
-        {
-            if ( bIsValidX ) // not(0<p<1)
-            {
-                if ( p == 0.0 )
-                    PushDouble( (xs == 0.0) ? 1.0 : 0.0 );
-                else if ( p == 1.0 )
-                    PushDouble( (xe == n) ? 1.0 : 0.0 );
-                else
-                    PushIllegalArgument();
-            }
-            else
-                PushIllegalArgument();
-        }
+        PushDouble(aResult.maValue);
     }
 }
 
@@ -1351,61 +1152,15 @@ void ScInterpreter::ScBinomDist()
 
     bool bIsCum   = GetBool();     // false=mass function; true=cumulative
     double p      = GetDouble();
-    double n      = ::rtl::math::approxFloor(GetDouble());
-    double x      = ::rtl::math::approxFloor(GetDouble());
-    double q = (0.5 - p) + 0.5;           // get one bit more for p near 1.0
-    if (n < 0.0 || x < 0.0 || x > n || p < 0.0 || p > 1.0)
+    double n      = GetDouble();
+    double x      = GetDouble();
+    const auto aResult = semath::evaluateBinomialDistribution(x, n, p, bIsCum);
+    if (!aResult)
     {
-        PushIllegalArgument();
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
         return;
     }
-    if ( p == 0.0)
-    {
-        PushDouble( (x==0.0 || bIsCum) ? 1.0 : 0.0 );
-        return;
-    }
-    if ( p == 1.0)
-    {
-        PushDouble( (x==n) ? 1.0 : 0.0);
-        return;
-    }
-    if (!bIsCum)
-        PushDouble( GetBinomDistPMF(x,n,p));
-    else
-    {
-        if (x == n)
-            PushDouble(1.0);
-        else
-        {
-            double fFactor = pow(q, n);
-            if (x == 0.0)
-                PushDouble(fFactor);
-            else if (fFactor <= ::std::numeric_limits<double>::min())
-            {
-                fFactor = pow(p, n);
-                if (fFactor <= ::std::numeric_limits<double>::min())
-                    PushDouble(GetBetaDist(q,n-x,x+1.0));
-                else
-                {
-                    if (fFactor > fMachEps)
-                    {
-                        double fSum = 1.0 - fFactor;
-                        sal_uInt32 max = static_cast<sal_uInt32> (n - x) - 1;
-                        for (sal_uInt32 i = 0; i < max && fFactor > 0.0; i++)
-                        {
-                            fFactor *= (n-i)/(i+1)*q/p;
-                            fSum -= fFactor;
-                        }
-                        PushDouble( (fSum < 0.0) ? 0.0 : fSum );
-                    }
-                    else
-                        PushDouble(lcl_GetBinomDistRange(n,n-x,n,fFactor,q,p));
-                }
-            }
-            else
-                PushDouble( lcl_GetBinomDistRange(n,0.0,x,fFactor,p,q)) ;
-        }
-    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScCritBinom()
@@ -1786,49 +1541,16 @@ void ScInterpreter::ScPoissonDist( bool bODFF )
     if ( !MustHaveParamCount( nParamCount, ( bODFF ? 2 : 3 ), 3 ) )
         return;
 
-    bool bCumulative = nParamCount != 3 || GetBool();         // default cumulative
-    double lambda    = GetDouble();                           // Mean
-    double x         = ::rtl::math::approxFloor(GetDouble()); // discrete distribution
-    if (lambda <= 0.0 || x < 0.0)
-        PushIllegalArgument();
-    else if (!bCumulative)                            // Probability mass function
+    bool bCumulative = nParamCount != 3 || GetBool(); // default cumulative
+    double lambda = GetDouble();                      // Mean
+    double x = GetDouble();                           // discrete distribution
+    const auto aResult = semath::evaluatePoissonDistribution(x, lambda, bCumulative);
+    if (!aResult)
     {
-        if (lambda >712.0)    // underflow in exp(-lambda)
-        {   // accuracy 11 Digits
-            PushDouble( exp(x*log(lambda)-lambda-GetLogGamma(x+1.0)));
-        }
-        else
-        {
-            double fPoissonVar = 1.0;
-            for ( double f = 0.0; f < x; ++f )
-                fPoissonVar *= lambda / ( f + 1.0 );
-            PushDouble( fPoissonVar * exp( -lambda ) );
-        }
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
     }
-    else                                // Cumulative distribution function
-    {
-        if (lambda > 712.0)  // underflow in exp(-lambda)
-        {   // accuracy 12 Digits
-            PushDouble(GetUpRegIGamma(x+1.0,lambda));
-        }
-        else
-        {
-            if (x >= 936.0) // result is always indistinguishable from 1
-                PushDouble (1.0);
-            else
-            {
-                double fSummand = std::exp(-lambda);
-                KahanSum fSum = fSummand;
-                int nEnd = sal::static_int_cast<int>( x );
-                for (int i = 1; i <= nEnd; i++)
-                {
-                    fSummand = (fSummand * lambda)/static_cast<double>(i);
-                    fSum += fSummand;
-                }
-                PushDouble(fSum.get());
-            }
-        }
-    }
+    PushDouble(aResult.maValue);
 }
 
 /** Local function used in the calculation of the hypergeometric distribution.
