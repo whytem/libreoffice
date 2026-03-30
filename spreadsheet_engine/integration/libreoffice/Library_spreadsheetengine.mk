@@ -40,6 +40,7 @@ $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spreadsheet_engine/source/core/MathBitwise \
     spreadsheet_engine/source/core/CalcConfig \
     spreadsheet_engine/source/core/CompilerSupport \
+    spreadsheet_engine/source/core/ConversionRuntime \
     spreadsheet_engine/source/core/DateTimeParse \
     spreadsheet_engine/source/core/DateTimeParts \
     spreadsheet_engine/source/core/DateTimeWeek \
@@ -48,7 +49,9 @@ $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spreadsheet_engine/source/core/ForceCalculation \
     spreadsheet_engine/source/core/LookupRuntime \
     spreadsheet_engine/source/core/OdfFormulaParser \
+    spreadsheet_engine/source/core/MathAggregate \
     spreadsheet_engine/source/core/MathFinancial \
+    spreadsheet_engine/source/core/MathFunctionRuntime \
     spreadsheet_engine/source/core/MathRounding \
     spreadsheet_engine/source/core/MathScalar \
     spreadsheet_engine/source/core/MathStatistical \

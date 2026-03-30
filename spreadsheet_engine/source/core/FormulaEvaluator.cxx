@@ -23,10 +23,13 @@
 #include <spreadsheetengine/api/Query.hxx>
 #include <spreadsheetengine/api/Text.hxx>
 #include <spreadsheetengine/api/Workday.hxx>
+#include <spreadsheetengine/runtime/ConversionRuntime.hxx>
 #include <spreadsheetengine/runtime/DateTimeParse.hxx>
 #include <spreadsheetengine/runtime/DateTimeParts.hxx>
 #include <spreadsheetengine/runtime/FinancialRuntime.hxx>
 #include <spreadsheetengine/runtime/LookupRuntime.hxx>
+#include <spreadsheetengine/runtime/MathAggregate.hxx>
+#include <spreadsheetengine/runtime/MathFunctionRuntime.hxx>
 #include <spreadsheetengine/runtime/MathRounding.hxx>
 #include <spreadsheetengine/runtime/MathStatistical.hxx>
 #include <spreadsheetengine/runtime/QueryRuntime.hxx>
@@ -55,6 +58,7 @@ namespace
 {
 
 namespace secompiler = spreadsheetengine::detail::compiler;
+namespace seconvert = spreadsheetengine::core::convert;
 namespace sedatetime = spreadsheetengine::core::datetime;
 namespace sefinance = spreadsheetengine::core::finance;
 namespace semath = spreadsheetengine::core::math;
@@ -479,141 +483,6 @@ namespace setoken = spreadsheetengine::detail::token;
     return api::ValueResult<api::String>::failure(api::Error::IllegalArgument);
 }
 
-struct AggregateOptions
-{
-    bool mbIgnoreHiddenRows = false;
-    bool mbIgnoreErrors = false;
-    bool mbIgnoreNestedAggregates = false;
-};
-
-struct AggregateScan
-{
-    std::vector<double> maNumbers;
-    sal_Int32 mnNonEmptyCount = 0;
-};
-
-struct UnitConversionFactor
-{
-    api::StringView maFromUnit;
-    api::StringView maToUnit;
-    double mfFactor = 1.0;
-};
-
-struct EuroCurrencyInfo
-{
-    api::StringView maCode;
-    double mfRate = 1.0;
-    sal_Int32 mnDecimals = 2;
-};
-
-constexpr UnitConversionFactor kKnownConversions[] = {
-    { u"uk_acre", u"us_acre", 0.999996000004 },
-    { u"us_acre", u"ang2", 4.04687260987425E+023 },
-    { u"ang2", u"ar", 1E-22 },
-    { u"ar", u"ft2", 1076.39104167097 },
-    { u"ft2", u"ha", 9.290304E-06 },
-    { u"ha", u"in2", 15500031.000062 },
-    { u"in2", u"ly2", 7.20836355779189E-36 },
-    { u"ly2", u"m2", 8.9501590038784E+031 },
-    { u"m2", u"Morgen", 0.0004 },
-    { u"Morgen", u"mi2", 0.000965255396356 },
-    { u"mi2", u"Nmi2", 0.755119708987773 },
-    { u"Nmi2", u"Pica2", 27560019740839.5 },
-    { u"ang", u"ell", 8.748906E-11 },
-    { u"ell", u"ft", 3.75000016575001 },
-    { u"ft", u"in", 12 },
-    { u"in", u"ly", 2.68483957766416E-18 },
-    { u"ly", u"m", 9.460528E+015 },
-    { u"m", u"mi", 0.000621371192237 },
-    { u"mi", u"Nmi", 0.868976241900648 },
-    { u"Nmi", u"parsec", 6.001922708E-14 },
-    { u"parsec", u"Pica", 8.74680337440886E+019 },
-    { u"survey_mi", u"yd", 1760.00352000704 },
-    { u"BTU", u"c", 252.165488508169 },
-    { u"c", u"cal", 0.99933031528756 },
-    { u"cal", u"e", 41867948.4613929 },
-    { u"e", u"eV", 624145700000 },
-    { u"eV", u"flb", 3.80206452103493E-18 },
-    { u"flb", u"HPh", 1.5697407642781E-08 },
-    { u"HPh", u"J", 2684519.71705162 },
-    { u"J", u"Wh", 0.000277777777778 },
-    { u"dyn", u"N", 1E-05 },
-    { u"N", u"lbf", 0.224808923655339 },
-    { u"lbf", u"pond", 453.5923144952 },
-    { u"ga", u"T", 0.0001 },
-    { u"g", u"grain", 15.43236 },
-    { u"cwt", u"uk_cwt", 0.892857142857143 },
-    { u"uk_cwt", u"lbm", 112.000014877089 },
-    { u"lbm", u"stone", 0.071428541793075 },
-    { u"stone", u"ton", 0.007 },
-    { u"ton", u"ozm", 32000.017962592 },
-    { u"ozm", u"sg", 0.001942566898708 },
-    { u"sg", u"u", 8.78861184032002E+027 },
-    { u"HP", u"PS", 1.0138700185381 },
-    { u"PS", u"W", 735.498542977386 },
-    { u"atm", u"mmHg", 760 },
-    { u"mmHg", u"Pa", 133.322363925 },
-    { u"Pa", u"psi", 0.0001450377 },
-    { u"psi", u"Torr", 51.7150920071126 },
-    { u"admkn", u"kn", 0.999999913606911 },
-    { u"kn", u"m/h", 1852 },
-    { u"m/h", u"m/s", 0.000277777777778 },
-    { u"m/s", u"mph", 2.2369362920544 },
-    { u"C", u"F", 33.8 },
-    { u"F", u"K", 255.927777777778 },
-    { u"K", u"Rank", 1.8 },
-    { u"Rank", u"Reau", -218.075555555556 },
-    { u"d", u"hr", 24 },
-    { u"hr", u"mn", 60 },
-    { u"mn", u"sec", 60 },
-    { u"sec", u"yr", 3.16880878140289E-08 },
-    { u"ang3", u"barrel", 6.28981077043211E-30 },
-    { u"barrel", u"bushel", 4.51167627067586 },
-    { u"bushel", u"cup", 148.946856929372 },
-    { u"cup", u"ft3", 0.008355034722222 },
-    { u"ft3", u"gal", 7.48051948051948 },
-    { u"in3", u"l", 0.016387064 },
-    { u"in3", u"gal", 0.00432900432900433 },
-    { u"l", u"ly3", 1.18101081256238E-51 },
-    { u"l", u"ml", 1000.0 },
-    { u"ly3", u"m3", 8.46732298606437E+047 },
-    { u"m3", u"yd3", 1.30795061931439 },
-    { u"m3", u"mi3", 2.39912758578928E-10 },
-    { u"mi3", u"Nmi3", 0.65618108690130639 },
-    { u"mi3", u"MTON", 5887918080000 },
-    { u"MTON", u"Nmi3", 1.1144534927043455E-13 },
-    { u"Nmi3", u"oz", 214792833387555 },
-    { u"oz", u"Pica3", 673596 },
-    { u"pt", u"qt", 0.5 },
-    { u"qt", u"tbs", 64 },
-    { u"tbs", u"tsp", 3 },
-    { u"tsp", u"tspm", 0.98578431875 },
-    { u"tspm", u"ml", 5.0 },
-    { u"tspm", u"uk_gal", 0.001099846241495 },
-    { u"uk_gal", u"uk_pt", 8 },
-    { u"uk_pt", u"uk_qt", 0.5 },
-    { u"uk_qt", u"yd3", 0.00148651530774 },
-    { u"Pica2", u"picapt2", 1 },
-    { u"picapt2", u"yd2", 1.48843545191282E-07 },
-    { u"Pica3", u"picapt3", 1 },
-    { u"picapt3", u"pica3", 0.000578703703705 },
-    { u"pica3", u"pt", 0.000160333493666 },
-    { u"gal", u"GRT", 0.001336805679661 },
-    { u"GRT", u"in3", 172799.98395775 },
-    { u"u", u"uk_ton", 1.63431440967062E-30 },
-    { u"Pica", u"pica", 0.083333333333353 },
-    { u"pica", u"survey_mi", 2.63046611952801E-06 },
-};
-
-constexpr EuroCurrencyInfo kEuroCurrencies[] = {
-    { u"EUR", 1.0, 2 },       { u"ATS", 13.7603, 2 },  { u"DEM", 1.95583, 2 },
-    { u"BEF", 40.3399, 0 },   { u"ESP", 166.386, 0 },  { u"FIM", 5.94573, 2 },
-    { u"FRF", 6.55957, 2 },   { u"IEP", 0.787564, 2 }, { u"ITL", 1936.27, 0 },
-    { u"LUF", 40.3399, 0 },   { u"NLG", 2.20371, 2 },  { u"PTE", 200.482, 1 },
-    { u"GRD", 340.75, 0 },    { u"SIT", 239.64, 0 },   { u"MTL", 0.4293, 2 },
-    { u"CYP", 0.585274, 2 },  { u"SKK", 30.126, 1 },
-};
-
 [[nodiscard]] std::optional<sal_Int32> toWholeNumber(double fValue)
 {
     if (!std::isfinite(fValue))
@@ -626,226 +495,8 @@ constexpr EuroCurrencyInfo kEuroCurrencies[] = {
     return static_cast<sal_Int32>(fRounded);
 }
 
-[[nodiscard]] std::optional<AggregateOptions> decodeAggregateOptions(sal_Int32 nOption)
-{
-    switch (nOption)
-    {
-        case 0:
-            return AggregateOptions { false, false, true };
-        case 1:
-            return AggregateOptions { true, false, true };
-        case 2:
-            return AggregateOptions { false, true, true };
-        case 3:
-            return AggregateOptions { true, true, true };
-        case 4:
-            return AggregateOptions { false, false, false };
-        case 5:
-            return AggregateOptions { true, false, false };
-        case 6:
-            return AggregateOptions { false, true, false };
-        case 7:
-            return AggregateOptions { true, true, false };
-        default:
-            return std::nullopt;
-    }
-}
-
-[[nodiscard]] api::String normalizeUnitSymbol(api::StringView rUnit)
-{
-    api::String aResult;
-    aResult.reserve(rUnit.size());
-    for (std::size_t nIndex = 0; nIndex < rUnit.size(); ++nIndex)
-    {
-        const char16_t cChar = rUnit[nIndex];
-        if (cChar == u'^' && nIndex + 1 < rUnit.size()
-            && rUnit[nIndex + 1] >= u'0' && rUnit[nIndex + 1] <= u'9')
-        {
-            continue;
-        }
-
-        aResult.push_back(cChar);
-    }
-    return aResult;
-}
-
-[[nodiscard]] api::String normalizeAsciiUpper(api::StringView rValue)
-{
-    api::String aResult;
-    aResult.reserve(rValue.size());
-    for (const char16_t cChar : rValue)
-    {
-        if (cChar >= u'a' && cChar <= u'z')
-            aResult.push_back(static_cast<char16_t>(cChar - (u'a' - u'A')));
-        else
-            aResult.push_back(cChar);
-    }
-    return aResult;
-}
-
-[[nodiscard]] std::optional<EuroCurrencyInfo> lookupEuroCurrency(
-    api::StringView rCode, bool bCaseInsensitive)
-{
-    const api::String aNormalized = bCaseInsensitive ? normalizeAsciiUpper(rCode) : api::String(rCode);
-    for (const auto& rCurrency : kEuroCurrencies)
-    {
-        if (aNormalized == rCurrency.maCode)
-            return rCurrency;
-    }
-    return std::nullopt;
-}
-
-[[nodiscard]] double roundToDecimalPlaces(double fValue, sal_Int32 nDecimals)
-{
-    if (nDecimals < 0)
-        return fValue;
-    const double fScale = std::pow(10.0, static_cast<double>(nDecimals));
-    return std::round(fValue * fScale) / fScale;
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateEuroConvertValue(double fValue,
-    api::StringView rFromCurrency, api::StringView rToCurrency, bool bCaseInsensitive,
-    bool bRoundToTargetDecimals)
-{
-    const auto oFrom = lookupEuroCurrency(rFromCurrency, bCaseInsensitive);
-    const auto oTo = lookupEuroCurrency(rToCurrency, bCaseInsensitive);
-    if (!oFrom || !oTo)
-        return api::ValueResult<double>::failure(api::Error::NotAvailable);
-
-    double fResult = fValue;
-    if (oFrom->maCode != oTo->maCode)
-    {
-        if (oFrom->maCode == u"EUR")
-            fResult *= oTo->mfRate;
-        else if (oTo->maCode == u"EUR")
-            fResult /= oFrom->mfRate;
-        else
-            fResult = (fValue / oFrom->mfRate) * oTo->mfRate;
-    }
-
-    if (bRoundToTargetDecimals)
-    {
-        fResult = roundToDecimalPlaces(fResult, oTo->mnDecimals);
-    }
-
-    return api::ValueResult<double>::success(fResult);
-}
-
-[[nodiscard]] bool equalUnitSymbol(api::StringView rLeft, api::StringView rRight)
-{
-    return normalizeUnitSymbol(rLeft) == normalizeUnitSymbol(rRight);
-}
-
-[[nodiscard]] std::optional<double> convertTemperatureUnit(
-    double fValue, api::StringView rFromUnit, api::StringView rToUnit)
-{
-    const api::String aNormalizedFrom = normalizeUnitSymbol(rFromUnit);
-    const api::String aNormalizedTo = normalizeUnitSymbol(rToUnit);
-
-    const auto toKelvin = [&](api::StringView rUnit) -> std::optional<double> {
-        if (rUnit == u"C")
-            return fValue + 273.15;
-        if (rUnit == u"F")
-            return (fValue + 459.67) * (5.0 / 9.0);
-        if (rUnit == u"K")
-            return fValue;
-        if (rUnit == u"Rank" || rUnit == u"RANK")
-            return fValue * (5.0 / 9.0);
-        if (rUnit == u"Reau" || rUnit == u"REAU")
-            return fValue * 1.25 + 273.15;
-        return std::nullopt;
-    };
-
-    const auto oKelvin = toKelvin(aNormalizedFrom);
-    if (!oKelvin)
-        return std::nullopt;
-
-    if (aNormalizedTo == u"C")
-        return *oKelvin - 273.15;
-    if (aNormalizedTo == u"F")
-        return *oKelvin * (9.0 / 5.0) - 459.67;
-    if (aNormalizedTo == u"K")
-        return *oKelvin;
-    if (aNormalizedTo == u"Rank" || aNormalizedTo == u"RANK")
-        return *oKelvin * (9.0 / 5.0);
-    if (aNormalizedTo == u"Reau" || aNormalizedTo == u"REAU")
-        return (*oKelvin - 273.15) * 0.8;
-    return std::nullopt;
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateConvertValue(
-    double fValue, api::StringView rFromUnit, api::StringView rToUnit)
-{
-    const api::String aNormalizedFrom = normalizeUnitSymbol(rFromUnit);
-    const api::String aNormalizedTo = normalizeUnitSymbol(rToUnit);
-    if (aNormalizedFrom == aNormalizedTo)
-        return api::ValueResult<double>::success(fValue);
-
-    if (const auto oTemperature = convertTemperatureUnit(fValue, rFromUnit, rToUnit))
-        return api::ValueResult<double>::success(*oTemperature);
-
-    for (const auto& rConversion : kKnownConversions)
-    {
-        if (equalUnitSymbol(rConversion.maFromUnit, rFromUnit)
-            && equalUnitSymbol(rConversion.maToUnit, rToUnit))
-        {
-            return api::ValueResult<double>::success(fValue * rConversion.mfFactor);
-        }
-    }
-
-    for (const auto& rConversion : kKnownConversions)
-    {
-        if (equalUnitSymbol(rConversion.maFromUnit, rToUnit)
-            && equalUnitSymbol(rConversion.maToUnit, rFromUnit))
-        {
-            return api::ValueResult<double>::success(fValue / rConversion.mfFactor);
-        }
-    }
-
-    struct PendingUnitConversion
-    {
-        api::String maUnit;
-        double mfFactor = 1.0;
-    };
-
-    std::vector<PendingUnitConversion> aPending { { aNormalizedFrom, 1.0 } };
-    std::vector<api::String> aVisited { aNormalizedFrom };
-
-    for (std::size_t nIndex = 0; nIndex < aPending.size(); ++nIndex)
-    {
-        const PendingUnitConversion& rCurrent = aPending[nIndex];
-        if (rCurrent.maUnit == aNormalizedTo)
-            return api::ValueResult<double>::success(fValue * rCurrent.mfFactor);
-
-        for (const auto& rConversion : kKnownConversions)
-        {
-            api::String aNextUnit;
-            double fNextFactor = 1.0;
-            if (normalizeUnitSymbol(rConversion.maFromUnit) == rCurrent.maUnit)
-            {
-                aNextUnit = normalizeUnitSymbol(rConversion.maToUnit);
-                fNextFactor = rCurrent.mfFactor * rConversion.mfFactor;
-            }
-            else if (normalizeUnitSymbol(rConversion.maToUnit) == rCurrent.maUnit)
-            {
-                aNextUnit = normalizeUnitSymbol(rConversion.maFromUnit);
-                fNextFactor = rCurrent.mfFactor / rConversion.mfFactor;
-            }
-            else
-            {
-                continue;
-            }
-
-            if (std::find(aVisited.begin(), aVisited.end(), aNextUnit) != aVisited.end())
-                continue;
-
-            aVisited.push_back(aNextUnit);
-            aPending.push_back({ std::move(aNextUnit), fNextFactor });
-        }
-    }
-
-    return api::ValueResult<double>::failure(api::Error::NotAvailable);
-}
+using AggregateOptions = semath::AggregateOptions;
+using AggregateScan = semath::AggregateScan;
 
 [[nodiscard]] api::String normalizeFunctionName(api::StringView rName)
 {
@@ -1013,865 +664,6 @@ public:
     for (const double fValue : rNumbers)
         fSum = ::rtl::math::approxAdd(fSum, fValue);
     return fSum;
-}
-
-[[nodiscard]] double phiValue(double fValue)
-{
-    return 0.39894228040143268 * std::exp(-(fValue * fValue) / 2.0);
-}
-
-[[nodiscard]] double taylorPolynomial(const double* pPolynomial, sal_uInt16 nMax, double fValue)
-{
-    double fResult = pPolynomial[nMax];
-    for (short nIndex = nMax - 1; nIndex >= 0; --nIndex)
-        fResult = (fResult * fValue) + pPolynomial[nIndex];
-    return fResult;
-}
-
-[[nodiscard]] double gaussValue(double fValue)
-{
-    const double fAbs = std::abs(fValue);
-    const sal_uInt16 nBucket = static_cast<sal_uInt16>(::rtl::math::approxFloor(fAbs));
-
-    double fResult = 0.0;
-    if (nBucket == 0)
-    {
-        static const double aT0[] = { 0.39894228040143268, -0.06649038006690545,
-            0.00997355701003582, -0.00118732821548045, 0.00011543468761616,
-            -0.00000944465625950, 0.00000066596935163, -0.00000004122667415,
-            0.00000000227352982, 0.00000000011301172, 0.00000000000511243,
-            -0.00000000000021218 };
-        fResult = taylorPolynomial(aT0, 11, fAbs * fAbs) * fAbs;
-    }
-    else if (nBucket <= 2)
-    {
-        static const double aT2[] = { 0.47724986805182079, 0.05399096651318805,
-            -0.05399096651318805, 0.02699548325659403, -0.00449924720943234,
-            -0.00224962360471617, 0.00134977416282970, -0.00011783742691370,
-            -0.00011515930357476, 0.00003704737285544, 0.00000282690796889,
-            -0.00000354513195524, 0.00000037669563126, 0.00000019202407921,
-            -0.00000005226908590, -0.00000000491799345, 0.00000000366377919,
-            -0.00000000015981997, -0.00000000017381238, 0.00000000002624031,
-            0.00000000000560919, -0.00000000000172127, -0.00000000000008634,
-            0.00000000000007894 };
-        fResult = taylorPolynomial(aT2, 23, fAbs - 2.0);
-    }
-    else if (nBucket <= 4)
-    {
-        static const double aT4[] = { 0.49996832875816688, 0.00013383022576489,
-            -0.00026766045152977, 0.00033457556441221, -0.00028996548915725,
-            0.00018178605666397, -0.00008252863922168, 0.00002551802519049,
-            -0.00000391665839292, -0.00000074018205222, 0.00000064422023359,
-            -0.00000017370155340, 0.00000000909595465, 0.00000000944943118,
-            -0.00000000329957075, 0.00000000029492075, 0.00000000011874477,
-            -0.00000000004420396, 0.00000000000361422, 0.00000000000143638,
-            -0.00000000000045848 };
-        fResult = taylorPolynomial(aT4, 20, fAbs - 4.0);
-    }
-    else
-    {
-        static const double aAsympt[] = { -1.0, 1.0, -3.0, 15.0, -105.0 };
-        fResult = 0.5
-                  + phiValue(fAbs)
-                        * (taylorPolynomial(aAsympt, 4, 1.0 / (fAbs * fAbs)) / fAbs);
-    }
-
-    return fValue < 0.0 ? -fResult : fResult;
-}
-
-[[nodiscard]] api::ValueResult<double> gammaContinuedFraction(double fAlpha, double fX)
-{
-    constexpr double fHalfMachEps = 0.5 * std::numeric_limits<double>::epsilon();
-    const double fBigInv = std::numeric_limits<double>::epsilon();
-    const double fBig = 1.0 / fBigInv;
-    double fCount = 0.0;
-    double fY = 1.0 - fAlpha;
-    double fDenom = fX + 2.0 - fAlpha;
-    double fPkm1 = fX + 1.0;
-    double fPkm2 = 1.0;
-    double fQkm1 = fDenom * fX;
-    double fQkm2 = fX;
-    double fApprox = fPkm1 / fQkm1;
-    bool bFinished = false;
-    do
-    {
-        fCount += 1.0;
-        fY += 1.0;
-        const double fNum = fY * fCount;
-        fDenom += 2.0;
-        double fPk = fPkm1 * fDenom - fPkm2 * fNum;
-        const double fQk = fQkm1 * fDenom - fQkm2 * fNum;
-        if (!::rtl::math::approxEqual(fQk, 0.0))
-        {
-            const double fR = fPk / fQk;
-            bFinished = std::abs((fApprox - fR) / fR) <= fHalfMachEps;
-            fApprox = fR;
-        }
-
-        fPkm2 = fPkm1;
-        fPkm1 = fPk;
-        fQkm2 = fQkm1;
-        fQkm1 = fQk;
-        if (std::abs(fPk) > fBig)
-        {
-            fPkm2 *= fBigInv;
-            fPkm1 *= fBigInv;
-            fQkm2 *= fBigInv;
-            fQkm1 *= fBigInv;
-        }
-    } while (!bFinished && fCount < 10000.0);
-
-    if (!bFinished)
-        return api::ValueResult<double>::failure(api::Error::NoConvergence);
-    return api::ValueResult<double>::success(fApprox);
-}
-
-[[nodiscard]] api::ValueResult<double> gammaSeries(double fAlpha, double fX)
-{
-    constexpr double fHalfMachEps = 0.5 * std::numeric_limits<double>::epsilon();
-    double fDenomFactor = fAlpha;
-    double fSummand = 1.0 / fAlpha;
-    double fSum = fSummand;
-    int nCount = 1;
-    do
-    {
-        fDenomFactor += 1.0;
-        fSummand *= fX / fDenomFactor;
-        fSum += fSummand;
-        ++nCount;
-    } while (fSummand / fSum > fHalfMachEps && nCount <= 10000);
-
-    if (nCount > 10000)
-        return api::ValueResult<double>::failure(api::Error::NoConvergence);
-    return api::ValueResult<double>::success(fSum);
-}
-
-[[nodiscard]] api::ValueResult<double> lowRegularizedIncompleteGamma(double fAlpha, double fX)
-{
-    const double fLnFactor = fAlpha * std::log(fX) - fX - std::lgamma(fAlpha);
-    const double fFactor = std::exp(fLnFactor);
-    if (fX > fAlpha + 1.0)
-    {
-        const auto aContinuedFraction = gammaContinuedFraction(fAlpha, fX);
-        if (!aContinuedFraction)
-            return aContinuedFraction;
-        return api::ValueResult<double>::success(1.0 - fFactor * aContinuedFraction.maValue);
-    }
-
-    const auto aSeries = gammaSeries(fAlpha, fX);
-    if (!aSeries)
-        return aSeries;
-    return api::ValueResult<double>::success(fFactor * aSeries.maValue);
-}
-
-[[nodiscard]] api::ValueResult<double> upRegularizedIncompleteGamma(double fAlpha, double fX)
-{
-    const double fLnFactor = fAlpha * std::log(fX) - fX - std::lgamma(fAlpha);
-    const double fFactor = std::exp(fLnFactor);
-    if (fX > fAlpha + 1.0)
-    {
-        const auto aContinuedFraction = gammaContinuedFraction(fAlpha, fX);
-        if (!aContinuedFraction)
-            return aContinuedFraction;
-        return api::ValueResult<double>::success(fFactor * aContinuedFraction.maValue);
-    }
-
-    const auto aSeries = gammaSeries(fAlpha, fX);
-    if (!aSeries)
-        return aSeries;
-    return api::ValueResult<double>::success(1.0 - fFactor * aSeries.maValue);
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateLegacyChiDist(double fChi, double fDegreesFreedom)
-{
-    if (fDegreesFreedom < 1.0 || fChi < 0.0)
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    if (fChi <= 0.0)
-        return api::ValueResult<double>::success(1.0);
-    return upRegularizedIncompleteGamma(fDegreesFreedom / 2.0, fChi / 2.0);
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateBinomialInverse(
-    double fTrials, double fProbability, double fAlpha)
-{
-    const double fN = ::rtl::math::approxFloor(fTrials);
-    if (fN < 0.0 || fProbability < 0.0 || fProbability > 1.0 || fAlpha < 0.0 || fAlpha > 1.0)
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    if (::rtl::math::approxEqual(fAlpha, 0.0))
-        return api::ValueResult<double>::success(0.0);
-    if (::rtl::math::approxEqual(fProbability, 0.0))
-        return api::ValueResult<double>::success(0.0);
-    if (::rtl::math::approxEqual(fProbability, 1.0))
-        return api::ValueResult<double>::success(fN);
-    if (::rtl::math::approxEqual(fAlpha, 1.0))
-        return api::ValueResult<double>::success(fN);
-
-    sal_Int32 nLow = 0;
-    sal_Int32 nHigh = static_cast<sal_Int32>(fN);
-    while (nLow < nHigh)
-    {
-        const sal_Int32 nMid = nLow + ((nHigh - nLow) / 2);
-        const auto aDistribution = semath::evaluateBinomialDistribution(
-            static_cast<double>(nMid), fN, fProbability, true);
-        if (!aDistribution)
-            return aDistribution;
-
-        if (aDistribution.maValue >= fAlpha || ::rtl::math::approxEqual(aDistribution.maValue, fAlpha))
-            nHigh = nMid;
-        else
-            nLow = nMid + 1;
-    }
-
-    return api::ValueResult<double>::success(static_cast<double>(nLow));
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateNormalDistribution(
-    double fX, double fMean, double fSigma, bool bCumulative)
-{
-    if (!(fSigma > 0.0))
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    constexpr double fSqrtTwo = 1.4142135623730950488;
-    constexpr double fInvSqrtTwoPi = 0.39894228040143267794;
-    const double fZ = (fX - fMean) / fSigma;
-    if (bCumulative)
-    {
-        return api::ValueResult<double>::success(
-            std::clamp(0.5 * std::erfc(-fZ / fSqrtTwo), 0.0, 1.0));
-    }
-
-    return api::ValueResult<double>::success(
-        std::exp(-0.5 * fZ * fZ) * fInvSqrtTwoPi / fSigma);
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateLogNormalDistribution(
-    double fX, double fMean, double fSigma, bool bCumulative)
-{
-    if (!(fSigma > 0.0))
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    if (bCumulative)
-    {
-        if (fX <= 0.0)
-            return api::ValueResult<double>::success(0.0);
-        return evaluateNormalDistribution(std::log(fX), fMean, fSigma, true);
-    }
-
-    if (!(fX > 0.0))
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    constexpr double fInvSqrtTwoPi = 0.39894228040143267794;
-    const double fZ = (std::log(fX) - fMean) / fSigma;
-    return api::ValueResult<double>::success(
-        std::exp(-0.5 * fZ * fZ) * fInvSqrtTwoPi / (fSigma * fX));
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateChiSquareDistribution(
-    double fX, double fDegreesFreedom, bool bCumulative, bool bMicrosoftSyntax)
-{
-    if (fDegreesFreedom < 1.0 || (bMicrosoftSyntax && fX < 0.0))
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    if (bCumulative)
-    {
-        if (fX <= 0.0)
-            return api::ValueResult<double>::success(0.0);
-        return lowRegularizedIncompleteGamma(fDegreesFreedom / 2.0, fX / 2.0);
-    }
-
-    if (fX <= 0.0)
-        return api::ValueResult<double>::success(0.0);
-
-    const double fHalfDf = fDegreesFreedom / 2.0;
-    const double fLogValue = (fHalfDf - 1.0) * std::log(fX * 0.5) - (fX / 2.0)
-                             - std::log(2.0) - std::lgamma(fHalfDf);
-    return api::ValueResult<double>::success(std::exp(fLogValue));
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateGammaDistribution(
-    double fX, double fAlpha, double fBeta, bool bCumulative, bool bMicrosoftSyntax)
-{
-    if (fAlpha <= 0.0 || fBeta <= 0.0 || (bMicrosoftSyntax && fX < 0.0))
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    if (bCumulative)
-    {
-        if (fX <= 0.0)
-            return api::ValueResult<double>::success(0.0);
-        return lowRegularizedIncompleteGamma(fAlpha, fX / fBeta);
-    }
-
-    if (fX < 0.0)
-        return api::ValueResult<double>::success(0.0);
-
-    if (::rtl::math::approxEqual(fX, 0.0))
-    {
-        if (fAlpha < 1.0)
-            return api::ValueResult<double>::failure(api::Error::DivisionByZero);
-        if (::rtl::math::approxEqual(fAlpha, 1.0))
-            return api::ValueResult<double>::success(1.0 / fBeta);
-        return api::ValueResult<double>::success(0.0);
-    }
-
-    const double fScaledX = fX / fBeta;
-    const double fLogValue = (fAlpha - 1.0) * std::log(fScaledX) - fScaledX - std::log(fBeta)
-                             - std::lgamma(fAlpha);
-    return api::ValueResult<double>::success(std::exp(fLogValue));
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateGammaValue(double fX)
-{
-    const double fWhole = ::rtl::math::approxFloor(fX);
-    if (fX <= 0.0 && ::rtl::math::approxEqual(fX, fWhole))
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    const double fResult = std::tgamma(fX);
-    if (!std::isfinite(fResult))
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    return api::ValueResult<double>::success(fResult);
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateStudentDistribution(
-    double fT, double fDegreesFreedom, int nType)
-{
-    if (fDegreesFreedom < 1.0)
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    switch (nType)
-    {
-        case 1:
-            return api::ValueResult<double>::success(
-                0.5 * semath::betaCdf(
-                          fDegreesFreedom / (fDegreesFreedom + fT * fT),
-                          fDegreesFreedom / 2.0, 0.5));
-        case 2:
-            return api::ValueResult<double>::success(semath::betaCdf(
-                fDegreesFreedom / (fDegreesFreedom + fT * fT), fDegreesFreedom / 2.0, 0.5));
-        case 3:
-            return api::ValueResult<double>::success(
-                std::pow(1.0 + (fT * fT / fDegreesFreedom), -(fDegreesFreedom + 1.0) / 2.0)
-                / (std::sqrt(fDegreesFreedom)
-                   * semath::betaValue(0.5, fDegreesFreedom / 2.0)));
-        case 4:
-        {
-            const double fX = fDegreesFreedom / (fT * fT + fDegreesFreedom);
-            const double fRightHalf = 0.5 * semath::betaCdf(
-                                                fX, 0.5 * fDegreesFreedom, 0.5);
-            return api::ValueResult<double>::success(fT < 0.0 ? fRightHalf : 1.0 - fRightHalf);
-        }
-        default:
-            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    }
-}
-
-template <typename DistributionFn>
-[[nodiscard]] api::ValueResult<double> invertMonotonicPositiveDistribution(
-    double fTarget, double fInitialHigh, bool bIncreasing, const DistributionFn& rDistribution)
-{
-    double fLow = 0.0;
-    double fHigh = std::max(1.0, fInitialHigh);
-    auto aHigh = rDistribution(fHigh);
-    if (!aHigh)
-        return aHigh;
-
-    bool bBracketed = bIncreasing ? (aHigh.maValue >= fTarget) : (aHigh.maValue <= fTarget);
-    for (int nIter = 0; !bBracketed && nIter < 128; ++nIter)
-    {
-        fHigh *= 2.0;
-        if (!std::isfinite(fHigh) || fHigh > 1.0e10)
-            return api::ValueResult<double>::failure(api::Error::NoConvergence);
-
-        aHigh = rDistribution(fHigh);
-        if (!aHigh)
-            return aHigh;
-        bBracketed = bIncreasing ? (aHigh.maValue >= fTarget) : (aHigh.maValue <= fTarget);
-    }
-
-    if (!bBracketed)
-        return api::ValueResult<double>::failure(api::Error::NoConvergence);
-
-    for (int nIter = 0; nIter < 160; ++nIter)
-    {
-        const double fMid = 0.5 * (fLow + fHigh);
-        const auto aMid = rDistribution(fMid);
-        if (!aMid)
-            return aMid;
-
-        if (bIncreasing ? (aMid.maValue < fTarget) : (aMid.maValue > fTarget))
-            fLow = fMid;
-        else
-            fHigh = fMid;
-    }
-
-    return api::ValueResult<double>::success(0.5 * (fLow + fHigh));
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateTInverse(
-    double fProbability, double fDegreesFreedom, int nType)
-{
-    if (fDegreesFreedom < 1.0 || fProbability <= 0.0 || fProbability > 1.0)
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    if ((nType == 2 || nType == 4) && ::rtl::math::approxEqual(fProbability, 1.0))
-        return api::ValueResult<double>::success(0.0);
-
-    if (nType == 4)
-    {
-        if (fProbability >= 1.0)
-            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-        if (::rtl::math::approxEqual(fProbability, 0.5))
-            return api::ValueResult<double>::success(0.0);
-        if (fProbability < 0.5)
-        {
-            const auto aMirror = evaluateTInverse(1.0 - fProbability, fDegreesFreedom, nType);
-            if (!aMirror)
-                return aMirror;
-            return api::ValueResult<double>::success(-aMirror.maValue);
-        }
-
-        return invertMonotonicPositiveDistribution(fProbability, fDegreesFreedom, true,
-            [fDegreesFreedom](double fX) {
-                return evaluateStudentDistribution(fX, fDegreesFreedom, 4);
-            });
-    }
-
-    if (nType != 2)
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    return invertMonotonicPositiveDistribution(fProbability, fDegreesFreedom, false,
-        [fDegreesFreedom](double fX) {
-            return evaluateStudentDistribution(fX, fDegreesFreedom, 2);
-        });
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateFRightTailDistribution(
-    double fX, double fDegreesFreedom1, double fDegreesFreedom2)
-{
-    if (fX < 0.0 || fDegreesFreedom1 < 1.0 || fDegreesFreedom2 < 1.0
-        || fDegreesFreedom1 >= 1.0e10 || fDegreesFreedom2 >= 1.0e10)
-    {
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    }
-
-    const double fArgument
-        = fDegreesFreedom2 / (fDegreesFreedom2 + fDegreesFreedom1 * fX);
-    return api::ValueResult<double>::success(semath::betaCdf(
-        fArgument, fDegreesFreedom2 / 2.0, fDegreesFreedom1 / 2.0));
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateFInverseRightTail(
-    double fProbability, double fDegreesFreedom1, double fDegreesFreedom2)
-{
-    if (fProbability <= 0.0 || fProbability > 1.0 || fDegreesFreedom1 < 1.0
-        || fDegreesFreedom2 < 1.0 || fDegreesFreedom1 >= 1.0e10
-        || fDegreesFreedom2 >= 1.0e10)
-    {
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    }
-
-    if (::rtl::math::approxEqual(fProbability, 1.0))
-        return api::ValueResult<double>::success(0.0);
-
-    return invertMonotonicPositiveDistribution(fProbability, fDegreesFreedom1, false,
-        [fDegreesFreedom1, fDegreesFreedom2](double fX) {
-            return evaluateFRightTailDistribution(fX, fDegreesFreedom1, fDegreesFreedom2);
-        });
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateVarianceNumbers(
-    const std::vector<double>& rNumbers, bool bSample, bool bReturnStdDev)
-{
-    const std::size_t nCount = rNumbers.size();
-    if (nCount == 0 || (bSample && nCount < 2))
-        return api::ValueResult<double>::failure(api::Error::DivisionByZero);
-
-    const double fMean = sumNumbers(rNumbers) / static_cast<double>(nCount);
-    KahanSum fSquaredDeviation = 0.0;
-    for (const double fValue : rNumbers)
-    {
-        const double fDelta = ::rtl::math::approxSub(fValue, fMean);
-        fSquaredDeviation += fDelta * fDelta;
-    }
-
-    double fResult = fSquaredDeviation.get() / static_cast<double>(bSample ? (nCount - 1) : nCount);
-    if (bReturnStdDev)
-        fResult = std::sqrt(fResult);
-    return api::ValueResult<double>::success(fResult);
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateTrimmean(
-    std::vector<double> aValues, double fPercent)
-{
-    if (aValues.empty() || fPercent < 0.0 || fPercent >= 1.0)
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    std::sort(aValues.begin(), aValues.end());
-    sal_Int32 nTrimCount
-        = static_cast<sal_Int32>(::rtl::math::approxFloor(fPercent * aValues.size()));
-    nTrimCount -= nTrimCount % 2;
-    const std::size_t nTrimEachSide = static_cast<std::size_t>(nTrimCount / 2);
-    if (nTrimEachSide * 2 >= aValues.size())
-        return api::ValueResult<double>::failure(api::Error::DivisionByZero);
-
-    KahanSum fSum = 0.0;
-    for (std::size_t nIndex = nTrimEachSide; nIndex < aValues.size() - nTrimEachSide; ++nIndex)
-        fSum += aValues[nIndex];
-
-    const std::size_t nRemaining = aValues.size() - (nTrimEachSide * 2);
-    return api::ValueResult<double>::success(fSum.get() / static_cast<double>(nRemaining));
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateModeSingle(const std::vector<double>& rValues)
-{
-    std::vector<std::pair<double, sal_Int32>> aCounts;
-    aCounts.reserve(rValues.size());
-
-    for (const double fValue : rValues)
-    {
-        auto it = std::find_if(aCounts.begin(), aCounts.end(), [fValue](const auto& rEntry) {
-            return ::rtl::math::approxEqual(rEntry.first, fValue);
-        });
-        if (it == aCounts.end())
-        {
-            aCounts.emplace_back(fValue, 1);
-            it = std::prev(aCounts.end());
-        }
-        else
-        {
-            ++it->second;
-        }
-    }
-
-    auto itBest = aCounts.end();
-    for (auto it = aCounts.begin(); it != aCounts.end(); ++it)
-    {
-        if (itBest == aCounts.end() || it->second > itBest->second)
-            itBest = it;
-    }
-
-    if (itBest == aCounts.end() || itBest->second < 2)
-        return api::ValueResult<double>::failure(api::Error::NotAvailable);
-    return api::ValueResult<double>::success(itBest->first);
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateHypergeometricDistribution(
-    double fX, double fTrials, double fSuccesses, double fPopulation, bool bCumulative)
-{
-    const double fWholePopulation = ::rtl::math::approxFloor(fPopulation);
-    const double fWholeSuccesses = ::rtl::math::approxFloor(fSuccesses);
-    const double fWholeTrials = ::rtl::math::approxFloor(fTrials);
-    const double fWholeX = ::rtl::math::approxFloor(fX);
-    if (fWholeX < 0.0 || fWholeTrials < fWholeX || fWholePopulation < fWholeTrials
-        || fWholePopulation < fWholeSuccesses || fWholeSuccesses < 0.0)
-    {
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    }
-
-    const auto probability = [fWholePopulation, fWholeSuccesses,
-                              fWholeTrials](sal_Int32 nValue) {
-        const long double fK = static_cast<long double>(nValue);
-        if (fK < 0.0 || fK > fWholeTrials || fK > fWholeSuccesses
-            || (fWholeTrials - fK) > (fWholePopulation - fWholeSuccesses))
-        {
-            return 0.0L;
-        }
-
-        const long double fLogProbability
-            = std::lgammal(static_cast<long double>(fWholeSuccesses) + 1.0L)
-              - std::lgammal(fK + 1.0L)
-              - std::lgammal(static_cast<long double>(fWholeSuccesses) - fK + 1.0L)
-              + std::lgammal(static_cast<long double>(fWholePopulation - fWholeSuccesses) + 1.0L)
-              - std::lgammal(static_cast<long double>(fWholeTrials) - fK + 1.0L)
-              - std::lgammal(static_cast<long double>(fWholePopulation - fWholeSuccesses)
-                             - (static_cast<long double>(fWholeTrials) - fK) + 1.0L)
-              - std::lgammal(static_cast<long double>(fWholePopulation) + 1.0L)
-              + std::lgammal(static_cast<long double>(fWholeTrials) + 1.0L)
-              + std::lgammal(static_cast<long double>(fWholePopulation - fWholeTrials) + 1.0L);
-        return std::exp(fLogProbability);
-    };
-
-    const sal_Int32 nX = static_cast<sal_Int32>(fWholeX);
-    if (!bCumulative)
-    {
-        return api::ValueResult<double>::success(static_cast<double>(probability(nX)));
-    }
-
-    long double fSum = 0.0L;
-    for (sal_Int32 nValue = 0; nValue <= nX; ++nValue)
-        fSum += probability(nValue);
-    return api::ValueResult<double>::success(
-        std::min(1.0, static_cast<double>(fSum)));
-}
-
-[[nodiscard]] api::ValueResult<double> evaluatePercentrank(
-    std::vector<double> aValues, double fValue, bool bInclusive, sal_Int32 nSignificance)
-{
-    if (aValues.empty())
-        return api::ValueResult<double>::failure(api::Error::NotAvailable);
-    if (nSignificance < 1)
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    std::sort(aValues.begin(), aValues.end());
-    const std::size_t nSize = aValues.size();
-    if (fValue < aValues.front() || fValue > aValues.back())
-        return api::ValueResult<double>::failure(api::Error::NotAvailable);
-    if (nSize == 1)
-        return api::ValueResult<double>::success(1.0);
-
-    double fResult = 0.0;
-    if (::rtl::math::approxEqual(fValue, aValues.front()))
-    {
-        fResult = bInclusive ? 0.0 : 1.0 / static_cast<double>(nSize + 1);
-    }
-    else
-    {
-        std::size_t nOldCount = 0;
-        double fOldValue = aValues.front();
-        std::size_t nIndex = 1;
-        for (; nIndex < nSize && aValues[nIndex] < fValue; ++nIndex)
-        {
-            if (!::rtl::math::approxEqual(aValues[nIndex], fOldValue))
-            {
-                nOldCount = nIndex;
-                fOldValue = aValues[nIndex];
-            }
-        }
-
-        if (nIndex < nSize && !::rtl::math::approxEqual(aValues[nIndex], fOldValue))
-            nOldCount = nIndex;
-
-        if (nIndex < nSize && ::rtl::math::approxEqual(fValue, aValues[nIndex]))
-        {
-            if (bInclusive)
-                fResult = static_cast<double>(nOldCount) / static_cast<double>(nSize - 1);
-            else
-                fResult = static_cast<double>(nIndex + 1) / static_cast<double>(nSize + 1);
-        }
-        else
-        {
-            if (nOldCount == 0 || nOldCount >= nSize)
-                return api::ValueResult<double>::failure(api::Error::NotAvailable);
-
-            const double fLower = aValues[nOldCount - 1];
-            const double fUpper = aValues[nOldCount];
-            if (::rtl::math::approxEqual(fLower, fUpper))
-                return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-            const double fFraction = (fValue - fLower) / (fUpper - fLower);
-            if (bInclusive)
-            {
-                fResult = (static_cast<double>(nOldCount - 1) + fFraction)
-                          / static_cast<double>(nSize - 1);
-            }
-            else
-            {
-                fResult = (static_cast<double>(nOldCount) + fFraction)
-                          / static_cast<double>(nSize + 1);
-            }
-        }
-    }
-
-    if (!::rtl::math::approxEqual(fResult, 0.0))
-    {
-        const double fExponent = ::rtl::math::approxFloor(std::log10(fResult)) + 1.0
-                                 - static_cast<double>(nSignificance);
-        const double fScale = std::pow(10.0, -fExponent);
-        fResult = ::rtl::math::round(fResult * fScale) / fScale;
-    }
-
-    return api::ValueResult<double>::success(fResult);
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateAggregateNumbers(
-    sal_Int32 nFunction, const AggregateScan& rScan)
-{
-    switch (nFunction)
-    {
-        case 1:
-            if (rScan.maNumbers.empty())
-                return api::ValueResult<double>::failure(api::Error::DivisionByZero);
-            return api::ValueResult<double>::success(
-                sumNumbers(rScan.maNumbers) / static_cast<double>(rScan.maNumbers.size()));
-        case 2:
-            return api::ValueResult<double>::success(static_cast<double>(rScan.maNumbers.size()));
-        case 3:
-            return api::ValueResult<double>::success(static_cast<double>(rScan.mnNonEmptyCount));
-        case 4:
-            if (rScan.maNumbers.empty())
-                return api::ValueResult<double>::success(0.0);
-            return api::ValueResult<double>::success(
-                *std::max_element(rScan.maNumbers.begin(), rScan.maNumbers.end()));
-        case 5:
-            if (rScan.maNumbers.empty())
-                return api::ValueResult<double>::success(0.0);
-            return api::ValueResult<double>::success(
-                *std::min_element(rScan.maNumbers.begin(), rScan.maNumbers.end()));
-        case 6:
-        {
-            if (rScan.maNumbers.empty())
-                return api::ValueResult<double>::success(0.0);
-
-            double fProduct = 1.0;
-            for (const double fValue : rScan.maNumbers)
-                fProduct *= fValue;
-            return api::ValueResult<double>::success(fProduct);
-        }
-        case 7:
-        case 8:
-        case 10:
-        case 11:
-        {
-            const bool bSample = nFunction == 7 || nFunction == 10;
-            const sal_Int32 nCount = static_cast<sal_Int32>(rScan.maNumbers.size());
-            if (nCount == 0 || (bSample && nCount < 2))
-                return api::ValueResult<double>::failure(api::Error::DivisionByZero);
-
-            const double fMean = sumNumbers(rScan.maNumbers) / static_cast<double>(nCount);
-            double fSquaredDeviation = 0.0;
-            for (const double fValue : rScan.maNumbers)
-            {
-                const double fDelta = fValue - fMean;
-                fSquaredDeviation += fDelta * fDelta;
-            }
-
-            const double fVariance = fSquaredDeviation
-                                     / static_cast<double>(bSample ? (nCount - 1) : nCount);
-            if (nFunction == 7 || nFunction == 8)
-                return api::ValueResult<double>::success(std::sqrt(fVariance));
-            return api::ValueResult<double>::success(fVariance);
-        }
-        case 9:
-            return api::ValueResult<double>::success(sumNumbers(rScan.maNumbers));
-        case 12:
-        {
-            if (rScan.maNumbers.empty())
-                return api::ValueResult<double>::failure(api::Error::DivisionByZero);
-            std::vector<double> aSorted = rScan.maNumbers;
-            std::sort(aSorted.begin(), aSorted.end());
-            const std::size_t nMid = aSorted.size() / 2;
-            if ((aSorted.size() % 2) != 0)
-                return api::ValueResult<double>::success(aSorted[nMid]);
-            return api::ValueResult<double>::success(
-                (aSorted[nMid - 1] + aSorted[nMid]) / 2.0);
-        }
-        case 13:
-        {
-            if (rScan.maNumbers.empty())
-                return api::ValueResult<double>::failure(api::Error::NotAvailable);
-
-            std::vector<double> aSorted = rScan.maNumbers;
-            std::sort(aSorted.begin(), aSorted.end());
-
-            double fBestValue = 0.0;
-            sal_Int32 nBestCount = 1;
-            bool bHasMode = false;
-            for (std::size_t nIndex = 0; nIndex < aSorted.size();)
-            {
-                std::size_t nNext = nIndex + 1;
-                while (nNext < aSorted.size()
-                       && ::rtl::math::approxEqual(aSorted[nNext], aSorted[nIndex]))
-                {
-                    ++nNext;
-                }
-
-                const sal_Int32 nCount = static_cast<sal_Int32>(nNext - nIndex);
-                if (nCount > nBestCount)
-                {
-                    nBestCount = nCount;
-                    fBestValue = aSorted[nIndex];
-                    bHasMode = true;
-                }
-                nIndex = nNext;
-            }
-
-            if (!bHasMode)
-                return api::ValueResult<double>::failure(api::Error::NotAvailable);
-            return api::ValueResult<double>::success(fBestValue);
-        }
-        default:
-            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    }
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateAggregateRankedNumbers(
-    sal_Int32 nFunction, const AggregateScan& rScan, double fRankValue)
-{
-    if (!std::isfinite(fRankValue) || rScan.maNumbers.empty())
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    std::vector<double> aSorted = rScan.maNumbers;
-    std::sort(aSorted.begin(), aSorted.end());
-
-    const auto percentileInc = [&](double fFraction) -> api::ValueResult<double> {
-        if (!(fFraction >= 0.0 && fFraction <= 1.0))
-            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-        if (aSorted.size() == 1)
-            return api::ValueResult<double>::success(aSorted.front());
-
-        const double fIndex = fFraction * static_cast<double>(aSorted.size() - 1);
-        const std::size_t nLower = static_cast<std::size_t>(std::floor(fIndex));
-        const std::size_t nUpper = static_cast<std::size_t>(std::ceil(fIndex));
-        if (nLower == nUpper)
-            return api::ValueResult<double>::success(aSorted[nLower]);
-
-        const double fWeight = fIndex - static_cast<double>(nLower);
-        return api::ValueResult<double>::success(
-            aSorted[nLower] + (aSorted[nUpper] - aSorted[nLower]) * fWeight);
-    };
-
-    const auto percentileExc = [&](double fFraction) -> api::ValueResult<double> {
-        if (!(fFraction > 0.0 && fFraction < 1.0))
-            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-        const double fIndex = fFraction * static_cast<double>(aSorted.size() + 1);
-        if (!(fIndex >= 1.0 && fIndex <= static_cast<double>(aSorted.size())))
-            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-        const std::size_t nLower = static_cast<std::size_t>(std::floor(fIndex));
-        const std::size_t nUpper = static_cast<std::size_t>(std::ceil(fIndex));
-        if (nLower == nUpper)
-            return api::ValueResult<double>::success(aSorted[nLower - 1]);
-
-        const double fWeight = fIndex - static_cast<double>(nLower);
-        return api::ValueResult<double>::success(
-            aSorted[nLower - 1] + (aSorted[nUpper - 1] - aSorted[nLower - 1]) * fWeight);
-    };
-
-    switch (nFunction)
-    {
-        case 14:
-        case 15:
-        {
-            const auto oRank = toWholeNumber(fRankValue);
-            if (!oRank || *oRank < 1 || *oRank > static_cast<sal_Int32>(aSorted.size()))
-                return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-            const std::size_t nIndex = nFunction == 14
-                                           ? aSorted.size() - static_cast<std::size_t>(*oRank)
-                                           : static_cast<std::size_t>(*oRank - 1);
-            return api::ValueResult<double>::success(aSorted[nIndex]);
-        }
-        case 16:
-            return percentileInc(fRankValue);
-        case 17:
-        {
-            const auto oQuartile = toWholeNumber(fRankValue);
-            if (!oQuartile || *oQuartile < 0 || *oQuartile > 4)
-                return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-            return percentileInc(static_cast<double>(*oQuartile) / 4.0);
-        }
-        case 18:
-            return percentileExc(fRankValue);
-        case 19:
-        {
-            const auto oQuartile = toWholeNumber(fRankValue);
-            if (!oQuartile || *oQuartile < 1 || *oQuartile > 3)
-                return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-            return percentileExc(static_cast<double>(*oQuartile) / 4.0);
-        }
-        default:
-            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    }
 }
 
 [[nodiscard]] std::optional<api::ColumnIndex> parseColumnName(api::StringView rColumnName)
@@ -2943,29 +1735,6 @@ struct InflatedStackItem
     }
 }
 
-[[nodiscard]] double roundMagnitudeDirectional(
-    double fValue, int nDecimals, api::RoundingMode eMode)
-{
-    double fRoundedMagnitude = api::math::roundToDecimals(std::abs(fValue), nDecimals, eMode);
-
-    const double fScale = std::pow(10.0, static_cast<double>(std::abs(nDecimals)));
-    if (!std::isfinite(fScale) || fScale == 0.0)
-        return fValue;
-
-    double fScaled = nDecimals >= 0 ? std::abs(fValue) * fScale : std::abs(fValue) / fScale;
-    if (nDecimals < 12)
-    {
-        const double fRoundedInteger = ::rtl::math::round(fScaled);
-        if (std::abs(fScaled - fRoundedInteger) <= 1e-12)
-        {
-            fRoundedMagnitude
-                = nDecimals >= 0 ? fRoundedInteger / fScale : fRoundedInteger * fScale;
-        }
-    }
-
-    return std::signbit(fValue) ? -fRoundedMagnitude : fRoundedMagnitude;
-}
-
 } // namespace
 
 const workbook::Sheet* Evaluator::getSheet(api::SheetId nSheet) const
@@ -2983,7 +1752,7 @@ const workbook::Cell* Evaluator::getCell(const api::CellAddress& rAddress) const
 
 const EvaluationResult* Evaluator::lookupLocalBinding(api::StringView rName) const
 {
-    const api::String aNormalizedName = normalizeAsciiUpper(rName);
+    const api::String aNormalizedName = uppercaseAscii(rName);
     for (auto aScopeIt = maLocalBindings.rbegin(); aScopeIt != maLocalBindings.rend(); ++aScopeIt)
     {
         const auto aBindingIt = aScopeIt->find(aNormalizedName);
@@ -3288,6 +2057,37 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aVisited)
             return api::ValueResult<AggregateScan>::failure(aVisited.meError);
         return api::ValueResult<AggregateScan>::success(std::move(aScan));
+    };
+
+    auto collectExtremaArguments = [&]() -> api::ValueResult<std::vector<double>> {
+        std::vector<double> aNumbers;
+        for (const auto& pChild : rNode.maChildren)
+        {
+            const auto aVisited = visitFlattenedValues(
+                visitFlattenedValues, *pChild,
+                [&](const api::CellValue& rValue,
+                    bool bFromReference) -> api::ValueResult<bool> {
+                    if (rValue.isError())
+                        return api::ValueResult<bool>::failure(rValue.meError);
+
+                    if (bFromReference)
+                    {
+                        if (rValue.isNumber())
+                            aNumbers.push_back(rValue.mfNumber);
+                        return api::ValueResult<bool>::success(true);
+                    }
+
+                    const auto aNumber = coerceToNumber(rValue);
+                    if (!aNumber)
+                        return api::ValueResult<bool>::failure(aNumber.meError);
+                    aNumbers.push_back(aNumber.maValue);
+                    return api::ValueResult<bool>::success(true);
+                });
+            if (!aVisited)
+                return api::ValueResult<std::vector<double>>::failure(aVisited.meError);
+        }
+
+        return api::ValueResult<std::vector<double>>::success(std::move(aNumbers));
     };
 
     auto evaluateLookupInputNode = [&](const formula::Node& rLookupNode)
@@ -3785,7 +2585,7 @@ EvaluationResult Evaluator::evaluateFunction(
                 return aValue;
             }
 
-            maLocalBindings.back()[normalizeAsciiUpper(rNameNode.maPrimaryText)] = aValue;
+            maLocalBindings.back()[uppercaseAscii(rNameNode.maPrimaryText)] = aValue;
         }
 
         EvaluationResult aResult = evaluateNode(*rNode.maChildren.back(), rCurrentAddress);
@@ -4135,7 +2935,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aNumber)
             return makeFailure(aNumber.meError);
 
-        return makeScalarResult(api::CellValue::number(gaussValue(aNumber.maValue)));
+        return makeScalarResult(api::CellValue::number(semath::gaussValue(aNumber.maValue)));
     }
 
     if (aFunctionName == u"GAMMALN" || aFunctionName == u"GAMMALN.PRECISE")
@@ -4690,7 +3490,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aDfNumber)
             return makeFailure(aDfNumber.meError);
 
-        const auto aChiDist = evaluateLegacyChiDist(
+        const auto aChiDist = semath::evaluateLegacyChiDist(
             aChiNumber.maValue, ::rtl::math::approxFloor(aDfNumber.maValue));
         if (!aChiDist)
             return makeFailure(aChiDist.meError);
@@ -4736,7 +3536,7 @@ EvaluationResult Evaluator::evaluateFunction(
             bCumulative = aCumulativeBool.maValue;
         }
 
-        const auto aDistribution = evaluateChiSquareDistribution(
+        const auto aDistribution = semath::evaluateChiSquareDistribution(
             aXNumber.maValue, ::rtl::math::approxFloor(aDfNumber.maValue), bCumulative,
             bMicrosoftSyntax);
         if (!aDistribution)
@@ -4785,7 +3585,7 @@ EvaluationResult Evaluator::evaluateFunction(
             bCumulative = aCumulativeBool.maValue;
         }
 
-        const auto aDistribution = evaluateNormalDistribution(
+        const auto aDistribution = semath::evaluateNormalDistribution(
             aXNumber.maValue, aMeanNumber.maValue, aSigmaNumber.maValue, bCumulative);
         if (!aDistribution)
             return makeFailure(aDistribution.meError);
@@ -4832,7 +3632,7 @@ EvaluationResult Evaluator::evaluateFunction(
             bCumulative = aCumulativeBool.maValue;
         }
 
-        const auto aDistribution = evaluateLogNormalDistribution(
+        const auto aDistribution = semath::evaluateLogNormalDistribution(
             aXNumber.maValue, aMeanNumber.maValue, aSigmaNumber.maValue, bCumulative);
         if (!aDistribution)
             return makeFailure(aDistribution.meError);
@@ -4881,7 +3681,7 @@ EvaluationResult Evaluator::evaluateFunction(
             bCumulative = aCumulativeBool.maValue;
         }
 
-        const auto aDistribution = evaluateGammaDistribution(
+        const auto aDistribution = semath::evaluateGammaDistribution(
             aXNumber.maValue, aAlphaNumber.maValue, aBetaNumber.maValue, bCumulative,
             bMicrosoftSyntax);
         if (!aDistribution)
@@ -4898,7 +3698,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aNumber)
             return makeFailure(aNumber.meError);
 
-        const auto aGammaValue = evaluateGammaValue(aNumber.maValue);
+        const auto aGammaValue = semath::evaluateGammaValue(aNumber.maValue);
         if (!aGammaValue)
             return makeFailure(aGammaValue.meError);
         return makeScalarResult(api::CellValue::number(aGammaValue.maValue));
@@ -4917,7 +3717,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aDegreesFreedom)
             return makeFailure(aDegreesFreedom.meError);
 
-        const auto aInverse = evaluateTInverse(
+        const auto aInverse = semath::evaluateTInverse(
             aProbability.maValue, ::rtl::math::approxFloor(aDegreesFreedom.maValue), 2);
         if (!aInverse)
             return makeFailure(aInverse.meError);
@@ -4938,7 +3738,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (aX.maValue < 0.0)
             return makeFailure(api::Error::IllegalArgument);
 
-        const auto aDistribution = evaluateStudentDistribution(
+        const auto aDistribution = semath::evaluateStudentDistribution(
             aX.maValue, ::rtl::math::approxFloor(aDegreesFreedom.maValue), 2);
         if (!aDistribution)
             return makeFailure(aDistribution.meError);
@@ -4970,7 +3770,7 @@ EvaluationResult Evaluator::evaluateFunction(
             return makeFailure(api::Error::IllegalArgument);
         const double fRightTailProbability
             = bLeftTail ? 1.0 - aProbability.maValue : aProbability.maValue;
-        const auto aInverse = evaluateFInverseRightTail(
+        const auto aInverse = semath::evaluateFInverseRightTail(
             fRightTailProbability, fDegreesFreedom1, fDegreesFreedom2);
         if (!aInverse)
             return makeFailure(aInverse.meError);
@@ -5000,7 +3800,8 @@ EvaluationResult Evaluator::evaluateFunction(
                                    || aFunctionName == u"STDEV.P"
                                    || aFunctionName == u"STDEVA"
                                    || aFunctionName == u"STDEVPA";
-        const auto aVariance = evaluateVarianceNumbers(aNumbers.maValue, bSample, bReturnStdDev);
+        const auto aVariance = semath::evaluateVarianceNumbers(
+            aNumbers.maValue, bSample, bReturnStdDev);
         if (!aVariance)
             return makeFailure(aVariance.meError);
         return makeScalarResult(api::CellValue::number(aVariance.maValue));
@@ -5063,7 +3864,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aAlpha)
             return makeFailure(aAlpha.meError);
 
-        const auto aInverse = evaluateBinomialInverse(
+        const auto aInverse = semath::evaluateBinomialInverse(
             aTrials.maValue, aProbability.maValue, aAlpha.maValue);
         if (!aInverse)
             return makeFailure(aInverse.meError);
@@ -5149,7 +3950,7 @@ EvaluationResult Evaluator::evaluateFunction(
             bCumulative = aCumulativeBool.maValue;
         }
 
-        const auto aDistribution = evaluateHypergeometricDistribution(
+        const auto aDistribution = semath::evaluateHypergeometricDistribution(
             aX.maValue, aTrials.maValue, aSuccesses.maValue, aPopulation.maValue, bCumulative);
         if (!aDistribution)
             return makeFailure(aDistribution.meError);
@@ -5180,7 +3981,7 @@ EvaluationResult Evaluator::evaluateFunction(
         }
 
         const bool bInclusive = aFunctionName != u"PERCENTRANK.EXC";
-        const auto aRank = evaluatePercentrank(
+        const auto aRank = semath::evaluatePercentrank(
             aScan.maValue.maNumbers, aValue.maValue, bInclusive, nSignificance);
         if (!aRank)
             return makeFailure(aRank.meError);
@@ -5202,7 +4003,7 @@ EvaluationResult Evaluator::evaluateFunction(
                 aCollected.maValue.maNumbers.end());
         }
 
-        const auto aMode = evaluateModeSingle(aScan.maNumbers);
+        const auto aMode = semath::evaluateModeSingle(aScan.maNumbers);
         if (!aMode)
             return makeFailure(aMode.meError);
         return makeScalarResult(api::CellValue::number(aMode.maValue));
@@ -5221,7 +4022,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aPercent)
             return makeFailure(aPercent.meError);
 
-        const auto aTrimmean = evaluateTrimmean(aScan.maValue.maNumbers, aPercent.maValue);
+        const auto aTrimmean = semath::evaluateTrimmean(aScan.maValue.maNumbers, aPercent.maValue);
         if (!aTrimmean)
             return makeFailure(aTrimmean.meError);
         return makeScalarResult(api::CellValue::number(aTrimmean.maValue));
@@ -5335,7 +4136,7 @@ EvaluationResult Evaluator::evaluateFunction(
                 = static_cast<double>(nObservedColumns - 1) * static_cast<double>(nObservedRows - 1);
         }
 
-        const auto aChiDist = evaluateLegacyChiDist(fChi.get(), fDegreesFreedom);
+        const auto aChiDist = semath::evaluateLegacyChiDist(fChi.get(), fDegreesFreedom);
         if (!aChiDist)
             return makeFailure(aChiDist.meError);
         return makeScalarResult(api::CellValue::number(aChiDist.maValue));
@@ -5657,20 +4458,12 @@ EvaluationResult Evaluator::evaluateFunction(
         else if (aFunctionName == u"ROUNDDOWN")
             eMode = api::RoundingMode::Down;
 
-        if (aFunctionName == u"ROUNDUP" || aFunctionName == u"ROUNDDOWN")
-        {
-            return makeScalarResult(api::CellValue::number(roundMagnitudeDirectional(
-                aValueNumber.maValue, nDecimals, eMode)));
-        }
-
-        if (rNode.maChildren.size() == 1)
-        {
-            return makeScalarResult(api::CellValue::number(::rtl::math::round(
-                aValueNumber.maValue, 0, api::math::toCoreRoundingMode(eMode))));
-        }
-
-        return makeScalarResult(api::CellValue::number(
-            api::math::roundToDecimals(aValueNumber.maValue, nDecimals, eMode)));
+        const auto aRounded = semath::evaluateRoundValue(
+            aValueNumber.maValue, nDecimals, eMode,
+            aFunctionName == u"ROUNDUP" || aFunctionName == u"ROUNDDOWN");
+        if (!aRounded)
+            return makeFailure(aRounded.meError);
+        return makeScalarResult(api::CellValue::number(aRounded.maValue));
     }
 
     if (aFunctionName == u"CEILING" || aFunctionName == u"FLOOR" || aFunctionName == u"CEILING.XCL"
@@ -5736,35 +4529,13 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!bMicrosoftCompat && bAbs && bMissingSignificance && fValue < 0.0)
             fSignificance = -1.0;
 
-        const bool bCeiling = aFunctionName == u"CEILING" || aFunctionName == u"CEILING.XCL";
-        if (bMicrosoftCompat)
-        {
-            if (bCeiling)
-            {
-                const auto aCeilingMs = api::math::ceilingMs(fValue, fSignificance);
-                if (!aCeilingMs)
-                    return makeFailure(aCeilingMs.meError);
-                return makeScalarResult(api::CellValue::number(aCeilingMs.maValue));
-            }
-
-            const auto aFloorMs = api::math::floorMs(fValue, fSignificance);
-            if (!aFloorMs)
-                return makeFailure(aFloorMs.meError);
-            return makeScalarResult(api::CellValue::number(aFloorMs.maValue));
-        }
-
-        if (bCeiling)
-        {
-            const auto aCeiling = api::math::ceiling(fValue, fSignificance, bAbs, true);
-            if (!aCeiling)
-                return makeFailure(aCeiling.meError);
-            return makeScalarResult(api::CellValue::number(aCeiling.maValue));
-        }
-
-        const auto aFloor = api::math::floor(fValue, fSignificance, bAbs, true);
-        if (!aFloor)
-            return makeFailure(aFloor.meError);
-        return makeScalarResult(api::CellValue::number(aFloor.maValue));
+        const auto aRounded = semath::evaluateCeilingFloorValue(
+            fValue, fSignificance, bAbs,
+            aFunctionName == u"CEILING" || aFunctionName == u"CEILING.XCL",
+            bMicrosoftCompat);
+        if (!aRounded)
+            return makeFailure(aRounded.meError);
+        return makeScalarResult(api::CellValue::number(aRounded.maValue));
     }
 
     if (aFunctionName == u"CEILING.MATH" || aFunctionName == u"FLOOR.MATH")
@@ -5812,24 +4583,11 @@ EvaluationResult Evaluator::evaluateFunction(
             fMode = aModeNumber.maValue;
         }
 
-        const double fMagnitude = std::abs(fSignificance);
-        double fResult = 0.0;
-        if (aFunctionName == u"CEILING.MATH")
-        {
-            if (aValueNumber.maValue < 0.0 && fMode != 0.0)
-                fResult = ::rtl::math::approxFloor(aValueNumber.maValue / fMagnitude) * fMagnitude;
-            else
-                fResult = core::math::computeCeilingPrecise(aValueNumber.maValue, fMagnitude);
-        }
-        else
-        {
-            if (aValueNumber.maValue < 0.0 && fMode != 0.0)
-                fResult = ::rtl::math::approxCeil(aValueNumber.maValue / fMagnitude) * fMagnitude;
-            else
-                fResult = core::math::computeFloorPrecise(aValueNumber.maValue, fMagnitude);
-        }
-
-        return makeScalarResult(api::CellValue::number(fResult));
+        const auto aRounded = semath::evaluateCeilingFloorMathValue(
+            aValueNumber.maValue, fSignificance, fMode, aFunctionName == u"CEILING.MATH");
+        if (!aRounded)
+            return makeFailure(aRounded.meError);
+        return makeScalarResult(api::CellValue::number(aRounded.maValue));
     }
 
     if (aFunctionName == u"CEILING.PRECISE" || aFunctionName == u"FLOOR.PRECISE"
@@ -5861,15 +4619,11 @@ EvaluationResult Evaluator::evaluateFunction(
             fSignificance = aSignificanceNumber.maValue;
         }
 
-        const double fMagnitude = std::abs(fSignificance);
-        if (aFunctionName == u"FLOOR.PRECISE")
-        {
-            return makeScalarResult(api::CellValue::number(
-                api::math::floorPrecise(aValueNumber.maValue, fMagnitude)));
-        }
-
-        return makeScalarResult(api::CellValue::number(
-            api::math::ceilingPrecise(aValueNumber.maValue, fMagnitude)));
+        const auto aRounded = semath::evaluateCeilingFloorPreciseValue(
+            aValueNumber.maValue, fSignificance, aFunctionName == u"FLOOR.PRECISE");
+        if (!aRounded)
+            return makeFailure(aRounded.meError);
+        return makeScalarResult(api::CellValue::number(aRounded.maValue));
     }
 
     if (aFunctionName == u"ROUNDSIG")
@@ -5893,14 +4647,11 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aDigitsNumber || !std::isfinite(aDigitsNumber.maValue))
             return makeFailure(api::Error::IllegalArgument);
 
-        const double fDigits = ::rtl::math::approxFloor(aDigitsNumber.maValue);
-        if (fDigits < 1.0)
-            return makeFailure(api::Error::IllegalArgument);
-        if (aValueNumber.maValue == 0.0)
-            return makeScalarResult(api::CellValue::number(0.0));
-
-        return makeScalarResult(api::CellValue::number(api::math::roundToSignificantDigits(
-            aValueNumber.maValue, fDigits)));
+        const auto aRounded
+            = semath::evaluateRoundSigValue(aValueNumber.maValue, aDigitsNumber.maValue);
+        if (!aRounded)
+            return makeFailure(aRounded.meError);
+        return makeScalarResult(api::CellValue::number(aRounded.maValue));
     }
 
     if (aFunctionName == u"DAYSINMONTH" || aFunctionName == u"DAYSINYEAR"
@@ -6744,7 +5495,7 @@ EvaluationResult Evaluator::evaluateFunction(
                 return makeFailure(api::Error::IllegalArgument);
         }
 
-        const auto aConverted = evaluateEuroConvertValue(
+        const auto aConverted = seconvert::evaluateEuroConvertValue(
             aValueNumber.maValue, aFromUnit.maValue, aToUnit.maValue, true, !bFullPrecision);
         if (!aConverted)
             return makeFailure(aConverted.meError);
@@ -6781,12 +5532,12 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aToUnit)
             return makeFailure(aToUnit.meError);
 
-        const auto aConverted = evaluateConvertValue(
+        const auto aConverted = seconvert::evaluateConvertValue(
             aValueNumber.maValue, aFromUnit.maValue, aToUnit.maValue);
         if (aConverted)
             return makeScalarResult(api::CellValue::number(aConverted.maValue));
 
-        const auto aEuroConverted = evaluateEuroConvertValue(
+        const auto aEuroConverted = seconvert::evaluateEuroConvertValue(
             aValueNumber.maValue, aFromUnit.maValue, aToUnit.maValue, false, false);
         if (aEuroConverted)
         {
@@ -6817,7 +5568,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aBaseNumber)
             return makeFailure(aBaseNumber.meError);
 
-        const auto aResult = api::numeral::fromBase(aText.maValue, aBaseNumber.maValue);
+        const auto aResult = seconvert::evaluateDecimalValue(aText.maValue, aBaseNumber.maValue);
         if (!aResult)
             return makeFailure(aResult.meError);
         return makeScalarResult(api::CellValue::number(aResult.maValue));
@@ -6851,7 +5602,7 @@ EvaluationResult Evaluator::evaluateFunction(
             oPlaces = aPlacesNumber.maValue;
         }
 
-        const auto aResult = api::numeral::toBase(aValueNumber.maValue, 16.0, oPlaces);
+        const auto aResult = seconvert::evaluateBaseValue(aValueNumber.maValue, 16.0, oPlaces);
         if (!aResult)
             return makeFailure(aResult.meError);
         return makeScalarResult(api::CellValue::text(aResult.maValue));
@@ -6975,11 +5726,10 @@ EvaluationResult Evaluator::evaluateFunction(
             fBase = aBaseNumber.maValue;
         }
 
-        if (!(fBase > 0.0) || rtl::math::approxEqual(fBase, 1.0))
-            return makeFailure(api::Error::IllegalArgument);
-
-        return makeScalarResult(api::CellValue::number(
-            std::log(aValueNumber.maValue) / std::log(fBase)));
+        const auto aLogarithm = semath::evaluateLogValue(aValueNumber.maValue, fBase);
+        if (!aLogarithm)
+            return makeFailure(aLogarithm.meError);
+        return makeScalarResult(api::CellValue::number(aLogarithm.maValue));
     }
 
     if (aFunctionName == u"MROUND")
@@ -7008,16 +5758,11 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aMultipleNumber)
             return makeFailure(aMultipleNumber.meError);
 
-        if (rtl::math::approxEqual(aMultipleNumber.maValue, 0.0))
-            return makeScalarResult(api::CellValue::number(0.0));
-
-        const double fResult = aMultipleNumber.maValue
-                               * rtl::math::round(
-                                   rtl::math::approxValue(aValueNumber.maValue
-                                                          / aMultipleNumber.maValue));
-        if (!std::isfinite(fResult))
-            return makeFailure(api::Error::IllegalArgument);
-        return makeScalarResult(api::CellValue::number(fResult));
+        const auto aRounded
+            = semath::evaluateMroundValue(aValueNumber.maValue, aMultipleNumber.maValue);
+        if (!aRounded)
+            return makeFailure(aRounded.meError);
+        return makeScalarResult(api::CellValue::number(aRounded.maValue));
     }
 
     if (aFunctionName == u"COMBIN")
@@ -7032,17 +5777,10 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aK)
             return makeFailure(aK.meError);
 
-        const auto oWholeN = toWholeNumber(aN.maValue);
-        const auto oWholeK = toWholeNumber(aK.maValue);
-        if (!oWholeN || !oWholeK || *oWholeN < 0 || *oWholeK < 0 || *oWholeK > *oWholeN)
-            return makeFailure(api::Error::IllegalArgument);
-
-        sal_Int32 n = *oWholeN;
-        sal_Int32 k = std::min(*oWholeK, static_cast<sal_Int32>(*oWholeN - *oWholeK));
-        double fResult = 1.0;
-        for (sal_Int32 i = 1; i <= k; ++i)
-            fResult = fResult * static_cast<double>(n - k + i) / static_cast<double>(i);
-        return makeScalarResult(api::CellValue::number(fResult));
+        const auto aCombin = semath::evaluateCombinValue(aN.maValue, aK.maValue, false);
+        if (!aCombin)
+            return makeFailure(aCombin.meError);
+        return makeScalarResult(api::CellValue::number(aCombin.maValue));
     }
 
     if (aFunctionName == u"COMBINA")
@@ -7057,24 +5795,10 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aK)
             return makeFailure(aK.meError);
 
-        const auto oWholeN = toWholeNumber(aN.maValue);
-        const auto oWholeK = toWholeNumber(aK.maValue);
-        if (!oWholeN || !oWholeK || *oWholeN < 0 || *oWholeK < 0)
-            return makeFailure(api::Error::IllegalArgument);
-        if (*oWholeN == 0 && *oWholeK == 0)
-            return makeScalarResult(api::CellValue::number(0.0));
-        if (*oWholeK == 0)
-            return makeScalarResult(api::CellValue::number(1.0));
-        if (*oWholeN < *oWholeK)
-            return makeFailure(api::Error::IllegalArgument);
-
-        const sal_Int32 n = *oWholeN + *oWholeK - 1;
-        const sal_Int32 k = *oWholeK;
-        sal_Int32 nChoose = std::min(k, static_cast<sal_Int32>(n - k));
-        double fResult = 1.0;
-        for (sal_Int32 i = 1; i <= nChoose; ++i)
-            fResult = fResult * static_cast<double>(n - nChoose + i) / static_cast<double>(i);
-        return makeScalarResult(api::CellValue::number(fResult));
+        const auto aCombina = semath::evaluateCombinValue(aN.maValue, aK.maValue, true);
+        if (!aCombina)
+            return makeFailure(aCombina.meError);
+        return makeScalarResult(api::CellValue::number(aCombina.maValue));
     }
 
     if (aFunctionName == u"MULTINOMIAL")
@@ -7082,49 +5806,20 @@ EvaluationResult Evaluator::evaluateFunction(
         if (rNode.maChildren.empty())
             return makeFailure(api::Error::IllegalArgument);
 
-        auto binomialCoefficient = [](double fN, double fK) {
-            double fValue = 0.0;
-            fK = ::rtl::math::approxFloor(fK);
-            if (fN < fK)
-                return fValue;
-            if (fK == 0.0)
-                return 1.0;
-
-            fValue = fN / fK;
-            fN -= 1.0;
-            fK -= 1.0;
-            while (fK > 0.0)
-            {
-                fValue *= fN / fK;
-                fK -= 1.0;
-                fN -= 1.0;
-            }
-            return fValue;
-        };
-
-        double fTotal = 0.0;
-        double fResult = 1.0;
+        std::vector<double> aValues;
+        aValues.reserve(rNode.maChildren.size());
         for (const auto& pChild : rNode.maChildren)
         {
             const auto aValue = evaluateNumericArgument(*pChild, std::nullopt);
             if (!aValue)
                 return makeFailure(aValue.meError);
-
-            const double fRounded
-                = aValue.maValue >= 0.0 ? ::rtl::math::approxFloor(aValue.maValue)
-                                        : ::rtl::math::approxCeil(aValue.maValue);
-            if (fRounded < 0.0)
-                return makeFailure(api::Error::IllegalArgument);
-
-            if (fRounded > 0.0)
-            {
-                fTotal += fRounded;
-                fResult *= binomialCoefficient(fTotal, fRounded);
-                if (!std::isfinite(fResult))
-                    return makeFailure(api::Error::IllegalArgument);
-            }
+            aValues.push_back(aValue.maValue);
         }
-        return makeScalarResult(api::CellValue::number(fResult));
+
+        const auto aMultinomial = semath::evaluateMultinomialValue(aValues);
+        if (!aMultinomial)
+            return makeFailure(aMultinomial.meError);
+        return makeScalarResult(api::CellValue::number(aMultinomial.maValue));
     }
 
     if (aFunctionName == u"CSC")
@@ -7138,12 +5833,10 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aValue.maValue.isNumber())
             return makeFailure(api::Error::IllegalArgument);
 
-        const double fSine = ::rtl::math::sin(aValue.maValue.mfNumber);
-        if (!std::isfinite(fSine))
-            return makeFailure(api::Error::IllegalArgument);
-        if (rtl::math::approxEqual(fSine, 0.0))
-            return makeFailure(api::Error::DivisionByZero);
-        return makeScalarResult(api::CellValue::number(1.0 / fSine));
+        const auto aCsc = semath::evaluateCscValue(aValue.maValue.mfNumber);
+        if (!aCsc)
+            return makeFailure(aCsc.meError);
+        return makeScalarResult(api::CellValue::number(aCsc.maValue));
     }
 
     if (aFunctionName == u"CSCH")
@@ -7157,12 +5850,10 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aValue.maValue.isNumber())
             return makeFailure(api::Error::IllegalArgument);
 
-        const double fSinh = std::sinh(aValue.maValue.mfNumber);
-        if (!std::isfinite(fSinh))
-            return makeFailure(api::Error::IllegalArgument);
-        if (rtl::math::approxEqual(fSinh, 0.0))
-            return makeFailure(api::Error::DivisionByZero);
-        return makeScalarResult(api::CellValue::number(1.0 / fSinh));
+        const auto aCsch = semath::evaluateCschValue(aValue.maValue.mfNumber);
+        if (!aCsch)
+            return makeFailure(aCsch.meError);
+        return makeScalarResult(api::CellValue::number(aCsch.maValue));
     }
 
     if (aFunctionName == u"TRUNC")
@@ -7187,13 +5878,10 @@ EvaluationResult Evaluator::evaluateFunction(
             nDigits = *oWholeDigits;
         }
 
-        const double fScale = std::pow(10.0, std::abs(nDigits));
-        double fResult = 0.0;
-        if (nDigits >= 0)
-            fResult = std::trunc(aValue.maValue * fScale) / fScale;
-        else
-            fResult = std::trunc(aValue.maValue / fScale) * fScale;
-        return makeScalarResult(api::CellValue::number(fResult));
+        const auto aTruncated = semath::evaluateTruncValue(aValue.maValue, nDigits);
+        if (!aTruncated)
+            return makeFailure(aTruncated.meError);
+        return makeScalarResult(api::CellValue::number(aTruncated.maValue));
     }
 
     if (aFunctionName == u"UNICHAR")
@@ -7784,7 +6472,7 @@ EvaluationResult Evaluator::evaluateFunction(
             ofMinLength = aLengthNumber.maValue;
         }
 
-        const auto aResult = api::numeral::toBase(
+        const auto aResult = seconvert::evaluateBaseValue(
             aValueNumber.maValue, aBaseNumber.maValue, ofMinLength);
         if (!aResult)
             return makeFailure(aResult.meError);
@@ -7820,7 +6508,7 @@ EvaluationResult Evaluator::evaluateFunction(
             ofMode = aModeNumber.maValue;
         }
 
-        const auto aResult = api::numeral::toRoman(aValueNumber.maValue, ofMode);
+        const auto aResult = seconvert::evaluateRomanValue(aValueNumber.maValue, ofMode);
         if (!aResult)
             return makeFailure(aResult.meError);
         return makeScalarResult(api::CellValue::text(aResult.maValue));
@@ -8155,10 +6843,8 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aRightNumber)
             return makeFailure(aRightNumber.meError);
 
-        if (aRightNumber.maValue == 0.0)
-            return makeFailure(api::Error::DivisionByZero);
-
-        const auto aModResult = api::math::modulo(aLeftNumber.maValue, aRightNumber.maValue);
+        const auto aModResult = semath::evaluateModValue(
+            aLeftNumber.maValue, aRightNumber.maValue);
         if (!aModResult)
             return makeFailure(aModResult.meError);
         return makeScalarResult(api::CellValue::number(aModResult.maValue));
@@ -8252,70 +6938,15 @@ EvaluationResult Evaluator::evaluateFunction(
         if (rNode.maChildren.empty())
             return makeFailure(api::Error::IllegalArgument);
 
-        std::optional<double> oBestValue;
-        const bool bFindMaximum = aFunctionName == u"MAX";
-        for (const auto& pChild : rNode.maChildren)
-        {
-            const bool bReferenceLike = pChild->meKind == formula::NodeKind::CellReference
-                                        || pChild->meKind == formula::NodeKind::RangeReference
-                                        || pChild->meKind == formula::NodeKind::NamedReference;
+        const auto aNumbers = collectExtremaArguments();
+        if (!aNumbers)
+            return makeFailure(aNumbers.meError);
 
-            EvaluationResult aArgument = bReferenceLike
-                                             ? evaluateReferenceNode(*pChild, rCurrentAddress)
-                                             : evaluateNode(*pChild, rCurrentAddress);
-            if (!aArgument)
-                return aArgument;
-
-            auto considerValue = [&](const api::CellValue& rValue) -> api::ValueResult<bool> {
-                if (rValue.isError())
-                    return api::ValueResult<bool>::failure(rValue.meError);
-
-                if (rValue.isNumber())
-                {
-                    if (!oBestValue
-                        || (bFindMaximum ? rValue.mfNumber > *oBestValue
-                                         : rValue.mfNumber < *oBestValue))
-                    {
-                        oBestValue = rValue.mfNumber;
-                    }
-                    return api::ValueResult<bool>::success(true);
-                }
-
-                return api::ValueResult<bool>::success(false);
-            };
-
-            if (aArgument.maValue.isMatrixReference())
-            {
-                const auto& rReference = aArgument.maValue.maReference;
-                for (api::RowIndex nRow = 0; nRow < rReference.maRange.rowCount(); ++nRow)
-                {
-                    for (api::ColumnIndex nCol = 0; nCol < rReference.maRange.columnCount(); ++nCol)
-                    {
-                        EvaluationResult aCell = materializeReferenceValue(rReference, nCol, nRow);
-                        if (!aCell)
-                            return aCell;
-
-                        const auto aConsidered = considerValue(aCell.maValue.maValue);
-                        if (!aConsidered)
-                            return makeFailure(aConsidered.meError);
-                    }
-                }
-                continue;
-            }
-
-            const auto aNumber = coerceToNumber(aArgument.maValue.maValue);
-            if (!aNumber)
-                return makeFailure(aNumber.meError);
-
-            if (!oBestValue
-                || (bFindMaximum ? aNumber.maValue > *oBestValue
-                                 : aNumber.maValue < *oBestValue))
-            {
-                oBestValue = aNumber.maValue;
-            }
-        }
-
-        return makeScalarResult(api::CellValue::number(oBestValue.value_or(0.0)));
+        const auto aExtrema = semath::evaluateExtremaNumbers(
+            aNumbers.maValue, aFunctionName == u"MAX", true);
+        if (!aExtrema)
+            return makeFailure(aExtrema.meError);
+        return makeScalarResult(api::CellValue::number(aExtrema.maValue));
     }
 
     if (aFunctionName == u"MAXA" || aFunctionName == u"MINA")
@@ -8326,13 +6957,12 @@ EvaluationResult Evaluator::evaluateFunction(
         const auto aNumbers = collectVarianceArguments(true);
         if (!aNumbers)
             return makeFailure(aNumbers.meError);
-        if (aNumbers.maValue.empty())
-            return makeFailure(api::Error::NoValue);
 
-        const auto pBest = aFunctionName == u"MAXA"
-                               ? std::max_element(aNumbers.maValue.begin(), aNumbers.maValue.end())
-                               : std::min_element(aNumbers.maValue.begin(), aNumbers.maValue.end());
-        return makeScalarResult(api::CellValue::number(*pBest));
+        const auto aExtrema = semath::evaluateExtremaNumbers(
+            aNumbers.maValue, aFunctionName == u"MAXA", false);
+        if (!aExtrema)
+            return makeFailure(aExtrema.meError);
+        return makeScalarResult(api::CellValue::number(aExtrema.maValue));
     }
 
     if (aFunctionName == u"SUBTOTAL")
@@ -8467,7 +7097,7 @@ EvaluationResult Evaluator::evaluateFunction(
                 return makeSubtotalError(aScanned.meError);
         }
 
-        const auto aAggregate = evaluateAggregateNumbers(nAggregateFunction, aScan);
+        const auto aAggregate = semath::evaluateAggregateNumbers(nAggregateFunction, aScan);
         if (!aAggregate)
             return makeSubtotalError(aAggregate.meError);
         return makeScalarResult(api::CellValue::number(aAggregate.maValue));
@@ -8506,7 +7136,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!oFunction || !oOption || *oFunction < 1 || *oFunction > 19)
             return makeAggregateError(api::Error::IllegalArgument);
 
-        const auto oOptions = decodeAggregateOptions(*oOption);
+        const auto oOptions = semath::decodeAggregateOptions(*oOption);
         if (!oOptions)
             return makeAggregateError(api::Error::IllegalArgument);
 
@@ -8624,7 +7254,7 @@ EvaluationResult Evaluator::evaluateFunction(
             if (!aRankNumber)
                 return makeAggregateError(aRankNumber.meError);
 
-            const auto aAggregate = evaluateAggregateRankedNumbers(
+            const auto aAggregate = semath::evaluateAggregateRankedNumbers(
                 *oFunction, aScan, aRankNumber.maValue);
             if (!aAggregate)
                 return makeAggregateError(aAggregate.meError);
@@ -8638,7 +7268,7 @@ EvaluationResult Evaluator::evaluateFunction(
                 return makeAggregateError(aScanned.meError);
         }
 
-        const auto aAggregate = evaluateAggregateNumbers(*oFunction, aScan);
+        const auto aAggregate = semath::evaluateAggregateNumbers(*oFunction, aScan);
         if (!aAggregate)
             return makeAggregateError(aAggregate.meError);
         return makeScalarResult(api::CellValue::number(aAggregate.maValue));
@@ -8682,7 +7312,7 @@ EvaluationResult Evaluator::evaluateFunction(
         else
             nAggregateFunction = 19;
 
-        const auto aAggregate = evaluateAggregateRankedNumbers(
+        const auto aAggregate = semath::evaluateAggregateRankedNumbers(
             nAggregateFunction, aScan.maValue, aRank.maValue);
         if (!aAggregate)
             return makeFailure(aAggregate.meError);

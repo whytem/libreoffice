@@ -18,8 +18,8 @@ the standalone evaluator and Calc.
 
 ## Executive Summary
 
-The `FormulaEvaluator` refactor is well underway and the first five planned
-runtime-extraction slices are now substantially complete in the codebase.
+The `FormulaEvaluator` refactor is well underway, and slices 1 through 9 are
+now substantially complete in the codebase.
 
 What is already true:
 
@@ -35,11 +35,17 @@ What is already true:
 - the major extracted text-family runtime now lives in `TextFunctionRuntime`
 - date/time parsing and coercion now live in `DateTimeParse`
 - financial orchestration now lives in `FinancialRuntime`
+- the remaining statistical foundation and distribution layer now live in
+  `MathStatistical`
+- aggregate/statistics helpers now live in `MathAggregate`
+- conversion and numeral/add-in wrappers now live in `ConversionRuntime`
+- the remaining evaluator math wrappers now largely live in
+  `MathFunctionRuntime`
 
 What is not yet true:
 
-- the remaining statistical, aggregate, conversion, and special-form clusters
-  are still inline in `FormulaEvaluator`
+- aggregate traversal families, compiled-token inflation, and special-form
+  orchestration still keep meaningful logic inline in `FormulaEvaluator`
 - Calc's `ScInterpreter` still does not delegate to the extracted engine
   runtime modules
 
@@ -76,7 +82,7 @@ This plan does not aim to:
 
 ## Current Runtime Baseline
 
-As of this plan, there are 22 runtime modules under
+As of this plan, there are 25 runtime modules under
 `spreadsheet_engine/inc/spreadsheetengine/runtime/`:
 
 | Module | Primary Domain |
@@ -95,7 +101,10 @@ As of this plan, there are 22 runtime modules under
 | `DateTimeParse` | Date/time lexical parsing and coercion helpers |
 | `DateTimeWeek` | Week-number behavior |
 | `DateTimeWorkday` | Workday/network-day behavior |
+| `ConversionRuntime` | Spreadsheet-facing conversion and add-in wrappers |
 | `FinancialRuntime` | Spreadsheet-facing financial orchestration |
+| `MathAggregate` | Aggregate/statistics helpers over collected numeric inputs |
+| `MathFunctionRuntime` | Spreadsheet-facing math wrapper behavior |
 | `NumeralConversion` | Base/roman/numeral conversion |
 | `TextServices` | Case-mapping and encoding interfaces |
 | `LookupRuntime` | Lookup traversal and search planning |
@@ -317,6 +326,8 @@ Goal:
 
 ### Slice 6: MathStatistical phase 2
 
+Status: substantially complete
+
 Extend `MathStatistical` to absorb the remaining inline statistical foundation
 and distribution functions.
 
@@ -354,7 +365,17 @@ Goal:
 - make `MathStatistical` the single home for the engine's shared statistical
   runtime
 
+Current state:
+
+- the remaining statistical foundation and distribution helpers are now routed
+  through `MathStatistical`
+- the former inline helper stubs have been removed from `FormulaEvaluator`
+- a small residual statistical tail may still be worth polishing later, but
+  the slice goal is met
+
 ### Slice 7: Aggregate/statistics runtime extraction
+
+Status: substantially complete
 
 Move the remaining aggregate/statistical collection-based helpers out of the
 evaluator:
@@ -378,7 +399,17 @@ The decision should be guided by cohesion:
   `MathStatistical`
 - if the file becomes too broad, use `MathAggregate`
 
+Current state:
+
+- `MathAggregate` now owns the extracted aggregate/statistics helper family
+- evaluator extrema dispatch is reduced to thinner collection plus runtime
+  delegation
+- `SUBTOTAL` / `AGGREGATE` traversal is still evaluator-owned and is the main
+  remaining follow-on for this area
+
 ### Slice 8: Conversion and numeral/add-in wrapper extraction
+
+Status: substantially complete
 
 Move the conversion cluster that still lives inline:
 
@@ -395,7 +426,15 @@ Recommended target:
 - add a narrow conversion-runtime wrapper if the function-family argument
   behavior should be kept separate from raw conversion kernels
 
+Current state:
+
+- the conversion cluster now lives in `ConversionRuntime`
+- evaluator call sites for `EUROCONVERT`, `CONVERT`, `DECIMAL`, `DEC2HEX`,
+  `BASE`, and `ROMAN` delegate through the runtime layer
+
 ### Slice 9: Remaining math-family wrappers
+
+Status: substantially complete
 
 Finish moving evaluator-local math wrappers into the existing runtime families:
 
@@ -422,6 +461,15 @@ Recommended target:
 - `MathTranscendental`
 - `MathBitwise`
 - `MathStatistical`
+
+Current state:
+
+- the bulk of the remaining evaluator-local math wrappers now dispatch through
+  `MathFunctionRuntime`
+- `MOD` and the extrema helpers joined that runtime-oriented cleanup in the
+  same refactor window
+- any remaining inline math calls are now tail work rather than a major
+  evaluator-owned subsystem
 
 ### Slice 10: Aggregate-family extraction
 

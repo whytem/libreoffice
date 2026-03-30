@@ -23,6 +23,46 @@ SPREADSHEETENGINE_DLLPUBLIC double betaValue(double fAlpha, double fBeta);
 
 SPREADSHEETENGINE_DLLPUBLIC double betaCdf(double fInput, double fAlpha, double fBeta);
 
+SPREADSHEETENGINE_DLLPUBLIC double gaussValue(double fValue);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> lowRegularizedIncompleteGamma(
+    double fAlpha, double fX);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> upRegularizedIncompleteGamma(
+    double fAlpha, double fX);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateLegacyChiDist(
+    double fChi, double fDegreesFreedom);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateBinomialInverse(
+    double fTrials, double fProbability, double fAlpha);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateNormalDistribution(
+    double fX, double fMean, double fSigma, bool bCumulative);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateLogNormalDistribution(
+    double fX, double fMean, double fSigma, bool bCumulative);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateChiSquareDistribution(
+    double fX, double fDegreesFreedom, bool bCumulative, bool bMicrosoftSyntax);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateGammaDistribution(
+    double fX, double fAlpha, double fBeta, bool bCumulative, bool bMicrosoftSyntax);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateGammaValue(double fX);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateStudentDistribution(
+    double fT, double fDegreesFreedom, int nType);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateTInverse(
+    double fProbability, double fDegreesFreedom, int nType);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateFRightTailDistribution(
+    double fX, double fDegreesFreedom1, double fDegreesFreedom2);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateFInverseRightTail(
+    double fProbability, double fDegreesFreedom1, double fDegreesFreedom2);
+
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateBetaDistribution(
     double fX, double fAlpha, double fBeta, double fLowerBound, double fUpperBound,
     bool bCumulative, bool bMicrosoftOrder);

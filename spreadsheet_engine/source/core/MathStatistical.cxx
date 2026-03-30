@@ -244,6 +244,128 @@ namespace
     return std::exp(fMaxLog) * fSum.get();
 }
 
+[[nodiscard]] double phiValue(double fValue)
+{
+    return 0.39894228040143268 * std::exp(-(fValue * fValue) / 2.0);
+}
+
+[[nodiscard]] double taylorPolynomial(const double* pPolynomial, sal_uInt16 nMax, double fValue)
+{
+    double fResult = pPolynomial[nMax];
+    for (short nIndex = nMax - 1; nIndex >= 0; --nIndex)
+        fResult = (fResult * fValue) + pPolynomial[nIndex];
+    return fResult;
+}
+
+[[nodiscard]] api::ValueResult<double> gammaContinuedFraction(double fAlpha, double fX)
+{
+    constexpr double fHalfMachEps = 0.5 * std::numeric_limits<double>::epsilon();
+    const double fBigInv = std::numeric_limits<double>::epsilon();
+    const double fBig = 1.0 / fBigInv;
+    double fCount = 0.0;
+    double fY = 1.0 - fAlpha;
+    double fDenom = fX + 2.0 - fAlpha;
+    double fPkm1 = fX + 1.0;
+    double fPkm2 = 1.0;
+    double fQkm1 = fDenom * fX;
+    double fQkm2 = fX;
+    double fApprox = fPkm1 / fQkm1;
+    bool bFinished = false;
+    do
+    {
+        fCount += 1.0;
+        fY += 1.0;
+        const double fNum = fY * fCount;
+        fDenom += 2.0;
+        double fPk = fPkm1 * fDenom - fPkm2 * fNum;
+        const double fQk = fQkm1 * fDenom - fQkm2 * fNum;
+        if (!::rtl::math::approxEqual(fQk, 0.0))
+        {
+            const double fR = fPk / fQk;
+            bFinished = std::abs((fApprox - fR) / fR) <= fHalfMachEps;
+            fApprox = fR;
+        }
+
+        fPkm2 = fPkm1;
+        fPkm1 = fPk;
+        fQkm2 = fQkm1;
+        fQkm1 = fQk;
+        if (std::abs(fPk) > fBig)
+        {
+            fPkm2 *= fBigInv;
+            fPkm1 *= fBigInv;
+            fQkm2 *= fBigInv;
+            fQkm1 *= fBigInv;
+        }
+    } while (!bFinished && fCount < 10000.0);
+
+    if (!bFinished)
+        return api::ValueResult<double>::failure(api::Error::NoConvergence);
+    return api::ValueResult<double>::success(fApprox);
+}
+
+[[nodiscard]] api::ValueResult<double> gammaSeries(double fAlpha, double fX)
+{
+    constexpr double fHalfMachEps = 0.5 * std::numeric_limits<double>::epsilon();
+    double fDenomFactor = fAlpha;
+    double fSummand = 1.0 / fAlpha;
+    double fSum = fSummand;
+    int nCount = 1;
+    do
+    {
+        fDenomFactor += 1.0;
+        fSummand *= fX / fDenomFactor;
+        fSum += fSummand;
+        ++nCount;
+    } while (fSummand / fSum > fHalfMachEps && nCount <= 10000);
+
+    if (nCount > 10000)
+        return api::ValueResult<double>::failure(api::Error::NoConvergence);
+    return api::ValueResult<double>::success(fSum);
+}
+
+template <typename DistributionFn>
+[[nodiscard]] api::ValueResult<double> invertMonotonicPositiveDistribution(
+    double fTarget, double fInitialHigh, bool bIncreasing, const DistributionFn& rDistribution)
+{
+    double fLow = 0.0;
+    double fHigh = std::max(1.0, fInitialHigh);
+    auto aHigh = rDistribution(fHigh);
+    if (!aHigh)
+        return aHigh;
+
+    bool bBracketed = bIncreasing ? (aHigh.maValue >= fTarget) : (aHigh.maValue <= fTarget);
+    for (int nIter = 0; !bBracketed && nIter < 128; ++nIter)
+    {
+        fHigh *= 2.0;
+        if (!std::isfinite(fHigh) || fHigh > 1.0e10)
+            return api::ValueResult<double>::failure(api::Error::NoConvergence);
+
+        aHigh = rDistribution(fHigh);
+        if (!aHigh)
+            return aHigh;
+        bBracketed = bIncreasing ? (aHigh.maValue >= fTarget) : (aHigh.maValue <= fTarget);
+    }
+
+    if (!bBracketed)
+        return api::ValueResult<double>::failure(api::Error::NoConvergence);
+
+    for (int nIter = 0; nIter < 160; ++nIter)
+    {
+        const double fMid = 0.5 * (fLow + fHigh);
+        const auto aMid = rDistribution(fMid);
+        if (!aMid)
+            return aMid;
+
+        if (bIncreasing ? (aMid.maValue < fTarget) : (aMid.maValue > fTarget))
+            fLow = fMid;
+        else
+            fHigh = fMid;
+    }
+
+    return api::ValueResult<double>::success(0.5 * (fLow + fHigh));
+}
+
 } // namespace
 
 api::ValueResult<double> fisherTransform(double fValue)
@@ -331,6 +453,350 @@ double betaCdf(double fInput, double fAlpha, double fBeta)
     if (bReflect)
         fResult = 1.0 - fResult;
     return std::clamp(fResult, 0.0, 1.0);
+}
+
+double gaussValue(double fValue)
+{
+    const double fAbs = std::abs(fValue);
+    const sal_uInt16 nBucket = static_cast<sal_uInt16>(::rtl::math::approxFloor(fAbs));
+
+    double fResult = 0.0;
+    if (nBucket == 0)
+    {
+        static const double aT0[] = { 0.39894228040143268, -0.06649038006690545,
+            0.00997355701003582, -0.00118732821548045, 0.00011543468761616,
+            -0.00000944465625950, 0.00000066596935163, -0.00000004122667415,
+            0.00000000227352982, 0.00000000011301172, 0.00000000000511243,
+            -0.00000000000021218 };
+        fResult = taylorPolynomial(aT0, 11, fAbs * fAbs) * fAbs;
+    }
+    else if (nBucket <= 2)
+    {
+        static const double aT2[] = { 0.47724986805182079, 0.05399096651318805,
+            -0.05399096651318805, 0.02699548325659403, -0.00449924720943234,
+            -0.00224962360471617, 0.00134977416282970, -0.00011783742691370,
+            -0.00011515930357476, 0.00003704737285544, 0.00000282690796889,
+            -0.00000354513195524, 0.00000037669563126, 0.00000019202407921,
+            -0.00000005226908590, -0.00000000491799345, 0.00000000366377919,
+            -0.00000000015981997, -0.00000000017381238, 0.00000000002624031,
+            0.00000000000560919, -0.00000000000172127, -0.00000000000008634,
+            0.00000000000007894 };
+        fResult = taylorPolynomial(aT2, 23, fAbs - 2.0);
+    }
+    else if (nBucket <= 4)
+    {
+        static const double aT4[] = { 0.49996832875816688, 0.00013383022576489,
+            -0.00026766045152977, 0.00033457556441221, -0.00028996548915725,
+            0.00018178605666397, -0.00008252863922168, 0.00002551802519049,
+            -0.00000391665839292, -0.00000074018205222, 0.00000064422023359,
+            -0.00000017370155340, 0.00000000909595465, 0.00000000944943118,
+            -0.00000000329957075, 0.00000000029492075, 0.00000000011874477,
+            -0.00000000004420396, 0.00000000000361422, 0.00000000000143638,
+            -0.00000000000045848 };
+        fResult = taylorPolynomial(aT4, 20, fAbs - 4.0);
+    }
+    else
+    {
+        static const double aAsympt[] = { -1.0, 1.0, -3.0, 15.0, -105.0 };
+        fResult = 0.5
+                  + phiValue(fAbs)
+                        * (taylorPolynomial(aAsympt, 4, 1.0 / (fAbs * fAbs)) / fAbs);
+    }
+
+    return fValue < 0.0 ? -fResult : fResult;
+}
+
+api::ValueResult<double> lowRegularizedIncompleteGamma(double fAlpha, double fX)
+{
+    const double fLnFactor = fAlpha * std::log(fX) - fX - std::lgamma(fAlpha);
+    const double fFactor = std::exp(fLnFactor);
+    if (fX > fAlpha + 1.0)
+    {
+        const auto aContinuedFraction = gammaContinuedFraction(fAlpha, fX);
+        if (!aContinuedFraction)
+            return aContinuedFraction;
+        return api::ValueResult<double>::success(1.0 - fFactor * aContinuedFraction.maValue);
+    }
+
+    const auto aSeries = gammaSeries(fAlpha, fX);
+    if (!aSeries)
+        return aSeries;
+    return api::ValueResult<double>::success(fFactor * aSeries.maValue);
+}
+
+api::ValueResult<double> upRegularizedIncompleteGamma(double fAlpha, double fX)
+{
+    const double fLnFactor = fAlpha * std::log(fX) - fX - std::lgamma(fAlpha);
+    const double fFactor = std::exp(fLnFactor);
+    if (fX > fAlpha + 1.0)
+    {
+        const auto aContinuedFraction = gammaContinuedFraction(fAlpha, fX);
+        if (!aContinuedFraction)
+            return aContinuedFraction;
+        return api::ValueResult<double>::success(fFactor * aContinuedFraction.maValue);
+    }
+
+    const auto aSeries = gammaSeries(fAlpha, fX);
+    if (!aSeries)
+        return aSeries;
+    return api::ValueResult<double>::success(1.0 - fFactor * aSeries.maValue);
+}
+
+api::ValueResult<double> evaluateLegacyChiDist(double fChi, double fDegreesFreedom)
+{
+    if (fDegreesFreedom < 1.0 || fChi < 0.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    if (fChi <= 0.0)
+        return api::ValueResult<double>::success(1.0);
+    return upRegularizedIncompleteGamma(fDegreesFreedom / 2.0, fChi / 2.0);
+}
+
+api::ValueResult<double> evaluateBinomialInverse(
+    double fTrials, double fProbability, double fAlpha)
+{
+    const double fN = ::rtl::math::approxFloor(fTrials);
+    if (fN < 0.0 || fProbability < 0.0 || fProbability > 1.0 || fAlpha < 0.0 || fAlpha > 1.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    if (::rtl::math::approxEqual(fAlpha, 0.0))
+        return api::ValueResult<double>::success(0.0);
+    if (::rtl::math::approxEqual(fProbability, 0.0))
+        return api::ValueResult<double>::success(0.0);
+    if (::rtl::math::approxEqual(fProbability, 1.0))
+        return api::ValueResult<double>::success(fN);
+    if (::rtl::math::approxEqual(fAlpha, 1.0))
+        return api::ValueResult<double>::success(fN);
+
+    sal_Int32 nLow = 0;
+    sal_Int32 nHigh = static_cast<sal_Int32>(fN);
+    while (nLow < nHigh)
+    {
+        const sal_Int32 nMid = nLow + ((nHigh - nLow) / 2);
+        const auto aDistribution = evaluateBinomialDistribution(
+            static_cast<double>(nMid), fN, fProbability, true);
+        if (!aDistribution)
+            return aDistribution;
+
+        if (aDistribution.maValue >= fAlpha
+            || ::rtl::math::approxEqual(aDistribution.maValue, fAlpha))
+        {
+            nHigh = nMid;
+        }
+        else
+        {
+            nLow = nMid + 1;
+        }
+    }
+
+    return api::ValueResult<double>::success(static_cast<double>(nLow));
+}
+
+api::ValueResult<double> evaluateNormalDistribution(
+    double fX, double fMean, double fSigma, bool bCumulative)
+{
+    if (!(fSigma > 0.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    constexpr double fSqrtTwo = 1.4142135623730950488;
+    constexpr double fInvSqrtTwoPi = 0.39894228040143267794;
+    const double fZ = (fX - fMean) / fSigma;
+    if (bCumulative)
+    {
+        return api::ValueResult<double>::success(
+            std::clamp(0.5 * std::erfc(-fZ / fSqrtTwo), 0.0, 1.0));
+    }
+
+    return api::ValueResult<double>::success(
+        std::exp(-0.5 * fZ * fZ) * fInvSqrtTwoPi / fSigma);
+}
+
+api::ValueResult<double> evaluateLogNormalDistribution(
+    double fX, double fMean, double fSigma, bool bCumulative)
+{
+    if (!(fSigma > 0.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    if (bCumulative)
+    {
+        if (fX <= 0.0)
+            return api::ValueResult<double>::success(0.0);
+        return evaluateNormalDistribution(std::log(fX), fMean, fSigma, true);
+    }
+
+    if (!(fX > 0.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    constexpr double fInvSqrtTwoPi = 0.39894228040143267794;
+    const double fZ = (std::log(fX) - fMean) / fSigma;
+    return api::ValueResult<double>::success(
+        std::exp(-0.5 * fZ * fZ) * fInvSqrtTwoPi / (fSigma * fX));
+}
+
+api::ValueResult<double> evaluateChiSquareDistribution(
+    double fX, double fDegreesFreedom, bool bCumulative, bool bMicrosoftSyntax)
+{
+    if (fDegreesFreedom < 1.0 || (bMicrosoftSyntax && fX < 0.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    if (bCumulative)
+    {
+        if (fX <= 0.0)
+            return api::ValueResult<double>::success(0.0);
+        return lowRegularizedIncompleteGamma(fDegreesFreedom / 2.0, fX / 2.0);
+    }
+
+    if (fX <= 0.0)
+        return api::ValueResult<double>::success(0.0);
+
+    const double fHalfDf = fDegreesFreedom / 2.0;
+    const double fLogValue = (fHalfDf - 1.0) * std::log(fX * 0.5) - (fX / 2.0)
+                             - std::log(2.0) - std::lgamma(fHalfDf);
+    return api::ValueResult<double>::success(std::exp(fLogValue));
+}
+
+api::ValueResult<double> evaluateGammaDistribution(
+    double fX, double fAlpha, double fBeta, bool bCumulative, bool bMicrosoftSyntax)
+{
+    if (fAlpha <= 0.0 || fBeta <= 0.0 || (bMicrosoftSyntax && fX < 0.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    if (bCumulative)
+    {
+        if (fX <= 0.0)
+            return api::ValueResult<double>::success(0.0);
+        return lowRegularizedIncompleteGamma(fAlpha, fX / fBeta);
+    }
+
+    if (fX < 0.0)
+        return api::ValueResult<double>::success(0.0);
+
+    if (::rtl::math::approxEqual(fX, 0.0))
+    {
+        if (fAlpha < 1.0)
+            return api::ValueResult<double>::failure(api::Error::DivisionByZero);
+        if (::rtl::math::approxEqual(fAlpha, 1.0))
+            return api::ValueResult<double>::success(1.0 / fBeta);
+        return api::ValueResult<double>::success(0.0);
+    }
+
+    const double fScaledX = fX / fBeta;
+    const double fLogValue = (fAlpha - 1.0) * std::log(fScaledX) - fScaledX - std::log(fBeta)
+                             - std::lgamma(fAlpha);
+    return api::ValueResult<double>::success(std::exp(fLogValue));
+}
+
+api::ValueResult<double> evaluateGammaValue(double fX)
+{
+    const double fWhole = ::rtl::math::approxFloor(fX);
+    if (fX <= 0.0 && ::rtl::math::approxEqual(fX, fWhole))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const double fResult = std::tgamma(fX);
+    if (!std::isfinite(fResult))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    return api::ValueResult<double>::success(fResult);
+}
+
+api::ValueResult<double> evaluateStudentDistribution(
+    double fT, double fDegreesFreedom, int nType)
+{
+    if (fDegreesFreedom < 1.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    switch (nType)
+    {
+        case 1:
+            return api::ValueResult<double>::success(
+                0.5 * betaCdf(fDegreesFreedom / (fDegreesFreedom + fT * fT),
+                    fDegreesFreedom / 2.0, 0.5));
+        case 2:
+            return api::ValueResult<double>::success(betaCdf(
+                fDegreesFreedom / (fDegreesFreedom + fT * fT), fDegreesFreedom / 2.0, 0.5));
+        case 3:
+            return api::ValueResult<double>::success(
+                std::pow(1.0 + (fT * fT / fDegreesFreedom), -(fDegreesFreedom + 1.0) / 2.0)
+                / (std::sqrt(fDegreesFreedom) * betaValue(0.5, fDegreesFreedom / 2.0)));
+        case 4:
+        {
+            const double fX = fDegreesFreedom / (fT * fT + fDegreesFreedom);
+            const double fRightHalf = 0.5 * betaCdf(fX, 0.5 * fDegreesFreedom, 0.5);
+            return api::ValueResult<double>::success(fT < 0.0 ? fRightHalf : 1.0 - fRightHalf);
+        }
+        default:
+            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+}
+
+api::ValueResult<double> evaluateTInverse(
+    double fProbability, double fDegreesFreedom, int nType)
+{
+    if (fDegreesFreedom < 1.0 || fProbability <= 0.0 || fProbability > 1.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    if ((nType == 2 || nType == 4) && ::rtl::math::approxEqual(fProbability, 1.0))
+        return api::ValueResult<double>::success(0.0);
+
+    if (nType == 4)
+    {
+        if (fProbability >= 1.0)
+            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+        if (::rtl::math::approxEqual(fProbability, 0.5))
+            return api::ValueResult<double>::success(0.0);
+        if (fProbability < 0.5)
+        {
+            const auto aMirror = evaluateTInverse(1.0 - fProbability, fDegreesFreedom, nType);
+            if (!aMirror)
+                return aMirror;
+            return api::ValueResult<double>::success(-aMirror.maValue);
+        }
+
+        return invertMonotonicPositiveDistribution(fProbability, fDegreesFreedom, true,
+            [fDegreesFreedom](double fX) {
+                return evaluateStudentDistribution(fX, fDegreesFreedom, 4);
+            });
+    }
+
+    if (nType != 2)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return invertMonotonicPositiveDistribution(fProbability, fDegreesFreedom, false,
+        [fDegreesFreedom](double fX) {
+            return evaluateStudentDistribution(fX, fDegreesFreedom, 2);
+        });
+}
+
+api::ValueResult<double> evaluateFRightTailDistribution(
+    double fX, double fDegreesFreedom1, double fDegreesFreedom2)
+{
+    if (fX < 0.0 || fDegreesFreedom1 < 1.0 || fDegreesFreedom2 < 1.0
+        || fDegreesFreedom1 >= 1.0e10 || fDegreesFreedom2 >= 1.0e10)
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    const double fArgument
+        = fDegreesFreedom2 / (fDegreesFreedom2 + fDegreesFreedom1 * fX);
+    return api::ValueResult<double>::success(
+        betaCdf(fArgument, fDegreesFreedom2 / 2.0, fDegreesFreedom1 / 2.0));
+}
+
+api::ValueResult<double> evaluateFInverseRightTail(
+    double fProbability, double fDegreesFreedom1, double fDegreesFreedom2)
+{
+    if (fProbability <= 0.0 || fProbability > 1.0 || fDegreesFreedom1 < 1.0
+        || fDegreesFreedom2 < 1.0 || fDegreesFreedom1 >= 1.0e10
+        || fDegreesFreedom2 >= 1.0e10)
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    if (::rtl::math::approxEqual(fProbability, 1.0))
+        return api::ValueResult<double>::success(0.0);
+
+    return invertMonotonicPositiveDistribution(fProbability, fDegreesFreedom1, false,
+        [fDegreesFreedom1, fDegreesFreedom2](double fX) {
+            return evaluateFRightTailDistribution(fX, fDegreesFreedom1, fDegreesFreedom2);
+        });
 }
 
 api::ValueResult<double> evaluateBetaDistribution(
