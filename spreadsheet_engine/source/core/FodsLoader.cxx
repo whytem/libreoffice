@@ -213,9 +213,10 @@ using XmlString = std::unique_ptr<xmlChar, decltype(xmlFree)>;
         return api::Error::NoConvergence;
     if (rText == u"#NAME?" || rText == u"#REF!" || rText == u"#NULL!")
         return api::Error::IllegalArgument;
-    if (rText.substr(0, 4) == u"Err:")
+    const std::size_t nColon = rText.rfind(u':');
+    if (nColon != api::StringView::npos && nColon + 1 < rText.size())
     {
-        const api::StringView aCode = rText.substr(4);
+        const api::StringView aCode = rText.substr(nColon + 1);
         bool bDigitsOnly = !aCode.empty();
         for (const char16_t cChar : aCode)
         {
@@ -255,7 +256,8 @@ using XmlString = std::unique_ptr<xmlChar, decltype(xmlFree)>;
         return api::Error::NoConvergence;
     if (rText == u"#NAME?" || rText == u"#REF!" || rText == u"#NULL!")
         return api::Error::IllegalArgument;
-    if (rText.substr(0, 4) == u"Err:")
+    const std::size_t nColon = rText.rfind(u':');
+    if (nColon != api::StringView::npos && nColon + 1 < rText.size())
         return mapDisplayedError(rText);
     return std::nullopt;
 }
@@ -339,6 +341,11 @@ void countIgnoredFeatures(const xmlNode* pNode, IgnoredFeatureSummary& rSummary)
 [[nodiscard]] bool isCollapsedRow(api::StringView rVisibility)
 {
     return rVisibility == u"collapse";
+}
+
+[[nodiscard]] bool isFilteredRow(api::StringView rVisibility)
+{
+    return rVisibility == u"filter";
 }
 
 void parseCalculationSettings(const xmlNode* pSettingsNode, workbook::Workbook& rWorkbook)
@@ -460,25 +467,14 @@ void parseNamedExpressions(const xmlNode* pNamedExpressions, api::StringView rSc
     }
 }
 
-void parseSheet(const xmlNode* pTableNode, workbook::Workbook& rWorkbook)
+void parseSheetRows(const xmlNode* pParentNode, workbook::Sheet& rSheet, api::RowIndex& rnRow)
 {
-    workbook::Sheet aSheet;
-    aSheet.maName = getPropString(pTableNode, pTableNs, "name");
-    api::RowIndex nRow = 0;
-
-    for (const xmlNode* pChild = pTableNode->children; pChild; pChild = pChild->next)
+    for (const xmlNode* pChild = pParentNode ? pParentNode->children : nullptr; pChild;
+         pChild = pChild->next)
     {
-        if (matchesNode(pChild, pTableNs, "table-source"))
+        if (matchesNode(pChild, pTableNs, "table-row-group"))
         {
-            aSheet.moSource = workbook::SheetSource { getPropString(pChild, pXLinkNs, "href"),
-                getPropString(pChild, pTableNs, "table-name"),
-                parseSheetSourceMode(getPropString(pChild, pTableNs, "mode")) };
-            continue;
-        }
-
-        if (matchesNode(pChild, pTableNs, "named-expressions"))
-        {
-            parseNamedExpressions(pChild, aSheet.maName, rWorkbook);
+            parseSheetRows(pChild, rSheet, rnRow);
             continue;
         }
 
@@ -487,16 +483,17 @@ void parseSheet(const xmlNode* pTableNode, workbook::Workbook& rWorkbook)
 
         const std::size_t nRowRepeat
             = parseRepeatCount(pChild, pTableNs, "number-rows-repeated");
-        const api::RowIndex nBaseRow = nRow;
-        const bool bCollapsedRow = isCollapsedRow(getPropString(pChild, pTableNs, "visibility"));
+        const api::RowIndex nBaseRow = rnRow;
+        const api::String aVisibility = getPropString(pChild, pTableNs, "visibility");
+        const bool bCollapsedRow = isCollapsedRow(aVisibility);
+        const bool bFilteredRow = isFilteredRow(aVisibility);
 
         for (std::size_t nRowOffset = 0; nRowOffset < nRowRepeat; ++nRowOffset)
         {
             if (bCollapsedRow)
-            {
-                aSheet.setRowHidden(
-                    nBaseRow + static_cast<api::RowIndex>(nRowOffset));
-            }
+                rSheet.setRowHidden(nBaseRow + static_cast<api::RowIndex>(nRowOffset));
+            if (bFilteredRow)
+                rSheet.setRowFiltered(nBaseRow + static_cast<api::RowIndex>(nRowOffset));
 
             api::ColumnIndex nColumn = 0;
             for (const xmlNode* pCellNode = pChild->children; pCellNode; pCellNode = pCellNode->next)
@@ -518,7 +515,7 @@ void parseSheet(const xmlNode* pTableNode, workbook::Workbook& rWorkbook)
                 {
                     for (std::size_t nColOffset = 0; nColOffset < nColRepeat; ++nColOffset)
                     {
-                        aSheet.setCell(
+                        rSheet.setCell(
                             nColumn + static_cast<api::ColumnIndex>(nColOffset),
                             nBaseRow + static_cast<api::RowIndex>(nRowOffset), aCell);
                     }
@@ -528,8 +525,34 @@ void parseSheet(const xmlNode* pTableNode, workbook::Workbook& rWorkbook)
             }
         }
 
-        nRow += static_cast<api::RowIndex>(nRowRepeat);
+        rnRow += static_cast<api::RowIndex>(nRowRepeat);
     }
+}
+
+void parseSheet(const xmlNode* pTableNode, workbook::Workbook& rWorkbook)
+{
+    workbook::Sheet aSheet;
+    aSheet.maName = getPropString(pTableNode, pTableNs, "name");
+    api::RowIndex nRow = 0;
+
+    for (const xmlNode* pChild = pTableNode->children; pChild; pChild = pChild->next)
+    {
+        if (matchesNode(pChild, pTableNs, "table-source"))
+        {
+            aSheet.moSource = workbook::SheetSource { getPropString(pChild, pXLinkNs, "href"),
+                getPropString(pChild, pTableNs, "table-name"),
+                parseSheetSourceMode(getPropString(pChild, pTableNs, "mode")) };
+            continue;
+        }
+
+        if (matchesNode(pChild, pTableNs, "named-expressions"))
+        {
+            parseNamedExpressions(pChild, aSheet.maName, rWorkbook);
+            continue;
+        }
+    }
+
+    parseSheetRows(pTableNode, aSheet, nRow);
 
     rWorkbook.maSheets.push_back(std::move(aSheet));
 }
@@ -624,6 +647,7 @@ void resolveImportedSheets(LoadResult& rResult, const std::filesystem::path& rPa
 
         rSheet.maCells = pSourceSheet->maCells;
         rSheet.maHiddenRows = pSourceSheet->maHiddenRows;
+        rSheet.maFilteredRows = pSourceSheet->maFilteredRows;
     }
 }
 

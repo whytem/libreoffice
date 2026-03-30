@@ -35,6 +35,7 @@ struct EvaluationResult
 class Evaluator
 {
     using AddressKey = std::tuple<api::SheetId, api::ColumnIndex, api::RowIndex>;
+    using LocalBindingMap = std::map<api::String, EvaluationResult>;
 
     enum class CacheState : sal_uInt8
     {
@@ -59,6 +60,7 @@ class Evaluator
     std::map<AddressKey, CacheEntry> maAstCellCache;
     std::map<AddressKey, CacheEntry> maCompiledCellCache;
     std::vector<api::CellAddress> maEvaluationStack;
+    std::vector<LocalBindingMap> maLocalBindings;
     ExecutionMode meActiveExecutionMode = ExecutionMode::Ast;
 
     [[nodiscard]] const workbook::Sheet* getSheet(api::SheetId nSheet) const;
@@ -73,6 +75,7 @@ class Evaluator
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
     [[nodiscard]] EvaluationResult evaluateFunction(
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] const EvaluationResult* lookupLocalBinding(api::StringView rName) const;
 
 public:
     explicit Evaluator(const workbook::Workbook& rWorkbook)

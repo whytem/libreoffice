@@ -4,6 +4,7 @@
 #include <cerrno>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <string>
 #include <string_view>
 
@@ -108,15 +109,39 @@ inline double stringToDouble(std::u16string_view aString, sal_Unicode cDecSepara
     return fValue;
 }
 
-inline double approxFloor(double fValue) { return std::floor(fValue); }
-
-inline double approxCeil(double fValue) { return std::ceil(fValue); }
-
 inline bool isRepresentableInteger(double fValue)
 {
     return std::isfinite(fValue) && std::trunc(fValue) == fValue
            && std::fabs(fValue) <= 0x1p53;
 }
+
+inline double approxValue(double fValue)
+{
+    const double fBigInt = 0x1p41;
+    if (fValue == 0.0 || !std::isfinite(fValue) || std::fabs(fValue) > fBigInt)
+        return fValue;
+
+    const bool bNegative = std::signbit(fValue);
+    double fAbs = std::fabs(fValue);
+    const int nExp = static_cast<int>(std::floor(std::log10(fAbs)));
+    const int nScaleExp = 14 - nExp;
+    const double fScale = std::pow(10.0, static_cast<double>(std::abs(nScaleExp)));
+
+    double fScaled = nScaleExp < 0 ? fAbs / fScale : fAbs * fScale;
+    if (!std::isfinite(fScaled))
+        return fValue;
+
+    fScaled = std::round(fScaled);
+    fScaled = nScaleExp < 0 ? fScaled * fScale : fScaled / fScale;
+    if (!std::isfinite(fScaled))
+        return fValue;
+
+    return bNegative ? -fScaled : fScaled;
+}
+
+inline double approxFloor(double fValue) { return std::floor(approxValue(fValue)); }
+
+inline double approxCeil(double fValue) { return std::ceil(approxValue(fValue)); }
 
 inline bool approxEqual(double fLeft, double fRight)
 {
@@ -185,11 +210,30 @@ inline double round(double fValue, int nDecimals, rtl_math_RoundingMode eMode)
     }
 }
 
-inline double sin(double fValue) { return std::sin(fValue); }
+inline bool isValidArcArg(double fValue)
+{
+    return std::fabs(fValue)
+           <= (static_cast<double>(static_cast<unsigned long>(0x80000000))
+               * static_cast<double>(static_cast<unsigned long>(0x80000000)) * 4.0);
+}
 
-inline double cos(double fValue) { return std::cos(fValue); }
+inline double sin(double fValue)
+{
+    return isValidArcArg(fValue) ? std::sin(fValue)
+                                 : std::numeric_limits<double>::quiet_NaN();
+}
 
-inline double tan(double fValue) { return std::tan(fValue); }
+inline double cos(double fValue)
+{
+    return isValidArcArg(fValue) ? std::cos(fValue)
+                                 : std::numeric_limits<double>::quiet_NaN();
+}
+
+inline double tan(double fValue)
+{
+    return isValidArcArg(fValue) ? std::tan(fValue)
+                                 : std::numeric_limits<double>::quiet_NaN();
+}
 
 inline double asinh(double fValue) { return std::asinh(fValue); }
 

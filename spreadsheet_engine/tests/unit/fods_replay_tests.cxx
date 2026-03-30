@@ -547,12 +547,40 @@ std::string childFallbackBucket(const std::unique_ptr<Node>& pChild)
     return nodeKindBucketName(pChild->meKind);
 }
 
+std::string functionCallFallbackBucket(const Node& rNode)
+{
+    const std::string aHead = stripFunctionNamespacePrefix(rNode.maPrimaryText);
+    if (aHead == "IF")
+    {
+        const std::string aCondition
+            = rNode.maChildren.size() > 0 ? childFallbackBucket(rNode.maChildren[0]) : "missing";
+        const std::string aThen
+            = rNode.maChildren.size() > 1 ? childFallbackBucket(rNode.maChildren[1]) : "missing";
+        const std::string aElse
+            = rNode.maChildren.size() > 2 ? childFallbackBucket(rNode.maChildren[2]) : "missing";
+        return "fn:IF:cond=" + aCondition + ":then=" + aThen + ":else=" + aElse;
+    }
+
+    if (aHead == "LOOKUP")
+    {
+        const std::string aLookup
+            = rNode.maChildren.size() > 0 ? childFallbackBucket(rNode.maChildren[0]) : "missing";
+        const std::string aSearch
+            = rNode.maChildren.size() > 1 ? childFallbackBucket(rNode.maChildren[1]) : "missing";
+        const std::string aResult
+            = rNode.maChildren.size() > 2 ? childFallbackBucket(rNode.maChildren[2]) : "missing";
+        return "fn:LOOKUP:lookup=" + aLookup + ":search=" + aSearch + ":result=" + aResult;
+    }
+
+    return "fn:" + aHead;
+}
+
 std::string cachedFallbackCategoryForNode(const Node& rNode)
 {
     switch (rNode.meKind)
     {
         case NodeKind::FunctionCall:
-            return "fn:" + stripFunctionNamespacePrefix(rNode.maPrimaryText);
+            return functionCallFallbackBucket(rNode);
         case NodeKind::BinaryOperation:
         {
             std::string aCategory

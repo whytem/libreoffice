@@ -151,6 +151,26 @@ int main()
         }
     }
 
+    {
+        const auto aSubtotalWorkbookPath
+            = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path()
+              / "sc" / "qa" / "unit" / "data" / "functions"
+                                          / "mathematical" / "fods" / "subtotal.fods";
+        const auto aSubtotalLoadResult = loadWorkbook(aSubtotalWorkbookPath.string());
+        if (!aSubtotalLoadResult)
+            return fail("spreadsheetengine_fods_tests", "subtotal workbook load failed");
+
+        const auto* pSheet3 = aSubtotalLoadResult.maValue.maWorkbook.findSheet(u"Sheet3");
+        const auto* pHiddenA16 = pSheet3 ? pSheet3->findCell(0, 15) : nullptr;
+        if (!pSheet3 || pSheet3->isRowHidden(3) || !pSheet3->isRowFiltered(3)
+            || !pSheet3->isRowFiltered(6) || pSheet3->isRowFiltered(1)
+            || !pSheet3->isRowHidden(15) || !pHiddenA16 || !pHiddenA16->maValue.isNumber()
+            || pHiddenA16->maValue.mfNumber != 1.0)
+        {
+            return fail("spreadsheetengine_fods_tests", "row-visibility parsing mismatch");
+        }
+    }
+
     std::cout << "spreadsheetengine FODS loader tests passed\n";
     return EXIT_SUCCESS;
 }

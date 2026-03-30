@@ -61,6 +61,7 @@ struct Sheet
     api::String maName;
     std::map<std::pair<api::ColumnIndex, api::RowIndex>, Cell> maCells;
     std::set<api::RowIndex> maHiddenRows;
+    std::set<api::RowIndex> maFilteredRows;
     std::optional<SheetSource> moSource;
 
     void setCell(api::ColumnIndex nColumn, api::RowIndex nRow, const Cell& rCell)
@@ -76,6 +77,14 @@ struct Sheet
             maHiddenRows.erase(nRow);
     }
 
+    void setRowFiltered(api::RowIndex nRow, bool bFiltered = true)
+    {
+        if (bFiltered)
+            maFilteredRows.insert(nRow);
+        else
+            maFilteredRows.erase(nRow);
+    }
+
     [[nodiscard]] const Cell* findCell(api::ColumnIndex nColumn, api::RowIndex nRow) const
     {
         const auto aIt = maCells.find({ nColumn, nRow });
@@ -85,6 +94,11 @@ struct Sheet
     [[nodiscard]] bool isRowHidden(api::RowIndex nRow) const
     {
         return maHiddenRows.contains(nRow);
+    }
+
+    [[nodiscard]] bool isRowFiltered(api::RowIndex nRow) const
+    {
+        return maFilteredRows.contains(nRow);
     }
 };
 

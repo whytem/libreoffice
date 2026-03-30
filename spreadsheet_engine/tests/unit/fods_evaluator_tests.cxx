@@ -112,6 +112,85 @@ Workbook makeWorkbook()
     aSheet1.setCell(46, 7, Cell { CellValue::text(u"A") });
     aSheet1.setCell(46, 8, Cell { CellValue::text(u"A") });
     aSheet1.setCell(47, 0, Cell { CellValue::text(u""), u"of:=\"\"" });
+    aSheet1.setCell(52, 0, Cell { CellValue::number(1.0) });
+    aSheet1.setCell(52, 1, Cell { CellValue::number(2.0) });
+    aSheet1.setCell(52, 2, Cell { CellValue::number(4.0) });
+    aSheet1.setCell(52, 3, Cell { CellValue::number(8.0) });
+    aSheet1.setCell(53, 0, Cell { CellValue::number(11.0) });
+    aSheet1.setCell(53, 1, Cell { CellValue::number(22.0) });
+    aSheet1.setCell(53, 2, Cell { CellValue::number(44.0) });
+    aSheet1.setCell(53, 3, Cell { CellValue::number(88.0) });
+    aSheet1.setCell(0, 60, Cell { CellValue::number(10.0) });
+    aSheet1.setCell(0, 61, Cell { CellValue::number(20.0) });
+    aSheet1.setCell(0, 62, Cell { CellValue::number(30.0) });
+    aSheet1.setRowFiltered(61);
+    aSheet1.setRowHidden(62);
+    aSheet1.setCell(54, 0, Cell { CellValue::text(u"A") });
+    aSheet1.setCell(55, 0, Cell { CellValue::text(u"C") });
+    aSheet1.setCell(56, 0, Cell { CellValue::text(u"E") });
+    aSheet1.setCell(57, 0, Cell { CellValue::text(u"G") });
+    aSheet1.setCell(54, 1, Cell { CellValue::text(u"CAR") });
+    aSheet1.setCell(55, 1, Cell { CellValue::text(u"BIKE") });
+    aSheet1.setCell(56, 1, Cell { CellValue::text(u"VAN") });
+    aSheet1.setCell(57, 1, Cell { CellValue::text(u"TRAIN") });
+    aSheet1.setCell(58, 0, Cell { CellValue::number(2.0) });
+    aSheet1.setCell(58, 1, Cell { CellValue::number(4.0) });
+    aSheet1.setCell(58, 2, Cell { CellValue::number(6.0) });
+    aSheet1.setCell(58, 3, Cell { CellValue::number(8.0) });
+    aSheet1.setCell(59, 0, Cell { CellValue::number(2.0) });
+    aSheet1.setCell(59, 1, Cell { CellValue::number(4.0) });
+    aSheet1.setCell(59, 2, Cell { CellValue::number(4.0) });
+    aSheet1.setCell(59, 3, Cell { CellValue::number(8.0) });
+    aSheet1.setCell(60, 0, Cell { CellValue::number(9.0) });
+    aSheet1.setCell(60, 1, Cell { CellValue::number(7.0) });
+    aSheet1.setCell(60, 2, Cell { CellValue::number(5.0) });
+    aSheet1.setCell(60, 3, Cell { CellValue::number(3.0) });
+    aSheet1.setCell(62, 0, Cell { CellValue::number(1.0) });
+    aSheet1.setCell(62, 1, Cell { CellValue::number(3.0) });
+    aSheet1.setCell(62, 2, Cell { CellValue::number(5.0) });
+    aSheet1.setCell(62, 3, Cell { CellValue::number(7.0) });
+    aSheet1.setCell(63, 0, Cell { CellValue::number(10.0) });
+    aSheet1.setCell(63, 1, Cell { CellValue::number(30.0) });
+    aSheet1.setCell(63, 2, Cell { CellValue::number(50.0) });
+    aSheet1.setCell(63, 3, Cell { CellValue::number(70.0) });
+    aSheet1.setCell(64, 0, Cell { CellValue::number(0.5), u"of:=NORMDIST(3;3;1;TRUE())" });
+    aSheet1.setCell(65, 0, Cell { CellValue::number(0.199471140200716),
+        u"of:=NORMDIST(3;3;2;FALSE())" });
+    aSheet1.setCell(66, 0, Cell { CellValue::number(0.77686983985157),
+        u"of:=CHISQDIST(3;2;1)" });
+    aSheet1.setCell(67, 0, Cell { CellValue::number(0.111565080074215),
+        u"of:=CHISQDIST(3;2;0)" });
+    aSheet1.setCell(68, 0, Cell { CellValue::number(0.550671035882778),
+        u"of:=GAMMADIST(0.8;1;1;1)" });
+    aSheet1.setCell(69, 0, Cell { CellValue::number(10.0), u"of:=GAMMADIST(0;1;0.1;0)" });
+    aSheet1.setCell(70, 0, Cell { CellValue::number(0.809090909090909),
+        u"of:=HYPGEOMDIST(2;2;90;100;0)" });
+    aSheet1.setCell(71, 0, Cell { CellValue::number(1.0), u"of:=HYPGEOMDIST(2;2;90;100;1)" });
+    aSheet1.setCell(72, 0, Cell { CellValue::number(4.0), u"of:=COM.MICROSOFT.BINOM.INV(8;0.35;0.8)" });
+    aSheet1.setCell(73, 0, Cell { CellValue::number(0.83), u"of:=PERCENTRANK({1;2;3;4};3.5;2)" });
+    aSheet1.setCell(74, 0, Cell { CellValue::number(0.83),
+        u"of:=COM.MICROSOFT.PERCENTRANK.INC({1;2;3;4};3.5;2)" });
+    aSheet1.setCell(75, 0, Cell { CellValue::number(0.7),
+        u"of:=COM.MICROSOFT.PERCENTRANK.EXC({1;2;3;4};3.5;2)" });
+    aSheet1.setCell(76, 0, Cell { CellValue::number(0.5), u"of:=LOGNORMDIST(1;0;1)" });
+    aSheet1.setCell(77, 0, Cell { CellValue::number(0.398942280401433),
+        u"of:=COM.MICROSOFT.LOGNORM.DIST(1;0;1;FALSE())" });
+    aSheet1.setCell(78, 0, Cell { CellValue::number(0.931933160851048),
+        u"of:=LEGACY.FINV(0.5;5;10)" });
+    aSheet1.setCell(79, 0, Cell { CellValue::number(1.9431802805153), u"of:=TINV(0.1;6)" });
+    aSheet1.setCell(80, 0, Cell { CellValue::number(2.66666666666667), u"of:=VARP(2;6;4)" });
+    aSheet1.setCell(81, 0, Cell { CellValue::number(4.0), u"of:=COM.MICROSOFT.VAR.S(2;6;4)" });
+    aSheet1.setCell(82, 0, Cell { CellValue::number(6.66666666666667), u"of:=VARA(\"red\";2;6;4)" });
+    aSheet1.setCell(83, 0, Cell { CellValue::number(5.0), u"of:=VARPA(\"red\";2;6;4)" });
+    aSheet1.setCell(84, 0, Cell { CellValue::number(1.63299316185545),
+        u"of:=COM.MICROSOFT.STDEV.P(2;6;4)" });
+    aSheet1.setCell(85, 0, Cell { CellValue::number(1.77245385090552), u"of:=GAMMA(0.5)" });
+    aSheet1.setCell(86, 0, Cell { CellValue::number(0.34089313230206),
+        u"of:=COM.MICROSOFT.T.DIST.2T(1;10)" });
+    aSheet1.setCell(87, 0, Cell { CellValue::number(2.0), u"of:=MODE.SNGL({1;2;2;3})" });
+    aSheet1.setCell(88, 0, Cell { CellValue::number(2.5), u"of:=TRIMMEAN({1;2;3;100};0.5)" });
+    aSheet1.setCell(89, 0, Cell { CellValue::number(2.0), u"of:=MAXA(FALSE();\"red\";2)" });
+    aSheet1.setCell(90, 0, Cell { CellValue::number(0.0), u"of:=MINA(TRUE();\"red\";2)" });
 
     Sheet aSheet2;
     aSheet2.maName = u"Sheet2";
@@ -146,6 +225,17 @@ int main()
 
     const Workbook aWorkbook = makeWorkbook();
     Evaluator aEvaluator(aWorkbook);
+    auto requireNumeric = [&](const CellAddress& rAddress, double fExpected, const char* pMessage,
+                              bool bCompiled = false) -> int {
+        const auto aResult = bCompiled ? aEvaluator.evaluateCellViaCompiledTokens(rAddress)
+                                       : aEvaluator.evaluateCell(rAddress);
+        if (!aResult || aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber()
+            || !almostEqual(aResult.maValue.maValue.mfNumber, fExpected))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", pMessage);
+        }
+        return 0;
+    };
 
     {
         const auto aResult = aEvaluator.evaluateCell({ 0, 1, 0 });
@@ -252,11 +342,11 @@ int main()
 
     {
         const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 24, 0 });
-        if (!aResult || !aResult.mbUsedCachedValue || !aResult.maValue.maValue.isText()
+        if (!aResult || aResult.mbUsedCachedValue || !aResult.maValue.maValue.isText()
             || aResult.maValue.maValue.maString != u"A")
         {
             return fail("spreadsheetengine_fods_evaluator_tests",
-                "compiled external-name text cached fallback mismatch");
+                "compiled external-name text mismatch");
         }
     }
 
@@ -324,6 +414,166 @@ int main()
             return fail("spreadsheetengine_fods_evaluator_tests",
                 "compiled one-arg ROUNDDOWN() mismatch");
         }
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 64, 0 }, 0.5, "NORMDIST() cumulative mismatch"))
+    {
+        return nResult;
+    }
+
+    if (const int nResult = requireNumeric(
+            { 0, 65, 0 }, 0.199471140200716, "NORMDIST() density mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 66, 0 }, 0.77686983985157, "CHISQDIST() cumulative mismatch"))
+    {
+        return nResult;
+    }
+
+    if (const int nResult = requireNumeric(
+            { 0, 67, 0 }, 0.111565080074215, "CHISQDIST() density mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 68, 0 }, 0.550671035882778, "GAMMADIST() cumulative mismatch"))
+    {
+        return nResult;
+    }
+
+    if (const int nResult = requireNumeric(
+            { 0, 69, 0 }, 10.0, "GAMMADIST() density-at-zero mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult = requireNumeric(
+            { 0, 70, 0 }, 0.809090909090909, "HYPGEOMDIST() density mismatch"))
+    {
+        return nResult;
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 71, 0 }, 1.0, "HYPGEOMDIST() cumulative mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 72, 0 }, 4.0, "BINOM.INV() mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 73, 0 }, 0.83, "PERCENTRANK() mismatch"))
+    {
+        return nResult;
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 74, 0 }, 0.83, "PERCENTRANK.INC() mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 75, 0 }, 0.7, "PERCENTRANK.EXC() mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 76, 0 }, 0.5, "LOGNORMDIST() mismatch"))
+    {
+        return nResult;
+    }
+
+    if (const int nResult = requireNumeric(
+            { 0, 77, 0 }, 0.398942280401433, "LOGNORM.DIST() density mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult = requireNumeric(
+            { 0, 78, 0 }, 0.931933160851048, "LEGACY.FINV() mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 79, 0 }, 1.9431802805153, "TINV() mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 80, 0 }, 2.66666666666667, "VARP() mismatch"))
+    {
+        return nResult;
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 81, 0 }, 4.0, "VAR.S() mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 82, 0 }, 6.66666666666667, "VARA() mismatch"))
+    {
+        return nResult;
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 83, 0 }, 5.0, "VARPA() mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult = requireNumeric(
+            { 0, 84, 0 }, 1.63299316185545, "STDEV.P() mismatch"))
+    {
+        return nResult;
+    }
+
+    if (const int nResult = requireNumeric(
+            { 0, 85, 0 }, 1.77245385090552, "GAMMA() mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult = requireNumeric(
+            { 0, 86, 0 }, 0.34089313230206, "T.DIST.2T() mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 87, 0 }, 2.0, "MODE.SNGL() mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult
+        = requireNumeric({ 0, 88, 0 }, 2.5, "TRIMMEAN() mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult = requireNumeric({ 0, 89, 0 }, 2.0, "MAXA() mismatch"))
+    {
+        return nResult;
+    }
+
+    if (const int nResult = requireNumeric({ 0, 90, 0 }, 0.0, "MINA() mismatch"))
+    {
+        return nResult;
     }
 
     {
@@ -432,6 +682,65 @@ int main()
         {
             return fail(
                 "spreadsheetengine_fods_evaluator_tests", "AGGREGATE() nested-skip mismatch");
+        }
+    }
+
+    {
+        const auto aScalarSum = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.AGGREGATE(9;6;3;4;5)", { 0, 0, 0 });
+        const auto aCompiledScalarSum = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.AGGREGATE(9;6;3;4;5)", { 0, 0, 0 });
+
+        const auto checkAggregateNumber = [&](const char* pLabel, const auto& rResult,
+                                              double fExpected) -> bool {
+            if (!rResult || rResult.mbUsedCachedValue || !rResult.maValue.maValue.isNumber()
+                || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+            {
+                std::fprintf(stderr, "%s: aggregate mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        if (!checkAggregateNumber("AGGREGATE scalar sum", aScalarSum, 12.0)
+            || !checkAggregateNumber("compiled AGGREGATE scalar sum", aCompiledScalarSum, 12.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "AGGREGATE() extended evaluation mismatch");
+        }
+    }
+
+    {
+        const auto aSubtotal = aEvaluator.evaluateFormula(
+            u"of:=SUBTOTAL(9;[.$A$61:.$A$63])", { 0, 0, 0 });
+        const auto aSubtotalCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=SUBTOTAL(9;[.$A$61:.$A$63])", { 0, 0, 0 });
+        const auto aSubtotalHidden = aEvaluator.evaluateFormula(
+            u"of:=SUBTOTAL(109;[.$A$61:.$A$63])", { 0, 0, 0 });
+        const auto aSubtotalHiddenCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=SUBTOTAL(109;[.$A$61:.$A$63])", { 0, 0, 0 });
+
+        const auto checkSubtotal = [&](const char* pLabel, const auto& rResult,
+                                       double fExpected) -> bool {
+            if (!rResult || rResult.mbUsedCachedValue || !rResult.maValue.maValue.isNumber()
+                || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+            {
+                std::fprintf(stderr, "%s: subtotal mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        if (!checkSubtotal("SUBTOTAL filtered rows", aSubtotal, 40.0)
+            || !checkSubtotal("compiled SUBTOTAL filtered rows", aSubtotalCompiled, 40.0)
+            || !checkSubtotal("SUBTOTAL filtered+hidden rows", aSubtotalHidden, 10.0)
+            || !checkSubtotal("compiled SUBTOTAL filtered+hidden rows", aSubtotalHiddenCompiled,
+                10.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "SUBTOTAL() filtered-row evaluation mismatch");
         }
     }
 
@@ -625,6 +934,1356 @@ int main()
     }
 
     {
+        const auto aVectorLookup
+            = aEvaluator.evaluateFormula(u"of:=LOOKUP(3;[.BA1:.BA4];[.BB1:.BB4])", { 0, 0, 0 });
+        const auto aArrayLookup
+            = aEvaluator.evaluateFormula(u"of:=LOOKUP(3;[.BA1:.BB4])", { 0, 0, 0 });
+        const auto aTextLookup = aEvaluator.evaluateFormula(
+            u"of:=LOOKUP(\"F\";[.BC1:.BF1];[.BC2:.BF2])", { 0, 0, 0 });
+        const auto aScalarLookup = aEvaluator.evaluateFormula(u"of:=LOOKUP(1;1;3)", { 0, 0, 0 });
+        const auto aMmultLookup
+            = aEvaluator.evaluateFormula(u"of:=LOOKUP(4;MMULT([.BK1:.BK4];1);[.BL1:.BL4])", { 0, 0, 0 });
+        const auto aMmultArrayLookup
+            = aEvaluator.evaluateFormula(u"of:=LOOKUP(4;MMULT([.BK1:.BK4];1))", { 0, 0, 0 });
+        const auto aInvalidMmultLookup
+            = aEvaluator.evaluateFormula(u"of:=LOOKUP(4;MMULT([.BK1:.BL4];1))", { 0, 0, 0 });
+        const auto aCompiledVectorLookup = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=LOOKUP(3;[.BA1:.BA4];[.BB1:.BB4])", { 0, 0, 0 });
+        const auto aCompiledArrayLookup = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=LOOKUP(3;[.BA1:.BB4])", { 0, 0, 0 });
+        const auto aCompiledTextLookup = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=LOOKUP(\"F\";[.BC1:.BF1];[.BC2:.BF2])", { 0, 0, 0 });
+        const auto aCompiledScalarLookup = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=LOOKUP(1;1;3)", { 0, 0, 0 });
+        const auto aCompiledMmultLookup = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=LOOKUP(4;MMULT([.BK1:.BK4];1);[.BL1:.BL4])", { 0, 0, 0 });
+        const auto aCompiledMmultArrayLookup = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=LOOKUP(4;MMULT([.BK1:.BK4];1))", { 0, 0, 0 });
+        const auto aCompiledInvalidMmultLookup = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=LOOKUP(4;MMULT([.BK1:.BL4];1))", { 0, 0, 0 });
+
+        const auto checkLookupNumber = [&](const char* pLabel, const auto& rResult,
+                                           double fExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isNumber() || rResult.mbUsedCachedValue
+                || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+            {
+                std::fprintf(stderr, "%s: lookup mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        const auto checkLookupText = [&](const char* pLabel, const auto& rResult,
+                                         std::u16string_view rExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isText() || rResult.mbUsedCachedValue
+                || rResult.maValue.maValue.maString != rExpected)
+            {
+                std::fprintf(stderr, "%s: lookup mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        const auto checkLookupError = [&](const char* pLabel, const auto& rResult,
+                                          spreadsheetengine::api::Error eExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isError() || rResult.mbUsedCachedValue
+                || rResult.maValue.maValue.meError != eExpected)
+            {
+                std::fprintf(stderr, "%s: lookup mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        if (!checkLookupNumber("vector LOOKUP", aVectorLookup, 22.0)
+            || !checkLookupNumber("array LOOKUP", aArrayLookup, 22.0)
+            || !checkLookupText("text LOOKUP", aTextLookup, u"VAN")
+            || !checkLookupNumber("scalar LOOKUP", aScalarLookup, 3.0)
+            || !checkLookupNumber("MMULT LOOKUP", aMmultLookup, 30.0)
+            || !checkLookupNumber("MMULT array LOOKUP", aMmultArrayLookup, 3.0)
+            || !checkLookupError("invalid MMULT LOOKUP", aInvalidMmultLookup,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkLookupNumber("compiled vector LOOKUP", aCompiledVectorLookup, 22.0)
+            || !checkLookupNumber("compiled array LOOKUP", aCompiledArrayLookup, 22.0)
+            || !checkLookupText("compiled text LOOKUP", aCompiledTextLookup, u"VAN")
+            || !checkLookupNumber("compiled scalar LOOKUP", aCompiledScalarLookup, 3.0)
+            || !checkLookupNumber("compiled MMULT LOOKUP", aCompiledMmultLookup, 30.0)
+            || !checkLookupNumber("compiled MMULT array LOOKUP", aCompiledMmultArrayLookup, 3.0)
+            || !checkLookupError("compiled invalid MMULT LOOKUP", aCompiledInvalidMmultLookup,
+                spreadsheetengine::api::Error::IllegalArgument))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "lookup evaluation mismatch");
+        }
+    }
+
+    {
+        const auto aMatchExact = aEvaluator.evaluateFormula(u"of:=MATCH(4;[.BA1:.BA4];0)", { 0, 0, 0 });
+        const auto aMatchApproxAsc
+            = aEvaluator.evaluateFormula(u"of:=MATCH(5;[.BA1:.BA4];1)", { 0, 0, 0 });
+        const auto aMatchApproxDesc
+            = aEvaluator.evaluateFormula(u"of:=MATCH(6;[.BI1:.BI4];-1)", { 0, 0, 0 });
+        const auto aMatchText
+            = aEvaluator.evaluateFormula(u"of:=MATCH(\"E\";[.BC1:.BF1];0)", { 0, 0, 0 });
+
+        const auto aCompiledMatchExact
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=MATCH(4;[.BA1:.BA4];0)", { 0, 0, 0 });
+        const auto aCompiledMatchApproxAsc = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=MATCH(5;[.BA1:.BA4];1)", { 0, 0, 0 });
+        const auto aCompiledMatchApproxDesc = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=MATCH(6;[.BI1:.BI4];-1)", { 0, 0, 0 });
+        const auto aCompiledMatchText = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=MATCH(\"E\";[.BC1:.BF1];0)", { 0, 0, 0 });
+        const auto aXMatchExact = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.XMATCH(4;[.BA1:.BA4])", { 0, 0, 0 });
+        const auto aXMatchText = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.XMATCH(\"E\";[.BC1:.BF1])", { 0, 0, 0 });
+        const auto aXMatchReverse = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.XMATCH(4;[.BH1:.BH4];0;-1)", { 0, 0, 0 });
+        const auto aXMatchNextSmaller = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.XMATCH(5;[.BA1:.BA4];-1;2)", { 0, 0, 0 });
+        const auto aXMatchNextLarger = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.XMATCH(5;[.BA1:.BA4];1;2)", { 0, 0, 0 });
+
+        const auto checkMatchNumber = [&](const char* pLabel, const auto& rResult,
+                                          double fExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isNumber() || rResult.mbUsedCachedValue
+                || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+            {
+                std::fprintf(stderr, "%s: MATCH mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        const auto aCompiledXMatchExact = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.XMATCH(4;[.BA1:.BA4])", { 0, 0, 0 });
+        const auto aCompiledXMatchText = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.XMATCH(\"E\";[.BC1:.BF1])", { 0, 0, 0 });
+        const auto aCompiledXMatchReverse = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.XMATCH(4;[.BH1:.BH4];0;-1)", { 0, 0, 0 });
+        const auto aCompiledXMatchNextSmaller = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.XMATCH(5;[.BA1:.BA4];-1;2)", { 0, 0, 0 });
+        const auto aCompiledXMatchNextLarger = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.XMATCH(5;[.BA1:.BA4];1;2)", { 0, 0, 0 });
+
+        if (!checkMatchNumber("exact MATCH", aMatchExact, 3.0)
+            || !checkMatchNumber("ascending MATCH", aMatchApproxAsc, 3.0)
+            || !checkMatchNumber("descending MATCH", aMatchApproxDesc, 2.0)
+            || !checkMatchNumber("text MATCH", aMatchText, 3.0)
+            || !checkMatchNumber("compiled exact MATCH", aCompiledMatchExact, 3.0)
+            || !checkMatchNumber("compiled ascending MATCH", aCompiledMatchApproxAsc, 3.0)
+            || !checkMatchNumber("compiled descending MATCH", aCompiledMatchApproxDesc, 2.0)
+            || !checkMatchNumber("compiled text MATCH", aCompiledMatchText, 3.0)
+            || !checkMatchNumber("exact XMATCH", aXMatchExact, 3.0)
+            || !checkMatchNumber("text XMATCH", aXMatchText, 3.0)
+            || !checkMatchNumber("reverse XMATCH", aXMatchReverse, 3.0)
+            || !checkMatchNumber("next smaller XMATCH", aXMatchNextSmaller, 3.0)
+            || !checkMatchNumber("next larger XMATCH", aXMatchNextLarger, 4.0)
+            || !checkMatchNumber("compiled exact XMATCH", aCompiledXMatchExact, 3.0)
+            || !checkMatchNumber("compiled text XMATCH", aCompiledXMatchText, 3.0)
+            || !checkMatchNumber("compiled reverse XMATCH", aCompiledXMatchReverse, 3.0)
+            || !checkMatchNumber("compiled next smaller XMATCH", aCompiledXMatchNextSmaller, 3.0)
+            || !checkMatchNumber("compiled next larger XMATCH", aCompiledXMatchNextLarger, 4.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "MATCH/XMATCH evaluation mismatch");
+        }
+    }
+
+    {
+        const auto aXLookupExact
+            = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.XLOOKUP(4;[.BA1:.BA4];[.BB1:.BB4])", { 0, 0, 0 });
+        const auto aXLookupText = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.XLOOKUP(\"E\";[.BC1:.BF1];[.BC2:.BF2])", { 0, 0, 0 });
+        const auto aXLookupMissing = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.XLOOKUP(5;[.BA1:.BA4];[.BB1:.BB4];\"missing\")", { 0, 0, 0 });
+        const auto aXLookupReverse = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.XLOOKUP(4;[.BH1:.BH4];[.BB1:.BB4];;0;-1)", { 0, 0, 0 });
+        const auto aXLookupNextSmaller = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.XLOOKUP(5;[.BA1:.BA4];[.BB1:.BB4];;-1;2)", { 0, 0, 0 });
+        const auto aXLookupNextLarger = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.XLOOKUP(5;[.BA1:.BA4];[.BB1:.BB4];;1;2)", { 0, 0, 0 });
+
+        const auto aCompiledXLookupExact = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.XLOOKUP(4;[.BA1:.BA4];[.BB1:.BB4])", { 0, 0, 0 });
+        const auto aCompiledXLookupText = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.XLOOKUP(\"E\";[.BC1:.BF1];[.BC2:.BF2])", { 0, 0, 0 });
+        const auto aCompiledXLookupMissing = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.XLOOKUP(5;[.BA1:.BA4];[.BB1:.BB4];\"missing\")", { 0, 0, 0 });
+        const auto aCompiledXLookupReverse = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.XLOOKUP(4;[.BH1:.BH4];[.BB1:.BB4];;0;-1)", { 0, 0, 0 });
+        const auto aCompiledXLookupNextSmaller = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.XLOOKUP(5;[.BA1:.BA4];[.BB1:.BB4];;-1;2)", { 0, 0, 0 });
+        const auto aCompiledXLookupNextLarger = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.XLOOKUP(5;[.BA1:.BA4];[.BB1:.BB4];;1;2)", { 0, 0, 0 });
+
+        const auto checkXLookupNumber = [&](const char* pLabel, const auto& rResult,
+                                            double fExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isNumber() || rResult.mbUsedCachedValue
+                || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+            {
+                std::fprintf(stderr, "%s: XLOOKUP mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        const auto checkXLookupText = [&](const char* pLabel, const auto& rResult,
+                                          std::u16string_view rExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isText() || rResult.mbUsedCachedValue
+                || rResult.maValue.maValue.maString != rExpected)
+            {
+                std::fprintf(stderr, "%s: XLOOKUP mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        if (!checkXLookupNumber("exact XLOOKUP", aXLookupExact, 44.0)
+            || !checkXLookupText("text XLOOKUP", aXLookupText, u"VAN")
+            || !checkXLookupText("missing XLOOKUP", aXLookupMissing, u"missing")
+            || !checkXLookupNumber("reverse XLOOKUP", aXLookupReverse, 44.0)
+            || !checkXLookupNumber("next smaller XLOOKUP", aXLookupNextSmaller, 44.0)
+            || !checkXLookupNumber("next larger XLOOKUP", aXLookupNextLarger, 88.0)
+            || !checkXLookupNumber("compiled exact XLOOKUP", aCompiledXLookupExact, 44.0)
+            || !checkXLookupText("compiled text XLOOKUP", aCompiledXLookupText, u"VAN")
+            || !checkXLookupText("compiled missing XLOOKUP", aCompiledXLookupMissing, u"missing")
+            || !checkXLookupNumber("compiled reverse XLOOKUP", aCompiledXLookupReverse, 44.0)
+            || !checkXLookupNumber("compiled next smaller XLOOKUP", aCompiledXLookupNextSmaller, 44.0)
+            || !checkXLookupNumber("compiled next larger XLOOKUP", aCompiledXLookupNextLarger, 88.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "XLOOKUP evaluation mismatch");
+        }
+    }
+
+    {
+        const auto aLetNumber = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.LET(_xlpm.first;5;_xlpm.second;_xlpm.first+5;_xlpm.second)",
+            { 0, 0, 0 });
+        const auto aLetSimple = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.LET(_xlpm.one;9;_xlpm.one)", { 0, 0, 0 });
+
+        const auto aCompiledLetNumber = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.LET(_xlpm.first;5;_xlpm.second;_xlpm.first+5;_xlpm.second)",
+            { 0, 0, 0 });
+        const auto aCompiledLetSimple = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.LET(_xlpm.one;9;_xlpm.one)", { 0, 0, 0 });
+
+        const auto checkLetNumber = [&](const char* pLabel, const auto& rResult,
+                                        double fExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isNumber() || rResult.mbUsedCachedValue
+                || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+            {
+                std::fprintf(stderr, "%s: LET mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        if (!checkLetNumber("direct numeric LET", aLetNumber, 10.0)
+            || !checkLetNumber("direct simple LET", aLetSimple, 9.0)
+            || !checkLetNumber("compiled numeric LET", aCompiledLetNumber, 10.0)
+            || !checkLetNumber("compiled simple LET", aCompiledLetSimple, 9.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "LET evaluation mismatch");
+        }
+    }
+
+    {
+        const auto aTextAfterBasic = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.TEXTAFTER(\"Brown, Lucas, Manager:1234:5678\";\",\";2)",
+            { 0, 0, 0 });
+        const auto aTextAfterArray = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.TEXTAFTER(\"Brown, Lucas, Manager:1234:5678\";{\",\";\":\"};4)",
+            { 0, 0, 0 });
+        const auto aTextAfterCaseInsensitive = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.TEXTAFTER(\"AlphaBetaGamma\";\"beta\";;1)", { 0, 0, 0 });
+        const auto aTextAfterMatchEnd = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.TEXTAFTER(\"LucasÇÇÇManager\";\"xxx\";1;;1)", { 0, 0, 0 });
+        const auto aTextAfterNotFound = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.TEXTAFTER(\"Brown, Lucas\";\"xxx\";;;;\"Not Found\")",
+            { 0, 0, 0 });
+
+        const auto aCompiledTextAfterBasic = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.TEXTAFTER(\"Brown, Lucas, Manager:1234:5678\";\",\";2)",
+            { 0, 0, 0 });
+        const auto aCompiledTextAfterArray = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.TEXTAFTER(\"Brown, Lucas, Manager:1234:5678\";{\",\";\":\"};4)",
+            { 0, 0, 0 });
+        const auto aCompiledTextAfterCaseInsensitive = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.TEXTAFTER(\"AlphaBetaGamma\";\"beta\";;1)", { 0, 0, 0 });
+        const auto aCompiledTextAfterMatchEnd = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.TEXTAFTER(\"LucasÇÇÇManager\";\"xxx\";1;;1)", { 0, 0, 0 });
+        const auto aCompiledTextAfterNotFound = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.TEXTAFTER(\"Brown, Lucas\";\"xxx\";;;;\"Not Found\")",
+            { 0, 0, 0 });
+
+        const auto checkTextAfter = [&](const char* pLabel, const auto& rResult,
+                                        std::u16string_view rExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isText() || rResult.mbUsedCachedValue
+                || rResult.maValue.maValue.maString != rExpected)
+            {
+                std::fprintf(stderr, "%s: TEXTAFTER mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        if (!checkTextAfter("direct basic TEXTAFTER", aTextAfterBasic, u" Manager:1234:5678")
+            || !checkTextAfter("direct array TEXTAFTER", aTextAfterArray, u"5678")
+            || !checkTextAfter("direct case-insensitive TEXTAFTER", aTextAfterCaseInsensitive,
+                u"Gamma")
+            || !checkTextAfter("direct match-end TEXTAFTER", aTextAfterMatchEnd,
+                u"LucasÇÇÇManager")
+            || !checkTextAfter("direct not-found TEXTAFTER", aTextAfterNotFound, u"Not Found")
+            || !checkTextAfter("compiled basic TEXTAFTER", aCompiledTextAfterBasic,
+                u" Manager:1234:5678")
+            || !checkTextAfter("compiled array TEXTAFTER", aCompiledTextAfterArray, u"5678")
+            || !checkTextAfter("compiled case-insensitive TEXTAFTER",
+                aCompiledTextAfterCaseInsensitive, u"Gamma")
+            || !checkTextAfter("compiled match-end TEXTAFTER", aCompiledTextAfterMatchEnd,
+                u"LucasÇÇÇManager")
+            || !checkTextAfter("compiled not-found TEXTAFTER", aCompiledTextAfterNotFound,
+                u"Not Found"))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "TEXTAFTER evaluation mismatch");
+        }
+    }
+
+    {
+        const auto aTextBeforeBasic = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.TEXTBEFORE(\"Brown, Lucas, Manager:1234:5678\";\",\";2)",
+            { 0, 0, 0 });
+        const auto aTextBeforeArray = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.TEXTBEFORE(\"Brown, Lucas, Manager:1234:5678\";{\",\";\":\"};4)",
+            { 0, 0, 0 });
+        const auto aTextBeforeCaseInsensitive = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.TEXTBEFORE(\"AlphaBetaGamma\";\"beta\";;1)", { 0, 0, 0 });
+        const auto aTextBeforeMatchEnd = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.TEXTBEFORE(\"LucasÇÇÇManager\";\"xxx\";1;;1)", { 0, 0, 0 });
+        const auto aTextBeforeNotFound = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.TEXTBEFORE(\"Brown, Lucas\";\"xxx\";;;;\"Not Found\")",
+            { 0, 0, 0 });
+
+        const auto aCompiledTextBeforeBasic = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.TEXTBEFORE(\"Brown, Lucas, Manager:1234:5678\";\",\";2)",
+            { 0, 0, 0 });
+        const auto aCompiledTextBeforeArray = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.TEXTBEFORE(\"Brown, Lucas, Manager:1234:5678\";{\",\";\":\"};4)",
+            { 0, 0, 0 });
+        const auto aCompiledTextBeforeCaseInsensitive = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.TEXTBEFORE(\"AlphaBetaGamma\";\"beta\";;1)", { 0, 0, 0 });
+        const auto aCompiledTextBeforeMatchEnd = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.TEXTBEFORE(\"LucasÇÇÇManager\";\"xxx\";1;;1)", { 0, 0, 0 });
+        const auto aCompiledTextBeforeNotFound = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.TEXTBEFORE(\"Brown, Lucas\";\"xxx\";;;;\"Not Found\")",
+            { 0, 0, 0 });
+
+        const auto checkTextBefore = [&](const char* pLabel, const auto& rResult,
+                                         std::u16string_view rExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isText() || rResult.mbUsedCachedValue
+                || rResult.maValue.maValue.maString != rExpected)
+            {
+                std::fprintf(stderr, "%s: TEXTBEFORE mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        if (!checkTextBefore("direct basic TEXTBEFORE", aTextBeforeBasic, u"Brown, Lucas")
+            || !checkTextBefore("direct array TEXTBEFORE", aTextBeforeArray,
+                u"Brown, Lucas, Manager:1234")
+            || !checkTextBefore("direct case-insensitive TEXTBEFORE",
+                aTextBeforeCaseInsensitive, u"Alpha")
+            || !checkTextBefore("direct match-end TEXTBEFORE", aTextBeforeMatchEnd,
+                u"LucasÇÇÇManager")
+            || !checkTextBefore("direct not-found TEXTBEFORE", aTextBeforeNotFound,
+                u"Not Found")
+            || !checkTextBefore("compiled basic TEXTBEFORE", aCompiledTextBeforeBasic,
+                u"Brown, Lucas")
+            || !checkTextBefore("compiled array TEXTBEFORE", aCompiledTextBeforeArray,
+                u"Brown, Lucas, Manager:1234")
+            || !checkTextBefore("compiled case-insensitive TEXTBEFORE",
+                aCompiledTextBeforeCaseInsensitive, u"Alpha")
+            || !checkTextBefore("compiled match-end TEXTBEFORE", aCompiledTextBeforeMatchEnd,
+                u"LucasÇÇÇManager")
+            || !checkTextBefore("compiled not-found TEXTBEFORE",
+                aCompiledTextBeforeNotFound, u"Not Found"))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "TEXTBEFORE evaluation mismatch");
+        }
+    }
+
+    {
+        const auto aIndirectA1
+            = aEvaluator.evaluateFormula(u"of:=INDIRECT(\"A1\")", { 0, 0, 0 });
+        const auto aIndirectAbs
+            = aEvaluator.evaluateFormula(u"of:=INDIRECT(\"$A$1\")", { 0, 0, 0 });
+        const auto aIndirectSheet
+            = aEvaluator.evaluateFormula(u"of:=INDIRECT(\"Sheet2!A1\")", { 0, 0, 0 });
+        const auto aIndirectR1C1
+            = aEvaluator.evaluateFormula(u"of:=INDIRECT(\"R1C1\";0)", { 0, 0, 0 });
+
+        const auto aCompiledIndirectA1
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=INDIRECT(\"A1\")", { 0, 0, 0 });
+        const auto aCompiledIndirectAbs = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=INDIRECT(\"$A$1\")", { 0, 0, 0 });
+        const auto aCompiledIndirectSheet = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=INDIRECT(\"Sheet2!A1\")", { 0, 0, 0 });
+        const auto aCompiledIndirectR1C1 = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=INDIRECT(\"R1C1\";0)", { 0, 0, 0 });
+
+        const auto checkIndirectNumber = [&](const char* pLabel, const auto& rResult,
+                                             double fExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isNumber() || rResult.mbUsedCachedValue
+                || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+            {
+                std::fprintf(stderr, "%s: INDIRECT mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        if (!checkIndirectNumber("direct A1 INDIRECT", aIndirectA1, 5.0)
+            || !checkIndirectNumber("direct absolute INDIRECT", aIndirectAbs, 5.0)
+            || !checkIndirectNumber("direct sheet INDIRECT", aIndirectSheet, 3.0)
+            || !checkIndirectNumber("direct R1C1 INDIRECT", aIndirectR1C1, 5.0)
+            || !checkIndirectNumber("compiled A1 INDIRECT", aCompiledIndirectA1, 5.0)
+            || !checkIndirectNumber("compiled absolute INDIRECT", aCompiledIndirectAbs, 5.0)
+            || !checkIndirectNumber("compiled sheet INDIRECT", aCompiledIndirectSheet, 3.0)
+            || !checkIndirectNumber("compiled R1C1 INDIRECT", aCompiledIndirectR1C1, 5.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "INDIRECT evaluation mismatch");
+        }
+    }
+
+    {
+        const auto aPoissonCdf
+            = aEvaluator.evaluateFormula(u"of:=POISSON.DIST(60;50;TRUE())", { 0, 0, 0 });
+        const auto aPoissonPmf
+            = aEvaluator.evaluateFormula(u"of:=POISSON.DIST(10;10;FALSE())", { 0, 0, 0 });
+        const auto aBinomCdf
+            = aEvaluator.evaluateFormula(u"of:=BINOMDIST(5;10;0.5;TRUE())", { 0, 0, 0 });
+        const auto aBinomRange
+            = aEvaluator.evaluateFormula(u"of:=BINOM.DIST.RANGE(10;1/6;2)", { 0, 0, 0 });
+        const auto aBetaCdf
+            = aEvaluator.evaluateFormula(u"of:=BETADIST(0.5;2;3)", { 0, 0, 0 });
+        const auto aBetaPdf
+            = aEvaluator.evaluateFormula(u"of:=BETA.DIST(0.5;2;3;FALSE())", { 0, 0, 0 });
+
+        const auto aCompiledPoissonCdf
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=POISSON.DIST(60;50;TRUE())", { 0, 0, 0 });
+        const auto aCompiledPoissonPmf
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=POISSON.DIST(10;10;FALSE())", { 0, 0, 0 });
+        const auto aCompiledBinomCdf
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=BINOMDIST(5;10;0.5;TRUE())", { 0, 0, 0 });
+        const auto aCompiledBinomRange
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=BINOM.DIST.RANGE(10;1/6;2)", { 0, 0, 0 });
+        const auto aCompiledBetaCdf
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=BETADIST(0.5;2;3)", { 0, 0, 0 });
+        const auto aCompiledBetaPdf
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=BETA.DIST(0.5;2;3;FALSE())", { 0, 0, 0 });
+
+        const auto checkDistribution = [&](const char* pLabel, const auto& rResult,
+                                           double fExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isNumber() || rResult.mbUsedCachedValue
+                || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+            {
+                std::fprintf(stderr, "%s: distribution mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        if (!checkDistribution("POISSON.DIST cumulative", aPoissonCdf, 0.927839820186743)
+            || !checkDistribution("POISSON.DIST mass", aPoissonPmf, 0.125110035721133)
+            || !checkDistribution("BINOMDIST cumulative", aBinomCdf, 0.623046875)
+            || !checkDistribution("BINOM.DIST.RANGE", aBinomRange, 0.290710049201722)
+            || !checkDistribution("BETADIST cumulative", aBetaCdf, 0.6875)
+            || !checkDistribution("BETA.DIST density", aBetaPdf, 1.5)
+            || !checkDistribution("compiled POISSON.DIST cumulative", aCompiledPoissonCdf,
+                0.927839820186743)
+            || !checkDistribution("compiled POISSON.DIST mass", aCompiledPoissonPmf,
+                0.125110035721133)
+            || !checkDistribution("compiled BINOMDIST cumulative", aCompiledBinomCdf, 0.623046875)
+            || !checkDistribution("compiled BINOM.DIST.RANGE", aCompiledBinomRange,
+                0.290710049201722)
+            || !checkDistribution("compiled BETADIST cumulative", aCompiledBetaCdf, 0.6875)
+            || !checkDistribution("compiled BETA.DIST density", aCompiledBetaPdf, 1.5))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "distribution evaluation mismatch");
+        }
+    }
+
+    {
+        const auto aAbs = aEvaluator.evaluateFormula(u"of:=ABS(-7.25)", { 0, 0, 0 });
+        const auto aDegrees
+            = aEvaluator.evaluateFormula(u"of:=DEGREES(3.141592653589793)", { 0, 0, 0 });
+        const auto aPi = aEvaluator.evaluateFormula(u"of:=PI()", { 0, 0, 0 });
+        const auto aAtanh = aEvaluator.evaluateFormula(u"of:=ATANH(0.5)", { 0, 0, 0 });
+        const auto aFisher = aEvaluator.evaluateFormula(u"of:=FISHER(0.5)", { 0, 0, 0 });
+        const auto aFisherInv
+            = aEvaluator.evaluateFormula(u"of:=FISHERINV(0.5493061443340549)", { 0, 0, 0 });
+        const auto aGauss = aEvaluator.evaluateFormula(u"of:=GAUSS(1)", { 0, 0, 0 });
+        const auto aGammaLn = aEvaluator.evaluateFormula(u"of:=GAMMALN(5)", { 0, 0, 0 });
+        const auto aGammaLnPrecise
+            = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.GAMMALN.PRECISE(5)", { 0, 0, 0 });
+        const auto aGcd = aEvaluator.evaluateFormula(u"of:=GCD({16|32|24};40)", { 0, 0, 0 });
+        const auto aLcm = aEvaluator.evaluateFormula(u"of:=LCM({4|6|10})", { 0, 0, 0 });
+        const auto aGeoMean
+            = aEvaluator.evaluateFormula(u"of:=GEOMEAN({4|1|0.03125})", { 0, 0, 0 });
+        const auto aHarMean = aEvaluator.evaluateFormula(u"of:=HARMEAN({1|2|4})", { 0, 0, 0 });
+        const auto aDateDif = aEvaluator.evaluateFormula(
+            u"of:=DATEDIF(DATE(2020;1;1);DATE(2021;3;15);\"ym\")", { 0, 0, 0 });
+        const auto aFloor = aEvaluator.evaluateFormula(u"of:=FLOOR(-11;-2)", { 0, 0, 0 });
+        const auto aFloorMode = aEvaluator.evaluateFormula(u"of:=FLOOR(-7.9;;5)", { 0, 0, 0 });
+        const auto aFloorMissingValue
+            = aEvaluator.evaluateFormula(u"of:=FLOOR(;2.3;5)", { 0, 0, 0 });
+        const auto aCeiling = aEvaluator.evaluateFormula(u"of:=CEILING(-11;-2)", { 0, 0, 0 });
+        const auto aFloorMath
+            = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.FLOOR.MATH(-11;-2;1)", { 0, 0, 0 });
+        const auto aCeilingMath = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.CEILING.MATH(-5.5;2;-1)", { 0, 0, 0 });
+        const auto aCeilingPrecise = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.CEILING.PRECISE(-2.5;2)", { 0, 0, 0 });
+        const auto aFloorPrecise = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.FLOOR.PRECISE(-2.5;2)", { 0, 0, 0 });
+        const auto aIsoCeiling
+            = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.ISO.CEILING(-4.3;2)", { 0, 0, 0 });
+        const auto aChar = aEvaluator.evaluateFormula(u"of:=CHAR(65)", { 0, 0, 0 });
+        const auto aCode = aEvaluator.evaluateFormula(u"of:=CODE(\"Az\")", { 0, 0, 0 });
+        const auto aDecimal = aEvaluator.evaluateFormula(u"of:=DECIMAL(\"FF\";16)", { 0, 0, 0 });
+        const auto aDec2Hex = aEvaluator.evaluateFormula(u"of:=DEC2HEX(255)", { 0, 0, 0 });
+        const auto aLog = aEvaluator.evaluateFormula(u"of:=LOG(8;2)", { 0, 0, 0 });
+        const auto aMround = aEvaluator.evaluateFormula(u"of:=MROUND(10;4)", { 0, 0, 0 });
+        const auto aMroundTie = aEvaluator.evaluateFormula(u"of:=MROUND(1.45;0.1)", { 0, 0, 0 });
+        const auto aMroundMissing = aEvaluator.evaluateFormula(u"of:=MROUND(15.5;)", { 0, 0, 0 });
+        const auto aCombin = aEvaluator.evaluateFormula(u"of:=COMBIN(6;2)", { 0, 0, 0 });
+        const auto aCombina = aEvaluator.evaluateFormula(u"of:=COMBINA(4;3)", { 0, 0, 0 });
+        const auto aCombinaZero = aEvaluator.evaluateFormula(u"of:=COMBINA(0;0)", { 0, 0, 0 });
+        const auto aCombinaKZero = aEvaluator.evaluateFormula(u"of:=COMBINA(12;0)", { 0, 0, 0 });
+        const auto aCombinaError = aEvaluator.evaluateFormula(u"of:=COMBINA(1;2)", { 0, 0, 0 });
+        const auto aMultinomial
+            = aEvaluator.evaluateFormula(u"of:=MULTINOMIAL(1;2;3)", { 0, 0, 0 });
+        const auto aMultinomialLarge = aEvaluator.evaluateFormula(
+            u"of:=MULTINOMIAL(1073741824;2;1)", { 0, 0, 0 });
+        const auto aBitXor = aEvaluator.evaluateFormula(u"of:=BITXOR(5;3)", { 0, 0, 0 });
+        const auto aBitXorLeftMissing = aEvaluator.evaluateFormula(u"of:=BITXOR(;25)", { 0, 0, 0 });
+        const auto aBitXorRightMissing = aEvaluator.evaluateFormula(u"of:=BITXOR(25;)", { 0, 0, 0 });
+        const auto aBitXorNoValue = aEvaluator.evaluateFormula(u"of:=BITXOR(25)", { 0, 0, 0 });
+        const auto aBitXorError = aEvaluator.evaluateFormula(u"of:=BITXOR(-1;2)", { 0, 0, 0 });
+        const auto aCsc = aEvaluator.evaluateFormula(u"of:=CSC(PI()/2)", { 0, 0, 0 });
+        const auto aCsch = aEvaluator.evaluateFormula(u"of:=CSCH(1)", { 0, 0, 0 });
+        const auto aCschZero = aEvaluator.evaluateFormula(u"of:=CSCH(0)", { 0, 0, 0 });
+        const auto aTrunc = aEvaluator.evaluateFormula(u"of:=TRUNC(-123.456;2)", { 0, 0, 0 });
+        const auto aUpper = aEvaluator.evaluateFormula(u"of:=UPPER(\"MiXeD\")", { 0, 0, 0 });
+        const auto aLower = aEvaluator.evaluateFormula(u"of:=LOWER(\"MiXeD\")", { 0, 0, 0 });
+        const auto aLen = aEvaluator.evaluateFormula(u"of:=LEN(\"A😀\")", { 0, 0, 0 });
+        const auto aLenb = aEvaluator.evaluateFormula(u"of:=LENB(\"ᄩA\")", { 0, 0, 0 });
+        const auto aSearch
+            = aEvaluator.evaluateFormula(u"of:=SEARCH(\"bc\";\"AbCd\")", { 0, 0, 0 });
+        const auto aFind
+            = aEvaluator.evaluateFormula(u"of:=FIND(\"bc\";\"AbCd\")", { 0, 0, 0 });
+        const auto aMid = aEvaluator.evaluateFormula(u"of:=MID(\"A😀BC\";2;2)", { 0, 0, 0 });
+        const auto aReplace
+            = aEvaluator.evaluateFormula(u"of:=REPLACE(\"abcdef\";2;3;\"ZZ\")", { 0, 0, 0 });
+        const auto aBase = aEvaluator.evaluateFormula(u"of:=BASE(255;16;4)", { 0, 0, 0 });
+        const auto aRoman = aEvaluator.evaluateFormula(u"of:=ROMAN(499;4)", { 0, 0, 0 });
+        const auto aLeft = aEvaluator.evaluateFormula(u"of:=LEFT(\"A😀BC\";2)", { 0, 0, 0 });
+        const auto aRight = aEvaluator.evaluateFormula(u"of:=RIGHT(\"A😀BC\";2)", { 0, 0, 0 });
+        const auto aProper
+            = aEvaluator.evaluateFormula(u"of:=PROPER(\"HELLO.THERE\")", { 0, 0, 0 });
+        const auto aProperDigits
+            = aEvaluator.evaluateFormula(u"of:=PROPER(\"76budget\")", { 0, 0, 0 });
+        const auto aSubstitute = aEvaluator.evaluateFormula(
+            u"of:=SUBSTITUTE(\"123123123\";\"3\";\"abc\";2)", { 0, 0, 0 });
+        const auto aT = aEvaluator.evaluateFormula(u"of:=T(7)", { 0, 0, 0 });
+        const auto aTError = aEvaluator.evaluateFormula(u"of:=T(NA())", { 0, 0, 0 });
+        const auto aConcat
+            = aEvaluator.evaluateFormula(u"of:=CONCAT(\"A\";[.BC1:.BF1])", { 0, 0, 0 });
+        const auto aFindb
+            = aEvaluator.evaluateFormula(u"of:=FINDB(\"ᄔ\";\"ᄩᄔᄕ\")", { 0, 0, 0 });
+        const auto aFindbNbsp = aEvaluator.evaluateFormula(
+            u"of:=FINDB(\"M\";\"Miriam\u00A0McGovern\";3)", { 0, 0, 0 });
+        const auto aSearchb
+            = aEvaluator.evaluateFormula(u"of:=SEARCHB(\"ab\";\"zAbz\")", { 0, 0, 0 });
+        const auto aReplaceb = aEvaluator.evaluateFormula(
+            u"of:=REPLACEB(\"ᄩᄔᄕ\";1;1;\"ab\")", { 0, 0, 0 });
+        const auto aAsc = aEvaluator.evaluateFormula(u"of:=ASC(\"ＡＢＣ１２３\")", { 0, 0, 0 });
+        const auto aAscKana
+            = aEvaluator.evaluateFormula(u"of:=ASC(\"オープンオフィス\")", { 0, 0, 0 });
+        const auto aJisPunctuation
+            = aEvaluator.evaluateFormula(u"of:=JIS(\"!\"&CHAR(34)&\"#$%&'()*+,-./\")", { 0, 0, 0 });
+        const auto aJisQuotes = aEvaluator.evaluateFormula(
+            u"of:=JIS(CHAR(34)&\"'\"&CHAR(92)&CHAR(96))", { 0, 0, 0 });
+        const auto aJisKanaMarks = aEvaluator.evaluateFormula(u"of:=JIS(\"ﾞﾟ\")", { 0, 0, 0 });
+        const auto aJisVoicedKana
+            = aEvaluator.evaluateFormula(u"of:=JIS(\"ｶﾞｷﾞｸﾞｹﾞｺﾞ\")", { 0, 0, 0 });
+        const auto aJisVoicedVowels
+            = aEvaluator.evaluateFormula(u"of:=JIS(\"ｱﾞｲﾞｳﾞｴﾞｵﾞ\")", { 0, 0, 0 });
+        const auto aLegacyChiDist
+            = aEvaluator.evaluateFormula(u"of:=LEGACY.CHIDIST(2;3)", { 0, 0, 0 });
+        const auto aAddress = aEvaluator.evaluateFormula(u"of:=ADDRESS(4;5)", { 0, 0, 0 });
+        const auto aAddressRowMixed
+            = aEvaluator.evaluateFormula(u"of:=ADDRESS(4;5;2)", { 0, 0, 0 });
+        const auto aAddressColumnMixed
+            = aEvaluator.evaluateFormula(u"of:=ADDRESS(4;5;3)", { 0, 0, 0 });
+        const auto aAddressR1C1
+            = aEvaluator.evaluateFormula(u"of:=ADDRESS(4;5;4;0)", { 0, 0, 0 });
+        const auto aAddressSheet = aEvaluator.evaluateFormula(
+            u"of:=ADDRESS(1;1;2;;\"Sheet2\")", { 0, 0, 0 });
+        const auto aAddressQuotedSheet = aEvaluator.evaluateFormula(
+            u"of:=ADDRESS(1;1;4;1;\"Sheet 3\")", { 0, 0, 0 });
+        const auto aAddressQuotedSheetR1C1 = aEvaluator.evaluateFormula(
+            u"of:=ADDRESS(1;1;1;0;\"Sheet 3\")", { 0, 0, 0 });
+        const auto aAddressError
+            = aEvaluator.evaluateFormula(u"of:=ADDRESS(1;1;0;1)", { 0, 0, 0 });
+        const auto aConvert
+            = aEvaluator.evaluateFormula(u"of:=CONVERT(1;\"m\";\"mi\")", { 0, 0, 0 });
+        const auto aConvertTemp
+            = aEvaluator.evaluateFormula(u"of:=CONVERT(2;\"C\";\"F\")", { 0, 0, 0 });
+        const auto aConvertCubic
+            = aEvaluator.evaluateFormula(u"of:=CONVERT(1;\"picapt3\";\"pica3\")", { 0, 0, 0 });
+        const auto aConvertCaretAlias = aEvaluator.evaluateFormula(
+            u"of:=CONVERT(1;\"picapt^3\";\"pica^3\")", { 0, 0, 0 });
+        const auto aConvertCubicStep
+            = aEvaluator.evaluateFormula(u"of:=CONVERT(1;\"pica3\";\"pt\")", { 0, 0, 0 });
+        const auto aConvertPica
+            = aEvaluator.evaluateFormula(u"of:=CONVERT(1;\"Pica\";\"pica\")", { 0, 0, 0 });
+        const auto aConvertPicaStep = aEvaluator.evaluateFormula(
+            u"of:=CONVERT(1;\"pica\";\"survey_mi\")", { 0, 0, 0 });
+        const auto aConvertIn3ToGal = aEvaluator.evaluateFormula(
+            u"of:=CONVERT(9072;\"in3\";\"gal\")", { 0, 0, 0 });
+        const auto aConvertM3ToYd3 = aEvaluator.evaluateFormula(
+            u"of:=CONVERT(10;\"m3\";\"yd3\")", { 0, 0, 0 });
+        const auto aConvertMtonToNmi3 = aEvaluator.evaluateFormula(
+            u"of:=CONVERT(100000000000000;\"MTON\";\"Nmi3\")", { 0, 0, 0 });
+        const auto aConvertTspmToMl = aEvaluator.evaluateFormula(
+            u"of:=CONVERT(1;\"tspm\";\"ml\")", { 0, 0, 0 });
+        const auto aBitLShift
+            = aEvaluator.evaluateFormula(u"of:=BITLSHIFT(6;1)", { 0, 0, 0 });
+        const auto aBitLShiftNegative = aEvaluator.evaluateFormula(
+            u"of:=BITLSHIFT(10;-2)", { 0, 0, 0 });
+        const auto aBitLShiftDefault
+            = aEvaluator.evaluateFormula(u"of:=BITLSHIFT(4;)", { 0, 0, 0 });
+        const auto aBitLShiftError = aEvaluator.evaluateFormula(
+            u"of:=BITLSHIFT(-4;2)", { 0, 0, 0 });
+        const auto aBitRShift
+            = aEvaluator.evaluateFormula(u"of:=BITRSHIFT(6;1)", { 0, 0, 0 });
+        const auto aBitRShiftNegative = aEvaluator.evaluateFormula(
+            u"of:=BITRSHIFT(10;-2)", { 0, 0, 0 });
+        const auto aBitRShiftDefault
+            = aEvaluator.evaluateFormula(u"of:=BITRSHIFT(4;)", { 0, 0, 0 });
+        const auto aBitRShiftError = aEvaluator.evaluateFormula(
+            u"of:=BITRSHIFT(-4;2)", { 0, 0, 0 });
+        const auto aConvertAlias = aEvaluator.evaluateFormula(
+            u"of:=ORG.OPENOFFICE.CONVERT(1;\"m\";\"mi\")", { 0, 0, 0 });
+        const auto aConvertEuro = aEvaluator.evaluateFormula(
+            u"of:=ORG.OPENOFFICE.CONVERT(100;\"ATS\";\"EUR\")", { 0, 0, 0 });
+        const auto aConvertEuroCaseError = aEvaluator.evaluateFormula(
+            u"of:=ORG.OPENOFFICE.CONVERT(100;\"skk\";\"skK\")", { 0, 0, 0 });
+        const auto aConvertAliasOptionalError = aEvaluator.evaluateFormula(
+            u"of:=ORG.OPENOFFICE.CONVERT(100;\"EUR\";\"SIT\";FALSE())", { 0, 0, 0 });
+        const auto aEuroConvert = aEvaluator.evaluateFormula(
+            u"of:=EUROCONVERT(100;\"ATS\";\"EUR\")", { 0, 0, 0 });
+        const auto aEuroConvertCase = aEvaluator.evaluateFormula(
+            u"of:=EUROCONVERT(100;\"EUR\";\"skK\")", { 0, 0, 0 });
+        const auto aEuroConvertPrecision = aEvaluator.evaluateFormula(
+            u"of:=EUROCONVERT(100;\"EUR\";\"SIT\";;3)", { 0, 0, 0 });
+        const auto aEuroConvertFullPrecision = aEvaluator.evaluateFormula(
+            u"of:=EUROCONVERT(100;\"ATS\";\"EUR\";TRUE())", { 0, 0, 0 });
+        const auto aEuroConvertPrecisionError = aEvaluator.evaluateFormula(
+            u"of:=EUROCONVERT(100;\"EUR\";\"SIT\";0;2)", { 0, 0, 0 });
+        const auto aHyperlink = aEvaluator.evaluateFormula(
+            u"of:=HYPERLINK(\"https://example.com\";\"Example\")", { 0, 0, 0 });
+        const auto aHyperlinkError = aEvaluator.evaluateFormula(
+            u"of:=HYPERLINK(NA();\"Example\")", { 0, 0, 0 });
+        const auto aTextJoin = aEvaluator.evaluateFormula(
+            u"of:=TEXTJOIN(\"-\";1;\"\";\"A\";\"\";\"B\")", { 0, 0, 0 });
+        const auto aOffset
+            = aEvaluator.evaluateFormula(u"of:=OFFSET([.BA1];1;0;1;2)", { 0, 0, 0 });
+        const auto aConcatenate
+            = aEvaluator.evaluateFormula(u"of:=CONCATENATE(\"A\";1;\"B\")", { 0, 0, 0 });
+        const auto aLarge
+            = aEvaluator.evaluateFormula(u"of:=LARGE({1;3;2};2)", { 0, 0, 0 });
+        const auto aSmall
+            = aEvaluator.evaluateFormula(u"of:=SMALL({1;3;2};2)", { 0, 0, 0 });
+        const auto aPercentile
+            = aEvaluator.evaluateFormula(u"of:=PERCENTILE({1;2;3;4};0.25)", { 0, 0, 0 });
+        const auto aPercentileExc = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.PERCENTILE.EXC({1;2;3;4};0.25)", { 0, 0, 0 });
+        const auto aQuartile
+            = aEvaluator.evaluateFormula(u"of:=QUARTILE({7;8;9;10};3)", { 0, 0, 0 });
+        const auto aQuartileExc = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.QUARTILE.EXC({7;8;9;10};3)", { 0, 0, 0 });
+        const auto aSkew
+            = aEvaluator.evaluateFormula(u"of:=SKEW({1;2;2;3;9})", { 0, 0, 0 });
+        const auto aSkewp
+            = aEvaluator.evaluateFormula(u"of:=SKEWP({1;2;2;3;9})", { 0, 0, 0 });
+
+        const auto aCompiledAbs
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=ABS(-7.25)", { 0, 0, 0 });
+        const auto aCompiledDegrees = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=DEGREES(3.141592653589793)", { 0, 0, 0 });
+        const auto aCompiledPi
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=PI()", { 0, 0, 0 });
+        const auto aCompiledAtanh
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=ATANH(0.5)", { 0, 0, 0 });
+        const auto aCompiledFisher = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=FISHER(0.5)", { 0, 0, 0 });
+        const auto aCompiledFisherInv = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=FISHERINV(0.5493061443340549)", { 0, 0, 0 });
+        const auto aCompiledGauss
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=GAUSS(1)", { 0, 0, 0 });
+        const auto aCompiledGammaLn = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=GAMMALN(5)", { 0, 0, 0 });
+        const auto aCompiledGammaLnPrecise = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.GAMMALN.PRECISE(5)", { 0, 0, 0 });
+        const auto aCompiledGcd = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=GCD({16|32|24};40)", { 0, 0, 0 });
+        const auto aCompiledLcm = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=LCM({4|6|10})", { 0, 0, 0 });
+        const auto aCompiledGeoMean = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=GEOMEAN({4|1|0.03125})", { 0, 0, 0 });
+        const auto aCompiledHarMean = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=HARMEAN({1|2|4})", { 0, 0, 0 });
+        const auto aCompiledDateDif = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=DATEDIF(DATE(2020;1;1);DATE(2021;3;15);\"ym\")", { 0, 0, 0 });
+        const auto aCompiledFloor
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=FLOOR(-11;-2)", { 0, 0, 0 });
+        const auto aCompiledFloorMode
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=FLOOR(-7.9;;5)", { 0, 0, 0 });
+        const auto aCompiledFloorMissingValue
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=FLOOR(;2.3;5)", { 0, 0, 0 });
+        const auto aCompiledCeiling
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=CEILING(-11;-2)", { 0, 0, 0 });
+        const auto aCompiledFloorMath = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.FLOOR.MATH(-11;-2;1)", { 0, 0, 0 });
+        const auto aCompiledCeilingMath = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.CEILING.MATH(-5.5;2;-1)", { 0, 0, 0 });
+        const auto aCompiledCeilingPrecise = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.CEILING.PRECISE(-2.5;2)", { 0, 0, 0 });
+        const auto aCompiledFloorPrecise = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.FLOOR.PRECISE(-2.5;2)", { 0, 0, 0 });
+        const auto aCompiledIsoCeiling = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.ISO.CEILING(-4.3;2)", { 0, 0, 0 });
+        const auto aCompiledChar
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=CHAR(65)", { 0, 0, 0 });
+        const auto aCompiledCode
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=CODE(\"Az\")", { 0, 0, 0 });
+        const auto aCompiledDecimal = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=DECIMAL(\"FF\";16)", { 0, 0, 0 });
+        const auto aCompiledDec2Hex = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=DEC2HEX(255)", { 0, 0, 0 });
+        const auto aCompiledLog
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=LOG(8;2)", { 0, 0, 0 });
+        const auto aCompiledMround
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=MROUND(10;4)", { 0, 0, 0 });
+        const auto aCompiledMroundTie = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=MROUND(1.45;0.1)", { 0, 0, 0 });
+        const auto aCompiledMroundMissing = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=MROUND(15.5;)", { 0, 0, 0 });
+        const auto aCompiledCombin
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=COMBIN(6;2)", { 0, 0, 0 });
+        const auto aCompiledCombina
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=COMBINA(4;3)", { 0, 0, 0 });
+        const auto aCompiledCombinaZero = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COMBINA(0;0)", { 0, 0, 0 });
+        const auto aCompiledCombinaKZero = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COMBINA(12;0)", { 0, 0, 0 });
+        const auto aCompiledCombinaError = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COMBINA(1;2)", { 0, 0, 0 });
+        const auto aCompiledMultinomial = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=MULTINOMIAL(1;2;3)", { 0, 0, 0 });
+        const auto aCompiledMultinomialLarge = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=MULTINOMIAL(1073741824;2;1)", { 0, 0, 0 });
+        const auto aCompiledBitXor
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=BITXOR(5;3)", { 0, 0, 0 });
+        const auto aCompiledBitXorLeftMissing = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=BITXOR(;25)", { 0, 0, 0 });
+        const auto aCompiledBitXorRightMissing = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=BITXOR(25;)", { 0, 0, 0 });
+        const auto aCompiledBitXorNoValue = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=BITXOR(25)", { 0, 0, 0 });
+        const auto aCompiledBitXorError = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=BITXOR(-1;2)", { 0, 0, 0 });
+        const auto aCompiledCsc
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=CSC(PI()/2)", { 0, 0, 0 });
+        const auto aCompiledCsch
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=CSCH(1)", { 0, 0, 0 });
+        const auto aCompiledCschZero
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=CSCH(0)", { 0, 0, 0 });
+        const auto aCompiledTrunc = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=TRUNC(-123.456;2)", { 0, 0, 0 });
+        const auto aCompiledUpper
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=UPPER(\"MiXeD\")", { 0, 0, 0 });
+        const auto aCompiledLower
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=LOWER(\"MiXeD\")", { 0, 0, 0 });
+        const auto aCompiledLen
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=LEN(\"A😀\")", { 0, 0, 0 });
+        const auto aCompiledLenb
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=LENB(\"ᄩA\")", { 0, 0, 0 });
+        const auto aCompiledSearch = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=SEARCH(\"bc\";\"AbCd\")", { 0, 0, 0 });
+        const auto aCompiledFind = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=FIND(\"bc\";\"AbCd\")", { 0, 0, 0 });
+        const auto aCompiledMid = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=MID(\"A😀BC\";2;2)", { 0, 0, 0 });
+        const auto aCompiledReplace = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=REPLACE(\"abcdef\";2;3;\"ZZ\")", { 0, 0, 0 });
+        const auto aCompiledBase = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=BASE(255;16;4)", { 0, 0, 0 });
+        const auto aCompiledRoman = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ROMAN(499;4)", { 0, 0, 0 });
+        const auto aCompiledLeft = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=LEFT(\"A😀BC\";2)", { 0, 0, 0 });
+        const auto aCompiledRight = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=RIGHT(\"A😀BC\";2)", { 0, 0, 0 });
+        const auto aCompiledProper = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=PROPER(\"HELLO.THERE\")", { 0, 0, 0 });
+        const auto aCompiledProperDigits = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=PROPER(\"76budget\")", { 0, 0, 0 });
+        const auto aCompiledSubstitute = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=SUBSTITUTE(\"123123123\";\"3\";\"abc\";2)", { 0, 0, 0 });
+        const auto aCompiledT = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=T(7)", { 0, 0, 0 });
+        const auto aCompiledTError = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=T(NA())", { 0, 0, 0 });
+        const auto aCompiledConcat = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CONCAT(\"A\";[.BC1:.BF1])", { 0, 0, 0 });
+        const auto aCompiledFindb = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=FINDB(\"ᄔ\";\"ᄩᄔᄕ\")", { 0, 0, 0 });
+        const auto aCompiledFindbNbsp = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=FINDB(\"M\";\"Miriam\u00A0McGovern\";3)", { 0, 0, 0 });
+        const auto aCompiledSearchb = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=SEARCHB(\"ab\";\"zAbz\")", { 0, 0, 0 });
+        const auto aCompiledReplaceb = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=REPLACEB(\"ᄩᄔᄕ\";1;1;\"ab\")", { 0, 0, 0 });
+        const auto aCompiledAsc
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=ASC(\"ＡＢＣ１２３\")", { 0, 0, 0 });
+        const auto aCompiledAscKana = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ASC(\"オープンオフィス\")", { 0, 0, 0 });
+        const auto aCompiledJisPunctuation = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=JIS(\"!\"&CHAR(34)&\"#$%&'()*+,-./\")", { 0, 0, 0 });
+        const auto aCompiledJisQuotes = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=JIS(CHAR(34)&\"'\"&CHAR(92)&CHAR(96))", { 0, 0, 0 });
+        const auto aCompiledJisKanaMarks
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=JIS(\"ﾞﾟ\")", { 0, 0, 0 });
+        const auto aCompiledJisVoicedKana = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=JIS(\"ｶﾞｷﾞｸﾞｹﾞｺﾞ\")", { 0, 0, 0 });
+        const auto aCompiledJisVoicedVowels = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=JIS(\"ｱﾞｲﾞｳﾞｴﾞｵﾞ\")", { 0, 0, 0 });
+        const auto aCompiledLegacyChiDist = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=LEGACY.CHIDIST(2;3)", { 0, 0, 0 });
+        const auto aCompiledAddress
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=ADDRESS(4;5)", { 0, 0, 0 });
+        const auto aCompiledAddressRowMixed = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ADDRESS(4;5;2)", { 0, 0, 0 });
+        const auto aCompiledAddressColumnMixed = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ADDRESS(4;5;3)", { 0, 0, 0 });
+        const auto aCompiledAddressR1C1 = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ADDRESS(4;5;4;0)", { 0, 0, 0 });
+        const auto aCompiledAddressSheet = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ADDRESS(1;1;2;;\"Sheet2\")", { 0, 0, 0 });
+        const auto aCompiledAddressQuotedSheet = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ADDRESS(1;1;4;1;\"Sheet 3\")", { 0, 0, 0 });
+        const auto aCompiledAddressQuotedSheetR1C1
+            = aEvaluator.evaluateFormulaViaCompiledTokens(
+                u"of:=ADDRESS(1;1;1;0;\"Sheet 3\")", { 0, 0, 0 });
+        const auto aCompiledAddressError = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ADDRESS(1;1;0;1)", { 0, 0, 0 });
+        const auto aCompiledConvert = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CONVERT(1;\"m\";\"mi\")", { 0, 0, 0 });
+        const auto aCompiledConvertTemp = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CONVERT(2;\"C\";\"F\")", { 0, 0, 0 });
+        const auto aCompiledConvertCubic = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CONVERT(1;\"picapt3\";\"pica3\")", { 0, 0, 0 });
+        const auto aCompiledConvertCaretAlias = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CONVERT(1;\"picapt^3\";\"pica^3\")", { 0, 0, 0 });
+        const auto aCompiledConvertCubicStep = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CONVERT(1;\"pica3\";\"pt\")", { 0, 0, 0 });
+        const auto aCompiledConvertPica = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CONVERT(1;\"Pica\";\"pica\")", { 0, 0, 0 });
+        const auto aCompiledConvertPicaStep = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CONVERT(1;\"pica\";\"survey_mi\")", { 0, 0, 0 });
+        const auto aCompiledConvertIn3ToGal = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CONVERT(9072;\"in3\";\"gal\")", { 0, 0, 0 });
+        const auto aCompiledConvertM3ToYd3 = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CONVERT(10;\"m3\";\"yd3\")", { 0, 0, 0 });
+        const auto aCompiledConvertMtonToNmi3 = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CONVERT(100000000000000;\"MTON\";\"Nmi3\")", { 0, 0, 0 });
+        const auto aCompiledConvertTspmToMl = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CONVERT(1;\"tspm\";\"ml\")", { 0, 0, 0 });
+        const auto aCompiledBitLShift = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=BITLSHIFT(6;1)", { 0, 0, 0 });
+        const auto aCompiledBitLShiftNegative = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=BITLSHIFT(10;-2)", { 0, 0, 0 });
+        const auto aCompiledBitLShiftDefault = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=BITLSHIFT(4;)", { 0, 0, 0 });
+        const auto aCompiledBitLShiftError = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=BITLSHIFT(-4;2)", { 0, 0, 0 });
+        const auto aCompiledBitRShift = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=BITRSHIFT(6;1)", { 0, 0, 0 });
+        const auto aCompiledBitRShiftNegative = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=BITRSHIFT(10;-2)", { 0, 0, 0 });
+        const auto aCompiledBitRShiftDefault = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=BITRSHIFT(4;)", { 0, 0, 0 });
+        const auto aCompiledBitRShiftError = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=BITRSHIFT(-4;2)", { 0, 0, 0 });
+        const auto aCompiledConvertAlias = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ORG.OPENOFFICE.CONVERT(1;\"m\";\"mi\")", { 0, 0, 0 });
+        const auto aCompiledConvertEuro = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ORG.OPENOFFICE.CONVERT(100;\"ATS\";\"EUR\")", { 0, 0, 0 });
+        const auto aCompiledConvertEuroCaseError = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ORG.OPENOFFICE.CONVERT(100;\"skk\";\"skK\")", { 0, 0, 0 });
+        const auto aCompiledConvertAliasOptionalError
+            = aEvaluator.evaluateFormulaViaCompiledTokens(
+                u"of:=ORG.OPENOFFICE.CONVERT(100;\"EUR\";\"SIT\";FALSE())", { 0, 0, 0 });
+        const auto aCompiledEuroConvert = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=EUROCONVERT(100;\"ATS\";\"EUR\")", { 0, 0, 0 });
+        const auto aCompiledEuroConvertCase = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=EUROCONVERT(100;\"EUR\";\"skK\")", { 0, 0, 0 });
+        const auto aCompiledEuroConvertPrecision = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=EUROCONVERT(100;\"EUR\";\"SIT\";;3)", { 0, 0, 0 });
+        const auto aCompiledEuroConvertFullPrecision
+            = aEvaluator.evaluateFormulaViaCompiledTokens(
+                u"of:=EUROCONVERT(100;\"ATS\";\"EUR\";TRUE())", { 0, 0, 0 });
+        const auto aCompiledEuroConvertPrecisionError
+            = aEvaluator.evaluateFormulaViaCompiledTokens(
+                u"of:=EUROCONVERT(100;\"EUR\";\"SIT\";0;2)", { 0, 0, 0 });
+        const auto aCompiledHyperlink = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=HYPERLINK(\"https://example.com\";\"Example\")", { 0, 0, 0 });
+        const auto aCompiledHyperlinkError = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=HYPERLINK(NA();\"Example\")", { 0, 0, 0 });
+        const auto aCompiledTextJoin = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=TEXTJOIN(\"-\";1;\"\";\"A\";\"\";\"B\")", { 0, 0, 0 });
+        const auto aCompiledOffset = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=OFFSET([.BA1];1;0;1;2)", { 0, 0, 0 });
+        const auto aCompiledConcatenate = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CONCATENATE(\"A\";1;\"B\")", { 0, 0, 0 });
+        const auto aCompiledLarge = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=LARGE({1;3;2};2)", { 0, 0, 0 });
+        const auto aCompiledSmall = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=SMALL({1;3;2};2)", { 0, 0, 0 });
+        const auto aCompiledPercentile = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=PERCENTILE({1;2;3;4};0.25)", { 0, 0, 0 });
+        const auto aCompiledPercentileExc = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.PERCENTILE.EXC({1;2;3;4};0.25)", { 0, 0, 0 });
+        const auto aCompiledQuartile = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=QUARTILE({7;8;9;10};3)", { 0, 0, 0 });
+        const auto aCompiledQuartileExc = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.QUARTILE.EXC({7;8;9;10};3)", { 0, 0, 0 });
+        const auto aCompiledSkew = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=SKEW({1;2;2;3;9})", { 0, 0, 0 });
+        const auto aCompiledSkewp = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=SKEWP({1;2;2;3;9})", { 0, 0, 0 });
+
+        const auto checkNumber = [&](const char* pLabel, const auto& rResult,
+                                     double fExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isNumber() || rResult.mbUsedCachedValue
+                || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+            {
+                std::fprintf(stderr, "%s: scalar function mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        const auto checkText = [&](const char* pLabel, const auto& rResult,
+                                   std::u16string_view rExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isText() || rResult.mbUsedCachedValue
+                || rResult.maValue.maValue.maString != rExpected)
+            {
+                std::fprintf(stderr, "%s: scalar function mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        const auto checkError = [&](const char* pLabel, const auto& rResult,
+                                    spreadsheetengine::api::Error eExpected) -> bool {
+            if (rResult.mbUsedCachedValue)
+            {
+                std::fprintf(stderr, "%s: scalar function mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+
+            if (!rResult)
+                return rResult.meError == eExpected;
+
+            if (rResult.maValue.isScalar() && rResult.maValue.maValue.isError()
+                && rResult.maValue.maValue.meError == eExpected)
+            {
+                return true;
+            }
+
+            std::fprintf(stderr, "%s: scalar function mismatch in %s\n",
+                "spreadsheetengine_fods_evaluator_tests", pLabel);
+            return false;
+        };
+
+        if (!checkNumber("ABS", aAbs, 7.25)
+            || !checkNumber("DEGREES", aDegrees, 180.0)
+            || !checkNumber("PI", aPi, 3.141592653589793)
+            || !checkNumber("ATANH", aAtanh, 0.5493061443340549)
+            || !checkNumber("FISHER", aFisher, 0.5493061443340549)
+            || !checkNumber("FISHERINV", aFisherInv, 0.5)
+            || !checkNumber("GAUSS", aGauss, 0.341344746068543)
+            || !checkNumber("GAMMALN", aGammaLn, 3.17805383034795)
+            || !checkNumber("GAMMALN.PRECISE", aGammaLnPrecise, 3.17805383034795)
+            || !checkNumber("GCD", aGcd, 8.0)
+            || !checkNumber("LCM", aLcm, 60.0)
+            || !checkNumber("GEOMEAN", aGeoMean, 0.5)
+            || !checkNumber("HARMEAN", aHarMean, 1.71428571428571)
+            || !checkNumber("DATEDIF", aDateDif, 2.0)
+            || !checkNumber("FLOOR", aFloor, -12.0)
+            || !checkNumber("FLOOR mode", aFloorMode, -7.0)
+            || !checkNumber("FLOOR missing value", aFloorMissingValue, 0.0)
+            || !checkNumber("CEILING", aCeiling, -10.0)
+            || !checkNumber("FLOOR.MATH", aFloorMath, -10.0)
+            || !checkNumber("CEILING.MATH", aCeilingMath, -6.0)
+            || !checkNumber("CEILING.PRECISE", aCeilingPrecise, -2.0)
+            || !checkNumber("FLOOR.PRECISE", aFloorPrecise, -4.0)
+            || !checkNumber("ISO.CEILING", aIsoCeiling, -4.0)
+            || !checkText("CHAR", aChar, u"A")
+            || !checkNumber("CODE", aCode, 65.0)
+            || !checkNumber("DECIMAL", aDecimal, 255.0)
+            || !checkText("DEC2HEX", aDec2Hex, u"FF")
+            || !checkNumber("LOG", aLog, 3.0)
+            || !checkNumber("MROUND", aMround, 12.0)
+            || !checkNumber("MROUND tie", aMroundTie, 1.5)
+            || !checkError("MROUND missing", aMroundMissing,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("COMBIN", aCombin, 15.0)
+            || !checkNumber("COMBINA", aCombina, 20.0)
+            || !checkNumber("COMBINA zero", aCombinaZero, 0.0)
+            || !checkNumber("COMBINA k zero", aCombinaKZero, 1.0)
+            || !checkError("COMBINA error", aCombinaError,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("MULTINOMIAL", aMultinomial, 60.0)
+            || !checkNumber("MULTINOMIAL large", aMultinomialLarge, 6.1897002310145506E+26)
+            || !checkNumber("BITXOR", aBitXor, 6.0)
+            || !checkNumber("BITXOR left missing", aBitXorLeftMissing, 25.0)
+            || !checkNumber("BITXOR right missing", aBitXorRightMissing, 25.0)
+            || !checkError("BITXOR missing arg", aBitXorNoValue,
+                spreadsheetengine::api::Error::NoValue)
+            || !checkError("BITXOR error", aBitXorError,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("CSC", aCsc, 1.0)
+            || !checkNumber("CSCH", aCsch, 0.850918128239322)
+            || !checkError("CSCH zero", aCschZero,
+                spreadsheetengine::api::Error::DivisionByZero)
+            || !checkNumber("TRUNC", aTrunc, -123.45)
+            || !checkText("UPPER", aUpper, u"MIXED")
+            || !checkText("LOWER", aLower, u"mixed")
+            || !checkNumber("LEN", aLen, 2.0)
+            || !checkNumber("LENB", aLenb, 3.0)
+            || !checkNumber("SEARCH", aSearch, 2.0)
+            || !checkError("FIND", aFind, spreadsheetengine::api::Error::NotAvailable)
+            || !checkText("MID", aMid, u"😀B")
+            || !checkText("REPLACE", aReplace, u"aZZef")
+            || !checkText("BASE", aBase, u"00FF")
+            || !checkText("ROMAN", aRoman, u"ID")
+            || !checkText("LEFT", aLeft, u"A😀")
+            || !checkText("RIGHT", aRight, u"BC")
+            || !checkText("PROPER", aProper, u"Hello.There")
+            || !checkText("PROPER digits", aProperDigits, u"76Budget")
+            || !checkText("SUBSTITUTE", aSubstitute, u"12312abc123")
+            || !checkText("T", aT, u"")
+            || !checkError("T error", aTError, spreadsheetengine::api::Error::NotAvailable)
+            || !checkText("CONCAT", aConcat, u"AACEG")
+            || !checkNumber("FINDB", aFindb, 3.0)
+            || !checkNumber("FINDB nbsp", aFindbNbsp, 8.0)
+            || !checkNumber("SEARCHB", aSearchb, 2.0)
+            || !checkText("REPLACEB", aReplaceb, u"ab ᄔᄕ")
+            || !checkText("ASC", aAsc, u"ABC123")
+            || !checkText("ASC katakana", aAscKana, u"ｵｰﾌﾟﾝｵﾌｨｽ")
+            || !checkText("JIS punctuation", aJisPunctuation, u"！”＃＄％＆’（）＊＋，－．／")
+            || !checkText("JIS quotes", aJisQuotes, u"”’￥‘")
+            || !checkText("JIS kana marks", aJisKanaMarks, u"゛゜")
+            || !checkText("JIS voiced kana", aJisVoicedKana, u"ガギグゲゴ")
+            || !checkText("JIS voiced vowels", aJisVoicedVowels, u"ア゛イ゛ウ゛エ゛オ゛")
+            || !checkNumber("LEGACY.CHIDIST", aLegacyChiDist, 0.5724067044708797)
+            || !checkText("ADDRESS", aAddress, u"$E$4")
+            || !checkText("ADDRESS row mixed", aAddressRowMixed, u"E$4")
+            || !checkText("ADDRESS column mixed", aAddressColumnMixed, u"$E4")
+            || !checkText("ADDRESS R1C1", aAddressR1C1, u"R[4]C[5]")
+            || !checkText("ADDRESS sheet", aAddressSheet, u"Sheet2.A$1")
+            || !checkText("ADDRESS quoted sheet", aAddressQuotedSheet, u"'Sheet 3'.A1")
+            || !checkText("ADDRESS quoted sheet R1C1", aAddressQuotedSheetR1C1,
+                u"'Sheet 3'!R1C1")
+            || !checkError("ADDRESS error", aAddressError,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("CONVERT", aConvert, 0.000621371192237)
+            || !checkNumber("CONVERT temperature", aConvertTemp, 35.6)
+            || !checkNumber("CONVERT cubic", aConvertCubic, 0.000578703703705)
+            || !checkNumber("CONVERT caret alias", aConvertCaretAlias, 0.000578703703705)
+            || !checkNumber("CONVERT cubic step", aConvertCubicStep, 0.000160333493666)
+            || !checkNumber("CONVERT Pica", aConvertPica, 0.083333333333353)
+            || !checkNumber("CONVERT Pica step", aConvertPicaStep, 2.63046611952801E-06)
+            || !checkNumber("CONVERT in3->gal", aConvertIn3ToGal, 39.2727272727273)
+            || !checkNumber("CONVERT m3->yd3", aConvertM3ToYd3, 13.0795061931439)
+            || !checkNumber("CONVERT MTON->Nmi3", aConvertMtonToNmi3, 11.1445349270435)
+            || !checkNumber("CONVERT tspm->ml", aConvertTspmToMl, 5.0)
+            || !checkNumber("BITLSHIFT", aBitLShift, 12.0)
+            || !checkNumber("BITLSHIFT negative shift", aBitLShiftNegative, 2.0)
+            || !checkNumber("BITLSHIFT default shift", aBitLShiftDefault, 4.0)
+            || !checkError(
+                "BITLSHIFT error", aBitLShiftError, spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("BITRSHIFT", aBitRShift, 3.0)
+            || !checkNumber("BITRSHIFT negative shift", aBitRShiftNegative, 40.0)
+            || !checkNumber("BITRSHIFT default shift", aBitRShiftDefault, 4.0)
+            || !checkError(
+                "BITRSHIFT error", aBitRShiftError, spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("CONVERT alias", aConvertAlias, 0.000621371192237)
+            || !checkNumber("CONVERT euro", aConvertEuro, 7.26728341678597)
+            || !checkError("CONVERT euro case error", aConvertEuroCaseError,
+                spreadsheetengine::api::Error::NotAvailable)
+            || !checkError("CONVERT alias optional error", aConvertAliasOptionalError,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("EUROCONVERT", aEuroConvert, 7.27)
+            || !checkNumber("EUROCONVERT case-insensitive", aEuroConvertCase, 3012.6)
+            || !checkNumber("EUROCONVERT precision", aEuroConvertPrecision, 23964.0)
+            || !checkNumber("EUROCONVERT full precision", aEuroConvertFullPrecision,
+                7.26728341678597)
+            || !checkError("EUROCONVERT precision error", aEuroConvertPrecisionError,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkText("HYPERLINK", aHyperlink, u"Example")
+            || !checkError(
+                "HYPERLINK error", aHyperlinkError, spreadsheetengine::api::Error::NotAvailable)
+            || !checkText("TEXTJOIN", aTextJoin, u"A-B")
+            || !checkText("CONCATENATE", aConcatenate, u"A1B")
+            || !checkNumber("LARGE", aLarge, 2.0)
+            || !checkNumber("SMALL", aSmall, 2.0)
+            || !checkNumber("PERCENTILE", aPercentile, 1.75)
+            || !checkNumber("PERCENTILE.EXC", aPercentileExc, 1.25)
+            || !checkNumber("QUARTILE", aQuartile, 9.25)
+            || !checkNumber("QUARTILE.EXC", aQuartileExc, 9.75)
+            || !checkNumber("SKEW", aSkew, 1.9693601762387922)
+            || !checkNumber("SKEWP", aSkewp, 1.3210869678752712)
+            || !checkNumber("compiled ABS", aCompiledAbs, 7.25)
+            || !checkNumber("compiled DEGREES", aCompiledDegrees, 180.0)
+            || !checkNumber("compiled PI", aCompiledPi, 3.141592653589793)
+            || !checkNumber("compiled ATANH", aCompiledAtanh, 0.5493061443340549)
+            || !checkNumber("compiled FISHER", aCompiledFisher, 0.5493061443340549)
+            || !checkNumber("compiled FISHERINV", aCompiledFisherInv, 0.5)
+            || !checkNumber("compiled GAUSS", aCompiledGauss, 0.341344746068543)
+            || !checkNumber("compiled GAMMALN", aCompiledGammaLn, 3.17805383034795)
+            || !checkNumber(
+                "compiled GAMMALN.PRECISE", aCompiledGammaLnPrecise, 3.17805383034795)
+            || !checkNumber("compiled GCD", aCompiledGcd, 8.0)
+            || !checkNumber("compiled LCM", aCompiledLcm, 60.0)
+            || !checkNumber("compiled GEOMEAN", aCompiledGeoMean, 0.5)
+            || !checkNumber("compiled HARMEAN", aCompiledHarMean, 1.71428571428571)
+            || !checkNumber("compiled DATEDIF", aCompiledDateDif, 2.0)
+            || !checkNumber("compiled FLOOR", aCompiledFloor, -12.0)
+            || !checkNumber("compiled FLOOR mode", aCompiledFloorMode, -7.0)
+            || !checkNumber("compiled FLOOR missing value", aCompiledFloorMissingValue, 0.0)
+            || !checkNumber("compiled CEILING", aCompiledCeiling, -10.0)
+            || !checkNumber("compiled FLOOR.MATH", aCompiledFloorMath, -10.0)
+            || !checkNumber("compiled CEILING.MATH", aCompiledCeilingMath, -6.0)
+            || !checkNumber("compiled CEILING.PRECISE", aCompiledCeilingPrecise, -2.0)
+            || !checkNumber("compiled FLOOR.PRECISE", aCompiledFloorPrecise, -4.0)
+            || !checkNumber("compiled ISO.CEILING", aCompiledIsoCeiling, -4.0)
+            || !checkText("compiled CHAR", aCompiledChar, u"A")
+            || !checkNumber("compiled CODE", aCompiledCode, 65.0)
+            || !checkNumber("compiled DECIMAL", aCompiledDecimal, 255.0)
+            || !checkText("compiled DEC2HEX", aCompiledDec2Hex, u"FF")
+            || !checkNumber("compiled LOG", aCompiledLog, 3.0)
+            || !checkNumber("compiled MROUND", aCompiledMround, 12.0)
+            || !checkNumber("compiled MROUND tie", aCompiledMroundTie, 1.5)
+            || !checkError("compiled MROUND missing", aCompiledMroundMissing,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("compiled COMBIN", aCompiledCombin, 15.0)
+            || !checkNumber("compiled COMBINA", aCompiledCombina, 20.0)
+            || !checkNumber("compiled COMBINA zero", aCompiledCombinaZero, 0.0)
+            || !checkNumber("compiled COMBINA k zero", aCompiledCombinaKZero, 1.0)
+            || !checkError("compiled COMBINA error", aCompiledCombinaError,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("compiled MULTINOMIAL", aCompiledMultinomial, 60.0)
+            || !checkNumber("compiled MULTINOMIAL large", aCompiledMultinomialLarge,
+                6.1897002310145506E+26)
+            || !checkNumber("compiled BITXOR", aCompiledBitXor, 6.0)
+            || !checkNumber("compiled BITXOR left missing", aCompiledBitXorLeftMissing, 25.0)
+            || !checkNumber("compiled BITXOR right missing", aCompiledBitXorRightMissing, 25.0)
+            || !checkError("compiled BITXOR missing arg", aCompiledBitXorNoValue,
+                spreadsheetengine::api::Error::NoValue)
+            || !checkError("compiled BITXOR error", aCompiledBitXorError,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("compiled CSC", aCompiledCsc, 1.0)
+            || !checkNumber("compiled CSCH", aCompiledCsch, 0.850918128239322)
+            || !checkError("compiled CSCH zero", aCompiledCschZero,
+                spreadsheetengine::api::Error::DivisionByZero)
+            || !checkNumber("compiled TRUNC", aCompiledTrunc, -123.45)
+            || !checkText("compiled UPPER", aCompiledUpper, u"MIXED")
+            || !checkText("compiled LOWER", aCompiledLower, u"mixed")
+            || !checkNumber("compiled LEN", aCompiledLen, 2.0)
+            || !checkNumber("compiled LENB", aCompiledLenb, 3.0)
+            || !checkNumber("compiled SEARCH", aCompiledSearch, 2.0)
+            || !checkError(
+                "compiled FIND", aCompiledFind, spreadsheetengine::api::Error::NotAvailable)
+            || !checkText("compiled MID", aCompiledMid, u"😀B")
+            || !checkText("compiled REPLACE", aCompiledReplace, u"aZZef")
+            || !checkText("compiled BASE", aCompiledBase, u"00FF")
+            || !checkText("compiled ROMAN", aCompiledRoman, u"ID")
+            || !checkText("compiled LEFT", aCompiledLeft, u"A😀")
+            || !checkText("compiled RIGHT", aCompiledRight, u"BC")
+            || !checkText("compiled PROPER", aCompiledProper, u"Hello.There")
+            || !checkText("compiled PROPER digits", aCompiledProperDigits, u"76Budget")
+            || !checkText("compiled SUBSTITUTE", aCompiledSubstitute, u"12312abc123")
+            || !checkText("compiled T", aCompiledT, u"")
+            || !checkError(
+                "compiled T error", aCompiledTError, spreadsheetengine::api::Error::NotAvailable)
+            || !checkText("compiled CONCAT", aCompiledConcat, u"AACEG")
+            || !checkNumber("compiled FINDB", aCompiledFindb, 3.0)
+            || !checkNumber("compiled FINDB nbsp", aCompiledFindbNbsp, 8.0)
+            || !checkNumber("compiled SEARCHB", aCompiledSearchb, 2.0)
+            || !checkText("compiled REPLACEB", aCompiledReplaceb, u"ab ᄔᄕ")
+            || !checkText("compiled ASC", aCompiledAsc, u"ABC123")
+            || !checkText("compiled ASC katakana", aCompiledAscKana, u"ｵｰﾌﾟﾝｵﾌｨｽ")
+            || !checkText("compiled JIS punctuation", aCompiledJisPunctuation,
+                u"！”＃＄％＆’（）＊＋，－．／")
+            || !checkText("compiled JIS quotes", aCompiledJisQuotes, u"”’￥‘")
+            || !checkText("compiled JIS kana marks", aCompiledJisKanaMarks, u"゛゜")
+            || !checkText("compiled JIS voiced kana", aCompiledJisVoicedKana, u"ガギグゲゴ")
+            || !checkText("compiled JIS voiced vowels", aCompiledJisVoicedVowels,
+                u"ア゛イ゛ウ゛エ゛オ゛")
+            || !checkNumber("compiled LEGACY.CHIDIST", aCompiledLegacyChiDist,
+                0.5724067044708797)
+            || !checkText("compiled ADDRESS", aCompiledAddress, u"$E$4")
+            || !checkText("compiled ADDRESS row mixed", aCompiledAddressRowMixed, u"E$4")
+            || !checkText("compiled ADDRESS column mixed", aCompiledAddressColumnMixed, u"$E4")
+            || !checkText("compiled ADDRESS R1C1", aCompiledAddressR1C1, u"R[4]C[5]")
+            || !checkText("compiled ADDRESS sheet", aCompiledAddressSheet, u"Sheet2.A$1")
+            || !checkText("compiled ADDRESS quoted sheet", aCompiledAddressQuotedSheet,
+                u"'Sheet 3'.A1")
+            || !checkText("compiled ADDRESS quoted sheet R1C1",
+                aCompiledAddressQuotedSheetR1C1, u"'Sheet 3'!R1C1")
+            || !checkError("compiled ADDRESS error", aCompiledAddressError,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("compiled CONVERT", aCompiledConvert, 0.000621371192237)
+            || !checkNumber("compiled CONVERT temperature", aCompiledConvertTemp, 35.6)
+            || !checkNumber("compiled CONVERT cubic", aCompiledConvertCubic,
+                0.000578703703705)
+            || !checkNumber("compiled CONVERT caret alias", aCompiledConvertCaretAlias,
+                0.000578703703705)
+            || !checkNumber("compiled CONVERT cubic step", aCompiledConvertCubicStep,
+                0.000160333493666)
+            || !checkNumber("compiled CONVERT Pica", aCompiledConvertPica, 0.083333333333353)
+            || !checkNumber(
+                "compiled CONVERT Pica step", aCompiledConvertPicaStep, 2.63046611952801E-06)
+            || !checkNumber(
+                "compiled CONVERT in3->gal", aCompiledConvertIn3ToGal, 39.2727272727273)
+            || !checkNumber(
+                "compiled CONVERT m3->yd3", aCompiledConvertM3ToYd3, 13.0795061931439)
+            || !checkNumber("compiled CONVERT MTON->Nmi3", aCompiledConvertMtonToNmi3,
+                11.1445349270435)
+            || !checkNumber(
+                "compiled CONVERT tspm->ml", aCompiledConvertTspmToMl, 5.0)
+            || !checkNumber("compiled BITLSHIFT", aCompiledBitLShift, 12.0)
+            || !checkNumber("compiled BITLSHIFT negative shift", aCompiledBitLShiftNegative, 2.0)
+            || !checkNumber("compiled BITLSHIFT default shift", aCompiledBitLShiftDefault, 4.0)
+            || !checkError("compiled BITLSHIFT error", aCompiledBitLShiftError,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("compiled BITRSHIFT", aCompiledBitRShift, 3.0)
+            || !checkNumber("compiled BITRSHIFT negative shift", aCompiledBitRShiftNegative, 40.0)
+            || !checkNumber("compiled BITRSHIFT default shift", aCompiledBitRShiftDefault, 4.0)
+            || !checkError("compiled BITRSHIFT error", aCompiledBitRShiftError,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("compiled CONVERT alias", aCompiledConvertAlias,
+                0.000621371192237)
+            || !checkNumber("compiled CONVERT euro", aCompiledConvertEuro, 7.26728341678597)
+            || !checkError("compiled CONVERT euro case error", aCompiledConvertEuroCaseError,
+                spreadsheetengine::api::Error::NotAvailable)
+            || !checkError("compiled CONVERT alias optional error",
+                aCompiledConvertAliasOptionalError,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("compiled EUROCONVERT", aCompiledEuroConvert, 7.27)
+            || !checkNumber("compiled EUROCONVERT case-insensitive",
+                aCompiledEuroConvertCase, 3012.6)
+            || !checkNumber("compiled EUROCONVERT precision",
+                aCompiledEuroConvertPrecision, 23964.0)
+            || !checkNumber("compiled EUROCONVERT full precision",
+                aCompiledEuroConvertFullPrecision, 7.26728341678597)
+            || !checkError("compiled EUROCONVERT precision error",
+                aCompiledEuroConvertPrecisionError,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkText("compiled HYPERLINK", aCompiledHyperlink, u"Example")
+            || !checkError("compiled HYPERLINK error", aCompiledHyperlinkError,
+                spreadsheetengine::api::Error::NotAvailable)
+            || !checkText("compiled TEXTJOIN", aCompiledTextJoin, u"A-B")
+            || !checkText("compiled CONCATENATE", aCompiledConcatenate, u"A1B")
+            || !checkNumber("compiled LARGE", aCompiledLarge, 2.0)
+            || !checkNumber("compiled SMALL", aCompiledSmall, 2.0)
+            || !checkNumber("compiled PERCENTILE", aCompiledPercentile, 1.75)
+            || !checkNumber("compiled PERCENTILE.EXC", aCompiledPercentileExc, 1.25)
+            || !checkNumber("compiled QUARTILE", aCompiledQuartile, 9.25)
+            || !checkNumber("compiled QUARTILE.EXC", aCompiledQuartileExc, 9.75)
+            || !checkNumber("compiled SKEW", aCompiledSkew, 1.9693601762387922)
+            || !checkNumber("compiled SKEWP", aCompiledSkewp, 1.3210869678752712))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "scalar function evaluation mismatch");
+        }
+
+        if (!aOffset || !aOffset.maValue.isMatrixReference()
+            || aOffset.maValue.maReference.matrixDimensions().mnColumns != 2
+            || aOffset.maValue.maReference.matrixDimensions().mnRows != 1)
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "OFFSET view mismatch");
+        }
+
+        const auto aOffsetFirst = aEvaluator.materializeReferenceValue(aOffset.maValue.maReference, 0, 0);
+        const auto aOffsetSecond = aEvaluator.materializeReferenceValue(aOffset.maValue.maReference, 1, 0);
+        if (!aOffsetFirst || !aOffsetSecond || !aOffsetFirst.maValue.maValue.isNumber()
+            || !aOffsetSecond.maValue.maValue.isNumber()
+            || !almostEqual(aOffsetFirst.maValue.maValue.mfNumber, 2.0)
+            || !almostEqual(aOffsetSecond.maValue.maValue.mfNumber, 22.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "OFFSET materialization mismatch");
+        }
+
+        if (!aCompiledOffset || !aCompiledOffset.maValue.isMatrixReference()
+            || aCompiledOffset.maValue.maReference.matrixDimensions().mnColumns != 2
+            || aCompiledOffset.maValue.maReference.matrixDimensions().mnRows != 1)
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests", "compiled OFFSET view mismatch");
+        }
+
+        const auto aCompiledOffsetFirst
+            = aEvaluator.materializeReferenceValue(aCompiledOffset.maValue.maReference, 0, 0);
+        const auto aCompiledOffsetSecond
+            = aEvaluator.materializeReferenceValue(aCompiledOffset.maValue.maReference, 1, 0);
+        if (!aCompiledOffsetFirst || !aCompiledOffsetSecond
+            || !aCompiledOffsetFirst.maValue.maValue.isNumber()
+            || !aCompiledOffsetSecond.maValue.maValue.isNumber()
+            || !almostEqual(aCompiledOffsetFirst.maValue.maValue.mfNumber, 2.0)
+            || !almostEqual(aCompiledOffsetSecond.maValue.maValue.mfNumber, 22.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "compiled OFFSET materialization mismatch");
+        }
+    }
+
+    {
         const auto aResult = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=EXACT(1;{1})", { 0, 0, 0 });
         if (!aResult || !aResult.maValue.maValue.isBoolean()
@@ -632,6 +2291,103 @@ int main()
         {
             return fail("spreadsheetengine_fods_evaluator_tests",
                 "compiled formula execution mismatch");
+        }
+    }
+
+    {
+        const auto aFv = aEvaluator.evaluateFormula(u"of:=FV(0.04;2;750;2500)", { 0, 0, 0 });
+        const auto aPv
+            = aEvaluator.evaluateFormula(u"of:=PV(0.08/12;48;500;20000)", { 0, 0, 0 });
+        const auto aPmt
+            = aEvaluator.evaluateFormula(u"of:=PMT(0.0199/12;36;25000)", { 0, 0, 0 });
+        const auto aNper
+            = aEvaluator.evaluateFormula(u"of:=NPER(0.06;153.75;2600)", { 0, 0, 0 });
+        const auto aRate = aEvaluator.evaluateFormula(u"of:=RATE(3;-10;900)", { 0, 0, 0 });
+        const auto aIspmt
+            = aEvaluator.evaluateFormula(u"of:=ISPMT(0.05;5;7;15000)", { 0, 0, 0 });
+        const auto aIpmt
+            = aEvaluator.evaluateFormula(u"of:=IPMT(0.05;5;7;15000)", { 0, 0, 0 });
+        const auto aPpmt = aEvaluator.evaluateFormula(
+            u"of:=PPMT(0.0875/12;1;36;5000;8000;1)", { 0, 0, 0 });
+        const auto aDdb
+            = aEvaluator.evaluateFormula(u"of:=DDB(25000;1000;36;1;6)", { 0, 0, 0 });
+        const auto aVdb
+            = aEvaluator.evaluateFormula(u"of:=VDB(35000;7500;36;10;20;2)", { 0, 0, 0 });
+        const auto aCumIpmt = aEvaluator.evaluateFormula(
+            u"of:=CUMIPMT(0.055/12;24;5000;4;6;1)", { 0, 0, 0 });
+        const auto aCumPrinc = aEvaluator.evaluateFormula(
+            u"of:=CUMPRINC(0.055/12;24;5000;4;6;1)", { 0, 0, 0 });
+        const auto aCompiledFv = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=FV(0.04;2;750;2500)", { 0, 0, 0 });
+        const auto aCompiledPv = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=PV(0.08/12;48;500;20000)", { 0, 0, 0 });
+        const auto aCompiledPmt = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=PMT(0.0199/12;36;25000)", { 0, 0, 0 });
+        const auto aCompiledNper = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=NPER(0.06;153.75;2600)", { 0, 0, 0 });
+        const auto aCompiledRate = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=RATE(3;-10;900)", { 0, 0, 0 });
+        const auto aCompiledIspmt = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ISPMT(0.05;5;7;15000)", { 0, 0, 0 });
+        const auto aCompiledIpmt = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=IPMT(0.05;5;7;15000)", { 0, 0, 0 });
+        const auto aCompiledPpmt = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=PPMT(0.0875/12;1;36;5000;8000;1)", { 0, 0, 0 });
+        const auto aCompiledDdb = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=DDB(25000;1000;36;1;6)", { 0, 0, 0 });
+        const auto aCompiledVdb = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=VDB(35000;7500;36;10;20;2)", { 0, 0, 0 });
+        const auto aCompiledCumIpmt = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CUMIPMT(0.055/12;24;5000;4;6;1)", { 0, 0, 0 });
+        const auto aCompiledCumPrinc = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CUMPRINC(0.055/12;24;5000;4;6;1)", { 0, 0, 0 });
+        const auto aVdbMissingFactor = aEvaluator.evaluateFormula(
+            u"of:=VDB(35000;7500;36;10;20;;)", { 0, 0, 0 });
+        const auto aCompiledCumIpmtEmptyType = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CUMIPMT(0.055/12;24;5000;4;6;)", { 0, 0, 0 });
+
+        const auto checkNumber = [&](const char* pLabel, const auto& rResult,
+                                     double fExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isNumber() || rResult.mbUsedCachedValue
+                || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+            {
+                std::fprintf(stderr, "%s: financial function mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        if (!checkNumber("FV", aFv, -4234.0)
+            || !checkNumber("PV", aPv, -35019.3680845542)
+            || !checkNumber("PMT", aPmt, -715.955334437392)
+            || !checkNumber("NPER", aNper, -12.0207780851555)
+            || !checkNumber("RATE", aRate, -0.75626593687807)
+            || !checkNumber("ISPMT", aIspmt, -214.285714285714)
+            || !checkNumber("IPMT", aIpmt, -352.973422514773)
+            || !checkNumber("PPMT", aPpmt, -350.992937038239)
+            || !checkNumber("DDB", aDdb, 4166.66666666666)
+            || !checkNumber("VDB", aVdb, 8603.80245372397)
+            || !checkNumber("CUMIPMT", aCumIpmt, -57.5412415342252)
+            || !checkNumber("CUMPRINC", aCumPrinc, -600.875855808337)
+            || !checkNumber("compiled FV", aCompiledFv, -4234.0)
+            || !checkNumber("compiled PV", aCompiledPv, -35019.3680845542)
+            || !checkNumber("compiled PMT", aCompiledPmt, -715.955334437392)
+            || !checkNumber("compiled NPER", aCompiledNper, -12.0207780851555)
+            || !checkNumber("compiled RATE", aCompiledRate, -0.75626593687807)
+            || !checkNumber("compiled ISPMT", aCompiledIspmt, -214.285714285714)
+            || !checkNumber("compiled IPMT", aCompiledIpmt, -352.973422514773)
+            || !checkNumber("compiled PPMT", aCompiledPpmt, -350.992937038239)
+            || !checkNumber("compiled DDB", aCompiledDdb, 4166.66666666666)
+            || !checkNumber("compiled VDB", aCompiledVdb, 8603.80245372397)
+            || !checkNumber("compiled CUMIPMT", aCompiledCumIpmt, -57.5412415342252)
+            || !checkNumber("compiled CUMPRINC", aCompiledCumPrinc, -600.875855808337)
+            || aVdbMissingFactor || aVdbMissingFactor.meError != spreadsheetengine::api::Error::IllegalArgument
+            || aCompiledCumIpmtEmptyType
+            || aCompiledCumIpmtEmptyType.meError != spreadsheetengine::api::Error::IllegalArgument)
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "financial function evaluation mismatch");
         }
     }
 
@@ -673,6 +2429,38 @@ int main()
             = aEvaluator.evaluateFormula(u"of:=EOMONTH(\"Jan11, 2015\";1)", { 0, 0, 0 });
         const auto aEdate
             = aEvaluator.evaluateFormula(u"of:=EDATE(\"2001-03-31\";1)", { 0, 0, 0 });
+        const auto aWorkdayIntl = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);2;5;{\"2014-11-2\";\"2014-11-3\";\"2014-11-4\"})",
+            { 0, 0, 0 });
+        const auto aNetworkdaysIntl = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.NETWORKDAYS.INTL(DATE(2014;11;1);DATE(2014;11;30);1;{\"2014-11-11\";\"2014-11-28\";\"2014-11-27\"})",
+            { 0, 0, 0 });
+        const auto aAllWeekendNetworkdays = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.NETWORKDAYS.INTL(DATE(2006;1;1);DATE(2006;2;1);\"1111111\";{\"2006-1-2\";\"2006-1-16\"})",
+            { 0, 0, 0 });
+        const auto aInvalidWorkdayIntl = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);2;8;{\"2014-11-2\"})",
+            { 0, 0, 0 });
+        const auto aTextWeekendWorkdayIntl = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);5;\"3\")", { 0, 0, 0 });
+        const auto aNumericMaskWorkdayIntl = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);1;1100000)", { 0, 0, 0 });
+        const auto aCompiledWorkdayIntl = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);2;5;{\"2014-11-2\";\"2014-11-3\";\"2014-11-4\"})",
+            { 0, 0, 0 });
+        const auto aCompiledNetworkdaysIntl = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.NETWORKDAYS.INTL(DATE(2014;11;1);DATE(2014;11;30);1;{\"2014-11-11\";\"2014-11-28\";\"2014-11-27\"})",
+            { 0, 0, 0 });
+        const auto aCompiledAllWeekendNetworkdays = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.NETWORKDAYS.INTL(DATE(2006;1;1);DATE(2006;2;1);\"1111111\";{\"2006-1-2\";\"2006-1-16\"})",
+            { 0, 0, 0 });
+        const auto aCompiledInvalidWorkdayIntl = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);2;8;{\"2014-11-2\"})",
+            { 0, 0, 0 });
+        const auto aCompiledTextWeekendWorkdayIntl = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);5;\"3\")", { 0, 0, 0 });
+        const auto aCompiledNumericMaskWorkdayIntl = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);1;1100000)", { 0, 0, 0 });
         if (!aDate || !aDate.maValue.maValue.isNumber()
             || !almostEqual(aDate.maValue.maValue.mfNumber, 42005.0)
             || !aExpectedDate || !aDateFunction || !aDateFunction.maValue.maValue.isNumber()
@@ -709,6 +2497,37 @@ int main()
             || !almostEqual(aEomonth.maValue.maValue.mfNumber, aExpectedEomonth.maValue)
             || !aExpectedEdate || !aEdate || !aEdate.maValue.maValue.isNumber()
             || !almostEqual(aEdate.maValue.maValue.mfNumber, aExpectedEdate.maValue)
+            || !aWorkdayIntl || !aWorkdayIntl.maValue.maValue.isNumber()
+            || !almostEqual(aWorkdayIntl.maValue.maValue.mfNumber, 41951.0)
+            || !aNetworkdaysIntl || !aNetworkdaysIntl.maValue.maValue.isNumber()
+            || !almostEqual(aNetworkdaysIntl.maValue.maValue.mfNumber, 17.0)
+            || !aAllWeekendNetworkdays || !aAllWeekendNetworkdays.maValue.maValue.isNumber()
+            || !almostEqual(aAllWeekendNetworkdays.maValue.maValue.mfNumber, 0.0)
+            || aInvalidWorkdayIntl
+            || aInvalidWorkdayIntl.meError != spreadsheetengine::api::Error::IllegalArgument
+            || !aCompiledWorkdayIntl || !aCompiledWorkdayIntl.maValue.maValue.isNumber()
+            || !almostEqual(aCompiledWorkdayIntl.maValue.maValue.mfNumber, 41951.0)
+            || !aCompiledNetworkdaysIntl
+            || !aCompiledNetworkdaysIntl.maValue.maValue.isNumber()
+            || !almostEqual(aCompiledNetworkdaysIntl.maValue.maValue.mfNumber, 17.0)
+            || !aCompiledAllWeekendNetworkdays
+            || !aCompiledAllWeekendNetworkdays.maValue.maValue.isNumber()
+            || !almostEqual(aCompiledAllWeekendNetworkdays.maValue.maValue.mfNumber, 0.0)
+            || aCompiledInvalidWorkdayIntl
+            || aCompiledInvalidWorkdayIntl.meError
+                   != spreadsheetengine::api::Error::IllegalArgument
+            || aTextWeekendWorkdayIntl
+            || aTextWeekendWorkdayIntl.meError
+                   != spreadsheetengine::api::Error::IllegalArgument
+            || aNumericMaskWorkdayIntl
+            || aNumericMaskWorkdayIntl.meError
+                   != spreadsheetengine::api::Error::IllegalArgument
+            || aCompiledTextWeekendWorkdayIntl
+            || aCompiledTextWeekendWorkdayIntl.meError
+                   != spreadsheetengine::api::Error::IllegalArgument
+            || aCompiledNumericMaskWorkdayIntl
+            || aCompiledNumericMaskWorkdayIntl.meError
+                   != spreadsheetengine::api::Error::IllegalArgument
             || aInvalidTime || aInvalidTime.meError != spreadsheetengine::api::Error::IllegalArgument
             || aInvalidTimeFunction
             || aInvalidTimeFunction.meError != spreadsheetengine::api::Error::IllegalArgument)
@@ -897,16 +2716,68 @@ int main()
 
     {
         const auto aRepoRoot = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
+        const auto aConvertPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                  / "addin" / "fods" / "convert.fods";
+        const auto aConvertAddPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                     / "mathematical" / "fods" / "convert_add.fods";
         const auto aTTestPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
                                 / "statistical" / "fods" / "t.test.fods";
         const auto aAggregatePath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
                                     / "mathematical" / "fods" / "aggregate.fods";
+        const auto aConvertLoad = spreadsheetengine::core::fods::loadWorkbook(aConvertPath.string());
+        const auto aConvertAddLoad
+            = spreadsheetengine::core::fods::loadWorkbook(aConvertAddPath.string());
         const auto aTTestLoad = spreadsheetengine::core::fods::loadWorkbook(aTTestPath.string());
         const auto aLoadResult = spreadsheetengine::core::fods::loadWorkbook(aAggregatePath.string());
+        if (!aConvertLoad)
+            return fail("spreadsheetengine_fods_evaluator_tests", "convert.fods load failed");
+        if (!aConvertAddLoad)
+            return fail("spreadsheetengine_fods_evaluator_tests", "convert_add.fods load failed");
         if (!aTTestLoad)
             return fail("spreadsheetengine_fods_evaluator_tests", "t.test.fods load failed");
         if (!aLoadResult)
             return fail("spreadsheetengine_fods_evaluator_tests", "aggregate.fods load failed");
+
+        Evaluator aConvertEvaluator(aConvertLoad.maValue.maWorkbook);
+        const auto aConvertRow150 = aConvertEvaluator.evaluateCell({ 1, 0, 149 });
+        const auto aConvertRow150Compiled = aConvertEvaluator.evaluateCellViaCompiledTokens({ 1, 0, 149 });
+        const auto aConvertRow151 = aConvertEvaluator.evaluateCell({ 1, 0, 150 });
+        const auto aConvertRow155 = aConvertEvaluator.evaluateCell({ 1, 0, 154 });
+        const auto aConvertRow156 = aConvertEvaluator.evaluateCell({ 1, 0, 155 });
+        if (!aConvertRow150 || aConvertRow150.mbUsedCachedValue
+            || !aConvertRow150.maValue.maValue.isNumber()
+            || !almostEqual(aConvertRow150.maValue.maValue.mfNumber, 0.00057870370370536402)
+            || !aConvertRow150Compiled || aConvertRow150Compiled.mbUsedCachedValue
+            || !aConvertRow150Compiled.maValue.maValue.isNumber()
+            || !almostEqual(
+                aConvertRow150Compiled.maValue.maValue.mfNumber, 0.00057870370370536402)
+            || !aConvertRow151 || aConvertRow151.mbUsedCachedValue
+            || !aConvertRow151.maValue.maValue.isNumber()
+            || !almostEqual(aConvertRow151.maValue.maValue.mfNumber, 0.000160333493666367)
+            || !aConvertRow155 || aConvertRow155.mbUsedCachedValue
+            || !aConvertRow155.maValue.maValue.isNumber()
+            || !almostEqual(aConvertRow155.maValue.maValue.mfNumber, 0.083333333333352799)
+            || !aConvertRow156 || aConvertRow156.mbUsedCachedValue
+            || !aConvertRow156.maValue.maValue.isNumber()
+            || !almostEqual(aConvertRow156.maValue.maValue.mfNumber, 0.00000263046611952801))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "convert.fods cubic-unit mismatch");
+        }
+
+        Evaluator aConvertAddEvaluator(aConvertAddLoad.maValue.maWorkbook);
+        const auto aConvertAddRow86 = aConvertAddEvaluator.evaluateCell({ 1, 0, 85 });
+        const auto aConvertAddRow86Compiled
+            = aConvertAddEvaluator.evaluateCellViaCompiledTokens({ 1, 0, 85 });
+        const auto checkConvertAddRow86 = [](const auto& rResult) {
+            return rResult && !rResult.mbUsedCachedValue && rResult.maValue.maValue.isNumber()
+                   && std::abs(rResult.maValue.maValue.mfNumber - 11.1445349270435) <= 1.0e-12;
+        };
+        if (!checkConvertAddRow86(aConvertAddRow86)
+            || !checkConvertAddRow86(aConvertAddRow86Compiled))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "convert_add.fods MTON->Nmi3 mismatch");
+        }
 
         Evaluator aTTestEvaluator(aTTestLoad.maValue.maWorkbook);
         const auto aTTestInvalidResult = aTTestEvaluator.evaluateCell({ 1, 0, 1 });
@@ -926,6 +2797,7 @@ int main()
         }
 
         Evaluator aAggregateEvaluator(aLoadResult.maValue.maWorkbook);
+
         for (int nRow = 8; nRow <= 18; ++nRow)
         {
             const auto aResult = aAggregateEvaluator.evaluateCell({ 1, 0, nRow });
