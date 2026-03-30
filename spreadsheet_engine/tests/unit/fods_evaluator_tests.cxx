@@ -195,6 +195,32 @@ Workbook makeWorkbook()
     aSheet1.setCell(88, 0, Cell { CellValue::number(2.5), u"of:=TRIMMEAN({1;2;3;100};0.5)" });
     aSheet1.setCell(89, 0, Cell { CellValue::number(2.0), u"of:=MAXA(FALSE();\"red\";2)" });
     aSheet1.setCell(90, 0, Cell { CellValue::number(0.0), u"of:=MINA(TRUE();\"red\";2)" });
+    aSheet1.setCell(51, 139, Cell { CellValue::text(u"Q1") });
+    aSheet1.setCell(51, 140, Cell { CellValue::text(u"Q2") });
+    aSheet1.setCell(52, 138, Cell { CellValue::text(u"total sales") });
+    aSheet1.setCell(53, 138, Cell { CellValue::text(u"cost of sales") });
+    aSheet1.setCell(54, 138, Cell { CellValue::text(u"gross profit") });
+    aSheet1.setCell(55, 138, Cell { CellValue::empty() });
+    aSheet1.setCell(56, 138, Cell { CellValue::text(u"tax") });
+    aSheet1.setCell(57, 138, Cell { CellValue::empty() });
+    aSheet1.setCell(58, 138, Cell { CellValue::text(u"net profit") });
+    aSheet1.setCell(59, 138, Cell { CellValue::text(u"profit [%]") });
+    aSheet1.setCell(52, 139, Cell { CellValue::number(50000.0) });
+    aSheet1.setCell(53, 139, Cell { CellValue::number(-25000.0) });
+    aSheet1.setCell(54, 139, Cell { CellValue::number(25000.0) });
+    aSheet1.setCell(55, 139, Cell { CellValue::empty() });
+    aSheet1.setCell(56, 139, Cell { CellValue::number(-4246.0) });
+    aSheet1.setCell(57, 139, Cell { CellValue::empty() });
+    aSheet1.setCell(58, 139, Cell { CellValue::number(19342.0) });
+    aSheet1.setCell(59, 139, Cell { CellValue::number(0.293) });
+    aSheet1.setCell(52, 140, Cell { CellValue::number(510300.0) });
+    aSheet1.setCell(53, 140, Cell { CellValue::number(-320900.0) });
+    aSheet1.setCell(54, 140, Cell { CellValue::number(189400.0) });
+    aSheet1.setCell(55, 140, Cell { CellValue::empty() });
+    aSheet1.setCell(56, 140, Cell { CellValue::number(-25000.0) });
+    aSheet1.setCell(57, 140, Cell { CellValue::empty() });
+    aSheet1.setCell(58, 140, Cell { CellValue::number(140000.0) });
+    aSheet1.setCell(59, 140, Cell { CellValue::number(0.274) });
 
     Sheet aSheet2;
     aSheet2.maName = u"Sheet2";
@@ -1168,6 +1194,10 @@ int main()
             u"of:=COM.MICROSOFT.XLOOKUP(5;[.BA1:.BA4];[.BB1:.BB4];;-1;2)", { 0, 0, 0 });
         const auto aXLookupNextLarger = aEvaluator.evaluateFormula(
             u"of:=COM.MICROSOFT.XLOOKUP(5;[.BA1:.BA4];[.BB1:.BB4];;1;2)", { 0, 0, 0 });
+        const auto aNestedXLookupNetProfit = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.XLOOKUP([.BG139];[.BA139:.BH139];"
+            u"COM.MICROSOFT.XLOOKUP([.AZ140];[.AZ140:.AZ141];[.BA140:.BH141]))",
+            { 0, 0, 0 });
 
         const auto aCompiledXLookupExact = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=COM.MICROSOFT.XLOOKUP(4;[.BA1:.BA4];[.BB1:.BB4])", { 0, 0, 0 });
@@ -1181,6 +1211,10 @@ int main()
             u"of:=COM.MICROSOFT.XLOOKUP(5;[.BA1:.BA4];[.BB1:.BB4];;-1;2)", { 0, 0, 0 });
         const auto aCompiledXLookupNextLarger = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=COM.MICROSOFT.XLOOKUP(5;[.BA1:.BA4];[.BB1:.BB4];;1;2)", { 0, 0, 0 });
+        const auto aCompiledNestedXLookupNetProfit = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.XLOOKUP([.BG139];[.BA139:.BH139];"
+            u"COM.MICROSOFT.XLOOKUP([.AZ140];[.AZ140:.AZ141];[.BA140:.BH141]))",
+            { 0, 0, 0 });
 
         const auto checkXLookupNumber = [&](const char* pLabel, const auto& rResult,
                                             double fExpected) -> bool {
@@ -1212,12 +1246,15 @@ int main()
             || !checkXLookupNumber("reverse XLOOKUP", aXLookupReverse, 44.0)
             || !checkXLookupNumber("next smaller XLOOKUP", aXLookupNextSmaller, 44.0)
             || !checkXLookupNumber("next larger XLOOKUP", aXLookupNextLarger, 88.0)
+            || !checkXLookupNumber("nested XLOOKUP net profit", aNestedXLookupNetProfit, 19342.0)
             || !checkXLookupNumber("compiled exact XLOOKUP", aCompiledXLookupExact, 44.0)
             || !checkXLookupText("compiled text XLOOKUP", aCompiledXLookupText, u"VAN")
             || !checkXLookupText("compiled missing XLOOKUP", aCompiledXLookupMissing, u"missing")
             || !checkXLookupNumber("compiled reverse XLOOKUP", aCompiledXLookupReverse, 44.0)
             || !checkXLookupNumber("compiled next smaller XLOOKUP", aCompiledXLookupNextSmaller, 44.0)
-            || !checkXLookupNumber("compiled next larger XLOOKUP", aCompiledXLookupNextLarger, 88.0))
+            || !checkXLookupNumber("compiled next larger XLOOKUP", aCompiledXLookupNextLarger, 88.0)
+            || !checkXLookupNumber("compiled nested XLOOKUP net profit",
+                aCompiledNestedXLookupNetProfit, 19342.0))
         {
             return fail("spreadsheetengine_fods_evaluator_tests", "XLOOKUP evaluation mismatch");
         }

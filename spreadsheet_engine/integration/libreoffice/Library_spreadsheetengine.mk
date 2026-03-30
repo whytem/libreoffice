@@ -40,10 +40,13 @@ $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spreadsheet_engine/source/core/MathBitwise \
     spreadsheet_engine/source/core/CalcConfig \
     spreadsheet_engine/source/core/CompilerSupport \
+    spreadsheet_engine/source/core/DateTimeParse \
     spreadsheet_engine/source/core/DateTimeParts \
     spreadsheet_engine/source/core/DateTimeWeek \
     spreadsheet_engine/source/core/DateTimeWorkday \
+    spreadsheet_engine/source/core/FinancialRuntime \
     spreadsheet_engine/source/core/ForceCalculation \
+    spreadsheet_engine/source/core/LookupRuntime \
     spreadsheet_engine/source/core/OdfFormulaParser \
     spreadsheet_engine/source/core/MathFinancial \
     spreadsheet_engine/source/core/MathRounding \
@@ -55,6 +58,8 @@ $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spreadsheet_engine/source/core/QueryRuntime \
     spreadsheet_engine/source/core/LibraryProbe \
     spreadsheet_engine/source/core/TextCase \
+    spreadsheet_engine/source/core/TextFunctionRuntime \
+    spreadsheet_engine/source/core/TextRuntimeSupport \
     spreadsheet_engine/source/core/TextScalar \
     spreadsheet_engine/source/core/TextWidth \
 ))
