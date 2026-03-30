@@ -651,39 +651,37 @@ double ScInterpreter::GetLogGamma(double fZ)
 
 double ScInterpreter::GetFDist(double x, double fF1, double fF2)
 {
-    double arg = fF2/(fF2+fF1*x);
-    double alpha = fF2/2.0;
-    double beta = fF1/2.0;
-    return GetBetaDist(arg, alpha, beta);
+    const auto aResult = semath::evaluateFRightTailDistribution(x, fF1, fF2);
+    if (!aResult)
+    {
+        SetError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return HUGE_VAL;
+    }
+    return aResult.maValue;
 }
 
 double ScInterpreter::GetTDist( double T, double fDF, int nType )
 {
-    switch ( nType )
+    const auto aResult = semath::evaluateStudentDistribution(T, fDF, nType);
+    if (!aResult)
     {
-        case 1 : // 1-tailed T-distribution
-            return 0.5 * GetBetaDist( fDF / ( fDF + T * T ), fDF / 2.0, 0.5 );
-        case 2 : // 2-tailed T-distribution
-            return GetBetaDist( fDF / ( fDF + T * T ), fDF / 2.0, 0.5);
-        case 3 : // left-tailed T-distribution (probability density function)
-            return pow( 1 + ( T * T / fDF ), -( fDF + 1 ) / 2 ) / ( sqrt( fDF ) * GetBeta( 0.5, fDF / 2.0 ) );
-        case 4 : // left-tailed T-distribution (cumulative distribution function)
-            double X = fDF / ( T * T + fDF );
-            double R = 0.5 * GetBetaDist( X, 0.5 * fDF, 0.5 );
-            return ( T < 0 ? R : 1 - R );
+        SetError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return HUGE_VAL;
     }
-    SetError( FormulaError::IllegalArgument );
-    return HUGE_VAL;
+    return aResult.maValue;
 }
 
 // for LEGACY.CHIDIST, returns right tail, fDF=degrees of freedom
 /** You must ensure fDF>0.0 */
 double ScInterpreter::GetChiDist(double fX, double fDF)
 {
-    if (fX <= 0.0)
-        return 1.0; // see ODFF
-    else
-        return GetUpRegIGamma( fDF/2.0, fX/2.0);
+    const auto aResult = semath::evaluateLegacyChiDist(fX, fDF);
+    if (!aResult)
+    {
+        SetError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return HUGE_VAL;
+    }
+    return aResult.maValue;
 }
 
 // ready for ODF 1.2
@@ -692,48 +690,14 @@ double ScInterpreter::GetChiDist(double fX, double fDF)
 /** You must ensure fDF>0.0 */
 double ScInterpreter::GetChiSqDistCDF(double fX, double fDF)
 {
-    if (fX <= 0.0)
-        return 0.0; // see ODFF
-    else
-        return GetLowRegIGamma( fDF/2.0, fX/2.0);
+    const auto aResult = semath::evaluateChiSquareDistribution(fX, fDF, true, false);
+    return aResult ? aResult.maValue : HUGE_VAL;
 }
 
 double ScInterpreter::GetChiSqDistPDF(double fX, double fDF)
 {
-    // you must ensure fDF is positive integer
-    double fValue;
-    if (fX <= 0.0)
-        return 0.0; // see ODFF
-    if (fDF*fX > 1391000.0)
-    {
-        // intermediate invalid values, use log
-        fValue = exp((0.5*fDF - 1) * log(fX*0.5) - 0.5 * fX - log(2.0) - GetLogGamma(0.5*fDF));
-    }
-    else // fDF is small in most cases, we can iterate
-    {
-        double fCount;
-        if (fmod(fDF,2.0)<0.5)
-        {
-            // even
-            fValue = 0.5;
-            fCount = 2.0;
-        }
-        else
-        {
-            fValue = 1/sqrt(fX*2*M_PI);
-            fCount = 1.0;
-        }
-        while ( fCount < fDF)
-        {
-            fValue *= (fX / fCount);
-            fCount += 2.0;
-        }
-        if (fX>=1425.0) // underflow in e^(-x/2)
-            fValue = exp(log(fValue)-fX/2);
-        else
-            fValue *= exp(-fX/2);
-    }
-    return fValue;
+    const auto aResult = semath::evaluateChiSquareDistribution(fX, fDF, false, false);
+    return aResult ? aResult.maValue : HUGE_VAL;
 }
 
 void ScInterpreter::ScChiSqDist()
@@ -788,15 +752,17 @@ void ScInterpreter::ScGamma()
     double x = GetDouble();
     if (x <= 0.0 && x == ::rtl::math::approxFloor(x))
         PushIllegalArgument();
+    else if (x > fMaxGammaArgument)
+        PushError(FormulaError::IllegalFPOperation);
     else
     {
-        double fResult = GetGamma(x);
-        if (nGlobalError != FormulaError::NONE)
+        const auto aResult = semath::evaluateGammaValue(x);
+        if (!aResult)
         {
-            PushError( nGlobalError);
+            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
             return;
         }
-        PushDouble(fResult);
+        PushDouble(aResult.maValue);
     }
 }
 
@@ -1170,88 +1136,14 @@ void ScInterpreter::ScCritBinom()
 
     double alpha  = GetDouble();
     double p      = GetDouble();
-    double n      = ::rtl::math::approxFloor(GetDouble());
-    if (n < 0.0 || alpha < 0.0 || alpha > 1.0 || p < 0.0 || p > 1.0)
-        PushIllegalArgument();
-    else if ( alpha == 0.0 )
-        PushDouble( 0.0 );
-    else if ( alpha == 1.0 )
-        PushDouble( p == 0 ? 0.0 : n );
-    else
+    double n      = GetDouble();
+    const auto aResult = semath::evaluateBinomialInverse(n, p, alpha);
+    if (!aResult)
     {
-        double fFactor;
-        double q = (0.5 - p) + 0.5;           // get one bit more for p near 1.0
-        if ( q > p )                          // work from the side where the cumulative curve is
-        {
-            // work from 0 upwards
-            fFactor = pow(q,n);
-            if (fFactor > ::std::numeric_limits<double>::min())
-            {
-                KahanSum fSum = fFactor;
-                sal_uInt32 max = static_cast<sal_uInt32> (n), i;
-                for (i = 0; i < max && fSum < alpha; i++)
-                {
-                    fFactor *= (n-i)/(i+1)*p/q;
-                    fSum += fFactor;
-                }
-                PushDouble(i);
-            }
-            else
-            {
-                // accumulate BinomDist until accumulated BinomDist reaches alpha
-                KahanSum fSum = 0.0;
-                sal_uInt32 max = static_cast<sal_uInt32> (n), i;
-                for (i = 0; i < max && fSum < alpha; i++)
-                {
-                    const double x = GetBetaDistPDF( p, ( i + 1 ), ( n - i + 1 ) )/( n + 1 );
-                    if ( nGlobalError == FormulaError::NONE )
-                        fSum += x;
-                    else
-                    {
-                        PushNoValue();
-                        return;
-                    }
-                }
-                assert(i > 0 && "coverity 2023.12.2");
-                PushDouble( i - 1 );
-            }
-        }
-        else
-        {
-            // work from n backwards
-            fFactor = pow(p, n);
-            if (fFactor > ::std::numeric_limits<double>::min())
-            {
-                KahanSum fSum = 1.0 - fFactor;
-                sal_uInt32 max = static_cast<sal_uInt32> (n), i;
-                for (i = 0; i < max && fSum >= alpha; i++)
-                {
-                    fFactor *= (n-i)/(i+1)*q/p;
-                    fSum -= fFactor;
-                }
-                PushDouble(n-i);
-            }
-            else
-            {
-                // accumulate BinomDist until accumulated BinomDist reaches alpha
-                KahanSum fSum = 0.0;
-                sal_uInt32 max = static_cast<sal_uInt32> (n), i;
-                alpha = 1 - alpha;
-                for (i = 0; i < max && fSum < alpha; i++)
-                {
-                    const double x = GetBetaDistPDF( q, ( i + 1 ), ( n - i + 1 ) )/( n + 1 );
-                    if ( nGlobalError == FormulaError::NONE )
-                        fSum += x;
-                    else
-                    {
-                        PushNoValue();
-                        return;
-                    }
-                }
-                PushDouble( n - i + 1 );
-            }
-        }
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
     }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScNegBinomDist()
@@ -1309,15 +1201,13 @@ void ScInterpreter::ScNormDist( int nMinParamCount )
     double sigma = GetDouble();                 // standard deviation
     double mue = GetDouble();                   // mean
     double x = GetDouble();                     // x
-    if (sigma <= 0.0)
+    const auto aResult = semath::evaluateNormalDistribution(x, mue, sigma, bCumulative);
+    if (!aResult)
     {
-        PushIllegalArgument();
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
         return;
     }
-    if (bCumulative)
-        PushDouble(integralPhi((x-mue)/sigma));
-    else
-        PushDouble(phi((x-mue)/sigma)/sigma);
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScLogNormDist( int nMinParamCount ) //expanded, see #i100119# and fdo72158
@@ -1329,25 +1219,13 @@ void ScInterpreter::ScLogNormDist( int nMinParamCount ) //expanded, see #i100119
     double sigma = nParamCount >= 3 ? GetDouble() : 1.0; // standard deviation
     double mue = nParamCount >= 2 ? GetDouble() : 0.0;   // mean
     double x = GetDouble();                              // x
-    if (sigma <= 0.0)
+    const auto aResult = semath::evaluateLogNormalDistribution(x, mue, sigma, bCumulative);
+    if (!aResult)
     {
-        PushIllegalArgument();
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
         return;
     }
-    if (bCumulative)
-    { // cumulative
-        if (x <= 0.0)
-            PushDouble(0.0);
-        else
-            PushDouble(integralPhi((log(x)-mue)/sigma));
-    }
-    else
-    { // density
-        if (x <= 0.0)
-            PushIllegalArgument();
-        else
-            PushDouble(phi((log(x)-mue)/sigma)/sigma/x);
-    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScStdNormDist()
@@ -1966,25 +1844,6 @@ void ScInterpreter::ScBetaInv()
         PushDouble(fA + fVal*(fB-fA));                  // scale to (A,B)
 }
 
-// Note: T, F, and Chi are
-// monotonically decreasing,
-// therefore 1-Dist as function
-
-class ScTDistFunction : public ScDistFunc
-{
-    ScInterpreter&  rInt;
-    double          fp, fDF;
-    int             nT;
-
-public:
-            ScTDistFunction( ScInterpreter& rI, double fpVal, double fDFVal, int nType ) :
-                rInt( rI ), fp( fpVal ), fDF( fDFVal ), nT( nType ) {}
-
-    virtual ~ScTDistFunction() {}
-
-    double  GetValue( double x ) const override  { return fp - rInt.GetTDist( x, fDF, nT ); }
-};
-
 void ScInterpreter::ScTInv( int nType )
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )
@@ -2011,27 +1870,14 @@ void ScInterpreter::ScTInv( int nType )
 
 double ScInterpreter::GetTInv( double fAlpha, double fSize, int nType )
 {
-    bool bConvError;
-    ScTDistFunction aFunc( *this, fAlpha, fSize, nType );
-    double fVal = lcl_IterateInverse( aFunc, fSize * 0.5, fSize, bConvError );
-    if (bConvError)
-        SetError(FormulaError::NoConvergence);
-    return fVal;
+    const auto aResult = semath::evaluateTInverse(fAlpha, fSize, nType);
+    if (!aResult)
+    {
+        SetError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return HUGE_VAL;
+    }
+    return aResult.maValue;
 }
-
-class ScFDistFunction : public ScDistFunc
-{
-    ScInterpreter&  rInt;
-    double          fp, fF1, fF2;
-
-public:
-            ScFDistFunction( ScInterpreter& rI, double fpVal, double fF1Val, double fF2Val ) :
-                rInt(rI), fp(fpVal), fF1(fF1Val), fF2(fF2Val) {}
-
-    virtual ~ScFDistFunction() {}
-
-    double  GetValue( double x ) const override  { return fp - rInt.GetFDist(x, fF1, fF2); }
-};
 
 void ScInterpreter::ScFInv()
 {
@@ -2046,12 +1892,13 @@ void ScInterpreter::ScFInv()
         return;
     }
 
-    bool bConvError;
-    ScFDistFunction aFunc( *this, fP, fF1, fF2 );
-    double fVal = lcl_IterateInverse( aFunc, fF1*0.5, fF1, bConvError );
-    if (bConvError)
-        SetError(FormulaError::NoConvergence);
-    PushDouble(fVal);
+    const auto aResult = semath::evaluateFInverseRightTail(fP, fF1, fF2);
+    if (!aResult)
+    {
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScFInv_LT()
@@ -2067,12 +1914,13 @@ void ScInterpreter::ScFInv_LT()
         return;
     }
 
-    bool bConvError;
-    ScFDistFunction aFunc( *this, ( 1.0 - fP ), fF1, fF2 );
-    double fVal = lcl_IterateInverse( aFunc, fF1*0.5, fF1, bConvError );
-    if (bConvError)
-        SetError(FormulaError::NoConvergence);
-    PushDouble(fVal);
+    const auto aResult = semath::evaluateFInverseRightTail(1.0 - fP, fF1, fF2);
+    if (!aResult)
+    {
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 class ScChiDistFunction : public ScDistFunc

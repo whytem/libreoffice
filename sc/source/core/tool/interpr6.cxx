@@ -25,14 +25,30 @@
 #include <dociter.hxx>
 #include <mtvfunctions.hxx>
 #include <scmatrix.hxx>
+#include <spreadsheetengine/runtime/MathStatistical.hxx>
+#include <spreadsheetengine/compat/libreoffice/Error.hxx>
 
 #include <arraysumfunctor.hxx>
 
 #include <formula/token.hxx>
 
 using namespace formula;
+namespace semath = spreadsheetengine::core::math;
+namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 
 double const fHalfMachEps = 0.5 * ::std::numeric_limits<double>::epsilon();
+
+namespace
+{
+
+FormulaError lcl_ToCalcMathFormulaError(spreadsheetengine::api::Error eError)
+{
+    if (eError == spreadsheetengine::api::Error::Domain)
+        return FormulaError::IllegalArgument;
+    return selibreoffice::toFormulaError(eError);
+}
+
+}
 
 // The idea how this group of gamma functions is calculated, is
 // based on the Cephes library
@@ -143,53 +159,14 @@ double ScInterpreter::GetUpRegIGamma( double fA, double fX )
     You must ensure fAlpha>0.0 and fLambda>0.0 */
 double ScInterpreter::GetGammaDistPDF( double fX, double fAlpha, double fLambda )
 {
-    if (fX < 0.0)
-        return 0.0;     // see ODFF
-    else if (fX == 0)
-        // in this case 0^0 isn't zero
+    const auto aResult = semath::evaluateGammaDistribution(
+        fX, fAlpha, fLambda, false, false);
+    if (!aResult)
     {
-        if (fAlpha < 1.0)
-        {
-            SetError(FormulaError::DivisionByZero);  // should be #DIV/0
-            return HUGE_VAL;
-        }
-        else if (fAlpha == 1)
-        {
-            return (1.0 / fLambda);
-        }
-        else
-        {
-            return 0.0;
-        }
+        SetError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return HUGE_VAL;
     }
-    else
-    {
-        double fXr = fX / fLambda;
-        // use exp(ln()) only for large arguments because of less accuracy
-        if (fXr > 1.0)
-        {
-            const double fLogDblMax = log( ::std::numeric_limits<double>::max());
-            if (log(fXr) * (fAlpha-1.0) < fLogDblMax && fAlpha < fMaxGammaArgument)
-            {
-                return o3tl::div_allow_zero(pow( fXr, fAlpha-1.0) * exp(-fXr) / fLambda, GetGamma(fAlpha));
-            }
-            else
-            {
-                return exp( (fAlpha-1.0) * log(fXr) - fXr - log(fLambda) - GetLogGamma(fAlpha));
-            }
-        }
-        else    // fXr near to zero
-        {
-            if (fAlpha<fMaxGammaArgument)
-            {
-                return o3tl::div_allow_zero(pow( fXr, fAlpha-1.0) * exp(-fXr) / fLambda, GetGamma(fAlpha));
-            }
-            else
-            {
-                return pow( fXr, fAlpha-1.0) * exp(-fXr) / fLambda / exp( GetLogGamma(fAlpha));
-            }
-        }
-    }
+    return aResult.maValue;
 }
 
 /** Gamma distribution, cumulative distribution function.
@@ -197,10 +174,14 @@ double ScInterpreter::GetGammaDistPDF( double fX, double fAlpha, double fLambda 
     You must ensure fAlpha>0.0 and fLambda>0.0 */
 double ScInterpreter::GetGammaDist( double fX, double fAlpha, double fLambda )
 {
-    if (fX <= 0.0)
-        return 0.0;
-    else
-        return GetLowRegIGamma( fAlpha, fX / fLambda);
+    const auto aResult = semath::evaluateGammaDistribution(
+        fX, fAlpha, fLambda, true, false);
+    if (!aResult)
+    {
+        SetError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return HUGE_VAL;
+    }
+    return aResult.maValue;
 }
 
 namespace {

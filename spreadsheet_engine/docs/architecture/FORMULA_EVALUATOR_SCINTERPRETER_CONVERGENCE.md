@@ -634,6 +634,14 @@ Status as of 2026-03-30:
 These Calc functions should converge after `MathStatistical` phase 2 and the
 aggregate/statistics extraction:
 
+Status as of 2026-03-30:
+- First wave completed in `sc/source/core/tool/interpr3.cxx` and
+  `sc/source/core/tool/interpr6.cxx`
+- Live delegations now cover the normal/log-normal, chi-square, legacy chi,
+  gamma-distribution, student-t, F-distribution, `CRITBINOM`, and direct
+  T/F inverse paths that already had stable runtime equivalents
+- Focused Calc coverage for this wave lives in `sc/qa/unit/ucalc_formula2.cxx`
+
 - chi-square family
 - gamma family
 - normal/log-normal family

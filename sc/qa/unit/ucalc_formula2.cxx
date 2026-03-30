@@ -261,6 +261,36 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedStatisticalDelegations)
     m_pDoc->SetString(ScAddress(0, 10, 0), u"=BETA.DIST(-0.1;2;3;TRUE)"_ustr);
     CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(0, 10, 0)));
 
+    m_pDoc->SetString(ScAddress(0, 11, 0), u"=NORMDIST(1;0;1;TRUE)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.8413447460685429, m_pDoc->GetValue(ScAddress(0, 11, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 12, 0), u"=LOGNORMDIST(1;0;1)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(ScAddress(0, 12, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 13, 0), u"=CHISQDIST(2;4)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.26424111765711533, m_pDoc->GetValue(ScAddress(0, 13, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 14, 0), u"=CHIDIST(2;4)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.7357588823428847, m_pDoc->GetValue(ScAddress(0, 14, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 15, 0), u"=GAMMADIST(2;1;2;TRUE)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.6321205588285577, m_pDoc->GetValue(ScAddress(0, 15, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 16, 0), u"=TDIST(1;1;2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(ScAddress(0, 16, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 17, 0), u"=FDIST(1;2;2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(ScAddress(0, 17, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 18, 0), u"=TINV(0.5;1)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 18, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 19, 0), u"=FINV(0.5;2;2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 19, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 20, 0), u"=CRITBINOM(5;0.5;0.5)"_ustr);
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(0, 20, 0)));
+
     m_pDoc->DeleteTab(0);
 }
 
