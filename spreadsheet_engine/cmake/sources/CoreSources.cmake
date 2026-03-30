@@ -17,6 +17,7 @@ set(SPREADSHEETENGINE_STANDALONE_CORE_SOURCES
     "${SPREADSHEETENGINE_ROOT}/source/core/MathStatistical.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/MathTranscendental.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/NumeralConversion.cxx"
+    "${SPREADSHEETENGINE_ROOT}/source/core/QueryRuntime.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/TextCase.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/TextScalar.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/TextWidth.cxx"

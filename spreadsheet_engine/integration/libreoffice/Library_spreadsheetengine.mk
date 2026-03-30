@@ -52,6 +52,7 @@ $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spreadsheet_engine/source/core/MathTranscendental \
     spreadsheet_engine/source/core/MatrixOperators \
     spreadsheet_engine/source/core/NumeralConversion \
+    spreadsheet_engine/source/core/QueryRuntime \
     spreadsheet_engine/source/core/LibraryProbe \
     spreadsheet_engine/source/core/TextCase \
     spreadsheet_engine/source/core/TextScalar \

@@ -66,6 +66,32 @@ inline constexpr sal_uInt16 kBuiltinExternalNameCatalogId = 1;
     return std::nullopt;
 }
 
+[[nodiscard]] inline std::optional<api::String> lookupBuiltinExternalSymbol(api::StringView rName)
+{
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETWORKDAY"))
+        return api::String(u"WORKDAY");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYEARFRAC"))
+        return api::String(u"YEARFRAC");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSERIESSUM"))
+        return api::String(u"SERIESSUM");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETQUOTIENT"))
+        return api::String(u"QUOTIENT");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCONVERT"))
+        return api::String(u"CONVERT");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDEC2HEX"))
+        return api::String(u"DEC2HEX");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETMROUND"))
+        return api::String(u"MROUND");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETMULTINOMIAL"))
+        return api::String(u"MULTINOMIAL");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSQRTPI"))
+        return api::String(u"SQRTPI");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETRANDBETWEEN"))
+        return api::String(u"RANDBETWEEN");
+
+    return std::nullopt;
+}
+
 } // namespace spreadsheetengine::detail::compiler
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
