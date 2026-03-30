@@ -154,17 +154,17 @@ compile host (`WorkbookCompileHost`), compiler preflight classifier
 (`SharedFormulaToken`), token stringifier (`TokenStringifier`), and workbook
 compiler lowering (`WorkbookCompilerLowering`).
 
-**Layer 3: FODS Runtime** (`detail/`)
+**Layer 3: Workbook Runtime** (`detail/`)
 Standalone workbook subsystem: `WorkbookModel` (sparse cell storage with named
 ranges and imported-sheet metadata), `FodsLoader` (libxml2-backed XML parser),
-`OdfFormulaParser` (ODF `of:=` formula tokenizer and AST), `FodsEvaluator`
+`OdfFormulaParser` (ODF `of:=` formula tokenizer and AST), `FormulaEvaluator`
 (lazy formula evaluator with memoization, cycle detection, and compiled-token
 execution support).
 
 **Layer 4: Runtime Helpers** (`runtime/`)
 Standalone function implementations: `MathScalar`, `MathTranscendental`,
-`MathBitwise`, `MathFinancial`, `MathRounding`, `TextCase`, `TextScalar`,
-`TextWidth`, `TextServices`, `DateTimeParts`, `DateTimeWeek`,
+`MathBitwise`, `MathFinancial`, `MathRounding`, `MathStatistical`,
+`TextCase`, `TextScalar`, `TextWidth`, `TextServices`, `DateTimeParts`, `DateTimeWeek`,
 `DateTimeWorkday`, `NumeralConversion`, `InMemoryHost`, `LibraryProbe`.
 
 **Layer 5: LibreOffice Adapters** (`compat/libreoffice/`)

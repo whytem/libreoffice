@@ -48,6 +48,7 @@ $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spreadsheet_engine/source/core/MathFinancial \
     spreadsheet_engine/source/core/MathRounding \
     spreadsheet_engine/source/core/MathScalar \
+    spreadsheet_engine/source/core/MathStatistical \
     spreadsheet_engine/source/core/MathTranscendental \
     spreadsheet_engine/source/core/MatrixOperators \
     spreadsheet_engine/source/core/NumeralConversion \

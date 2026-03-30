@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-#include <spreadsheetengine/detail/FodsEvaluator.hxx>
+#include <spreadsheetengine/detail/FormulaEvaluator.hxx>
 #include <spreadsheetengine/detail/FodsCompilerPreflight.hxx>
 #include <spreadsheetengine/detail/FodsLoader.hxx>
 #include <spreadsheetengine/detail/OdfFormulaParser.hxx>
@@ -31,8 +31,8 @@ using spreadsheetengine::api::String;
 using spreadsheetengine::api::StringView;
 using spreadsheetengine::detail::compiler::FormulaPreflightReason;
 using spreadsheetengine::detail::compiler::preflightReasonName;
-using spreadsheetengine::core::fods::EvaluationResult;
-using spreadsheetengine::core::fods::Evaluator;
+using spreadsheetengine::core::eval::Evaluator;
+using spreadsheetengine::core::eval::EvaluationResult;
 using spreadsheetengine::core::formula::Node;
 using spreadsheetengine::core::formula::NodeKind;
 using spreadsheetengine::core::fods::loadWorkbook;

@@ -7,7 +7,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include <spreadsheetengine/detail/FodsEvaluator.hxx>
+#include <spreadsheetengine/detail/FormulaEvaluator.hxx>
 
 #include <rtl/math.hxx>
 
@@ -23,6 +23,10 @@
 #include <spreadsheetengine/api/Text.hxx>
 #include <spreadsheetengine/api/Workday.hxx>
 #include <spreadsheetengine/runtime/DateTimeParts.hxx>
+#include <spreadsheetengine/runtime/MathRounding.hxx>
+#include <spreadsheetengine/runtime/MathStatistical.hxx>
+#include <spreadsheetengine/runtime/TextCase.hxx>
+#include <spreadsheetengine/runtime/TextScalar.hxx>
 
 #include "DateAlgorithms.hxx"
 
@@ -45,12 +49,13 @@
 
 #include <kahan.hxx>
 
-namespace spreadsheetengine::core::fods
+namespace spreadsheetengine::core::eval
 {
 namespace
 {
 
 namespace secompiler = spreadsheetengine::detail::compiler;
+namespace semath = spreadsheetengine::core::math;
 namespace setoken = spreadsheetengine::detail::token;
 
 [[nodiscard]] std::tuple<api::SheetId, api::ColumnIndex, api::RowIndex> makeAddressKey(
@@ -153,20 +158,54 @@ namespace setoken = spreadsheetengine::detail::token;
         static_cast<int32_t>(rRight.size()), 0, &eStatus);
 }
 
-[[nodiscard]] api::String uppercaseText(api::StringView rValue)
+class EvaluatorCaseMappingService final : public core::text::CaseMappingService
 {
-    icu::UnicodeString aText(
-        reinterpret_cast<const UChar*>(rValue.data()), static_cast<int32_t>(rValue.size()));
-    aText.toUpper();
-    return fromUnicodeString(aText);
+public:
+    api::String uppercase(api::StringView rInput) const override
+    {
+        icu::UnicodeString aText(
+            reinterpret_cast<const UChar*>(rInput.data()), static_cast<int32_t>(rInput.size()));
+        aText.toUpper();
+        return fromUnicodeString(aText);
+    }
+
+    api::String lowercase(api::StringView rInput) const override
+    {
+        icu::UnicodeString aText(
+            reinterpret_cast<const UChar*>(rInput.data()), static_cast<int32_t>(rInput.size()));
+        aText.toLower();
+        return fromUnicodeString(aText);
+    }
+
+    bool isLetter(char32_t nCodePoint) const override { return u_isalpha(nCodePoint); }
+};
+
+class EvaluatorEncodingService final : public core::text::SingleByteEncodingService
+{
+public:
+    sal_Int32 encodeFirstCharacter(api::StringView rInput) const override
+    {
+        if (rInput.empty())
+            return 0;
+        return static_cast<unsigned char>(rInput.front() & 0x00FF);
+    }
+
+    std::optional<api::String> decodeSingleByte(unsigned char nValue) const override
+    {
+        return api::String(1, static_cast<char16_t>(nValue));
+    }
+};
+
+[[nodiscard]] const EvaluatorCaseMappingService& evaluatorCaseMappingService()
+{
+    static const EvaluatorCaseMappingService aService;
+    return aService;
 }
 
-[[nodiscard]] api::String lowercaseText(api::StringView rValue)
+[[nodiscard]] const EvaluatorEncodingService& evaluatorEncodingService()
 {
-    icu::UnicodeString aText(
-        reinterpret_cast<const UChar*>(rValue.data()), static_cast<int32_t>(rValue.size()));
-    aText.toLower();
-    return fromUnicodeString(aText);
+    static const EvaluatorEncodingService aService;
+    return aService;
 }
 
 [[nodiscard]] api::String propercaseText(api::StringView rValue)
@@ -1130,6 +1169,49 @@ struct TextDelimiterMatch
     };
 }
 
+[[nodiscard]] std::optional<double> parseStoredDateValue(api::StringView rValue)
+{
+    constexpr api::DateParts aDefaultNullDate { 1899, 12, 30 };
+
+    rValue = trimAsciiWhitespace(rValue);
+    if (rValue.empty())
+        return std::nullopt;
+
+    api::StringView aDatePart = rValue;
+    api::StringView aTimePart;
+    const std::size_t nTimeSeparator = rValue.find_first_of(u"T ");
+    if (nTimeSeparator != api::StringView::npos)
+    {
+        aDatePart = trimAsciiWhitespace(rValue.substr(0, nTimeSeparator));
+        aTimePart = trimAsciiWhitespace(rValue.substr(nTimeSeparator + 1));
+    }
+
+    sal_Int16 nYear = 0;
+    sal_Int16 nMonth = 0;
+    sal_Int16 nDay = 0;
+    if (!parseDateText(aDatePart, nYear, nMonth, nDay))
+        return std::nullopt;
+    if (!detail::date::isValidDate(
+            static_cast<sal_uInt16>(nDay), static_cast<sal_uInt16>(nMonth), nYear))
+    {
+        return std::nullopt;
+    }
+
+    const api::DateParts aDate { nYear, nMonth, nDay };
+    double fSerial = static_cast<double>(
+        detail::date::toAbsoluteDays(aDate) - detail::date::toAbsoluteDays(aDefaultNullDate));
+
+    if (!aTimePart.empty())
+    {
+        const auto oTimeSerial = parseTimeText(aTimePart);
+        if (!oTimeSerial)
+            return std::nullopt;
+        fSerial += *oTimeSerial;
+    }
+
+    return fSerial;
+}
+
 [[nodiscard]] constexpr api::DateParts defaultFodsNullDate()
 {
     return { 1899, 12, 30 };
@@ -1145,6 +1227,9 @@ struct TextDelimiterMatch
                                                                : api::StringView(rCell.maValue.maString);
     if (rCell.maRawValueType == u"date")
     {
+        if (const auto oStoredDate = parseStoredDateValue(aLexical))
+            return api::CellValue::number(*oStoredDate);
+
         if (const auto oParsed = parseStandaloneNumberText(aLexical))
         {
             if (oParsed->meKind == api::NumberParseResult::Kind::Date
@@ -2519,319 +2604,6 @@ struct LookupInput
     return fValue < 0.0 ? -fResult : fResult;
 }
 
-[[nodiscard]] double lanczosSum(double fZ)
-{
-    static constexpr double fNum[13] = {
-        23531376880.41075968857200767445163675473,
-        42919803642.64909876895789904700198885093,
-        35711959237.35566804944018545154716670596,
-        17921034426.03720969991975575445893111267,
-        6039542586.35202800506429164430729792107,
-        1439720407.311721673663223072794912393972,
-        248874557.8620541565114603864132294232163,
-        31426415.58540019438061423162831820536287,
-        2876370.628935372441225409051620849613599,
-        186056.2653952234950402949897160456992822,
-        8071.672002365816210638002902272250613822,
-        210.8242777515793458725097339207133627117,
-        2.506628274631000270164908177133837338626
-    };
-    static constexpr double fDenom[13] = {
-        0.0,
-        39916800.0,
-        120543840.0,
-        150917976.0,
-        105258076.0,
-        45995730.0,
-        13339535.0,
-        2637558.0,
-        357423.0,
-        32670.0,
-        1925.0,
-        66.0,
-        1.0
-    };
-
-    double fSumNum;
-    double fSumDenom;
-    if (fZ <= 1.0)
-    {
-        fSumNum = fNum[12];
-        fSumDenom = fDenom[12];
-        for (int nIndex = 11; nIndex >= 0; --nIndex)
-        {
-            fSumNum *= fZ;
-            fSumNum += fNum[nIndex];
-            fSumDenom *= fZ;
-            fSumDenom += fDenom[nIndex];
-        }
-    }
-    else
-    {
-        const double fInverse = 1.0 / fZ;
-        fSumNum = fNum[0];
-        fSumDenom = fDenom[0];
-        for (int nIndex = 1; nIndex <= 12; ++nIndex)
-        {
-            fSumNum *= fInverse;
-            fSumNum += fNum[nIndex];
-            fSumDenom *= fInverse;
-            fSumDenom += fDenom[nIndex];
-        }
-    }
-
-    return fSumNum / fSumDenom;
-}
-
-[[nodiscard]] double betaValue(double fAlpha, double fBeta);
-
-[[nodiscard]] double logBeta(double fAlpha, double fBeta)
-{
-    double fA = fAlpha;
-    double fB = fBeta;
-    if (fB > fA)
-        std::swap(fA, fB);
-
-    constexpr double fMaxGammaArgument = 171.624376956302;
-    if (fA + fB < fMaxGammaArgument)
-        return std::log(betaValue(fA, fB));
-
-    constexpr long double fG = 6.024680040776729583740234375L;
-    const long double fGMinusHalf = fG - 0.5L;
-    long double fLanczos = static_cast<long double>(lanczosSum(fA));
-    fLanczos /= static_cast<long double>(lanczosSum(fA + fB));
-    fLanczos *= static_cast<long double>(lanczosSum(fB));
-    long double fLogLanczos = std::log(fLanczos);
-    const long double fABG = static_cast<long double>(fA + fB) + fGMinusHalf;
-    fLogLanczos += 0.5L
-                   * (std::log(fABG) - std::log(static_cast<long double>(fA) + fGMinusHalf)
-                      - std::log(static_cast<long double>(fB) + fGMinusHalf));
-    const long double fTempA = static_cast<long double>(fB) / (static_cast<long double>(fA) + fGMinusHalf);
-    const long double fTempB = static_cast<long double>(fA) / (static_cast<long double>(fB) + fGMinusHalf);
-    return static_cast<double>(-static_cast<long double>(fA) * std::log1p(fTempA)
-                               - static_cast<long double>(fB) * std::log1p(fTempB)
-                               - fGMinusHalf + fLogLanczos);
-}
-
-[[nodiscard]] double betaValue(double fAlpha, double fBeta)
-{
-    double fA = fAlpha;
-    double fB = fBeta;
-    if (fB > fA)
-        std::swap(fA, fB);
-
-    constexpr double fMaxGammaArgument = 171.624376956302;
-    if (fA + fB < fMaxGammaArgument)
-        return (std::tgamma(fA) / std::tgamma(fA + fB)) * std::tgamma(fB);
-
-    constexpr long double fG = 6.024680040776729583740234375L;
-    const long double fGMinusHalf = fG - 0.5L;
-    long double fLanczos = static_cast<long double>(lanczosSum(fA));
-    fLanczos /= static_cast<long double>(lanczosSum(fA + fB));
-    fLanczos *= static_cast<long double>(lanczosSum(fB));
-    const long double fABG = static_cast<long double>(fA + fB) + fGMinusHalf;
-    fLanczos *= std::sqrt(
-        (fABG / (static_cast<long double>(fA) + fGMinusHalf))
-        / (static_cast<long double>(fB) + fGMinusHalf));
-    const long double fTempA = static_cast<long double>(fB) / (static_cast<long double>(fA) + fGMinusHalf);
-    const long double fTempB = static_cast<long double>(fA) / (static_cast<long double>(fB) + fGMinusHalf);
-    const long double fResult = std::exp(-static_cast<long double>(fA) * std::log1p(fTempA)
-                                         - static_cast<long double>(fB) * std::log1p(fTempB)
-                                         - fGMinusHalf)
-                                * fLanczos;
-    return static_cast<double>(fResult);
-}
-
-[[nodiscard]] double betaPdf(double fX, double fAlpha, double fBeta)
-{
-    if (fAlpha == 1.0)
-    {
-        if (fBeta == 1.0)
-            return 1.0;
-        if (fBeta == 2.0)
-            return -2.0 * fX + 2.0;
-        if (fX == 1.0 && fBeta < 1.0)
-            return HUGE_VAL;
-        if (fX <= 0.01)
-            return fBeta + fBeta * std::expm1((fBeta - 1.0) * std::log1p(-fX));
-        return fBeta * std::pow((0.5 - fX) + 0.5, fBeta - 1.0);
-    }
-    if (fBeta == 1.0)
-    {
-        if (fAlpha == 2.0)
-            return fAlpha * fX;
-        if (fX == 0.0 && fAlpha < 1.0)
-            return HUGE_VAL;
-        return fAlpha * std::pow(fX, fAlpha - 1.0);
-    }
-
-    if (fX <= 0.0)
-    {
-        if (fX == 0.0 && fAlpha < 1.0)
-            return HUGE_VAL;
-        return 0.0;
-    }
-    if (fX >= 1.0)
-    {
-        if (fX == 1.0 && fBeta < 1.0)
-            return HUGE_VAL;
-        return 0.0;
-    }
-
-    const double fLogDoubleMax = std::log(std::numeric_limits<double>::max());
-    const double fLogDoubleMin = std::log(std::numeric_limits<double>::min());
-    const double fLogY = fX < 0.1 ? std::log1p(-fX) : std::log((0.5 - fX) + 0.5);
-    const double fLogX = std::log(fX);
-    const double fAlphaMinusOneLogX = (fAlpha - 1.0) * fLogX;
-    const double fBetaMinusOneLogY = (fBeta - 1.0) * fLogY;
-    const double fLogBeta = logBeta(fAlpha, fBeta);
-    if (fAlphaMinusOneLogX < fLogDoubleMax && fAlphaMinusOneLogX > fLogDoubleMin
-        && fBetaMinusOneLogY < fLogDoubleMax && fBetaMinusOneLogY > fLogDoubleMin
-        && fLogBeta < fLogDoubleMax && fLogBeta > fLogDoubleMin
-        && fAlphaMinusOneLogX + fBetaMinusOneLogY < fLogDoubleMax
-        && fAlphaMinusOneLogX + fBetaMinusOneLogY > fLogDoubleMin)
-    {
-        return std::pow(fX, fAlpha - 1.0) * std::pow((0.5 - fX) + 0.5, fBeta - 1.0)
-               / betaValue(fAlpha, fBeta);
-    }
-
-    return static_cast<double>(std::exp((static_cast<long double>(fAlpha) - 1.0L)
-                                            * static_cast<long double>(fLogX)
-                                        + (static_cast<long double>(fBeta) - 1.0L)
-                                              * static_cast<long double>(fLogY)
-                                        - static_cast<long double>(fLogBeta)));
-}
-
-[[nodiscard]] double betaContinuedFraction(double fX, double fAlpha, double fBeta)
-{
-    double fA1 = 1.0;
-    double fB1 = 1.0;
-    double fB2 = 1.0 - (fAlpha + fBeta) / (fAlpha + 1.0) * fX;
-    double fA2 = 1.0;
-    double fNorm = 1.0;
-    double fCurrent = 1.0;
-    if (!::rtl::math::approxEqual(fB2, 0.0))
-    {
-        fNorm = 1.0 / fB2;
-        fCurrent = fA2 * fNorm;
-    }
-    else
-        fA2 = 0.0;
-
-    double fNext = fCurrent;
-    for (double fM = 1.0; fM < 50000.0; fM += 1.0)
-    {
-        const double fAlphaPlus2M = fAlpha + 2.0 * fM;
-        const double fEven = fM * (fBeta - fM) * fX / ((fAlphaPlus2M - 1.0) * fAlphaPlus2M);
-        const double fOdd = -(fAlpha + fM) * (fAlpha + fBeta + fM) * fX
-                            / (fAlphaPlus2M * (fAlphaPlus2M + 1.0));
-        fA1 = (fA2 + fEven * fA1) * fNorm;
-        fB1 = (fB2 + fEven * fB1) * fNorm;
-        fA2 = fA1 + fOdd * fA2 * fNorm;
-        fB2 = fB1 + fOdd * fB2 * fNorm;
-        if (::rtl::math::approxEqual(fB2, 0.0))
-            continue;
-
-        fNorm = 1.0 / fB2;
-        fNext = fA2 * fNorm;
-        if (std::abs(fCurrent - fNext) <= std::abs(fCurrent) * std::numeric_limits<double>::epsilon())
-            return fNext;
-        fCurrent = fNext;
-    }
-
-    return fCurrent;
-}
-
-[[nodiscard]] double betaCdf(double fInput, double fAlpha, double fBeta)
-{
-    if (fInput <= 0.0)
-        return 0.0;
-    if (fInput >= 1.0)
-        return 1.0;
-    if (fBeta == 1.0)
-        return std::pow(fInput, fAlpha);
-    if (fAlpha == 1.0)
-        return -std::expm1(fBeta * std::log1p(-fInput));
-
-    double fX = fInput;
-    double fY = 1.0 - fInput;
-    double fLnX = std::log(fInput);
-    double fLnY = std::log1p(-fInput);
-    double fA = fAlpha;
-    double fB = fBeta;
-    const bool bReflect = fInput > fAlpha / (fAlpha + fBeta);
-    if (bReflect)
-    {
-        fA = fBeta;
-        fB = fAlpha;
-        fX = fY;
-        fY = fInput;
-        fLnX = fLnY;
-        fLnY = std::log(fInput);
-    }
-
-    double fResult = betaContinuedFraction(fX, fA, fB) / fA;
-    const double fP = fA / (fA + fB);
-    const double fQ = fB / (fA + fB);
-    double fScale = 0.0;
-    if (fA > 1.0 && fB > 1.0 && fP < 0.97 && fQ < 0.97)
-        fScale = betaPdf(fX, fA, fB) * fX * fY;
-    else
-        fScale = std::exp(fA * fLnX + fB * fLnY - logBeta(fA, fB));
-    fResult *= fScale;
-    if (bReflect)
-        fResult = 1.0 - fResult;
-    return std::clamp(fResult, 0.0, 1.0);
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateBetaDistribution(double fX, double fAlpha,
-    double fBeta, double fLowerBound, double fUpperBound, bool bCumulative, bool bMicrosoftOrder)
-{
-    const double fScale = fUpperBound - fLowerBound;
-    if (fScale <= 0.0 || fAlpha <= 0.0 || fBeta <= 0.0)
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    if (bCumulative)
-    {
-        if (!bMicrosoftOrder)
-        {
-            if (fX < fLowerBound)
-                return api::ValueResult<double>::success(0.0);
-            if (fX > fUpperBound)
-                return api::ValueResult<double>::success(1.0);
-        }
-        else if (fX < fLowerBound || fX > fUpperBound)
-            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-        const double fStandardX = (fX - fLowerBound) / fScale;
-        return api::ValueResult<double>::success(betaCdf(fStandardX, fAlpha, fBeta));
-    }
-
-    if (!bMicrosoftOrder)
-    {
-        if (fX < fLowerBound || fX > fUpperBound)
-            return api::ValueResult<double>::success(0.0);
-    }
-    else if (fX < fLowerBound || fX > fUpperBound)
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    const double fStandardX = (fX - fLowerBound) / fScale;
-    if ((::rtl::math::approxEqual(fStandardX, 0.0) && fAlpha < 1.0)
-        || (::rtl::math::approxEqual(fStandardX, 1.0) && fBeta < 1.0))
-    {
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    }
-
-    return api::ValueResult<double>::success(betaPdf(fStandardX, fAlpha, fBeta) / fScale);
-}
-
-[[nodiscard]] double binomialLogPmf(double fSuccesses, double fTrials, double fProbability)
-{
-    return std::lgamma(fTrials + 1.0) - std::lgamma(fSuccesses + 1.0)
-           - std::lgamma(fTrials - fSuccesses + 1.0) + fSuccesses * std::log(fProbability)
-           + (fTrials - fSuccesses) * std::log1p(-fProbability);
-}
-
 [[nodiscard]] api::ValueResult<double> gammaContinuedFraction(double fAlpha, double fX)
 {
     constexpr double fHalfMachEps = 0.5 * std::numeric_limits<double>::epsilon();
@@ -2944,154 +2716,6 @@ struct LookupInput
     return upRegularizedIncompleteGamma(fDegreesFreedom / 2.0, fChi / 2.0);
 }
 
-[[nodiscard]] double sumExpProbabilityRange(
-    sal_Int32 nStart, sal_Int32 nEnd, const std::function<double(sal_Int32)>& rLogProbability)
-{
-    if (nEnd < nStart)
-        return 0.0;
-
-    double fMaxLog = -std::numeric_limits<double>::infinity();
-    for (sal_Int32 nIndex = nStart; nIndex <= nEnd; ++nIndex)
-        fMaxLog = std::max(fMaxLog, rLogProbability(nIndex));
-    if (!std::isfinite(fMaxLog))
-        return 0.0;
-
-    KahanSum fSum = 0.0;
-    for (sal_Int32 nIndex = nStart; nIndex <= nEnd; ++nIndex)
-        fSum += std::exp(rLogProbability(nIndex) - fMaxLog);
-    return std::exp(fMaxLog) * fSum.get();
-}
-
-[[nodiscard]] api::ValueResult<double> evaluatePoissonDistribution(
-    double fX, double fLambda, bool bCumulative)
-{
-    if (fLambda <= 0.0 || fX < 0.0)
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    const sal_Int32 nX = static_cast<sal_Int32>(::rtl::math::approxFloor(fX));
-    const auto logProbability = [fLambda](sal_Int32 nValue) {
-        return static_cast<double>(nValue) * std::log(fLambda) - fLambda
-               - std::lgamma(static_cast<double>(nValue) + 1.0);
-    };
-
-    if (!bCumulative)
-        return api::ValueResult<double>::success(std::exp(logProbability(nX)));
-
-    return api::ValueResult<double>::success(
-        std::min(1.0, sumExpProbabilityRange(0, nX, logProbability)));
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateBinomialDistribution(
-    double fSuccesses, double fTrials, double fProbability, bool bCumulative)
-{
-    const double fN = ::rtl::math::approxFloor(fTrials);
-    const double fX = ::rtl::math::approxFloor(fSuccesses);
-    if (fN < 0.0 || fX < 0.0 || fX > fN || fProbability < 0.0 || fProbability > 1.0)
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-
-    if (::rtl::math::approxEqual(fProbability, 0.0))
-        return api::ValueResult<double>::success((::rtl::math::approxEqual(fX, 0.0) || bCumulative) ? 1.0
-                                                                                                     : 0.0);
-    if (::rtl::math::approxEqual(fProbability, 1.0))
-        return api::ValueResult<double>::success(::rtl::math::approxEqual(fX, fN) ? 1.0 : 0.0);
-
-    const sal_Int32 nN = static_cast<sal_Int32>(fN);
-    const sal_Int32 nX = static_cast<sal_Int32>(fX);
-    const double fQ = (0.5 - fProbability) + 0.5;
-    auto accumulateRange = [&](sal_Int32 nStart, sal_Int32 nEnd, double fTerm,
-                               double fNumeratorProbability,
-                               double fDenominatorProbability) {
-        for (sal_Int32 nIndex = 1; nIndex <= nStart && fTerm > 0.0; ++nIndex)
-            fTerm *= (fN - static_cast<double>(nIndex) + 1.0) / static_cast<double>(nIndex)
-                     * fNumeratorProbability / fDenominatorProbability;
-
-        KahanSum fSum = fTerm;
-        for (sal_Int32 nIndex = nStart + 1; nIndex <= nEnd && fTerm > 0.0; ++nIndex)
-        {
-            fTerm *= (fN - static_cast<double>(nIndex) + 1.0) / static_cast<double>(nIndex)
-                     * fNumeratorProbability / fDenominatorProbability;
-            fSum += fTerm;
-        }
-        return std::min(1.0, fSum.get());
-    };
-
-    const auto logProbability = [fN, fProbability](sal_Int32 nValue) {
-        return binomialLogPmf(static_cast<double>(nValue), fN, fProbability);
-    };
-
-    if (!bCumulative)
-        return api::ValueResult<double>::success(std::exp(logProbability(nX)));
-
-    if (nX == nN)
-        return api::ValueResult<double>::success(1.0);
-
-    const double fLowTerm = std::pow(fQ, fN);
-    if (fLowTerm > std::numeric_limits<double>::min())
-        return api::ValueResult<double>::success(accumulateRange(0, nX, fLowTerm, fProbability, fQ));
-
-    const double fHighTerm = std::pow(fProbability, fN);
-    if (fHighTerm > std::numeric_limits<double>::min())
-    {
-        const double fTail = accumulateRange(0, nN - nX - 1, fHighTerm, fQ, fProbability);
-        return api::ValueResult<double>::success(std::max(0.0, 1.0 - fTail));
-    }
-
-    return api::ValueResult<double>::success(std::min(1.0, sumExpProbabilityRange(0, nX, logProbability)));
-}
-
-[[nodiscard]] api::ValueResult<double> evaluateBinomialRangeDistribution(
-    double fTrials, double fProbability, double fSuccessStart, double fSuccessEnd)
-{
-    const double fN = ::rtl::math::approxFloor(fTrials);
-    const double fStart = ::rtl::math::approxFloor(fSuccessStart);
-    const double fEnd = ::rtl::math::approxFloor(fSuccessEnd);
-    if (fN < 0.0 || fStart < 0.0 || fStart > fEnd || fEnd > fN || fProbability < 0.0
-        || fProbability > 1.0)
-    {
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    }
-
-    if (::rtl::math::approxEqual(fProbability, 0.0))
-        return api::ValueResult<double>::success(::rtl::math::approxEqual(fStart, 0.0) ? 1.0 : 0.0);
-    if (::rtl::math::approxEqual(fProbability, 1.0))
-        return api::ValueResult<double>::success(::rtl::math::approxEqual(fEnd, fN) ? 1.0 : 0.0);
-
-    const sal_Int32 nN = static_cast<sal_Int32>(fN);
-    const sal_Int32 nStart = static_cast<sal_Int32>(fStart);
-    const sal_Int32 nEnd = static_cast<sal_Int32>(fEnd);
-    const double fQ = (0.5 - fProbability) + 0.5;
-    auto accumulateRange = [&](sal_Int32 nRangeStart, sal_Int32 nRangeEnd, double fTerm,
-                               double fNumeratorProbability,
-                               double fDenominatorProbability) {
-        for (sal_Int32 nIndex = 1; nIndex <= nRangeStart && fTerm > 0.0; ++nIndex)
-            fTerm *= (fN - static_cast<double>(nIndex) + 1.0) / static_cast<double>(nIndex)
-                     * fNumeratorProbability / fDenominatorProbability;
-
-        KahanSum fSum = fTerm;
-        for (sal_Int32 nIndex = nRangeStart + 1; nIndex <= nRangeEnd && fTerm > 0.0; ++nIndex)
-        {
-            fTerm *= (fN - static_cast<double>(nIndex) + 1.0) / static_cast<double>(nIndex)
-                     * fNumeratorProbability / fDenominatorProbability;
-            fSum += fTerm;
-        }
-        return std::min(1.0, fSum.get());
-    };
-
-    const double fLowTerm = std::pow(fQ, fN);
-    if (fLowTerm > std::numeric_limits<double>::min())
-        return api::ValueResult<double>::success(accumulateRange(nStart, nEnd, fLowTerm, fProbability, fQ));
-
-    const double fHighTerm = std::pow(fProbability, fN);
-    if (fHighTerm > std::numeric_limits<double>::min())
-        return api::ValueResult<double>::success(accumulateRange(
-            nN - nEnd, nN - nStart, fHighTerm, fQ, fProbability));
-
-    const auto logProbability = [fN, fProbability](sal_Int32 nValue) {
-        return binomialLogPmf(static_cast<double>(nValue), fN, fProbability);
-    };
-    return api::ValueResult<double>::success(sumExpProbabilityRange(nStart, nEnd, logProbability));
-}
-
 [[nodiscard]] api::ValueResult<double> evaluateBinomialInverse(
     double fTrials, double fProbability, double fAlpha)
 {
@@ -3113,7 +2737,7 @@ struct LookupInput
     while (nLow < nHigh)
     {
         const sal_Int32 nMid = nLow + ((nHigh - nLow) / 2);
-        const auto aDistribution = evaluateBinomialDistribution(
+        const auto aDistribution = semath::evaluateBinomialDistribution(
             static_cast<double>(nMid), fN, fProbability, true);
         if (!aDistribution)
             return aDistribution;
@@ -3242,20 +2866,23 @@ struct LookupInput
     switch (nType)
     {
         case 1:
-            return api::ValueResult<double>::success(0.5
-                * betaCdf(fDegreesFreedom / (fDegreesFreedom + fT * fT), fDegreesFreedom / 2.0,
-                    0.5));
+            return api::ValueResult<double>::success(
+                0.5 * semath::betaCdf(
+                          fDegreesFreedom / (fDegreesFreedom + fT * fT),
+                          fDegreesFreedom / 2.0, 0.5));
         case 2:
-            return api::ValueResult<double>::success(betaCdf(
+            return api::ValueResult<double>::success(semath::betaCdf(
                 fDegreesFreedom / (fDegreesFreedom + fT * fT), fDegreesFreedom / 2.0, 0.5));
         case 3:
             return api::ValueResult<double>::success(
                 std::pow(1.0 + (fT * fT / fDegreesFreedom), -(fDegreesFreedom + 1.0) / 2.0)
-                / (std::sqrt(fDegreesFreedom) * betaValue(0.5, fDegreesFreedom / 2.0)));
+                / (std::sqrt(fDegreesFreedom)
+                   * semath::betaValue(0.5, fDegreesFreedom / 2.0)));
         case 4:
         {
             const double fX = fDegreesFreedom / (fT * fT + fDegreesFreedom);
-            const double fRightHalf = 0.5 * betaCdf(fX, 0.5 * fDegreesFreedom, 0.5);
+            const double fRightHalf = 0.5 * semath::betaCdf(
+                                                fX, 0.5 * fDegreesFreedom, 0.5);
             return api::ValueResult<double>::success(fT < 0.0 ? fRightHalf : 1.0 - fRightHalf);
         }
         default:
@@ -3354,8 +2981,8 @@ template <typename DistributionFn>
 
     const double fArgument
         = fDegreesFreedom2 / (fDegreesFreedom2 + fDegreesFreedom1 * fX);
-    return api::ValueResult<double>::success(
-        betaCdf(fArgument, fDegreesFreedom2 / 2.0, fDegreesFreedom1 / 2.0));
+    return api::ValueResult<double>::success(semath::betaCdf(
+        fArgument, fDegreesFreedom2 / 2.0, fDegreesFreedom1 / 2.0));
 }
 
 [[nodiscard]] api::ValueResult<double> evaluateFInverseRightTail(
@@ -5729,11 +5356,13 @@ EvaluationResult Evaluator::evaluateFunction(
         if (rNode.maChildren.size() != 1)
             return makeFailure(api::Error::IllegalArgument);
 
-        EvaluationResult aArgument
-            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        EvaluationResult aArgument = evaluateNode(*rNode.maChildren[0], rCurrentAddress);
+        if (aArgument && !aArgument.maValue.isScalar())
+            aArgument = materializeReferenceValue(aArgument.maValue.maReference, 0, 0);
         if (!aArgument)
             return makeScalarResult(api::CellValue::boolean(false));
-        return makeScalarResult(api::CellValue::boolean(aArgument.maValue.maValue.isNumber()));
+        return makeScalarResult(api::CellValue::boolean(
+            aArgument.maValue.maValue.isNumber() || aArgument.maValue.maValue.isBoolean()));
     }
 
     if (aFunctionName == u"ISNA")
@@ -5967,10 +5596,10 @@ EvaluationResult Evaluator::evaluateFunction(
         const auto aNumber = coerceToNumber(aArgument.maValue.maValue);
         if (!aNumber)
             return makeFailure(aNumber.meError);
-        if (aNumber.maValue <= -1.0 || aNumber.maValue >= 1.0)
-            return makeFailure(api::Error::Domain);
-        return makeScalarResult(api::CellValue::number(
-            0.5 * std::log((1.0 + aNumber.maValue) / (1.0 - aNumber.maValue))));
+        const auto aFisher = semath::fisherTransform(aNumber.maValue);
+        if (!aFisher)
+            return makeFailure(aFisher.meError);
+        return makeScalarResult(api::CellValue::number(aFisher.maValue));
     }
 
     if (aFunctionName == u"FISHERINV")
@@ -5985,7 +5614,8 @@ EvaluationResult Evaluator::evaluateFunction(
         const auto aNumber = coerceToNumber(aArgument.maValue.maValue);
         if (!aNumber)
             return makeFailure(aNumber.meError);
-        return makeScalarResult(api::CellValue::number(std::tanh(aNumber.maValue)));
+        return makeScalarResult(
+            api::CellValue::number(semath::inverseFisherTransform(aNumber.maValue)));
     }
 
     if (aFunctionName == u"ATANH")
@@ -6559,7 +6189,7 @@ EvaluationResult Evaluator::evaluateFunction(
             bCumulative = aCumulativeBool.maValue;
         }
 
-        const auto aPoisson = evaluatePoissonDistribution(
+        const auto aPoisson = semath::evaluatePoissonDistribution(
             aXNumber.maValue, aLambdaNumber.maValue, bCumulative);
         if (!aPoisson)
             return makeFailure(aPoisson.meError);
@@ -6938,7 +6568,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aCumulativeBool)
             return makeFailure(aCumulativeBool.meError);
 
-        const auto aBinomial = evaluateBinomialDistribution(
+        const auto aBinomial = semath::evaluateBinomialDistribution(
             aXNumber.maValue, aNNumber.maValue, aPNumber.maValue, aCumulativeBool.maValue);
         if (!aBinomial)
             return makeFailure(aBinomial.meError);
@@ -7008,7 +6638,7 @@ EvaluationResult Evaluator::evaluateFunction(
             fEnd = aEndNumber.maValue;
         }
 
-        const auto aRange = evaluateBinomialRangeDistribution(
+        const auto aRange = semath::evaluateBinomialRangeDistribution(
             aNNumber.maValue, aPNumber.maValue, aStartNumber.maValue, fEnd);
         if (!aRange)
             return makeFailure(aRange.meError);
@@ -7322,7 +6952,7 @@ EvaluationResult Evaluator::evaluateFunction(
             }
         }
 
-        const auto aBetaDistribution = evaluateBetaDistribution(aXNumber.maValue,
+        const auto aBetaDistribution = semath::evaluateBetaDistribution(aXNumber.maValue,
             aAlphaNumber.maValue, aBetaNumber.maValue, fLowerBound, fUpperBound, bCumulative,
             bMicrosoftOrder);
         if (!aBetaDistribution)
@@ -7715,14 +7345,14 @@ EvaluationResult Evaluator::evaluateFunction(
             if (aValueNumber.maValue < 0.0 && fMode != 0.0)
                 fResult = ::rtl::math::approxFloor(aValueNumber.maValue / fMagnitude) * fMagnitude;
             else
-                fResult = ::rtl::math::approxCeil(aValueNumber.maValue / fMagnitude) * fMagnitude;
+                fResult = core::math::computeCeilingPrecise(aValueNumber.maValue, fMagnitude);
         }
         else
         {
             if (aValueNumber.maValue < 0.0 && fMode != 0.0)
                 fResult = ::rtl::math::approxCeil(aValueNumber.maValue / fMagnitude) * fMagnitude;
             else
-                fResult = ::rtl::math::approxFloor(aValueNumber.maValue / fMagnitude) * fMagnitude;
+                fResult = core::math::computeFloorPrecise(aValueNumber.maValue, fMagnitude);
         }
 
         return makeScalarResult(api::CellValue::number(fResult));
@@ -9624,8 +9254,11 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!oWholeNumber || *oWholeNumber < 1 || *oWholeNumber > 255)
             return makeFailure(api::Error::IllegalArgument);
 
-        return makeScalarResult(api::CellValue::text(
-            api::String(1, static_cast<char16_t>(*oWholeNumber))));
+        const auto aCharacter = api::text::charFromValue(
+            evaluatorEncodingService(), static_cast<double>(*oWholeNumber));
+        if (!aCharacter)
+            return makeFailure(aCharacter.meError);
+        return makeScalarResult(api::CellValue::text(aCharacter.maValue));
     }
 
     if (aFunctionName == u"CODE")
@@ -9644,8 +9277,8 @@ EvaluationResult Evaluator::evaluateFunction(
         if (aText.maValue.empty())
             return makeFailure(api::Error::IllegalArgument);
 
-        return makeScalarResult(api::CellValue::number(
-            static_cast<double>(static_cast<unsigned char>(aText.maValue.front() & 0x00FF))));
+        return makeScalarResult(api::CellValue::number(static_cast<double>(
+            api::text::codeFromText(evaluatorEncodingService(), aText.maValue))));
     }
 
     if (aFunctionName == u"ADDRESS")
@@ -10264,8 +9897,10 @@ EvaluationResult Evaluator::evaluateFunction(
             return makeFailure(aText.meError);
 
         const api::String aResult = aFunctionName == u"UPPER"
-                                        ? uppercaseText(aText.maValue)
-                                        : lowercaseText(aText.maValue);
+                                        ? api::text::uppercase(
+                                              evaluatorCaseMappingService(), aText.maValue)
+                                        : api::text::lowercase(
+                                              evaluatorCaseMappingService(), aText.maValue);
         return makeScalarResult(api::CellValue::text(aResult));
     }
 
@@ -12138,6 +11773,6 @@ EvaluationResult Evaluator::evaluateCellViaCompiledTokens(const api::CellAddress
     return evaluateCellInternal(rAddress, ExecutionMode::CompiledToken);
 }
 
-} // namespace spreadsheetengine::core::fods
+} // namespace spreadsheetengine::core::eval
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

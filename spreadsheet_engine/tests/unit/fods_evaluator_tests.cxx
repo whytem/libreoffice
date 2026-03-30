@@ -6,7 +6,7 @@
 #include <limits>
 
 #include <spreadsheetengine/api/Calendar.hxx>
-#include <spreadsheetengine/detail/FodsEvaluator.hxx>
+#include <spreadsheetengine/detail/FormulaEvaluator.hxx>
 #include <spreadsheetengine/detail/FodsLoader.hxx>
 
 #include "TestSupport.hxx"
@@ -18,7 +18,7 @@ using spreadsheetengine::api::CellAddress;
 using spreadsheetengine::api::CellValue;
 using spreadsheetengine::api::DateParts;
 using spreadsheetengine::api::calendar::makeDateSerial;
-using spreadsheetengine::core::fods::Evaluator;
+using spreadsheetengine::core::eval::Evaluator;
 using spreadsheetengine::core::workbook::Cell;
 using spreadsheetengine::core::workbook::NamedRange;
 using spreadsheetengine::core::workbook::Sheet;
@@ -92,6 +92,10 @@ Workbook makeWorkbook()
     aTypedTimeCell.maRawValueType = u"time";
     aTypedTimeCell.maRawValue = u"PT00H01M26.47S";
     aSheet1.setCell(10, 1, aTypedTimeCell);
+    Cell aTypedDateCell { CellValue::text(u"01/01/1000") };
+    aTypedDateCell.maRawValueType = u"date";
+    aTypedDateCell.maRawValue = u"1000-01-06";
+    aSheet1.setCell(10, 2, aTypedDateCell);
     aSheet1.setCell(
         11, 1, Cell { CellValue::number(1.0), u"of:=COUNTIF([.K2:.K2];\"=\"&[.K2])" });
     aSheet1.setCell(12, 2, Cell { CellValue::text(u"A") });
@@ -236,6 +240,23 @@ int main()
         }
         return 0;
     };
+    auto requireLiveNumericCell = [&](const CellAddress& rAddress, const char* pMessage,
+                                      bool bCompiled = false) -> int {
+        const auto aResult = bCompiled ? aEvaluator.evaluateCellViaCompiledTokens(rAddress)
+                                       : aEvaluator.evaluateCell(rAddress);
+        if (!aResult || aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber())
+            return fail("spreadsheetengine_fods_evaluator_tests", pMessage);
+        return 0;
+    };
+    auto requireBooleanFormula = [&](const auto& rResult, bool bExpected,
+                                     const char* pMessage) -> int {
+        if (!rResult || rResult.mbUsedCachedValue || !rResult.maValue.maValue.isBoolean()
+            || !almostEqual(rResult.maValue.maValue.mfNumber, bExpected ? 1.0 : 0.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", pMessage);
+        }
+        return 0;
+    };
 
     {
         const auto aResult = aEvaluator.evaluateCell({ 0, 1, 0 });
@@ -309,6 +330,47 @@ int main()
         {
             return fail("spreadsheetengine_fods_evaluator_tests", "ISERROR() mismatch");
         }
+    }
+
+    if (requireLiveNumericCell({ 0, 10, 2 },
+            "typed stored date cell materialization mismatch"))
+    {
+        return 1;
+    }
+
+    if (requireLiveNumericCell({ 0, 10, 2 },
+            "compiled typed stored date cell materialization mismatch", true))
+    {
+        return 1;
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateFormula(u"of:=ISNUMBER([.K3])", { 0, 0, 0 });
+        if (requireBooleanFormula(aResult, true, "typed stored date ISNUMBER mismatch"))
+            return 1;
+    }
+
+    {
+        const auto aResult
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=ISNUMBER([.K3])", { 0, 0, 0 });
+        if (requireBooleanFormula(
+                aResult, true, "compiled typed stored date ISNUMBER mismatch"))
+        {
+            return 1;
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateFormula(u"of:=ISNUMBER(TRUE())", { 0, 0, 0 });
+        if (requireBooleanFormula(aResult, true, "ISNUMBER(TRUE()) mismatch"))
+            return 1;
+    }
+
+    {
+        const auto aResult
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=ISNUMBER(TRUE())", { 0, 0, 0 });
+        if (requireBooleanFormula(aResult, true, "compiled ISNUMBER(TRUE()) mismatch"))
+            return 1;
     }
 
     {

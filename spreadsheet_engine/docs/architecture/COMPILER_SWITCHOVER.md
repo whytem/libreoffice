@@ -41,7 +41,7 @@ Today the two worlds are still split:
 - Calc production formulas are compiled by Calc
 - standalone FODS replay parses formulas through:
   - `spreadsheetengine/detail/OdfFormulaParser.hxx`
-  - `spreadsheetengine/detail/FodsEvaluator.hxx`
+  - `spreadsheetengine/detail/FormulaEvaluator.hxx`
 
 The token/compiler-host milestone created the platform needed for convergence:
 
@@ -113,7 +113,7 @@ support to run the compiled formulas already covered by standalone FODS replay.
   - [WorkbookModel.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/detail/WorkbookModel.hxx)
   - [FodsLoader.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/detail/FodsLoader.hxx)
   - [OdfFormulaParser.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/detail/OdfFormulaParser.hxx)
-  - [FodsEvaluator.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/detail/FodsEvaluator.hxx)
+  - [FormulaEvaluator.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/detail/FormulaEvaluator.hxx)
 - enabled raw FODS replay families:
   - logical
   - mathematical

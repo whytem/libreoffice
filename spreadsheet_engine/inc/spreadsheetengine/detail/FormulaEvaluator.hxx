@@ -17,7 +17,7 @@
 #include <spreadsheetengine/detail/TokenModel.hxx>
 #include <spreadsheetengine/detail/WorkbookModel.hxx>
 
-namespace spreadsheetengine::core::fods
+namespace spreadsheetengine::core::eval
 {
 
 struct EvaluationResult
@@ -108,6 +108,6 @@ public:
         const api::CellAddress& rAddress);
 };
 
-} // namespace spreadsheetengine::core::fods
+} // namespace spreadsheetengine::core::eval
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
