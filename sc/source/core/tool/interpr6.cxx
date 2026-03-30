@@ -36,8 +36,6 @@ using namespace formula;
 namespace semath = spreadsheetengine::core::math;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 
-double const fHalfMachEps = 0.5 * ::std::numeric_limits<double>::epsilon();
-
 namespace
 {
 
@@ -48,110 +46,6 @@ FormulaError lcl_ToCalcMathFormulaError(spreadsheetengine::api::Error eError)
     return selibreoffice::toFormulaError(eError);
 }
 
-}
-
-// The idea how this group of gamma functions is calculated, is
-// based on the Cephes library
-// online http://www.moshier.net/#Cephes [called 2008-02]
-
-/** You must ensure fA>0.0 && fX>0.0
-    valid results only if fX > fA+1.0
-    uses continued fraction with odd items */
-double ScInterpreter::GetGammaContFraction( double fA, double fX )
-{
-
-    double const fBigInv = ::std::numeric_limits<double>::epsilon();
-    double const fBig = 1.0/fBigInv;
-    double fCount = 0.0;
-    double fY = 1.0 - fA;
-    double fDenom = fX + 2.0-fA;
-    double fPkm1 = fX + 1.0;
-    double fPkm2 = 1.0;
-    double fQkm1 = fDenom * fX;
-    double fQkm2 = fX;
-    double fApprox = fPkm1/fQkm1;
-    bool bFinished = false;
-    do
-    {
-        fCount = fCount +1.0;
-        fY = fY+ 1.0;
-        const double fNum = fY * fCount;
-        fDenom = fDenom +2.0;
-        double fPk = fPkm1 * fDenom  -  fPkm2 * fNum;
-        const double fQk = fQkm1 * fDenom  -  fQkm2 * fNum;
-        if (fQk != 0.0)
-        {
-            const double fR = fPk/fQk;
-            bFinished = (fabs( (fApprox - fR)/fR ) <= fHalfMachEps);
-            fApprox = fR;
-        }
-        fPkm2 = fPkm1;
-        fPkm1 = fPk;
-        fQkm2 = fQkm1;
-        fQkm1 = fQk;
-        if (fabs(fPk) > fBig)
-        {
-            // reduce a fraction does not change the value
-            fPkm2 = fPkm2 * fBigInv;
-            fPkm1 = fPkm1 * fBigInv;
-            fQkm2 = fQkm2 * fBigInv;
-            fQkm1 = fQkm1 * fBigInv;
-        }
-    } while (!bFinished && fCount<10000);
-    // most iterations, if fX==fAlpha+1.0; approx sqrt(fAlpha) iterations then
-    if (!bFinished)
-    {
-        SetError(FormulaError::NoConvergence);
-    }
-    return fApprox;
-}
-
-/** You must ensure fA>0.0 && fX>0.0
-    valid results only if fX <= fA+1.0
-    uses power series */
-double ScInterpreter::GetGammaSeries( double fA, double fX )
-{
-    double fDenomfactor = fA;
-    double fSummand = o3tl::div_allow_zero(1.0, fA);
-    double fSum = fSummand;
-    int nCount=1;
-    do
-    {
-        fDenomfactor = fDenomfactor + 1.0;
-        fSummand = fSummand * fX/fDenomfactor;
-        fSum = fSum + fSummand;
-        nCount = nCount+1;
-    } while ( fSummand/fSum > fHalfMachEps && nCount<=10000);
-    // large amount of iterations will be carried out for huge fAlpha, even
-    // if fX <= fAlpha+1.0
-    if (nCount>10000)
-    {
-        SetError(FormulaError::NoConvergence);
-    }
-    return fSum;
-}
-
-/** You must ensure fA>0.0 && fX>0.0) */
-double ScInterpreter::GetLowRegIGamma( double fA, double fX )
-{
-    double fLnFactor = fA * log(fX) - fX - GetLogGamma(fA);
-    double fFactor = exp(fLnFactor);    // Do we need more accuracy than exp(ln()) has?
-    if (fX>fA+1.0)  // includes fX>1.0; 1-GetUpRegIGamma, continued fraction
-        return 1.0 - fFactor * GetGammaContFraction(fA,fX);
-    else            // fX<=1.0 || fX<=fA+1.0, series
-        return fFactor * GetGammaSeries(fA,fX);
-}
-
-/** You must ensure fA>0.0 && fX>0.0) */
-double ScInterpreter::GetUpRegIGamma( double fA, double fX )
-{
-
-    double fLnFactor= fA*log(fX)-fX-GetLogGamma(fA);
-    double fFactor = exp(fLnFactor); //Do I need more accuracy than exp(ln()) has?;
-    if (fX>fA+1.0) // includes fX>1.0
-            return fFactor * GetGammaContFraction(fA,fX);
-    else //fX<=1 || fX<=fA+1, 1-GetLowRegIGamma, series
-            return 1.0 -fFactor * GetGammaSeries(fA,fX);
 }
 
 /** Gamma distribution, probability density function.

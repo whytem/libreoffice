@@ -695,43 +695,36 @@ shared-runtime targets.
 
 ### Inverse distribution iteration strategy
 
-Current mismatch:
+Resolved policy:
 
-- Calc uses `lcl_IterateInverse` with inverse quadratic interpolation and
-  bracketing
-- the evaluator currently uses bracket-doubling plus pure bisection
+- the shared runtime adopts Calc's original `lcl_IterateInverse` behavior as
+  the authoritative implementation
+- inverse-distribution call sites in both standalone and Calc now converge on
+  that single Brent-like interpolation-plus-bracketing strategy
+- the old standalone-only bracket-doubling / pure-bisection path should not be
+  reintroduced
 
-Decision needed:
+Why:
 
-- choose whether the shared runtime standard should be:
-  - Calc's current Brent-like behavior
-  - the current evaluator behavior
-  - a new shared implementation validated against both
-
-Recommended default:
-
-- converge on one shared runtime implementation and make both callers consume it
-- prefer the algorithm that gives the best combination of stability, parity,
-  and maintainability after empirical comparison
+- this minimizes edge-case drift against historical Calc behavior
+- it removes the need to maintain or validate two separate inverse solvers
 
 ### Gamma implementation strategy
 
-Current mismatch:
+Resolved policy:
 
-- Calc uses an explicit Lanczos-based implementation
-- the evaluator uses `std::tgamma` / `std::lgamma` in some remaining paths
+- the shared runtime adopts Calc's original Lanczos-based gamma implementation
+  for the behavior-sensitive gamma surfaces that were previously divergent
+- Calc now consumes that shared implementation instead of keeping a separate
+  local `GetGamma` / `GetLogGamma` copy
+- the old duplicated Calc-local gamma helper path should stay removed
 
-Decision needed:
+Why:
 
-- whether to standardize on:
-  - explicit shared Lanczos-based implementation
-  - standard-library gamma functions
-  - a split policy with documented rationale
-
-Recommended default:
-
-- choose a single shared implementation if parity and edge-case behavior allow
-- document and test any deliberate split if one remains necessary
+- this preserves Calc's established overflow, underflow, reflection, and
+  inverse-distribution edge behavior
+- it avoids a long-term split where Calc and standalone can silently drift on
+  the same mathematical family
 
 ## Validation Strategy
 

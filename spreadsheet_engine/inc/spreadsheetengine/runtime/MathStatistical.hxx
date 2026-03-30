@@ -21,6 +21,8 @@ SPREADSHEETENGINE_DLLPUBLIC double inverseFisherTransform(double fValue);
 
 SPREADSHEETENGINE_DLLPUBLIC double betaValue(double fAlpha, double fBeta);
 
+SPREADSHEETENGINE_DLLPUBLIC double logBetaValue(double fAlpha, double fBeta);
+
 SPREADSHEETENGINE_DLLPUBLIC double betaCdf(double fInput, double fAlpha, double fBeta);
 
 SPREADSHEETENGINE_DLLPUBLIC double gaussValue(double fValue);
@@ -65,6 +67,8 @@ SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateGammaInverse(
     double fProbability, double fAlpha, double fBeta);
 
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateGammaValue(double fX);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateLogGammaValue(double fX);
 
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateStudentDistribution(
     double fT, double fDegreesFreedom, int nType);

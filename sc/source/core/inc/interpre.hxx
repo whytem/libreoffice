@@ -999,8 +999,6 @@ private:
     double GetTDist( double T, double fDF, int nType );
     double Fakultaet(double x);
     static double BinomCoeff(double n, double k);
-    double GetGamma(double x);
-    static double GetLogGamma(double x);
     double GetBeta(double fAlpha, double fBeta);
     static double GetLogBeta(double fAlpha, double fBeta);
     double GetBinomDistPMF(double x, double n, double p); //probability mass function
@@ -1108,12 +1106,6 @@ private:
     void ScErf();
     void ScErfc();
 
-    static const double fMaxGammaArgument;
-
-    double GetGammaContFraction(double fA,double fX);
-    double GetGammaSeries(double fA,double fX);
-    double GetLowRegIGamma(double fA,double fX);    // lower regularized incomplete gamma function, GAMMAQ
-    double GetUpRegIGamma(double fA,double fX);     // upper regularized incomplete gamma function, GAMMAP
     // probability density function; fLambda is "scale" parameter
     double GetGammaDistPDF(double fX, double fAlpha, double fLambda);
     // cumulative distribution function; fLambda is "scale" parameter

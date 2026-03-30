@@ -86,34 +86,66 @@ namespace
     return fSumNum / fSumDenom;
 }
 
-[[nodiscard]] double logBeta(double fAlpha, double fBeta)
+constexpr double fMaxGammaArgument = 171.624376956302;
+constexpr double fLanczosG = 6.024680040776729583740234375;
+
+[[nodiscard]] double gammaHelperPositive(double fZ)
 {
-    double fA = fAlpha;
-    double fB = fBeta;
-    if (fB > fA)
-        std::swap(fA, fB);
+    double fGamma = lanczosSum(fZ);
+    const double fZgHelp = fZ + fLanczosG - 0.5;
+    const double fHalfpower = std::pow(fZgHelp, fZ / 2.0 - 0.25);
+    fGamma *= fHalfpower;
+    fGamma /= std::exp(fZgHelp);
+    fGamma *= fHalfpower;
+    if (fZ <= 20.0 && fZ == ::rtl::math::approxFloor(fZ))
+        fGamma = ::rtl::math::round(fGamma);
+    return fGamma;
+}
 
-    constexpr double fMaxGammaArgument = 171.624376956302;
-    if (fA + fB < fMaxGammaArgument)
-        return std::log(betaValue(fA, fB));
+[[nodiscard]] double logGammaHelperPositive(double fZ)
+{
+    const double fZgHelp = fZ + fLanczosG - 0.5;
+    return std::log(lanczosSum(fZ)) + (fZ - 0.5) * std::log(fZgHelp) - fZgHelp;
+}
 
-    constexpr long double fG = 6.024680040776729583740234375L;
-    const long double fGMinusHalf = fG - 0.5L;
-    long double fLanczos = static_cast<long double>(lanczosSum(fA));
-    fLanczos /= static_cast<long double>(lanczosSum(fA + fB));
-    fLanczos *= static_cast<long double>(lanczosSum(fB));
-    long double fLogLanczos = std::log(fLanczos);
-    const long double fABG = static_cast<long double>(fA + fB) + fGMinusHalf;
-    fLogLanczos += 0.5L
-                   * (std::log(fABG) - std::log(static_cast<long double>(fA) + fGMinusHalf)
-                      - std::log(static_cast<long double>(fB) + fGMinusHalf));
-    const long double fTempA
-        = static_cast<long double>(fB) / (static_cast<long double>(fA) + fGMinusHalf);
-    const long double fTempB
-        = static_cast<long double>(fA) / (static_cast<long double>(fB) + fGMinusHalf);
-    return static_cast<double>(-static_cast<long double>(fA) * std::log1p(fTempA)
-                               - static_cast<long double>(fB) * std::log1p(fTempB)
-                               - fGMinusHalf + fLogLanczos);
+[[nodiscard]] double logGammaValuePositive(double fZ)
+{
+    if (fZ >= fMaxGammaArgument)
+        return logGammaHelperPositive(fZ);
+    if (fZ >= 1.0)
+        return std::log(gammaHelperPositive(fZ));
+    if (fZ >= 0.5)
+        return std::log(gammaHelperPositive(fZ + 1.0) / fZ);
+    return logGammaHelperPositive(fZ + 2.0) - std::log1p(fZ) - std::log(fZ);
+}
+
+[[nodiscard]] double logBetaInternal(double fAlpha, double fBeta)
+{
+    double fA;
+    double fB;
+    if (fAlpha > fBeta)
+    {
+        fA = fAlpha;
+        fB = fBeta;
+    }
+    else
+    {
+        fA = fBeta;
+        fB = fAlpha;
+    }
+
+    const double fGMinusHalf = fLanczosG - 0.5;
+    double fLanczos = lanczosSum(fA);
+    fLanczos /= lanczosSum(fA + fB);
+    fLanczos *= lanczosSum(fB);
+    double fLogLanczos = std::log(fLanczos);
+    const double fABG = fA + fB + fGMinusHalf;
+    fLogLanczos += 0.5
+                   * (std::log(fABG) - std::log(fA + fGMinusHalf)
+                      - std::log(fB + fGMinusHalf));
+    const double fTempA = fB / (fA + fGMinusHalf);
+    const double fTempB = fA / (fB + fGMinusHalf);
+    return -fA * std::log1p(fTempA) - fB * std::log1p(fTempB) - fGMinusHalf + fLogLanczos;
 }
 
 [[nodiscard]] double betaPdf(double fX, double fAlpha, double fBeta)
@@ -158,7 +190,7 @@ namespace
     const double fLogX = std::log(fX);
     const double fAlphaMinusOneLogX = (fAlpha - 1.0) * fLogX;
     const double fBetaMinusOneLogY = (fBeta - 1.0) * fLogY;
-    const double fLogBeta = logBeta(fAlpha, fBeta);
+    const double fLogBeta = logBetaInternal(fAlpha, fBeta);
     if (fAlphaMinusOneLogX < fLogDoubleMax && fAlphaMinusOneLogX > fLogDoubleMin
         && fBetaMinusOneLogY < fLogDoubleMax && fBetaMinusOneLogY > fLogDoubleMin
         && fLogBeta < fLogDoubleMax && fLogBeta > fLogDoubleMin
@@ -221,8 +253,9 @@ namespace
 
 [[nodiscard]] double binomialLogPmf(double fSuccesses, double fTrials, double fProbability)
 {
-    return std::lgamma(fTrials + 1.0) - std::lgamma(fSuccesses + 1.0)
-           - std::lgamma(fTrials - fSuccesses + 1.0) + fSuccesses * std::log(fProbability)
+    return logGammaValuePositive(fTrials + 1.0) - logGammaValuePositive(fSuccesses + 1.0)
+           - logGammaValuePositive(fTrials - fSuccesses + 1.0)
+           + fSuccesses * std::log(fProbability)
            + (fTrials - fSuccesses) * std::log1p(-fProbability);
 }
 
@@ -324,84 +357,133 @@ namespace
     return api::ValueResult<double>::success(fSum);
 }
 
-template <typename DistributionFn>
-[[nodiscard]] api::ValueResult<double> invertMonotonicPositiveDistribution(
-    double fTarget, double fInitialHigh, bool bIncreasing, const DistributionFn& rDistribution)
+[[nodiscard]] bool hasChangeOfSign(double fLeft, double fRight)
 {
-    double fLow = 0.0;
-    double fHigh = std::max(1.0, fInitialHigh);
-    auto aHigh = rDistribution(fHigh);
-    if (!aHigh)
-        return aHigh;
-
-    bool bBracketed = bIncreasing ? (aHigh.maValue >= fTarget) : (aHigh.maValue <= fTarget);
-    for (int nIter = 0; !bBracketed && nIter < 128; ++nIter)
-    {
-        fHigh *= 2.0;
-        if (!std::isfinite(fHigh) || fHigh > 1.0e10)
-            return api::ValueResult<double>::failure(api::Error::NoConvergence);
-
-        aHigh = rDistribution(fHigh);
-        if (!aHigh)
-            return aHigh;
-        bBracketed = bIncreasing ? (aHigh.maValue >= fTarget) : (aHigh.maValue <= fTarget);
-    }
-
-    if (!bBracketed)
-        return api::ValueResult<double>::failure(api::Error::NoConvergence);
-
-    for (int nIter = 0; nIter < 160; ++nIter)
-    {
-        const double fMid = 0.5 * (fLow + fHigh);
-        const auto aMid = rDistribution(fMid);
-        if (!aMid)
-            return aMid;
-
-        if (bIncreasing ? (aMid.maValue < fTarget) : (aMid.maValue > fTarget))
-            fLow = fMid;
-        else
-            fHigh = fMid;
-    }
-
-    return api::ValueResult<double>::success(0.5 * (fLow + fHigh));
+    return (fLeft < 0.0 && fRight > 0.0) || (fLeft > 0.0 && fRight < 0.0);
 }
 
 template <typename DistributionFn>
-[[nodiscard]] api::ValueResult<double> invertMonotonicBoundedDistribution(
-    double fTarget, double fLow, double fHigh, bool bIncreasing, const DistributionFn& rDistribution)
+[[nodiscard]] api::ValueResult<double> iterateInverseCalcStyle(
+    double fAx, double fBx, const DistributionFn& rFunction)
 {
-    auto aLow = rDistribution(fLow);
-    if (!aLow)
-        return aLow;
-    auto aHigh = rDistribution(fHigh);
-    if (!aHigh)
-        return aHigh;
+    constexpr double fYEps = 1.0E-307;
+    constexpr double fXEps = std::numeric_limits<double>::epsilon();
 
-    if (::rtl::math::approxEqual(aLow.maValue, fTarget))
-        return api::ValueResult<double>::success(fLow);
-    if (::rtl::math::approxEqual(aHigh.maValue, fTarget))
-        return api::ValueResult<double>::success(fHigh);
+    if (!(fAx < fBx))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    const bool bBracketed = bIncreasing
-                                ? (aLow.maValue <= fTarget && fTarget <= aHigh.maValue)
-                                : (aLow.maValue >= fTarget && fTarget >= aHigh.maValue);
-    if (!bBracketed)
-        return api::ValueResult<double>::failure(api::Error::NoConvergence);
+    KahanSum fkAx = fAx;
+    KahanSum fkBx = fBx;
 
-    for (int nIter = 0; nIter < 160; ++nIter)
+    auto aAy = rFunction(fAx);
+    if (!aAy)
+        return aAy;
+    auto aBy = rFunction(fBx);
+    if (!aBy)
+        return aBy;
+
+    double fAy = aAy.maValue;
+    double fBy = aBy.maValue;
+    KahanSum fTemp = 0.0;
+    unsigned short nCount = 0;
+    for (; nCount < 1000 && !hasChangeOfSign(fAy, fBy); ++nCount)
     {
-        const double fMid = 0.5 * (fLow + fHigh);
-        const auto aMid = rDistribution(fMid);
-        if (!aMid)
-            return aMid;
-
-        if (bIncreasing ? (aMid.maValue < fTarget) : (aMid.maValue > fTarget))
-            fLow = fMid;
+        if (std::abs(fAy) <= std::abs(fBy))
+        {
+            fTemp = fkAx;
+            fkAx += (fkAx.get() - fkBx.get()) * 2.0;
+            if (fkAx.get() < 0.0)
+                fkAx = 0.0;
+            fkBx = fTemp;
+            fBy = fAy;
+            aAy = rFunction(fkAx.get());
+            if (!aAy)
+                return aAy;
+            fAy = aAy.maValue;
+        }
         else
-            fHigh = fMid;
+        {
+            fTemp = fkBx;
+            fkBx += (fkBx.get() - fkAx.get()) * 2.0;
+            fkAx = fTemp;
+            fAy = fBy;
+            aBy = rFunction(fkBx.get());
+            if (!aBy)
+                return aBy;
+            fBy = aBy.maValue;
+        }
     }
 
-    return api::ValueResult<double>::success(0.5 * (fLow + fHigh));
+    fAx = fkAx.get();
+    fBx = fkBx.get();
+    if (fAy == 0.0)
+        return api::ValueResult<double>::success(fAx);
+    if (fBy == 0.0)
+        return api::ValueResult<double>::success(fBx);
+    if (!hasChangeOfSign(fAy, fBy))
+        return api::ValueResult<double>::failure(api::Error::NoConvergence);
+
+    double fPx = fAx;
+    double fPy = fAy;
+    double fQx = fBx;
+    double fQy = fBy;
+    double fRx = fAx;
+    double fRy = fAy;
+    double fSx = 0.5 * (fAx + fBx);
+    bool bHasToInterpolate = true;
+    nCount = 0;
+    while (nCount < 500 && std::abs(fRy) > fYEps
+           && (fBx - fAx) > std::max(std::abs(fAx), std::abs(fBx)) * fXEps)
+    {
+        if (bHasToInterpolate)
+        {
+            if (fPy != fQy && fQy != fRy && fRy != fPy)
+            {
+                fSx = fPx * fRy * fQy / (fRy - fPy) / (fQy - fPy)
+                      + fRx * fQy * fPy / (fQy - fRy) / (fPy - fRy)
+                      + fQx * fPy * fRy / (fPy - fQy) / (fRy - fQy);
+                bHasToInterpolate = (fAx < fSx) && (fSx < fBx);
+            }
+            else
+            {
+                bHasToInterpolate = false;
+            }
+        }
+        if (!bHasToInterpolate)
+        {
+            fSx = 0.5 * (fAx + fBx);
+            fQx = fBx;
+            fQy = fBy;
+            bHasToInterpolate = true;
+        }
+
+        fPx = fQx;
+        fQx = fRx;
+        fRx = fSx;
+        fPy = fQy;
+        fQy = fRy;
+
+        const auto aRy = rFunction(fSx);
+        if (!aRy)
+            return aRy;
+        fRy = aRy.maValue;
+
+        if (hasChangeOfSign(fAy, fRy))
+        {
+            fBx = fRx;
+            fBy = fRy;
+        }
+        else
+        {
+            fAx = fRx;
+            fAy = fRy;
+        }
+
+        bHasToInterpolate = bHasToInterpolate && (std::abs(fRy) * 2.0 <= std::abs(fQy));
+        ++nCount;
+    }
+
+    return api::ValueResult<double>::success(fRx);
 }
 
 } // namespace
@@ -427,11 +509,10 @@ double betaValue(double fAlpha, double fBeta)
     if (fB > fA)
         std::swap(fA, fB);
 
-    constexpr double fMaxGammaArgument = 171.624376956302;
     if (fA + fB < fMaxGammaArgument)
         return (std::tgamma(fA) / std::tgamma(fA + fB)) * std::tgamma(fB);
 
-    constexpr long double fG = 6.024680040776729583740234375L;
+    constexpr long double fG = static_cast<long double>(fLanczosG);
     const long double fGMinusHalf = fG - 0.5L;
     long double fLanczos = static_cast<long double>(lanczosSum(fA));
     fLanczos /= static_cast<long double>(lanczosSum(fA + fB));
@@ -449,6 +530,11 @@ double betaValue(double fAlpha, double fBeta)
                                          - fGMinusHalf)
                                 * fLanczos;
     return static_cast<double>(fResult);
+}
+
+double logBetaValue(double fAlpha, double fBeta)
+{
+    return logBetaInternal(fAlpha, fBeta);
 }
 
 double betaCdf(double fInput, double fAlpha, double fBeta)
@@ -486,7 +572,7 @@ double betaCdf(double fInput, double fAlpha, double fBeta)
     if (fA > 1.0 && fB > 1.0 && fP < 0.97 && fQ < 0.97)
         fScale = betaPdf(fX, fA, fB) * fX * fY;
     else
-        fScale = std::exp(fA * fLnX + fB * fLnY - logBeta(fA, fB));
+        fScale = std::exp(fA * fLnX + fB * fLnY - logBetaInternal(fA, fB));
     fResult *= fScale;
     if (bReflect)
         fResult = 1.0 - fResult;
@@ -657,7 +743,7 @@ api::ValueResult<double> evaluateStandardNormalInverse(double fProbability)
 
 api::ValueResult<double> lowRegularizedIncompleteGamma(double fAlpha, double fX)
 {
-    const double fLnFactor = fAlpha * std::log(fX) - fX - std::lgamma(fAlpha);
+    const double fLnFactor = fAlpha * std::log(fX) - fX - logGammaValuePositive(fAlpha);
     const double fFactor = std::exp(fLnFactor);
     if (fX > fAlpha + 1.0)
     {
@@ -675,7 +761,7 @@ api::ValueResult<double> lowRegularizedIncompleteGamma(double fAlpha, double fX)
 
 api::ValueResult<double> upRegularizedIncompleteGamma(double fAlpha, double fX)
 {
-    const double fLnFactor = fAlpha * std::log(fX) - fX - std::lgamma(fAlpha);
+    const double fLnFactor = fAlpha * std::log(fX) - fX - logGammaValuePositive(fAlpha);
     const double fFactor = std::exp(fLnFactor);
     if (fX > fAlpha + 1.0)
     {
@@ -823,7 +909,7 @@ api::ValueResult<double> evaluateChiSquareDistribution(
 
     const double fHalfDf = fDegreesFreedom / 2.0;
     const double fLogValue = (fHalfDf - 1.0) * std::log(fX * 0.5) - (fX / 2.0)
-                             - std::log(2.0) - std::lgamma(fHalfDf);
+                             - std::log(2.0) - logGammaValuePositive(fHalfDf);
     return api::ValueResult<double>::success(std::exp(fLogValue));
 }
 
@@ -834,9 +920,12 @@ api::ValueResult<double> evaluateChiSquareInverse(double fProbability, double fD
     if (::rtl::math::approxEqual(fProbability, 0.0))
         return api::ValueResult<double>::success(0.0);
 
-    return invertMonotonicPositiveDistribution(fProbability, fDegreesFreedom, true,
-        [fDegreesFreedom](double fX) {
-            return evaluateChiSquareDistribution(fX, fDegreesFreedom, true, false);
+    return iterateInverseCalcStyle(fDegreesFreedom * 0.5, fDegreesFreedom,
+        [fProbability, fDegreesFreedom](double fX) {
+            const auto aDistribution = evaluateChiSquareDistribution(fX, fDegreesFreedom, true, false);
+            if (!aDistribution)
+                return aDistribution;
+            return api::ValueResult<double>::success(fProbability - aDistribution.maValue);
         });
 }
 
@@ -867,7 +956,7 @@ api::ValueResult<double> evaluateGammaDistribution(
 
     const double fScaledX = fX / fBeta;
     const double fLogValue = (fAlpha - 1.0) * std::log(fScaledX) - fScaledX - std::log(fBeta)
-                             - std::lgamma(fAlpha);
+                             - logGammaValuePositive(fAlpha);
     return api::ValueResult<double>::success(std::exp(fLogValue));
 }
 
@@ -879,9 +968,13 @@ api::ValueResult<double> evaluateGammaInverse(
     if (::rtl::math::approxEqual(fProbability, 0.0))
         return api::ValueResult<double>::success(0.0);
 
-    return invertMonotonicPositiveDistribution(fProbability, std::max(1.0, fAlpha * fBeta), true,
-        [fAlpha, fBeta](double fX) {
-            return evaluateGammaDistribution(fX, fAlpha, fBeta, true, false);
+    const double fStart = fAlpha * fBeta;
+    return iterateInverseCalcStyle(fStart * 0.5, fStart,
+        [fProbability, fAlpha, fBeta](double fX) {
+            const auto aDistribution = evaluateGammaDistribution(fX, fAlpha, fBeta, true, false);
+            if (!aDistribution)
+                return aDistribution;
+            return api::ValueResult<double>::success(fProbability - aDistribution.maValue);
         });
 }
 
@@ -890,11 +983,40 @@ api::ValueResult<double> evaluateGammaValue(double fX)
     const double fWhole = ::rtl::math::approxFloor(fX);
     if (fX <= 0.0 && ::rtl::math::approxEqual(fX, fWhole))
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    if (fX > fMaxGammaArgument)
+        return api::ValueResult<double>::failure(api::Error::Domain);
 
-    const double fResult = std::tgamma(fX);
-    if (!std::isfinite(fResult))
+    const double fLogPi = std::log(M_PI);
+    const double fLogDblMax = std::log(std::numeric_limits<double>::max());
+    if (fX >= 1.0)
+        return api::ValueResult<double>::success(gammaHelperPositive(fX));
+    if (fX >= 0.5)
+        return api::ValueResult<double>::success(gammaHelperPositive(fX + 1.0) / fX);
+    if (fX >= -0.5)
+    {
+        const double fLogTest = logGammaHelperPositive(fX + 2.0) - std::log1p(fX)
+                                - std::log(std::abs(fX));
+        if (fLogTest >= fLogDblMax)
+            return api::ValueResult<double>::failure(api::Error::Domain);
+        return api::ValueResult<double>::success(gammaHelperPositive(fX + 2.0) / (fX + 1.0) / fX);
+    }
+
+    const double fSin = ::rtl::math::sin(M_PI * fX);
+    const double fLogDivisor = logGammaHelperPositive(1.0 - fX) + std::log(std::abs(fSin));
+    if (fLogDivisor - fLogPi >= fLogDblMax)
+        return api::ValueResult<double>::success(0.0);
+    if (fLogDivisor < 0.0 && fLogPi - fLogDivisor > fLogDblMax)
+        return api::ValueResult<double>::failure(api::Error::Domain);
+
+    return api::ValueResult<double>::success(
+        std::exp(fLogPi - fLogDivisor) * (fSin < 0.0 ? -1.0 : 1.0));
+}
+
+api::ValueResult<double> evaluateLogGammaValue(double fX)
+{
+    if (!(fX > 0.0))
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    return api::ValueResult<double>::success(fResult);
+    return api::ValueResult<double>::success(logGammaValuePositive(fX));
 }
 
 api::ValueResult<double> evaluateStudentDistribution(
@@ -950,18 +1072,24 @@ api::ValueResult<double> evaluateTInverse(
             return api::ValueResult<double>::success(-aMirror.maValue);
         }
 
-        return invertMonotonicPositiveDistribution(fProbability, fDegreesFreedom, true,
-            [fDegreesFreedom](double fX) {
-                return evaluateStudentDistribution(fX, fDegreesFreedom, 4);
+        return iterateInverseCalcStyle(fDegreesFreedom * 0.5, fDegreesFreedom,
+            [fProbability, fDegreesFreedom](double fX) {
+                const auto aDistribution = evaluateStudentDistribution(fX, fDegreesFreedom, 4);
+                if (!aDistribution)
+                    return aDistribution;
+                return api::ValueResult<double>::success(fProbability - aDistribution.maValue);
             });
     }
 
     if (nType != 2)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    return invertMonotonicPositiveDistribution(fProbability, fDegreesFreedom, false,
-        [fDegreesFreedom](double fX) {
-            return evaluateStudentDistribution(fX, fDegreesFreedom, 2);
+    return iterateInverseCalcStyle(fDegreesFreedom * 0.5, fDegreesFreedom,
+        [fProbability, fDegreesFreedom](double fX) {
+            const auto aDistribution = evaluateStudentDistribution(fX, fDegreesFreedom, 2);
+            if (!aDistribution)
+                return aDistribution;
+            return api::ValueResult<double>::success(fProbability - aDistribution.maValue);
         });
 }
 
@@ -993,9 +1121,13 @@ api::ValueResult<double> evaluateFInverseRightTail(
     if (::rtl::math::approxEqual(fProbability, 1.0))
         return api::ValueResult<double>::success(0.0);
 
-    return invertMonotonicPositiveDistribution(fProbability, fDegreesFreedom1, false,
-        [fDegreesFreedom1, fDegreesFreedom2](double fX) {
-            return evaluateFRightTailDistribution(fX, fDegreesFreedom1, fDegreesFreedom2);
+    return iterateInverseCalcStyle(fDegreesFreedom1 * 0.5, fDegreesFreedom1,
+        [fProbability, fDegreesFreedom1, fDegreesFreedom2](double fX) {
+            const auto aDistribution
+                = evaluateFRightTailDistribution(fX, fDegreesFreedom1, fDegreesFreedom2);
+            if (!aDistribution)
+                return aDistribution;
+            return api::ValueResult<double>::success(fProbability - aDistribution.maValue);
         });
 }
 
@@ -1007,9 +1139,12 @@ api::ValueResult<double> evaluateLegacyChiInverse(
     if (::rtl::math::approxEqual(fProbability, 1.0))
         return api::ValueResult<double>::success(0.0);
 
-    return invertMonotonicPositiveDistribution(fProbability, fDegreesFreedom, false,
-        [fDegreesFreedom](double fX) {
-            return evaluateLegacyChiDist(fX, fDegreesFreedom);
+    return iterateInverseCalcStyle(fDegreesFreedom * 0.5, fDegreesFreedom,
+        [fProbability, fDegreesFreedom](double fX) {
+            const auto aDistribution = evaluateLegacyChiDist(fX, fDegreesFreedom);
+            if (!aDistribution)
+                return aDistribution;
+            return api::ValueResult<double>::success(fProbability - aDistribution.maValue);
         });
 }
 
@@ -1068,10 +1203,13 @@ api::ValueResult<double> evaluateBetaInverse(
     if (::rtl::math::approxEqual(fProbability, 1.0))
         return api::ValueResult<double>::success(fUpperBound);
 
-    const auto aStandard = invertMonotonicBoundedDistribution(
-        fProbability, 0.0, 1.0, true,
-        [fAlpha, fBeta](double fX) {
-            return evaluateBetaDistribution(fX, fAlpha, fBeta, 0.0, 1.0, true, false);
+    const auto aStandard = iterateInverseCalcStyle(0.0, 1.0,
+        [fProbability, fAlpha, fBeta](double fX) {
+            const auto aDistribution
+                = evaluateBetaDistribution(fX, fAlpha, fBeta, 0.0, 1.0, true, false);
+            if (!aDistribution)
+                return aDistribution;
+            return api::ValueResult<double>::success(fProbability - aDistribution.maValue);
         });
     if (!aStandard)
         return aStandard;
@@ -1089,7 +1227,7 @@ api::ValueResult<double> evaluatePoissonDistribution(
     const sal_Int32 nX = static_cast<sal_Int32>(::rtl::math::approxFloor(fX));
     const auto logProbability = [fLambda](sal_Int32 nValue) {
         return static_cast<double>(nValue) * std::log(fLambda) - fLambda
-               - std::lgamma(static_cast<double>(nValue) + 1.0);
+               - logGammaValuePositive(static_cast<double>(nValue) + 1.0);
     };
 
     if (!bCumulative)

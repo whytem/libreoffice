@@ -52,8 +52,6 @@ static size_t MAX_COUNT_DOUBLE_FOR_SORT(const ScSheetLimits& rSheetLimits)
     return rSheetLimits.GetMaxRowCount() * 2;
 }
 
-const double ScInterpreter::fMaxGammaArgument = 171.624376956302;  // found experimental
-
 namespace {
 
 FormulaError lcl_ToCalcMathFormulaError(spreadsheetengine::api::Error eError)
@@ -210,159 +208,6 @@ double ScInterpreter::BinomCoeff(double n, double k)
     return nVal;
 }
 
-// The algorithm is based on lanczos13m53 in lanczos.hpp
-// in math library from http://www.boost.org
-/** you must ensure fZ>0
-    Uses a variant of the Lanczos sum with a rational function. */
-static double lcl_getLanczosSum(double fZ)
-{
-    static const double fNum[13] ={
-        23531376880.41075968857200767445163675473,
-        42919803642.64909876895789904700198885093,
-        35711959237.35566804944018545154716670596,
-        17921034426.03720969991975575445893111267,
-        6039542586.35202800506429164430729792107,
-        1439720407.311721673663223072794912393972,
-        248874557.8620541565114603864132294232163,
-        31426415.58540019438061423162831820536287,
-        2876370.628935372441225409051620849613599,
-        186056.2653952234950402949897160456992822,
-        8071.672002365816210638002902272250613822,
-        210.8242777515793458725097339207133627117,
-        2.506628274631000270164908177133837338626
-        };
-    static const double fDenom[13] = {
-        0,
-        39916800,
-        120543840,
-        150917976,
-        105258076,
-        45995730,
-        13339535,
-        2637558,
-        357423,
-        32670,
-        1925,
-        66,
-        1
-        };
-    // Horner scheme
-    double fSumNum;
-    double fSumDenom;
-    int nI;
-    if (fZ<=1.0)
-    {
-        fSumNum = fNum[12];
-        fSumDenom = fDenom[12];
-        for (nI = 11; nI >= 0; --nI)
-        {
-            fSumNum *= fZ;
-            fSumNum += fNum[nI];
-            fSumDenom *= fZ;
-            fSumDenom += fDenom[nI];
-        }
-    }
-    else
-    // Cancel down with fZ^12; Horner scheme with reverse coefficients
-    {
-        double fZInv = 1/fZ;
-        fSumNum = fNum[0];
-        fSumDenom = fDenom[0];
-        for (nI = 1; nI <=12; ++nI)
-        {
-            fSumNum *= fZInv;
-            fSumNum += fNum[nI];
-            fSumDenom *= fZInv;
-            fSumDenom += fDenom[nI];
-        }
-    }
-    return fSumNum/fSumDenom;
-}
-
-// The algorithm is based on tgamma in gamma.hpp
-// in math library from http://www.boost.org
-/** You must ensure fZ>0; fZ>171.624376956302 will overflow. */
-static double lcl_GetGammaHelper(double fZ)
-{
-    double fGamma = lcl_getLanczosSum(fZ);
-    const double fg = 6.024680040776729583740234375;
-    double fZgHelp = fZ + fg - 0.5;
-    // avoid intermediate overflow
-    double fHalfpower = pow( fZgHelp, fZ / 2 - 0.25);
-    fGamma *= fHalfpower;
-    fGamma /= exp(fZgHelp);
-    fGamma *= fHalfpower;
-    if (fZ <= 20.0 && fZ == ::rtl::math::approxFloor(fZ))
-        fGamma = ::rtl::math::round(fGamma);
-    return fGamma;
-}
-
-// The algorithm is based on tgamma in gamma.hpp
-// in math library from http://www.boost.org
-/** You must ensure fZ>0 */
-static double lcl_GetLogGammaHelper(double fZ)
-{
-    const double fg = 6.024680040776729583740234375;
-    double fZgHelp = fZ + fg - 0.5;
-    return log( lcl_getLanczosSum(fZ)) + (fZ-0.5) * log(fZgHelp) - fZgHelp;
-}
-
-/** You must ensure non integer arguments for fZ<1 */
-double ScInterpreter::GetGamma(double fZ)
-{
-    const double fLogPi = log(M_PI);
-    const double fLogDblMax = log( ::std::numeric_limits<double>::max());
-
-    if (fZ > fMaxGammaArgument)
-    {
-        SetError(FormulaError::IllegalFPOperation);
-        return HUGE_VAL;
-    }
-
-    if (fZ >= 1.0)
-        return lcl_GetGammaHelper(fZ);
-
-    if (fZ >= 0.5)  // shift to x>=1 using Gamma(x)=Gamma(x+1)/x
-        return lcl_GetGammaHelper(fZ+1) / fZ;
-
-    if (fZ >= -0.5) // shift to x>=1, might overflow
-    {
-        double fLogTest = lcl_GetLogGammaHelper(fZ+2) - std::log1p(fZ) - log( std::abs(fZ));
-        if (fLogTest >= fLogDblMax)
-        {
-            SetError( FormulaError::IllegalFPOperation);
-            return HUGE_VAL;
-        }
-        return lcl_GetGammaHelper(fZ+2) / (fZ+1) / fZ;
-    }
-    // fZ<-0.5
-    // Use Euler's reflection formula: gamma(x)= pi/ ( gamma(1-x)*sin(pi*x) )
-    double fLogDivisor = lcl_GetLogGammaHelper(1-fZ) + log( std::abs( ::rtl::math::sin( M_PI*fZ)));
-    if (fLogDivisor - fLogPi >= fLogDblMax)     // underflow
-        return 0.0;
-
-    if (fLogDivisor<0.0)
-        if (fLogPi - fLogDivisor > fLogDblMax)  // overflow
-        {
-            SetError(FormulaError::IllegalFPOperation);
-            return HUGE_VAL;
-        }
-
-    return exp( fLogPi - fLogDivisor) * ((::rtl::math::sin( M_PI*fZ) < 0.0) ? -1.0 : 1.0);
-}
-
-/** You must ensure fZ>0 */
-double ScInterpreter::GetLogGamma(double fZ)
-{
-    if (fZ >= fMaxGammaArgument)
-        return lcl_GetLogGammaHelper(fZ);
-    if (fZ >= 1.0)
-        return log(lcl_GetGammaHelper(fZ));
-    if (fZ >= 0.5)
-        return log( lcl_GetGammaHelper(fZ+1) / fZ);
-    return lcl_GetLogGammaHelper(fZ+2) - std::log1p(fZ) - log(fZ);
-}
-
 double ScInterpreter::GetFDist(double x, double fF1, double fF2)
 {
     const auto aResult = semath::evaluateFRightTailDistribution(x, fF1, fF2);
@@ -464,29 +309,25 @@ void ScInterpreter::ScChiSqDist_MS()
 void ScInterpreter::ScGamma()
 {
     double x = GetDouble();
-    if (x <= 0.0 && x == ::rtl::math::approxFloor(x))
-        PushIllegalArgument();
-    else if (x > fMaxGammaArgument)
-        PushError(FormulaError::IllegalFPOperation);
-    else
+    const auto aResult = semath::evaluateGammaValue(x);
+    if (!aResult)
     {
-        const auto aResult = semath::evaluateGammaValue(x);
-        if (!aResult)
-        {
-            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-            return;
-        }
-        PushDouble(aResult.maValue);
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
     }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScLogGamma()
 {
     double x = GetDouble();
-    if (x > 0.0)    // constraint from ODFF
-        PushDouble( GetLogGamma(x));
-    else
-        PushIllegalArgument();
+    const auto aResult = semath::evaluateLogGammaValue(x);
+    if (!aResult)
+    {
+        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 double ScInterpreter::GetBeta(double fAlpha, double fBeta)
@@ -497,30 +338,7 @@ double ScInterpreter::GetBeta(double fAlpha, double fBeta)
 // Same as GetBeta but with logarithm
 double ScInterpreter::GetLogBeta(double fAlpha, double fBeta)
 {
-    double fA;
-    double fB;
-    if (fAlpha > fBeta)
-    {
-        fA = fAlpha; fB = fBeta;
-    }
-    else
-    {
-        fA = fBeta; fB = fAlpha;
-    }
-    const double fg = 6.024680040776729583740234375; //see GetGamma
-    double fgm = fg - 0.5;
-    double fLanczos = lcl_getLanczosSum(fA);
-    fLanczos /= lcl_getLanczosSum(fA+fB);
-    fLanczos *= lcl_getLanczosSum(fB);
-    double fLogLanczos = log(fLanczos);
-    double fABgm = fA+fB+fgm;
-    fLogLanczos += 0.5*(log(fABgm)-log(fA+fgm)-log(fB+fgm));
-    double fTempA = fB/(fA+fgm); // (fA+fgm)/fABgm = 1 / ( 1 + fB/(fA+fgm))
-    double fTempB = fA/(fB+fgm);
-    double fResult = -fA * std::log1p(fTempA)
-                        -fB * std::log1p(fTempB)-fgm;
-    fResult += fLogLanczos;
-    return fResult;
+    return semath::logBetaValue(fAlpha, fBeta);
 }
 
 // beta distribution probability density function
