@@ -177,19 +177,19 @@ EvaluationResult Evaluator::evaluateMathFamilyBody(
         return makeScalarResult(api::CellValue::number(aFinite.maValue));
     };
 
-if (aFunctionName == u"ABS")
+    if (aFunctionName == u"ABS")
     {
         if (rNode.maChildren.size() != 1)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         EvaluationResult aArgument
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
         if (!aArgument)
-            return aArgument;
+            return makeCellError(aArgument.meError);
 
         const auto aNumber = coerceToNumber(aArgument.maValue.maValue);
         if (!aNumber)
-            return makeFailure(aNumber.meError);
+            return makeCellError(aNumber.meError);
         return makeScalarResult(api::CellValue::number(api::math::abs(aNumber.maValue)));
     }
 
@@ -228,16 +228,16 @@ if (aFunctionName == u"ABS")
     if (aFunctionName == u"DEGREES")
     {
         if (rNode.maChildren.size() != 1)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         EvaluationResult aArgument
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
         if (!aArgument)
-            return aArgument;
+            return makeCellError(aArgument.meError);
 
         const auto aNumber = coerceToNumber(aArgument.maValue.maValue);
         if (!aNumber)
-            return makeFailure(aNumber.meError);
+            return makeCellError(aNumber.meError);
         return makeScalarResult(api::CellValue::number(api::math::degrees(aNumber.maValue)));
     }
 
@@ -651,18 +651,18 @@ if (aFunctionName == u"ABS")
     if (aFunctionName == u"BITAND" || aFunctionName == u"BITOR" || aFunctionName == u"BITXOR")
     {
         if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aLeft = aContext.evaluateNumericArgument(*rNode.maChildren[0], 0.0);
         if (!aLeft)
-            return makeFailure(aLeft.meError);
+            return makeCellError(aLeft.meError);
 
         if (rNode.maChildren.size() == 1)
-            return makeFailure(api::Error::NoValue);
+            return makeCellError(api::Error::NoValue);
 
         const auto aRight = aContext.evaluateNumericArgument(*rNode.maChildren[1], 0.0);
         if (!aRight)
-            return makeFailure(aRight.meError);
+            return makeCellError(aRight.meError);
 
         std::optional<double> oResult;
         if (aFunctionName == u"BITAND")
@@ -673,26 +673,26 @@ if (aFunctionName == u"ABS")
             oResult = semath::computeBitXor(aLeft.maValue, aRight.maValue);
 
         if (!oResult)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
         return makeScalarResult(api::CellValue::number(*oResult));
     }
 
     if (aFunctionName == u"BITLSHIFT" || aFunctionName == u"BITRSHIFT")
     {
         if (rNode.maChildren.size() != 2)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aValueNumber = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
         if (!aValueNumber)
-            return makeFailure(aValueNumber.meError);
+            return makeCellError(aValueNumber.meError);
         const auto aShiftNumber = aContext.evaluateNumericArgument(*rNode.maChildren[1], 0.0);
         if (!aShiftNumber)
-            return makeFailure(aShiftNumber.meError);
+            return makeCellError(aShiftNumber.meError);
 
         const auto oWholeValue = toWholeNumber(aValueNumber.maValue);
         const auto oWholeShift = toWholeNumber(aShiftNumber.maValue);
         if (!oWholeValue || !oWholeShift || *oWholeValue < 0)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const std::int32_t nShift = *oWholeShift;
         const std::uint64_t nValue = static_cast<std::uint64_t>(*oWholeValue);
@@ -707,7 +707,7 @@ if (aFunctionName == u"ABS")
                     api::CellValue::number(static_cast<double>(nValue >> (-nShift))));
 
             if (nShift >= 64)
-                return makeFailure(api::Error::IllegalArgument);
+                return makeCellError(api::Error::IllegalArgument);
             return makeScalarResult(
                 api::CellValue::number(static_cast<double>(nValue << nShift)));
         }
@@ -716,7 +716,7 @@ if (aFunctionName == u"ABS")
         {
             const std::int32_t nLeftShift = -nShift;
             if (nLeftShift >= 64)
-                return makeFailure(api::Error::IllegalArgument);
+                return makeCellError(api::Error::IllegalArgument);
             return makeScalarResult(
                 api::CellValue::number(static_cast<double>(nValue << nLeftShift)));
         }
@@ -905,36 +905,36 @@ if (aFunctionName == u"ABS")
     if (aFunctionName == u"COMBIN")
     {
         if (rNode.maChildren.size() != 2)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aN = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
         if (!aN)
-            return makeFailure(aN.meError);
+            return makeCellError(aN.meError);
         const auto aK = aContext.evaluateNumericArgument(*rNode.maChildren[1], std::nullopt);
         if (!aK)
-            return makeFailure(aK.meError);
+            return makeCellError(aK.meError);
 
         const auto aCombin = semath::evaluateCombinValue(aN.maValue, aK.maValue, false);
         if (!aCombin)
-            return makeFailure(aCombin.meError);
+            return makeCellError(aCombin.meError);
         return makeScalarResult(api::CellValue::number(aCombin.maValue));
     }
 
     if (aFunctionName == u"COMBINA")
     {
         if (rNode.maChildren.size() != 2)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aN = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
         if (!aN)
-            return makeFailure(aN.meError);
+            return makeCellError(aN.meError);
         const auto aK = aContext.evaluateNumericArgument(*rNode.maChildren[1], std::nullopt);
         if (!aK)
-            return makeFailure(aK.meError);
+            return makeCellError(aK.meError);
 
         const auto aCombina = semath::evaluateCombinValue(aN.maValue, aK.maValue, true);
         if (!aCombina)
-            return makeFailure(aCombina.meError);
+            return makeCellError(aCombina.meError);
         return makeScalarResult(api::CellValue::number(aCombina.maValue));
     }
 

@@ -470,6 +470,28 @@ int main()
         const auto aPermut = aEvaluator.evaluateFormula(u"of:=PERMUT(4;2)", { 0, 0, 0 });
         const auto aCompiledPermut
             = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=PERMUT(4;2)", { 0, 0, 0 });
+        const auto aAverage = aEvaluator.evaluateFormula(u"of:=AVERAGE({1|2|3})", { 0, 0, 0 });
+        const auto aCompiledAverage
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=AVERAGE({1|2|3})", { 0, 0, 0 });
+        const auto aAverageA
+            = aEvaluator.evaluateFormula(u"of:=AVERAGEA({1|TRUE|\"x\"})", { 0, 0, 0 });
+        const auto aCompiledAverageA = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=AVERAGEA({1|TRUE|\"x\"})", { 0, 0, 0 });
+        const auto aCorrel
+            = aEvaluator.evaluateFormula(u"of:=CORREL({1|2|3};{1|2|3})", { 0, 0, 0 });
+        const auto aCompiledCorrel = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CORREL({1|2|3};{1|2|3})", { 0, 0, 0 });
+        const auto aIntercept
+            = aEvaluator.evaluateFormula(u"of:=INTERCEPT({2|4|6};{1|2|3})", { 0, 0, 0 });
+        const auto aCompiledIntercept = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=INTERCEPT({2|4|6};{1|2|3})", { 0, 0, 0 });
+        const auto aForecast
+            = aEvaluator.evaluateFormula(u"of:=FORECAST(4;{2|4|6};{1|2|3})", { 0, 0, 0 });
+        const auto aCompiledForecast = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=FORECAST(4;{2|4|6};{1|2|3})", { 0, 0, 0 });
+        const auto aDevSq = aEvaluator.evaluateFormula(u"of:=DEVSQ({1|2|3})", { 0, 0, 0 });
+        const auto aCompiledDevSq
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=DEVSQ({1|2|3})", { 0, 0, 0 });
         const auto aNumberValue
             = aEvaluator.evaluateFormula(u"of:=NUMBERVALUE(\"1,23\";\",\";\".\")", { 0, 0, 0 });
         const auto aCompiledNumberValue = aEvaluator.evaluateFormulaViaCompiledTokens(
@@ -507,6 +529,51 @@ int main()
             return nResult;
         if (const int nResult = requireNumericFormula(
                 aCompiledPermut, 12.0, "compiled PERMUT mismatch"))
+        {
+            return nResult;
+        }
+        if (const int nResult = requireNumericFormula(aAverage, 2.0, "AVERAGE mismatch"))
+            return nResult;
+        if (const int nResult = requireNumericFormula(
+                aCompiledAverage, 2.0, "compiled AVERAGE mismatch"))
+        {
+            return nResult;
+        }
+        if (const int nResult = requireNumericFormula(
+                aAverageA, 0.6666666666666666, "AVERAGEA mismatch"))
+        {
+            return nResult;
+        }
+        if (const int nResult = requireNumericFormula(aCompiledAverageA, 0.6666666666666666,
+                "compiled AVERAGEA mismatch"))
+        {
+            return nResult;
+        }
+        if (const int nResult = requireNumericFormula(aCorrel, 1.0, "CORREL mismatch"))
+            return nResult;
+        if (const int nResult = requireNumericFormula(
+                aCompiledCorrel, 1.0, "compiled CORREL mismatch"))
+        {
+            return nResult;
+        }
+        if (const int nResult = requireNumericFormula(aIntercept, 0.0, "INTERCEPT mismatch"))
+            return nResult;
+        if (const int nResult = requireNumericFormula(
+                aCompiledIntercept, 0.0, "compiled INTERCEPT mismatch"))
+        {
+            return nResult;
+        }
+        if (const int nResult = requireNumericFormula(aForecast, 8.0, "FORECAST mismatch"))
+            return nResult;
+        if (const int nResult = requireNumericFormula(
+                aCompiledForecast, 8.0, "compiled FORECAST mismatch"))
+        {
+            return nResult;
+        }
+        if (const int nResult = requireNumericFormula(aDevSq, 2.0, "DEVSQ mismatch"))
+            return nResult;
+        if (const int nResult = requireNumericFormula(
+                aCompiledDevSq, 2.0, "compiled DEVSQ mismatch"))
         {
             return nResult;
         }

@@ -66,10 +66,13 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
           || rFunctionName == u"COM.MICROSOFT.QUARTILE.INC"
           || rFunctionName == u"QUARTILE.EXC"
           || rFunctionName == u"COM.MICROSOFT.QUARTILE.EXC";
-    if (!(bCriteriaAggregate || rFunctionName == u"MAX" || rFunctionName == u"MIN" || rFunctionName == u"MAXA"
-            || rFunctionName == u"MINA" || rFunctionName == u"SUM" || rFunctionName == u"COUNT"
-            || rFunctionName == u"COUNTA" || rFunctionName == u"MEDIAN" || rFunctionName == u"SUBTOTAL"
-            || rFunctionName == u"AGGREGATE" || bRankedAggregate || rFunctionName == u"SKEW"
+    if (!(bCriteriaAggregate || rFunctionName == u"MAX" || rFunctionName == u"MIN"
+            || rFunctionName == u"MAXA" || rFunctionName == u"MINA"
+            || rFunctionName == u"SUM" || rFunctionName == u"AVERAGE"
+            || rFunctionName == u"AVERAGEA" || rFunctionName == u"COUNT"
+            || rFunctionName == u"COUNTA" || rFunctionName == u"MEDIAN"
+            || rFunctionName == u"SUBTOTAL" || rFunctionName == u"AGGREGATE"
+            || bRankedAggregate || rFunctionName == u"SKEW"
             || rFunctionName == u"SKEWP"))
     {
         return std::nullopt;
@@ -307,6 +310,25 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
         }
 
         return detail::makeScalarResult(api::CellValue::number(fSum));
+    }
+
+    if (rFunctionName == u"AVERAGE" || rFunctionName == u"AVERAGEA")
+    {
+        if (rNode.maChildren.empty())
+            return detail::makeFailure(api::Error::IllegalArgument);
+
+        const auto aNumbers = collectVarianceArguments(rFunctionName == u"AVERAGEA");
+        if (!aNumbers)
+            return detail::makeFailure(aNumbers.meError);
+        if (aNumbers.maValue.empty())
+            return detail::makeFailure(api::Error::DivisionByZero);
+
+        double fSum = 0.0;
+        for (const double fValue : aNumbers.maValue)
+            fSum = fp::approxAdd(fSum, fValue);
+
+        return detail::makeScalarResult(api::CellValue::number(
+            fSum / static_cast<double>(aNumbers.maValue.size())));
     }
 
     if (rFunctionName == u"COUNT" || rFunctionName == u"COUNTA")

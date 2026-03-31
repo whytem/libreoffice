@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 
 namespace spreadsheetengine::core::eval
 {
@@ -126,6 +127,14 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateStatisticalRuntimeFamily(
         api::StringView(u"T.DIST.RT"),
         api::StringView(u"COM.MICROSOFT.T.DIST.RT"),
         api::StringView(u"LEGACY.TDIST"),
+        api::StringView(u"CORREL"),
+        api::StringView(u"PEARSON"),
+        api::StringView(u"RSQ"),
+        api::StringView(u"STEYX"),
+        api::StringView(u"INTERCEPT"),
+        api::StringView(u"FORECAST"),
+        api::StringView(u"FTEST"),
+        api::StringView(u"DEVSQ"),
         api::StringView(u"FDIST"),
         api::StringView(u"LEGACY.FDIST"),
         api::StringView(u"F.DIST.RT"),
@@ -266,6 +275,97 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
         if (!aVisited)
             return api::ValueResult<std::vector<double>>::failure(aVisited.meError);
         return api::ValueResult<std::vector<double>>::success(std::move(aValues));
+    };
+
+    struct RegressionStats
+    {
+        double fCount = 0.0;
+        double fMeanX = 0.0;
+        double fMeanY = 0.0;
+        fp::KahanSum fSumDeltaXDeltaY = 0.0;
+        fp::KahanSum fSumSqrDeltaX = 0.0;
+        fp::KahanSum fSumSqrDeltaY = 0.0;
+    };
+
+    const auto collectRegressionStats
+        = [&](const formula::Node& rKnownYNode, const formula::Node& rKnownXNode)
+        -> api::ValueResult<RegressionStats> {
+        const auto collectValueSequence = [&](const formula::Node& rArgument)
+            -> api::ValueResult<std::vector<api::CellValue>> {
+            std::vector<api::CellValue> aValues;
+            const auto aVisited = aContext.visitFlattenedValues(
+                rArgument, [&](const api::CellValue& rValue, bool) -> api::ValueResult<bool> {
+                    aValues.push_back(rValue);
+                    return api::ValueResult<bool>::success(true);
+                });
+            if (!aVisited)
+                return api::ValueResult<std::vector<api::CellValue>>::failure(aVisited.meError);
+            return api::ValueResult<std::vector<api::CellValue>>::success(std::move(aValues));
+        };
+
+        const auto aKnownY = collectValueSequence(rKnownYNode);
+        if (!aKnownY)
+            return api::ValueResult<RegressionStats>::failure(aKnownY.meError);
+        const auto aKnownX = collectValueSequence(rKnownXNode);
+        if (!aKnownX)
+            return api::ValueResult<RegressionStats>::failure(aKnownX.meError);
+
+        if (aKnownY.maValue.size() != aKnownX.maValue.size())
+            return api::ValueResult<RegressionStats>::failure(api::Error::IllegalArgument);
+
+        RegressionStats aStats;
+        fp::KahanSum fSumX = 0.0;
+        fp::KahanSum fSumY = 0.0;
+        for (std::size_t nIndex = 0; nIndex < aKnownY.maValue.size(); ++nIndex)
+        {
+            const api::CellValue& rY = aKnownY.maValue[nIndex];
+            const api::CellValue& rX = aKnownX.maValue[nIndex];
+            if (rY.isError())
+                return api::ValueResult<RegressionStats>::failure(rY.meError);
+            if (rX.isError())
+                return api::ValueResult<RegressionStats>::failure(rX.meError);
+            if ((rY.isText() || rY.isEmpty()) || (rX.isText() || rX.isEmpty()))
+                continue;
+
+            const auto aY = coerceToNumber(rY);
+            if (!aY)
+                return api::ValueResult<RegressionStats>::failure(aY.meError);
+            const auto aX = coerceToNumber(rX);
+            if (!aX)
+                return api::ValueResult<RegressionStats>::failure(aX.meError);
+
+            fSumX += aX.maValue;
+            fSumY += aY.maValue;
+            aStats.fCount += 1.0;
+        }
+
+        if (aStats.fCount < 1.0)
+            return api::ValueResult<RegressionStats>::failure(api::Error::NoValue);
+
+        aStats.fMeanX = fSumX.get() / aStats.fCount;
+        aStats.fMeanY = fSumY.get() / aStats.fCount;
+        for (std::size_t nIndex = 0; nIndex < aKnownY.maValue.size(); ++nIndex)
+        {
+            const api::CellValue& rY = aKnownY.maValue[nIndex];
+            const api::CellValue& rX = aKnownX.maValue[nIndex];
+            if ((rY.isText() || rY.isEmpty()) || (rX.isText() || rX.isEmpty()))
+                continue;
+
+            const auto aY = coerceToNumber(rY);
+            if (!aY)
+                return api::ValueResult<RegressionStats>::failure(aY.meError);
+            const auto aX = coerceToNumber(rX);
+            if (!aX)
+                return api::ValueResult<RegressionStats>::failure(aX.meError);
+
+            const double fDeltaX = aX.maValue - aStats.fMeanX;
+            const double fDeltaY = aY.maValue - aStats.fMeanY;
+            aStats.fSumDeltaXDeltaY += fDeltaX * fDeltaY;
+            aStats.fSumSqrDeltaX += fDeltaX * fDeltaX;
+            aStats.fSumSqrDeltaY += fDeltaY * fDeltaY;
+        }
+
+        return api::ValueResult<RegressionStats>::success(std::move(aStats));
     };
 
     if (aFunctionName == u"T.TEST" || aFunctionName == u"TTEST")
@@ -554,87 +654,169 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
         if (rNode.maChildren.size() != 2)
             return makeCellError(api::Error::IllegalArgument);
 
-        const auto aKnownY = materializeMatrixOperand(*rNode.maChildren[0]);
-        if (!aKnownY)
-            return makeCellError(aKnownY.meError);
-        const auto aKnownX = materializeMatrixOperand(*rNode.maChildren[1]);
-        if (!aKnownX)
-            return makeCellError(aKnownX.meError);
+        const auto aStats = collectRegressionStats(*rNode.maChildren[0], *rNode.maChildren[1]);
+        if (!aStats)
+            return makeCellError(aStats.meError);
 
-        if (aKnownY.maValue.mnColumns != aKnownX.maValue.mnColumns
-            || aKnownY.maValue.mnRows != aKnownX.maValue.mnRows)
-        {
-            return makeCellError(api::Error::IllegalArgument);
-        }
-
-        double fCount = 0.0;
-        fp::KahanSum fSumX = 0.0;
-        fp::KahanSum fSumY = 0.0;
-        for (api::MatrixSize nColumn = 0; nColumn < aKnownY.maValue.mnColumns; ++nColumn)
-        {
-            for (api::MatrixSize nRow = 0; nRow < aKnownY.maValue.mnRows; ++nRow)
-            {
-                const std::size_t nIndex = static_cast<std::size_t>(
-                    nRow * aKnownY.maValue.mnColumns + nColumn);
-                const api::CellValue& rY = aKnownY.maValue.maValues[nIndex];
-                const api::CellValue& rX = aKnownX.maValue.maValues[nIndex];
-                if (rY.isError())
-                    return makeCellError(rY.meError);
-                if (rX.isError())
-                    return makeCellError(rX.meError);
-                if ((rY.isText() || rY.isEmpty()) || (rX.isText() || rX.isEmpty()))
-                    continue;
-
-                const auto aY = coerceToNumber(rY);
-                if (!aY)
-                    return makeCellError(aY.meError);
-                const auto aX = coerceToNumber(rX);
-                if (!aX)
-                    return makeCellError(aX.meError);
-
-                fSumX += aX.maValue;
-                fSumY += aY.maValue;
-                fCount += 1.0;
-            }
-        }
-
-        if (fCount < 1.0)
-            return makeCellError(api::Error::NoValue);
-
-        const double fMeanX = fSumX.get() / fCount;
-        const double fMeanY = fSumY.get() / fCount;
-        fp::KahanSum fSumDeltaXDeltaY = 0.0;
-        fp::KahanSum fSumSqrDeltaX = 0.0;
-        for (api::MatrixSize nColumn = 0; nColumn < aKnownY.maValue.mnColumns; ++nColumn)
-        {
-            for (api::MatrixSize nRow = 0; nRow < aKnownY.maValue.mnRows; ++nRow)
-            {
-                const std::size_t nIndex = static_cast<std::size_t>(
-                    nRow * aKnownY.maValue.mnColumns + nColumn);
-                const api::CellValue& rY = aKnownY.maValue.maValues[nIndex];
-                const api::CellValue& rX = aKnownX.maValue.maValues[nIndex];
-                if ((rY.isText() || rY.isEmpty()) || (rX.isText() || rX.isEmpty()))
-                    continue;
-
-                const auto aY = coerceToNumber(rY);
-                if (!aY)
-                    return makeCellError(aY.meError);
-                const auto aX = coerceToNumber(rX);
-                if (!aX)
-                    return makeCellError(aX.meError);
-
-                fSumDeltaXDeltaY += (aX.maValue - fMeanX) * (aY.maValue - fMeanY);
-                fSumSqrDeltaX += (aX.maValue - fMeanX) * (aX.maValue - fMeanX);
-            }
-        }
-
-        if (fp::approxEqual(fSumSqrDeltaX.get(), 0.0))
+        if (fp::approxEqual(aStats.maValue.fSumSqrDeltaX.get(), 0.0))
             return makeCellError(api::Error::DivisionByZero);
 
-        const long double fSlope = static_cast<long double>(fSumDeltaXDeltaY.get())
-                                   / static_cast<long double>(fSumSqrDeltaX.get());
+        const long double fSlope
+            = static_cast<long double>(aStats.maValue.fSumDeltaXDeltaY.get())
+              / static_cast<long double>(aStats.maValue.fSumSqrDeltaX.get());
         return makeScalarResult(api::CellValue::number(
             roundToSignificantDigits(static_cast<double>(fSlope), 15)));
+    }
+
+    if (aFunctionName == u"CORREL" || aFunctionName == u"PEARSON" || aFunctionName == u"RSQ"
+        || aFunctionName == u"STEYX")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aStats = collectRegressionStats(*rNode.maChildren[0], *rNode.maChildren[1]);
+        if (!aStats)
+            return makeCellError(aStats.meError);
+
+        if (aFunctionName == u"STEYX" && aStats.maValue.fCount < 3.0)
+            return makeCellError(api::Error::NoValue);
+
+        if (aStats.maValue.fSumSqrDeltaX.get() < std::numeric_limits<double>::min()
+            || ((aFunctionName == u"CORREL" || aFunctionName == u"PEARSON"
+                 || aFunctionName == u"RSQ")
+                && aStats.maValue.fSumSqrDeltaY.get() < std::numeric_limits<double>::min()))
+        {
+            return makeCellError(api::Error::DivisionByZero);
+        }
+
+        if (aFunctionName == u"STEYX")
+        {
+            const double fResidual
+                = aStats.maValue.fSumSqrDeltaY.get()
+                  - (aStats.maValue.fSumDeltaXDeltaY.get()
+                     * aStats.maValue.fSumDeltaXDeltaY.get()
+                     / aStats.maValue.fSumSqrDeltaX.get());
+            return makeScalarResult(api::CellValue::number(
+                std::sqrt(fResidual / (aStats.maValue.fCount - 2.0))));
+        }
+
+        const double fPearson = aStats.maValue.fSumDeltaXDeltaY.get()
+                                / std::sqrt(aStats.maValue.fSumSqrDeltaX.get()
+                                            * aStats.maValue.fSumSqrDeltaY.get());
+        if (aFunctionName == u"RSQ")
+            return makeScalarResult(api::CellValue::number(fPearson * fPearson));
+        return makeScalarResult(api::CellValue::number(fPearson));
+    }
+
+    if (aFunctionName == u"INTERCEPT" || aFunctionName == u"FORECAST")
+    {
+        if (rNode.maChildren.size() != 2 + (aFunctionName == u"FORECAST" ? 1 : 0))
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aStats = collectRegressionStats(*rNode.maChildren[0], *rNode.maChildren[1]);
+        if (!aStats)
+            return makeCellError(aStats.meError);
+        if (fp::approxEqual(aStats.maValue.fSumSqrDeltaX.get(), 0.0))
+            return makeCellError(api::Error::DivisionByZero);
+
+        const double fSlope = aStats.maValue.fSumDeltaXDeltaY.get()
+                              / aStats.maValue.fSumSqrDeltaX.get();
+        const double fIntercept
+            = aStats.maValue.fMeanY - fSlope * aStats.maValue.fMeanX;
+        if (aFunctionName == u"INTERCEPT")
+            return makeScalarResult(api::CellValue::number(fIntercept));
+
+        const auto aForecastX = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[2]);
+        if (!aForecastX)
+            return makeCellError(aForecastX.meError);
+        return makeScalarResult(
+            api::CellValue::number(aStats.maValue.fMeanY + fSlope * (aForecastX.maValue
+                                                                     - aStats.maValue.fMeanX)));
+    }
+
+    if (aFunctionName == u"FTEST")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aSample1 = collectNumericSampleValues(*rNode.maChildren[0]);
+        if (!aSample1)
+            return makeCellError(aSample1.meError);
+        const auto aSample2 = collectNumericSampleValues(*rNode.maChildren[1]);
+        if (!aSample2)
+            return makeCellError(aSample2.meError);
+        if (aSample1.maValue.size() < 2 || aSample2.maValue.size() < 2)
+            return makeCellError(api::Error::NoValue);
+
+        auto computeSampleVariance = [](const std::vector<double>& rSample) {
+            fp::KahanSum fSum = 0.0;
+            fp::KahanSum fSumSqr = 0.0;
+            for (const double fValue : rSample)
+            {
+                fSum += fValue;
+                fSumSqr += fValue * fValue;
+            }
+
+            const double fCount = static_cast<double>(rSample.size());
+            return (fSumSqr.get() - fSum.get() * fSum.get() / fCount) / (fCount - 1.0);
+        };
+
+        const double fVariance1 = computeSampleVariance(aSample1.maValue);
+        const double fVariance2 = computeSampleVariance(aSample2.maValue);
+        if (fp::approxEqual(fVariance1, 0.0) || fp::approxEqual(fVariance2, 0.0))
+            return makeCellError(api::Error::NoValue);
+
+        double fRatio = 0.0;
+        double fDf1 = 0.0;
+        double fDf2 = 0.0;
+        if (fVariance1 > fVariance2)
+        {
+            fRatio = fVariance1 / fVariance2;
+            fDf1 = static_cast<double>(aSample1.maValue.size() - 1);
+            fDf2 = static_cast<double>(aSample2.maValue.size() - 1);
+        }
+        else
+        {
+            fRatio = fVariance2 / fVariance1;
+            fDf1 = static_cast<double>(aSample2.maValue.size() - 1);
+            fDf2 = static_cast<double>(aSample1.maValue.size() - 1);
+        }
+
+        const auto aFdist = semath::evaluateFRightTailDistribution(fRatio, fDf1, fDf2);
+        if (!aFdist)
+            return makeCellError(aFdist.meError);
+
+        return makeScalarResult(
+            api::CellValue::number(2.0 * std::min(aFdist.maValue, 1.0 - aFdist.maValue)));
+    }
+
+    if (aFunctionName == u"DEVSQ")
+    {
+        if (rNode.maChildren.empty())
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aNumbers = aContext.collectVarianceArguments(false);
+        if (!aNumbers)
+            return makeCellError(aNumbers.meError);
+        if (aNumbers.maValue.empty())
+            return makeCellError(api::Error::DivisionByZero);
+
+        double fCount = 0.0;
+        fp::KahanSum fSum = 0.0;
+        for (const double fValue : aNumbers.maValue)
+        {
+            fSum += fValue;
+            fCount += 1.0;
+        }
+
+        const double fMean = fSum.get() / fCount;
+        fp::KahanSum fSquaredDeviation = 0.0;
+        for (const double fValue : aNumbers.maValue)
+        {
+            const double fDelta = fp::approxSub(fValue, fMean);
+            fSquaredDeviation += fDelta * fDelta;
+        }
+        return makeScalarResult(api::CellValue::number(fSquaredDeviation.get()));
     }
 
     if (aFunctionName == u"RANK" || aFunctionName == u"RANK.EQ"
