@@ -53,9 +53,12 @@ EvaluationResult Evaluator::evaluateLogicalFamilyBody(
     const api::CellAddress& rCurrentAddress)
 {
     const api::StringView aFunctionName = rFunctionName;
+    const auto makeCellError = [&](api::Error eError) -> EvaluationResult {
+        return makeScalarResult(api::CellValue::error(eError));
+    };
     const auto evaluateLogicalFold = [&](bool bInitial, auto aFold) -> EvaluationResult {
         if (rNode.maChildren.empty())
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         bool bResult = bInitial;
         bool bSawValue = false;
@@ -69,7 +72,7 @@ EvaluationResult Evaluator::evaluateLogicalFamilyBody(
                                              ? evaluateReferenceNode(*pChild, rCurrentAddress)
                                              : evaluateNode(*pChild, rCurrentAddress);
             if (!aArgument)
-                return aArgument;
+                return makeCellError(aArgument.meError);
 
             if (aArgument.maValue.isMatrixReference())
             {
@@ -85,7 +88,7 @@ EvaluationResult Evaluator::evaluateLogicalFamilyBody(
                             continue;
                         const auto aBool = coerceToBoolean(aCell.maValue.maValue);
                         if (!aBool)
-                            return makeFailure(aBool.meError);
+                            return makeCellError(aBool.meError);
                         bResult = aFold(bResult, aBool.maValue);
                         bSawValue = true;
                     }
@@ -95,13 +98,13 @@ EvaluationResult Evaluator::evaluateLogicalFamilyBody(
 
             const auto aBool = coerceToBoolean(aArgument.maValue.maValue);
             if (!aBool)
-                return makeFailure(aBool.meError);
+                return makeCellError(aBool.meError);
             bResult = aFold(bResult, aBool.maValue);
             bSawValue = true;
         }
 
         if (!bSawValue)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         return makeScalarResult(api::CellValue::boolean(bResult));
     };
@@ -139,15 +142,15 @@ EvaluationResult Evaluator::evaluateLogicalFamilyBody(
     if (aFunctionName == u"NOT")
     {
         if (rNode.maChildren.size() != 1)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         EvaluationResult aArgument
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
         if (!aArgument)
-            return aArgument;
+            return makeCellError(aArgument.meError);
         const auto aBool = coerceToBoolean(aArgument.maValue.maValue);
         if (!aBool)
-            return makeFailure(aBool.meError);
+            return makeCellError(aBool.meError);
         return makeScalarResult(api::CellValue::boolean(!aBool.maValue));
     }
 

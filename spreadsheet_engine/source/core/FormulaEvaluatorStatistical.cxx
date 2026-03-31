@@ -56,6 +56,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateStatisticalRuntimeFamily(
         api::StringView(u"GAMMALN.PRECISE"),
         api::StringView(u"COM.MICROSOFT.GAMMALN.PRECISE"),
         api::StringView(u"PERMUTATIONA"),
+        api::StringView(u"PERMUT"),
         api::StringView(u"SLOPE"),
         api::StringView(u"KURT"),
         api::StringView(u"RANK"),
@@ -173,6 +174,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateStatisticalRuntimeFamily(
         api::StringView(u"PERCENTRANK.INC"),
         api::StringView(u"PERCENTRANK.EXC"),
         api::StringView(u"MODE.SNGL"),
+        api::StringView(u"PROB"),
         api::StringView(u"TRIMMEAN"),
         api::StringView(u"CHISQ.TEST"),
         api::StringView(u"LEGACY.CHITEST"),
@@ -502,17 +504,33 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
     if (aFunctionName == u"GAUSS")
     {
         if (rNode.maChildren.size() != 1)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         EvaluationResult aArgument
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
         if (!aArgument)
-            return aArgument;
+            return makeCellError(aArgument.meError);
         const auto aNumber = coerceToNumber(aArgument.maValue.maValue);
         if (!aNumber)
-            return makeFailure(aNumber.meError);
+            return makeCellError(aNumber.meError);
 
         return makeScalarResult(api::CellValue::number(semath::gaussValue(aNumber.maValue)));
+    }
+
+    if (aFunctionName == u"PERMUT")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aN = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[0]);
+        if (!aN)
+            return makeCellError(aN.meError);
+        const auto aK = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[1]);
+        if (!aK)
+            return makeCellError(aK.meError);
+
+        return aContext.makeNumericOrErrorResult(
+            semath::evaluatePermutationValue(aN.maValue, aK.maValue));
     }
 
     if (aFunctionName == u"PERMUTATIONA")
@@ -1402,30 +1420,30 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
         || aFunctionName == u"F.INV" || aFunctionName == u"COM.MICROSOFT.F.INV")
     {
         if (rNode.maChildren.size() != 3)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aProbability = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
         const auto aDegreesFreedom1 = aContext.evaluateNumericArgument(*rNode.maChildren[1], std::nullopt);
         const auto aDegreesFreedom2 = aContext.evaluateNumericArgument(*rNode.maChildren[2], std::nullopt);
         if (!aProbability)
-            return makeFailure(aProbability.meError);
+            return makeCellError(aProbability.meError);
         if (!aDegreesFreedom1)
-            return makeFailure(aDegreesFreedom1.meError);
+            return makeCellError(aDegreesFreedom1.meError);
         if (!aDegreesFreedom2)
-            return makeFailure(aDegreesFreedom2.meError);
+            return makeCellError(aDegreesFreedom2.meError);
 
         const double fDegreesFreedom1 = fp::approxFloor(aDegreesFreedom1.maValue);
         const double fDegreesFreedom2 = fp::approxFloor(aDegreesFreedom2.maValue);
         const bool bLeftTail = aFunctionName == u"FINV" || aFunctionName == u"F.INV"
                                || aFunctionName == u"COM.MICROSOFT.F.INV";
         if (bLeftTail && (aProbability.maValue <= 0.0 || aProbability.maValue >= 1.0))
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
         const double fRightTailProbability
             = bLeftTail ? 1.0 - aProbability.maValue : aProbability.maValue;
         const auto aInverse = semath::evaluateFInverseRightTail(
             fRightTailProbability, fDegreesFreedom1, fDegreesFreedom2);
         if (!aInverse)
-            return makeFailure(aInverse.meError);
+            return makeCellError(aInverse.meError);
         return makeScalarResult(api::CellValue::number(aInverse.maValue));
     }
 
@@ -1734,6 +1752,61 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
         return makeScalarResult(api::CellValue::number(aDistribution.maValue));
     }
 
+    if (aFunctionName == u"PROB")
+    {
+        if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 4)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aUpper = aContext.evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[2]);
+        if (!aUpper)
+            return makeCellError(aUpper.meError);
+
+        double fLower = aUpper.maValue;
+        if (rNode.maChildren.size() == 4)
+        {
+            const auto aLower
+                = aContext.evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[3]);
+            if (!aLower)
+                return makeCellError(aLower.meError);
+            fLower = aLower.maValue;
+        }
+
+        const auto aProbabilities = materializeMatrixOperand(*rNode.maChildren[0]);
+        if (!aProbabilities)
+            return makeCellError(aProbabilities.meError);
+        const auto aValues = materializeMatrixOperand(*rNode.maChildren[1]);
+        if (!aValues)
+            return makeCellError(aValues.meError);
+        if (aProbabilities.maValue.mnColumns != aValues.maValue.mnColumns
+            || aProbabilities.maValue.mnRows != aValues.maValue.mnRows
+            || aProbabilities.maValue.maValues.empty())
+        {
+            return makeCellError(api::Error::NotAvailable);
+        }
+
+        std::vector<double> aProbabilityValues;
+        std::vector<double> aDataValues;
+        aProbabilityValues.reserve(aProbabilities.maValue.maValues.size());
+        aDataValues.reserve(aValues.maValue.maValues.size());
+        for (std::size_t nIndex = 0; nIndex < aProbabilities.maValue.maValues.size(); ++nIndex)
+        {
+            const api::CellValue& rProbability = aProbabilities.maValue.maValues[nIndex];
+            const api::CellValue& rValue = aValues.maValue.maValues[nIndex];
+            if (rProbability.isError())
+                return makeCellError(rProbability.meError);
+            if (rValue.isError())
+                return makeCellError(rValue.meError);
+            if (!rProbability.isNumber() || !rValue.isNumber())
+                return makeCellError(api::Error::IllegalArgument);
+
+            aProbabilityValues.push_back(rProbability.mfNumber);
+            aDataValues.push_back(rValue.mfNumber);
+        }
+
+        return aContext.makeNumericOrErrorResult(
+            semath::evaluateProbability(aProbabilityValues, aDataValues, fLower, aUpper.maValue));
+    }
+
     if (aFunctionName == u"PERCENTRANK" || aFunctionName == u"PERCENTRANK.INC"
         || aFunctionName == u"PERCENTRANK.EXC")
     {
@@ -1925,7 +1998,7 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
         if ((bMicrosoftOrder && (rNode.maChildren.size() < 4 || rNode.maChildren.size() > 6))
             || (!bMicrosoftOrder && (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 6)))
         {
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
         }
 
         auto evaluateScalarNumber = [&](std::size_t nIndex) -> api::ValueResult<double> {
@@ -1940,11 +2013,11 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
         const auto aAlphaNumber = evaluateScalarNumber(1);
         const auto aBetaNumber = evaluateScalarNumber(2);
         if (!aXNumber)
-            return makeFailure(aXNumber.meError);
+            return makeCellError(aXNumber.meError);
         if (!aAlphaNumber)
-            return makeFailure(aAlphaNumber.meError);
+            return makeCellError(aAlphaNumber.meError);
         if (!aBetaNumber)
-            return makeFailure(aBetaNumber.meError);
+            return makeCellError(aBetaNumber.meError);
 
         bool bCumulative = true;
         double fLowerBound = 0.0;
@@ -1954,23 +2027,23 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
             EvaluationResult aCumulativeResult
                 = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[3], rCurrentAddress));
             if (!aCumulativeResult)
-                return aCumulativeResult;
+                return makeCellError(aCumulativeResult.meError);
             const auto aCumulativeBool = coerceToBoolean(aCumulativeResult.maValue.maValue);
             if (!aCumulativeBool)
-                return makeFailure(aCumulativeBool.meError);
+                return makeCellError(aCumulativeBool.meError);
             bCumulative = aCumulativeBool.maValue;
             if (rNode.maChildren.size() >= 5)
             {
                 const auto aLower = evaluateScalarNumber(4);
                 if (!aLower)
-                    return makeFailure(aLower.meError);
+                    return makeCellError(aLower.meError);
                 fLowerBound = aLower.maValue;
             }
             if (rNode.maChildren.size() >= 6)
             {
                 const auto aUpper = evaluateScalarNumber(5);
                 if (!aUpper)
-                    return makeFailure(aUpper.meError);
+                    return makeCellError(aUpper.meError);
                 fUpperBound = aUpper.maValue;
             }
         }
@@ -1980,14 +2053,14 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
             {
                 const auto aLower = evaluateScalarNumber(3);
                 if (!aLower)
-                    return makeFailure(aLower.meError);
+                    return makeCellError(aLower.meError);
                 fLowerBound = aLower.maValue;
             }
             if (rNode.maChildren.size() >= 5)
             {
                 const auto aUpper = evaluateScalarNumber(4);
                 if (!aUpper)
-                    return makeFailure(aUpper.meError);
+                    return makeCellError(aUpper.meError);
                 fUpperBound = aUpper.maValue;
             }
             if (rNode.maChildren.size() == 6)
@@ -1995,10 +2068,10 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
                 EvaluationResult aCumulativeResult = ensureScalarValue(
                     *this, evaluateNode(*rNode.maChildren[5], rCurrentAddress));
                 if (!aCumulativeResult)
-                    return aCumulativeResult;
+                    return makeCellError(aCumulativeResult.meError);
                 const auto aCumulativeBool = coerceToBoolean(aCumulativeResult.maValue.maValue);
                 if (!aCumulativeBool)
-                    return makeFailure(aCumulativeBool.meError);
+                    return makeCellError(aCumulativeBool.meError);
                 bCumulative = aCumulativeBool.maValue;
             }
         }
@@ -2007,7 +2080,7 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
             aAlphaNumber.maValue, aBetaNumber.maValue, fLowerBound, fUpperBound, bCumulative,
             bMicrosoftOrder);
         if (!aBetaDistribution)
-            return makeFailure(aBetaDistribution.meError);
+            return makeCellError(aBetaDistribution.meError);
         return makeScalarResult(api::CellValue::number(aBetaDistribution.maValue));
     }
 

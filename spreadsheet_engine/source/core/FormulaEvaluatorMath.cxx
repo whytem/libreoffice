@@ -52,6 +52,9 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateMathFamily(
         api::StringView(u"ACOSH"),
         api::StringView(u"ATANH"),
         api::StringView(u"ACOTH"),
+        api::StringView(u"EVEN"),
+        api::StringView(u"ODD"),
+        api::StringView(u"COLOR"),
         api::StringView(u"GCD"),
         api::StringView(u"LCM"),
         api::StringView(u"SIGN"),
@@ -108,66 +111,69 @@ EvaluationResult Evaluator::evaluateMathFamilyBody(
 {
     const api::StringView aFunctionName = rFunctionName;
     FunctionEvalContext aContext { *this, rNode, rCurrentAddress };
+    const auto makeCellError = [&](api::Error eError) -> EvaluationResult {
+        return makeScalarResult(api::CellValue::error(eError));
+    };
     const auto evaluateUnaryNumericFinite = [&](auto aCompute) -> EvaluationResult {
         if (rNode.maChildren.size() != 1)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
         if (!aValue)
-            return makeFailure(aValue.meError);
+            return makeCellError(aValue.meError);
 
         const auto aResult = seutil::makeFiniteResult(aCompute(aValue.maValue));
         if (!aResult)
-            return makeFailure(aResult.meError);
+            return makeCellError(aResult.meError);
         return makeScalarResult(api::CellValue::number(aResult.maValue));
     };
     const auto evaluateUnaryNumericFiniteWithError = [&](auto aCompute,
                                                          api::Error eError) -> EvaluationResult {
         if (rNode.maChildren.size() != 1)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
         if (!aValue)
-            return makeFailure(aValue.meError);
+            return makeCellError(aValue.meError);
 
         const double fResult = aCompute(aValue.maValue);
         if (!std::isfinite(fResult))
-            return makeFailure(eError);
+            return makeCellError(eError);
         return makeScalarResult(api::CellValue::number(fResult));
     };
     const auto evaluateUnaryNumericOptional = [&](auto aCompute) -> EvaluationResult {
         if (rNode.maChildren.size() != 1)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
         if (!aValue)
-            return makeFailure(aValue.meError);
+            return makeCellError(aValue.meError);
 
         const auto oResult = aCompute(aValue.maValue);
         if (!oResult)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aFinite = seutil::makeFiniteResult(*oResult);
         if (!aFinite)
-            return makeFailure(aFinite.meError);
+            return makeCellError(aFinite.meError);
         return makeScalarResult(api::CellValue::number(aFinite.maValue));
     };
     const auto evaluateUnaryNumericOptionalWithError = [&](auto aCompute,
                                                            api::Error eError) -> EvaluationResult {
         if (rNode.maChildren.size() != 1)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
         if (!aValue)
-            return makeFailure(aValue.meError);
+            return makeCellError(aValue.meError);
 
         const auto oResult = aCompute(aValue.maValue);
         if (!oResult)
-            return makeFailure(eError);
+            return makeCellError(eError);
 
         const auto aFinite = seutil::makeFiniteResult(*oResult);
         if (!aFinite)
-            return makeFailure(aFinite.meError);
+            return makeCellError(aFinite.meError);
         return makeScalarResult(api::CellValue::number(aFinite.maValue));
     };
 
@@ -277,24 +283,67 @@ if (aFunctionName == u"ABS")
     if (aFunctionName == u"ATANH")
     {
         if (rNode.maChildren.size() != 1)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         EvaluationResult aArgument
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
         if (!aArgument)
-            return aArgument;
+            return makeCellError(aArgument.meError);
         const auto aNumber = coerceToNumber(aArgument.maValue.maValue);
         if (!aNumber)
-            return makeFailure(aNumber.meError);
+            return makeCellError(aNumber.meError);
 
         const auto aResult = api::math::inverseHyperbolicTangent(aNumber.maValue);
         if (!aResult)
-            return makeFailure(aResult.meError);
+            return makeCellError(aResult.meError);
         return makeScalarResult(api::CellValue::number(aResult.maValue));
     }
 
     if (aFunctionName == u"ACOTH")
         return evaluateUnaryNumericOptionalWithError(semath::computeArcCotHyp, api::Error::Domain);
+
+    if (aFunctionName == u"EVEN" || aFunctionName == u"ODD")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue)
+            return makeCellError(aValue.meError);
+
+        const double fResult
+            = aFunctionName == u"EVEN" ? semath::computeEven(aValue.maValue)
+                                       : semath::computeOdd(aValue.maValue);
+        return makeScalarResult(api::CellValue::number(fResult));
+    }
+
+    if (aFunctionName == u"COLOR")
+    {
+        if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 4)
+            return makeCellError(api::Error::IllegalArgument);
+
+        std::array<double, 4> aChannels{ 0.0, 0.0, 0.0, 0.0 };
+        for (std::size_t nIndex = 0; nIndex < rNode.maChildren.size(); ++nIndex)
+        {
+            const auto aValue
+                = aContext.evaluateNumericArgument(*rNode.maChildren[nIndex], std::nullopt);
+            if (!aValue)
+                return makeCellError(aValue.meError);
+
+            const double fFloor = fp::approxFloor(aValue.maValue);
+            if (fFloor < 0.0 || fFloor > 255.0)
+                return makeCellError(api::Error::IllegalArgument);
+            if (nIndex < 3)
+                aChannels[nIndex + 1] = fFloor;
+            else
+                aChannels[0] = fFloor;
+        }
+
+        const double fResult = 256.0 * 256.0 * 256.0 * aChannels[0]
+                               + 256.0 * 256.0 * aChannels[1]
+                               + 256.0 * aChannels[2] + aChannels[3];
+        return makeScalarResult(api::CellValue::number(fResult));
+    }
 
     if (aFunctionName == u"SIGN")
     {
@@ -680,16 +729,16 @@ if (aFunctionName == u"ABS")
     if (aFunctionName == u"LOG")
     {
         if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         EvaluationResult aValueArgument
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
         if (!aValueArgument)
-            return aValueArgument;
+            return makeCellError(aValueArgument.meError);
 
         const auto aValueNumber = coerceToNumber(aValueArgument.maValue.maValue);
         if (!aValueNumber || !(aValueNumber.maValue > 0.0))
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         double fBase = 10.0;
         if (rNode.maChildren.size() == 2
@@ -698,47 +747,47 @@ if (aFunctionName == u"ABS")
             EvaluationResult aBaseArgument
                 = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
             if (!aBaseArgument)
-                return aBaseArgument;
+                return makeCellError(aBaseArgument.meError);
 
             const auto aBaseNumber = coerceToNumber(aBaseArgument.maValue.maValue);
             if (!aBaseNumber)
-                return makeFailure(aBaseNumber.meError);
+                return makeCellError(aBaseNumber.meError);
             fBase = aBaseNumber.maValue;
         }
 
         const auto aLogarithm = semath::evaluateLogValue(aValueNumber.maValue, fBase);
         if (!aLogarithm)
-            return makeFailure(aLogarithm.meError);
+            return makeCellError(aLogarithm.meError);
         return makeScalarResult(api::CellValue::number(aLogarithm.maValue));
     }
 
     if (aFunctionName == u"LOG10")
     {
         if (rNode.maChildren.size() != 1)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
         if (!aValue)
-            return makeFailure(aValue.meError);
+            return makeCellError(aValue.meError);
 
         const auto oLogarithm = semath::computeLog10(aValue.maValue);
         if (!oLogarithm)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
         return makeScalarResult(api::CellValue::number(*oLogarithm));
     }
 
     if (aFunctionName == u"LN")
     {
         if (rNode.maChildren.size() != 1)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
         if (!aValue)
-            return makeFailure(aValue.meError);
+            return makeCellError(aValue.meError);
 
         const auto oLogarithm = semath::computeLn(aValue.maValue);
         if (!oLogarithm)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
         return makeScalarResult(api::CellValue::number(*oLogarithm));
     }
 

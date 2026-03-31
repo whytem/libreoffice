@@ -290,6 +290,15 @@ int main()
         }
         return 0;
     };
+    auto requireNumericFormula = [&](const auto& rResult, double fExpected,
+                                     const char* pMessage) -> int {
+        if (!rResult || rResult.mbUsedCachedValue || !rResult.maValue.maValue.isNumber()
+            || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", pMessage);
+        }
+        return 0;
+    };
 
     {
         const auto aResult = aEvaluator.evaluateCell({ 0, 1, 0 });
@@ -449,21 +458,99 @@ int main()
     }
 
     {
+        const auto aEven = aEvaluator.evaluateFormula(u"of:=EVEN(1.2)", { 0, 0, 0 });
+        const auto aCompiledEven
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=EVEN(1.2)", { 0, 0, 0 });
+        const auto aOdd = aEvaluator.evaluateFormula(u"of:=ODD(-2)", { 0, 0, 0 });
+        const auto aCompiledOdd
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=ODD(-2)", { 0, 0, 0 });
+        const auto aColor = aEvaluator.evaluateFormula(u"of:=COLOR(1;2;3)", { 0, 0, 0 });
+        const auto aCompiledColor
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=COLOR(1;2;3)", { 0, 0, 0 });
+        const auto aPermut = aEvaluator.evaluateFormula(u"of:=PERMUT(4;2)", { 0, 0, 0 });
+        const auto aCompiledPermut
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=PERMUT(4;2)", { 0, 0, 0 });
+        const auto aNumberValue
+            = aEvaluator.evaluateFormula(u"of:=NUMBERVALUE(\"1,23\";\",\";\".\")", { 0, 0, 0 });
+        const auto aCompiledNumberValue = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=NUMBERVALUE(\"1,23\";\",\";\".\")", { 0, 0, 0 });
+        const auto aRegex = aEvaluator.evaluateFormula(u"of:=REGEX(\"abc123\";\"[0-9]+\")",
+            { 0, 0, 0 });
+        const auto aCompiledRegex = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=REGEX(\"abc123\";\"[0-9]+\")", { 0, 0, 0 });
+        const auto aRegexReplace = aEvaluator.evaluateFormula(
+            u"of:=REGEX(\"a1b2\";\"[0-9]\";\"x\";\"g\")", { 0, 0, 0 });
+        const auto aCompiledRegexReplace = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=REGEX(\"a1b2\";\"[0-9]\";\"x\";\"g\")", { 0, 0, 0 });
+        if (const int nResult = requireNumericFormula(aEven, 2.0, "EVEN mismatch"))
+            return nResult;
+        if (const int nResult = requireNumericFormula(
+                aCompiledEven, 2.0, "compiled EVEN mismatch"))
+        {
+            return nResult;
+        }
+        if (const int nResult = requireNumericFormula(aOdd, -3.0, "ODD mismatch"))
+            return nResult;
+        if (const int nResult = requireNumericFormula(
+                aCompiledOdd, -3.0, "compiled ODD mismatch"))
+        {
+            return nResult;
+        }
+        if (const int nResult = requireNumericFormula(aColor, 66051.0, "COLOR mismatch"))
+            return nResult;
+        if (const int nResult = requireNumericFormula(
+                aCompiledColor, 66051.0, "compiled COLOR mismatch"))
+        {
+            return nResult;
+        }
+        if (const int nResult = requireNumericFormula(aPermut, 12.0, "PERMUT mismatch"))
+            return nResult;
+        if (const int nResult = requireNumericFormula(
+                aCompiledPermut, 12.0, "compiled PERMUT mismatch"))
+        {
+            return nResult;
+        }
+        if (const int nResult = requireNumericFormula(
+                aNumberValue, 1.23, "NUMBERVALUE mismatch"))
+        {
+            return nResult;
+        }
+        if (const int nResult = requireNumericFormula(
+                aCompiledNumberValue, 1.23, "compiled NUMBERVALUE mismatch"))
+        {
+            return nResult;
+        }
+        if (!aRegex || aRegex.mbUsedCachedValue || !aRegex.maValue.maValue.isText()
+            || aRegex.maValue.maValue.maString != u"123" || !aCompiledRegex
+            || aCompiledRegex.mbUsedCachedValue || !aCompiledRegex.maValue.maValue.isText()
+            || aCompiledRegex.maValue.maValue.maString != u"123" || !aRegexReplace
+            || aRegexReplace.mbUsedCachedValue || !aRegexReplace.maValue.maValue.isText()
+            || aRegexReplace.maValue.maValue.maString != u"axbx" || !aCompiledRegexReplace
+            || aCompiledRegexReplace.mbUsedCachedValue
+            || !aCompiledRegexReplace.maValue.maValue.isText()
+            || aCompiledRegexReplace.maValue.maValue.maString != u"axbx")
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "math/text promotion mismatch");
+        }
+    }
+
+    {
         const auto aResult = aEvaluator.evaluateCell({ 0, 6, 0 });
-        if (!aResult || !aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber()
+        if (!aResult || !aResult.maValue.maValue.isNumber()
             || !almostEqual(aResult.maValue.maValue.mfNumber, 42.0))
         {
-            return fail("spreadsheetengine_fods_evaluator_tests", "cached fallback mismatch");
+            return fail("spreadsheetengine_fods_evaluator_tests", "live scalar mismatch");
         }
     }
 
     {
         const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 6, 0 });
-        if (!aResult || !aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber()
+        if (!aResult || !aResult.maValue.maValue.isNumber()
             || !almostEqual(aResult.maValue.maValue.mfNumber, 42.0))
         {
             return fail("spreadsheetengine_fods_evaluator_tests",
-                "compiled cached fallback mismatch");
+                "compiled live scalar mismatch");
         }
     }
 
@@ -3644,11 +3731,10 @@ int main()
         }
 
         const auto aErr511Result = aFixtureEvaluator.evaluateCell({ 0, 7, 0 });
-        if (!aErr511Result || !aErr511Result.mbUsedCachedValue
-            || !aErr511Result.maValue.maValue.isError())
+        if (!aErr511Result || !aErr511Result.maValue.maValue.isError())
         {
             return fail(
-                "spreadsheetengine_fods_evaluator_tests", "Err:511 cached fallback mismatch");
+                "spreadsheetengine_fods_evaluator_tests", "Err:511 live error mismatch");
         }
     }
 

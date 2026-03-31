@@ -164,27 +164,27 @@ if (aFunctionName == u"EUROCONVERT")
     if (aFunctionName == u"DECIMAL")
     {
         if (rNode.maChildren.size() != 2)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
         EvaluationResult aTextArgument
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
         if (!aTextArgument)
-            return aTextArgument;
+            return makeScalarResult(api::CellValue::error(aTextArgument.meError));
         EvaluationResult aBaseArgument
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
         if (!aBaseArgument)
-            return aBaseArgument;
+            return makeScalarResult(api::CellValue::error(aBaseArgument.meError));
 
         const auto aText = coerceToString(aTextArgument.maValue.maValue);
         if (!aText)
-            return makeFailure(aText.meError);
+            return makeScalarResult(api::CellValue::error(aText.meError));
         const auto aBaseNumber = coerceToNumber(aBaseArgument.maValue.maValue);
         if (!aBaseNumber)
-            return makeFailure(aBaseNumber.meError);
+            return makeScalarResult(api::CellValue::error(aBaseNumber.meError));
 
         const auto aResult = seconvert::evaluateDecimalValue(aText.maValue, aBaseNumber.maValue);
         if (!aResult)
-            return makeFailure(aResult.meError);
+            return makeScalarResult(api::CellValue::error(aResult.meError));
         return makeScalarResult(api::CellValue::number(aResult.maValue));
     }
 

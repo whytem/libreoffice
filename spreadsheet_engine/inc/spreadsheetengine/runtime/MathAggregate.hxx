@@ -60,6 +60,10 @@ SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<std::vector<double>> evaluateModeVa
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateHypergeometricDistribution(
     double fX, double fTrials, double fSuccesses, double fPopulation, bool bCumulative);
 
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateProbability(
+    const std::vector<double>& rProbabilities, const std::vector<double>& rValues,
+    double fLower, double fUpper);
+
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluatePercentrank(
     std::vector<double> aValues, double fValue, bool bInclusive, sal_Int32 nSignificance);
 

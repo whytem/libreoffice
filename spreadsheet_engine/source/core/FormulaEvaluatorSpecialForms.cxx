@@ -585,9 +585,9 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpecialForm(
         || rFunctionName == u"IFNA" || rFunctionName == u"COM.MICROSOFT.IFNA")
     {
         if (rNode.maChildren.size() != 2)
-            return detail::makeFailure(api::Error::IllegalArgument);
+            return detail::makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
         if (rNode.maChildren[0]->meKind == formula::NodeKind::EmptyArgument)
-            return detail::makeFailure(api::Error::IllegalArgument);
+            return detail::makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
         const bool bNAOnly = rFunctionName == u"IFNA" || rFunctionName == u"COM.MICROSOFT.IFNA";
         EvaluationResult aPrimary = evaluateNode(*rNode.maChildren[0], rCurrentAddress);

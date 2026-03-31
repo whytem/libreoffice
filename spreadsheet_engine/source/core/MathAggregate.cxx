@@ -272,6 +272,41 @@ api::ValueResult<double> evaluateHypergeometricDistribution(
     return api::ValueResult<double>::success(std::min(1.0, static_cast<double>(fSum)));
 }
 
+api::ValueResult<double> evaluateProbability(
+    const std::vector<double>& rProbabilities, const std::vector<double>& rValues,
+    double fLower, double fUpper)
+{
+    if (rProbabilities.empty() || rProbabilities.size() != rValues.size())
+        return api::ValueResult<double>::failure(api::Error::NotAvailable);
+
+    double fLo = fLower;
+    double fUp = fUpper;
+    if (fLo > fUp)
+        std::swap(fLo, fUp);
+
+    fp::KahanSum fSum = 0.0;
+    fp::KahanSum fResult = 0.0;
+    for (std::size_t nIndex = 0; nIndex < rProbabilities.size(); ++nIndex)
+    {
+        const double fProbability = rProbabilities[nIndex];
+        const double fValue = rValues[nIndex];
+        if (!std::isfinite(fProbability) || !std::isfinite(fValue) || fProbability < 0.0
+            || fProbability > 1.0)
+        {
+            return api::ValueResult<double>::failure(api::Error::NoValue);
+        }
+
+        fSum += fProbability;
+        if (fValue >= fLo && fValue <= fUp)
+            fResult += fProbability;
+    }
+
+    if (std::abs((fSum - 1.0).get()) > 1.0E-7)
+        return api::ValueResult<double>::failure(api::Error::NoValue);
+
+    return api::ValueResult<double>::success(fResult.get());
+}
+
 api::ValueResult<double> evaluatePercentrank(
     std::vector<double> aValues, double fValue, bool bInclusive, std::int32_t nSignificance)
 {

@@ -43,6 +43,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateInformationFamily(
         api::StringView(u"ISREF"),
         api::StringView(u"N"),
         api::StringView(u"TYPE"),
+        api::StringView(u"ISFORMULA"),
         api::StringView(u"ROW"),
         api::StringView(u"COLUMN"),
         api::StringView(u"ERROR.TYPE"),
@@ -58,6 +59,9 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
     const api::CellAddress& rCurrentAddress)
 {
     const api::StringView aFunctionName = rFunctionName;
+    const auto makeCellError = [&](api::Error eError) -> EvaluationResult {
+        return makeScalarResult(api::CellValue::error(eError));
+    };
 
     if (aFunctionName == u"ISERROR")
     {
@@ -233,6 +237,29 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
         if (rValue.isError())
             return makeScalarResult(api::CellValue::number(16.0));
         return makeScalarResult(api::CellValue::number(1.0));
+    }
+
+    if (aFunctionName == u"ISFORMULA")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const formula::Node& rArgument = *rNode.maChildren[0];
+        if (rArgument.meKind != formula::NodeKind::CellReference
+            && rArgument.meKind != formula::NodeKind::RangeReference
+            && rArgument.meKind != formula::NodeKind::NamedReference)
+        {
+            return makeScalarResult(api::CellValue::boolean(false));
+        }
+
+        EvaluationResult aReference = evaluateReferenceNode(rArgument, rCurrentAddress);
+        if (!aReference || !aReference.maValue.isMatrixReference())
+            return makeScalarResult(api::CellValue::boolean(false));
+        if (!aReference.maValue.maReference.isSingleCell())
+            return makeScalarResult(api::CellValue::boolean(false));
+
+        const workbook::Cell* pCell = getCell(aReference.maValue.maReference.maRange.maStart);
+        return makeScalarResult(api::CellValue::boolean(pCell && pCell->hasFormula()));
     }
 
     if (aFunctionName == u"ROW" || aFunctionName == u"COLUMN")

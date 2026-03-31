@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <array>
 
+#include <unicode/regex.h>
+
 namespace spreadsheetengine::core::eval
 {
 namespace
@@ -57,6 +59,8 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateTextFamily(
         api::StringView(u"RIGHT"),
         api::StringView(u"TEXTJOIN"),
         api::StringView(u"CONCAT"),
+        api::StringView(u"NUMBERVALUE"),
+        api::StringView(u"REGEX"),
         api::StringView(u"T"),
         api::StringView(u"EXACT"),
     };
@@ -812,6 +816,197 @@ if (aFunctionName == u"CONCATENATE")
         }
 
         return makeScalarResult(api::CellValue::text(aResult));
+    }
+
+    if (aFunctionName == u"NUMBERVALUE")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
+        {
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+        }
+
+        EvaluationResult aInput
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aInput)
+            return makeScalarResult(api::CellValue::error(aInput.meError));
+
+        if (aInput.maValue.maValue.isNumber() || aInput.maValue.maValue.isBoolean())
+            return makeScalarResult(api::CellValue::number(aInput.maValue.maValue.mfNumber));
+
+        const auto aInputText = coerceToString(aInput.maValue.maValue);
+        if (!aInputText)
+            return makeScalarResult(api::CellValue::error(aInputText.meError));
+
+        std::optional<api::String> oDecimalSeparator;
+        std::optional<api::String> oGroupSeparator;
+        if (rNode.maChildren.size() >= 2
+            && rNode.maChildren[1]->meKind != formula::NodeKind::EmptyArgument)
+        {
+            EvaluationResult aDecimal
+                = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
+            if (!aDecimal)
+                return makeScalarResult(api::CellValue::error(aDecimal.meError));
+            const auto aDecimalText = coerceToString(aDecimal.maValue.maValue);
+            if (!aDecimalText)
+                return makeScalarResult(api::CellValue::error(aDecimalText.meError));
+            oDecimalSeparator = aDecimalText.maValue;
+        }
+        if (rNode.maChildren.size() >= 3
+            && rNode.maChildren[2]->meKind != formula::NodeKind::EmptyArgument)
+        {
+            EvaluationResult aGroup
+                = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[2], rCurrentAddress));
+            if (!aGroup)
+                return makeScalarResult(api::CellValue::error(aGroup.meError));
+            const auto aGroupText = coerceToString(aGroup.maValue.maValue);
+            if (!aGroupText)
+                return makeScalarResult(api::CellValue::error(aGroupText.meError));
+            oGroupSeparator = aGroupText.maValue;
+        }
+
+        const auto aParsed
+            = api::text::parseNumberValue(aInputText.maValue, oDecimalSeparator, oGroupSeparator, false);
+        if (!aParsed)
+            return makeScalarResult(api::CellValue::error(aParsed.meError));
+        return makeScalarResult(api::CellValue::number(aParsed.maValue));
+    }
+
+    if (aFunctionName == u"REGEX")
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        auto evaluateTextArgument = [&](const formula::Node& rArgument)
+            -> api::ValueResult<api::String> {
+            EvaluationResult aValue
+                = ensureScalarValue(*this, evaluateNode(rArgument, rCurrentAddress));
+            if (!aValue)
+                return api::ValueResult<api::String>::failure(aValue.meError);
+            return coerceToString(aValue.maValue.maValue);
+        };
+
+        bool bGlobalReplacement = false;
+        sal_Int32 nOccurrence = 1;
+        if (rNode.maChildren.size() == 4
+            && rNode.maChildren[3]->meKind != formula::NodeKind::EmptyArgument)
+        {
+            EvaluationResult aFlagsOrOccurrence
+                = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[3], rCurrentAddress));
+            if (!aFlagsOrOccurrence)
+            {
+                return makeScalarResult(api::CellValue::error(aFlagsOrOccurrence.meError));
+            }
+
+            if (aFlagsOrOccurrence.maValue.maValue.isNumber()
+                || aFlagsOrOccurrence.maValue.maValue.isBoolean())
+            {
+                const auto aOccurrence = coerceToNumber(aFlagsOrOccurrence.maValue.maValue);
+                if (!aOccurrence)
+                    return makeScalarResult(api::CellValue::error(aOccurrence.meError));
+                const auto oWholeOccurrence = toWholeNumber(aOccurrence.maValue);
+                if (!oWholeOccurrence)
+                    return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+                nOccurrence = static_cast<sal_Int32>(*oWholeOccurrence);
+            }
+            else
+            {
+                const auto aFlags = coerceToString(aFlagsOrOccurrence.maValue.maValue);
+                if (!aFlags)
+                    return makeScalarResult(api::CellValue::error(aFlags.meError));
+                if (aFlags.maValue.size() > 1)
+                    return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+                if (!aFlags.maValue.empty())
+                {
+                    if (aFlags.maValue == u"g")
+                        bGlobalReplacement = true;
+                    else
+                        return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+                }
+            }
+        }
+
+        const bool bReplacementArgPresent
+            = rNode.maChildren.size() >= 3
+              && rNode.maChildren[2]->meKind != formula::NodeKind::EmptyArgument;
+        api::String aReplacement;
+        const bool bReplacement = bReplacementArgPresent && nOccurrence != 0;
+        if (bReplacementArgPresent)
+        {
+            const auto aReplacementText = evaluateTextArgument(*rNode.maChildren[2]);
+            if (!aReplacementText)
+                return makeScalarResult(api::CellValue::error(aReplacementText.meError));
+            aReplacement = aReplacementText.maValue;
+        }
+
+        const auto aExpression = evaluateTextArgument(*rNode.maChildren[1]);
+        if (!aExpression)
+            return makeScalarResult(api::CellValue::error(aExpression.meError));
+        const auto aText = evaluateTextArgument(*rNode.maChildren[0]);
+        if (!aText)
+            return makeScalarResult(api::CellValue::error(aText.meError));
+
+        if (nOccurrence == 0)
+            return makeScalarResult(api::CellValue::text(aText.maValue));
+
+        UErrorCode eStatus = U_ZERO_ERROR;
+        const icu::UnicodeString aPattern(
+            false, reinterpret_cast<const UChar*>(aExpression.maValue.data()),
+            static_cast<int32_t>(aExpression.maValue.size()));
+        icu::RegexMatcher aMatcher(aPattern, 0, eStatus);
+        if (U_FAILURE(eStatus))
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+        aMatcher.setTimeLimit(23 * 1000, eStatus);
+
+        const icu::UnicodeString aIcuText(
+            false, reinterpret_cast<const UChar*>(aText.maValue.data()),
+            static_cast<int32_t>(aText.maValue.size()));
+        aMatcher.reset(aIcuText);
+
+        if (!bReplacement)
+        {
+            sal_Int32 nCount = 0;
+            while (aMatcher.find(eStatus) && U_SUCCESS(eStatus) && ++nCount < nOccurrence)
+                ;
+            if (U_FAILURE(eStatus))
+                return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+            if (nCount != nOccurrence)
+                return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
+
+            const icu::UnicodeString aMatch(aMatcher.group(eStatus));
+            if (U_FAILURE(eStatus))
+                return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+            return makeScalarResult(api::CellValue::text(api::String(
+                reinterpret_cast<const char16_t*>(aMatch.getBuffer()),
+                static_cast<std::size_t>(aMatch.length()))));
+        }
+
+        const icu::UnicodeString aIcuReplacement(
+            false, reinterpret_cast<const UChar*>(aReplacement.data()),
+            static_cast<int32_t>(aReplacement.size()));
+        icu::UnicodeString aReplaced;
+        if (bGlobalReplacement)
+            aReplaced = aMatcher.replaceAll(aIcuReplacement, eStatus);
+        else if (nOccurrence == 1)
+            aReplaced = aMatcher.replaceFirst(aIcuReplacement, eStatus);
+        else
+        {
+            sal_Int32 nCount = 0;
+            while (aMatcher.find(eStatus) && U_SUCCESS(eStatus))
+            {
+                if (++nCount == nOccurrence)
+                {
+                    aMatcher.appendReplacement(aReplaced, aIcuReplacement, eStatus);
+                    break;
+                }
+            }
+            aMatcher.appendTail(aReplaced);
+        }
+        if (U_FAILURE(eStatus))
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        return makeScalarResult(api::CellValue::text(api::String(
+            reinterpret_cast<const char16_t*>(aReplaced.getBuffer()),
+            static_cast<std::size_t>(aReplaced.length()))));
     }
 
     if (aFunctionName == u"T")
