@@ -23,8 +23,8 @@ namespace rtl::math
 
 namespace fp = spreadsheetengine::core::fp;
 
-inline double stringToDouble(std::u16string_view aString, sal_Unicode cDecSeparator,
-    sal_Unicode cGroupSeparator, rtl_math_ConversionStatus* pStatus = nullptr,
+inline double stringToDouble(std::u16string_view aString, char16_t cDecSeparator,
+    char16_t cGroupSeparator, rtl_math_ConversionStatus* pStatus = nullptr,
     sal_Int32* pParsedEnd = nullptr)
 {
     fp::ConversionStatus eStatus = fp::ConversionStatus::Ok;
