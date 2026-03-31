@@ -1871,6 +1871,165 @@ int main()
     }
 
     {
+        const auto aNormSDist
+            = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.NORM.S.DIST(1;TRUE())", { 0, 0, 0 });
+        const auto aNormSPdf
+            = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.NORM.S.DIST(1;FALSE())", { 0, 0, 0 });
+        const auto aNormSInv
+            = aEvaluator.evaluateFormula(u"of:=NORMSINV(0.975)", { 0, 0, 0 });
+        const auto aNormInv
+            = aEvaluator.evaluateFormula(u"of:=NORMINV(0.9;0;1)", { 0, 0, 0 });
+        const auto aLogInv = aEvaluator.evaluateFormula(u"of:=LOGINV(0.5)", { 0, 0, 0 });
+        const auto aGammaInv
+            = aEvaluator.evaluateFormula(u"of:=GAMMAINV(0.5;1;2)", { 0, 0, 0 });
+        const auto aBetaInv
+            = aEvaluator.evaluateFormula(u"of:=BETAINV(0.5;2;3)", { 0, 0, 0 });
+        const auto aChiInv = aEvaluator.evaluateFormula(u"of:=CHIINV(0.05;2)", { 0, 0, 0 });
+        const auto aChiSqInvRt
+            = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.CHISQ.INV.RT(0.05;2)", { 0, 0, 0 });
+        const auto aChiSqDistRt
+            = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.CHISQ.DIST.RT(3;2)", { 0, 0, 0 });
+        const auto aExpLegacy
+            = aEvaluator.evaluateFormula(u"of:=EXPONDIST(1;2;TRUE())", { 0, 0, 0 });
+        const auto aExpMs
+            = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.EXPON.DIST(1;2;FALSE())", { 0, 0, 0 });
+        const auto aNegBinomLegacy
+            = aEvaluator.evaluateFormula(u"of:=NEGBINOMDIST(1;1;0.5)", { 0, 0, 0 });
+        const auto aNegBinomMs = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.NEGBINOM.DIST(1;1;0.5;TRUE())", { 0, 0, 0 });
+        const auto aWeibullLegacy
+            = aEvaluator.evaluateFormula(u"of:=WEIBULL(1;2;3;TRUE())", { 0, 0, 0 });
+        const auto aWeibullMs = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.WEIBULL.DIST(1;2;3;FALSE())", { 0, 0, 0 });
+        const auto aConfidenceNorm = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.CONFIDENCE.NORM(0.05;1.5;100)", { 0, 0, 0 });
+        const auto aStandardize
+            = aEvaluator.evaluateFormula(u"of:=STANDARDIZE(5;2;3)", { 0, 0, 0 });
+        const auto aTDistRt
+            = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.T.DIST.RT(1;10)", { 0, 0, 0 });
+        const auto aErfPrecise
+            = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.ERF.PRECISE(1)", { 0, 0, 0 });
+        const auto aErfcPrecise
+            = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.ERFC.PRECISE(1)", { 0, 0, 0 });
+        const auto aGammaLnPreciseCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.GAMMALN.PRECISE(5)", { 0, 0, 0 });
+        const auto aNormSDistCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.NORM.S.DIST(1;TRUE())", { 0, 0, 0 });
+        const auto aNormSPdfCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.NORM.S.DIST(1;FALSE())", { 0, 0, 0 });
+        const auto aNormSInvCompiled
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=NORMSINV(0.975)", { 0, 0, 0 });
+        const auto aNormInvCompiled
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=NORMINV(0.9;0;1)", { 0, 0, 0 });
+        const auto aLogInvCompiled
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=LOGINV(0.5)", { 0, 0, 0 });
+        const auto aGammaInvCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=GAMMAINV(0.5;1;2)", { 0, 0, 0 });
+        const auto aBetaInvCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=BETAINV(0.5;2;3)", { 0, 0, 0 });
+        const auto aChiInvCompiled
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=CHIINV(0.05;2)", { 0, 0, 0 });
+        const auto aChiSqInvRtCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.CHISQ.INV.RT(0.05;2)", { 0, 0, 0 });
+        const auto aChiSqDistRtCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.CHISQ.DIST.RT(3;2)", { 0, 0, 0 });
+        const auto aExpLegacyCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=EXPONDIST(1;2;TRUE())", { 0, 0, 0 });
+        const auto aExpMsCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.EXPON.DIST(1;2;FALSE())", { 0, 0, 0 });
+        const auto aNegBinomLegacyCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=NEGBINOMDIST(1;1;0.5)", { 0, 0, 0 });
+        const auto aNegBinomMsCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.NEGBINOM.DIST(1;1;0.5;TRUE())", { 0, 0, 0 });
+        const auto aWeibullLegacyCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=WEIBULL(1;2;3;TRUE())", { 0, 0, 0 });
+        const auto aWeibullMsCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.WEIBULL.DIST(1;2;3;FALSE())", { 0, 0, 0 });
+        const auto aConfidenceNormCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.CONFIDENCE.NORM(0.05;1.5;100)", { 0, 0, 0 });
+        const auto aStandardizeCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=STANDARDIZE(5;2;3)", { 0, 0, 0 });
+        const auto aTDistRtCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.T.DIST.RT(1;10)", { 0, 0, 0 });
+        const auto aErfPreciseCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.ERF.PRECISE(1)", { 0, 0, 0 });
+        const auto aErfcPreciseCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.ERFC.PRECISE(1)", { 0, 0, 0 });
+
+        const auto checkStatScalar = [&](const char* pLabel, const auto& rResult,
+                                         double fExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isNumber() || rResult.mbUsedCachedValue
+                || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+            {
+                std::fprintf(stderr, "%s: statistical dispatch mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        if (!checkStatScalar("NORM.S.DIST cumulative", aNormSDist, 0.841344746068543)
+            || !checkStatScalar("NORM.S.DIST density", aNormSPdf, 0.241970724519143)
+            || !checkStatScalar("NORMSINV", aNormSInv, 1.95996398454005)
+            || !checkStatScalar("NORMINV", aNormInv, 1.2815515655446)
+            || !checkStatScalar("LOGINV", aLogInv, 1.0)
+            || !checkStatScalar("GAMMAINV", aGammaInv, 1.38629436111989)
+            || !checkStatScalar("BETAINV", aBetaInv, 0.38572756813239)
+            || !checkStatScalar("CHIINV", aChiInv, 5.99146454710798)
+            || !checkStatScalar("CHISQ.INV.RT", aChiSqInvRt, 5.99146454710798)
+            || !checkStatScalar("CHISQ.DIST.RT", aChiSqDistRt, 0.22313016014843)
+            || !checkStatScalar("EXPONDIST cumulative", aExpLegacy, 0.864664716763387)
+            || !checkStatScalar("EXPON.DIST density", aExpMs, 0.270670566473225)
+            || !checkStatScalar("NEGBINOMDIST", aNegBinomLegacy, 0.25)
+            || !checkStatScalar("NEGBINOM.DIST", aNegBinomMs, 0.75)
+            || !checkStatScalar("WEIBULL cumulative", aWeibullLegacy, 0.105160683185631)
+            || !checkStatScalar("WEIBULL.DIST density", aWeibullMs, 0.198853181514304)
+            || !checkStatScalar("CONFIDENCE.NORM", aConfidenceNorm, 0.293994597681008)
+            || !checkStatScalar("STANDARDIZE", aStandardize, 1.0)
+            || !checkStatScalar("T.DIST.RT", aTDistRt, 0.17044656615103)
+            || !checkStatScalar("ERF.PRECISE", aErfPrecise, 0.842700792949715)
+            || !checkStatScalar("ERFC.PRECISE", aErfcPrecise, 0.157299207050285)
+            || !checkStatScalar("compiled GAMMALN.PRECISE", aGammaLnPreciseCompiled,
+                3.17805383034795)
+            || !checkStatScalar("compiled NORM.S.DIST cumulative", aNormSDistCompiled,
+                0.841344746068543)
+            || !checkStatScalar("compiled NORM.S.DIST density", aNormSPdfCompiled,
+                0.241970724519143)
+            || !checkStatScalar("compiled NORMSINV", aNormSInvCompiled, 1.95996398454005)
+            || !checkStatScalar("compiled NORMINV", aNormInvCompiled, 1.2815515655446)
+            || !checkStatScalar("compiled LOGINV", aLogInvCompiled, 1.0)
+            || !checkStatScalar("compiled GAMMAINV", aGammaInvCompiled, 1.38629436111989)
+            || !checkStatScalar("compiled BETAINV", aBetaInvCompiled, 0.38572756813239)
+            || !checkStatScalar("compiled CHIINV", aChiInvCompiled, 5.99146454710798)
+            || !checkStatScalar("compiled CHISQ.INV.RT", aChiSqInvRtCompiled,
+                5.99146454710798)
+            || !checkStatScalar("compiled CHISQ.DIST.RT", aChiSqDistRtCompiled,
+                0.22313016014843)
+            || !checkStatScalar("compiled EXPONDIST cumulative", aExpLegacyCompiled,
+                0.864664716763387)
+            || !checkStatScalar("compiled EXPON.DIST density", aExpMsCompiled,
+                0.270670566473225)
+            || !checkStatScalar("compiled NEGBINOMDIST", aNegBinomLegacyCompiled, 0.25)
+            || !checkStatScalar("compiled NEGBINOM.DIST", aNegBinomMsCompiled, 0.75)
+            || !checkStatScalar("compiled WEIBULL cumulative", aWeibullLegacyCompiled,
+                0.105160683185631)
+            || !checkStatScalar("compiled WEIBULL.DIST density", aWeibullMsCompiled,
+                0.198853181514304)
+            || !checkStatScalar("compiled CONFIDENCE.NORM", aConfidenceNormCompiled,
+                0.293994597681008)
+            || !checkStatScalar("compiled STANDARDIZE", aStandardizeCompiled, 1.0)
+            || !checkStatScalar("compiled T.DIST.RT", aTDistRtCompiled, 0.17044656615103)
+            || !checkStatScalar("compiled ERF.PRECISE", aErfPreciseCompiled,
+                0.842700792949715)
+            || !checkStatScalar("compiled ERFC.PRECISE", aErfcPreciseCompiled,
+                0.157299207050285))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "statistical runtime dispatch mismatch");
+        }
+    }
+
+    {
         const auto aAbs = aEvaluator.evaluateFormula(u"of:=ABS(-7.25)", { 0, 0, 0 });
         const auto aDegrees
             = aEvaluator.evaluateFormula(u"of:=DEGREES(3.141592653589793)", { 0, 0, 0 });
