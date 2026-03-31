@@ -70,7 +70,8 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
             || rFunctionName == u"MAXA" || rFunctionName == u"MINA"
             || rFunctionName == u"SUM" || rFunctionName == u"AVERAGE"
             || rFunctionName == u"AVERAGEA" || rFunctionName == u"COUNT"
-            || rFunctionName == u"COUNTA" || rFunctionName == u"MEDIAN"
+            || rFunctionName == u"COUNTA"
+            || rFunctionName == u"MEDIAN"
             || rFunctionName == u"SUBTOTAL" || rFunctionName == u"AGGREGATE"
             || bRankedAggregate || rFunctionName == u"SKEW"
             || rFunctionName == u"SKEWP"))
@@ -242,42 +243,46 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
         return aNumber;
     };
 
+    const auto makeCellError = [](api::Error eError) -> EvaluationResult {
+        return detail::makeScalarResult(api::CellValue::error(eError));
+    };
+
     if (rFunctionName == u"MAX" || rFunctionName == u"MIN")
     {
         if (rNode.maChildren.empty())
-            return detail::makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aNumbers = collectExtremaArguments();
         if (!aNumbers)
-            return detail::makeFailure(aNumbers.meError);
+            return makeCellError(aNumbers.meError);
 
         const auto aExtrema
             = semath::evaluateExtremaNumbers(aNumbers.maValue, rFunctionName == u"MAX", true);
         if (!aExtrema)
-            return detail::makeFailure(aExtrema.meError);
+            return makeCellError(aExtrema.meError);
         return detail::makeScalarResult(api::CellValue::number(aExtrema.maValue));
     }
 
     if (rFunctionName == u"MAXA" || rFunctionName == u"MINA")
     {
         if (rNode.maChildren.empty())
-            return detail::makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aNumbers = collectVarianceArguments(true);
         if (!aNumbers)
-            return detail::makeFailure(aNumbers.meError);
+            return makeCellError(aNumbers.meError);
 
         const auto aExtrema
             = semath::evaluateExtremaNumbers(aNumbers.maValue, rFunctionName == u"MAXA", false);
         if (!aExtrema)
-            return detail::makeFailure(aExtrema.meError);
+            return makeCellError(aExtrema.meError);
         return detail::makeScalarResult(api::CellValue::number(aExtrema.maValue));
     }
 
     if (rFunctionName == u"SUM")
     {
         if (rNode.maChildren.empty())
-            return detail::makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         double fSum = 0.0;
         for (const auto& pChild : rNode.maChildren)
@@ -306,7 +311,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
                     return api::ValueResult<bool>::success(true);
                 });
             if (!aVisited)
-                return detail::makeFailure(aVisited.meError);
+                return makeCellError(aVisited.meError);
         }
 
         return detail::makeScalarResult(api::CellValue::number(fSum));
@@ -315,13 +320,13 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
     if (rFunctionName == u"AVERAGE" || rFunctionName == u"AVERAGEA")
     {
         if (rNode.maChildren.empty())
-            return detail::makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aNumbers = collectVarianceArguments(rFunctionName == u"AVERAGEA");
         if (!aNumbers)
-            return detail::makeFailure(aNumbers.meError);
+            return makeCellError(aNumbers.meError);
         if (aNumbers.maValue.empty())
-            return detail::makeFailure(api::Error::DivisionByZero);
+            return makeCellError(api::Error::DivisionByZero);
 
         double fSum = 0.0;
         for (const double fValue : aNumbers.maValue)
@@ -334,7 +339,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
     if (rFunctionName == u"COUNT" || rFunctionName == u"COUNTA")
     {
         if (rNode.maChildren.empty())
-            return detail::makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         double fCount = 0.0;
         for (const auto& pChild : rNode.maChildren)
@@ -372,7 +377,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
                     return api::ValueResult<bool>::success(true);
                 });
             if (!aVisited)
-                return detail::makeFailure(aVisited.meError);
+                return makeCellError(aVisited.meError);
         }
 
         return detail::makeScalarResult(api::CellValue::number(fCount));
@@ -381,19 +386,19 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
     if (rFunctionName == u"MEDIAN")
     {
         if (rNode.maChildren.empty())
-            return detail::makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aNumbers = collectVarianceArguments(false);
         if (!aNumbers)
-            return detail::makeFailure(aNumbers.meError);
+            return makeCellError(aNumbers.meError);
         if (aNumbers.maValue.empty())
-            return detail::makeFailure(api::Error::NoValue);
+            return makeCellError(api::Error::NoValue);
 
         semath::AggregateScan aScan;
         aScan.maNumbers = std::move(aNumbers.maValue);
         const auto aMedian = semath::evaluateAggregateNumbers(12, aScan);
         if (!aMedian)
-            return detail::makeFailure(aMedian.meError);
+            return makeCellError(aMedian.meError);
         return detail::makeScalarResult(api::CellValue::number(aMedian.maValue));
     }
 
@@ -539,15 +544,15 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
     if (bRankedAggregate)
     {
         if (rNode.maChildren.size() != 2)
-            return detail::makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aScan = collectAggregateScanFromArgument(*rNode.maChildren[0]);
         if (!aScan)
-            return detail::makeFailure(aScan.meError);
+            return makeCellError(aScan.meError);
 
         const auto aRank = evaluateNumericArgument(*rNode.maChildren[1], std::nullopt);
         if (!aRank)
-            return detail::makeFailure(aRank.meError);
+            return makeCellError(aRank.meError);
 
         std::int32_t nAggregateFunction = 0;
         if (rFunctionName == u"LARGE")
@@ -577,7 +582,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
         const auto aAggregate
             = semath::evaluateAggregateRankedNumbers(nAggregateFunction, aScan.maValue, aRank.maValue);
         if (!aAggregate)
-            return detail::makeFailure(aAggregate.meError);
+            return makeCellError(aAggregate.meError);
         return detail::makeScalarResult(api::CellValue::number(aAggregate.maValue));
     }
 
@@ -586,14 +591,14 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
     {
         const auto aCollected = collectAggregateScanFromArgument(*pChild);
         if (!aCollected)
-            return detail::makeFailure(aCollected.meError);
+            return makeCellError(aCollected.meError);
         aScan.maNumbers.insert(aScan.maNumbers.end(), aCollected.maValue.maNumbers.begin(),
             aCollected.maValue.maNumbers.end());
     }
 
     const auto aSkew = semath::evaluateSkewNumbers(aScan.maNumbers, rFunctionName == u"SKEWP");
     if (!aSkew)
-        return detail::makeFailure(aSkew.meError);
+        return makeCellError(aSkew.meError);
     return detail::makeScalarResult(api::CellValue::number(aSkew.maValue));
 }
 
