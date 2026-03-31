@@ -61,6 +61,7 @@ constexpr UnitConversionFactor kKnownConversions[] = {
     { u"parsec", u"Pica", 8.74680337440886E+019 },
     { u"survey_mi", u"yd", 1760.00352000704 },
     { u"BTU", u"c", 252.165488508169 },
+    { u"bit", u"byte", 0.125 },
     { u"c", u"cal", 0.99933031528756 },
     { u"cal", u"e", 41867948.4613929 },
     { u"e", u"eV", 624145700000 },
@@ -132,6 +133,7 @@ constexpr UnitConversionFactor kKnownConversions[] = {
     { u"gal", u"GRT", 0.001336805679661 },
     { u"GRT", u"in3", 172799.98395775 },
     { u"u", u"uk_ton", 1.63431440967062E-30 },
+    { u"grain", u"lbm", 1.0 / 7000.0 },
     { u"Pica", u"pica", 0.083333333333353 },
     { u"pica", u"survey_mi", 2.63046611952801E-06 },
 };
@@ -190,6 +192,61 @@ constexpr EuroCurrencyInfo kEuroCurrencies[] = {
     return aResult;
 }
 
+[[nodiscard]] api::String canonicalizeUnitSymbol(api::StringView rUnit)
+{
+    const api::String aNormalized = normalizeUnitSymbol(rUnit);
+    const api::String aUpper = normalizeAsciiUpper(aNormalized);
+    if (aUpper == u"BTU")
+        return api::String(u"BTU");
+    if (aUpper == u"EV")
+        return api::String(u"eV");
+    if (aUpper == u"WH")
+        return api::String(u"Wh");
+    if (aUpper == u"NMI")
+        return api::String(u"Nmi");
+    if (aUpper == u"NMI2")
+        return api::String(u"Nmi2");
+    if (aUpper == u"NMI3")
+        return api::String(u"Nmi3");
+    if (aUpper == u"PC")
+        return api::String(u"parsec");
+    if (aUpper == u"DY")
+        return api::String(u"dyn");
+    if (aUpper == u"HH")
+        return api::String(u"HPh");
+    if (aUpper == u"SHWEIGHT")
+        return api::String(u"cwt");
+    if (aUpper == u"LCWT" || aUpper == u"HWEIGHT")
+        return api::String(u"uk_cwt");
+    if (aUpper == u"LTON")
+        return api::String(u"uk_ton");
+    if (aUpper == u"W")
+        return api::String(u"W");
+    if (aUpper == u"M/HR")
+        return api::String(u"m/h");
+    if (aUpper == u"M/SEC")
+        return api::String(u"m/s");
+    if (aUpper == u"CEL")
+        return api::String(u"C");
+    if (aUpper == u"FAH")
+        return api::String(u"F");
+    if (aUpper == u"KEL")
+        return api::String(u"K");
+    if (aUpper == u"DAY")
+        return api::String(u"d");
+    if (aUpper == u"MIN")
+        return api::String(u"mn");
+    if (aUpper == u"S")
+        return api::String(u"sec");
+    if (aUpper == u"LT")
+        return api::String(u"l");
+    if (aUpper == u"REGTON")
+        return api::String(u"GRT");
+    if (aUpper == u"US_PT")
+        return api::String(u"pt");
+    return aNormalized;
+}
+
 [[nodiscard]] std::optional<EuroCurrencyInfo> lookupEuroCurrency(
     api::StringView rCode, bool bCaseInsensitive)
 {
@@ -213,7 +270,12 @@ constexpr EuroCurrencyInfo kEuroCurrencies[] = {
 
 [[nodiscard]] bool equalUnitSymbol(api::StringView rLeft, api::StringView rRight)
 {
-    return normalizeUnitSymbol(rLeft) == normalizeUnitSymbol(rRight);
+    return canonicalizeUnitSymbol(rLeft) == canonicalizeUnitSymbol(rRight);
+}
+
+[[nodiscard]] api::String foldUnitSymbol(api::StringView rUnit)
+{
+    return normalizeAsciiUpper(canonicalizeUnitSymbol(rUnit));
 }
 
 [[nodiscard]] std::optional<double> convertTemperatureUnit(
@@ -284,8 +346,10 @@ api::ValueResult<double> evaluateEuroConvertValue(
 api::ValueResult<double> evaluateConvertValue(
     double fValue, api::StringView rFromUnit, api::StringView rToUnit)
 {
-    const api::String aNormalizedFrom = normalizeUnitSymbol(rFromUnit);
-    const api::String aNormalizedTo = normalizeUnitSymbol(rToUnit);
+    const api::String aNormalizedFrom = canonicalizeUnitSymbol(rFromUnit);
+    const api::String aNormalizedTo = canonicalizeUnitSymbol(rToUnit);
+    const api::String aFoldedFrom = foldUnitSymbol(rFromUnit);
+    const api::String aFoldedTo = foldUnitSymbol(rToUnit);
     if (aNormalizedFrom == aNormalizedTo)
         return api::ValueResult<double>::success(fValue);
 
@@ -310,6 +374,27 @@ api::ValueResult<double> evaluateConvertValue(
         }
     }
 
+    if (aFoldedFrom == aFoldedTo)
+        return api::ValueResult<double>::failure(api::Error::NotAvailable);
+
+    for (const auto& rConversion : kKnownConversions)
+    {
+        if (foldUnitSymbol(rConversion.maFromUnit) == aFoldedFrom
+            && foldUnitSymbol(rConversion.maToUnit) == aFoldedTo)
+        {
+            return api::ValueResult<double>::success(fValue * rConversion.mfFactor);
+        }
+    }
+
+    for (const auto& rConversion : kKnownConversions)
+    {
+        if (foldUnitSymbol(rConversion.maFromUnit) == aFoldedTo
+            && foldUnitSymbol(rConversion.maToUnit) == aFoldedFrom)
+        {
+            return api::ValueResult<double>::success(fValue / rConversion.mfFactor);
+        }
+    }
+
     struct PendingUnitConversion
     {
         api::String maUnit;
@@ -329,14 +414,14 @@ api::ValueResult<double> evaluateConvertValue(
         {
             api::String aNextUnit;
             double fNextFactor = 1.0;
-            if (normalizeUnitSymbol(rConversion.maFromUnit) == rCurrent.maUnit)
+            if (canonicalizeUnitSymbol(rConversion.maFromUnit) == rCurrent.maUnit)
             {
-                aNextUnit = normalizeUnitSymbol(rConversion.maToUnit);
+                aNextUnit = canonicalizeUnitSymbol(rConversion.maToUnit);
                 fNextFactor = rCurrent.mfFactor * rConversion.mfFactor;
             }
-            else if (normalizeUnitSymbol(rConversion.maToUnit) == rCurrent.maUnit)
+            else if (canonicalizeUnitSymbol(rConversion.maToUnit) == rCurrent.maUnit)
             {
-                aNextUnit = normalizeUnitSymbol(rConversion.maFromUnit);
+                aNextUnit = canonicalizeUnitSymbol(rConversion.maFromUnit);
                 fNextFactor = rCurrent.mfFactor / rConversion.mfFactor;
             }
             else
@@ -349,6 +434,45 @@ api::ValueResult<double> evaluateConvertValue(
 
             aVisited.push_back(aNextUnit);
             aPending.push_back({ std::move(aNextUnit), fNextFactor });
+        }
+    }
+
+    std::vector<PendingUnitConversion> aFoldedPending{ { aFoldedFrom, 1.0 } };
+    std::vector<api::String> aFoldedVisited{ aFoldedFrom };
+
+    for (std::size_t nIndex = 0; nIndex < aFoldedPending.size(); ++nIndex)
+    {
+        const PendingUnitConversion& rCurrent = aFoldedPending[nIndex];
+        if (rCurrent.maUnit == aFoldedTo)
+            return api::ValueResult<double>::success(fValue * rCurrent.mfFactor);
+
+        for (const auto& rConversion : kKnownConversions)
+        {
+            api::String aNextUnit;
+            double fNextFactor = 1.0;
+            if (foldUnitSymbol(rConversion.maFromUnit) == rCurrent.maUnit)
+            {
+                aNextUnit = foldUnitSymbol(rConversion.maToUnit);
+                fNextFactor = rCurrent.mfFactor * rConversion.mfFactor;
+            }
+            else if (foldUnitSymbol(rConversion.maToUnit) == rCurrent.maUnit)
+            {
+                aNextUnit = foldUnitSymbol(rConversion.maFromUnit);
+                fNextFactor = rCurrent.mfFactor / rConversion.mfFactor;
+            }
+            else
+            {
+                continue;
+            }
+
+            if (std::find(aFoldedVisited.begin(), aFoldedVisited.end(), aNextUnit)
+                != aFoldedVisited.end())
+            {
+                continue;
+            }
+
+            aFoldedVisited.push_back(aNextUnit);
+            aFoldedPending.push_back({ std::move(aNextUnit), fNextFactor });
         }
     }
 

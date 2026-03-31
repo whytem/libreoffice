@@ -34,9 +34,27 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateMathFamily(
         api::StringView(u"ABS"),
         api::StringView(u"PI"),
         api::StringView(u"DEGREES"),
+        api::StringView(u"RADIANS"),
+        api::StringView(u"SIN"),
+        api::StringView(u"COS"),
+        api::StringView(u"TAN"),
+        api::StringView(u"COT"),
+        api::StringView(u"ASIN"),
+        api::StringView(u"ACOS"),
+        api::StringView(u"ATAN"),
+        api::StringView(u"ACOT"),
+        api::StringView(u"ATAN2"),
+        api::StringView(u"SINH"),
+        api::StringView(u"COSH"),
+        api::StringView(u"TANH"),
+        api::StringView(u"COTH"),
+        api::StringView(u"ASINH"),
+        api::StringView(u"ACOSH"),
         api::StringView(u"ATANH"),
+        api::StringView(u"ACOTH"),
         api::StringView(u"GCD"),
         api::StringView(u"LCM"),
+        api::StringView(u"SIGN"),
         api::StringView(u"ROUND"),
         api::StringView(u"ROUNDUP"),
         api::StringView(u"ROUNDDOWN"),
@@ -50,16 +68,31 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateMathFamily(
         api::StringView(u"FLOOR.PRECISE"),
         api::StringView(u"ISO.CEILING"),
         api::StringView(u"ROUNDSIG"),
+        api::StringView(u"BITAND"),
+        api::StringView(u"BITOR"),
         api::StringView(u"BITXOR"),
         api::StringView(u"BITLSHIFT"),
         api::StringView(u"BITRSHIFT"),
+        api::StringView(u"POWER"),
         api::StringView(u"LOG"),
+        api::StringView(u"LOG10"),
+        api::StringView(u"LN"),
+        api::StringView(u"PRODUCT"),
+        api::StringView(u"QUOTIENT"),
         api::StringView(u"MROUND"),
         api::StringView(u"COMBIN"),
         api::StringView(u"COMBINA"),
+        api::StringView(u"FACT"),
         api::StringView(u"MULTINOMIAL"),
+        api::StringView(u"SERIESSUM"),
+        api::StringView(u"SEC"),
+        api::StringView(u"SECH"),
         api::StringView(u"CSC"),
         api::StringView(u"CSCH"),
+        api::StringView(u"EXP"),
+        api::StringView(u"INT"),
+        api::StringView(u"SQRT"),
+        api::StringView(u"SUMSQ"),
         api::StringView(u"TRUNC"),
         api::StringView(u"MOD"),
         api::StringView(u"RAWSUBTRACT"),
@@ -75,6 +108,68 @@ EvaluationResult Evaluator::evaluateMathFamilyBody(
 {
     const api::StringView aFunctionName = rFunctionName;
     FunctionEvalContext aContext { *this, rNode, rCurrentAddress };
+    const auto evaluateUnaryNumericFinite = [&](auto aCompute) -> EvaluationResult {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue)
+            return makeFailure(aValue.meError);
+
+        const auto aResult = seutil::makeFiniteResult(aCompute(aValue.maValue));
+        if (!aResult)
+            return makeFailure(aResult.meError);
+        return makeScalarResult(api::CellValue::number(aResult.maValue));
+    };
+    const auto evaluateUnaryNumericFiniteWithError = [&](auto aCompute,
+                                                         api::Error eError) -> EvaluationResult {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue)
+            return makeFailure(aValue.meError);
+
+        const double fResult = aCompute(aValue.maValue);
+        if (!std::isfinite(fResult))
+            return makeFailure(eError);
+        return makeScalarResult(api::CellValue::number(fResult));
+    };
+    const auto evaluateUnaryNumericOptional = [&](auto aCompute) -> EvaluationResult {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue)
+            return makeFailure(aValue.meError);
+
+        const auto oResult = aCompute(aValue.maValue);
+        if (!oResult)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aFinite = seutil::makeFiniteResult(*oResult);
+        if (!aFinite)
+            return makeFailure(aFinite.meError);
+        return makeScalarResult(api::CellValue::number(aFinite.maValue));
+    };
+    const auto evaluateUnaryNumericOptionalWithError = [&](auto aCompute,
+                                                           api::Error eError) -> EvaluationResult {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue)
+            return makeFailure(aValue.meError);
+
+        const auto oResult = aCompute(aValue.maValue);
+        if (!oResult)
+            return makeFailure(eError);
+
+        const auto aFinite = seutil::makeFiniteResult(*oResult);
+        if (!aFinite)
+            return makeFailure(aFinite.meError);
+        return makeScalarResult(api::CellValue::number(aFinite.maValue));
+    };
 
 if (aFunctionName == u"ABS")
     {
@@ -100,6 +195,30 @@ if (aFunctionName == u"ABS")
         return makeScalarResult(api::CellValue::number(api::math::pi()));
     }
 
+    if (aFunctionName == u"SIN")
+        return evaluateUnaryNumericFinite(semath::computeSin);
+
+    if (aFunctionName == u"COS")
+        return evaluateUnaryNumericFinite(semath::computeCos);
+
+    if (aFunctionName == u"TAN")
+        return evaluateUnaryNumericFinite(semath::computeTan);
+
+    if (aFunctionName == u"COT")
+        return evaluateUnaryNumericFinite(semath::computeCot);
+
+    if (aFunctionName == u"ASIN")
+        return evaluateUnaryNumericFiniteWithError(semath::computeArcSin, api::Error::Domain);
+
+    if (aFunctionName == u"ACOS")
+        return evaluateUnaryNumericFiniteWithError(semath::computeArcCos, api::Error::Domain);
+
+    if (aFunctionName == u"ATAN")
+        return evaluateUnaryNumericFinite(semath::computeArcTan);
+
+    if (aFunctionName == u"ACOT")
+        return evaluateUnaryNumericFinite(semath::computeArcCot);
+
     if (aFunctionName == u"DEGREES")
     {
         if (rNode.maChildren.size() != 1)
@@ -115,6 +234,45 @@ if (aFunctionName == u"ABS")
             return makeFailure(aNumber.meError);
         return makeScalarResult(api::CellValue::number(api::math::degrees(aNumber.maValue)));
     }
+
+    if (aFunctionName == u"RADIANS")
+        return evaluateUnaryNumericFinite(semath::computeRadians);
+
+    if (aFunctionName == u"ATAN2")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aY = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aY)
+            return makeFailure(aY.meError);
+        const auto aX = aContext.evaluateNumericArgument(*rNode.maChildren[1], std::nullopt);
+        if (!aX)
+            return makeFailure(aX.meError);
+
+        const auto aResult = seutil::makeFiniteResult(std::atan2(aY.maValue, aX.maValue));
+        if (!aResult)
+            return makeFailure(aResult.meError);
+        return makeScalarResult(api::CellValue::number(aResult.maValue));
+    }
+
+    if (aFunctionName == u"SINH")
+        return evaluateUnaryNumericFinite(semath::computeSinHyp);
+
+    if (aFunctionName == u"COSH")
+        return evaluateUnaryNumericFinite(semath::computeCosHyp);
+
+    if (aFunctionName == u"TANH")
+        return evaluateUnaryNumericFinite(semath::computeTanHyp);
+
+    if (aFunctionName == u"COTH")
+        return evaluateUnaryNumericFinite(semath::computeCotHyp);
+
+    if (aFunctionName == u"ASINH")
+        return evaluateUnaryNumericFinite(semath::computeArcSinHyp);
+
+    if (aFunctionName == u"ACOSH")
+        return evaluateUnaryNumericOptionalWithError(semath::computeArcCosHyp, api::Error::Domain);
 
     if (aFunctionName == u"ATANH")
     {
@@ -133,6 +291,32 @@ if (aFunctionName == u"ABS")
         if (!aResult)
             return makeFailure(aResult.meError);
         return makeScalarResult(api::CellValue::number(aResult.maValue));
+    }
+
+    if (aFunctionName == u"ACOTH")
+        return evaluateUnaryNumericOptionalWithError(semath::computeArcCotHyp, api::Error::Domain);
+
+    if (aFunctionName == u"SIGN")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue)
+            return makeFailure(aValue.meError);
+        return makeScalarResult(api::CellValue::number(
+            static_cast<double>(semath::computePlusMinus(aValue.maValue))));
+    }
+
+    if (aFunctionName == u"INT")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue)
+            return makeFailure(aValue.meError);
+        return makeScalarResult(api::CellValue::number(semath::computeInt(aValue.maValue)));
     }
 
     if (aFunctionName == u"GCD" || aFunctionName == u"LCM")
@@ -287,7 +471,7 @@ if (aFunctionName == u"ABS")
             bAbs = !fp::approxEqual(aModeNumber.maValue, 0.0);
         }
 
-        if (!bMicrosoftCompat && bAbs && bMissingSignificance && fValue < 0.0)
+        if (!bMicrosoftCompat && bMissingSignificance && fValue < 0.0)
             fSignificance = -1.0;
 
         const auto aRounded = semath::evaluateCeilingFloorValue(
@@ -415,44 +599,33 @@ if (aFunctionName == u"ABS")
         return makeScalarResult(api::CellValue::number(aRounded.maValue));
     }
 
-    if (aFunctionName == u"BITXOR")
+    if (aFunctionName == u"BITAND" || aFunctionName == u"BITOR" || aFunctionName == u"BITXOR")
     {
         if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
             return makeFailure(api::Error::IllegalArgument);
 
-        auto evaluateBitXorArgument = [&](const formula::Node& rArgument,
-                                          std::optional<double> oDefaultValue)
-            -> api::ValueResult<std::uint64_t> {
-            const auto aValue = aContext.evaluateNumericArgument(rArgument, oDefaultValue);
-            if (!aValue)
-                return api::ValueResult<std::uint64_t>::failure(aValue.meError);
-
-            if (!std::isfinite(aValue.maValue) || aValue.maValue < 0.0
-                || aValue.maValue > 281474976710655.0)
-            {
-                return api::ValueResult<std::uint64_t>::failure(api::Error::IllegalArgument);
-            }
-
-            const double fRounded = std::round(aValue.maValue);
-            if (std::abs(aValue.maValue - fRounded) > 1e-9)
-                return api::ValueResult<std::uint64_t>::failure(api::Error::IllegalArgument);
-            return api::ValueResult<std::uint64_t>::success(
-                static_cast<std::uint64_t>(fRounded));
-        };
-
-        const auto aLeft = evaluateBitXorArgument(*rNode.maChildren[0], 0.0);
+        const auto aLeft = aContext.evaluateNumericArgument(*rNode.maChildren[0], 0.0);
         if (!aLeft)
             return makeFailure(aLeft.meError);
 
         if (rNode.maChildren.size() == 1)
             return makeFailure(api::Error::NoValue);
 
-        const auto aRight = evaluateBitXorArgument(*rNode.maChildren[1], 0.0);
+        const auto aRight = aContext.evaluateNumericArgument(*rNode.maChildren[1], 0.0);
         if (!aRight)
             return makeFailure(aRight.meError);
 
-        return makeScalarResult(
-            api::CellValue::number(static_cast<double>(aLeft.maValue ^ aRight.maValue)));
+        std::optional<double> oResult;
+        if (aFunctionName == u"BITAND")
+            oResult = semath::computeBitAnd(aLeft.maValue, aRight.maValue);
+        else if (aFunctionName == u"BITOR")
+            oResult = semath::computeBitOr(aLeft.maValue, aRight.maValue);
+        else
+            oResult = semath::computeBitXor(aLeft.maValue, aRight.maValue);
+
+        if (!oResult)
+            return makeFailure(api::Error::IllegalArgument);
+        return makeScalarResult(api::CellValue::number(*oResult));
     }
 
     if (aFunctionName == u"BITLSHIFT" || aFunctionName == u"BITRSHIFT")
@@ -539,6 +712,114 @@ if (aFunctionName == u"ABS")
         return makeScalarResult(api::CellValue::number(aLogarithm.maValue));
     }
 
+    if (aFunctionName == u"LOG10")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue)
+            return makeFailure(aValue.meError);
+
+        const auto oLogarithm = semath::computeLog10(aValue.maValue);
+        if (!oLogarithm)
+            return makeFailure(api::Error::IllegalArgument);
+        return makeScalarResult(api::CellValue::number(*oLogarithm));
+    }
+
+    if (aFunctionName == u"LN")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue)
+            return makeFailure(aValue.meError);
+
+        const auto oLogarithm = semath::computeLn(aValue.maValue);
+        if (!oLogarithm)
+            return makeFailure(api::Error::IllegalArgument);
+        return makeScalarResult(api::CellValue::number(*oLogarithm));
+    }
+
+    if (aFunctionName == u"POWER")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aBase = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aBase)
+            return makeFailure(aBase.meError);
+        const auto aExponent = aContext.evaluateNumericArgument(*rNode.maChildren[1], std::nullopt);
+        if (!aExponent)
+            return makeFailure(aExponent.meError);
+
+        const double fResult = std::pow(aBase.maValue, aExponent.maValue);
+        if (!std::isfinite(fResult))
+            return makeFailure(api::Error::Domain);
+        return makeScalarResult(api::CellValue::number(fResult));
+    }
+
+    if (aFunctionName == u"PRODUCT")
+    {
+        if (rNode.maChildren.empty())
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aNumbers = aContext.collectNumericArguments(true);
+        if (!aNumbers)
+            return makeFailure(aNumbers.meError);
+        if (aNumbers.maValue.empty())
+            return makeScalarResult(api::CellValue::number(0.0));
+
+        double fResult = 1.0;
+        for (double fValue : aNumbers.maValue)
+        {
+            fResult *= fValue;
+            if (!std::isfinite(fResult))
+                return makeFailure(api::Error::IllegalArgument);
+        }
+        return makeScalarResult(api::CellValue::number(fResult));
+    }
+
+    if (aFunctionName == u"SUMSQ")
+    {
+        if (rNode.maChildren.empty())
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aNumbers = aContext.collectNumericArguments(true);
+        if (!aNumbers)
+            return makeFailure(aNumbers.meError);
+        if (aNumbers.maValue.empty())
+            return makeScalarResult(api::CellValue::number(0.0));
+
+        double fResult = 0.0;
+        for (double fValue : aNumbers.maValue)
+        {
+            fResult += fValue * fValue;
+            if (!std::isfinite(fResult))
+                return makeFailure(api::Error::IllegalArgument);
+        }
+        return makeScalarResult(api::CellValue::number(fResult));
+    }
+
+    if (aFunctionName == u"QUOTIENT")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aNumerator = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aNumerator)
+            return makeFailure(aNumerator.meError);
+        const auto aDenominator = aContext.evaluateNumericArgument(*rNode.maChildren[1], std::nullopt);
+        if (!aDenominator)
+            return makeFailure(aDenominator.meError);
+        if (fp::approxEqual(aDenominator.maValue, 0.0))
+            return makeFailure(api::Error::DivisionByZero);
+
+        return makeScalarResult(api::CellValue::number(
+            std::trunc(aNumerator.maValue / aDenominator.maValue)));
+    }
+
     if (aFunctionName == u"MROUND")
     {
         if (rNode.maChildren.size() != 2)
@@ -608,6 +889,24 @@ if (aFunctionName == u"ABS")
         return makeScalarResult(api::CellValue::number(aCombina.maValue));
     }
 
+    if (aFunctionName == u"FACT")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aValue = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue)
+            return makeFailure(aValue.meError);
+        if (aValue.maValue < 0.0)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const double fRounded = std::floor(aValue.maValue);
+        const double fResult = std::tgamma(fRounded + 1.0);
+        if (!std::isfinite(fResult))
+            return makeFailure(api::Error::IllegalArgument);
+        return makeScalarResult(api::CellValue::number(fResult));
+    }
+
     if (aFunctionName == u"MULTINOMIAL")
     {
         if (rNode.maChildren.empty())
@@ -627,6 +926,52 @@ if (aFunctionName == u"ABS")
         if (!aMultinomial)
             return makeFailure(aMultinomial.meError);
         return makeScalarResult(api::CellValue::number(aMultinomial.maValue));
+    }
+
+    if (aFunctionName == u"SERIESSUM")
+    {
+        if (rNode.maChildren.size() != 4)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aX = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aX)
+            return makeFailure(aX.meError);
+        const auto aN = aContext.evaluateNumericArgument(*rNode.maChildren[1], std::nullopt);
+        if (!aN)
+            return makeFailure(aN.meError);
+        const auto aM = aContext.evaluateNumericArgument(*rNode.maChildren[2], std::nullopt);
+        if (!aM)
+            return makeFailure(aM.meError);
+
+        double fResult = 0.0;
+        std::size_t nCoefficientIndex = 0;
+        const auto aVisited = aContext.visitFlattenedValues(
+            *rNode.maChildren[3],
+            [&](const api::CellValue& rValue,
+                bool bFromReference) -> api::ValueResult<bool> {
+                if (rValue.isError())
+                    return api::ValueResult<bool>::failure(rValue.meError);
+                if (bFromReference && (rValue.isEmpty() || rValue.isText()))
+                    return api::ValueResult<bool>::success(true);
+                if (rValue.isEmpty())
+                    return api::ValueResult<bool>::success(true);
+
+                const auto aCoefficient = coerceToNumber(rValue);
+                if (!aCoefficient)
+                    return api::ValueResult<bool>::failure(aCoefficient.meError);
+
+                const double fTerm = aCoefficient.maValue
+                                     * std::pow(aX.maValue,
+                                         aN.maValue + aM.maValue * static_cast<double>(nCoefficientIndex));
+                fResult += fTerm;
+                if (!std::isfinite(fResult))
+                    return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
+                ++nCoefficientIndex;
+                return api::ValueResult<bool>::success(true);
+            });
+        if (!aVisited)
+            return makeFailure(aVisited.meError);
+        return makeScalarResult(api::CellValue::number(fResult));
     }
 
     if (aFunctionName == u"CSC")
@@ -662,6 +1007,18 @@ if (aFunctionName == u"ABS")
             return makeFailure(aCsch.meError);
         return makeScalarResult(api::CellValue::number(aCsch.maValue));
     }
+
+    if (aFunctionName == u"SEC")
+        return evaluateUnaryNumericFinite(semath::computeSecant);
+
+    if (aFunctionName == u"SECH")
+        return evaluateUnaryNumericFinite(semath::computeSecantHyp);
+
+    if (aFunctionName == u"EXP")
+        return evaluateUnaryNumericFinite(semath::computeExp);
+
+    if (aFunctionName == u"SQRT")
+        return evaluateUnaryNumericOptional(semath::computeSqrt);
 
     if (aFunctionName == u"TRUNC")
     {
