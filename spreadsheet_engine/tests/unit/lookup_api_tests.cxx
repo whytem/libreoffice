@@ -1,6 +1,7 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
 #include <iostream>
+#include <cstdint>
 #include <unordered_map>
 #include <vector>
 
@@ -285,9 +286,9 @@ int main()
         else if (rFunction == "XMATCH")
         {
             const auto aMatchMode = spreadsheetengine::api::lookup::normalizeExtendedMatchMode(
-                static_cast<sal_Int16>(parseDouble(rRow.maColumns[2])));
+                static_cast<std::int16_t>(parseDouble(rRow.maColumns[2])));
             const auto aSearchMode = spreadsheetengine::api::lookup::normalizeSearchMode(
-                static_cast<sal_Int16>(parseDouble(rRow.maColumns[3])));
+                static_cast<std::int16_t>(parseDouble(rRow.maColumns[3])));
             if (!aMatchMode || !aSearchMode)
             {
                 return failSharedCase(

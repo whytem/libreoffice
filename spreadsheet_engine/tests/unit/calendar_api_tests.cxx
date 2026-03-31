@@ -1,6 +1,7 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
 #include <iostream>
+#include <cstdint>
 #include <vector>
 
 #include <spreadsheetengine/api/Calendar.hxx>
@@ -153,9 +154,9 @@ int main()
             return std::nullopt;
 
         const auto aSerial = makeDateSerial(
-            aNullDate, static_cast<sal_Int16>(std::stoi(aToken.substr(0, nDash1))),
-            static_cast<sal_Int16>(std::stoi(aToken.substr(nDash1 + 1, nDash2 - nDash1 - 1))),
-            static_cast<sal_Int16>(std::stoi(aToken.substr(nDash2 + 1))), true);
+            aNullDate, static_cast<std::int16_t>(std::stoi(aToken.substr(0, nDash1))),
+            static_cast<std::int16_t>(std::stoi(aToken.substr(nDash1 + 1, nDash2 - nDash1 - 1))),
+            static_cast<std::int16_t>(std::stoi(aToken.substr(nDash2 + 1))), true);
         if (!aSerial)
             return std::nullopt;
         return static_cast<DateSerial>(aSerial.maValue);
@@ -198,11 +199,11 @@ int main()
         if (rFunction == "DATE")
         {
             const auto aResult = makeDateSerial(
-                aNullDate, static_cast<sal_Int16>(spreadsheetengine::standalone::test::parseDouble(
+                aNullDate, static_cast<std::int16_t>(spreadsheetengine::standalone::test::parseDouble(
                                rRow.maColumns[1])),
-                static_cast<sal_Int16>(spreadsheetengine::standalone::test::parseDouble(
+                static_cast<std::int16_t>(spreadsheetengine::standalone::test::parseDouble(
                     rRow.maColumns[2])),
-                static_cast<sal_Int16>(spreadsheetengine::standalone::test::parseDouble(
+                static_cast<std::int16_t>(spreadsheetengine::standalone::test::parseDouble(
                     rRow.maColumns[3])),
                 rRow.maColumns[4] == "STRICT");
             if (!aResult
@@ -268,7 +269,7 @@ int main()
             const auto aResult = dayOfWeek(
                 aNullDate, static_cast<DateSerial>(
                                spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1])),
-                static_cast<sal_Int16>(
+                static_cast<std::int16_t>(
                     spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])));
             if (!aResult
                 || aResult.maValue
@@ -284,7 +285,7 @@ int main()
                     aNullDate,
                     static_cast<DateSerial>(
                         spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1])),
-                    static_cast<sal_Int16>(
+                    static_cast<std::int16_t>(
                         spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[2])))
                 != static_cast<int>(
                     spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[5])))
@@ -308,7 +309,7 @@ int main()
         else if (rFunction == "EASTERSUNDAY")
         {
             const auto aResult = easterSundaySerial(
-                aNullDate, static_cast<sal_Int16>(
+                aNullDate, static_cast<std::int16_t>(
                                spreadsheetengine::standalone::test::parseDouble(rRow.maColumns[1])));
             const auto oExpectedSerial = parseDateSerialToken(rRow.maColumns[5]);
             if (!aResult || !oExpectedSerial
