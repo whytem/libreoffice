@@ -9,6 +9,9 @@
 
 #pragma once
 
+#include <sal/types.h>
+
+#include <spreadsheetengine/api/Date.hxx>
 #include <spreadsheetengine/api/Error.hxx>
 #include <spreadsheetengine/spreadsheetenginedllapi.h>
 
@@ -58,6 +61,14 @@ SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateDoubleDecliningBala
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateVariableDecliningBalance(
     double fCost, double fSalvage, double fLife, double fStart,
     double fEnd, double fFactor, bool bNoSwitch);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateYearFraction(
+    const api::DateParts& rNullDate, api::DateSerial nStartDate, api::DateSerial nEndDate,
+    sal_Int32 nBasis);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluatePrice(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    double fRate, double fYield, double fRedemption, sal_Int32 nFrequency, sal_Int32 nBasis);
 
 } // namespace spreadsheetengine::core::finance
 

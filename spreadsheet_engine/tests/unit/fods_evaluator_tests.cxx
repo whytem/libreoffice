@@ -82,6 +82,10 @@ Workbook makeWorkbook()
         Cell { CellValue::boolean(true),
             u"of:=ORG.LIBREOFFICE.ROUNDSIG(1234.567;3)=1230" });
     aSheet1.setCell(31, 0, Cell { CellValue::number(-45.0), u"of:=ROUNDDOWN(-45.67)" });
+    aSheet1.setCell(32, 0, Cell { CellValue::number(95.0428743993921),
+        u"of:=PRICE(\"1999-02-15\";\"2007-11-15\";0.0575;0.065;100;2;0)" });
+    aSheet1.setCell(33, 0, Cell { CellValue::number(95.0780346202577),
+        u"of:=PRICE(\"1999-02-15\";\"2007-11-15\";0.0575;0.065;100;1)" });
     aSheet1.setCell(6, 25, Cell { CellValue::number(0.5) });
     aSheet1.setCell(8, 1, Cell { CellValue::text(u"one") });
     aSheet1.setCell(8, 2, Cell { CellValue::text(u"oneone") });
@@ -419,14 +423,16 @@ int main()
         }
     }
 
+    if (const int nResult = requireNumeric(
+            { 0, 23, 0 }, 1.0, "YEARFRAC() mismatch"))
     {
-        const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 23, 0 });
-        if (!aResult || !aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber()
-            || !almostEqual(aResult.maValue.maValue.mfNumber, 1.0))
-        {
-            return fail("spreadsheetengine_fods_evaluator_tests",
-                "compiled external-name cached fallback mismatch");
-        }
+        return nResult;
+    }
+
+    if (const int nResult = requireNumeric(
+            { 0, 23, 0 }, 1.0, "compiled YEARFRAC() mismatch", true))
+    {
+        return nResult;
     }
 
     {
@@ -503,6 +509,24 @@ int main()
             return fail("spreadsheetengine_fods_evaluator_tests",
                 "compiled one-arg ROUNDDOWN() mismatch");
         }
+    }
+
+    if (const int nResult = requireNumeric(
+            { 0, 32, 0 }, 95.0428743993921, "PRICE() mismatch"))
+    {
+        return nResult;
+    }
+
+    if (const int nResult = requireNumeric(
+            { 0, 32, 0 }, 95.0428743993921, "compiled PRICE() mismatch", true))
+    {
+        return nResult;
+    }
+
+    if (const int nResult = requireNumeric(
+            { 0, 33, 0 }, 95.0780346202577, "compiled PRICE() default-basis mismatch", true))
+    {
+        return nResult;
     }
 
     if (const int nResult

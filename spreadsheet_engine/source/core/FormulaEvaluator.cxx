@@ -1288,6 +1288,79 @@ EvaluationResult Evaluator::evaluateFunction(
         return aNumber;
     };
 
+    auto evaluateRequiredNumberArgument = [&](const formula::Node& rArgument)
+        -> api::ValueResult<double> {
+        if (rArgument.meKind == formula::NodeKind::EmptyArgument)
+            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+        const auto aValue = evaluateScalarArgumentValue(rArgument);
+        if (!aValue)
+            return api::ValueResult<double>::failure(aValue.meError);
+        if (aValue.maValue.isEmpty())
+            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+        return coerceToNumber(aValue.maValue);
+    };
+
+    auto evaluateRequiredDateArgument = [&](const formula::Node& rArgument)
+        -> api::ValueResult<api::DateSerial> {
+        if (rArgument.meKind == formula::NodeKind::EmptyArgument)
+            return api::ValueResult<api::DateSerial>::failure(api::Error::IllegalArgument);
+
+        const auto aValue = evaluateScalarArgumentValue(rArgument);
+        if (!aValue)
+            return api::ValueResult<api::DateSerial>::failure(aValue.meError);
+        if (aValue.maValue.isEmpty())
+            return api::ValueResult<api::DateSerial>::failure(api::Error::IllegalArgument);
+
+        const auto oDateSerial = sedatetime::coerceToDateSerial(aValue.maValue);
+        if (!oDateSerial)
+            return api::ValueResult<api::DateSerial>::failure(api::Error::IllegalArgument);
+        return api::ValueResult<api::DateSerial>::success(*oDateSerial);
+    };
+
+    auto evaluateOptionalWholeNumberArgument
+        = [&](const formula::Node& rArgument, sal_Int32 nDefaultValue)
+        -> api::ValueResult<sal_Int32> {
+        if (rArgument.meKind == formula::NodeKind::EmptyArgument)
+            return api::ValueResult<sal_Int32>::success(nDefaultValue);
+
+        const auto aValue = evaluateScalarArgumentValue(rArgument);
+        if (!aValue)
+            return api::ValueResult<sal_Int32>::failure(aValue.meError);
+        if (aValue.maValue.isEmpty())
+            return api::ValueResult<sal_Int32>::success(nDefaultValue);
+
+        const auto aNumber = coerceToNumber(aValue.maValue);
+        if (!aNumber)
+            return api::ValueResult<sal_Int32>::failure(aNumber.meError);
+
+        const auto oWhole = toWholeNumber(aNumber.maValue);
+        if (!oWhole)
+            return api::ValueResult<sal_Int32>::failure(api::Error::IllegalArgument);
+        return api::ValueResult<sal_Int32>::success(*oWhole);
+    };
+
+    auto evaluateRequiredWholeNumberArgument = [&](const formula::Node& rArgument)
+        -> api::ValueResult<sal_Int32> {
+        if (rArgument.meKind == formula::NodeKind::EmptyArgument)
+            return api::ValueResult<sal_Int32>::failure(api::Error::IllegalArgument);
+
+        const auto aValue = evaluateScalarArgumentValue(rArgument);
+        if (!aValue)
+            return api::ValueResult<sal_Int32>::failure(aValue.meError);
+        if (aValue.maValue.isEmpty())
+            return api::ValueResult<sal_Int32>::failure(api::Error::IllegalArgument);
+
+        const auto aNumber = coerceToNumber(aValue.maValue);
+        if (!aNumber)
+            return api::ValueResult<sal_Int32>::failure(aNumber.meError);
+
+        const auto oWhole = toWholeNumber(aNumber.maValue);
+        if (!oWhole)
+            return api::ValueResult<sal_Int32>::failure(api::Error::IllegalArgument);
+        return api::ValueResult<sal_Int32>::success(*oWhole);
+    };
+
     auto collectAggregateScanFromArgument = [&](const formula::Node& rArgument)
         -> api::ValueResult<AggregateScan> {
         AggregateScan aScan;
@@ -2644,6 +2717,75 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aDepreciation)
             return makeFailure(aDepreciation.meError);
         return makeScalarResult(api::CellValue::number(aDepreciation.maValue));
+    }
+
+    if (aFunctionName == u"YEARFRAC" || aFunctionName == u"GETYEARFRAC")
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aStartDate = evaluateRequiredDateArgument(*rNode.maChildren[0]);
+        if (!aStartDate)
+            return makeFailure(aStartDate.meError);
+        const auto aEndDate = evaluateRequiredDateArgument(*rNode.maChildren[1]);
+        if (!aEndDate)
+            return makeFailure(aEndDate.meError);
+
+        sal_Int32 nBasis = 0;
+        if (rNode.maChildren.size() == 3)
+        {
+            const auto aBasis = evaluateOptionalWholeNumberArgument(*rNode.maChildren[2], 0);
+            if (!aBasis)
+                return makeFailure(aBasis.meError);
+            nBasis = aBasis.maValue;
+        }
+
+        const auto aYearFraction = sefinance::evaluateYearFraction(
+            sedatetime::defaultNullDate(), aStartDate.maValue, aEndDate.maValue, nBasis);
+        if (!aYearFraction)
+            return makeFailure(aYearFraction.meError);
+        return makeScalarResult(api::CellValue::number(aYearFraction.maValue));
+    }
+
+    if (aFunctionName == u"PRICE")
+    {
+        if (rNode.maChildren.size() < 6 || rNode.maChildren.size() > 7)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aSettlement = evaluateRequiredDateArgument(*rNode.maChildren[0]);
+        if (!aSettlement)
+            return makeFailure(aSettlement.meError);
+        const auto aMaturity = evaluateRequiredDateArgument(*rNode.maChildren[1]);
+        if (!aMaturity)
+            return makeFailure(aMaturity.meError);
+        const auto aRate = evaluateRequiredNumberArgument(*rNode.maChildren[2]);
+        if (!aRate)
+            return makeFailure(aRate.meError);
+        const auto aYield = evaluateRequiredNumberArgument(*rNode.maChildren[3]);
+        if (!aYield)
+            return makeFailure(aYield.meError);
+        const auto aRedemption = evaluateRequiredNumberArgument(*rNode.maChildren[4]);
+        if (!aRedemption)
+            return makeFailure(aRedemption.meError);
+        const auto aFrequency = evaluateRequiredWholeNumberArgument(*rNode.maChildren[5]);
+        if (!aFrequency)
+            return makeFailure(aFrequency.meError);
+
+        sal_Int32 nBasis = 0;
+        if (rNode.maChildren.size() == 7)
+        {
+            const auto aBasis = evaluateOptionalWholeNumberArgument(*rNode.maChildren[6], 0);
+            if (!aBasis)
+                return makeFailure(aBasis.meError);
+            nBasis = aBasis.maValue;
+        }
+
+        const auto aPrice = sefinance::evaluatePrice(
+            sedatetime::defaultNullDate(), aSettlement.maValue, aMaturity.maValue,
+            aRate.maValue, aYield.maValue, aRedemption.maValue, aFrequency.maValue, nBasis);
+        if (!aPrice)
+            return makeFailure(aPrice.meError);
+        return makeScalarResult(api::CellValue::number(aPrice.maValue));
     }
 
     if (aFunctionName == u"POISSON" || aFunctionName == u"POISSON.DIST")
