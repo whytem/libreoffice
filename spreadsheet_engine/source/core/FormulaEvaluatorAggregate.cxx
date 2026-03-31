@@ -65,7 +65,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
           || rFunctionName == u"QUARTILE.EXC"
           || rFunctionName == u"COM.MICROSOFT.QUARTILE.EXC";
     if (!(rFunctionName == u"MAX" || rFunctionName == u"MIN" || rFunctionName == u"MAXA"
-            || rFunctionName == u"MINA" || rFunctionName == u"SUBTOTAL"
+            || rFunctionName == u"MINA" || rFunctionName == u"SUM" || rFunctionName == u"SUBTOTAL"
             || rFunctionName == u"AGGREGATE" || bRankedAggregate || rFunctionName == u"SKEW"
             || rFunctionName == u"SKEWP"))
     {
@@ -263,6 +263,44 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
         if (!aExtrema)
             return detail::makeFailure(aExtrema.meError);
         return detail::makeScalarResult(api::CellValue::number(aExtrema.maValue));
+    }
+
+    if (rFunctionName == u"SUM")
+    {
+        if (rNode.maChildren.empty())
+            return detail::makeFailure(api::Error::IllegalArgument);
+
+        double fSum = 0.0;
+        for (const auto& pChild : rNode.maChildren)
+        {
+            const auto aVisited = visitFlattenedValues(
+                visitFlattenedValues, *pChild,
+                [&](const api::CellValue& rValue,
+                    bool bFromReference) -> api::ValueResult<bool> {
+                    if (rValue.isError())
+                        return api::ValueResult<bool>::failure(rValue.meError);
+
+                    if (rValue.isEmpty())
+                        return api::ValueResult<bool>::success(true);
+
+                    if (bFromReference)
+                    {
+                        if (rValue.isNumber())
+                            fSum += rValue.mfNumber;
+                        return api::ValueResult<bool>::success(true);
+                    }
+
+                    const auto aNumber = detail::coerceToNumber(rValue);
+                    if (!aNumber)
+                        return api::ValueResult<bool>::failure(aNumber.meError);
+                    fSum += aNumber.maValue;
+                    return api::ValueResult<bool>::success(true);
+                });
+            if (!aVisited)
+                return detail::makeFailure(aVisited.meError);
+        }
+
+        return detail::makeScalarResult(api::CellValue::number(fSum));
     }
 
     if (rFunctionName == u"SUBTOTAL")

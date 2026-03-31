@@ -242,6 +242,83 @@ namespace setext = spreadsheetengine::core::text;
     }
 }
 
+[[nodiscard]] std::optional<sal_Int32> classifyLegacyErrorTypeLiteral(api::StringView rText)
+{
+    const api::String aUpper = uppercaseAscii(rText);
+    if (aUpper == u"#NULL!")
+        return 521;
+    if (aUpper == u"#DIV/0!")
+        return 532;
+    if (aUpper == u"#VALUE!")
+        return 519;
+    if (aUpper == u"#REF!")
+        return 524;
+    if (aUpper == u"#NAME?")
+        return 525;
+    if (aUpper == u"#NUM!")
+        return 503;
+    if (aUpper == u"#N/A")
+        return 32767;
+    if (aUpper == u"#GETTING_DATA")
+        return 508;
+
+    if (aUpper.starts_with(u"#ERR") && aUpper.size() > 5 && aUpper.back() == u'!')
+    {
+        const api::StringView aDigits = aUpper.substr(4, aUpper.size() - 5);
+        sal_Int32 nCode = 0;
+        for (const char16_t cChar : aDigits)
+        {
+            if (cChar < u'0' || cChar > u'9')
+                return std::nullopt;
+            nCode = nCode * 10 + static_cast<sal_Int32>(cChar - u'0');
+        }
+        if (nCode > 0)
+            return nCode;
+        return std::nullopt;
+    }
+
+    const std::size_t nColon = aUpper.rfind(u':');
+    if (nColon != api::StringView::npos && nColon + 1 < aUpper.size())
+    {
+        sal_Int32 nCode = 0;
+        for (const char16_t cChar : aUpper.substr(nColon + 1))
+        {
+            if (cChar < u'0' || cChar > u'9')
+                return std::nullopt;
+            nCode = nCode * 10 + static_cast<sal_Int32>(cChar - u'0');
+        }
+        if (nCode >= 500 || nCode == 32767)
+            return nCode;
+        return 525;
+    }
+
+    if (!rText.empty() && rText.front() == u'#')
+        return 525;
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<sal_Int32> classifyLegacyErrorType(api::Error eError)
+{
+    switch (eError)
+    {
+        case api::Error::IllegalArgument:
+            return 502;
+        case api::Error::DivisionByZero:
+            return 532;
+        case api::Error::StringOverflow:
+            return 513;
+        case api::Error::NoValue:
+            return 519;
+        case api::Error::NoConvergence:
+        case api::Error::Domain:
+            return 503;
+        case api::Error::NotAvailable:
+            return 32767;
+        default:
+            return std::nullopt;
+    }
+}
+
 [[nodiscard]] std::optional<double> parseAsciiDouble(api::StringView rValue)
 {
     if (rValue.empty())
@@ -455,6 +532,32 @@ namespace setext = spreadsheetengine::core::text;
         aResult.push_back(cChar);
     }
     aResult.push_back(u'"');
+    return aResult;
+}
+
+[[nodiscard]] api::String formatBasisDateTime(double fSerialValue)
+{
+    const api::DateParts aNullDate = sedatetime::defaultNullDate();
+    const api::DateSerial nDateSerial = static_cast<api::DateSerial>(rtl::math::approxFloor(fSerialValue));
+    const double fTimeValue = sedatetime::normalizeTimeFraction(fSerialValue);
+
+    const sal_Int16 nYear = static_cast<sal_Int16>(sedatetime::extractYear(aNullDate, nDateSerial));
+    const sal_Int16 nMonth = static_cast<sal_Int16>(sedatetime::extractMonth(aNullDate, nDateSerial));
+    const auto oDay = sedatetime::extractDay(aNullDate, nDateSerial);
+    const sal_Int16 nDay = static_cast<sal_Int16>(oDay.value_or(0.0));
+    const sal_Int16 nHour = static_cast<sal_Int16>(sedatetime::extractHour(fTimeValue));
+    const sal_Int16 nMinute = static_cast<sal_Int16>(sedatetime::extractMinute(fTimeValue));
+    const sal_Int16 nSecond = static_cast<sal_Int16>(sedatetime::extractSecond(fTimeValue));
+
+    char aBuffer[32];
+    const int nLength = std::snprintf(aBuffer, sizeof(aBuffer), "%04d-%02d-%02d %02d:%02d:%02d",
+        static_cast<int>(nYear), static_cast<int>(nMonth), static_cast<int>(nDay),
+        static_cast<int>(nHour), static_cast<int>(nMinute), static_cast<int>(nSecond));
+
+    api::String aResult;
+    aResult.reserve(static_cast<std::size_t>(std::max(nLength, 0)));
+    for (int i = 0; i < nLength; ++i)
+        aResult.push_back(static_cast<char16_t>(aBuffer[i]));
     return aResult;
 }
 
@@ -1869,14 +1972,15 @@ EvaluationResult Evaluator::evaluateFunction(
             && aArgument.maValue.maValue.meError == api::Error::NotAvailable));
     }
 
-    if (aFunctionName == u"ERROR.TYPE")
+    if (aFunctionName == u"ERROR.TYPE" || aFunctionName == u"ERRORTYPE")
     {
+        const bool bLegacyErrorType = aFunctionName == u"ERRORTYPE";
         if (rNode.maChildren.size() != 1)
             return makeFailure(api::Error::IllegalArgument);
 
         const formula::Node& rArgument = *rNode.maChildren[0];
         const auto classifyReferenceErrorType = [&](const formula::Node& rReferenceNode)
-            -> std::optional<sal_Int16> {
+            -> std::optional<sal_Int32> {
             api::ValueResult<api::ResolvedReference> aReference
                 = api::ValueResult<api::ResolvedReference>::failure(api::Error::IllegalArgument);
 
@@ -1884,7 +1988,7 @@ EvaluationResult Evaluator::evaluateFunction(
             {
                 aReference = resolveReferenceText(rReferenceNode.maPrimaryText, rCurrentAddress.mnSheet);
                 if (!aReference && aReference.meError == api::Error::IllegalArgument)
-                    return 4;
+                    return bLegacyErrorType ? 524 : 4;
             }
             else if (rReferenceNode.meKind == formula::NodeKind::RangeReference)
             {
@@ -1893,13 +1997,13 @@ EvaluationResult Evaluator::evaluateFunction(
                 aAddress += rReferenceNode.maSecondaryText;
                 aReference = resolveReferenceText(aAddress, rCurrentAddress.mnSheet);
                 if (!aReference && aReference.meError == api::Error::IllegalArgument)
-                    return 4;
+                    return bLegacyErrorType ? 524 : 4;
             }
             else if (rReferenceNode.meKind == formula::NodeKind::NamedReference)
             {
                 aReference = resolveNamedRange(rReferenceNode.maPrimaryText, rCurrentAddress.mnSheet);
                 if (!aReference && aReference.meError == api::Error::NotAvailable)
-                    return 5;
+                    return bLegacyErrorType ? 525 : 5;
             }
             else
             {
@@ -1907,17 +2011,25 @@ EvaluationResult Evaluator::evaluateFunction(
             }
 
             if (!aReference || !aReference.maValue.isSingleCell())
-                return std::nullopt;
+                return bLegacyErrorType ? std::optional<sal_Int32>(519) : std::nullopt;
 
             const workbook::Cell* pCell = getCell(aReference.maValue.maRange.maStart);
             if (!pCell)
                 return std::nullopt;
 
             if (pCell->maRawValueType == u"error")
+            {
+                if (bLegacyErrorType)
+                    return classifyLegacyErrorTypeLiteral(pCell->maRawValue);
                 return classifyOdfErrorTypeLiteral(pCell->maRawValue);
+            }
 
             if (pCell->maValue.isError())
+            {
+                if (bLegacyErrorType)
+                    return classifyLegacyErrorType(pCell->maValue.meError);
                 return classifyOdfErrorType(pCell->maValue.meError);
+            }
 
             return std::nullopt;
         };
@@ -1925,13 +2037,20 @@ EvaluationResult Evaluator::evaluateFunction(
         if (rArgument.meKind == formula::NodeKind::ErrorLiteral)
         {
             const api::String aUpperLiteral = uppercaseAscii(rArgument.maPrimaryText);
-            if (aUpperLiteral == u"#GETTING_DATA"
-                || (aUpperLiteral.starts_with(u"#ERR") && aUpperLiteral.size() > 5
-                    && aUpperLiteral.back() == u'!'))
+            if (!bLegacyErrorType
+                && (aUpperLiteral == u"#GETTING_DATA"
+                    || (aUpperLiteral.starts_with(u"#ERR") && aUpperLiteral.size() > 5
+                        && aUpperLiteral.back() == u'!')))
             {
                 return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
             }
-            if (const auto oErrorType = classifyOdfErrorTypeLiteral(rArgument.maPrimaryText))
+            const std::optional<sal_Int32> oErrorType = bLegacyErrorType
+                                                            ? classifyLegacyErrorTypeLiteral(
+                                                                  rArgument.maPrimaryText)
+                                                            : std::optional<sal_Int32>(
+                                                                  classifyOdfErrorTypeLiteral(
+                                                                      rArgument.maPrimaryText));
+            if (oErrorType)
             {
                 return makeScalarResult(api::CellValue::number(static_cast<double>(*oErrorType)));
             }
@@ -1949,15 +2068,23 @@ EvaluationResult Evaluator::evaluateFunction(
             if (rArgument.meKind == formula::NodeKind::NamedReference
                 && aArgument.meError == api::Error::NotAvailable)
             {
-                return makeScalarResult(api::CellValue::number(5.0));
+                return makeScalarResult(
+                    api::CellValue::number(bLegacyErrorType ? 525.0 : 5.0));
             }
             if ((rArgument.meKind == formula::NodeKind::CellReference
                     || rArgument.meKind == formula::NodeKind::RangeReference)
                 && aArgument.meError == api::Error::IllegalArgument)
             {
-                return makeScalarResult(api::CellValue::number(4.0));
+                return makeScalarResult(
+                    api::CellValue::number(bLegacyErrorType ? 524.0 : 4.0));
             }
-            if (const auto oErrorType = classifyOdfErrorType(aArgument.meError))
+            const std::optional<sal_Int32> oErrorType = bLegacyErrorType
+                                                            ? classifyLegacyErrorType(
+                                                                  aArgument.meError)
+                                                            : std::optional<sal_Int32>(
+                                                                  classifyOdfErrorType(
+                                                                      aArgument.meError));
+            if (oErrorType)
                 return makeScalarResult(api::CellValue::number(static_cast<double>(*oErrorType)));
             return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
         }
@@ -1965,7 +2092,14 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aArgument.maValue.isScalar() || !aArgument.maValue.maValue.isError())
             return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
 
-        if (const auto oErrorType = classifyOdfErrorType(aArgument.maValue.maValue.meError))
+        const std::optional<sal_Int32> oErrorType = bLegacyErrorType
+                                                        ? classifyLegacyErrorType(
+                                                              aArgument.maValue.maValue.meError)
+                                                        : std::optional<sal_Int32>(
+                                                              classifyOdfErrorType(
+                                                                  aArgument.maValue.maValue
+                                                                      .meError));
+        if (oErrorType)
             return makeScalarResult(api::CellValue::number(static_cast<double>(*oErrorType)));
         return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
     }
@@ -3614,6 +3748,35 @@ EvaluationResult Evaluator::evaluateFunction(
 
         return makeScalarResult(api::CellValue::text(
             api::text::cleanPrintable(aText.maValue)));
+    }
+
+    if (aFunctionName == u"BASISODATETIME")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aArgument
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aArgument)
+            return aArgument;
+
+        double fSerialValue = 0.0;
+        if (aArgument.maValue.maValue.isText())
+        {
+            const auto oParsed = sedatetime::parseStandaloneNumberText(aArgument.maValue.maValue.maString);
+            if (!oParsed)
+                return makeFailure(api::Error::IllegalArgument);
+            fSerialValue = oParsed->mfValue;
+        }
+        else
+        {
+            const auto aNumber = coerceToNumber(aArgument.maValue.maValue);
+            if (!aNumber)
+                return makeFailure(aNumber.meError);
+            fSerialValue = aNumber.maValue;
+        }
+
+        return makeScalarResult(api::CellValue::text(formatBasisDateTime(fSerialValue)));
     }
 
     if (aFunctionName == u"VALUE" || aFunctionName == u"DATEVALUE" || aFunctionName == u"TIMEVALUE")

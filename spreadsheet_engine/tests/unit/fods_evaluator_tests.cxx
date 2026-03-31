@@ -86,6 +86,8 @@ Workbook makeWorkbook()
         u"of:=PRICE(\"1999-02-15\";\"2007-11-15\";0.0575;0.065;100;2;0)" });
     aSheet1.setCell(33, 0, Cell { CellValue::number(95.0780346202577),
         u"of:=PRICE(\"1999-02-15\";\"2007-11-15\";0.0575;0.065;100;1)" });
+    aSheet1.setCell(34, 0, Cell { CellValue::number(48.0), u"of:=SUM([.A1:.B2])" });
+    aSheet1.setCell(35, 0, Cell { CellValue::text(u"1899-12-26 12:00:00"), u"of:=BASISODATETIME(-3.5)" });
     aSheet1.setCell(6, 25, Cell { CellValue::number(0.5) });
     aSheet1.setCell(8, 1, Cell { CellValue::text(u"one") });
     aSheet1.setCell(8, 2, Cell { CellValue::text(u"oneone") });
@@ -527,6 +529,38 @@ int main()
             { 0, 33, 0 }, 95.0780346202577, "compiled PRICE() default-basis mismatch", true))
     {
         return nResult;
+    }
+
+    if (const int nResult = requireNumeric(
+            { 0, 34, 0 }, 48.0, "SUM() mismatch"))
+    {
+        return nResult;
+    }
+
+    if (const int nResult = requireNumeric(
+            { 0, 34, 0 }, 48.0, "compiled SUM() mismatch", true))
+    {
+        return nResult;
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCell({ 0, 35, 0 });
+        if (!aResult || aResult.mbUsedCachedValue || !aResult.maValue.maValue.isText()
+            || aResult.maValue.maValue.maString != u"1899-12-26 12:00:00")
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "BASISODATETIME() mismatch");
+        }
+    }
+
+    {
+        const auto aResult = aEvaluator.evaluateCellViaCompiledTokens({ 0, 35, 0 });
+        if (!aResult || aResult.mbUsedCachedValue || !aResult.maValue.maValue.isText()
+            || aResult.maValue.maValue.maString != u"1899-12-26 12:00:00")
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "compiled BASISODATETIME() mismatch");
+        }
     }
 
     if (const int nResult
@@ -1220,11 +1254,19 @@ int main()
         const auto aRepoRoot = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
         const auto aErrorTypePath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
                                     / "spreadsheet" / "fods" / "error.type.fods";
+        const auto aLegacyErrorTypePath = aRepoRoot / "sc" / "qa" / "unit" / "data"
+                                          / "functions" / "spreadsheet" / "fods"
+                                          / "errortype.fods";
         const auto aLoadResult = spreadsheetengine::core::fods::loadWorkbook(aErrorTypePath.string());
         if (!aLoadResult)
             return fail("spreadsheetengine_fods_evaluator_tests", "error.type.fods load failed");
+        const auto aLegacyLoadResult
+            = spreadsheetengine::core::fods::loadWorkbook(aLegacyErrorTypePath.string());
+        if (!aLegacyLoadResult)
+            return fail("spreadsheetengine_fods_evaluator_tests", "errortype.fods load failed");
 
         Evaluator aErrorTypeEvaluator(aLoadResult.maValue.maWorkbook);
+        Evaluator aLegacyErrorTypeEvaluator(aLegacyLoadResult.maValue.maWorkbook);
         const auto reportErrorTypeMismatch = [&](const char* pLabel) -> bool {
             std::fprintf(stderr, "%s: ERROR.TYPE mismatch in %s\n",
                 "spreadsheetengine_fods_evaluator_tests", pLabel);
@@ -1296,6 +1338,46 @@ int main()
         const auto aCompiledArrayConstant
             = aErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
                 u"of:=ERROR.TYPE({#N/A})", aSheet2Origin);
+        const auto aLegacyRef = aLegacyErrorTypeEvaluator.evaluateFormula(
+            u"of:=ORG.OPENOFFICE.ERRORTYPE(#REF!)", { 0, 0, 0 });
+        const auto aLegacyGettingData = aLegacyErrorTypeEvaluator.evaluateFormula(
+            u"of:=ORG.OPENOFFICE.ERRORTYPE(#getting_data)", { 0, 0, 0 });
+        const auto aLegacyName = aLegacyErrorTypeEvaluator.evaluateFormula(
+            u"of:=ORG.OPENOFFICE.ERRORTYPE(#NAME?)", { 0, 0, 0 });
+        const auto aLegacyErr7 = aLegacyErrorTypeEvaluator.evaluateFormula(
+            u"of:=ORG.OPENOFFICE.ERRORTYPE(err:7)", { 0, 0, 0 });
+        const auto aLegacyAhoj = aLegacyErrorTypeEvaluator.evaluateFormula(
+            u"of:=ORG.OPENOFFICE.ERRORTYPE(ahoj)", { 0, 0, 0 });
+
+        const auto aCompiledLegacyRef = aLegacyErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ORG.OPENOFFICE.ERRORTYPE(#REF!)", { 0, 0, 0 });
+        const auto aCompiledLegacyName = aLegacyErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ORG.OPENOFFICE.ERRORTYPE(#NAME?)", { 0, 0, 0 });
+        const auto aCompiledLegacyErr7 = aLegacyErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ORG.OPENOFFICE.ERRORTYPE(err:7)", { 0, 0, 0 });
+        const auto aCompiledLegacyAhoj = aLegacyErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ORG.OPENOFFICE.ERRORTYPE(ahoj)", { 0, 0, 0 });
+        const auto aLegacyCellA8 = aLegacyErrorTypeEvaluator.evaluateCell({ 1, 0, 7 });
+        const auto aLegacyCellA12 = aLegacyErrorTypeEvaluator.evaluateCell({ 1, 0, 11 });
+        const auto aLegacyCellA14 = aLegacyErrorTypeEvaluator.evaluateCell({ 1, 0, 13 });
+        const auto aLegacyCellA15 = aLegacyErrorTypeEvaluator.evaluateCell({ 1, 0, 14 });
+        const auto aLegacyCellA17 = aLegacyErrorTypeEvaluator.evaluateCell({ 1, 0, 16 });
+        const auto aLegacyCellA18 = aLegacyErrorTypeEvaluator.evaluateCell({ 1, 0, 17 });
+        const auto aLegacyCellA19 = aLegacyErrorTypeEvaluator.evaluateCell({ 1, 0, 18 });
+        const auto aCompiledLegacyCellA8
+            = aLegacyErrorTypeEvaluator.evaluateCellViaCompiledTokens({ 1, 0, 7 });
+        const auto aCompiledLegacyCellA12
+            = aLegacyErrorTypeEvaluator.evaluateCellViaCompiledTokens({ 1, 0, 11 });
+        const auto aCompiledLegacyCellA14
+            = aLegacyErrorTypeEvaluator.evaluateCellViaCompiledTokens({ 1, 0, 13 });
+        const auto aCompiledLegacyCellA15
+            = aLegacyErrorTypeEvaluator.evaluateCellViaCompiledTokens({ 1, 0, 14 });
+        const auto aCompiledLegacyCellA17
+            = aLegacyErrorTypeEvaluator.evaluateCellViaCompiledTokens({ 1, 0, 16 });
+        const auto aCompiledLegacyCellA18
+            = aLegacyErrorTypeEvaluator.evaluateCellViaCompiledTokens({ 1, 0, 17 });
+        const auto aCompiledLegacyCellA19
+            = aLegacyErrorTypeEvaluator.evaluateCellViaCompiledTokens({ 1, 0, 18 });
 
         if (!checkErrorTypeNumber("ERROR.TYPE(NA())", aNa, 7.0)
             || !checkErrorTypeNumber("ERROR.TYPE(#REF!)", aRef, 4.0)
@@ -1316,7 +1398,53 @@ int main()
             || !checkErrorTypeNumber("compiled ERROR.TYPE(ahoj)", aCompiledUnknownName, 5.0)
             || !checkErrorTypeNa("compiled ERROR.TYPE(5)", aCompiledNonError)
             || !checkErrorTypeNumber(
-                "compiled ERROR.TYPE({#N/A})", aCompiledArrayConstant, 7.0))
+                "compiled ERROR.TYPE({#N/A})", aCompiledArrayConstant, 7.0)
+            || !checkErrorTypeNumber(
+                "ERRORTYPE(#REF!)", aLegacyRef, 524.0)
+            || !checkErrorTypeNumber(
+                "ERRORTYPE(#getting_data)", aLegacyGettingData, 508.0)
+            || !checkErrorTypeNumber(
+                "ERRORTYPE(#NAME?)", aLegacyName, 525.0)
+            || !checkErrorTypeNumber(
+                "ERRORTYPE(err:7)", aLegacyErr7, 525.0)
+            || !checkErrorTypeNumber(
+                "ERRORTYPE(ahoj)", aLegacyAhoj, 525.0)
+            || !checkErrorTypeNumber(
+                "ERRORTYPE cell A8", aLegacyCellA8, 525.0)
+            || !checkErrorTypeNumber(
+                "ERRORTYPE cell A12", aLegacyCellA12, 532.0)
+            || !checkErrorTypeNumber(
+                "ERRORTYPE cell A14", aLegacyCellA14, 508.0)
+            || !checkErrorTypeNa(
+                "ERRORTYPE cell A15", aLegacyCellA15)
+            || !checkErrorTypeNumber(
+                "ERRORTYPE cell A17", aLegacyCellA17, 511.0)
+            || !checkErrorTypeNumber(
+                "ERRORTYPE cell A18", aLegacyCellA18, 32767.0)
+            || !checkErrorTypeNumber(
+                "ERRORTYPE cell A19", aLegacyCellA19, 519.0)
+            || !checkErrorTypeNumber(
+                "compiled ERRORTYPE(#REF!)", aCompiledLegacyRef, 524.0)
+            || !checkErrorTypeNumber(
+                "compiled ERRORTYPE(#NAME?)", aCompiledLegacyName, 525.0)
+            || !checkErrorTypeNumber(
+                "compiled ERRORTYPE(err:7)", aCompiledLegacyErr7, 525.0)
+            || !checkErrorTypeNumber(
+                "compiled ERRORTYPE(ahoj)", aCompiledLegacyAhoj, 525.0)
+            || !checkErrorTypeNumber(
+                "compiled ERRORTYPE cell A8", aCompiledLegacyCellA8, 525.0)
+            || !checkErrorTypeNumber(
+                "compiled ERRORTYPE cell A12", aCompiledLegacyCellA12, 532.0)
+            || !checkErrorTypeNumber(
+                "compiled ERRORTYPE cell A14", aCompiledLegacyCellA14, 508.0)
+            || !checkErrorTypeNa(
+                "compiled ERRORTYPE cell A15", aCompiledLegacyCellA15)
+            || !checkErrorTypeNumber(
+                "compiled ERRORTYPE cell A17", aCompiledLegacyCellA17, 511.0)
+            || !checkErrorTypeNumber(
+                "compiled ERRORTYPE cell A18", aCompiledLegacyCellA18, 32767.0)
+            || !checkErrorTypeNumber(
+                "compiled ERRORTYPE cell A19", aCompiledLegacyCellA19, 519.0))
         {
             return fail("spreadsheetengine_fods_evaluator_tests", "ERROR.TYPE evaluation mismatch");
         }
@@ -2931,11 +3059,11 @@ int main()
 
         Evaluator aFixtureEvaluator(aLoadResult.maValue.maWorkbook);
         const auto aResult = aFixtureEvaluator.evaluateCell({ 0, 4, 0 });
-        if (!aResult || !aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber()
+        if (!aResult || aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber()
             || !almostEqual(aResult.maValue.maValue.mfNumber, 1.0))
         {
             return fail(
-                "spreadsheetengine_fods_evaluator_tests", "fixture cached fallback mismatch");
+                "spreadsheetengine_fods_evaluator_tests", "fixture SUM() mismatch");
         }
 
         const auto aImportedResult
