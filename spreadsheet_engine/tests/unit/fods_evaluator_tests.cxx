@@ -88,6 +88,7 @@ Workbook makeWorkbook()
         u"of:=PRICE(\"1999-02-15\";\"2007-11-15\";0.0575;0.065;100;1)" });
     aSheet1.setCell(34, 0, Cell { CellValue::number(48.0), u"of:=SUM([.A1:.B2])" });
     aSheet1.setCell(35, 0, Cell { CellValue::text(u"1899-12-26 12:00:00"), u"of:=BASISODATETIME(-3.5)" });
+    aSheet1.setCell(206, 0, Cell { CellValue::boolean(true), u"of:=ROUND([.A1:.A2];0)=5" });
     aSheet1.setCell(6, 25, Cell { CellValue::number(0.5) });
     aSheet1.setCell(8, 1, Cell { CellValue::text(u"one") });
     aSheet1.setCell(8, 2, Cell { CellValue::text(u"oneone") });
@@ -299,7 +300,6 @@ int main()
         }
         return 0;
     };
-
     {
         const auto aResult = aEvaluator.evaluateCell({ 0, 1, 0 });
         if (!aResult || !aResult.maValue.isScalar() || !aResult.maValue.maValue.isNumber()
@@ -757,6 +757,19 @@ int main()
             return fail("spreadsheetengine_fods_evaluator_tests",
                 "compiled BASISODATETIME() mismatch");
         }
+    }
+
+    if (const int nResult = requireBooleanFormula(
+            aEvaluator.evaluateCell({ 0, 206, 0 }), true, "ROUND anchored comparison mismatch"))
+    {
+        return nResult;
+    }
+
+    if (const int nResult = requireBooleanFormula(
+            aEvaluator.evaluateCellViaCompiledTokens({ 0, 206, 0 }), true,
+            "compiled ROUND anchored comparison mismatch"))
+    {
+        return nResult;
     }
 
     if (const int nResult

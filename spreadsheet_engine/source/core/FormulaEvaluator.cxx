@@ -575,7 +575,8 @@ EvaluationResult Evaluator::evaluateNode(
         }
         case formula::NodeKind::UnaryOperation:
         {
-            EvaluationResult aChild = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+            EvaluationResult aChild
+                = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
             if (!aChild)
                 return aChild;
             const auto aNumber = coerceToNumber(aChild.maValue.maValue);
@@ -588,10 +589,12 @@ EvaluationResult Evaluator::evaluateNode(
         }
         case formula::NodeKind::BinaryOperation:
         {
-            EvaluationResult aLeft = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+            EvaluationResult aLeft
+                = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
             if (!aLeft)
                 return aLeft;
-            EvaluationResult aRight = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
+            EvaluationResult aRight
+                = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
             if (!aRight)
                 return aRight;
 

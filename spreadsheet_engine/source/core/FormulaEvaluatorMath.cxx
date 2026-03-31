@@ -413,34 +413,26 @@ EvaluationResult Evaluator::evaluateMathFamilyBody(
     if (aFunctionName == u"ROUND" || aFunctionName == u"ROUNDUP" || aFunctionName == u"ROUNDDOWN")
     {
         if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
-        EvaluationResult aValue
-            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
-        if (!aValue)
-            return aValue;
-
-        const auto aValueNumber = coerceToNumber(aValue.maValue.maValue);
+        const auto aValueNumber
+            = aContext.evaluateAnchoredNumericArgument(*rNode.maChildren[0], std::nullopt);
         if (!aValueNumber)
-            return makeFailure(aValueNumber.meError);
+            return makeCellError(aValueNumber.meError);
 
         int nDecimals = 0;
         if (rNode.maChildren.size() == 2)
         {
-            EvaluationResult aDecimals
-                = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
-            if (!aDecimals)
-                return aDecimals;
-
-            const auto aDigitsNumber = coerceToNumber(aDecimals.maValue.maValue);
+            const auto aDigitsNumber
+                = aContext.evaluateAnchoredNumericArgument(*rNode.maChildren[1], 0.0);
             if (!aDigitsNumber || !std::isfinite(aDigitsNumber.maValue))
-                return makeFailure(api::Error::IllegalArgument);
+                return makeCellError(api::Error::IllegalArgument);
 
             const double fTruncatedDigits = std::trunc(aDigitsNumber.maValue);
             if (fTruncatedDigits < static_cast<double>(std::numeric_limits<int>::min())
                 || fTruncatedDigits > static_cast<double>(std::numeric_limits<int>::max()))
             {
-                return makeFailure(api::Error::IllegalArgument);
+                return makeCellError(api::Error::IllegalArgument);
             }
 
             nDecimals = static_cast<int>(fTruncatedDigits);
@@ -456,7 +448,7 @@ EvaluationResult Evaluator::evaluateMathFamilyBody(
             aValueNumber.maValue, nDecimals, eMode,
             aFunctionName == u"ROUNDUP" || aFunctionName == u"ROUNDDOWN");
         if (!aRounded)
-            return makeFailure(aRounded.meError);
+            return makeCellError(aRounded.meError);
         return makeScalarResult(api::CellValue::number(aRounded.maValue));
     }
 
@@ -623,28 +615,21 @@ EvaluationResult Evaluator::evaluateMathFamilyBody(
     if (aFunctionName == u"ROUNDSIG")
     {
         if (rNode.maChildren.size() != 2)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
-        EvaluationResult aValue
-            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
-        if (!aValue)
-            return aValue;
-        EvaluationResult aDigits
-            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
-        if (!aDigits)
-            return aDigits;
-
-        const auto aValueNumber = coerceToNumber(aValue.maValue.maValue);
+        const auto aValueNumber
+            = aContext.evaluateAnchoredNumericArgument(*rNode.maChildren[0], std::nullopt);
         if (!aValueNumber)
-            return makeFailure(aValueNumber.meError);
-        const auto aDigitsNumber = coerceToNumber(aDigits.maValue.maValue);
+            return makeCellError(aValueNumber.meError);
+        const auto aDigitsNumber
+            = aContext.evaluateAnchoredNumericArgument(*rNode.maChildren[1], std::nullopt);
         if (!aDigitsNumber || !std::isfinite(aDigitsNumber.maValue))
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aRounded
             = semath::evaluateRoundSigValue(aValueNumber.maValue, aDigitsNumber.maValue);
         if (!aRounded)
-            return makeFailure(aRounded.meError);
+            return makeCellError(aRounded.meError);
         return makeScalarResult(api::CellValue::number(aRounded.maValue));
     }
 
