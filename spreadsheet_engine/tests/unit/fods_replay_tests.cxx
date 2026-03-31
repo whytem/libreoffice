@@ -97,7 +97,7 @@ struct CompiledDiffSummary
     std::map<std::string, std::string> maWorkbookOutcomeExamples;
 };
 
-enum class CompiledDiffWorkbookOutcome : sal_uInt8
+enum class CompiledDiffWorkbookOutcome : std::uint8_t
 {
     Matched = 0,
     CachedFallbackOnly,
