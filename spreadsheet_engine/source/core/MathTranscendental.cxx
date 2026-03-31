@@ -12,7 +12,7 @@
 #include <cmath>
 
 #include <basegfx/numeric/ftools.hxx>
-#include <rtl/math.hxx>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
 
 namespace spreadsheetengine::core::math
 {
@@ -23,13 +23,13 @@ double computeDegrees(double fRadians) { return basegfx::rad2deg(fRadians); }
 
 double computeRadians(double fDegrees) { return basegfx::deg2rad(fDegrees); }
 
-double computeSin(double fValue) { return ::rtl::math::sin(fValue); }
+double computeSin(double fValue) { return std::sin(fValue); }
 
-double computeCos(double fValue) { return ::rtl::math::cos(fValue); }
+double computeCos(double fValue) { return std::cos(fValue); }
 
-double computeTan(double fValue) { return ::rtl::math::tan(fValue); }
+double computeTan(double fValue) { return std::tan(fValue); }
 
-double computeCot(double fValue) { return 1.0 / ::rtl::math::tan(fValue); }
+double computeCot(double fValue) { return 1.0 / std::tan(fValue); }
 
 double computeArcSin(double fValue) { return std::asin(fValue); }
 
@@ -47,13 +47,13 @@ double computeTanHyp(double fValue) { return std::tanh(fValue); }
 
 double computeCotHyp(double fValue) { return 1.0 / std::tanh(fValue); }
 
-double computeArcSinHyp(double fValue) { return ::rtl::math::asinh(fValue); }
+double computeArcSinHyp(double fValue) { return std::asinh(fValue); }
 
 std::optional<double> computeArcCosHyp(double fValue)
 {
     if (fValue < 1.0)
         return std::nullopt;
-    return ::rtl::math::acosh(fValue);
+    return std::acosh(fValue);
 }
 
 std::optional<double> computeArcTanHyp(double fValue)
@@ -70,9 +70,9 @@ std::optional<double> computeArcCotHyp(double fValue)
     return 0.5 * std::log((fValue + 1.0) / (fValue - 1.0));
 }
 
-double computeCosecant(double fValue) { return 1.0 / ::rtl::math::sin(fValue); }
+double computeCosecant(double fValue) { return 1.0 / std::sin(fValue); }
 
-double computeSecant(double fValue) { return 1.0 / ::rtl::math::cos(fValue); }
+double computeSecant(double fValue) { return 1.0 / std::cos(fValue); }
 
 double computeCosecantHyp(double fValue) { return 1.0 / std::sinh(fValue); }
 

@@ -12,7 +12,7 @@
 #include <optional>
 #include <vector>
 
-#include <sal/types.h>
+#include <spreadsheetengine/api/Types.hxx>
 
 #include <spreadsheetengine/api/Host.hxx>
 #include <spreadsheetengine/api/String.hxx>

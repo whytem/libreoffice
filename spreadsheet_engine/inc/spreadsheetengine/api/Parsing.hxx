@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include <rtl/math.hxx>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
 
 #include <spreadsheetengine/api/Host.hxx>
 #include <spreadsheetengine/runtime/DateTimeParts.hxx>
@@ -46,7 +46,7 @@ inline api::ValueResult<double> dateValueFromText(
     if (!aParsed || !isDateLike(aParsed.maValue.meKind))
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    return api::ValueResult<double>::success(rtl::math::approxFloor(aParsed.maValue.mfValue));
+    return api::ValueResult<double>::success(spreadsheetengine::core::fp::approxFloor(aParsed.maValue.mfValue));
 }
 
 inline api::ValueResult<double> timeValueFromText(

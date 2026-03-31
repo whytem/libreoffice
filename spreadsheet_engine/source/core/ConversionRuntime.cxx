@@ -8,6 +8,7 @@
  */
 
 #include <spreadsheetengine/runtime/ConversionRuntime.hxx>
+#include <cstdint>
 
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
 
@@ -33,7 +34,7 @@ struct EuroCurrencyInfo
 {
     api::StringView maCode;
     double mfRate = 1.0;
-    sal_Int32 mnDecimals = 2;
+    std::int32_t mnDecimals = 2;
 };
 
 constexpr UnitConversionFactor kKnownConversions[] = {
@@ -202,7 +203,7 @@ constexpr EuroCurrencyInfo kEuroCurrencies[] = {
     return std::nullopt;
 }
 
-[[nodiscard]] double roundToDecimalPlaces(double fValue, sal_Int32 nDecimals)
+[[nodiscard]] double roundToDecimalPlaces(double fValue, std::int32_t nDecimals)
 {
     if (nDecimals < 0)
         return fValue;

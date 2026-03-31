@@ -8,6 +8,7 @@
  */
 
 #include <spreadsheetengine/detail/compiler/CompiledFormulaInflation.hxx>
+#include <cstdint>
 
 #include <spreadsheetengine/detail/BuiltinExternalNames.hxx>
 #include <spreadsheetengine/detail/WorkbookCompilerLowering.hxx>
@@ -153,7 +154,7 @@ using spreadsheetengine::core::eval::detail::formatNumber;
 
 struct InflatedStackItem
 {
-    enum class Kind : sal_uInt8
+    enum class Kind : std::uint8_t
     {
         Node = 0,
         FunctionName,

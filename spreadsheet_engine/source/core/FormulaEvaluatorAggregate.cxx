@@ -8,11 +8,12 @@
  */
 
 #include <spreadsheetengine/detail/FormulaEvaluator.hxx>
+#include <cstdint>
 #include <spreadsheetengine/runtime/MathAggregate.hxx>
 
 #include "FormulaEvaluatorUtils.hxx"
 
-#include <rtl/math.hxx>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
 
 namespace spreadsheetengine::core::eval
 {
@@ -326,7 +327,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
             return detail::makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
         bool bIgnoreHiddenRows = false;
-        sal_Int32 nAggregateFunction = 0;
+        std::int32_t nAggregateFunction = 0;
         if (*oFunctionCode >= 1 && *oFunctionCode <= 11)
             nAggregateFunction = *oFunctionCode;
         else if (*oFunctionCode >= 101 && *oFunctionCode <= 111)
@@ -455,7 +456,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
         if (!aRank)
             return detail::makeFailure(aRank.meError);
 
-        sal_Int32 nAggregateFunction = 0;
+        std::int32_t nAggregateFunction = 0;
         if (rFunctionName == u"LARGE")
             nAggregateFunction = 14;
         else if (rFunctionName == u"SMALL")
@@ -506,7 +507,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
 api::ValueResult<bool> Evaluator::scanAggregateScanArgument(
     const formula::Node& rArgument, const api::CellAddress& rCurrentAddress,
     semath::AggregateScan& rScan, const semath::AggregateOptions& rOptions,
-    sal_Int32 nFunction)
+    std::int32_t nFunction)
 {
     auto consumeValue = [&](const api::CellValue& rValue) -> api::ValueResult<bool> {
         if (rValue.isError())

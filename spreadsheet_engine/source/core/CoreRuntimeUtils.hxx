@@ -10,11 +10,12 @@
 #pragma once
 
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <optional>
 #include <string>
 
-#include <sal/types.h>
+#include <spreadsheetengine/api/Types.hxx>
 
 #include <spreadsheetengine/api/Error.hxx>
 #include <spreadsheetengine/api/Host.hxx>
@@ -81,7 +82,7 @@ namespace spreadsheetengine::core::util
     return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 }
 
-[[nodiscard]] inline std::optional<sal_Int32> toWholeNumber(double fValue)
+[[nodiscard]] inline std::optional<std::int32_t> toWholeNumber(double fValue)
 {
     if (!std::isfinite(fValue))
         return std::nullopt;
@@ -90,7 +91,7 @@ namespace spreadsheetengine::core::util
     if (std::abs(fValue - fRounded) > 1e-9)
         return std::nullopt;
 
-    return static_cast<sal_Int32>(fRounded);
+    return static_cast<std::int32_t>(fRounded);
 }
 
 [[nodiscard]] inline api::ValueResult<double> makeFiniteResult(double fValue)

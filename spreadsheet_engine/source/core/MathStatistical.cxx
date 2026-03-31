@@ -8,14 +8,15 @@
  */
 
 #include <spreadsheetengine/runtime/MathStatistical.hxx>
+#include <cstdint>
 
 #include <cmath>
 #include <functional>
 #include <limits>
 
-#include <rtl/math.hxx>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
 
-#include <kahan.hxx>
+#include <spreadsheetengine/runtime/KahanSum.hxx>
 
 namespace spreadsheetengine::core::math
 {
@@ -97,8 +98,8 @@ constexpr double fLanczosG = 6.024680040776729583740234375;
     fGamma *= fHalfpower;
     fGamma /= std::exp(fZgHelp);
     fGamma *= fHalfpower;
-    if (fZ <= 20.0 && fZ == ::rtl::math::approxFloor(fZ))
-        fGamma = ::rtl::math::round(fGamma);
+    if (fZ <= 20.0 && fZ == fp::approxFloor(fZ))
+        fGamma = fp::round(fGamma);
     return fGamma;
 }
 
@@ -216,7 +217,7 @@ constexpr double fLanczosG = 6.024680040776729583740234375;
     double fA2 = 1.0;
     double fNorm = 1.0;
     double fCurrent = 1.0;
-    if (!::rtl::math::approxEqual(fB2, 0.0))
+    if (!fp::approxEqual(fB2, 0.0))
     {
         fNorm = 1.0 / fB2;
         fCurrent = fA2 * fNorm;
@@ -235,7 +236,7 @@ constexpr double fLanczosG = 6.024680040776729583740234375;
         fB1 = (fB2 + fEven * fB1) * fNorm;
         fA2 = fA1 + fOdd * fA2 * fNorm;
         fB2 = fB1 + fOdd * fB2 * fNorm;
-        if (::rtl::math::approxEqual(fB2, 0.0))
+        if (fp::approxEqual(fB2, 0.0))
             continue;
 
         fNorm = 1.0 / fB2;
@@ -260,19 +261,19 @@ constexpr double fLanczosG = 6.024680040776729583740234375;
 }
 
 [[nodiscard]] double sumExpProbabilityRange(
-    sal_Int32 nStart, sal_Int32 nEnd, const std::function<double(sal_Int32)>& rLogProbability)
+    std::int32_t nStart, std::int32_t nEnd, const std::function<double(std::int32_t)>& rLogProbability)
 {
     if (nEnd < nStart)
         return 0.0;
 
     double fMaxLog = -std::numeric_limits<double>::infinity();
-    for (sal_Int32 nIndex = nStart; nIndex <= nEnd; ++nIndex)
+    for (std::int32_t nIndex = nStart; nIndex <= nEnd; ++nIndex)
         fMaxLog = std::max(fMaxLog, rLogProbability(nIndex));
     if (!std::isfinite(fMaxLog))
         return 0.0;
 
-    KahanSum fSum = 0.0;
-    for (sal_Int32 nIndex = nStart; nIndex <= nEnd; ++nIndex)
+    fp::KahanSum fSum = 0.0;
+    for (std::int32_t nIndex = nStart; nIndex <= nEnd; ++nIndex)
         fSum += std::exp(rLogProbability(nIndex) - fMaxLog);
     return std::exp(fMaxLog) * fSum.get();
 }
@@ -282,7 +283,7 @@ constexpr double fLanczosG = 6.024680040776729583740234375;
     return 0.39894228040143268 * std::exp(-(fValue * fValue) / 2.0);
 }
 
-[[nodiscard]] double taylorPolynomial(const double* pPolynomial, sal_uInt16 nMax, double fValue)
+[[nodiscard]] double taylorPolynomial(const double* pPolynomial, std::uint16_t nMax, double fValue)
 {
     double fResult = pPolynomial[nMax];
     for (short nIndex = nMax - 1; nIndex >= 0; --nIndex)
@@ -312,7 +313,7 @@ constexpr double fLanczosG = 6.024680040776729583740234375;
         fDenom += 2.0;
         double fPk = fPkm1 * fDenom - fPkm2 * fNum;
         const double fQk = fQkm1 * fDenom - fQkm2 * fNum;
-        if (!::rtl::math::approxEqual(fQk, 0.0))
+        if (!fp::approxEqual(fQk, 0.0))
         {
             const double fR = fPk / fQk;
             bFinished = std::abs((fApprox - fR) / fR) <= fHalfMachEps;
@@ -372,8 +373,8 @@ template <typename DistributionFn>
     if (!(fAx < fBx))
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    KahanSum fkAx = fAx;
-    KahanSum fkBx = fBx;
+    fp::KahanSum fkAx = fAx;
+    fp::KahanSum fkBx = fBx;
 
     auto aAy = rFunction(fAx);
     if (!aAy)
@@ -384,7 +385,7 @@ template <typename DistributionFn>
 
     double fAy = aAy.maValue;
     double fBy = aBy.maValue;
-    KahanSum fTemp = 0.0;
+    fp::KahanSum fTemp = 0.0;
     unsigned short nCount = 0;
     for (; nCount < 1000 && !hasChangeOfSign(fAy, fBy); ++nCount)
     {
@@ -582,7 +583,7 @@ double betaCdf(double fInput, double fAlpha, double fBeta)
 double gaussValue(double fValue)
 {
     const double fAbs = std::abs(fValue);
-    const sal_uInt16 nBucket = static_cast<sal_uInt16>(::rtl::math::approxFloor(fAbs));
+    const std::uint16_t nBucket = static_cast<std::uint16_t>(fp::approxFloor(fAbs));
 
     double fResult = 0.0;
     if (nBucket == 0)
@@ -634,8 +635,8 @@ api::ValueResult<double> evaluateStandardNormalInverse(double fProbability)
 {
     if (fProbability < 0.0 || fProbability > 1.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    if (::rtl::math::approxEqual(fProbability, 0.0)
-        || ::rtl::math::approxEqual(fProbability, 1.0))
+    if (fp::approxEqual(fProbability, 0.0)
+        || fp::approxEqual(fProbability, 1.0))
     {
         return api::ValueResult<double>::failure(api::Error::NoValue);
     }
@@ -789,31 +790,31 @@ api::ValueResult<double> evaluateLegacyChiDist(double fChi, double fDegreesFreed
 api::ValueResult<double> evaluateBinomialInverse(
     double fTrials, double fProbability, double fAlpha)
 {
-    const double fN = ::rtl::math::approxFloor(fTrials);
+    const double fN = fp::approxFloor(fTrials);
     if (fN < 0.0 || fProbability < 0.0 || fProbability > 1.0 || fAlpha < 0.0 || fAlpha > 1.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    if (::rtl::math::approxEqual(fAlpha, 0.0))
+    if (fp::approxEqual(fAlpha, 0.0))
         return api::ValueResult<double>::success(0.0);
-    if (::rtl::math::approxEqual(fProbability, 0.0))
+    if (fp::approxEqual(fProbability, 0.0))
         return api::ValueResult<double>::success(0.0);
-    if (::rtl::math::approxEqual(fProbability, 1.0))
+    if (fp::approxEqual(fProbability, 1.0))
         return api::ValueResult<double>::success(fN);
-    if (::rtl::math::approxEqual(fAlpha, 1.0))
+    if (fp::approxEqual(fAlpha, 1.0))
         return api::ValueResult<double>::success(fN);
 
-    sal_Int32 nLow = 0;
-    sal_Int32 nHigh = static_cast<sal_Int32>(fN);
+    std::int32_t nLow = 0;
+    std::int32_t nHigh = static_cast<std::int32_t>(fN);
     while (nLow < nHigh)
     {
-        const sal_Int32 nMid = nLow + ((nHigh - nLow) / 2);
+        const std::int32_t nMid = nLow + ((nHigh - nLow) / 2);
         const auto aDistribution = evaluateBinomialDistribution(
             static_cast<double>(nMid), fN, fProbability, true);
         if (!aDistribution)
             return aDistribution;
 
         if (aDistribution.maValue >= fAlpha
-            || ::rtl::math::approxEqual(aDistribution.maValue, fAlpha))
+            || fp::approxEqual(aDistribution.maValue, fAlpha))
         {
             nHigh = nMid;
         }
@@ -917,7 +918,7 @@ api::ValueResult<double> evaluateChiSquareInverse(double fProbability, double fD
 {
     if (fDegreesFreedom < 1.0 || fProbability < 0.0 || fProbability >= 1.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    if (::rtl::math::approxEqual(fProbability, 0.0))
+    if (fp::approxEqual(fProbability, 0.0))
         return api::ValueResult<double>::success(0.0);
 
     return iterateInverseCalcStyle(fDegreesFreedom * 0.5, fDegreesFreedom,
@@ -945,11 +946,11 @@ api::ValueResult<double> evaluateGammaDistribution(
     if (fX < 0.0)
         return api::ValueResult<double>::success(0.0);
 
-    if (::rtl::math::approxEqual(fX, 0.0))
+    if (fp::approxEqual(fX, 0.0))
     {
         if (fAlpha < 1.0)
             return api::ValueResult<double>::failure(api::Error::DivisionByZero);
-        if (::rtl::math::approxEqual(fAlpha, 1.0))
+        if (fp::approxEqual(fAlpha, 1.0))
             return api::ValueResult<double>::success(1.0 / fBeta);
         return api::ValueResult<double>::success(0.0);
     }
@@ -965,7 +966,7 @@ api::ValueResult<double> evaluateGammaInverse(
 {
     if (fAlpha <= 0.0 || fBeta <= 0.0 || fProbability < 0.0 || fProbability >= 1.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    if (::rtl::math::approxEqual(fProbability, 0.0))
+    if (fp::approxEqual(fProbability, 0.0))
         return api::ValueResult<double>::success(0.0);
 
     const double fStart = fAlpha * fBeta;
@@ -980,8 +981,8 @@ api::ValueResult<double> evaluateGammaInverse(
 
 api::ValueResult<double> evaluateGammaValue(double fX)
 {
-    const double fWhole = ::rtl::math::approxFloor(fX);
-    if (fX <= 0.0 && ::rtl::math::approxEqual(fX, fWhole))
+    const double fWhole = fp::approxFloor(fX);
+    if (fX <= 0.0 && fp::approxEqual(fX, fWhole))
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
     if (fX > fMaxGammaArgument)
         return api::ValueResult<double>::failure(api::Error::Domain);
@@ -1001,7 +1002,7 @@ api::ValueResult<double> evaluateGammaValue(double fX)
         return api::ValueResult<double>::success(gammaHelperPositive(fX + 2.0) / (fX + 1.0) / fX);
     }
 
-    const double fSin = ::rtl::math::sin(M_PI * fX);
+    const double fSin = std::sin(M_PI * fX);
     const double fLogDivisor = logGammaHelperPositive(1.0 - fX) + std::log(std::abs(fSin));
     if (fLogDivisor - fLogPi >= fLogDblMax)
         return api::ValueResult<double>::success(0.0);
@@ -1055,14 +1056,14 @@ api::ValueResult<double> evaluateTInverse(
     if (fDegreesFreedom < 1.0 || fProbability <= 0.0 || fProbability > 1.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    if ((nType == 2 || nType == 4) && ::rtl::math::approxEqual(fProbability, 1.0))
+    if ((nType == 2 || nType == 4) && fp::approxEqual(fProbability, 1.0))
         return api::ValueResult<double>::success(0.0);
 
     if (nType == 4)
     {
         if (fProbability >= 1.0)
             return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-        if (::rtl::math::approxEqual(fProbability, 0.5))
+        if (fp::approxEqual(fProbability, 0.5))
             return api::ValueResult<double>::success(0.0);
         if (fProbability < 0.5)
         {
@@ -1118,7 +1119,7 @@ api::ValueResult<double> evaluateFInverseRightTail(
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
     }
 
-    if (::rtl::math::approxEqual(fProbability, 1.0))
+    if (fp::approxEqual(fProbability, 1.0))
         return api::ValueResult<double>::success(0.0);
 
     return iterateInverseCalcStyle(fDegreesFreedom1 * 0.5, fDegreesFreedom1,
@@ -1136,7 +1137,7 @@ api::ValueResult<double> evaluateLegacyChiInverse(
 {
     if (fDegreesFreedom < 1.0 || fProbability <= 0.0 || fProbability > 1.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    if (::rtl::math::approxEqual(fProbability, 1.0))
+    if (fp::approxEqual(fProbability, 1.0))
         return api::ValueResult<double>::success(0.0);
 
     return iterateInverseCalcStyle(fDegreesFreedom * 0.5, fDegreesFreedom,
@@ -1181,8 +1182,8 @@ api::ValueResult<double> evaluateBetaDistribution(
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
     const double fStandardX = (fX - fLowerBound) / fScale;
-    if ((::rtl::math::approxEqual(fStandardX, 0.0) && fAlpha < 1.0)
-        || (::rtl::math::approxEqual(fStandardX, 1.0) && fBeta < 1.0))
+    if ((fp::approxEqual(fStandardX, 0.0) && fAlpha < 1.0)
+        || (fp::approxEqual(fStandardX, 1.0) && fBeta < 1.0))
     {
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
     }
@@ -1198,9 +1199,9 @@ api::ValueResult<double> evaluateBetaInverse(
     {
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
     }
-    if (::rtl::math::approxEqual(fProbability, 0.0))
+    if (fp::approxEqual(fProbability, 0.0))
         return api::ValueResult<double>::success(fLowerBound);
-    if (::rtl::math::approxEqual(fProbability, 1.0))
+    if (fp::approxEqual(fProbability, 1.0))
         return api::ValueResult<double>::success(fUpperBound);
 
     const auto aStandard = iterateInverseCalcStyle(0.0, 1.0,
@@ -1224,8 +1225,8 @@ api::ValueResult<double> evaluatePoissonDistribution(
     if (fLambda <= 0.0 || fX < 0.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    const sal_Int32 nX = static_cast<sal_Int32>(::rtl::math::approxFloor(fX));
-    const auto logProbability = [fLambda](sal_Int32 nValue) {
+    const std::int32_t nX = static_cast<std::int32_t>(fp::approxFloor(fX));
+    const auto logProbability = [fLambda](std::int32_t nValue) {
         return static_cast<double>(nValue) * std::log(fLambda) - fLambda
                - logGammaValuePositive(static_cast<double>(nValue) + 1.0);
     };
@@ -1240,31 +1241,31 @@ api::ValueResult<double> evaluatePoissonDistribution(
 api::ValueResult<double> evaluateBinomialDistribution(
     double fSuccesses, double fTrials, double fProbability, bool bCumulative)
 {
-    const double fN = ::rtl::math::approxFloor(fTrials);
-    const double fX = ::rtl::math::approxFloor(fSuccesses);
+    const double fN = fp::approxFloor(fTrials);
+    const double fX = fp::approxFloor(fSuccesses);
     if (fN < 0.0 || fX < 0.0 || fX > fN || fProbability < 0.0 || fProbability > 1.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    if (::rtl::math::approxEqual(fProbability, 0.0))
+    if (fp::approxEqual(fProbability, 0.0))
     {
         return api::ValueResult<double>::success(
-            (::rtl::math::approxEqual(fX, 0.0) || bCumulative) ? 1.0 : 0.0);
+            (fp::approxEqual(fX, 0.0) || bCumulative) ? 1.0 : 0.0);
     }
-    if (::rtl::math::approxEqual(fProbability, 1.0))
-        return api::ValueResult<double>::success(::rtl::math::approxEqual(fX, fN) ? 1.0 : 0.0);
+    if (fp::approxEqual(fProbability, 1.0))
+        return api::ValueResult<double>::success(fp::approxEqual(fX, fN) ? 1.0 : 0.0);
 
-    const sal_Int32 nN = static_cast<sal_Int32>(fN);
-    const sal_Int32 nX = static_cast<sal_Int32>(fX);
+    const std::int32_t nN = static_cast<std::int32_t>(fN);
+    const std::int32_t nX = static_cast<std::int32_t>(fX);
     const double fQ = (0.5 - fProbability) + 0.5;
-    auto accumulateRange = [&](sal_Int32 nStart, sal_Int32 nEnd, double fTerm,
+    auto accumulateRange = [&](std::int32_t nStart, std::int32_t nEnd, double fTerm,
                                double fNumeratorProbability,
                                double fDenominatorProbability) {
-        for (sal_Int32 nIndex = 1; nIndex <= nStart && fTerm > 0.0; ++nIndex)
+        for (std::int32_t nIndex = 1; nIndex <= nStart && fTerm > 0.0; ++nIndex)
             fTerm *= (fN - static_cast<double>(nIndex) + 1.0) / static_cast<double>(nIndex)
                      * fNumeratorProbability / fDenominatorProbability;
 
-        KahanSum fSum = fTerm;
-        for (sal_Int32 nIndex = nStart + 1; nIndex <= nEnd && fTerm > 0.0; ++nIndex)
+        fp::KahanSum fSum = fTerm;
+        for (std::int32_t nIndex = nStart + 1; nIndex <= nEnd && fTerm > 0.0; ++nIndex)
         {
             fTerm *= (fN - static_cast<double>(nIndex) + 1.0) / static_cast<double>(nIndex)
                      * fNumeratorProbability / fDenominatorProbability;
@@ -1273,7 +1274,7 @@ api::ValueResult<double> evaluateBinomialDistribution(
         return std::min(1.0, fSum.get());
     };
 
-    const auto logProbability = [fN, fProbability](sal_Int32 nValue) {
+    const auto logProbability = [fN, fProbability](std::int32_t nValue) {
         return binomialLogPmf(static_cast<double>(nValue), fN, fProbability);
     };
 
@@ -1305,8 +1306,8 @@ api::ValueResult<double> evaluateNegativeBinomialDistribution(
     double fFailures, double fSuccesses, double fProbability, bool bCumulative,
     bool bMicrosoftSyntax)
 {
-    const double fWholeFailures = ::rtl::math::approxFloor(fFailures);
-    const double fWholeSuccesses = ::rtl::math::approxFloor(fSuccesses);
+    const double fWholeFailures = fp::approxFloor(fFailures);
+    const double fWholeSuccesses = fp::approxFloor(fSuccesses);
     if (bMicrosoftSyntax)
     {
         if (fWholeSuccesses < 1.0 || fWholeFailures < 0.0 || fProbability < 0.0
@@ -1337,33 +1338,33 @@ api::ValueResult<double> evaluateNegativeBinomialDistribution(
 api::ValueResult<double> evaluateBinomialRangeDistribution(
     double fTrials, double fProbability, double fSuccessStart, double fSuccessEnd)
 {
-    const double fN = ::rtl::math::approxFloor(fTrials);
-    const double fStart = ::rtl::math::approxFloor(fSuccessStart);
-    const double fEnd = ::rtl::math::approxFloor(fSuccessEnd);
+    const double fN = fp::approxFloor(fTrials);
+    const double fStart = fp::approxFloor(fSuccessStart);
+    const double fEnd = fp::approxFloor(fSuccessEnd);
     if (fN < 0.0 || fStart < 0.0 || fStart > fEnd || fEnd > fN || fProbability < 0.0
         || fProbability > 1.0)
     {
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
     }
 
-    if (::rtl::math::approxEqual(fProbability, 0.0))
-        return api::ValueResult<double>::success(::rtl::math::approxEqual(fStart, 0.0) ? 1.0 : 0.0);
-    if (::rtl::math::approxEqual(fProbability, 1.0))
-        return api::ValueResult<double>::success(::rtl::math::approxEqual(fEnd, fN) ? 1.0 : 0.0);
+    if (fp::approxEqual(fProbability, 0.0))
+        return api::ValueResult<double>::success(fp::approxEqual(fStart, 0.0) ? 1.0 : 0.0);
+    if (fp::approxEqual(fProbability, 1.0))
+        return api::ValueResult<double>::success(fp::approxEqual(fEnd, fN) ? 1.0 : 0.0);
 
-    const sal_Int32 nN = static_cast<sal_Int32>(fN);
-    const sal_Int32 nStart = static_cast<sal_Int32>(fStart);
-    const sal_Int32 nEnd = static_cast<sal_Int32>(fEnd);
+    const std::int32_t nN = static_cast<std::int32_t>(fN);
+    const std::int32_t nStart = static_cast<std::int32_t>(fStart);
+    const std::int32_t nEnd = static_cast<std::int32_t>(fEnd);
     const double fQ = (0.5 - fProbability) + 0.5;
-    auto accumulateRange = [&](sal_Int32 nRangeStart, sal_Int32 nRangeEnd, double fTerm,
+    auto accumulateRange = [&](std::int32_t nRangeStart, std::int32_t nRangeEnd, double fTerm,
                                double fNumeratorProbability,
                                double fDenominatorProbability) {
-        for (sal_Int32 nIndex = 1; nIndex <= nRangeStart && fTerm > 0.0; ++nIndex)
+        for (std::int32_t nIndex = 1; nIndex <= nRangeStart && fTerm > 0.0; ++nIndex)
             fTerm *= (fN - static_cast<double>(nIndex) + 1.0) / static_cast<double>(nIndex)
                      * fNumeratorProbability / fDenominatorProbability;
 
-        KahanSum fSum = fTerm;
-        for (sal_Int32 nIndex = nRangeStart + 1; nIndex <= nRangeEnd && fTerm > 0.0; ++nIndex)
+        fp::KahanSum fSum = fTerm;
+        for (std::int32_t nIndex = nRangeStart + 1; nIndex <= nRangeEnd && fTerm > 0.0; ++nIndex)
         {
             fTerm *= (fN - static_cast<double>(nIndex) + 1.0) / static_cast<double>(nIndex)
                      * fNumeratorProbability / fDenominatorProbability;
@@ -1386,7 +1387,7 @@ api::ValueResult<double> evaluateBinomialRangeDistribution(
             accumulateRange(nN - nEnd, nN - nStart, fHighTerm, fQ, fProbability));
     }
 
-    const auto logProbability = [fN, fProbability](sal_Int32 nValue) {
+    const auto logProbability = [fN, fProbability](std::int32_t nValue) {
         return binomialLogPmf(static_cast<double>(nValue), fN, fProbability);
     };
     return api::ValueResult<double>::success(sumExpProbabilityRange(nStart, nEnd, logProbability));
@@ -1434,7 +1435,7 @@ api::ValueResult<double> evaluateComplementaryErrorFunction(double fValue)
 api::ValueResult<double> evaluateConfidence(
     double fAlpha, double fSigma, double fSampleSize)
 {
-    const double fN = ::rtl::math::approxFloor(fSampleSize);
+    const double fN = fp::approxFloor(fSampleSize);
     if (!(fSigma > 0.0) || !(fAlpha > 0.0) || !(fAlpha < 1.0) || !(fN >= 1.0))
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
@@ -1447,10 +1448,10 @@ api::ValueResult<double> evaluateConfidence(
 api::ValueResult<double> evaluateConfidenceT(
     double fAlpha, double fSigma, double fSampleSize)
 {
-    const double fN = ::rtl::math::approxFloor(fSampleSize);
+    const double fN = fp::approxFloor(fSampleSize);
     if (!(fSigma > 0.0) || !(fAlpha > 0.0) || !(fAlpha < 1.0) || !(fN >= 1.0))
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    if (::rtl::math::approxEqual(fN, 1.0))
+    if (fp::approxEqual(fN, 1.0))
         return api::ValueResult<double>::failure(api::Error::DivisionByZero);
 
     const auto aInverse = evaluateTInverse(fAlpha, fN - 1.0, 2);

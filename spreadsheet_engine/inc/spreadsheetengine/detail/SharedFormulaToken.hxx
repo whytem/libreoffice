@@ -11,7 +11,7 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <rtl/math.hxx>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
 
 #include <spreadsheetengine/api/SharedFormula.hxx>
 #include <spreadsheetengine/detail/TokenModel.hxx>
@@ -173,7 +173,7 @@ inline void updateInvariantForReference(
                         break;
                     }
                     case setoken::Kind::Value:
-                        if (!rtl::math::approxEqual(std::get<double>(rLeftToken.maPayload),
+                        if (!spreadsheetengine::core::fp::approxEqual(std::get<double>(rLeftToken.maPayload),
                                 std::get<double>(rRightToken.maPayload)))
                         {
                             return seshared::TokenCompareState::NotEqual;

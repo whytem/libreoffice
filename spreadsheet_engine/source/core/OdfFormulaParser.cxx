@@ -8,6 +8,7 @@
  */
 
 #include <spreadsheetengine/detail/OdfFormulaParser.hxx>
+#include <cstdint>
 
 #include <cctype>
 #include <cstdlib>
@@ -470,9 +471,9 @@ class Parser
             return nullptr;
 
         auto pNode = makeNode(NodeKind::ArrayConstant);
-        sal_Int32 nRows = 1;
-        sal_Int32 nCurrentColumns = 0;
-        sal_Int32 nExpectedColumns = -1;
+        std::int32_t nRows = 1;
+        std::int32_t nCurrentColumns = 0;
+        std::int32_t nExpectedColumns = -1;
 
         skipSpaces();
         if (consume(u'}'))

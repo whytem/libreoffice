@@ -8,8 +8,9 @@
  */
 
 #include <spreadsheetengine/runtime/QueryRuntime.hxx>
+#include <cstdint>
 
-#include <rtl/math.hxx>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
 
 #include <optional>
 #include <string>
@@ -328,7 +329,7 @@ namespace
 
 } // namespace
 
-sal_Int32 compareFoldedText(api::StringView rLeft, api::StringView rRight)
+std::int32_t compareFoldedText(api::StringView rLeft, api::StringView rRight)
 {
     UErrorCode eStatus = U_ZERO_ERROR;
     return u_strCaseCompare(reinterpret_cast<const UChar*>(rLeft.data()),
@@ -450,7 +451,7 @@ bool matchesCriteriaPredicate(const CriteriaPredicate& rPredicate, const api::Ce
             const bool bCandidateBlankCell = rCandidate.isEmpty();
             const bool bCandidateZeroLike
                 = (rCandidate.isNumber() || rCandidate.isBoolean())
-                  && ::rtl::math::approxEqual(rCandidate.mfNumber, 0.0);
+                  && fp::approxEqual(rCandidate.mfNumber, 0.0);
             switch (rPredicate.meOperator)
             {
                 case formula::BinaryOperator::Equal:
@@ -498,19 +499,19 @@ bool matchesCriteriaPredicate(const CriteriaPredicate& rPredicate, const api::Ce
             switch (rPredicate.meOperator)
             {
                 case formula::BinaryOperator::Equal:
-                    return ::rtl::math::approxEqual(*oCandidateNumber, rPredicate.mfNumber);
+                    return fp::approxEqual(*oCandidateNumber, rPredicate.mfNumber);
                 case formula::BinaryOperator::NotEqual:
-                    return !::rtl::math::approxEqual(*oCandidateNumber, rPredicate.mfNumber);
+                    return !fp::approxEqual(*oCandidateNumber, rPredicate.mfNumber);
                 case formula::BinaryOperator::Less:
                     return *oCandidateNumber < rPredicate.mfNumber;
                 case formula::BinaryOperator::LessEqual:
                     return *oCandidateNumber < rPredicate.mfNumber
-                           || ::rtl::math::approxEqual(*oCandidateNumber, rPredicate.mfNumber);
+                           || fp::approxEqual(*oCandidateNumber, rPredicate.mfNumber);
                 case formula::BinaryOperator::Greater:
                     return *oCandidateNumber > rPredicate.mfNumber;
                 case formula::BinaryOperator::GreaterEqual:
                     return *oCandidateNumber > rPredicate.mfNumber
-                           || ::rtl::math::approxEqual(*oCandidateNumber, rPredicate.mfNumber);
+                           || fp::approxEqual(*oCandidateNumber, rPredicate.mfNumber);
                 default:
                     return false;
             }
@@ -539,7 +540,7 @@ bool matchesCriteriaPredicate(const CriteriaPredicate& rPredicate, const api::Ce
             if (aCandidateText.empty())
                 return false;
 
-            const sal_Int32 nCompare = compareFoldedText(aCandidateText, rPredicate.maText);
+            const std::int32_t nCompare = compareFoldedText(aCandidateText, rPredicate.maText);
             switch (rPredicate.meOperator)
             {
                 case formula::BinaryOperator::Less:
@@ -625,7 +626,7 @@ api::ValueResult<api::CellValue> evaluateCriteriaAggregate(
                     break;
                 case CriteriaAggregateKind::Sum:
                 case CriteriaAggregateKind::Average:
-                    fSum = ::rtl::math::approxAdd(fSum, *oNumber);
+                    fSum = fp::approxAdd(fSum, *oNumber);
                     ++nCount;
                     break;
                 case CriteriaAggregateKind::Max:

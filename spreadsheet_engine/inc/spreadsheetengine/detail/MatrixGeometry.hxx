@@ -12,7 +12,7 @@
 #include <spreadsheetengine/api/Matrix.hxx>
 
 #include <algorithm>
-#include <sal/types.h>
+#include <spreadsheetengine/api/Types.hxx>
 #include <iterator>
 
 namespace spreadsheetengine::core::matrix

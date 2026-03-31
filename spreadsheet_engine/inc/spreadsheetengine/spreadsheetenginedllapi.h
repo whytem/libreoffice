@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include <sal/types.h>
+#include <spreadsheetengine/api/Types.hxx>
 
 #if defined(SPREADSHEETENGINE_DLLIMPLEMENTATION)
 #define SPREADSHEETENGINE_DLLPUBLIC SAL_DLLPUBLIC_EXPORT

@@ -10,26 +10,27 @@
 #pragma once
 
 #include <cassert>
+#include <cstdint>
 #include <limits>
 
-#include <sal/types.h>
+#include <spreadsheetengine/api/Types.hxx>
 
 #include <spreadsheetengine/api/Date.hxx>
 
 namespace spreadsheetengine::core::detail::date
 {
 
-constexpr sal_Int16 kYearMax = std::numeric_limits<sal_Int16>::max();
-constexpr sal_Int16 kYearMin = std::numeric_limits<sal_Int16>::min();
+constexpr std::int16_t kYearMax = std::numeric_limits<std::int16_t>::max();
+constexpr std::int16_t kYearMin = std::numeric_limits<std::int16_t>::min();
 
-constexpr sal_Int32 yearToDays(sal_Int16 nYear)
+constexpr std::int32_t yearToDays(std::int16_t nYear)
 {
     assert(nYear != 0);
     auto val = [](int off, int y) { return off + y * 365 + y / 4 - y / 100 + y / 400; };
     return nYear < 0 ? val(-366, nYear + 1) : val(0, nYear - 1);
 }
 
-constexpr bool isLeapYear(sal_Int16 nYear)
+constexpr bool isLeapYear(std::int16_t nYear)
 {
     assert(nYear != 0);
     if (nYear < 0)
@@ -37,19 +38,19 @@ constexpr bool isLeapYear(sal_Int16 nYear)
     return (((nYear % 4) == 0) && ((nYear % 100) != 0)) || ((nYear % 400) == 0);
 }
 
-constexpr sal_uInt16 getDaysInMonth(sal_uInt16 nMonth, sal_Int16 nYear)
+constexpr std::uint16_t getDaysInMonth(std::uint16_t nMonth, std::int16_t nYear)
 {
     assert(1 <= nMonth && nMonth <= 12);
     if (nMonth < 1 || 12 < nMonth)
         return 0;
 
-    constexpr sal_uInt16 aDaysInMonth[12]
+    constexpr std::uint16_t aDaysInMonth[12]
         = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-    sal_uInt16 nDays = aDaysInMonth[nMonth - 1];
+    std::uint16_t nDays = aDaysInMonth[nMonth - 1];
     return nMonth == 2 && isLeapYear(nYear) ? nDays + 1 : nDays;
 }
 
-constexpr bool isValidDate(sal_uInt16 nDay, sal_uInt16 nMonth, sal_Int16 nYear)
+constexpr bool isValidDate(std::uint16_t nDay, std::uint16_t nMonth, std::int16_t nYear)
 {
     if (nYear == 0)
         return false;
@@ -58,7 +59,7 @@ constexpr bool isValidDate(sal_uInt16 nDay, sal_uInt16 nMonth, sal_Int16 nYear)
     return 1 <= nDay && nDay <= getDaysInMonth(nMonth, nYear);
 }
 
-constexpr bool isValidAndGregorian(sal_uInt16 nDay, sal_uInt16 nMonth, sal_Int16 nYear)
+constexpr bool isValidAndGregorian(std::uint16_t nDay, std::uint16_t nMonth, std::int16_t nYear)
 {
     if (!isValidDate(nDay, nMonth, nYear))
         return false;
@@ -69,15 +70,15 @@ constexpr bool isValidAndGregorian(sal_uInt16 nDay, sal_uInt16 nMonth, sal_Int16
     return nYear != 1582 || nMonth != 10 || nDay >= 15;
 }
 
-constexpr sal_Int32 convertDateToDays(sal_uInt16 nDay, sal_uInt16 nMonth, sal_Int16 nYear)
+constexpr std::int32_t convertDateToDays(std::uint16_t nDay, std::uint16_t nMonth, std::int16_t nYear)
 {
-    sal_Int32 nDays = yearToDays(nYear);
-    for (sal_uInt16 i = 1; i < nMonth; ++i)
+    std::int32_t nDays = yearToDays(nYear);
+    for (std::uint16_t i = 1; i < nMonth; ++i)
         nDays += getDaysInMonth(i, nYear);
     return nDays + nDay;
 }
 
-inline bool normalize(sal_uInt16& rDay, sal_uInt16& rMonth, sal_Int16& rYear)
+inline bool normalize(std::uint16_t& rDay, std::uint16_t& rMonth, std::int16_t& rYear)
 {
     if (isValidDate(rDay, rMonth, rYear))
         return false;
@@ -108,7 +109,7 @@ inline bool normalize(sal_uInt16& rDay, sal_uInt16& rMonth, sal_Int16& rYear)
 
     if (rYear < 0)
     {
-        sal_uInt16 nDays;
+        std::uint16_t nDays;
         while (rDay > (nDays = getDaysInMonth(rMonth, rYear)))
         {
             rDay -= nDays;
@@ -129,7 +130,7 @@ inline bool normalize(sal_uInt16& rDay, sal_uInt16& rMonth, sal_Int16& rYear)
     }
     else
     {
-        sal_uInt16 nDays;
+        std::uint16_t nDays;
         while (rDay > (nDays = getDaysInMonth(rMonth, rYear)))
         {
             rDay -= nDays;
@@ -157,10 +158,10 @@ inline bool normalize(sal_uInt16& rDay, sal_uInt16& rMonth, sal_Int16& rYear)
     return true;
 }
 
-inline void convertDaysToDate(sal_Int32 nDays, sal_uInt16& rDay, sal_uInt16& rMonth, sal_Int16& rYear)
+inline void convertDaysToDate(std::int32_t nDays, std::uint16_t& rDay, std::uint16_t& rMonth, std::int16_t& rYear)
 {
-    constexpr sal_Int32 MIN_DAYS = convertDateToDays(1, 1, kYearMin);
-    constexpr sal_Int32 MAX_DAYS = convertDateToDays(31, 12, kYearMax);
+    constexpr std::int32_t MIN_DAYS = convertDateToDays(1, 1, kYearMin);
+    constexpr std::int32_t MAX_DAYS = convertDateToDays(31, 12, kYearMax);
 
     if (nDays <= MIN_DAYS)
     {
@@ -177,14 +178,14 @@ inline void convertDaysToDate(sal_Int32 nDays, sal_uInt16& rDay, sal_uInt16& rMo
         return;
     }
 
-    const sal_Int16 nSign = (nDays <= 0 ? -1 : 1);
-    sal_Int32 nTempDays;
-    sal_Int32 i = 0;
+    const std::int16_t nSign = (nDays <= 0 ? -1 : 1);
+    std::int32_t nTempDays;
+    std::int32_t i = 0;
     bool bCalc;
 
     do
     {
-        rYear = static_cast<sal_Int16>((nDays / 365) - (i * nSign));
+        rYear = static_cast<std::int16_t>((nDays / 365) - (i * nSign));
         if (rYear == 0)
             rYear = nSign;
         nTempDays = nDays - yearToDays(rYear);
@@ -207,48 +208,48 @@ inline void convertDaysToDate(sal_Int32 nDays, sal_uInt16& rDay, sal_uInt16& rMo
         nTempDays -= getDaysInMonth(rMonth, rYear);
         ++rMonth;
     }
-    rDay = static_cast<sal_uInt16>(nTempDays);
+    rDay = static_cast<std::uint16_t>(nTempDays);
 }
 
-inline spreadsheetengine::api::DateParts fromAbsoluteDays(sal_Int32 nDays)
+inline spreadsheetengine::api::DateParts fromAbsoluteDays(std::int32_t nDays)
 {
-    sal_uInt16 nDay;
-    sal_uInt16 nMonth;
-    sal_Int16 nYear;
+    std::uint16_t nDay;
+    std::uint16_t nMonth;
+    std::int16_t nYear;
     convertDaysToDate(nDays, nDay, nMonth, nYear);
     return { nYear, static_cast<std::int16_t>(nMonth), static_cast<std::int16_t>(nDay) };
 }
 
-inline sal_Int32 toAbsoluteDays(const spreadsheetengine::api::DateParts& rDate)
+inline std::int32_t toAbsoluteDays(const spreadsheetengine::api::DateParts& rDate)
 {
-    return convertDateToDays(static_cast<sal_uInt16>(rDate.mnDay),
-        static_cast<sal_uInt16>(rDate.mnMonth), static_cast<sal_Int16>(rDate.mnYear));
+    return convertDateToDays(static_cast<std::uint16_t>(rDate.mnDay),
+        static_cast<std::uint16_t>(rDate.mnMonth), static_cast<std::int16_t>(rDate.mnYear));
 }
 
-inline sal_uInt16 getDayOfYear(const spreadsheetengine::api::DateParts& rDate)
+inline std::uint16_t getDayOfYear(const spreadsheetengine::api::DateParts& rDate)
 {
-    sal_uInt16 nDay = static_cast<sal_uInt16>(rDate.mnDay);
-    for (sal_uInt16 i = 1; i < static_cast<sal_uInt16>(rDate.mnMonth); ++i)
-        nDay += getDaysInMonth(i, static_cast<sal_Int16>(rDate.mnYear));
+    std::uint16_t nDay = static_cast<std::uint16_t>(rDate.mnDay);
+    for (std::uint16_t i = 1; i < static_cast<std::uint16_t>(rDate.mnMonth); ++i)
+        nDay += getDaysInMonth(i, static_cast<std::int16_t>(rDate.mnYear));
     return nDay;
 }
 
-inline sal_Int16 getPrevYear(sal_Int16 nYear) { return nYear == 1 ? -1 : nYear - 1; }
-inline sal_Int16 getNextYear(sal_Int16 nYear) { return nYear == -1 ? 1 : nYear + 1; }
+inline std::int16_t getPrevYear(std::int16_t nYear) { return nYear == 1 ? -1 : nYear - 1; }
+inline std::int16_t getNextYear(std::int16_t nYear) { return nYear == -1 ? 1 : nYear + 1; }
 
-inline sal_Int16 getDayOfWeekFromAbsoluteDays(sal_Int32 nDays)
+inline std::int16_t getDayOfWeekFromAbsoluteDays(std::int32_t nDays)
 {
-    sal_Int32 nWeekday = (nDays - 1) % 7;
+    std::int32_t nWeekday = (nDays - 1) % 7;
     if (nWeekday < 0)
         nWeekday += 7;
-    return static_cast<sal_Int16>(nWeekday);
+    return static_cast<std::int16_t>(nWeekday);
 }
 
-inline sal_uInt16 getWeekOfYear(
-    const spreadsheetengine::api::DateParts& rDate, sal_Int16 nStartDay, sal_Int16 nMinimumNumberOfDaysInWeek)
+inline std::uint16_t getWeekOfYear(
+    const spreadsheetengine::api::DateParts& rDate, std::int16_t nStartDay, std::int16_t nMinimumNumberOfDaysInWeek)
 {
     short n1WDay = static_cast<short>(getDayOfWeekFromAbsoluteDays(
-        convertDateToDays(1, 1, static_cast<sal_Int16>(rDate.mnYear))));
+        convertDateToDays(1, 1, static_cast<std::int16_t>(rDate.mnYear))));
     short nDayOfYear = static_cast<short>(getDayOfYear(rDate));
 
     nDayOfYear--;
@@ -266,9 +267,9 @@ inline sal_uInt16 getWeekOfYear(
         else if (nWeek == 53)
         {
             const short nDaysInYear
-                = static_cast<short>(isLeapYear(static_cast<sal_Int16>(rDate.mnYear)) ? 366 : 365);
+                = static_cast<short>(isLeapYear(static_cast<std::int16_t>(rDate.mnYear)) ? 366 : 365);
             short nDaysNextYear = static_cast<short>(getDayOfWeekFromAbsoluteDays(
-                convertDateToDays(1, 1, getNextYear(static_cast<sal_Int16>(rDate.mnYear)))));
+                convertDateToDays(1, 1, getNextYear(static_cast<std::int16_t>(rDate.mnYear)))));
             nDaysNextYear = (nDaysNextYear + (7 - nStartDay)) % 7;
             if (nDayOfYear > (nDaysInYear - nDaysNextYear - 1))
                 nWeek = 1;
@@ -280,7 +281,7 @@ inline sal_uInt16 getWeekOfYear(
         if (nWeek == 0)
         {
             const auto aPrevYearEnd
-                = spreadsheetengine::api::DateParts{ getPrevYear(static_cast<sal_Int16>(rDate.mnYear)), 12, 31 };
+                = spreadsheetengine::api::DateParts{ getPrevYear(static_cast<std::int16_t>(rDate.mnYear)), 12, 31 };
             nWeek = static_cast<short>(getWeekOfYear(aPrevYearEnd, nStartDay, nMinimumNumberOfDaysInWeek));
         }
     }
@@ -292,7 +293,7 @@ inline sal_uInt16 getWeekOfYear(
             nWeek = 53;
         else if (n1WDay == nMinimumNumberOfDaysInWeek + 1)
         {
-            nWeek = isLeapYear(getPrevYear(static_cast<sal_Int16>(rDate.mnYear))) ? 53 : 52;
+            nWeek = isLeapYear(getPrevYear(static_cast<std::int16_t>(rDate.mnYear))) ? 53 : 52;
         }
         else
             nWeek = 52;
@@ -306,7 +307,7 @@ inline sal_uInt16 getWeekOfYear(
 
             if (nWeek == 53)
             {
-                sal_Int32 nTempDays = toAbsoluteDays(rDate);
+                std::int32_t nTempDays = toAbsoluteDays(rDate);
                 nTempDays += 6 - (getDayOfWeekFromAbsoluteDays(nTempDays) + (7 - nStartDay)) % 7;
                 nWeek = static_cast<short>(getWeekOfYear(
                     fromAbsoluteDays(nTempDays), nStartDay, nMinimumNumberOfDaysInWeek));
@@ -314,7 +315,7 @@ inline sal_uInt16 getWeekOfYear(
         }
     }
 
-    return static_cast<sal_uInt16>(nWeek);
+    return static_cast<std::uint16_t>(nWeek);
 }
 
 } // namespace spreadsheetengine::core::detail::date

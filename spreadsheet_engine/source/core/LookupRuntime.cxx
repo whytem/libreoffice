@@ -8,8 +8,9 @@
  */
 
 #include <spreadsheetengine/runtime/LookupRuntime.hxx>
+#include <cstdint>
 
-#include <rtl/math.hxx>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
 
 #include <spreadsheetengine/runtime/QueryRuntime.hxx>
 
@@ -126,7 +127,7 @@ using spreadsheetengine::core::util::coerceToNumber;
     if (!aLookupNumber || !aCandidateNumber)
         return false;
 
-    return rtl::math::approxEqual(aLookupNumber.maValue, aCandidateNumber.maValue);
+    return fp::approxEqual(aLookupNumber.maValue, aCandidateNumber.maValue);
 }
 
 [[nodiscard]] bool isPatternExactLookupMatch(const api::CellValue& rLookup,
@@ -163,7 +164,7 @@ using spreadsheetengine::core::util::coerceToNumber;
     if (!aLookupNumber || !aCandidateNumber)
         return false;
 
-    return rtl::math::approxEqual(aLookupNumber.maValue, aCandidateNumber.maValue);
+    return fp::approxEqual(aLookupNumber.maValue, aCandidateNumber.maValue);
 }
 
 [[nodiscard]] std::optional<api::MatrixSize> findExtendedExactIndex(
@@ -317,7 +318,7 @@ api::ValueResult<api::MatrixSize> resolveTabularLookupIndex(
                     continue;
 
                 if (aCandidateNumber.maValue < aLookupNumber.maValue
-                    || rtl::math::approxEqual(
+                    || fp::approxEqual(
                         aCandidateNumber.maValue, aLookupNumber.maValue))
                 {
                     oResolvedIndex = nSearchIndex;
@@ -382,7 +383,7 @@ api::ValueResult<api::MatrixSize> resolveLookupIndex(const LookupMaterializer& r
         if (!aLookupNumber)
             return false;
 
-        return rtl::math::approxEqual(aCandidateNumber.maValue, aLookupNumber.maValue);
+        return fp::approxEqual(aCandidateNumber.maValue, aLookupNumber.maValue);
     };
 
     if (rSearchInput.mbScalar)
@@ -418,7 +419,7 @@ api::ValueResult<api::MatrixSize> resolveLookupIndex(const LookupMaterializer& r
                 const api::StringView aCandidateText
                     = rCandidate.isText() ? api::StringView(rCandidate.maString)
                                           : api::StringView();
-                const sal_Int32 nCompare
+                const std::int32_t nCompare
                     = sequery::compareFoldedText(aCandidateText, rLookup.maString);
                 if (nCompare == 0)
                 {
@@ -466,7 +467,7 @@ api::ValueResult<api::MatrixSize> resolveLookupIndex(const LookupMaterializer& r
             if (!aCandidateNumber)
                 continue;
 
-            if (rtl::math::approxEqual(aCandidateNumber.maValue, aLookupNumber.maValue))
+            if (fp::approxEqual(aCandidateNumber.maValue, aLookupNumber.maValue))
             {
                 oResolvedIndex = nSearchIndex;
                 bSeenExactNumericMatch = true;
@@ -545,7 +546,7 @@ api::ValueResult<api::MatrixSize> resolveMatchIndex(const LookupMaterializer& rM
                     const api::StringView aCandidateText
                         = rCandidate.isText() ? api::StringView(rCandidate.maString)
                                               : api::StringView();
-                    const sal_Int32 nCompare
+                    const std::int32_t nCompare
                         = sequery::compareFoldedText(aCandidateText, rLookup.maString);
                     if (nCompare == 0)
                     {
@@ -585,7 +586,7 @@ api::ValueResult<api::MatrixSize> resolveMatchIndex(const LookupMaterializer& rM
                 if (!aCandidateNumber)
                     continue;
 
-                if (rtl::math::approxEqual(aCandidateNumber.maValue, aLookupNumber.maValue))
+                if (fp::approxEqual(aCandidateNumber.maValue, aLookupNumber.maValue))
                 {
                     oResolvedIndex = nSearchIndex;
                     bSeenExactNumericMatch = true;
@@ -624,7 +625,7 @@ api::ValueResult<api::MatrixSize> resolveMatchIndex(const LookupMaterializer& rM
                     const api::StringView aCandidateText
                         = rCandidate.isText() ? api::StringView(rCandidate.maString)
                                               : api::StringView();
-                    const sal_Int32 nCompare
+                    const std::int32_t nCompare
                         = sequery::compareFoldedText(aCandidateText, rLookup.maString);
                     if (nCompare == 0)
                     {
@@ -664,7 +665,7 @@ api::ValueResult<api::MatrixSize> resolveMatchIndex(const LookupMaterializer& rM
                 if (!aCandidateNumber)
                     continue;
 
-                if (rtl::math::approxEqual(aCandidateNumber.maValue, aLookupNumber.maValue))
+                if (fp::approxEqual(aCandidateNumber.maValue, aLookupNumber.maValue))
                 {
                     oResolvedIndex = nSearchIndex;
                     bSeenExactNumericMatch = true;
@@ -824,7 +825,7 @@ api::ValueResult<api::MatrixSize> resolveExtendedMatchIndex(
                     const api::StringView aCandidateText
                         = rCandidate.isText() ? api::StringView(rCandidate.maString)
                                               : api::StringView();
-                    const sal_Int32 nCompare
+                    const std::int32_t nCompare
                         = sequery::compareFoldedText(aCandidateText, rLookup.maString);
                     if (nCompare < 0)
                         oResolvedIndex = nSearchIndex;
@@ -966,7 +967,7 @@ api::ValueResult<api::MatrixSize> resolveExtendedMatchIndex(
                 const api::StringView aCandidateText
                     = rCandidate.isText() ? api::StringView(rCandidate.maString)
                                           : api::StringView();
-                const sal_Int32 nCompare
+                const std::int32_t nCompare
                     = sequery::compareFoldedText(aCandidateText, rLookup.maString);
                 if ((!bDescending && nCompare > 0) || (bDescending && nCompare < 0))
                 {

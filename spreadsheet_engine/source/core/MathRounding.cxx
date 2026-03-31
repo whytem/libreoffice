@@ -8,17 +8,18 @@
  */
 
 #include <spreadsheetengine/runtime/MathRounding.hxx>
+#include <cstdint>
 
 #include <cmath>
 
 namespace spreadsheetengine::core::math
 {
 
-double roundToDecimals(double fValue, sal_Int16 nDecimals, rtl_math_RoundingMode eMode)
+double roundToDecimals(double fValue, std::int16_t nDecimals, fp::RoundingMode eMode)
 {
-    constexpr sal_Int16 kSigDig = 12;
+    constexpr std::int16_t kSigDig = 12;
 
-    if ((eMode == rtl_math_RoundingMode_Down || eMode == rtl_math_RoundingMode_Up)
+    if ((eMode == fp::RoundingMode::Down || eMode == fp::RoundingMode::Up)
         && nDecimals < kSigDig && std::fmod(fValue, 1.0) != 0.0)
     {
         double fRes = fValue;
@@ -30,10 +31,10 @@ double roundToDecimals(double fValue, sal_Int16 nDecimals, rtl_math_RoundingMode
 
         if (std::isfinite(fRes))
         {
-            if (eMode == rtl_math_RoundingMode_Up)
-                fRes = ::rtl::math::approxFloor(fRes);
+            if (eMode == fp::RoundingMode::Up)
+                fRes = fp::approxFloor(fRes);
 
-            double fRounded = ::rtl::math::round(fRes, nDecimals + fTemp, eMode);
+            double fRounded = fp::round(fRes, nDecimals + fTemp, eMode);
             if (fTemp < 0.0)
                 fRounded /= std::pow(10.0, -fTemp);
             else
@@ -42,7 +43,7 @@ double roundToDecimals(double fValue, sal_Int16 nDecimals, rtl_math_RoundingMode
         }
     }
 
-    return ::rtl::math::round(fValue, nDecimals, eMode);
+    return fp::round(fValue, nDecimals, eMode);
 }
 
 double roundToSignificantDigits(double fValue, double fDigits)
@@ -54,7 +55,7 @@ double roundToSignificantDigits(double fValue, double fDigits)
     else
         fIn /= std::pow(10.0, fTemp);
 
-    double fRes = ::rtl::math::round(fIn);
+    double fRes = fp::round(fIn);
     if (fTemp < 0.0)
         fRes /= std::pow(10.0, -fTemp);
     else
@@ -74,9 +75,9 @@ std::optional<double> computeCeiling(double fValue, double fSignificance, bool b
         fSignificance = -fSignificance;
 
     if (!bAbs && fValue < 0.0)
-        return ::rtl::math::approxFloor(fValue / fSignificance) * fSignificance;
+        return fp::approxFloor(fValue / fSignificance) * fSignificance;
 
-    return ::rtl::math::approxCeil(fValue / fSignificance) * fSignificance;
+    return fp::approxCeil(fValue / fSignificance) * fSignificance;
 }
 
 std::optional<double> computeCeilingMs(double fValue, double fSignificance)
@@ -85,10 +86,10 @@ std::optional<double> computeCeilingMs(double fValue, double fSignificance)
         return 0.0;
 
     if (fValue * fSignificance > 0.0)
-        return ::rtl::math::approxCeil(fValue / fSignificance) * fSignificance;
+        return fp::approxCeil(fValue / fSignificance) * fSignificance;
 
     if (fValue < 0.0)
-        return ::rtl::math::approxFloor(fValue / -fSignificance) * -fSignificance;
+        return fp::approxFloor(fValue / -fSignificance) * -fSignificance;
 
     return std::nullopt;
 }
@@ -98,7 +99,7 @@ double computeCeilingPrecise(double fValue, double fSignificance)
     if (fValue == 0.0 || fSignificance == 0.0)
         return 0.0;
 
-    return ::rtl::math::approxCeil(fValue / fSignificance) * fSignificance;
+    return fp::approxCeil(fValue / fSignificance) * fSignificance;
 }
 
 std::optional<double> computeFloor(double fValue, double fSignificance, bool bAbs, bool bODFF)
@@ -113,9 +114,9 @@ std::optional<double> computeFloor(double fValue, double fSignificance, bool bAb
         fSignificance = -fSignificance;
 
     if (!bAbs && fValue < 0.0)
-        return ::rtl::math::approxCeil(fValue / fSignificance) * fSignificance;
+        return fp::approxCeil(fValue / fSignificance) * fSignificance;
 
-    return ::rtl::math::approxFloor(fValue / fSignificance) * fSignificance;
+    return fp::approxFloor(fValue / fSignificance) * fSignificance;
 }
 
 std::optional<double> computeFloorMs(double fValue, double fSignificance)
@@ -124,13 +125,13 @@ std::optional<double> computeFloorMs(double fValue, double fSignificance)
         return 0.0;
 
     if (fValue * fSignificance > 0.0)
-        return ::rtl::math::approxFloor(fValue / fSignificance) * fSignificance;
+        return fp::approxFloor(fValue / fSignificance) * fSignificance;
 
     if (fSignificance == 0.0)
         return std::nullopt;
 
     if (fValue < 0.0)
-        return ::rtl::math::approxCeil(fValue / -fSignificance) * -fSignificance;
+        return fp::approxCeil(fValue / -fSignificance) * -fSignificance;
 
     return std::nullopt;
 }
@@ -140,28 +141,28 @@ double computeFloorPrecise(double fValue, double fSignificance)
     if (fValue == 0.0 || fSignificance == 0.0)
         return 0.0;
 
-    return ::rtl::math::approxFloor(fValue / fSignificance) * fSignificance;
+    return fp::approxFloor(fValue / fSignificance) * fSignificance;
 }
 
 double computeEven(double fValue)
 {
     if (fValue < 0.0)
-        return ::rtl::math::approxFloor(fValue / 2.0) * 2.0;
+        return fp::approxFloor(fValue / 2.0) * 2.0;
 
-    return ::rtl::math::approxCeil(fValue / 2.0) * 2.0;
+    return fp::approxCeil(fValue / 2.0) * 2.0;
 }
 
 double computeOdd(double fValue)
 {
     if (fValue >= 0.0)
     {
-        fValue = ::rtl::math::approxCeil(fValue);
+        fValue = fp::approxCeil(fValue);
         if (std::fmod(fValue, 2.0) == 0.0)
             ++fValue;
     }
     else
     {
-        fValue = ::rtl::math::approxFloor(fValue);
+        fValue = fp::approxFloor(fValue);
         if (std::fmod(fValue, 2.0) == 0.0)
             --fValue;
     }

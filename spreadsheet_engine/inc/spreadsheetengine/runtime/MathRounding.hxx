@@ -11,15 +11,19 @@
 
 #include <optional>
 
-#include <rtl/math.hxx>
-#include <sal/types.h>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
+#include <spreadsheetengine/api/Types.hxx>
 #include <spreadsheetengine/spreadsheetenginedllapi.h>
+
+#if __has_include(<sal/config.h>)
+#include <rtl/math.hxx>
+#endif
 
 namespace spreadsheetengine::core::math
 {
 
 SPREADSHEETENGINE_DLLPUBLIC double roundToDecimals(
-    double fValue, sal_Int16 nDecimals, rtl_math_RoundingMode eMode);
+    double fValue, sal_Int16 nDecimals, fp::RoundingMode eMode);
 
 SPREADSHEETENGINE_DLLPUBLIC double roundToSignificantDigits(
     double fValue, double fDigits);
@@ -45,6 +49,19 @@ SPREADSHEETENGINE_DLLPUBLIC double computeFloorPrecise(
 SPREADSHEETENGINE_DLLPUBLIC double computeEven(double fValue);
 
 SPREADSHEETENGINE_DLLPUBLIC double computeOdd(double fValue);
+
+// Backward-compatible overload for callers passing rtl_math_RoundingMode directly
+#if __has_include(<sal/config.h>)
+inline double roundToDecimals(double fValue, sal_Int16 nDecimals, rtl_math_RoundingMode eMode)
+{
+    fp::RoundingMode eFpMode = fp::RoundingMode::Corrected;
+    if (eMode == rtl_math_RoundingMode_Down)
+        eFpMode = fp::RoundingMode::Down;
+    else if (eMode == rtl_math_RoundingMode_Up)
+        eFpMode = fp::RoundingMode::Up;
+    return roundToDecimals(fValue, nDecimals, eFpMode);
+}
+#endif
 
 } // namespace spreadsheetengine::core::math
 

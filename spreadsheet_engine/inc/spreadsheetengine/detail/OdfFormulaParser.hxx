@@ -12,7 +12,7 @@
 #include <memory>
 #include <vector>
 
-#include <sal/types.h>
+#include <spreadsheetengine/api/Types.hxx>
 
 #include <spreadsheetengine/api/String.hxx>
 #include <spreadsheetengine/spreadsheetenginedllapi.h>

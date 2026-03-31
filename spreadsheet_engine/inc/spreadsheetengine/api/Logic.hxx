@@ -12,8 +12,8 @@
 #include <cmath>
 #include <optional>
 
-#include <rtl/math.hxx>
-#include <sal/types.h>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
+#include <spreadsheetengine/api/Types.hxx>
 
 #include <spreadsheetengine/api/Error.hxx>
 
@@ -66,7 +66,7 @@ inline std::optional<sal_Int16> normalizeChooseIndex(double fValue, sal_Int16 nJ
     if (!std::isfinite(fValue))
         return std::nullopt;
 
-    const double fFloor = ::rtl::math::approxFloor(fValue);
+    const double fFloor = spreadsheetengine::core::fp::approxFloor(fValue);
     if (fFloor < 1 || fFloor >= nJumpCount)
         return std::nullopt;
 

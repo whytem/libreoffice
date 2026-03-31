@@ -8,6 +8,7 @@
  */
 
 #include <spreadsheetengine/detail/FormulaEvaluator.hxx>
+#include <cstdint>
 
 #include <spreadsheetengine/api/Logic.hxx>
 
@@ -188,9 +189,9 @@ namespace
         case formula::NodeKind::ArrayConstant:
         {
             api::String aResult = u"{";
-            for (sal_Int32 nRow = 0; nRow < rNode.mnArrayRows; ++nRow)
+            for (std::int32_t nRow = 0; nRow < rNode.mnArrayRows; ++nRow)
             {
-                for (sal_Int32 nColumn = 0; nColumn < rNode.mnArrayColumns; ++nColumn)
+                for (std::int32_t nColumn = 0; nColumn < rNode.mnArrayColumns; ++nColumn)
                 {
                     const std::size_t nIndex
                         = static_cast<std::size_t>(nRow * rNode.mnArrayColumns + nColumn);
@@ -363,17 +364,17 @@ namespace
 [[nodiscard]] std::optional<api::ResolvedReference> parseIndirectR1C1ReferenceText(
     api::StringView rText, const workbook::Workbook& rWorkbook, api::SheetId nImplicitSheet)
 {
-    const auto parsePositiveIndex = [](api::StringView rDigits) -> std::optional<sal_Int64> {
+    const auto parsePositiveIndex = [](api::StringView rDigits) -> std::optional<std::int64_t> {
         if (rDigits.empty())
             return std::nullopt;
-        sal_Int64 nValue = 0;
+        std::int64_t nValue = 0;
         for (const char16_t cChar : rDigits)
         {
             if (cChar < u'0' || cChar > u'9')
                 return std::nullopt;
             nValue = nValue * 10 + (cChar - u'0');
         }
-        return nValue > 0 ? std::optional<sal_Int64>(nValue) : std::nullopt;
+        return nValue > 0 ? std::optional<std::int64_t>(nValue) : std::nullopt;
     };
 
     const std::size_t nBangPos = rText.rfind(u'!');
@@ -706,11 +707,11 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpecialForm(
         if (!aColumns)
             return detail::makeFailure(aColumns.meError);
 
-        const sal_Int32 nRowOffset = static_cast<sal_Int32>(std::trunc(aRows.maValue));
-        const sal_Int32 nColumnOffset = static_cast<sal_Int32>(std::trunc(aColumns.maValue));
+        const std::int32_t nRowOffset = static_cast<std::int32_t>(std::trunc(aRows.maValue));
+        const std::int32_t nColumnOffset = static_cast<std::int32_t>(std::trunc(aColumns.maValue));
 
-        sal_Int32 nHeight
-            = static_cast<sal_Int32>(aReference.maValue.maReference.maRange.rowCount());
+        std::int32_t nHeight
+            = static_cast<std::int32_t>(aReference.maValue.maReference.maRange.rowCount());
         if (rNode.maChildren.size() >= 4
             && rNode.maChildren[3]->meKind != formula::NodeKind::EmptyArgument)
         {
@@ -723,8 +724,8 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpecialForm(
             nHeight = *oWholeHeight;
         }
 
-        sal_Int32 nWidth
-            = static_cast<sal_Int32>(aReference.maValue.maReference.maRange.columnCount());
+        std::int32_t nWidth
+            = static_cast<std::int32_t>(aReference.maValue.maReference.maRange.columnCount());
         if (rNode.maChildren.size() >= 5
             && rNode.maChildren[4]->meKind != formula::NodeKind::EmptyArgument)
         {
@@ -738,12 +739,12 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpecialForm(
         }
 
         const auto& rSourceRange = aReference.maValue.maReference.maRange;
-        const sal_Int64 nStartColumn
-            = static_cast<sal_Int64>(rSourceRange.maStart.mnColumn) + nColumnOffset;
-        const sal_Int64 nStartRow
-            = static_cast<sal_Int64>(rSourceRange.maStart.mnRow) + nRowOffset;
-        const sal_Int64 nEndColumn = nStartColumn + nWidth - 1;
-        const sal_Int64 nEndRow = nStartRow + nHeight - 1;
+        const std::int64_t nStartColumn
+            = static_cast<std::int64_t>(rSourceRange.maStart.mnColumn) + nColumnOffset;
+        const std::int64_t nStartRow
+            = static_cast<std::int64_t>(rSourceRange.maStart.mnRow) + nRowOffset;
+        const std::int64_t nEndColumn = nStartColumn + nWidth - 1;
+        const std::int64_t nEndRow = nStartRow + nHeight - 1;
         if (nStartColumn < 0 || nStartRow < 0 || nEndColumn < 0 || nEndRow < 0)
             return detail::makeFailure(api::Error::NoValue);
 

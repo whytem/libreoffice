@@ -8,6 +8,7 @@
  */
 
 #include <spreadsheetengine/runtime/TextFunctionRuntime.hxx>
+#include <cstdint>
 
 #include <algorithm>
 
@@ -21,14 +22,14 @@ namespace
 
 struct TextDelimiterMatch
 {
-    sal_Int32 mnCodePointIndex = 0;
-    sal_Int32 mnCodePointLength = 0;
+    std::int32_t mnCodePointIndex = 0;
+    std::int32_t mnCodePointLength = 0;
     std::size_t mnDelimiterOrder = 0;
 };
 
 [[nodiscard]] std::optional<TextDelimiterMatch> findNextTextDelimiterMatch(
     spreadsheetengine::api::StringView rText,
-    const std::vector<spreadsheetengine::api::String>& rDelimiters, sal_Int32 nCodePointStart,
+    const std::vector<spreadsheetengine::api::String>& rDelimiters, std::int32_t nCodePointStart,
     bool bCaseInsensitive)
 {
     std::optional<TextDelimiterMatch> oBestMatch;
@@ -63,7 +64,7 @@ struct TextDelimiterMatch
     const std::vector<spreadsheetengine::api::String>& rDelimiters, bool bCaseInsensitive)
 {
     std::vector<TextDelimiterMatch> aMatches;
-    sal_Int32 nSearchStart = 0;
+    std::int32_t nSearchStart = 0;
     while (true)
     {
         const auto oMatch = findNextTextDelimiterMatch(
@@ -73,22 +74,22 @@ struct TextDelimiterMatch
 
         aMatches.push_back(*oMatch);
         nSearchStart = oMatch->mnCodePointIndex
-                       + std::max<sal_Int32>(oMatch->mnCodePointLength, 1);
+                       + std::max<std::int32_t>(oMatch->mnCodePointLength, 1);
     }
     return aMatches;
 }
 
 [[nodiscard]] std::optional<spreadsheetengine::api::String> resolveDelimitedTextSlice(
     spreadsheetengine::api::StringView rText,
-    const std::vector<spreadsheetengine::api::String>& rDelimiters, sal_Int32 nInstance,
+    const std::vector<spreadsheetengine::api::String>& rDelimiters, std::int32_t nInstance,
     bool bCaseInsensitive, bool bMatchEnd, bool bReturnAfter)
 {
     const auto aMatches = collectTextDelimiterMatches(rText, rDelimiters, bCaseInsensitive);
-    const sal_Int32 nTextLength = countCodePoints(rText);
+    const std::int32_t nTextLength = countCodePoints(rText);
 
     if (bReturnAfter)
     {
-        sal_Int32 nSliceStart = 0;
+        std::int32_t nSliceStart = 0;
         if (nInstance > 0)
         {
             const std::size_t nRequested = static_cast<std::size_t>(nInstance);
@@ -135,7 +136,7 @@ struct TextDelimiterMatch
         return sliceText(rText, nSliceStart, nTextLength - nSliceStart);
     }
 
-    sal_Int32 nSliceLength = 0;
+    std::int32_t nSliceLength = 0;
     if (nInstance > 0)
     {
         const std::size_t nRequested = static_cast<std::size_t>(nInstance);
@@ -162,8 +163,8 @@ struct TextDelimiterMatch
 
 }
 
-std::optional<sal_Int32> findText(spreadsheetengine::api::StringView rNeedle,
-    spreadsheetengine::api::StringView rHaystack, sal_Int32 nStart, bool bCaseInsensitive)
+std::optional<std::int32_t> findText(spreadsheetengine::api::StringView rNeedle,
+    spreadsheetengine::api::StringView rHaystack, std::int32_t nStart, bool bCaseInsensitive)
 {
     return findTextCodePointIndex(rNeedle, rHaystack, nStart, bCaseInsensitive);
 }
@@ -176,24 +177,24 @@ std::optional<std::size_t> findByteText(spreadsheetengine::api::StringView rNeed
 }
 
 spreadsheetengine::api::String sliceText(
-    spreadsheetengine::api::StringView rText, sal_Int32 nCodePointStart,
-    sal_Int32 nCodePointLength)
+    spreadsheetengine::api::StringView rText, std::int32_t nCodePointStart,
+    std::int32_t nCodePointLength)
 {
     return substringByCodePoints(rText, nCodePointStart, nCodePointLength);
 }
 
 spreadsheetengine::api::String sliceTextLeftRight(
-    spreadsheetengine::api::StringView rText, sal_Int32 nLength, bool bFromRight)
+    spreadsheetengine::api::StringView rText, std::int32_t nLength, bool bFromRight)
 {
-    const sal_Int32 nCodePointCount = countCodePoints(rText);
-    const sal_Int32 nSliceLength = std::min(nLength, nCodePointCount);
-    const sal_Int32 nSliceStart
-        = bFromRight ? std::max<sal_Int32>(0, nCodePointCount - nSliceLength) : 0;
+    const std::int32_t nCodePointCount = countCodePoints(rText);
+    const std::int32_t nSliceLength = std::min(nLength, nCodePointCount);
+    const std::int32_t nSliceStart
+        = bFromRight ? std::max<std::int32_t>(0, nCodePointCount - nSliceLength) : 0;
     return sliceText(rText, nSliceStart, nSliceLength);
 }
 
 spreadsheetengine::api::String replaceText(spreadsheetengine::api::StringView rSource,
-    sal_Int32 nCodePointStart, sal_Int32 nCodePointLength,
+    std::int32_t nCodePointStart, std::int32_t nCodePointLength,
     spreadsheetengine::api::StringView rReplacement)
 {
     return replaceByCodePoints(rSource, nCodePointStart, nCodePointLength, rReplacement);
@@ -212,14 +213,14 @@ spreadsheetengine::api::String replaceByteText(
 
 spreadsheetengine::api::String substituteText(spreadsheetengine::api::StringView rSource,
     spreadsheetengine::api::StringView rOldText, spreadsheetengine::api::StringView rNewText,
-    std::optional<sal_Int32> oInstance)
+    std::optional<std::int32_t> oInstance)
 {
     if (rOldText.empty())
         return spreadsheetengine::api::String(rSource);
 
     spreadsheetengine::api::String aResult;
     std::size_t nSearchOffset = 0;
-    sal_Int32 nMatchCount = 0;
+    std::int32_t nMatchCount = 0;
     while (nSearchOffset <= rSource.size())
     {
         const std::size_t nFound = rSource.find(rOldText, nSearchOffset);
@@ -244,7 +245,7 @@ spreadsheetengine::api::String substituteText(spreadsheetengine::api::StringView
 
 std::optional<spreadsheetengine::api::String> textAfter(
     spreadsheetengine::api::StringView rText,
-    const std::vector<spreadsheetengine::api::String>& rDelimiters, sal_Int32 nInstance,
+    const std::vector<spreadsheetengine::api::String>& rDelimiters, std::int32_t nInstance,
     bool bCaseInsensitive, bool bMatchEnd)
 {
     return resolveDelimitedTextSlice(
@@ -253,7 +254,7 @@ std::optional<spreadsheetengine::api::String> textAfter(
 
 std::optional<spreadsheetengine::api::String> textBefore(
     spreadsheetengine::api::StringView rText,
-    const std::vector<spreadsheetengine::api::String>& rDelimiters, sal_Int32 nInstance,
+    const std::vector<spreadsheetengine::api::String>& rDelimiters, std::int32_t nInstance,
     bool bCaseInsensitive, bool bMatchEnd)
 {
     return resolveDelimitedTextSlice(

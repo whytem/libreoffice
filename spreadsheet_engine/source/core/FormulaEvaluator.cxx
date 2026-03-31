@@ -8,8 +8,9 @@
  */
 
 #include <spreadsheetengine/detail/FormulaEvaluator.hxx>
+#include <cstdint>
 
-#include <rtl/math.hxx>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
 
 #include <spreadsheetengine/detail/WorkbookCompileHost.hxx>
 #include <spreadsheetengine/detail/WorkbookCompilerLowering.hxx>
@@ -54,7 +55,7 @@
 #include <optional>
 #include <string>
 
-#include <kahan.hxx>
+#include <spreadsheetengine/runtime/KahanSum.hxx>
 
 namespace spreadsheetengine::core::eval
 {
@@ -163,7 +164,7 @@ using detail::formatQuotedString;
     return api::Error::NoValue;
 }
 
-[[nodiscard]] std::optional<sal_Int16> classifyOdfErrorTypeLiteral(api::StringView rText)
+[[nodiscard]] std::optional<std::int16_t> classifyOdfErrorTypeLiteral(api::StringView rText)
 {
     const api::String aUpper = uppercaseAscii(rText);
     if (aUpper == u"#NULL!")
@@ -189,7 +190,7 @@ using detail::formatQuotedString;
     return std::nullopt;
 }
 
-[[nodiscard]] std::optional<sal_Int16> classifyOdfErrorType(api::Error eError)
+[[nodiscard]] std::optional<std::int16_t> classifyOdfErrorType(api::Error eError)
 {
     switch (eError)
     {
@@ -207,7 +208,7 @@ using detail::formatQuotedString;
     }
 }
 
-[[nodiscard]] std::optional<sal_Int32> classifyLegacyErrorTypeLiteral(api::StringView rText)
+[[nodiscard]] std::optional<std::int32_t> classifyLegacyErrorTypeLiteral(api::StringView rText)
 {
     const api::String aUpper = uppercaseAscii(rText);
     if (aUpper == u"#NULL!")
@@ -230,12 +231,12 @@ using detail::formatQuotedString;
     if (aUpper.starts_with(u"#ERR") && aUpper.size() > 5 && aUpper.back() == u'!')
     {
         const api::StringView aDigits = aUpper.substr(4, aUpper.size() - 5);
-        sal_Int32 nCode = 0;
+        std::int32_t nCode = 0;
         for (const char16_t cChar : aDigits)
         {
             if (cChar < u'0' || cChar > u'9')
                 return std::nullopt;
-            nCode = nCode * 10 + static_cast<sal_Int32>(cChar - u'0');
+            nCode = nCode * 10 + static_cast<std::int32_t>(cChar - u'0');
         }
         if (nCode > 0)
             return nCode;
@@ -245,12 +246,12 @@ using detail::formatQuotedString;
     const std::size_t nColon = aUpper.rfind(u':');
     if (nColon != api::StringView::npos && nColon + 1 < aUpper.size())
     {
-        sal_Int32 nCode = 0;
+        std::int32_t nCode = 0;
         for (const char16_t cChar : aUpper.substr(nColon + 1))
         {
             if (cChar < u'0' || cChar > u'9')
                 return std::nullopt;
-            nCode = nCode * 10 + static_cast<sal_Int32>(cChar - u'0');
+            nCode = nCode * 10 + static_cast<std::int32_t>(cChar - u'0');
         }
         if (nCode >= 500 || nCode == 32767)
             return nCode;
@@ -262,7 +263,7 @@ using detail::formatQuotedString;
     return std::nullopt;
 }
 
-[[nodiscard]] std::optional<sal_Int32> classifyLegacyErrorType(api::Error eError)
+[[nodiscard]] std::optional<std::int32_t> classifyLegacyErrorType(api::Error eError)
 {
     switch (eError)
     {
@@ -298,19 +299,19 @@ using detail::formatQuotedString;
     return rValue;
 }
 
-[[nodiscard]] std::optional<sal_Int16> parseAsciiInt16(api::StringView rValue)
+[[nodiscard]] std::optional<std::int16_t> parseAsciiInt16(api::StringView rValue)
 {
     if (rValue.empty())
         return std::nullopt;
 
-    sal_Int32 nValue = 0;
+    std::int32_t nValue = 0;
     for (const char16_t cChar : rValue)
     {
         if (cChar < u'0' || cChar > u'9')
             return std::nullopt;
         nValue = (nValue * 10) + (cChar - u'0');
     }
-    return static_cast<sal_Int16>(nValue);
+    return static_cast<std::int16_t>(nValue);
 }
 
 [[nodiscard]] std::optional<api::CellValue> parseTypedStoredCellValue(
@@ -396,7 +397,7 @@ using detail::formatQuotedString;
 [[nodiscard]] api::DateSerial countWorkdaysFods(api::DateSerial nDate1, api::DateSerial nDate2,
     const std::vector<api::DateSerial>& rSortedHolidays, const api::WeekendMask& rWeekendMask)
 {
-    sal_Int32 nCount = 0;
+    std::int32_t nCount = 0;
     const bool bReverse = nDate1 > nDate2;
     if (bReverse)
         std::swap(nDate1, nDate2);
@@ -453,16 +454,16 @@ using detail::formatQuotedString;
 [[nodiscard]] api::String formatBasisDateTime(double fSerialValue)
 {
     const api::DateParts aNullDate = sedatetime::defaultNullDate();
-    const api::DateSerial nDateSerial = static_cast<api::DateSerial>(rtl::math::approxFloor(fSerialValue));
+    const api::DateSerial nDateSerial = static_cast<api::DateSerial>(fp::approxFloor(fSerialValue));
     const double fTimeValue = sedatetime::normalizeTimeFraction(fSerialValue);
 
-    const sal_Int16 nYear = static_cast<sal_Int16>(sedatetime::extractYear(aNullDate, nDateSerial));
-    const sal_Int16 nMonth = static_cast<sal_Int16>(sedatetime::extractMonth(aNullDate, nDateSerial));
+    const std::int16_t nYear = static_cast<std::int16_t>(sedatetime::extractYear(aNullDate, nDateSerial));
+    const std::int16_t nMonth = static_cast<std::int16_t>(sedatetime::extractMonth(aNullDate, nDateSerial));
     const auto oDay = sedatetime::extractDay(aNullDate, nDateSerial);
-    const sal_Int16 nDay = static_cast<sal_Int16>(oDay.value_or(0.0));
-    const sal_Int16 nHour = static_cast<sal_Int16>(sedatetime::extractHour(fTimeValue));
-    const sal_Int16 nMinute = static_cast<sal_Int16>(sedatetime::extractMinute(fTimeValue));
-    const sal_Int16 nSecond = static_cast<sal_Int16>(sedatetime::extractSecond(fTimeValue));
+    const std::int16_t nDay = static_cast<std::int16_t>(oDay.value_or(0.0));
+    const std::int16_t nHour = static_cast<std::int16_t>(sedatetime::extractHour(fTimeValue));
+    const std::int16_t nMinute = static_cast<std::int16_t>(sedatetime::extractMinute(fTimeValue));
+    const std::int16_t nSecond = static_cast<std::int16_t>(sedatetime::extractSecond(fTimeValue));
 
     char aBuffer[32];
     const int nLength = std::snprintf(aBuffer, sizeof(aBuffer), "%04d-%02d-%02d %02d:%02d:%02d",
@@ -585,8 +586,8 @@ public:
 
         if (!rInput.maValues.empty())
         {
-            const sal_Int64 nLinearIndex
-                = static_cast<sal_Int64>(aCoordinate.mnRow) * rInput.mnColumns
+            const std::int64_t nLinearIndex
+                = static_cast<std::int64_t>(aCoordinate.mnRow) * rInput.mnColumns
                   + aCoordinate.mnColumn;
             if (nLinearIndex < 0
                 || static_cast<std::size_t>(nLinearIndex) >= rInput.maValues.size())
@@ -638,7 +639,7 @@ public:
 {
     double fSum = 0.0;
     for (const double fValue : rNumbers)
-        fSum = ::rtl::math::approxAdd(fSum, fValue);
+        fSum = fp::approxAdd(fSum, fValue);
     return fSum;
 }
 
@@ -647,7 +648,7 @@ public:
     if (rColumnName.empty())
         return std::nullopt;
 
-    sal_Int64 nColumn = 0;
+    std::int64_t nColumn = 0;
     for (const char16_t cChar : rColumnName)
     {
         char16_t cUpper = cChar;
@@ -734,7 +735,7 @@ public:
     if (aAddressToken.empty())
         return std::nullopt;
 
-    sal_Int64 nRow = 0;
+    std::int64_t nRow = 0;
     for (const char16_t cChar : aAddressToken)
     {
         if (cChar < u'0' || cChar > u'9')
@@ -797,7 +798,7 @@ public:
 }
 
 [[nodiscard]] api::String formatAddressFunctionResult(api::RowIndex nRow, api::ColumnIndex nColumn,
-    sal_Int32 nAbsMode, bool bA1Style, api::StringView rSheetName)
+    std::int32_t nAbsMode, bool bA1Style, api::StringView rSheetName)
 {
     api::String aResult;
     if (!rSheetName.empty())
@@ -852,17 +853,17 @@ public:
     switch (eOperator)
     {
         case formula::BinaryOperator::Equal:
-            return ::rtl::math::approxEqual(fLeft, fRight);
+            return fp::approxEqual(fLeft, fRight);
         case formula::BinaryOperator::NotEqual:
-            return !::rtl::math::approxEqual(fLeft, fRight);
+            return !fp::approxEqual(fLeft, fRight);
         case formula::BinaryOperator::Less:
             return fLeft < fRight;
         case formula::BinaryOperator::LessEqual:
-            return fLeft < fRight || ::rtl::math::approxEqual(fLeft, fRight);
+            return fLeft < fRight || fp::approxEqual(fLeft, fRight);
         case formula::BinaryOperator::Greater:
             return fLeft > fRight;
         case formula::BinaryOperator::GreaterEqual:
-            return fLeft > fRight || ::rtl::math::approxEqual(fLeft, fRight);
+            return fLeft > fRight || fp::approxEqual(fLeft, fRight);
         default:
             return false;
     }
@@ -1193,6 +1194,20 @@ EvaluationResult Evaluator::evaluateFunction(
         return api::ValueResult<api::CellValue>::success(aValue.maValue.maValue);
     };
 
+    auto evaluateAnchoredScalarArgumentValue = [&](const formula::Node& rArgument)
+        -> api::ValueResult<api::CellValue> {
+        EvaluationResult aValue = evaluateNode(rArgument, rCurrentAddress);
+        if (!aValue)
+            return api::ValueResult<api::CellValue>::failure(aValue.meError);
+        if (aValue.maValue.isMatrixReference())
+            aValue = materializeReferenceValue(aValue.maValue.maReference, 0, 0);
+        if (!aValue)
+            return api::ValueResult<api::CellValue>::failure(aValue.meError);
+        if (!aValue.maValue.isScalar())
+            return api::ValueResult<api::CellValue>::failure(api::Error::IllegalArgument);
+        return api::ValueResult<api::CellValue>::success(aValue.maValue.maValue);
+    };
+
     auto evaluateNumericArgument = [&](const formula::Node& rArgument,
                                       std::optional<double> oDefaultForEmpty)
         -> api::ValueResult<double> {
@@ -1209,12 +1224,43 @@ EvaluationResult Evaluator::evaluateFunction(
         return aNumber;
     };
 
+    auto evaluateAnchoredNumericArgument = [&](const formula::Node& rArgument,
+                                               std::optional<double> oDefaultForEmpty)
+        -> api::ValueResult<double> {
+        if (rArgument.meKind == formula::NodeKind::EmptyArgument && oDefaultForEmpty)
+            return api::ValueResult<double>::success(*oDefaultForEmpty);
+
+        const auto aValue = evaluateAnchoredScalarArgumentValue(rArgument);
+        if (!aValue)
+            return api::ValueResult<double>::failure(aValue.meError);
+        if (aValue.maValue.isEmpty() && oDefaultForEmpty)
+            return api::ValueResult<double>::success(*oDefaultForEmpty);
+
+        const auto aNumber = coerceToNumber(aValue.maValue);
+        if (!aNumber)
+            return api::ValueResult<double>::failure(aNumber.meError);
+        return aNumber;
+    };
+
     auto evaluateRequiredNumberArgument = [&](const formula::Node& rArgument)
         -> api::ValueResult<double> {
         if (rArgument.meKind == formula::NodeKind::EmptyArgument)
             return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
         const auto aValue = evaluateScalarArgumentValue(rArgument);
+        if (!aValue)
+            return api::ValueResult<double>::failure(aValue.meError);
+        if (aValue.maValue.isEmpty())
+            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+        return coerceToNumber(aValue.maValue);
+    };
+
+    auto evaluateRequiredAnchoredNumberArgument = [&](const formula::Node& rArgument)
+        -> api::ValueResult<double> {
+        if (rArgument.meKind == formula::NodeKind::EmptyArgument)
+            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+        const auto aValue = evaluateAnchoredScalarArgumentValue(rArgument);
         if (!aValue)
             return api::ValueResult<double>::failure(aValue.meError);
         if (aValue.maValue.isEmpty())
@@ -1240,46 +1286,52 @@ EvaluationResult Evaluator::evaluateFunction(
     };
 
     auto evaluateOptionalWholeNumberArgument
-        = [&](const formula::Node& rArgument, sal_Int32 nDefaultValue)
-        -> api::ValueResult<sal_Int32> {
+        = [&](const formula::Node& rArgument, std::int32_t nDefaultValue)
+        -> api::ValueResult<std::int32_t> {
         if (rArgument.meKind == formula::NodeKind::EmptyArgument)
-            return api::ValueResult<sal_Int32>::success(nDefaultValue);
+            return api::ValueResult<std::int32_t>::success(nDefaultValue);
 
         const auto aValue = evaluateScalarArgumentValue(rArgument);
         if (!aValue)
-            return api::ValueResult<sal_Int32>::failure(aValue.meError);
+            return api::ValueResult<std::int32_t>::failure(aValue.meError);
         if (aValue.maValue.isEmpty())
-            return api::ValueResult<sal_Int32>::success(nDefaultValue);
+            return api::ValueResult<std::int32_t>::success(nDefaultValue);
 
         const auto aNumber = coerceToNumber(aValue.maValue);
         if (!aNumber)
-            return api::ValueResult<sal_Int32>::failure(aNumber.meError);
+            return api::ValueResult<std::int32_t>::failure(aNumber.meError);
 
         const auto oWhole = toWholeNumber(aNumber.maValue);
         if (!oWhole)
-            return api::ValueResult<sal_Int32>::failure(api::Error::IllegalArgument);
-        return api::ValueResult<sal_Int32>::success(*oWhole);
+            return api::ValueResult<std::int32_t>::failure(api::Error::IllegalArgument);
+        return api::ValueResult<std::int32_t>::success(*oWhole);
     };
 
     auto evaluateRequiredWholeNumberArgument = [&](const formula::Node& rArgument)
-        -> api::ValueResult<sal_Int32> {
+        -> api::ValueResult<std::int32_t> {
         if (rArgument.meKind == formula::NodeKind::EmptyArgument)
-            return api::ValueResult<sal_Int32>::failure(api::Error::IllegalArgument);
+            return api::ValueResult<std::int32_t>::failure(api::Error::IllegalArgument);
 
         const auto aValue = evaluateScalarArgumentValue(rArgument);
         if (!aValue)
-            return api::ValueResult<sal_Int32>::failure(aValue.meError);
+            return api::ValueResult<std::int32_t>::failure(aValue.meError);
         if (aValue.maValue.isEmpty())
-            return api::ValueResult<sal_Int32>::failure(api::Error::IllegalArgument);
+            return api::ValueResult<std::int32_t>::failure(api::Error::IllegalArgument);
 
         const auto aNumber = coerceToNumber(aValue.maValue);
         if (!aNumber)
-            return api::ValueResult<sal_Int32>::failure(aNumber.meError);
+            return api::ValueResult<std::int32_t>::failure(aNumber.meError);
 
         const auto oWhole = toWholeNumber(aNumber.maValue);
         if (!oWhole)
-            return api::ValueResult<sal_Int32>::failure(api::Error::IllegalArgument);
-        return api::ValueResult<sal_Int32>::success(*oWhole);
+            return api::ValueResult<std::int32_t>::failure(api::Error::IllegalArgument);
+        return api::ValueResult<std::int32_t>::success(*oWhole);
+    };
+
+    auto makeNumericOrErrorResult = [&](api::ValueResult<double> aValue) -> EvaluationResult {
+        if (!aValue)
+            return makeScalarResult(api::CellValue::error(aValue.meError));
+        return makeScalarResult(api::CellValue::number(aValue.maValue));
     };
 
     auto collectAggregateScanFromArgument = [&](const formula::Node& rArgument)
@@ -1798,7 +1850,7 @@ EvaluationResult Evaluator::evaluateFunction(
 
         const formula::Node& rArgument = *rNode.maChildren[0];
         const auto classifyReferenceErrorType = [&](const formula::Node& rReferenceNode)
-            -> std::optional<sal_Int32> {
+            -> std::optional<std::int32_t> {
             api::ValueResult<api::ResolvedReference> aReference
                 = api::ValueResult<api::ResolvedReference>::failure(api::Error::IllegalArgument);
 
@@ -1829,7 +1881,7 @@ EvaluationResult Evaluator::evaluateFunction(
             }
 
             if (!aReference || !aReference.maValue.isSingleCell())
-                return bLegacyErrorType ? std::optional<sal_Int32>(519) : std::nullopt;
+                return bLegacyErrorType ? std::optional<std::int32_t>(519) : std::nullopt;
 
             const workbook::Cell* pCell = getCell(aReference.maValue.maRange.maStart);
             if (!pCell)
@@ -1862,10 +1914,10 @@ EvaluationResult Evaluator::evaluateFunction(
             {
                 return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
             }
-            const std::optional<sal_Int32> oErrorType = bLegacyErrorType
+            const std::optional<std::int32_t> oErrorType = bLegacyErrorType
                                                             ? classifyLegacyErrorTypeLiteral(
                                                                   rArgument.maPrimaryText)
-                                                            : std::optional<sal_Int32>(
+                                                            : std::optional<std::int32_t>(
                                                                   classifyOdfErrorTypeLiteral(
                                                                       rArgument.maPrimaryText));
             if (oErrorType)
@@ -1896,10 +1948,10 @@ EvaluationResult Evaluator::evaluateFunction(
                 return makeScalarResult(
                     api::CellValue::number(bLegacyErrorType ? 524.0 : 4.0));
             }
-            const std::optional<sal_Int32> oErrorType = bLegacyErrorType
+            const std::optional<std::int32_t> oErrorType = bLegacyErrorType
                                                             ? classifyLegacyErrorType(
                                                                   aArgument.meError)
-                                                            : std::optional<sal_Int32>(
+                                                            : std::optional<std::int32_t>(
                                                                   classifyOdfErrorType(
                                                                       aArgument.meError));
             if (oErrorType)
@@ -1910,10 +1962,10 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aArgument.maValue.isScalar() || !aArgument.maValue.maValue.isError())
             return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
 
-        const std::optional<sal_Int32> oErrorType = bLegacyErrorType
+        const std::optional<std::int32_t> oErrorType = bLegacyErrorType
                                                         ? classifyLegacyErrorType(
                                                               aArgument.maValue.maValue.meError)
-                                                        : std::optional<sal_Int32>(
+                                                        : std::optional<std::int32_t>(
                                                               classifyOdfErrorType(
                                                                   aArgument.maValue.maValue
                                                                       .meError));
@@ -2235,7 +2287,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (aNumbers.maValue.empty())
             return makeFailure(api::Error::IllegalArgument);
 
-        sal_Int64 nResult = 0;
+        std::int64_t nResult = 0;
         bool bSawValue = false;
         for (const double fValue : aNumbers.maValue)
         {
@@ -2243,13 +2295,13 @@ EvaluationResult Evaluator::evaluateFunction(
                 return makeFailure(api::Error::IllegalArgument);
 
             const auto fTruncated = std::trunc(fValue);
-            if (fTruncated < static_cast<double>(std::numeric_limits<sal_Int64>::min())
-                || fTruncated > static_cast<double>(std::numeric_limits<sal_Int64>::max()))
+            if (fTruncated < static_cast<double>(std::numeric_limits<std::int64_t>::min())
+                || fTruncated > static_cast<double>(std::numeric_limits<std::int64_t>::max()))
             {
                 return makeFailure(api::Error::IllegalArgument);
             }
 
-            const sal_Int64 nValue = static_cast<sal_Int64>(fTruncated);
+            const std::int64_t nValue = static_cast<std::int64_t>(fTruncated);
             if (!bSawValue)
             {
                 nResult = std::abs(nValue);
@@ -2683,7 +2735,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aEndDate)
             return makeFailure(aEndDate.meError);
 
-        sal_Int32 nBasis = 0;
+        std::int32_t nBasis = 0;
         if (rNode.maChildren.size() == 3)
         {
             const auto aBasis = evaluateOptionalWholeNumberArgument(*rNode.maChildren[2], 0);
@@ -2723,7 +2775,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aFrequency)
             return makeFailure(aFrequency.meError);
 
-        sal_Int32 nBasis = 0;
+        std::int32_t nBasis = 0;
         if (rNode.maChildren.size() == 7)
         {
             const auto aBasis = evaluateOptionalWholeNumberArgument(*rNode.maChildren[6], 0);
@@ -2764,7 +2816,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aRate)
             return makeScalarResult(api::CellValue::error(aRate.meError));
 
-        sal_Int32 nBasis = 0;
+        std::int32_t nBasis = 0;
         if (rNode.maChildren.size() == 7)
         {
             const auto aBasis = evaluateOptionalWholeNumberArgument(*rNode.maChildren[6], 0);
@@ -2809,7 +2861,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aFrequency)
             return makeScalarResult(api::CellValue::error(aFrequency.meError));
 
-        sal_Int32 nBasis = 0;
+        std::int32_t nBasis = 0;
         if (rNode.maChildren.size() == 8)
         {
             const auto aBasis = evaluateOptionalWholeNumberArgument(*rNode.maChildren[7], 0);
@@ -2894,7 +2946,7 @@ EvaluationResult Evaluator::evaluateFunction(
             return makeFailure(aDfNumber.meError);
 
         const auto aChiDist = semath::evaluateLegacyChiDist(
-            aChiNumber.maValue, ::rtl::math::approxFloor(aDfNumber.maValue));
+            aChiNumber.maValue, fp::approxFloor(aDfNumber.maValue));
         if (!aChiDist)
             return makeFailure(aChiDist.meError);
         return makeScalarResult(api::CellValue::number(aChiDist.maValue));
@@ -2907,44 +2959,250 @@ EvaluationResult Evaluator::evaluateFunction(
             || (!bMicrosoftSyntax
                 && (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)))
         {
-            return makeFailure(api::Error::IllegalArgument);
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
         }
 
-        EvaluationResult aXResult
-            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
-        EvaluationResult aDfResult
-            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
-        if (!aXResult)
-            return aXResult;
-        if (!aDfResult)
-            return aDfResult;
-
-        const auto aXNumber = coerceToNumber(aXResult.maValue.maValue);
-        const auto aDfNumber = coerceToNumber(aDfResult.maValue.maValue);
+        const auto aXNumber = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        const auto aDfNumber = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[1]);
         if (!aXNumber)
-            return makeFailure(aXNumber.meError);
+            return makeScalarResult(api::CellValue::error(aXNumber.meError));
         if (!aDfNumber)
-            return makeFailure(aDfNumber.meError);
+            return makeScalarResult(api::CellValue::error(aDfNumber.meError));
 
         bool bCumulative = true;
         if (rNode.maChildren.size() == 3)
         {
-            EvaluationResult aCumulativeResult
-                = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[2], rCurrentAddress));
-            if (!aCumulativeResult)
-                return aCumulativeResult;
-            const auto aCumulativeBool = coerceToBoolean(aCumulativeResult.maValue.maValue);
+            const auto aCumulativeValue = evaluateAnchoredScalarArgumentValue(*rNode.maChildren[2]);
+            if (!aCumulativeValue)
+                return makeScalarResult(api::CellValue::error(aCumulativeValue.meError));
+            const auto aCumulativeBool = coerceToBoolean(aCumulativeValue.maValue);
             if (!aCumulativeBool)
-                return makeFailure(aCumulativeBool.meError);
+                return makeScalarResult(api::CellValue::error(aCumulativeBool.meError));
             bCumulative = aCumulativeBool.maValue;
         }
 
-        const auto aDistribution = semath::evaluateChiSquareDistribution(
-            aXNumber.maValue, ::rtl::math::approxFloor(aDfNumber.maValue), bCumulative,
-            bMicrosoftSyntax);
-        if (!aDistribution)
-            return makeFailure(aDistribution.meError);
-        return makeScalarResult(api::CellValue::number(aDistribution.maValue));
+        return makeNumericOrErrorResult(semath::evaluateChiSquareDistribution(
+            aXNumber.maValue, fp::approxFloor(aDfNumber.maValue), bCumulative,
+            bMicrosoftSyntax));
+    }
+
+    if (aFunctionName == u"CHISQ.DIST.RT" || aFunctionName == u"COM.MICROSOFT.CHISQ.DIST.RT")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aX = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        const auto aDegreesFreedom = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[1]);
+        if (!aX)
+            return makeScalarResult(api::CellValue::error(aX.meError));
+        if (!aDegreesFreedom)
+            return makeScalarResult(api::CellValue::error(aDegreesFreedom.meError));
+
+        const auto aCdf = semath::evaluateChiSquareDistribution(
+            aX.maValue, fp::approxFloor(aDegreesFreedom.maValue), true, true);
+        if (!aCdf)
+            return makeScalarResult(api::CellValue::error(aCdf.meError));
+        return makeScalarResult(api::CellValue::number(1.0 - aCdf.maValue));
+    }
+
+    if (aFunctionName == u"CHISQ.INV" || aFunctionName == u"COM.MICROSOFT.CHISQ.INV"
+        || aFunctionName == u"CHISQINV" || aFunctionName == u"CHISQ.INV.RT"
+        || aFunctionName == u"COM.MICROSOFT.CHISQ.INV.RT"
+        || aFunctionName == u"LEGACY.CHIINV" || aFunctionName == u"CHIINV")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aProbability = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        const auto aDegreesFreedom = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[1]);
+        if (!aProbability)
+            return makeScalarResult(api::CellValue::error(aProbability.meError));
+        if (!aDegreesFreedom)
+            return makeScalarResult(api::CellValue::error(aDegreesFreedom.meError));
+
+        const double fDegreesFreedom = fp::approxFloor(aDegreesFreedom.maValue);
+        if (aFunctionName == u"LEGACY.CHIINV" || aFunctionName == u"CHIINV")
+        {
+            return makeNumericOrErrorResult(
+                semath::evaluateLegacyChiInverse(aProbability.maValue, fDegreesFreedom));
+        }
+
+        const bool bRightTail = aFunctionName == u"CHISQ.INV.RT"
+                                || aFunctionName == u"COM.MICROSOFT.CHISQ.INV.RT";
+        const double fLeftTailProbability
+            = bRightTail ? 1.0 - aProbability.maValue : aProbability.maValue;
+        return makeNumericOrErrorResult(
+            semath::evaluateChiSquareInverse(fLeftTailProbability, fDegreesFreedom));
+    }
+
+    if (aFunctionName == u"LEGACY.NORMSDIST" || aFunctionName == u"NORMSDIST"
+        || aFunctionName == u"NORM.S.DIST" || aFunctionName == u"COM.MICROSOFT.NORM.S.DIST")
+    {
+        const bool bMicrosoftSyntax = aFunctionName == u"NORM.S.DIST"
+                                      || aFunctionName == u"COM.MICROSOFT.NORM.S.DIST";
+        if ((bMicrosoftSyntax && rNode.maChildren.size() != 2)
+            || (!bMicrosoftSyntax && rNode.maChildren.size() != 1))
+        {
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+        }
+
+        const auto aX = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        if (!aX)
+            return makeScalarResult(api::CellValue::error(aX.meError));
+
+        bool bCumulative = true;
+        if (bMicrosoftSyntax)
+        {
+            const auto aCumulativeValue = evaluateAnchoredScalarArgumentValue(*rNode.maChildren[1]);
+            if (!aCumulativeValue)
+                return makeScalarResult(api::CellValue::error(aCumulativeValue.meError));
+            const auto aCumulativeBool = coerceToBoolean(aCumulativeValue.maValue);
+            if (!aCumulativeBool)
+                return makeScalarResult(api::CellValue::error(aCumulativeBool.meError));
+            bCumulative = aCumulativeBool.maValue;
+        }
+
+        return makeNumericOrErrorResult(
+            semath::evaluateNormalDistribution(aX.maValue, 0.0, 1.0, bCumulative));
+    }
+
+    if (aFunctionName == u"LEGACY.NORMSINV" || aFunctionName == u"NORMSINV"
+        || aFunctionName == u"NORM.S.INV" || aFunctionName == u"COM.MICROSOFT.NORM.S.INV")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aProbability = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        if (!aProbability)
+            return makeScalarResult(api::CellValue::error(aProbability.meError));
+
+        return makeNumericOrErrorResult(
+            semath::evaluateStandardNormalInverse(aProbability.maValue));
+    }
+
+    if (aFunctionName == u"NORMINV" || aFunctionName == u"NORM.INV"
+        || aFunctionName == u"COM.MICROSOFT.NORM.INV")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aProbability = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        const auto aMean = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[1]);
+        const auto aSigma = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[2]);
+        if (!aProbability)
+            return makeScalarResult(api::CellValue::error(aProbability.meError));
+        if (!aMean)
+            return makeScalarResult(api::CellValue::error(aMean.meError));
+        if (!aSigma)
+            return makeScalarResult(api::CellValue::error(aSigma.meError));
+
+        return makeNumericOrErrorResult(
+            semath::evaluateNormalInverse(aProbability.maValue, aMean.maValue, aSigma.maValue));
+    }
+
+    if (aFunctionName == u"STANDARDIZE")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aX = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        const auto aMean = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[1]);
+        const auto aSigma = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[2]);
+        if (!aX)
+            return makeScalarResult(api::CellValue::error(aX.meError));
+        if (!aMean)
+            return makeScalarResult(api::CellValue::error(aMean.meError));
+        if (!aSigma)
+            return makeScalarResult(api::CellValue::error(aSigma.meError));
+        if (aSigma.maValue < 0.0)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+        if (fp::approxEqual(aSigma.maValue, 0.0))
+            return makeScalarResult(api::CellValue::error(api::Error::DivisionByZero));
+
+        return makeScalarResult(
+            api::CellValue::number((aX.maValue - aMean.maValue) / aSigma.maValue));
+    }
+
+    if (aFunctionName == u"LOGINV" || aFunctionName == u"LOGNORM.INV"
+        || aFunctionName == u"COM.MICROSOFT.LOGNORM.INV")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aProbability = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        if (!aProbability)
+            return makeScalarResult(api::CellValue::error(aProbability.meError));
+
+        const auto aMean = rNode.maChildren.size() >= 2
+                               ? evaluateAnchoredNumericArgument(*rNode.maChildren[1], 0.0)
+                               : api::ValueResult<double>::success(0.0);
+        const auto aSigma = rNode.maChildren.size() == 3
+                                ? evaluateAnchoredNumericArgument(*rNode.maChildren[2], 1.0)
+                                : api::ValueResult<double>::success(1.0);
+        if (!aMean)
+            return makeScalarResult(api::CellValue::error(aMean.meError));
+        if (!aSigma)
+            return makeScalarResult(api::CellValue::error(aSigma.meError));
+
+        return makeNumericOrErrorResult(
+            semath::evaluateLogNormalInverse(aProbability.maValue, aMean.maValue, aSigma.maValue));
+    }
+
+    if (aFunctionName == u"GAMMAINV" || aFunctionName == u"GAMMA.INV"
+        || aFunctionName == u"COM.MICROSOFT.GAMMA.INV")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aProbability = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        const auto aAlpha = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[1]);
+        const auto aBeta = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[2]);
+        if (!aProbability)
+            return makeScalarResult(api::CellValue::error(aProbability.meError));
+        if (!aAlpha)
+            return makeScalarResult(api::CellValue::error(aAlpha.meError));
+        if (!aBeta)
+            return makeScalarResult(api::CellValue::error(aBeta.meError));
+
+        return makeNumericOrErrorResult(
+            semath::evaluateGammaInverse(aProbability.maValue, aAlpha.maValue, aBeta.maValue));
+    }
+
+    if (aFunctionName == u"GAMMALN" || aFunctionName == u"GAMMALN.PRECISE"
+        || aFunctionName == u"COM.MICROSOFT.GAMMALN.PRECISE")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aValue = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        if (!aValue)
+            return makeScalarResult(api::CellValue::error(aValue.meError));
+        return makeNumericOrErrorResult(semath::evaluateLogGammaValue(aValue.maValue));
+    }
+
+    if (aFunctionName == u"ERF" || aFunctionName == u"ERF.PRECISE"
+        || aFunctionName == u"COM.MICROSOFT.ERF.PRECISE")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aValue = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        if (!aValue)
+            return makeScalarResult(api::CellValue::error(aValue.meError));
+        return makeNumericOrErrorResult(semath::evaluateErrorFunction(aValue.maValue));
+    }
+
+    if (aFunctionName == u"ERFC" || aFunctionName == u"ERFC.PRECISE"
+        || aFunctionName == u"COM.MICROSOFT.ERFC.PRECISE")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aValue = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        if (!aValue)
+            return makeScalarResult(api::CellValue::error(aValue.meError));
+        return makeNumericOrErrorResult(
+            semath::evaluateComplementaryErrorFunction(aValue.maValue));
     }
 
     if (aFunctionName == u"NORMDIST" || aFunctionName == u"NORM.DIST")
@@ -3107,6 +3365,38 @@ EvaluationResult Evaluator::evaluateFunction(
         return makeScalarResult(api::CellValue::number(aGammaValue.maValue));
     }
 
+    if (aFunctionName == u"BETA.INV" || aFunctionName == u"COM.MICROSOFT.BETA.INV"
+        || aFunctionName == u"BETAINV")
+    {
+        if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 5)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aProbability = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        const auto aAlpha = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[1]);
+        const auto aBeta = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[2]);
+        if (!aProbability)
+            return makeScalarResult(api::CellValue::error(aProbability.meError));
+        if (!aAlpha)
+            return makeScalarResult(api::CellValue::error(aAlpha.meError));
+        if (!aBeta)
+            return makeScalarResult(api::CellValue::error(aBeta.meError));
+
+        const auto aLower = rNode.maChildren.size() >= 4
+                                ? evaluateAnchoredNumericArgument(*rNode.maChildren[3], 0.0)
+                                : api::ValueResult<double>::success(0.0);
+        const auto aUpper = rNode.maChildren.size() == 5
+                                ? evaluateAnchoredNumericArgument(*rNode.maChildren[4], 1.0)
+                                : api::ValueResult<double>::success(1.0);
+        if (!aLower)
+            return makeScalarResult(api::CellValue::error(aLower.meError));
+        if (!aUpper)
+            return makeScalarResult(api::CellValue::error(aUpper.meError));
+
+        return makeNumericOrErrorResult(semath::evaluateBetaInverse(
+            aProbability.maValue, aAlpha.maValue, aBeta.maValue, aLower.maValue,
+            aUpper.maValue));
+    }
+
     if (aFunctionName == u"TINV" || aFunctionName == u"T.INV.2T"
         || aFunctionName == u"COM.MICROSOFT.T.INV.2T")
     {
@@ -3121,7 +3411,7 @@ EvaluationResult Evaluator::evaluateFunction(
             return makeFailure(aDegreesFreedom.meError);
 
         const auto aInverse = semath::evaluateTInverse(
-            aProbability.maValue, ::rtl::math::approxFloor(aDegreesFreedom.maValue), 2);
+            aProbability.maValue, fp::approxFloor(aDegreesFreedom.maValue), 2);
         if (!aInverse)
             return makeFailure(aInverse.meError);
         return makeScalarResult(api::CellValue::number(aInverse.maValue));
@@ -3142,10 +3432,59 @@ EvaluationResult Evaluator::evaluateFunction(
             return makeFailure(api::Error::IllegalArgument);
 
         const auto aDistribution = semath::evaluateStudentDistribution(
-            aX.maValue, ::rtl::math::approxFloor(aDegreesFreedom.maValue), 2);
+            aX.maValue, fp::approxFloor(aDegreesFreedom.maValue), 2);
         if (!aDistribution)
             return makeFailure(aDistribution.meError);
         return makeScalarResult(api::CellValue::number(aDistribution.maValue));
+    }
+
+    if (aFunctionName == u"T.DIST.RT" || aFunctionName == u"COM.MICROSOFT.T.DIST.RT")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aX = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        const auto aDegreesFreedom = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[1]);
+        if (!aX)
+            return makeScalarResult(api::CellValue::error(aX.meError));
+        if (!aDegreesFreedom)
+            return makeScalarResult(api::CellValue::error(aDegreesFreedom.meError));
+
+        const auto aDistribution = semath::evaluateStudentDistribution(
+            aX.maValue, fp::approxFloor(aDegreesFreedom.maValue), 1);
+        if (!aDistribution)
+            return makeScalarResult(api::CellValue::error(aDistribution.meError));
+        const double fValue
+            = aX.maValue < 0.0 ? 1.0 - aDistribution.maValue : aDistribution.maValue;
+        return makeScalarResult(api::CellValue::number(fValue));
+    }
+
+    if (aFunctionName == u"CONFIDENCE" || aFunctionName == u"CONFIDENCE.NORM"
+        || aFunctionName == u"COM.MICROSOFT.CONFIDENCE.NORM"
+        || aFunctionName == u"CONFIDENCE.T" || aFunctionName == u"COM.MICROSOFT.CONFIDENCE.T")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aAlpha = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        const auto aSigma = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[1]);
+        const auto aSampleSize = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[2]);
+        if (!aAlpha)
+            return makeScalarResult(api::CellValue::error(aAlpha.meError));
+        if (!aSigma)
+            return makeScalarResult(api::CellValue::error(aSigma.meError));
+        if (!aSampleSize)
+            return makeScalarResult(api::CellValue::error(aSampleSize.meError));
+
+        const double fSampleSize = fp::approxFloor(aSampleSize.maValue);
+        if (aFunctionName == u"CONFIDENCE.T" || aFunctionName == u"COM.MICROSOFT.CONFIDENCE.T")
+        {
+            return makeNumericOrErrorResult(
+                semath::evaluateConfidenceT(aAlpha.maValue, aSigma.maValue, fSampleSize));
+        }
+
+        return makeNumericOrErrorResult(
+            semath::evaluateConfidence(aAlpha.maValue, aSigma.maValue, fSampleSize));
     }
 
     if (aFunctionName == u"FINV" || aFunctionName == u"LEGACY.FINV"
@@ -3165,8 +3504,8 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aDegreesFreedom2)
             return makeFailure(aDegreesFreedom2.meError);
 
-        const double fDegreesFreedom1 = ::rtl::math::approxFloor(aDegreesFreedom1.maValue);
-        const double fDegreesFreedom2 = ::rtl::math::approxFloor(aDegreesFreedom2.maValue);
+        const double fDegreesFreedom1 = fp::approxFloor(aDegreesFreedom1.maValue);
+        const double fDegreesFreedom2 = fp::approxFloor(aDegreesFreedom2.maValue);
         const bool bLeftTail = aFunctionName == u"FINV" || aFunctionName == u"F.INV"
                                || aFunctionName == u"COM.MICROSOFT.F.INV";
         if (bLeftTail && (aProbability.maValue <= 0.0 || aProbability.maValue >= 1.0))
@@ -3322,6 +3661,94 @@ EvaluationResult Evaluator::evaluateFunction(
         return makeScalarResult(api::CellValue::number(aRange.maValue));
     }
 
+    if (aFunctionName == u"NEGBINOMDIST" || aFunctionName == u"NEGBINOM.DIST"
+        || aFunctionName == u"COM.MICROSOFT.NEGBINOM.DIST")
+    {
+        const bool bMicrosoftSyntax = aFunctionName != u"NEGBINOMDIST";
+        if ((bMicrosoftSyntax && rNode.maChildren.size() != 4)
+            || (!bMicrosoftSyntax && rNode.maChildren.size() != 3))
+        {
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+        }
+
+        const auto aFailures = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        const auto aSuccesses = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[1]);
+        const auto aProbability = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[2]);
+        if (!aFailures)
+            return makeScalarResult(api::CellValue::error(aFailures.meError));
+        if (!aSuccesses)
+            return makeScalarResult(api::CellValue::error(aSuccesses.meError));
+        if (!aProbability)
+            return makeScalarResult(api::CellValue::error(aProbability.meError));
+
+        bool bCumulative = false;
+        if (bMicrosoftSyntax)
+        {
+            const auto aCumulativeValue = evaluateAnchoredScalarArgumentValue(*rNode.maChildren[3]);
+            if (!aCumulativeValue)
+                return makeScalarResult(api::CellValue::error(aCumulativeValue.meError));
+            const auto aCumulativeBool = coerceToBoolean(aCumulativeValue.maValue);
+            if (!aCumulativeBool)
+                return makeScalarResult(api::CellValue::error(aCumulativeBool.meError));
+            bCumulative = aCumulativeBool.maValue;
+        }
+
+        return makeNumericOrErrorResult(semath::evaluateNegativeBinomialDistribution(
+            aFailures.maValue, aSuccesses.maValue, aProbability.maValue, bCumulative,
+            bMicrosoftSyntax));
+    }
+
+    if (aFunctionName == u"EXPONDIST" || aFunctionName == u"EXPON.DIST"
+        || aFunctionName == u"COM.MICROSOFT.EXPON.DIST")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aX = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        const auto aLambda = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[1]);
+        if (!aX)
+            return makeScalarResult(api::CellValue::error(aX.meError));
+        if (!aLambda)
+            return makeScalarResult(api::CellValue::error(aLambda.meError));
+
+        const auto aCumulativeValue = evaluateAnchoredScalarArgumentValue(*rNode.maChildren[2]);
+        if (!aCumulativeValue)
+            return makeScalarResult(api::CellValue::error(aCumulativeValue.meError));
+        const auto aCumulativeBool = coerceToBoolean(aCumulativeValue.maValue);
+        if (!aCumulativeBool)
+            return makeScalarResult(api::CellValue::error(aCumulativeBool.meError));
+
+        return makeNumericOrErrorResult(semath::evaluateExponentialDistribution(
+            aX.maValue, aLambda.maValue, aCumulativeBool.maValue));
+    }
+
+    if (aFunctionName == u"WEIBULL" || aFunctionName == u"WEIBULL.DIST"
+        || aFunctionName == u"COM.MICROSOFT.WEIBULL.DIST")
+    {
+        if (rNode.maChildren.size() != 4)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aX = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        const auto aAlpha = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[1]);
+        const auto aBeta = evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[2]);
+        if (!aX)
+            return makeScalarResult(api::CellValue::error(aX.meError));
+        if (!aAlpha)
+            return makeScalarResult(api::CellValue::error(aAlpha.meError));
+        if (!aBeta)
+            return makeScalarResult(api::CellValue::error(aBeta.meError));
+
+        const auto aCumulativeValue = evaluateAnchoredScalarArgumentValue(*rNode.maChildren[3]);
+        if (!aCumulativeValue)
+            return makeScalarResult(api::CellValue::error(aCumulativeValue.meError));
+        const auto aCumulativeBool = coerceToBoolean(aCumulativeValue.maValue);
+        if (!aCumulativeBool)
+            return makeScalarResult(api::CellValue::error(aCumulativeBool.meError));
+
+        return makeNumericOrErrorResult(semath::evaluateWeibullDistribution(
+            aX.maValue, aAlpha.maValue, aBeta.maValue, aCumulativeBool.maValue));
+    }
+
     if (aFunctionName == u"HYPGEOMDIST" || aFunctionName == u"HYPGEOM.DIST")
     {
         if (rNode.maChildren.size() < 4 || rNode.maChildren.size() > 5)
@@ -3374,13 +3801,13 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aValue)
             return makeFailure(aValue.meError);
 
-        sal_Int32 nSignificance = 3;
+        std::int32_t nSignificance = 3;
         if (rNode.maChildren.size() == 3)
         {
             const auto aSignificance = evaluateNumericArgument(*rNode.maChildren[2], std::nullopt);
             if (!aSignificance)
                 return makeFailure(aSignificance.meError);
-            nSignificance = static_cast<sal_Int32>(::rtl::math::approxFloor(aSignificance.maValue));
+            nSignificance = static_cast<std::int32_t>(fp::approxFloor(aSignificance.maValue));
         }
 
         const bool bInclusive = aFunctionName != u"PERCENTRANK.EXC";
@@ -3482,7 +3909,7 @@ EvaluationResult Evaluator::evaluateFunction(
             return api::ValueResult<api::CellValue>::success(aCell.maValue.maValue);
         };
 
-        KahanSum fChi = 0.0;
+        fp::KahanSum fChi = 0.0;
         bool bSawNonEmptyPair = false;
         for (api::MatrixSize nColumn = 0; nColumn < nObservedColumns; ++nColumn)
         {
@@ -3512,7 +3939,7 @@ EvaluationResult Evaluator::evaluateFunction(
                     return makeFailure(aObservedNumber.meError);
                 if (!aExpectedNumber)
                     return makeFailure(aExpectedNumber.meError);
-                if (::rtl::math::approxEqual(aExpectedNumber.maValue, 0.0))
+                if (fp::approxEqual(aExpectedNumber.maValue, 0.0))
                     return makeFailure(api::Error::DivisionByZero);
 
                 const double fDifference = aObservedNumber.maValue - aExpectedNumber.maValue;
@@ -3530,7 +3957,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (nObservedColumns == 1 || nObservedRows == 1)
         {
             fDegreesFreedom = static_cast<double>(nObservedColumns * nObservedRows - 1);
-            if (::rtl::math::approxEqual(fDegreesFreedom, 0.0))
+            if (fp::approxEqual(fDegreesFreedom, 0.0))
                 return makeFailure(api::Error::NotAvailable);
         }
         else
@@ -3714,7 +4141,7 @@ EvaluationResult Evaluator::evaluateFunction(
             }
 
             return makeScalarResult(api::CellValue::number(
-                rtl::math::approxFloor(oParsed->mfValue)));
+                fp::approxFloor(oParsed->mfValue)));
         }
 
         if (oParsed->meKind != api::NumberParseResult::Kind::Time
@@ -3797,9 +4224,9 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aDayNumber)
             return makeFailure(aDayNumber.meError);
 
-        const sal_Int16 nYear = static_cast<sal_Int16>(std::trunc(aYearNumber.maValue));
-        const sal_Int16 nMonth = static_cast<sal_Int16>(std::trunc(aMonthNumber.maValue));
-        const sal_Int16 nDay = static_cast<sal_Int16>(std::trunc(aDayNumber.maValue));
+        const std::int16_t nYear = static_cast<std::int16_t>(std::trunc(aYearNumber.maValue));
+        const std::int16_t nMonth = static_cast<std::int16_t>(std::trunc(aMonthNumber.maValue));
+        const std::int16_t nDay = static_cast<std::int16_t>(std::trunc(aDayNumber.maValue));
         if (nYear < 0)
             return makeFailure(api::Error::IllegalArgument);
 
@@ -3955,7 +4382,7 @@ EvaluationResult Evaluator::evaluateFunction(
             const auto aModeNumber = coerceToNumber(aMode.maValue.maValue);
             if (!aModeNumber)
                 return makeScalarResult(api::CellValue::error(aModeNumber.meError));
-            bAbs = !::rtl::math::approxEqual(aModeNumber.maValue, 0.0);
+            bAbs = !fp::approxEqual(aModeNumber.maValue, 0.0);
         }
 
         if (!bMicrosoftCompat && bAbs && bMissingSignificance && fValue < 0.0)
@@ -4102,16 +4529,16 @@ EvaluationResult Evaluator::evaluateFunction(
             return makeFailure(api::Error::IllegalArgument);
 
         const api::DateParts aNullDate = sedatetime::defaultNullDate();
-        const sal_Int16 nYear = static_cast<sal_Int16>(
+        const std::int16_t nYear = static_cast<std::int16_t>(
             spreadsheetengine::core::datetime::extractYear(aNullDate, *oDateSerial));
-        const sal_Int16 nMonth = static_cast<sal_Int16>(
+        const std::int16_t nMonth = static_cast<std::int16_t>(
             spreadsheetengine::core::datetime::extractMonth(aNullDate, *oDateSerial));
 
         if (aFunctionName == u"DAYSINMONTH")
         {
             return makeScalarResult(api::CellValue::number(
                 static_cast<double>(spreadsheetengine::core::detail::date::getDaysInMonth(
-                    static_cast<sal_uInt16>(nMonth), nYear))));
+                    static_cast<std::uint16_t>(nMonth), nYear))));
         }
 
         const bool bLeapYear = spreadsheetengine::core::detail::date::isLeapYear(nYear);
@@ -4164,7 +4591,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aDateNumber)
             return makeScalarResult(api::CellValue::error(aDateNumber.meError));
         const api::DateSerial nDateSerial
-            = static_cast<api::DateSerial>(rtl::math::approxFloor(aDateNumber.maValue));
+            = static_cast<api::DateSerial>(fp::approxFloor(aDateNumber.maValue));
 
         const api::DateParts aNullDate = sedatetime::defaultNullDate();
         if (aFunctionName == u"YEAR")
@@ -4230,7 +4657,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aMonthNumber || !std::isfinite(aMonthNumber.maValue))
             return makeFailure(api::Error::IllegalArgument);
 
-        const sal_Int32 nMonthOffset = static_cast<sal_Int32>(std::trunc(aMonthNumber.maValue));
+        const std::int32_t nMonthOffset = static_cast<std::int32_t>(std::trunc(aMonthNumber.maValue));
         const auto oShifted = sedatetime::shiftMonthSerial(
             *oDateSerial, nMonthOffset, aFunctionName == u"EOMONTH");
         if (!oShifted)
@@ -4251,7 +4678,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!oDateSerial)
             return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
-        sal_Int16 nMode = 1;
+        std::int16_t nMode = 1;
         if (rNode.maChildren.size() == 2)
         {
             if (rNode.maChildren[1]->meKind == formula::NodeKind::EmptyArgument)
@@ -4269,7 +4696,7 @@ EvaluationResult Evaluator::evaluateFunction(
             const auto oWholeMode = toWholeNumber(aModeNumber.maValue);
             if (!oWholeMode)
                 return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
-            nMode = static_cast<sal_Int16>(*oWholeMode);
+            nMode = static_cast<std::int16_t>(*oWholeMode);
         }
 
         const auto aWeekday
@@ -4292,7 +4719,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!oDateSerial)
             return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
-        sal_Int16 nMode = 1;
+        std::int16_t nMode = 1;
         if (rNode.maChildren.size() == 2
             && rNode.maChildren[1]->meKind != formula::NodeKind::EmptyArgument)
         {
@@ -4307,7 +4734,7 @@ EvaluationResult Evaluator::evaluateFunction(
                 const auto oWholeMode = toWholeNumber(aModeNumber.maValue);
                 if (!oWholeMode)
                     return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
-                nMode = static_cast<sal_Int16>(*oWholeMode);
+                nMode = static_cast<std::int16_t>(*oWholeMode);
             }
         }
 
@@ -4372,20 +4799,20 @@ EvaluationResult Evaluator::evaluateFunction(
             return makeScalarResult(api::CellValue::error(aYearNumber.meError));
 
         const auto oWholeYear = toWholeNumber(aYearNumber.maValue);
-        if (!oWholeYear || *oWholeYear < std::numeric_limits<sal_Int16>::min()
-            || *oWholeYear > std::numeric_limits<sal_Int16>::max())
+        if (!oWholeYear || *oWholeYear < std::numeric_limits<std::int16_t>::min()
+            || *oWholeYear > std::numeric_limits<std::int16_t>::max())
         {
             return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
         }
 
-        sal_Int16 nYear = static_cast<sal_Int16>(*oWholeYear);
+        std::int16_t nYear = static_cast<std::int16_t>(*oWholeYear);
         if (nYear >= 0 && nYear < 100)
         {
-            constexpr sal_Int16 nTwoDigitYearStart = 1930;
+            constexpr std::int16_t nTwoDigitYearStart = 1930;
             if (nYear < (nTwoDigitYearStart % 100))
-                nYear = static_cast<sal_Int16>(nYear + (((nTwoDigitYearStart / 100) + 1) * 100));
+                nYear = static_cast<std::int16_t>(nYear + (((nTwoDigitYearStart / 100) + 1) * 100));
             else
-                nYear = static_cast<sal_Int16>(nYear + ((nTwoDigitYearStart / 100) * 100));
+                nYear = static_cast<std::int16_t>(nYear + ((nTwoDigitYearStart / 100) * 100));
         }
 
         const auto aEaster = api::calendar::easterSundaySerial(sedatetime::defaultNullDate(), nYear);
@@ -4424,14 +4851,14 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!oWholeMode || (*oWholeMode != 0 && *oWholeMode != 1))
             return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
-        const sal_Int32 nNullDate = sedate::toAbsoluteDays(sedatetime::defaultNullDate());
+        const std::int32_t nNullDate = sedate::toAbsoluteDays(sedatetime::defaultNullDate());
         const api::DateParts aStartDate = sedate::fromAbsoluteDays(nNullDate + *oStartDate);
         const api::DateParts aEndDate = sedate::fromAbsoluteDays(nNullDate + *oEndDate);
 
-        sal_Int32 nYears = static_cast<sal_Int32>(aEndDate.mnYear) - aStartDate.mnYear;
+        std::int32_t nYears = static_cast<std::int32_t>(aEndDate.mnYear) - aStartDate.mnYear;
         if (*oWholeMode == 0)
         {
-            sal_Int32 nMonths = static_cast<sal_Int32>(aEndDate.mnMonth) - aStartDate.mnMonth
+            std::int32_t nMonths = static_cast<std::int32_t>(aEndDate.mnMonth) - aStartDate.mnMonth
                                 + nYears * 12;
             if (*oStartDate < *oEndDate)
             {
@@ -4493,7 +4920,7 @@ EvaluationResult Evaluator::evaluateFunction(
             return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
         const auto oWeeks = sedatetime::computeWeeksDifference(
-            *oStartDate, *oEndDate, static_cast<sal_Int16>(*oWholeMode));
+            *oStartDate, *oEndDate, static_cast<std::int16_t>(*oWholeMode));
         if (!oWeeks)
             return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
@@ -4524,7 +4951,7 @@ EvaluationResult Evaluator::evaluateFunction(
 
         const api::DateParts aDate = sedate::fromAbsoluteDays(
             sedate::toAbsoluteDays(sedatetime::defaultNullDate()) + *oDateSerial);
-        const sal_Int32 nJan1WeekDay
+        const std::int32_t nJan1WeekDay
             = (sedate::toAbsoluteDays({ aDate.mnYear, 1, 1 }) - 1) % 7;
         const double fWeeksInYear = nJan1WeekDay == 3
                                         ? 53.0
@@ -4639,7 +5066,7 @@ EvaluationResult Evaluator::evaluateFunction(
             const auto aModeNumber = coerceToNumber(aMode.maValue.maValue);
             if (!aModeNumber)
                 return makeFailure(aModeNumber.meError);
-            bApproximate = !rtl::math::approxEqual(aModeNumber.maValue, 0.0);
+            bApproximate = !fp::approxEqual(aModeNumber.maValue, 0.0);
         }
 
         LookupInput aTableInput;
@@ -4774,8 +5201,8 @@ EvaluationResult Evaluator::evaluateFunction(
 
             if (!rDataInput.maValues.empty())
             {
-                const sal_Int64 nLinearIndex
-                    = static_cast<sal_Int64>(aResultCoordinate.maValue.mnRow) * rDataInput.mnColumns
+                const std::int64_t nLinearIndex
+                    = static_cast<std::int64_t>(aResultCoordinate.maValue.mnRow) * rDataInput.mnColumns
                       + aResultCoordinate.maValue.mnColumn;
                 if (nLinearIndex < 0
                     || static_cast<std::size_t>(nLinearIndex) >= rDataInput.maValues.size())
@@ -4918,7 +5345,7 @@ EvaluationResult Evaluator::evaluateFunction(
                 return makeFailure(api::Error::IllegalArgument);
 
             const auto aNormalized
-                = api::lookup::normalizeExtendedMatchMode(static_cast<sal_Int16>(*oWholeMode));
+                = api::lookup::normalizeExtendedMatchMode(static_cast<std::int16_t>(*oWholeMode));
             if (!aNormalized)
                 return makeFailure(aNormalized.meError);
             eMatchMode = aNormalized.maValue;
@@ -4943,7 +5370,7 @@ EvaluationResult Evaluator::evaluateFunction(
                 return makeFailure(api::Error::IllegalArgument);
 
             const auto aNormalized
-                = api::lookup::normalizeSearchMode(static_cast<sal_Int16>(*oWholeMode));
+                = api::lookup::normalizeSearchMode(static_cast<std::int16_t>(*oWholeMode));
             if (!aNormalized)
                 return makeFailure(aNormalized.meError);
             eSearchMode = aNormalized.maValue;
@@ -5028,7 +5455,7 @@ EvaluationResult Evaluator::evaluateFunction(
                 return makeFailure(api::Error::IllegalArgument);
 
             const auto aNormalized = api::lookup::normalizeExtendedMatchMode(
-                static_cast<sal_Int16>(*oWholeMode));
+                static_cast<std::int16_t>(*oWholeMode));
             if (!aNormalized)
                 return makeFailure(aNormalized.meError);
             eMatchMode = aNormalized.maValue;
@@ -5053,7 +5480,7 @@ EvaluationResult Evaluator::evaluateFunction(
                 return makeFailure(api::Error::IllegalArgument);
 
             const auto aNormalized
-                = api::lookup::normalizeSearchMode(static_cast<sal_Int16>(*oWholeMode));
+                = api::lookup::normalizeSearchMode(static_cast<std::int16_t>(*oWholeMode));
             if (!aNormalized)
                 return makeFailure(aNormalized.meError);
             eSearchMode = aNormalized.maValue;
@@ -5126,13 +5553,13 @@ EvaluationResult Evaluator::evaluateFunction(
 
                     const auto aNumber = coerceToNumber(rValue);
                     if (!aNumber || !std::isfinite(aNumber.maValue)
-                        || aNumber.maValue < static_cast<double>(std::numeric_limits<sal_Int32>::min())
-                        || aNumber.maValue > static_cast<double>(std::numeric_limits<sal_Int32>::max()))
+                        || aNumber.maValue < static_cast<double>(std::numeric_limits<std::int32_t>::min())
+                        || aNumber.maValue > static_cast<double>(std::numeric_limits<std::int32_t>::max()))
                     {
                         return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
                     }
 
-                    const sal_Int32 nRequestedIndex = static_cast<sal_Int32>(aNumber.maValue);
+                    const std::int32_t nRequestedIndex = static_cast<std::int32_t>(aNumber.maValue);
                     const auto aSelection = api::array::normalizeSelectionIndex(
                         nRequestedIndex,
                         bChooseColumns ? aSourceDimensions.mnColumns : aSourceDimensions.mnRows);
@@ -5217,7 +5644,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!oWholeRow || !oWholeColumn || *oWholeRow < 1 || *oWholeColumn < 1)
             return makeFailure(api::Error::IllegalArgument);
 
-        sal_Int32 nAbsMode = 1;
+        std::int32_t nAbsMode = 1;
         if (rNode.maChildren.size() >= 3
             && rNode.maChildren[2]->meKind != formula::NodeKind::EmptyArgument)
         {
@@ -5443,22 +5870,22 @@ EvaluationResult Evaluator::evaluateFunction(
 
         auto evaluateBitXorArgument = [&](const formula::Node& rArgument,
                                           std::optional<double> oDefaultValue)
-            -> api::ValueResult<sal_uInt64> {
+            -> api::ValueResult<std::uint64_t> {
             const auto aValue = evaluateNumericArgument(rArgument, oDefaultValue);
             if (!aValue)
-                return api::ValueResult<sal_uInt64>::failure(aValue.meError);
+                return api::ValueResult<std::uint64_t>::failure(aValue.meError);
 
             if (!std::isfinite(aValue.maValue) || aValue.maValue < 0.0
                 || aValue.maValue > 281474976710655.0)
             {
-                return api::ValueResult<sal_uInt64>::failure(api::Error::IllegalArgument);
+                return api::ValueResult<std::uint64_t>::failure(api::Error::IllegalArgument);
             }
 
             const double fRounded = std::round(aValue.maValue);
             if (std::abs(aValue.maValue - fRounded) > 1e-9)
-                return api::ValueResult<sal_uInt64>::failure(api::Error::IllegalArgument);
-            return api::ValueResult<sal_uInt64>::success(
-                static_cast<sal_uInt64>(fRounded));
+                return api::ValueResult<std::uint64_t>::failure(api::Error::IllegalArgument);
+            return api::ValueResult<std::uint64_t>::success(
+                static_cast<std::uint64_t>(fRounded));
         };
 
         const auto aLeft = evaluateBitXorArgument(*rNode.maChildren[0], 0.0);
@@ -5493,8 +5920,8 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!oWholeValue || !oWholeShift || *oWholeValue < 0)
             return makeFailure(api::Error::IllegalArgument);
 
-        const sal_Int32 nShift = *oWholeShift;
-        const sal_uInt64 nValue = static_cast<sal_uInt64>(*oWholeValue);
+        const std::int32_t nShift = *oWholeShift;
+        const std::uint64_t nValue = static_cast<std::uint64_t>(*oWholeValue);
 
         if (nShift == 0)
             return makeScalarResult(api::CellValue::number(static_cast<double>(nValue)));
@@ -5513,7 +5940,7 @@ EvaluationResult Evaluator::evaluateFunction(
 
         if (nShift < 0)
         {
-            const sal_Int32 nLeftShift = -nShift;
+            const std::int32_t nLeftShift = -nShift;
             if (nLeftShift >= 64)
                 return makeFailure(api::Error::IllegalArgument);
             return makeScalarResult(
@@ -5693,7 +6120,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aValue)
             return makeFailure(aValue.meError);
 
-        sal_Int32 nDigits = 0;
+        std::int32_t nDigits = 0;
         if (rNode.maChildren.size() == 2
             && rNode.maChildren[1]->meKind != formula::NodeKind::EmptyArgument)
         {
@@ -5731,7 +6158,7 @@ EvaluationResult Evaluator::evaluateFunction(
             return makeFailure(api::Error::IllegalArgument);
 
         const auto aCharacter
-            = api::text::unicharFromCodePoint(static_cast<sal_uInt32>(*oWholeNumber));
+            = api::text::unicharFromCodePoint(static_cast<std::uint32_t>(*oWholeNumber));
         if (!aCharacter)
             return makeFailure(aCharacter.meError);
 
@@ -5964,7 +6391,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (aOldText.maValue.empty())
             return makeScalarResult(api::CellValue::text(aSource.maValue));
 
-        std::optional<sal_Int32> oInstance;
+        std::optional<std::int32_t> oInstance;
         if (rNode.maChildren.size() == 4
             && rNode.maChildren[3]->meKind != formula::NodeKind::EmptyArgument)
         {
@@ -6002,7 +6429,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aHaystack)
             return makeFailure(aHaystack.meError);
 
-        sal_Int32 nStart = 1;
+        std::int32_t nStart = 1;
         if (rNode.maChildren.size() == 3
             && rNode.maChildren[2]->meKind != formula::NodeKind::EmptyArgument)
         {
@@ -6052,7 +6479,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (aDelimiters.empty())
             return makeFailure(api::Error::IllegalArgument);
 
-        sal_Int32 nInstance = 1;
+        std::int32_t nInstance = 1;
         if (rNode.maChildren.size() >= 3
             && rNode.maChildren[2]->meKind != formula::NodeKind::EmptyArgument)
         {
@@ -6132,7 +6559,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (aDelimiters.empty())
             return makeFailure(api::Error::IllegalArgument);
 
-        sal_Int32 nInstance = 1;
+        std::int32_t nInstance = 1;
         if (rNode.maChildren.size() >= 3
             && rNode.maChildren[2]->meKind != formula::NodeKind::EmptyArgument)
         {
@@ -6356,7 +6783,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (!aText)
             return makeFailure(aText.meError);
 
-        sal_Int32 nLength = 1;
+        std::int32_t nLength = 1;
         if (rNode.maChildren.size() == 2
             && rNode.maChildren[1]->meKind != formula::NodeKind::EmptyArgument)
         {
@@ -6741,10 +7168,10 @@ EvaluationResult Evaluator::evaluateNode(
             {
                 case formula::BinaryOperator::Add:
                     return makeScalarResult(api::CellValue::number(
-                        ::rtl::math::approxAdd(aLeftNumber.maValue, aRightNumber.maValue)));
+                        fp::approxAdd(aLeftNumber.maValue, aRightNumber.maValue)));
                 case formula::BinaryOperator::Subtract:
                     return makeScalarResult(api::CellValue::number(
-                        ::rtl::math::approxSub(aLeftNumber.maValue, aRightNumber.maValue)));
+                        fp::approxSub(aLeftNumber.maValue, aRightNumber.maValue)));
                 case formula::BinaryOperator::Multiply:
                     return makeScalarResult(
                         api::CellValue::number(aLeftNumber.maValue * aRightNumber.maValue));

@@ -8,6 +8,7 @@
  */
 
 #include <spreadsheetengine/runtime/MathFunctionRuntime.hxx>
+#include <cstdint>
 
 #include <spreadsheetengine/api/Math.hxx>
 #include <spreadsheetengine/runtime/MathRounding.hxx>
@@ -16,7 +17,7 @@
 #include <cmath>
 #include <limits>
 
-#include <rtl/math.hxx>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
 
 #include "CoreRuntimeUtils.hxx"
 
@@ -47,7 +48,7 @@ using spreadsheetengine::core::util::makeFiniteResult;
 }
 
 [[nodiscard]] double roundMagnitudeDirectional(
-    double fValue, sal_Int32 nDecimals, api::RoundingMode eMode)
+    double fValue, std::int32_t nDecimals, api::RoundingMode eMode)
 {
     double fRoundedMagnitude = api::math::roundToDecimals(std::abs(fValue), nDecimals, eMode);
 
@@ -59,7 +60,7 @@ using spreadsheetengine::core::util::makeFiniteResult;
     const double fScaled = nDecimals >= 0 ? fMagnitude * fScale : fMagnitude / fScale;
     if (nDecimals < 12)
     {
-        const double fRoundedInteger = ::rtl::math::round(fScaled);
+        const double fRoundedInteger = fp::round(fScaled);
         if (std::abs(fScaled - fRoundedInteger) <= 1e-12)
         {
             fRoundedMagnitude
@@ -73,14 +74,14 @@ using spreadsheetengine::core::util::makeFiniteResult;
 } // namespace
 
 api::ValueResult<double> evaluateRoundValue(
-    double fValue, sal_Int32 nDecimals, api::RoundingMode eMode, bool bDirectional)
+    double fValue, std::int32_t nDecimals, api::RoundingMode eMode, bool bDirectional)
 {
     if (bDirectional)
         return api::ValueResult<double>::success(roundMagnitudeDirectional(fValue, nDecimals, eMode));
 
     if (nDecimals == 0)
     {
-        return api::ValueResult<double>::success(::rtl::math::round(
+        return api::ValueResult<double>::success(fp::round(
             fValue, 0, api::math::toCoreRoundingMode(eMode)));
     }
 
@@ -113,14 +114,14 @@ api::ValueResult<double> evaluateCeilingFloorMathValue(
     if (bCeiling)
     {
         if (fValue < 0.0 && fMode != 0.0)
-            fResult = ::rtl::math::approxFloor(fValue / fMagnitude) * fMagnitude;
+            fResult = fp::approxFloor(fValue / fMagnitude) * fMagnitude;
         else
             fResult = computeCeilingPrecise(fValue, fMagnitude);
     }
     else
     {
         if (fValue < 0.0 && fMode != 0.0)
-            fResult = ::rtl::math::approxCeil(fValue / fMagnitude) * fMagnitude;
+            fResult = fp::approxCeil(fValue / fMagnitude) * fMagnitude;
         else
             fResult = computeFloorPrecise(fValue, fMagnitude);
     }
@@ -139,7 +140,7 @@ api::ValueResult<double> evaluateCeilingFloorPreciseValue(
 
 api::ValueResult<double> evaluateRoundSigValue(double fValue, double fDigits)
 {
-    const double fWholeDigits = ::rtl::math::approxFloor(fDigits);
+    const double fWholeDigits = fp::approxFloor(fDigits);
     if (fWholeDigits < 1.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
     if (fValue == 0.0)
@@ -150,19 +151,19 @@ api::ValueResult<double> evaluateRoundSigValue(double fValue, double fDigits)
 
 api::ValueResult<double> evaluateLogValue(double fValue, double fBase)
 {
-    if (!(fValue > 0.0) || !(fBase > 0.0) || ::rtl::math::approxEqual(fBase, 1.0))
+    if (!(fValue > 0.0) || !(fBase > 0.0) || fp::approxEqual(fBase, 1.0))
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
     return api::math::logarithm(fValue, fBase);
 }
 
 api::ValueResult<double> evaluateMroundValue(double fValue, double fMultiple)
 {
-    if (::rtl::math::approxEqual(fMultiple, 0.0))
+    if (fp::approxEqual(fMultiple, 0.0))
         return api::ValueResult<double>::success(0.0);
 
     const double fResult = fMultiple
-                           * ::rtl::math::round(
-                               ::rtl::math::approxValue(fValue / fMultiple));
+                           * fp::round(
+                               fp::approxValue(fValue / fMultiple));
     return makeFiniteResult(fResult);
 }
 
@@ -179,7 +180,7 @@ api::ValueResult<double> evaluateModValue(double fNumerator, double fDenominator
 
 api::ValueResult<double> evaluateFactorialValue(double fValue)
 {
-    double fWhole = ::rtl::math::approxFloor(fValue);
+    double fWhole = fp::approxFloor(fValue);
     if (fWhole < 0.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
     if (fWhole == 0.0)
@@ -198,8 +199,8 @@ api::ValueResult<double> evaluateFactorialValue(double fValue)
 
 api::ValueResult<double> evaluateCombinValue(double fN, double fK, bool bAllowRepetition)
 {
-    const double fWholeN = ::rtl::math::approxFloor(fN);
-    const double fWholeK = ::rtl::math::approxFloor(fK);
+    const double fWholeN = fp::approxFloor(fN);
+    const double fWholeK = fp::approxFloor(fK);
     if (fWholeN < 0.0 || fWholeK < 0.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
@@ -223,8 +224,8 @@ api::ValueResult<double> evaluateCombinValue(double fN, double fK, bool bAllowRe
 
 api::ValueResult<double> evaluatePermutationValue(double fN, double fK)
 {
-    const double fWholeN = ::rtl::math::approxFloor(fN);
-    const double fWholeK = ::rtl::math::approxFloor(fK);
+    const double fWholeN = fp::approxFloor(fN);
+    const double fWholeK = fp::approxFloor(fK);
     if (fWholeN < 0.0 || fWholeK < 0.0 || fWholeK > fWholeN)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
     if (fWholeK == 0.0)
@@ -238,8 +239,8 @@ api::ValueResult<double> evaluatePermutationValue(double fN, double fK)
 
 api::ValueResult<double> evaluatePermutationAValue(double fN, double fK)
 {
-    const double fWholeN = ::rtl::math::approxFloor(fN);
-    const double fWholeK = ::rtl::math::approxFloor(fK);
+    const double fWholeN = fp::approxFloor(fN);
+    const double fWholeK = fp::approxFloor(fK);
     if (fWholeN < 0.0 || fWholeK < 0.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
     return api::ValueResult<double>::success(std::pow(fWholeN, fWholeK));
@@ -252,7 +253,7 @@ api::ValueResult<double> evaluateMultinomialValue(const std::vector<double>& rVa
     for (const double fInput : rValues)
     {
         const double fRounded
-            = fInput >= 0.0 ? ::rtl::math::approxFloor(fInput) : ::rtl::math::approxCeil(fInput);
+            = fInput >= 0.0 ? fp::approxFloor(fInput) : fp::approxCeil(fInput);
         if (fRounded < 0.0)
             return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
@@ -273,7 +274,7 @@ api::ValueResult<double> evaluateCscValue(double fValue)
     const double fResult = api::math::cosecant(fValue);
     if (!std::isfinite(fResult))
     {
-        if (::rtl::math::approxEqual(::rtl::math::sin(fValue), 0.0))
+        if (fp::approxEqual(std::sin(fValue), 0.0))
             return api::ValueResult<double>::failure(api::Error::DivisionByZero);
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
     }
@@ -285,14 +286,14 @@ api::ValueResult<double> evaluateCschValue(double fValue)
     const double fResult = api::math::hyperbolicCosecant(fValue);
     if (!std::isfinite(fResult))
     {
-        if (::rtl::math::approxEqual(std::sinh(fValue), 0.0))
+        if (fp::approxEqual(std::sinh(fValue), 0.0))
             return api::ValueResult<double>::failure(api::Error::DivisionByZero);
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
     }
     return api::ValueResult<double>::success(fResult);
 }
 
-api::ValueResult<double> evaluateTruncValue(double fValue, sal_Int32 nDigits)
+api::ValueResult<double> evaluateTruncValue(double fValue, std::int32_t nDigits)
 {
     const double fScale = std::pow(10.0, std::abs(nDigits));
     double fResult = 0.0;

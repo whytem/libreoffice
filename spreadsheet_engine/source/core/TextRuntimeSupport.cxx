@@ -8,6 +8,7 @@
  */
 
 #include <spreadsheetengine/runtime/TextRuntimeSupport.hxx>
+#include <cstdint>
 
 #include <algorithm>
 #include <memory>
@@ -60,7 +61,7 @@ public:
 class DefaultSingleByteEncodingService final : public SingleByteEncodingService
 {
 public:
-    [[nodiscard]] sal_Int32 encodeFirstCharacter(
+    [[nodiscard]] std::int32_t encodeFirstCharacter(
         spreadsheetengine::api::StringView rInput) const override
     {
         if (rInput.empty())
@@ -219,13 +220,13 @@ public:
         reinterpret_cast<const UChar*>(rText.data()), static_cast<int32_t>(rText.size()));
 }
 
-[[nodiscard]] sal_Int32 clampCodePointIndex(const icu::UnicodeString& rText, sal_Int32 nIndex)
+[[nodiscard]] std::int32_t clampCodePointIndex(const icu::UnicodeString& rText, std::int32_t nIndex)
 {
     if (nIndex <= 0)
         return 0;
 
-    sal_Int32 nOffset = 0;
-    sal_Int32 nRemaining = nIndex;
+    std::int32_t nOffset = 0;
+    std::int32_t nRemaining = nIndex;
     while (nRemaining > 0 && nOffset < rText.length())
     {
         nOffset = rText.moveIndex32(nOffset, 1);
@@ -255,24 +256,24 @@ const WidthConversionService& defaultWidthConversionService()
 }
 
 spreadsheetengine::api::String substringByCodePoints(
-    spreadsheetengine::api::StringView rText, sal_Int32 nCodePointStart,
-    sal_Int32 nCodePointLength)
+    spreadsheetengine::api::StringView rText, std::int32_t nCodePointStart,
+    std::int32_t nCodePointLength)
 {
     icu::UnicodeString aText = toUnicodeString(rText);
-    const sal_Int32 nStartOffset = clampCodePointIndex(aText, nCodePointStart);
-    const sal_Int32 nEndOffset = clampCodePointIndex(
-        aText, nCodePointStart + std::max<sal_Int32>(0, nCodePointLength));
+    const std::int32_t nStartOffset = clampCodePointIndex(aText, nCodePointStart);
+    const std::int32_t nEndOffset = clampCodePointIndex(
+        aText, nCodePointStart + std::max<std::int32_t>(0, nCodePointLength));
     return fromUnicodeString(aText.tempSubStringBetween(nStartOffset, nEndOffset));
 }
 
 spreadsheetengine::api::String replaceByCodePoints(spreadsheetengine::api::StringView rText,
-    sal_Int32 nCodePointStart, sal_Int32 nCodePointLength,
+    std::int32_t nCodePointStart, std::int32_t nCodePointLength,
     spreadsheetengine::api::StringView rReplacement)
 {
     icu::UnicodeString aText = toUnicodeString(rText);
-    const sal_Int32 nStartOffset = clampCodePointIndex(aText, nCodePointStart);
-    const sal_Int32 nEndOffset = clampCodePointIndex(
-        aText, nCodePointStart + std::max<sal_Int32>(0, nCodePointLength));
+    const std::int32_t nStartOffset = clampCodePointIndex(aText, nCodePointStart);
+    const std::int32_t nEndOffset = clampCodePointIndex(
+        aText, nCodePointStart + std::max<std::int32_t>(0, nCodePointLength));
     const icu::UnicodeString aReplacement(
         reinterpret_cast<const UChar*>(rReplacement.data()),
         static_cast<int32_t>(rReplacement.size()));
@@ -280,8 +281,8 @@ spreadsheetengine::api::String replaceByCodePoints(spreadsheetengine::api::Strin
     return fromUnicodeString(aText);
 }
 
-std::optional<sal_Int32> findTextCodePointIndex(spreadsheetengine::api::StringView rNeedle,
-    spreadsheetengine::api::StringView rHaystack, sal_Int32 nCodePointStart,
+std::optional<std::int32_t> findTextCodePointIndex(spreadsheetengine::api::StringView rNeedle,
+    spreadsheetengine::api::StringView rHaystack, std::int32_t nCodePointStart,
     bool bCaseInsensitive)
 {
     icu::UnicodeString aNeedle = toUnicodeString(rNeedle);
@@ -292,8 +293,8 @@ std::optional<sal_Int32> findTextCodePointIndex(spreadsheetengine::api::StringVi
         aHaystack.foldCase();
     }
 
-    const sal_Int32 nStartOffset = clampCodePointIndex(aHaystack, std::max<sal_Int32>(0, nCodePointStart));
-    const sal_Int32 nFoundOffset = aHaystack.indexOf(aNeedle, nStartOffset);
+    const std::int32_t nStartOffset = clampCodePointIndex(aHaystack, std::max<std::int32_t>(0, nCodePointStart));
+    const std::int32_t nFoundOffset = aHaystack.indexOf(aNeedle, nStartOffset);
     if (nFoundOffset < 0)
         return std::nullopt;
 

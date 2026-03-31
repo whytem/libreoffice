@@ -11,7 +11,7 @@
 
 #include <cmath>
 
-#include <rtl/math.hxx>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
 
 namespace spreadsheetengine::core::math
 {
@@ -32,7 +32,7 @@ double computeAbs(double fValue)
 
 double computeInt(double fValue)
 {
-    return ::rtl::math::approxFloor(fValue);
+    return fp::approxFloor(fValue);
 }
 
 double computeArcTan2(double fY, double fX)
@@ -63,8 +63,8 @@ std::optional<double> computeLog10(double fValue)
 
 std::optional<double> computeMod(double fNumerator, double fDenominator)
 {
-    const double fRes = ::rtl::math::approxSub(
-        fNumerator, ::rtl::math::approxFloor(fNumerator / fDenominator) * fDenominator);
+    const double fRes = fp::approxSub(
+        fNumerator, fp::approxFloor(fNumerator / fDenominator) * fDenominator);
     if ((fDenominator > 0 && fRes >= 0 && fRes < fDenominator)
         || (fDenominator < 0 && fRes <= 0 && fRes > fDenominator))
     {

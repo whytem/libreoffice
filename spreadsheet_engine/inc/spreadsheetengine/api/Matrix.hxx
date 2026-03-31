@@ -11,7 +11,7 @@
 
 #include <spreadsheetengine/api/String.hxx>
 
-#include <sal/types.h>
+#include <spreadsheetengine/api/Types.hxx>
 
 namespace spreadsheetengine::api
 {

@@ -44,16 +44,16 @@ struct FinancialRateResult
     constexpr explicit operator bool() const { return ok(); }
 };
 
-inline rtl_math_RoundingMode toCoreRoundingMode(api::RoundingMode eMode)
+inline spreadsheetengine::core::fp::RoundingMode toCoreRoundingMode(api::RoundingMode eMode)
 {
     switch (eMode)
     {
         case api::RoundingMode::Down:
-            return rtl_math_RoundingMode_Down;
+            return spreadsheetengine::core::fp::RoundingMode::Down;
         case api::RoundingMode::Up:
-            return rtl_math_RoundingMode_Up;
+            return spreadsheetengine::core::fp::RoundingMode::Up;
         default:
-            return rtl_math_RoundingMode_Corrected;
+            return spreadsheetengine::core::fp::RoundingMode::Corrected;
     }
 }
 

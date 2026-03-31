@@ -1,4 +1,5 @@
 set(SPREADSHEETENGINE_STANDALONE_PUBLIC_API_HEADERS
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Types.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Array.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Calendar.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/api/Compiler.hxx"
@@ -29,6 +30,8 @@ set(SPREADSHEETENGINE_STANDALONE_PUBLIC_API_HEADERS
 
 set(SPREADSHEETENGINE_STANDALONE_PUBLIC_RUNTIME_HEADERS
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/spreadsheetenginedllapi.h"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/FloatingPoint.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/KahanSum.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/DateTimeParts.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/DateTimeWeek.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/DateTimeWorkday.hxx"

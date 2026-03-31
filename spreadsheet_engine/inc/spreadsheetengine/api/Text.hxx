@@ -11,7 +11,7 @@
 
 #include <optional>
 
-#include <sal/types.h>
+#include <spreadsheetengine/api/Types.hxx>
 
 #include <spreadsheetengine/api/Error.hxx>
 #include <spreadsheetengine/api/String.hxx>

@@ -8,6 +8,7 @@
  */
 
 #include <spreadsheetengine/runtime/FinancialRuntime.hxx>
+#include <cstdint>
 
 #include <spreadsheetengine/runtime/MathFinancial.hxx>
 
@@ -17,8 +18,8 @@
 #include <cmath>
 #include <optional>
 
-#include <rtl/math.hxx>
-#include <sal/types.h>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
+#include <spreadsheetengine/api/Types.hxx>
 
 #include "CoreRuntimeUtils.hxx"
 
@@ -35,9 +36,9 @@ using spreadsheetengine::core::util::makeFiniteResult;
     return fTotalPeriods > 0.0 && fPeriod >= 1.0 && fPeriod <= fTotalPeriods;
 }
 
-[[nodiscard]] bool isValidBasis(sal_Int32 nBasis) { return nBasis >= 0 && nBasis <= 4; }
+[[nodiscard]] bool isValidBasis(std::int32_t nBasis) { return nBasis >= 0 && nBasis <= 4; }
 
-[[nodiscard]] bool isValidCouponFrequency(sal_Int32 nFrequency)
+[[nodiscard]] bool isValidCouponFrequency(std::int32_t nFrequency)
 {
     return nFrequency == 1 || nFrequency == 2 || nFrequency == 4;
 }
@@ -50,13 +51,13 @@ using spreadsheetengine::core::util::makeFiniteResult;
         spreadsheetengine::core::detail::date::toAbsoluteDays(rNullDate) + nDateSerial);
 }
 
-[[nodiscard]] sal_Int32 getDaysInYears(sal_Int16 nYear1, sal_Int16 nYear2)
+[[nodiscard]] std::int32_t getDaysInYears(std::int16_t nYear1, std::int16_t nYear2)
 {
     if (nYear1 > nYear2)
         return 0;
 
-    sal_Int32 nDayCount = 0;
-    for (sal_Int16 nYear = nYear1; nYear <= nYear2; ++nYear)
+    std::int32_t nDayCount = 0;
+    for (std::int16_t nYear = nYear1; nYear <= nYear2; ++nYear)
         nDayCount += spreadsheetengine::core::detail::date::isLeapYear(nYear) ? 366 : 365;
     return nDayCount;
 }
@@ -64,10 +65,10 @@ using spreadsheetengine::core::util::makeFiniteResult;
 class FinanceDate
 {
 private:
-    sal_uInt16 mnOrigDay = 0;
-    sal_uInt16 mnDay = 0;
-    sal_uInt16 mnMonth = 0;
-    sal_Int16 mnYear = 0;
+    std::uint16_t mnOrigDay = 0;
+    std::uint16_t mnDay = 0;
+    std::uint16_t mnMonth = 0;
+    std::int16_t mnYear = 0;
     bool mbLastDayMode = false;
     bool mbLastDay = false;
     bool mb30Days = false;
@@ -77,7 +78,7 @@ private:
     {
         if (mb30Days)
         {
-            mnDay = std::min(mnOrigDay, static_cast<sal_uInt16>(30));
+            mnDay = std::min(mnOrigDay, static_cast<std::uint16_t>(30));
             if (mbLastDay
                 || mnDay >= spreadsheetengine::core::detail::date::getDaysInMonth(mnMonth, mnYear))
             {
@@ -86,54 +87,54 @@ private:
             return;
         }
 
-        const sal_uInt16 nLastDay
+        const std::uint16_t nLastDay
             = spreadsheetengine::core::detail::date::getDaysInMonth(mnMonth, mnYear);
         mnDay = mbLastDay ? nLastDay : std::min(mnOrigDay, nLastDay);
     }
 
-    [[nodiscard]] sal_uInt16 getDaysInMonth() const
+    [[nodiscard]] std::uint16_t getDaysInMonth() const
     {
         return getDaysInMonth(mnMonth);
     }
 
-    [[nodiscard]] sal_uInt16 getDaysInMonth(sal_uInt16 nMonth) const
+    [[nodiscard]] std::uint16_t getDaysInMonth(std::uint16_t nMonth) const
     {
         return mb30Days ? 30
                         : spreadsheetengine::core::detail::date::getDaysInMonth(nMonth, mnYear);
     }
 
-    [[nodiscard]] sal_Int32 getDaysInMonthRange(sal_uInt16 nFrom, sal_uInt16 nTo) const
+    [[nodiscard]] std::int32_t getDaysInMonthRange(std::uint16_t nFrom, std::uint16_t nTo) const
     {
         if (nFrom > nTo)
             return 0;
 
         if (mb30Days)
-            return static_cast<sal_Int32>(nTo - nFrom + 1) * 30;
+            return static_cast<std::int32_t>(nTo - nFrom + 1) * 30;
 
-        sal_Int32 nDayCount = 0;
-        for (sal_uInt16 nMonth = nFrom; nMonth <= nTo; ++nMonth)
+        std::int32_t nDayCount = 0;
+        for (std::uint16_t nMonth = nFrom; nMonth <= nTo; ++nMonth)
             nDayCount += getDaysInMonth(nMonth);
         return nDayCount;
     }
 
-    [[nodiscard]] sal_Int32 getDaysInYearRange(sal_Int16 nFrom, sal_Int16 nTo) const
+    [[nodiscard]] std::int32_t getDaysInYearRange(std::int16_t nFrom, std::int16_t nTo) const
     {
         if (nFrom > nTo)
             return 0;
-        return mb30Days ? (static_cast<sal_Int32>(nTo - nFrom + 1) * 360)
+        return mb30Days ? (static_cast<std::int32_t>(nTo - nFrom + 1) * 360)
                         : getDaysInYears(nFrom, nTo);
     }
 
-    [[nodiscard]] bool doAddYears(sal_Int32 nYearCount)
+    [[nodiscard]] bool doAddYears(std::int32_t nYearCount)
     {
-        const sal_Int32 nNewYear = static_cast<sal_Int32>(mnYear) + nYearCount;
+        const std::int32_t nNewYear = static_cast<std::int32_t>(mnYear) + nYearCount;
         if (nNewYear < spreadsheetengine::core::detail::date::kYearMin
             || nNewYear > spreadsheetengine::core::detail::date::kYearMax || nNewYear == 0)
         {
             return false;
         }
 
-        mnYear = static_cast<sal_Int16>(nNewYear);
+        mnYear = static_cast<std::int16_t>(nNewYear);
         return true;
     }
 
@@ -141,12 +142,12 @@ public:
     FinanceDate() = default;
 
     FinanceDate(const spreadsheetengine::api::DateParts& rNullDate,
-        spreadsheetengine::api::DateSerial nDate, sal_Int32 nBasis)
+        spreadsheetengine::api::DateSerial nDate, std::int32_t nBasis)
     {
         const spreadsheetengine::api::DateParts aDate = dateFromSerial(rNullDate, nDate);
-        mnOrigDay = static_cast<sal_uInt16>(aDate.mnDay);
-        mnMonth = static_cast<sal_uInt16>(aDate.mnMonth);
-        mnYear = static_cast<sal_Int16>(aDate.mnYear);
+        mnOrigDay = static_cast<std::uint16_t>(aDate.mnDay);
+        mnMonth = static_cast<std::uint16_t>(aDate.mnMonth);
+        mnYear = static_cast<std::int16_t>(aDate.mnYear);
         mbLastDayMode = nBasis != 5;
         mbLastDay = mnOrigDay
                     >= spreadsheetengine::core::detail::date::getDaysInMonth(mnMonth, mnYear);
@@ -155,10 +156,10 @@ public:
         setDay();
     }
 
-    [[nodiscard]] sal_uInt16 getMonth() const { return mnMonth; }
-    [[nodiscard]] sal_Int16 getYear() const { return mnYear; }
+    [[nodiscard]] std::uint16_t getMonth() const { return mnMonth; }
+    [[nodiscard]] std::int16_t getYear() const { return mnYear; }
 
-    [[nodiscard]] bool setYear(sal_Int16 nNewYear)
+    [[nodiscard]] bool setYear(std::int16_t nNewYear)
     {
         if (nNewYear == 0)
             return false;
@@ -167,7 +168,7 @@ public:
         return true;
     }
 
-    [[nodiscard]] bool addYears(sal_Int32 nYearCount)
+    [[nodiscard]] bool addYears(std::int32_t nYearCount)
     {
         if (!doAddYears(nYearCount))
             return false;
@@ -175,25 +176,25 @@ public:
         return true;
     }
 
-    [[nodiscard]] bool addMonths(sal_Int32 nMonthCount)
+    [[nodiscard]] bool addMonths(std::int32_t nMonthCount)
     {
-        sal_Int32 nNewMonth = nMonthCount + static_cast<sal_Int32>(mnMonth);
+        std::int32_t nNewMonth = nMonthCount + static_cast<std::int32_t>(mnMonth);
         if (nNewMonth > 12)
         {
             --nNewMonth;
             if (!doAddYears(nNewMonth / 12))
                 return false;
-            mnMonth = static_cast<sal_uInt16>(nNewMonth % 12) + 1;
+            mnMonth = static_cast<std::uint16_t>(nNewMonth % 12) + 1;
         }
         else if (nNewMonth < 1)
         {
             if (!doAddYears(nNewMonth / 12 - 1))
                 return false;
-            mnMonth = static_cast<sal_uInt16>(nNewMonth % 12 + 12);
+            mnMonth = static_cast<std::uint16_t>(nNewMonth % 12 + 12);
         }
         else
         {
-            mnMonth = static_cast<sal_uInt16>(nNewMonth);
+            mnMonth = static_cast<std::uint16_t>(nNewMonth);
         }
 
         setDay();
@@ -203,12 +204,12 @@ public:
     [[nodiscard]] spreadsheetengine::api::DateSerial
     getDate(const spreadsheetengine::api::DateParts& rNullDate) const
     {
-        const sal_uInt16 nLastDay
+        const std::uint16_t nLastDay
             = spreadsheetengine::core::detail::date::getDaysInMonth(mnMonth, mnYear);
-        const sal_uInt16 nRealDay = (mbLastDayMode && mbLastDay) ? nLastDay
+        const std::uint16_t nRealDay = (mbLastDayMode && mbLastDay) ? nLastDay
                                                                  : std::min(nLastDay, mnOrigDay);
-        const spreadsheetengine::api::DateParts aDate { mnYear, static_cast<sal_Int16>(mnMonth),
-            static_cast<sal_Int16>(nRealDay) };
+        const spreadsheetengine::api::DateParts aDate { mnYear, static_cast<std::int16_t>(mnMonth),
+            static_cast<std::int16_t>(nRealDay) };
         return spreadsheetengine::core::detail::date::toAbsoluteDays(aDate)
                - spreadsheetengine::core::detail::date::toAbsoluteDays(rNullDate);
     }
@@ -228,12 +229,12 @@ public:
 
     [[nodiscard]] bool operator>(const FinanceDate& rOther) const { return rOther < *this; }
 
-    [[nodiscard]] static std::optional<sal_Int32> getDiff(FinanceDate aFrom, FinanceDate aTo)
+    [[nodiscard]] static std::optional<std::int32_t> getDiff(FinanceDate aFrom, FinanceDate aTo)
     {
         if (aFrom > aTo)
             std::swap(aFrom, aTo);
 
-        sal_Int32 nDiff = 0;
+        std::int32_t nDiff = 0;
         if (aTo.mb30Days)
         {
             if (aTo.mbUSMode)
@@ -267,7 +268,7 @@ public:
             if (aFrom.mnYear < aTo.mnYear)
             {
                 nDiff += aFrom.getDaysInMonthRange(aFrom.mnMonth, 12);
-                if (!aFrom.addMonths(13 - static_cast<sal_Int32>(aFrom.mnMonth)))
+                if (!aFrom.addMonths(13 - static_cast<std::int32_t>(aFrom.mnMonth)))
                     return std::nullopt;
 
                 nDiff += aFrom.getDaysInYearRange(aFrom.mnYear, aTo.mnYear - 1);
@@ -281,14 +282,14 @@ public:
         }
 
         nDiff += aTo.mnDay - aFrom.mnDay;
-        return std::max<sal_Int32>(nDiff, 0);
+        return std::max<std::int32_t>(nDiff, 0);
     }
 };
 
 [[nodiscard]] std::optional<FinanceDate> getPreviousCouponDate(
     const spreadsheetengine::api::DateParts& rNullDate,
     spreadsheetengine::api::DateSerial nSettlement,
-    spreadsheetengine::api::DateSerial nMaturity, sal_Int32 nFrequency, sal_Int32 nBasis)
+    spreadsheetengine::api::DateSerial nMaturity, std::int32_t nFrequency, std::int32_t nBasis)
 {
     if (nSettlement >= nMaturity || !isValidCouponFrequency(nFrequency))
         return std::nullopt;
@@ -311,7 +312,7 @@ public:
 [[nodiscard]] std::optional<FinanceDate> getNextCouponDate(
     const spreadsheetengine::api::DateParts& rNullDate,
     spreadsheetengine::api::DateSerial nSettlement,
-    spreadsheetengine::api::DateSerial nMaturity, sal_Int32 nFrequency, sal_Int32 nBasis)
+    spreadsheetengine::api::DateSerial nMaturity, std::int32_t nFrequency, std::int32_t nBasis)
 {
     if (nSettlement >= nMaturity || !isValidCouponFrequency(nFrequency))
         return std::nullopt;
@@ -334,7 +335,7 @@ public:
 [[nodiscard]] std::optional<double> getCouponDayBasis(
     const spreadsheetengine::api::DateParts& rNullDate,
     spreadsheetengine::api::DateSerial nSettlement,
-    spreadsheetengine::api::DateSerial nMaturity, sal_Int32 nFrequency, sal_Int32 nBasis)
+    spreadsheetengine::api::DateSerial nMaturity, std::int32_t nFrequency, std::int32_t nBasis)
 {
     const auto oPrevious = getPreviousCouponDate(
         rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
@@ -351,7 +352,7 @@ public:
 [[nodiscard]] std::optional<double> getCouponDays(
     const spreadsheetengine::api::DateParts& rNullDate,
     spreadsheetengine::api::DateSerial nSettlement,
-    spreadsheetengine::api::DateSerial nMaturity, sal_Int32 nFrequency, sal_Int32 nBasis)
+    spreadsheetengine::api::DateSerial nMaturity, std::int32_t nFrequency, std::int32_t nBasis)
 {
     if (nSettlement >= nMaturity || !isValidCouponFrequency(nFrequency))
         return std::nullopt;
@@ -389,7 +390,7 @@ public:
 [[nodiscard]] std::optional<double> getCouponDaysNext(
     const spreadsheetengine::api::DateParts& rNullDate,
     spreadsheetengine::api::DateSerial nSettlement,
-    spreadsheetengine::api::DateSerial nMaturity, sal_Int32 nFrequency, sal_Int32 nBasis)
+    spreadsheetengine::api::DateSerial nMaturity, std::int32_t nFrequency, std::int32_t nBasis)
 {
     if (nSettlement >= nMaturity || !isValidCouponFrequency(nFrequency))
         return std::nullopt;
@@ -418,7 +419,7 @@ public:
 [[nodiscard]] std::optional<double> getCouponCount(
     const spreadsheetengine::api::DateParts& rNullDate,
     spreadsheetengine::api::DateSerial nSettlement,
-    spreadsheetengine::api::DateSerial nMaturity, sal_Int32 nFrequency, sal_Int32 nBasis)
+    spreadsheetengine::api::DateSerial nMaturity, std::int32_t nFrequency, std::int32_t nBasis)
 {
     if (nSettlement >= nMaturity || !isValidCouponFrequency(nFrequency))
         return std::nullopt;
@@ -429,18 +430,18 @@ public:
     if (!oPrevious)
         return std::nullopt;
 
-    const sal_Int32 nMonths
-        = (static_cast<sal_Int32>(aMaturity.getYear()) - static_cast<sal_Int32>(oPrevious->getYear()))
+    const std::int32_t nMonths
+        = (static_cast<std::int32_t>(aMaturity.getYear()) - static_cast<std::int32_t>(oPrevious->getYear()))
               * 12
-          + static_cast<sal_Int32>(aMaturity.getMonth())
-          - static_cast<sal_Int32>(oPrevious->getMonth());
+          + static_cast<std::int32_t>(aMaturity.getMonth())
+          - static_cast<std::int32_t>(oPrevious->getMonth());
     return static_cast<double>(nMonths * nFrequency / 12);
 }
 
 [[nodiscard]] std::optional<double> computeYearFractionValue(
     const spreadsheetengine::api::DateParts& rNullDate,
     spreadsheetengine::api::DateSerial nStartDate,
-    spreadsheetengine::api::DateSerial nEndDate, sal_Int32 nBasis)
+    spreadsheetengine::api::DateSerial nEndDate, std::int32_t nBasis)
 {
     if (nStartDate == nEndDate)
         return 0.0;
@@ -451,14 +452,14 @@ public:
     const spreadsheetengine::api::DateParts aStart = dateFromSerial(rNullDate, nStartDate);
     const spreadsheetengine::api::DateParts aEnd = dateFromSerial(rNullDate, nEndDate);
 
-    sal_uInt16 nDay1 = static_cast<sal_uInt16>(aStart.mnDay);
-    sal_uInt16 nDay2 = static_cast<sal_uInt16>(aEnd.mnDay);
-    sal_uInt16 nMonth1 = static_cast<sal_uInt16>(aStart.mnMonth);
-    sal_uInt16 nMonth2 = static_cast<sal_uInt16>(aEnd.mnMonth);
-    const sal_Int16 nYear1 = static_cast<sal_Int16>(aStart.mnYear);
-    const sal_Int16 nYear2 = static_cast<sal_Int16>(aEnd.mnYear);
+    std::uint16_t nDay1 = static_cast<std::uint16_t>(aStart.mnDay);
+    std::uint16_t nDay2 = static_cast<std::uint16_t>(aEnd.mnDay);
+    std::uint16_t nMonth1 = static_cast<std::uint16_t>(aStart.mnMonth);
+    std::uint16_t nMonth2 = static_cast<std::uint16_t>(aEnd.mnMonth);
+    const std::int16_t nYear1 = static_cast<std::int16_t>(aStart.mnYear);
+    const std::int16_t nYear2 = static_cast<std::int16_t>(aEnd.mnYear);
 
-    sal_Int32 nDayDiff = 0;
+    std::int32_t nDayDiff = 0;
     switch (nBasis)
     {
         case 0:
@@ -567,7 +568,7 @@ api::ValueResult<double> evaluatePayment(
     double fRate, double fPeriods, double fPresentValue, double fFutureValue,
     bool bPayInAdvance)
 {
-    if (::rtl::math::approxEqual(fPeriods, 0.0))
+    if (fp::approxEqual(fPeriods, 0.0))
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
     return makeFiniteResult(spreadsheetengine::core::math::computePayment(
@@ -599,7 +600,7 @@ api::ValueResult<double> evaluateRate(
 api::ValueResult<double> evaluateInterestSchedulePayment(
     double fRate, double fPeriod, double fTotalPeriods, double fInvestment)
 {
-    if (::rtl::math::approxEqual(fTotalPeriods, 0.0))
+    if (fp::approxEqual(fTotalPeriods, 0.0))
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
     return makeFiniteResult(
@@ -700,7 +701,7 @@ api::ValueResult<double> evaluateVariableDecliningBalance(
 
 api::ValueResult<double> evaluateYearFraction(
     const api::DateParts& rNullDate, api::DateSerial nStartDate, api::DateSerial nEndDate,
-    sal_Int32 nBasis)
+    std::int32_t nBasis)
 {
     const auto oYearFraction = computeYearFractionValue(rNullDate, nStartDate, nEndDate, nBasis);
     if (!oYearFraction)
@@ -710,7 +711,7 @@ api::ValueResult<double> evaluateYearFraction(
 
 api::ValueResult<double> evaluatePrice(
     const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
-    double fRate, double fYield, double fRedemption, sal_Int32 nFrequency, sal_Int32 nBasis)
+    double fRate, double fYield, double fRedemption, std::int32_t nFrequency, std::int32_t nBasis)
 {
     if (fYield < 0.0 || fRate < 0.0 || !(fRedemption > 0.0)
         || !isValidCouponFrequency(nFrequency) || nSettlement >= nMaturity)
@@ -728,7 +729,7 @@ api::ValueResult<double> evaluatePrice(
     const auto oCouponDayBasis
         = getCouponDayBasis(rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
     if (!oCouponDays || !oCouponDaysNext || !oCouponCount || !oCouponDayBasis
-        || ::rtl::math::approxEqual(*oCouponDays, 0.0))
+        || fp::approxEqual(*oCouponDays, 0.0))
     {
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
     }
@@ -750,7 +751,7 @@ api::ValueResult<double> evaluatePrice(
 api::ValueResult<double> evaluateAmorlinc(
     const api::DateParts& rNullDate, double fCost, api::DateSerial nPurchaseDate,
     api::DateSerial nFirstPeriodEndDate, double fSalvage, double fPeriod, double fRate,
-    sal_Int32 nBasis)
+    std::int32_t nBasis)
 {
     if (nPurchaseDate > nFirstPeriodEndDate || !(fRate > 0.0) || fSalvage > fCost
         || !(fCost > 0.0) || fSalvage < 0.0 || fPeriod < 0.0 || !isValidBasis(nBasis))
@@ -763,11 +764,11 @@ api::ValueResult<double> evaluateAmorlinc(
     if (!oFirstPeriodFraction)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    const sal_uInt32 nPeriod = static_cast<sal_uInt32>(fPeriod);
+    const std::uint32_t nPeriod = static_cast<std::uint32_t>(fPeriod);
     const double fDepreciationPerPeriod = fCost * fRate;
     const double fDepreciableCost = fCost - fSalvage;
     const double fInitialDepreciation = *oFirstPeriodFraction * fRate * fCost;
-    const sal_uInt32 nFullPeriods = static_cast<sal_uInt32>(
+    const std::uint32_t nFullPeriods = static_cast<std::uint32_t>(
         (fCost - fSalvage - fInitialDepreciation) / fDepreciationPerPeriod);
 
     double fResult = 0.0;
@@ -791,7 +792,7 @@ api::ValueResult<double> evaluateAmorlinc(
 api::ValueResult<double> evaluateOddlyield(
     const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
     api::DateSerial nLastInterest, double fRate, double fPrice, double fRedemption,
-    sal_Int32 nFrequency, sal_Int32 nBasis)
+    std::int32_t nFrequency, std::int32_t nBasis)
 {
     if (!(fRate > 0.0) || !(fPrice > 0.0) || !(fRedemption > 0.0)
         || !isValidCouponFrequency(nFrequency) || nMaturity <= nSettlement

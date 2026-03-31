@@ -8,13 +8,14 @@
  */
 
 #include <spreadsheetengine/runtime/MathAggregate.hxx>
+#include <cstdint>
 
 #include <algorithm>
 #include <cmath>
 #include <vector>
 
-#include <kahan.hxx>
-#include <rtl/math.hxx>
+#include <spreadsheetengine/runtime/KahanSum.hxx>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
 
 #include "CoreRuntimeUtils.hxx"
 
@@ -29,13 +30,13 @@ using spreadsheetengine::core::util::toWholeNumber;
 {
     double fSum = 0.0;
     for (const double fValue : rNumbers)
-        fSum = ::rtl::math::approxAdd(fSum, fValue);
+        fSum = fp::approxAdd(fSum, fValue);
     return fSum;
 }
 
 } // namespace
 
-std::optional<AggregateOptions> decodeAggregateOptions(sal_Int32 nOption)
+std::optional<AggregateOptions> decodeAggregateOptions(std::int32_t nOption)
 {
     switch (nOption)
     {
@@ -83,10 +84,10 @@ api::ValueResult<double> evaluateVarianceNumbers(
         return api::ValueResult<double>::failure(api::Error::DivisionByZero);
 
     const double fMean = sumNumbers(rNumbers) / static_cast<double>(nCount);
-    KahanSum fSquaredDeviation = 0.0;
+    fp::KahanSum fSquaredDeviation = 0.0;
     for (const double fValue : rNumbers)
     {
-        const double fDelta = ::rtl::math::approxSub(fValue, fMean);
+        const double fDelta = fp::approxSub(fValue, fMean);
         fSquaredDeviation += fDelta * fDelta;
     }
 
@@ -102,14 +103,14 @@ api::ValueResult<double> evaluateTrimmean(std::vector<double> aValues, double fP
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
     std::sort(aValues.begin(), aValues.end());
-    sal_Int32 nTrimCount
-        = static_cast<sal_Int32>(::rtl::math::approxFloor(fPercent * aValues.size()));
+    std::int32_t nTrimCount
+        = static_cast<std::int32_t>(fp::approxFloor(fPercent * aValues.size()));
     nTrimCount -= nTrimCount % 2;
     const std::size_t nTrimEachSide = static_cast<std::size_t>(nTrimCount / 2);
     if (nTrimEachSide * 2 >= aValues.size())
         return api::ValueResult<double>::failure(api::Error::DivisionByZero);
 
-    KahanSum fSum = 0.0;
+    fp::KahanSum fSum = 0.0;
     for (std::size_t nIndex = nTrimEachSide; nIndex < aValues.size() - nTrimEachSide; ++nIndex)
         fSum += aValues[nIndex];
 
@@ -122,12 +123,12 @@ api::ValueResult<double> evaluateGeometricMeanNumbers(const std::vector<double>&
     if (rValues.empty())
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    KahanSum fLogSum = 0.0;
+    fp::KahanSum fLogSum = 0.0;
     for (const double fValue : rValues)
     {
         if (fValue < 0.0 || !std::isfinite(fValue))
             return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-        if (::rtl::math::approxEqual(fValue, 0.0))
+        if (fp::approxEqual(fValue, 0.0))
             return api::ValueResult<double>::success(0.0);
         fLogSum += std::log(fValue);
     }
@@ -141,7 +142,7 @@ api::ValueResult<double> evaluateHarmonicMeanNumbers(const std::vector<double>& 
     if (rValues.empty())
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    KahanSum fInverseSum = 0.0;
+    fp::KahanSum fInverseSum = 0.0;
     for (const double fValue : rValues)
     {
         if (!(fValue > 0.0) || !std::isfinite(fValue))
@@ -149,7 +150,7 @@ api::ValueResult<double> evaluateHarmonicMeanNumbers(const std::vector<double>& 
         fInverseSum += 1.0 / fValue;
     }
 
-    if (::rtl::math::approxEqual(fInverseSum.get(), 0.0))
+    if (fp::approxEqual(fInverseSum.get(), 0.0))
         return api::ValueResult<double>::failure(api::Error::DivisionByZero);
 
     return api::ValueResult<double>::success(
@@ -177,8 +178,8 @@ api::ValueResult<std::vector<double>> evaluateModeValues(const std::vector<doubl
     std::sort(aSorted.begin(), aSorted.end());
 
     std::vector<double> aModes;
-    sal_Int32 nMaxCount = 1;
-    sal_Int32 nCurrentCount = 1;
+    std::int32_t nMaxCount = 1;
+    std::int32_t nCurrentCount = 1;
     double fCurrentValue = aSorted.front();
     for (std::size_t nIndex = 1; nIndex <= aSorted.size(); ++nIndex)
     {
@@ -228,10 +229,10 @@ api::ValueResult<std::vector<double>> evaluateModeValues(const std::vector<doubl
 api::ValueResult<double> evaluateHypergeometricDistribution(
     double fX, double fTrials, double fSuccesses, double fPopulation, bool bCumulative)
 {
-    const double fWholePopulation = ::rtl::math::approxFloor(fPopulation);
-    const double fWholeSuccesses = ::rtl::math::approxFloor(fSuccesses);
-    const double fWholeTrials = ::rtl::math::approxFloor(fTrials);
-    const double fWholeX = ::rtl::math::approxFloor(fX);
+    const double fWholePopulation = fp::approxFloor(fPopulation);
+    const double fWholeSuccesses = fp::approxFloor(fSuccesses);
+    const double fWholeTrials = fp::approxFloor(fTrials);
+    const double fWholeX = fp::approxFloor(fX);
     if (fWholeX < 0.0 || fWholeTrials < fWholeX || fWholePopulation < fWholeTrials
         || fWholePopulation < fWholeSuccesses || fWholeSuccesses < 0.0)
     {
@@ -239,7 +240,7 @@ api::ValueResult<double> evaluateHypergeometricDistribution(
     }
 
     const auto probability = [fWholePopulation, fWholeSuccesses,
-                              fWholeTrials](sal_Int32 nValue) {
+                              fWholeTrials](std::int32_t nValue) {
         const long double fK = static_cast<long double>(nValue);
         if (fK < 0.0 || fK > fWholeTrials || fK > fWholeSuccesses
             || (fWholeTrials - fK) > (fWholePopulation - fWholeSuccesses))
@@ -261,18 +262,18 @@ api::ValueResult<double> evaluateHypergeometricDistribution(
         return std::exp(fLogProbability);
     };
 
-    const sal_Int32 nX = static_cast<sal_Int32>(fWholeX);
+    const std::int32_t nX = static_cast<std::int32_t>(fWholeX);
     if (!bCumulative)
         return api::ValueResult<double>::success(static_cast<double>(probability(nX)));
 
     long double fSum = 0.0L;
-    for (sal_Int32 nValue = 0; nValue <= nX; ++nValue)
+    for (std::int32_t nValue = 0; nValue <= nX; ++nValue)
         fSum += probability(nValue);
     return api::ValueResult<double>::success(std::min(1.0, static_cast<double>(fSum)));
 }
 
 api::ValueResult<double> evaluatePercentrank(
-    std::vector<double> aValues, double fValue, bool bInclusive, sal_Int32 nSignificance)
+    std::vector<double> aValues, double fValue, bool bInclusive, std::int32_t nSignificance)
 {
     if (aValues.empty())
         return api::ValueResult<double>::failure(api::Error::NotAvailable);
@@ -287,7 +288,7 @@ api::ValueResult<double> evaluatePercentrank(
         return api::ValueResult<double>::success(1.0);
 
     double fResult = 0.0;
-    if (::rtl::math::approxEqual(fValue, aValues.front()))
+    if (fp::approxEqual(fValue, aValues.front()))
     {
         fResult = bInclusive ? 0.0 : 1.0 / static_cast<double>(nSize + 1);
     }
@@ -298,17 +299,17 @@ api::ValueResult<double> evaluatePercentrank(
         std::size_t nIndex = 1;
         for (; nIndex < nSize && aValues[nIndex] < fValue; ++nIndex)
         {
-            if (!::rtl::math::approxEqual(aValues[nIndex], fOldValue))
+            if (!fp::approxEqual(aValues[nIndex], fOldValue))
             {
                 nOldCount = nIndex;
                 fOldValue = aValues[nIndex];
             }
         }
 
-        if (nIndex < nSize && !::rtl::math::approxEqual(aValues[nIndex], fOldValue))
+        if (nIndex < nSize && !fp::approxEqual(aValues[nIndex], fOldValue))
             nOldCount = nIndex;
 
-        if (nIndex < nSize && ::rtl::math::approxEqual(fValue, aValues[nIndex]))
+        if (nIndex < nSize && fp::approxEqual(fValue, aValues[nIndex]))
         {
             if (bInclusive)
                 fResult = static_cast<double>(nOldCount) / static_cast<double>(nSize - 1);
@@ -322,7 +323,7 @@ api::ValueResult<double> evaluatePercentrank(
 
             const double fLower = aValues[nOldCount - 1];
             const double fUpper = aValues[nOldCount];
-            if (::rtl::math::approxEqual(fLower, fUpper))
+            if (fp::approxEqual(fLower, fUpper))
                 return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
             const double fFraction = (fValue - fLower) / (fUpper - fLower);
@@ -339,12 +340,12 @@ api::ValueResult<double> evaluatePercentrank(
         }
     }
 
-    if (!::rtl::math::approxEqual(fResult, 0.0))
+    if (!fp::approxEqual(fResult, 0.0))
     {
-        const double fExponent = ::rtl::math::approxFloor(std::log10(fResult)) + 1.0
+        const double fExponent = fp::approxFloor(std::log10(fResult)) + 1.0
                                  - static_cast<double>(nSignificance);
         const double fScale = std::pow(10.0, -fExponent);
-        fResult = ::rtl::math::round(fResult * fScale) / fScale;
+        fResult = fp::round(fResult * fScale) / fScale;
     }
 
     return api::ValueResult<double>::success(fResult);
@@ -355,14 +356,14 @@ api::ValueResult<double> evaluateSkewNumbers(const std::vector<double>& rValues,
     if (rValues.size() < 3)
         return api::ValueResult<double>::failure(api::Error::DivisionByZero);
 
-    KahanSum fSum = 0.0;
+    fp::KahanSum fSum = 0.0;
     for (const double fValue : rValues)
         fSum += fValue;
 
     const double fCount = static_cast<double>(rValues.size());
     const double fMean = fSum.get() / fCount;
 
-    KahanSum fVarianceSum = 0.0;
+    fp::KahanSum fVarianceSum = 0.0;
     for (const double fValue : rValues)
         fVarianceSum += (fValue - fMean) * (fValue - fMean);
 
@@ -371,7 +372,7 @@ api::ValueResult<double> evaluateSkewNumbers(const std::vector<double>& rValues,
     if (fStdDev == 0.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    KahanSum fCubeSum = 0.0;
+    fp::KahanSum fCubeSum = 0.0;
     for (const double fValue : rValues)
     {
         const double fDelta = (fValue - fMean) / fStdDev;
@@ -391,13 +392,13 @@ api::ValueResult<double> evaluateKurtosisNumbers(const std::vector<double>& rVal
     if (fCount < 4.0)
         return api::ValueResult<double>::failure(api::Error::DivisionByZero);
 
-    KahanSum fSum = 0.0;
+    fp::KahanSum fSum = 0.0;
     for (const double fValue : rValues)
         fSum += fValue;
 
     const double fMean = fSum.get() / fCount;
 
-    KahanSum fVarianceSum = 0.0;
+    fp::KahanSum fVarianceSum = 0.0;
     for (const double fValue : rValues)
         fVarianceSum += (fValue - fMean) * (fValue - fMean);
 
@@ -405,7 +406,7 @@ api::ValueResult<double> evaluateKurtosisNumbers(const std::vector<double>& rVal
     if (fStdDev == 0.0)
         return api::ValueResult<double>::failure(api::Error::DivisionByZero);
 
-    KahanSum fFourthMoment = 0.0;
+    fp::KahanSum fFourthMoment = 0.0;
     for (const double fValue : rValues)
     {
         const double fDelta = (fValue - fMean) / fStdDev;
@@ -419,7 +420,7 @@ api::ValueResult<double> evaluateKurtosisNumbers(const std::vector<double>& rVal
     return api::ValueResult<double>::success(fFourthMoment.get() * fLeading - fTrailing);
 }
 
-api::ValueResult<double> evaluateAggregateNumbers(sal_Int32 nFunction, const AggregateScan& rScan)
+api::ValueResult<double> evaluateAggregateNumbers(std::int32_t nFunction, const AggregateScan& rScan)
 {
     switch (nFunction)
     {
@@ -483,7 +484,7 @@ api::ValueResult<double> evaluateAggregateNumbers(sal_Int32 nFunction, const Agg
 }
 
 api::ValueResult<double> evaluateAggregateRankedNumbers(
-    sal_Int32 nFunction, const AggregateScan& rScan, double fRankValue)
+    std::int32_t nFunction, const AggregateScan& rScan, double fRankValue)
 {
     if (!std::isfinite(fRankValue) || rScan.maNumbers.empty())
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
@@ -532,7 +533,7 @@ api::ValueResult<double> evaluateAggregateRankedNumbers(
         case 15:
         {
             const auto oRank = toWholeNumber(fRankValue);
-            if (!oRank || *oRank < 1 || *oRank > static_cast<sal_Int32>(aSorted.size()))
+            if (!oRank || *oRank < 1 || *oRank > static_cast<std::int32_t>(aSorted.size()))
                 return api::ValueResult<double>::failure(api::Error::IllegalArgument);
             const std::size_t nIndex = nFunction == 14
                                            ? aSorted.size() - static_cast<std::size_t>(*oRank)

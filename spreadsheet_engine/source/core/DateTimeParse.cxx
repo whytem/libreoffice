@@ -8,12 +8,13 @@
  */
 
 #include <spreadsheetengine/runtime/DateTimeParse.hxx>
+#include <cstdint>
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 
-#include <rtl/math.hxx>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
 
 #include <spreadsheetengine/api/Calendar.hxx>
 #include <spreadsheetengine/runtime/DateTimeParts.hxx>
@@ -72,11 +73,11 @@ using spreadsheetengine::core::util::uppercaseAscii;
     if (!bHasDigit)
         return std::nullopt;
 
-    rtl_math_ConversionStatus eStatus = rtl_math_ConversionStatus_Ok;
-    sal_Int32 nEnd = 0;
-    const double fValue = rtl::math::stringToDouble(rValue, u'.', 0, &eStatus, &nEnd);
-    if (eStatus != rtl_math_ConversionStatus_Ok
-        || nEnd != static_cast<sal_Int32>(rValue.size()))
+    fp::ConversionStatus eStatus = fp::ConversionStatus::Ok;
+    std::int32_t nEnd = 0;
+    const double fValue = fp::stringToDouble(rValue, u'.', 0, &eStatus, &nEnd);
+    if (eStatus != fp::ConversionStatus::Ok
+        || nEnd != static_cast<std::int32_t>(rValue.size()))
     {
         return std::nullopt;
     }
@@ -104,20 +105,20 @@ using spreadsheetengine::core::util::uppercaseAscii;
     return rValue;
 }
 
-[[nodiscard]] std::optional<sal_Int16> parseAsciiInt16(spreadsheetengine::api::StringView rValue)
+[[nodiscard]] std::optional<std::int16_t> parseAsciiInt16(spreadsheetengine::api::StringView rValue)
 {
     const auto oDouble = parseAsciiDouble(rValue);
-    if (!oDouble || !std::isfinite(*oDouble) || ::rtl::math::approxFloor(*oDouble) != *oDouble
-        || *oDouble < static_cast<double>(std::numeric_limits<sal_Int16>::min())
-        || *oDouble > static_cast<double>(std::numeric_limits<sal_Int16>::max()))
+    if (!oDouble || !std::isfinite(*oDouble) || fp::approxFloor(*oDouble) != *oDouble
+        || *oDouble < static_cast<double>(std::numeric_limits<std::int16_t>::min())
+        || *oDouble > static_cast<double>(std::numeric_limits<std::int16_t>::max()))
     {
         return std::nullopt;
     }
 
-    return static_cast<sal_Int16>(*oDouble);
+    return static_cast<std::int16_t>(*oDouble);
 }
 
-[[nodiscard]] std::optional<sal_Int16> parseMonthName(
+[[nodiscard]] std::optional<std::int16_t> parseMonthName(
     spreadsheetengine::api::StringView rValue)
 {
     const auto aUpper = uppercaseAscii(rValue);
@@ -149,7 +150,7 @@ using spreadsheetengine::core::util::uppercaseAscii;
 }
 
 [[nodiscard]] bool splitThreePartNumericDate(spreadsheetengine::api::StringView rValue,
-    char16_t cSeparator, sal_Int16& rnFirst, sal_Int16& rnSecond, sal_Int16& rnThird)
+    char16_t cSeparator, std::int16_t& rnFirst, std::int16_t& rnSecond, std::int16_t& rnThird)
 {
     const std::size_t nFirstSep = rValue.find(cSeparator);
     if (nFirstSep == spreadsheetengine::api::StringView::npos)
@@ -171,16 +172,16 @@ using spreadsheetengine::core::util::uppercaseAscii;
     return true;
 }
 
-[[nodiscard]] bool parseDateText(spreadsheetengine::api::StringView rValue, sal_Int16& rnYear,
-    sal_Int16& rnMonth, sal_Int16& rnDay)
+[[nodiscard]] bool parseDateText(spreadsheetengine::api::StringView rValue, std::int16_t& rnYear,
+    std::int16_t& rnMonth, std::int16_t& rnDay)
 {
     rValue = trimAsciiWhitespace(rValue);
     if (rValue.empty())
         return false;
 
-    sal_Int16 nFirst = 0;
-    sal_Int16 nSecond = 0;
-    sal_Int16 nThird = 0;
+    std::int16_t nFirst = 0;
+    std::int16_t nSecond = 0;
+    std::int16_t nThird = 0;
     if (splitThreePartNumericDate(rValue, u'-', nFirst, nSecond, nThird))
     {
         rnYear = nFirst;
@@ -261,9 +262,9 @@ using spreadsheetengine::core::util::uppercaseAscii;
     if (!bHasMeridiem && nFirstColon == spreadsheetengine::api::StringView::npos)
         return std::nullopt;
 
-    sal_Int16 nHour = 0;
-    sal_Int16 nMinute = 0;
-    sal_Int16 nSecond = 0;
+    std::int16_t nHour = 0;
+    std::int16_t nMinute = 0;
+    std::int16_t nSecond = 0;
     if (nFirstColon == spreadsheetengine::api::StringView::npos)
     {
         const auto oHour = parseAsciiInt16(rValue);
@@ -303,7 +304,7 @@ using spreadsheetengine::core::util::uppercaseAscii;
         if (nHour < 1 || nHour > 12)
             return std::nullopt;
         if (bPM)
-            nHour = nHour == 12 ? 12 : static_cast<sal_Int16>(nHour + 12);
+            nHour = nHour == 12 ? 12 : static_cast<std::int16_t>(nHour + 12);
         else
             nHour = nHour == 12 ? 0 : nHour;
     }
@@ -413,9 +414,9 @@ std::optional<spreadsheetengine::api::NumberParseResult> parseStandaloneNumberTe
             *oTime, 0, spreadsheetengine::api::NumberParseResult::Kind::Time
         };
 
-    sal_Int16 nYear = 0;
-    sal_Int16 nMonth = 0;
-    sal_Int16 nDay = 0;
+    std::int16_t nYear = 0;
+    std::int16_t nMonth = 0;
+    std::int16_t nDay = 0;
     if (parseDateText(aTrimmed, nYear, nMonth, nDay))
     {
         const auto aDateSerial = spreadsheetengine::api::calendar::makeDateSerial(
@@ -470,13 +471,13 @@ std::optional<double> parseStoredDateValue(spreadsheetengine::api::StringView rV
         aTimePart = trimAsciiWhitespace(rValue.substr(nTimeSeparator + 1));
     }
 
-    sal_Int16 nYear = 0;
-    sal_Int16 nMonth = 0;
-    sal_Int16 nDay = 0;
+    std::int16_t nYear = 0;
+    std::int16_t nMonth = 0;
+    std::int16_t nDay = 0;
     if (!parseDateText(aDatePart, nYear, nMonth, nDay))
         return std::nullopt;
     if (!detail::date::isValidDate(
-            static_cast<sal_uInt16>(nDay), static_cast<sal_uInt16>(nMonth), nYear))
+            static_cast<std::uint16_t>(nDay), static_cast<std::uint16_t>(nMonth), nYear))
     {
         return std::nullopt;
     }
@@ -506,14 +507,14 @@ std::optional<spreadsheetengine::api::DateSerial> coerceToDateSerial(
         case spreadsheetengine::api::CellValueKind::Number:
         case spreadsheetengine::api::CellValueKind::Boolean:
             return static_cast<spreadsheetengine::api::DateSerial>(
-                rtl::math::approxFloor(rValue.mfNumber));
+                fp::approxFloor(rValue.mfNumber));
         case spreadsheetengine::api::CellValueKind::Text:
         {
             const auto oParsed = parseStandaloneNumberText(rValue.maString);
             if (!oParsed)
                 return std::nullopt;
             return static_cast<spreadsheetengine::api::DateSerial>(
-                rtl::math::approxFloor(oParsed->mfValue));
+                fp::approxFloor(oParsed->mfValue));
         }
         case spreadsheetengine::api::CellValueKind::Error:
             return std::nullopt;
@@ -523,30 +524,30 @@ std::optional<spreadsheetengine::api::DateSerial> coerceToDateSerial(
 }
 
 std::optional<double> shiftMonthSerial(
-    spreadsheetengine::api::DateSerial nDateSerial, sal_Int32 nMonthOffset, bool bEndOfMonth)
+    spreadsheetengine::api::DateSerial nDateSerial, std::int32_t nMonthOffset, bool bEndOfMonth)
 {
     const spreadsheetengine::api::DateParts aNullDate = defaultNullDate();
 
-    const sal_Int16 nYear
-        = static_cast<sal_Int16>(extractYear(aNullDate, nDateSerial));
-    const sal_Int16 nMonth
-        = static_cast<sal_Int16>(extractMonth(aNullDate, nDateSerial));
+    const std::int16_t nYear
+        = static_cast<std::int16_t>(extractYear(aNullDate, nDateSerial));
+    const std::int16_t nMonth
+        = static_cast<std::int16_t>(extractMonth(aNullDate, nDateSerial));
     const auto aDayResult = spreadsheetengine::api::calendar::dayFromSerial(aNullDate, nDateSerial);
     if (!aDayResult)
         return std::nullopt;
 
-    const sal_Int32 nZeroBasedMonth
-        = static_cast<sal_Int32>(nYear) * 12 + static_cast<sal_Int32>(nMonth - 1) + nMonthOffset;
+    const std::int32_t nZeroBasedMonth
+        = static_cast<std::int32_t>(nYear) * 12 + static_cast<std::int32_t>(nMonth - 1) + nMonthOffset;
     if (nZeroBasedMonth < 12)
         return std::nullopt;
 
-    const sal_Int16 nTargetYear = static_cast<sal_Int16>(nZeroBasedMonth / 12);
-    const sal_Int16 nTargetMonth = static_cast<sal_Int16>((nZeroBasedMonth % 12) + 1);
-    const sal_uInt16 nDaysInTargetMonth = detail::date::getDaysInMonth(
-        static_cast<sal_uInt16>(nTargetMonth), nTargetYear);
-    const sal_Int16 nTargetDay = bEndOfMonth
-                                     ? static_cast<sal_Int16>(nDaysInTargetMonth)
-                                     : static_cast<sal_Int16>(std::min<double>(
+    const std::int16_t nTargetYear = static_cast<std::int16_t>(nZeroBasedMonth / 12);
+    const std::int16_t nTargetMonth = static_cast<std::int16_t>((nZeroBasedMonth % 12) + 1);
+    const std::uint16_t nDaysInTargetMonth = detail::date::getDaysInMonth(
+        static_cast<std::uint16_t>(nTargetMonth), nTargetYear);
+    const std::int16_t nTargetDay = bEndOfMonth
+                                     ? static_cast<std::int16_t>(nDaysInTargetMonth)
+                                     : static_cast<std::int16_t>(std::min<double>(
                                            aDayResult.maValue, nDaysInTargetMonth));
 
     const auto aShifted = spreadsheetengine::api::calendar::makeDateSerial(
@@ -558,7 +559,7 @@ std::optional<double> shiftMonthSerial(
 
 std::optional<double> computeWeeksDifference(
     spreadsheetengine::api::DateSerial nStartDate, spreadsheetengine::api::DateSerial nEndDate,
-    sal_Int16 nMode)
+    std::int16_t nMode)
 {
     if (nMode == 0)
         return static_cast<double>((nEndDate - nStartDate) / 7);

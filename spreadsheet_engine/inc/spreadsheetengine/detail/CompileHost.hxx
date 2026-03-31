@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include <sal/types.h>
+#include <spreadsheetengine/api/Types.hxx>
 
 #include <optional>
 

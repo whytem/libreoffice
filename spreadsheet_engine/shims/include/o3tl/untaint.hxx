@@ -1,7 +1,8 @@
 #pragma once
 
-#include <cmath>
-#include <limits>
+// Shim: redirect to the engine's FloatingPoint module for divAllowZero.
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
+
 #include <type_traits>
 
 namespace o3tl
@@ -9,14 +10,7 @@ namespace o3tl
 
 inline double div_allow_zero(double a, double b)
 {
-    if (b == 0.0)
-    {
-        if (std::isfinite(a) && a != 0.0)
-            return std::signbit(a) ? -std::numeric_limits<double>::infinity()
-                                   : std::numeric_limits<double>::infinity();
-        return std::numeric_limits<double>::quiet_NaN();
-    }
-    return a / b;
+    return spreadsheetengine::core::fp::divAllowZero(a, b);
 }
 
 template <typename T> inline void untaint_for_overrun([[maybe_unused]] T& rValue) {}

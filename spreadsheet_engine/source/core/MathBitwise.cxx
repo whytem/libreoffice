@@ -8,12 +8,13 @@
  */
 
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
+#include <cstdint>
 
 #include <cmath>
 #include <optional>
 
-#include <rtl/math.hxx>
-#include <sal/types.h>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
+#include <spreadsheetengine/api/Types.hxx>
 
 namespace spreadsheetengine::core::math
 {
@@ -23,13 +24,13 @@ namespace
 
 constexpr double BIT_OPERAND_LIMIT = 281474976710656.0; // 2^48
 
-std::optional<sal_uInt64> normalizeBitOperand(double fValue)
+std::optional<std::uint64_t> normalizeBitOperand(double fValue)
 {
-    const double fNormalized = ::rtl::math::approxFloor(fValue);
+    const double fNormalized = fp::approxFloor(fValue);
     if (fNormalized >= BIT_OPERAND_LIMIT || fNormalized < 0.0)
         return std::nullopt;
 
-    return static_cast<sal_uInt64>(fNormalized);
+    return static_cast<std::uint64_t>(fNormalized);
 }
 
 }
@@ -71,10 +72,10 @@ std::optional<double> computeBitLeftShift(double fValue, double fShift)
         return std::nullopt;
 
     const double fNormalizedValue = static_cast<double>(*nValue);
-    const double fNormalizedShift = ::rtl::math::approxFloor(fShift);
+    const double fNormalizedShift = fp::approxFloor(fShift);
 
     if (fNormalizedShift < 0.0)
-        return ::rtl::math::approxFloor(fNormalizedValue / std::pow(2.0, -fNormalizedShift));
+        return fp::approxFloor(fNormalizedValue / std::pow(2.0, -fNormalizedShift));
     if (fNormalizedShift == 0.0)
         return fNormalizedValue;
     return fNormalizedValue * std::pow(2.0, fNormalizedShift);
@@ -87,13 +88,13 @@ std::optional<double> computeBitRightShift(double fValue, double fShift)
         return std::nullopt;
 
     const double fNormalizedValue = static_cast<double>(*nValue);
-    const double fNormalizedShift = ::rtl::math::approxFloor(fShift);
+    const double fNormalizedShift = fp::approxFloor(fShift);
 
     if (fNormalizedShift < 0.0)
         return fNormalizedValue * std::pow(2.0, -fNormalizedShift);
     if (fNormalizedShift == 0.0)
         return fNormalizedValue;
-    return ::rtl::math::approxFloor(fNormalizedValue / std::pow(2.0, fNormalizedShift));
+    return fp::approxFloor(fNormalizedValue / std::pow(2.0, fNormalizedShift));
 }
 
 } // namespace spreadsheetengine::core::math

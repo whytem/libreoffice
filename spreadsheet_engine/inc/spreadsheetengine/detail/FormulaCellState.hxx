@@ -12,7 +12,7 @@
 #include <cassert>
 #include <climits>
 
-#include <sal/types.h>
+#include <spreadsheetengine/api/Types.hxx>
 
 namespace spreadsheetengine::core::formulacell
 {

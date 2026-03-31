@@ -8,14 +8,15 @@
  */
 
 #include <spreadsheetengine/runtime/MathFinancial.hxx>
+#include <cstdint>
 
 #include <algorithm>
 #include <cstddef>
 #include <cmath>
 
-#include <kahan.hxx>
-#include <o3tl/untaint.hxx>
-#include <rtl/math.hxx>
+#include <spreadsheetengine/runtime/KahanSum.hxx>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
 
 namespace spreadsheetengine::core::math
 {
@@ -24,7 +25,7 @@ namespace
 
 constexpr double kRateEpsilon = 1.0E-7;
 constexpr double kRateEpsilonSmall = 1.0E-14;
-constexpr sal_uInt16 kRateIterationsMax = 150;
+constexpr std::uint16_t kRateIterationsMax = 150;
 
 bool iterateRate(
     double fNper, double fPayment, double fPresentValue, double fFutureValue,
@@ -38,7 +39,7 @@ bool iterateRate(
     double fTermDerivation;
     double fGeoSeries;
     double fGeoSeriesDerivation;
-    sal_uInt16 nCount = 0;
+    std::uint16_t nCount = 0;
 
     if (bPayType)
     {
@@ -46,7 +47,7 @@ bool iterateRate(
         fPresentValue += fPayment;
     }
 
-    if (fNper == ::rtl::math::round(fNper))
+    if (fNper == fp::round(fNper))
     {
         fX = fGuess;
         while (!bFound && nCount < kRateIterationsMax)
@@ -133,13 +134,13 @@ bool iterateRate(
 double computeInterestSchedulePayment(
     double fRate, double fPeriod, double fTotalPeriods, double fInvestment)
 {
-    return fInvestment * fRate * (o3tl::div_allow_zero(fPeriod, fTotalPeriods) - 1.0);
+    return fInvestment * fRate * (fp::divAllowZero(fPeriod, fTotalPeriods) - 1.0);
 }
 
 double computeSumOfYearsDepreciation(
     double fCost, double fSalvage, double fLife, double fPeriod)
 {
-    return o3tl::div_allow_zero(
+    return fp::divAllowZero(
         (fCost - fSalvage) * (fLife - fPeriod + 1.0), (fLife * (fLife + 1.0)) / 2.0);
 }
 
@@ -163,7 +164,7 @@ double computePresentValue(
 double computeDoubleDecliningBalance(
     double fCost, double fSalvage, double fLife, double fPeriod, double fFactor)
 {
-    double fRate = o3tl::div_allow_zero(fFactor, fLife);
+    double fRate = fp::divAllowZero(fFactor, fLife);
     double fOldValue;
     if (fRate >= 1.0)
     {
@@ -182,21 +183,21 @@ double computeFixedDecliningBalance(
     double fCost, double fSalvage, double fLife, double fPeriod, double fMonths)
 {
     double fOffRate = 1.0 - std::pow(fSalvage / fCost, 1.0 / fLife);
-    fOffRate = ::rtl::math::approxFloor((fOffRate * 1000.0) + 0.5) / 1000.0;
+    fOffRate = fp::approxFloor((fOffRate * 1000.0) + 0.5) / 1000.0;
     const double fFirstOffRate = fCost * fOffRate * fMonths / 12.0;
 
     double fDb = 0.0;
-    if (::rtl::math::approxFloor(fPeriod) == 1.0)
+    if (fp::approxFloor(fPeriod) == 1.0)
         fDb = fFirstOffRate;
     else
     {
-        KahanSum fSumOffRate = fFirstOffRate;
+        fp::KahanSum fSumOffRate = fFirstOffRate;
         double fMin = fLife;
         if (fMin > fPeriod)
             fMin = fPeriod;
 
-        const sal_uInt16 iMax = static_cast<sal_uInt16>(::rtl::math::approxFloor(fMin));
-        for (sal_uInt16 i = 2; i <= iMax; ++i)
+        const std::uint16_t iMax = static_cast<std::uint16_t>(fp::approxFloor(fMin));
+        for (std::uint16_t i = 2; i <= iMax; ++i)
         {
             fDb = -(fSumOffRate - fCost).get() * fOffRate;
             fSumOffRate += fDb;
@@ -213,8 +214,8 @@ double computeVariableDecliningBalanceSegment(
     double fCost, double fSalvage, double fLife, double fRemainingLife,
     double fPeriod, double fFactor)
 {
-    KahanSum fVdb = 0.0;
-    const double fIntEnd = ::rtl::math::approxCeil(fPeriod);
+    fp::KahanSum fVdb = 0.0;
+    const double fIntEnd = fp::approxCeil(fPeriod);
     const std::size_t nLoopEnd = static_cast<std::size_t>(fIntEnd);
 
     double fSln = 0.0;
@@ -257,9 +258,9 @@ double computeVariableDecliningBalance(
     double fCost, double fSalvage, double fLife, double fStart,
     double fEnd, double fFactor, bool bNoSwitch)
 {
-    KahanSum fVdb = 0.0;
-    const double fIntStart = ::rtl::math::approxFloor(fStart);
-    const double fIntEnd = ::rtl::math::approxCeil(fEnd);
+    fp::KahanSum fVdb = 0.0;
+    const double fIntStart = fp::approxFloor(fStart);
+    const double fIntEnd = fp::approxCeil(fEnd);
     const std::size_t nLoopStart = static_cast<std::size_t>(fIntStart);
     const std::size_t nLoopEnd = static_cast<std::size_t>(fIntEnd);
 
@@ -281,10 +282,10 @@ double computeVariableDecliningBalance(
     else
     {
         double fPart = 0.0;
-        if (!::rtl::math::approxEqual(fStart, fIntStart)
-            || !::rtl::math::approxEqual(fEnd, fIntEnd))
+        if (!fp::approxEqual(fStart, fIntStart)
+            || !fp::approxEqual(fEnd, fIntEnd))
         {
-            if (!::rtl::math::approxEqual(fStart, fIntStart))
+            if (!fp::approxEqual(fStart, fIntStart))
             {
                 const double fTempIntEnd = fIntStart + 1.0;
                 const double fTempValue = fCost
@@ -295,7 +296,7 @@ double computeVariableDecliningBalance(
                              fTempValue, fSalvage, fLife, fLife - fIntStart,
                              fTempIntEnd - fIntStart, fFactor);
             }
-            if (!::rtl::math::approxEqual(fEnd, fIntEnd))
+            if (!fp::approxEqual(fEnd, fIntEnd))
             {
                 const double fTempIntStart = fIntEnd - 1.0;
                 const double fTempValue = fCost
@@ -324,7 +325,7 @@ double computePayment(
 {
     double fPayment;
     if (fRate == 0.0)
-        fPayment = o3tl::div_allow_zero(fPresentValue + fFutureValue, fNper);
+        fPayment = fp::divAllowZero(fPresentValue + fFutureValue, fNper);
     else if (bPayInAdvance)
         fPayment = (fFutureValue + fPresentValue * std::exp(fNper * std::log1p(fRate))) * fRate
                    / (std::expm1((fNper + 1) * std::log1p(fRate)) - fRate);
@@ -390,7 +391,7 @@ double computeCumulativeInterest(
     double fRate, double fStart, double fEnd, double fNper,
     double fPresentValue, double fFutureValue, bool bPayInAdvance)
 {
-    KahanSum fInterest = 0.0;
+    fp::KahanSum fInterest = 0.0;
     std::size_t nStart = static_cast<std::size_t>(fStart);
     const std::size_t nEnd = static_cast<std::size_t>(fEnd);
     const double fPayment = computePayment(
@@ -422,7 +423,7 @@ double computeCumulativePrincipal(
     double fRate, double fStart, double fEnd, double fNper,
     double fPresentValue, double fFutureValue, bool bPayInAdvance)
 {
-    KahanSum fPrincipal = 0.0;
+    fp::KahanSum fPrincipal = 0.0;
     std::size_t nStart = static_cast<std::size_t>(fStart);
     const std::size_t nEnd = static_cast<std::size_t>(fEnd);
     const double fPayment = computePayment(
@@ -472,11 +473,11 @@ double computePeriodsForFutureValue(
         return 0.0;
 
     if (fRate == 0.0)
-        return -o3tl::div_allow_zero(fPresentValue + fFutureValue, fPayment);
+        return -fp::divAllowZero(fPresentValue + fFutureValue, fPayment);
 
     if (bPayInAdvance)
     {
-        return std::log(-o3tl::div_allow_zero(
+        return std::log(-fp::divAllowZero(
                             fRate * fFutureValue - fPayment * (1.0 + fRate),
                             (fRate * fPresentValue + fPayment * (1.0 + fRate))))
                / std::log1p(fRate);
@@ -528,7 +529,7 @@ double computeNominalAnnualRate(double fEffectiveRate, double fPeriods)
 
 double computeStraightLineDepreciation(double fCost, double fSalvage, double fLife)
 {
-    return o3tl::div_allow_zero(fCost - fSalvage, fLife);
+    return fp::divAllowZero(fCost - fSalvage, fLife);
 }
 
 } // namespace spreadsheetengine::core::math

@@ -8,6 +8,7 @@
  */
 
 #include <spreadsheetengine/runtime/DateTimeWorkday.hxx>
+#include <cstdint>
 
 #include <algorithm>
 #include <cstddef>
@@ -153,12 +154,12 @@ bool applyWeekendMaskMsSpec(spreadsheetengine::api::StringView rWeekendDays, boo
     }
 }
 
-sal_Int32 countWorkdays(spreadsheetengine::api::DateSerial nDate1,
+std::int32_t countWorkdays(spreadsheetengine::api::DateSerial nDate1,
     spreadsheetengine::api::DateSerial nDate2,
     const std::vector<spreadsheetengine::api::DateSerial>& rSortedHolidays,
     const spreadsheetengine::api::WeekendMask& rWeekendMask)
 {
-    sal_Int32 nCount = 0;
+    std::int32_t nCount = 0;
     std::size_t nRef = 0;
     const bool bReverse = nDate1 > nDate2;
     if (bReverse)

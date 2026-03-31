@@ -8,11 +8,12 @@
  */
 
 #include <spreadsheetengine/runtime/TextScalar.hxx>
+#include <cstdint>
 
 #include <cmath>
 #include <optional>
 
-#include <rtl/math.hxx>
+#include <spreadsheetengine/runtime/FloatingPoint.hxx>
 #include <unicode/uchar.h>
 
 namespace spreadsheetengine::core::text
@@ -110,10 +111,10 @@ spreadsheetengine::api::String trimRepeatedSpaces(spreadsheetengine::api::String
     return aBuffer;
 }
 
-sal_Int32 countCodePoints(spreadsheetengine::api::StringView rInput)
+std::int32_t countCodePoints(spreadsheetengine::api::StringView rInput)
 {
     std::size_t nIndex = 0;
-    sal_Int32 nCount = 0;
+    std::int32_t nCount = 0;
     while (nIndex < rInput.size())
     {
         iterateCodePoint(rInput, nIndex);
@@ -170,19 +171,19 @@ NumberValueResult parseNumberValue(spreadsheetengine::api::StringView rInput,
 
     removeChars(aInputString, u" \t\n\r");
 
-    sal_Int32 nPercentCount = 0;
+    std::int32_t nPercentCount = 0;
     while (!aInputString.empty() && aInputString.back() == u'%')
     {
         aInputString.pop_back();
         ++nPercentCount;
     }
 
-    rtl_math_ConversionStatus eStatus = rtl_math_ConversionStatus_Ok;
-    sal_Int32 nParseEnd = 0;
-    double fValue = rtl::math::stringToDouble(
+    fp::ConversionStatus eStatus = fp::ConversionStatus::Ok;
+    std::int32_t nParseEnd = 0;
+    double fValue = fp::stringToDouble(
         aInputString, cDecimalSeparator, 0, &eStatus, &nParseEnd);
-    if (eStatus == rtl_math_ConversionStatus_Ok
-        && nParseEnd == static_cast<sal_Int32>(aInputString.size()))
+    if (eStatus == fp::ConversionStatus::Ok
+        && nParseEnd == static_cast<std::int32_t>(aInputString.size()))
     {
         if (nPercentCount)
             fValue *= std::pow(10.0, -(nPercentCount * 2));
@@ -208,7 +209,7 @@ spreadsheetengine::api::String cleanPrintable(spreadsheetengine::api::StringView
     return aBuffer;
 }
 
-sal_Int32 codeFromText(
+std::int32_t codeFromText(
     const SingleByteEncodingService& rEncodingService, spreadsheetengine::api::StringView rInput)
 {
     if (rInput.empty())
@@ -233,7 +234,7 @@ std::optional<double> unicodeFromText(spreadsheetengine::api::StringView rInput)
     return static_cast<double>(iterateCodePoint(rInput, nIndex));
 }
 
-std::optional<spreadsheetengine::api::String> unicharFromCodePoint(sal_uInt32 nCodePoint)
+std::optional<spreadsheetengine::api::String> unicharFromCodePoint(std::uint32_t nCodePoint)
 {
     if (!isUnicodeScalarValue(nCodePoint))
         return std::nullopt;
