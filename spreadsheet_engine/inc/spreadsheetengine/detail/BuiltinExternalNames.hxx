@@ -43,6 +43,15 @@ inline constexpr sal_uInt16 kBuiltinExternalNameCatalogId = 1;
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETWORKDAY");
     if (equalLookupText(rSymbol, u"YEARFRAC"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYEARFRAC");
+    if (equalLookupText(rSymbol, u"YEARS") || equalLookupText(rSymbol, u"ORG.OPENOFFICE.YEARS"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.DATEFUNCTIONS.GETDIFFYEARS");
+    if (equalLookupText(rSymbol, u"WEEKS") || equalLookupText(rSymbol, u"ORG.OPENOFFICE.WEEKS"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.DATEFUNCTIONS.GETDIFFWEEKS");
+    if (equalLookupText(rSymbol, u"WEEKSINYEAR")
+        || equalLookupText(rSymbol, u"ORG.OPENOFFICE.WEEKSINYEAR"))
+    {
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.DATEFUNCTIONS.GETWEEKSINYEAR");
+    }
     if (equalLookupText(rSymbol, u"SERIESSUM"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSERIESSUM");
     if (equalLookupText(rSymbol, u"QUOTIENT"))
@@ -72,6 +81,12 @@ inline constexpr sal_uInt16 kBuiltinExternalNameCatalogId = 1;
         return api::String(u"WORKDAY");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYEARFRAC"))
         return api::String(u"YEARFRAC");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.DATEFUNCTIONS.GETDIFFYEARS"))
+        return api::String(u"YEARS");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.DATEFUNCTIONS.GETDIFFWEEKS"))
+        return api::String(u"WEEKS");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.DATEFUNCTIONS.GETWEEKSINYEAR"))
+        return api::String(u"WEEKSINYEAR");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSERIESSUM"))
         return api::String(u"SERIESSUM");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETQUOTIENT"))

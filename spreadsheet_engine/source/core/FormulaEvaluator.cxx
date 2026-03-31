@@ -61,6 +61,7 @@ namespace
 
 namespace secompiler = spreadsheetengine::detail::compiler;
 namespace seconvert = spreadsheetengine::core::convert;
+namespace sedate = spreadsheetengine::core::detail::date;
 namespace sedatetime = spreadsheetengine::core::datetime;
 namespace sefinance = spreadsheetengine::core::finance;
 namespace semath = spreadsheetengine::core::math;
@@ -4223,6 +4224,86 @@ EvaluationResult Evaluator::evaluateFunction(
         return makeScalarResult(api::CellValue::boolean(bLeapYear));
     }
 
+    const auto coerceStandaloneDateTimeNumber = [&](const api::CellValue& rValue)
+        -> api::ValueResult<double> {
+        switch (rValue.meKind)
+        {
+            case api::CellValueKind::Empty:
+                return api::ValueResult<double>::success(0.0);
+            case api::CellValueKind::Number:
+            case api::CellValueKind::Boolean:
+                return api::ValueResult<double>::success(rValue.mfNumber);
+            case api::CellValueKind::Text:
+            {
+                if (const auto oParsed = sedatetime::parseStandaloneNumberText(rValue.maString))
+                    return api::ValueResult<double>::success(oParsed->mfValue);
+                if (const auto oStored = sedatetime::parseStoredDateValue(rValue.maString))
+                    return api::ValueResult<double>::success(*oStored);
+                return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+            }
+            case api::CellValueKind::Error:
+                return api::ValueResult<double>::failure(rValue.meError);
+        }
+
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    };
+
+    if (aFunctionName == u"YEAR" || aFunctionName == u"MONTH" || aFunctionName == u"DAY")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aDateValue = evaluateScalarArgumentValue(*rNode.maChildren[0]);
+        if (!aDateValue)
+            return makeScalarResult(api::CellValue::error(aDateValue.meError));
+        const auto aDateNumber = coerceStandaloneDateTimeNumber(aDateValue.maValue);
+        if (!aDateNumber)
+            return makeScalarResult(api::CellValue::error(aDateNumber.meError));
+        const api::DateSerial nDateSerial
+            = static_cast<api::DateSerial>(rtl::math::approxFloor(aDateNumber.maValue));
+
+        const api::DateParts aNullDate = sedatetime::defaultNullDate();
+        if (aFunctionName == u"YEAR")
+        {
+            return makeScalarResult(api::CellValue::number(
+                spreadsheetengine::core::datetime::extractYear(aNullDate, nDateSerial)));
+        }
+        if (aFunctionName == u"MONTH")
+        {
+            return makeScalarResult(api::CellValue::number(
+                spreadsheetengine::core::datetime::extractMonth(aNullDate, nDateSerial)));
+        }
+
+        const auto oDay = spreadsheetengine::core::datetime::extractDay(aNullDate, nDateSerial);
+        if (!oDay)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+        return makeScalarResult(api::CellValue::number(*oDay));
+    }
+
+    if (aFunctionName == u"HOUR" || aFunctionName == u"MINUTE" || aFunctionName == u"SECOND")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aTimeValue = evaluateScalarArgumentValue(*rNode.maChildren[0]);
+        if (!aTimeValue)
+            return makeScalarResult(api::CellValue::error(aTimeValue.meError));
+
+        const auto aNumber = coerceStandaloneDateTimeNumber(aTimeValue.maValue);
+        if (!aNumber)
+            return makeScalarResult(api::CellValue::error(aNumber.meError));
+
+        double fComponent = 0.0;
+        if (aFunctionName == u"HOUR")
+            fComponent = sedatetime::extractHour(aNumber.maValue);
+        else if (aFunctionName == u"MINUTE")
+            fComponent = sedatetime::extractMinute(aNumber.maValue);
+        else
+            fComponent = sedatetime::extractSecond(aNumber.maValue);
+
+        return makeScalarResult(api::CellValue::number(fComponent));
+    }
+
     if (aFunctionName == u"EDATE" || aFunctionName == u"EOMONTH")
     {
         if (rNode.maChildren.size() != 2)
@@ -4254,43 +4335,299 @@ EvaluationResult Evaluator::evaluateFunction(
         return makeScalarResult(api::CellValue::number(*oShifted));
     }
 
+    if (aFunctionName == u"WEEKDAY")
+    {
+        if (rNode.maChildren.size() < 1 || rNode.maChildren.size() > 2)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aDateValue = evaluateScalarArgumentValue(*rNode.maChildren[0]);
+        if (!aDateValue)
+            return makeScalarResult(api::CellValue::error(aDateValue.meError));
+        const auto oDateSerial = sedatetime::coerceToDateSerial(aDateValue.maValue);
+        if (!oDateSerial)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        sal_Int16 nMode = 1;
+        if (rNode.maChildren.size() == 2)
+        {
+            if (rNode.maChildren[1]->meKind == formula::NodeKind::EmptyArgument)
+                return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+            const auto aModeValue = evaluateScalarArgumentValue(*rNode.maChildren[1]);
+            if (!aModeValue)
+                return makeScalarResult(api::CellValue::error(aModeValue.meError));
+            if (aModeValue.maValue.isEmpty())
+                return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+            const auto aModeNumber = coerceToNumber(aModeValue.maValue);
+            if (!aModeNumber)
+                return makeScalarResult(api::CellValue::error(aModeNumber.meError));
+            const auto oWholeMode = toWholeNumber(aModeNumber.maValue);
+            if (!oWholeMode)
+                return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+            nMode = static_cast<sal_Int16>(*oWholeMode);
+        }
+
+        const auto aWeekday
+            = api::calendar::dayOfWeek(sedatetime::defaultNullDate(), *oDateSerial, nMode);
+        if (!aWeekday)
+            return makeScalarResult(api::CellValue::error(aWeekday.meError));
+
+        return makeScalarResult(api::CellValue::number(static_cast<double>(aWeekday.maValue)));
+    }
+
+    if (aFunctionName == u"WEEKNUM")
+    {
+        if (rNode.maChildren.size() < 1 || rNode.maChildren.size() > 2)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aDateValue = evaluateScalarArgumentValue(*rNode.maChildren[0]);
+        if (!aDateValue)
+            return makeScalarResult(api::CellValue::error(aDateValue.meError));
+        const auto oDateSerial = sedatetime::coerceToDateSerial(aDateValue.maValue);
+        if (!oDateSerial)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        sal_Int16 nMode = 1;
+        if (rNode.maChildren.size() == 2
+            && rNode.maChildren[1]->meKind != formula::NodeKind::EmptyArgument)
+        {
+            const auto aModeValue = evaluateScalarArgumentValue(*rNode.maChildren[1]);
+            if (!aModeValue)
+                return makeScalarResult(api::CellValue::error(aModeValue.meError));
+            if (!aModeValue.maValue.isEmpty())
+            {
+                const auto aModeNumber = coerceToNumber(aModeValue.maValue);
+                if (!aModeNumber)
+                    return makeScalarResult(api::CellValue::error(aModeNumber.meError));
+                const auto oWholeMode = toWholeNumber(aModeNumber.maValue);
+                if (!oWholeMode)
+                    return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+                nMode = static_cast<sal_Int16>(*oWholeMode);
+            }
+        }
+
+        const auto aWeek
+            = api::calendar::weekOfYear(sedatetime::defaultNullDate(), *oDateSerial, nMode);
+        if (!aWeek)
+            return makeScalarResult(api::CellValue::error(aWeek.meError));
+
+        return makeScalarResult(api::CellValue::number(static_cast<double>(aWeek.maValue)));
+    }
+
+    if (aFunctionName == u"DAYS360")
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aStartValue = evaluateScalarArgumentValue(*rNode.maChildren[0]);
+        if (!aStartValue)
+            return makeScalarResult(api::CellValue::error(aStartValue.meError));
+        const auto aEndValue = evaluateScalarArgumentValue(*rNode.maChildren[1]);
+        if (!aEndValue)
+            return makeScalarResult(api::CellValue::error(aEndValue.meError));
+
+        const auto oStartDate = sedatetime::coerceToDateSerial(aStartValue.maValue);
+        const auto oEndDate = sedatetime::coerceToDateSerial(aEndValue.maValue);
+        if (!oStartDate || !oEndDate)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        bool bEuropeanMethod = false;
+        if (rNode.maChildren.size() == 3
+            && rNode.maChildren[2]->meKind != formula::NodeKind::EmptyArgument)
+        {
+            const auto aMethodValue = evaluateScalarArgumentValue(*rNode.maChildren[2]);
+            if (!aMethodValue)
+                return makeScalarResult(api::CellValue::error(aMethodValue.meError));
+            if (!aMethodValue.maValue.isEmpty())
+            {
+                const auto aMethod = coerceToBoolean(aMethodValue.maValue);
+                if (!aMethod)
+                    return makeScalarResult(api::CellValue::error(aMethod.meError));
+                bEuropeanMethod = aMethod.maValue;
+            }
+        }
+
+        return makeScalarResult(api::CellValue::number(api::calendar::diffDate360(
+            sedatetime::defaultNullDate(), *oStartDate, *oEndDate, bEuropeanMethod)));
+    }
+
+    if (aFunctionName == u"EASTERSUNDAY")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aYearValue = evaluateScalarArgumentValue(*rNode.maChildren[0]);
+        if (!aYearValue)
+            return makeScalarResult(api::CellValue::error(aYearValue.meError));
+        if (aYearValue.maValue.isEmpty())
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aYearNumber = coerceToNumber(aYearValue.maValue);
+        if (!aYearNumber)
+            return makeScalarResult(api::CellValue::error(aYearNumber.meError));
+
+        const auto oWholeYear = toWholeNumber(aYearNumber.maValue);
+        if (!oWholeYear || *oWholeYear < std::numeric_limits<sal_Int16>::min()
+            || *oWholeYear > std::numeric_limits<sal_Int16>::max())
+        {
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+        }
+
+        sal_Int16 nYear = static_cast<sal_Int16>(*oWholeYear);
+        if (nYear >= 0 && nYear < 100)
+        {
+            constexpr sal_Int16 nTwoDigitYearStart = 1930;
+            if (nYear < (nTwoDigitYearStart % 100))
+                nYear = static_cast<sal_Int16>(nYear + (((nTwoDigitYearStart / 100) + 1) * 100));
+            else
+                nYear = static_cast<sal_Int16>(nYear + ((nTwoDigitYearStart / 100) * 100));
+        }
+
+        const auto aEaster = api::calendar::easterSundaySerial(sedatetime::defaultNullDate(), nYear);
+        if (!aEaster)
+            return makeScalarResult(api::CellValue::error(aEaster.meError));
+
+        return makeScalarResult(api::CellValue::number(aEaster.maValue));
+    }
+
+    if (aFunctionName == u"YEARS")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aStartValue = evaluateScalarArgumentValue(*rNode.maChildren[0]);
+        if (!aStartValue)
+            return makeScalarResult(api::CellValue::error(aStartValue.meError));
+        const auto aEndValue = evaluateScalarArgumentValue(*rNode.maChildren[1]);
+        if (!aEndValue)
+            return makeScalarResult(api::CellValue::error(aEndValue.meError));
+        const auto aModeValue = evaluateScalarArgumentValue(*rNode.maChildren[2]);
+        if (!aModeValue)
+            return makeScalarResult(api::CellValue::error(aModeValue.meError));
+        if (aModeValue.maValue.isEmpty())
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto oStartDate = sedatetime::coerceToDateSerial(aStartValue.maValue);
+        const auto oEndDate = sedatetime::coerceToDateSerial(aEndValue.maValue);
+        if (!oStartDate || !oEndDate)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aModeNumber = coerceToNumber(aModeValue.maValue);
+        if (!aModeNumber)
+            return makeScalarResult(api::CellValue::error(aModeNumber.meError));
+        const auto oWholeMode = toWholeNumber(aModeNumber.maValue);
+        if (!oWholeMode || (*oWholeMode != 0 && *oWholeMode != 1))
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const sal_Int32 nNullDate = sedate::toAbsoluteDays(sedatetime::defaultNullDate());
+        const api::DateParts aStartDate = sedate::fromAbsoluteDays(nNullDate + *oStartDate);
+        const api::DateParts aEndDate = sedate::fromAbsoluteDays(nNullDate + *oEndDate);
+
+        sal_Int32 nYears = static_cast<sal_Int32>(aEndDate.mnYear) - aStartDate.mnYear;
+        if (*oWholeMode == 0)
+        {
+            sal_Int32 nMonths = static_cast<sal_Int32>(aEndDate.mnMonth) - aStartDate.mnMonth
+                                + nYears * 12;
+            if (*oStartDate < *oEndDate)
+            {
+                if (aStartDate.mnDay > aEndDate.mnDay)
+                    --nMonths;
+            }
+            else if (*oStartDate > *oEndDate)
+            {
+                if (aStartDate.mnDay < aEndDate.mnDay)
+                    ++nMonths;
+            }
+            nYears = nMonths / 12;
+        }
+
+        return makeScalarResult(api::CellValue::number(static_cast<double>(nYears)));
+    }
+
     if (aFunctionName == u"WEEKS")
     {
         if (rNode.maChildren.size() != 3)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
-        EvaluationResult aStart
-            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        const auto evaluateWeeksArgument = [&](const formula::Node& rArgument) -> EvaluationResult {
+            EvaluationResult aArgument = evaluateNode(rArgument, rCurrentAddress);
+            if (!aArgument)
+                return makeScalarResult(api::CellValue::error(aArgument.meError));
+            if (aArgument.maValue.isScalar())
+                return aArgument;
+            if (!aArgument.maValue.maReference.isSingleCell())
+                return makeScalarResult(api::CellValue::error(api::Error::NoValue));
+
+            aArgument = materializeReferenceValue(aArgument.maValue.maReference, 0, 0);
+            if (!aArgument)
+                return makeScalarResult(api::CellValue::error(aArgument.meError));
+            return aArgument;
+        };
+
+        EvaluationResult aStart = evaluateWeeksArgument(*rNode.maChildren[0]);
         if (!aStart)
             return aStart;
-        EvaluationResult aEnd
-            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
+        EvaluationResult aEnd = evaluateWeeksArgument(*rNode.maChildren[1]);
         if (!aEnd)
             return aEnd;
-        EvaluationResult aMode
-            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[2], rCurrentAddress));
+        EvaluationResult aMode = evaluateWeeksArgument(*rNode.maChildren[2]);
         if (!aMode)
             return aMode;
 
         const auto oStartDate = sedatetime::coerceToDateSerial(aStart.maValue.maValue);
         const auto oEndDate = sedatetime::coerceToDateSerial(aEnd.maValue.maValue);
         if (!oStartDate || !oEndDate || aMode.maValue.maValue.isEmpty())
-            return makeFailure(api::Error::IllegalArgument);
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
         const auto aModeNumber = coerceToNumber(aMode.maValue.maValue);
         if (!aModeNumber)
-            return makeFailure(aModeNumber.meError);
+            return makeScalarResult(api::CellValue::error(aModeNumber.meError));
 
         const auto oWholeMode = toWholeNumber(aModeNumber.maValue);
         if (!oWholeMode)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
         const auto oWeeks = sedatetime::computeWeeksDifference(
             *oStartDate, *oEndDate, static_cast<sal_Int16>(*oWholeMode));
         if (!oWeeks)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
         return makeScalarResult(api::CellValue::number(*oWeeks));
+    }
+
+    if (aFunctionName == u"WEEKSINYEAR")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        EvaluationResult aDateArgument = evaluateNode(*rNode.maChildren[0], rCurrentAddress);
+        if (!aDateArgument)
+            return makeScalarResult(api::CellValue::error(aDateArgument.meError));
+        if (!aDateArgument.maValue.isScalar())
+        {
+            if (!aDateArgument.maValue.maReference.isSingleCell())
+                return makeScalarResult(api::CellValue::error(api::Error::NoValue));
+
+            aDateArgument = materializeReferenceValue(aDateArgument.maValue.maReference, 0, 0);
+            if (!aDateArgument)
+                return makeScalarResult(api::CellValue::error(aDateArgument.meError));
+        }
+
+        const auto oDateSerial = sedatetime::coerceToDateSerial(aDateArgument.maValue.maValue);
+        if (!oDateSerial)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const api::DateParts aDate = sedate::fromAbsoluteDays(
+            sedate::toAbsoluteDays(sedatetime::defaultNullDate()) + *oDateSerial);
+        const sal_Int32 nJan1WeekDay
+            = (sedate::toAbsoluteDays({ aDate.mnYear, 1, 1 }) - 1) % 7;
+        const double fWeeksInYear = nJan1WeekDay == 3
+                                        ? 53.0
+                                        : (nJan1WeekDay == 2 && sedate::isLeapYear(aDate.mnYear)
+                                               ? 53.0
+                                               : 52.0);
+        return makeScalarResult(api::CellValue::number(fWeeksInYear));
     }
 
     if (aFunctionName == u"WORKDAY.INTL")

@@ -2868,6 +2868,9 @@ int main()
         const auto aWeeks = aEvaluator.evaluateFormula(
             u"of:=ORG.OPENOFFICE.WEEKS(DATEVALUE(\"2021-11-14\");DATEVALUE(\"2021-11-15\");1)",
             { 0, 0, 0 });
+        const auto aWeeksInYear
+            = aEvaluator.evaluateFormula(u"of:=ORG.OPENOFFICE.WEEKSINYEAR(\"2014-12-31\")",
+                { 0, 0, 0 });
         const auto aExactVLookup = aEvaluator.evaluateFormula(
             u"of:=VLOOKUP(7;{5|21;6|22;8|24};2;0)", { 0, 0, 0 });
         const auto aIsNaMax = aEvaluator.evaluateFormula(u"of:=ISNA(MAX(NA()))", { 0, 0, 0 });
@@ -2881,6 +2884,27 @@ int main()
             = aEvaluator.evaluateFormula(u"of:=ORG.OPENOFFICE.ISLEAPYEAR(\"2000-02-01\")", { 0, 0, 0 });
         const auto aIsoWeekNum
             = aEvaluator.evaluateFormula(u"of:=ISOWEEKNUM(\"Jan11, 2015\")", { 0, 0, 0 });
+        const auto aYear = aEvaluator.evaluateFormula(u"of:=YEAR(1)", { 0, 0, 0 });
+        const auto aMonth = aEvaluator.evaluateFormula(u"of:=MONTH(1)", { 0, 0, 0 });
+        const auto aDay
+            = aEvaluator.evaluateFormula(u"of:=DAY(\"1899-12-29T15:26:14\")", { 0, 0, 0 });
+        const auto aHour
+            = aEvaluator.evaluateFormula(u"of:=HOUR(\"17:20:00\")", { 0, 0, 0 });
+        const auto aMinute = aEvaluator.evaluateFormula(
+            u"of:=MINUTE(\"1954-07-20 16:30:01\")", { 0, 0, 0 });
+        const auto aSecond = aEvaluator.evaluateFormula(
+            u"of:=SECOND(\"1954-07-20 16:30:01\")", { 0, 0, 0 });
+        const auto aWeekday
+            = aEvaluator.evaluateFormula(u"of:=WEEKDAY(\"2000-06-14\";2)", { 0, 0, 0 });
+        const auto aWeeknum
+            = aEvaluator.evaluateFormula(u"of:=WEEKNUM(\"2016-07-24\";21)", { 0, 0, 0 });
+        const auto aDays360
+            = aEvaluator.evaluateFormula(u"of:=DAYS360(DATE(2001;2;28);DATE(2001;3;31);TRUE())",
+                { 0, 0, 0 });
+        const auto aEasterSunday
+            = aEvaluator.evaluateFormula(u"of:=EASTERSUNDAY(2015)", { 0, 0, 0 });
+        const auto aYears = aEvaluator.evaluateFormula(
+            u"of:=ORG.OPENOFFICE.YEARS(DATE(2014;1;15);DATE(2016;4;1);0)", { 0, 0, 0 });
         const auto aEomonth
             = aEvaluator.evaluateFormula(u"of:=EOMONTH(\"Jan11, 2015\";1)", { 0, 0, 0 });
         const auto aEdate
@@ -2917,6 +2941,42 @@ int main()
             u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);5;\"3\")", { 0, 0, 0 });
         const auto aCompiledNumericMaskWorkdayIntl = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);1;1100000)", { 0, 0, 0 });
+        const auto aCompiledYear = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=YEAR(1)",
+            { 0, 0, 0 });
+        const auto aCompiledMonth = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=MONTH(1)",
+            { 0, 0, 0 });
+        const auto aCompiledDay = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=DAY(\"1899-12-29T15:26:14\")", { 0, 0, 0 });
+        const auto aCompiledHour = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=HOUR(\"17:20:00\")", { 0, 0, 0 });
+        const auto aCompiledMinute = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=MINUTE(\"1954-07-20 16:30:01\")", { 0, 0, 0 });
+        const auto aCompiledSecond = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=SECOND(\"1954-07-20 16:30:01\")", { 0, 0, 0 });
+        const auto aCompiledWeekday
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=WEEKDAY(\"2000-06-14\";2)",
+                { 0, 0, 0 });
+        const auto aCompiledWeeknum
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=WEEKNUM(\"2016-07-24\";21)",
+                { 0, 0, 0 });
+        const auto aCompiledDays360
+            = aEvaluator.evaluateFormulaViaCompiledTokens(
+                u"of:=DAYS360(DATE(2001;2;28);DATE(2001;3;31);TRUE())", { 0, 0, 0 });
+        const auto aCompiledEasterSunday
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=EASTERSUNDAY(2015)", { 0, 0, 0 });
+        const auto aCompiledYears = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ORG.OPENOFFICE.YEARS(DATE(2014;1;15);DATE(2016;4;1);0)", { 0, 0, 0 });
+        const auto checkNumber = [&](const char* pLabel, const auto& rResult,
+                                     double fExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isNumber() || rResult.mbUsedCachedValue
+                || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+            {
+                std::fprintf(stderr, "%s: date/time function mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
         if (!aDate || !aDate.maValue.maValue.isNumber()
             || !almostEqual(aDate.maValue.maValue.mfNumber, 42005.0)
             || !aExpectedDate || !aDateFunction || !aDateFunction.maValue.maValue.isNumber()
@@ -2934,6 +2994,8 @@ int main()
             || !almostEqual(aRawSubtract.maValue.maValue.mfNumber, 0.25)
             || !aWeeks || !aWeeks.maValue.maValue.isNumber()
             || !almostEqual(aWeeks.maValue.maValue.mfNumber, 1.0)
+            || !aWeeksInYear || !aWeeksInYear.maValue.maValue.isNumber()
+            || !almostEqual(aWeeksInYear.maValue.maValue.mfNumber, 52.0)
             || aExactVLookup || aExactVLookup.meError != spreadsheetengine::api::Error::IllegalArgument
             || !aIsNaMax || !aIsNaMax.maValue.maValue.isBoolean()
             || !almostEqual(aIsNaMax.maValue.maValue.mfNumber, 1.0)
@@ -2949,6 +3011,17 @@ int main()
             || !almostEqual(aIsLeapYear.maValue.maValue.mfNumber, 1.0)
             || !aIsoWeekNum || !aIsoWeekNum.maValue.maValue.isNumber()
             || !almostEqual(aIsoWeekNum.maValue.maValue.mfNumber, 2.0)
+            || !checkNumber("YEAR", aYear, 1899.0)
+            || !checkNumber("MONTH", aMonth, 12.0)
+            || !checkNumber("DAY", aDay, 29.0)
+            || !checkNumber("HOUR", aHour, 17.0)
+            || !checkNumber("MINUTE", aMinute, 30.0)
+            || !checkNumber("SECOND", aSecond, 1.0)
+            || !checkNumber("WEEKDAY", aWeekday, 3.0)
+            || !checkNumber("WEEKNUM", aWeeknum, 29.0)
+            || !checkNumber("DAYS360", aDays360, 32.0)
+            || !checkNumber("EASTERSUNDAY", aEasterSunday, 42099.0)
+            || !checkNumber("YEARS", aYears, 2.0)
             || !aExpectedEomonth || !aEomonth || !aEomonth.maValue.maValue.isNumber()
             || !almostEqual(aEomonth.maValue.maValue.mfNumber, aExpectedEomonth.maValue)
             || !aExpectedEdate || !aEdate || !aEdate.maValue.maValue.isNumber()
@@ -2984,6 +3057,17 @@ int main()
             || aCompiledNumericMaskWorkdayIntl
             || aCompiledNumericMaskWorkdayIntl.meError
                    != spreadsheetengine::api::Error::IllegalArgument
+            || !checkNumber("compiled YEAR", aCompiledYear, 1899.0)
+            || !checkNumber("compiled MONTH", aCompiledMonth, 12.0)
+            || !checkNumber("compiled DAY", aCompiledDay, 29.0)
+            || !checkNumber("compiled HOUR", aCompiledHour, 17.0)
+            || !checkNumber("compiled MINUTE", aCompiledMinute, 30.0)
+            || !checkNumber("compiled SECOND", aCompiledSecond, 1.0)
+            || !checkNumber("compiled WEEKDAY", aCompiledWeekday, 3.0)
+            || !checkNumber("compiled WEEKNUM", aCompiledWeeknum, 29.0)
+            || !checkNumber("compiled DAYS360", aCompiledDays360, 32.0)
+            || !checkNumber("compiled EASTERSUNDAY", aCompiledEasterSunday, 42099.0)
+            || !checkNumber("compiled YEARS", aCompiledYears, 2.0)
             || aInvalidTime || aInvalidTime.meError != spreadsheetengine::api::Error::IllegalArgument
             || aInvalidTimeFunction
             || aInvalidTimeFunction.meError != spreadsheetengine::api::Error::IllegalArgument)
@@ -3395,14 +3479,20 @@ int main()
                                / "date_time" / "fods" / "time.fods";
         const auto aWeeksPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
                                 / "date_time" / "fods" / "weeks.fods";
+        const auto aWeeksInYearPath = aRepoRoot / "sc" / "qa" / "unit" / "data"
+                                      / "functions" / "date_time" / "fods"
+                                      / "weeksinyear.fods";
         const auto aVlookupPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
                                   / "spreadsheet" / "fods" / "vlookup.fods";
         const auto aEomonthLoad = spreadsheetengine::core::fods::loadWorkbook(aEomonthPath.string());
         const auto aEdateLoad = spreadsheetengine::core::fods::loadWorkbook(aEdatePath.string());
         const auto aTimeLoad = spreadsheetengine::core::fods::loadWorkbook(aTimePath.string());
         const auto aWeeksLoad = spreadsheetengine::core::fods::loadWorkbook(aWeeksPath.string());
+        const auto aWeeksInYearLoad
+            = spreadsheetengine::core::fods::loadWorkbook(aWeeksInYearPath.string());
         const auto aVlookupLoad = spreadsheetengine::core::fods::loadWorkbook(aVlookupPath.string());
-        if (!aEomonthLoad || !aEdateLoad || !aTimeLoad || !aWeeksLoad || !aVlookupLoad)
+        if (!aEomonthLoad || !aEdateLoad || !aTimeLoad || !aWeeksLoad || !aWeeksInYearLoad
+            || !aVlookupLoad)
             return fail("spreadsheetengine_fods_evaluator_tests", "month-shift FODS load failed");
 
         Evaluator aEomonthEvaluator(aEomonthLoad.maValue.maWorkbook);
@@ -3436,11 +3526,78 @@ int main()
 
         Evaluator aWeeksEvaluator(aWeeksLoad.maValue.maWorkbook);
         const auto aWeeksResult = aWeeksEvaluator.evaluateCell({ 1, 0, 11 });
+        const auto aWeeksErrorResult = aWeeksEvaluator.evaluateCell({ 1, 0, 1 });
+        const auto aCompiledWeeksResult = aWeeksEvaluator.evaluateCellViaCompiledTokens({ 1, 0, 11 });
+        const auto aCompiledWeeksErrorResult
+            = aWeeksEvaluator.evaluateCellViaCompiledTokens({ 1, 0, 1 });
         if (!aWeeksResult || aWeeksResult.mbUsedCachedValue
             || !aWeeksResult.maValue.maValue.isNumber()
             || !almostEqual(aWeeksResult.maValue.maValue.mfNumber, 1.0))
         {
             return fail("spreadsheetengine_fods_evaluator_tests", "weeks.fods live evaluation mismatch");
+        }
+        if (!aWeeksErrorResult || aWeeksErrorResult.mbUsedCachedValue
+            || !aWeeksErrorResult.maValue.maValue.isError()
+            || aWeeksErrorResult.maValue.maValue.meError != spreadsheetengine::api::Error::NoValue)
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests", "weeks.fods live error mismatch");
+        }
+        if (!aCompiledWeeksResult || aCompiledWeeksResult.mbUsedCachedValue
+            || !aCompiledWeeksResult.maValue.maValue.isNumber()
+            || !almostEqual(aCompiledWeeksResult.maValue.maValue.mfNumber, 1.0))
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests", "weeks.fods compiled evaluation mismatch");
+        }
+        if (!aCompiledWeeksErrorResult || aCompiledWeeksErrorResult.mbUsedCachedValue
+            || !aCompiledWeeksErrorResult.maValue.maValue.isError()
+            || aCompiledWeeksErrorResult.maValue.maValue.meError
+                   != spreadsheetengine::api::Error::NoValue)
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests", "weeks.fods compiled error mismatch");
+        }
+
+        Evaluator aWeeksInYearEvaluator(aWeeksInYearLoad.maValue.maWorkbook);
+        const auto aWeeksInYearResult = aWeeksInYearEvaluator.evaluateCell({ 1, 0, 1 });
+        const auto aWeeksInYearErrorResult = aWeeksInYearEvaluator.evaluateCell({ 1, 0, 4 });
+        const auto aCompiledWeeksInYearResult
+            = aWeeksInYearEvaluator.evaluateCellViaCompiledTokens({ 1, 0, 1 });
+        const auto aCompiledWeeksInYearErrorResult
+            = aWeeksInYearEvaluator.evaluateCellViaCompiledTokens({ 1, 0, 4 });
+        if (!aWeeksInYearResult || aWeeksInYearResult.mbUsedCachedValue
+            || !aWeeksInYearResult.maValue.maValue.isNumber()
+            || !almostEqual(aWeeksInYearResult.maValue.maValue.mfNumber, 52.0))
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests",
+                "weeksinyear.fods live evaluation mismatch");
+        }
+        if (!aWeeksInYearErrorResult || aWeeksInYearErrorResult.mbUsedCachedValue
+            || !aWeeksInYearErrorResult.maValue.maValue.isError()
+            || aWeeksInYearErrorResult.maValue.maValue.meError
+                   != spreadsheetengine::api::Error::IllegalArgument)
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests", "weeksinyear.fods live error mismatch");
+        }
+        if (!aCompiledWeeksInYearResult || aCompiledWeeksInYearResult.mbUsedCachedValue
+            || !aCompiledWeeksInYearResult.maValue.maValue.isNumber()
+            || !almostEqual(aCompiledWeeksInYearResult.maValue.maValue.mfNumber, 52.0))
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests",
+                "weeksinyear.fods compiled evaluation mismatch");
+        }
+        if (!aCompiledWeeksInYearErrorResult || aCompiledWeeksInYearErrorResult.mbUsedCachedValue
+            || !aCompiledWeeksInYearErrorResult.maValue.maValue.isError()
+            || aCompiledWeeksInYearErrorResult.maValue.maValue.meError
+                   != spreadsheetengine::api::Error::IllegalArgument)
+        {
+            return fail(
+                "spreadsheetengine_fods_evaluator_tests",
+                "weeksinyear.fods compiled error mismatch");
         }
 
         Evaluator aVlookupEvaluator(aVlookupLoad.maValue.maWorkbook);

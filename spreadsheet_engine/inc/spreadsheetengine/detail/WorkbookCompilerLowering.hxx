@@ -191,6 +191,18 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeGetDate;
     if (aNormalized == u"TIME")
         return token::kOpCodeGetTime;
+    if (aNormalized == u"YEAR")
+        return token::kOpCodeGetYear;
+    if (aNormalized == u"MONTH")
+        return token::kOpCodeGetMonth;
+    if (aNormalized == u"DAY")
+        return token::kOpCodeGetDay;
+    if (aNormalized == u"HOUR")
+        return token::kOpCodeGetHour;
+    if (aNormalized == u"MINUTE")
+        return token::kOpCodeGetMin;
+    if (aNormalized == u"SECOND")
+        return token::kOpCodeGetSec;
     if (aNormalized == u"DAYS360")
         return token::kOpCodeGetDiffDate360;
     if (aNormalized == u"NETWORKDAYS")
@@ -201,6 +213,8 @@ lookupLexicalFunctionOpcode(api::StringView rName)
         return token::kOpCodeWeek;
     if (aNormalized == u"WEEKDAY")
         return token::kOpCodeGetDayOfWeek;
+    if (aNormalized == u"EASTERSUNDAY" || aNormalized == u"ORG.OPENOFFICE.EASTERSUNDAY")
+        return token::kOpCodeEasterSunday;
     if (aNormalized == u"MOD")
         return token::kOpCodeMod;
     if (aNormalized == u"MIN")
