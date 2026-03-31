@@ -3899,12 +3899,15 @@ int main()
                                      / "mathematical" / "fods" / "convert_add.fods";
         const auto aTTestPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
                                 / "statistical" / "fods" / "t.test.fods";
+        const auto aForecastPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                   / "statistical" / "fods" / "forecast.fods";
         const auto aAggregatePath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
                                     / "mathematical" / "fods" / "aggregate.fods";
         const auto aConvertLoad = spreadsheetengine::core::fods::loadWorkbook(aConvertPath.string());
         const auto aConvertAddLoad
             = spreadsheetengine::core::fods::loadWorkbook(aConvertAddPath.string());
         const auto aTTestLoad = spreadsheetengine::core::fods::loadWorkbook(aTTestPath.string());
+        const auto aForecastLoad = spreadsheetengine::core::fods::loadWorkbook(aForecastPath.string());
         const auto aLoadResult = spreadsheetengine::core::fods::loadWorkbook(aAggregatePath.string());
         if (!aConvertLoad)
             return fail("spreadsheetengine_fods_evaluator_tests", "convert.fods load failed");
@@ -3912,6 +3915,8 @@ int main()
             return fail("spreadsheetengine_fods_evaluator_tests", "convert_add.fods load failed");
         if (!aTTestLoad)
             return fail("spreadsheetengine_fods_evaluator_tests", "t.test.fods load failed");
+        if (!aForecastLoad)
+            return fail("spreadsheetengine_fods_evaluator_tests", "forecast.fods load failed");
         if (!aLoadResult)
             return fail("spreadsheetengine_fods_evaluator_tests", "aggregate.fods load failed");
 
@@ -3965,6 +3970,59 @@ int main()
         {
             return fail(
                 "spreadsheetengine_fods_evaluator_tests", "t.test.fods paired-zero-variance mismatch");
+        }
+
+        Evaluator aForecastEvaluator(aForecastLoad.maValue.maWorkbook);
+        constexpr struct
+        {
+            CellAddress maAddress;
+            double mfExpected;
+            const char* mpLabel;
+        } kForecastValueChecks[] {
+            { { 1, 0, 1 }, 13.0, "forecast.fods Sheet2.A2 mismatch" },
+            { { 1, 0, 2 }, 10.6072530864198, "forecast.fods Sheet2.A3 mismatch" },
+            { { 1, 0, 3 }, 112.723528625461, "forecast.fods Sheet2.A4 mismatch" },
+            { { 1, 0, 42 }, -10.6658950617284, "forecast.fods Sheet2.A43 mismatch" },
+            { { 1, 0, 43 }, -31.9390432098765, "forecast.fods Sheet2.A44 mismatch" },
+            { { 1, 0, 44 }, 5.0, "forecast.fods Sheet2.A45 mismatch" },
+            { { 1, 0, 45 }, 10.6571428571429, "forecast.fods Sheet2.A46 mismatch" },
+            { { 1, 0, 46 }, -5.0, "forecast.fods Sheet2.A47 mismatch" },
+        };
+
+        for (const auto& rCheck : kForecastValueChecks)
+        {
+            const auto aLive = aForecastEvaluator.evaluateCell(rCheck.maAddress);
+            const auto aCompiled = aForecastEvaluator.evaluateCellViaCompiledTokens(rCheck.maAddress);
+            if (!aLive || aLive.mbUsedCachedValue || !aLive.maValue.maValue.isNumber()
+                || !almostEqual(aLive.maValue.maValue.mfNumber, rCheck.mfExpected)
+                || !aCompiled || aCompiled.mbUsedCachedValue
+                || !aCompiled.maValue.maValue.isNumber()
+                || !almostEqual(aCompiled.maValue.maValue.mfNumber, rCheck.mfExpected))
+            {
+                return fail("spreadsheetengine_fods_evaluator_tests", rCheck.mpLabel);
+            }
+        }
+
+        constexpr CellAddress kForecastComparisonChecks[] {
+            { 1, 2, 1 }, { 1, 2, 2 }, { 1, 2, 3 }, { 1, 2, 42 },
+            { 1, 2, 43 }, { 1, 2, 44 }, { 1, 2, 45 }, { 1, 2, 46 },
+        };
+        for (const auto& rAddress : kForecastComparisonChecks)
+        {
+            const auto aLive = aForecastEvaluator.evaluateCell(rAddress);
+            const auto aCompiled = aForecastEvaluator.evaluateCellViaCompiledTokens(rAddress);
+            if (!aLive || aLive.mbUsedCachedValue || !aLive.maValue.maValue.isBoolean()
+                || !almostEqual(aLive.maValue.maValue.mfNumber, 1.0))
+            {
+                return fail("spreadsheetengine_fods_evaluator_tests",
+                    "forecast.fods comparison live mismatch");
+            }
+            if (!aCompiled || aCompiled.mbUsedCachedValue || !aCompiled.maValue.maValue.isBoolean()
+                || !almostEqual(aCompiled.maValue.maValue.mfNumber, 1.0))
+            {
+                return fail("spreadsheetengine_fods_evaluator_tests",
+                    "forecast.fods comparison compiled mismatch");
+            }
         }
 
         const auto* pSheet2 = aLoadResult.maValue.maWorkbook.findSheet(u"Sheet2");

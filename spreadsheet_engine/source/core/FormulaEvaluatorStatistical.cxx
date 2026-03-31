@@ -713,7 +713,11 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
         if (rNode.maChildren.size() != 2 + (aFunctionName == u"FORECAST" ? 1 : 0))
             return makeCellError(api::Error::IllegalArgument);
 
-        const auto aStats = collectRegressionStats(*rNode.maChildren[0], *rNode.maChildren[1]);
+        const formula::Node& rKnownY
+            = *rNode.maChildren[aFunctionName == u"FORECAST" ? 1 : 0];
+        const formula::Node& rKnownX
+            = *rNode.maChildren[aFunctionName == u"FORECAST" ? 2 : 1];
+        const auto aStats = collectRegressionStats(rKnownY, rKnownX);
         if (!aStats)
             return makeCellError(aStats.meError);
         if (fp::approxEqual(aStats.maValue.fSumSqrDeltaX.get(), 0.0))
@@ -726,7 +730,7 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
         if (aFunctionName == u"INTERCEPT")
             return makeScalarResult(api::CellValue::number(fIntercept));
 
-        const auto aForecastX = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[2]);
+        const auto aForecastX = aContext.evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
         if (!aForecastX)
             return makeCellError(aForecastX.meError);
         return makeScalarResult(
