@@ -2740,6 +2740,93 @@ EvaluationResult Evaluator::evaluateFunction(
         return makeScalarResult(api::CellValue::number(aPrice.maValue));
     }
 
+    if (aFunctionName == u"AMORLINC" || aFunctionName == u"GETAMORLINC")
+    {
+        if (rNode.maChildren.size() < 6 || rNode.maChildren.size() > 7)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aCost = evaluateRequiredNumberArgument(*rNode.maChildren[0]);
+        if (!aCost)
+            return makeScalarResult(api::CellValue::error(aCost.meError));
+        const auto aPurchaseDate = evaluateRequiredDateArgument(*rNode.maChildren[1]);
+        if (!aPurchaseDate)
+            return makeScalarResult(api::CellValue::error(aPurchaseDate.meError));
+        const auto aFirstPeriodEndDate = evaluateRequiredDateArgument(*rNode.maChildren[2]);
+        if (!aFirstPeriodEndDate)
+            return makeScalarResult(api::CellValue::error(aFirstPeriodEndDate.meError));
+        const auto aSalvage = evaluateRequiredNumberArgument(*rNode.maChildren[3]);
+        if (!aSalvage)
+            return makeScalarResult(api::CellValue::error(aSalvage.meError));
+        const auto aPeriod = evaluateRequiredNumberArgument(*rNode.maChildren[4]);
+        if (!aPeriod)
+            return makeScalarResult(api::CellValue::error(aPeriod.meError));
+        const auto aRate = evaluateRequiredNumberArgument(*rNode.maChildren[5]);
+        if (!aRate)
+            return makeScalarResult(api::CellValue::error(aRate.meError));
+
+        sal_Int32 nBasis = 0;
+        if (rNode.maChildren.size() == 7)
+        {
+            const auto aBasis = evaluateOptionalWholeNumberArgument(*rNode.maChildren[6], 0);
+            if (!aBasis)
+                return makeScalarResult(api::CellValue::error(aBasis.meError));
+            nBasis = aBasis.maValue;
+        }
+
+        const auto aDepreciation = sefinance::evaluateAmorlinc(
+            sedatetime::defaultNullDate(), aCost.maValue, aPurchaseDate.maValue,
+            aFirstPeriodEndDate.maValue, aSalvage.maValue, aPeriod.maValue, aRate.maValue,
+            nBasis);
+        if (!aDepreciation)
+            return makeScalarResult(api::CellValue::error(aDepreciation.meError));
+        return makeScalarResult(api::CellValue::number(aDepreciation.maValue));
+    }
+
+    if (aFunctionName == u"ODDLYIELD" || aFunctionName == u"GETODDLYIELD")
+    {
+        if (rNode.maChildren.size() < 7 || rNode.maChildren.size() > 8)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aSettlement = evaluateRequiredDateArgument(*rNode.maChildren[0]);
+        if (!aSettlement)
+            return makeScalarResult(api::CellValue::error(aSettlement.meError));
+        const auto aMaturity = evaluateRequiredDateArgument(*rNode.maChildren[1]);
+        if (!aMaturity)
+            return makeScalarResult(api::CellValue::error(aMaturity.meError));
+        const auto aLastInterest = evaluateRequiredDateArgument(*rNode.maChildren[2]);
+        if (!aLastInterest)
+            return makeScalarResult(api::CellValue::error(aLastInterest.meError));
+        const auto aRate = evaluateRequiredNumberArgument(*rNode.maChildren[3]);
+        if (!aRate)
+            return makeScalarResult(api::CellValue::error(aRate.meError));
+        const auto aPrice = evaluateRequiredNumberArgument(*rNode.maChildren[4]);
+        if (!aPrice)
+            return makeScalarResult(api::CellValue::error(aPrice.meError));
+        const auto aRedemption = evaluateRequiredNumberArgument(*rNode.maChildren[5]);
+        if (!aRedemption)
+            return makeScalarResult(api::CellValue::error(aRedemption.meError));
+        const auto aFrequency = evaluateRequiredWholeNumberArgument(*rNode.maChildren[6]);
+        if (!aFrequency)
+            return makeScalarResult(api::CellValue::error(aFrequency.meError));
+
+        sal_Int32 nBasis = 0;
+        if (rNode.maChildren.size() == 8)
+        {
+            const auto aBasis = evaluateOptionalWholeNumberArgument(*rNode.maChildren[7], 0);
+            if (!aBasis)
+                return makeScalarResult(api::CellValue::error(aBasis.meError));
+            nBasis = aBasis.maValue;
+        }
+
+        const auto aYield = sefinance::evaluateOddlyield(
+            sedatetime::defaultNullDate(), aSettlement.maValue, aMaturity.maValue,
+            aLastInterest.maValue, aRate.maValue, aPrice.maValue, aRedemption.maValue,
+            aFrequency.maValue, nBasis);
+        if (!aYield)
+            return makeScalarResult(api::CellValue::error(aYield.meError));
+        return makeScalarResult(api::CellValue::number(aYield.maValue));
+    }
+
     if (aFunctionName == u"POISSON" || aFunctionName == u"POISSON.DIST")
     {
         const bool bLegacyPoisson = aFunctionName == u"POISSON";
@@ -3820,7 +3907,7 @@ EvaluationResult Evaluator::evaluateFunction(
         if (rNode.maChildren.empty() || rNode.maChildren.size() > 3
             || (bMicrosoftCompat && rNode.maChildren.size() != 2))
         {
-            return makeFailure(api::Error::IllegalArgument);
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
         }
 
         double fValue = 0.0;
@@ -3833,7 +3920,7 @@ EvaluationResult Evaluator::evaluateFunction(
 
             const auto aValueNumber = coerceToNumber(aValue.maValue.maValue);
             if (!aValueNumber)
-                return makeFailure(aValueNumber.meError);
+                return makeScalarResult(api::CellValue::error(aValueNumber.meError));
             fValue = aValueNumber.maValue;
         }
 
@@ -3848,7 +3935,7 @@ EvaluationResult Evaluator::evaluateFunction(
 
             const auto aSignificanceNumber = coerceToNumber(aSignificance.maValue.maValue);
             if (!aSignificanceNumber)
-                return makeFailure(aSignificanceNumber.meError);
+                return makeScalarResult(api::CellValue::error(aSignificanceNumber.meError));
             fSignificance = aSignificanceNumber.maValue;
         }
 
@@ -3867,7 +3954,7 @@ EvaluationResult Evaluator::evaluateFunction(
 
             const auto aModeNumber = coerceToNumber(aMode.maValue.maValue);
             if (!aModeNumber)
-                return makeFailure(aModeNumber.meError);
+                return makeScalarResult(api::CellValue::error(aModeNumber.meError));
             bAbs = !::rtl::math::approxEqual(aModeNumber.maValue, 0.0);
         }
 
@@ -3879,14 +3966,14 @@ EvaluationResult Evaluator::evaluateFunction(
             aFunctionName == u"CEILING" || aFunctionName == u"CEILING.XCL",
             bMicrosoftCompat);
         if (!aRounded)
-            return makeFailure(aRounded.meError);
+            return makeScalarResult(api::CellValue::error(aRounded.meError));
         return makeScalarResult(api::CellValue::number(aRounded.maValue));
     }
 
     if (aFunctionName == u"CEILING.MATH" || aFunctionName == u"FLOOR.MATH")
     {
         if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
         EvaluationResult aValue
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
@@ -3895,7 +3982,7 @@ EvaluationResult Evaluator::evaluateFunction(
 
         const auto aValueNumber = coerceToNumber(aValue.maValue.maValue);
         if (!aValueNumber)
-            return makeFailure(aValueNumber.meError);
+            return makeScalarResult(api::CellValue::error(aValueNumber.meError));
 
         double fSignificance = 1.0;
         if (rNode.maChildren.size() >= 2)
@@ -3907,7 +3994,7 @@ EvaluationResult Evaluator::evaluateFunction(
 
             const auto aSignificanceNumber = coerceToNumber(aSignificance.maValue.maValue);
             if (!aSignificanceNumber)
-                return makeFailure(aSignificanceNumber.meError);
+                return makeScalarResult(api::CellValue::error(aSignificanceNumber.meError));
             fSignificance = aSignificanceNumber.maValue;
         }
 
@@ -3924,14 +4011,14 @@ EvaluationResult Evaluator::evaluateFunction(
 
             const auto aModeNumber = coerceToNumber(aMode.maValue.maValue);
             if (!aModeNumber)
-                return makeFailure(aModeNumber.meError);
+                return makeScalarResult(api::CellValue::error(aModeNumber.meError));
             fMode = aModeNumber.maValue;
         }
 
         const auto aRounded = semath::evaluateCeilingFloorMathValue(
             aValueNumber.maValue, fSignificance, fMode, aFunctionName == u"CEILING.MATH");
         if (!aRounded)
-            return makeFailure(aRounded.meError);
+            return makeScalarResult(api::CellValue::error(aRounded.meError));
         return makeScalarResult(api::CellValue::number(aRounded.maValue));
     }
 
@@ -3939,7 +4026,7 @@ EvaluationResult Evaluator::evaluateFunction(
         || aFunctionName == u"ISO.CEILING")
     {
         if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
         EvaluationResult aValue
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
@@ -3948,7 +4035,7 @@ EvaluationResult Evaluator::evaluateFunction(
 
         const auto aValueNumber = coerceToNumber(aValue.maValue.maValue);
         if (!aValueNumber)
-            return makeFailure(aValueNumber.meError);
+            return makeScalarResult(api::CellValue::error(aValueNumber.meError));
 
         double fSignificance = 1.0;
         if (rNode.maChildren.size() == 2)
@@ -3960,14 +4047,14 @@ EvaluationResult Evaluator::evaluateFunction(
 
             const auto aSignificanceNumber = coerceToNumber(aSignificance.maValue.maValue);
             if (!aSignificanceNumber)
-                return makeFailure(aSignificanceNumber.meError);
+                return makeScalarResult(api::CellValue::error(aSignificanceNumber.meError));
             fSignificance = aSignificanceNumber.maValue;
         }
 
         const auto aRounded = semath::evaluateCeilingFloorPreciseValue(
             aValueNumber.maValue, fSignificance, aFunctionName == u"FLOOR.PRECISE");
         if (!aRounded)
-            return makeFailure(aRounded.meError);
+            return makeScalarResult(api::CellValue::error(aRounded.meError));
         return makeScalarResult(api::CellValue::number(aRounded.maValue));
     }
 
@@ -5180,7 +5267,7 @@ EvaluationResult Evaluator::evaluateFunction(
     if (aFunctionName == u"EUROCONVERT")
     {
         if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 5)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
         EvaluationResult aValueArgument
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
@@ -5197,13 +5284,13 @@ EvaluationResult Evaluator::evaluateFunction(
 
         const auto aValueNumber = coerceToNumber(aValueArgument.maValue.maValue);
         if (!aValueNumber)
-            return makeFailure(aValueNumber.meError);
+            return makeScalarResult(api::CellValue::error(aValueNumber.meError));
         const auto aFromUnit = coerceToString(aFromUnitArgument.maValue.maValue);
         if (!aFromUnit)
-            return makeFailure(aFromUnit.meError);
+            return makeScalarResult(api::CellValue::error(aFromUnit.meError));
         const auto aToUnit = coerceToString(aToUnitArgument.maValue.maValue);
         if (!aToUnit)
-            return makeFailure(aToUnit.meError);
+            return makeScalarResult(api::CellValue::error(aToUnit.meError));
 
         bool bFullPrecision = false;
         if (rNode.maChildren.size() >= 4
@@ -5216,7 +5303,7 @@ EvaluationResult Evaluator::evaluateFunction(
             {
                 const auto aBool = coerceToBoolean(aFullPrecision.maValue);
                 if (!aBool)
-                    return makeFailure(aBool.meError);
+                    return makeScalarResult(api::CellValue::error(aBool.meError));
                 bFullPrecision = aBool.maValue;
             }
         }
@@ -5224,29 +5311,29 @@ EvaluationResult Evaluator::evaluateFunction(
         if (rNode.maChildren.size() == 5)
         {
             if (rNode.maChildren[4]->meKind == formula::NodeKind::EmptyArgument)
-                return makeFailure(api::Error::IllegalArgument);
+                return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
             const auto aTriangulationPrecision
                 = evaluateNumericArgument(*rNode.maChildren[4], std::nullopt);
             if (!aTriangulationPrecision)
-                return makeFailure(aTriangulationPrecision.meError);
+                return makeScalarResult(api::CellValue::error(aTriangulationPrecision.meError));
 
             const auto oWholePrecision = toWholeNumber(aTriangulationPrecision.maValue);
             if (!oWholePrecision || *oWholePrecision < 3)
-                return makeFailure(api::Error::IllegalArgument);
+                return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
         }
 
         const auto aConverted = seconvert::evaluateEuroConvertValue(
             aValueNumber.maValue, aFromUnit.maValue, aToUnit.maValue, true, !bFullPrecision);
         if (!aConverted)
-            return makeFailure(aConverted.meError);
+            return makeScalarResult(api::CellValue::error(aConverted.meError));
         return makeScalarResult(api::CellValue::number(aConverted.maValue));
     }
 
     if (aFunctionName == u"CONVERT")
     {
         if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 5)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
         if (rNode.maChildren.size() > 3)
             return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
@@ -5265,13 +5352,13 @@ EvaluationResult Evaluator::evaluateFunction(
 
         const auto aValueNumber = coerceToNumber(aValueArgument.maValue.maValue);
         if (!aValueNumber)
-            return makeFailure(aValueNumber.meError);
+            return makeScalarResult(api::CellValue::error(aValueNumber.meError));
         const auto aFromUnit = coerceToString(aFromUnitArgument.maValue.maValue);
         if (!aFromUnit)
-            return makeFailure(aFromUnit.meError);
+            return makeScalarResult(api::CellValue::error(aFromUnit.meError));
         const auto aToUnit = coerceToString(aToUnitArgument.maValue.maValue);
         if (!aToUnit)
-            return makeFailure(aToUnit.meError);
+            return makeScalarResult(api::CellValue::error(aToUnit.meError));
 
         const auto aConverted = seconvert::evaluateConvertValue(
             aValueNumber.maValue, aFromUnit.maValue, aToUnit.maValue);
@@ -5285,7 +5372,7 @@ EvaluationResult Evaluator::evaluateFunction(
             return makeScalarResult(api::CellValue::number(aEuroConverted.maValue));
         }
 
-        return makeFailure(aConverted.meError);
+        return makeScalarResult(api::CellValue::error(aConverted.meError));
     }
 
     if (aFunctionName == u"DECIMAL")

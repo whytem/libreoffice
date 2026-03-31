@@ -1907,6 +1907,8 @@ int main()
             u"of:=COM.MICROSOFT.CEILING.PRECISE(-2.5;2)", { 0, 0, 0 });
         const auto aFloorPrecise = aEvaluator.evaluateFormula(
             u"of:=COM.MICROSOFT.FLOOR.PRECISE(-2.5;2)", { 0, 0, 0 });
+        const auto aFloorPreciseError = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.FLOOR.PRECISE(4.3;2;1)", { 0, 0, 0 });
         const auto aIsoCeiling
             = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.ISO.CEILING(-4.3;2)", { 0, 0, 0 });
         const auto aChar = aEvaluator.evaluateFormula(u"of:=CHAR(65)", { 0, 0, 0 });
@@ -2128,6 +2130,8 @@ int main()
             u"of:=COM.MICROSOFT.CEILING.PRECISE(-2.5;2)", { 0, 0, 0 });
         const auto aCompiledFloorPrecise = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=COM.MICROSOFT.FLOOR.PRECISE(-2.5;2)", { 0, 0, 0 });
+        const auto aCompiledFloorPreciseError = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.FLOOR.PRECISE(4.3;2;1)", { 0, 0, 0 });
         const auto aCompiledIsoCeiling = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=COM.MICROSOFT.ISO.CEILING(-4.3;2)", { 0, 0, 0 });
         const auto aCompiledChar
@@ -2413,6 +2417,8 @@ int main()
             || !checkNumber("CEILING.MATH", aCeilingMath, -6.0)
             || !checkNumber("CEILING.PRECISE", aCeilingPrecise, -2.0)
             || !checkNumber("FLOOR.PRECISE", aFloorPrecise, -4.0)
+            || !checkError("FLOOR.PRECISE error", aFloorPreciseError,
+                spreadsheetengine::api::Error::IllegalArgument)
             || !checkNumber("ISO.CEILING", aIsoCeiling, -4.0)
             || !checkText("CHAR", aChar, u"A")
             || !checkNumber("CODE", aCode, 65.0)
@@ -2556,6 +2562,8 @@ int main()
             || !checkNumber("compiled CEILING.MATH", aCompiledCeilingMath, -6.0)
             || !checkNumber("compiled CEILING.PRECISE", aCompiledCeilingPrecise, -2.0)
             || !checkNumber("compiled FLOOR.PRECISE", aCompiledFloorPrecise, -4.0)
+            || !checkError("compiled FLOOR.PRECISE error", aCompiledFloorPreciseError,
+                spreadsheetengine::api::Error::IllegalArgument)
             || !checkNumber("compiled ISO.CEILING", aCompiledIsoCeiling, -4.0)
             || !checkText("compiled CHAR", aCompiledChar, u"A")
             || !checkNumber("compiled CODE", aCompiledCode, 65.0)
@@ -2797,6 +2805,28 @@ int main()
             u"of:=CUMIPMT(0.055/12;24;5000;4;6;1)", { 0, 0, 0 });
         const auto aCompiledCumPrinc = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=CUMPRINC(0.055/12;24;5000;4;6;1)", { 0, 0, 0 });
+        const auto aOddlyield = aEvaluator.evaluateFormula(
+            u"of:=ODDLYIELD(\"1999-04-20\";\"1999-06-15\";\"1998-10-15\";0.0375;99.875;100;2)",
+            { 0, 0, 0 });
+        const auto aOddlyieldError = aEvaluator.evaluateFormula(
+            u"of:=ODDLYIELD(\"1999-04-20\";\"1999-06-15\";\"1998-10-15\";0.0375;0;100;2;0)",
+            { 0, 0, 0 });
+        const auto aAmorlinc = aEvaluator.evaluateFormula(
+            u"of:=AMORLINC(10000;DATE(2012;3;1);DATE(2012;12;31);1500;1;0.3)", { 0, 0, 0 });
+        const auto aAmorlincError = aEvaluator.evaluateFormula(
+            u"of:=AMORLINC(-10000;DATE(2012;3;1);DATE(2012;12;31);1500;1;0.3;4)",
+            { 0, 0, 0 });
+        const auto aCompiledOddlyield = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ODDLYIELD(\"1999-04-20\";\"1999-06-15\";\"1998-10-15\";0.0375;99.875;100;2)",
+            { 0, 0, 0 });
+        const auto aCompiledOddlyieldError = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ODDLYIELD(\"1999-04-20\";\"1999-06-15\";\"1998-10-15\";0.0375;0;100;2;0)",
+            { 0, 0, 0 });
+        const auto aCompiledAmorlinc = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=AMORLINC(10000;DATE(2012;3;1);DATE(2012;12;31);1500;1;0.3)", { 0, 0, 0 });
+        const auto aCompiledAmorlincError = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=AMORLINC(-10000;DATE(2012;3;1);DATE(2012;12;31);1500;1;0.3;4)",
+            { 0, 0, 0 });
         const auto aVdbMissingFactor = aEvaluator.evaluateFormula(
             u"of:=VDB(35000;7500;36;10;20;;)", { 0, 0, 0 });
         const auto aCompiledCumIpmtEmptyType = aEvaluator.evaluateFormulaViaCompiledTokens(
@@ -2808,6 +2838,18 @@ int main()
                 || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
             {
                 std::fprintf(stderr, "%s: financial function mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        const auto checkError = [&](const char* pLabel, const auto& rResult,
+                                    spreadsheetengine::api::Error eExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isError() || rResult.mbUsedCachedValue
+                || rResult.maValue.maValue.meError != eExpected)
+            {
+                std::fprintf(stderr, "%s: financial function error mismatch in %s\n",
                     "spreadsheetengine_fods_evaluator_tests", pLabel);
                 return false;
             }
@@ -2838,6 +2880,18 @@ int main()
             || !checkNumber("compiled VDB", aCompiledVdb, 8603.80245372397)
             || !checkNumber("compiled CUMIPMT", aCompiledCumIpmt, -57.5412415342252)
             || !checkNumber("compiled CUMPRINC", aCompiledCumPrinc, -600.875855808337)
+            || !checkNumber("ODDLYIELD", aOddlyield, 0.0448731663302424)
+            || !checkError(
+                "ODDLYIELD error", aOddlyieldError, spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("AMORLINC", aAmorlinc, 3000.0)
+            || !checkError(
+                "AMORLINC error", aAmorlincError, spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("compiled ODDLYIELD", aCompiledOddlyield, 0.0448731663302424)
+            || !checkError("compiled ODDLYIELD error", aCompiledOddlyieldError,
+                spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("compiled AMORLINC", aCompiledAmorlinc, 3000.0)
+            || !checkError("compiled AMORLINC error", aCompiledAmorlincError,
+                spreadsheetengine::api::Error::IllegalArgument)
             || aVdbMissingFactor || aVdbMissingFactor.meError != spreadsheetengine::api::Error::IllegalArgument
             || aCompiledCumIpmtEmptyType
             || aCompiledCumIpmtEmptyType.meError != spreadsheetengine::api::Error::IllegalArgument)

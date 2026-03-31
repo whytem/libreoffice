@@ -70,6 +70,16 @@ SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluatePrice(
     const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
     double fRate, double fYield, double fRedemption, sal_Int32 nFrequency, sal_Int32 nBasis);
 
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateAmorlinc(
+    const api::DateParts& rNullDate, double fCost, api::DateSerial nPurchaseDate,
+    api::DateSerial nFirstPeriodEndDate, double fSalvage, double fPeriod, double fRate,
+    sal_Int32 nBasis);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateOddlyield(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    api::DateSerial nLastInterest, double fRate, double fPrice, double fRedemption,
+    sal_Int32 nFrequency, sal_Int32 nBasis);
+
 } // namespace spreadsheetengine::core::finance
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

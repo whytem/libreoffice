@@ -61,6 +61,10 @@ inline constexpr sal_uInt16 kBuiltinExternalNameCatalogId = 1;
     {
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCONVERT");
     }
+    if (equalLookupText(rSymbol, u"AMORLINC"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETAMORLINC");
+    if (equalLookupText(rSymbol, u"ODDLYIELD"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETODDLYIELD");
     if (equalLookupText(rSymbol, u"DEC2HEX"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDEC2HEX");
     if (equalLookupText(rSymbol, u"MROUND"))
@@ -93,6 +97,10 @@ inline constexpr sal_uInt16 kBuiltinExternalNameCatalogId = 1;
         return api::String(u"QUOTIENT");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCONVERT"))
         return api::String(u"CONVERT");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETAMORLINC"))
+        return api::String(u"AMORLINC");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETODDLYIELD"))
+        return api::String(u"ODDLYIELD");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDEC2HEX"))
         return api::String(u"DEC2HEX");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETMROUND"))
