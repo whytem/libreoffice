@@ -17,7 +17,7 @@
 namespace spreadsheetengine::core::formulacell
 {
 
-enum class NotifyKind : sal_uInt8
+enum class NotifyKind : std::uint8_t
 {
     Other,
     DataChanged,
@@ -25,14 +25,14 @@ enum class NotifyKind : sal_uInt8
     HiddenRowsChanged
 };
 
-enum class VolatileKind : sal_uInt8
+enum class VolatileKind : std::uint8_t
 {
     Other,
     VolatileMacro,
     NotVolatile
 };
 
-enum class DependencyCheckFailure : sal_uInt8
+enum class DependencyCheckFailure : std::uint8_t
 {
     None,
     Cycle,
@@ -41,7 +41,7 @@ enum class DependencyCheckFailure : sal_uInt8
     DependencyCalculationFailed
 };
 
-enum class GroupInterpretFailure : sal_uInt8
+enum class GroupInterpretFailure : std::uint8_t
 {
     None,
     DependencyComputationAborted,
@@ -51,7 +51,7 @@ enum class GroupInterpretFailure : sal_uInt8
     ParentCycleSkipTail
 };
 
-enum class GroupBackendFailure : sal_uInt8
+enum class GroupBackendFailure : std::uint8_t
 {
     None,
     DependencyCheckFailedPreviously,
@@ -67,7 +67,7 @@ enum class GroupBackendFailure : sal_uInt8
     InterpreterTableOp
 };
 
-enum class OpenCLVectorStateClass : sal_uInt8
+enum class OpenCLVectorStateClass : std::uint8_t
 {
     Enabled,
     DisabledByOpcode,
@@ -76,7 +76,7 @@ enum class OpenCLVectorStateClass : sal_uInt8
     DisabledOrUnknown
 };
 
-enum class FormulaGroupPreflightFailure : sal_uInt8
+enum class FormulaGroupPreflightFailure : std::uint8_t
 {
     None,
     PartOfCycle,

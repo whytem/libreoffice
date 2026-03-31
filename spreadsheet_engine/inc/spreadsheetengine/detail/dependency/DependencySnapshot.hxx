@@ -96,7 +96,7 @@ struct DependencySnapshot
 namespace detail
 {
 
-[[nodiscard]] inline bool isAsciiAlpha(sal_Unicode cChar)
+[[nodiscard]] inline bool isAsciiAlpha(char16_t cChar)
 {
     return (cChar >= u'A' && cChar <= u'Z') || (cChar >= u'a' && cChar <= u'z');
 }
@@ -105,10 +105,10 @@ namespace detail
 {
     api::String aFolded;
     aFolded.reserve(rText.size());
-    for (const sal_Unicode cChar : rText)
+    for (const char16_t cChar : rText)
     {
         if (cChar >= u'a' && cChar <= u'z')
-            aFolded.push_back(static_cast<sal_Unicode>(cChar - u'a' + u'A'));
+            aFolded.push_back(static_cast<char16_t>(cChar - u'a' + u'A'));
         else
             aFolded.push_back(cChar);
     }

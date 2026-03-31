@@ -17,7 +17,7 @@
 namespace spreadsheetengine::detail::compiler
 {
 
-enum class FormulaPreflightReason : sal_uInt8
+enum class FormulaPreflightReason : std::uint8_t
 {
     Ready = 0,
     ParseFailure,

@@ -61,7 +61,7 @@ inline IfErrorAction selectIfErrorAction(api::Error eError, bool bNAonly)
                                                  : IfErrorAction::KeepPrimary;
 }
 
-inline std::optional<sal_Int16> normalizeChooseIndex(double fValue, sal_Int16 nJumpCount)
+inline std::optional<std::int16_t> normalizeChooseIndex(double fValue, std::int16_t nJumpCount)
 {
     if (!std::isfinite(fValue))
         return std::nullopt;
@@ -70,15 +70,15 @@ inline std::optional<sal_Int16> normalizeChooseIndex(double fValue, sal_Int16 nJ
     if (fFloor < 1 || fFloor >= nJumpCount)
         return std::nullopt;
 
-    return static_cast<sal_Int16>(fFloor);
+    return static_cast<std::int16_t>(fFloor);
 }
 
-inline api::ValueResult<sal_Int16> chooseJumpIndex(sal_Int16 nIndex, sal_Int16 nJumpCount)
+inline api::ValueResult<std::int16_t> chooseJumpIndex(std::int16_t nIndex, std::int16_t nJumpCount)
 {
     if (nIndex >= 1 && nIndex < nJumpCount)
-        return api::ValueResult<sal_Int16>::success(nIndex);
+        return api::ValueResult<std::int16_t>::success(nIndex);
 
-    return api::ValueResult<sal_Int16>::failure(api::Error::IllegalArgument);
+    return api::ValueResult<std::int16_t>::failure(api::Error::IllegalArgument);
 }
 
 enum class IfsAction
@@ -91,7 +91,7 @@ enum class IfsAction
 };
 
 inline IfsAction evaluateIfsCondition(
-    bool bCondition, bool bConditionError, sal_Int16 nRemainingParamsAfterCondition)
+    bool bCondition, bool bConditionError, std::int16_t nRemainingParamsAfterCondition)
 {
     if (bConditionError)
         return IfsAction::ReturnNoValue;

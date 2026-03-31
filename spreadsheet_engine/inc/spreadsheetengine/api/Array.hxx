@@ -19,19 +19,19 @@
 namespace spreadsheetengine::api::array
 {
 
-enum class Axis : sal_uInt8
+enum class Axis : std::uint8_t
 {
     Columns,
     Rows
 };
 
-enum class StackDirection : sal_uInt8
+enum class StackDirection : std::uint8_t
 {
     Horizontal,
     Vertical
 };
 
-enum class FlattenIgnore : sal_uInt8
+enum class FlattenIgnore : std::uint8_t
 {
     Default = 0,
     Blanks = 1,
@@ -87,7 +87,7 @@ struct MatrixSlice
 {
     MatrixSize nStart = 0;
     MatrixSize nEnd = nSize;
-    if (oCount && nSize > 0 && static_cast<sal_uInt64>(std::abs(*oCount)) < static_cast<sal_uInt64>(nSize))
+    if (oCount && nSize > 0 && static_cast<std::uint64_t>(std::abs(*oCount)) < static_cast<std::uint64_t>(nSize))
     {
         if (bTake)
         {

@@ -21,7 +21,7 @@
 namespace spreadsheetengine::detail::compiler
 {
 
-enum class ExtendedErrorDetection : sal_uInt8
+enum class ExtendedErrorDetection : std::uint8_t
 {
     None = 0,
     NameBreak,

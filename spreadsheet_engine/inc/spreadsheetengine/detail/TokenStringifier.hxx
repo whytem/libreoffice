@@ -164,7 +164,7 @@ inline api::String tokenPayloadToDiagnosticString(const setoken::Token& rToken)
             appendAscii(aText, " tableref(index=");
             appendNumber(aText, rData.mnIndex);
             appendAscii(aText, ",item=");
-            appendNumber(aText, static_cast<sal_uInt16>(rData.meItem));
+            appendNumber(aText, static_cast<std::uint16_t>(rData.meItem));
             appendAscii(aText, ")");
             break;
         }

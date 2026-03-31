@@ -9,9 +9,14 @@
 
 #pragma once
 
-// When built inside LibreOffice, resolve to sal_* types so that Calc code
-// passing sal_Int32 etc. across the engine boundary sees identical types.
-// When built standalone, resolve to standard C++ fixed-width types.
+// When built inside LibreOffice, include sal/types.h so that sal_Int32 etc.
+// are the real LibreOffice typedefs (critical for ABI compatibility with Calc
+// on platforms where sal_Int32 is 'long' rather than 'int').
+// When built standalone, define the sal_* aliases for <cstdint> equivalents.
+// Engine headers prefer standard C++ type names directly for 8/16/64-bit
+// types, but sal_Int32/sal_uInt32 are retained in public signatures for
+// cross-platform Calc compatibility. The remaining sal_* aliases below
+// support test code and any transitive consumers.
 
 #if __has_include(<sal/config.h>)
 #include <sal/types.h>

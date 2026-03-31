@@ -76,7 +76,7 @@ struct NumberParseResult
 {
     double mfValue = 0.0;
     FormatIndex mnFormat = 0;
-    enum class Kind : sal_uInt8
+    enum class Kind : std::uint8_t
     {
         Number,
         Date,
@@ -88,7 +88,7 @@ struct NumberParseResult
     [[nodiscard]] constexpr bool operator==(const NumberParseResult& rOther) const = default;
 };
 
-enum class NumberParseMode : sal_uInt8
+enum class NumberParseMode : std::uint8_t
 {
     General,
     LaxTime
@@ -121,13 +121,13 @@ struct ResolvedReference
     }
 };
 
-enum class CellValueViewKind : sal_uInt8
+enum class CellValueViewKind : std::uint8_t
 {
     Scalar,
     MatrixReference
 };
 
-enum class CellValueKind : sal_uInt8
+enum class CellValueKind : std::uint8_t
 {
     Empty,
     Number,

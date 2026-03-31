@@ -18,7 +18,7 @@
 namespace spreadsheetengine::api::lookup
 {
 
-enum class Operation : sal_uInt8
+enum class Operation : std::uint8_t
 {
     Match,
     XMatch,
@@ -28,7 +28,7 @@ enum class Operation : sal_uInt8
     XLookup
 };
 
-enum class MatchMode : sal_Int8
+enum class MatchMode : std::int8_t
 {
     ExactOrNotAvailable = 0,
     ExactOrNextSmaller = -1,
@@ -37,7 +37,7 @@ enum class MatchMode : sal_Int8
     Regex = 3
 };
 
-enum class SearchMode : sal_Int8
+enum class SearchMode : std::int8_t
 {
     Forward = 1,
     Reverse = -1,
@@ -45,20 +45,20 @@ enum class SearchMode : sal_Int8
     BinaryDescending = -2
 };
 
-enum class VectorOrientation : sal_uInt8
+enum class VectorOrientation : std::uint8_t
 {
     Row,
     Column
 };
 
-enum class ComparisonOp : sal_uInt8
+enum class ComparisonOp : std::uint8_t
 {
     Equal,
     LessEqual,
     GreaterEqual
 };
 
-enum class PatternMode : sal_uInt8
+enum class PatternMode : std::uint8_t
 {
     Normal,
     Detect,
@@ -136,7 +136,7 @@ struct VectorSlice
     }
 }
 
-[[nodiscard]] inline ValueResult<SearchMode> normalizeSearchMode(sal_Int16 nMode)
+[[nodiscard]] inline ValueResult<SearchMode> normalizeSearchMode(std::int16_t nMode)
 {
     if (nMode >= -2 && nMode <= 2 && nMode != 0)
         return ValueResult<SearchMode>::success(static_cast<SearchMode>(nMode));
@@ -144,7 +144,7 @@ struct VectorSlice
     return ValueResult<SearchMode>::failure(Error::IllegalArgument);
 }
 
-[[nodiscard]] inline ValueResult<MatchMode> normalizeExtendedMatchMode(sal_Int16 nMode)
+[[nodiscard]] inline ValueResult<MatchMode> normalizeExtendedMatchMode(std::int16_t nMode)
 {
     if (nMode >= -1 && nMode <= 3)
         return ValueResult<MatchMode>::success(static_cast<MatchMode>(nMode));

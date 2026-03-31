@@ -20,7 +20,7 @@
 namespace spreadsheetengine::core::workbook
 {
 
-enum class FormulaSearchType : sal_uInt8
+enum class FormulaSearchType : std::uint8_t
 {
     Normal,
     Wildcard,
@@ -38,7 +38,7 @@ struct Cell
     [[nodiscard]] bool hasFormula() const { return !maFormula.empty(); }
 };
 
-enum class SheetSourceMode : sal_uInt8
+enum class SheetSourceMode : std::uint8_t
 {
     Unknown,
     CopyResultsOnly

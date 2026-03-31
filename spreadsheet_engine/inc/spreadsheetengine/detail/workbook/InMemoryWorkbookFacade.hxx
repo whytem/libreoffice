@@ -64,7 +64,7 @@ private:
     std::map<std::pair<api::SheetId, std::pair<api::ColumnIndex, api::RowIndex>>,
         FormulaGroupEntry> maFormulaGroups;
     api::Grammar maGrammar;
-    sal_Int64 mnGeneration = 0;
+    std::int64_t mnGeneration = 0;
 
 public:
     InMemoryWorkbookFacade() = default;
@@ -142,7 +142,7 @@ public:
     }
 
     void setGrammar(const api::Grammar& rGrammar) { maGrammar = rGrammar; }
-    void setGeneration(sal_Int64 nGeneration) { mnGeneration = nGeneration; }
+    void setGeneration(std::int64_t nGeneration) { mnGeneration = nGeneration; }
 
     // --- WorkbookFacade implementation ---
 

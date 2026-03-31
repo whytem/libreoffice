@@ -39,14 +39,14 @@ class Evaluator
     using AddressKey = std::tuple<api::SheetId, api::ColumnIndex, api::RowIndex>;
     using LocalBindingMap = std::map<api::String, EvaluationResult>;
 
-    enum class CacheState : sal_uInt8
+    enum class CacheState : std::uint8_t
     {
         Unseen,
         Active,
         Complete
     };
 
-    enum class ExecutionMode : sal_uInt8
+    enum class ExecutionMode : std::uint8_t
     {
         Ast = 0,
         CompiledToken

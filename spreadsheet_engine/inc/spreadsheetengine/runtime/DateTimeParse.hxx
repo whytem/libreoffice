@@ -35,7 +35,7 @@ SPREADSHEETENGINE_DLLPUBLIC std::optional<double> shiftMonthSerial(
     spreadsheetengine::api::DateSerial nDateSerial, sal_Int32 nMonthOffset, bool bEndOfMonth);
 SPREADSHEETENGINE_DLLPUBLIC std::optional<double> computeWeeksDifference(
     spreadsheetengine::api::DateSerial nStartDate, spreadsheetengine::api::DateSerial nEndDate,
-    sal_Int16 nMode);
+    std::int16_t nMode);
 
 } // namespace spreadsheetengine::core::datetime
 

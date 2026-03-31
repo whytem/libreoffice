@@ -63,7 +63,7 @@ constexpr void applyBufferWindowStart(const BufferWindow& rWindow, Column& rnCol
     return api::normalizeReplicatedCoordinate(rDimensions, rCoordinate);
 }
 
-[[nodiscard]] constexpr sal_uInt64 jumpEntryIndex(
+[[nodiscard]] constexpr std::uint64_t jumpEntryIndex(
     const api::MatrixDimensions& rDimensions, const api::MatrixCoordinate& rCoordinate)
 {
     return matrix::columnMajorLinearIndex(rDimensions, rCoordinate);

@@ -20,7 +20,7 @@
 namespace spreadsheetengine::detail::compiler
 {
 
-enum class LookupSupport : sal_uInt8
+enum class LookupSupport : std::uint8_t
 {
     Supported = 0,
     Unsupported
@@ -133,7 +133,7 @@ public:
             if (oLocalIndex)
             {
                 return token::NameData {
-                    static_cast<sal_Int16>(*onSheet),
+                    static_cast<std::int16_t>(*onSheet),
                     *oLocalIndex,
                 };
             }
@@ -191,7 +191,7 @@ private:
         return mrWorkbook.maSheets[nSheet].maName;
     }
 
-    [[nodiscard]] std::optional<sal_uInt16> lookupRangeNameIndex(
+    [[nodiscard]] std::optional<std::uint16_t> lookupRangeNameIndex(
         api::StringView rName, api::StringView rScopeSheetName) const
     {
         for (std::size_t nIndex = 0; nIndex < mrWorkbook.maNamedRanges.size(); ++nIndex)
@@ -203,10 +203,10 @@ private:
                 continue;
             }
 
-            if (nIndex >= std::numeric_limits<sal_uInt16>::max())
+            if (nIndex >= std::numeric_limits<std::uint16_t>::max())
                 return std::nullopt;
 
-            return static_cast<sal_uInt16>(nIndex + 1);
+            return static_cast<std::uint16_t>(nIndex + 1);
         }
 
         return std::nullopt;

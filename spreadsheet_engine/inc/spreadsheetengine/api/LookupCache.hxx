@@ -18,7 +18,7 @@
 namespace spreadsheetengine::api::lookupcache
 {
 
-enum class Result : sal_uInt8
+enum class Result : std::uint8_t
 {
     NotCached,
     CriteriaDifferent,
@@ -26,7 +26,7 @@ enum class Result : sal_uInt8
     Found
 };
 
-enum class QueryOp : sal_uInt8
+enum class QueryOp : std::uint8_t
 {
     Unknown,
     Equal,

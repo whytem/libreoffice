@@ -59,7 +59,7 @@ struct SheetDescriptor
 };
 
 /// Cell type classification for the facade.
-enum class CellKind : sal_uInt8
+enum class CellKind : std::uint8_t
 {
     Empty,
     Scalar,
@@ -78,7 +78,7 @@ struct CellDescriptor
 };
 
 /// Formula cell classification.
-enum class FormulaCellKind : sal_uInt8
+enum class FormulaCellKind : std::uint8_t
 {
     Ordinary,
     SharedGroupMember,
@@ -100,7 +100,7 @@ struct FormulaCellDescriptor
 };
 
 /// Named range scope.
-enum class NamedRangeScope : sal_uInt8
+enum class NamedRangeScope : std::uint8_t
 {
     Global,
     SheetLocal
@@ -134,7 +134,7 @@ struct FormulaGroupDescriptor
 /// Lightweight snapshot metadata for differential validation.
 struct WorkbookSnapshotInfo
 {
-    sal_Int64 mnGeneration = 0;
+    std::int64_t mnGeneration = 0;
     sal_Int32 mnSheetCount = 0;
     sal_Int32 mnFormulaCellCount = 0;
 
@@ -144,7 +144,7 @@ struct WorkbookSnapshotInfo
 // --- Mutation events ---
 
 /// Kind of document mutation for invalidation modeling.
-enum class MutationKind : sal_uInt8
+enum class MutationKind : std::uint8_t
 {
     SetScalarValue,
     SetFormula,

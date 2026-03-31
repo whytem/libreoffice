@@ -24,9 +24,9 @@
 namespace spreadsheetengine::detail::token
 {
 
-using OpCodeValue = sal_uInt16;
-using ParamClassValue = sal_uInt8;
-using ErrorCode = sal_uInt16;
+using OpCodeValue = std::uint16_t;
+using ParamClassValue = std::uint8_t;
+using ErrorCode = std::uint16_t;
 
 constexpr OpCodeValue kOpCodeNone = 0;
 constexpr OpCodeValue kOpCodePush = 0;
@@ -148,7 +148,7 @@ constexpr OpCodeValue kOpCodeSearchB = 496;
 constexpr ParamClassValue kParamClassUnknown = 0;
 constexpr ErrorCode kErrorCodeNone = 0;
 
-enum class Kind : sal_uInt8
+enum class Kind : std::uint8_t
 {
     PlainOpcode,
     Missing,
@@ -171,7 +171,7 @@ enum class Kind : sal_uInt8
     Whitespace
 };
 
-enum class VectorState : sal_uInt8
+enum class VectorState : std::uint8_t
 {
     Disabled,
     DisabledNotInSubSet,
@@ -230,7 +230,7 @@ enum class VectorState : sal_uInt8
 
 struct ByteData
 {
-    sal_uInt8 mnByte = 0;
+    std::uint8_t mnByte = 0;
     ParamClassValue mnInForceArray = kParamClassUnknown;
 
     [[nodiscard]] constexpr bool operator==(const ByteData& rOther) const = default;
@@ -246,22 +246,22 @@ struct StringData
 
 struct NameData
 {
-    sal_Int16 mnSheet = -1;
-    sal_uInt16 mnIndex = 0;
+    std::int16_t mnSheet = -1;
+    std::uint16_t mnIndex = 0;
 
     [[nodiscard]] constexpr bool operator==(const NameData& rOther) const = default;
 };
 
 struct DatabaseRangeData
 {
-    sal_uInt16 mnIndex = 0;
+    std::uint16_t mnIndex = 0;
 
     [[nodiscard]] constexpr bool operator==(const DatabaseRangeData& rOther) const = default;
 };
 
 struct ExternalSingleRefData
 {
-    sal_uInt16 mnFileId = 0;
+    std::uint16_t mnFileId = 0;
     api::String maTabName;
     api::refdata::SingleRefData maReference;
 
@@ -270,7 +270,7 @@ struct ExternalSingleRefData
 
 struct ExternalDoubleRefData
 {
-    sal_uInt16 mnFileId = 0;
+    std::uint16_t mnFileId = 0;
     api::String maTabName;
     api::refdata::ComplexRefData maReference;
 
@@ -279,7 +279,7 @@ struct ExternalDoubleRefData
 
 struct ExternalNameData
 {
-    sal_uInt16 mnFileId = 0;
+    std::uint16_t mnFileId = 0;
     api::String maName;
 
     [[nodiscard]] constexpr bool operator==(const ExternalNameData& rOther) const = default;
@@ -296,7 +296,7 @@ struct MatrixData
     [[nodiscard]] constexpr bool operator==(const MatrixData& rOther) const = default;
 };
 
-enum class TableRefItem : sal_uInt16
+enum class TableRefItem : std::uint16_t
 {
     None = 0,
     Table = 1 << 0,
@@ -309,8 +309,8 @@ enum class TableRefItem : sal_uInt16
 
 constexpr TableRefItem operator|(TableRefItem eLeft, TableRefItem eRight)
 {
-    return static_cast<TableRefItem>(static_cast<sal_uInt16>(eLeft)
-                                     | static_cast<sal_uInt16>(eRight));
+    return static_cast<TableRefItem>(static_cast<std::uint16_t>(eLeft)
+                                     | static_cast<std::uint16_t>(eRight));
 }
 
 constexpr TableRefItem& operator|=(TableRefItem& reLeft, TableRefItem eRight)
@@ -321,7 +321,7 @@ constexpr TableRefItem& operator|=(TableRefItem& reLeft, TableRefItem eRight)
 
 struct TableRefData
 {
-    sal_uInt16 mnIndex = 0;
+    std::uint16_t mnIndex = 0;
     TableRefItem meItem = TableRefItem::None;
 
     [[nodiscard]] constexpr bool operator==(const TableRefData& rOther) const = default;
@@ -337,8 +337,8 @@ struct JumpData
 
 struct WhitespaceData
 {
-    sal_uInt8 mnCount = 0;
-    sal_Unicode mcChar = 0;
+    std::uint8_t mnCount = 0;
+    char16_t mcChar = 0;
 
     [[nodiscard]] constexpr bool operator==(const WhitespaceData& rOther) const = default;
 };
@@ -370,7 +370,7 @@ struct CompiledFormula
     std::vector<Token> maTokens;
     std::optional<XmlFormulaSource> moXmlFormulaSource;
     ErrorCode mnCodeError = kErrorCodeNone;
-    sal_uInt8 mnRecalcModeBits = 0;
+    std::uint8_t mnRecalcModeBits = 0;
     bool mbHyperLink = false;
     bool mbFromRangeName = false;
     bool mbShareable = true;

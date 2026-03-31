@@ -20,8 +20,8 @@ namespace spreadsheetengine::core::datetime
 {
 
 SPREADSHEETENGINE_DLLPUBLIC std::optional<double> makeDateSerial(
-    const spreadsheetengine::api::DateParts& rNullDate, sal_Int16 nYear, sal_Int16 nMonth,
-    sal_Int16 nDay, bool bStrict);
+    const spreadsheetengine::api::DateParts& rNullDate, std::int16_t nYear, std::int16_t nMonth,
+    std::int16_t nDay, bool bStrict);
 
 SPREADSHEETENGINE_DLLPUBLIC double extractYear(
     const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays);
@@ -44,7 +44,7 @@ SPREADSHEETENGINE_DLLPUBLIC std::optional<double> makeTimeSerial(
 SPREADSHEETENGINE_DLLPUBLIC double normalizeTimeFraction(double fTimeInDays);
 
 SPREADSHEETENGINE_DLLPUBLIC std::optional<double> computeEasterSundaySerial(
-    const spreadsheetengine::api::DateParts& rNullDate, sal_Int16 nYear);
+    const spreadsheetengine::api::DateParts& rNullDate, std::int16_t nYear);
 
 SPREADSHEETENGINE_DLLPUBLIC double computeDiffDate(double fDate1, double fDate2);
 

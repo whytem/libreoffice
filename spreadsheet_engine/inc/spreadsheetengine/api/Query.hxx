@@ -18,7 +18,7 @@
 namespace spreadsheetengine::api::query
 {
 
-enum class Operator : sal_uInt8
+enum class Operator : std::uint8_t
 {
     Equal,
     NotEqual,
@@ -34,7 +34,7 @@ enum class Operator : sal_uInt8
     DoesNotEndWith
 };
 
-enum class OperandKind : sal_uInt8
+enum class OperandKind : std::uint8_t
 {
     Value,
     Text,
@@ -44,14 +44,14 @@ enum class OperandKind : sal_uInt8
     BackgroundColor
 };
 
-enum class SearchType : sal_uInt8
+enum class SearchType : std::uint8_t
 {
     Normal,
     Wildcard,
     Regex
 };
 
-enum class ComparisonRoute : sal_uInt8
+enum class ComparisonRoute : std::uint8_t
 {
     None,
     Value,

@@ -33,27 +33,27 @@ struct MatrixWritePlan
 struct BroadcastExecutionPlan
 {
     MatrixRange maOperationRange {};
-    sal_uInt64 mnRowRepeats = 0;
-    sal_uInt64 mnColumnRepeats = 0;
+    std::uint64_t mnRowRepeats = 0;
+    std::uint64_t mnColumnRepeats = 0;
     bool mbReplicated = false;
     bool mbValid = false;
 };
 
 struct ValidRunPlan
 {
-    sal_uInt64 mnStartIndex = 0;
-    sal_uInt64 mnLength = 0;
+    std::uint64_t mnStartIndex = 0;
+    std::uint64_t mnLength = 0;
     bool mbValid = false;
 };
 
 [[nodiscard]] constexpr api::MatrixDimensions makeDimensions(
-    sal_uInt64 nColumns, sal_uInt64 nRows)
+    std::uint64_t nColumns, std::uint64_t nRows)
 {
     return { static_cast<api::MatrixSize>(nColumns), static_cast<api::MatrixSize>(nRows) };
 }
 
 [[nodiscard]] constexpr api::MatrixCoordinate makeCoordinate(
-    sal_uInt64 nColumn, sal_uInt64 nRow)
+    std::uint64_t nColumn, std::uint64_t nRow)
 {
     return { static_cast<api::MatrixSize>(nColumn), static_cast<api::MatrixSize>(nRow) };
 }
@@ -65,11 +65,11 @@ struct ValidRunPlan
 }
 
 [[nodiscard]] constexpr api::MatrixCoordinate offsetCoordinate(
-    const api::MatrixCoordinate& rCoordinate, sal_uInt64 nColumnOffset, sal_uInt64 nRowOffset)
+    const api::MatrixCoordinate& rCoordinate, std::uint64_t nColumnOffset, std::uint64_t nRowOffset)
 {
     return makeCoordinate(
-        static_cast<sal_uInt64>(rCoordinate.mnColumn) + nColumnOffset,
-        static_cast<sal_uInt64>(rCoordinate.mnRow) + nRowOffset);
+        static_cast<std::uint64_t>(rCoordinate.mnColumn) + nColumnOffset,
+        static_cast<std::uint64_t>(rCoordinate.mnRow) + nRowOffset);
 }
 
 [[nodiscard]] constexpr bool isValidRange(
@@ -81,63 +81,63 @@ struct ValidRunPlan
            && rRange.maStart.mnRow <= rRange.maEnd.mnRow;
 }
 
-[[nodiscard]] constexpr sal_uInt64 columnCount(const MatrixRange& rRange)
+[[nodiscard]] constexpr std::uint64_t columnCount(const MatrixRange& rRange)
 {
-    return static_cast<sal_uInt64>(rRange.maEnd.mnColumn - rRange.maStart.mnColumn) + 1;
+    return static_cast<std::uint64_t>(rRange.maEnd.mnColumn - rRange.maStart.mnColumn) + 1;
 }
 
-[[nodiscard]] constexpr sal_uInt64 rowCount(const MatrixRange& rRange)
+[[nodiscard]] constexpr std::uint64_t rowCount(const MatrixRange& rRange)
 {
-    return static_cast<sal_uInt64>(rRange.maEnd.mnRow - rRange.maStart.mnRow) + 1;
+    return static_cast<std::uint64_t>(rRange.maEnd.mnRow - rRange.maStart.mnRow) + 1;
 }
 
-[[nodiscard]] constexpr sal_uInt64 columnMajorLinearIndex(
+[[nodiscard]] constexpr std::uint64_t columnMajorLinearIndex(
     const api::MatrixDimensions& rDimensions, const api::MatrixCoordinate& rCoordinate)
 {
-    return static_cast<sal_uInt64>(rDimensions.mnRows)
-           * static_cast<sal_uInt64>(rCoordinate.mnColumn)
-           + static_cast<sal_uInt64>(rCoordinate.mnRow);
+    return static_cast<std::uint64_t>(rDimensions.mnRows)
+           * static_cast<std::uint64_t>(rCoordinate.mnColumn)
+           + static_cast<std::uint64_t>(rCoordinate.mnRow);
 }
 
-[[nodiscard]] constexpr sal_uInt64 offsetColumnMajorLinearIndex(
+[[nodiscard]] constexpr std::uint64_t offsetColumnMajorLinearIndex(
     const api::MatrixDimensions& rDimensions, const api::MatrixCoordinate& rCoordinate,
-    sal_uInt64 nColumnOffset, sal_uInt64 nRowOffset)
+    std::uint64_t nColumnOffset, std::uint64_t nRowOffset)
 {
     return columnMajorLinearIndex(
         rDimensions, offsetCoordinate(rCoordinate, nColumnOffset, nRowOffset));
 }
 
 [[nodiscard]] constexpr api::MatrixCoordinate coordinateFromLinearIndex(
-    const api::MatrixDimensions& rDimensions, sal_uInt64 nIndex)
+    const api::MatrixDimensions& rDimensions, std::uint64_t nIndex)
 {
-    const sal_uInt64 nRows = rDimensions.mnRows > 0 ? static_cast<sal_uInt64>(rDimensions.mnRows) : 0;
-    const sal_uInt64 nColumn = nRows > 1 ? nIndex / nRows : nIndex;
-    const sal_uInt64 nRow = nIndex - (nColumn * nRows);
+    const std::uint64_t nRows = rDimensions.mnRows > 0 ? static_cast<std::uint64_t>(rDimensions.mnRows) : 0;
+    const std::uint64_t nColumn = nRows > 1 ? nIndex / nRows : nIndex;
+    const std::uint64_t nRow = nIndex - (nColumn * nRows);
     return makeCoordinate(nColumn, nRow);
 }
 
 [[nodiscard]] constexpr api::MatrixCoordinate coordinateFromTransposedLinearIndex(
-    const api::MatrixDimensions& rDimensions, sal_uInt64 nIndex)
+    const api::MatrixDimensions& rDimensions, std::uint64_t nIndex)
 {
-    const sal_uInt64 nColumns
-        = rDimensions.mnColumns > 0 ? static_cast<sal_uInt64>(rDimensions.mnColumns) : 0;
-    const sal_uInt64 nRow = nColumns > 1 ? nIndex / nColumns : nIndex;
-    const sal_uInt64 nColumn = nIndex - (nRow * nColumns);
+    const std::uint64_t nColumns
+        = rDimensions.mnColumns > 0 ? static_cast<std::uint64_t>(rDimensions.mnColumns) : 0;
+    const std::uint64_t nRow = nColumns > 1 ? nIndex / nColumns : nIndex;
+    const std::uint64_t nColumn = nIndex - (nRow * nColumns);
     return makeCoordinate(nColumn, nRow);
 }
 
 [[nodiscard]] constexpr MatrixRange columnVectorRange(
-    const api::MatrixCoordinate& rStart, sal_uInt64 nCount)
+    const api::MatrixCoordinate& rStart, std::uint64_t nCount)
 {
     return makeRange(
         rStart,
         makeCoordinate(
-            static_cast<sal_uInt64>(rStart.mnColumn),
-            static_cast<sal_uInt64>(rStart.mnRow) + nCount - 1));
+            static_cast<std::uint64_t>(rStart.mnColumn),
+            static_cast<std::uint64_t>(rStart.mnRow) + nCount - 1));
 }
 
 [[nodiscard]] constexpr bool canPlaceColumnVector(
-    const api::MatrixDimensions& rDimensions, const api::MatrixCoordinate& rStart, sal_uInt64 nCount)
+    const api::MatrixDimensions& rDimensions, const api::MatrixCoordinate& rStart, std::uint64_t nCount)
 {
     if (!nCount || !api::isValidCoordinate(rDimensions, rStart))
         return false;
@@ -152,7 +152,7 @@ struct ValidRunPlan
 }
 
 [[nodiscard]] constexpr MatrixWritePlan planColumnVectorWrite(
-    const api::MatrixDimensions& rDimensions, const api::MatrixCoordinate& rStart, sal_uInt64 nCount)
+    const api::MatrixDimensions& rDimensions, const api::MatrixCoordinate& rStart, std::uint64_t nCount)
 {
     const bool bValid = canPlaceColumnVector(rDimensions, rStart, nCount);
     return { bValid ? columnVectorRange(rStart, nCount) : MatrixRange {}, bValid };
@@ -168,28 +168,28 @@ struct ValidRunPlan
     if (!bReplicated)
     {
         return { makeRange(makeCoordinate(0, 0),
-                           makeCoordinate(static_cast<sal_uInt64>(rTargetDimensions.mnColumns) - 1,
-                                          static_cast<sal_uInt64>(rTargetDimensions.mnRows) - 1)),
+                           makeCoordinate(static_cast<std::uint64_t>(rTargetDimensions.mnColumns) - 1,
+                                          static_cast<std::uint64_t>(rTargetDimensions.mnRows) - 1)),
                  1, 1, false, true };
     }
 
-    const sal_uInt64 nOperationColumns = std::min(static_cast<sal_uInt64>(rSourceDimensions.mnColumns),
-                                                  static_cast<sal_uInt64>(rTargetDimensions.mnColumns));
-    const sal_uInt64 nOperationRows = std::min(static_cast<sal_uInt64>(rSourceDimensions.mnRows),
-                                               static_cast<sal_uInt64>(rTargetDimensions.mnRows));
+    const std::uint64_t nOperationColumns = std::min(static_cast<std::uint64_t>(rSourceDimensions.mnColumns),
+                                                  static_cast<std::uint64_t>(rTargetDimensions.mnColumns));
+    const std::uint64_t nOperationRows = std::min(static_cast<std::uint64_t>(rSourceDimensions.mnRows),
+                                               static_cast<std::uint64_t>(rTargetDimensions.mnRows));
     if (!nOperationColumns || !nOperationRows)
         return {};
 
     return { makeRange(makeCoordinate(0, 0),
                        makeCoordinate(nOperationColumns - 1, nOperationRows - 1)),
-             rSourceDimensions.mnRows == 1 ? static_cast<sal_uInt64>(rTargetDimensions.mnRows) : 1,
-             rSourceDimensions.mnColumns == 1 ? static_cast<sal_uInt64>(rTargetDimensions.mnColumns)
+             rSourceDimensions.mnRows == 1 ? static_cast<std::uint64_t>(rTargetDimensions.mnRows) : 1,
+             rSourceDimensions.mnColumns == 1 ? static_cast<std::uint64_t>(rTargetDimensions.mnColumns)
                                               : 1,
              true, true };
 }
 
 template <typename ValidContainer>
-[[nodiscard]] auto planContiguousValidRun(const ValidContainer& rValid, sal_uInt64 nStartIndex)
+[[nodiscard]] auto planContiguousValidRun(const ValidContainer& rValid, std::uint64_t nStartIndex)
     -> ValidRunPlan
 {
     if (nStartIndex >= rValid.size() || !rValid[nStartIndex])
@@ -197,19 +197,19 @@ template <typename ValidContainer>
 
     auto aBegin = std::next(rValid.begin(), nStartIndex);
     auto aEnd = std::find(aBegin, rValid.end(), false);
-    return { nStartIndex, static_cast<sal_uInt64>(std::distance(aBegin, aEnd)), true };
+    return { nStartIndex, static_cast<std::uint64_t>(std::distance(aBegin, aEnd)), true };
 }
 
 [[nodiscard]] constexpr api::MatrixCoordinate advanceColumnMajorLoopSeedCoordinate(
-    const api::MatrixCoordinate& rCurrentCoordinate, sal_uInt64 nRowCount, sal_uInt64 nRunLength)
+    const api::MatrixCoordinate& rCurrentCoordinate, std::uint64_t nRowCount, std::uint64_t nRunLength)
 {
     if (!nRowCount)
         return rCurrentCoordinate;
 
-    sal_uInt64 nColumn = static_cast<sal_uInt64>(rCurrentCoordinate.mnColumn)
+    std::uint64_t nColumn = static_cast<std::uint64_t>(rCurrentCoordinate.mnColumn)
                          + (nRunLength / nRowCount);
-    sal_uInt64 nRow
-        = static_cast<sal_uInt64>(rCurrentCoordinate.mnRow) + (nRunLength % nRowCount);
+    std::uint64_t nRow
+        = static_cast<std::uint64_t>(rCurrentCoordinate.mnRow) + (nRunLength % nRowCount);
     if (nRow >= nRowCount)
     {
         nRow -= nRowCount;
@@ -248,7 +248,7 @@ template <typename Column, typename Row>
 }
 
 [[nodiscard]] constexpr bool isSizeAllocatable(
-    const api::MatrixDimensions& rDimensions, sal_uInt64 nElementsMax)
+    const api::MatrixDimensions& rDimensions, std::uint64_t nElementsMax)
 {
     if (!rDimensions.isAllocated())
         return false;
@@ -260,8 +260,8 @@ template <typename Column, typename Row>
     if (bZeroColumns)
         return true;
 
-    const sal_uInt64 nColumns = static_cast<sal_uInt64>(rDimensions.mnColumns);
-    const sal_uInt64 nRows = static_cast<sal_uInt64>(rDimensions.mnRows);
+    const std::uint64_t nColumns = static_cast<std::uint64_t>(rDimensions.mnColumns);
+    const std::uint64_t nRows = static_cast<std::uint64_t>(rDimensions.mnRows);
     return nColumns <= (nElementsMax / nRows);
 }
 

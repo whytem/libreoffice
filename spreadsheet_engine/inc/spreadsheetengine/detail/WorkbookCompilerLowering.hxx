@@ -19,7 +19,7 @@
 namespace spreadsheetengine::detail::compiler
 {
 
-enum class FormulaLoweringReason : sal_uInt8
+enum class FormulaLoweringReason : std::uint8_t
 {
     Ready = 0,
     ParseFailure,
@@ -81,7 +81,7 @@ inline void setFailure(
     rResult.mnFailureOffset = nFailureOffset;
 }
 
-[[nodiscard]] constexpr bool isAsciiAlpha(const sal_Unicode cChar)
+[[nodiscard]] constexpr bool isAsciiAlpha(const char16_t cChar)
 {
     return (cChar >= u'A' && cChar <= u'Z') || (cChar >= u'a' && cChar <= u'z');
 }
@@ -90,10 +90,10 @@ inline void setFailure(
 {
     api::String aFolded;
     aFolded.reserve(rText.size());
-    for (const sal_Unicode cChar : rText)
+    for (const char16_t cChar : rText)
     {
         if (cChar >= u'A' && cChar <= u'Z')
-            aFolded.push_back(static_cast<sal_Unicode>(cChar - u'A' + u'a'));
+            aFolded.push_back(static_cast<char16_t>(cChar - u'A' + u'a'));
         else
             aFolded.push_back(cChar);
     }
@@ -339,11 +339,11 @@ lookupLexicalFunctionOpcode(api::StringView rName)
     if (rColumnName.empty())
         return std::nullopt;
 
-    sal_Int64 nColumn = 0;
-    for (sal_Unicode cChar : rColumnName)
+    std::int64_t nColumn = 0;
+    for (char16_t cChar : rColumnName)
     {
         if (cChar >= u'a' && cChar <= u'z')
-            cChar = static_cast<sal_Unicode>(cChar - u'a' + u'A');
+            cChar = static_cast<char16_t>(cChar - u'a' + u'A');
         if (cChar < u'A' || cChar > u'Z')
             return std::nullopt;
         nColumn = (nColumn * 26) + (cChar - u'A' + 1);
@@ -377,7 +377,7 @@ lookupLexicalFunctionOpcode(api::StringView rName)
 
 struct ParsedSingleReference
 {
-    enum class Shape : sal_uInt8
+    enum class Shape : std::uint8_t
     {
         Cell = 0,
         WholeRow,
@@ -390,13 +390,13 @@ struct ParsedSingleReference
     api::RowIndex mnResolvedRow = 0;
     Shape meShape = Shape::Cell;
     bool mbExternal = false;
-    sal_uInt16 mnFileId = 0;
+    std::uint16_t mnFileId = 0;
     api::String maExternalTabName;
 };
 
 struct ExternalReferenceContext
 {
-    sal_uInt16 mnFileId = 0;
+    std::uint16_t mnFileId = 0;
     api::String maTabName;
 };
 
@@ -420,10 +420,10 @@ struct ExternalReferenceContext
     constexpr api::StringView aPrefix = u"#ERR";
     if (rError.starts_with(aPrefix) && rError.size() > aPrefix.size() + 1 && rError.back() == u'!')
     {
-        sal_Int64 nError = 0;
+        std::int64_t nError = 0;
         for (std::size_t nIndex = aPrefix.size(); nIndex + 1 < rError.size(); ++nIndex)
         {
-            const sal_Unicode cChar = rError[nIndex];
+            const char16_t cChar = rError[nIndex];
             if (cChar < u'0' || cChar > u'9')
                 return 0;
             nError = (nError * 10) + (cChar - u'0');
@@ -434,12 +434,12 @@ struct ExternalReferenceContext
     return 0;
 }
 
-[[nodiscard]] inline sal_uInt16 hashExternalLink(api::StringView rExternalLink)
+[[nodiscard]] inline std::uint16_t hashExternalLink(api::StringView rExternalLink)
 {
     sal_uInt32 nHash = 2166136261u;
-    for (const sal_Unicode cChar : rExternalLink)
+    for (const char16_t cChar : rExternalLink)
         nHash = (nHash ^ cChar) * 16777619u;
-    const sal_uInt16 nValue = static_cast<sal_uInt16>((nHash & 0xffffu) ? (nHash & 0xffffu) : 1u);
+    const std::uint16_t nValue = static_cast<std::uint16_t>((nHash & 0xffffu) ? (nHash & 0xffffu) : 1u);
     return nValue;
 }
 
@@ -505,7 +505,7 @@ template <typename Host>
     const auto isAllDigits = [](api::StringView rText) {
         if (rText.empty())
             return false;
-        for (const sal_Unicode cChar : rText)
+        for (const char16_t cChar : rText)
         {
             if (cChar < u'0' || cChar > u'9')
                 return false;
@@ -531,8 +531,8 @@ template <typename Host>
 
     if (isAllDigits(aAddressToken))
     {
-        sal_Int64 nRow = 0;
-        for (const sal_Unicode cChar : aAddressToken)
+        std::int64_t nRow = 0;
+        for (const char16_t cChar : aAddressToken)
             nRow = (nRow * 10) + (cChar - u'0');
         if (nRow <= 0)
             return std::nullopt;
@@ -569,8 +569,8 @@ template <typename Host>
             if (!isAllDigits(aAddressToken))
                 return std::nullopt;
 
-            sal_Int64 nRow = 0;
-            for (const sal_Unicode cChar : aAddressToken)
+            std::int64_t nRow = 0;
+            for (const char16_t cChar : aAddressToken)
                 nRow = (nRow * 10) + (cChar - u'0');
             if (nRow <= 0)
                 return std::nullopt;
@@ -1038,7 +1038,7 @@ template <typename Host>
                     StringData { api::String(rNode.maPrimaryText), foldAsciiCase(rNode.maPrimaryText) });
             }
             pushToken(rResult, token::Kind::Byte, kLoweredOpArgumentCount,
-                ByteData { static_cast<sal_uInt8>(rNode.maChildren.size()),
+                ByteData { static_cast<std::uint8_t>(rNode.maChildren.size()),
                     token::kParamClassUnknown });
             pushToken(rResult, token::Kind::PlainOpcode, kLoweredOpFunctionCall, {});
             return true;
@@ -1145,7 +1145,7 @@ template <typename Host>
                 const api::StringView aHead = rNode.maPrimaryText.substr(0, nColonPos);
                 const api::StringView aTail = rNode.maPrimaryText.substr(nColonPos + 1);
                 bool bTailNumeric = true;
-                sal_Int64 nTailValue = 0;
+                std::int64_t nTailValue = 0;
                 for (const char16_t cChar : aTail)
                 {
                     if (cChar < u'0' || cChar > u'9')

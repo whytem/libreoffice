@@ -15,7 +15,7 @@
 namespace spreadsheetengine::api::formulavalue
 {
 
-enum class ValueType : sal_uInt8
+enum class ValueType : std::uint8_t
 {
     Invalid,
     Value,
@@ -34,7 +34,7 @@ struct FormulaResultValue
     [[nodiscard]] constexpr bool operator==(const FormulaResultValue& rOther) const = default;
 };
 
-enum class CarrierType : sal_uInt8
+enum class CarrierType : std::uint8_t
 {
     Unknown,
     EmptyCell,

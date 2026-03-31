@@ -16,11 +16,11 @@
 namespace spreadsheetengine::detail::compiler
 {
 
-inline constexpr sal_uInt16 kBuiltinExternalNameCatalogId = 1;
+inline constexpr std::uint16_t kBuiltinExternalNameCatalogId = 1;
 
-[[nodiscard]] constexpr sal_Unicode foldAscii(sal_Unicode c)
+[[nodiscard]] constexpr char16_t foldAscii(char16_t c)
 {
-    return (c >= u'A' && c <= u'Z') ? static_cast<sal_Unicode>(c - u'A' + u'a') : c;
+    return (c >= u'A' && c <= u'Z') ? static_cast<char16_t>(c - u'A' + u'a') : c;
 }
 
 [[nodiscard]] inline bool equalLookupText(api::StringView rLeft, api::StringView rRight)

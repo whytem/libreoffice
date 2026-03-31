@@ -26,14 +26,14 @@ struct WeekdayResult
 
 SPREADSHEETENGINE_DLLPUBLIC WeekdayResult computeDayOfWeek(
     const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays,
-    sal_Int16 nFlag);
+    std::int16_t nFlag);
 
 SPREADSHEETENGINE_DLLPUBLIC int computeWeeknumOOo(const spreadsheetengine::api::DateParts& rNullDate,
-    spreadsheetengine::api::DateSerial nDays, sal_Int16 nFlag);
+    spreadsheetengine::api::DateSerial nDays, std::int16_t nFlag);
 
 SPREADSHEETENGINE_DLLPUBLIC std::optional<int> computeWeekOfYear(
     const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays,
-    sal_Int16 nFlag);
+    std::int16_t nFlag);
 
 SPREADSHEETENGINE_DLLPUBLIC int computeIsoWeekOfYear(
     const spreadsheetengine::api::DateParts& rNullDate, spreadsheetengine::api::DateSerial nDays);

@@ -275,7 +275,7 @@ inline api::ValueResult<double> squareRoot(double fValue)
 inline double roundToDecimals(double fValue, int nDecimals, api::RoundingMode eMode)
 {
     return spreadsheetengine::core::math::roundToDecimals(
-        fValue, static_cast<sal_Int16>(nDecimals), toCoreRoundingMode(eMode));
+        fValue, static_cast<std::int16_t>(nDecimals), toCoreRoundingMode(eMode));
 }
 
 inline double roundToSignificantDigits(double fValue, double fDigits)

@@ -39,7 +39,7 @@ struct CompileRequest
 struct CompileStatus
 {
     token::CompiledFormula maFormula;
-    sal_uInt16 mnFailureIndex = 0;
+    std::uint16_t mnFailureIndex = 0;
     api::String maFailureMessage;
     bool mbUsedLegacyBackend = false;
 

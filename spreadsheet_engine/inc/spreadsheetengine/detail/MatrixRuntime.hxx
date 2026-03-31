@@ -16,12 +16,12 @@
 namespace spreadsheetengine::core::matrix
 {
 
-constexpr sal_uInt64 kAverageMatrixElementBytes = 12;
-constexpr sal_uInt64 kArbitraryColumnCap = 128;
-constexpr sal_uInt8 kEmptyResultFlagValue = 1;
-constexpr sal_uInt8 kEmptyPathFlagValue = 2;
+constexpr std::uint64_t kAverageMatrixElementBytes = 12;
+constexpr std::uint64_t kArbitraryColumnCap = 128;
+constexpr std::uint8_t kEmptyResultFlagValue = 1;
+constexpr std::uint8_t kEmptyPathFlagValue = 2;
 
-enum class StoredElementType : sal_uInt8
+enum class StoredElementType : std::uint8_t
 {
     Unknown,
     Empty,
@@ -30,14 +30,14 @@ enum class StoredElementType : sal_uInt8
     String
 };
 
-enum class StoredFlagType : sal_uInt8
+enum class StoredFlagType : std::uint8_t
 {
     Unknown,
     Empty,
     Integer
 };
 
-enum class StoredEmptyKind : sal_uInt8
+enum class StoredEmptyKind : std::uint8_t
 {
     Unknown,
     Cell,
@@ -89,7 +89,7 @@ struct AllocationPlan
 }
 
 [[nodiscard]] constexpr StoredEmptyKind classifyStoredEmptyKind(
-    StoredFlagType eFlagType, sal_uInt8 nFlagValue)
+    StoredFlagType eFlagType, std::uint8_t nFlagValue)
 {
     if (eFlagType == StoredFlagType::Empty)
         return StoredEmptyKind::Cell;
@@ -109,7 +109,7 @@ struct AllocationPlan
     return StoredEmptyKind::Unknown;
 }
 
-[[nodiscard]] constexpr sal_uInt8 storedFlagValue(StoredEmptyKind eKind)
+[[nodiscard]] constexpr std::uint8_t storedFlagValue(StoredEmptyKind eKind)
 {
     switch (eKind)
     {
@@ -125,25 +125,25 @@ struct AllocationPlan
     return 0;
 }
 
-[[nodiscard]] constexpr bool isStoredEmptyResult(StoredElementType eType, sal_uInt8 nFlagValue)
+[[nodiscard]] constexpr bool isStoredEmptyResult(StoredElementType eType, std::uint8_t nFlagValue)
 {
     return eType == StoredElementType::Empty
            && classifyStoredEmptyKind(StoredFlagType::Integer, nFlagValue) == StoredEmptyKind::Result;
 }
 
-[[nodiscard]] constexpr bool isStoredEmptyPath(StoredElementType eType, sal_uInt8 nFlagValue)
+[[nodiscard]] constexpr bool isStoredEmptyPath(StoredElementType eType, std::uint8_t nFlagValue)
 {
     return eType == StoredElementType::Empty
            && classifyStoredEmptyKind(StoredFlagType::Integer, nFlagValue) == StoredEmptyKind::Path;
 }
 
-[[nodiscard]] constexpr bool isStoredLogicalEmpty(StoredElementType eType, sal_uInt8 nFlagValue)
+[[nodiscard]] constexpr bool isStoredLogicalEmpty(StoredElementType eType, std::uint8_t nFlagValue)
 {
     return eType == StoredElementType::Empty && !isStoredEmptyPath(eType, nFlagValue);
 }
 
 [[nodiscard]] constexpr api::MatrixValueType classifyStoredValueType(
-    StoredElementType eType, StoredFlagType eFlagType, sal_uInt8 nFlagValue)
+    StoredElementType eType, StoredFlagType eFlagType, std::uint8_t nFlagValue)
 {
     switch (eType)
     {
@@ -166,29 +166,29 @@ struct AllocationPlan
     return api::MatrixValueType::Empty;
 }
 
-[[nodiscard]] constexpr sal_uInt64 defaultMemoryBudgetBytes(sal_uInt64 nPointerBytes)
+[[nodiscard]] constexpr std::uint64_t defaultMemoryBudgetBytes(std::uint64_t nPointerBytes)
 {
     return nPointerBytes < 8 ? 0x40000000 : 0x180000000;
 }
 
-[[nodiscard]] constexpr sal_uInt64 elementsForMemoryBudget(
-    sal_uInt64 nMemoryBytes, sal_uInt64 nBytesPerElement = kAverageMatrixElementBytes)
+[[nodiscard]] constexpr std::uint64_t elementsForMemoryBudget(
+    std::uint64_t nMemoryBytes, std::uint64_t nBytesPerElement = kAverageMatrixElementBytes)
 {
     return nBytesPerElement ? nMemoryBytes / nBytesPerElement : 0;
 }
 
-[[nodiscard]] constexpr sal_uInt64 cappedElementLimitForMemory(
-    sal_uInt64 nMemoryBytes, sal_uInt64 nMaxRowCount,
-    sal_uInt64 nColumnCap = kArbitraryColumnCap,
-    sal_uInt64 nBytesPerElement = kAverageMatrixElementBytes)
+[[nodiscard]] constexpr std::uint64_t cappedElementLimitForMemory(
+    std::uint64_t nMemoryBytes, std::uint64_t nMaxRowCount,
+    std::uint64_t nColumnCap = kArbitraryColumnCap,
+    std::uint64_t nBytesPerElement = kAverageMatrixElementBytes)
 {
-    const sal_uInt64 nElementLimit = elementsForMemoryBudget(nMemoryBytes, nBytesPerElement);
-    const sal_uInt64 nArbitraryLimit = nMaxRowCount * nColumnCap;
+    const std::uint64_t nElementLimit = elementsForMemoryBudget(nMemoryBytes, nBytesPerElement);
+    const std::uint64_t nArbitraryLimit = nMaxRowCount * nColumnCap;
     return nElementLimit < nArbitraryLimit ? nElementLimit : nArbitraryLimit;
 }
 
-[[nodiscard]] constexpr sal_uInt64 defaultElementLimitForPlatform(
-    sal_uInt64 nMaxRowCount, sal_uInt64 nPointerBytes)
+[[nodiscard]] constexpr std::uint64_t defaultElementLimitForPlatform(
+    std::uint64_t nMaxRowCount, std::uint64_t nPointerBytes)
 {
     return cappedElementLimitForMemory(defaultMemoryBudgetBytes(nPointerBytes), nMaxRowCount);
 }
@@ -204,20 +204,20 @@ struct AllocationPlan
 }
 
 [[nodiscard]] constexpr bool fitsWithinElementLimit(
-    const api::MatrixDimensions& rDimensions, sal_uInt64 nElementLimit)
+    const api::MatrixDimensions& rDimensions, std::uint64_t nElementLimit)
 {
     if (!hasAllocatableShape(rDimensions))
         return false;
     if (rDimensions.isEmpty())
         return true;
 
-    const sal_uInt64 nColumns = static_cast<sal_uInt64>(rDimensions.mnColumns);
-    const sal_uInt64 nRows = static_cast<sal_uInt64>(rDimensions.mnRows);
+    const std::uint64_t nColumns = static_cast<std::uint64_t>(rDimensions.mnColumns);
+    const std::uint64_t nRows = static_cast<std::uint64_t>(rDimensions.mnRows);
     return nColumns <= (nElementLimit / nRows);
 }
 
 [[nodiscard]] constexpr AllocationPlan planAllocation(
-    const api::MatrixDimensions& rRequestedDimensions, sal_uInt64 nElementLimit,
+    const api::MatrixDimensions& rRequestedDimensions, std::uint64_t nElementLimit,
     AllocationFallback eFallbackOnFailure)
 {
     if (fitsWithinElementLimit(rRequestedDimensions, nElementLimit))
@@ -226,32 +226,32 @@ struct AllocationPlan
     return { { 1, 1 }, eFallbackOnFailure };
 }
 
-[[nodiscard]] constexpr sal_uInt64 budgetWithReleasedCurrentElements(
-    sal_uInt64 nRemainingElementBudget, sal_uInt64 nCurrentElementCount)
+[[nodiscard]] constexpr std::uint64_t budgetWithReleasedCurrentElements(
+    std::uint64_t nRemainingElementBudget, std::uint64_t nCurrentElementCount)
 {
     return nRemainingElementBudget + nCurrentElementCount;
 }
 
-[[nodiscard]] constexpr sal_uInt64 budgetAfterAllocation(
-    sal_uInt64 nAvailableElementBudget, const api::MatrixDimensions& rAllocatedDimensions)
+[[nodiscard]] constexpr std::uint64_t budgetAfterAllocation(
+    std::uint64_t nAvailableElementBudget, const api::MatrixDimensions& rAllocatedDimensions)
 {
     return nAvailableElementBudget - rAllocatedDimensions.elementCount();
 }
 
-[[nodiscard]] constexpr sal_uInt64 budgetAfterConstruction(
-    sal_uInt64 nRemainingElementBudget, const api::MatrixDimensions& rAllocatedDimensions)
+[[nodiscard]] constexpr std::uint64_t budgetAfterConstruction(
+    std::uint64_t nRemainingElementBudget, const api::MatrixDimensions& rAllocatedDimensions)
 {
     return budgetAfterAllocation(nRemainingElementBudget, rAllocatedDimensions);
 }
 
-[[nodiscard]] constexpr sal_uInt64 budgetAfterDestruction(
-    sal_uInt64 nRemainingElementBudget, const api::MatrixDimensions& rReleasedDimensions)
+[[nodiscard]] constexpr std::uint64_t budgetAfterDestruction(
+    std::uint64_t nRemainingElementBudget, const api::MatrixDimensions& rReleasedDimensions)
 {
     return budgetWithReleasedCurrentElements(nRemainingElementBudget, rReleasedDimensions.elementCount());
 }
 
-[[nodiscard]] constexpr sal_uInt64 budgetAfterResize(
-    sal_uInt64 nRemainingElementBudget, sal_uInt64 nCurrentElementCount,
+[[nodiscard]] constexpr std::uint64_t budgetAfterResize(
+    std::uint64_t nRemainingElementBudget, std::uint64_t nCurrentElementCount,
     const api::MatrixDimensions& rAllocatedDimensions)
 {
     return budgetAfterAllocation(
@@ -260,8 +260,8 @@ struct AllocationPlan
 }
 
 [[nodiscard]] constexpr AllocationPlan planResize(
-    const api::MatrixDimensions& rRequestedDimensions, sal_uInt64 nCurrentElementCount,
-    sal_uInt64 nRemainingElementBudget, AllocationFallback eFallbackOnFailure)
+    const api::MatrixDimensions& rRequestedDimensions, std::uint64_t nCurrentElementCount,
+    std::uint64_t nRemainingElementBudget, AllocationFallback eFallbackOnFailure)
 {
     return planAllocation(
         rRequestedDimensions,

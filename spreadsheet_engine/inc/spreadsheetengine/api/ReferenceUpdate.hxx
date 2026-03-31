@@ -17,14 +17,14 @@
 namespace spreadsheetengine::api::refupdate
 {
 
-enum class UpdateMode : sal_uInt8
+enum class UpdateMode : std::uint8_t
 {
     InsertDelete,
     Move,
     Reorder
 };
 
-enum class UpdateResult : sal_uInt8
+enum class UpdateResult : std::uint8_t
 {
     Nothing,
     Updated,

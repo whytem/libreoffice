@@ -18,7 +18,7 @@ namespace spreadsheetengine::api
 
 using MatrixSize = sal_Int32;
 
-enum class MatrixValueType : sal_uInt8
+enum class MatrixValueType : std::uint8_t
 {
     Value = 0x00,
     Boolean = 0x01,
@@ -30,7 +30,7 @@ enum class MatrixValueType : sal_uInt8
 
 [[nodiscard]] constexpr bool isValueType(MatrixValueType eType)
 {
-    return static_cast<sal_uInt8>(eType) <= static_cast<sal_uInt8>(MatrixValueType::Boolean);
+    return static_cast<std::uint8_t>(eType) <= static_cast<std::uint8_t>(MatrixValueType::Boolean);
 }
 
 [[nodiscard]] constexpr bool isBooleanType(MatrixValueType eType)
@@ -40,26 +40,26 @@ enum class MatrixValueType : sal_uInt8
 
 [[nodiscard]] constexpr bool isNonValueType(MatrixValueType eType)
 {
-    return (static_cast<sal_uInt8>(eType) & static_cast<sal_uInt8>(MatrixValueType::NonvalueMask))
+    return (static_cast<std::uint8_t>(eType) & static_cast<std::uint8_t>(MatrixValueType::NonvalueMask))
            != 0;
 }
 
 [[nodiscard]] constexpr bool isRealStringType(MatrixValueType eType)
 {
-    return (static_cast<sal_uInt8>(eType) & static_cast<sal_uInt8>(MatrixValueType::NonvalueMask))
-           == static_cast<sal_uInt8>(MatrixValueType::Text);
+    return (static_cast<std::uint8_t>(eType) & static_cast<std::uint8_t>(MatrixValueType::NonvalueMask))
+           == static_cast<std::uint8_t>(MatrixValueType::Text);
 }
 
 [[nodiscard]] constexpr bool isEmptyType(MatrixValueType eType)
 {
-    return (static_cast<sal_uInt8>(eType) & static_cast<sal_uInt8>(MatrixValueType::NonvalueMask))
-           == static_cast<sal_uInt8>(MatrixValueType::Empty);
+    return (static_cast<std::uint8_t>(eType) & static_cast<std::uint8_t>(MatrixValueType::NonvalueMask))
+           == static_cast<std::uint8_t>(MatrixValueType::Empty);
 }
 
 [[nodiscard]] constexpr bool isEmptyPathType(MatrixValueType eType)
 {
-    return (static_cast<sal_uInt8>(eType) & static_cast<sal_uInt8>(MatrixValueType::NonvalueMask))
-           == static_cast<sal_uInt8>(MatrixValueType::EmptyPath);
+    return (static_cast<std::uint8_t>(eType) & static_cast<std::uint8_t>(MatrixValueType::NonvalueMask))
+           == static_cast<std::uint8_t>(MatrixValueType::EmptyPath);
 }
 
 struct MatrixDimensions
@@ -73,12 +73,12 @@ struct MatrixDimensions
 
     [[nodiscard]] constexpr bool isEmpty() const { return mnColumns == 0 || mnRows == 0; }
 
-    [[nodiscard]] constexpr sal_uInt64 elementCount() const
+    [[nodiscard]] constexpr std::uint64_t elementCount() const
     {
         if (mnColumns <= 0 || mnRows <= 0)
             return 0;
 
-        return static_cast<sal_uInt64>(mnColumns) * static_cast<sal_uInt64>(mnRows);
+        return static_cast<std::uint64_t>(mnColumns) * static_cast<std::uint64_t>(mnRows);
     }
 };
 

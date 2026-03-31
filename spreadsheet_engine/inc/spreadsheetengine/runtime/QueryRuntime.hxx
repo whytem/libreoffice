@@ -24,7 +24,7 @@ namespace spreadsheetengine::core::query
 
 struct CriteriaPredicate
 {
-    enum class OperandKind : sal_uInt8
+    enum class OperandKind : std::uint8_t
     {
         Empty = 0,
         Number,
@@ -49,7 +49,7 @@ struct CriteriaAggregateInput
     api::MatrixSize mnRows = 1;
 };
 
-enum class CriteriaAggregateKind : sal_uInt8
+enum class CriteriaAggregateKind : std::uint8_t
 {
     Count = 0,
     Sum,

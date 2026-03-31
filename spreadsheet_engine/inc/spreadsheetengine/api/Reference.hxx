@@ -17,7 +17,7 @@
 namespace spreadsheetengine::api::reference
 {
 
-enum class IndexSelectionKind : sal_uInt8
+enum class IndexSelectionKind : std::uint8_t
 {
     KeepSource,
     Scalar,
@@ -66,11 +66,11 @@ struct IndexReferenceSelection
     if (nWidth <= 0 || nHeight <= 0)
         return ValueResult<CellRange>::failure(Error::IllegalArgument);
 
-    const sal_Int64 nStartColumn
-        = static_cast<sal_Int64>(rBaseRange.maStart.mnColumn) + nColumnOffset;
-    const sal_Int64 nStartRow = static_cast<sal_Int64>(rBaseRange.maStart.mnRow) + nRowOffset;
-    const sal_Int64 nEndColumn = nStartColumn + nWidth - 1;
-    const sal_Int64 nEndRow = nStartRow + nHeight - 1;
+    const std::int64_t nStartColumn
+        = static_cast<std::int64_t>(rBaseRange.maStart.mnColumn) + nColumnOffset;
+    const std::int64_t nStartRow = static_cast<std::int64_t>(rBaseRange.maStart.mnRow) + nRowOffset;
+    const std::int64_t nEndColumn = nStartColumn + nWidth - 1;
+    const std::int64_t nEndRow = nStartRow + nHeight - 1;
     if (nStartColumn < 0 || nStartRow < 0 || nEndColumn > nMaxColumn || nEndRow > nMaxRow)
         return ValueResult<CellRange>::failure(Error::IllegalArgument);
 
@@ -83,7 +83,7 @@ struct IndexReferenceSelection
 
 [[nodiscard]] inline ValueResult<IndexMatrixSelection> planIndexMatrixSelection(
     const MatrixDimensions& rSourceDimensions, RowIndex nRow, ColumnIndex nColumn,
-    bool bColumnMissing, sal_uInt8 nParamCount)
+    bool bColumnMissing, std::uint8_t nParamCount)
 {
     if (nRow < 0 || nColumn < 0 || rSourceDimensions.mnColumns <= 0 || rSourceDimensions.mnRows <= 0)
         return ValueResult<IndexMatrixSelection>::failure(Error::IllegalArgument);
@@ -148,7 +148,7 @@ struct IndexReferenceSelection
 }
 
 [[nodiscard]] inline ValueResult<IndexReferenceSelection> planIndexReferenceSelection(
-    const CellRange& rSourceRange, RowIndex nRow, ColumnIndex nColumn, sal_uInt8 nParamCount)
+    const CellRange& rSourceRange, RowIndex nRow, ColumnIndex nColumn, std::uint8_t nParamCount)
 {
     if (nRow < 0 || nColumn < 0 || !rSourceRange.isNormalized()
         || rSourceRange.maStart.mnSheet != rSourceRange.maEnd.mnSheet)

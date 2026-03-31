@@ -23,7 +23,7 @@ namespace spreadsheetengine::api::calendar
 {
 
 inline api::ValueResult<double> makeDateSerial(
-    const api::DateParts& rNullDate, sal_Int16 nYear, sal_Int16 nMonth, sal_Int16 nDay, bool bStrict)
+    const api::DateParts& rNullDate, std::int16_t nYear, std::int16_t nMonth, std::int16_t nDay, bool bStrict)
 {
     if (auto oValue
         = spreadsheetengine::core::datetime::makeDateSerial(rNullDate, nYear, nMonth, nDay, bStrict))
@@ -72,7 +72,7 @@ inline api::ValueResult<double> makeTimeSerial(double fHour, double fMinute, dou
     return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 }
 
-inline api::ValueResult<double> easterSundaySerial(const api::DateParts& rNullDate, sal_Int16 nYear)
+inline api::ValueResult<double> easterSundaySerial(const api::DateParts& rNullDate, std::int16_t nYear)
 {
     if (auto oValue = spreadsheetengine::core::datetime::computeEasterSundaySerial(rNullDate, nYear))
         return api::ValueResult<double>::success(*oValue);
@@ -100,7 +100,7 @@ inline api::ValueResult<double> dateDif(const api::DateParts& rNullDate,
 }
 
 inline api::ValueResult<int> dayOfWeek(
-    const api::DateParts& rNullDate, api::DateSerial nDays, sal_Int16 nFlag)
+    const api::DateParts& rNullDate, api::DateSerial nDays, std::int16_t nFlag)
 {
     const auto aResult = spreadsheetengine::core::datetime::computeDayOfWeek(rNullDate, nDays, nFlag);
     if (aResult.mbValid)
@@ -108,13 +108,13 @@ inline api::ValueResult<int> dayOfWeek(
     return api::ValueResult<int>::failure(api::Error::IllegalArgument);
 }
 
-inline int weeknumOOo(const api::DateParts& rNullDate, api::DateSerial nDays, sal_Int16 nFlag)
+inline int weeknumOOo(const api::DateParts& rNullDate, api::DateSerial nDays, std::int16_t nFlag)
 {
     return spreadsheetengine::core::datetime::computeWeeknumOOo(rNullDate, nDays, nFlag);
 }
 
 inline api::ValueResult<int> weekOfYear(
-    const api::DateParts& rNullDate, api::DateSerial nDays, sal_Int16 nFlag)
+    const api::DateParts& rNullDate, api::DateSerial nDays, std::int16_t nFlag)
 {
     if (auto oValue = spreadsheetengine::core::datetime::computeWeekOfYear(rNullDate, nDays, nFlag))
         return api::ValueResult<int>::success(*oValue);

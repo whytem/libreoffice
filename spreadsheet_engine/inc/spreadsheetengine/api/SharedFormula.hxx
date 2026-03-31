@@ -19,14 +19,14 @@
 namespace spreadsheetengine::api::sharedformula
 {
 
-enum class TokenCompareState : sal_uInt8
+enum class TokenCompareState : std::uint8_t
 {
     NotEqual,
     EqualInvariant,
     EqualRelativeRef
 };
 
-enum class JoinAction : sal_uInt8
+enum class JoinAction : std::uint8_t
 {
     None,
     MergeGroups,
@@ -35,7 +35,7 @@ enum class JoinAction : sal_uInt8
     CreateGroup
 };
 
-enum class UnsharePosition : sal_uInt8
+enum class UnsharePosition : std::uint8_t
 {
     None,
     Top,
@@ -43,7 +43,7 @@ enum class UnsharePosition : sal_uInt8
     Middle
 };
 
-enum class GroupRunAction : sal_uInt8
+enum class GroupRunAction : std::uint8_t
 {
     None,
     ExtendExistingGroup,

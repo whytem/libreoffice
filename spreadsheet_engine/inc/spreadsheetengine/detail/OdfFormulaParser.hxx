@@ -20,7 +20,7 @@
 namespace spreadsheetengine::core::formula
 {
 
-enum class NodeKind : sal_uInt8
+enum class NodeKind : std::uint8_t
 {
     NumberLiteral,
     StringLiteral,
@@ -38,13 +38,13 @@ enum class NodeKind : sal_uInt8
     FunctionCall
 };
 
-enum class UnaryOperator : sal_uInt8
+enum class UnaryOperator : std::uint8_t
 {
     Plus,
     Minus
 };
 
-enum class BinaryOperator : sal_uInt8
+enum class BinaryOperator : std::uint8_t
 {
     Add,
     Subtract,

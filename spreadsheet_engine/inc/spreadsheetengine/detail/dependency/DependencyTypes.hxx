@@ -29,13 +29,13 @@ struct DependencyNodeId
     [[nodiscard]] constexpr bool isValid() const { return mnIndex >= 0; }
 };
 
-enum class DependencyNodeKind : sal_uInt8
+enum class DependencyNodeKind : std::uint8_t
 {
     FormulaCell,
     NamedRange
 };
 
-enum class DependencySourceKind : sal_uInt8
+enum class DependencySourceKind : std::uint8_t
 {
     Cell,
     Range,
@@ -43,7 +43,7 @@ enum class DependencySourceKind : sal_uInt8
     OpaqueWorkbook
 };
 
-enum class DependencyEdgeKind : sal_uInt8
+enum class DependencyEdgeKind : std::uint8_t
 {
     DirectCell,
     DirectRange,
@@ -144,7 +144,7 @@ struct DependencyBuildReport
     [[nodiscard]] constexpr bool operator==(const DependencyBuildReport& rOther) const = default;
 };
 
-enum class DirtyReason : sal_uInt8
+enum class DirtyReason : std::uint8_t
 {
     ScalarValueChanged,
     FormulaChanged,
@@ -173,7 +173,7 @@ struct DirtyNamedRange
     [[nodiscard]] constexpr bool operator==(const DirtyNamedRange& rOther) const = default;
 };
 
-enum class RebuildScopeKind : sal_uInt8
+enum class RebuildScopeKind : std::uint8_t
 {
     FormulaCell,
     Sheet,

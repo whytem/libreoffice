@@ -119,16 +119,16 @@ inline void setAddress(
 
 inline void putInOrder(SingleRefData& rRef1, SingleRefData& rRef2, const CellAddress& rPos)
 {
-    const sal_uInt8 kColumn = 1;
-    const sal_uInt8 kRow = 2;
-    const sal_uInt8 kSheet = 4;
+    const std::uint8_t kColumn = 1;
+    const std::uint8_t kRow = 2;
+    const std::uint8_t kSheet = 4;
 
-    sal_uInt8 nRelState1 = rRef1.maFlags.mbRelativeName
+    std::uint8_t nRelState1 = rRef1.maFlags.mbRelativeName
                                ? ((rRef1.maFlags.mbSheetRelative ? kSheet : 0)
                                   | (rRef1.maFlags.mbRowRelative ? kRow : 0)
                                   | (rRef1.maFlags.mbColumnRelative ? kColumn : 0))
                                : 0;
-    sal_uInt8 nRelState2 = rRef2.maFlags.mbRelativeName
+    std::uint8_t nRelState2 = rRef2.maFlags.mbRelativeName
                                ? ((rRef2.maFlags.mbSheetRelative ? kSheet : 0)
                                   | (rRef2.maFlags.mbRowRelative ? kRow : 0)
                                   | (rRef2.maFlags.mbColumnRelative ? kColumn : 0))
@@ -136,7 +136,7 @@ inline void putInOrder(SingleRefData& rRef1, SingleRefData& rRef2, const CellAdd
 
     const auto swapDimension = [&](auto SingleRefFlags::* pRelative, auto SingleRefFlags::* pDeleted,
                                    auto& nValue1, auto& nValue2, auto nResolved1, auto nResolved2,
-                                   auto nBase, sal_uInt8 nMask) {
+                                   auto nBase, std::uint8_t nMask) {
         if (nResolved2 >= nResolved1)
             return;
 
