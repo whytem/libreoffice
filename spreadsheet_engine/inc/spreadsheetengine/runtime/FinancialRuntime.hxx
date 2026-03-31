@@ -41,6 +41,15 @@ SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateRate(
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateNominal(
     double fEffectiveRate, double fPeriods);
 
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateEffectiveAnnualRate(
+    double fNominalRate, double fPeriods);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateDollarFraction(
+    double fDollarDecimal, double fFractionDenominator);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateDollarDecimal(
+    double fDollarFraction, double fFractionDenominator);
+
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateInterestSchedulePayment(
     double fRate, double fPeriod, double fTotalPeriods, double fInvestment);
 
@@ -134,9 +143,19 @@ SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateTbillPrice(
     const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
     double fDiscount);
 
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateTbillEq(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    double fDiscount);
+
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateTbillYield(
     const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
     double fPrice);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateFutureValueSchedule(
+    double fPrincipal, const std::vector<double>& rSchedule);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluatePaybackDuration(
+    double fRate, double fPresentValue, double fFutureValue);
 
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateOddlprice(
     const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,

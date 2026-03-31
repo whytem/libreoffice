@@ -763,6 +763,46 @@ api::ValueResult<double> evaluateNominal(double fEffectiveRate, double fPeriods)
     return makeFiniteResult((std::pow(fEffectiveRate + 1.0, 1.0 / fPeriods) - 1.0) * fPeriods);
 }
 
+api::ValueResult<double> evaluateEffectiveAnnualRate(double fNominalRate, double fPeriods)
+{
+    if (fPeriods < 1.0 || fNominalRate < 0.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    if (fp::approxEqual(fNominalRate, 0.0))
+        return api::ValueResult<double>::success(0.0);
+
+    const double fWholePeriods = fp::approxFloor(fPeriods);
+    return makeFiniteResult(
+        spreadsheetengine::core::math::computeEffectiveAnnualRate(fNominalRate, fWholePeriods));
+}
+
+api::ValueResult<double> evaluateDollarFraction(double fDollarDecimal, double fFractionDenominator)
+{
+    const double fWholeDenominator = fp::approxFloor(fFractionDenominator);
+    if (!(fWholeDenominator > 0.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    double fIntegralPart = 0.0;
+    double fResult = std::modf(fDollarDecimal, &fIntegralPart);
+    fResult *= fWholeDenominator;
+    fResult *= std::pow(10.0, -std::ceil(std::log10(fWholeDenominator)));
+    fResult += fIntegralPart;
+    return makeFiniteResult(fResult);
+}
+
+api::ValueResult<double> evaluateDollarDecimal(double fDollarFraction, double fFractionDenominator)
+{
+    const double fWholeDenominator = fp::approxFloor(fFractionDenominator);
+    if (!(fWholeDenominator > 0.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    double fIntegralPart = 0.0;
+    double fResult = std::modf(fDollarFraction, &fIntegralPart);
+    fResult /= fWholeDenominator;
+    fResult *= std::pow(10.0, std::ceil(std::log10(fWholeDenominator)));
+    fResult += fIntegralPart;
+    return makeFiniteResult(fResult);
+}
+
 api::ValueResult<double> evaluateInterestSchedulePayment(
     double fRate, double fPeriod, double fTotalPeriods, double fInvestment)
 {
@@ -1261,6 +1301,22 @@ api::ValueResult<double> evaluateTbillPrice(
     return makeFiniteResult(100.0 * (1.0 - fDiscount * *oYearFraction));
 }
 
+api::ValueResult<double> evaluateTbillEq(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    double fDiscount)
+{
+    const auto oYearFraction = computeYearFractionValue(rNullDate, nSettlement, nMaturity + 1, 0);
+    if (!(fDiscount > 0.0) || nSettlement >= nMaturity || !oYearFraction)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const std::int32_t nDiff360 = static_cast<std::int32_t>(std::llround(*oYearFraction * 360.0));
+    if (nDiff360 > 360)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return makeFiniteResult(
+        (365.0 * fDiscount) / (360.0 - (fDiscount * static_cast<double>(nDiff360))));
+}
+
 api::ValueResult<double> evaluateTbillYield(
     const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
     double fPrice)
@@ -1281,6 +1337,24 @@ api::ValueResult<double> evaluateTbillYield(
     fYield /= static_cast<double>(nDayCount);
     fYield *= 360.0;
     return makeFiniteResult(fYield);
+}
+
+api::ValueResult<double> evaluateFutureValueSchedule(
+    double fPrincipal, const std::vector<double>& rSchedule)
+{
+    double fValue = fPrincipal;
+    for (double fRate : rSchedule)
+        fValue *= 1.0 + fRate;
+    return makeFiniteResult(fValue);
+}
+
+api::ValueResult<double> evaluatePaybackDuration(
+    double fRate, double fPresentValue, double fFutureValue)
+{
+    if (!(fRate > 0.0) || !(fPresentValue > 0.0) || !(fFutureValue > 0.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    return makeFiniteResult(
+        spreadsheetengine::core::math::computePaybackDuration(fRate, fPresentValue, fFutureValue));
 }
 
 api::ValueResult<double> evaluateOddlprice(

@@ -67,7 +67,8 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
           || rFunctionName == u"QUARTILE.EXC"
           || rFunctionName == u"COM.MICROSOFT.QUARTILE.EXC";
     if (!(bCriteriaAggregate || rFunctionName == u"MAX" || rFunctionName == u"MIN" || rFunctionName == u"MAXA"
-            || rFunctionName == u"MINA" || rFunctionName == u"SUM" || rFunctionName == u"SUBTOTAL"
+            || rFunctionName == u"MINA" || rFunctionName == u"SUM" || rFunctionName == u"COUNT"
+            || rFunctionName == u"COUNTA" || rFunctionName == u"MEDIAN" || rFunctionName == u"SUBTOTAL"
             || rFunctionName == u"AGGREGATE" || bRankedAggregate || rFunctionName == u"SKEW"
             || rFunctionName == u"SKEWP"))
     {
@@ -306,6 +307,72 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
         }
 
         return detail::makeScalarResult(api::CellValue::number(fSum));
+    }
+
+    if (rFunctionName == u"COUNT" || rFunctionName == u"COUNTA")
+    {
+        if (rNode.maChildren.empty())
+            return detail::makeFailure(api::Error::IllegalArgument);
+
+        double fCount = 0.0;
+        for (const auto& pChild : rNode.maChildren)
+        {
+            if (rFunctionName == u"COUNTA"
+                && pChild->meKind == formula::NodeKind::EmptyArgument)
+            {
+                fCount += 1.0;
+                continue;
+            }
+
+            const auto aVisited = visitFlattenedValues(
+                visitFlattenedValues, *pChild,
+                [&](const api::CellValue& rValue,
+                    bool bFromReference) -> api::ValueResult<bool> {
+                    if (rValue.isError() && rFunctionName == u"COUNT")
+                        return api::ValueResult<bool>::failure(rValue.meError);
+
+                    if (rFunctionName == u"COUNT")
+                    {
+                        if (bFromReference)
+                        {
+                            if (rValue.isNumber())
+                                fCount += 1.0;
+                            return api::ValueResult<bool>::success(true);
+                        }
+
+                        if (rValue.isNumber())
+                            fCount += 1.0;
+                        return api::ValueResult<bool>::success(true);
+                    }
+
+                    if (!rValue.isEmpty())
+                        fCount += 1.0;
+                    return api::ValueResult<bool>::success(true);
+                });
+            if (!aVisited)
+                return detail::makeFailure(aVisited.meError);
+        }
+
+        return detail::makeScalarResult(api::CellValue::number(fCount));
+    }
+
+    if (rFunctionName == u"MEDIAN")
+    {
+        if (rNode.maChildren.empty())
+            return detail::makeFailure(api::Error::IllegalArgument);
+
+        const auto aNumbers = collectVarianceArguments(false);
+        if (!aNumbers)
+            return detail::makeFailure(aNumbers.meError);
+        if (aNumbers.maValue.empty())
+            return detail::makeFailure(api::Error::NoValue);
+
+        semath::AggregateScan aScan;
+        aScan.maNumbers = std::move(aNumbers.maValue);
+        const auto aMedian = semath::evaluateAggregateNumbers(12, aScan);
+        if (!aMedian)
+            return detail::makeFailure(aMedian.meError);
+        return detail::makeScalarResult(api::CellValue::number(aMedian.maValue));
     }
 
     if (rFunctionName == u"SUBTOTAL")

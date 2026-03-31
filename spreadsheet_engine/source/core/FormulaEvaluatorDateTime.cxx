@@ -52,8 +52,11 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateDateTimeFamily(
         api::StringView(u"EOMONTH"),
         api::StringView(u"WEEKDAY"),
         api::StringView(u"WEEKNUM"),
+        api::StringView(u"DAYS"),
         api::StringView(u"DAYS360"),
         api::StringView(u"EASTERSUNDAY"),
+        api::StringView(u"MONTHS"),
+        api::StringView(u"ORG.OPENOFFICE.MONTHS"),
         api::StringView(u"YEARS"),
         api::StringView(u"WEEKS"),
         api::StringView(u"WEEKSINYEAR"),
@@ -537,6 +540,41 @@ if (aFunctionName == u"BASISODATETIME")
             sedatetime::defaultNullDate(), *oStartDate, *oEndDate, bEuropeanMethod)));
     }
 
+    if (aFunctionName == u"DAYS")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto coerceDaysArgument = [&](const formula::Node& rArgument)
+            -> api::ValueResult<double> {
+            const auto aValue = aContext.evaluateScalarArgumentValue(rArgument);
+            if (!aValue)
+                return api::ValueResult<double>::failure(aValue.meError);
+            if (aValue.maValue.isEmpty())
+                return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+            if (aValue.maValue.isText())
+            {
+                const auto oParsed = sedatetime::parseStandaloneNumberText(aValue.maValue.maString);
+                if (!oParsed)
+                    return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+                return api::ValueResult<double>::success(oParsed->mfValue);
+            }
+
+            return coerceToNumber(aValue.maValue);
+        };
+
+        const auto aEnd = coerceDaysArgument(*rNode.maChildren[0]);
+        if (!aEnd)
+            return makeScalarResult(api::CellValue::error(aEnd.meError));
+        const auto aStart = coerceDaysArgument(*rNode.maChildren[1]);
+        if (!aStart)
+            return makeScalarResult(api::CellValue::error(aStart.meError));
+
+        return makeScalarResult(api::CellValue::number(
+            api::calendar::diffDate(aEnd.maValue, aStart.maValue)));
+    }
+
     if (aFunctionName == u"EASTERSUNDAY")
     {
         if (rNode.maChildren.size() != 1)
@@ -574,6 +612,58 @@ if (aFunctionName == u"BASISODATETIME")
             return makeScalarResult(api::CellValue::error(aEaster.meError));
 
         return makeScalarResult(api::CellValue::number(aEaster.maValue));
+    }
+
+    if (aFunctionName == u"MONTHS" || aFunctionName == u"ORG.OPENOFFICE.MONTHS")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aStartValue = aContext.evaluateScalarArgumentValue(*rNode.maChildren[0]);
+        if (!aStartValue)
+            return makeScalarResult(api::CellValue::error(aStartValue.meError));
+        const auto aEndValue = aContext.evaluateScalarArgumentValue(*rNode.maChildren[1]);
+        if (!aEndValue)
+            return makeScalarResult(api::CellValue::error(aEndValue.meError));
+        const auto aModeValue = aContext.evaluateScalarArgumentValue(*rNode.maChildren[2]);
+        if (!aModeValue)
+            return makeScalarResult(api::CellValue::error(aModeValue.meError));
+        if (aModeValue.maValue.isEmpty())
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto oStartDate = sedatetime::coerceToDateSerial(aStartValue.maValue);
+        const auto oEndDate = sedatetime::coerceToDateSerial(aEndValue.maValue);
+        if (!oStartDate || !oEndDate)
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const auto aModeNumber = coerceToNumber(aModeValue.maValue);
+        if (!aModeNumber)
+            return makeScalarResult(api::CellValue::error(aModeNumber.meError));
+        const auto oWholeMode = toWholeNumber(aModeNumber.maValue);
+        if (!oWholeMode || (*oWholeMode != 0 && *oWholeMode != 1))
+            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+
+        const std::int32_t nNullDate = sedate::toAbsoluteDays(sedatetime::defaultNullDate());
+        const api::DateParts aStartDate = sedate::fromAbsoluteDays(nNullDate + *oStartDate);
+        const api::DateParts aEndDate = sedate::fromAbsoluteDays(nNullDate + *oEndDate);
+
+        std::int32_t nMonths = static_cast<std::int32_t>(aEndDate.mnMonth) - aStartDate.mnMonth
+                               + (static_cast<std::int32_t>(aEndDate.mnYear) - aStartDate.mnYear)
+                                     * 12;
+        if (*oWholeMode == 0 && *oStartDate != *oEndDate)
+        {
+            if (*oStartDate < *oEndDate)
+            {
+                if (aStartDate.mnDay > aEndDate.mnDay)
+                    --nMonths;
+            }
+            else if (aStartDate.mnDay < aEndDate.mnDay)
+            {
+                ++nMonths;
+            }
+        }
+
+        return makeScalarResult(api::CellValue::number(static_cast<double>(nMonths)));
     }
 
     if (aFunctionName == u"YEARS")

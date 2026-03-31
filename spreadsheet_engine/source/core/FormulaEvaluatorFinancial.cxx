@@ -39,6 +39,11 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateFinancialFamily(
         api::StringView(u"NOMINAL"),
         api::StringView(u"NOMINAL_ADD"),
         api::StringView(u"GETNOMINAL"),
+        api::StringView(u"DOLLARFR"),
+        api::StringView(u"GETDOLLARFR"),
+        api::StringView(u"DOLLARDE"),
+        api::StringView(u"GETDOLLARDE"),
+        api::StringView(u"EFFECT"),
         api::StringView(u"NPV"),
         api::StringView(u"RRI"),
         api::StringView(u"ISPMT"),
@@ -77,8 +82,12 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateFinancialFamily(
         api::StringView(u"GETYIELD"),
         api::StringView(u"TBILLPRICE"),
         api::StringView(u"GETTBILLPRICE"),
+        api::StringView(u"TBILLEQ"),
+        api::StringView(u"GETTBILLEQ"),
         api::StringView(u"TBILLYIELD"),
         api::StringView(u"GETTBILLYIELD"),
+        api::StringView(u"FVSCHEDULE"),
+        api::StringView(u"GETFVSCHEDULE"),
         api::StringView(u"AMORLINC"),
         api::StringView(u"GETAMORLINC"),
         api::StringView(u"AMORDEGRC"),
@@ -99,6 +108,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateFinancialFamily(
         api::StringView(u"GETCOUPPCD"),
         api::StringView(u"COUPNUM"),
         api::StringView(u"GETCOUPNUM"),
+        api::StringView(u"PDURATION"),
         api::StringView(u"XIRR"),
         api::StringView(u"GETXIRR"),
     };
@@ -262,24 +272,24 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
     if (aFunctionName == u"RATE")
     {
         if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 6)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aNper = aContext.evaluateNumericArgument(*rNode.maChildren[0], 0.0);
         if (!aNper)
-            return makeFailure(aNper.meError);
+            return makeCellError(aNper.meError);
         const auto aPayment = aContext.evaluateNumericArgument(*rNode.maChildren[1], 0.0);
         if (!aPayment)
-            return makeFailure(aPayment.meError);
+            return makeCellError(aPayment.meError);
         const auto aPresentValue = aContext.evaluateNumericArgument(*rNode.maChildren[2], 0.0);
         if (!aPresentValue)
-            return makeFailure(aPresentValue.meError);
+            return makeCellError(aPresentValue.meError);
 
         double fFutureValue = 0.0;
         if (rNode.maChildren.size() >= 4)
         {
             const auto aFutureValue = aContext.evaluateNumericArgument(*rNode.maChildren[3], 0.0);
             if (!aFutureValue)
-                return makeFailure(aFutureValue.meError);
+                return makeCellError(aFutureValue.meError);
             fFutureValue = aFutureValue.maValue;
         }
 
@@ -292,13 +302,13 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
             {
                 const auto aPayTypeValue = aContext.evaluateScalarArgumentValue(*rNode.maChildren[4]);
                 if (!aPayTypeValue)
-                    return makeFailure(aPayTypeValue.meError);
+                    return makeCellError(aPayTypeValue.meError);
                 if (aPayTypeValue.maValue.isEmpty())
-                    return makeFailure(api::Error::IllegalArgument);
+                    return makeCellError(api::Error::IllegalArgument);
 
                 const auto aPayType = coerceToBoolean(aPayTypeValue.maValue);
                 if (!aPayType)
-                    return makeFailure(aPayType.meError);
+                    return makeCellError(aPayType.meError);
                 bPayInAdvance = aPayType.maValue;
             }
         }
@@ -312,13 +322,13 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
             {
                 const auto aGuessValue = aContext.evaluateScalarArgumentValue(*rNode.maChildren[5]);
                 if (!aGuessValue)
-                    return makeFailure(aGuessValue.meError);
+                    return makeCellError(aGuessValue.meError);
                 if (aGuessValue.maValue.isEmpty())
-                    return makeFailure(api::Error::IllegalArgument);
+                    return makeCellError(api::Error::IllegalArgument);
 
                 const auto aGuess = coerceToNumber(aGuessValue.maValue);
                 if (!aGuess)
-                    return makeFailure(aGuess.meError);
+                    return makeCellError(aGuess.meError);
                 fGuess = aGuess.maValue;
             }
         }
@@ -327,7 +337,7 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
             aNper.maValue, aPayment.maValue, aPresentValue.maValue, fFutureValue,
             bPayInAdvance, fGuess);
         if (!aRateResult)
-            return makeFailure(aRateResult.meError);
+            return makeCellError(aRateResult.meError);
         return makeScalarResult(api::CellValue::number(aRateResult.maValue));
     }
 
@@ -348,6 +358,65 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
         if (!aNominal)
             return makeCellError(aNominal.meError);
         return makeScalarResult(api::CellValue::number(aNominal.maValue));
+    }
+
+    if (aFunctionName == u"EFFECT")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aNominalRate = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[0]);
+        if (!aNominalRate)
+            return makeCellError(aNominalRate.meError);
+        const auto aPeriods = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[1]);
+        if (!aPeriods)
+            return makeCellError(aPeriods.meError);
+
+        const auto aEffect
+            = sefinance::evaluateEffectiveAnnualRate(aNominalRate.maValue, aPeriods.maValue);
+        if (!aEffect)
+            return makeCellError(aEffect.meError);
+        return makeScalarResult(api::CellValue::number(aEffect.maValue));
+    }
+
+    if (aFunctionName == u"DOLLARFR" || aFunctionName == u"GETDOLLARFR")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aDollarDecimal = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[0]);
+        if (!aDollarDecimal)
+            return makeCellError(aDollarDecimal.meError);
+        const auto aFractionDenominator
+            = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[1]);
+        if (!aFractionDenominator)
+            return makeCellError(aFractionDenominator.meError);
+
+        const auto aDollarFraction = sefinance::evaluateDollarFraction(
+            aDollarDecimal.maValue, aFractionDenominator.maValue);
+        if (!aDollarFraction)
+            return makeCellError(aDollarFraction.meError);
+        return makeScalarResult(api::CellValue::number(aDollarFraction.maValue));
+    }
+
+    if (aFunctionName == u"DOLLARDE" || aFunctionName == u"GETDOLLARDE")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aDollarFraction = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[0]);
+        if (!aDollarFraction)
+            return makeCellError(aDollarFraction.meError);
+        const auto aFractionDenominator
+            = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[1]);
+        if (!aFractionDenominator)
+            return makeCellError(aFractionDenominator.meError);
+
+        const auto aDollarDecimal = sefinance::evaluateDollarDecimal(
+            aDollarFraction.maValue, aFractionDenominator.maValue);
+        if (!aDollarDecimal)
+            return makeCellError(aDollarDecimal.meError);
+        return makeScalarResult(api::CellValue::number(aDollarDecimal.maValue));
     }
 
     if (aFunctionName == u"NPV")
@@ -377,22 +446,22 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
     if (aFunctionName == u"RRI")
     {
         if (rNode.maChildren.size() != 3)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aPeriods = aContext.evaluateNumericArgument(*rNode.maChildren[0], 0.0);
         if (!aPeriods)
-            return makeFailure(aPeriods.meError);
+            return makeCellError(aPeriods.meError);
         const auto aPresentValue = aContext.evaluateNumericArgument(*rNode.maChildren[1], 0.0);
         if (!aPresentValue)
-            return makeFailure(aPresentValue.meError);
+            return makeCellError(aPresentValue.meError);
         const auto aFutureValue = aContext.evaluateNumericArgument(*rNode.maChildren[2], 0.0);
         if (!aFutureValue)
-            return makeFailure(aFutureValue.meError);
+            return makeCellError(aFutureValue.meError);
 
         const auto aRri = sefinance::evaluateGrowthRateOverPeriods(
             aPeriods.maValue, aPresentValue.maValue, aFutureValue.maValue);
         if (!aRri)
-            return makeFailure(aRri.meError);
+            return makeCellError(aRri.meError);
         return makeScalarResult(api::CellValue::number(aRri.maValue));
     }
 
@@ -424,27 +493,27 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
     if (aFunctionName == u"IPMT" || aFunctionName == u"PPMT")
     {
         if (rNode.maChildren.size() < 4 || rNode.maChildren.size() > 6)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aRate = aContext.evaluateNumericArgument(*rNode.maChildren[0], 0.0);
         if (!aRate)
-            return makeFailure(aRate.meError);
+            return makeCellError(aRate.meError);
         const auto aPeriod = aContext.evaluateNumericArgument(*rNode.maChildren[1], 0.0);
         if (!aPeriod)
-            return makeFailure(aPeriod.meError);
+            return makeCellError(aPeriod.meError);
         const auto aTotalPeriods = aContext.evaluateNumericArgument(*rNode.maChildren[2], 0.0);
         if (!aTotalPeriods)
-            return makeFailure(aTotalPeriods.meError);
+            return makeCellError(aTotalPeriods.meError);
         const auto aPresentValue = aContext.evaluateNumericArgument(*rNode.maChildren[3], 0.0);
         if (!aPresentValue)
-            return makeFailure(aPresentValue.meError);
+            return makeCellError(aPresentValue.meError);
 
         double fFutureValue = 0.0;
         if (rNode.maChildren.size() >= 5)
         {
             const auto aFutureValue = aContext.evaluateNumericArgument(*rNode.maChildren[4], 0.0);
             if (!aFutureValue)
-                return makeFailure(aFutureValue.meError);
+                return makeCellError(aFutureValue.meError);
             fFutureValue = aFutureValue.maValue;
         }
 
@@ -453,7 +522,7 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
         {
             const auto aPayType = aContext.evaluatePayTypeArgument(*rNode.maChildren[5], false);
             if (!aPayType)
-                return makeFailure(aPayType.meError);
+                return makeCellError(aPayType.meError);
             bPayInAdvance = aPayType.maValue;
         }
 
@@ -463,7 +532,7 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
                 aRate.maValue, aPeriod.maValue, aTotalPeriods.maValue,
                 aPresentValue.maValue, fFutureValue, bPayInAdvance);
             if (!aInterest)
-                return makeFailure(aInterest.meError);
+                return makeCellError(aInterest.meError);
             return makeScalarResult(api::CellValue::number(aInterest.maValue));
         }
 
@@ -471,33 +540,35 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
             aRate.maValue, aPeriod.maValue, aTotalPeriods.maValue, aPresentValue.maValue,
             fFutureValue, bPayInAdvance);
         if (!aPrincipal)
-            return makeFailure(aPrincipal.meError);
+            return makeCellError(aPrincipal.meError);
         return makeScalarResult(api::CellValue::number(aPrincipal.maValue));
     }
 
     if (aFunctionName == u"CUMIPMT" || aFunctionName == u"CUMPRINC")
     {
         if (rNode.maChildren.size() != 6)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aRate = aContext.evaluateNumericArgument(*rNode.maChildren[0], 0.0);
         if (!aRate)
-            return makeFailure(aRate.meError);
+            return makeCellError(aRate.meError);
         const auto aTotalPeriods = aContext.evaluateNumericArgument(*rNode.maChildren[1], 0.0);
         if (!aTotalPeriods)
-            return makeFailure(aTotalPeriods.meError);
+            return makeCellError(aTotalPeriods.meError);
         const auto aPresentValue = aContext.evaluateNumericArgument(*rNode.maChildren[2], 0.0);
         if (!aPresentValue)
-            return makeFailure(aPresentValue.meError);
+            return makeCellError(aPresentValue.meError);
         const auto aStart = aContext.evaluateNumericArgument(*rNode.maChildren[3], 0.0);
         if (!aStart)
-            return makeFailure(aStart.meError);
+            return makeCellError(aStart.meError);
         const auto aEnd = aContext.evaluateNumericArgument(*rNode.maChildren[4], 0.0);
         if (!aEnd)
-            return makeFailure(aEnd.meError);
+            return makeCellError(aEnd.meError);
+        if (rNode.maChildren[5]->meKind == formula::NodeKind::EmptyArgument)
+            return makeFailure(api::Error::IllegalArgument);
         const auto aPayType = aContext.evaluateStrictPaymentTypeArgument(*rNode.maChildren[5]);
         if (!aPayType)
-            return makeFailure(aPayType.meError);
+            return makeCellError(aPayType.meError);
 
         if (aFunctionName == u"CUMIPMT")
         {
@@ -505,7 +576,7 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
                 aRate.maValue, aTotalPeriods.maValue, aPresentValue.maValue,
                 aStart.maValue, aEnd.maValue, aPayType.maValue);
             if (!aInterest)
-                return makeFailure(aInterest.meError);
+                return makeCellError(aInterest.meError);
             return makeScalarResult(api::CellValue::number(aInterest.maValue));
         }
 
@@ -513,43 +584,43 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
             aRate.maValue, aTotalPeriods.maValue, aPresentValue.maValue,
             aStart.maValue, aEnd.maValue, aPayType.maValue);
         if (!aPrincipal)
-            return makeFailure(aPrincipal.meError);
+            return makeCellError(aPrincipal.meError);
         return makeScalarResult(api::CellValue::number(aPrincipal.maValue));
     }
 
     if (aFunctionName == u"DDB")
     {
         if (rNode.maChildren.size() < 4 || rNode.maChildren.size() > 5)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aCost = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
         if (!aCost)
-            return makeFailure(aCost.meError);
+            return makeCellError(aCost.meError);
         const auto aSalvage = aContext.evaluateNumericArgument(*rNode.maChildren[1], std::nullopt);
         if (!aSalvage)
-            return makeFailure(aSalvage.meError);
+            return makeCellError(aSalvage.meError);
         const auto aLife = aContext.evaluateNumericArgument(*rNode.maChildren[2], std::nullopt);
         if (!aLife)
-            return makeFailure(aLife.meError);
+            return makeCellError(aLife.meError);
         const auto aPeriod = aContext.evaluateNumericArgument(*rNode.maChildren[3], std::nullopt);
         if (!aPeriod)
-            return makeFailure(aPeriod.meError);
+            return makeCellError(aPeriod.meError);
 
         double fFactor = 2.0;
         if (rNode.maChildren.size() == 5)
         {
             if (rNode.maChildren[4]->meKind == formula::NodeKind::EmptyArgument)
-                return makeFailure(api::Error::IllegalArgument);
+                return makeCellError(api::Error::IllegalArgument);
             const auto aFactor = aContext.evaluateNumericArgument(*rNode.maChildren[4], std::nullopt);
             if (!aFactor)
-                return makeFailure(aFactor.meError);
+                return makeCellError(aFactor.meError);
             fFactor = aFactor.maValue;
         }
 
         const auto aDepreciation = sefinance::evaluateDoubleDecliningBalance(
             aCost.maValue, aSalvage.maValue, aLife.maValue, aPeriod.maValue, fFactor);
         if (!aDepreciation)
-            return makeFailure(aDepreciation.meError);
+            return makeCellError(aDepreciation.meError);
         return makeScalarResult(api::CellValue::number(aDepreciation.maValue));
     }
 
@@ -590,25 +661,25 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
     if (aFunctionName == u"VDB")
     {
         if (rNode.maChildren.size() < 5 || rNode.maChildren.size() > 7)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aCost = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
         if (!aCost)
-            return makeFailure(aCost.meError);
+            return makeCellError(aCost.meError);
         const auto aSalvage = aContext.evaluateNumericArgument(*rNode.maChildren[1], 0.0);
         if (!aSalvage)
-            return makeFailure(aSalvage.meError);
+            return makeCellError(aSalvage.meError);
         const auto aLife = aContext.evaluateNumericArgument(*rNode.maChildren[2], std::nullopt);
         if (!aLife)
-            return makeFailure(aLife.meError);
+            return makeCellError(aLife.meError);
         const auto aStart = aContext.evaluateNumericArgument(*rNode.maChildren[3], 0.0);
         if (!aStart)
-            return makeFailure(aStart.meError);
+            return makeCellError(aStart.meError);
         if (rNode.maChildren[4]->meKind == formula::NodeKind::EmptyArgument)
             return makeFailure(api::Error::IllegalArgument);
         const auto aEnd = aContext.evaluateNumericArgument(*rNode.maChildren[4], std::nullopt);
         if (!aEnd)
-            return makeFailure(aEnd.meError);
+            return makeCellError(aEnd.meError);
 
         double fFactor = 2.0;
         if (rNode.maChildren.size() >= 6)
@@ -617,7 +688,7 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
                 return makeFailure(api::Error::IllegalArgument);
             const auto aFactor = aContext.evaluateNumericArgument(*rNode.maChildren[5], std::nullopt);
             if (!aFactor)
-                return makeFailure(aFactor.meError);
+                return makeCellError(aFactor.meError);
             fFactor = aFactor.maValue;
         }
 
@@ -626,7 +697,7 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
         {
             const auto aNoSwitch = aContext.evaluatePayTypeArgument(*rNode.maChildren[6], false);
             if (!aNoSwitch)
-                return makeFailure(aNoSwitch.meError);
+                return makeCellError(aNoSwitch.meError);
             bNoSwitch = aNoSwitch.maValue;
         }
 
@@ -634,7 +705,7 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
             aCost.maValue, aSalvage.maValue, aLife.maValue, aStart.maValue,
             aEnd.maValue, fFactor, bNoSwitch);
         if (!aDepreciation)
-            return makeFailure(aDepreciation.meError);
+            return makeCellError(aDepreciation.meError);
         return makeScalarResult(api::CellValue::number(aDepreciation.maValue));
     }
 
@@ -734,28 +805,28 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
     if (aFunctionName == u"YEARFRAC" || aFunctionName == u"GETYEARFRAC")
     {
         if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aStartDate = aContext.evaluateRequiredDateArgument(*rNode.maChildren[0]);
         if (!aStartDate)
-            return makeFailure(aStartDate.meError);
+            return makeCellError(aStartDate.meError);
         const auto aEndDate = aContext.evaluateRequiredDateArgument(*rNode.maChildren[1]);
         if (!aEndDate)
-            return makeFailure(aEndDate.meError);
+            return makeCellError(aEndDate.meError);
 
         std::int32_t nBasis = 0;
         if (rNode.maChildren.size() == 3)
         {
             const auto aBasis = aContext.evaluateOptionalWholeNumberArgument(*rNode.maChildren[2], 0);
             if (!aBasis)
-                return makeFailure(aBasis.meError);
+                return makeCellError(aBasis.meError);
             nBasis = aBasis.maValue;
         }
 
         const auto aYearFraction = sefinance::evaluateYearFraction(
             sedatetime::defaultNullDate(), aStartDate.maValue, aEndDate.maValue, nBasis);
         if (!aYearFraction)
-            return makeFailure(aYearFraction.meError);
+            return makeCellError(aYearFraction.meError);
         return makeScalarResult(api::CellValue::number(aYearFraction.maValue));
     }
 
@@ -803,30 +874,30 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
     if (aFunctionName == u"PRICEMAT" || aFunctionName == u"GETPRICEMAT")
     {
         if (rNode.maChildren.size() < 5 || rNode.maChildren.size() > 6)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aSettlement = aContext.evaluateRequiredDateArgument(*rNode.maChildren[0]);
         if (!aSettlement)
-            return makeFailure(aSettlement.meError);
+            return makeCellError(aSettlement.meError);
         const auto aMaturity = aContext.evaluateRequiredDateArgument(*rNode.maChildren[1]);
         if (!aMaturity)
-            return makeFailure(aMaturity.meError);
+            return makeCellError(aMaturity.meError);
         const auto aIssue = aContext.evaluateRequiredDateArgument(*rNode.maChildren[2]);
         if (!aIssue)
-            return makeFailure(aIssue.meError);
+            return makeCellError(aIssue.meError);
         const auto aRate = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[3]);
         if (!aRate)
-            return makeFailure(aRate.meError);
+            return makeCellError(aRate.meError);
         const auto aYield = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[4]);
         if (!aYield)
-            return makeFailure(aYield.meError);
+            return makeCellError(aYield.meError);
 
         std::int32_t nBasis = 0;
         if (rNode.maChildren.size() == 6)
         {
             const auto aBasis = aContext.evaluateOptionalWholeNumberArgument(*rNode.maChildren[5], 0);
             if (!aBasis)
-                return makeFailure(aBasis.meError);
+                return makeCellError(aBasis.meError);
             nBasis = aBasis.maValue;
         }
 
@@ -834,7 +905,7 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
             sedatetime::defaultNullDate(), aSettlement.maValue, aMaturity.maValue,
             aIssue.maValue, aRate.maValue, aYield.maValue, nBasis);
         if (!aPricemat)
-            return makeFailure(aPricemat.meError);
+            return makeCellError(aPricemat.meError);
         return makeScalarResult(api::CellValue::number(aPricemat.maValue));
     }
 
@@ -952,27 +1023,27 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
     if (aFunctionName == u"PRICEDISC" || aFunctionName == u"GETPRICEDISC")
     {
         if (rNode.maChildren.size() < 4 || rNode.maChildren.size() > 5)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aSettlement = aContext.evaluateRequiredDateArgument(*rNode.maChildren[0]);
         if (!aSettlement)
-            return makeFailure(aSettlement.meError);
+            return makeCellError(aSettlement.meError);
         const auto aMaturity = aContext.evaluateRequiredDateArgument(*rNode.maChildren[1]);
         if (!aMaturity)
-            return makeFailure(aMaturity.meError);
+            return makeCellError(aMaturity.meError);
         const auto aDiscount = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[2]);
         if (!aDiscount)
-            return makeFailure(aDiscount.meError);
+            return makeCellError(aDiscount.meError);
         const auto aRedemption = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[3]);
         if (!aRedemption)
-            return makeFailure(aRedemption.meError);
+            return makeCellError(aRedemption.meError);
 
         std::int32_t nBasis = 0;
         if (rNode.maChildren.size() == 5)
         {
             const auto aBasis = aContext.evaluateOptionalWholeNumberArgument(*rNode.maChildren[4], 0);
             if (!aBasis)
-                return makeFailure(aBasis.meError);
+                return makeCellError(aBasis.meError);
             nBasis = aBasis.maValue;
         }
 
@@ -980,7 +1051,7 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
             sedatetime::defaultNullDate(), aSettlement.maValue, aMaturity.maValue,
             aDiscount.maValue, aRedemption.maValue, nBasis);
         if (!aPricedisc)
-            return makeFailure(aPricedisc.meError);
+            return makeCellError(aPricedisc.meError);
         return makeScalarResult(api::CellValue::number(aPricedisc.maValue));
     }
 
@@ -1022,27 +1093,27 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
     if (aFunctionName == u"YIELDDISC" || aFunctionName == u"GETYIELDDISC")
     {
         if (rNode.maChildren.size() < 4 || rNode.maChildren.size() > 5)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aSettlement = aContext.evaluateRequiredDateArgument(*rNode.maChildren[0]);
         if (!aSettlement)
-            return makeFailure(aSettlement.meError);
+            return makeCellError(aSettlement.meError);
         const auto aMaturity = aContext.evaluateRequiredDateArgument(*rNode.maChildren[1]);
         if (!aMaturity)
-            return makeFailure(aMaturity.meError);
+            return makeCellError(aMaturity.meError);
         const auto aPrice = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[2]);
         if (!aPrice)
-            return makeFailure(aPrice.meError);
+            return makeCellError(aPrice.meError);
         const auto aRedemption = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[3]);
         if (!aRedemption)
-            return makeFailure(aRedemption.meError);
+            return makeCellError(aRedemption.meError);
 
         std::int32_t nBasis = 0;
         if (rNode.maChildren.size() == 5)
         {
             const auto aBasis = aContext.evaluateOptionalWholeNumberArgument(*rNode.maChildren[4], 0);
             if (!aBasis)
-                return makeFailure(aBasis.meError);
+                return makeCellError(aBasis.meError);
             nBasis = aBasis.maValue;
         }
 
@@ -1050,37 +1121,37 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
             sedatetime::defaultNullDate(), aSettlement.maValue, aMaturity.maValue,
             aPrice.maValue, aRedemption.maValue, nBasis);
         if (!aYielddisc)
-            return makeFailure(aYielddisc.meError);
+            return makeCellError(aYielddisc.meError);
         return makeScalarResult(api::CellValue::number(aYielddisc.maValue));
     }
 
     if (aFunctionName == u"MDURATION" || aFunctionName == u"GETMDURATION")
     {
         if (rNode.maChildren.size() < 5 || rNode.maChildren.size() > 6)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aSettlement = aContext.evaluateRequiredDateArgument(*rNode.maChildren[0]);
         if (!aSettlement)
-            return makeFailure(aSettlement.meError);
+            return makeCellError(aSettlement.meError);
         const auto aMaturity = aContext.evaluateRequiredDateArgument(*rNode.maChildren[1]);
         if (!aMaturity)
-            return makeFailure(aMaturity.meError);
+            return makeCellError(aMaturity.meError);
         const auto aCoupon = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[2]);
         if (!aCoupon)
-            return makeFailure(aCoupon.meError);
+            return makeCellError(aCoupon.meError);
         const auto aYield = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[3]);
         if (!aYield)
-            return makeFailure(aYield.meError);
+            return makeCellError(aYield.meError);
         const auto aFrequency = aContext.evaluateRequiredWholeNumberArgument(*rNode.maChildren[4]);
         if (!aFrequency)
-            return makeFailure(aFrequency.meError);
+            return makeCellError(aFrequency.meError);
 
         std::int32_t nBasis = 0;
         if (rNode.maChildren.size() == 6)
         {
             const auto aBasis = aContext.evaluateOptionalWholeNumberArgument(*rNode.maChildren[5], 0);
             if (!aBasis)
-                return makeFailure(aBasis.meError);
+                return makeCellError(aBasis.meError);
             nBasis = aBasis.maValue;
         }
 
@@ -1088,7 +1159,7 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
             sedatetime::defaultNullDate(), aSettlement.maValue, aMaturity.maValue,
             aCoupon.maValue, aYield.maValue, aFrequency.maValue, nBasis);
         if (!aDuration)
-            return makeFailure(aDuration.meError);
+            return makeCellError(aDuration.meError);
         return makeScalarResult(api::CellValue::number(aDuration.maValue));
     }
 
@@ -1136,46 +1207,69 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
     if (aFunctionName == u"TBILLPRICE" || aFunctionName == u"GETTBILLPRICE")
     {
         if (rNode.maChildren.size() != 3)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aSettlement = aContext.evaluateRequiredDateArgument(*rNode.maChildren[0]);
         if (!aSettlement)
-            return makeFailure(aSettlement.meError);
+            return makeCellError(aSettlement.meError);
         const auto aMaturity = aContext.evaluateRequiredDateArgument(*rNode.maChildren[1]);
         if (!aMaturity)
-            return makeFailure(aMaturity.meError);
+            return makeCellError(aMaturity.meError);
         const auto aDiscount = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[2]);
         if (!aDiscount)
-            return makeFailure(aDiscount.meError);
+            return makeCellError(aDiscount.meError);
 
         const auto aPrice = sefinance::evaluateTbillPrice(
             sedatetime::defaultNullDate(), aSettlement.maValue, aMaturity.maValue,
             aDiscount.maValue);
         if (!aPrice)
-            return makeFailure(aPrice.meError);
+            return makeCellError(aPrice.meError);
         return makeScalarResult(api::CellValue::number(aPrice.maValue));
+    }
+
+    if (aFunctionName == u"TBILLEQ" || aFunctionName == u"GETTBILLEQ")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aSettlement = aContext.evaluateRequiredDateArgument(*rNode.maChildren[0]);
+        if (!aSettlement)
+            return makeCellError(aSettlement.meError);
+        const auto aMaturity = aContext.evaluateRequiredDateArgument(*rNode.maChildren[1]);
+        if (!aMaturity)
+            return makeCellError(aMaturity.meError);
+        const auto aDiscount = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[2]);
+        if (!aDiscount)
+            return makeCellError(aDiscount.meError);
+
+        const auto aTbillEq = sefinance::evaluateTbillEq(
+            sedatetime::defaultNullDate(), aSettlement.maValue, aMaturity.maValue,
+            aDiscount.maValue);
+        if (!aTbillEq)
+            return makeCellError(aTbillEq.meError);
+        return makeScalarResult(api::CellValue::number(aTbillEq.maValue));
     }
 
     if (aFunctionName == u"TBILLYIELD" || aFunctionName == u"GETTBILLYIELD")
     {
         if (rNode.maChildren.size() != 3)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aSettlement = aContext.evaluateRequiredDateArgument(*rNode.maChildren[0]);
         if (!aSettlement)
-            return makeFailure(aSettlement.meError);
+            return makeCellError(aSettlement.meError);
         const auto aMaturity = aContext.evaluateRequiredDateArgument(*rNode.maChildren[1]);
         if (!aMaturity)
-            return makeFailure(aMaturity.meError);
+            return makeCellError(aMaturity.meError);
         const auto aPrice = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[2]);
         if (!aPrice)
-            return makeFailure(aPrice.meError);
+            return makeCellError(aPrice.meError);
 
         const auto aYield = sefinance::evaluateTbillYield(
             sedatetime::defaultNullDate(), aSettlement.maValue, aMaturity.maValue,
             aPrice.maValue);
         if (!aYield)
-            return makeFailure(aYield.meError);
+            return makeCellError(aYield.meError);
         return makeScalarResult(api::CellValue::number(aYield.maValue));
     }
 
@@ -1361,24 +1455,24 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
         || aFunctionName == u"COUPNUM" || aFunctionName == u"GETCOUPNUM")
     {
         if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 4)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aSettlement = aContext.evaluateRequiredDateArgument(*rNode.maChildren[0]);
         if (!aSettlement)
-            return makeFailure(aSettlement.meError);
+            return makeCellError(aSettlement.meError);
         const auto aMaturity = aContext.evaluateRequiredDateArgument(*rNode.maChildren[1]);
         if (!aMaturity)
-            return makeFailure(aMaturity.meError);
+            return makeCellError(aMaturity.meError);
         const auto aFrequency = aContext.evaluateRequiredWholeNumberArgument(*rNode.maChildren[2]);
         if (!aFrequency)
-            return makeFailure(aFrequency.meError);
+            return makeCellError(aFrequency.meError);
 
         std::int32_t nBasis = 0;
         if (rNode.maChildren.size() == 4)
         {
             const auto aBasis = aContext.evaluateOptionalWholeNumberArgument(*rNode.maChildren[3], 0);
             if (!aBasis)
-                return makeFailure(aBasis.meError);
+                return makeCellError(aBasis.meError);
             nBasis = aBasis.maValue;
         }
 
@@ -1421,7 +1515,52 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
         }
 
         if (!aResult)
-            return makeFailure(aResult.meError);
+            return makeCellError(aResult.meError);
+        return makeScalarResult(api::CellValue::number(aResult.maValue));
+    }
+
+    if (aFunctionName == u"FVSCHEDULE" || aFunctionName == u"GETFVSCHEDULE")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aPrincipal = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[0]);
+        if (!aPrincipal)
+            return makeCellError(aPrincipal.meError);
+        if (rNode.maChildren[1]->meKind == formula::NodeKind::EmptyArgument)
+            return makeCellError(api::Error::IllegalArgument);
+        const auto aSchedule = collectNumericSeries(*rNode.maChildren[1]);
+        if (!aSchedule)
+            return makeCellError(aSchedule.meError);
+        if (aSchedule.maValue.empty())
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aResult
+            = sefinance::evaluateFutureValueSchedule(aPrincipal.maValue, aSchedule.maValue);
+        if (!aResult)
+            return makeCellError(aResult.meError);
+        return makeScalarResult(api::CellValue::number(aResult.maValue));
+    }
+
+    if (aFunctionName == u"PDURATION")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aRate = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[0]);
+        if (!aRate)
+            return makeCellError(aRate.meError);
+        const auto aPresentValue = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[1]);
+        if (!aPresentValue)
+            return makeCellError(aPresentValue.meError);
+        const auto aFutureValue = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[2]);
+        if (!aFutureValue)
+            return makeCellError(aFutureValue.meError);
+
+        const auto aResult = sefinance::evaluatePaybackDuration(
+            aRate.maValue, aPresentValue.maValue, aFutureValue.maValue);
+        if (!aResult)
+            return makeCellError(aResult.meError);
         return makeScalarResult(api::CellValue::number(aResult.maValue));
     }
 

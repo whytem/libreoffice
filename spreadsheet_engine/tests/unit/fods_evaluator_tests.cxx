@@ -3808,10 +3808,10 @@ int main()
         if (!aTTestInvalidResult || aTTestInvalidResult.mbUsedCachedValue
             || !aTTestInvalidResult.maValue.maValue.isError()
             || aTTestInvalidResult.maValue.maValue.meError
-                   != spreadsheetengine::api::Error::NoValue)
+                   != spreadsheetengine::api::Error::DivisionByZero)
         {
             return fail(
-                "spreadsheetengine_fods_evaluator_tests", "t.test.fods invalid-mode mismatch");
+                "spreadsheetengine_fods_evaluator_tests", "t.test.fods paired-zero-variance mismatch");
         }
 
         const auto* pSheet2 = aLoadResult.maValue.maWorkbook.findSheet(u"Sheet2");

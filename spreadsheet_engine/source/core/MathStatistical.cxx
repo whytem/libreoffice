@@ -1023,7 +1023,6 @@ api::ValueResult<double> evaluateLogGammaValue(double fX)
 api::ValueResult<double> evaluateStudentDistribution(
     double fT, double fDegreesFreedom, int nType)
 {
-    fDegreesFreedom = fp::approxFloor(fDegreesFreedom);
     if (fDegreesFreedom < 1.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 

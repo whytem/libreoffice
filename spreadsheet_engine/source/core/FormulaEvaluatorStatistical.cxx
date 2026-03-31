@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 
 namespace spreadsheetengine::core::eval
 {
@@ -24,6 +25,19 @@ template <std::size_t N>
     return std::find(rRegistry.begin(), rRegistry.end(), rFunctionName) != rRegistry.end();
 }
 
+[[nodiscard]] double roundToSignificantDigits(double fValue, int nDigits)
+{
+    if (!std::isfinite(fValue) || fValue == 0.0 || nDigits <= 0)
+        return fValue;
+
+    const double fScale = std::pow(
+        10.0, static_cast<double>(nDigits) - 1.0 - std::floor(std::log10(std::fabs(fValue))));
+    if (!std::isfinite(fScale) || fScale == 0.0)
+        return fValue;
+
+    return std::round(fValue * fScale) / fScale;
+}
+
 } // namespace
 
 std::optional<EvaluationResult> Evaluator::tryEvaluateStatisticalRuntimeFamily(
@@ -33,12 +47,22 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateStatisticalRuntimeFamily(
     static constexpr std::array kStatisticalFunctions{
         api::StringView(u"T.TEST"),
         api::StringView(u"TTEST"),
+        api::StringView(u"ZTEST"),
+        api::StringView(u"Z.TEST"),
         api::StringView(u"FISHER"),
         api::StringView(u"FISHERINV"),
         api::StringView(u"GAUSS"),
         api::StringView(u"GAMMALN"),
         api::StringView(u"GAMMALN.PRECISE"),
         api::StringView(u"COM.MICROSOFT.GAMMALN.PRECISE"),
+        api::StringView(u"PERMUTATIONA"),
+        api::StringView(u"SLOPE"),
+        api::StringView(u"KURT"),
+        api::StringView(u"RANK"),
+        api::StringView(u"RANK.EQ"),
+        api::StringView(u"COM.MICROSOFT.RANK.EQ"),
+        api::StringView(u"RANK.AVG"),
+        api::StringView(u"COM.MICROSOFT.RANK.AVG"),
         api::StringView(u"GEOMEAN"),
         api::StringView(u"HARMEAN"),
         api::StringView(u"POISSON"),
@@ -100,6 +124,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateStatisticalRuntimeFamily(
         api::StringView(u"COM.MICROSOFT.T.DIST.2T"),
         api::StringView(u"T.DIST.RT"),
         api::StringView(u"COM.MICROSOFT.T.DIST.RT"),
+        api::StringView(u"LEGACY.TDIST"),
         api::StringView(u"FDIST"),
         api::StringView(u"LEGACY.FDIST"),
         api::StringView(u"F.DIST.RT"),
@@ -129,6 +154,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateStatisticalRuntimeFamily(
         api::StringView(u"STDEVPA"),
         api::StringView(u"BINOMDIST"),
         api::StringView(u"BINOM.DIST"),
+        api::StringView(u"CRITBINOM"),
         api::StringView(u"BINOM.INV"),
         api::StringView(u"BINOM.DIST.RANGE"),
         api::StringView(u"B"),
@@ -164,37 +190,279 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
 {
     const api::StringView aFunctionName = rFunctionName;
     FunctionEvalContext aContext { *this, rNode, rCurrentAddress };
+    const auto makeCellError = [&](api::Error eError) -> EvaluationResult {
+        return makeScalarResult(api::CellValue::error(eError));
+    };
 
-if (aFunctionName == u"T.TEST" || aFunctionName == u"TTEST")
+    struct MatrixOperand
     {
-        if (rNode.maChildren.size() != 4)
-            return makeFailure(api::Error::IllegalArgument);
+        api::MatrixSize mnColumns = 1;
+        api::MatrixSize mnRows = 1;
+        std::vector<api::CellValue> maValues;
+    };
 
-        EvaluationResult aTailsResult
-            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[2], rCurrentAddress));
-        if (!aTailsResult)
-            return aTailsResult;
-        const auto aTailsNumber = coerceToNumber(aTailsResult.maValue.maValue);
-        if (!aTailsNumber)
-            return makeFailure(aTailsNumber.meError);
+    const auto materializeMatrixOperand = [&](const formula::Node& rArgument)
+        -> api::ValueResult<MatrixOperand> {
+        EvaluationResult aValue = evaluateNode(rArgument, rCurrentAddress);
+        if (!aValue)
+            return api::ValueResult<MatrixOperand>::failure(aValue.meError);
 
-        EvaluationResult aTypeResult
-            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[3], rCurrentAddress));
-        if (!aTypeResult)
-            return aTypeResult;
-        const auto aTypeNumber = coerceToNumber(aTypeResult.maValue.maValue);
-        if (!aTypeNumber)
-            return makeFailure(aTypeNumber.meError);
-
-        const auto oTails = toWholeNumber(aTailsNumber.maValue);
-        const auto oType = toWholeNumber(aTypeNumber.maValue);
-        if (!oTails || !oType || (*oTails != 1 && *oTails != 2) || (*oType < 1 || *oType > 3)
-            || *oType == 1)
+        MatrixOperand aOperand;
+        if (aValue.maValue.isScalar())
         {
-            return makeScalarResult(api::CellValue::error(api::Error::NoValue));
+            aOperand.maValues.push_back(aValue.maValue.maValue);
+            return api::ValueResult<MatrixOperand>::success(std::move(aOperand));
         }
 
-        return makeFailure(api::Error::IllegalArgument);
+        const auto aDimensions = aValue.maValue.maReference.matrixDimensions();
+        aOperand.mnColumns = aDimensions.mnColumns;
+        aOperand.mnRows = aDimensions.mnRows;
+        aOperand.maValues.reserve(static_cast<std::size_t>(aOperand.mnColumns)
+                                  * static_cast<std::size_t>(aOperand.mnRows));
+        for (api::MatrixSize nRow = 0; nRow < aOperand.mnRows; ++nRow)
+        {
+            for (api::MatrixSize nColumn = 0; nColumn < aOperand.mnColumns; ++nColumn)
+            {
+                EvaluationResult aElement
+                    = materializeReferenceValue(aValue.maValue.maReference, nColumn, nRow);
+                if (!aElement)
+                    return api::ValueResult<MatrixOperand>::failure(aElement.meError);
+                if (!aElement.maValue.isScalar())
+                    return api::ValueResult<MatrixOperand>::failure(api::Error::IllegalArgument);
+                aOperand.maValues.push_back(aElement.maValue.maValue);
+            }
+        }
+
+        return api::ValueResult<MatrixOperand>::success(std::move(aOperand));
+    };
+
+    const auto collectNumericSampleValues = [&](const formula::Node& rArgument)
+        -> api::ValueResult<std::vector<double>> {
+        std::vector<double> aValues;
+        const auto aVisited = aContext.visitFlattenedValues(
+            rArgument,
+            [&](const api::CellValue& rValue, bool bFromReference) -> api::ValueResult<bool> {
+                if (rValue.isError())
+                    return api::ValueResult<bool>::failure(rValue.meError);
+                if (rValue.isEmpty())
+                    return api::ValueResult<bool>::success(true);
+                if (rValue.isText())
+                {
+                    if (bFromReference)
+                        return api::ValueResult<bool>::success(true);
+                    return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
+                }
+                if (rValue.isBoolean() && bFromReference)
+                    return api::ValueResult<bool>::success(true);
+
+                const auto aNumber = coerceToNumber(rValue);
+                if (!aNumber)
+                    return api::ValueResult<bool>::failure(aNumber.meError);
+                aValues.push_back(aNumber.maValue);
+                return api::ValueResult<bool>::success(true);
+            });
+        if (!aVisited)
+            return api::ValueResult<std::vector<double>>::failure(aVisited.meError);
+        return api::ValueResult<std::vector<double>>::success(std::move(aValues));
+    };
+
+    if (aFunctionName == u"T.TEST" || aFunctionName == u"TTEST")
+    {
+        if (rNode.maChildren.size() != 4)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aTails = aContext.evaluateRequiredWholeNumberArgument(*rNode.maChildren[2]);
+        if (!aTails)
+            return makeCellError(aTails.meError);
+        const auto aType = aContext.evaluateRequiredWholeNumberArgument(*rNode.maChildren[3]);
+        if (!aType)
+            return makeCellError(aType.meError);
+        if ((aTails.maValue != 1 && aTails.maValue != 2)
+            || (aType.maValue < 1 || aType.maValue > 3))
+        {
+            return makeCellError(api::Error::IllegalArgument);
+        }
+
+        double fT = 0.0;
+        double fF = 0.0;
+        if (aType.maValue == 1)
+        {
+            const auto aSample1 = materializeMatrixOperand(*rNode.maChildren[0]);
+            if (!aSample1)
+                return makeCellError(aSample1.meError);
+            const auto aSample2 = materializeMatrixOperand(*rNode.maChildren[1]);
+            if (!aSample2)
+                return makeCellError(aSample2.meError);
+            if (aSample1.maValue.mnColumns != aSample2.maValue.mnColumns
+                || aSample1.maValue.mnRows != aSample2.maValue.mnRows)
+            {
+                return makeCellError(api::Error::IllegalArgument);
+            }
+
+            double fCount = 0.0;
+            fp::KahanSum fSum1 = 0.0;
+            fp::KahanSum fSum2 = 0.0;
+            fp::KahanSum fSumSqrD = 0.0;
+            for (std::size_t nIndex = 0; nIndex < aSample1.maValue.maValues.size(); ++nIndex)
+            {
+                const api::CellValue& rValue1 = aSample1.maValue.maValues[nIndex];
+                const api::CellValue& rValue2 = aSample2.maValue.maValues[nIndex];
+                if (rValue1.isError())
+                    return makeCellError(rValue1.meError);
+                if (rValue2.isError())
+                    return makeCellError(rValue2.meError);
+                if ((rValue1.isText() || rValue1.isEmpty())
+                    || (rValue2.isText() || rValue2.isEmpty()))
+                {
+                    continue;
+                }
+
+                const auto aValue1 = coerceToNumber(rValue1);
+                if (!aValue1)
+                    return makeCellError(aValue1.meError);
+                const auto aValue2 = coerceToNumber(rValue2);
+                if (!aValue2)
+                    return makeCellError(aValue2.meError);
+
+                fSum1 += aValue1.maValue;
+                fSum2 += aValue2.maValue;
+                fSumSqrD += (aValue1.maValue - aValue2.maValue)
+                            * (aValue1.maValue - aValue2.maValue);
+                fCount += 1.0;
+            }
+            if (fCount < 1.0)
+                return makeCellError(api::Error::NoValue);
+
+            const double fSumD = fSum1.get() - fSum2.get();
+            const double fDivider = fSumSqrD.get() * fCount - fSumD * fSumD;
+            if (fp::approxEqual(fDivider, 0.0))
+                return makeCellError(api::Error::DivisionByZero);
+
+            fT = std::abs(fSumD) * std::sqrt((fCount - 1.0) / fDivider);
+            fF = fCount - 1.0;
+        }
+        else
+        {
+            const auto aSample1 = collectNumericSampleValues(*rNode.maChildren[0]);
+            if (!aSample1)
+                return makeCellError(aSample1.meError);
+            const auto aSample2 = collectNumericSampleValues(*rNode.maChildren[1]);
+            if (!aSample2)
+                return makeCellError(aSample2.meError);
+            if (aSample1.maValue.size() < 2 || aSample2.maValue.size() < 2)
+                return makeCellError(api::Error::NoValue);
+
+            const auto calculateTest = [&](bool bTemplin) -> api::ValueResult<bool> {
+                double fCount1 = 0.0;
+                double fCount2 = 0.0;
+                fp::KahanSum fSum1 = 0.0;
+                fp::KahanSum fSumSqr1 = 0.0;
+                fp::KahanSum fSum2 = 0.0;
+                fp::KahanSum fSumSqr2 = 0.0;
+                for (double fValue : aSample1.maValue)
+                {
+                    fSum1 += fValue;
+                    fSumSqr1 += fValue * fValue;
+                    fCount1 += 1.0;
+                }
+                for (double fValue : aSample2.maValue)
+                {
+                    fSum2 += fValue;
+                    fSumSqr2 += fValue * fValue;
+                    fCount2 += 1.0;
+                }
+
+                if (bTemplin)
+                {
+                    const double fS1
+                        = (fSumSqr1.get() - fSum1.get() * fSum1.get() / fCount1)
+                          / (fCount1 - 1.0) / fCount1;
+                    const double fS2
+                        = (fSumSqr2.get() - fSum2.get() * fSum2.get() / fCount2)
+                          / (fCount2 - 1.0) / fCount2;
+                    if (fp::approxEqual(fS1 + fS2, 0.0))
+                        return api::ValueResult<bool>::failure(api::Error::NoValue);
+                    fT = std::abs(fSum1.get() / fCount1 - fSum2.get() / fCount2)
+                         / std::sqrt(fS1 + fS2);
+                    const double c = fS1 / (fS1 + fS2);
+                    fF = 1.0 / (c * c / (fCount1 - 1.0)
+                                + (1.0 - c) * (1.0 - c) / (fCount2 - 1.0));
+                }
+                else
+                {
+                    const double fS1
+                        = (fSumSqr1.get() - fSum1.get() * fSum1.get() / fCount1)
+                          / (fCount1 - 1.0);
+                    const double fS2
+                        = (fSumSqr2.get() - fSum2.get() * fSum2.get() / fCount2)
+                          / (fCount2 - 1.0);
+                    fT = std::abs(fSum1.get() / fCount1 - fSum2.get() / fCount2)
+                         / std::sqrt((fCount1 - 1.0) * fS1 + (fCount2 - 1.0) * fS2)
+                         * std::sqrt(
+                             fCount1 * fCount2 * (fCount1 + fCount2 - 2.0) / (fCount1 + fCount2));
+                    fF = fCount1 + fCount2 - 2.0;
+                }
+                return api::ValueResult<bool>::success(true);
+            };
+
+            const auto aTest = calculateTest(aType.maValue == 3);
+            if (!aTest)
+                return makeCellError(aTest.meError);
+        }
+
+        const auto aDistribution
+            = semath::evaluateStudentDistribution(fT, fF, aTails.maValue);
+        if (!aDistribution)
+            return makeCellError(aDistribution.meError);
+        return makeScalarResult(api::CellValue::number(aDistribution.maValue));
+    }
+
+    if (aFunctionName == u"ZTEST" || aFunctionName == u"Z.TEST")
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aValues = collectNumericSampleValues(*rNode.maChildren[0]);
+        if (!aValues)
+            return makeCellError(aValues.meError);
+        if (aValues.maValue.size() <= 1)
+            return makeCellError(api::Error::DivisionByZero);
+
+        const auto aX = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[1]);
+        if (!aX)
+            return makeCellError(aX.meError);
+
+        fp::KahanSum fSum = 0.0;
+        fp::KahanSum fSumSqr = 0.0;
+        double fCount = 0.0;
+        for (double fValue : aValues.maValue)
+        {
+            fSum += fValue;
+            fSumSqr += fValue * fValue;
+            fCount += 1.0;
+        }
+
+        const double fMean = fSum.get() / fCount;
+        double fZ = 0.0;
+        if (rNode.maChildren.size() == 3)
+        {
+            const auto aSigma = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[2]);
+            if (!aSigma)
+                return makeCellError(aSigma.meError);
+            if (!(aSigma.maValue > 0.0))
+                return makeCellError(api::Error::IllegalArgument);
+            fZ = (fMean - aX.maValue) * std::sqrt(fCount) / aSigma.maValue;
+        }
+        else
+        {
+            const double fSigma
+                = (fSumSqr.get() - fSum.get() * fSum.get() / fCount) / (fCount - 1.0);
+            if (fp::approxEqual(fSigma, 0.0))
+                return makeCellError(api::Error::DivisionByZero);
+            fZ = (fMean - aX.maValue) / std::sqrt(fSigma / fCount);
+        }
+
+        return makeScalarResult(api::CellValue::number(0.5 - semath::gaussValue(fZ)));
     }
 
     if (aFunctionName == u"FISHER")
@@ -245,6 +513,192 @@ if (aFunctionName == u"T.TEST" || aFunctionName == u"TTEST")
             return makeFailure(aNumber.meError);
 
         return makeScalarResult(api::CellValue::number(semath::gaussValue(aNumber.maValue)));
+    }
+
+    if (aFunctionName == u"PERMUTATIONA")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aN = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[0]);
+        if (!aN)
+            return makeCellError(aN.meError);
+        const auto aK = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[1]);
+        if (!aK)
+            return makeCellError(aK.meError);
+
+        return aContext.makeNumericOrErrorResult(
+            semath::evaluatePermutationAValue(aN.maValue, aK.maValue));
+    }
+
+    if (aFunctionName == u"SLOPE")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aKnownY = materializeMatrixOperand(*rNode.maChildren[0]);
+        if (!aKnownY)
+            return makeCellError(aKnownY.meError);
+        const auto aKnownX = materializeMatrixOperand(*rNode.maChildren[1]);
+        if (!aKnownX)
+            return makeCellError(aKnownX.meError);
+
+        if (aKnownY.maValue.mnColumns != aKnownX.maValue.mnColumns
+            || aKnownY.maValue.mnRows != aKnownX.maValue.mnRows)
+        {
+            return makeCellError(api::Error::IllegalArgument);
+        }
+
+        double fCount = 0.0;
+        fp::KahanSum fSumX = 0.0;
+        fp::KahanSum fSumY = 0.0;
+        for (api::MatrixSize nColumn = 0; nColumn < aKnownY.maValue.mnColumns; ++nColumn)
+        {
+            for (api::MatrixSize nRow = 0; nRow < aKnownY.maValue.mnRows; ++nRow)
+            {
+                const std::size_t nIndex = static_cast<std::size_t>(
+                    nRow * aKnownY.maValue.mnColumns + nColumn);
+                const api::CellValue& rY = aKnownY.maValue.maValues[nIndex];
+                const api::CellValue& rX = aKnownX.maValue.maValues[nIndex];
+                if (rY.isError())
+                    return makeCellError(rY.meError);
+                if (rX.isError())
+                    return makeCellError(rX.meError);
+                if ((rY.isText() || rY.isEmpty()) || (rX.isText() || rX.isEmpty()))
+                    continue;
+
+                const auto aY = coerceToNumber(rY);
+                if (!aY)
+                    return makeCellError(aY.meError);
+                const auto aX = coerceToNumber(rX);
+                if (!aX)
+                    return makeCellError(aX.meError);
+
+                fSumX += aX.maValue;
+                fSumY += aY.maValue;
+                fCount += 1.0;
+            }
+        }
+
+        if (fCount < 1.0)
+            return makeCellError(api::Error::NoValue);
+
+        const double fMeanX = fSumX.get() / fCount;
+        const double fMeanY = fSumY.get() / fCount;
+        fp::KahanSum fSumDeltaXDeltaY = 0.0;
+        fp::KahanSum fSumSqrDeltaX = 0.0;
+        for (api::MatrixSize nColumn = 0; nColumn < aKnownY.maValue.mnColumns; ++nColumn)
+        {
+            for (api::MatrixSize nRow = 0; nRow < aKnownY.maValue.mnRows; ++nRow)
+            {
+                const std::size_t nIndex = static_cast<std::size_t>(
+                    nRow * aKnownY.maValue.mnColumns + nColumn);
+                const api::CellValue& rY = aKnownY.maValue.maValues[nIndex];
+                const api::CellValue& rX = aKnownX.maValue.maValues[nIndex];
+                if ((rY.isText() || rY.isEmpty()) || (rX.isText() || rX.isEmpty()))
+                    continue;
+
+                const auto aY = coerceToNumber(rY);
+                if (!aY)
+                    return makeCellError(aY.meError);
+                const auto aX = coerceToNumber(rX);
+                if (!aX)
+                    return makeCellError(aX.meError);
+
+                fSumDeltaXDeltaY += (aX.maValue - fMeanX) * (aY.maValue - fMeanY);
+                fSumSqrDeltaX += (aX.maValue - fMeanX) * (aX.maValue - fMeanX);
+            }
+        }
+
+        if (fp::approxEqual(fSumSqrDeltaX.get(), 0.0))
+            return makeCellError(api::Error::DivisionByZero);
+
+        const long double fSlope = static_cast<long double>(fSumDeltaXDeltaY.get())
+                                   / static_cast<long double>(fSumSqrDeltaX.get());
+        return makeScalarResult(api::CellValue::number(
+            roundToSignificantDigits(static_cast<double>(fSlope), 15)));
+    }
+
+    if (aFunctionName == u"RANK" || aFunctionName == u"RANK.EQ"
+        || aFunctionName == u"COM.MICROSOFT.RANK.EQ"
+        || aFunctionName == u"RANK.AVG" || aFunctionName == u"COM.MICROSOFT.RANK.AVG")
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aValue = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[0]);
+        if (!aValue)
+            return makeCellError(aValue.meError);
+
+        std::vector<double> aSortArray;
+        const auto aVisited = aContext.visitFlattenedValues(
+            *rNode.maChildren[1],
+            [&](const api::CellValue& rValue, bool bFromReference) -> api::ValueResult<bool> {
+                if (rValue.isError())
+                    return api::ValueResult<bool>::failure(rValue.meError);
+                if (rValue.isEmpty())
+                    return api::ValueResult<bool>::success(true);
+                if (bFromReference && rValue.isText())
+                    return api::ValueResult<bool>::success(true);
+
+                const auto aNumber = coerceToNumber(rValue);
+                if (!aNumber)
+                    return api::ValueResult<bool>::failure(aNumber.meError);
+                aSortArray.push_back(aNumber.maValue);
+                return api::ValueResult<bool>::success(true);
+            });
+        if (!aVisited)
+            return makeCellError(aVisited.meError);
+        if (aSortArray.empty())
+            return makeCellError(api::Error::NoValue);
+
+        bool bAscending = false;
+        if (rNode.maChildren.size() == 3)
+        {
+            const auto aAscending = aContext.evaluatePayTypeArgument(*rNode.maChildren[2], false);
+            if (!aAscending)
+                return makeCellError(aAscending.meError);
+            bAscending = aAscending.maValue;
+        }
+
+        std::sort(aSortArray.begin(), aSortArray.end());
+        if (aValue.maValue < aSortArray.front() || aValue.maValue > aSortArray.back())
+            return makeCellError(api::Error::NotAvailable);
+
+        double fFirstPos = -1.0;
+        double fLastPos = 0.0;
+        bool bFinished = false;
+        std::size_t nIndex = 0;
+        for (; nIndex < aSortArray.size() && !bFinished; ++nIndex)
+        {
+            if (fp::approxEqual(aSortArray[nIndex], aValue.maValue))
+            {
+                if (fFirstPos < 0.0)
+                    fFirstPos = static_cast<double>(nIndex) + 1.0;
+            }
+            else if (aSortArray[nIndex] > aValue.maValue)
+            {
+                fLastPos = static_cast<double>(nIndex);
+                bFinished = true;
+            }
+        }
+        if (!bFinished)
+            fLastPos = static_cast<double>(nIndex);
+        if (fFirstPos <= 0.0)
+            return makeCellError(api::Error::NotAvailable);
+
+        const bool bAverage
+            = aFunctionName == u"RANK.AVG" || aFunctionName == u"COM.MICROSOFT.RANK.AVG";
+        const double fSize = static_cast<double>(aSortArray.size());
+        if (!bAverage)
+        {
+            return makeScalarResult(api::CellValue::number(
+                bAscending ? fFirstPos : fSize + 1.0 - fLastPos));
+        }
+
+        return makeScalarResult(api::CellValue::number(
+            bAscending ? (fFirstPos + fLastPos) / 2.0
+                       : fSize + 1.0 - (fFirstPos + fLastPos) / 2.0));
     }
 
     if (aFunctionName == u"GAMMALN" || aFunctionName == u"GAMMALN.PRECISE")
@@ -828,7 +1282,7 @@ if (aFunctionName == u"T.TEST" || aFunctionName == u"TTEST")
         || aFunctionName == u"F.DIST.RT" || aFunctionName == u"COM.MICROSOFT.F.DIST.RT")
     {
         if (rNode.maChildren.size() != 3)
-            return makeFailure(api::Error::IllegalArgument);
+            return makeCellError(api::Error::IllegalArgument);
 
         const auto aX = aContext.evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
         const auto aDegreesFreedom1
@@ -836,16 +1290,16 @@ if (aFunctionName == u"T.TEST" || aFunctionName == u"TTEST")
         const auto aDegreesFreedom2
             = aContext.evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[2]);
         if (!aX)
-            return makeFailure(aX.meError);
+            return makeCellError(aX.meError);
         if (!aDegreesFreedom1)
-            return makeFailure(aDegreesFreedom1.meError);
+            return makeCellError(aDegreesFreedom1.meError);
         if (!aDegreesFreedom2)
-            return makeFailure(aDegreesFreedom2.meError);
+            return makeCellError(aDegreesFreedom2.meError);
 
         const auto aDistribution = semath::evaluateFRightTailDistribution(
             aX.maValue, aDegreesFreedom1.maValue, aDegreesFreedom2.maValue);
         if (!aDistribution)
-            return makeFailure(aDistribution.meError);
+            return makeCellError(aDistribution.meError);
         return makeScalarResult(api::CellValue::number(aDistribution.maValue));
     }
 
@@ -889,6 +1343,30 @@ if (aFunctionName == u"T.TEST" || aFunctionName == u"TTEST")
         const double fValue
             = aX.maValue < 0.0 ? 1.0 - aDistribution.maValue : aDistribution.maValue;
         return makeScalarResult(api::CellValue::number(fValue));
+    }
+
+    if (aFunctionName == u"LEGACY.TDIST")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aX = aContext.evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        const auto aDegreesFreedom = aContext.evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[1]);
+        const auto aTails = aContext.evaluateRequiredWholeNumberArgument(*rNode.maChildren[2]);
+        if (!aX)
+            return makeCellError(aX.meError);
+        if (!aDegreesFreedom)
+            return makeCellError(aDegreesFreedom.meError);
+        if (!aTails)
+            return makeCellError(aTails.meError);
+        if (aX.maValue < 0.0 || (aTails.maValue != 1 && aTails.maValue != 2))
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aDistribution = semath::evaluateStudentDistribution(
+            aX.maValue, fp::approxFloor(aDegreesFreedom.maValue), aTails.maValue);
+        if (!aDistribution)
+            return makeCellError(aDistribution.meError);
+        return makeScalarResult(api::CellValue::number(aDistribution.maValue));
     }
 
     if (aFunctionName == u"CONFIDENCE" || aFunctionName == u"CONFIDENCE.NORM"
@@ -981,6 +1459,21 @@ if (aFunctionName == u"T.TEST" || aFunctionName == u"TTEST")
         return makeScalarResult(api::CellValue::number(aVariance.maValue));
     }
 
+    if (aFunctionName == u"KURT")
+    {
+        if (rNode.maChildren.empty())
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aNumbers = aContext.collectVarianceArguments(false);
+        if (!aNumbers)
+            return makeCellError(aNumbers.meError);
+
+        const auto aKurtosis = semath::evaluateKurtosisNumbers(aNumbers.maValue);
+        if (!aKurtosis)
+            return makeCellError(aKurtosis.meError);
+        return makeScalarResult(api::CellValue::number(aKurtosis.maValue));
+    }
+
     if (aFunctionName == u"BINOMDIST" || aFunctionName == u"BINOM.DIST")
     {
         if (rNode.maChildren.size() != 4)
@@ -1042,6 +1535,28 @@ if (aFunctionName == u"T.TEST" || aFunctionName == u"TTEST")
             aTrials.maValue, aProbability.maValue, aAlpha.maValue);
         if (!aInverse)
             return makeFailure(aInverse.meError);
+        return makeScalarResult(api::CellValue::number(aInverse.maValue));
+    }
+
+    if (aFunctionName == u"CRITBINOM")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aTrials = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
+        const auto aProbability = aContext.evaluateNumericArgument(*rNode.maChildren[1], std::nullopt);
+        const auto aAlpha = aContext.evaluateNumericArgument(*rNode.maChildren[2], std::nullopt);
+        if (!aTrials)
+            return makeCellError(aTrials.meError);
+        if (!aProbability)
+            return makeCellError(aProbability.meError);
+        if (!aAlpha)
+            return makeCellError(aAlpha.meError);
+
+        const auto aInverse = semath::evaluateBinomialInverse(
+            aTrials.maValue, aProbability.maValue, aAlpha.maValue);
+        if (!aInverse)
+            return makeCellError(aInverse.meError);
         return makeScalarResult(api::CellValue::number(aInverse.maValue));
     }
 

@@ -45,6 +45,8 @@ inline constexpr std::uint16_t kBuiltinExternalNameCatalogId = 1;
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYEARFRAC");
     if (equalLookupText(rSymbol, u"YEARS") || equalLookupText(rSymbol, u"ORG.OPENOFFICE.YEARS"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.DATEFUNCTIONS.GETDIFFYEARS");
+    if (equalLookupText(rSymbol, u"MONTHS") || equalLookupText(rSymbol, u"ORG.OPENOFFICE.MONTHS"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.DATEFUNCTIONS.GETDIFFMONTHS");
     if (equalLookupText(rSymbol, u"WEEKS") || equalLookupText(rSymbol, u"ORG.OPENOFFICE.WEEKS"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.DATEFUNCTIONS.GETDIFFWEEKS");
     if (equalLookupText(rSymbol, u"WEEKSINYEAR")
@@ -65,6 +67,10 @@ inline constexpr std::uint16_t kBuiltinExternalNameCatalogId = 1;
     }
     if (equalLookupText(rSymbol, u"NOMINAL") || equalLookupText(rSymbol, u"NOMINAL_ADD"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETNOMINAL");
+    if (equalLookupText(rSymbol, u"DOLLARFR"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDOLLARFR");
+    if (equalLookupText(rSymbol, u"DOLLARDE"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDOLLARDE");
     if (equalLookupText(rSymbol, u"PRICE"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETPRICE");
     if (equalLookupText(rSymbol, u"PRICEMAT"))
@@ -85,8 +91,12 @@ inline constexpr std::uint16_t kBuiltinExternalNameCatalogId = 1;
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYIELD");
     if (equalLookupText(rSymbol, u"TBILLPRICE"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETTBILLPRICE");
+    if (equalLookupText(rSymbol, u"TBILLEQ"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETTBILLEQ");
     if (equalLookupText(rSymbol, u"TBILLYIELD"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETTBILLYIELD");
+    if (equalLookupText(rSymbol, u"FVSCHEDULE"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETFVSCHEDULE");
     if (equalLookupText(rSymbol, u"AMORLINC"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETAMORLINC");
     if (equalLookupText(rSymbol, u"AMORDEGRC"))
@@ -131,6 +141,8 @@ inline constexpr std::uint16_t kBuiltinExternalNameCatalogId = 1;
         return api::String(u"YEARFRAC");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.DATEFUNCTIONS.GETDIFFYEARS"))
         return api::String(u"YEARS");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.DATEFUNCTIONS.GETDIFFMONTHS"))
+        return api::String(u"MONTHS");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.DATEFUNCTIONS.GETDIFFWEEKS"))
         return api::String(u"WEEKS");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.DATEFUNCTIONS.GETWEEKSINYEAR"))
@@ -145,6 +157,10 @@ inline constexpr std::uint16_t kBuiltinExternalNameCatalogId = 1;
         return api::String(u"CONVERT");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETNOMINAL"))
         return api::String(u"NOMINAL");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDOLLARFR"))
+        return api::String(u"DOLLARFR");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDOLLARDE"))
+        return api::String(u"DOLLARDE");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETPRICE"))
         return api::String(u"PRICE");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETPRICEMAT"))
@@ -165,8 +181,12 @@ inline constexpr std::uint16_t kBuiltinExternalNameCatalogId = 1;
         return api::String(u"YIELD");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETTBILLPRICE"))
         return api::String(u"TBILLPRICE");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETTBILLEQ"))
+        return api::String(u"TBILLEQ");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETTBILLYIELD"))
         return api::String(u"TBILLYIELD");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETFVSCHEDULE"))
+        return api::String(u"FVSCHEDULE");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETAMORLINC"))
         return api::String(u"AMORLINC");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETAMORDEGRC"))
