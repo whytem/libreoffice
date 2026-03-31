@@ -15,6 +15,7 @@
 #include <spreadsheetengine/detail/WorkbookCompilerLowering.hxx>
 #include <spreadsheetengine/detail/compiler/CompiledFormulaInflation.hxx>
 
+#include <spreadsheetengine/api/Array.hxx>
 #include <spreadsheetengine/api/Calendar.hxx>
 #include <spreadsheetengine/api/Logic.hxx>
 #include <spreadsheetengine/api/Lookup.hxx>
@@ -195,6 +196,50 @@ namespace setext = spreadsheetengine::core::text;
     }
 
     return api::Error::NoValue;
+}
+
+[[nodiscard]] std::optional<sal_Int16> classifyOdfErrorTypeLiteral(api::StringView rText)
+{
+    const api::String aUpper = uppercaseAscii(rText);
+    if (aUpper == u"#NULL!")
+        return 1;
+    if (aUpper == u"#DIV/0!")
+        return 2;
+    if (aUpper == u"#VALUE!")
+        return 3;
+    if (aUpper == u"#REF!")
+        return 4;
+    if (aUpper == u"#NAME?")
+        return 5;
+    if (aUpper == u"#NUM!")
+        return 6;
+    if (aUpper == u"#N/A")
+        return 7;
+    if (aUpper == u"#GETTING_DATA")
+        return std::nullopt;
+    if (aUpper.starts_with(u"#ERR") && aUpper.size() > 5 && aUpper.back() == u'!')
+        return std::nullopt;
+    if (!rText.empty() && rText.front() == u'#')
+        return 5;
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<sal_Int16> classifyOdfErrorType(api::Error eError)
+{
+    switch (eError)
+    {
+        case api::Error::DivisionByZero:
+            return 2;
+        case api::Error::NoValue:
+            return 3;
+        case api::Error::NoConvergence:
+        case api::Error::Domain:
+            return 6;
+        case api::Error::NotAvailable:
+            return 7;
+        default:
+            return std::nullopt;
+    }
 }
 
 [[nodiscard]] std::optional<double> parseAsciiDouble(api::StringView rValue)
@@ -1749,6 +1794,107 @@ EvaluationResult Evaluator::evaluateFunction(
         return makeScalarResult(api::CellValue::boolean(
             aArgument.maValue.maValue.isError()
             && aArgument.maValue.maValue.meError == api::Error::NotAvailable));
+    }
+
+    if (aFunctionName == u"ERROR.TYPE")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const formula::Node& rArgument = *rNode.maChildren[0];
+        const auto classifyReferenceErrorType = [&](const formula::Node& rReferenceNode)
+            -> std::optional<sal_Int16> {
+            api::ValueResult<api::ResolvedReference> aReference
+                = api::ValueResult<api::ResolvedReference>::failure(api::Error::IllegalArgument);
+
+            if (rReferenceNode.meKind == formula::NodeKind::CellReference)
+            {
+                aReference = resolveReferenceText(rReferenceNode.maPrimaryText, rCurrentAddress.mnSheet);
+                if (!aReference && aReference.meError == api::Error::IllegalArgument)
+                    return 4;
+            }
+            else if (rReferenceNode.meKind == formula::NodeKind::RangeReference)
+            {
+                api::String aAddress = rReferenceNode.maPrimaryText;
+                aAddress.push_back(u':');
+                aAddress += rReferenceNode.maSecondaryText;
+                aReference = resolveReferenceText(aAddress, rCurrentAddress.mnSheet);
+                if (!aReference && aReference.meError == api::Error::IllegalArgument)
+                    return 4;
+            }
+            else if (rReferenceNode.meKind == formula::NodeKind::NamedReference)
+            {
+                aReference = resolveNamedRange(rReferenceNode.maPrimaryText, rCurrentAddress.mnSheet);
+                if (!aReference && aReference.meError == api::Error::NotAvailable)
+                    return 5;
+            }
+            else
+            {
+                return std::nullopt;
+            }
+
+            if (!aReference || !aReference.maValue.isSingleCell())
+                return std::nullopt;
+
+            const workbook::Cell* pCell = getCell(aReference.maValue.maRange.maStart);
+            if (!pCell)
+                return std::nullopt;
+
+            if (pCell->maRawValueType == u"error")
+                return classifyOdfErrorTypeLiteral(pCell->maRawValue);
+
+            if (pCell->maValue.isError())
+                return classifyOdfErrorType(pCell->maValue.meError);
+
+            return std::nullopt;
+        };
+
+        if (rArgument.meKind == formula::NodeKind::ErrorLiteral)
+        {
+            const api::String aUpperLiteral = uppercaseAscii(rArgument.maPrimaryText);
+            if (aUpperLiteral == u"#GETTING_DATA"
+                || (aUpperLiteral.starts_with(u"#ERR") && aUpperLiteral.size() > 5
+                    && aUpperLiteral.back() == u'!'))
+            {
+                return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+            }
+            if (const auto oErrorType = classifyOdfErrorTypeLiteral(rArgument.maPrimaryText))
+            {
+                return makeScalarResult(api::CellValue::number(static_cast<double>(*oErrorType)));
+            }
+            return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
+        }
+
+        if (const auto oReferenceErrorType = classifyReferenceErrorType(rArgument))
+        {
+            return makeScalarResult(api::CellValue::number(static_cast<double>(*oReferenceErrorType)));
+        }
+
+        EvaluationResult aArgument = evaluateNode(rArgument, rCurrentAddress);
+        if (!aArgument)
+        {
+            if (rArgument.meKind == formula::NodeKind::NamedReference
+                && aArgument.meError == api::Error::NotAvailable)
+            {
+                return makeScalarResult(api::CellValue::number(5.0));
+            }
+            if ((rArgument.meKind == formula::NodeKind::CellReference
+                    || rArgument.meKind == formula::NodeKind::RangeReference)
+                && aArgument.meError == api::Error::IllegalArgument)
+            {
+                return makeScalarResult(api::CellValue::number(4.0));
+            }
+            if (const auto oErrorType = classifyOdfErrorType(aArgument.meError))
+                return makeScalarResult(api::CellValue::number(static_cast<double>(*oErrorType)));
+            return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
+        }
+
+        if (!aArgument.maValue.isScalar() || !aArgument.maValue.maValue.isError())
+            return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
+
+        if (const auto oErrorType = classifyOdfErrorType(aArgument.maValue.maValue.meError))
+            return makeScalarResult(api::CellValue::number(static_cast<double>(*oErrorType)));
+        return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
     }
 
     if (aFunctionName == u"IFERROR" || aFunctionName == u"IFNA")
@@ -4400,6 +4546,66 @@ EvaluationResult Evaluator::evaluateFunction(
             return materializeReferenceValue(aSliceReference, 0, 0);
 
         return makeReferenceResult(aSliceReference);
+    }
+
+    if (aFunctionName == u"CHOOSECOLS" || aFunctionName == u"CHOOSEROWS")
+    {
+        if (rNode.maChildren.size() < 2)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const bool bChooseColumns = aFunctionName == u"CHOOSECOLS";
+        EvaluationResult aSource = evaluateReferenceNode(*rNode.maChildren[0], rCurrentAddress);
+        if (!aSource)
+            return aSource;
+        if (!aSource.maValue.isMatrixReference())
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aSourceDimensions = aSource.maValue.maReference.matrixDimensions();
+        if (aSourceDimensions.mnColumns < 1 || aSourceDimensions.mnRows < 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        std::optional<api::MatrixSize> oFirstSelection;
+        for (std::size_t nIndex = 1; nIndex < rNode.maChildren.size(); ++nIndex)
+        {
+            if (rNode.maChildren[nIndex]->meKind == formula::NodeKind::EmptyArgument)
+                return makeFailure(api::Error::IllegalArgument);
+
+            const auto aVisited = visitFlattenedValues(
+                visitFlattenedValues, *rNode.maChildren[nIndex],
+                [&](const api::CellValue& rValue, bool) -> api::ValueResult<bool> {
+                    if (rValue.isError())
+                        return api::ValueResult<bool>::failure(rValue.meError);
+                    if (rValue.isEmpty() || rValue.isText())
+                        return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
+
+                    const auto aNumber = coerceToNumber(rValue);
+                    if (!aNumber || !std::isfinite(aNumber.maValue)
+                        || aNumber.maValue < static_cast<double>(std::numeric_limits<sal_Int32>::min())
+                        || aNumber.maValue > static_cast<double>(std::numeric_limits<sal_Int32>::max()))
+                    {
+                        return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
+                    }
+
+                    const sal_Int32 nRequestedIndex = static_cast<sal_Int32>(aNumber.maValue);
+                    const auto aSelection = api::array::normalizeSelectionIndex(
+                        nRequestedIndex,
+                        bChooseColumns ? aSourceDimensions.mnColumns : aSourceDimensions.mnRows);
+                    if (!aSelection)
+                        return api::ValueResult<bool>::failure(aSelection.meError);
+
+                    if (!oFirstSelection)
+                        oFirstSelection = aSelection.maValue;
+                    return api::ValueResult<bool>::success(true);
+                });
+            if (!aVisited)
+                return makeFailure(aVisited.meError);
+        }
+
+        if (!oFirstSelection)
+            return makeFailure(api::Error::IllegalArgument);
+
+        return materializeReferenceValue(aSource.maValue.maReference,
+            bChooseColumns ? *oFirstSelection : 0, bChooseColumns ? 0 : *oFirstSelection);
     }
 
     if (aFunctionName == u"CHAR")

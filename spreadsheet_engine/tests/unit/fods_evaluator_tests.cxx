@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <optional>
 
 #include <spreadsheetengine/api/Calendar.hxx>
 #include <spreadsheetengine/detail/FormulaEvaluator.hxx>
@@ -1104,6 +1105,196 @@ int main()
                 spreadsheetengine::api::Error::IllegalArgument))
         {
             return fail("spreadsheetengine_fods_evaluator_tests", "lookup evaluation mismatch");
+        }
+    }
+
+    {
+        const auto aChooseCols = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.CHOOSECOLS([.BC1:.BF2];2;-1)", { 0, 0, 0 });
+        const auto aChooseColsArray = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.CHOOSECOLS([.BA1:.BB4];{2|1})", { 0, 0, 0 });
+        const auto aChooseColsInvalid = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.CHOOSECOLS([.BA1:.BB4];0)", { 0, 0, 0 });
+        const auto aChooseRows = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.CHOOSEROWS([.BA1:.BB4];2;-1)", { 0, 0, 0 });
+        const auto aChooseRowsArray = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.CHOOSEROWS([.BA1:.BB4];{-1|2})", { 0, 0, 0 });
+        const auto aChooseRowsInvalid = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.CHOOSEROWS([.BA1:.BB4];0)", { 0, 0, 0 });
+
+        const auto aCompiledChooseCols = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.CHOOSECOLS([.BC1:.BF2];2;-1)", { 0, 0, 0 });
+        const auto aCompiledChooseColsArray = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.CHOOSECOLS([.BA1:.BB4];{2|1})", { 0, 0, 0 });
+        const auto aCompiledChooseColsInvalid = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.CHOOSECOLS([.BA1:.BB4];0)", { 0, 0, 0 });
+        const auto aCompiledChooseRows = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.CHOOSEROWS([.BA1:.BB4];2;-1)", { 0, 0, 0 });
+        const auto aCompiledChooseRowsArray = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.CHOOSEROWS([.BA1:.BB4];{-1|2})", { 0, 0, 0 });
+        const auto aCompiledChooseRowsInvalid = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.CHOOSEROWS([.BA1:.BB4];0)", { 0, 0, 0 });
+
+        const auto checkChooseNumber = [&](const char* pLabel, const auto& rResult,
+                                           double fExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isNumber() || rResult.mbUsedCachedValue
+                || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+            {
+                std::fprintf(stderr, "%s: CHOOSECOLS/CHOOSEROWS mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        const auto checkChooseText = [&](const char* pLabel, const auto& rResult,
+                                         std::u16string_view rExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isText() || rResult.mbUsedCachedValue
+                || rResult.maValue.maValue.maString != rExpected)
+            {
+                std::fprintf(stderr, "%s: CHOOSECOLS/CHOOSEROWS mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        const auto checkChooseError = [&](const char* pLabel, const auto& rResult) -> bool {
+            if (rResult || rResult.meError != spreadsheetengine::api::Error::IllegalArgument)
+            {
+                std::fprintf(stderr, "%s: CHOOSECOLS/CHOOSEROWS mismatch in %s\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        if (!checkChooseText("CHOOSECOLS text anchor", aChooseCols, u"C")
+            || !checkChooseNumber("CHOOSECOLS array selection", aChooseColsArray, 11.0)
+            || !checkChooseError("CHOOSECOLS invalid index", aChooseColsInvalid)
+            || !checkChooseNumber("CHOOSEROWS numeric anchor", aChooseRows, 2.0)
+            || !checkChooseNumber("CHOOSEROWS array selection", aChooseRowsArray, 8.0)
+            || !checkChooseError("CHOOSEROWS invalid index", aChooseRowsInvalid)
+            || !checkChooseText("compiled CHOOSECOLS text anchor", aCompiledChooseCols, u"C")
+            || !checkChooseNumber(
+                "compiled CHOOSECOLS array selection", aCompiledChooseColsArray, 11.0)
+            || !checkChooseError(
+                "compiled CHOOSECOLS invalid index", aCompiledChooseColsInvalid)
+            || !checkChooseNumber("compiled CHOOSEROWS numeric anchor",
+                aCompiledChooseRows, 2.0)
+            || !checkChooseNumber("compiled CHOOSEROWS array selection",
+                aCompiledChooseRowsArray, 8.0)
+            || !checkChooseError(
+                "compiled CHOOSEROWS invalid index", aCompiledChooseRowsInvalid))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests",
+                "CHOOSECOLS/CHOOSEROWS evaluation mismatch");
+        }
+    }
+
+    {
+        const auto aRepoRoot = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
+        const auto aErrorTypePath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                    / "spreadsheet" / "fods" / "error.type.fods";
+        const auto aLoadResult = spreadsheetengine::core::fods::loadWorkbook(aErrorTypePath.string());
+        if (!aLoadResult)
+            return fail("spreadsheetengine_fods_evaluator_tests", "error.type.fods load failed");
+
+        Evaluator aErrorTypeEvaluator(aLoadResult.maValue.maWorkbook);
+        const auto reportErrorTypeMismatch = [&](const char* pLabel) -> bool {
+            std::fprintf(stderr, "%s: ERROR.TYPE mismatch in %s\n",
+                "spreadsheetengine_fods_evaluator_tests", pLabel);
+            return false;
+        };
+        const auto checkErrorTypeNumber = [&](const char* pLabel, const auto& rResult,
+                                              double fExpected) -> bool {
+            if (!rResult || rResult.mbUsedCachedValue || !rResult.maValue.maValue.isNumber()
+                || !almostEqual(rResult.maValue.maValue.mfNumber, fExpected))
+            {
+                return reportErrorTypeMismatch(pLabel);
+            }
+            return true;
+        };
+        const auto checkErrorTypeNa = [&](const char* pLabel, const auto& rResult) -> bool {
+            if (!rResult || rResult.mbUsedCachedValue || !rResult.maValue.maValue.isError()
+                || rResult.maValue.maValue.meError != spreadsheetengine::api::Error::NotAvailable)
+            {
+                return reportErrorTypeMismatch(pLabel);
+            }
+            return true;
+        };
+        const auto checkErrorTypeValueError = [&](const char* pLabel, const auto& rResult) -> bool {
+            if (!rResult || rResult.mbUsedCachedValue || !rResult.maValue.maValue.isError()
+                || rResult.maValue.maValue.meError
+                       != spreadsheetengine::api::Error::IllegalArgument)
+            {
+                return reportErrorTypeMismatch(pLabel);
+            }
+            return true;
+        };
+
+        const CellAddress aSheet2Origin { 1, 0, 0 };
+        const auto aNa = aErrorTypeEvaluator.evaluateFormula(u"of:=ERROR.TYPE(NA())", aSheet2Origin);
+        const auto aRef
+            = aErrorTypeEvaluator.evaluateFormula(u"of:=ERROR.TYPE(#REF!)", aSheet2Origin);
+        const auto aGettingData = aErrorTypeEvaluator.evaluateFormula(
+            u"of:=ERROR.TYPE(#getting_data)", aSheet2Origin);
+        const auto aName
+            = aErrorTypeEvaluator.evaluateFormula(u"of:=ERROR.TYPE(#NAME?)", aSheet2Origin);
+        const auto aDivZero
+            = aErrorTypeEvaluator.evaluateFormula(u"of:=ERROR.TYPE([.F11])", aSheet2Origin);
+        const auto aGettingDataReference
+            = aErrorTypeEvaluator.evaluateFormula(u"of:=ERROR.TYPE([.A9])", aSheet2Origin);
+        const auto aUnknownName
+            = aErrorTypeEvaluator.evaluateFormula(u"of:=ERROR.TYPE(ahoj)", aSheet2Origin);
+        const auto aNonError
+            = aErrorTypeEvaluator.evaluateFormula(u"of:=ERROR.TYPE(5)", aSheet2Origin);
+        const auto aArrayConstant
+            = aErrorTypeEvaluator.evaluateFormula(u"of:=ERROR.TYPE({#N/A})", aSheet2Origin);
+
+        const auto aCompiledNa = aErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ERROR.TYPE(NA())", aSheet2Origin);
+        const auto aCompiledRef = aErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ERROR.TYPE(#REF!)", aSheet2Origin);
+        const auto aCompiledGettingData = aErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ERROR.TYPE(#getting_data)", aSheet2Origin);
+        const auto aCompiledName = aErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ERROR.TYPE(#NAME?)", aSheet2Origin);
+        const auto aCompiledDivZero = aErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ERROR.TYPE([.F11])", aSheet2Origin);
+        const auto aCompiledGettingDataReference
+            = aErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
+                u"of:=ERROR.TYPE([.A9])", aSheet2Origin);
+        const auto aCompiledUnknownName = aErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ERROR.TYPE(ahoj)", aSheet2Origin);
+        const auto aCompiledNonError = aErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ERROR.TYPE(5)", aSheet2Origin);
+        const auto aCompiledArrayConstant
+            = aErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
+                u"of:=ERROR.TYPE({#N/A})", aSheet2Origin);
+
+        if (!checkErrorTypeNumber("ERROR.TYPE(NA())", aNa, 7.0)
+            || !checkErrorTypeNumber("ERROR.TYPE(#REF!)", aRef, 4.0)
+            || !checkErrorTypeValueError("ERROR.TYPE(#getting_data)", aGettingData)
+            || !checkErrorTypeNumber("ERROR.TYPE(#NAME?)", aName, 5.0)
+            || !checkErrorTypeNumber("ERROR.TYPE(F11)", aDivZero, 2.0)
+            || !checkErrorTypeNa("ERROR.TYPE(A9)", aGettingDataReference)
+            || !checkErrorTypeNumber("ERROR.TYPE(ahoj)", aUnknownName, 5.0)
+            || !checkErrorTypeNa("ERROR.TYPE(5)", aNonError)
+            || !checkErrorTypeNumber("ERROR.TYPE({#N/A})", aArrayConstant, 7.0)
+            || !checkErrorTypeNumber("compiled ERROR.TYPE(NA())", aCompiledNa, 7.0)
+            || !checkErrorTypeNumber("compiled ERROR.TYPE(#REF!)", aCompiledRef, 4.0)
+            || !checkErrorTypeValueError(
+                "compiled ERROR.TYPE(#getting_data)", aCompiledGettingData)
+            || !checkErrorTypeNumber("compiled ERROR.TYPE(#NAME?)", aCompiledName, 5.0)
+            || !checkErrorTypeNumber("compiled ERROR.TYPE(F11)", aCompiledDivZero, 2.0)
+            || !checkErrorTypeNa("compiled ERROR.TYPE(A9)", aCompiledGettingDataReference)
+            || !checkErrorTypeNumber("compiled ERROR.TYPE(ahoj)", aCompiledUnknownName, 5.0)
+            || !checkErrorTypeNa("compiled ERROR.TYPE(5)", aCompiledNonError)
+            || !checkErrorTypeNumber(
+                "compiled ERROR.TYPE({#N/A})", aCompiledArrayConstant, 7.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "ERROR.TYPE evaluation mismatch");
         }
     }
 
