@@ -23,6 +23,8 @@
 #include <unicode/coll.h>
 #include <unicode/unistr.h>
 
+#include "CoreRuntimeUtils.hxx"
+
 namespace spreadsheetengine::core::lookup
 {
 namespace
@@ -30,49 +32,8 @@ namespace
 
 namespace sequery = spreadsheetengine::core::query;
 
-[[nodiscard]] std::optional<double> parseAsciiDouble(api::StringView rValue)
-{
-    if (rValue.empty())
-        return std::nullopt;
-
-    std::string aAscii;
-    aAscii.reserve(rValue.size());
-    for (const char16_t cChar : rValue)
-    {
-        if (cChar > 0x7f)
-            return std::nullopt;
-        aAscii.push_back(static_cast<char>(cChar));
-    }
-
-    char* pEnd = nullptr;
-    const double fValue = std::strtod(aAscii.c_str(), &pEnd);
-    if (!pEnd || *pEnd != '\0')
-        return std::nullopt;
-
-    return fValue;
-}
-
-[[nodiscard]] api::ValueResult<double> coerceToNumber(const api::CellValue& rValue)
-{
-    switch (rValue.meKind)
-    {
-        case api::CellValueKind::Empty:
-            return api::ValueResult<double>::success(0.0);
-        case api::CellValueKind::Number:
-        case api::CellValueKind::Boolean:
-            return api::ValueResult<double>::success(rValue.mfNumber);
-        case api::CellValueKind::Text:
-        {
-            if (const auto oValue = parseAsciiDouble(rValue.maString))
-                return api::ValueResult<double>::success(*oValue);
-            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-        }
-        case api::CellValueKind::Error:
-            return api::ValueResult<double>::failure(rValue.meError);
-    }
-
-    return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-}
+using spreadsheetengine::core::util::parseAsciiDouble;
+using spreadsheetengine::core::util::coerceToNumber;
 
 [[nodiscard]] api::ValueResult<int> compareLookupText(
     api::StringView rLeft, api::StringView rRight)

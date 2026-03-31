@@ -17,8 +17,15 @@
 
 #include <spreadsheetengine/detail/FormulaEvaluator.hxx>
 
+#include "CoreRuntimeUtils.hxx"
+
 namespace spreadsheetengine::core::eval::detail
 {
+
+using spreadsheetengine::core::util::uppercaseAscii;
+using spreadsheetengine::core::util::parseAsciiDouble;
+using spreadsheetengine::core::util::coerceToNumber;
+using spreadsheetengine::core::util::toWholeNumber;
 
 [[nodiscard]] inline EvaluationResult makeScalarResult(
     const api::CellValue& rValue, bool bUsedCachedValue = false)
@@ -40,20 +47,6 @@ namespace spreadsheetengine::core::eval::detail
 {
     EvaluationResult aResult;
     aResult.meError = eError;
-    return aResult;
-}
-
-[[nodiscard]] inline api::String uppercaseAscii(api::StringView rValue)
-{
-    api::String aResult;
-    aResult.reserve(rValue.size());
-    for (const char16_t cChar : rValue)
-    {
-        if (cChar >= u'a' && cChar <= u'z')
-            aResult.push_back(static_cast<char16_t>(cChar - u'a' + u'A'));
-        else
-            aResult.push_back(cChar);
-    }
     return aResult;
 }
 
@@ -79,28 +72,6 @@ namespace spreadsheetengine::core::eval::detail
 [[nodiscard]] inline api::String normalizeFunctionName(api::StringView rName)
 {
     return uppercaseAscii(normalizeDisplayFunctionName(rName));
-}
-
-[[nodiscard]] inline std::optional<double> parseAsciiDouble(api::StringView rValue)
-{
-    if (rValue.empty())
-        return std::nullopt;
-
-    std::string aAscii;
-    aAscii.reserve(rValue.size());
-    for (const char16_t cChar : rValue)
-    {
-        if (cChar > 0x7f)
-            return std::nullopt;
-        aAscii.push_back(static_cast<char>(cChar));
-    }
-
-    char* pEnd = nullptr;
-    const double fValue = std::strtod(aAscii.c_str(), &pEnd);
-    if (!pEnd || *pEnd != '\0')
-        return std::nullopt;
-
-    return fValue;
 }
 
 [[nodiscard]] inline api::String formatNumber(double fValue)
@@ -129,28 +100,6 @@ namespace spreadsheetengine::core::eval::detail
     }
     aResult.push_back(u'"');
     return aResult;
-}
-
-[[nodiscard]] inline api::ValueResult<double> coerceToNumber(const api::CellValue& rValue)
-{
-    switch (rValue.meKind)
-    {
-        case api::CellValueKind::Empty:
-            return api::ValueResult<double>::success(0.0);
-        case api::CellValueKind::Number:
-        case api::CellValueKind::Boolean:
-            return api::ValueResult<double>::success(rValue.mfNumber);
-        case api::CellValueKind::Text:
-        {
-            if (auto oValue = parseAsciiDouble(rValue.maString))
-                return api::ValueResult<double>::success(*oValue);
-            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-        }
-        case api::CellValueKind::Error:
-            return api::ValueResult<double>::failure(rValue.meError);
-    }
-
-    return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 }
 
 [[nodiscard]] inline api::ValueResult<bool> coerceToBoolean(const api::CellValue& rValue)
@@ -198,18 +147,6 @@ namespace spreadsheetengine::core::eval::detail
     }
 
     return api::ValueResult<api::String>::failure(api::Error::IllegalArgument);
-}
-
-[[nodiscard]] inline std::optional<sal_Int32> toWholeNumber(double fValue)
-{
-    if (!std::isfinite(fValue))
-        return std::nullopt;
-
-    const double fRounded = std::round(fValue);
-    if (std::abs(fValue - fRounded) > 1e-9)
-        return std::nullopt;
-
-    return static_cast<sal_Int32>(fRounded);
 }
 
 [[nodiscard]] inline EvaluationResult ensureScalarValue(Evaluator& rEvaluator, EvaluationResult aResult)

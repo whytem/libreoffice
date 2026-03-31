@@ -20,29 +20,15 @@
 #include <rtl/math.hxx>
 #include <sal/types.h>
 
+#include "CoreRuntimeUtils.hxx"
+
 namespace spreadsheetengine::core::finance
 {
 namespace
 {
 
-[[nodiscard]] api::ValueResult<double> makeFiniteNumberResult(double fValue)
-{
-    if (!std::isfinite(fValue))
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    return api::ValueResult<double>::success(fValue);
-}
-
-[[nodiscard]] std::optional<sal_Int32> toWholeNumber(double fValue)
-{
-    if (!std::isfinite(fValue))
-        return std::nullopt;
-
-    const double fRounded = std::round(fValue);
-    if (std::abs(fValue - fRounded) > 1e-9)
-        return std::nullopt;
-
-    return static_cast<sal_Int32>(fRounded);
-}
+using spreadsheetengine::core::util::toWholeNumber;
+using spreadsheetengine::core::util::makeFiniteResult;
 
 [[nodiscard]] bool isValidPaymentPeriod(double fPeriod, double fTotalPeriods)
 {
@@ -566,14 +552,14 @@ public:
 api::ValueResult<double> evaluateFutureValue(
     double fRate, double fPeriods, double fPayment, double fPresentValue, bool bPayInAdvance)
 {
-    return makeFiniteNumberResult(spreadsheetengine::core::math::computeFutureValue(
+    return makeFiniteResult(spreadsheetengine::core::math::computeFutureValue(
         fRate, fPeriods, fPayment, fPresentValue, bPayInAdvance));
 }
 
 api::ValueResult<double> evaluatePresentValue(
     double fRate, double fPeriods, double fPayment, double fFutureValue, bool bPayInAdvance)
 {
-    return makeFiniteNumberResult(spreadsheetengine::core::math::computePresentValue(
+    return makeFiniteResult(spreadsheetengine::core::math::computePresentValue(
         fRate, fPeriods, fPayment, fFutureValue, bPayInAdvance));
 }
 
@@ -584,7 +570,7 @@ api::ValueResult<double> evaluatePayment(
     if (::rtl::math::approxEqual(fPeriods, 0.0))
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    return makeFiniteNumberResult(spreadsheetengine::core::math::computePayment(
+    return makeFiniteResult(spreadsheetengine::core::math::computePayment(
         fRate, fPeriods, fPresentValue, fFutureValue, bPayInAdvance));
 }
 
@@ -592,7 +578,7 @@ api::ValueResult<double> evaluatePeriodsForFutureValue(
     double fRate, double fPayment, double fPresentValue, double fFutureValue,
     bool bPayInAdvance)
 {
-    return makeFiniteNumberResult(spreadsheetengine::core::math::computePeriodsForFutureValue(
+    return makeFiniteResult(spreadsheetengine::core::math::computePeriodsForFutureValue(
         fRate, fPayment, fPresentValue, fFutureValue, bPayInAdvance));
 }
 
@@ -607,7 +593,7 @@ api::ValueResult<double> evaluateRate(
         fPeriods, fPayment, fPresentValue, fFutureValue, bPayInAdvance, fGuess, true);
     if (!aRateResult.mbConverged)
         return api::ValueResult<double>::failure(api::Error::NoConvergence);
-    return makeFiniteNumberResult(aRateResult.mfRate);
+    return makeFiniteResult(aRateResult.mfRate);
 }
 
 api::ValueResult<double> evaluateInterestSchedulePayment(
@@ -616,7 +602,7 @@ api::ValueResult<double> evaluateInterestSchedulePayment(
     if (::rtl::math::approxEqual(fTotalPeriods, 0.0))
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    return makeFiniteNumberResult(
+    return makeFiniteResult(
         spreadsheetengine::core::math::computeInterestSchedulePayment(
             fRate, fPeriod, fTotalPeriods, fInvestment));
 }
@@ -628,7 +614,7 @@ api::ValueResult<double> evaluateInterestPayment(
     if (!isValidPaymentPeriod(fPeriod, fTotalPeriods))
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    return makeFiniteNumberResult(spreadsheetengine::core::math::computeInterestPayment(
+    return makeFiniteResult(spreadsheetengine::core::math::computeInterestPayment(
                                        fRate, fPeriod, fTotalPeriods, fPresentValue,
                                        fFutureValue, bPayInAdvance)
                                        .mfInterest);
@@ -641,7 +627,7 @@ api::ValueResult<double> evaluatePrincipalPayment(
     if (!isValidPaymentPeriod(fPeriod, fTotalPeriods))
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    return makeFiniteNumberResult(spreadsheetengine::core::math::computePrincipalPayment(
+    return makeFiniteResult(spreadsheetengine::core::math::computePrincipalPayment(
         fRate, fPeriod, fTotalPeriods, fPresentValue, fFutureValue, bPayInAdvance));
 }
 
@@ -660,7 +646,7 @@ api::ValueResult<double> evaluateCumulativeInterest(
     if (!oWholeStart || !oWholeEnd)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    return makeFiniteNumberResult(spreadsheetengine::core::math::computeCumulativeInterest(
+    return makeFiniteResult(spreadsheetengine::core::math::computeCumulativeInterest(
         fRate, static_cast<double>(*oWholeStart), static_cast<double>(*oWholeEnd),
         fTotalPeriods, fPresentValue, 0.0, bPayInAdvance));
 }
@@ -680,7 +666,7 @@ api::ValueResult<double> evaluateCumulativePrincipal(
     if (!oWholeStart || !oWholeEnd)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    return makeFiniteNumberResult(spreadsheetengine::core::math::computeCumulativePrincipal(
+    return makeFiniteResult(spreadsheetengine::core::math::computeCumulativePrincipal(
         fRate, static_cast<double>(*oWholeStart), static_cast<double>(*oWholeEnd),
         fTotalPeriods, fPresentValue, 0.0, bPayInAdvance));
 }
@@ -694,7 +680,7 @@ api::ValueResult<double> evaluateDoubleDecliningBalance(
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
     }
 
-    return makeFiniteNumberResult(spreadsheetengine::core::math::computeDoubleDecliningBalance(
+    return makeFiniteResult(spreadsheetengine::core::math::computeDoubleDecliningBalance(
         fCost, fSalvage, fLife, fPeriod, fFactor));
 }
 
@@ -708,7 +694,7 @@ api::ValueResult<double> evaluateVariableDecliningBalance(
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
     }
 
-    return makeFiniteNumberResult(spreadsheetengine::core::math::computeVariableDecliningBalance(
+    return makeFiniteResult(spreadsheetengine::core::math::computeVariableDecliningBalance(
         fCost, fSalvage, fLife, fStart, fEnd, fFactor, bNoSwitch));
 }
 
@@ -758,7 +744,81 @@ api::ValueResult<double> evaluatePrice(
     for (double fCouponIndex = 0.0; fCouponIndex < *oCouponCount; ++fCouponIndex)
         fPrice += fCouponAmount / std::pow(fYieldFactor, fCouponIndex + fDiscountFactor);
 
-    return makeFiniteNumberResult(fPrice);
+    return makeFiniteResult(fPrice);
+}
+
+api::ValueResult<double> evaluateAmorlinc(
+    const api::DateParts& rNullDate, double fCost, api::DateSerial nPurchaseDate,
+    api::DateSerial nFirstPeriodEndDate, double fSalvage, double fPeriod, double fRate,
+    sal_Int32 nBasis)
+{
+    if (nPurchaseDate > nFirstPeriodEndDate || !(fRate > 0.0) || fSalvage > fCost
+        || !(fCost > 0.0) || fSalvage < 0.0 || fPeriod < 0.0 || !isValidBasis(nBasis))
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    const auto oFirstPeriodFraction
+        = computeYearFractionValue(rNullDate, nPurchaseDate, nFirstPeriodEndDate, nBasis);
+    if (!oFirstPeriodFraction)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const sal_uInt32 nPeriod = static_cast<sal_uInt32>(fPeriod);
+    const double fDepreciationPerPeriod = fCost * fRate;
+    const double fDepreciableCost = fCost - fSalvage;
+    const double fInitialDepreciation = *oFirstPeriodFraction * fRate * fCost;
+    const sal_uInt32 nFullPeriods = static_cast<sal_uInt32>(
+        (fCost - fSalvage - fInitialDepreciation) / fDepreciationPerPeriod);
+
+    double fResult = 0.0;
+    if (nPeriod == 0)
+    {
+        fResult = fInitialDepreciation;
+    }
+    else if (nPeriod <= nFullPeriods)
+    {
+        fResult = fDepreciationPerPeriod;
+    }
+    else if (nPeriod == nFullPeriods + 1)
+    {
+        fResult = fDepreciableCost - fDepreciationPerPeriod * nFullPeriods
+                  - fInitialDepreciation;
+    }
+
+    return makeFiniteResult(std::max(fResult, 0.0));
+}
+
+api::ValueResult<double> evaluateOddlyield(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    api::DateSerial nLastInterest, double fRate, double fPrice, double fRedemption,
+    sal_Int32 nFrequency, sal_Int32 nBasis)
+{
+    if (!(fRate > 0.0) || !(fPrice > 0.0) || !(fRedemption > 0.0)
+        || !isValidCouponFrequency(nFrequency) || nMaturity <= nSettlement
+        || nSettlement <= nLastInterest || !isValidBasis(nBasis))
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    const double fFrequency = static_cast<double>(nFrequency);
+    const auto oLastToMaturity
+        = computeYearFractionValue(rNullDate, nLastInterest, nMaturity, nBasis);
+    const auto oSettlementToMaturity
+        = computeYearFractionValue(rNullDate, nSettlement, nMaturity, nBasis);
+    const auto oLastToSettlement
+        = computeYearFractionValue(rNullDate, nLastInterest, nSettlement, nBasis);
+    if (!oLastToMaturity || !oSettlementToMaturity || !oLastToSettlement)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const double fDCi = *oLastToMaturity * fFrequency;
+    const double fDSCi = *oSettlementToMaturity * fFrequency;
+    const double fAi = *oLastToSettlement * fFrequency;
+
+    double fYield = fRedemption + fDCi * 100.0 * fRate / fFrequency;
+    fYield /= fPrice + fAi * 100.0 * fRate / fFrequency;
+    fYield -= 1.0;
+    fYield *= fFrequency / fDSCi;
+    return makeFiniteResult(fYield);
 }
 
 } // namespace spreadsheetengine::core::finance

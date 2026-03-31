@@ -17,6 +17,7 @@
 #include <spreadsheetengine/detail/OdfFormulaParser.hxx>
 #include <spreadsheetengine/detail/TokenModel.hxx>
 #include <spreadsheetengine/detail/WorkbookModel.hxx>
+#include <spreadsheetengine/runtime/MathAggregate.hxx>
 
 namespace spreadsheetengine::core::eval
 {
@@ -79,6 +80,10 @@ class Evaluator
     [[nodiscard]] std::optional<EvaluationResult> tryEvaluateAggregateFamily(
         api::StringView rFunctionName, const formula::Node& rNode,
         const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] api::ValueResult<bool> scanAggregateScanArgument(
+        const formula::Node& rArgument, const api::CellAddress& rCurrentAddress,
+        math::AggregateScan& rScan, const math::AggregateOptions& rOptions,
+        sal_Int32 nFunction);
     [[nodiscard]] std::optional<EvaluationResult> tryEvaluateSpecialForm(
         api::StringView rFunctionName, const formula::Node& rNode,
         const api::CellAddress& rCurrentAddress);

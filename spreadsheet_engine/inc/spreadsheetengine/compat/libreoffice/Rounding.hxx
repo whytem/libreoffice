@@ -29,20 +29,6 @@ inline spreadsheetengine::api::RoundingMode toApiRoundingMode(rtl_math_RoundingM
     }
 }
 
-inline rtl_math_RoundingMode toLibreOfficeRoundingMode(
-    spreadsheetengine::api::RoundingMode eMode)
-{
-    switch (eMode)
-    {
-        case spreadsheetengine::api::RoundingMode::Down:
-            return rtl_math_RoundingMode_Down;
-        case spreadsheetengine::api::RoundingMode::Up:
-            return rtl_math_RoundingMode_Up;
-        default:
-            return rtl_math_RoundingMode_Corrected;
-    }
-}
-
 } // namespace spreadsheetengine::compat::libreoffice
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

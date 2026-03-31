@@ -337,96 +337,17 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
         else
             return detail::makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
+        semath::AggregateOptions aSubtotalOptions;
+        aSubtotalOptions.mbIgnoreHiddenRows = bIgnoreHiddenRows;
+        aSubtotalOptions.mbIgnoreErrors = false;
+        aSubtotalOptions.mbIgnoreNestedAggregates = true;
+
         semath::AggregateScan aScan;
-        auto consumeSubtotalValue = [&](const api::CellValue& rValue) -> api::ValueResult<bool> {
-            if (rValue.isError())
-            {
-                if (nAggregateFunction == 2)
-                    return api::ValueResult<bool>::success(true);
-                if (nAggregateFunction == 3)
-                {
-                    ++aScan.mnNonEmptyCount;
-                    return api::ValueResult<bool>::success(true);
-                }
-                return api::ValueResult<bool>::failure(rValue.meError);
-            }
-
-            if (!rValue.isEmpty())
-                ++aScan.mnNonEmptyCount;
-
-            if (rValue.isNumber())
-                aScan.maNumbers.push_back(rValue.mfNumber);
-            return api::ValueResult<bool>::success(true);
-        };
-
-        auto scanSubtotalArgument = [&](const formula::Node& rArgument) -> api::ValueResult<bool> {
-            const bool bReferenceLike = rArgument.meKind == formula::NodeKind::CellReference
-                                        || rArgument.meKind == formula::NodeKind::RangeReference
-                                        || rArgument.meKind == formula::NodeKind::NamedReference;
-
-            EvaluationResult aArgument = bReferenceLike ? evaluateReferenceNode(rArgument, rCurrentAddress)
-                                                        : evaluateNode(rArgument, rCurrentAddress);
-            if (!aArgument)
-            {
-                if (nAggregateFunction == 2)
-                    return api::ValueResult<bool>::success(true);
-                if (nAggregateFunction == 3)
-                {
-                    ++aScan.mnNonEmptyCount;
-                    return api::ValueResult<bool>::success(true);
-                }
-                return api::ValueResult<bool>::failure(aArgument.meError);
-            }
-
-            if (!aArgument.maValue.isMatrixReference())
-                return consumeSubtotalValue(aArgument.maValue.maValue);
-
-            const auto& rReference = aArgument.maValue.maReference;
-            const workbook::Sheet* pSheet = getSheet(rReference.maRange.maStart.mnSheet);
-            if (!pSheet)
-                return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
-
-            for (api::RowIndex nRow = 0; nRow < rReference.maRange.rowCount(); ++nRow)
-            {
-                for (api::ColumnIndex nCol = 0; nCol < rReference.maRange.columnCount(); ++nCol)
-                {
-                    const api::CellAddress aAddress = rReference.addressAt(nCol, nRow);
-                    const bool bFilteredRow = pSheet->isRowFiltered(aAddress.mnRow);
-                    const bool bManuallyHiddenRow = pSheet->isRowHidden(aAddress.mnRow);
-                    if (bFilteredRow || (bIgnoreHiddenRows && bManuallyHiddenRow))
-                        continue;
-
-                    const workbook::Cell* pReferencedCell = getCell(aAddress);
-                    if (pReferencedCell && cellContainsAggregateLike(*pReferencedCell))
-                        continue;
-
-                    EvaluationResult aCell = materializeReferenceValue(rReference, nCol, nRow);
-                    if (!aCell)
-                    {
-                        if (nAggregateFunction == 2)
-                            continue;
-                        if (nAggregateFunction == 3)
-                        {
-                            ++aScan.mnNonEmptyCount;
-                            continue;
-                        }
-                        return api::ValueResult<bool>::failure(aCell.meError);
-                    }
-
-                    if (!aCell.maValue.isScalar())
-                        return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
-
-                    const auto aConsumed = consumeSubtotalValue(aCell.maValue.maValue);
-                    if (!aConsumed)
-                        return aConsumed;
-                }
-            }
-            return api::ValueResult<bool>::success(true);
-        };
-
         for (std::size_t nIndex = 1; nIndex < rNode.maChildren.size(); ++nIndex)
         {
-            const auto aScanned = scanSubtotalArgument(*rNode.maChildren[nIndex]);
+            const auto aScanned = scanAggregateScanArgument(
+                *rNode.maChildren[nIndex], rCurrentAddress, aScan, aSubtotalOptions,
+                nAggregateFunction);
             if (!aScanned)
                 return detail::makeScalarResult(api::CellValue::error(aScanned.meError));
         }
@@ -477,107 +398,14 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
             return detail::makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
 
         semath::AggregateScan aScan;
-        auto consumeAggregateValue = [&](const api::CellValue& rValue) -> api::ValueResult<bool> {
-            if (rValue.isError())
-            {
-                if (oOptions->mbIgnoreErrors)
-                    return api::ValueResult<bool>::success(true);
-                if (*oFunction == 2)
-                    return api::ValueResult<bool>::success(true);
-                if (*oFunction == 3)
-                {
-                    ++aScan.mnNonEmptyCount;
-                    return api::ValueResult<bool>::success(true);
-                }
-                return api::ValueResult<bool>::failure(rValue.meError);
-            }
-
-            if (!rValue.isEmpty())
-                ++aScan.mnNonEmptyCount;
-
-            if (rValue.isNumber())
-                aScan.maNumbers.push_back(rValue.mfNumber);
-            return api::ValueResult<bool>::success(true);
-        };
-
-        auto scanAggregateArgument = [&](const formula::Node& rArgument) -> api::ValueResult<bool> {
-            const bool bReferenceLike = rArgument.meKind == formula::NodeKind::CellReference
-                                        || rArgument.meKind == formula::NodeKind::RangeReference
-                                        || rArgument.meKind == formula::NodeKind::NamedReference;
-
-            EvaluationResult aArgument = bReferenceLike ? evaluateReferenceNode(rArgument, rCurrentAddress)
-                                                        : evaluateNode(rArgument, rCurrentAddress);
-            if (!aArgument)
-            {
-                if (oOptions->mbIgnoreErrors && aArgument.maCyclePath.empty())
-                    return api::ValueResult<bool>::success(true);
-                if (*oFunction == 2)
-                    return api::ValueResult<bool>::success(true);
-                if (*oFunction == 3)
-                {
-                    ++aScan.mnNonEmptyCount;
-                    return api::ValueResult<bool>::success(true);
-                }
-                return api::ValueResult<bool>::failure(aArgument.meError);
-            }
-
-            if (!aArgument.maValue.isMatrixReference())
-                return consumeAggregateValue(aArgument.maValue.maValue);
-
-            const auto& rReference = aArgument.maValue.maReference;
-            const workbook::Sheet* pSheet = getSheet(rReference.maRange.maStart.mnSheet);
-            if (!pSheet)
-                return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
-
-            for (api::RowIndex nRow = 0; nRow < rReference.maRange.rowCount(); ++nRow)
-            {
-                for (api::ColumnIndex nCol = 0; nCol < rReference.maRange.columnCount(); ++nCol)
-                {
-                    const api::CellAddress aAddress = rReference.addressAt(nCol, nRow);
-                    const bool bFilteredRow = pSheet->isRowFiltered(aAddress.mnRow);
-                    const bool bManuallyHiddenRow = pSheet->isRowHidden(aAddress.mnRow);
-                    if (bFilteredRow || (oOptions->mbIgnoreHiddenRows && bManuallyHiddenRow))
-                        continue;
-
-                    const workbook::Cell* pReferencedCell = getCell(aAddress);
-                    if (pReferencedCell && oOptions->mbIgnoreNestedAggregates
-                        && cellContainsAggregateLike(*pReferencedCell))
-                    {
-                        continue;
-                    }
-
-                    EvaluationResult aCell = materializeReferenceValue(rReference, nCol, nRow);
-                    if (!aCell)
-                    {
-                        if (oOptions->mbIgnoreErrors && aCell.maCyclePath.empty())
-                            continue;
-                        if (*oFunction == 2)
-                            continue;
-                        if (*oFunction == 3)
-                        {
-                            ++aScan.mnNonEmptyCount;
-                            continue;
-                        }
-                        return api::ValueResult<bool>::failure(aCell.meError);
-                    }
-
-                    if (!aCell.maValue.isScalar())
-                        return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
-
-                    const auto aConsumed = consumeAggregateValue(aCell.maValue.maValue);
-                    if (!aConsumed)
-                        return aConsumed;
-                }
-            }
-            return api::ValueResult<bool>::success(true);
-        };
 
         const bool bRankedFunction = *oFunction >= 14;
         if (bRankedFunction)
         {
             if (rNode.maChildren.size() != 4)
                 return detail::makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
-            const auto aScanned = scanAggregateArgument(*rNode.maChildren[2]);
+            const auto aScanned = scanAggregateScanArgument(
+                *rNode.maChildren[2], rCurrentAddress, aScan, *oOptions, *oFunction);
             if (!aScanned)
                 return detail::makeScalarResult(api::CellValue::error(aScanned.meError));
 
@@ -602,7 +430,8 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
 
         for (std::size_t nIndex = 2; nIndex < rNode.maChildren.size(); ++nIndex)
         {
-            const auto aScanned = scanAggregateArgument(*rNode.maChildren[nIndex]);
+            const auto aScanned = scanAggregateScanArgument(
+                *rNode.maChildren[nIndex], rCurrentAddress, aScan, *oOptions, *oFunction);
             if (!aScanned)
                 return detail::makeScalarResult(api::CellValue::error(aScanned.meError));
         }
@@ -672,6 +501,105 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
     if (!aSkew)
         return detail::makeFailure(aSkew.meError);
     return detail::makeScalarResult(api::CellValue::number(aSkew.maValue));
+}
+
+api::ValueResult<bool> Evaluator::scanAggregateScanArgument(
+    const formula::Node& rArgument, const api::CellAddress& rCurrentAddress,
+    semath::AggregateScan& rScan, const semath::AggregateOptions& rOptions,
+    sal_Int32 nFunction)
+{
+    auto consumeValue = [&](const api::CellValue& rValue) -> api::ValueResult<bool> {
+        if (rValue.isError())
+        {
+            if (rOptions.mbIgnoreErrors)
+                return api::ValueResult<bool>::success(true);
+            if (nFunction == 2)
+                return api::ValueResult<bool>::success(true);
+            if (nFunction == 3)
+            {
+                ++rScan.mnNonEmptyCount;
+                return api::ValueResult<bool>::success(true);
+            }
+            return api::ValueResult<bool>::failure(rValue.meError);
+        }
+
+        if (!rValue.isEmpty())
+            ++rScan.mnNonEmptyCount;
+
+        if (rValue.isNumber())
+            rScan.maNumbers.push_back(rValue.mfNumber);
+        return api::ValueResult<bool>::success(true);
+    };
+
+    const bool bReferenceLike = rArgument.meKind == formula::NodeKind::CellReference
+                                || rArgument.meKind == formula::NodeKind::RangeReference
+                                || rArgument.meKind == formula::NodeKind::NamedReference;
+
+    EvaluationResult aArgument = bReferenceLike ? evaluateReferenceNode(rArgument, rCurrentAddress)
+                                                : evaluateNode(rArgument, rCurrentAddress);
+    if (!aArgument)
+    {
+        if (rOptions.mbIgnoreErrors && aArgument.maCyclePath.empty())
+            return api::ValueResult<bool>::success(true);
+        if (nFunction == 2)
+            return api::ValueResult<bool>::success(true);
+        if (nFunction == 3)
+        {
+            ++rScan.mnNonEmptyCount;
+            return api::ValueResult<bool>::success(true);
+        }
+        return api::ValueResult<bool>::failure(aArgument.meError);
+    }
+
+    if (!aArgument.maValue.isMatrixReference())
+        return consumeValue(aArgument.maValue.maValue);
+
+    const auto& rReference = aArgument.maValue.maReference;
+    const workbook::Sheet* pSheet = getSheet(rReference.maRange.maStart.mnSheet);
+    if (!pSheet)
+        return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
+
+    for (api::RowIndex nRow = 0; nRow < rReference.maRange.rowCount(); ++nRow)
+    {
+        for (api::ColumnIndex nCol = 0; nCol < rReference.maRange.columnCount(); ++nCol)
+        {
+            const api::CellAddress aAddress = rReference.addressAt(nCol, nRow);
+            const bool bFilteredRow = pSheet->isRowFiltered(aAddress.mnRow);
+            const bool bManuallyHiddenRow = pSheet->isRowHidden(aAddress.mnRow);
+            if (bFilteredRow || (rOptions.mbIgnoreHiddenRows && bManuallyHiddenRow))
+                continue;
+
+            const workbook::Cell* pReferencedCell = getCell(aAddress);
+            if (pReferencedCell && rOptions.mbIgnoreNestedAggregates
+                && cellContainsAggregateLike(*pReferencedCell))
+            {
+                continue;
+            }
+
+            EvaluationResult aCell = materializeReferenceValue(rReference, nCol, nRow);
+            if (!aCell)
+            {
+                if (rOptions.mbIgnoreErrors && aCell.maCyclePath.empty())
+                    continue;
+                if (nFunction == 2)
+                    continue;
+                if (nFunction == 3)
+                {
+                    ++rScan.mnNonEmptyCount;
+                    continue;
+                }
+                return api::ValueResult<bool>::failure(aCell.meError);
+            }
+
+            if (!aCell.maValue.isScalar())
+                return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
+
+            const auto aConsumed = consumeValue(aCell.maValue.maValue);
+            if (!aConsumed)
+                return aConsumed;
+        }
+    }
+    return api::ValueResult<bool>::success(true);
 }
 
 } // namespace spreadsheetengine::core::eval

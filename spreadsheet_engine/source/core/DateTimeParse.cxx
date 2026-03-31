@@ -18,6 +18,7 @@
 #include <spreadsheetengine/api/Calendar.hxx>
 #include <spreadsheetengine/runtime/DateTimeParts.hxx>
 
+#include "CoreRuntimeUtils.hxx"
 #include "DateAlgorithms.hxx"
 
 namespace spreadsheetengine::core::datetime
@@ -25,20 +26,7 @@ namespace spreadsheetengine::core::datetime
 namespace
 {
 
-[[nodiscard]] spreadsheetengine::api::String uppercaseAscii(
-    spreadsheetengine::api::StringView rValue)
-{
-    spreadsheetengine::api::String aResult;
-    aResult.reserve(rValue.size());
-    for (const char16_t cChar : rValue)
-    {
-        if (cChar >= u'a' && cChar <= u'z')
-            aResult.push_back(static_cast<char16_t>(cChar - u'a' + u'A'));
-        else
-            aResult.push_back(cChar);
-    }
-    return aResult;
-}
+using spreadsheetengine::core::util::uppercaseAscii;
 
 [[nodiscard]] std::optional<double> parseAsciiDouble(spreadsheetengine::api::StringView rValue)
 {

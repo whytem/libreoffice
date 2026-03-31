@@ -16,10 +16,14 @@
 #include <kahan.hxx>
 #include <rtl/math.hxx>
 
+#include "CoreRuntimeUtils.hxx"
+
 namespace spreadsheetengine::core::math
 {
 namespace
 {
+
+using spreadsheetengine::core::util::toWholeNumber;
 
 [[nodiscard]] double sumNumbers(const std::vector<double>& rNumbers)
 {
@@ -27,18 +31,6 @@ namespace
     for (const double fValue : rNumbers)
         fSum = ::rtl::math::approxAdd(fSum, fValue);
     return fSum;
-}
-
-[[nodiscard]] std::optional<sal_Int32> toWholeNumber(double fValue)
-{
-    if (!std::isfinite(fValue))
-        return std::nullopt;
-
-    const double fRounded = std::round(fValue);
-    if (std::abs(fValue - fRounded) > 1e-9)
-        return std::nullopt;
-
-    return static_cast<sal_Int32>(fRounded);
 }
 
 } // namespace

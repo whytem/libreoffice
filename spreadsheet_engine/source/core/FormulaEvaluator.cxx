@@ -39,7 +39,9 @@
 #include <spreadsheetengine/runtime/TextRuntimeSupport.hxx>
 #include <spreadsheetengine/runtime/TextScalar.hxx>
 
+#include "CoreRuntimeUtils.hxx"
 #include "DateAlgorithms.hxx"
+#include "FormulaEvaluatorUtils.hxx"
 
 #include <array>
 #include <algorithm>
@@ -68,53 +70,34 @@ namespace semath = spreadsheetengine::core::math;
 namespace selookup = spreadsheetengine::core::lookup;
 namespace sequery = spreadsheetengine::core::query;
 namespace setext = spreadsheetengine::core::text;
+namespace seutil = spreadsheetengine::core::util;
+
+using detail::makeScalarResult;
+using detail::makeReferenceResult;
+using detail::makeFailure;
+using detail::ensureScalarValue;
+using detail::uppercaseAscii;
+using detail::hasFunctionPrefix;
+using detail::normalizeDisplayFunctionName;
+using detail::normalizeFunctionName;
+using detail::parseAsciiDouble;
+using detail::coerceToNumber;
+using detail::coerceToBoolean;
+using detail::coerceToString;
+using detail::toWholeNumber;
+using detail::formatNumber;
+using detail::formatQuotedString;
+
 [[nodiscard]] std::tuple<api::SheetId, api::ColumnIndex, api::RowIndex> makeAddressKey(
     const api::CellAddress& rAddress)
 {
     return { rAddress.mnSheet, rAddress.mnColumn, rAddress.mnRow };
 }
 
-[[nodiscard]] EvaluationResult makeScalarResult(
-    const api::CellValue& rValue, bool bUsedCachedValue = false)
-{
-    EvaluationResult aResult;
-    aResult.maValue = api::CellValueView::scalar(rValue);
-    aResult.mbUsedCachedValue = bUsedCachedValue;
-    return aResult;
-}
-
-[[nodiscard]] EvaluationResult makeReferenceResult(const api::ResolvedReference& rReference)
-{
-    EvaluationResult aResult;
-    aResult.maValue = api::CellValueView::matrixReference(rReference);
-    return aResult;
-}
-
-[[nodiscard]] EvaluationResult makeFailure(api::Error eError)
-{
-    EvaluationResult aResult;
-    aResult.meError = eError;
-    return aResult;
-}
-
 [[nodiscard]] bool hasCachedFallbackValue(const workbook::Cell& rCell)
 {
     return rCell.maValue.isNumber() || rCell.maValue.isBoolean() || rCell.maValue.isText()
            || rCell.maValue.isError();
-}
-
-[[nodiscard]] api::String uppercaseAscii(api::StringView rValue)
-{
-    api::String aResult;
-    aResult.reserve(rValue.size());
-    for (const char16_t cChar : rValue)
-    {
-        if (cChar >= u'a' && cChar <= u'z')
-            aResult.push_back(static_cast<char16_t>(cChar - u'a' + u'A'));
-        else
-            aResult.push_back(cChar);
-    }
-    return aResult;
 }
 
 [[nodiscard]] api::query::SearchType toQuerySearchType(workbook::FormulaSearchType eSearchType)
@@ -132,28 +115,9 @@ namespace setext = spreadsheetengine::core::text;
     return api::query::SearchType::Normal;
 }
 
-[[nodiscard]] bool hasFunctionPrefix(api::StringView rName, api::StringView rPrefix)
-{
-    return rName.substr(0, rPrefix.size()) == rPrefix;
-}
-
 [[nodiscard]] bool usesMicrosoftCompatibilityName(api::StringView rName)
 {
     return hasFunctionPrefix(rName, u"COM.MICROSOFT.");
-}
-
-[[nodiscard]] api::String normalizeDisplayFunctionName(api::StringView rName)
-{
-    const api::StringView aMicrosoftPrefix = u"COM.MICROSOFT.";
-    const api::StringView aLibreOfficePrefix = u"ORG.LIBREOFFICE.";
-    const api::StringView aOpenOfficePrefix = u"ORG.OPENOFFICE.";
-    if (rName.substr(0, aMicrosoftPrefix.size()) == aMicrosoftPrefix)
-        return api::String(rName.substr(aMicrosoftPrefix.size()));
-    if (rName.substr(0, aLibreOfficePrefix.size()) == aLibreOfficePrefix)
-        return api::String(rName.substr(aLibreOfficePrefix.size()));
-    if (rName.substr(0, aOpenOfficePrefix.size()) == aOpenOfficePrefix)
-        return api::String(rName.substr(aOpenOfficePrefix.size()));
-    return api::String(rName);
 }
 
 [[nodiscard]] api::Error mapErrorLiteral(api::StringView rText)
@@ -318,28 +282,6 @@ namespace setext = spreadsheetengine::core::text;
         default:
             return std::nullopt;
     }
-}
-
-[[nodiscard]] std::optional<double> parseAsciiDouble(api::StringView rValue)
-{
-    if (rValue.empty())
-        return std::nullopt;
-
-    std::string aAscii;
-    aAscii.reserve(rValue.size());
-    for (const char16_t cChar : rValue)
-    {
-        if (cChar > 0x7f)
-            return std::nullopt;
-        aAscii.push_back(static_cast<char>(cChar));
-    }
-
-    char* pEnd = nullptr;
-    const double fValue = std::strtod(aAscii.c_str(), &pEnd);
-    if (!pEnd || *pEnd != '\0')
-        return std::nullopt;
-
-    return fValue;
 }
 
 [[nodiscard]] bool isAsciiWhitespace(char16_t cChar)
@@ -508,34 +450,6 @@ namespace setext = spreadsheetengine::core::text;
     return nDate;
 }
 
-[[nodiscard]] api::String formatNumber(double fValue)
-{
-    char aBuffer[32];
-    const int nLength = std::snprintf(aBuffer, sizeof(aBuffer), "%.17G", fValue);
-    const std::string aAscii(aBuffer, static_cast<std::size_t>(std::max(nLength, 0)));
-
-    api::String aResult;
-    aResult.reserve(aAscii.size());
-    for (const char cChar : aAscii)
-        aResult.push_back(static_cast<char16_t>(cChar));
-    return aResult;
-}
-
-[[nodiscard]] api::String formatQuotedString(api::StringView rValue)
-{
-    api::String aResult;
-    aResult.reserve(rValue.size() + 2);
-    aResult.push_back(u'"');
-    for (const char16_t cChar : rValue)
-    {
-        if (cChar == u'"')
-            aResult.push_back(u'"');
-        aResult.push_back(cChar);
-    }
-    aResult.push_back(u'"');
-    return aResult;
-}
-
 [[nodiscard]] api::String formatBasisDateTime(double fSerialValue)
 {
     const api::DateParts aNullDate = sedatetime::defaultNullDate();
@@ -562,94 +476,8 @@ namespace setext = spreadsheetengine::core::text;
     return aResult;
 }
 
-[[nodiscard]] api::ValueResult<double> coerceToNumber(const api::CellValue& rValue)
-{
-    switch (rValue.meKind)
-    {
-        case api::CellValueKind::Empty:
-            return api::ValueResult<double>::success(0.0);
-        case api::CellValueKind::Number:
-        case api::CellValueKind::Boolean:
-            return api::ValueResult<double>::success(rValue.mfNumber);
-        case api::CellValueKind::Text:
-        {
-            if (auto oValue = parseAsciiDouble(rValue.maString))
-                return api::ValueResult<double>::success(*oValue);
-            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-        }
-        case api::CellValueKind::Error:
-            return api::ValueResult<double>::failure(rValue.meError);
-    }
-
-    return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-}
-
-[[nodiscard]] api::ValueResult<bool> coerceToBoolean(const api::CellValue& rValue)
-{
-    switch (rValue.meKind)
-    {
-        case api::CellValueKind::Empty:
-            return api::ValueResult<bool>::success(false);
-        case api::CellValueKind::Number:
-        case api::CellValueKind::Boolean:
-            return api::ValueResult<bool>::success(rValue.mfNumber != 0.0);
-        case api::CellValueKind::Text:
-        {
-            const api::String aUpper = uppercaseAscii(rValue.maString);
-            if (aUpper == u"TRUE")
-                return api::ValueResult<bool>::success(true);
-            if (aUpper == u"FALSE")
-                return api::ValueResult<bool>::success(false);
-            if (auto oNumber = parseAsciiDouble(rValue.maString))
-                return api::ValueResult<bool>::success(*oNumber != 0.0);
-            return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
-        }
-        case api::CellValueKind::Error:
-            return api::ValueResult<bool>::failure(rValue.meError);
-    }
-
-    return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
-}
-
-[[nodiscard]] api::ValueResult<api::String> coerceToString(const api::CellValue& rValue)
-{
-    switch (rValue.meKind)
-    {
-        case api::CellValueKind::Empty:
-            return api::ValueResult<api::String>::success({});
-        case api::CellValueKind::Number:
-            return api::ValueResult<api::String>::success(formatNumber(rValue.mfNumber));
-        case api::CellValueKind::Boolean:
-            return api::ValueResult<api::String>::success(
-                rValue.mfNumber != 0.0 ? api::String(u"TRUE") : api::String(u"FALSE"));
-        case api::CellValueKind::Text:
-            return api::ValueResult<api::String>::success(rValue.maString);
-        case api::CellValueKind::Error:
-            return api::ValueResult<api::String>::failure(rValue.meError);
-    }
-
-    return api::ValueResult<api::String>::failure(api::Error::IllegalArgument);
-}
-
-[[nodiscard]] std::optional<sal_Int32> toWholeNumber(double fValue)
-{
-    if (!std::isfinite(fValue))
-        return std::nullopt;
-
-    const double fRounded = std::round(fValue);
-    if (std::abs(fValue - fRounded) > 1e-9)
-        return std::nullopt;
-
-    return static_cast<sal_Int32>(fRounded);
-}
-
 using AggregateOptions = semath::AggregateOptions;
 using AggregateScan = semath::AggregateScan;
-
-[[nodiscard]] api::String normalizeFunctionName(api::StringView rName)
-{
-    return uppercaseAscii(normalizeDisplayFunctionName(rName));
-}
 
 using CriteriaAggregateInput = sequery::CriteriaAggregateInput;
 using CriteriaPredicate = sequery::CriteriaPredicate;
@@ -1016,17 +844,6 @@ public:
     }
 
     return aResult;
-}
-
-[[nodiscard]] EvaluationResult ensureScalarValue(Evaluator& rEvaluator, EvaluationResult aResult)
-{
-    if (!aResult)
-        return aResult;
-    if (aResult.maValue.isScalar())
-        return aResult;
-    if (!aResult.maValue.maReference.isSingleCell())
-        return makeFailure(api::Error::IllegalArgument);
-    return rEvaluator.materializeReferenceValue(aResult.maValue.maReference, 0, 0);
 }
 
 [[nodiscard]] bool evaluateNumericComparison(

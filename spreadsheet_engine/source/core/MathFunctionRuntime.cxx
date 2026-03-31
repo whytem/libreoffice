@@ -18,10 +18,15 @@
 
 #include <rtl/math.hxx>
 
+#include "CoreRuntimeUtils.hxx"
+
 namespace spreadsheetengine::core::math
 {
 namespace
 {
+
+using spreadsheetengine::core::util::makeFiniteResult;
+
 [[nodiscard]] double binomialCoefficient(double fN, double fK)
 {
     if (fN < fK)
@@ -63,13 +68,6 @@ namespace
     }
 
     return std::signbit(fValue) ? -fRoundedMagnitude : fRoundedMagnitude;
-}
-
-[[nodiscard]] api::ValueResult<double> makeFiniteResult(double fValue)
-{
-    if (!std::isfinite(fValue))
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    return api::ValueResult<double>::success(fValue);
 }
 
 } // namespace
@@ -249,24 +247,6 @@ api::ValueResult<double> evaluatePermutationAValue(double fN, double fK)
 
 api::ValueResult<double> evaluateMultinomialValue(const std::vector<double>& rValues)
 {
-    auto binomialCoefficient = [](double fN, double fK) {
-        if (fN < fK)
-            return 0.0;
-        if (fK == 0.0)
-            return 1.0;
-
-        double fValue = fN / fK;
-        fN -= 1.0;
-        fK -= 1.0;
-        while (fK > 0.0)
-        {
-            fValue *= fN / fK;
-            fK -= 1.0;
-            fN -= 1.0;
-        }
-        return fValue;
-    };
-
     double fTotal = 0.0;
     double fResult = 1.0;
     for (const double fInput : rValues)
