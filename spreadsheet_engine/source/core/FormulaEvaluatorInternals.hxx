@@ -1081,10 +1081,41 @@ struct Evaluator::FunctionEvalContext
     }
 
     [[nodiscard]] api::ValueResult<api::WeekendMask> evaluateWeekendMaskArgument(
-        const formula::Node* pArgument, bool bWorkdayFunction) const
+        const formula::Node* pArgument, bool bWorkdayFunction, bool bAllowSequence = false) const
     {
         if (!pArgument || pArgument->meKind == formula::NodeKind::EmptyArgument)
             return api::ValueResult<api::WeekendMask>::success(api::workday::defaultWeekendMask());
+
+        if (bAllowSequence)
+        {
+            std::vector<double> aWeekendSequence;
+            bool bSequenceCompatible = true;
+            const auto aVisited = visitFlattenedValues(
+                *pArgument, [&](const api::CellValue& rValue, bool) -> api::ValueResult<bool> {
+                    if (rValue.isError())
+                        return api::ValueResult<bool>::failure(rValue.meError);
+                    if (rValue.isEmpty())
+                        return api::ValueResult<bool>::success(true);
+
+                    const auto aNumber = coerceToNumber(rValue);
+                    if (!aNumber)
+                    {
+                        bSequenceCompatible = false;
+                        return api::ValueResult<bool>::success(true);
+                    }
+
+                    aWeekendSequence.push_back(aNumber.maValue);
+                    return api::ValueResult<bool>::success(true);
+                });
+            if (!aVisited)
+                return api::ValueResult<api::WeekendMask>::failure(aVisited.meError);
+
+            if (bSequenceCompatible && aWeekendSequence.size() == 7)
+                return api::workday::weekendMaskFromSequence(aWeekendSequence);
+
+            if (bSequenceCompatible && aWeekendSequence.size() > 1)
+                return api::ValueResult<api::WeekendMask>::failure(api::Error::IllegalArgument);
+        }
 
         EvaluationResult aWeekendValue;
         if (pArgument->meKind == formula::NodeKind::ArrayConstant)

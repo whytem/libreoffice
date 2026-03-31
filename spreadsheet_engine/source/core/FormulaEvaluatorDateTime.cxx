@@ -57,6 +57,8 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateDateTimeFamily(
         api::StringView(u"YEARS"),
         api::StringView(u"WEEKS"),
         api::StringView(u"WEEKSINYEAR"),
+        api::StringView(u"WORKDAY"),
+        api::StringView(u"NETWORKDAYS"),
         api::StringView(u"WORKDAY.INTL"),
         api::StringView(u"NETWORKDAYS.INTL"),
     };
@@ -713,10 +715,14 @@ if (aFunctionName == u"BASISODATETIME")
         return makeScalarResult(api::CellValue::number(fWeeksInYear));
     }
 
-    if (aFunctionName == u"WORKDAY.INTL")
+    if (aFunctionName == u"WORKDAY" || aFunctionName == u"WORKDAY.INTL")
     {
-        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)
+        const bool bIntl = aFunctionName == u"WORKDAY.INTL";
+        if ((!bIntl && (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4))
+            || (bIntl && (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)))
+        {
             return makeFailure(api::Error::IllegalArgument);
+        }
 
         const auto aStartNumber = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
         const auto aDaysNumber = aContext.evaluateNumericArgument(*rNode.maChildren[1], std::nullopt);
@@ -730,13 +736,28 @@ if (aFunctionName == u"BASISODATETIME")
         if (!oStartDate || !oDays)
             return makeFailure(api::Error::IllegalArgument);
 
-        const auto aWeekendMask = aContext.evaluateWeekendMaskArgument(
-            rNode.maChildren.size() >= 3 ? rNode.maChildren[2].get() : nullptr, true);
+        api::ValueResult<api::WeekendMask> aWeekendMask
+            = api::ValueResult<api::WeekendMask>::success({});
+        if (bIntl)
+        {
+            aWeekendMask = aContext.evaluateWeekendMaskArgument(
+                rNode.maChildren.size() >= 3 ? rNode.maChildren[2].get() : nullptr, true, true);
+        }
+        else
+        {
+            sedatetime::setDefaultWeekendMask(aWeekendMask.maValue);
+            if (rNode.maChildren.size() == 4)
+            {
+                aWeekendMask
+                    = aContext.evaluateWeekendMaskArgument(rNode.maChildren[3].get(), true, true);
+            }
+        }
         if (!aWeekendMask)
             return makeFailure(aWeekendMask.meError);
 
         const auto aHolidays = aContext.collectHolidaySerials(
-            rNode.maChildren.size() >= 4 ? rNode.maChildren[3].get() : nullptr);
+            bIntl ? (rNode.maChildren.size() >= 4 ? rNode.maChildren[3].get() : nullptr)
+                  : (rNode.maChildren.size() >= 3 ? rNode.maChildren[2].get() : nullptr));
         if (!aHolidays)
             return makeFailure(aHolidays.meError);
 
@@ -745,10 +766,14 @@ if (aFunctionName == u"BASISODATETIME")
             aHolidays.maValue, aWeekendMask.maValue)));
     }
 
-    if (aFunctionName == u"NETWORKDAYS.INTL")
+    if (aFunctionName == u"NETWORKDAYS" || aFunctionName == u"NETWORKDAYS.INTL")
     {
-        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)
+        const bool bIntl = aFunctionName == u"NETWORKDAYS.INTL";
+        if ((!bIntl && (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4))
+            || (bIntl && (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)))
+        {
             return makeFailure(api::Error::IllegalArgument);
+        }
 
         const auto aStartNumber = aContext.evaluateNumericArgument(*rNode.maChildren[0], std::nullopt);
         const auto aEndNumber = aContext.evaluateNumericArgument(*rNode.maChildren[1], std::nullopt);
@@ -762,13 +787,28 @@ if (aFunctionName == u"BASISODATETIME")
         if (!oStartDate || !oEndDate)
             return makeFailure(api::Error::IllegalArgument);
 
-        const auto aWeekendMask = aContext.evaluateWeekendMaskArgument(
-            rNode.maChildren.size() >= 3 ? rNode.maChildren[2].get() : nullptr, false);
+        api::ValueResult<api::WeekendMask> aWeekendMask
+            = api::ValueResult<api::WeekendMask>::success({});
+        if (bIntl)
+        {
+            aWeekendMask = aContext.evaluateWeekendMaskArgument(
+                rNode.maChildren.size() >= 3 ? rNode.maChildren[2].get() : nullptr, false, true);
+        }
+        else
+        {
+            sedatetime::setDefaultWeekendMask(aWeekendMask.maValue);
+            if (rNode.maChildren.size() == 4)
+            {
+                aWeekendMask
+                    = aContext.evaluateWeekendMaskArgument(rNode.maChildren[3].get(), false, true);
+            }
+        }
         if (!aWeekendMask)
             return makeFailure(aWeekendMask.meError);
 
         const auto aHolidays = aContext.collectHolidaySerials(
-            rNode.maChildren.size() >= 4 ? rNode.maChildren[3].get() : nullptr);
+            bIntl ? (rNode.maChildren.size() >= 4 ? rNode.maChildren[3].get() : nullptr)
+                  : (rNode.maChildren.size() >= 3 ? rNode.maChildren[2].get() : nullptr));
         if (!aHolidays)
             return makeFailure(aHolidays.meError);
 

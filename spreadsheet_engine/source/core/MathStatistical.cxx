@@ -1023,6 +1023,7 @@ api::ValueResult<double> evaluateLogGammaValue(double fX)
 api::ValueResult<double> evaluateStudentDistribution(
     double fT, double fDegreesFreedom, int nType)
 {
+    fDegreesFreedom = fp::approxFloor(fDegreesFreedom);
     if (fDegreesFreedom < 1.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
@@ -1053,6 +1054,7 @@ api::ValueResult<double> evaluateStudentDistribution(
 api::ValueResult<double> evaluateTInverse(
     double fProbability, double fDegreesFreedom, int nType)
 {
+    fDegreesFreedom = fp::approxFloor(fDegreesFreedom);
     if (fDegreesFreedom < 1.0 || fProbability <= 0.0 || fProbability > 1.0)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
@@ -1097,6 +1099,8 @@ api::ValueResult<double> evaluateTInverse(
 api::ValueResult<double> evaluateFRightTailDistribution(
     double fX, double fDegreesFreedom1, double fDegreesFreedom2)
 {
+    fDegreesFreedom1 = fp::approxFloor(fDegreesFreedom1);
+    fDegreesFreedom2 = fp::approxFloor(fDegreesFreedom2);
     if (fX < 0.0 || fDegreesFreedom1 < 1.0 || fDegreesFreedom2 < 1.0
         || fDegreesFreedom1 >= 1.0e10 || fDegreesFreedom2 >= 1.0e10)
     {
@@ -1112,6 +1116,8 @@ api::ValueResult<double> evaluateFRightTailDistribution(
 api::ValueResult<double> evaluateFInverseRightTail(
     double fProbability, double fDegreesFreedom1, double fDegreesFreedom2)
 {
+    fDegreesFreedom1 = fp::approxFloor(fDegreesFreedom1);
+    fDegreesFreedom2 = fp::approxFloor(fDegreesFreedom2);
     if (fProbability <= 0.0 || fProbability > 1.0 || fDegreesFreedom1 < 1.0
         || fDegreesFreedom2 < 1.0 || fDegreesFreedom1 >= 1.0e10
         || fDegreesFreedom2 >= 1.0e10)

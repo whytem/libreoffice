@@ -36,6 +36,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateInformationFamily(
         api::StringView(u"ISNUMBER"),
         api::StringView(u"ISNA"),
         api::StringView(u"ISTEXT"),
+        api::StringView(u"ISNONTEXT"),
         api::StringView(u"ISBLANK"),
         api::StringView(u"ISEVEN"),
         api::StringView(u"ISODD"),
@@ -99,7 +100,7 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
             aArgument.maValue.maValue.isNumber() || aArgument.maValue.maValue.isBoolean()));
     }
 
-    if (aFunctionName == u"ISTEXT")
+    if (aFunctionName == u"ISTEXT" || aFunctionName == u"ISNONTEXT")
     {
         if (rNode.maChildren.size() != 1)
             return makeFailure(api::Error::IllegalArgument);
@@ -109,7 +110,9 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
             aArgument = materializeReferenceValue(aArgument.maValue.maReference, 0, 0);
         if (!aArgument)
             return makeScalarResult(api::CellValue::boolean(false));
-        return makeScalarResult(api::CellValue::boolean(aArgument.maValue.maValue.isText()));
+        const bool bIsText = aArgument.maValue.maValue.isText();
+        return makeScalarResult(api::CellValue::boolean(
+            aFunctionName == u"ISTEXT" ? bIsText : !bIsText));
     }
 
     if (aFunctionName == u"ISBLANK")

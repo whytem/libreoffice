@@ -407,6 +407,48 @@ int main()
     }
 
     {
+        const auto aOr = aEvaluator.evaluateFormula(u"of:=OR(TRUE();FALSE())", { 0, 0, 0 });
+        const auto aCompiledOr
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=OR(TRUE();FALSE())", { 0, 0, 0 });
+        const auto aXor = aEvaluator.evaluateFormula(u"of:=XOR(TRUE();TRUE();FALSE())", { 0, 0, 0 });
+        const auto aCompiledXor = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=XOR(TRUE();TRUE();FALSE())", { 0, 0, 0 });
+        const auto aNot = aEvaluator.evaluateFormula(u"of:=NOT(0)", { 0, 0, 0 });
+        const auto aCompiledNot
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=NOT(0)", { 0, 0, 0 });
+        const auto aIsNonText = aEvaluator.evaluateFormula(u"of:=ISNONTEXT(1)", { 0, 0, 0 });
+        const auto aCompiledIsNonText
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=ISNONTEXT(1)", { 0, 0, 0 });
+        const auto aIfs
+            = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.IFS(0;1;1;2)", { 0, 0, 0 });
+        const auto aCompiledIfs = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.IFS(0;1;1;2)", { 0, 0, 0 });
+        const auto aSwitch = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.SWITCH(\"b\";\"a\";1;\"b\";2;9)", { 0, 0, 0 });
+        const auto aCompiledSwitch = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.SWITCH(\"b\";\"a\";1;\"b\";2;9)", { 0, 0, 0 });
+        if (requireBooleanFormula(aOr, true, "OR mismatch")
+            || requireBooleanFormula(aCompiledOr, true, "compiled OR mismatch")
+            || requireBooleanFormula(aXor, false, "XOR mismatch")
+            || requireBooleanFormula(aCompiledXor, false, "compiled XOR mismatch")
+            || requireBooleanFormula(aNot, true, "NOT mismatch")
+            || requireBooleanFormula(aCompiledNot, true, "compiled NOT mismatch")
+            || requireBooleanFormula(aIsNonText, true, "ISNONTEXT mismatch")
+            || requireBooleanFormula(aCompiledIsNonText, true, "compiled ISNONTEXT mismatch")
+            || !aIfs || aIfs.mbUsedCachedValue || !aIfs.maValue.maValue.isNumber()
+            || !almostEqual(aIfs.maValue.maValue.mfNumber, 2.0) || !aCompiledIfs
+            || aCompiledIfs.mbUsedCachedValue || !aCompiledIfs.maValue.maValue.isNumber()
+            || !almostEqual(aCompiledIfs.maValue.maValue.mfNumber, 2.0) || !aSwitch
+            || aSwitch.mbUsedCachedValue || !aSwitch.maValue.maValue.isNumber()
+            || !almostEqual(aSwitch.maValue.maValue.mfNumber, 2.0) || !aCompiledSwitch
+            || aCompiledSwitch.mbUsedCachedValue || !aCompiledSwitch.maValue.maValue.isNumber()
+            || !almostEqual(aCompiledSwitch.maValue.maValue.mfNumber, 2.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "logical/info function mismatch");
+        }
+    }
+
+    {
         const auto aResult = aEvaluator.evaluateCell({ 0, 6, 0 });
         if (!aResult || !aResult.mbUsedCachedValue || !aResult.maValue.maValue.isNumber()
             || !almostEqual(aResult.maValue.maValue.mfNumber, 42.0))
@@ -1905,8 +1947,12 @@ int main()
             u"of:=COM.MICROSOFT.CONFIDENCE.NORM(0.05;1.5;100)", { 0, 0, 0 });
         const auto aStandardize
             = aEvaluator.evaluateFormula(u"of:=STANDARDIZE(5;2;3)", { 0, 0, 0 });
+        const auto aTInv
+            = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.T.INV(0.95;10)", { 0, 0, 0 });
         const auto aTDistRt
             = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.T.DIST.RT(1;10)", { 0, 0, 0 });
+        const auto aFDistRt = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.F.DIST.RT(0.8;8;12)", { 0, 0, 0 });
         const auto aErfPrecise
             = aEvaluator.evaluateFormula(u"of:=COM.MICROSOFT.ERF.PRECISE(1)", { 0, 0, 0 });
         const auto aErfcPrecise
@@ -1949,8 +1995,12 @@ int main()
             u"of:=COM.MICROSOFT.CONFIDENCE.NORM(0.05;1.5;100)", { 0, 0, 0 });
         const auto aStandardizeCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=STANDARDIZE(5;2;3)", { 0, 0, 0 });
+        const auto aTInvCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.T.INV(0.95;10)", { 0, 0, 0 });
         const auto aTDistRtCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=COM.MICROSOFT.T.DIST.RT(1;10)", { 0, 0, 0 });
+        const auto aFDistRtCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.F.DIST.RT(0.8;8;12)", { 0, 0, 0 });
         const auto aErfPreciseCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=COM.MICROSOFT.ERF.PRECISE(1)", { 0, 0, 0 });
         const auto aErfcPreciseCompiled = aEvaluator.evaluateFormulaViaCompiledTokens(
@@ -1986,7 +2036,9 @@ int main()
             || !checkStatScalar("WEIBULL.DIST density", aWeibullMs, 0.198853181514304)
             || !checkStatScalar("CONFIDENCE.NORM", aConfidenceNorm, 0.293994597681008)
             || !checkStatScalar("STANDARDIZE", aStandardize, 1.0)
+            || !checkStatScalar("T.INV", aTInv, 1.81246112281073)
             || !checkStatScalar("T.DIST.RT", aTDistRt, 0.17044656615103)
+            || !checkStatScalar("F.DIST.RT", aFDistRt, 0.614339643745812)
             || !checkStatScalar("ERF.PRECISE", aErfPrecise, 0.842700792949715)
             || !checkStatScalar("ERFC.PRECISE", aErfcPrecise, 0.157299207050285)
             || !checkStatScalar("compiled GAMMALN.PRECISE", aGammaLnPreciseCompiled,
@@ -2018,7 +2070,10 @@ int main()
             || !checkStatScalar("compiled CONFIDENCE.NORM", aConfidenceNormCompiled,
                 0.293994597681008)
             || !checkStatScalar("compiled STANDARDIZE", aStandardizeCompiled, 1.0)
+            || !checkStatScalar("compiled T.INV", aTInvCompiled, 1.81246112281073)
             || !checkStatScalar("compiled T.DIST.RT", aTDistRtCompiled, 0.17044656615103)
+            || !checkStatScalar("compiled F.DIST.RT", aFDistRtCompiled,
+                0.614339643745812)
             || !checkStatScalar("compiled ERF.PRECISE", aErfPreciseCompiled,
                 0.842700792949715)
             || !checkStatScalar("compiled ERFC.PRECISE", aErfcPreciseCompiled,
@@ -2940,6 +2995,21 @@ int main()
             u"of:=CUMIPMT(0.055/12;24;5000;4;6;1)", { 0, 0, 0 });
         const auto aCumPrinc = aEvaluator.evaluateFormula(
             u"of:=CUMPRINC(0.055/12;24;5000;4;6;1)", { 0, 0, 0 });
+        const auto aDb = aEvaluator.evaluateFormula(u"of:=DB(25000;1000;36;1;6)", { 0, 0, 0 });
+        const auto aDisc = aEvaluator.evaluateFormula(
+            u"of:=DISC(\"2001-01-25\";\"2001-11-15\";97;100;3)", { 0, 0, 0 });
+        const auto aMduration = aEvaluator.evaluateFormula(
+            u"of:=MDURATION(\"2001-01-01\";\"2006-01-01\";0.08;0.09;2;3)", { 0, 0, 0 });
+        const auto aYield = aEvaluator.evaluateFormula(
+            u"of:=YIELD(DATE(1999;2;15);DATE(2007;11;15);0.0575;95.04287;100;2;0)",
+            { 0, 0, 0 });
+        const auto aTbillprice = aEvaluator.evaluateFormula(
+            u"of:=TBILLPRICE(DATE(1999;3;31);DATE(1999;6;1);0.0914)", { 0, 0, 0 });
+        const auto aTbillyield = aEvaluator.evaluateFormula(
+            u"of:=TBILLYIELD(DATE(1999;3;31);DATE(1999;6;1);0.0914)", { 0, 0, 0 });
+        const auto aOddlprice = aEvaluator.evaluateFormula(
+            u"of:=ODDLPRICE(DATE(1999;2;7);DATE(1999;6;15);DATE(1998;10;15);0.0375;0.0405;100;2;0)",
+            { 0, 0, 0 });
         const auto aCompiledFv = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=FV(0.04;2;750;2500)", { 0, 0, 0 });
         const auto aCompiledPv = aEvaluator.evaluateFormulaViaCompiledTokens(
@@ -2964,6 +3034,22 @@ int main()
             u"of:=CUMIPMT(0.055/12;24;5000;4;6;1)", { 0, 0, 0 });
         const auto aCompiledCumPrinc = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=CUMPRINC(0.055/12;24;5000;4;6;1)", { 0, 0, 0 });
+        const auto aCompiledDb = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=DB(25000;1000;36;1;6)", { 0, 0, 0 });
+        const auto aCompiledDisc = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=DISC(\"2001-01-25\";\"2001-11-15\";97;100;3)", { 0, 0, 0 });
+        const auto aCompiledMduration = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=MDURATION(\"2001-01-01\";\"2006-01-01\";0.08;0.09;2;3)", { 0, 0, 0 });
+        const auto aCompiledYield = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=YIELD(DATE(1999;2;15);DATE(2007;11;15);0.0575;95.04287;100;2;0)",
+            { 0, 0, 0 });
+        const auto aCompiledTbillprice = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=TBILLPRICE(DATE(1999;3;31);DATE(1999;6;1);0.0914)", { 0, 0, 0 });
+        const auto aCompiledTbillyield = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=TBILLYIELD(DATE(1999;3;31);DATE(1999;6;1);0.0914)", { 0, 0, 0 });
+        const auto aCompiledOddlprice = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ODDLPRICE(DATE(1999;2;7);DATE(1999;6;15);DATE(1998;10;15);0.0375;0.0405;100;2;0)",
+            { 0, 0, 0 });
         const auto aOddlyield = aEvaluator.evaluateFormula(
             u"of:=ODDLYIELD(\"1999-04-20\";\"1999-06-15\";\"1998-10-15\";0.0375;99.875;100;2)",
             { 0, 0, 0 });
@@ -2975,6 +3061,43 @@ int main()
         const auto aAmorlincError = aEvaluator.evaluateFormula(
             u"of:=AMORLINC(-10000;DATE(2012;3;1);DATE(2012;12;31);1500;1;0.3;4)",
             { 0, 0, 0 });
+        const auto aReceived = aEvaluator.evaluateFormula(
+            u"of:=RECEIVED(DATE(1999;2;15);DATE(1999;5;15);1000;0.0575;0)", { 0, 0, 0 });
+        const auto aPricedisc = aEvaluator.evaluateFormula(
+            u"of:=PRICEDISC(\"1999-02-15\";\"1999-03-01\";0.0525;100;2)", { 0, 0, 0 });
+        const auto aIntrate = aEvaluator.evaluateFormula(
+            u"of:=INTRATE(\"1990-01-15\";\"2002-05-05\";1000000;2000000;3)", { 0, 0, 0 });
+        const auto aNominal = aEvaluator.evaluateFormula(u"of:=NOMINAL(0.135;12)", { 0, 0, 0 });
+        const auto aNpv = aEvaluator.evaluateFormula(u"of:=NPV(0.0875;10;20;30)", { 0, 0, 0 });
+        const auto aRri = aEvaluator.evaluateFormula(u"of:=RRI(4;7500;10000)", { 0, 0, 0 });
+        const auto aSln = aEvaluator.evaluateFormula(u"of:=SLN(50000;3.5;84)", { 0, 0, 0 });
+        const auto aSyd = aEvaluator.evaluateFormula(u"of:=SYD(50000;10000;5;1)", { 0, 0, 0 });
+        const auto aAccrintm = aEvaluator.evaluateFormula(
+            u"of:=ACCRINTM(DATE(2012;1;1);DATE(2013;2;15);0.065;5000;3)", { 0, 0, 0 });
+        const auto aPricemat = aEvaluator.evaluateFormula(
+            u"of:=PRICEMAT(\"1999-02-15\";\"1999-04-13\";\"1998-11-11\";0.061;0.061;0)",
+            { 0, 0, 0 });
+        const auto aYielddisc = aEvaluator.evaluateFormula(
+            u"of:=YIELDDISC(DATE(1999;2;15);DATE(1999;3;1);99.795;100;2)", { 0, 0, 0 });
+        const auto aCoupdaybs = aEvaluator.evaluateFormula(
+            u"of:=COUPDAYBS(\"2001-01-25\";\"2001-11-15\";2;3)", { 0, 0, 0 });
+        const auto aCoupdays = aEvaluator.evaluateFormula(
+            u"of:=COUPDAYS(\"2001-01-25\";\"2001-11-15\";2;3)", { 0, 0, 0 });
+        const auto aCoupdaysnc = aEvaluator.evaluateFormula(
+            u"of:=COUPDAYSNC(\"2001-01-25\";\"2001-11-15\";2;3)", { 0, 0, 0 });
+        const auto aCouppcd = aEvaluator.evaluateFormula(
+            u"of:=COUPPCD(\"2001-01-25\";\"2001-11-15\";2;3)", { 0, 0, 0 });
+        const auto aCoupncd = aEvaluator.evaluateFormula(
+            u"of:=COUPNCD(\"2001-01-25\";\"2001-11-15\";2;3)", { 0, 0, 0 });
+        const auto aCoupnum = aEvaluator.evaluateFormula(
+            u"of:=COUPNUM(\"2001-01-25\";\"2001-11-15\";2;3)", { 0, 0, 0 });
+        const auto aAmordegrc = aEvaluator.evaluateFormula(
+            u"of:=AMORDEGRC(10000;DATE(2012;3;1);DATE(2012;12;31);1500;1;0.31;1)",
+            { 0, 0, 0 });
+        const auto aIrr
+            = aEvaluator.evaluateFormula(u"of:=IRR({-10000|5000|5000|5000})", { 0, 0, 0 });
+        const auto aMirr = aEvaluator.evaluateFormula(
+            u"of:=MIRR({-10000|3400|6500|1000};0.065;0.1)", { 0, 0, 0 });
         const auto aCompiledOddlyield = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=ODDLYIELD(\"1999-04-20\";\"1999-06-15\";\"1998-10-15\";0.0375;99.875;100;2)",
             { 0, 0, 0 });
@@ -2986,6 +3109,48 @@ int main()
         const auto aCompiledAmorlincError = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=AMORLINC(-10000;DATE(2012;3;1);DATE(2012;12;31);1500;1;0.3;4)",
             { 0, 0, 0 });
+        const auto aCompiledReceived = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=RECEIVED(DATE(1999;2;15);DATE(1999;5;15);1000;0.0575;0)", { 0, 0, 0 });
+        const auto aCompiledPricedisc = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=PRICEDISC(\"1999-02-15\";\"1999-03-01\";0.0525;100;2)", { 0, 0, 0 });
+        const auto aCompiledIntrate = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=INTRATE(\"1990-01-15\";\"2002-05-05\";1000000;2000000;3)", { 0, 0, 0 });
+        const auto aCompiledNominal = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=NOMINAL(0.135;12)", { 0, 0, 0 });
+        const auto aCompiledNpv = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=NPV(0.0875;10;20;30)", { 0, 0, 0 });
+        const auto aCompiledRri = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=RRI(4;7500;10000)", { 0, 0, 0 });
+        const auto aCompiledSln = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=SLN(50000;3.5;84)", { 0, 0, 0 });
+        const auto aCompiledSyd = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=SYD(50000;10000;5;1)", { 0, 0, 0 });
+        const auto aCompiledAccrintm = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ACCRINTM(DATE(2012;1;1);DATE(2013;2;15);0.065;5000;3)", { 0, 0, 0 });
+        const auto aCompiledPricemat = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=PRICEMAT(\"1999-02-15\";\"1999-04-13\";\"1998-11-11\";0.061;0.061;0)",
+            { 0, 0, 0 });
+        const auto aCompiledYielddisc = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=YIELDDISC(DATE(1999;2;15);DATE(1999;3;1);99.795;100;2)", { 0, 0, 0 });
+        const auto aCompiledCoupdaybs = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUPDAYBS(\"2001-01-25\";\"2001-11-15\";2;3)", { 0, 0, 0 });
+        const auto aCompiledCoupdays = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUPDAYS(\"2001-01-25\";\"2001-11-15\";2;3)", { 0, 0, 0 });
+        const auto aCompiledCoupdaysnc = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUPDAYSNC(\"2001-01-25\";\"2001-11-15\";2;3)", { 0, 0, 0 });
+        const auto aCompiledCouppcd = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUPPCD(\"2001-01-25\";\"2001-11-15\";2;3)", { 0, 0, 0 });
+        const auto aCompiledCoupncd = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUPNCD(\"2001-01-25\";\"2001-11-15\";2;3)", { 0, 0, 0 });
+        const auto aCompiledCoupnum = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COUPNUM(\"2001-01-25\";\"2001-11-15\";2;3)", { 0, 0, 0 });
+        const auto aCompiledAmordegrc = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=AMORDEGRC(10000;DATE(2012;3;1);DATE(2012;12;31);1500;1;0.31;1)",
+            { 0, 0, 0 });
+        const auto aCompiledIrr = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=IRR({-10000|5000|5000|5000})", { 0, 0, 0 });
+        const auto aCompiledMirr = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=MIRR({-10000|3400|6500|1000};0.065;0.1)", { 0, 0, 0 });
         const auto aVdbMissingFactor = aEvaluator.evaluateFormula(
             u"of:=VDB(35000;7500;36;10;20;;)", { 0, 0, 0 });
         const auto aCompiledCumIpmtEmptyType = aEvaluator.evaluateFormulaViaCompiledTokens(
@@ -3039,18 +3204,72 @@ int main()
             || !checkNumber("compiled VDB", aCompiledVdb, 8603.80245372397)
             || !checkNumber("compiled CUMIPMT", aCompiledCumIpmt, -57.5412415342252)
             || !checkNumber("compiled CUMPRINC", aCompiledCumPrinc, -600.875855808337)
+            || !checkNumber("DB", aDb, 1075.0)
+            || !checkNumber("DISC", aDisc, 0.0372448979591837)
+            || !checkNumber("MDURATION", aMduration, 4.02068710841898)
+            || !checkNumber("YIELD", aYield, 0.0650000068807552)
+            || !checkNumber("TBILLPRICE", aTbillprice, 98.4258888888889)
+            || !checkNumber("TBILLYIELD", aTbillyield, 6346.98524740594)
+            || !checkNumber("ODDLPRICE", aOddlprice, 99.8782860147214)
+            || !checkNumber("compiled DB", aCompiledDb, 1075.0)
+            || !checkNumber("compiled DISC", aCompiledDisc, 0.0372448979591837)
+            || !checkNumber("compiled MDURATION", aCompiledMduration, 4.02068710841898)
+            || !checkNumber("compiled YIELD", aCompiledYield, 0.0650000068807552)
+            || !checkNumber("compiled TBILLPRICE", aCompiledTbillprice, 98.4258888888889)
+            || !checkNumber("compiled TBILLYIELD", aCompiledTbillyield, 6346.98524740594)
+            || !checkNumber("compiled ODDLPRICE", aCompiledOddlprice, 99.8782860147214)
             || !checkNumber("ODDLYIELD", aOddlyield, 0.0448731663302424)
             || !checkError(
                 "ODDLYIELD error", aOddlyieldError, spreadsheetengine::api::Error::IllegalArgument)
             || !checkNumber("AMORLINC", aAmorlinc, 3000.0)
             || !checkError(
                 "AMORLINC error", aAmorlincError, spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("RECEIVED", aReceived, 1014.25593057982)
+            || !checkNumber("PRICEDISC", aPricedisc, 99.7958333333333)
+            || !checkNumber("INTRATE", aIntrate, 0.0812374805252615)
+            || !checkNumber("NOMINAL", aNominal, 0.127303166959042)
+            || !checkNumber("NPV", aNpv, 49.432121038173)
+            || !checkNumber("RRI", aRri, 0.074569931823542)
+            || !checkNumber("SLN", aSln, 595.196428571429)
+            || !checkNumber("SYD", aSyd, 13333.3333333333)
+            || !checkNumber("ACCRINTM", aAccrintm, 365.958904109589)
+            || !checkNumber("PRICEMAT", aPricemat, 99.984498875557)
+            || !checkNumber("YIELDDISC", aYielddisc, 0.0528225719868601)
+            || !checkNumber("COUPDAYBS", aCoupdaybs, 71.0)
+            || !checkNumber("COUPDAYS", aCoupdays, 182.5)
+            || !checkNumber("COUPDAYSNC", aCoupdaysnc, 110.0)
+            || !checkNumber("COUPPCD", aCouppcd, 36845.0)
+            || !checkNumber("COUPNCD", aCoupncd, 37026.0)
+            || !checkNumber("COUPNUM", aCoupnum, 2.0)
+            || !checkNumber("AMORDEGRC", aAmordegrc, 2848.0)
+            || !checkNumber("IRR", aIrr, 0.233751928528259)
+            || !checkNumber("MIRR", aMirr, 0.0703949396602768)
             || !checkNumber("compiled ODDLYIELD", aCompiledOddlyield, 0.0448731663302424)
             || !checkError("compiled ODDLYIELD error", aCompiledOddlyieldError,
                 spreadsheetengine::api::Error::IllegalArgument)
             || !checkNumber("compiled AMORLINC", aCompiledAmorlinc, 3000.0)
             || !checkError("compiled AMORLINC error", aCompiledAmorlincError,
                 spreadsheetengine::api::Error::IllegalArgument)
+            || !checkNumber("compiled RECEIVED", aCompiledReceived, 1014.25593057982)
+            || !checkNumber("compiled PRICEDISC", aCompiledPricedisc, 99.7958333333333)
+            || !checkNumber("compiled INTRATE", aCompiledIntrate, 0.0812374805252615)
+            || !checkNumber("compiled NOMINAL", aCompiledNominal, 0.127303166959042)
+            || !checkNumber("compiled NPV", aCompiledNpv, 49.432121038173)
+            || !checkNumber("compiled RRI", aCompiledRri, 0.074569931823542)
+            || !checkNumber("compiled SLN", aCompiledSln, 595.196428571429)
+            || !checkNumber("compiled SYD", aCompiledSyd, 13333.3333333333)
+            || !checkNumber("compiled ACCRINTM", aCompiledAccrintm, 365.958904109589)
+            || !checkNumber("compiled PRICEMAT", aCompiledPricemat, 99.984498875557)
+            || !checkNumber("compiled YIELDDISC", aCompiledYielddisc, 0.0528225719868601)
+            || !checkNumber("compiled COUPDAYBS", aCompiledCoupdaybs, 71.0)
+            || !checkNumber("compiled COUPDAYS", aCompiledCoupdays, 182.5)
+            || !checkNumber("compiled COUPDAYSNC", aCompiledCoupdaysnc, 110.0)
+            || !checkNumber("compiled COUPPCD", aCompiledCouppcd, 36845.0)
+            || !checkNumber("compiled COUPNCD", aCompiledCoupncd, 37026.0)
+            || !checkNumber("compiled COUPNUM", aCompiledCoupnum, 2.0)
+            || !checkNumber("compiled AMORDEGRC", aCompiledAmordegrc, 2848.0)
+            || !checkNumber("compiled IRR", aCompiledIrr, 0.233751928528259)
+            || !checkNumber("compiled MIRR", aCompiledMirr, 0.0703949396602768)
             || aVdbMissingFactor || aVdbMissingFactor.meError != spreadsheetengine::api::Error::IllegalArgument
             || aCompiledCumIpmtEmptyType
             || aCompiledCumIpmtEmptyType.meError != spreadsheetengine::api::Error::IllegalArgument)
@@ -3065,6 +3284,8 @@ int main()
         const auto aExpectedEomonth = makeDateSerial(aNullDate, 2015, 2, 28, true);
         const auto aExpectedEdate = makeDateSerial(aNullDate, 2001, 4, 30, true);
         const auto aExpectedDate = makeDateSerial(aNullDate, 2022, 1, 9, false);
+        const auto aExpectedSequenceWorkdayIntl
+            = makeDateSerial(aNullDate, 2014, 10, 30, true);
         const auto aDate = aEvaluator.evaluateFormula(u"of:=DATEVALUE(\"Jan1, 2015\")", { 0, 0, 0 });
         const auto aDateFunction = aEvaluator.evaluateFormula(u"of:=DATE(2022;1;9)", { 0, 0, 0 });
         const auto aDateTime
@@ -3122,6 +3343,15 @@ int main()
             = aEvaluator.evaluateFormula(u"of:=EOMONTH(\"Jan11, 2015\";1)", { 0, 0, 0 });
         const auto aEdate
             = aEvaluator.evaluateFormula(u"of:=EDATE(\"2001-03-31\";1)", { 0, 0, 0 });
+        const auto aWorkday = aEvaluator.evaluateFormula(
+            u"of:=WORKDAY(DATE(2014;11;1);5;{\"2014-11-2\";\"2014-11-3\";\"2014-11-4\"})",
+            { 0, 0, 0 });
+        const auto aNetworkdays = aEvaluator.evaluateFormula(
+            u"of:=NETWORKDAYS(DATE(2014;11;1);DATE(2014;11;30);{\"2014-11-11\";\"2014-11-28\";\"2014-11-27\"})",
+            { 0, 0, 0 });
+        const auto aNetworkdaysSequence = aEvaluator.evaluateFormula(
+            u"of:=NETWORKDAYS(DATE(2014;11;1);DATE(2014;11;7);;{1;0;1;0;1;0;1})",
+            { 0, 0, 0 });
         const auto aWorkdayIntl = aEvaluator.evaluateFormula(
             u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);2;5;{\"2014-11-2\";\"2014-11-3\";\"2014-11-4\"})",
             { 0, 0, 0 });
@@ -3138,6 +3368,12 @@ int main()
             u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);5;\"3\")", { 0, 0, 0 });
         const auto aNumericMaskWorkdayIntl = aEvaluator.evaluateFormula(
             u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);1;1100000)", { 0, 0, 0 });
+        const auto aSequenceWorkdayIntl = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);-2;{1;1;0;0;0;0;0};{\"2014-11-2\";\"2014-11-3\";\"2014-11-4\"})",
+            { 0, 0, 0 });
+        const auto aSequenceNetworkdaysIntl = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.NETWORKDAYS.INTL(DATE(2014;11;1);DATE(2014;11;7);{1;0;1;0;1;0;1})",
+            { 0, 0, 0 });
         const auto aCompiledWorkdayIntl = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);2;5;{\"2014-11-2\";\"2014-11-3\";\"2014-11-4\"})",
             { 0, 0, 0 });
@@ -3154,6 +3390,21 @@ int main()
             u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);5;\"3\")", { 0, 0, 0 });
         const auto aCompiledNumericMaskWorkdayIntl = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);1;1100000)", { 0, 0, 0 });
+        const auto aCompiledSequenceWorkdayIntl = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);-2;{1;1;0;0;0;0;0};{\"2014-11-2\";\"2014-11-3\";\"2014-11-4\"})",
+            { 0, 0, 0 });
+        const auto aCompiledSequenceNetworkdaysIntl = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.NETWORKDAYS.INTL(DATE(2014;11;1);DATE(2014;11;7);{1;0;1;0;1;0;1})",
+            { 0, 0, 0 });
+        const auto aCompiledWorkday = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=WORKDAY(DATE(2014;11;1);5;{\"2014-11-2\";\"2014-11-3\";\"2014-11-4\"})",
+            { 0, 0, 0 });
+        const auto aCompiledNetworkdays = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=NETWORKDAYS(DATE(2014;11;1);DATE(2014;11;30);{\"2014-11-11\";\"2014-11-28\";\"2014-11-27\"})",
+            { 0, 0, 0 });
+        const auto aCompiledNetworkdaysSequence = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=NETWORKDAYS(DATE(2014;11;1);DATE(2014;11;7);;{1;0;1;0;1;0;1})",
+            { 0, 0, 0 });
         const auto aCompiledYear = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=YEAR(1)",
             { 0, 0, 0 });
         const auto aCompiledMonth = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=MONTH(1)",
@@ -3235,6 +3486,9 @@ int main()
             || !checkNumber("DAYS360", aDays360, 32.0)
             || !checkNumber("EASTERSUNDAY", aEasterSunday, 42099.0)
             || !checkNumber("YEARS", aYears, 2.0)
+            || !checkNumber("WORKDAY", aWorkday, 41954.0)
+            || !checkNumber("NETWORKDAYS", aNetworkdays, 17.0)
+            || !checkNumber("NETWORKDAYS sequence", aNetworkdaysSequence, 3.0)
             || !aExpectedEomonth || !aEomonth || !aEomonth.maValue.maValue.isNumber()
             || !almostEqual(aEomonth.maValue.maValue.mfNumber, aExpectedEomonth.maValue)
             || !aExpectedEdate || !aEdate || !aEdate.maValue.maValue.isNumber()
@@ -3243,6 +3497,13 @@ int main()
             || !almostEqual(aWorkdayIntl.maValue.maValue.mfNumber, 41951.0)
             || !aNetworkdaysIntl || !aNetworkdaysIntl.maValue.maValue.isNumber()
             || !almostEqual(aNetworkdaysIntl.maValue.maValue.mfNumber, 17.0)
+            || !aExpectedSequenceWorkdayIntl || !aSequenceWorkdayIntl
+            || !aSequenceWorkdayIntl.maValue.maValue.isNumber()
+            || !almostEqual(aSequenceWorkdayIntl.maValue.maValue.mfNumber,
+                   aExpectedSequenceWorkdayIntl.maValue)
+            || !aSequenceNetworkdaysIntl
+            || !aSequenceNetworkdaysIntl.maValue.maValue.isNumber()
+            || !almostEqual(aSequenceNetworkdaysIntl.maValue.maValue.mfNumber, 3.0)
             || !aAllWeekendNetworkdays || !aAllWeekendNetworkdays.maValue.maValue.isNumber()
             || !almostEqual(aAllWeekendNetworkdays.maValue.maValue.mfNumber, 0.0)
             || aInvalidWorkdayIntl
@@ -3252,6 +3513,13 @@ int main()
             || !aCompiledNetworkdaysIntl
             || !aCompiledNetworkdaysIntl.maValue.maValue.isNumber()
             || !almostEqual(aCompiledNetworkdaysIntl.maValue.maValue.mfNumber, 17.0)
+            || !aCompiledSequenceWorkdayIntl
+            || !aCompiledSequenceWorkdayIntl.maValue.maValue.isNumber()
+            || !almostEqual(aCompiledSequenceWorkdayIntl.maValue.maValue.mfNumber,
+                   aExpectedSequenceWorkdayIntl.maValue)
+            || !aCompiledSequenceNetworkdaysIntl
+            || !aCompiledSequenceNetworkdaysIntl.maValue.maValue.isNumber()
+            || !almostEqual(aCompiledSequenceNetworkdaysIntl.maValue.maValue.mfNumber, 3.0)
             || !aCompiledAllWeekendNetworkdays
             || !aCompiledAllWeekendNetworkdays.maValue.maValue.isNumber()
             || !almostEqual(aCompiledAllWeekendNetworkdays.maValue.maValue.mfNumber, 0.0)
@@ -3281,6 +3549,9 @@ int main()
             || !checkNumber("compiled DAYS360", aCompiledDays360, 32.0)
             || !checkNumber("compiled EASTERSUNDAY", aCompiledEasterSunday, 42099.0)
             || !checkNumber("compiled YEARS", aCompiledYears, 2.0)
+            || !checkNumber("compiled WORKDAY", aCompiledWorkday, 41954.0)
+            || !checkNumber("compiled NETWORKDAYS", aCompiledNetworkdays, 17.0)
+            || !checkNumber("compiled NETWORKDAYS sequence", aCompiledNetworkdaysSequence, 3.0)
             || aInvalidTime || aInvalidTime.meError != spreadsheetengine::api::Error::IllegalArgument
             || aInvalidTimeFunction
             || aInvalidTimeFunction.meError != spreadsheetengine::api::Error::IllegalArgument)

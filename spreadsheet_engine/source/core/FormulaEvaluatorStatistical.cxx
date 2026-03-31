@@ -92,12 +92,18 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateStatisticalRuntimeFamily(
         api::StringView(u"COM.MICROSOFT.BETA.INV"),
         api::StringView(u"BETAINV"),
         api::StringView(u"TINV"),
+        api::StringView(u"T.INV"),
+        api::StringView(u"COM.MICROSOFT.T.INV"),
         api::StringView(u"T.INV.2T"),
         api::StringView(u"COM.MICROSOFT.T.INV.2T"),
         api::StringView(u"T.DIST.2T"),
         api::StringView(u"COM.MICROSOFT.T.DIST.2T"),
         api::StringView(u"T.DIST.RT"),
         api::StringView(u"COM.MICROSOFT.T.DIST.RT"),
+        api::StringView(u"FDIST"),
+        api::StringView(u"LEGACY.FDIST"),
+        api::StringView(u"F.DIST.RT"),
+        api::StringView(u"COM.MICROSOFT.F.DIST.RT"),
         api::StringView(u"CONFIDENCE"),
         api::StringView(u"CONFIDENCE.NORM"),
         api::StringView(u"COM.MICROSOFT.CONFIDENCE.NORM"),
@@ -797,7 +803,8 @@ if (aFunctionName == u"T.TEST" || aFunctionName == u"TTEST")
     }
 
     if (aFunctionName == u"TINV" || aFunctionName == u"T.INV.2T"
-        || aFunctionName == u"COM.MICROSOFT.T.INV.2T")
+        || aFunctionName == u"COM.MICROSOFT.T.INV.2T"
+        || aFunctionName == u"T.INV" || aFunctionName == u"COM.MICROSOFT.T.INV")
     {
         if (rNode.maChildren.size() != 2)
             return makeFailure(api::Error::IllegalArgument);
@@ -810,10 +817,36 @@ if (aFunctionName == u"T.TEST" || aFunctionName == u"TTEST")
             return makeFailure(aDegreesFreedom.meError);
 
         const auto aInverse = semath::evaluateTInverse(
-            aProbability.maValue, fp::approxFloor(aDegreesFreedom.maValue), 2);
+            aProbability.maValue, fp::approxFloor(aDegreesFreedom.maValue),
+            (aFunctionName == u"T.INV" || aFunctionName == u"COM.MICROSOFT.T.INV") ? 4 : 2);
         if (!aInverse)
             return makeFailure(aInverse.meError);
         return makeScalarResult(api::CellValue::number(aInverse.maValue));
+    }
+
+    if (aFunctionName == u"FDIST" || aFunctionName == u"LEGACY.FDIST"
+        || aFunctionName == u"F.DIST.RT" || aFunctionName == u"COM.MICROSOFT.F.DIST.RT")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aX = aContext.evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        const auto aDegreesFreedom1
+            = aContext.evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[1]);
+        const auto aDegreesFreedom2
+            = aContext.evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[2]);
+        if (!aX)
+            return makeFailure(aX.meError);
+        if (!aDegreesFreedom1)
+            return makeFailure(aDegreesFreedom1.meError);
+        if (!aDegreesFreedom2)
+            return makeFailure(aDegreesFreedom2.meError);
+
+        const auto aDistribution = semath::evaluateFRightTailDistribution(
+            aX.maValue, aDegreesFreedom1.maValue, aDegreesFreedom2.maValue);
+        if (!aDistribution)
+            return makeFailure(aDistribution.meError);
+        return makeScalarResult(api::CellValue::number(aDistribution.maValue));
     }
 
     if (aFunctionName == u"T.DIST.2T" || aFunctionName == u"COM.MICROSOFT.T.DIST.2T")

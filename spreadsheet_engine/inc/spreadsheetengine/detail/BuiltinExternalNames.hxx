@@ -56,15 +56,59 @@ inline constexpr std::uint16_t kBuiltinExternalNameCatalogId = 1;
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSERIESSUM");
     if (equalLookupText(rSymbol, u"QUOTIENT"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETQUOTIENT");
+    if (equalLookupText(rSymbol, u"ACCRINTM"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETACCRINTM");
     if (equalLookupText(rSymbol, u"CONVERT")
         || equalLookupText(rSymbol, u"ORG.OPENOFFICE.CONVERT"))
     {
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCONVERT");
     }
+    if (equalLookupText(rSymbol, u"NOMINAL") || equalLookupText(rSymbol, u"NOMINAL_ADD"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETNOMINAL");
+    if (equalLookupText(rSymbol, u"PRICE"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETPRICE");
+    if (equalLookupText(rSymbol, u"PRICEMAT"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETPRICEMAT");
+    if (equalLookupText(rSymbol, u"DISC"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDISC");
+    if (equalLookupText(rSymbol, u"RECEIVED"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETRECEIVED");
+    if (equalLookupText(rSymbol, u"PRICEDISC"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETPRICEDISC");
+    if (equalLookupText(rSymbol, u"INTRATE"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETINTRATE");
+    if (equalLookupText(rSymbol, u"YIELDDISC"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYIELDDISC");
+    if (equalLookupText(rSymbol, u"MDURATION"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETMDURATION");
+    if (equalLookupText(rSymbol, u"YIELD"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYIELD");
+    if (equalLookupText(rSymbol, u"TBILLPRICE"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETTBILLPRICE");
+    if (equalLookupText(rSymbol, u"TBILLYIELD"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETTBILLYIELD");
     if (equalLookupText(rSymbol, u"AMORLINC"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETAMORLINC");
+    if (equalLookupText(rSymbol, u"AMORDEGRC"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETAMORDEGRC");
+    if (equalLookupText(rSymbol, u"ODDLPRICE"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETODDLPRICE");
     if (equalLookupText(rSymbol, u"ODDLYIELD"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETODDLYIELD");
+    if (equalLookupText(rSymbol, u"COUPNCD"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCOUPNCD");
+    if (equalLookupText(rSymbol, u"COUPDAYS"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCOUPDAYS");
+    if (equalLookupText(rSymbol, u"COUPDAYSNC"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCOUPDAYSNC");
+    if (equalLookupText(rSymbol, u"COUPDAYBS"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCOUPDAYBS");
+    if (equalLookupText(rSymbol, u"COUPPCD"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCOUPPCD");
+    if (equalLookupText(rSymbol, u"COUPNUM"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCOUPNUM");
+    if (equalLookupText(rSymbol, u"XIRR"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETXIRR");
     if (equalLookupText(rSymbol, u"DEC2HEX"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDEC2HEX");
     if (equalLookupText(rSymbol, u"MROUND"))
@@ -95,12 +139,56 @@ inline constexpr std::uint16_t kBuiltinExternalNameCatalogId = 1;
         return api::String(u"SERIESSUM");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETQUOTIENT"))
         return api::String(u"QUOTIENT");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETACCRINTM"))
+        return api::String(u"ACCRINTM");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCONVERT"))
         return api::String(u"CONVERT");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETNOMINAL"))
+        return api::String(u"NOMINAL");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETPRICE"))
+        return api::String(u"PRICE");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETPRICEMAT"))
+        return api::String(u"PRICEMAT");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDISC"))
+        return api::String(u"DISC");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETRECEIVED"))
+        return api::String(u"RECEIVED");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETPRICEDISC"))
+        return api::String(u"PRICEDISC");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETINTRATE"))
+        return api::String(u"INTRATE");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYIELDDISC"))
+        return api::String(u"YIELDDISC");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETMDURATION"))
+        return api::String(u"MDURATION");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYIELD"))
+        return api::String(u"YIELD");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETTBILLPRICE"))
+        return api::String(u"TBILLPRICE");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETTBILLYIELD"))
+        return api::String(u"TBILLYIELD");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETAMORLINC"))
         return api::String(u"AMORLINC");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETAMORDEGRC"))
+        return api::String(u"AMORDEGRC");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETODDLPRICE"))
+        return api::String(u"ODDLPRICE");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETODDLYIELD"))
         return api::String(u"ODDLYIELD");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCOUPNCD"))
+        return api::String(u"COUPNCD");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCOUPDAYS"))
+        return api::String(u"COUPDAYS");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCOUPDAYSNC"))
+        return api::String(u"COUPDAYSNC");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCOUPDAYBS"))
+        return api::String(u"COUPDAYBS");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCOUPPCD"))
+        return api::String(u"COUPPCD");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCOUPNUM"))
+        return api::String(u"COUPNUM");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETXIRR"))
+        return api::String(u"XIRR");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDEC2HEX"))
         return api::String(u"DEC2HEX");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETMROUND"))

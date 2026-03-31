@@ -444,7 +444,8 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpecialForm(
     const api::CellAddress& rCurrentAddress)
 {
     if (!(rFunctionName == u"FORMULA" || rFunctionName == u"IF" || rFunctionName == u"LET"
-            || rFunctionName == u"IFERROR" || rFunctionName == u"IFNA"
+            || rFunctionName == u"IFERROR" || rFunctionName == u"COM.MICROSOFT.IFERROR"
+            || rFunctionName == u"IFNA" || rFunctionName == u"COM.MICROSOFT.IFNA"
             || rFunctionName == u"INDIRECT" || rFunctionName == u"HYPERLINK"
             || rFunctionName == u"OFFSET"))
     {
@@ -580,14 +581,15 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpecialForm(
         return aResult;
     }
 
-    if (rFunctionName == u"IFERROR" || rFunctionName == u"IFNA")
+    if (rFunctionName == u"IFERROR" || rFunctionName == u"COM.MICROSOFT.IFERROR"
+        || rFunctionName == u"IFNA" || rFunctionName == u"COM.MICROSOFT.IFNA")
     {
         if (rNode.maChildren.size() != 2)
             return detail::makeFailure(api::Error::IllegalArgument);
         if (rNode.maChildren[0]->meKind == formula::NodeKind::EmptyArgument)
             return detail::makeFailure(api::Error::IllegalArgument);
 
-        const bool bNAOnly = rFunctionName == u"IFNA";
+        const bool bNAOnly = rFunctionName == u"IFNA" || rFunctionName == u"COM.MICROSOFT.IFNA";
         EvaluationResult aPrimary = evaluateNode(*rNode.maChildren[0], rCurrentAddress);
         if (!aPrimary)
         {

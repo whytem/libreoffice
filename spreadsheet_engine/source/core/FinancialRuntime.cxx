@@ -10,9 +10,12 @@
 #include <spreadsheetengine/runtime/FinancialRuntime.hxx>
 #include <cstdint>
 
+#include <spreadsheetengine/runtime/KahanSum.hxx>
 #include <spreadsheetengine/runtime/MathFinancial.hxx>
 
 #include "DateAlgorithms.hxx"
+
+#include <o3tl/untaint.hxx>
 
 #include <algorithm>
 #include <cmath>
@@ -548,6 +551,161 @@ public:
     return static_cast<double>(nDayDiff) / fDaysInYear;
 }
 
+[[nodiscard]] std::optional<double> computeYearDifferenceValue(
+    const spreadsheetengine::api::DateParts& rNullDate,
+    spreadsheetengine::api::DateSerial nStartDate,
+    spreadsheetengine::api::DateSerial nEndDate, std::int32_t nBasis)
+{
+    bool bNegative = nStartDate > nEndDate;
+    if (bNegative)
+        std::swap(nStartDate, nEndDate);
+
+    std::int32_t nDaysInFirstYear = 0;
+    std::int32_t nTotalDays = 0;
+    switch (nBasis)
+    {
+        case 0:
+        case 4:
+        {
+            const auto aStart = dateFromSerial(rNullDate, nStartDate);
+            const auto aEnd = dateFromSerial(rNullDate, nEndDate);
+
+            const bool bLeap = spreadsheetengine::core::detail::date::isLeapYear(aStart.mnYear);
+            std::int32_t nMonths = static_cast<std::int32_t>(aEnd.mnMonth) - aStart.mnMonth;
+            std::int32_t nDays = static_cast<std::int32_t>(aEnd.mnDay) - aStart.mnDay;
+            nMonths += (static_cast<std::int32_t>(aEnd.mnYear) - aStart.mnYear) * 12;
+            nTotalDays = nMonths * 30 + nDays;
+            if (nBasis == 0 && aStart.mnMonth == 2 && aEnd.mnMonth != 2
+                && aStart.mnYear == aEnd.mnYear)
+            {
+                nTotalDays -= bLeap ? 1 : 2;
+            }
+            nDaysInFirstYear = 360;
+            break;
+        }
+        case 1:
+        {
+            const auto aStart = dateFromSerial(rNullDate, nStartDate);
+            nDaysInFirstYear
+                = spreadsheetengine::core::detail::date::isLeapYear(aStart.mnYear) ? 366 : 365;
+            nTotalDays = nEndDate - nStartDate;
+            break;
+        }
+        case 2:
+            nDaysInFirstYear = 360;
+            nTotalDays = nEndDate - nStartDate;
+            break;
+        case 3:
+            nDaysInFirstYear = 365;
+            nTotalDays = nEndDate - nStartDate;
+            break;
+        default:
+            return std::nullopt;
+    }
+
+    if (bNegative)
+        nTotalDays = -nTotalDays;
+    if (nDaysInFirstYear == 0)
+        return std::nullopt;
+
+    return static_cast<double>(nTotalDays) / static_cast<double>(nDaysInFirstYear);
+}
+
+[[nodiscard]] double xirrResult(
+    const std::vector<double>& rValues,
+    const std::vector<spreadsheetengine::api::DateSerial>& rDates, double fRate)
+{
+    const double fDate0 = static_cast<double>(rDates.front());
+    const double fBase = fRate + 1.0;
+    double fResult = rValues.front();
+    for (std::size_t nIndex = 1; nIndex < rValues.size(); ++nIndex)
+    {
+        fResult += rValues[nIndex]
+                   / std::pow(fBase, (static_cast<double>(rDates[nIndex]) - fDate0) / 365.0);
+    }
+    return fResult;
+}
+
+[[nodiscard]] double xirrResultDerivative(
+    const std::vector<double>& rValues,
+    const std::vector<spreadsheetengine::api::DateSerial>& rDates, double fRate)
+{
+    const double fDate0 = static_cast<double>(rDates.front());
+    const double fBase = fRate + 1.0;
+    double fResult = 0.0;
+    for (std::size_t nIndex = 1; nIndex < rValues.size(); ++nIndex)
+    {
+        const double fExponent = (static_cast<double>(rDates[nIndex]) - fDate0) / 365.0;
+        fResult -= fExponent * rValues[nIndex] / std::pow(fBase, fExponent + 1.0);
+    }
+    return fResult;
+}
+
+[[nodiscard]] std::optional<double> computePriceValue(
+    const spreadsheetengine::api::DateParts& rNullDate,
+    spreadsheetengine::api::DateSerial nSettlement, spreadsheetengine::api::DateSerial nMaturity,
+    double fRate, double fYield, double fRedemption, std::int32_t nFrequency, std::int32_t nBasis)
+{
+    const auto oCouponDays = getCouponDays(rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
+    const auto oCouponDaysNext
+        = getCouponDaysNext(rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
+    const auto oCouponCount = getCouponCount(rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
+    const auto oCouponDayBasis
+        = getCouponDayBasis(rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
+    if (!oCouponDays || !oCouponDaysNext || !oCouponCount || !oCouponDayBasis
+        || fp::approxEqual(*oCouponDays, 0.0))
+    {
+        return std::nullopt;
+    }
+
+    const double fFrequency = static_cast<double>(nFrequency);
+    const double fDiscountFactor = *oCouponDaysNext / *oCouponDays;
+    double fPrice = fRedemption
+                    / std::pow(1.0 + fYield / fFrequency, *oCouponCount - 1.0 + fDiscountFactor);
+    fPrice -= 100.0 * fRate / fFrequency * *oCouponDayBasis / *oCouponDays;
+
+    const double fCouponAmount = 100.0 * fRate / fFrequency;
+    const double fYieldFactor = 1.0 + fYield / fFrequency;
+    for (double fCouponIndex = 0.0; fCouponIndex < *oCouponCount; ++fCouponIndex)
+        fPrice += fCouponAmount / std::pow(fYieldFactor, fCouponIndex + fDiscountFactor);
+
+    return fPrice;
+}
+
+[[nodiscard]] std::optional<double> computeDurationValue(
+    const spreadsheetengine::api::DateParts& rNullDate,
+    spreadsheetengine::api::DateSerial nSettlement, spreadsheetengine::api::DateSerial nMaturity,
+    double fCoupon, double fYield, std::int32_t nFrequency, std::int32_t nBasis)
+{
+    const auto oYearFraction = computeYearFractionValue(rNullDate, nSettlement, nMaturity, nBasis);
+    const auto oCouponCount = getCouponCount(rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
+    if (!oYearFraction || !oCouponCount)
+        return std::nullopt;
+
+    const double f100 = 100.0;
+    const double fCouponCashflow = fCoupon * f100 / static_cast<double>(nFrequency);
+    const double fYieldFactor = fYield / static_cast<double>(nFrequency) + 1.0;
+    const double fCouponDiff = *oYearFraction * static_cast<double>(nFrequency) - *oCouponCount;
+
+    double fDuration = 0.0;
+    for (double fIndex = 1.0; fIndex < *oCouponCount; ++fIndex)
+        fDuration += (fIndex + fCouponDiff) * fCouponCashflow
+                     / std::pow(fYieldFactor, fIndex + fCouponDiff);
+
+    fDuration += (*oCouponCount + fCouponDiff) * (fCouponCashflow + f100)
+                 / std::pow(fYieldFactor, *oCouponCount + fCouponDiff);
+
+    double fPrice = 0.0;
+    for (double fIndex = 1.0; fIndex < *oCouponCount; ++fIndex)
+        fPrice += fCouponCashflow / std::pow(fYieldFactor, fIndex + fCouponDiff);
+
+    fPrice += (fCouponCashflow + f100) / std::pow(fYieldFactor, *oCouponCount + fCouponDiff);
+    if (fp::approxEqual(fPrice, 0.0))
+        return std::nullopt;
+
+    return fDuration / fPrice / static_cast<double>(nFrequency);
+}
+
 } // namespace
 
 api::ValueResult<double> evaluateFutureValue(
@@ -595,6 +753,14 @@ api::ValueResult<double> evaluateRate(
     if (!aRateResult.mbConverged)
         return api::ValueResult<double>::failure(api::Error::NoConvergence);
     return makeFiniteResult(aRateResult.mfRate);
+}
+
+api::ValueResult<double> evaluateNominal(double fEffectiveRate, double fPeriods)
+{
+    if (fEffectiveRate <= 0.0 || fPeriods <= 0.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return makeFiniteResult((std::pow(fEffectiveRate + 1.0, 1.0 / fPeriods) - 1.0) * fPeriods);
 }
 
 api::ValueResult<double> evaluateInterestSchedulePayment(
@@ -699,6 +865,39 @@ api::ValueResult<double> evaluateVariableDecliningBalance(
         fCost, fSalvage, fLife, fStart, fEnd, fFactor, bNoSwitch));
 }
 
+api::ValueResult<double> evaluateFixedDecliningBalance(
+    double fCost, double fSalvage, double fLife, double fPeriod, double fMonths)
+{
+    if (!(fCost > 0.0) || fSalvage < 0.0 || fSalvage > fCost || !(fLife > 0.0)
+        || fLife > 1200.0 || !(fPeriod > 0.0) || fPeriod > (fLife + 1.0)
+        || !(fMonths >= 1.0) || !(fMonths <= 12.0))
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    return makeFiniteResult(spreadsheetengine::core::math::computeFixedDecliningBalance(
+        fCost, fSalvage, fLife, fPeriod, fMonths));
+}
+
+api::ValueResult<double> evaluateStraightLineDepreciation(
+    double fCost, double fSalvage, double fLife)
+{
+    if (fp::approxEqual(fLife, 0.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return makeFiniteResult(
+        spreadsheetengine::core::math::computeStraightLineDepreciation(
+            fCost, fSalvage, fLife));
+}
+
+api::ValueResult<double> evaluateSumOfYearsDepreciation(
+    double fCost, double fSalvage, double fLife, double fPeriod)
+{
+    return makeFiniteResult(
+        spreadsheetengine::core::math::computeSumOfYearsDepreciation(
+            fCost, fSalvage, fLife, fPeriod));
+}
+
 api::ValueResult<double> evaluateYearFraction(
     const api::DateParts& rNullDate, api::DateSerial nStartDate, api::DateSerial nEndDate,
     std::int32_t nBasis)
@@ -722,30 +921,34 @@ api::ValueResult<double> evaluatePrice(
     if (!isValidBasis(nBasis))
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    const auto oCouponDays = getCouponDays(rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
-    const auto oCouponDaysNext
-        = getCouponDaysNext(rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
-    const auto oCouponCount = getCouponCount(rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
-    const auto oCouponDayBasis
-        = getCouponDayBasis(rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
-    if (!oCouponDays || !oCouponDaysNext || !oCouponCount || !oCouponDayBasis
-        || fp::approxEqual(*oCouponDays, 0.0))
-    {
+    const auto oPrice = computePriceValue(
+        rNullDate, nSettlement, nMaturity, fRate, fYield, fRedemption, nFrequency, nBasis);
+    if (!oPrice)
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
-    }
+    return makeFiniteResult(*oPrice);
+}
 
-    const double fFrequency = static_cast<double>(nFrequency);
-    const double fDiscountFactor = *oCouponDaysNext / *oCouponDays;
-    double fPrice = fRedemption
-                    / std::pow(1.0 + fYield / fFrequency, *oCouponCount - 1.0 + fDiscountFactor);
-    fPrice -= 100.0 * fRate / fFrequency * *oCouponDayBasis / *oCouponDays;
+api::ValueResult<double> evaluatePricemat(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    api::DateSerial nIssue, double fRate, double fYield, std::int32_t nBasis)
+{
+    if (fRate < 0.0 || fYield < 0.0 || nSettlement >= nMaturity || !isValidBasis(nBasis))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    const double fCouponAmount = 100.0 * fRate / fFrequency;
-    const double fYieldFactor = 1.0 + fYield / fFrequency;
-    for (double fCouponIndex = 0.0; fCouponIndex < *oCouponCount; ++fCouponIndex)
-        fPrice += fCouponAmount / std::pow(fYieldFactor, fCouponIndex + fDiscountFactor);
+    const auto oIssueToMaturity
+        = computeYearFractionValue(rNullDate, nIssue, nMaturity, nBasis);
+    const auto oIssueToSettlement
+        = computeYearFractionValue(rNullDate, nIssue, nSettlement, nBasis);
+    const auto oSettlementToMaturity
+        = computeYearFractionValue(rNullDate, nSettlement, nMaturity, nBasis);
+    if (!oIssueToMaturity || !oIssueToSettlement || !oSettlementToMaturity)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
-    return makeFiniteResult(fPrice);
+    double fResult = 1.0 + *oIssueToMaturity * fRate;
+    fResult /= 1.0 + *oSettlementToMaturity * fYield;
+    fResult -= *oIssueToSettlement * fRate;
+    fResult *= 100.0;
+    return makeFiniteResult(fResult);
 }
 
 api::ValueResult<double> evaluateAmorlinc(
@@ -789,6 +992,329 @@ api::ValueResult<double> evaluateAmorlinc(
     return makeFiniteResult(std::max(fResult, 0.0));
 }
 
+api::ValueResult<double> evaluateAmordegrc(
+    const api::DateParts& rNullDate, double fCost, api::DateSerial nPurchaseDate,
+    api::DateSerial nFirstPeriodEndDate, double fSalvage, double fPeriod, double fRate,
+    std::int32_t nBasis)
+{
+    if (nPurchaseDate > nFirstPeriodEndDate || !(fRate > 0.0) || fSalvage > fCost
+        || !(fCost > 0.0) || fSalvage < 0.0 || fPeriod < 0.0 || !isValidBasis(nBasis))
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    const auto oFirstPeriodFraction
+        = computeYearFractionValue(rNullDate, nPurchaseDate, nFirstPeriodEndDate, nBasis);
+    if (!oFirstPeriodFraction)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const std::uint32_t nPeriod = static_cast<std::uint32_t>(fPeriod);
+    const double fUsefulPeriod = 1.0 / fRate;
+    double fCoefficient = 2.5;
+    if (fUsefulPeriod < 3.0)
+        fCoefficient = 1.0;
+    else if (fUsefulPeriod < 5.0)
+        fCoefficient = 1.5;
+    else if (fUsefulPeriod <= 6.0)
+        fCoefficient = 2.0;
+
+    const double fAdjustedRate = fRate * fCoefficient;
+    double fDepreciation = std::round(*oFirstPeriodFraction * fAdjustedRate * fCost);
+    fCost -= fDepreciation;
+    double fRemainingDepreciableCost = fCost - fSalvage;
+
+    for (std::uint32_t nIndex = 0; nIndex < nPeriod; ++nIndex)
+    {
+        fDepreciation = std::round(fAdjustedRate * fCost);
+        fRemainingDepreciableCost -= fDepreciation;
+        if (fRemainingDepreciableCost < 0.0)
+        {
+            switch (nPeriod - nIndex)
+            {
+                case 0:
+                case 1:
+                    return makeFiniteResult(std::round(fCost * 0.5));
+                default:
+                    return makeFiniteResult(0.0);
+            }
+        }
+        fCost -= fDepreciation;
+    }
+
+    return makeFiniteResult(fDepreciation);
+}
+
+api::ValueResult<double> evaluateReceived(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    double fInvestment, double fDiscount, std::int32_t nBasis)
+{
+    if (!(fInvestment > 0.0) || !(fDiscount > 0.0) || nSettlement >= nMaturity
+        || !isValidBasis(nBasis))
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    const auto oYearDifference = computeYearDifferenceValue(
+        rNullDate, nSettlement, nMaturity, nBasis);
+    if (!oYearDifference)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return makeFiniteResult(fInvestment / (1.0 - (fDiscount * *oYearDifference)));
+}
+
+api::ValueResult<double> evaluateAccrintm(
+    const api::DateParts& rNullDate, api::DateSerial nIssue, api::DateSerial nSettlement,
+    double fRate, double fParValue, std::int32_t nBasis)
+{
+    if (fRate <= 0.0 || fParValue <= 0.0 || nIssue >= nSettlement || !isValidBasis(nBasis))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const auto oYearDifference = computeYearDifferenceValue(
+        rNullDate, nIssue, nSettlement, nBasis);
+    if (!oYearDifference)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return makeFiniteResult(fParValue * fRate * *oYearDifference);
+}
+
+api::ValueResult<double> evaluateDisc(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    double fPrice, double fRedemption, std::int32_t nBasis)
+{
+    if (!(fPrice > 0.0) || !(fRedemption > 0.0) || nSettlement >= nMaturity
+        || !isValidBasis(nBasis))
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    const auto oYearFraction = computeYearFractionValue(rNullDate, nSettlement, nMaturity, nBasis);
+    if (!oYearFraction || fp::approxEqual(*oYearFraction, 0.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return makeFiniteResult((1.0 - fPrice / fRedemption) / *oYearFraction);
+}
+
+api::ValueResult<double> evaluatePricedisc(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    double fDiscount, double fRedemption, std::int32_t nBasis)
+{
+    if (!(fDiscount > 0.0) || !(fRedemption > 0.0) || nSettlement >= nMaturity
+        || !isValidBasis(nBasis))
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    const auto oYearDifference = computeYearDifferenceValue(
+        rNullDate, nSettlement, nMaturity, nBasis);
+    if (!oYearDifference)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return makeFiniteResult(fRedemption * (1.0 - fDiscount * *oYearDifference));
+}
+
+api::ValueResult<double> evaluateIntrate(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    double fInvestment, double fRedemption, std::int32_t nBasis)
+{
+    if (!(fInvestment > 0.0) || !(fRedemption > 0.0) || nSettlement >= nMaturity
+        || !isValidBasis(nBasis))
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    const auto oYearDifference = computeYearDifferenceValue(
+        rNullDate, nSettlement, nMaturity, nBasis);
+    if (!oYearDifference || fp::approxEqual(*oYearDifference, 0.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return makeFiniteResult(((fRedemption / fInvestment) - 1.0) / *oYearDifference);
+}
+
+api::ValueResult<double> evaluateYielddisc(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    double fPrice, double fRedemption, std::int32_t nBasis)
+{
+    if (!(fPrice > 0.0) || !(fRedemption > 0.0) || nSettlement >= nMaturity
+        || !isValidBasis(nBasis))
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    const auto oYearFraction = computeYearFractionValue(rNullDate, nSettlement, nMaturity, nBasis);
+    if (!oYearFraction || fp::approxEqual(*oYearFraction, 0.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return makeFiniteResult(((fRedemption / fPrice) - 1.0) / *oYearFraction);
+}
+
+api::ValueResult<double> evaluateModifiedDuration(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    double fCoupon, double fYield, std::int32_t nFrequency, std::int32_t nBasis)
+{
+    if (fCoupon < 0.0 || fYield < 0.0 || !isValidCouponFrequency(nFrequency)
+        || nSettlement >= nMaturity || !isValidBasis(nBasis))
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    const auto oDuration = computeDurationValue(
+        rNullDate, nSettlement, nMaturity, fCoupon, fYield, nFrequency, nBasis);
+    if (!oDuration)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return makeFiniteResult(
+        *oDuration / (1.0 + (fYield / static_cast<double>(nFrequency))));
+}
+
+api::ValueResult<double> evaluateYield(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    double fCoupon, double fPrice, double fRedemption, std::int32_t nFrequency, std::int32_t nBasis)
+{
+    if (fCoupon < 0.0 || !(fPrice > 0.0) || !(fRedemption > 0.0)
+        || !isValidCouponFrequency(nFrequency) || nSettlement >= nMaturity
+        || !isValidBasis(nBasis))
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    const double fYieldRate = fCoupon;
+    double fPriceCandidate = 0.0;
+    double fYieldLow = 0.0;
+    double fYieldHigh = 1.0;
+
+    const auto oPriceLow = computePriceValue(
+        rNullDate, nSettlement, nMaturity, fYieldRate, fYieldLow, fRedemption, nFrequency, nBasis);
+    const auto oPriceHigh = computePriceValue(
+        rNullDate, nSettlement, nMaturity, fYieldRate, fYieldHigh, fRedemption, nFrequency, nBasis);
+    if (!oPriceLow || !oPriceHigh)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    double fPriceLow = *oPriceLow;
+    double fPriceHigh = *oPriceHigh;
+    double fYieldMid = (fYieldHigh - fYieldLow) * 0.5;
+
+    for (std::uint32_t nIter = 0; nIter < 100 && !fp::approxEqual(fPriceCandidate, fPrice); ++nIter)
+    {
+        const auto oPriceMid = computePriceValue(
+            rNullDate, nSettlement, nMaturity, fYieldRate, fYieldMid, fRedemption, nFrequency,
+            nBasis);
+        if (!oPriceMid)
+            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+        fPriceCandidate = *oPriceMid;
+
+        if (fp::approxEqual(fPrice, fPriceLow))
+            return makeFiniteResult(fYieldLow);
+        if (fp::approxEqual(fPrice, fPriceHigh))
+            return makeFiniteResult(fYieldHigh);
+        if (fp::approxEqual(fPrice, fPriceCandidate))
+            return makeFiniteResult(fYieldMid);
+
+        if (fPrice < fPriceHigh)
+        {
+            fYieldHigh *= 2.0;
+            const auto oExpandedPrice = computePriceValue(
+                rNullDate, nSettlement, nMaturity, fYieldRate, fYieldHigh, fRedemption,
+                nFrequency, nBasis);
+            if (!oExpandedPrice)
+                return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+            fPriceHigh = *oExpandedPrice;
+            fYieldMid = (fYieldHigh - fYieldLow) * 0.5;
+            continue;
+        }
+
+        if (fPrice < fPriceCandidate)
+        {
+            fYieldLow = fYieldMid;
+            fPriceLow = fPriceCandidate;
+        }
+        else
+        {
+            fYieldHigh = fYieldMid;
+            fPriceHigh = fPriceCandidate;
+        }
+
+        if (fp::approxEqual(fPriceLow, fPriceHigh))
+            break;
+
+        fYieldMid = fYieldHigh
+                    - (fYieldHigh - fYieldLow) * ((fPrice - fPriceHigh) / (fPriceLow - fPriceHigh));
+    }
+
+    if (std::fabs(fPrice - fPriceCandidate) > fPrice / 100.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return makeFiniteResult(fYieldMid);
+}
+
+api::ValueResult<double> evaluateTbillPrice(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    double fDiscount)
+{
+    if (!(fDiscount > 0.0) || nSettlement > nMaturity)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const auto oYearFraction = computeYearFractionValue(rNullDate, nSettlement, nMaturity + 1, 0);
+    double fIntegralPart = 0.0;
+    if (!oYearFraction || fp::approxEqual(std::modf(*oYearFraction, &fIntegralPart), 0.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return makeFiniteResult(100.0 * (1.0 - fDiscount * *oYearFraction));
+}
+
+api::ValueResult<double> evaluateTbillYield(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    double fPrice)
+{
+    if (!(fPrice > 0.0) || nSettlement >= nMaturity)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const auto oYearFraction = computeYearFractionValue(rNullDate, nSettlement, nMaturity, 0);
+    if (!oYearFraction)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const std::int32_t nDayCount = static_cast<std::int32_t>(std::llround(*oYearFraction * 360.0)) + 1;
+    if (nDayCount > 360)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    double fYield = 100.0 / fPrice;
+    fYield -= 1.0;
+    fYield /= static_cast<double>(nDayCount);
+    fYield *= 360.0;
+    return makeFiniteResult(fYield);
+}
+
+api::ValueResult<double> evaluateOddlprice(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    api::DateSerial nLastInterest, double fRate, double fYield, double fRedemption,
+    std::int32_t nFrequency, std::int32_t nBasis)
+{
+    if (!(fRate > 0.0) || fYield < 0.0 || !(fRedemption > 0.0)
+        || !isValidCouponFrequency(nFrequency) || nMaturity <= nSettlement
+        || nSettlement <= nLastInterest || !isValidBasis(nBasis))
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    const double fFrequency = static_cast<double>(nFrequency);
+    const auto oLastToMaturity
+        = computeYearFractionValue(rNullDate, nLastInterest, nMaturity, nBasis);
+    const auto oSettlementToMaturity
+        = computeYearFractionValue(rNullDate, nSettlement, nMaturity, nBasis);
+    const auto oLastToSettlement
+        = computeYearFractionValue(rNullDate, nLastInterest, nSettlement, nBasis);
+    if (!oLastToMaturity || !oSettlementToMaturity || !oLastToSettlement)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const double fDCi = *oLastToMaturity * fFrequency;
+    const double fDSCi = *oSettlementToMaturity * fFrequency;
+    const double fAi = *oLastToSettlement * fFrequency;
+
+    double fPrice = fRedemption + fDCi * 100.0 * fRate / fFrequency;
+    fPrice /= fDSCi * fYield / fFrequency + 1.0;
+    fPrice -= fAi * 100.0 * fRate / fFrequency;
+    return makeFiniteResult(fPrice);
+}
+
 api::ValueResult<double> evaluateOddlyield(
     const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
     api::DateSerial nLastInterest, double fRate, double fPrice, double fRedemption,
@@ -820,6 +1346,247 @@ api::ValueResult<double> evaluateOddlyield(
     fYield -= 1.0;
     fYield *= fFrequency / fDSCi;
     return makeFiniteResult(fYield);
+}
+
+api::ValueResult<double> evaluateCoupdaybs(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    std::int32_t nFrequency, std::int32_t nBasis)
+{
+    if (!isValidBasis(nBasis))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const auto oCouponDayBasis
+        = getCouponDayBasis(rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
+    if (!oCouponDayBasis)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    return makeFiniteResult(*oCouponDayBasis);
+}
+
+api::ValueResult<double> evaluateCoupdays(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    std::int32_t nFrequency, std::int32_t nBasis)
+{
+    if (!isValidBasis(nBasis))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const auto oCouponDays = getCouponDays(rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
+    if (!oCouponDays)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    return makeFiniteResult(*oCouponDays);
+}
+
+api::ValueResult<double> evaluateCoupdaysnc(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    std::int32_t nFrequency, std::int32_t nBasis)
+{
+    if (!isValidBasis(nBasis))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const auto oCouponDaysNext
+        = getCouponDaysNext(rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
+    if (!oCouponDaysNext)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    return makeFiniteResult(*oCouponDaysNext);
+}
+
+api::ValueResult<double> evaluateCouppcd(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    std::int32_t nFrequency, std::int32_t nBasis)
+{
+    if (!isValidBasis(nBasis))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const auto oPrevious = getPreviousCouponDate(
+        rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
+    if (!oPrevious)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    return makeFiniteResult(static_cast<double>(oPrevious->getDate(rNullDate)));
+}
+
+api::ValueResult<double> evaluateCoupncd(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    std::int32_t nFrequency, std::int32_t nBasis)
+{
+    if (!isValidBasis(nBasis))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const auto oNext = getNextCouponDate(rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
+    if (!oNext)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    return makeFiniteResult(static_cast<double>(oNext->getDate(rNullDate)));
+}
+
+api::ValueResult<double> evaluateCoupnum(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    std::int32_t nFrequency, std::int32_t nBasis)
+{
+    if (!isValidBasis(nBasis))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const auto oCouponCount
+        = getCouponCount(rNullDate, nSettlement, nMaturity, nFrequency, nBasis);
+    if (!oCouponCount)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    return makeFiniteResult(*oCouponCount);
+}
+
+api::ValueResult<double> evaluateIrrNumbers(
+    const std::vector<double>& rValues, double fGuess)
+{
+    if (rValues.empty())
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    constexpr double fEpsilon = 1.0e-7;
+    constexpr std::uint16_t nIterationsMax = 20;
+    double fRate = fp::approxEqual(fGuess, -1.0) ? 0.1 : fGuess;
+    double fStep = 1.0;
+    std::uint16_t nIteration = 0;
+
+    while (fStep > fEpsilon && nIteration < nIterationsMax)
+    {
+        fp::KahanSum fNumerator = 0.0;
+        fp::KahanSum fDenominator = 0.0;
+        double fCount = 0.0;
+        for (double fValue : rValues)
+        {
+            fNumerator += fValue / std::pow(1.0 + fRate, fCount);
+            fDenominator += -fCount * fValue / std::pow(1.0 + fRate, fCount + 1.0);
+            fCount += 1.0;
+        }
+
+        const double fNewRate
+            = fRate - o3tl::div_allow_zero(fNumerator.get(), fDenominator.get());
+        fStep = std::abs(fNewRate - fRate);
+        fRate = fNewRate;
+        ++nIteration;
+        if (!std::isfinite(fRate))
+            return api::ValueResult<double>::failure(api::Error::NoConvergence);
+    }
+
+    if (fp::approxEqual(fGuess, 0.0) && std::abs(fRate) < fEpsilon)
+        fRate = 0.0;
+    if (fStep >= fEpsilon)
+        return api::ValueResult<double>::failure(api::Error::NoConvergence);
+    return makeFiniteResult(fRate);
+}
+
+api::ValueResult<double> evaluateMirrNumbers(
+    const std::vector<double>& rValues, double fFinanceRate, double fReinvestRate)
+{
+    if (rValues.empty())
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const double fReinvestFactor = fReinvestRate + 1.0;
+    const double fFinanceFactor = fFinanceRate + 1.0;
+    fp::KahanSum fNpvReinvest = 0.0;
+    fp::KahanSum fNpvInvest = 0.0;
+    double fPowReinvest = 1.0;
+    double fPowInvest = 1.0;
+    std::size_t nCount = 0;
+    bool bHasPositive = false;
+    bool bHasNegative = false;
+
+    for (double fValue : rValues)
+    {
+        if (fValue > 0.0)
+        {
+            bHasPositive = true;
+            fNpvReinvest += fValue * fPowReinvest;
+        }
+        else if (fValue < 0.0)
+        {
+            bHasNegative = true;
+            fNpvInvest += fValue * fPowInvest;
+        }
+
+        fPowReinvest /= fReinvestFactor;
+        fPowInvest /= fFinanceFactor;
+        ++nCount;
+    }
+
+    if (!(bHasPositive && bHasNegative) || nCount < 2)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    double fResult = -o3tl::div_allow_zero(fNpvReinvest.get(), fNpvInvest.get());
+    fResult *= std::pow(fReinvestFactor, static_cast<double>(nCount - 1));
+    fResult = std::pow(fResult, 1.0 / static_cast<double>(nCount - 1));
+    return makeFiniteResult(fResult - 1.0);
+}
+
+api::ValueResult<double> evaluateXirrNumbers(
+    const std::vector<double>& rValues, const std::vector<api::DateSerial>& rDates,
+    double fGuess)
+{
+    if (rValues.size() < 2 || rValues.size() != rDates.size() || fGuess <= -1.0)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    double fResultRate = fGuess;
+    constexpr double fMaxEps = 1.0e-10;
+    constexpr std::int32_t nMaxIter = 50;
+
+    std::int32_t nIter = 0;
+    double fResultValue = 0.0;
+    std::int32_t nIterScan = 0;
+    bool bContinueLoop = false;
+    bool bScanExhausted = false;
+
+    do
+    {
+        if (nIterScan >= 1)
+            fResultRate = -0.99 + static_cast<double>(nIterScan - 1) * 0.01;
+
+        do
+        {
+            fResultValue = xirrResult(rValues, rDates, fResultRate);
+            const double fNewRate = fResultRate
+                                    - o3tl::div_allow_zero(
+                                        fResultValue,
+                                        xirrResultDerivative(rValues, rDates, fResultRate));
+            const double fRateEps = std::fabs(fNewRate - fResultRate);
+            fResultRate = fNewRate;
+            bContinueLoop = (fRateEps > fMaxEps) && (std::fabs(fResultValue) > fMaxEps);
+        }
+        while (bContinueLoop && (++nIter < nMaxIter));
+
+        nIter = 0;
+        if (std::isnan(fResultRate) || std::isinf(fResultRate) || std::isnan(fResultValue)
+            || std::isinf(fResultValue))
+        {
+            bContinueLoop = true;
+        }
+
+        ++nIterScan;
+        bScanExhausted = nIterScan >= 200;
+    }
+    while (bContinueLoop && !bScanExhausted);
+
+    if (bContinueLoop)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    return makeFiniteResult(fResultRate);
+}
+
+api::ValueResult<double> evaluateNetPresentValueNumbers(
+    double fRate, const std::vector<double>& rValues)
+{
+    fp::KahanSum fValue = 0.0;
+    double fCount = 1.0;
+    for (double fCashFlow : rValues)
+    {
+        fValue += fCashFlow / std::pow(1.0 + fRate, fCount);
+        fCount += 1.0;
+    }
+
+    return makeFiniteResult(fValue.get());
+}
+
+api::ValueResult<double> evaluateGrowthRateOverPeriods(
+    double fPeriods, double fPresentValue, double fFutureValue)
+{
+    if (fPeriods <= 0.0 || fp::approxEqual(fPresentValue, 0.0))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return makeFiniteResult(spreadsheetengine::core::math::computeGrowthRateOverPeriods(
+        fPeriods, fPresentValue, fFutureValue));
 }
 
 } // namespace spreadsheetengine::core::finance
