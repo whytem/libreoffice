@@ -51,7 +51,16 @@ $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spreadsheet_engine/source/core/ForceCalculation \
     spreadsheet_engine/source/core/FormulaEvaluator \
     spreadsheet_engine/source/core/FormulaEvaluatorAggregate \
+    spreadsheet_engine/source/core/FormulaEvaluatorConversion \
+    spreadsheet_engine/source/core/FormulaEvaluatorDateTime \
+    spreadsheet_engine/source/core/FormulaEvaluatorFinancial \
+    spreadsheet_engine/source/core/FormulaEvaluatorInformation \
+    spreadsheet_engine/source/core/FormulaEvaluatorLogical \
+    spreadsheet_engine/source/core/FormulaEvaluatorLookup \
+    spreadsheet_engine/source/core/FormulaEvaluatorMath \
     spreadsheet_engine/source/core/FormulaEvaluatorSpecialForms \
+    spreadsheet_engine/source/core/FormulaEvaluatorStatistical \
+    spreadsheet_engine/source/core/FormulaEvaluatorText \
     spreadsheet_engine/source/core/LookupRuntime \
     spreadsheet_engine/source/core/OdfFormulaParser \
     spreadsheet_engine/source/core/MathAggregate \

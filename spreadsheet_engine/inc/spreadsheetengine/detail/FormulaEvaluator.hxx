@@ -58,6 +58,8 @@ class Evaluator
         EvaluationResult maResult;
     };
 
+    struct FunctionEvalContext;
+
     const workbook::Workbook& mrWorkbook;
     std::map<AddressKey, CacheEntry> maAstCellCache;
     std::map<AddressKey, CacheEntry> maCompiledCellCache;
@@ -77,7 +79,67 @@ class Evaluator
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
     [[nodiscard]] EvaluationResult evaluateFunction(
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] EvaluationResult evaluateFunctionIfChainDispatch(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] EvaluationResult evaluateAggregateCriteriaFamilyBody(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] EvaluationResult evaluateInformationFamilyBody(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] EvaluationResult evaluateStatisticalRuntimeFamilyBody(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] EvaluationResult evaluateFinancialFamilyBody(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] EvaluationResult evaluateDateTimeFamilyBody(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] EvaluationResult evaluateLookupFamilyBody(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] EvaluationResult evaluateTextFamilyBody(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] EvaluationResult evaluateConversionFamilyBody(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] EvaluationResult evaluateMathFamilyBody(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] EvaluationResult evaluateLogicalFamilyBody(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
     [[nodiscard]] std::optional<EvaluationResult> tryEvaluateAggregateFamily(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] std::optional<EvaluationResult> tryEvaluateInformationFamily(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] std::optional<EvaluationResult> tryEvaluateStatisticalRuntimeFamily(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] std::optional<EvaluationResult> tryEvaluateFinancialFamily(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] std::optional<EvaluationResult> tryEvaluateDateTimeFamily(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] std::optional<EvaluationResult> tryEvaluateLookupFamily(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] std::optional<EvaluationResult> tryEvaluateTextFamily(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] std::optional<EvaluationResult> tryEvaluateConversionFamily(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] std::optional<EvaluationResult> tryEvaluateMathFamily(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] std::optional<EvaluationResult> tryEvaluateLogicalFamily(
         api::StringView rFunctionName, const formula::Node& rNode,
         const api::CellAddress& rCurrentAddress);
     [[nodiscard]] api::ValueResult<bool> scanAggregateScanArgument(

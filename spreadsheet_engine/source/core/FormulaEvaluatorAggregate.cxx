@@ -7,13 +7,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include <spreadsheetengine/detail/FormulaEvaluator.hxx>
+#include "FormulaEvaluatorInternals.hxx"
+
 #include <cstdint>
-#include <spreadsheetengine/runtime/MathAggregate.hxx>
-
-#include "FormulaEvaluatorUtils.hxx"
-
-#include <spreadsheetengine/runtime/FloatingPoint.hxx>
 
 namespace spreadsheetengine::core::eval
 {
@@ -55,6 +51,11 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
     api::StringView rFunctionName, const formula::Node& rNode,
     const api::CellAddress& rCurrentAddress)
 {
+    const bool bCriteriaAggregate
+        = rFunctionName == u"COUNTIF" || rFunctionName == u"COUNTIFS"
+          || rFunctionName == u"SUMIF" || rFunctionName == u"SUMIFS"
+          || rFunctionName == u"AVERAGEIF" || rFunctionName == u"AVERAGEIFS"
+          || rFunctionName == u"MAXIFS" || rFunctionName == u"MINIFS";
     const bool bRankedAggregate
         = rFunctionName == u"LARGE" || rFunctionName == u"SMALL"
           || rFunctionName == u"PERCENTILE" || rFunctionName == u"PERCENTILE.INC"
@@ -65,13 +66,16 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
           || rFunctionName == u"COM.MICROSOFT.QUARTILE.INC"
           || rFunctionName == u"QUARTILE.EXC"
           || rFunctionName == u"COM.MICROSOFT.QUARTILE.EXC";
-    if (!(rFunctionName == u"MAX" || rFunctionName == u"MIN" || rFunctionName == u"MAXA"
+    if (!(bCriteriaAggregate || rFunctionName == u"MAX" || rFunctionName == u"MIN" || rFunctionName == u"MAXA"
             || rFunctionName == u"MINA" || rFunctionName == u"SUM" || rFunctionName == u"SUBTOTAL"
             || rFunctionName == u"AGGREGATE" || bRankedAggregate || rFunctionName == u"SKEW"
             || rFunctionName == u"SKEWP"))
     {
         return std::nullopt;
     }
+
+    if (bCriteriaAggregate)
+        return evaluateAggregateCriteriaFamilyBody(rFunctionName, rNode, rCurrentAddress);
 
     auto visitFlattenedValues
         = [&](const auto& self, const formula::Node& rArgument,
@@ -502,6 +506,167 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
     if (!aSkew)
         return detail::makeFailure(aSkew.meError);
     return detail::makeScalarResult(api::CellValue::number(aSkew.maValue));
+}
+
+EvaluationResult Evaluator::evaluateAggregateCriteriaFamilyBody(
+    api::StringView rFunctionName, const formula::Node& rNode,
+    const api::CellAddress& rCurrentAddress)
+{
+    const api::StringView aFunctionName = rFunctionName;
+
+    if (aFunctionName == u"COUNTIF" || aFunctionName == u"COUNTIFS"
+        || aFunctionName == u"SUMIF" || aFunctionName == u"SUMIFS"
+        || aFunctionName == u"AVERAGEIF" || aFunctionName == u"AVERAGEIFS"
+        || aFunctionName == u"MAXIFS" || aFunctionName == u"MINIFS")
+    {
+        const auto eQuerySearchType = toQuerySearchType(mrWorkbook.meFormulaSearchType);
+        const EvaluatorCriteriaAggregateMaterializer aMaterializer(*this);
+
+        auto evaluateAggregateInput = [&](const formula::Node& rArgument)
+            -> api::ValueResult<CriteriaAggregateInput> {
+            EvaluationResult aValue = evaluateNode(rArgument, rCurrentAddress);
+            if (!aValue)
+                return api::ValueResult<CriteriaAggregateInput>::failure(aValue.meError);
+            const auto oInput = makeCriteriaAggregateInput(aValue);
+            if (!oInput)
+                return api::ValueResult<CriteriaAggregateInput>::failure(api::Error::IllegalArgument);
+            return api::ValueResult<CriteriaAggregateInput>::success(*oInput);
+        };
+
+        auto evaluateCriteria = [&](const formula::Node& rArgument)
+            -> api::ValueResult<CriteriaPredicate> {
+            EvaluationResult aValue
+                = ensureScalarValue(*this, evaluateNode(rArgument, rCurrentAddress));
+            if (!aValue)
+                return api::ValueResult<CriteriaPredicate>::failure(aValue.meError);
+
+            api::CellValue aCriteriaValue = aValue.maValue.maValue;
+            const bool bReferenceLikeArgument = rArgument.meKind == formula::NodeKind::CellReference
+                                                || rArgument.meKind == formula::NodeKind::RangeReference
+                                                || rArgument.meKind == formula::NodeKind::NamedReference;
+            if (bReferenceLikeArgument && aCriteriaValue.isEmpty())
+                aCriteriaValue = api::CellValue::number(0.0);
+
+            const auto oCriteria = sequery::makeCriteriaPredicate(
+                aCriteriaValue, sedatetime::parseStandaloneNumberText, parseAsciiDouble);
+            if (!oCriteria)
+                return api::ValueResult<CriteriaPredicate>::failure(api::Error::IllegalArgument);
+            return api::ValueResult<CriteriaPredicate>::success(*oCriteria);
+        };
+
+        if (aFunctionName == u"COUNTIF")
+        {
+            if (rNode.maChildren.size() != 2)
+                return makeFailure(api::Error::IllegalArgument);
+
+            const auto aRange = evaluateAggregateInput(*rNode.maChildren[0]);
+            if (!aRange)
+                return makeFailure(aRange.meError);
+            const auto aCriteria = evaluateCriteria(*rNode.maChildren[1]);
+            if (!aCriteria)
+                return makeFailure(aCriteria.meError);
+
+            const auto aResult = sequery::evaluateCriteriaAggregate(aMaterializer,
+                { aRange.maValue }, { aCriteria.maValue }, nullptr, CriteriaAggregateKind::Count,
+                eQuerySearchType, mrWorkbook.mbSearchCriteriaMustApplyToWholeCell);
+            return aResult ? makeScalarResult(aResult.maValue) : makeFailure(aResult.meError);
+        }
+
+        if (aFunctionName == u"COUNTIFS")
+        {
+            if (rNode.maChildren.size() < 2 || (rNode.maChildren.size() % 2) != 0)
+                return makeFailure(api::Error::IllegalArgument);
+
+            std::vector<CriteriaAggregateInput> aRanges;
+            std::vector<CriteriaPredicate> aCriteria;
+            aRanges.reserve(rNode.maChildren.size() / 2);
+            aCriteria.reserve(rNode.maChildren.size() / 2);
+            for (std::size_t nIndex = 0; nIndex < rNode.maChildren.size(); nIndex += 2)
+            {
+                const auto aRange = evaluateAggregateInput(*rNode.maChildren[nIndex]);
+                if (!aRange)
+                    return makeFailure(aRange.meError);
+                const auto aCriterion = evaluateCriteria(*rNode.maChildren[nIndex + 1]);
+                if (!aCriterion)
+                    return makeFailure(aCriterion.meError);
+                aRanges.push_back(aRange.maValue);
+                aCriteria.push_back(aCriterion.maValue);
+            }
+
+            const auto aResult = sequery::evaluateCriteriaAggregate(aMaterializer, aRanges,
+                aCriteria, nullptr, CriteriaAggregateKind::Count, eQuerySearchType,
+                mrWorkbook.mbSearchCriteriaMustApplyToWholeCell);
+            return aResult ? makeScalarResult(aResult.maValue) : makeFailure(aResult.meError);
+        }
+
+        if (aFunctionName == u"SUMIF" || aFunctionName == u"AVERAGEIF")
+        {
+            if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
+                return makeFailure(api::Error::IllegalArgument);
+
+            const auto aCriteriaRange = evaluateAggregateInput(*rNode.maChildren[0]);
+            if (!aCriteriaRange)
+                return makeFailure(aCriteriaRange.meError);
+            const auto aCriteria = evaluateCriteria(*rNode.maChildren[1]);
+            if (!aCriteria)
+                return makeFailure(aCriteria.meError);
+
+            std::optional<CriteriaAggregateInput> oTargetRange;
+            if (rNode.maChildren.size() == 3)
+            {
+                const auto aTarget = evaluateAggregateInput(*rNode.maChildren[2]);
+                if (!aTarget)
+                    return makeFailure(aTarget.meError);
+                oTargetRange = aTarget.maValue;
+            }
+
+            const auto aResult = sequery::evaluateCriteriaAggregate(aMaterializer,
+                { aCriteriaRange.maValue }, { aCriteria.maValue },
+                oTargetRange ? &*oTargetRange : nullptr,
+                aFunctionName == u"SUMIF" ? CriteriaAggregateKind::Sum
+                                          : CriteriaAggregateKind::Average,
+                eQuerySearchType, mrWorkbook.mbSearchCriteriaMustApplyToWholeCell);
+            return aResult ? makeScalarResult(aResult.maValue) : makeFailure(aResult.meError);
+        }
+
+        if (rNode.maChildren.size() < 3 || (rNode.maChildren.size() % 2) == 0)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aTargetRange = evaluateAggregateInput(*rNode.maChildren[0]);
+        if (!aTargetRange)
+            return makeFailure(aTargetRange.meError);
+
+        std::vector<CriteriaAggregateInput> aRanges;
+        std::vector<CriteriaPredicate> aCriteria;
+        aRanges.reserve((rNode.maChildren.size() - 1) / 2);
+        aCriteria.reserve((rNode.maChildren.size() - 1) / 2);
+        for (std::size_t nIndex = 1; nIndex < rNode.maChildren.size(); nIndex += 2)
+        {
+            const auto aRange = evaluateAggregateInput(*rNode.maChildren[nIndex]);
+            if (!aRange)
+                return makeFailure(aRange.meError);
+            const auto aCriterion = evaluateCriteria(*rNode.maChildren[nIndex + 1]);
+            if (!aCriterion)
+                return makeFailure(aCriterion.meError);
+            aRanges.push_back(aRange.maValue);
+            aCriteria.push_back(aCriterion.maValue);
+        }
+
+        CriteriaAggregateKind eAggregateKind = CriteriaAggregateKind::Sum;
+        if (aFunctionName == u"AVERAGEIFS")
+            eAggregateKind = CriteriaAggregateKind::Average;
+        else if (aFunctionName == u"MAXIFS")
+            eAggregateKind = CriteriaAggregateKind::Max;
+        else if (aFunctionName == u"MINIFS")
+            eAggregateKind = CriteriaAggregateKind::Min;
+
+        const auto aResult = sequery::evaluateCriteriaAggregate(aMaterializer, aRanges, aCriteria,
+            &aTargetRange.maValue, eAggregateKind, eQuerySearchType,
+            mrWorkbook.mbSearchCriteriaMustApplyToWholeCell);
+        return aResult ? makeScalarResult(aResult.maValue) : makeFailure(aResult.meError);
+    }
+
+    return makeFailure(api::Error::IllegalArgument);
 }
 
 api::ValueResult<bool> Evaluator::scanAggregateScanArgument(
