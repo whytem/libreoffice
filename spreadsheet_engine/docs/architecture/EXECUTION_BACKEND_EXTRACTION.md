@@ -45,7 +45,7 @@ The starting handoff from the completed recalc-orchestration milestone is:
 
 ## Current Status
 
-This milestone is now active with its first two phases complete.
+This milestone is now active with its first three phases complete.
 
 - Phase 0 is complete: the orchestration/execution boundary is explicitly
   documented, the first helper duplication inventory is frozen, and the Phase 1
@@ -53,8 +53,10 @@ This milestone is now active with its first two phases complete.
 - Phase 1 is complete: engine-owned scalar coercion and text-position
   normalization helpers now exist, standalone consumes them directly, and Calc
   reaches the same normalization path through thin adapters in `ScInterpreter`
-- Phase 2 is the active implementation frontier
-- Phase 3 remains high-level until the token-walking helper surface is stable
+- Phase 2 is complete: Calc's operator-dispatch shell now routes comparison
+  operators, logical folds, unary matrix/scalar operators, and synthetic binary
+  dispatch through shared interpreter-shell helpers with focused Calc coverage
+- Phase 3 is now the active implementation frontier
 
 The starting baseline for this milestone is:
 
@@ -409,6 +411,8 @@ Completion criteria for Phase 1, now met:
 
 ### Phase 2: Extract Token Walking / Stack Shell Helpers
 
+Status: **Complete**
+
 Goals:
 
 - move reusable execution-shell mechanics out of Calc while leaving Calc as
@@ -419,6 +423,41 @@ Deliverables:
 - engine/compat helpers for stack walking and token dispatch support
 - reduced Calc-local evaluator shell logic
 - differential validation around stack-sensitive functions
+
+Implemented outcome:
+
+Phase 2 landed the first bounded stack-shell extraction surface rather than a
+full `ScInterpreter` rewrite. Calc now routes the operator-dispatch shell
+through extracted helpers for:
+
+- scalar and matrix comparison dispatch (`=`, `<>`, `<`, `>`, `<=`, `>=`)
+- stack-driven logical folds (`AND`, `OR`, `XOR`)
+- unary matrix/scalar operator dispatch (`NOT`, unary minus)
+- synthetic binary dispatch for percent-sign execution
+
+Implemented in:
+
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx`
+- `sc/source/core/inc/interpre.hxx`
+- `sc/source/core/tool/interpr1.cxx`
+- `sc/qa/unit/ucalc_formula2.cxx`
+
+What Phase 2 intentionally did not move:
+
+- general token walking across the full opcode dispatcher
+- short-circuit and jump stack behavior
+- reference-list traversal beyond the operator/logical shell
+- host-mediated reference and matrix iteration outside the bounded operator
+  surface
+
+Completion criteria for Phase 2, now met:
+
+- the first operator-shell helper family is extracted behind a compat/shared
+  dispatch surface
+- Calc-local duplication in `interpr1.cxx` is materially reduced for the
+  migrated operators
+- focused Calc tests cover scalar, range, matrix, and synthetic-dispatch cases
+- the full standalone and replay validation baseline remains green
 
 ### Phase 3: Extract Reference-Sensitive Execution Slices
 
@@ -459,6 +498,10 @@ Suggested standalone additions for Phase 1:
 - dedicated unit tests for the new coercion helper layer
 - targeted evaluator tests proving `FormulaEvaluator` now consumes that layer
 
+Suggested focused Calc lane for Phase 2:
+
+- `make -j4 CppunitTest_sc_ucalc_formula2`
+
 ## Critical Files
 
 | File | Role |
@@ -466,6 +509,7 @@ Suggested standalone additions for Phase 1:
 | [PROJECT_STATUS.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/PROJECT_STATUS.md) | Consolidated project state and roadmap |
 | [RECALC_ORCHESTRATION_EXTRACTION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/RECALC_ORCHESTRATION_EXTRACTION.md) | Completed orchestration milestone and handoff boundary |
 | [RecalcQueueExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/RecalcQueueExecution.hxx) | Calc bridge that consumes engine-owned recalc queue output |
+| [InterpreterDispatch.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx) | Shared compat support for Calc operator dispatch and logical-fold shell helpers |
 | [FormulaEvaluator.cxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/source/core/FormulaEvaluator.cxx) | Standalone execution shell reference point |
 | [FormulaEvaluatorInternals.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/source/core/FormulaEvaluatorInternals.hxx) | Current standalone coercion and evaluator-helper concentration point |
 | [formulacell.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/data/formulacell.cxx) | Calc formula-cell execution host |

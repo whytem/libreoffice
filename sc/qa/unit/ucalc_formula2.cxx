@@ -473,6 +473,52 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedStatisticalDelegations)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterOperatorDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+
+    m_pDoc->InsertTab(0, u"Ops"_ustr);
+
+    m_pDoc->SetValue(ScAddress(0, 0, 0), 1.0);
+    m_pDoc->SetValue(ScAddress(0, 1, 0), 0.0);
+
+    m_pDoc->SetString(ScAddress(1, 0, 0), u"=AND(A1:A2)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(false, static_cast<bool>(m_pDoc->GetValue(ScAddress(1, 0, 0))));
+
+    m_pDoc->SetString(ScAddress(1, 1, 0), u"=OR(A1:A2)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(1, 1, 0))));
+
+    m_pDoc->SetString(ScAddress(1, 2, 0), u"=XOR(A1:A2)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(1, 2, 0))));
+
+    m_pDoc->SetString(ScAddress(1, 3, 0), u"=NOT(A2)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(1, 3, 0))));
+
+    m_pDoc->SetString(ScAddress(1, 4, 0), u"=-A1"_ustr);
+    ASSERT_DOUBLES_EQUAL(-1.0, m_pDoc->GetValue(ScAddress(1, 4, 0)));
+
+    m_pDoc->SetString(ScAddress(1, 5, 0), u"=50%"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(ScAddress(1, 5, 0)));
+
+    m_pDoc->SetString(ScAddress(1, 6, 0), u"=A1=A2"_ustr);
+    CPPUNIT_ASSERT_EQUAL(false, static_cast<bool>(m_pDoc->GetValue(ScAddress(1, 6, 0))));
+
+    m_pDoc->SetString(ScAddress(1, 7, 0), u"=A1>A2"_ustr);
+    CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(1, 7, 0))));
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+    m_pDoc->InsertMatrixFormula(2, 0, 2, 1, aMark, u"=A1:A2>0"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(ScAddress(2, 0, 0)));
+    CPPUNIT_ASSERT_EQUAL(u"FALSE"_ustr, m_pDoc->GetString(ScAddress(2, 1, 0)));
+
+    m_pDoc->InsertMatrixFormula(3, 0, 3, 1, aMark, u"=NOT(A1:A2)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"FALSE"_ustr, m_pDoc->GetString(ScAddress(3, 0, 0)));
+    CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(ScAddress(3, 1, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncIFERROR)
 {
     // IFERROR/IFNA (fdo#56124)

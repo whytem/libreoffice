@@ -34,6 +34,7 @@
 #include <sortparam.hxx>
 #include "parclass.hxx"
 #include <lookupsearchmode.hxx>
+#include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 
 #include <unordered_map>
@@ -749,6 +750,14 @@ private:
     void ScWrapRows();
 
 private:
+    void ScCompareOp(
+        spreadsheetengine::compat::libreoffice::interpreterdispatch::ComparisonMode eMode,
+        ScQueryOp eOp);
+    void ScLogicalFoldOp(
+        spreadsheetengine::compat::libreoffice::interpreterdispatch::LogicalFoldMode eMode);
+    void ScUnaryMatrixOrScalarOp(
+        spreadsheetengine::compat::libreoffice::interpreterdispatch::UnaryMatrixScalarMode eMode);
+    void ScSyntheticBinaryOp(OpCode eOpCode, void (ScInterpreter::*pOperation)());
     void ScTextBeforeOrAfter(bool bBefore);
     void ScChooseColsOrRows(bool bCols);
     void ScToColOrRow(bool bCol);

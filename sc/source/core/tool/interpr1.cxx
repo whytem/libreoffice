@@ -63,6 +63,7 @@
 #include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Reference.hxx>
 #include <spreadsheetengine/api/StringReference.hxx>
+#include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
 #include <spreadsheetengine/runtime/MathAggregate.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
@@ -101,6 +102,7 @@ namespace selogic = spreadsheetengine::api::logic;
 namespace selookup = spreadsheetengine::api::lookup;
 namespace seref = spreadsheetengine::api::reference;
 namespace sestringref = spreadsheetengine::api::stringreference;
+namespace seinterpre = spreadsheetengine::compat::libreoffice::interpreterdispatch;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 
 namespace
@@ -1258,11 +1260,11 @@ ScMatrixRef ScInterpreter::QueryMat( const ScMatrixRef& pMat, sc::CompareOptions
     return pResultMatrix;
 }
 
-void ScInterpreter::ScEqual()
+void ScInterpreter::ScCompareOp(seinterpre::ComparisonMode eMode, ScQueryOp eOp)
 {
-    if ( GetStackType(1) == svMatrix || GetStackType(2) == svMatrix )
+    if (GetStackType(1) == svMatrix || GetStackType(2) == svMatrix)
     {
-        sc::RangeMatrix aMat = CompareMat(SC_EQUAL);
+        sc::RangeMatrix aMat = CompareMat(eOp);
         if (!aMat.mpMat)
         {
             PushIllegalParameter();
@@ -1270,393 +1272,211 @@ void ScInterpreter::ScEqual()
         }
 
         PushMatrix(aMat);
+        return;
     }
+
+    PushInt(int(seinterpre::matchesComparisonResult(Compare(eOp), eMode)));
+}
+
+void ScInterpreter::ScLogicalFoldOp(seinterpre::LogicalFoldMode eMode)
+{
+    nFuncFmtType = SvNumFormatType::LOGICAL;
+    short nParamCount = GetByte();
+    if (!MustHaveParamCountMin(nParamCount, 1))
+        return;
+
+    bool bHaveValue = false;
+    bool bRes = seinterpre::initialLogicalFoldValue(eMode);
+    size_t nRefInList = 0;
+
+    const auto foldValue = [&](bool bValue) {
+        bHaveValue = true;
+        bRes = seinterpre::foldLogicalValue(eMode, bRes, bValue);
+    };
+
+    while (nParamCount-- > 0)
+    {
+        if (nGlobalError == FormulaError::NONE)
+        {
+            switch (GetStackType())
+            {
+                case svDouble:
+                    foldValue(PopDouble() != 0.0);
+                break;
+                case svString:
+                    Pop();
+                    SetError(FormulaError::NoValue);
+                break;
+                case svSingleRef:
+                {
+                    ScAddress aAdr;
+                    PopSingleRef(aAdr);
+                    if (nGlobalError == FormulaError::NONE)
+                    {
+                        ScRefCellValue aCell(mrDoc, aAdr);
+                        if (aCell.hasNumeric())
+                            foldValue(GetCellValue(aAdr, aCell) != 0.0);
+                    }
+                }
+                break;
+                case svDoubleRef:
+                case svRefList:
+                {
+                    ScRange aRange;
+                    PopDoubleRef(aRange, nParamCount, nRefInList);
+                    if (nGlobalError == FormulaError::NONE)
+                    {
+                        double fVal;
+                        FormulaError nErr = FormulaError::NONE;
+                        ScValueIterator aValIter(mrContext, aRange);
+                        if (aValIter.GetFirst(fVal, nErr))
+                        {
+                            do
+                            {
+                                foldValue(fVal != 0.0);
+                            } while (nErr == FormulaError::NONE && aValIter.GetNext(fVal, nErr));
+                        }
+                        SetError(nErr);
+                    }
+                }
+                break;
+                case svExternalSingleRef:
+                case svExternalDoubleRef:
+                case svMatrix:
+                {
+                    ScMatrixRef pMat = GetMatrix();
+                    if (pMat)
+                    {
+                        double fVal = 0.0;
+                        switch (eMode)
+                        {
+                            case seinterpre::LogicalFoldMode::And:
+                                fVal = pMat->And();
+                            break;
+                            case seinterpre::LogicalFoldMode::Or:
+                                fVal = pMat->Or();
+                            break;
+                            case seinterpre::LogicalFoldMode::Xor:
+                                fVal = pMat->Xor();
+                            break;
+                        }
+
+                        FormulaError nErr = GetDoubleErrorValue(fVal);
+                        if (nErr != FormulaError::NONE)
+                        {
+                            SetError(nErr);
+                            bRes = false;
+                        }
+                        else
+                            foldValue(fVal != 0.0);
+                    }
+                }
+                break;
+                default:
+                    PopError();
+                    SetError(FormulaError::IllegalParameter);
+            }
+        }
+        else
+            Pop();
+    }
+
+    if (bHaveValue)
+        PushInt(int(bRes));
     else
-        PushInt( int(Compare( SC_EQUAL) == 0) );
+        PushNoValue();
+}
+
+void ScInterpreter::ScUnaryMatrixOrScalarOp(seinterpre::UnaryMatrixScalarMode eMode)
+{
+    switch (GetStackType())
+    {
+        case svMatrix:
+        {
+            ScMatrixRef pMat = GetMatrix();
+            if (!pMat)
+                PushIllegalParameter();
+            else
+            {
+                SCSIZE nC, nR;
+                pMat->GetDimensions(nC, nR);
+                ScMatrixRef pResMat = GetNewMat(nC, nR, /*bEmpty*/true);
+                if (!pResMat)
+                    PushIllegalArgument();
+                else
+                {
+                    if (eMode == seinterpre::UnaryMatrixScalarMode::Negate)
+                        pMat->NegOp(*pResMat);
+                    else
+                        pMat->NotOp(*pResMat);
+                    PushMatrix(pResMat);
+                }
+            }
+        }
+        break;
+        default:
+            if (eMode == seinterpre::UnaryMatrixScalarMode::Negate)
+                PushDouble(-GetDouble());
+            else
+                PushInt(int(GetDouble() == 0.0));
+    }
+}
+
+void ScInterpreter::ScSyntheticBinaryOp(OpCode eOpCode, void (ScInterpreter::*pOperation)())
+{
+    const FormulaToken* pSaveCur = pCur;
+    const sal_uInt8 nSavePar = cPar;
+    cPar = 2;
+    FormulaByteToken aOperation(eOpCode, cPar);
+    pCur = &aOperation;
+    (this->*pOperation)();
+    pCur = pSaveCur;
+    cPar = nSavePar;
+}
+
+void ScInterpreter::ScEqual()
+{
+    ScCompareOp(seinterpre::ComparisonMode::Equal, SC_EQUAL);
 }
 
 void ScInterpreter::ScNotEqual()
 {
-    if ( GetStackType(1) == svMatrix || GetStackType(2) == svMatrix )
-    {
-        sc::RangeMatrix aMat = CompareMat(SC_NOT_EQUAL);
-        if (!aMat.mpMat)
-        {
-            PushIllegalParameter();
-            return;
-        }
-
-        PushMatrix(aMat);
-    }
-    else
-        PushInt( int(Compare( SC_NOT_EQUAL) != 0) );
+    ScCompareOp(seinterpre::ComparisonMode::NotEqual, SC_NOT_EQUAL);
 }
 
 void ScInterpreter::ScLess()
 {
-    if ( GetStackType(1) == svMatrix || GetStackType(2) == svMatrix )
-    {
-        sc::RangeMatrix aMat = CompareMat(SC_LESS);
-        if (!aMat.mpMat)
-        {
-            PushIllegalParameter();
-            return;
-        }
-
-        PushMatrix(aMat);
-    }
-    else
-        PushInt( int(Compare( SC_LESS) < 0) );
+    ScCompareOp(seinterpre::ComparisonMode::Less, SC_LESS);
 }
 
 void ScInterpreter::ScGreater()
 {
-    if ( GetStackType(1) == svMatrix || GetStackType(2) == svMatrix )
-    {
-        sc::RangeMatrix aMat = CompareMat(SC_GREATER);
-        if (!aMat.mpMat)
-        {
-            PushIllegalParameter();
-            return;
-        }
-
-        PushMatrix(aMat);
-    }
-    else
-        PushInt( int(Compare( SC_GREATER) > 0) );
+    ScCompareOp(seinterpre::ComparisonMode::Greater, SC_GREATER);
 }
 
 void ScInterpreter::ScLessEqual()
 {
-    if ( GetStackType(1) == svMatrix || GetStackType(2) == svMatrix )
-    {
-        sc::RangeMatrix aMat = CompareMat(SC_LESS_EQUAL);
-        if (!aMat.mpMat)
-        {
-            PushIllegalParameter();
-            return;
-        }
-
-        PushMatrix(aMat);
-    }
-    else
-        PushInt( int(Compare( SC_LESS_EQUAL) <= 0) );
+    ScCompareOp(seinterpre::ComparisonMode::LessEqual, SC_LESS_EQUAL);
 }
 
 void ScInterpreter::ScGreaterEqual()
 {
-    if ( GetStackType(1) == svMatrix || GetStackType(2) == svMatrix )
-    {
-        sc::RangeMatrix aMat = CompareMat(SC_GREATER_EQUAL);
-        if (!aMat.mpMat)
-        {
-            PushIllegalParameter();
-            return;
-        }
-
-        PushMatrix(aMat);
-    }
-    else
-        PushInt( int(Compare( SC_GREATER_EQUAL) >= 0) );
+    ScCompareOp(seinterpre::ComparisonMode::GreaterEqual, SC_GREATER_EQUAL);
 }
 
 void ScInterpreter::ScAnd()
 {
-    nFuncFmtType = SvNumFormatType::LOGICAL;
-    short nParamCount = GetByte();
-    if ( !MustHaveParamCountMin( nParamCount, 1 ) )
-        return;
-
-    bool bHaveValue = false;
-    bool bRes = true;
-    size_t nRefInList = 0;
-    while( nParamCount-- > 0)
-    {
-        if ( nGlobalError == FormulaError::NONE )
-        {
-            switch ( GetStackType() )
-            {
-                case svDouble :
-                    bHaveValue = true;
-                    bRes &= ( PopDouble() != 0.0 );
-                break;
-                case svString :
-                    Pop();
-                    SetError( FormulaError::NoValue );
-                break;
-                case svSingleRef :
-                {
-                    ScAddress aAdr;
-                    PopSingleRef( aAdr );
-                    if ( nGlobalError == FormulaError::NONE )
-                    {
-                        ScRefCellValue aCell(mrDoc, aAdr);
-                        if (aCell.hasNumeric())
-                        {
-                            bHaveValue = true;
-                            bRes &= ( GetCellValue(aAdr, aCell) != 0.0 );
-                        }
-                        // else: Xcl raises no error here
-                    }
-                }
-                break;
-                case svDoubleRef:
-                case svRefList:
-                {
-                    ScRange aRange;
-                    PopDoubleRef( aRange, nParamCount, nRefInList);
-                    if ( nGlobalError == FormulaError::NONE )
-                    {
-                        double fVal;
-                        FormulaError nErr = FormulaError::NONE;
-                        ScValueIterator aValIter( mrContext, aRange );
-                        if ( aValIter.GetFirst( fVal, nErr ) && nErr == FormulaError::NONE )
-                        {
-                            bHaveValue = true;
-                            do
-                            {
-                                bRes &= ( fVal != 0.0 );
-                            } while ( (nErr == FormulaError::NONE) &&
-                                aValIter.GetNext( fVal, nErr ) );
-                        }
-                        SetError( nErr );
-                    }
-                }
-                break;
-                case svExternalSingleRef:
-                case svExternalDoubleRef:
-                case svMatrix:
-                {
-                    ScMatrixRef pMat = GetMatrix();
-                    if ( pMat )
-                    {
-                        bHaveValue = true;
-                        double fVal = pMat->And();
-                        FormulaError nErr = GetDoubleErrorValue( fVal );
-                        if ( nErr != FormulaError::NONE )
-                        {
-                            SetError( nErr );
-                            bRes = false;
-                        }
-                        else
-                            bRes &= (fVal != 0.0);
-                    }
-                    // else: GetMatrix did set FormulaError::IllegalParameter
-                }
-                break;
-                default:
-                    PopError();
-                    SetError( FormulaError::IllegalParameter);
-            }
-        }
-        else
-            Pop();
-    }
-    if ( bHaveValue )
-        PushInt( int(bRes) );
-    else
-        PushNoValue();
+    ScLogicalFoldOp(seinterpre::LogicalFoldMode::And);
 }
 
 void ScInterpreter::ScOr()
 {
-    nFuncFmtType = SvNumFormatType::LOGICAL;
-    short nParamCount = GetByte();
-    if ( !MustHaveParamCountMin( nParamCount, 1 ) )
-        return;
-
-    bool bHaveValue = false;
-    bool bRes = false;
-    size_t nRefInList = 0;
-    while( nParamCount-- > 0)
-    {
-        if ( nGlobalError == FormulaError::NONE )
-        {
-            switch ( GetStackType() )
-            {
-                case svDouble :
-                    bHaveValue = true;
-                    bRes |= ( PopDouble() != 0.0 );
-                break;
-                case svString :
-                    Pop();
-                    SetError( FormulaError::NoValue );
-                break;
-                case svSingleRef :
-                {
-                    ScAddress aAdr;
-                    PopSingleRef( aAdr );
-                    if ( nGlobalError == FormulaError::NONE )
-                    {
-                        ScRefCellValue aCell(mrDoc, aAdr);
-                        if (aCell.hasNumeric())
-                        {
-                            bHaveValue = true;
-                            bRes |= ( GetCellValue(aAdr, aCell) != 0.0 );
-                        }
-                        // else: Xcl raises no error here
-                    }
-                }
-                break;
-                case svDoubleRef:
-                case svRefList:
-                {
-                    ScRange aRange;
-                    PopDoubleRef( aRange, nParamCount, nRefInList);
-                    if ( nGlobalError == FormulaError::NONE )
-                    {
-                        double fVal;
-                        FormulaError nErr = FormulaError::NONE;
-                        ScValueIterator aValIter( mrContext, aRange );
-                        if ( aValIter.GetFirst( fVal, nErr ) && nErr == FormulaError::NONE )
-                        {
-                            bHaveValue = true;
-                            do
-                            {
-                                bRes |= ( fVal != 0.0 );
-                            } while ( (nErr == FormulaError::NONE) &&
-                                aValIter.GetNext( fVal, nErr ) );
-                        }
-                        SetError( nErr );
-                    }
-                }
-                break;
-                case svExternalSingleRef:
-                case svExternalDoubleRef:
-                case svMatrix:
-                {
-                    bHaveValue = true;
-                    ScMatrixRef pMat = GetMatrix();
-                    if ( pMat )
-                    {
-                        bHaveValue = true;
-                        double fVal = pMat->Or();
-                        FormulaError nErr = GetDoubleErrorValue( fVal );
-                        if ( nErr != FormulaError::NONE )
-                        {
-                            SetError( nErr );
-                            bRes = false;
-                        }
-                        else
-                            bRes |= (fVal != 0.0);
-                    }
-                    // else: GetMatrix did set FormulaError::IllegalParameter
-                }
-                break;
-                default:
-                    PopError();
-                    SetError( FormulaError::IllegalParameter);
-            }
-        }
-        else
-            Pop();
-    }
-    if ( bHaveValue )
-        PushInt( int(bRes) );
-    else
-        PushNoValue();
+    ScLogicalFoldOp(seinterpre::LogicalFoldMode::Or);
 }
 
 void ScInterpreter::ScXor()
 {
-
-    nFuncFmtType = SvNumFormatType::LOGICAL;
-    short nParamCount = GetByte();
-    if ( !MustHaveParamCountMin( nParamCount, 1 ) )
-        return;
-
-    bool bHaveValue = false;
-    bool bRes = false;
-    size_t nRefInList = 0;
-    while( nParamCount-- > 0)
-    {
-        if ( nGlobalError == FormulaError::NONE )
-        {
-            switch ( GetStackType() )
-            {
-                case svDouble :
-                    bHaveValue = true;
-                    bRes ^= ( PopDouble() != 0.0 );
-                break;
-                case svString :
-                    Pop();
-                    SetError( FormulaError::NoValue );
-                break;
-                case svSingleRef :
-                {
-                    ScAddress aAdr;
-                    PopSingleRef( aAdr );
-                    if ( nGlobalError == FormulaError::NONE )
-                    {
-                        ScRefCellValue aCell(mrDoc, aAdr);
-                        if (aCell.hasNumeric())
-                        {
-                            bHaveValue = true;
-                            bRes ^= ( GetCellValue(aAdr, aCell) != 0.0 );
-                        }
-                        /* TODO: set error? Excel doesn't have XOR, but
-                         * doesn't set an error in this case for AND and
-                         * OR. */
-                    }
-                }
-                break;
-                case svDoubleRef:
-                case svRefList:
-                {
-                    ScRange aRange;
-                    PopDoubleRef( aRange, nParamCount, nRefInList);
-                    if ( nGlobalError == FormulaError::NONE )
-                    {
-                        double fVal;
-                        FormulaError nErr = FormulaError::NONE;
-                        ScValueIterator aValIter( mrContext, aRange );
-                        if ( aValIter.GetFirst( fVal, nErr ) )
-                        {
-                            bHaveValue = true;
-                            do
-                            {
-                                bRes ^= ( fVal != 0.0 );
-                            } while ( (nErr == FormulaError::NONE) &&
-                                aValIter.GetNext( fVal, nErr ) );
-                        }
-                        SetError( nErr );
-                    }
-                }
-                break;
-                case svExternalSingleRef:
-                case svExternalDoubleRef:
-                case svMatrix:
-                {
-                    bHaveValue = true;
-                    ScMatrixRef pMat = GetMatrix();
-                    if ( pMat )
-                    {
-                        bHaveValue = true;
-                        double fVal = pMat->Xor();
-                        FormulaError nErr = GetDoubleErrorValue( fVal );
-                        if ( nErr != FormulaError::NONE )
-                        {
-                            SetError( nErr );
-                            bRes = false;
-                        }
-                        else
-                            bRes ^= ( fVal != 0.0 );
-                    }
-                    // else: GetMatrix did set FormulaError::IllegalParameter
-                }
-                break;
-                default:
-                    PopError();
-                    SetError( FormulaError::IllegalParameter);
-            }
-        }
-        else
-            Pop();
-    }
-    if ( bHaveValue )
-        PushInt( int(bRes) );
-    else
-        PushNoValue();
+    ScLogicalFoldOp(seinterpre::LogicalFoldMode::Xor);
 }
 
 void ScInterpreter::ScNeg()
@@ -1664,75 +1484,20 @@ void ScInterpreter::ScNeg()
     // Simple negation doesn't change current format type to number, keep
     // current type.
     nFuncFmtType = nCurFmtType;
-    switch ( GetStackType() )
-    {
-        case svMatrix :
-        {
-            ScMatrixRef pMat = GetMatrix();
-            if ( !pMat )
-                PushIllegalParameter();
-            else
-            {
-                SCSIZE nC, nR;
-                pMat->GetDimensions( nC, nR );
-                ScMatrixRef pResMat = GetNewMat( nC, nR, /*bEmpty*/true );
-                if ( !pResMat )
-                    PushIllegalArgument();
-                else
-                {
-                    pMat->NegOp( *pResMat);
-                    PushMatrix( pResMat );
-                }
-            }
-        }
-        break;
-        default:
-            PushDouble( -GetDouble() );
-    }
+    ScUnaryMatrixOrScalarOp(seinterpre::UnaryMatrixScalarMode::Negate);
 }
 
 void ScInterpreter::ScPercentSign()
 {
     nFuncFmtType = SvNumFormatType::PERCENT;
-    const FormulaToken* pSaveCur = pCur;
-    sal_uInt8 nSavePar = cPar;
     PushInt( 100 );
-    cPar = 2;
-    FormulaByteToken aDivOp( ocDiv, cPar );
-    pCur = &aDivOp;
-    ScDiv();
-    pCur = pSaveCur;
-    cPar = nSavePar;
+    ScSyntheticBinaryOp(ocDiv, &ScInterpreter::ScDiv);
 }
 
 void ScInterpreter::ScNot()
 {
     nFuncFmtType = SvNumFormatType::LOGICAL;
-    switch ( GetStackType() )
-    {
-        case svMatrix :
-        {
-            ScMatrixRef pMat = GetMatrix();
-            if ( !pMat )
-                PushIllegalParameter();
-            else
-            {
-                SCSIZE nC, nR;
-                pMat->GetDimensions( nC, nR );
-                ScMatrixRef pResMat = GetNewMat( nC, nR, /*bEmpty*/true);
-                if ( !pResMat )
-                    PushIllegalArgument();
-                else
-                {
-                    pMat->NotOp( *pResMat);
-                    PushMatrix( pResMat );
-                }
-            }
-        }
-        break;
-        default:
-            PushInt( int(GetDouble() == 0.0) );
-    }
+    ScUnaryMatrixOrScalarOp(seinterpre::UnaryMatrixScalarMode::LogicalNot);
 }
 
 void ScInterpreter::ScBitAnd()

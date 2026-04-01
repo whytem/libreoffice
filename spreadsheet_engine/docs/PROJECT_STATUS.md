@@ -46,7 +46,7 @@ is now also in closeout status.
 | Recalc orchestration extraction | **Complete** | Engine-owned recalc planning, queue construction, authority pilots, and Calc queue-consumption bridge are complete through the safe structural/named-range pilot surface |
 | FormulaEvaluator runtime modularization | **Complete** | The old evaluator monolith has been split across focused runtime and support modules such as `LookupRuntime`, `QueryRuntime`, `TextFunctionRuntime`, `DateTimeParse`, `FinancialRuntime`, `MathAggregate`, `MathFunctionRuntime`, and `ConversionRuntime` |
 | Calc pure-computation convergence | **Complete** | Calc now delegates the in-scope pure-computation statistical, aggregate, inverse-distribution, combinatoric, and error-function families to the same shared runtime modules used by standalone, with Calc-aligned algorithms adopted where behavior risk existed |
-| Execution backend extraction | **Active** | Phase 0 and Phase 1 are complete: the execution boundary is frozen, shared scalar coercion helpers are engine-owned, and Calc/standalone now share text-position normalization semantics while Phase 2 targets token-walking and stack-shell helpers |
+| Execution backend extraction | **Active** | Phases 0, 1, and 2 are complete: the execution boundary is frozen, shared scalar coercion helpers are engine-owned, and Calc's operator-dispatch shell now uses extracted stack/dispatch helpers while Phase 3 targets reference-sensitive execution slices |
 
 The immediate active frontier is now narrower and more practical:
 
@@ -594,8 +594,9 @@ internals. This coupling is by design:
   replay baseline
 - Keep the now-completed recalc-orchestration boundary stable while the
   execution backend moves behind it
-- Use the completed Phase 0/1 helper inventory and shared scalar-coercion layer
-  as the base for Phase 2 token-walking and stack-shell extraction in
+- Use the completed Phase 0-2 helper inventory, shared scalar-coercion layer,
+  and operator-shell dispatch helpers as the base for the Phase 3
+  reference-sensitive execution work in
   [EXECUTION_BACKEND_EXTRACTION.md](architecture/EXECUTION_BACKEND_EXTRACTION.md)
 
 ### Active Milestone: Execution Backend Extraction
@@ -623,23 +624,23 @@ The completed recalc-orchestration milestone landed:
 - Phase 6 isolated Calc queue consumption behind a dedicated compat bridge and
   opened the next execution-backend milestone from that stable boundary
 
-The active implementation frontier now starts at **Phase 2: Extract Token
-Walking / Stack Shell Helpers** of the execution-backend milestone.
+The active implementation frontier now starts at **Phase 3: Extract
+Reference-Sensitive Execution Slices** of the execution-backend milestone.
 
 The recommended active sequence is:
 
-1. Keep the completed Phase 0/1 helper layer stable and green.
-2. Extract token-walking and stack-shell helpers without re-opening queue or
-   storage authority.
-3. Move reference-sensitive execution slices only after the token-walking layer
-   is stable.
+1. Keep the completed Phase 0-2 helper layers stable and green.
+2. Move the first reference-sensitive execution slices behind explicit host
+   bridges.
+3. Keep token walking, stack shell, and queue authority stable while those
+   reference-sensitive families migrate.
 
 ### Medium-term: Extract The Execution Backend On Top Of The Settled Scheduler Boundary
 
 - Keep the completed engine-owned dirty-plan and queue boundary green while
   execution slices move behind it
-- Extract shared coercion, argument normalization, and evaluator-shell helpers
-  where Calc and standalone still duplicate logic
+- Extract reference-sensitive evaluator helpers where Calc and standalone still
+  duplicate logic, building on the now-shared coercion and operator-shell layers
 - Use explicit compat bridges where Calc still needs host-owned services during
   the execution-backend transition
 - Use the completed shared-runtime convergence work as a prerequisite, not as a
