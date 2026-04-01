@@ -167,9 +167,32 @@ scattered Calc state.
 If planner fidelity is incomplete, prefer safe over-invalidation or queue
 widening over under-recalculation.
 
+## Phase Status
+
+The milestone is now past the setup stage:
+
+- **Phase 0:** complete
+- **Phase 1:** complete
+- **Phase 2:** complete
+- **Phase 3+:** still open
+
+What landed through Phase 2:
+
+- engine-owned recalc planning types in
+  `detail/dependency/RecalcPlanner.hxx`
+- queue construction on top of `InvalidationPlan`
+- group-policy and structural-rebuild metadata on queue entries
+- Calc-side scheduler shadow comparison in
+  `compat/libreoffice/RecalcShadow.hxx`
+- runtime shadow logging hooks for `SetValue`, `SetString`, and `SetEmptyCell`
+- dedicated standalone and Calc validation lanes for queue planning and queue
+  comparison
+
 ## Proposed Phases
 
 ### Phase 0: Freeze Baseline And Instrumentation
+
+Status: **Complete**
 
 Goals:
 
@@ -183,7 +206,17 @@ Deliverables:
 - milestone doc committed under `docs/architecture/`
 - explicit validation lane list for scheduler-shadow work
 
+Validation lanes now frozen for this milestone stage:
+
+- `spreadsheetengine_recalc_planner_tests`
+- `spreadsheetengine_dependency_invalidation_tests`
+- `CppunitTest_sc_ucalc_dependency_shadow`
+- `spreadsheetengine_fods_evaluator_tests`
+- `spreadsheetengine_fods_replay_tests --summary`
+
 ### Phase 1: Engine-Owned Recalc Types
+
+Status: **Complete**
 
 Goals:
 
@@ -196,12 +229,19 @@ Deliverables:
 - group-policy and structural-rebuild markers
 - standalone unit tests for queue construction on synthetic dependency graphs
 
+Implemented in:
+
+- `spreadsheet_engine/inc/spreadsheetengine/detail/dependency/RecalcPlanner.hxx`
+- `spreadsheet_engine/tests/unit/recalc_planner_tests.cxx`
+
 Likely file area:
 
 - `spreadsheet_engine/inc/spreadsheetengine/detail/dependency/`
 - `spreadsheet_engine/source/core/`
 
 ### Phase 2: Shadow Scheduler In Calc
+
+Status: **Complete**
 
 Goals:
 
@@ -213,6 +253,12 @@ Deliverables:
 - Calc compat/shadow adapter for recalc planning
 - dedicated Calc shadow tests for non-structural edits
 - first diagnostic diff reporting for queue mismatches
+
+Implemented in:
+
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/RecalcShadow.hxx`
+- `sc/qa/unit/ucalc_dependency_shadow.cxx`
+- `sc/source/core/data/document.cxx`
 
 Likely initial mutation families:
 

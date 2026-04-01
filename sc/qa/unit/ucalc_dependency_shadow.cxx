@@ -17,6 +17,7 @@
 #include <scopetools.hxx>
 #include <spreadsheetengine/compat/libreoffice/DependencyShadow.hxx>
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
+#include <spreadsheetengine/compat/libreoffice/RecalcShadow.hxx>
 #include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
 #include <spreadsheetengine/detail/dependency/DependencySnapshot.hxx>
 #include <spreadsheetengine/detail/dependency/InvalidationPlanner.hxx>
@@ -32,6 +33,9 @@ using spreadsheetengine::api::CellAddress;
 using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
 using spreadsheetengine::compat::libreoffice::dependencyshadow::ScopedInvalidationShadow;
 using spreadsheetengine::compat::libreoffice::dependencyshadow::ShadowComparisonKind;
+using spreadsheetengine::compat::libreoffice::recalcshadow::ScopedRecalcShadow;
+using RecalcShadowComparisonKind
+    = spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparisonKind;
 using spreadsheetengine::detail::dependency::DirtyFormulaCell;
 
 struct AddressLess
@@ -86,6 +90,14 @@ void assertNotUnderInvalidation(
 {
     CPPUNIT_ASSERT(oComparison.has_value());
     CPPUNIT_ASSERT(oComparison->meKind != ShadowComparisonKind::UnderInvalidation);
+}
+
+void assertExactRecalcShadow(
+    const std::optional<spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparison>&
+        oComparison)
+{
+    CPPUNIT_ASSERT(oComparison.has_value());
+    CPPUNIT_ASSERT_EQUAL(RecalcShadowComparisonKind::Exact, oComparison->meKind);
 }
 
 } // namespace
@@ -301,6 +313,116 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testRuntimeDependencyShadowAudit)
         = aShadow.compare(*m_pDoc, translateSetScalarValue(ScAddress(0, 0, 0)));
     CPPUNIT_ASSERT(oComparison.has_value());
     CPPUNIT_ASSERT_EQUAL(ShadowComparisonKind::Exact, oComparison->meKind);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testSetValueRecalcShadow)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=B1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedRecalcShadow aShadow(*m_pDoc, true);
+    CPPUNIT_ASSERT(aShadow.isCaptured());
+
+    m_pDoc->SetValue(0, 0, 0, 9.0);
+    assertExactRecalcShadow(
+        aShadow.compare(*m_pDoc, translateSetScalarValue(ScAddress(0, 0, 0))));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testSetStringScalarRecalcShadow)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetString(0, 0, 0, u"a"_ustr);
+    m_pDoc->SetString(1, 0, 0, u"=LEN(A1)"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=B1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedRecalcShadow aShadow(*m_pDoc, true);
+    m_pDoc->SetString(0, 0, 0, u"alpha"_ustr);
+
+    assertExactRecalcShadow(
+        aShadow.compare(*m_pDoc, translateSetScalarValue(ScAddress(0, 0, 0))));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testSetFormulaRecalcShadow)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=B1+1"_ustr);
+    m_pDoc->SetString(3, 0, 0, u"=B1+2"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedRecalcShadow aShadow(*m_pDoc, true);
+    m_pDoc->SetString(1, 0, 0, u"=A1*3"_ustr);
+
+    assertExactRecalcShadow(
+        aShadow.compare(*m_pDoc, translateSetFormula(ScAddress(1, 0, 0), u"=A1*3"_ustr)));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testClearCellRecalcShadow)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateClearCell;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=B1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedRecalcShadow aShadow(*m_pDoc, true);
+    m_pDoc->SetEmptyCell(ScAddress(0, 0, 0));
+
+    assertExactRecalcShadow(
+        aShadow.compare(*m_pDoc, translateClearCell(ScAddress(0, 0, 0))));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testClearRangeRecalcShadow)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateClearRange;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetString(1, 0, 0, u"=SUM(A1:A2)"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=B1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedRecalcShadow aShadow(*m_pDoc, true);
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+    m_pDoc->DeleteArea(0, 0, 0, 1, aMark, InsertDeleteFlags::CONTENTS);
+
+    assertExactRecalcShadow(
+        aShadow.compare(*m_pDoc, translateClearRange(ScRange(0, 0, 0, 0, 1, 0))));
 
     m_pDoc->DeleteTab(0);
 }

@@ -503,6 +503,7 @@ target_link_libraries(myapp PRIVATE spreadsheetengine::core)
 | `spreadsheetengine_fods_replay_tests` | Raw FODS workbook replay harness |
 | `spreadsheetengine_workbook_facade_tests` | Workbook facade types, contract, consumers |
 | `spreadsheetengine_dependency_invalidation_tests` | Dependency snapshots, reverse edges, invalidation planning |
+| `spreadsheetengine_recalc_planner_tests` | Recalc seed/queue construction and group-policy planning |
 | `spreadsheetengine_installed_package_smoke` | Installed-package downstream-consumer smoke |
 
 Calc-side validation targets for the currently completed facade/compiler/
@@ -513,7 +514,7 @@ dependency/runtime-convergence work:
 - `CppunitTest_sc_ucalc_shadow_compiler`
 - `CppunitTest_sc_ucalc_compile_diff`
 - `CppunitTest_sc_ucalc_workbook_facade`
-- `CppunitTest_sc_ucalc_dependency_shadow`
+- `CppunitTest_sc_ucalc_dependency_shadow` (dependency + recalc shadow comparison)
 - `CppunitTest_sc_ucalc_formula2`
 
 ---
@@ -599,17 +600,25 @@ The next extraction program is no longer replay promotion. It is the policy
 layer that decides what becomes dirty, what order recalculation runs in, and
 how grouped/shared execution behaves after edits.
 
+Phases 0-2 of that milestone are now complete:
+
+- Phase 0 froze the zero-fallback replay baseline and the validation lanes
+- Phase 1 landed engine-owned recalc seeds, queue entries, plan results, and
+  group-policy/structural-rebuild metadata on top of the invalidation planner
+- Phase 2 landed a Calc shadow adapter that compares engine queue membership,
+  ordering, and group handling against Calc's live formula-tree state after
+  representative non-structural edits
+
+The active implementation frontier now starts at **Phase 3: Authoritative
+Dirty-Plan Pilot**.
+
 The recommended active sequence is:
 
-1. Define engine-owned recalc-plan and scheduler types on top of the completed
-   workbook facade and invalidation planner.
-2. Run the scheduler in shadow mode inside Calc and compare dirty sets, queue
-   ordering, and group/fallback behavior after representative edits.
-3. Promote selected safe mutation families to engine-owned dirty planning while
+1. Promote selected safe mutation families to engine-owned dirty planning while
    Calc still performs execution.
-4. Promote selected safe mutation families to engine-owned queue/scheduling
+2. Promote selected safe mutation families to engine-owned queue/scheduling
    policy.
-5. Expand to structural and named-range mutations only after the non-structural
+3. Expand to structural and named-range mutations only after the non-structural
    shadow lane is stable.
 
 ### Medium-term: Extract Recalculation Orchestration On Top Of The Planner
@@ -618,8 +627,8 @@ The recommended active sequence is:
   authoritative dirty-set ownership for selected safe mutation families
 - Extract recalc queue/scheduling policy on top of the completed workbook
   facade and dependency planner
-- Expand Calc runtime consumers beyond the current opt-in dependency-shadow
-  auditing hooks
+- Expand Calc runtime consumers beyond the current opt-in dependency-shadow and
+  recalc-shadow auditing hooks
 - Tighten structural-mutation and named-range mutation parity where scheduler
   extraction exposes gaps
 - Use the completed shared-runtime convergence work as a prerequisite, not as a
