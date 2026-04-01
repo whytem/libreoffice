@@ -329,6 +329,17 @@ const workbook::Cell* Evaluator::getCell(const api::CellAddress& rAddress) const
     return pSheet ? pSheet->findCell(rAddress.mnColumn, rAddress.mnRow) : nullptr;
 }
 
+std::optional<api::CellValue> Evaluator::tryGetStoredCellValue(
+    const api::CellAddress& rAddress) const
+{
+    const workbook::Cell* pCell = getCell(rAddress);
+    if (!pCell || !hasCachedFallbackValue(*pCell))
+        return std::nullopt;
+    if (const auto oTypedValue = parseTypedStoredCellValue(*pCell))
+        return oTypedValue;
+    return pCell->maValue;
+}
+
 const EvaluationResult* Evaluator::lookupLocalBinding(api::StringView rName) const
 {
     const api::String aNormalizedName = uppercaseAscii(rName);
@@ -463,6 +474,7 @@ EvaluationResult Evaluator::evaluateFunction(
         &Evaluator::tryEvaluateStatisticalRuntimeFamily,
         &Evaluator::tryEvaluateFinancialFamily,
         &Evaluator::tryEvaluateDateTimeFamily,
+        &Evaluator::tryEvaluateSpreadsheetFamily,
         &Evaluator::tryEvaluateLookupFamily,
         &Evaluator::tryEvaluateTextFamily,
         &Evaluator::tryEvaluateConversionFamily,

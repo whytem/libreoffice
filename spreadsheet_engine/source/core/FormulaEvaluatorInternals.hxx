@@ -959,6 +959,38 @@ struct Evaluator::FunctionEvalContext
             return api::ValueResult<LookupInput>::success(aInput);
         }
 
+        if (rLookupNode.meKind == formula::NodeKind::ArrayConstant)
+        {
+            if (rLookupNode.mnArrayColumns < 1 || rLookupNode.mnArrayRows < 1
+                || static_cast<sal_Int32>(rLookupNode.maChildren.size())
+                       != rLookupNode.mnArrayColumns * rLookupNode.mnArrayRows)
+            {
+                return api::ValueResult<LookupInput>::failure(api::Error::IllegalArgument);
+            }
+
+            LookupInput aInput;
+            aInput.mbScalar = false;
+            aInput.mnColumns = rLookupNode.mnArrayColumns;
+            aInput.mnRows = rLookupNode.mnArrayRows;
+            aInput.maValues.reserve(rLookupNode.maChildren.size());
+            for (const auto& pChild : rLookupNode.maChildren)
+            {
+                const auto aValue = evaluateScalarArgumentValue(*pChild);
+                if (!aValue)
+                    return api::ValueResult<LookupInput>::failure(aValue.meError);
+                aInput.maValues.push_back(aValue.maValue);
+            }
+
+            if (aInput.mnColumns == 1 && aInput.mnRows == 1 && !aInput.maValues.empty())
+            {
+                LookupInput aScalar;
+                aScalar.maScalar = aInput.maValues.front();
+                return api::ValueResult<LookupInput>::success(aScalar);
+            }
+
+            return api::ValueResult<LookupInput>::success(aInput);
+        }
+
         if (rLookupNode.meKind == formula::NodeKind::FunctionCall
             && rLookupNode.maPrimaryText == u"MMULT")
         {

@@ -69,6 +69,8 @@ class Evaluator
 
     [[nodiscard]] const workbook::Sheet* getSheet(api::SheetId nSheet) const;
     [[nodiscard]] const workbook::Cell* getCell(const api::CellAddress& rAddress) const;
+    [[nodiscard]] std::optional<api::CellValue> tryGetStoredCellValue(
+        const api::CellAddress& rAddress) const;
     [[nodiscard]] std::map<AddressKey, CacheEntry>& cacheForMode(ExecutionMode eMode);
     [[nodiscard]] EvaluationResult evaluateCellInternal(
         const api::CellAddress& rAddress, ExecutionMode eMode);
@@ -95,6 +97,9 @@ class Evaluator
         api::StringView rFunctionName, const formula::Node& rNode,
         const api::CellAddress& rCurrentAddress);
     [[nodiscard]] EvaluationResult evaluateDateTimeFamilyBody(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] EvaluationResult evaluateSpreadsheetFamilyBody(
         api::StringView rFunctionName, const formula::Node& rNode,
         const api::CellAddress& rCurrentAddress);
     [[nodiscard]] EvaluationResult evaluateLookupFamilyBody(
@@ -125,6 +130,9 @@ class Evaluator
         api::StringView rFunctionName, const formula::Node& rNode,
         const api::CellAddress& rCurrentAddress);
     [[nodiscard]] std::optional<EvaluationResult> tryEvaluateDateTimeFamily(
+        api::StringView rFunctionName, const formula::Node& rNode,
+        const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] std::optional<EvaluationResult> tryEvaluateSpreadsheetFamily(
         api::StringView rFunctionName, const formula::Node& rNode,
         const api::CellAddress& rCurrentAddress);
     [[nodiscard]] std::optional<EvaluationResult> tryEvaluateLookupFamily(

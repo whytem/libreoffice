@@ -11,6 +11,8 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
+#include <cstdio>
 
 #include <unicode/regex.h>
 
@@ -24,6 +26,193 @@ template <std::size_t N>
     api::StringView rFunctionName, const std::array<api::StringView, N>& rRegistry)
 {
     return std::find(rRegistry.begin(), rRegistry.end(), rFunctionName) != rRegistry.end();
+}
+
+[[nodiscard]] api::String asciiToApiString(std::string_view rAscii)
+{
+    api::String aText;
+    aText.reserve(rAscii.size());
+    for (const char cChar : rAscii)
+        aText.push_back(static_cast<char16_t>(cChar));
+    return aText;
+}
+
+[[nodiscard]] api::String insertThousandsSeparators(api::String aText)
+{
+    const std::size_t nDecimalPos = aText.find(u'.');
+    std::size_t nInsertPos = nDecimalPos == api::String::npos ? aText.size() : nDecimalPos;
+    while (nInsertPos > 3)
+    {
+        nInsertPos -= 3;
+        aText.insert(nInsertPos, 1, u',');
+    }
+    return aText;
+}
+
+[[nodiscard]] api::ValueResult<api::String> formatFixedDisplay(
+    double fValue, std::int32_t nDecimals, bool bThousands, bool bCurrency)
+{
+    if (!std::isfinite(fValue) || nDecimals < -15 || nDecimals > 15)
+        return api::ValueResult<api::String>::failure(api::Error::IllegalArgument);
+
+    const double fRounded = api::math::roundToDecimals(
+        fValue, static_cast<std::int16_t>(nDecimals), api::RoundingMode::Corrected);
+    if (!std::isfinite(fRounded))
+        return api::ValueResult<api::String>::failure(api::Error::IllegalArgument);
+
+    const std::int32_t nPrintedDecimals = std::max<std::int32_t>(nDecimals, 0);
+    char aBuffer[128];
+    const int nLength = std::snprintf(
+        aBuffer, sizeof(aBuffer), "%.*f", static_cast<int>(nPrintedDecimals), std::abs(fRounded));
+    if (nLength < 0)
+        return api::ValueResult<api::String>::failure(api::Error::IllegalArgument);
+
+    api::String aFormatted = asciiToApiString(
+        std::string_view(aBuffer, static_cast<std::size_t>(nLength)));
+    if (bThousands)
+        aFormatted = insertThousandsSeparators(std::move(aFormatted));
+
+    api::String aResult;
+    if (!fp::approxEqual(fRounded, 0.0) && std::signbit(fRounded))
+        aResult.push_back(u'-');
+    if (bCurrency)
+        aResult.push_back(u'$');
+    aResult += aFormatted;
+    return api::ValueResult<api::String>::success(std::move(aResult));
+}
+
+constexpr std::u16string_view TH_0      = u"ศูนย์";
+constexpr std::u16string_view TH_1      = u"หนึ่ง";
+constexpr std::u16string_view TH_2      = u"สอง";
+constexpr std::u16string_view TH_3      = u"สาม";
+constexpr std::u16string_view TH_4      = u"สี่";
+constexpr std::u16string_view TH_5      = u"ห้า";
+constexpr std::u16string_view TH_6      = u"หก";
+constexpr std::u16string_view TH_7      = u"เจ็ด";
+constexpr std::u16string_view TH_8      = u"แปด";
+constexpr std::u16string_view TH_9      = u"เก้า";
+constexpr std::u16string_view TH_10     = u"สิบ";
+constexpr std::u16string_view TH_11     = u"เอ็ด";
+constexpr std::u16string_view TH_20     = u"ยี่";
+constexpr std::u16string_view TH_1E2    = u"ร้อย";
+constexpr std::u16string_view TH_1E3    = u"พัน";
+constexpr std::u16string_view TH_1E4    = u"หมื่น";
+constexpr std::u16string_view TH_1E5    = u"แสน";
+constexpr std::u16string_view TH_1E6    = u"ล้าน";
+constexpr std::u16string_view TH_DOT0   = u"ถ้วน";
+constexpr std::u16string_view TH_BAHT   = u"บาท";
+constexpr std::u16string_view TH_SATANG = u"สตางค์";
+constexpr std::u16string_view TH_MINUS  = u"ลบ";
+
+void appendBahtDigit(api::String& rText, char cDigit)
+{
+    switch (cDigit)
+    {
+        case '1': rText += TH_1; break;
+        case '2': rText += TH_2; break;
+        case '3': rText += TH_3; break;
+        case '4': rText += TH_4; break;
+        case '5': rText += TH_5; break;
+        case '6': rText += TH_6; break;
+        case '7': rText += TH_7; break;
+        case '8': rText += TH_8; break;
+        case '9': rText += TH_9; break;
+    }
+}
+
+void appendBahtPow10(api::String& rText, char cDigit, std::int32_t nPow10)
+{
+    appendBahtDigit(rText, cDigit);
+    switch (nPow10)
+    {
+        case 2: rText += TH_1E2; break;
+        case 3: rText += TH_1E3; break;
+        case 4: rText += TH_1E4; break;
+        case 5: rText += TH_1E5; break;
+    }
+}
+
+void appendBahtBlock(api::String& rText, std::string_view rBlock)
+{
+    auto aIt = rBlock.begin();
+    for (std::size_t nPow = rBlock.size() - 1; nPow >= 2; --nPow)
+    {
+        const char cDigit = *aIt++;
+        if (cDigit != '0')
+            appendBahtPow10(rText, cDigit, static_cast<std::int32_t>(nPow));
+        if (nPow == 2)
+            break;
+    }
+
+    const char cTens = rBlock.size() > 1 ? *aIt++ : '0';
+    const char cOnes = *aIt;
+    if (cTens >= '1')
+    {
+        if (cTens >= '3')
+            appendBahtDigit(rText, cTens);
+        else if (cTens == '2')
+            rText += TH_20;
+        rText += TH_10;
+    }
+    if ((cTens > '0') && (cOnes == '1'))
+        rText += TH_11;
+    else if (cOnes > '0')
+        appendBahtDigit(rText, cOnes);
+}
+
+[[nodiscard]] api::ValueResult<api::String> formatBahtText(double fValue)
+{
+    if (!std::isfinite(fValue))
+        return api::ValueResult<api::String>::failure(api::Error::IllegalArgument);
+
+    const double fRounded = api::math::roundToDecimals(
+        fValue, 2, api::RoundingMode::Corrected);
+    char aBuffer[128];
+    const int nLength = std::snprintf(aBuffer, sizeof(aBuffer), "%.2f", std::abs(fRounded));
+    if (nLength < 4)
+        return api::ValueResult<api::String>::failure(api::Error::IllegalArgument);
+
+    const std::string aNumber(aBuffer, static_cast<std::size_t>(nLength));
+    const std::size_t nDotPos = aNumber.size() - 3;
+    std::string_view aBaht(aNumber.data(), nDotPos);
+    std::string_view aSatang(aNumber.data() + nDotPos + 1, 2);
+    const bool bNoBaht = aBaht == "0";
+    const bool bNoSatang = aSatang == "00";
+    if (bNoBaht && bNoSatang)
+        return api::ValueResult<api::String>::success(api::String(TH_0) + api::String(TH_BAHT)
+                                                      + api::String(TH_DOT0));
+
+    api::String aText;
+    if (fRounded < 0.0)
+        aText += TH_MINUS;
+
+    if (!bNoBaht)
+    {
+        std::size_t nBlockSize = aBaht.size() % 6;
+        if (nBlockSize == 0)
+            nBlockSize = 6;
+        while (!aBaht.empty())
+        {
+            appendBahtBlock(aText, aBaht.substr(0, nBlockSize));
+            aBaht.remove_prefix(nBlockSize);
+            nBlockSize = 6;
+            if (!aBaht.empty())
+                aText += TH_1E6;
+        }
+        aText += TH_BAHT;
+    }
+
+    if (bNoSatang)
+    {
+        aText += TH_DOT0;
+    }
+    else
+    {
+        appendBahtBlock(aText, aSatang);
+        aText += TH_SATANG;
+    }
+
+    return api::ValueResult<api::String>::success(std::move(aText));
 }
 
 } // namespace
@@ -45,6 +234,9 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateTextFamily(
         api::StringView(u"JIS"),
         api::StringView(u"LEN"),
         api::StringView(u"LENB"),
+        api::StringView(u"DOLLAR"),
+        api::StringView(u"FIXED"),
+        api::StringView(u"BAHTTEXT"),
         api::StringView(u"FINDB"),
         api::StringView(u"SEARCHB"),
         api::StringView(u"REPLACEB"),
@@ -287,24 +479,75 @@ if (aFunctionName == u"CONCATENATE")
             static_cast<double>(setext::expandDbcsByteText(aText.maValue, false).size())));
     }
 
+    if (aFunctionName == u"DOLLAR" || aFunctionName == u"FIXED")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aValue = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[0]);
+        if (!aValue)
+            return makeFailure(aValue.meError);
+
+        std::int32_t nDecimals = 2;
+        if (rNode.maChildren.size() >= 2)
+        {
+            const auto aDecimals = aContext.evaluateAnchoredNumericArgument(*rNode.maChildren[1], 2.0);
+            if (!aDecimals)
+                return makeFailure(aDecimals.meError);
+            nDecimals = static_cast<std::int32_t>(fp::approxFloor(aDecimals.maValue));
+        }
+
+        bool bThousands = true;
+        if (aFunctionName == u"FIXED" && rNode.maChildren.size() == 3
+            && rNode.maChildren[2]->meKind != formula::NodeKind::EmptyArgument)
+        {
+            const auto aNoCommas = aContext.evaluateAnchoredScalarArgumentValue(*rNode.maChildren[2]);
+            if (!aNoCommas)
+                return makeFailure(aNoCommas.meError);
+            const auto aBoolean = coerceToBoolean(aNoCommas.maValue);
+            if (!aBoolean)
+                return makeFailure(aBoolean.meError);
+            bThousands = !aBoolean.maValue;
+        }
+
+        const auto aFormatted = formatFixedDisplay(
+            aValue.maValue, nDecimals, bThousands, aFunctionName == u"DOLLAR");
+        if (!aFormatted)
+            return makeFailure(aFormatted.meError);
+        return makeScalarResult(api::CellValue::text(aFormatted.maValue));
+    }
+
+    if (aFunctionName == u"BAHTTEXT")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aValue = aContext.evaluateRequiredAnchoredNumberArgument(*rNode.maChildren[0]);
+        if (!aValue)
+            return makeFailure(aValue.meError);
+
+        const auto aFormatted = formatBahtText(aValue.maValue);
+        if (!aFormatted)
+            return makeFailure(aFormatted.meError);
+        return makeScalarResult(api::CellValue::text(aFormatted.maValue));
+    }
+
     if (aFunctionName == u"FINDB" || aFunctionName == u"SEARCHB")
     {
         if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
             return makeFailure(api::Error::IllegalArgument);
 
-        EvaluationResult aNeedleArgument
-            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
-        if (!aNeedleArgument)
-            return aNeedleArgument;
-        EvaluationResult aHaystackArgument
-            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
-        if (!aHaystackArgument)
-            return aHaystackArgument;
+        const auto aNeedleValue = aContext.evaluateAnchoredScalarArgumentValue(*rNode.maChildren[0]);
+        if (!aNeedleValue)
+            return makeFailure(aNeedleValue.meError);
+        const auto aHaystackValue = aContext.evaluateAnchoredScalarArgumentValue(*rNode.maChildren[1]);
+        if (!aHaystackValue)
+            return makeFailure(aHaystackValue.meError);
 
-        const auto aNeedle = coerceToString(aNeedleArgument.maValue.maValue);
+        const auto aNeedle = coerceToString(aNeedleValue.maValue);
         if (!aNeedle)
             return makeFailure(aNeedle.meError);
-        const auto aHaystack = coerceToString(aHaystackArgument.maValue.maValue);
+        const auto aHaystack = coerceToString(aHaystackValue.maValue);
         if (!aHaystack)
             return makeFailure(aHaystack.meError);
 
@@ -312,7 +555,8 @@ if (aFunctionName == u"CONCATENATE")
         if (rNode.maChildren.size() == 3
             && rNode.maChildren[2]->meKind != formula::NodeKind::EmptyArgument)
         {
-            const auto aStart = aContext.evaluateNumericArgument(*rNode.maChildren[2], std::nullopt);
+            const auto aStart
+                = aContext.evaluateAnchoredNumericArgument(*rNode.maChildren[2], std::nullopt);
             if (!aStart)
                 return makeFailure(aStart.meError);
             const auto oWholeStart = toWholeNumber(aStart.maValue);
