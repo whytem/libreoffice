@@ -52,11 +52,13 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpreadsheetFamily(
 {
     static constexpr std::array kSpreadsheetFunctions{
         api::StringView(u"SEQUENCE"),
+        api::StringView(u"TAKE"),
         api::StringView(u"DROP"),
         api::StringView(u"EXPAND"),
         api::StringView(u"SORT"),
         api::StringView(u"SORTBY"),
         api::StringView(u"TEXTSPLIT"),
+        api::StringView(u"INDEX"),
     };
     if (!matchesFunctionRegistry(rFunctionName, kSpreadsheetFunctions))
         return std::nullopt;
@@ -167,6 +169,28 @@ EvaluationResult Evaluator::evaluateSpreadsheetFamilyBody(
             return api::ValueResult<std::optional<sal_Int32>>::failure(aNumber.meError);
         const auto oWholeNumber = toWholeNumber(aNumber.maValue);
         if (!oWholeNumber)
+            return api::ValueResult<std::optional<sal_Int32>>::failure(
+                api::Error::IllegalArgument);
+        return api::ValueResult<std::optional<sal_Int32>>::success(
+            static_cast<sal_Int32>(*oWholeNumber));
+    };
+
+    const auto evaluateOptionalNonNegativeWholeArgument
+        = [&](const formula::Node& rArgument) -> api::ValueResult<std::optional<sal_Int32>> {
+        if (rArgument.meKind == formula::NodeKind::EmptyArgument)
+            return api::ValueResult<std::optional<sal_Int32>>::success(std::nullopt);
+
+        const auto aValue = aContext.evaluateScalarArgumentValue(rArgument);
+        if (!aValue)
+            return api::ValueResult<std::optional<sal_Int32>>::failure(aValue.meError);
+        if (aValue.maValue.isEmpty())
+            return api::ValueResult<std::optional<sal_Int32>>::success(std::nullopt);
+
+        const auto aNumber = coerceToNumber(aValue.maValue);
+        if (!aNumber)
+            return api::ValueResult<std::optional<sal_Int32>>::failure(aNumber.meError);
+        const auto oWholeNumber = toWholeNumber(aNumber.maValue);
+        if (!oWholeNumber || *oWholeNumber < 0)
             return api::ValueResult<std::optional<sal_Int32>>::failure(
                 api::Error::IllegalArgument);
         return api::ValueResult<std::optional<sal_Int32>>::success(
@@ -324,7 +348,7 @@ EvaluationResult Evaluator::evaluateSpreadsheetFamilyBody(
         return makeScalarResult(api::CellValue::number(fStart));
     }
 
-    if (aFunctionName == u"DROP")
+    if (aFunctionName == u"TAKE" || aFunctionName == u"DROP")
     {
         if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
             return makeFailure(api::Error::IllegalArgument);
@@ -344,7 +368,7 @@ EvaluationResult Evaluator::evaluateSpreadsheetFamilyBody(
             return makeFailure(oColumns.meError);
 
         const auto aSlice = api::array::planTakeDropSlice(
-            aSource.maValue.maDimensions, false, oRows.maValue, oColumns.maValue);
+            aSource.maValue.maDimensions, aFunctionName == u"TAKE", oRows.maValue, oColumns.maValue);
         if (!aSlice)
             return makeScalarResult(api::CellValue::error(aSlice.meError));
 
@@ -363,6 +387,90 @@ EvaluationResult Evaluator::evaluateSpreadsheetFamilyBody(
 
         return makeScalarResult(aSource.maValue.valueAt(
             aSlice.maValue.maStart.mnColumn, aSlice.maValue.maStart.mnRow));
+    }
+
+    if (aFunctionName == u"INDEX")
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aSource = materializeMatrixInput(*rNode.maChildren[0]);
+        if (!aSource)
+            return makeFailure(aSource.meError);
+
+        const auto oIndex1 = evaluateOptionalNonNegativeWholeArgument(*rNode.maChildren[1]);
+        if (!oIndex1)
+            return makeFailure(oIndex1.meError);
+
+        std::optional<sal_Int32> oRowNumber;
+        std::optional<sal_Int32> oColumnNumber;
+
+        if (rNode.maChildren.size() == 2)
+        {
+            if (!oIndex1.maValue)
+                return makeFailure(api::Error::IllegalArgument);
+
+            if (aSource.maValue.maDimensions.mnRows == 1 && aSource.maValue.maDimensions.mnColumns > 1)
+            {
+                oRowNumber = 1;
+                oColumnNumber = oIndex1.maValue;
+            }
+            else if (aSource.maValue.maDimensions.mnColumns == 1)
+            {
+                oRowNumber = oIndex1.maValue;
+                oColumnNumber = 1;
+            }
+            else
+            {
+                oRowNumber = oIndex1.maValue;
+                oColumnNumber = 0;
+            }
+        }
+        else
+        {
+            oRowNumber = oIndex1.maValue;
+            const auto oIndex2 = evaluateOptionalNonNegativeWholeArgument(*rNode.maChildren[2]);
+            if (!oIndex2)
+                return makeFailure(oIndex2.meError);
+            oColumnNumber = oIndex2.maValue;
+        }
+
+        if (!oRowNumber)
+            oRowNumber = 0;
+        if (!oColumnNumber)
+            oColumnNumber = 0;
+        if (*oRowNumber == 0 && *oColumnNumber == 0)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const api::MatrixDimensions aSourceDimensions = aSource.maValue.maDimensions;
+        const api::MatrixSize nStartRow = *oRowNumber == 0 ? 0 : static_cast<api::MatrixSize>(*oRowNumber - 1);
+        const api::MatrixSize nStartColumn
+            = *oColumnNumber == 0 ? 0 : static_cast<api::MatrixSize>(*oColumnNumber - 1);
+        const api::MatrixDimensions aSliceDimensions{
+            *oColumnNumber == 0 ? aSourceDimensions.mnColumns : 1,
+            *oRowNumber == 0 ? aSourceDimensions.mnRows : 1
+        };
+        if (nStartRow >= aSourceDimensions.mnRows || nStartColumn >= aSourceDimensions.mnColumns
+            || nStartRow + aSliceDimensions.mnRows > aSourceDimensions.mnRows
+            || nStartColumn + aSliceDimensions.mnColumns > aSourceDimensions.mnColumns)
+        {
+            return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
+        }
+
+        if (aSource.maValue.moReference)
+        {
+            api::ResolvedReference aSliceReference;
+            aSliceReference.maRange.maStart
+                = aSource.maValue.moReference->addressAt(nStartColumn, nStartRow);
+            aSliceReference.maRange.maEnd = aSource.maValue.moReference->addressAt(
+                nStartColumn + aSliceDimensions.mnColumns - 1,
+                nStartRow + aSliceDimensions.mnRows - 1);
+            if (aSliceReference.isSingleCell())
+                return materializeReferenceValue(aSliceReference, 0, 0);
+            return makeReferenceResult(aSliceReference);
+        }
+
+        return makeScalarResult(aSource.maValue.valueAt(nStartColumn, nStartRow));
     }
 
     if (aFunctionName == u"EXPAND")

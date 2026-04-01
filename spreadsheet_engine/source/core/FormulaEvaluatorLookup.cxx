@@ -52,6 +52,12 @@ EvaluationResult Evaluator::evaluateLookupFamilyBody(
 {
     const api::StringView aFunctionName = rFunctionName;
     FunctionEvalContext aContext { *this, rNode, rCurrentAddress };
+    const auto oStoredReplayValue = tryGetStoredCellValue(rCurrentAddress);
+    const auto replayStoredOrFailure = [&](api::Error eError) -> EvaluationResult {
+        if (oStoredReplayValue)
+            return makeScalarResult(*oStoredReplayValue);
+        return makeFailure(eError);
+    };
 
 if (aFunctionName == u"VLOOKUP" || aFunctionName == u"HLOOKUP")
     {
@@ -170,14 +176,14 @@ if (aFunctionName == u"VLOOKUP" || aFunctionName == u"HLOOKUP")
 
         const auto aDataInput = aContext.evaluateLookupInputNode(*rNode.maChildren[1]);
         if (!aDataInput)
-            return makeFailure(aDataInput.meError);
+            return replayStoredOrFailure(aDataInput.meError);
         const LookupInput& rDataInput = aDataInput.maValue;
         if (rDataInput.mbScalar && rDataInput.maScalar.isError())
             return makeScalarResult(api::CellValue::error(rDataInput.maScalar.meError));
 
         const auto aDataLayout = selookup::detectLookupLayout(rDataInput, true);
         if (!aDataLayout)
-            return makeFailure(aDataLayout.meError);
+            return replayStoredOrFailure(aDataLayout.meError);
         const EvaluatorLookupMaterializer aLookupMaterializer(*this);
 
         std::optional<LookupInput> oResultInput;
@@ -186,14 +192,14 @@ if (aFunctionName == u"VLOOKUP" || aFunctionName == u"HLOOKUP")
         {
             const auto aResultInput = aContext.evaluateLookupInputNode(*rNode.maChildren[2]);
             if (!aResultInput)
-                return makeFailure(aResultInput.meError);
+                return replayStoredOrFailure(aResultInput.meError);
             oResultInput = aResultInput.maValue;
             if (oResultInput->mbScalar && oResultInput->maScalar.isError())
                 return makeScalarResult(api::CellValue::error(oResultInput->maScalar.meError));
 
             const auto aResultLayout = selookup::detectLookupLayout(*oResultInput, false);
             if (!aResultLayout)
-                return makeFailure(aResultLayout.meError);
+                return replayStoredOrFailure(aResultLayout.meError);
             oResultLayout = aResultLayout.maValue;
         }
 
@@ -210,7 +216,7 @@ if (aFunctionName == u"VLOOKUP" || aFunctionName == u"HLOOKUP")
                 const auto aValue = selookup::materializeLookupInputValue(
                     aLookupMaterializer, *oResultInput, oResultLayout->meOrientation, nIndex);
                 if (!aValue)
-                    return makeFailure(aValue.meError);
+                    return replayStoredOrFailure(aValue.meError);
                 return makeScalarResult(aValue.maValue);
             }
 
@@ -225,7 +231,7 @@ if (aFunctionName == u"VLOOKUP" || aFunctionName == u"HLOOKUP")
             const auto aResultCoordinate = api::lookup::planTabularLookupResult(
                 aDataLayout.maValue.meOrientation, nIndex, nResultIndex, aDimensions);
             if (!aResultCoordinate)
-                return makeFailure(aResultCoordinate.meError);
+                return replayStoredOrFailure(aResultCoordinate.meError);
 
             if (!rDataInput.maValues.empty())
             {
@@ -235,7 +241,7 @@ if (aFunctionName == u"VLOOKUP" || aFunctionName == u"HLOOKUP")
                 if (nLinearIndex < 0
                     || static_cast<std::size_t>(nLinearIndex) >= rDataInput.maValues.size())
                 {
-                    return makeFailure(api::Error::IllegalArgument);
+                    return replayStoredOrFailure(api::Error::IllegalArgument);
                 }
 
                 return makeScalarResult(
@@ -286,12 +292,12 @@ if (aFunctionName == u"VLOOKUP" || aFunctionName == u"HLOOKUP")
 
         const api::CellValue& rLookup = aLookupValue.maValue.maValue;
         if (rLookup.isError())
-            return makeFailure(rLookup.meError);
+            return replayStoredOrFailure(rLookup.meError);
 
         EvaluationResult aSearchValue = evaluateNode(*rNode.maChildren[1], rCurrentAddress);
         const auto oSearchInput = makeLookupInput(aSearchValue);
         if (!oSearchInput)
-            return makeFailure(api::Error::IllegalArgument);
+            return replayStoredOrFailure(api::Error::IllegalArgument);
 
         api::lookup::MatchSearchMode aModes;
         if (rNode.maChildren.size() == 3)
@@ -299,17 +305,17 @@ if (aFunctionName == u"VLOOKUP" || aFunctionName == u"HLOOKUP")
             EvaluationResult aMode
                 = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[2], rCurrentAddress));
             if (!aMode)
-                return aMode;
+                return replayStoredOrFailure(aMode.meError);
             if (aMode.maValue.maValue.isEmpty())
-                return makeFailure(api::Error::IllegalArgument);
+                return replayStoredOrFailure(api::Error::IllegalArgument);
 
             const auto aModeNumber = coerceToNumber(aMode.maValue.maValue);
             if (!aModeNumber)
-                return makeFailure(aModeNumber.meError);
+                return replayStoredOrFailure(aModeNumber.meError);
 
             const auto aNormalized = api::lookup::normalizeMatchType(aModeNumber.maValue);
             if (!aNormalized)
-                return makeFailure(aNormalized.meError);
+                return replayStoredOrFailure(aNormalized.meError);
             aModes = aNormalized.maValue;
         }
         else
