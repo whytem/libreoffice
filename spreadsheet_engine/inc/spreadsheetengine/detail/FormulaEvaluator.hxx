@@ -73,6 +73,14 @@ class Evaluator
     [[nodiscard]] const workbook::Cell* getCell(const api::CellAddress& rAddress) const;
     [[nodiscard]] std::optional<api::CellValue> tryGetStoredCellValue(
         const api::CellAddress& rAddress) const;
+    [[nodiscard]] std::optional<EvaluationResult> tryMakeStoredReplayResult(
+        const api::CellAddress& rAddress) const;
+    [[nodiscard]] std::optional<EvaluationResult> tryMakeStoredReplayResult(
+        const formula::Node& rNode, const api::CellAddress& rAddress) const;
+    [[nodiscard]] EvaluationResult makeStoredReplayOrFailure(
+        const api::CellAddress& rAddress, api::Error eError) const;
+    [[nodiscard]] EvaluationResult makeStoredReplayOrFailure(
+        const formula::Node& rNode, const api::CellAddress& rAddress, api::Error eError) const;
     [[nodiscard]] std::map<AddressKey, CacheEntry>& cacheForMode(ExecutionMode eMode);
     [[nodiscard]] EvaluationResult evaluateCellInternal(
         const api::CellAddress& rAddress, ExecutionMode eMode);
@@ -82,6 +90,10 @@ class Evaluator
     [[nodiscard]] EvaluationResult evaluateNode(
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
     [[nodiscard]] EvaluationResult evaluateReferenceNode(
+        const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] EvaluationResult evaluateUnaryOperationNode(
+        const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] EvaluationResult evaluateBinaryOperationNode(
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
     [[nodiscard]] EvaluationResult evaluateFunction(
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);

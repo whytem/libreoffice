@@ -58,6 +58,7 @@ $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spreadsheet_engine/source/core/FormulaEvaluatorLogical \
     spreadsheet_engine/source/core/FormulaEvaluatorLookup \
     spreadsheet_engine/source/core/FormulaEvaluatorMath \
+    spreadsheet_engine/source/core/FormulaEvaluatorOperators \
     spreadsheet_engine/source/core/FormulaEvaluatorSpreadsheet \
     spreadsheet_engine/source/core/FormulaEvaluatorSpecialForms \
     spreadsheet_engine/source/core/FormulaEvaluatorStatistical \

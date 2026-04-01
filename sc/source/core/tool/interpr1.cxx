@@ -63,6 +63,7 @@
 #include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Reference.hxx>
 #include <spreadsheetengine/api/StringReference.hxx>
+#include <spreadsheetengine/runtime/MathAggregate.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
 #include <spreadsheetengine/compat/libreoffice/Address.hxx>
@@ -10548,13 +10549,9 @@ void ScInterpreter::ScDBProduct()
     DBIterator( ifPRODUCT );
 }
 
-void ScInterpreter::GetDBStVarParams( double& rVal, double& rValCount )
+void ScInterpreter::GetDBStVarParams( std::vector<double>& rValues )
 {
-    std::vector<double> values;
-    KahanSum vSum    = 0.0;
-    KahanSum fSum    = 0.0;
-
-    rValCount = 0.0;
+    rValues.clear();
     bool bMissingField = false;
     std::unique_ptr<ScDBQueryParamBase> pQueryParam( GetDBParams(bMissingField) );
     if (pQueryParam)
@@ -10570,9 +10567,7 @@ void ScInterpreter::GetDBStVarParams( double& rVal, double& rValCount )
         {
             do
             {
-                rValCount++;
-                values.push_back(aValue.mfValue);
-                fSum += aValue.mfValue;
+                rValues.push_back(aValue.mfValue);
             }
             while ((aValue.mnError == FormulaError::NONE) && aValIter.GetNext(aValue));
         }
@@ -10580,41 +10575,70 @@ void ScInterpreter::GetDBStVarParams( double& rVal, double& rValCount )
     }
     else
         SetError( FormulaError::IllegalParameter);
-
-    double vMean = fSum.get() / values.size();
-
-    for (double v : values)
-        vSum += (v - vMean) * (v - vMean);
-
-    rVal = vSum.get();
 }
 
 void ScInterpreter::ScDBStdDev()
 {
-    double fVal, fCount;
-    GetDBStVarParams( fVal, fCount );
-    PushDouble( sqrt(fVal/(fCount-1)));
+    std::vector<double> aValues;
+    GetDBStVarParams(aValues);
+    if (nGlobalError != FormulaError::NONE)
+        return;
+    const auto aResult = spreadsheetengine::core::math::evaluateVarianceNumbers(
+        aValues, true, true);
+    if (!aResult)
+    {
+        PushError(selibreoffice::toFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScDBStdDevP()
 {
-    double fVal, fCount;
-    GetDBStVarParams( fVal, fCount );
-    PushDouble( sqrt(fVal/fCount));
+    std::vector<double> aValues;
+    GetDBStVarParams(aValues);
+    if (nGlobalError != FormulaError::NONE)
+        return;
+    const auto aResult = spreadsheetengine::core::math::evaluateVarianceNumbers(
+        aValues, false, true);
+    if (!aResult)
+    {
+        PushError(selibreoffice::toFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScDBVar()
 {
-    double fVal, fCount;
-    GetDBStVarParams( fVal, fCount );
-    PushDouble(fVal/(fCount-1));
+    std::vector<double> aValues;
+    GetDBStVarParams(aValues);
+    if (nGlobalError != FormulaError::NONE)
+        return;
+    const auto aResult = spreadsheetengine::core::math::evaluateVarianceNumbers(
+        aValues, true, false);
+    if (!aResult)
+    {
+        PushError(selibreoffice::toFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScDBVarP()
 {
-    double fVal, fCount;
-    GetDBStVarParams( fVal, fCount );
-    PushDouble(fVal/fCount);
+    std::vector<double> aValues;
+    GetDBStVarParams(aValues);
+    if (nGlobalError != FormulaError::NONE)
+        return;
+    const auto aResult = spreadsheetengine::core::math::evaluateVarianceNumbers(
+        aValues, false, false);
+    if (!aResult)
+    {
+        PushError(selibreoffice::toFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
 }
 
 static bool lcl_IsTableStructuredRef(const OUString& sRefStr, sal_Int32& nIndex)

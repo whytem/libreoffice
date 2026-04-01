@@ -15,6 +15,7 @@ set(SPREADSHEETENGINE_STANDALONE_CORE_SOURCES
     "${SPREADSHEETENGINE_ROOT}/source/core/FormulaEvaluatorLogical.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/FormulaEvaluatorLookup.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/FormulaEvaluatorMath.cxx"
+    "${SPREADSHEETENGINE_ROOT}/source/core/FormulaEvaluatorOperators.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/FormulaEvaluatorSpreadsheet.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/FormulaEvaluatorSpecialForms.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/FormulaEvaluatorStatistical.cxx"

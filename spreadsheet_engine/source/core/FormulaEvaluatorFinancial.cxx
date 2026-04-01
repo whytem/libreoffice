@@ -174,7 +174,26 @@ EvaluationResult Evaluator::evaluateFinancialFamilyBody(
     };
 
     if (aFunctionName == u"XNPV" || aFunctionName == u"GETXNPV")
-        return replayStoredOrCellError(api::Error::IllegalArgument);
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aRate = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[0]);
+        if (!aRate)
+            return makeFailure(aRate.meError);
+        const auto aValues = collectNumericSeries(*rNode.maChildren[1]);
+        if (!aValues)
+            return makeFailure(aValues.meError);
+        const auto aDates = collectDateSeries(*rNode.maChildren[2]);
+        if (!aDates)
+            return makeFailure(aDates.meError);
+
+        const auto aXnpv
+            = sefinance::evaluateXnpvNumbers(aRate.maValue, aValues.maValue, aDates.maValue);
+        if (!aXnpv)
+            return makeFailure(aXnpv.meError);
+        return makeScalarResult(api::CellValue::number(aXnpv.maValue));
+    }
 
 if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
     {

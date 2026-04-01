@@ -58,6 +58,45 @@ CPPUNIT_TEST_FIXTURE(Test, test_getDec2Hex)
     CPPUNIT_ASSERT_EQUAL(u"000000006E"_ustr,
                          mxAnalysis->getDec2Hex({}, 110, css::uno::Any(float(10))));
 }
+
+CPPUNIT_TEST_FIXTURE(Test, test_sharedFinancialRuntimeDelegates)
+{
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0509453369140622, mxAnalysis->getEffect(0.05, 4), 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.05, mxAnalysis->getNominal(0.0509453369140622, 4), 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.02, mxAnalysis->getDollarfr(1.125, 16), 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.125, mxAnalysis->getDollarde(1.02, 16), 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-600.875855808337,
+                                 mxAnalysis->getCumprinc(0.055 / 12.0, 24, 5000, 4, 6, 1),
+                                 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-57.5412415342252,
+                                 mxAnalysis->getCumipmt(0.055 / 12.0, 24, 5000, 4, 6, 1),
+                                 1e-12);
+
+    css::uno::Sequence<css::uno::Sequence<double>> aSchedule(1);
+    aSchedule.getArray()[0].realloc(2);
+    aSchedule.getArray()[0].getArray()[0] = 0.1;
+    aSchedule.getArray()[0].getArray()[1] = 0.2;
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(132.0, mxAnalysis->getFvschedule(100.0, aSchedule), 1e-12);
+
+    css::uno::Sequence<css::uno::Sequence<double>> aValues(1);
+    aValues.getArray()[0].realloc(2);
+    aValues.getArray()[0].getArray()[0] = 100.0;
+    aValues.getArray()[0].getArray()[1] = 200.0;
+    css::uno::Sequence<css::uno::Sequence<sal_Int32>> aDates(1);
+    aDates.getArray()[0].realloc(2);
+    aDates.getArray()[0].getArray()[0] = 1;
+    aDates.getArray()[0].getArray()[1] = 366;
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(281.818181818182, mxAnalysis->getXnpv(0.1, aValues, aDates),
+                                 1e-12);
+
+    css::uno::Sequence<css::uno::Sequence<double>> aIrrValues(1);
+    aIrrValues.getArray()[0].realloc(2);
+    aIrrValues.getArray()[0].getArray()[0] = -100.0;
+    aIrrValues.getArray()[0].getArray()[1] = 110.0;
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.1,
+                                 mxAnalysis->getXirr({}, aIrrValues, aDates, css::uno::Any(0.1)),
+                                 1e-12);
+}
 }
 
 CPPUNIT_PLUGIN_IMPLEMENT();

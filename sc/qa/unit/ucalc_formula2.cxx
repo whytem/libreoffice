@@ -222,6 +222,38 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncCHOOSE)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testDatabaseVarianceRuntimeDelegation)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+
+    m_pDoc->InsertTab(0, u"Formula"_ustr);
+
+    m_pDoc->SetString(ScAddress(0, 0, 0), u"Name"_ustr);
+    m_pDoc->SetString(ScAddress(1, 0, 0), u"Weight"_ustr);
+    m_pDoc->SetString(ScAddress(0, 1, 0), u"A"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 1, 0), 10.0);
+    m_pDoc->SetString(ScAddress(0, 2, 0), u"B"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 2, 0), 20.0);
+    m_pDoc->SetString(ScAddress(0, 3, 0), u"C"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 3, 0), 30.0);
+
+    m_pDoc->SetString(ScAddress(3, 0, 0), u"Weight"_ustr);
+    m_pDoc->SetString(ScAddress(3, 1, 0), u">=10"_ustr);
+
+    m_pDoc->SetString(ScAddress(5, 0, 0), u"=DVAR(A1:B4;\"Weight\";D1:D2)"_ustr);
+    m_pDoc->SetString(ScAddress(5, 1, 0), u"=DVARP(A1:B4;\"Weight\";D1:D2)"_ustr);
+    m_pDoc->SetString(ScAddress(5, 2, 0), u"=DSTDEV(A1:B4;\"Weight\";D1:D2)"_ustr);
+    m_pDoc->SetString(ScAddress(5, 3, 0), u"=DSTDEVP(A1:B4;\"Weight\";D1:D2)"_ustr);
+
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(100.0, m_pDoc->GetValue(ScAddress(5, 0, 0)), 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(66.6666666666667, m_pDoc->GetValue(ScAddress(5, 1, 0)), 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(ScAddress(5, 2, 0)), 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(8.16496580927726, m_pDoc->GetValue(ScAddress(5, 3, 0)),
+                                 1e-12);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedStatisticalDelegations)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);

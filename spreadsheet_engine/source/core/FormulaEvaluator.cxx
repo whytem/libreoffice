@@ -272,50 +272,6 @@ namespace secompiler = spreadsheetengine::detail::compiler;
     return api::CellAddress { nSheet, *oColumn, static_cast<api::RowIndex>(nRow - 1) };
 }
 
-[[nodiscard]] bool evaluateNumericComparison(
-    double fLeft, double fRight, formula::BinaryOperator eOperator)
-{
-    switch (eOperator)
-    {
-        case formula::BinaryOperator::Equal:
-            return fp::approxEqual(fLeft, fRight);
-        case formula::BinaryOperator::NotEqual:
-            return !fp::approxEqual(fLeft, fRight);
-        case formula::BinaryOperator::Less:
-            return fLeft < fRight;
-        case formula::BinaryOperator::LessEqual:
-            return fLeft < fRight || fp::approxEqual(fLeft, fRight);
-        case formula::BinaryOperator::Greater:
-            return fLeft > fRight;
-        case formula::BinaryOperator::GreaterEqual:
-            return fLeft > fRight || fp::approxEqual(fLeft, fRight);
-        default:
-            return false;
-    }
-}
-
-[[nodiscard]] bool evaluateStringComparison(
-    api::StringView rLeft, api::StringView rRight, formula::BinaryOperator eOperator)
-{
-    switch (eOperator)
-    {
-        case formula::BinaryOperator::Equal:
-            return rLeft == rRight;
-        case formula::BinaryOperator::NotEqual:
-            return rLeft != rRight;
-        case formula::BinaryOperator::Less:
-            return rLeft < rRight;
-        case formula::BinaryOperator::LessEqual:
-            return rLeft <= rRight;
-        case formula::BinaryOperator::Greater:
-            return rLeft > rRight;
-        case formula::BinaryOperator::GreaterEqual:
-            return rLeft >= rRight;
-        default:
-            return false;
-    }
-}
-
 const workbook::Sheet* Evaluator::getSheet(api::SheetId nSheet) const
 {
     if (nSheet < 0 || static_cast<std::size_t>(nSheet) >= mrWorkbook.maSheets.size())
@@ -338,6 +294,40 @@ std::optional<api::CellValue> Evaluator::tryGetStoredCellValue(
     if (const auto oTypedValue = parseTypedStoredCellValue(*pCell))
         return oTypedValue;
     return pCell->maValue;
+}
+
+std::optional<EvaluationResult> Evaluator::tryMakeStoredReplayResult(
+    const api::CellAddress& rAddress) const
+{
+    if (!canUseStoredReplayValue())
+        return std::nullopt;
+    if (const auto oStoredValue = tryGetStoredCellValue(rAddress))
+        return makeScalarResult(*oStoredValue);
+    return std::nullopt;
+}
+
+std::optional<EvaluationResult> Evaluator::tryMakeStoredReplayResult(
+    const formula::Node& rNode, const api::CellAddress& rAddress) const
+{
+    if (!isActiveFormulaRoot(rNode))
+        return std::nullopt;
+    return tryMakeStoredReplayResult(rAddress);
+}
+
+EvaluationResult Evaluator::makeStoredReplayOrFailure(
+    const api::CellAddress& rAddress, api::Error eError) const
+{
+    if (const auto oStoredResult = tryMakeStoredReplayResult(rAddress))
+        return *oStoredResult;
+    return makeFailure(eError);
+}
+
+EvaluationResult Evaluator::makeStoredReplayOrFailure(
+    const formula::Node& rNode, const api::CellAddress& rAddress, api::Error eError) const
+{
+    if (const auto oStoredResult = tryMakeStoredReplayResult(rNode, rAddress))
+        return *oStoredResult;
+    return makeFailure(eError);
 }
 
 const EvaluationResult* Evaluator::lookupLocalBinding(api::StringView rName) const
@@ -427,72 +417,10 @@ api::ValueResult<api::ResolvedReference> Evaluator::resolveNamedRange(
     return api::ValueResult<api::ResolvedReference>::failure(api::Error::NotAvailable);
 }
 
-EvaluationResult Evaluator::evaluateReferenceNode(
-    const formula::Node& rNode, const api::CellAddress& rCurrentAddress)
-{
-    const auto replayStoredOrFailure = [&](api::Error eError) -> EvaluationResult {
-        if (isActiveFormulaRoot(rNode) && canUseStoredReplayValue())
-        {
-            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
-                return makeScalarResult(*oStoredValue);
-        }
-        return makeFailure(eError);
-    };
-
-    switch (rNode.meKind)
-    {
-        case formula::NodeKind::CellReference:
-        {
-            const auto aReference = resolveReferenceText(rNode.maPrimaryText, rCurrentAddress.mnSheet);
-            if (!aReference)
-                return replayStoredOrFailure(aReference.meError);
-            return makeReferenceResult(aReference.maValue);
-        }
-        case formula::NodeKind::RangeReference:
-        {
-            api::String aReference = rNode.maPrimaryText;
-            aReference.push_back(u':');
-            aReference += rNode.maSecondaryText;
-            const auto aRange = resolveReferenceText(aReference, rCurrentAddress.mnSheet);
-            if (!aRange)
-                return replayStoredOrFailure(aRange.meError);
-            return makeReferenceResult(aRange.maValue);
-        }
-        case formula::NodeKind::NamedReference:
-        {
-            const auto aRange = resolveNamedRange(rNode.maPrimaryText, rCurrentAddress.mnSheet);
-            if (!aRange)
-                return replayStoredOrFailure(aRange.meError);
-            return makeReferenceResult(aRange.maValue);
-        }
-        case formula::NodeKind::RangeConstructor:
-            return replayStoredOrFailure(api::Error::IllegalArgument);
-        case formula::NodeKind::ReferenceList:
-            return replayStoredOrFailure(api::Error::IllegalArgument);
-        default:
-        {
-            EvaluationResult aValue = evaluateNode(rNode, rCurrentAddress);
-            if (!aValue)
-                return replayStoredOrFailure(aValue.meError);
-            if (!aValue.maValue.isMatrixReference())
-                return replayStoredOrFailure(api::Error::IllegalArgument);
-            return aValue;
-        }
-    }
-}
-
 EvaluationResult Evaluator::evaluateFunction(
     const formula::Node& rNode, const api::CellAddress& rCurrentAddress)
 {
     const api::String aFunctionName = normalizeFunctionName(rNode.maPrimaryText);
-    const auto replayStoredFunctionFailure = [&](api::Error eError) -> EvaluationResult {
-        if (isActiveFormulaRoot(rNode) && canUseStoredReplayValue())
-        {
-            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
-                return makeScalarResult(*oStoredValue);
-        }
-        return makeFailure(eError);
-    };
 
     constexpr std::array aStructuredDispatchers{
         &Evaluator::tryEvaluateSpecialForm,
@@ -513,12 +441,12 @@ EvaluationResult Evaluator::evaluateFunction(
         if (const auto oDispatched = (this->*pDispatch)(aFunctionName, rNode, rCurrentAddress))
         {
             if (!*oDispatched)
-                return replayStoredFunctionFailure(oDispatched->meError);
+                return makeStoredReplayOrFailure(rNode, rCurrentAddress, oDispatched->meError);
             return *oDispatched;
         }
     }
 
-    return replayStoredFunctionFailure(api::Error::IllegalArgument);
+    return makeStoredReplayOrFailure(rNode, rCurrentAddress, api::Error::IllegalArgument);
 }
 
 EvaluationResult Evaluator::evaluateFunctionIfChainDispatch(
@@ -564,15 +492,6 @@ EvaluationResult Evaluator::evaluateFunctionIfChainDispatch(
 EvaluationResult Evaluator::evaluateNode(
     const formula::Node& rNode, const api::CellAddress& rCurrentAddress)
 {
-    const auto replayStoredRootFailure = [&](api::Error eError) -> EvaluationResult {
-        if (isActiveFormulaRoot(rNode) && canUseStoredReplayValue())
-        {
-            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
-                return makeScalarResult(*oStoredValue);
-        }
-        return makeFailure(eError);
-    };
-
     switch (rNode.meKind)
     {
         case formula::NodeKind::NumberLiteral:
@@ -589,7 +508,7 @@ EvaluationResult Evaluator::evaluateNode(
         {
             const auto aReference = resolveReferenceText(rNode.maPrimaryText, rCurrentAddress.mnSheet);
             if (!aReference)
-                return replayStoredRootFailure(aReference.meError);
+                return makeStoredReplayOrFailure(rNode, rCurrentAddress, aReference.meError);
             return materializeReferenceValue(aReference.maValue, 0, 0);
         }
         case formula::NodeKind::RangeReference:
@@ -599,7 +518,7 @@ EvaluationResult Evaluator::evaluateNode(
             aReference += rNode.maSecondaryText;
             const auto aRange = resolveReferenceText(aReference, rCurrentAddress.mnSheet);
             if (!aRange)
-                return replayStoredRootFailure(aRange.meError);
+                return makeStoredReplayOrFailure(rNode, rCurrentAddress, aRange.meError);
             if (aRange.maValue.isSingleCell())
                 return materializeReferenceValue(aRange.maValue, 0, 0);
             return makeReferenceResult(aRange.maValue);
@@ -610,148 +529,26 @@ EvaluationResult Evaluator::evaluateNode(
                 return *pLocalBinding;
             const auto aRange = resolveNamedRange(rNode.maPrimaryText, rCurrentAddress.mnSheet);
             if (!aRange)
-                return replayStoredRootFailure(aRange.meError);
+                return makeStoredReplayOrFailure(rNode, rCurrentAddress, aRange.meError);
             if (aRange.maValue.isSingleCell())
                 return materializeReferenceValue(aRange.maValue, 0, 0);
             return makeReferenceResult(aRange.maValue);
         }
         case formula::NodeKind::RangeConstructor:
-            return replayStoredRootFailure(api::Error::IllegalArgument);
+            return makeStoredReplayOrFailure(rNode, rCurrentAddress, api::Error::IllegalArgument);
         case formula::NodeKind::ReferenceList:
-            return replayStoredRootFailure(api::Error::IllegalArgument);
+            return makeStoredReplayOrFailure(rNode, rCurrentAddress, api::Error::IllegalArgument);
         case formula::NodeKind::ArrayConstant:
         {
             if (rNode.mnArrayRows != 1 || rNode.mnArrayColumns != 1 || rNode.maChildren.empty())
-                return replayStoredRootFailure(api::Error::IllegalArgument);
+                return makeStoredReplayOrFailure(
+                    rNode, rCurrentAddress, api::Error::IllegalArgument);
             return evaluateNode(*rNode.maChildren[0], rCurrentAddress);
         }
         case formula::NodeKind::UnaryOperation:
-        {
-            EvaluationResult aChild
-                = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
-            if (!aChild)
-                return replayStoredRootFailure(aChild.meError);
-            const auto aNumber = coerceToNumber(aChild.maValue.maValue);
-            if (!aNumber)
-                return replayStoredRootFailure(aNumber.meError);
-            const double fValue = rNode.meUnaryOperator == formula::UnaryOperator::Minus
-                                      ? -aNumber.maValue
-                                      : aNumber.maValue;
-            return makeScalarResult(api::CellValue::number(fValue));
-        }
+            return evaluateUnaryOperationNode(rNode, rCurrentAddress);
         case formula::NodeKind::BinaryOperation:
-        {
-            const auto replayStoredBinaryResult = [&]() -> std::optional<EvaluationResult> {
-                if (!isActiveFormulaRoot(rNode) || !canUseStoredReplayValue())
-                    return std::nullopt;
-                if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
-                    return makeScalarResult(*oStoredValue);
-                return std::nullopt;
-            };
-            EvaluationResult aLeft
-                = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
-            if (!aLeft)
-            {
-                if (const auto oStored = replayStoredBinaryResult())
-                    return *oStored;
-                return aLeft;
-            }
-            EvaluationResult aRight
-                = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
-            if (!aRight)
-            {
-                if (const auto oStored = replayStoredBinaryResult())
-                    return *oStored;
-                return aRight;
-            }
-
-            if (rNode.meBinaryOperator == formula::BinaryOperator::Concat)
-            {
-                const auto aLeftText = coerceToString(aLeft.maValue.maValue);
-                if (!aLeftText)
-                    return makeFailure(aLeftText.meError);
-                const auto aRightText = coerceToString(aRight.maValue.maValue);
-                if (!aRightText)
-                    return makeFailure(aRightText.meError);
-                api::String aValue = aLeftText.maValue;
-                aValue += aRightText.maValue;
-                return makeScalarResult(api::CellValue::text(aValue));
-            }
-
-            if (rNode.meBinaryOperator == formula::BinaryOperator::Equal
-                || rNode.meBinaryOperator == formula::BinaryOperator::NotEqual
-                || rNode.meBinaryOperator == formula::BinaryOperator::Less
-                || rNode.meBinaryOperator == formula::BinaryOperator::LessEqual
-                || rNode.meBinaryOperator == formula::BinaryOperator::Greater
-                || rNode.meBinaryOperator == formula::BinaryOperator::GreaterEqual)
-            {
-                if (aLeft.maValue.maValue.isText() && aRight.maValue.maValue.isText())
-                {
-                    return makeScalarResult(api::CellValue::boolean(evaluateStringComparison(
-                        aLeft.maValue.maValue.maString, aRight.maValue.maValue.maString,
-                        rNode.meBinaryOperator)));
-                }
-
-                const auto aLeftNumber = coerceToNumber(aLeft.maValue.maValue);
-                if (!aLeftNumber)
-                {
-                    if (const auto oStored = replayStoredBinaryResult())
-                        return *oStored;
-                    return makeFailure(aLeftNumber.meError);
-                }
-                const auto aRightNumber = coerceToNumber(aRight.maValue.maValue);
-                if (!aRightNumber)
-                {
-                    if (const auto oStored = replayStoredBinaryResult())
-                        return *oStored;
-                    return makeFailure(aRightNumber.meError);
-                }
-                return makeScalarResult(api::CellValue::boolean(evaluateNumericComparison(
-                    aLeftNumber.maValue, aRightNumber.maValue, rNode.meBinaryOperator)));
-            }
-
-            const auto aLeftNumber = coerceToNumber(aLeft.maValue.maValue);
-            if (!aLeftNumber)
-            {
-                if (const auto oStored = replayStoredBinaryResult())
-                    return *oStored;
-                return makeFailure(aLeftNumber.meError);
-            }
-            const auto aRightNumber = coerceToNumber(aRight.maValue.maValue);
-            if (!aRightNumber)
-            {
-                if (const auto oStored = replayStoredBinaryResult())
-                    return *oStored;
-                return makeFailure(aRightNumber.meError);
-            }
-
-            switch (rNode.meBinaryOperator)
-            {
-                case formula::BinaryOperator::Add:
-                    return makeScalarResult(api::CellValue::number(
-                        fp::approxAdd(aLeftNumber.maValue, aRightNumber.maValue)));
-                case formula::BinaryOperator::Subtract:
-                    return makeScalarResult(api::CellValue::number(
-                        fp::approxSub(aLeftNumber.maValue, aRightNumber.maValue)));
-                case formula::BinaryOperator::Multiply:
-                    return makeScalarResult(
-                        api::CellValue::number(aLeftNumber.maValue * aRightNumber.maValue));
-                case formula::BinaryOperator::Divide:
-                    if (aRightNumber.maValue == 0.0)
-                    {
-                        if (const auto oStored = replayStoredBinaryResult())
-                            return *oStored;
-                        return makeFailure(api::Error::DivisionByZero);
-                    }
-                    return makeScalarResult(
-                        api::CellValue::number(aLeftNumber.maValue / aRightNumber.maValue));
-                case formula::BinaryOperator::Power:
-                    return makeScalarResult(api::CellValue::number(
-                        std::pow(aLeftNumber.maValue, aRightNumber.maValue)));
-                default:
-                    return makeFailure(api::Error::IllegalArgument);
-            }
-        }
+            return evaluateBinaryOperationNode(rNode, rCurrentAddress);
         case formula::NodeKind::FunctionCall:
             return evaluateFunction(rNode, rCurrentAddress);
     }
@@ -764,22 +561,12 @@ EvaluationResult Evaluator::evaluateFormula(
 {
     const formula::ParseResult aParse = formula::parseFormula(rFormula);
     if (!aParse)
-    {
-        if (canUseStoredReplayValue())
-        {
-            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
-                return makeScalarResult(*oStoredValue);
-        }
-        return makeFailure(api::Error::IllegalArgument);
-    }
+        return makeStoredReplayOrFailure(rCurrentAddress, api::Error::IllegalArgument);
     maActiveFormulaRoots.push_back(aParse.mpRoot.get());
     EvaluationResult aResult = evaluateNode(*aParse.mpRoot, rCurrentAddress);
     maActiveFormulaRoots.pop_back();
-    if (!aResult && aResult.maCyclePath.empty() && canUseStoredReplayValue())
-    {
-        if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
-            return makeScalarResult(*oStoredValue);
-    }
+    if (!aResult && aResult.maCyclePath.empty())
+        return makeStoredReplayOrFailure(rCurrentAddress, aResult.meError);
     return aResult;
 }
 
@@ -791,22 +578,12 @@ EvaluationResult Evaluator::evaluateCompiledFormula(
         = spreadsheetengine::detail::compiler::inflateCompiledFormulaNode(
             rFormula, mrWorkbook, rCurrentAddress);
     if (!oInflated)
-    {
-        if (canUseStoredReplayValue())
-        {
-            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
-                return makeScalarResult(*oStoredValue);
-        }
-        return makeFailure(api::Error::IllegalArgument);
-    }
+        return makeStoredReplayOrFailure(rCurrentAddress, api::Error::IllegalArgument);
     maActiveFormulaRoots.push_back(oInflated->get());
     EvaluationResult aResult = evaluateNode(**oInflated, rCurrentAddress);
     maActiveFormulaRoots.pop_back();
-    if (!aResult && aResult.maCyclePath.empty() && canUseStoredReplayValue())
-    {
-        if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
-            return makeScalarResult(*oStoredValue);
-    }
+    if (!aResult && aResult.maCyclePath.empty())
+        return makeStoredReplayOrFailure(rCurrentAddress, aResult.meError);
     return aResult;
 }
 
@@ -828,14 +605,7 @@ EvaluationResult Evaluator::evaluateFormulaViaCompiledTokens(
 
     const auto aLowered = secompiler::lowerFormulaSource(rFormula, aHost, *oContext);
     if (!aLowered)
-    {
-        if (canUseStoredReplayValue())
-        {
-            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
-                return makeScalarResult(*oStoredValue);
-        }
-        return makeFailure(api::Error::IllegalArgument);
-    }
+        return makeStoredReplayOrFailure(rCurrentAddress, api::Error::IllegalArgument);
     return evaluateCompiledFormula(aLowered.maFormula, rCurrentAddress);
 }
 

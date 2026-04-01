@@ -24,6 +24,7 @@ $(eval $(call gb_Library_set_componentfile,analysis,scaddins/source/analysis/ana
 $(eval $(call gb_Library_set_include,analysis,\
     $$(INCLUDE) \
     -I$(SRCDIR)/scaddins/inc \
+    -I$(SRCDIR)/spreadsheet_engine/inc \
 ))
 
 $(eval $(call gb_Library_use_common_precompiled_header,analysis))
@@ -38,6 +39,7 @@ $(eval $(call gb_Library_use_libraries,analysis,\
 	comphelper \
 	cppu \
 	cppuhelper \
+	spreadsheetengine \
 	sal \
 	utl \
 	i18nlangtag \

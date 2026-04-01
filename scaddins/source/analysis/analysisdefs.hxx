@@ -19,6 +19,11 @@
 
 #pragma once
 
+#include "analysishelper.hxx"
+
+#include <spreadsheetengine/api/Date.hxx>
+#include <spreadsheetengine/api/Error.hxx>
+
 #include <com/sun/star/lang/IllegalArgumentException.hpp>
 #include <cmath>
 
@@ -28,6 +33,24 @@ inline double finiteOrThrow(double d)
     if (!std::isfinite(d))
         throw css::lang::IllegalArgumentException();
     return d;
+}
+
+inline spreadsheetengine::api::DateParts getNullDateParts(
+    const css::uno::Reference<css::beans::XPropertySet>& xOpt)
+{
+    sal_uInt16 nDay = 0;
+    sal_uInt16 nMonth = 0;
+    sal_uInt16 nYear = 0;
+    sca::analysis::DaysToDate(sca::analysis::GetNullDate(xOpt), nDay, nMonth, nYear);
+    return { static_cast<std::int16_t>(nYear), static_cast<std::int16_t>(nMonth),
+        static_cast<std::int16_t>(nDay) };
+}
+
+inline double valueOrThrow(spreadsheetengine::api::ValueResult<double> aResult)
+{
+    if (!aResult)
+        throw css::lang::IllegalArgumentException();
+    return finiteOrThrow(aResult.maValue);
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

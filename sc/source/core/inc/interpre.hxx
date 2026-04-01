@@ -773,7 +773,7 @@ public:
     void ScDBMax();
     void ScDBMin();
     void ScDBProduct();
-    void GetDBStVarParams( double& rVal, double& rValCount );
+    void GetDBStVarParams( std::vector<double>& rValues );
     void ScDBStdDev();
     void ScDBStdDevP();
     void ScDBVar();

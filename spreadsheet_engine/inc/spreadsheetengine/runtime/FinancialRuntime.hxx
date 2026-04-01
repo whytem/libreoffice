@@ -201,6 +201,9 @@ SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateXirrNumbers(
     const std::vector<double>& rValues, const std::vector<api::DateSerial>& rDates,
     double fGuess);
 
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateXnpvNumbers(
+    double fRate, const std::vector<double>& rValues, const std::vector<api::DateSerial>& rDates);
+
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateNetPresentValueNumbers(
     double fRate, const std::vector<double>& rValues);
 

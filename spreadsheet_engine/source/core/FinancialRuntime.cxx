@@ -1639,6 +1639,24 @@ api::ValueResult<double> evaluateXirrNumbers(
     return makeFiniteResult(fResultRate);
 }
 
+api::ValueResult<double> evaluateXnpvNumbers(
+    double fRate, const std::vector<double>& rValues, const std::vector<api::DateSerial>& rDates)
+{
+    if (fRate <= -1.0 || rValues.size() < 2 || rValues.size() != rDates.size())
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const double fBaseDate = static_cast<double>(rDates.front());
+    fp::KahanSum fValue = 0.0;
+    for (std::size_t nIndex = 0; nIndex < rValues.size(); ++nIndex)
+    {
+        const double fYears
+            = (static_cast<double>(rDates[nIndex]) - fBaseDate) / 365.0;
+        fValue += rValues[nIndex] / std::pow(1.0 + fRate, fYears);
+    }
+
+    return makeFiniteResult(fValue.get());
+}
+
 api::ValueResult<double> evaluateNetPresentValueNumbers(
     double fRate, const std::vector<double>& rValues)
 {

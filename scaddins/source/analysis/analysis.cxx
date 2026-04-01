@@ -20,6 +20,7 @@
 #include "analysisdefs.hxx"
 #include "analysis.hxx"
 #include "bessel.hxx"
+#include <spreadsheetengine/runtime/FinancialRuntime.hxx>
 #include <comphelper/random.hxx>
 #include <cppuhelper/supportsservice.hxx>
 #include <cppuhelper/weak.hxx>
@@ -38,6 +39,8 @@ constexpr OUStringLiteral MY_IMPLNAME = u"com.sun.star.sheet.addin.AnalysisImpl"
 
 using namespace                 ::com::sun::star;
 using namespace sca::analysis;
+
+namespace sefinance = spreadsheetengine::core::finance;
 
 OUString AnalysisAddIn::GetFuncDescrStr(const TranslateId* pResId, sal_uInt16 nStrIndex)
 {
@@ -387,8 +390,8 @@ sal_Int32 SAL_CALL AnalysisAddIn::getWorkday( const uno::Reference< beans::XProp
 double SAL_CALL AnalysisAddIn::getYearfrac( const uno::Reference< beans::XPropertySet >& xOpt,
     sal_Int32 nStartDate, sal_Int32 nEndDate, const uno::Any& rMode )
 {
-    double fRet = GetYearFrac( xOpt, nStartDate, nEndDate, getDateMode( xOpt, rMode ) );
-    return finiteOrThrow( fRet );
+    return valueOrThrow(sefinance::evaluateYearFraction(
+        getNullDateParts(xOpt), nStartDate, nEndDate, getDateMode(xOpt, rMode)));
 }
 
 sal_Int32 SAL_CALL AnalysisAddIn::getEdate( const uno::Reference< beans::XPropertySet >& xOpt, sal_Int32 nStartDate, sal_Int32 nMonths )
