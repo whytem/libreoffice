@@ -64,6 +64,8 @@ class Evaluator
     std::map<AddressKey, CacheEntry> maAstCellCache;
     std::map<AddressKey, CacheEntry> maCompiledCellCache;
     std::vector<api::CellAddress> maEvaluationStack;
+    std::vector<const formula::Node*> maActiveFormulaRoots;
+    std::size_t mnWorkbookFormulaDepth = 0;
     std::vector<LocalBindingMap> maLocalBindings;
     ExecutionMode meActiveExecutionMode = ExecutionMode::Ast;
 
@@ -74,6 +76,8 @@ class Evaluator
     [[nodiscard]] std::map<AddressKey, CacheEntry>& cacheForMode(ExecutionMode eMode);
     [[nodiscard]] EvaluationResult evaluateCellInternal(
         const api::CellAddress& rAddress, ExecutionMode eMode);
+    [[nodiscard]] bool isActiveFormulaRoot(const formula::Node& rNode) const;
+    [[nodiscard]] bool canUseStoredReplayValue() const;
 
     [[nodiscard]] EvaluationResult evaluateNode(
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);

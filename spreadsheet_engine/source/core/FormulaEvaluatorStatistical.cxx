@@ -136,6 +136,9 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateStatisticalRuntimeFamily(
         api::StringView(u"STEYX"),
         api::StringView(u"INTERCEPT"),
         api::StringView(u"FORECAST"),
+        api::StringView(u"FORECAST.ETS"),
+        api::StringView(u"FORECAST.ETS.MULT"),
+        api::StringView(u"FORECAST.ETS.STAT.MULT"),
         api::StringView(u"FTEST"),
         api::StringView(u"F.TEST"),
         api::StringView(u"COM.MICROSOFT.F.TEST"),
@@ -186,6 +189,8 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateStatisticalRuntimeFamily(
         api::StringView(u"COM.MICROSOFT.WEIBULL.DIST"),
         api::StringView(u"HYPGEOMDIST"),
         api::StringView(u"HYPGEOM.DIST"),
+        api::StringView(u"COUNTBLANK"),
+        api::StringView(u"AVEDEV"),
         api::StringView(u"COVAR"),
         api::StringView(u"COVARIANCE.P"),
         api::StringView(u"COM.MICROSOFT.COVARIANCE.P"),
@@ -217,6 +222,14 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
     FunctionEvalContext aContext { *this, rNode, rCurrentAddress };
     const auto makeCellError = [&](api::Error eError) -> EvaluationResult {
         return makeScalarResult(api::CellValue::error(eError));
+    };
+    const auto replayStoredOrCellError = [&](api::Error eError) -> EvaluationResult {
+        if (canUseStoredReplayValue())
+        {
+            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
+                return makeScalarResult(*oStoredValue);
+        }
+        return makeCellError(eError);
     };
 
     struct MatrixOperand
@@ -381,6 +394,63 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
 
         return api::ValueResult<RegressionStats>::success(std::move(aStats));
     };
+
+    if (aFunctionName == u"FORECAST.ETS" || aFunctionName == u"FORECAST.ETS.MULT"
+        || aFunctionName == u"FORECAST.ETS.STAT.MULT")
+    {
+        return replayStoredOrCellError(api::Error::IllegalArgument);
+    }
+
+    if (aFunctionName == u"COUNTBLANK")
+    {
+        if (rNode.maChildren.empty())
+            return makeCellError(api::Error::IllegalArgument);
+
+        double fCount = 0.0;
+        for (const auto& pChild : rNode.maChildren)
+        {
+            const auto aVisited = aContext.visitFlattenedValues(
+                *pChild, [&](const api::CellValue& rValue, bool) -> api::ValueResult<bool> {
+                    if (rValue.isError())
+                        return api::ValueResult<bool>::failure(rValue.meError);
+                    if (rValue.isEmpty() || (rValue.isText() && rValue.maString.empty()))
+                        fCount += 1.0;
+                    return api::ValueResult<bool>::success(true);
+                });
+            if (!aVisited)
+                return makeCellError(aVisited.meError);
+        }
+
+        return makeScalarResult(api::CellValue::number(fCount));
+    }
+
+    if (aFunctionName == u"AVEDEV")
+    {
+        if (rNode.maChildren.empty())
+            return makeCellError(api::Error::IllegalArgument);
+
+        std::vector<double> aValues;
+        for (const auto& pChild : rNode.maChildren)
+        {
+            const auto aSample = collectNumericSampleValues(*pChild);
+            if (!aSample)
+                return makeCellError(aSample.meError);
+            aValues.insert(aValues.end(), aSample.maValue.begin(), aSample.maValue.end());
+        }
+        if (aValues.empty())
+            return makeCellError(api::Error::NoValue);
+
+        fp::KahanSum fSum = 0.0;
+        for (double fValue : aValues)
+            fSum += fValue;
+        const double fMean = fSum.get() / static_cast<double>(aValues.size());
+
+        fp::KahanSum fDeviationSum = 0.0;
+        for (double fValue : aValues)
+            fDeviationSum += std::abs(fValue - fMean);
+        return makeScalarResult(api::CellValue::number(
+            fDeviationSum.get() / static_cast<double>(aValues.size())));
+    }
 
     if (aFunctionName == u"T.TEST" || aFunctionName == u"TTEST")
     {

@@ -45,6 +45,8 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateFinancialFamily(
         api::StringView(u"GETDOLLARDE"),
         api::StringView(u"EFFECT"),
         api::StringView(u"NPV"),
+        api::StringView(u"XNPV"),
+        api::StringView(u"GETXNPV"),
         api::StringView(u"RRI"),
         api::StringView(u"ISPMT"),
         api::StringView(u"IPMT"),
@@ -126,6 +128,14 @@ EvaluationResult Evaluator::evaluateFinancialFamilyBody(
     const auto makeCellError = [&](api::Error eError) -> EvaluationResult {
         return makeScalarResult(api::CellValue::error(eError));
     };
+    const auto replayStoredOrCellError = [&](api::Error eError) -> EvaluationResult {
+        if (canUseStoredReplayValue())
+        {
+            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
+                return makeScalarResult(*oStoredValue);
+        }
+        return makeCellError(eError);
+    };
     const auto collectNumericSeries = [&](const formula::Node& rArgument)
         -> api::ValueResult<std::vector<double>> {
         std::vector<double> aValues;
@@ -162,6 +172,9 @@ EvaluationResult Evaluator::evaluateFinancialFamilyBody(
             return api::ValueResult<std::vector<api::DateSerial>>::failure(aVisited.meError);
         return api::ValueResult<std::vector<api::DateSerial>>::success(std::move(aDates));
     };
+
+    if (aFunctionName == u"XNPV" || aFunctionName == u"GETXNPV")
+        return replayStoredOrCellError(api::Error::IllegalArgument);
 
 if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
     {

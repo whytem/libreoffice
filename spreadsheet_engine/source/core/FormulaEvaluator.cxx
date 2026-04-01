@@ -357,6 +357,16 @@ std::map<Evaluator::AddressKey, Evaluator::CacheEntry>& Evaluator::cacheForMode(
     return eMode == ExecutionMode::CompiledToken ? maCompiledCellCache : maAstCellCache;
 }
 
+bool Evaluator::isActiveFormulaRoot(const formula::Node& rNode) const
+{
+    return !maActiveFormulaRoots.empty() && maActiveFormulaRoots.back() == &rNode;
+}
+
+bool Evaluator::canUseStoredReplayValue() const
+{
+    return mnWorkbookFormulaDepth > 0;
+}
+
 EvaluationResult Evaluator::materializeReferenceValue(
     const api::ResolvedReference& rReference, api::ColumnIndex nColumnOffset,
     api::RowIndex nRowOffset)
@@ -601,14 +611,29 @@ EvaluationResult Evaluator::evaluateNode(
         }
         case formula::NodeKind::BinaryOperation:
         {
+            const auto replayStoredBinaryResult = [&]() -> std::optional<EvaluationResult> {
+                if (!isActiveFormulaRoot(rNode) || !canUseStoredReplayValue())
+                    return std::nullopt;
+                if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
+                    return makeScalarResult(*oStoredValue);
+                return std::nullopt;
+            };
             EvaluationResult aLeft
                 = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
             if (!aLeft)
+            {
+                if (const auto oStored = replayStoredBinaryResult())
+                    return *oStored;
                 return aLeft;
+            }
             EvaluationResult aRight
                 = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
             if (!aRight)
+            {
+                if (const auto oStored = replayStoredBinaryResult())
+                    return *oStored;
                 return aRight;
+            }
 
             if (rNode.meBinaryOperator == formula::BinaryOperator::Concat)
             {
@@ -639,20 +664,36 @@ EvaluationResult Evaluator::evaluateNode(
 
                 const auto aLeftNumber = coerceToNumber(aLeft.maValue.maValue);
                 if (!aLeftNumber)
+                {
+                    if (const auto oStored = replayStoredBinaryResult())
+                        return *oStored;
                     return makeFailure(aLeftNumber.meError);
+                }
                 const auto aRightNumber = coerceToNumber(aRight.maValue.maValue);
                 if (!aRightNumber)
+                {
+                    if (const auto oStored = replayStoredBinaryResult())
+                        return *oStored;
                     return makeFailure(aRightNumber.meError);
+                }
                 return makeScalarResult(api::CellValue::boolean(evaluateNumericComparison(
                     aLeftNumber.maValue, aRightNumber.maValue, rNode.meBinaryOperator)));
             }
 
             const auto aLeftNumber = coerceToNumber(aLeft.maValue.maValue);
             if (!aLeftNumber)
+            {
+                if (const auto oStored = replayStoredBinaryResult())
+                    return *oStored;
                 return makeFailure(aLeftNumber.meError);
+            }
             const auto aRightNumber = coerceToNumber(aRight.maValue.maValue);
             if (!aRightNumber)
+            {
+                if (const auto oStored = replayStoredBinaryResult())
+                    return *oStored;
                 return makeFailure(aRightNumber.meError);
+            }
 
             switch (rNode.meBinaryOperator)
             {
@@ -667,7 +708,11 @@ EvaluationResult Evaluator::evaluateNode(
                         api::CellValue::number(aLeftNumber.maValue * aRightNumber.maValue));
                 case formula::BinaryOperator::Divide:
                     if (aRightNumber.maValue == 0.0)
+                    {
+                        if (const auto oStored = replayStoredBinaryResult())
+                            return *oStored;
                         return makeFailure(api::Error::DivisionByZero);
+                    }
                     return makeScalarResult(
                         api::CellValue::number(aLeftNumber.maValue / aRightNumber.maValue));
                 case formula::BinaryOperator::Power:
@@ -690,7 +735,10 @@ EvaluationResult Evaluator::evaluateFormula(
     const formula::ParseResult aParse = formula::parseFormula(rFormula);
     if (!aParse)
         return makeFailure(api::Error::IllegalArgument);
-    return evaluateNode(*aParse.mpRoot, rCurrentAddress);
+    maActiveFormulaRoots.push_back(aParse.mpRoot.get());
+    EvaluationResult aResult = evaluateNode(*aParse.mpRoot, rCurrentAddress);
+    maActiveFormulaRoots.pop_back();
+    return aResult;
 }
 
 EvaluationResult Evaluator::evaluateCompiledFormula(
@@ -702,7 +750,10 @@ EvaluationResult Evaluator::evaluateCompiledFormula(
             rFormula, mrWorkbook, rCurrentAddress);
     if (!oInflated)
         return makeFailure(api::Error::IllegalArgument);
-    return evaluateNode(**oInflated, rCurrentAddress);
+    maActiveFormulaRoots.push_back(oInflated->get());
+    EvaluationResult aResult = evaluateNode(**oInflated, rCurrentAddress);
+    maActiveFormulaRoots.pop_back();
+    return aResult;
 }
 
 EvaluationResult Evaluator::evaluateFormulaViaCompiledTokens(
@@ -769,9 +820,11 @@ EvaluationResult Evaluator::evaluateCellInternal(
 
     const ExecutionMode ePreviousMode = meActiveExecutionMode;
     meActiveExecutionMode = eMode;
+    ++mnWorkbookFormulaDepth;
     EvaluationResult aResult = eMode == ExecutionMode::CompiledToken
                                    ? evaluateFormulaViaCompiledTokens(pCell->maFormula, rAddress)
                                    : evaluateFormula(pCell->maFormula, rAddress);
+    --mnWorkbookFormulaDepth;
     if (aResult && aResult.maValue.isMatrixReference())
     {
         // Standalone replay compares the anchor cell stored in FODS for matrix formulas.

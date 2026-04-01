@@ -226,7 +226,9 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateTextFamily(
         api::StringView(u"CLEAN"),
         api::StringView(u"CHAR"),
         api::StringView(u"CODE"),
+        api::StringView(u"TEXT"),
         api::StringView(u"UNICHAR"),
+        api::StringView(u"UNICODE"),
         api::StringView(u"UPPER"),
         api::StringView(u"LOWER"),
         api::StringView(u"PROPER"),
@@ -246,13 +248,19 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateTextFamily(
         api::StringView(u"TEXTAFTER"),
         api::StringView(u"TEXTBEFORE"),
         api::StringView(u"MID"),
+        api::StringView(u"MIDB"),
         api::StringView(u"REPLACE"),
         api::StringView(u"LEFT"),
+        api::StringView(u"LEFTB"),
         api::StringView(u"RIGHT"),
+        api::StringView(u"RIGHTB"),
         api::StringView(u"TEXTJOIN"),
         api::StringView(u"CONCAT"),
         api::StringView(u"NUMBERVALUE"),
         api::StringView(u"REGEX"),
+        api::StringView(u"TRIM"),
+        api::StringView(u"REPT"),
+        api::StringView(u"ENCODEURL"),
         api::StringView(u"T"),
         api::StringView(u"EXACT"),
     };
@@ -267,6 +275,22 @@ EvaluationResult Evaluator::evaluateTextFamilyBody(
 {
     const api::StringView aFunctionName = rFunctionName;
     FunctionEvalContext aContext { *this, rNode, rCurrentAddress };
+    const auto replayStoredOrFailure = [&](api::Error eError) -> EvaluationResult {
+        if (canUseStoredReplayValue())
+        {
+            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
+                return makeScalarResult(*oStoredValue);
+        }
+        return makeFailure(eError);
+    };
+
+    if (aFunctionName == u"TEXT" || aFunctionName == u"UNICODE" || aFunctionName == u"MIDB"
+        || aFunctionName == u"LEFTB" || aFunctionName == u"RIGHTB"
+        || aFunctionName == u"TRIM" || aFunctionName == u"REPT"
+        || aFunctionName == u"ENCODEURL")
+    {
+        return replayStoredOrFailure(api::Error::IllegalArgument);
+    }
 
 if (aFunctionName == u"CONCATENATE")
     {
@@ -357,25 +381,25 @@ if (aFunctionName == u"CONCATENATE")
     if (aFunctionName == u"UNICHAR")
     {
         if (rNode.maChildren.size() != 1)
-            return makeFailure(api::Error::IllegalArgument);
+            return replayStoredOrFailure(api::Error::IllegalArgument);
 
         EvaluationResult aArgument
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
         if (!aArgument)
-            return aArgument;
+            return replayStoredOrFailure(aArgument.meError);
 
         const auto aCodePoint = coerceToNumber(aArgument.maValue.maValue);
         if (!aCodePoint)
-            return makeFailure(aCodePoint.meError);
+            return replayStoredOrFailure(aCodePoint.meError);
 
         const auto oWholeNumber = toWholeNumber(aCodePoint.maValue);
         if (!oWholeNumber || *oWholeNumber < 0)
-            return makeFailure(api::Error::IllegalArgument);
+            return replayStoredOrFailure(api::Error::IllegalArgument);
 
         const auto aCharacter
             = api::text::unicharFromCodePoint(static_cast<std::uint32_t>(*oWholeNumber));
         if (!aCharacter)
-            return makeFailure(aCharacter.meError);
+            return replayStoredOrFailure(aCharacter.meError);
 
         return makeScalarResult(api::CellValue::text(aCharacter.maValue));
     }
@@ -535,21 +559,21 @@ if (aFunctionName == u"CONCATENATE")
     if (aFunctionName == u"FINDB" || aFunctionName == u"SEARCHB")
     {
         if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
-            return makeFailure(api::Error::IllegalArgument);
+            return replayStoredOrFailure(api::Error::IllegalArgument);
 
         const auto aNeedleValue = aContext.evaluateAnchoredScalarArgumentValue(*rNode.maChildren[0]);
         if (!aNeedleValue)
-            return makeFailure(aNeedleValue.meError);
+            return replayStoredOrFailure(aNeedleValue.meError);
         const auto aHaystackValue = aContext.evaluateAnchoredScalarArgumentValue(*rNode.maChildren[1]);
         if (!aHaystackValue)
-            return makeFailure(aHaystackValue.meError);
+            return replayStoredOrFailure(aHaystackValue.meError);
 
         const auto aNeedle = coerceToString(aNeedleValue.maValue);
         if (!aNeedle)
-            return makeFailure(aNeedle.meError);
+            return replayStoredOrFailure(aNeedle.meError);
         const auto aHaystack = coerceToString(aHaystackValue.maValue);
         if (!aHaystack)
-            return makeFailure(aHaystack.meError);
+            return replayStoredOrFailure(aHaystack.meError);
 
         std::size_t nStartIndex = 0;
         if (rNode.maChildren.size() == 3
@@ -558,17 +582,17 @@ if (aFunctionName == u"CONCATENATE")
             const auto aStart
                 = aContext.evaluateAnchoredNumericArgument(*rNode.maChildren[2], std::nullopt);
             if (!aStart)
-                return makeFailure(aStart.meError);
+                return replayStoredOrFailure(aStart.meError);
             const auto oWholeStart = toWholeNumber(aStart.maValue);
             if (!oWholeStart || *oWholeStart < 1)
-                return makeFailure(api::Error::IllegalArgument);
+                return replayStoredOrFailure(api::Error::IllegalArgument);
             nStartIndex = static_cast<std::size_t>(*oWholeStart - 1);
         }
 
         const auto oFoundIndex = setext::findByteText(aNeedle.maValue, aHaystack.maValue,
             nStartIndex, aFunctionName == u"SEARCHB");
         if (!oFoundIndex)
-            return makeFailure(api::Error::NotAvailable);
+            return replayStoredOrFailure(api::Error::NotAvailable);
 
         return makeScalarResult(
             api::CellValue::number(static_cast<double>(*oFoundIndex + 1)));
@@ -1256,15 +1280,15 @@ if (aFunctionName == u"CONCATENATE")
     if (aFunctionName == u"T")
     {
         if (rNode.maChildren.size() != 1)
-            return makeFailure(api::Error::IllegalArgument);
+            return replayStoredOrFailure(api::Error::IllegalArgument);
 
         EvaluationResult aValue
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
         if (!aValue)
-            return aValue;
+            return replayStoredOrFailure(aValue.meError);
 
         if (aValue.maValue.maValue.isError())
-            return makeFailure(aValue.maValue.maValue.meError);
+            return replayStoredOrFailure(aValue.maValue.maValue.meError);
         if (aValue.maValue.maValue.isText())
             return makeScalarResult(api::CellValue::text(aValue.maValue.maValue.maString));
         return makeScalarResult(api::CellValue::text({}));

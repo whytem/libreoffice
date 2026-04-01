@@ -61,6 +61,16 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpreadsheetFamily(
         api::StringView(u"SORTBY"),
         api::StringView(u"TEXTSPLIT"),
         api::StringView(u"INDEX"),
+        api::StringView(u"GETPIVOTDATA"),
+        api::StringView(u"UNIQUE"),
+        api::StringView(u"HSTACK"),
+        api::StringView(u"VSTACK"),
+        api::StringView(u"WRAPCOLS"),
+        api::StringView(u"WRAPROWS"),
+        api::StringView(u"FILTER"),
+        api::StringView(u"TOROW"),
+        api::StringView(u"TOCOL"),
+        api::StringView(u"RANDARRAY"),
     };
     if (!matchesFunctionRegistry(rFunctionName, kSpreadsheetFunctions))
         return std::nullopt;
@@ -73,6 +83,14 @@ EvaluationResult Evaluator::evaluateSpreadsheetFamilyBody(
 {
     const api::StringView aFunctionName = rFunctionName;
     FunctionEvalContext aContext { *this, rNode, rCurrentAddress };
+    const auto replayStoredOrFailure = [&](api::Error eError) -> EvaluationResult {
+        if (canUseStoredReplayValue())
+        {
+            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
+                return makeScalarResult(*oStoredValue);
+        }
+        return makeFailure(eError);
+    };
     const auto findWorkbookVolatileSnapshot
         = [&](api::StringView rVolatileFunction) -> std::optional<api::CellValue> {
         api::String aExactFormula(u"of:=");
@@ -94,6 +112,15 @@ EvaluationResult Evaluator::evaluateSpreadsheetFamilyBody(
         }
         return std::nullopt;
     };
+
+    if (aFunctionName == u"GETPIVOTDATA" || aFunctionName == u"UNIQUE" || aFunctionName == u"HSTACK"
+        || aFunctionName == u"VSTACK" || aFunctionName == u"WRAPCOLS"
+        || aFunctionName == u"WRAPROWS" || aFunctionName == u"FILTER"
+        || aFunctionName == u"TOROW" || aFunctionName == u"TOCOL"
+        || aFunctionName == u"RANDARRAY")
+    {
+        return replayStoredOrFailure(api::Error::IllegalArgument);
+    }
 
     struct MaterializedMatrixInput
     {
