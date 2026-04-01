@@ -46,6 +46,8 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateInformationFamily(
         api::StringView(u"ISFORMULA"),
         api::StringView(u"ROW"),
         api::StringView(u"COLUMN"),
+        api::StringView(u"ROWS"),
+        api::StringView(u"COLUMNS"),
         api::StringView(u"ERROR.TYPE"),
         api::StringView(u"ERRORTYPE"),
     };
@@ -321,6 +323,69 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
         }
 
         return makeFailure(api::Error::IllegalArgument);
+    }
+
+    if (aFunctionName == u"ROWS" || aFunctionName == u"COLUMNS")
+    {
+        const bool bRows = aFunctionName == u"ROWS";
+        double fValue = 0.0;
+        for (const auto& pArgument : rNode.maChildren)
+        {
+            const formula::Node& rArgument = *pArgument;
+            if (rArgument.meKind == formula::NodeKind::CellReference)
+            {
+                fValue += 1.0;
+                continue;
+            }
+
+            if (rArgument.meKind == formula::NodeKind::RangeReference)
+            {
+                api::String aAddress = rArgument.maPrimaryText;
+                aAddress.push_back(u':');
+                aAddress += rArgument.maSecondaryText;
+                const auto aResolved = resolveReferenceText(aAddress, rCurrentAddress.mnSheet);
+                if (!aResolved)
+                    return makeFailure(aResolved.meError);
+                fValue += bRows ? static_cast<double>(aResolved.maValue.maRange.rowCount())
+                                : static_cast<double>(aResolved.maValue.maRange.columnCount());
+                continue;
+            }
+
+            if (rArgument.meKind == formula::NodeKind::NamedReference)
+            {
+                const auto aResolved = resolveNamedRange(rArgument.maPrimaryText, rCurrentAddress.mnSheet);
+                if (!aResolved)
+                    return makeFailure(aResolved.meError);
+                fValue += bRows ? static_cast<double>(aResolved.maValue.maRange.rowCount())
+                                : static_cast<double>(aResolved.maValue.maRange.columnCount());
+                continue;
+            }
+
+            if (rArgument.meKind == formula::NodeKind::ArrayConstant)
+            {
+                if (rArgument.mnArrayColumns < 1 || rArgument.mnArrayRows < 1
+                    || static_cast<sal_Int32>(rArgument.maChildren.size())
+                           != rArgument.mnArrayColumns * rArgument.mnArrayRows)
+                {
+                    return makeFailure(api::Error::IllegalArgument);
+                }
+                fValue += bRows ? static_cast<double>(rArgument.mnArrayRows)
+                                : static_cast<double>(rArgument.mnArrayColumns);
+                continue;
+            }
+
+            EvaluationResult aArgument = evaluateNode(rArgument, rCurrentAddress);
+            if (!aArgument)
+                return makeFailure(aArgument.meError);
+            if (!aArgument.maValue.isMatrixReference())
+                return makeFailure(api::Error::IllegalArgument);
+
+            const auto aDimensions = aArgument.maValue.maReference.matrixDimensions();
+            fValue += bRows ? static_cast<double>(aDimensions.mnRows)
+                            : static_cast<double>(aDimensions.mnColumns);
+        }
+
+        return makeScalarResult(api::CellValue::number(fValue));
     }
 
     if (aFunctionName == u"ERROR.TYPE" || aFunctionName == u"ERRORTYPE")

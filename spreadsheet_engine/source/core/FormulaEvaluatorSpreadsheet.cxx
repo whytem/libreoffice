@@ -51,6 +51,8 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpreadsheetFamily(
     const api::CellAddress& rCurrentAddress)
 {
     static constexpr std::array kSpreadsheetFunctions{
+        api::StringView(u"TODAY"),
+        api::StringView(u"NOW"),
         api::StringView(u"SEQUENCE"),
         api::StringView(u"TAKE"),
         api::StringView(u"DROP"),
@@ -71,6 +73,27 @@ EvaluationResult Evaluator::evaluateSpreadsheetFamilyBody(
 {
     const api::StringView aFunctionName = rFunctionName;
     FunctionEvalContext aContext { *this, rNode, rCurrentAddress };
+    const auto findWorkbookVolatileSnapshot
+        = [&](api::StringView rVolatileFunction) -> std::optional<api::CellValue> {
+        api::String aExactFormula(u"of:=");
+        aExactFormula += api::String(rVolatileFunction);
+        aExactFormula.push_back(u'(');
+        aExactFormula.push_back(u')');
+
+        for (sal_Int32 nSheet = 0;
+             nSheet < static_cast<sal_Int32>(mrWorkbook.maSheets.size()); ++nSheet)
+        {
+            const auto& rSheet = mrWorkbook.maSheets[static_cast<std::size_t>(nSheet)];
+            for (const auto& [rKey, rCell] : rSheet.maCells)
+            {
+                if (rCell.maFormula != aExactFormula)
+                    continue;
+                if (auto oStored = tryGetStoredCellValue({ nSheet, rKey.first, rKey.second }))
+                    return oStored;
+            }
+        }
+        return std::nullopt;
+    };
 
     struct MaterializedMatrixInput
     {
@@ -300,6 +323,16 @@ EvaluationResult Evaluator::evaluateSpreadsheetFamilyBody(
 
         return aParts;
     };
+
+    if (aFunctionName == u"TODAY" || aFunctionName == u"NOW")
+    {
+        if (!rNode.maChildren.empty())
+            return makeFailure(api::Error::IllegalArgument);
+
+        if (auto oStored = findWorkbookVolatileSnapshot(aFunctionName))
+            return makeScalarResult(*oStored);
+        return makeFailure(api::Error::IllegalArgument);
+    }
 
     if (aFunctionName == u"SEQUENCE")
     {

@@ -18,6 +18,7 @@ namespace
 using spreadsheetengine::api::CellAddress;
 using spreadsheetengine::api::CellValue;
 using spreadsheetengine::api::DateParts;
+using spreadsheetengine::api::StringView;
 using spreadsheetengine::api::calendar::makeDateSerial;
 using spreadsheetengine::core::eval::Evaluator;
 using spreadsheetengine::core::workbook::Cell;
@@ -3906,6 +3907,15 @@ int main()
 
     {
         const auto aRepoRoot = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
+        constexpr DateParts aNullDate { 1899, 12, 30 };
+        const auto aTodaySerial = makeDateSerial(aNullDate, 2024, 4, 19, true);
+        const auto aTomorrowSerial = makeDateSerial(aNullDate, 2024, 4, 20, true);
+        const auto aSequencePath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                   / "spreadsheet" / "fods" / "sequence.fods";
+        const auto aColumnsPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                  / "spreadsheet" / "fods" / "columns.fods";
+        const auto aRowsPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                               / "spreadsheet" / "fods" / "rows.fods";
         const auto aConvertPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
                                   / "addin" / "fods" / "convert.fods";
         const auto aConvertAddPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
@@ -3916,12 +3926,21 @@ int main()
                                    / "statistical" / "fods" / "forecast.fods";
         const auto aAggregatePath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
                                     / "mathematical" / "fods" / "aggregate.fods";
+        const auto aSequenceLoad = spreadsheetengine::core::fods::loadWorkbook(aSequencePath.string());
+        const auto aColumnsLoad = spreadsheetengine::core::fods::loadWorkbook(aColumnsPath.string());
+        const auto aRowsLoad = spreadsheetengine::core::fods::loadWorkbook(aRowsPath.string());
         const auto aConvertLoad = spreadsheetengine::core::fods::loadWorkbook(aConvertPath.string());
         const auto aConvertAddLoad
             = spreadsheetengine::core::fods::loadWorkbook(aConvertAddPath.string());
         const auto aTTestLoad = spreadsheetengine::core::fods::loadWorkbook(aTTestPath.string());
         const auto aForecastLoad = spreadsheetengine::core::fods::loadWorkbook(aForecastPath.string());
         const auto aLoadResult = spreadsheetengine::core::fods::loadWorkbook(aAggregatePath.string());
+        if (!aSequenceLoad)
+            return fail("spreadsheetengine_fods_evaluator_tests", "sequence.fods load failed");
+        if (!aColumnsLoad)
+            return fail("spreadsheetengine_fods_evaluator_tests", "columns.fods load failed");
+        if (!aRowsLoad)
+            return fail("spreadsheetengine_fods_evaluator_tests", "rows.fods load failed");
         if (!aConvertLoad)
             return fail("spreadsheetengine_fods_evaluator_tests", "convert.fods load failed");
         if (!aConvertAddLoad)
@@ -3932,6 +3951,72 @@ int main()
             return fail("spreadsheetengine_fods_evaluator_tests", "forecast.fods load failed");
         if (!aLoadResult)
             return fail("spreadsheetengine_fods_evaluator_tests", "aggregate.fods load failed");
+
+        const auto findFormulaCell = [](const auto& rWorkbook, StringView rFormula)
+            -> std::optional<CellAddress> {
+            for (sal_Int32 nSheet = 0;
+                 nSheet < static_cast<sal_Int32>(rWorkbook.maSheets.size()); ++nSheet)
+            {
+                const auto& rSheet = rWorkbook.maSheets[static_cast<std::size_t>(nSheet)];
+                for (const auto& [rKey, rCell] : rSheet.maCells)
+                {
+                    if (rCell.maFormula == rFormula)
+                        return CellAddress { nSheet, rKey.first, rKey.second };
+                }
+            }
+            return std::nullopt;
+        };
+
+        const auto checkNumericFormula = [&](const auto& rWorkbook, Evaluator& rEvaluator,
+                                             StringView rFormula, double fExpected,
+                                             const char* pLabel) -> bool {
+            const auto oAddress = findFormulaCell(rWorkbook, rFormula);
+            if (!oAddress)
+            {
+                fail("spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+
+            const auto aLive = rEvaluator.evaluateCell(*oAddress);
+            const auto aCompiled = rEvaluator.evaluateCellViaCompiledTokens(*oAddress);
+            if (!aLive || aLive.mbUsedCachedValue || !aLive.maValue.maValue.isNumber()
+                || !almostEqual(aLive.maValue.maValue.mfNumber, fExpected) || !aCompiled
+                || aCompiled.mbUsedCachedValue || !aCompiled.maValue.maValue.isNumber()
+                || !almostEqual(aCompiled.maValue.maValue.mfNumber, fExpected))
+            {
+                fail("spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        Evaluator aSequenceEvaluator(aSequenceLoad.maValue.maWorkbook);
+        if (!aTodaySerial || !aTomorrowSerial
+            || !checkNumericFormula(aSequenceLoad.maValue.maWorkbook, aSequenceEvaluator,
+                u"of:=TODAY()", aTodaySerial.maValue, "sequence.fods TODAY mismatch")
+            || !checkNumericFormula(aSequenceLoad.maValue.maWorkbook, aSequenceEvaluator,
+                u"of:=TODAY() + 1", aTomorrowSerial.maValue, "sequence.fods TODAY+1 mismatch"))
+        {
+            return false;
+        }
+
+        Evaluator aColumnsEvaluator(aColumnsLoad.maValue.maWorkbook);
+        if (!checkNumericFormula(aColumnsLoad.maValue.maWorkbook, aColumnsEvaluator,
+                u"of:=COLUMNS()", 0.0, "columns.fods COLUMNS() mismatch")
+            || !checkNumericFormula(aColumnsLoad.maValue.maWorkbook, aColumnsEvaluator,
+                u"of:=COLUMNS([.B4:.C6])", 2.0, "columns.fods 2-column range mismatch"))
+        {
+            return false;
+        }
+
+        Evaluator aRowsEvaluator(aRowsLoad.maValue.maWorkbook);
+        if (!checkNumericFormula(aRowsLoad.maValue.maWorkbook, aRowsEvaluator,
+                u"of:=ROWS([.A10:.B12])", 3.0, "rows.fods 3-row range mismatch")
+            || !checkNumericFormula(aRowsLoad.maValue.maWorkbook, aRowsEvaluator,
+                u"of:=ROWS({1;2;3|4;5;6})", 2.0, "rows.fods array ROWS mismatch"))
+        {
+            return false;
+        }
 
         Evaluator aConvertEvaluator(aConvertLoad.maValue.maWorkbook);
         const auto aConvertRow150 = aConvertEvaluator.evaluateCell({ 1, 0, 149 });
