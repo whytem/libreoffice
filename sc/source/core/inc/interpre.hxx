@@ -64,55 +64,6 @@ enum MatchMode{ exactorNA=0, exactorS=-1, exactorG=1, wildcard=2, regex=3 };
 // mode for the TOCOL and TOROW formula functions
 enum class IgnoreValues{ DEFAULT=0, BLANKS=1, ERRORS=2, ALL=3 };
 
-struct VectorSearchArguments
-{
-    // struct contains the contents of the function arguments
-    // OpCode of struct owner
-    sal_uInt16 nSearchOpCode = SC_OPCODE_NONE;
-
-    // match mode (common, enum values are from XLOOKUP)
-    // optional 5th argument to set match mode
-    //   0 - Exact match. If none found, return #N/A. (MATCH value 0)
-    //  -1 - Exact match. If none found, return the next smaller item. (MATCH value 1)
-    //   1 - Exact match. If none found, return the next larger item. (MATCH value -1)
-    //   2 - A wildcard match where *, ?, and ~ have special meaning. (XLOOKUP only)
-    // TODO : is this enum needed, or do we solely use rEntry.eOp ?
-    MatchMode eMatchMode = exactorG;
-
-    // value to be searched for (common)
-    SCCOL nCol1 = 0;
-    SCROW nRow1 = 0;
-    SCTAB nTab1 = 0;
-    SCCOL nCol2 = 0;
-    SCROW nRow2 = 0;
-    SCTAB nTab2 = 0;
-    ScMatrixRef pMatSrc;
-    bool isStringSearch = true;
-    bool isEmptySearch = false;
-    double fSearchVal;
-    svl::SharedString sSearchStr;
-    bool bVLookup;
-
-    // search mode (only XLOOKUP has all 4 options, MATCH only uses Forward)
-    // optional 6th argument to set search mode
-    //   1 - Perform a search starting at the first item. This is the default.
-    //  -1 - Perform a reverse search starting at the last item.
-    //   2 - Perform a binary search that relies on lookup_array being sorted in ascending order.
-    //       If not sorted, invalid results will be returned.
-    //  -2 - Perform a binary search that relies on lookup_array being sorted in descending order.
-    //       If not sorted, invalid results will be returned.
-    //
-    LookupSearchMode eSearchMode = LookupSearchMode::Forward;
-
-    // search variables
-    SCSIZE nHitIndex = 0;
-    SCSIZE nBestFit = SCSIZE_MAX;
-
-    // result
-    int nIndex = -1;
-    bool isResultNA = false;
-};
-
 namespace sc {
 
 struct CompareOptions;
@@ -293,6 +244,10 @@ private:
     void PushIllegalArgument();
     void PushNoValue();
     void PushNA();
+    void PushLookupScalarValue(const spreadsheetengine::api::CellValue& rValue);
+    void PushLookupExecutionResult(
+        const spreadsheetengine::compat::libreoffice::lookupexecution::LookupExecutionResult& rResult,
+        bool bPreserveSingleReference);
 
     // Functions for accessing a document
 
@@ -300,9 +255,11 @@ private:
     bool IsTableOpInRange( const ScRange& );
     sal_uInt32 GetCellNumberFormat( const ScAddress& rPos, const ScRefCellValue& rCell );
     double ConvertStringToValue( const OUString& );
-    bool SearchVectorForValue( VectorSearchArguments& );
-    bool SearchMatrixForValue( VectorSearchArguments&, const ScQueryParam&, const ScQueryEntry&, const ScQueryEntry::Item& );
-    bool SearchRangeForValue( VectorSearchArguments&, ScQueryParam&, const ScQueryEntry& );
+    spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>
+    PopLookupExecutionValue(bool bAllowEmpty, bool bUseRawStackType = false);
+    spreadsheetengine::api::ValueResult<
+        spreadsheetengine::compat::libreoffice::lookupexecution::LookupInput>
+    PopLookupExecutionInput(bool bAllowScalar, bool bRequireVector);
 
 public:
     static double ScGetGCD(double fx, double fy);
@@ -563,10 +520,6 @@ private:
 
     // Set error according to rVal, and set rVal to 0.0 if there was an error.
     inline void TreatDoubleError( double& rVal );
-    // Lookup using ScLookupCache, @returns true if found and result address
-    bool LookupQueryWithCache( ScAddress & o_rResultPos, const ScQueryParam & rParam,
-            const ScComplexRefData* refData, LookupSearchMode nSearchMode, sal_uInt16 nOpCode ) const;
-
     void ScIfJump();
     void ScIfJumpNotMatrix( const short* pJump, short nJumpCount );
     void ScIfError( bool bNAonly );

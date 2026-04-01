@@ -142,8 +142,9 @@ if (aFunctionName == u"VLOOKUP" || aFunctionName == u"HLOOKUP")
             aLookupMaterializer, aTableInput, eOrientation, aResolvedIndex.maValue);
         if (!aMatchedSearchValue)
             return makeFailure(aMatchedSearchValue.meError);
-        if (rLookup.isText() && (aMatchedSearchValue.maValue.isNumber()
-                                 || aMatchedSearchValue.maValue.isBoolean()))
+        if (bApproximate && rLookup.isText()
+            && (aMatchedSearchValue.maValue.isNumber()
+                || aMatchedSearchValue.maValue.isBoolean()))
         {
             return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
         }
@@ -523,7 +524,7 @@ if (aFunctionName == u"VLOOKUP" || aFunctionName == u"HLOOKUP")
         const EvaluatorLookupMaterializer aLookupMaterializer(*this);
         const auto aResolvedIndex = selookup::resolveExtendedMatchIndex(
             aLookupMaterializer, rLookup, *oSearchInput, eMatchMode, eSearchMode,
-            toQuerySearchType(mrWorkbook.meFormulaSearchType), false);
+            toQuerySearchType(mrWorkbook.meFormulaSearchType), true);
         if (!aResolvedIndex)
         {
             if (rNode.maChildren.size() >= 4

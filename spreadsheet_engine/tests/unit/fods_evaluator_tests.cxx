@@ -1297,6 +1297,8 @@ int main()
             = aEvaluator.evaluateFormula(u"of:=LOOKUP(3;[.BA1:.BB4])", { 0, 0, 0 });
         const auto aTextLookup = aEvaluator.evaluateFormula(
             u"of:=LOOKUP(\"F\";[.BC1:.BF1];[.BC2:.BF2])", { 0, 0, 0 });
+        const auto aTextNumericVLookup = aEvaluator.evaluateFormula(
+            u"of:=VLOOKUP(\"4\";[.BA1:.BB4];2;0)", { 0, 0, 0 });
         const auto aScalarLookup = aEvaluator.evaluateFormula(u"of:=LOOKUP(1;1;3)", { 0, 0, 0 });
         const auto aMmultLookup
             = aEvaluator.evaluateFormula(u"of:=LOOKUP(4;MMULT([.BK1:.BK4];1);[.BL1:.BL4])", { 0, 0, 0 });
@@ -1310,6 +1312,8 @@ int main()
             u"of:=LOOKUP(3;[.BA1:.BB4])", { 0, 0, 0 });
         const auto aCompiledTextLookup = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=LOOKUP(\"F\";[.BC1:.BF1];[.BC2:.BF2])", { 0, 0, 0 });
+        const auto aCompiledTextNumericVLookup = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=VLOOKUP(\"4\";[.BA1:.BB4];2;0)", { 0, 0, 0 });
         const auto aCompiledScalarLookup = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=LOOKUP(1;1;3)", { 0, 0, 0 });
         const auto aCompiledMmultLookup = aEvaluator.evaluateFormulaViaCompiledTokens(
@@ -1358,6 +1362,7 @@ int main()
         if (!checkLookupNumber("vector LOOKUP", aVectorLookup, 22.0)
             || !checkLookupNumber("array LOOKUP", aArrayLookup, 22.0)
             || !checkLookupText("text LOOKUP", aTextLookup, u"VAN")
+            || !checkLookupNumber("text numeric VLOOKUP", aTextNumericVLookup, 44.0)
             || !checkLookupNumber("scalar LOOKUP", aScalarLookup, 3.0)
             || !checkLookupNumber("MMULT LOOKUP", aMmultLookup, 30.0)
             || !checkLookupNumber("MMULT array LOOKUP", aMmultArrayLookup, 3.0)
@@ -1366,6 +1371,7 @@ int main()
             || !checkLookupNumber("compiled vector LOOKUP", aCompiledVectorLookup, 22.0)
             || !checkLookupNumber("compiled array LOOKUP", aCompiledArrayLookup, 22.0)
             || !checkLookupText("compiled text LOOKUP", aCompiledTextLookup, u"VAN")
+            || !checkLookupNumber("compiled text numeric VLOOKUP", aCompiledTextNumericVLookup, 44.0)
             || !checkLookupNumber("compiled scalar LOOKUP", aCompiledScalarLookup, 3.0)
             || !checkLookupNumber("compiled MMULT LOOKUP", aCompiledMmultLookup, 30.0)
             || !checkLookupNumber("compiled MMULT array LOOKUP", aCompiledMmultArrayLookup, 3.0)
@@ -1747,6 +1753,8 @@ int main()
             u"of:=COM.MICROSOFT.XLOOKUP(5;[.BA1:.BA4];[.BB1:.BB4];;-1;2)", { 0, 0, 0 });
         const auto aXLookupNextLarger = aEvaluator.evaluateFormula(
             u"of:=COM.MICROSOFT.XLOOKUP(5;[.BA1:.BA4];[.BB1:.BB4];;1;2)", { 0, 0, 0 });
+        const auto aXLookupRegex = aEvaluator.evaluateFormula(
+            u"of:=COM.MICROSOFT.XLOOKUP(\"^E$\";[.BC1:.BF1];[.BC2:.BF2];;3)", { 0, 0, 0 });
         const auto aNestedXLookupNetProfit = aEvaluator.evaluateFormula(
             u"of:=COM.MICROSOFT.XLOOKUP([.BG139];[.BA139:.BH139];"
             u"COM.MICROSOFT.XLOOKUP([.AZ140];[.AZ140:.AZ141];[.BA140:.BH141]))",
@@ -1764,6 +1772,8 @@ int main()
             u"of:=COM.MICROSOFT.XLOOKUP(5;[.BA1:.BA4];[.BB1:.BB4];;-1;2)", { 0, 0, 0 });
         const auto aCompiledXLookupNextLarger = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=COM.MICROSOFT.XLOOKUP(5;[.BA1:.BA4];[.BB1:.BB4];;1;2)", { 0, 0, 0 });
+        const auto aCompiledXLookupRegex = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=COM.MICROSOFT.XLOOKUP(\"^E$\";[.BC1:.BF1];[.BC2:.BF2];;3)", { 0, 0, 0 });
         const auto aCompiledNestedXLookupNetProfit = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=COM.MICROSOFT.XLOOKUP([.BG139];[.BA139:.BH139];"
             u"COM.MICROSOFT.XLOOKUP([.AZ140];[.AZ140:.AZ141];[.BA140:.BH141]))",
@@ -1799,6 +1809,7 @@ int main()
             || !checkXLookupNumber("reverse XLOOKUP", aXLookupReverse, 44.0)
             || !checkXLookupNumber("next smaller XLOOKUP", aXLookupNextSmaller, 44.0)
             || !checkXLookupNumber("next larger XLOOKUP", aXLookupNextLarger, 88.0)
+            || !checkXLookupText("regex XLOOKUP", aXLookupRegex, u"VAN")
             || !checkXLookupNumber("nested XLOOKUP net profit", aNestedXLookupNetProfit, 19342.0)
             || !checkXLookupNumber("compiled exact XLOOKUP", aCompiledXLookupExact, 44.0)
             || !checkXLookupText("compiled text XLOOKUP", aCompiledXLookupText, u"VAN")
@@ -1806,6 +1817,7 @@ int main()
             || !checkXLookupNumber("compiled reverse XLOOKUP", aCompiledXLookupReverse, 44.0)
             || !checkXLookupNumber("compiled next smaller XLOOKUP", aCompiledXLookupNextSmaller, 44.0)
             || !checkXLookupNumber("compiled next larger XLOOKUP", aCompiledXLookupNextLarger, 88.0)
+            || !checkXLookupText("compiled regex XLOOKUP", aCompiledXLookupRegex, u"VAN")
             || !checkXLookupNumber("compiled nested XLOOKUP net profit",
                 aCompiledNestedXLookupNetProfit, 19342.0))
         {

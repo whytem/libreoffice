@@ -45,7 +45,7 @@ The starting handoff from the completed recalc-orchestration milestone is:
 
 ## Current Status
 
-This milestone is now active with its first four phases complete.
+This milestone is now active with Phases 0 through 4 complete.
 
 - Phase 0 is complete: the orchestration/execution boundary is explicitly
   documented, the first helper duplication inventory is frozen, and the Phase 1
@@ -60,7 +60,9 @@ This milestone is now active with its first four phases complete.
   through explicit compat bridges for `MATCH` / `XMATCH` execution plus
   `ADDRESS` / `OFFSET` / `INDEX` planning and formatting, while Calc still
   owns stack movement and host-only services
-- Phase 4 is now the active implementation frontier
+- Phase 4 is complete: `LOOKUP`, `VLOOKUP`, `HLOOKUP`, and `XLOOKUP` now route
+  bounded traversal, slice planning, and result shaping through the expanded
+  compat lookup bridge while Calc keeps stack mutation and host-only services
 
 The starting baseline for this milestone is:
 
@@ -545,6 +547,8 @@ Completion criteria for Phase 3, now met:
 
 ### Phase 4: Expand Bounded Lookup And Reference Traversal
 
+Status: **Complete**
+
 Goals:
 
 - move the next bounded lookup/reference walkers without reopening general
@@ -559,6 +563,125 @@ Target surface:
   `ScInterpreter`
 - additional workbook-address/string-reference glue only where a compat bridge
   is clearly narrower than the existing Calc shell
+
+Phase 4 shipped as four concrete workstreams.
+
+#### 4.1 Expand The Lookup Compat Bridge Surface
+
+The first task is to widen the new compat bridge layer just enough to support
+bounded lookup traversal without forcing Calc storage or stack mechanics into
+the engine.
+
+Primary targets:
+
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/LookupExecution.hxx`
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx`
+- `spreadsheet_engine/source/core/FormulaEvaluatorLookup.cxx`
+
+Required bridge capabilities:
+
+- shared lookup-vector materialization for one-dimensional and tabular inputs
+- shared result-slice planning for `VLOOKUP` / `HLOOKUP` / `XLOOKUP`
+- bounded not-found and approximate-match shaping that stays aligned with Calc
+- narrow reference/name helpers only where the lookup family cannot stay
+  coherent without them
+
+Bridge rules:
+
+- the bridge must stay compat-shaped and may depend on Calc host symbols
+- do not move `ScDocument` ownership, token arrays, or general stack walking
+- prefer header-only compat helpers if the implementation depends directly on
+  Calc symbols that do not belong in `libspreadsheetenginelo`
+
+#### 4.2 Rewire Calc Lookup Entry Points One Family At A Time
+
+Calc should consume the expanded bridge in tightly bounded slices rather than
+through a single all-at-once rewrite.
+
+Primary Calc targets:
+
+- `sc/source/core/tool/interpr1.cxx`
+- `sc/source/core/inc/interpre.hxx`
+
+Recommended execution order:
+
+1. `LOOKUP`
+2. `VLOOKUP` / `HLOOKUP`
+3. `XLOOKUP`
+
+For each adoption step:
+
+- keep Calc-owned stack mutation local to `ScInterpreter`
+- route lookup-input materialization and match/result planning through the
+  compat bridge
+- preserve existing Calc error shaping and document-backed behavior where host
+  semantics still matter
+
+#### 4.3 Keep Standalone And Calc On The Same Lookup Core
+
+Phase 4 should reduce duplication, not create a second lookup implementation.
+
+Primary standalone targets:
+
+- `spreadsheet_engine/source/core/FormulaEvaluatorLookup.cxx`
+- `spreadsheet_engine/source/core/FormulaEvaluatorInternals.hxx`
+
+Required outcome:
+
+- the standalone evaluator and Calc compat bridge should both rely on the same
+  underlying lookup runtime contracts
+- any newly extracted planner/materializer helper should be shared between
+  standalone and Calc where feasible
+- if a helper cannot be shared yet, the reason should be explicitly documented
+  as a Calc-host constraint rather than left as accidental duplication
+
+#### 4.4 Validation And Closeout Contract
+
+Completion criteria for Phase 4, now met:
+
+- the migrated lookup families are executing through the compat bridge in Calc
+- standalone lookup evaluation still uses the same authoritative lookup runtime
+- the replay baseline remains fully green
+- the remaining Calc-owned lookup/reference shell is narrowed to the next
+  bounded slice instead of left as an open-ended tail
+
+Focused validation lane for every Phase 4 slice:
+
+- `make -j4 CppunitTest_sc_ucalc_shared_cases`
+- `make -j4 CppunitTest_sc_ucalc_formula2`
+- `make -j4 CppunitTest_sc_ucalc_dependency_shadow`
+- `make -j4 CppunitTest_sc_ucalc_workbook_facade`
+- `cmake --build spreadsheet_engine/build_check --target spreadsheetengine_lookup_tests spreadsheetengine_reference_tests spreadsheetengine_fods_evaluator_tests spreadsheetengine_fods_replay_tests -j4`
+- `spreadsheet_engine/build_check/spreadsheetengine_lookup_tests`
+- `spreadsheet_engine/build_check/spreadsheetengine_reference_tests`
+- `spreadsheet_engine/build_check/spreadsheetengine_fods_evaluator_tests`
+- `spreadsheet_engine/build_check/spreadsheetengine_fods_replay_tests --summary`
+- `git diff --check`
+
+Concrete file/test inventory for Phase 4:
+
+- Calc execution surface:
+  - `sc/source/core/tool/interpr1.cxx`
+  - `sc/source/core/inc/interpre.hxx`
+- Standalone execution surface:
+  - `spreadsheet_engine/source/core/FormulaEvaluatorLookup.cxx`
+- Compat bridges:
+  - `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/LookupExecution.hxx`
+  - `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx`
+- Focused Calc tests:
+  - `sc/qa/unit/ucalc_shared_cases.cxx`
+  - `sc/qa/unit/ucalc_formula2.cxx`
+- Focused standalone tests:
+  - `spreadsheet_engine/tests/unit/lookup_api_tests.cxx`
+  - `spreadsheet_engine/tests/unit/fods_evaluator_tests.cxx`
+
+Phase 4 explicit defer list:
+
+- general token walking across the remaining opcode dispatcher
+- short-circuit and jump-shell behavior
+- broader name-resolution compilation flows outside the bounded lookup slice
+- storage-sensitive database and matrix families
+- any recalc-authority, listener, or queue-boundary changes
 
 ## Validation Strategy
 

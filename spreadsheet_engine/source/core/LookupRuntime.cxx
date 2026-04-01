@@ -112,11 +112,21 @@ using spreadsheetengine::core::util::coerceToNumber;
 {
     if (rLookup.isText())
     {
-        if (!rCandidate.isText())
+        if (rCandidate.isText())
+        {
+            return sequery::matchesWholeCellLookupText(
+                rLookup.maString, rCandidate.maString, eSearchType);
+        }
+
+        if (rCandidate.isEmpty())
             return false;
 
-        return sequery::matchesWholeCellLookupText(
-            rLookup.maString, rCandidate.maString, eSearchType);
+        const auto aLookupNumber = coerceToNumber(rLookup);
+        const auto aCandidateNumber = coerceToNumber(rCandidate);
+        if (!aLookupNumber || !aCandidateNumber)
+            return false;
+
+        return fp::approxEqual(aLookupNumber.maValue, aCandidateNumber.maValue);
     }
 
     if (rCandidate.isText() || rCandidate.isEmpty())
@@ -141,10 +151,7 @@ using spreadsheetengine::core::util::coerceToNumber;
     {
         if (eMatchMode == api::lookup::MatchMode::ExactOrNotAvailable)
         {
-            if (!rCandidate.isText())
-                return false;
-            return sequery::matchesWholeCellLookupText(
-                rLookup.maString, rCandidate.maString, eSearchType);
+            return isExactLookupMatch(rLookup, rCandidate, eSearchType);
         }
 
         if (!(rCandidate.isText() || rCandidate.isEmpty()))
@@ -712,6 +719,14 @@ api::ValueResult<api::MatrixSize> resolveExtendedMatchIndex(
         && api::lookup::isBinarySearchMode(eSearchMode))
     {
         return api::ValueResult<api::MatrixSize>::failure(api::Error::NoValue);
+    }
+
+    if (rLookup.isText())
+    {
+        if (eMatchMode == api::lookup::MatchMode::Wildcard)
+            eSearchType = api::query::SearchType::Wildcard;
+        else if (eMatchMode == api::lookup::MatchMode::Regex)
+            eSearchType = api::query::SearchType::Regex;
     }
 
     api::MatrixSize nSearchLength = trimTrailingEmptyLookupLength(
