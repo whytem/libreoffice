@@ -11,10 +11,12 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <map>
 #include <set>
 #include <string>
 
 #include <document.hxx>
+#include <globalnames.hxx>
 #include <rangenam.hxx>
 #include <scopetools.hxx>
 #include <spreadsheetengine/compat/libreoffice/DependencyShadow.hxx>
@@ -152,6 +154,35 @@ void forceFormulaTreeOrder(ScDocument& rDoc, std::initializer_list<ScAddress> aO
     }
 }
 
+void reverseCurrentFormulaTreeOrder(ScDocument& rDoc)
+{
+    auto aCurrent
+        = spreadsheetengine::compat::libreoffice::recalcshadow::detail::collectFormulaTreeAddresses(
+            rDoc);
+    std::reverse(aCurrent.begin(), aCurrent.end());
+    for (const auto& rAddress : aCurrent)
+    {
+        if (ScFormulaCell* pCell = rDoc.GetFormulaCell(
+                ScAddress(rAddress.mnColumn, rAddress.mnRow, rAddress.mnSheet)))
+        {
+            if (rDoc.IsInFormulaTrack(pCell))
+                rDoc.RemoveFromFormulaTrack(pCell);
+            if (rDoc.IsInFormulaTree(pCell))
+                rDoc.RemoveFromFormulaTree(pCell);
+        }
+    }
+
+    for (const auto& rAddress : aCurrent)
+    {
+        if (ScFormulaCell* pCell = rDoc.GetFormulaCell(
+                ScAddress(rAddress.mnColumn, rAddress.mnRow, rAddress.mnSheet)))
+        {
+            pCell->SetDirtyVar();
+            rDoc.PutInFormulaTree(pCell);
+        }
+    }
+}
+
 void assertPilotAppliedWithExactQueue(
     const std::optional<spreadsheetengine::compat::libreoffice::recalcauthority::PilotResult>&
         oResult,
@@ -165,6 +196,25 @@ void assertPilotAppliedWithExactQueue(
     CPPUNIT_ASSERT(oResult->moComparisonAfter.has_value());
     CPPUNIT_ASSERT_EQUAL(RecalcShadowComparisonKind::Exact, oResult->moComparisonAfter->meKind);
 
+    CPPUNIT_ASSERT(
+        spreadsheetengine::compat::libreoffice::recalcshadow::detail::collectPredictedQueueAddresses(
+            oResult->maPlan)
+        == spreadsheetengine::compat::libreoffice::recalcshadow::detail::
+            collectFormulaTreeAddresses(rDoc));
+}
+
+void assertPilotAppliedAndExactAfter(
+    const std::optional<spreadsheetengine::compat::libreoffice::recalcauthority::PilotResult>&
+        oResult,
+    const ScDocument& rDoc)
+{
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(PilotResultKind::Applied, oResult->meKind);
+    CPPUNIT_ASSERT(oResult->moComparisonBefore.has_value());
+    CPPUNIT_ASSERT(oResult->moComparisonBefore->meKind
+                   != RecalcShadowComparisonKind::UnderScheduling);
+    CPPUNIT_ASSERT(oResult->moComparisonAfter.has_value());
+    CPPUNIT_ASSERT_EQUAL(RecalcShadowComparisonKind::Exact, oResult->moComparisonAfter->meKind);
     CPPUNIT_ASSERT(
         spreadsheetengine::compat::libreoffice::recalcshadow::detail::collectPredictedQueueAddresses(
             oResult->maPlan)
@@ -633,6 +683,95 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testRuntimeRecalcAuthoritySetValueHoo
 
     assertExactRecalcShadow(
         aShadow.compare(*m_pDoc, translateSetScalarValue(ScAddress(0, 0, 0))));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testInsertRowRecalcAuthorityPilot)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetString(1, 0, 0, u"=SUM(A1:A2)"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=B1"_ustr);
+    m_pDoc->SetString(3, 0, 0, u"=B1+1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedRecalcAuthority aAuthority(*m_pDoc, true);
+    CPPUNIT_ASSERT(aAuthority.canApplyAuthority());
+
+    m_pDoc->InsertRow(ScRange(0, 1, 0, m_pDoc->MaxCol(), 1, 0));
+    reverseCurrentFormulaTreeOrder(*m_pDoc);
+
+    assertPilotAppliedAndExactAfter(
+        aAuthority.apply(*m_pDoc, translateInsertRows(0, 1, 1)), *m_pDoc);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testDeleteColumnRecalcAuthorityPilot)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateDeleteColumns;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(1, 0, 0, 2.0);
+    m_pDoc->SetString(2, 0, 0, u"=A1+B1"_ustr);
+    m_pDoc->SetString(3, 0, 0, u"=C1"_ustr);
+    m_pDoc->SetString(4, 0, 0, u"=D1+1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedRecalcAuthority aAuthority(*m_pDoc, true);
+    CPPUNIT_ASSERT(aAuthority.canApplyAuthority());
+
+    m_pDoc->DeleteCol(ScRange(1, 0, 0, 1, m_pDoc->MaxRow(), 0));
+    reverseCurrentFormulaTreeOrder(*m_pDoc);
+
+    assertPilotAppliedAndExactAfter(
+        aAuthority.apply(*m_pDoc, translateDeleteColumns(0, 1, 1)), *m_pDoc);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testNamedRangeRenameRecalcAuthorityPilot)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateRenameNamedRange;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    auto* pName = new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(pName));
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetString(1, 0, 0, u"=SUM(Metrics)"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=B1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedRecalcAuthority aAuthority(*m_pDoc, true);
+    CPPUNIT_ASSERT(aAuthority.canApplyAuthority());
+
+    std::map<OUString, ScRangeName> aRangeMap;
+    aRangeMap.emplace(STR_GLOBAL_RANGE_NAME, *m_pDoc->GetRangeName());
+    ScRangeName& rUpdated = aRangeMap.find(STR_GLOBAL_RANGE_NAME)->second;
+    ScRangeData* pUpdated = rUpdated.findByIndex(pName->GetIndex());
+    CPPUNIT_ASSERT(pUpdated);
+    pUpdated->SetNewName(u"RenamedMetrics"_ustr);
+
+    m_pDoc->SetAllRangeNames(aRangeMap);
+    reverseCurrentFormulaTreeOrder(*m_pDoc);
+
+    assertPilotAppliedAndExactAfter(
+        aAuthority.apply(*m_pDoc,
+            translateRenameNamedRange(*m_pDoc, *m_pDoc->GetRangeName()->findByIndex(pName->GetIndex()),
+                std::nullopt, u"Metrics"_ustr)),
+        *m_pDoc);
 
     m_pDoc->DeleteTab(0);
 }

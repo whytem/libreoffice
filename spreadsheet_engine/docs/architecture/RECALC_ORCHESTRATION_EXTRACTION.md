@@ -176,9 +176,10 @@ The milestone is now past the setup stage:
 - **Phase 2:** complete
 - **Phase 3:** complete
 - **Phase 4:** complete
-- **Phase 5+:** still open
+- **Phase 5:** complete
+- **Phase 6:** still open
 
-What landed through Phase 4:
+What landed through Phase 5:
 
 - engine-owned recalc planning types in
   `detail/dependency/RecalcPlanner.hxx`
@@ -190,10 +191,16 @@ What landed through Phase 4:
   `compat/libreoffice/RecalcAuthority.hxx`
 - runtime shadow and authority hooks for `SetValue`, `SetString`,
   `SetEmptyCell`, and `ClearRange`
+- runtime authority expansion for whole-row / whole-column insert-delete
+  mutations
+- named-range authority coverage through `SetAllRangeNames` and
+  `InsertNewRangeName`
 - dedicated standalone and Calc validation lanes for queue planning and queue
   comparison
 - ordering-sensitive Calc authority tests for `SetValue`, `SetFormula`,
   `ClearCell`, and `ClearRange`
+- ordering-sensitive Calc authority tests for structural row/column mutations
+  and named-range renames
 
 ## Proposed Phases
 
@@ -320,6 +327,8 @@ Implemented in:
 
 ### Phase 5: Expand To Structural And Named-Range Mutations
 
+Status: **Complete**
+
 Goals:
 
 - widen authority from simple edits to the already-modeled structural and
@@ -330,6 +339,14 @@ Deliverables:
 - row/column insert/delete queue planning
 - named-range mutation recalc planning
 - broader shared-formula group stability coverage
+
+Implemented in:
+
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/RecalcAuthority.hxx`
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/RecalcShadow.hxx`
+- `sc/source/core/data/document.cxx`
+- `sc/source/core/data/documen3.cxx`
+- `sc/qa/unit/ucalc_dependency_shadow.cxx`
 
 ### Phase 6: Hand Off To Execution-Backend Extraction
 

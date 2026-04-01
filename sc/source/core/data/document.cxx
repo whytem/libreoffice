@@ -1278,6 +1278,8 @@ bool ScDocument::InsertRow( SCCOL nStartCol, SCTAB nStartTab,
                             SCROW nStartRow, SCSIZE nSize, ScDocument* pRefUndoDoc,
                             const ScMarkData* pTabMark )
 {
+    using spreadsheetengine::compat::libreoffice::recalcauthority::ScopedRecalcAuthority;
+
     SCTAB i;
 
     PutInOrder( nStartCol, nEndCol );
@@ -1287,6 +1289,12 @@ bool ScDocument::InsertRow( SCCOL nStartCol, SCTAB nStartTab,
         nStartTab = 0;
         nEndTab = GetTableCount() - 1;
     }
+
+    const bool bAuthorityEligible = !pTabMark && nStartTab == nEndTab && nStartCol == 0
+                                    && nEndCol == MaxCol();
+    const auto aAuthority = bAuthorityEligible
+        ? ScopedRecalcAuthority::captureIfRuntimeEnabled(*this)
+        : ScopedRecalcAuthority();
 
     bool bTest = true;
     bool bRet = false;
@@ -1388,6 +1396,13 @@ bool ScDocument::InsertRow( SCCOL nStartCol, SCTAB nStartTab,
     }
     EnableDelayDeletingBroadcasters( oldDelayedDeleteBroadcasters );
     SetAutoCalc( bOldAutoCalc );
+    if (bRet && bAuthorityEligible)
+    {
+        aAuthority.logAndApply(*this,
+            spreadsheetengine::compat::libreoffice::mutation::translateInsertRows(
+                nStartTab, nStartRow, static_cast<sal_Int32>(nSize)),
+            "ScDocument::InsertRow");
+    }
     if ( bRet && pChartListenerCollection )
         pChartListenerCollection->UpdateDirtyCharts();
     return bRet;
@@ -1406,6 +1421,8 @@ void ScDocument::DeleteRow( SCCOL nStartCol, SCTAB nStartTab,
                             ScDocument* pRefUndoDoc, bool* pUndoOutline,
                             const ScMarkData* pTabMark )
 {
+    using spreadsheetengine::compat::libreoffice::recalcauthority::ScopedRecalcAuthority;
+
     SCTAB i;
 
     PutInOrder( nStartCol, nEndCol );
@@ -1415,6 +1432,12 @@ void ScDocument::DeleteRow( SCCOL nStartCol, SCTAB nStartTab,
         nStartTab = 0;
         nEndTab = GetTableCount() - 1;
     }
+
+    const bool bAuthorityEligible = !pTabMark && nStartTab == nEndTab && nStartCol == 0
+                                    && nEndCol == MaxCol();
+    const auto aAuthority = bAuthorityEligible
+        ? ScopedRecalcAuthority::captureIfRuntimeEnabled(*this)
+        : ScopedRecalcAuthority();
 
     sc::AutoCalcSwitch aACSwitch(*this, false); // avoid multiple calculations
 
@@ -1507,6 +1530,14 @@ void ScDocument::DeleteRow( SCCOL nStartCol, SCTAB nStartTab,
 
     if (pChartListenerCollection)
         pChartListenerCollection->UpdateDirtyCharts();
+
+    if (bAuthorityEligible)
+    {
+        aAuthority.logAndApply(*this,
+            spreadsheetengine::compat::libreoffice::mutation::translateDeleteRows(
+                nStartTab, nStartRow, static_cast<sal_Int32>(nSize)),
+            "ScDocument::DeleteRow");
+    }
 }
 
 void ScDocument::DeleteRow( const ScRange& rRange )
@@ -1542,6 +1573,8 @@ bool ScDocument::InsertCol( SCROW nStartRow, SCTAB nStartTab,
                             SCCOL nStartCol, SCSIZE nSize, ScDocument* pRefUndoDoc,
                             const ScMarkData* pTabMark )
 {
+    using spreadsheetengine::compat::libreoffice::recalcauthority::ScopedRecalcAuthority;
+
     SCTAB i;
 
     PutInOrder( nStartRow, nEndRow );
@@ -1551,6 +1584,12 @@ bool ScDocument::InsertCol( SCROW nStartRow, SCTAB nStartTab,
         nStartTab = 0;
         nEndTab = GetTableCount() - 1;
     }
+
+    const bool bAuthorityEligible = !pTabMark && nStartTab == nEndTab && nStartRow == 0
+                                    && nEndRow == MaxRow();
+    const auto aAuthority = bAuthorityEligible
+        ? ScopedRecalcAuthority::captureIfRuntimeEnabled(*this)
+        : ScopedRecalcAuthority();
 
     bool bTest = true;
     bool bRet = false;
@@ -1618,6 +1657,13 @@ bool ScDocument::InsertCol( SCROW nStartRow, SCTAB nStartTab,
     }
     EnableDelayDeletingBroadcasters( oldDelayedDeleteBroadcasters );
     SetAutoCalc( bOldAutoCalc );
+    if (bRet && bAuthorityEligible)
+    {
+        aAuthority.logAndApply(*this,
+            spreadsheetengine::compat::libreoffice::mutation::translateInsertColumns(
+                nStartTab, nStartCol, static_cast<sal_Int32>(nSize)),
+            "ScDocument::InsertCol");
+    }
     if ( bRet && pChartListenerCollection )
         pChartListenerCollection->UpdateDirtyCharts();
     return bRet;
@@ -1634,6 +1680,8 @@ void ScDocument::DeleteCol(SCROW nStartRow, SCTAB nStartTab, SCROW nEndRow, SCTA
                                 SCCOL nStartCol, SCSIZE nSize, ScDocument* pRefUndoDoc,
                                 bool* pUndoOutline, const ScMarkData* pTabMark )
 {
+    using spreadsheetengine::compat::libreoffice::recalcauthority::ScopedRecalcAuthority;
+
     SCTAB i;
 
     PutInOrder( nStartRow, nEndRow );
@@ -1643,6 +1691,12 @@ void ScDocument::DeleteCol(SCROW nStartRow, SCTAB nStartTab, SCROW nEndRow, SCTA
         nStartTab = 0;
         nEndTab = GetTableCount() - 1;
     }
+
+    const bool bAuthorityEligible = !pTabMark && nStartTab == nEndTab && nStartRow == 0
+                                    && nEndRow == MaxRow();
+    const auto aAuthority = bAuthorityEligible
+        ? ScopedRecalcAuthority::captureIfRuntimeEnabled(*this)
+        : ScopedRecalcAuthority();
 
     sc::AutoCalcSwitch aACSwitch(*this, false); // avoid multiple calculations
     ScBulkBroadcast aBulkBroadcast(GetBASM(), SfxHintId::ScDataChanged);
@@ -1723,6 +1777,14 @@ void ScDocument::DeleteCol(SCROW nStartRow, SCTAB nStartTab, SCROW nEndRow, SCTA
 
     if (pChartListenerCollection)
         pChartListenerCollection->UpdateDirtyCharts();
+
+    if (bAuthorityEligible)
+    {
+        aAuthority.logAndApply(*this,
+            spreadsheetengine::compat::libreoffice::mutation::translateDeleteColumns(
+                nStartTab, nStartCol, static_cast<sal_Int32>(nSize)),
+            "ScDocument::DeleteCol");
+    }
 }
 
 void ScDocument::DeleteCol( const ScRange& rRange )

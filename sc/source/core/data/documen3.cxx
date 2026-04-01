@@ -80,9 +80,20 @@
 #include <config_fuzzers.h>
 #include <memory>
 
+#include <spreadsheetengine/compat/libreoffice/DependencyShadow.hxx>
+#include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
+#include <spreadsheetengine/compat/libreoffice/RecalcAuthority.hxx>
+#include <spreadsheetengine/compat/libreoffice/RecalcShadow.hxx>
+#include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
+
 using namespace com::sun::star;
 
 namespace {
+
+using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+using spreadsheetengine::detail::facade::MutationEvent;
+using spreadsheetengine::detail::facade::NamedRangeDescriptor;
+using spreadsheetengine::detail::facade::NamedRangeId;
 
 void sortAndRemoveDuplicates(std::vector<ScTypedStrData>& rStrings, bool bCaseSens)
 {
@@ -108,6 +119,56 @@ void sortAndRemoveDuplicates(std::vector<ScTypedStrData>& rStrings, bool bCaseSe
     }
 }
 
+[[nodiscard]] const NamedRangeDescriptor* findNamedRangeById(
+    const std::vector<NamedRangeDescriptor>& rRanges, const NamedRangeId& rId)
+{
+    const auto aIt = std::find_if(rRanges.begin(), rRanges.end(),
+        [&rId](const NamedRangeDescriptor& rDescriptor) {
+            return rDescriptor.maId == rId;
+        });
+    return aIt == rRanges.end() ? nullptr : &*aIt;
+}
+
+[[nodiscard]] std::optional<MutationEvent> inferSingleNamedRangeMutation(
+    const std::vector<NamedRangeDescriptor>& rBefore,
+    const std::vector<NamedRangeDescriptor>& rAfter)
+{
+    std::vector<NamedRangeDescriptor> aAdded;
+    std::vector<NamedRangeDescriptor> aRemoved;
+    std::vector<std::pair<NamedRangeDescriptor, NamedRangeDescriptor>> aChanged;
+
+    for (const auto& rBeforeDescriptor : rBefore)
+    {
+        if (const auto* pAfterDescriptor = findNamedRangeById(rAfter, rBeforeDescriptor.maId))
+        {
+            if (!(*pAfterDescriptor == rBeforeDescriptor))
+                aChanged.emplace_back(rBeforeDescriptor, *pAfterDescriptor);
+        }
+        else
+        {
+            aRemoved.push_back(rBeforeDescriptor);
+        }
+    }
+
+    for (const auto& rAfterDescriptor : rAfter)
+    {
+        if (!findNamedRangeById(rBefore, rAfterDescriptor.maId))
+            aAdded.push_back(rAfterDescriptor);
+    }
+
+    if (aChanged.size() == 1 && aAdded.empty() && aRemoved.empty())
+        return MutationEvent::renameNamedRange(
+            aChanged.front().first, aChanged.front().second);
+
+    if (aAdded.size() == 1 && aRemoved.empty() && aChanged.empty())
+        return MutationEvent::addNamedRange(aAdded.front());
+
+    if (aRemoved.size() == 1 && aAdded.empty() && aChanged.empty())
+        return MutationEvent::removeNamedRange(aRemoved.front());
+
+    return std::nullopt;
+}
+
 }
 
 void ScDocument::GetAllTabRangeNames(ScRangeName::TabNameCopyMap& rNames) const
@@ -131,6 +192,16 @@ void ScDocument::GetAllTabRangeNames(ScRangeName::TabNameCopyMap& rNames) const
 
 void ScDocument::SetAllRangeNames(const std::map<OUString, ScRangeName>& rRangeMap)
 {
+    using spreadsheetengine::compat::libreoffice::dependencyshadow::ScopedInvalidationShadow;
+    using spreadsheetengine::compat::libreoffice::recalcauthority::ScopedRecalcAuthority;
+    using spreadsheetengine::compat::libreoffice::recalcshadow::ScopedRecalcShadow;
+
+    const CalcWorkbookFacade aBeforeFacade(*this, 0);
+    const auto aBeforeNamedRanges = aBeforeFacade.getNamedRangeDescriptors();
+    const auto aAuthority = ScopedRecalcAuthority::captureIfRuntimeEnabled(*this);
+    const auto aShadow = ScopedInvalidationShadow::captureIfRuntimeEnabled(*this);
+    const auto aRecalcShadow = ScopedRecalcShadow::captureIfRuntimeEnabled(*this);
+
     for (const auto& [rName, rRangeName] : rRangeMap)
     {
         if (rName == STR_GLOBAL_RANGE_NAME)
@@ -149,6 +220,15 @@ void ScDocument::SetAllRangeNames(const std::map<OUString, ScRangeName>& rRangeM
             else
                 SetRangeName( nTab, std::unique_ptr<ScRangeName>(new ScRangeName( rRangeName )) );
         }
+    }
+
+    const CalcWorkbookFacade aAfterFacade(*this, 0);
+    if (const auto oMutation = inferSingleNamedRangeMutation(
+            aBeforeNamedRanges, aAfterFacade.getNamedRangeDescriptors()))
+    {
+        aShadow.log(*this, *oMutation, "ScDocument::SetAllRangeNames");
+        aRecalcShadow.log(*this, *oMutation, "ScDocument::SetAllRangeNames");
+        aAuthority.logAndApply(*this, *oMutation, "ScDocument::SetAllRangeNames");
     }
 }
 
@@ -223,22 +303,54 @@ bool ScDocument::IsAddressInRangeName( RangeNameScope eScope, const ScAddress& r
 
 bool ScDocument::InsertNewRangeName( const OUString& rName, const ScAddress& rPos, const OUString& rExpr )
 {
+    using spreadsheetengine::compat::libreoffice::dependencyshadow::ScopedInvalidationShadow;
+    using spreadsheetengine::compat::libreoffice::recalcauthority::ScopedRecalcAuthority;
+    using spreadsheetengine::compat::libreoffice::recalcshadow::ScopedRecalcShadow;
+    using spreadsheetengine::compat::libreoffice::mutation::translateAddNamedRange;
+
     ScRangeName* pGlobalNames = GetRangeName();
     if (!pGlobalNames)
         return false;
 
+    const auto aAuthority = ScopedRecalcAuthority::captureIfRuntimeEnabled(*this);
+    const auto aShadow = ScopedInvalidationShadow::captureIfRuntimeEnabled(*this);
+    const auto aRecalcShadow = ScopedRecalcShadow::captureIfRuntimeEnabled(*this);
     ScRangeData* pName = new ScRangeData(*this, rName, rExpr, rPos, ScRangeData::Type::Name, GetGrammar());
-    return pGlobalNames->insert(pName);
+    const bool bInserted = pGlobalNames->insert(pName);
+    if (bInserted)
+    {
+        const auto aMutation = translateAddNamedRange(*this, *pName);
+        aShadow.log(*this, aMutation, "ScDocument::InsertNewRangeName");
+        aRecalcShadow.log(*this, aMutation, "ScDocument::InsertNewRangeName");
+        aAuthority.logAndApply(*this, aMutation, "ScDocument::InsertNewRangeName");
+    }
+    return bInserted;
 }
 
 bool ScDocument::InsertNewRangeName( SCTAB nTab, const OUString& rName, const ScAddress& rPos, const OUString& rExpr )
 {
+    using spreadsheetengine::compat::libreoffice::dependencyshadow::ScopedInvalidationShadow;
+    using spreadsheetengine::compat::libreoffice::recalcauthority::ScopedRecalcAuthority;
+    using spreadsheetengine::compat::libreoffice::recalcshadow::ScopedRecalcShadow;
+    using spreadsheetengine::compat::libreoffice::mutation::translateAddNamedRange;
+
     ScRangeName* pLocalNames = GetRangeName(nTab);
     if (!pLocalNames)
         return false;
 
+    const auto aAuthority = ScopedRecalcAuthority::captureIfRuntimeEnabled(*this);
+    const auto aShadow = ScopedInvalidationShadow::captureIfRuntimeEnabled(*this);
+    const auto aRecalcShadow = ScopedRecalcShadow::captureIfRuntimeEnabled(*this);
     ScRangeData* pName = new ScRangeData(*this, rName, rExpr, rPos, ScRangeData::Type::Name, GetGrammar());
-    return pLocalNames->insert(pName);
+    const bool bInserted = pLocalNames->insert(pName);
+    if (bInserted)
+    {
+        const auto aMutation = translateAddNamedRange(*this, *pName, nTab);
+        aShadow.log(*this, aMutation, "ScDocument::InsertNewRangeNameLocal");
+        aRecalcShadow.log(*this, aMutation, "ScDocument::InsertNewRangeNameLocal");
+        aAuthority.logAndApply(*this, aMutation, "ScDocument::InsertNewRangeNameLocal");
+    }
+    return bInserted;
 }
 
 const ScRangeData* ScDocument::GetRangeAtBlock( const ScRange& rBlock, OUString& rName, bool* pSheetLocal ) const

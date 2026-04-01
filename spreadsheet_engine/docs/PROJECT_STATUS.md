@@ -612,28 +612,30 @@ Phases 0-4 of that milestone are now complete:
   verification failure
 - Phase 4 landed engine-owned queue application for the same safe non-structural
   mutation families, validated with ordering-sensitive Calc differential tests
+- Phase 5 widened that pilot to whole-row / whole-column structural mutations
+  plus named-range mutation flows, with rebuilt post-mutation queue planning
+  for snapshot-rebuild cases
 
-The active implementation frontier now starts at **Phase 5: Expand To
-Structural And Named-Range Mutations**.
+The active implementation frontier now starts at **Phase 6: Hand Off To
+Execution-Backend Extraction**.
 
 The recommended active sequence is:
 
-1. Expand the authoritative planner/scheduler pilot from the safe
-   non-structural edits to structural and named-range mutations.
-2. Tighten shared-formula and structural ordering coverage around that wider
-   scheduler boundary.
-3. Only after scheduler authority is stable, continue into execution-backend
-   extraction.
+1. Keep the completed scheduler-authority pilot green while execution slices
+   begin moving behind the engine boundary.
+2. Extract token walking, coercion, and reference-sensitive evaluator shell
+   logic in validated slices.
+3. Revisit broader workbook/storage authority only after execution authority is
+   stable.
 
 ### Medium-term: Extract Recalculation Orchestration On Top Of The Planner
 
-- Expand the current opt-in authoritative dirty-plan and queue pilot from
-  non-structural edits to the structural and named-range mutation families
-  already modeled by the dependency planner
+- Keep the current engine-owned dirty-plan and queue pilot green across the
+  widened non-structural, structural, and named-range mutation surface
 - Keep Calc consuming engine-owned scheduler outputs while storage mutation and
   actual formula execution remain Calc-hosted
-- Tighten structural-mutation, named-range, and shared-formula stability
-  coverage where scheduler extraction exposes gaps
+- Use the now-stable scheduler boundary as the prerequisite for evaluator-shell
+  extraction
 - Use the completed shared-runtime convergence work as a prerequisite, not as a
   competing roadmap stream
 
@@ -649,7 +651,7 @@ authority decision:
 | Area | Current state | Next step |
 |------|---------------|-----------|
 | Compiler authority inside Calc | Standalone switchover is complete; Calc still uses `ScCompiler` for most production paths | Keep engine-first compile adoption expanding only where the bridge/diff lanes make it safe |
-| Recalculation orchestration | Workbook facade plus dependency/invalidation planner are complete in shadow mode | Move dirty-set ownership and recalc scheduling onto engine-owned planner outputs |
+| Recalculation orchestration | Engine-owned dirty planning and queue/scheduling authority are piloted across non-structural, structural, and named-range mutations | Keep the authority lane stable while execution-backend extraction builds on top |
 | Execution backend | `ScInterpreter` and execution backends are still Calc-owned, although the pure-computation runtime kernels are now substantially shared | Incrementally extract the remaining evaluator shell, coercion, and reference-sensitive execution logic behind strong differential validation |
 | Workbook/storage authority | Calc-backed facade exists and is validated | Defer any authority shift until scheduler and execution layers are stable |
 
@@ -659,10 +661,10 @@ authority decision:
    - Keep the `0 / 50,661` cached-fallback result green
    - Keep compiled replay and lexical parity maintenance lanes green
 2. **Extract recalculation orchestration**
-   - Expand the completed authoritative pilot from safe non-structural edits
-     to structural and named-range mutation families
-   - Keep recalc queue/scheduling policy engine-owned as that authority
-     boundary widens
+   - Keep the completed authoritative planner/scheduler pilot green as the
+     stable precondition for execution extraction
+   - Continue using engine-owned queue/scheduling policy as the settled
+     orchestration boundary
 3. **Incrementally extract the CPU execution backend**
    - Move token walking, coercion, and evaluation mechanics out of Calc in
      small validated slices

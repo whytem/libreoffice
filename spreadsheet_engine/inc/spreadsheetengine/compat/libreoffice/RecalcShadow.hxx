@@ -285,6 +285,25 @@ struct QueueGroup
     return aComparison;
 }
 
+[[nodiscard]] inline spreadsheetengine::detail::dependency::RecalcPlan buildComparisonPlan(
+    const spreadsheetengine::detail::dependency::DependencySnapshot& rBeforeSnapshot,
+    const spreadsheetengine::detail::facade::MutationEvent& rMutation,
+    const CalcWorkbookFacade& rAfterFacade)
+{
+    auto aInvalidationPlan
+        = spreadsheetengine::detail::dependency::planInvalidation(rBeforeSnapshot, rMutation);
+    if (!aInvalidationPlan.mbRequiresSnapshotRebuild)
+        return spreadsheetengine::detail::dependency::buildRecalcPlan(rBeforeSnapshot,
+            aInvalidationPlan);
+
+    const auto aAfterSnapshot
+        = spreadsheetengine::detail::dependency::buildDependencySnapshot(rAfterFacade);
+    const auto aAfterInvalidation
+        = spreadsheetengine::detail::dependency::planInvalidation(aAfterSnapshot, rMutation);
+    return spreadsheetengine::detail::dependency::buildRecalcPlan(aAfterSnapshot,
+        aAfterInvalidation);
+}
+
 inline void logComparison(const ShadowComparison& rComparison, const char* pContext)
 {
     const char* pLabel = pContext ? pContext : "mutation";
@@ -362,12 +381,9 @@ public:
         if (!mbCaptured)
             return std::nullopt;
 
-        const auto aInvalidationPlan
-            = spreadsheetengine::detail::dependency::planInvalidation(maSnapshot, rMutation);
-        const auto aRecalcPlan
-            = spreadsheetengine::detail::dependency::buildRecalcPlan(maSnapshot, aInvalidationPlan);
         const CalcWorkbookFacade aAfterFacade(rDoc, 0);
-        return detail::comparePlanToDocument(aRecalcPlan, aAfterFacade, rDoc);
+        return detail::comparePlanToDocument(
+            detail::buildComparisonPlan(maSnapshot, rMutation, aAfterFacade), aAfterFacade, rDoc);
     }
 
     template <typename EventBuilder>

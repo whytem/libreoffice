@@ -262,12 +262,9 @@ public:
             return std::nullopt;
 
         PilotResult aResult;
-        const auto aInvalidationPlan
-            = spreadsheetengine::detail::dependency::planInvalidation(maSnapshot, rMutation);
-        aResult.maPlan
-            = spreadsheetengine::detail::dependency::buildRecalcPlan(maSnapshot, aInvalidationPlan);
-
         const CalcWorkbookFacade aAfterFacade(rDoc, 0);
+        aResult.maPlan
+            = recalcshadow::detail::buildComparisonPlan(maSnapshot, rMutation, aAfterFacade);
         aResult.moComparisonBefore
             = recalcshadow::detail::comparePlanToDocument(aResult.maPlan, aAfterFacade, rDoc);
         detail::assertSafeComparison(*aResult.moComparisonBefore, "recalc authority before apply");
