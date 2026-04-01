@@ -9,8 +9,9 @@ Active milestone docs:
 
 - [EXECUTION_BACKEND_EXTRACTION.md](EXECUTION_BACKEND_EXTRACTION.md) -
   active milestone for extracting evaluator-shell execution logic on top of the
-  completed orchestration boundary; Phases 0 through 4 are complete and the
-  next bounded execution slice is now the planning frontier
+  completed orchestration boundary; Phases 0 through 5 are complete and the
+  next frontier is the remaining bounded token-walking, jump, and
+  name/string-reference shell
 - [RECALC_ORCHESTRATION_EXTRACTION.md](RECALC_ORCHESTRATION_EXTRACTION.md) -
   completed milestone for engine-owned recalc authority and queue/scheduling
   extraction

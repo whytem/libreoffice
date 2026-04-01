@@ -34,6 +34,38 @@ int main()
     if (!aArea || aArea.maValue != 1 || aBadArea || aBadArea.meError != Error::NotAvailable)
         return fail("spreadsheetengine_reference_tests", "area selection mismatch");
 
+    const CellRange aSheetSpan { CellAddress { 1, 2, 3 }, CellAddress { 3, 4, 5 } };
+    const auto aColumnPlan = spreadsheetengine::api::reference::planAxisReference(
+        aSheetSpan, spreadsheetengine::api::reference::ReferenceAxis::Column);
+    const auto aRowPlan = spreadsheetengine::api::reference::planAxisReference(
+        aSheetSpan, spreadsheetengine::api::reference::ReferenceAxis::Row);
+    const auto aColumnCount = spreadsheetengine::api::reference::countReferenceAxisSpan(
+        aSheetSpan, spreadsheetengine::api::reference::ReferenceAxis::Column, true);
+    const auto aRowCount = spreadsheetengine::api::reference::countReferenceAxisSpan(
+        aSheetSpan, spreadsheetengine::api::reference::ReferenceAxis::Row, true);
+    const auto aMatrixColumnCount = spreadsheetengine::api::reference::countMatrixAxisSpan(
+        MatrixDimensions { 4, 2 }, spreadsheetengine::api::reference::ReferenceAxis::Column);
+    const auto aMatrixRowCount = spreadsheetengine::api::reference::countMatrixAxisSpan(
+        MatrixDimensions { 4, 2 }, spreadsheetengine::api::reference::ReferenceAxis::Row);
+    const auto aAreaCount = spreadsheetengine::api::reference::countAreas(3);
+    const auto aSheetOrdinal
+        = spreadsheetengine::api::reference::sheetOrdinalFromReference(aSheetSpan);
+    const auto aSheetCount
+        = spreadsheetengine::api::reference::sheetCountFromReference(aSheetSpan);
+    if (!aColumnPlan || aColumnPlan.maValue.mfStart != 3.0 || aColumnPlan.maValue.mnLength != 3
+        || !aColumnPlan.maValue.requiresMatrixResult() || !aRowPlan
+        || aRowPlan.maValue.mfStart != 4.0 || aRowPlan.maValue.mnLength != 3
+        || !aColumnCount || !almostEqual(aColumnCount.maValue, 9.0) || !aRowCount
+        || !almostEqual(aRowCount.maValue, 9.0) || !aMatrixColumnCount
+        || !almostEqual(aMatrixColumnCount.maValue, 4.0) || !aMatrixRowCount
+        || !almostEqual(aMatrixRowCount.maValue, 2.0) || !aAreaCount
+        || !almostEqual(aAreaCount.maValue, 3.0) || !aSheetOrdinal
+        || !almostEqual(aSheetOrdinal.maValue, 2.0) || !aSheetCount
+        || !almostEqual(aSheetCount.maValue, 3.0))
+    {
+        return fail("spreadsheetengine_reference_tests", "reference shape planning mismatch");
+    }
+
     const CellRange aBaseRange { CellAddress { 0, 2, 3 }, CellAddress { 0, 4, 5 } };
     const auto aOffset = spreadsheetengine::api::reference::planOffsetRange(
         aBaseRange, 1, -2, std::nullopt, std::nullopt, 1023, 65535);

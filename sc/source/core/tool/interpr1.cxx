@@ -185,6 +185,36 @@ void ScInterpreter::PushLookupExecutionResult(
     }
 }
 
+void ScInterpreter::PushReferenceAxisPlan(const serefexec::AxisReferencePlan& rPlan)
+{
+    if (!rPlan.requiresMatrixResult())
+    {
+        PushDouble(rPlan.mfStart);
+        return;
+    }
+
+    const auto aDimensions = rPlan.resultDimensions();
+    ScMatrixRef pResultMatrix
+        = GetNewMat(static_cast<SCSIZE>(aDimensions.mnColumns), static_cast<SCSIZE>(aDimensions.mnRows),
+            /*bEmpty*/ true);
+    if (!pResultMatrix)
+    {
+        PushIllegalArgument();
+        return;
+    }
+
+    for (sal_Int32 nIndex = 0; nIndex < rPlan.mnLength; ++nIndex)
+    {
+        const double fValue = rPlan.mfStart + static_cast<double>(nIndex);
+        if (rPlan.meAxis == spreadsheetengine::api::reference::ReferenceAxis::Column)
+            pResultMatrix->PutDouble(fValue, static_cast<SCSIZE>(nIndex), 0);
+        else
+            pResultMatrix->PutDouble(fValue, 0, static_cast<SCSIZE>(nIndex));
+    }
+
+    PushMatrix(pResultMatrix);
+}
+
 spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>
 ScInterpreter::PopLookupExecutionValue(bool bAllowEmpty, bool bUseRawStackType)
 {
@@ -4417,40 +4447,41 @@ void ScInterpreter::ScStDevP( bool bTextAsZero )
 void ScInterpreter::ScColumns()
 {
     sal_uInt8 nParamCount = GetByte();
-    sal_uLong nVal = 0;
-    SCCOL nCol1;
-    SCROW nRow1;
-    SCTAB nTab1;
-    SCCOL nCol2;
-    SCROW nRow2;
-    SCTAB nTab2;
+    double fValue = 0.0;
     while (nParamCount-- > 0)
     {
         switch ( GetStackType() )
         {
             case svSingleRef:
                 PopError();
-                nVal++;
+                fValue += 1.0;
                 break;
             case svDoubleRef:
-                PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
-                nVal += static_cast<sal_uLong>(nTab2 - nTab1 + 1) *
-                    static_cast<sal_uLong>(nCol2 - nCol1 + 1);
+            {
+                ScRange aRange;
+                PopDoubleRef(aRange);
+                const auto aCount = serefexec::countReferenceAxisSpan(
+                    aRange, serefexec::ReferenceAxis::Column);
+                if (!aCount)
+                    SetError(selibreoffice::toFormulaError(aCount.meError));
+                else
+                    fValue += aCount.maValue;
+            }
                 break;
             case svMatrix:
             {
                 ScMatrixRef pMat = PopMatrix();
-                if (pMat)
-                {
-                    SCSIZE nC, nR;
-                    pMat->GetDimensions(nC, nR);
-                    nVal += nC;
-                }
+                const auto aCount = serefexec::countMatrixAxisSpan(
+                    pMat, serefexec::ReferenceAxis::Column);
+                if (!aCount)
+                    SetError(selibreoffice::toFormulaError(aCount.meError));
+                else
+                    fValue += aCount.maValue;
             }
             break;
             case svExternalSingleRef:
                 PopError();
-                nVal++;
+                fValue += 1.0;
             break;
             case svExternalDoubleRef:
             {
@@ -4458,9 +4489,12 @@ void ScInterpreter::ScColumns()
                 OUString aTabName;
                 ScComplexRefData aRef;
                 PopExternalDoubleRef( nFileId, aTabName, aRef);
-                ScRange aAbs = aRef.toAbs(mrDoc, aPos);
-                nVal += static_cast<sal_uLong>(aAbs.aEnd.Tab() - aAbs.aStart.Tab() + 1) *
-                    static_cast<sal_uLong>(aAbs.aEnd.Col() - aAbs.aStart.Col() + 1);
+                const auto aCount = serefexec::countReferenceAxisSpan(
+                    aRef.toAbs(mrDoc, aPos), serefexec::ReferenceAxis::Column);
+                if (!aCount)
+                    SetError(selibreoffice::toFormulaError(aCount.meError));
+                else
+                    fValue += aCount.maValue;
             }
             break;
             default:
@@ -4468,46 +4502,47 @@ void ScInterpreter::ScColumns()
                 SetError(FormulaError::IllegalParameter);
         }
     }
-    PushDouble(static_cast<double>(nVal));
+    PushDouble(fValue);
 }
 
 void ScInterpreter::ScRows()
 {
     sal_uInt8 nParamCount = GetByte();
-    sal_uLong nVal = 0;
-    SCCOL nCol1;
-    SCROW nRow1;
-    SCTAB nTab1;
-    SCCOL nCol2;
-    SCROW nRow2;
-    SCTAB nTab2;
+    double fValue = 0.0;
     while (nParamCount-- > 0)
     {
         switch ( GetStackType() )
         {
             case svSingleRef:
                 PopError();
-                nVal++;
+                fValue += 1.0;
                 break;
             case svDoubleRef:
-                PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
-                nVal += static_cast<sal_uLong>(nTab2 - nTab1 + 1) *
-                    static_cast<sal_uLong>(nRow2 - nRow1 + 1);
+            {
+                ScRange aRange;
+                PopDoubleRef(aRange);
+                const auto aCount
+                    = serefexec::countReferenceAxisSpan(aRange, serefexec::ReferenceAxis::Row);
+                if (!aCount)
+                    SetError(selibreoffice::toFormulaError(aCount.meError));
+                else
+                    fValue += aCount.maValue;
+            }
                 break;
             case svMatrix:
             {
                 ScMatrixRef pMat = PopMatrix();
-                if (pMat)
-                {
-                    SCSIZE nC, nR;
-                    pMat->GetDimensions(nC, nR);
-                    nVal += nR;
-                }
+                const auto aCount
+                    = serefexec::countMatrixAxisSpan(pMat, serefexec::ReferenceAxis::Row);
+                if (!aCount)
+                    SetError(selibreoffice::toFormulaError(aCount.meError));
+                else
+                    fValue += aCount.maValue;
             }
             break;
             case svExternalSingleRef:
                 PopError();
-                nVal++;
+                fValue += 1.0;
             break;
             case svExternalDoubleRef:
             {
@@ -4515,9 +4550,12 @@ void ScInterpreter::ScRows()
                 OUString aTabName;
                 ScComplexRefData aRef;
                 PopExternalDoubleRef( nFileId, aTabName, aRef);
-                ScRange aAbs = aRef.toAbs(mrDoc, aPos);
-                nVal += static_cast<sal_uLong>(aAbs.aEnd.Tab() - aAbs.aStart.Tab() + 1) *
-                    static_cast<sal_uLong>(aAbs.aEnd.Row() - aAbs.aStart.Row() + 1);
+                const auto aCount = serefexec::countReferenceAxisSpan(
+                    aRef.toAbs(mrDoc, aPos), serefexec::ReferenceAxis::Row);
+                if (!aCount)
+                    SetError(selibreoffice::toFormulaError(aCount.meError));
+                else
+                    fValue += aCount.maValue;
             }
             break;
             default:
@@ -4525,24 +4563,21 @@ void ScInterpreter::ScRows()
                 SetError(FormulaError::IllegalParameter);
         }
     }
-    PushDouble(static_cast<double>(nVal));
+    PushDouble(fValue);
 }
 
 void ScInterpreter::ScSheets()
 {
     sal_uInt8 nParamCount = GetByte();
-    sal_uLong nVal;
     if ( nParamCount == 0 )
-        nVal = mrDoc.GetTableCount();
+    {
+        const auto aCount = serefexec::workbookSheetCount(mrDoc);
+        PushDouble(aCount.maValue);
+        return;
+    }
     else
     {
-        nVal = 0;
-        SCCOL nCol1;
-        SCROW nRow1;
-        SCTAB nTab1;
-        SCCOL nCol2;
-        SCROW nRow2;
-        SCTAB nTab2;
+        double fValue = 0.0;
         while (nGlobalError == FormulaError::NONE && nParamCount-- > 0)
         {
             switch ( GetStackType() )
@@ -4550,11 +4585,18 @@ void ScInterpreter::ScSheets()
                 case svSingleRef:
                 case svExternalSingleRef:
                     PopError();
-                    nVal++;
+                    fValue += 1.0;
                 break;
                 case svDoubleRef:
-                    PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
-                    nVal += static_cast<sal_uLong>(nTab2 - nTab1 + 1);
+                {
+                    ScRange aRange;
+                    PopDoubleRef(aRange);
+                    const auto aCount = serefexec::sheetCount(aRange);
+                    if (!aCount)
+                        SetError(selibreoffice::toFormulaError(aCount.meError));
+                    else
+                        fValue += aCount.maValue;
+                }
                 break;
                 case svExternalDoubleRef:
                 {
@@ -4562,8 +4604,11 @@ void ScInterpreter::ScSheets()
                     OUString aTabName;
                     ScComplexRefData aRef;
                     PopExternalDoubleRef( nFileId, aTabName, aRef);
-                    ScRange aAbs = aRef.toAbs(mrDoc, aPos);
-                    nVal += static_cast<sal_uLong>(aAbs.aEnd.Tab() - aAbs.aStart.Tab() + 1);
+                    const auto aCount = serefexec::sheetCount(aRef.toAbs(mrDoc, aPos));
+                    if (!aCount)
+                        SetError(selibreoffice::toFormulaError(aCount.meError));
+                    else
+                        fValue += aCount.maValue;
                 }
                 break;
                 default:
@@ -4571,8 +4616,8 @@ void ScInterpreter::ScSheets()
                     SetError( FormulaError::IllegalParameter );
             }
         }
+        PushDouble(fValue);
     }
-    PushDouble( static_cast<double>(nVal) );
 }
 
 void ScInterpreter::ScColumn()
@@ -4606,14 +4651,12 @@ void ScInterpreter::ScColumn()
             }
             if (!bMayBeScalar || nCols != 1 || nRows != 1)
             {
-                ScMatrixRef pResMat = GetNewMat( static_cast<SCSIZE>(nCols), 1, /*bEmpty*/true );
-                if (pResMat)
-                {
-                    for (SCCOL i=0; i < nCols; ++i)
-                        pResMat->PutDouble( nVal + i, static_cast<SCSIZE>(i), 0);
-                    PushMatrix( pResMat);
-                    return;
-                }
+                serefexec::AxisReferencePlan aPlan;
+                aPlan.meAxis = serefexec::ReferenceAxis::Column;
+                aPlan.mfStart = nVal;
+                aPlan.mnLength = nCols;
+                PushReferenceAxisPlan(aPlan);
+                return;
             }
         }
     }
@@ -4627,7 +4670,13 @@ void ScInterpreter::ScColumn()
                 SCROW nRow1(0);
                 SCTAB nTab1(0);
                 PopSingleRef( nCol1, nRow1, nTab1 );
-                nVal = static_cast<double>(nCol1 + 1);
+                const auto aPlan = serefexec::planAxisReference(
+                    ScRange(nCol1, nRow1, nTab1, nCol1, nRow1, nTab1),
+                    serefexec::ReferenceAxis::Column);
+                if (!aPlan)
+                    SetError(selibreoffice::toFormulaError(aPlan.meError));
+                else
+                    nVal = aPlan.maValue.mfStart;
             }
             break;
             case svExternalSingleRef :
@@ -4637,7 +4686,14 @@ void ScInterpreter::ScColumn()
                 ScSingleRefData aRef;
                 PopExternalSingleRef( nFileId, aTabName, aRef );
                 ScAddress aAbsRef = aRef.toAbs(mrDoc, aPos);
-                nVal = static_cast<double>( aAbsRef.Col() + 1 );
+                const auto aPlan = serefexec::planAxisReference(
+                    ScRange(aAbsRef.Col(), aAbsRef.Row(), aAbsRef.Tab(), aAbsRef.Col(),
+                        aAbsRef.Row(), aAbsRef.Tab()),
+                    serefexec::ReferenceAxis::Column);
+                if (!aPlan)
+                    SetError(selibreoffice::toFormulaError(aPlan.meError));
+                else
+                    nVal = aPlan.maValue.mfStart;
             }
             break;
 
@@ -4663,22 +4719,30 @@ void ScInterpreter::ScColumn()
                     ScRange aAbs = aRef.toAbs(mrDoc, aPos);
                     nCol1 = aAbs.aStart.Col();
                     nCol2 = aAbs.aEnd.Col();
-                }
-                if (nCol2 > nCol1)
-                {
-                    ScMatrixRef pResMat = GetNewMat(
-                            static_cast<SCSIZE>(nCol2-nCol1+1), 1, /*bEmpty*/true);
-                    if (pResMat)
+                    const auto aPlan
+                        = serefexec::planAxisReference(aAbs, serefexec::ReferenceAxis::Column);
+                    if (!aPlan)
+                        SetError(selibreoffice::toFormulaError(aPlan.meError));
+                    else if (aPlan.maValue.requiresMatrixResult())
                     {
-                        for (SCCOL i = nCol1; i <= nCol2; i++)
-                            pResMat->PutDouble(static_cast<double>(i+1),
-                                    static_cast<SCSIZE>(i-nCol1), 0);
-                        PushMatrix(pResMat);
+                        PushReferenceAxisPlan(aPlan.maValue);
                         return;
                     }
+                    else
+                        nVal = aPlan.maValue.mfStart;
+                    break;
+                }
+                const auto aPlan = serefexec::planAxisReference(
+                    ScRange(nCol1, 0, 0, nCol2, 0, 0), serefexec::ReferenceAxis::Column);
+                if (!aPlan)
+                    SetError(selibreoffice::toFormulaError(aPlan.meError));
+                else if (aPlan.maValue.requiresMatrixResult())
+                {
+                    PushReferenceAxisPlan(aPlan.maValue);
+                    return;
                 }
                 else
-                    nVal = static_cast<double>(nCol1 + 1);
+                    nVal = aPlan.maValue.mfStart;
             }
             break;
             default:
@@ -4719,14 +4783,12 @@ void ScInterpreter::ScRow()
             }
             if (!bMayBeScalar || nCols != 1 || nRows != 1)
             {
-                ScMatrixRef pResMat = GetNewMat( 1, static_cast<SCSIZE>(nRows), /*bEmpty*/true);
-                if (pResMat)
-                {
-                    for (SCROW i=0; i < nRows; i++)
-                        pResMat->PutDouble( nVal + i, 0, static_cast<SCSIZE>(i));
-                    PushMatrix( pResMat);
-                    return;
-                }
+                serefexec::AxisReferencePlan aPlan;
+                aPlan.meAxis = serefexec::ReferenceAxis::Row;
+                aPlan.mfStart = nVal;
+                aPlan.mnLength = nRows;
+                PushReferenceAxisPlan(aPlan);
+                return;
             }
         }
     }
@@ -4740,7 +4802,13 @@ void ScInterpreter::ScRow()
                 SCROW nRow1(0);
                 SCTAB nTab1(0);
                 PopSingleRef( nCol1, nRow1, nTab1 );
-                nVal = static_cast<double>(nRow1 + 1);
+                const auto aPlan = serefexec::planAxisReference(
+                    ScRange(nCol1, nRow1, nTab1, nCol1, nRow1, nTab1),
+                    serefexec::ReferenceAxis::Row);
+                if (!aPlan)
+                    SetError(selibreoffice::toFormulaError(aPlan.meError));
+                else
+                    nVal = aPlan.maValue.mfStart;
             }
             break;
             case svExternalSingleRef :
@@ -4750,7 +4818,14 @@ void ScInterpreter::ScRow()
                 ScSingleRefData aRef;
                 PopExternalSingleRef( nFileId, aTabName, aRef );
                 ScAddress aAbsRef = aRef.toAbs(mrDoc, aPos);
-                nVal = static_cast<double>( aAbsRef.Row() + 1 );
+                const auto aPlan = serefexec::planAxisReference(
+                    ScRange(aAbsRef.Col(), aAbsRef.Row(), aAbsRef.Tab(), aAbsRef.Col(),
+                        aAbsRef.Row(), aAbsRef.Tab()),
+                    serefexec::ReferenceAxis::Row);
+                if (!aPlan)
+                    SetError(selibreoffice::toFormulaError(aPlan.meError));
+                else
+                    nVal = aPlan.maValue.mfStart;
             }
             break;
             case svDoubleRef :
@@ -4775,22 +4850,30 @@ void ScInterpreter::ScRow()
                     ScRange aAbs = aRef.toAbs(mrDoc, aPos);
                     nRow1 = aAbs.aStart.Row();
                     nRow2 = aAbs.aEnd.Row();
-                }
-                if (nRow2 > nRow1)
-                {
-                    ScMatrixRef pResMat = GetNewMat( 1,
-                            static_cast<SCSIZE>(nRow2-nRow1+1), /*bEmpty*/true);
-                    if (pResMat)
+                    const auto aPlan
+                        = serefexec::planAxisReference(aAbs, serefexec::ReferenceAxis::Row);
+                    if (!aPlan)
+                        SetError(selibreoffice::toFormulaError(aPlan.meError));
+                    else if (aPlan.maValue.requiresMatrixResult())
                     {
-                        for (SCROW i = nRow1; i <= nRow2; i++)
-                            pResMat->PutDouble(static_cast<double>(i+1), 0,
-                                    static_cast<SCSIZE>(i-nRow1));
-                        PushMatrix(pResMat);
+                        PushReferenceAxisPlan(aPlan.maValue);
                         return;
                     }
+                    else
+                        nVal = aPlan.maValue.mfStart;
+                    break;
+                }
+                const auto aPlan = serefexec::planAxisReference(
+                    ScRange(0, nRow1, 0, 0, nRow2, 0), serefexec::ReferenceAxis::Row);
+                if (!aPlan)
+                    SetError(selibreoffice::toFormulaError(aPlan.meError));
+                else if (aPlan.maValue.requiresMatrixResult())
+                {
+                    PushReferenceAxisPlan(aPlan.maValue);
+                    return;
                 }
                 else
-                    nVal = static_cast<double>(nRow1 + 1);
+                    nVal = aPlan.maValue.mfStart;
             }
             break;
             default:
@@ -4806,9 +4889,12 @@ void ScInterpreter::ScSheet()
     if ( !MustHaveParamCount( nParamCount, 0, 1 ) )
         return;
 
-    SCTAB nVal = 0;
+    double fValue = 0.0;
     if ( nParamCount == 0 )
-        nVal = aPos.Tab() + 1;
+    {
+        const auto aOrdinal = spreadsheetengine::api::reference::sheetOrdinalFromSheetId(aPos.Tab());
+        fValue = aOrdinal.maValue;
+    }
     else
     {
         switch ( GetStackType() )
@@ -4816,10 +4902,11 @@ void ScInterpreter::ScSheet()
             case svString :
             {
                 svl::SharedString aStr = PopString();
-                if ( mrDoc.GetTable(aStr.getString(), nVal))
-                    ++nVal;
+                const auto aOrdinal = serefexec::sheetOrdinal(mrDoc, aStr.getString());
+                if (!aOrdinal)
+                    SetError(selibreoffice::toFormulaError(aOrdinal.meError));
                 else
-                    SetError( FormulaError::IllegalArgument );
+                    fValue = aOrdinal.maValue;
             }
             break;
             case svSingleRef :
@@ -4828,28 +4915,32 @@ void ScInterpreter::ScSheet()
                 SCROW nRow1(0);
                 SCTAB nTab1(0);
                 PopSingleRef(nCol1, nRow1, nTab1);
-                nVal = nTab1 + 1;
+                const auto aOrdinal = serefexec::sheetOrdinal(
+                    ScRange(nCol1, nRow1, nTab1, nCol1, nRow1, nTab1));
+                if (!aOrdinal)
+                    SetError(selibreoffice::toFormulaError(aOrdinal.meError));
+                else
+                    fValue = aOrdinal.maValue;
             }
             break;
             case svDoubleRef :
             {
-                SCCOL nCol1;
-                SCROW nRow1;
-                SCTAB nTab1;
-                SCCOL nCol2;
-                SCROW nRow2;
-                SCTAB nTab2;
-                PopDoubleRef( nCol1, nRow1, nTab1, nCol2, nRow2, nTab2 );
-                nVal = nTab1 + 1;
+                ScRange aRange;
+                PopDoubleRef(aRange);
+                const auto aOrdinal = serefexec::sheetOrdinal(aRange);
+                if (!aOrdinal)
+                    SetError(selibreoffice::toFormulaError(aOrdinal.meError));
+                else
+                    fValue = aOrdinal.maValue;
             }
             break;
             default:
                 SetError( FormulaError::IllegalParameter );
         }
         if ( nGlobalError != FormulaError::NONE )
-            nVal = 0;
+            fValue = 0.0;
     }
-    PushDouble( static_cast<double>(nVal) );
+    PushDouble(fValue);
 }
 
 void ScInterpreter::ScMatch()
@@ -9888,34 +9979,46 @@ void ScInterpreter::ScAreas()
     if (!MustHaveParamCount( nParamCount, 1))
         return;
 
-    size_t nCount = 0;
+    double fCount = 0.0;
     switch (GetStackType())
     {
         case svSingleRef:
             {
                 FormulaConstTokenRef xT = PopToken();
                 ValidateRef( *xT->GetSingleRef());
-                ++nCount;
+                const auto aCount = serefexec::countAreas(1);
+                if (!aCount)
+                    SetError(selibreoffice::toFormulaError(aCount.meError));
+                else
+                    fCount = aCount.maValue;
             }
             break;
         case svDoubleRef:
             {
                 FormulaConstTokenRef xT = PopToken();
                 ValidateRef( *xT->GetDoubleRef());
-                ++nCount;
+                const auto aCount = serefexec::countAreas(1);
+                if (!aCount)
+                    SetError(selibreoffice::toFormulaError(aCount.meError));
+                else
+                    fCount = aCount.maValue;
             }
             break;
         case svRefList:
             {
                 FormulaConstTokenRef xT = PopToken();
                 ValidateRef( *(xT->GetRefList()));
-                nCount += xT->GetRefList()->size();
+                const auto aCount = serefexec::countAreas(xT->GetRefList()->size());
+                if (!aCount)
+                    SetError(selibreoffice::toFormulaError(aCount.meError));
+                else
+                    fCount = aCount.maValue;
             }
             break;
         default:
             SetError( FormulaError::IllegalParameter);
     }
-    PushDouble( double(nCount));
+    PushDouble(fCount);
 }
 
 void ScInterpreter::ScCurrency()

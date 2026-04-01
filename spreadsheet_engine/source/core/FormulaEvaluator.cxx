@@ -367,7 +367,7 @@ EvaluationResult Evaluator::materializeReferenceValue(
     return evaluateCellInternal(rReference.addressAt(nColumnOffset, nRowOffset), meActiveExecutionMode);
 }
 
-api::ValueResult<api::ResolvedReference> Evaluator::resolveReferenceText(
+api::ValueResult<api::CellRange> Evaluator::resolveReferenceRangeText(
     api::StringView rReference, api::SheetId nCurrentSheet) const
 {
     const std::size_t nColonPos = rReference.find(u':');
@@ -375,29 +375,42 @@ api::ValueResult<api::ResolvedReference> Evaluator::resolveReferenceText(
     {
         const auto oAddress = parseCellAddressToken(rReference, mrWorkbook, nCurrentSheet);
         if (!oAddress)
-            return api::ValueResult<api::ResolvedReference>::failure(api::Error::IllegalArgument);
+            return api::ValueResult<api::CellRange>::failure(api::Error::IllegalArgument);
 
-        api::ResolvedReference aReference { { *oAddress, *oAddress } };
-        return api::ValueResult<api::ResolvedReference>::success(aReference);
+        return api::ValueResult<api::CellRange>::success({ *oAddress, *oAddress });
     }
 
     const auto oStart
         = parseCellAddressToken(rReference.substr(0, nColonPos), mrWorkbook, nCurrentSheet);
     if (!oStart)
-        return api::ValueResult<api::ResolvedReference>::failure(api::Error::IllegalArgument);
+        return api::ValueResult<api::CellRange>::failure(api::Error::IllegalArgument);
 
     const auto oEnd = parseCellAddressToken(
         rReference.substr(nColonPos + 1), mrWorkbook, oStart->mnSheet);
-    if (!oEnd || oStart->mnSheet != oEnd->mnSheet)
-        return api::ValueResult<api::ResolvedReference>::failure(api::Error::IllegalArgument);
+    if (!oEnd)
+        return api::ValueResult<api::CellRange>::failure(api::Error::IllegalArgument);
 
     api::CellRange aRange { *oStart, *oEnd };
+    if (aRange.maStart.mnSheet > aRange.maEnd.mnSheet)
+        std::swap(aRange.maStart.mnSheet, aRange.maEnd.mnSheet);
     if (aRange.maStart.mnColumn > aRange.maEnd.mnColumn)
         std::swap(aRange.maStart.mnColumn, aRange.maEnd.mnColumn);
     if (aRange.maStart.mnRow > aRange.maEnd.mnRow)
         std::swap(aRange.maStart.mnRow, aRange.maEnd.mnRow);
 
-    api::ResolvedReference aReference { aRange };
+    return api::ValueResult<api::CellRange>::success(aRange);
+}
+
+api::ValueResult<api::ResolvedReference> Evaluator::resolveReferenceText(
+    api::StringView rReference, api::SheetId nCurrentSheet) const
+{
+    const auto aRange = resolveReferenceRangeText(rReference, nCurrentSheet);
+    if (!aRange)
+        return api::ValueResult<api::ResolvedReference>::failure(aRange.meError);
+    if (aRange.maValue.maStart.mnSheet != aRange.maValue.maEnd.mnSheet)
+        return api::ValueResult<api::ResolvedReference>::failure(api::Error::IllegalArgument);
+
+    api::ResolvedReference aReference { aRange.maValue };
     return api::ValueResult<api::ResolvedReference>::success(aReference);
 }
 

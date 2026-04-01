@@ -13,7 +13,9 @@
 
 #include <address.hxx>
 #include <compiler.hxx>
+#include <document.hxx>
 #include <formula/grammar.hxx>
+#include <scmatrix.hxx>
 
 #include <spreadsheetengine/api/Reference.hxx>
 #include <spreadsheetengine/compat/libreoffice/Address.hxx>
@@ -23,6 +25,9 @@
 
 namespace spreadsheetengine::compat::libreoffice::referenceexecution
 {
+
+using ReferenceAxis = spreadsheetengine::api::reference::ReferenceAxis;
+using AxisReferencePlan = spreadsheetengine::api::reference::AxisReferencePlan;
 
 namespace detail
 {
@@ -102,6 +107,74 @@ struct AddressFunctionRequest
     sal_Int32 nArea, std::size_t nAreaCount)
 {
     return spreadsheetengine::api::reference::normalizeAreaSelection(nArea, nAreaCount);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<AxisReferencePlan> planAxisReference(
+    const ScRange& rRange, ReferenceAxis eAxis)
+{
+    spreadsheetengine::api::CellRange aRange
+        = toApiCellRange(ScRange(rRange.aStart.Col(), rRange.aStart.Row(), 0, rRange.aEnd.Col(),
+            rRange.aEnd.Row(), 0));
+    return spreadsheetengine::api::reference::planAxisReference(aRange, eAxis);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<double> countReferenceAxisSpan(
+    const ScRange& rRange, ReferenceAxis eAxis)
+{
+    return spreadsheetengine::api::reference::countReferenceAxisSpan(
+        toApiCellRange(rRange), eAxis, true);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<double> countMatrixAxisSpan(
+    const ScMatrixRef& pMatrix, ReferenceAxis eAxis)
+{
+    if (!pMatrix)
+        return spreadsheetengine::api::ValueResult<double>::failure(
+            spreadsheetengine::api::Error::IllegalArgument);
+
+    SCSIZE nColumns = 0;
+    SCSIZE nRows = 0;
+    pMatrix->GetDimensions(nColumns, nRows);
+    return spreadsheetengine::api::reference::countMatrixAxisSpan(
+        { static_cast<spreadsheetengine::api::MatrixSize>(nColumns),
+            static_cast<spreadsheetengine::api::MatrixSize>(nRows) },
+        eAxis);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<double> countAreas(std::size_t nAreaCount)
+{
+    return spreadsheetengine::api::reference::countAreas(nAreaCount);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<double> sheetOrdinal(
+    const ScRange& rRange)
+{
+    return spreadsheetengine::api::reference::sheetOrdinalFromReference(toApiCellRange(rRange));
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<double> sheetCount(const ScRange& rRange)
+{
+    return spreadsheetengine::api::reference::sheetCountFromReference(toApiCellRange(rRange));
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<double> sheetOrdinal(
+    const ScDocument& rDocument, const OUString& rSheetName)
+{
+    SCTAB nTab = 0;
+    if (!rDocument.GetTable(rSheetName, nTab))
+    {
+        return spreadsheetengine::api::ValueResult<double>::failure(
+            spreadsheetengine::api::Error::IllegalArgument);
+    }
+
+    return spreadsheetengine::api::reference::sheetOrdinalFromSheetId(nTab);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<double> workbookSheetCount(
+    const ScDocument& rDocument)
+{
+    return spreadsheetengine::api::reference::sheetCountFromWorkbookSize(
+        rDocument.GetTableCount());
 }
 
 [[nodiscard]] inline spreadsheetengine::api::ValueResult<ScRange> planOffsetRange(

@@ -36,6 +36,7 @@
 #include <lookupsearchmode.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
 #include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 
 #include <unordered_map>
@@ -248,6 +249,8 @@ private:
     void PushLookupExecutionResult(
         const spreadsheetengine::compat::libreoffice::lookupexecution::LookupExecutionResult& rResult,
         bool bPreserveSingleReference);
+    void PushReferenceAxisPlan(
+        const spreadsheetengine::compat::libreoffice::referenceexecution::AxisReferencePlan& rPlan);
 
     // Functions for accessing a document
 

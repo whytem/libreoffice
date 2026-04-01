@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <array>
 
+#include <spreadsheetengine/api/Reference.hxx>
+
 namespace spreadsheetengine::core::eval
 {
 namespace
@@ -48,6 +50,9 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateInformationFamily(
         api::StringView(u"COLUMN"),
         api::StringView(u"ROWS"),
         api::StringView(u"COLUMNS"),
+        api::StringView(u"AREAS"),
+        api::StringView(u"SHEET"),
+        api::StringView(u"SHEETS"),
         api::StringView(u"ERROR.TYPE"),
         api::StringView(u"ERRORTYPE"),
     };
@@ -63,6 +68,58 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
     const api::StringView aFunctionName = rFunctionName;
     const auto makeCellError = [&](api::Error eError) -> EvaluationResult {
         return makeScalarResult(api::CellValue::error(eError));
+    };
+    const auto resolveNamedRangeRange
+        = [&](api::StringView rName) -> api::ValueResult<api::CellRange> {
+        if (rCurrentAddress.mnSheet >= 0
+            && static_cast<std::size_t>(rCurrentAddress.mnSheet) < mrWorkbook.maSheets.size())
+        {
+            const auto& rSheet
+                = mrWorkbook.maSheets[static_cast<std::size_t>(rCurrentAddress.mnSheet)];
+            if (const auto* pLocal = mrWorkbook.findNamedRange(rName, rSheet.maName))
+            {
+                return resolveReferenceRangeText(pLocal->maCellRangeAddress, rCurrentAddress.mnSheet);
+            }
+        }
+
+        if (const auto* pGlobal = mrWorkbook.findNamedRange(rName))
+            return resolveReferenceRangeText(pGlobal->maCellRangeAddress, rCurrentAddress.mnSheet);
+
+        return api::ValueResult<api::CellRange>::failure(api::Error::NotAvailable);
+    };
+    const auto resolveReferenceRangeArgument
+        = [&](const formula::Node& rArgument) -> api::ValueResult<api::CellRange> {
+        if (rArgument.meKind == formula::NodeKind::CellReference)
+            return resolveReferenceRangeText(rArgument.maPrimaryText, rCurrentAddress.mnSheet);
+
+        if (rArgument.meKind == formula::NodeKind::RangeReference)
+        {
+            api::String aAddress = rArgument.maPrimaryText;
+            aAddress.push_back(u':');
+            aAddress += rArgument.maSecondaryText;
+            return resolveReferenceRangeText(aAddress, rCurrentAddress.mnSheet);
+        }
+
+        if (rArgument.meKind == formula::NodeKind::NamedReference)
+            return resolveNamedRangeRange(rArgument.maPrimaryText);
+
+        return api::ValueResult<api::CellRange>::failure(api::Error::IllegalArgument);
+    };
+    const auto resolveAxisReferencePlan = [&](const formula::Node& rArgument,
+                                          api::reference::ReferenceAxis eAxis)
+        -> api::ValueResult<api::reference::AxisReferencePlan> {
+        const auto aRange = resolveReferenceRangeArgument(rArgument);
+        if (!aRange)
+        {
+            return api::ValueResult<api::reference::AxisReferencePlan>::failure(aRange.meError);
+        }
+
+        return api::reference::planAxisReference(aRange.maValue, eAxis);
+    };
+    const auto localSheetCount = [&]() -> std::size_t {
+        return static_cast<std::size_t>(std::count_if(
+            mrWorkbook.maSheets.begin(), mrWorkbook.maSheets.end(),
+            [](const auto& rSheet) { return !rSheet.moSource.has_value(); }));
     };
 
     if (aFunctionName == u"ISERROR")
@@ -270,6 +327,8 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
             return makeFailure(api::Error::IllegalArgument);
 
         const bool bRow = aFunctionName == u"ROW";
+        const api::reference::ReferenceAxis eAxis
+            = bRow ? api::reference::ReferenceAxis::Row : api::reference::ReferenceAxis::Column;
         if (rNode.maChildren.empty()
             || rNode.maChildren[0]->meKind == formula::NodeKind::EmptyArgument)
         {
@@ -278,48 +337,27 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
         }
 
         const formula::Node& rArgument = *rNode.maChildren[0];
+        if (rArgument.meKind == formula::NodeKind::CellReference
+            || rArgument.meKind == formula::NodeKind::RangeReference
+            || rArgument.meKind == formula::NodeKind::NamedReference)
+        {
+            const auto aPlan = resolveAxisReferencePlan(rArgument, eAxis);
+            if (!aPlan)
+                return makeFailure(aPlan.meError);
+            return makeScalarResult(api::CellValue::number(aPlan.maValue.mfStart));
+        }
+
         EvaluationResult aArgument = evaluateNode(rArgument, rCurrentAddress);
         if (!aArgument)
             return makeFailure(aArgument.meError);
 
         if (aArgument.maValue.isMatrixReference())
         {
-            const auto& rStart = aArgument.maValue.maReference.maRange.maStart;
-            return makeScalarResult(api::CellValue::number(
-                static_cast<double>(bRow ? rStart.mnRow + 1 : rStart.mnColumn + 1)));
-        }
-
-        if (rArgument.meKind == formula::NodeKind::CellReference)
-        {
-            const auto aResolved = resolveReferenceText(rArgument.maPrimaryText, rCurrentAddress.mnSheet);
-            if (!aResolved || !aResolved.maValue.isSingleCell())
-                return makeFailure(aResolved.meError);
-            const auto& rStart = aResolved.maValue.maRange.maStart;
-            return makeScalarResult(api::CellValue::number(
-                static_cast<double>(bRow ? rStart.mnRow + 1 : rStart.mnColumn + 1)));
-        }
-
-        if (rArgument.meKind == formula::NodeKind::RangeReference)
-        {
-            api::String aAddress = rArgument.maPrimaryText;
-            aAddress.push_back(u':');
-            aAddress += rArgument.maSecondaryText;
-            const auto aResolved = resolveReferenceText(aAddress, rCurrentAddress.mnSheet);
-            if (!aResolved)
-                return makeFailure(aResolved.meError);
-            const auto& rStart = aResolved.maValue.maRange.maStart;
-            return makeScalarResult(api::CellValue::number(
-                static_cast<double>(bRow ? rStart.mnRow + 1 : rStart.mnColumn + 1)));
-        }
-
-        if (rArgument.meKind == formula::NodeKind::NamedReference)
-        {
-            const auto aResolved = resolveNamedRange(rArgument.maPrimaryText, rCurrentAddress.mnSheet);
-            if (!aResolved)
-                return makeFailure(aResolved.meError);
-            const auto& rStart = aResolved.maValue.maRange.maStart;
-            return makeScalarResult(api::CellValue::number(
-                static_cast<double>(bRow ? rStart.mnRow + 1 : rStart.mnColumn + 1)));
+            const auto aPlan = api::reference::planAxisReference(
+                aArgument.maValue.maReference.maRange, eAxis);
+            if (!aPlan)
+                return makeFailure(aPlan.meError);
+            return makeScalarResult(api::CellValue::number(aPlan.maValue.mfStart));
         }
 
         return makeFailure(api::Error::IllegalArgument);
@@ -328,36 +366,24 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
     if (aFunctionName == u"ROWS" || aFunctionName == u"COLUMNS")
     {
         const bool bRows = aFunctionName == u"ROWS";
+        const api::reference::ReferenceAxis eAxis
+            = bRows ? api::reference::ReferenceAxis::Row : api::reference::ReferenceAxis::Column;
         double fValue = 0.0;
         for (const auto& pArgument : rNode.maChildren)
         {
             const formula::Node& rArgument = *pArgument;
-            if (rArgument.meKind == formula::NodeKind::CellReference)
+            if (rArgument.meKind == formula::NodeKind::CellReference
+                || rArgument.meKind == formula::NodeKind::RangeReference
+                || rArgument.meKind == formula::NodeKind::NamedReference)
             {
-                fValue += 1.0;
-                continue;
-            }
-
-            if (rArgument.meKind == formula::NodeKind::RangeReference)
-            {
-                api::String aAddress = rArgument.maPrimaryText;
-                aAddress.push_back(u':');
-                aAddress += rArgument.maSecondaryText;
-                const auto aResolved = resolveReferenceText(aAddress, rCurrentAddress.mnSheet);
-                if (!aResolved)
-                    return makeFailure(aResolved.meError);
-                fValue += bRows ? static_cast<double>(aResolved.maValue.maRange.rowCount())
-                                : static_cast<double>(aResolved.maValue.maRange.columnCount());
-                continue;
-            }
-
-            if (rArgument.meKind == formula::NodeKind::NamedReference)
-            {
-                const auto aResolved = resolveNamedRange(rArgument.maPrimaryText, rCurrentAddress.mnSheet);
-                if (!aResolved)
-                    return makeFailure(aResolved.meError);
-                fValue += bRows ? static_cast<double>(aResolved.maValue.maRange.rowCount())
-                                : static_cast<double>(aResolved.maValue.maRange.columnCount());
+                const auto aRange = resolveReferenceRangeArgument(rArgument);
+                if (!aRange)
+                    return makeFailure(aRange.meError);
+                const auto aCount
+                    = api::reference::countReferenceAxisSpan(aRange.maValue, eAxis, true);
+                if (!aCount)
+                    return makeFailure(aCount.meError);
+                fValue += aCount.maValue;
                 continue;
             }
 
@@ -369,8 +395,11 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
                 {
                     return makeFailure(api::Error::IllegalArgument);
                 }
-                fValue += bRows ? static_cast<double>(rArgument.mnArrayRows)
-                                : static_cast<double>(rArgument.mnArrayColumns);
+                const auto aCount = api::reference::countMatrixAxisSpan(
+                    { rArgument.mnArrayColumns, rArgument.mnArrayRows }, eAxis);
+                if (!aCount)
+                    return makeFailure(aCount.meError);
+                fValue += aCount.maValue;
                 continue;
             }
 
@@ -380,12 +409,148 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
             if (!aArgument.maValue.isMatrixReference())
                 return makeFailure(api::Error::IllegalArgument);
 
-            const auto aDimensions = aArgument.maValue.maReference.matrixDimensions();
-            fValue += bRows ? static_cast<double>(aDimensions.mnRows)
-                            : static_cast<double>(aDimensions.mnColumns);
+            const auto aCount = api::reference::countReferenceAxisSpan(
+                aArgument.maValue.maReference.maRange, eAxis, true);
+            if (!aCount)
+                return makeFailure(aCount.meError);
+            fValue += aCount.maValue;
         }
 
         return makeScalarResult(api::CellValue::number(fValue));
+    }
+
+    if (aFunctionName == u"AREAS")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const formula::Node& rArgument = *rNode.maChildren[0];
+        if (rArgument.meKind == formula::NodeKind::ReferenceList)
+        {
+            for (const auto& pArea : rArgument.maChildren)
+            {
+                const auto aArea = resolveReferenceRangeArgument(*pArea);
+                if (!aArea)
+                    return makeFailure(aArea.meError);
+            }
+
+            const auto aCount = api::reference::countAreas(rArgument.maChildren.size());
+            if (!aCount)
+                return makeFailure(aCount.meError);
+            return makeScalarResult(api::CellValue::number(aCount.maValue));
+        }
+
+        if (rArgument.meKind == formula::NodeKind::CellReference
+            || rArgument.meKind == formula::NodeKind::RangeReference
+            || rArgument.meKind == formula::NodeKind::NamedReference)
+        {
+            const auto aRange = resolveReferenceRangeArgument(rArgument);
+            if (!aRange)
+                return makeFailure(aRange.meError);
+            const auto aCount = api::reference::countAreas(1);
+            if (!aCount)
+                return makeFailure(aCount.meError);
+            return makeScalarResult(api::CellValue::number(aCount.maValue));
+        }
+
+        return makeFailure(api::Error::IllegalArgument);
+    }
+
+    if (aFunctionName == u"SHEET")
+    {
+        if (rNode.maChildren.size() > 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        if (rNode.maChildren.empty()
+            || rNode.maChildren[0]->meKind == formula::NodeKind::EmptyArgument)
+        {
+            const auto aOrdinal
+                = api::reference::sheetOrdinalFromSheetId(rCurrentAddress.mnSheet);
+            if (!aOrdinal)
+                return makeFailure(aOrdinal.meError);
+            return makeScalarResult(api::CellValue::number(aOrdinal.maValue));
+        }
+
+        const formula::Node& rArgument = *rNode.maChildren[0];
+        if (rArgument.meKind == formula::NodeKind::CellReference
+            || rArgument.meKind == formula::NodeKind::RangeReference
+            || rArgument.meKind == formula::NodeKind::NamedReference)
+        {
+            const auto aRange = resolveReferenceRangeArgument(rArgument);
+            if (!aRange)
+                return makeFailure(aRange.meError);
+            const auto aOrdinal = api::reference::sheetOrdinalFromReference(aRange.maValue);
+            if (!aOrdinal)
+                return makeFailure(aOrdinal.meError);
+            return makeScalarResult(api::CellValue::number(aOrdinal.maValue));
+        }
+
+        const auto aValue = ensureScalarValue(*this, evaluateNode(rArgument, rCurrentAddress));
+        if (!aValue)
+            return makeFailure(aValue.meError);
+
+        if (aValue.maValue.isMatrixReference())
+        {
+            const auto aOrdinal
+                = api::reference::sheetOrdinalFromReference(aValue.maValue.maReference.maRange);
+            if (!aOrdinal)
+                return makeFailure(aOrdinal.meError);
+            return makeScalarResult(api::CellValue::number(aOrdinal.maValue));
+        }
+
+        if (!aValue.maValue.maValue.isText())
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto oSheet = mrWorkbook.findSheetId(aValue.maValue.maValue.maString);
+        if (!oSheet)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aOrdinal = api::reference::sheetOrdinalFromSheetId(*oSheet);
+        if (!aOrdinal)
+            return makeFailure(aOrdinal.meError);
+        return makeScalarResult(api::CellValue::number(aOrdinal.maValue));
+    }
+
+    if (aFunctionName == u"SHEETS")
+    {
+        if (rNode.maChildren.size() > 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        if (rNode.maChildren.empty()
+            || rNode.maChildren[0]->meKind == formula::NodeKind::EmptyArgument)
+        {
+            const auto aCount = api::reference::sheetCountFromWorkbookSize(localSheetCount());
+            return makeScalarResult(api::CellValue::number(aCount.maValue));
+        }
+
+        const formula::Node& rArgument = *rNode.maChildren[0];
+        if (rArgument.meKind == formula::NodeKind::CellReference
+            || rArgument.meKind == formula::NodeKind::RangeReference
+            || rArgument.meKind == formula::NodeKind::NamedReference)
+        {
+            const auto aRange = resolveReferenceRangeArgument(rArgument);
+            if (!aRange)
+                return makeFailure(aRange.meError);
+            const auto aCount = api::reference::sheetCountFromReference(aRange.maValue);
+            if (!aCount)
+                return makeFailure(aCount.meError);
+            return makeScalarResult(api::CellValue::number(aCount.maValue));
+        }
+
+        const auto aValue = ensureScalarValue(*this, evaluateNode(rArgument, rCurrentAddress));
+        if (!aValue)
+            return makeFailure(aValue.meError);
+
+        if (aValue.maValue.isMatrixReference())
+        {
+            const auto aCount
+                = api::reference::sheetCountFromReference(aValue.maValue.maReference.maRange);
+            if (!aCount)
+                return makeFailure(aCount.meError);
+            return makeScalarResult(api::CellValue::number(aCount.maValue));
+        }
+
+        return makeFailure(api::Error::IllegalArgument);
     }
 
     if (aFunctionName == u"ERROR.TYPE" || aFunctionName == u"ERRORTYPE")

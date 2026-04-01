@@ -46,16 +46,18 @@ is now also in closeout status.
 | Recalc orchestration extraction | **Complete** | Engine-owned recalc planning, queue construction, authority pilots, and Calc queue-consumption bridge are complete through the safe structural/named-range pilot surface |
 | FormulaEvaluator runtime modularization | **Complete** | The old evaluator monolith has been split across focused runtime and support modules such as `LookupRuntime`, `QueryRuntime`, `TextFunctionRuntime`, `DateTimeParse`, `FinancialRuntime`, `MathAggregate`, `MathFunctionRuntime`, and `ConversionRuntime` |
 | Calc pure-computation convergence | **Complete** | Calc now delegates the in-scope pure-computation statistical, aggregate, inverse-distribution, combinatoric, and error-function families to the same shared runtime modules used by standalone, with Calc-aligned algorithms adopted where behavior risk existed |
-| Execution backend extraction | **Active** | Phases 0 through 4 are complete: the execution boundary is frozen, shared scalar coercion and operator-shell helpers are engine-owned, the first reference-sensitive slices moved behind compat bridges, and bounded `LOOKUP` / `VLOOKUP` / `HLOOKUP` / `XLOOKUP` traversal now uses the shared lookup core in both Calc and standalone |
+| Execution backend extraction | **Active** | Phases 0 through 5 are complete: the execution boundary is frozen, shared scalar coercion and operator-shell helpers are engine-owned, the first reference-sensitive slices and bounded lookup traversal moved behind compat bridges, and `ROW` / `COLUMN` / `ROWS` / `COLUMNS` / `AREAS` / `SHEET` / `SHEETS` now share bounded reference-shape logic between Calc and standalone |
 
 The immediate active frontier is now narrower and more practical:
 
 - keep the fully promoted replay corpus green across all eleven function
   families with zero cached-fallback cells
 - continue the execution-backend milestone from the now-frozen recalc
-  orchestration boundary, with the next bounded post-Phase-4 execution slice
-  to be planned on top of the completed `MATCH` / `XMATCH` / `ADDRESS` /
-  `OFFSET` / `INDEX` / `LOOKUP` / `VLOOKUP` / `HLOOKUP` / `XLOOKUP` boundary
+  orchestration boundary, with the next slice targeting the remaining bounded
+  token-walking plus jump/name/string-reference shell on top of the completed
+  `MATCH` / `XMATCH` / `ADDRESS` / `OFFSET` / `INDEX` / `LOOKUP` /
+  `VLOOKUP` / `HLOOKUP` / `XLOOKUP` / `ROW` / `COLUMN` / `ROWS` /
+  `COLUMNS` / `AREAS` / `SHEET` / `SHEETS` boundary
 - keep expanding engine-first adoption inside Calc only where differential
   validation keeps compiler/runtime behavior safe
 
@@ -626,18 +628,18 @@ The completed recalc-orchestration milestone landed:
 - Phase 6 isolated Calc queue consumption behind a dedicated compat bridge and
   opened the next execution-backend milestone from that stable boundary
 
-The active implementation frontier now starts after the completed **Phase 4:
-Expand Bounded Lookup And Reference Traversal** slice of the
+The active implementation frontier is now the **post-Phase-5 bounded
+token-walking, jump, and name/string-reference shell** in the
 execution-backend milestone.
 
 The recommended active sequence is:
 
-1. Keep the completed Phase 0-4 helper and compat-bridge layers stable and
+1. Keep the completed Phase 0-5 helper and compat-bridge layers stable and
    green.
-2. Plan the next bounded post-lookup execution slice before widening into
-   general token walking.
-3. Keep token walking, stack shell, and queue authority stable while those
-   later bounded execution families migrate.
+2. Extract the next bounded token-walking and jump/name shell slice without
+   reopening general opcode-dispatch or storage concerns.
+3. Keep token walking, stack shell, and queue authority stable while later
+   bounded execution families migrate.
 
 ### Medium-term: Extract The Execution Backend On Top Of The Settled Scheduler Boundary
 

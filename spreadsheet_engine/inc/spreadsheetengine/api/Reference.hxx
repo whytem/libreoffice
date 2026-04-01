@@ -17,6 +17,32 @@
 namespace spreadsheetengine::api::reference
 {
 
+enum class ReferenceAxis : std::uint8_t
+{
+    Column,
+    Row
+};
+
+struct AxisReferencePlan
+{
+    double mfStart = 1.0;
+    MatrixSize mnLength = 1;
+    ReferenceAxis meAxis = ReferenceAxis::Column;
+
+    [[nodiscard]] constexpr bool operator==(const AxisReferencePlan& rOther) const = default;
+
+    [[nodiscard]] constexpr bool requiresMatrixResult() const
+    {
+        return mnLength > 1;
+    }
+
+    [[nodiscard]] constexpr MatrixDimensions resultDimensions() const
+    {
+        return meAxis == ReferenceAxis::Column ? MatrixDimensions { mnLength, 1 }
+                                               : MatrixDimensions { 1, mnLength };
+    }
+};
+
 enum class IndexSelectionKind : std::uint8_t
 {
     KeepSource,
@@ -41,6 +67,105 @@ struct IndexReferenceSelection
 
     [[nodiscard]] constexpr bool operator==(const IndexReferenceSelection& rOther) const = default;
 };
+
+[[nodiscard]] inline bool hasOrderedBounds(const CellRange& rRange)
+{
+    return rRange.maStart.mnSheet <= rRange.maEnd.mnSheet
+           && rRange.maStart.mnColumn <= rRange.maEnd.mnColumn
+           && rRange.maStart.mnRow <= rRange.maEnd.mnRow;
+}
+
+[[nodiscard]] inline ValueResult<AxisReferencePlan> planAxisReference(
+    const CellRange& rRange, ReferenceAxis eAxis)
+{
+    if (!hasOrderedBounds(rRange))
+        return ValueResult<AxisReferencePlan>::failure(Error::IllegalArgument);
+
+    AxisReferencePlan aPlan;
+    aPlan.meAxis = eAxis;
+    if (eAxis == ReferenceAxis::Column)
+    {
+        aPlan.mfStart = static_cast<double>(rRange.maStart.mnColumn + 1);
+        aPlan.mnLength = rRange.maEnd.mnColumn - rRange.maStart.mnColumn + 1;
+    }
+    else
+    {
+        aPlan.mfStart = static_cast<double>(rRange.maStart.mnRow + 1);
+        aPlan.mnLength = rRange.maEnd.mnRow - rRange.maStart.mnRow + 1;
+    }
+
+    return ValueResult<AxisReferencePlan>::success(aPlan);
+}
+
+[[nodiscard]] inline ValueResult<double> countReferenceAxisSpan(
+    const CellRange& rRange, ReferenceAxis eAxis, bool bMultiplyAcrossSheets)
+{
+    if (!hasOrderedBounds(rRange))
+        return ValueResult<double>::failure(Error::IllegalArgument);
+
+    const std::int64_t nAxisSpan = eAxis == ReferenceAxis::Column
+                                       ? static_cast<std::int64_t>(rRange.maEnd.mnColumn)
+                                             - rRange.maStart.mnColumn + 1
+                                       : static_cast<std::int64_t>(rRange.maEnd.mnRow)
+                                             - rRange.maStart.mnRow + 1;
+    const std::int64_t nSheetSpan = bMultiplyAcrossSheets
+                                        ? static_cast<std::int64_t>(rRange.maEnd.mnSheet)
+                                              - rRange.maStart.mnSheet + 1
+                                        : 1;
+    if (nAxisSpan <= 0 || nSheetSpan <= 0)
+        return ValueResult<double>::failure(Error::IllegalArgument);
+
+    return ValueResult<double>::success(static_cast<double>(nAxisSpan * nSheetSpan));
+}
+
+[[nodiscard]] inline ValueResult<double> countMatrixAxisSpan(
+    const MatrixDimensions& rDimensions, ReferenceAxis eAxis)
+{
+    const MatrixSize nAxisSpan
+        = eAxis == ReferenceAxis::Column ? rDimensions.mnColumns : rDimensions.mnRows;
+    if (rDimensions.mnColumns <= 0 || rDimensions.mnRows <= 0 || nAxisSpan <= 0)
+        return ValueResult<double>::failure(Error::IllegalArgument);
+
+    return ValueResult<double>::success(static_cast<double>(nAxisSpan));
+}
+
+[[nodiscard]] inline ValueResult<double> countAreas(std::size_t nAreaCount)
+{
+    if (nAreaCount == 0)
+        return ValueResult<double>::failure(Error::IllegalArgument);
+
+    return ValueResult<double>::success(static_cast<double>(nAreaCount));
+}
+
+[[nodiscard]] inline ValueResult<double> sheetOrdinalFromSheetId(SheetId nSheet)
+{
+    if (nSheet < 0)
+        return ValueResult<double>::failure(Error::IllegalArgument);
+
+    return ValueResult<double>::success(static_cast<double>(nSheet + 1));
+}
+
+[[nodiscard]] inline ValueResult<double> sheetCountFromWorkbookSize(std::size_t nSheetCount)
+{
+    return ValueResult<double>::success(static_cast<double>(nSheetCount));
+}
+
+[[nodiscard]] inline ValueResult<double> sheetOrdinalFromReference(const CellRange& rRange)
+{
+    if (!hasOrderedBounds(rRange))
+        return ValueResult<double>::failure(Error::IllegalArgument);
+
+    return sheetOrdinalFromSheetId(rRange.maStart.mnSheet);
+}
+
+[[nodiscard]] inline ValueResult<double> sheetCountFromReference(const CellRange& rRange)
+{
+    if (!hasOrderedBounds(rRange))
+        return ValueResult<double>::failure(Error::IllegalArgument);
+
+    return ValueResult<double>::success(static_cast<double>(
+        static_cast<std::int64_t>(rRange.maEnd.mnSheet) - rRange.maStart.mnSheet + 1));
+}
 
 [[nodiscard]] inline ValueResult<std::size_t> normalizeAreaSelection(
     sal_Int32 nArea, std::size_t nAreaCount)

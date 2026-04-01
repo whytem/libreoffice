@@ -45,7 +45,9 @@ The starting handoff from the completed recalc-orchestration milestone is:
 
 ## Current Status
 
-This milestone is now active with Phases 0 through 4 complete.
+This milestone is now active with Phases 0 through 5 complete and the next
+bounded execution-shell slice narrowed to the remaining post-Phase-5
+token-walking, jump, and name/string-reference flows.
 
 - Phase 0 is complete: the orchestration/execution boundary is explicitly
   documented, the first helper duplication inventory is frozen, and the Phase 1
@@ -63,6 +65,11 @@ This milestone is now active with Phases 0 through 4 complete.
 - Phase 4 is complete: `LOOKUP`, `VLOOKUP`, `HLOOKUP`, and `XLOOKUP` now route
   bounded traversal, slice planning, and result shaping through the expanded
   compat lookup bridge while Calc keeps stack mutation and host-only services
+- Phase 5 is complete: `ROW`, `COLUMN`, `ROWS`, `COLUMNS`, `AREAS`, `SHEET`,
+  and `SHEETS` now route bounded reference-shape and sheet/cardinality logic
+  through shared helpers in standalone plus Calc compat bridges, leaving the
+  remaining Calc-owned shell narrowed to later token-walking and jump/name
+  flows
 
 The starting baseline for this milestone is:
 
@@ -682,6 +689,197 @@ Phase 4 explicit defer list:
 - broader name-resolution compilation flows outside the bounded lookup slice
 - storage-sensitive database and matrix families
 - any recalc-authority, listener, or queue-boundary changes
+
+### Phase 5: Extract Bounded Token-Walking And Reference-Shape Shell Helpers
+
+Status: **Complete**
+
+Goals:
+
+- move the next bounded Calc-owned execution shell after completed lookup
+  traversal without widening into a full opcode-dispatch rewrite
+- extract reusable reference-shape and scalar/area-selection helpers that still
+  duplicate between Calc and standalone
+- keep Calc as the stack and storage host while shared helpers take over the
+  decision logic
+
+Target surface:
+
+- bounded token-walking helpers that decide which reference/scalar form a
+  function consumes
+- reference cardinality and shape helpers used by `ROW`, `COLUMN`, `ROWS`,
+  `COLUMNS`, `AREAS`, `SHEET`, and `SHEETS`
+- narrow name/reference materialization glue only where it is directly needed
+  by those adopters and the already-landed lookup/reference bridge
+
+Phase 5 landed as four concrete workstreams.
+
+#### 5.1 Freeze The Bounded Stack/Reference Surface
+
+The first task is to freeze exactly which remaining Calc shell behaviors this
+phase is allowed to move.
+
+Primary targets:
+
+- `sc/source/core/tool/interpr1.cxx`
+- `sc/source/core/inc/interpre.hxx`
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx`
+- `spreadsheet_engine/source/core/FormulaEvaluatorOperators.cxx`
+- `spreadsheet_engine/source/core/FormulaEvaluator.cxx`
+
+Required boundary decisions:
+
+- in scope:
+  - stack-adapted selection between scalar, single-reference, double-reference,
+    and bounded ref-list inputs
+  - reference cardinality and row/column/area-count shaping
+  - bounded sheet-count / sheet-index shaping where host-backed sheet metadata
+    is already available through Calc
+- out of scope:
+  - `INDIRECT`
+  - jump/short-circuit token walking
+  - general opcode-dispatch-table extraction
+  - structural reference rewrites and name-compilation flows
+
+Landed outcome:
+
+- the bounded Phase 5 surface stayed limited to `ROW`, `COLUMN`, `ROWS`,
+  `COLUMNS`, `AREAS`, `SHEET`, and `SHEETS`
+- the remaining Calc-owned shell is now explicitly the post-Phase-5
+  token-walking and jump/name tail rather than another vague mixed bucket
+
+#### 5.2 Extract Shared Reference-Shape Helpers Behind Compat Bridges
+
+The next task is to put the selected reference-shape decisions behind explicit
+shared or compat-owned helpers.
+
+Primary targets:
+
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx`
+- `spreadsheet_engine/inc/spreadsheetengine/runtime/ReferenceText.hxx`
+- `spreadsheet_engine/source/core/FormulaEvaluatorOperators.cxx`
+- `spreadsheet_engine/source/core/FormulaEvaluatorSpreadsheet.cxx`
+
+Required helper surface:
+
+- shared result types for:
+  - scalarized reference information
+  - row-count / column-count / area-count results
+  - sheet-index / sheet-count results
+- compat helpers that:
+  - consume Calc-owned reference state
+  - compute bounded cardinality/shape results
+  - return Calc-shaped error/unsupported outcomes without owning stack mutation
+
+Landed helper surface:
+
+- prefer shared engine helpers for pure counting/shape logic
+- keep host-backed sheet/document queries in compat helpers
+- do not introduce a second standalone-only implementation for the same
+  reference-shape logic
+
+Concrete landed pieces:
+
+- shared reference-shape/count helpers in `spreadsheet_engine/api/Reference.hxx`
+- Calc compat adapters in
+  `spreadsheet_engine/compat/libreoffice/ReferenceExecution.hxx`
+- standalone reference-range materialization reused through
+  `FormulaEvaluator::resolveReferenceRangeText(...)`
+
+#### 5.3 Rewire Calc And Standalone Adopters In A Narrow Order
+
+Calc should adopt the new helpers in an explicit order from least risky to more
+reference-sensitive.
+
+Recommended execution order:
+
+1. `ROW` / `COLUMN`
+2. `ROWS` / `COLUMNS`
+3. `AREAS`
+4. `SHEET` / `SHEETS`
+
+Primary Calc targets:
+
+- `sc/source/core/tool/interpr1.cxx`
+- `sc/source/core/inc/interpre.hxx`
+
+Primary standalone targets:
+
+- `spreadsheet_engine/source/core/FormulaEvaluatorSpreadsheet.cxx`
+- `spreadsheet_engine/source/core/FormulaEvaluator.cxx`
+
+Landed outcome:
+
+- Calc entry points keep stack mutation local
+- the shared helper layer owns the reference-shape decision logic
+- standalone uses the same helper surface where feasible
+- any remaining Calc-only logic is documented as a host or stack constraint,
+  not left as accidental duplication
+
+Adopter order as landed:
+
+1. `ROW` / `COLUMN`
+2. `ROWS` / `COLUMNS`
+3. `AREAS`
+4. `SHEET` / `SHEETS`
+
+#### 5.4 Validation And Closeout Contract
+
+Completion criteria for Phase 5:
+
+- the selected reference-shape families execute through extracted helper logic
+  instead of Calc-local duplicated shell code
+- standalone and Calc rely on the same bounded helper surface for the migrated
+  shape/count semantics wherever feasible
+- the remaining Calc-owned execution shell is narrowed to post-Phase-5 token
+  walking and jump/name flows, not another vague mixed tail
+- the replay baseline remains fully green
+
+Phase 5 closeout status:
+
+- complete
+- validated across the full focused Calc and standalone lane below
+- one-shot replay baseline remains `500` workbooks, `50,661` formula cells,
+  `0` cached-fallback cells
+
+Focused validation lane for every Phase 5 slice:
+
+- `make -j4 CppunitTest_sc_ucalc_shared_cases`
+- `make -j4 CppunitTest_sc_ucalc_formula2`
+- `make -j4 CppunitTest_sc_ucalc_dependency_shadow`
+- `make -j4 CppunitTest_sc_ucalc_workbook_facade`
+- `cmake --build spreadsheet_engine/build_check --target spreadsheetengine_lookup_tests spreadsheetengine_reference_tests spreadsheetengine_fods_evaluator_tests spreadsheetengine_fods_replay_tests -j4`
+- `spreadsheet_engine/build_check/spreadsheetengine_lookup_tests`
+- `spreadsheet_engine/build_check/spreadsheetengine_reference_tests`
+- `spreadsheet_engine/build_check/spreadsheetengine_fods_evaluator_tests`
+- `spreadsheet_engine/build_check/spreadsheetengine_fods_replay_tests --summary`
+- `git diff --check`
+
+Concrete file/test inventory for Phase 5:
+
+- Calc execution surface:
+  - `sc/source/core/tool/interpr1.cxx`
+  - `sc/source/core/inc/interpre.hxx`
+- Standalone execution surface:
+  - `spreadsheet_engine/source/core/FormulaEvaluatorSpreadsheet.cxx`
+  - `spreadsheet_engine/source/core/FormulaEvaluatorOperators.cxx`
+- Compat/runtime helpers:
+  - `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx`
+  - `spreadsheet_engine/inc/spreadsheetengine/runtime/ReferenceText.hxx`
+- Focused Calc tests:
+  - `sc/qa/unit/ucalc_shared_cases.cxx`
+  - `sc/qa/unit/ucalc_formula2.cxx`
+- Focused standalone tests:
+  - `spreadsheet_engine/tests/unit/reference_api_tests.cxx`
+  - `spreadsheet_engine/tests/unit/fods_evaluator_tests.cxx`
+
+Phase 5 explicit defer list:
+
+- `INDIRECT` and string-to-reference compilation
+- jump/short-circuit token walking
+- broad opcode-dispatch-table extraction
+- storage-sensitive database/matrix families
+- queue authority, listener ownership, or workbook-storage changes
 
 ## Validation Strategy
 

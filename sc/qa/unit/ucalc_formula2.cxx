@@ -5029,6 +5029,58 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testRegexForXLOOKUP)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testReferenceShapePhase5)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+
+    CPPUNIT_ASSERT(m_pDoc->InsertTab(0, u"Sheet1"_ustr));
+    CPPUNIT_ASSERT(m_pDoc->InsertTab(1, u"Sheet2"_ustr));
+    CPPUNIT_ASSERT(m_pDoc->InsertTab(2, u"Sheet3"_ustr));
+
+    m_pDoc->SetString(1, 0, 0, u"=COLUMN(B4:C6)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(2.0, m_pDoc->GetValue(1, 0, 0));
+
+    m_pDoc->SetString(1, 1, 0, u"=ROW(B4:B6)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(4.0, m_pDoc->GetValue(1, 1, 0));
+
+    m_pDoc->SetString(1, 2, 0, u"=COLUMNS(Sheet1.A1:Sheet3.B2)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(6.0, m_pDoc->GetValue(1, 2, 0));
+
+    m_pDoc->SetString(1, 3, 0, u"=ROWS(Sheet1.A1:Sheet3.B2)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(6.0, m_pDoc->GetValue(1, 3, 0));
+
+    m_pDoc->SetString(1, 4, 0, u"=AREAS((A1:B3~C1))"_ustr);
+    CPPUNIT_ASSERT_EQUAL(2.0, m_pDoc->GetValue(1, 4, 0));
+
+    m_pDoc->SetString(1, 5, 0, u"=SHEET()"_ustr);
+    CPPUNIT_ASSERT_EQUAL(1.0, m_pDoc->GetValue(1, 5, 0));
+
+    m_pDoc->SetString(1, 6, 0, u"=SHEET(\"Sheet3\")"_ustr);
+    CPPUNIT_ASSERT_EQUAL(3.0, m_pDoc->GetValue(1, 6, 0));
+
+    m_pDoc->SetString(1, 7, 0, u"=SHEETS()"_ustr);
+    CPPUNIT_ASSERT_EQUAL(3.0, m_pDoc->GetValue(1, 7, 0));
+
+    m_pDoc->SetString(1, 8, 0, u"=SHEETS(Sheet1.A1:Sheet3.B2)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(3.0, m_pDoc->GetValue(1, 8, 0));
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+    m_pDoc->InsertMatrixFormula(5, 9, 7, 9, aMark, u"=COLUMN()"_ustr);
+    CPPUNIT_ASSERT_EQUAL(6.0, m_pDoc->GetValue(5, 9, 0));
+    CPPUNIT_ASSERT_EQUAL(7.0, m_pDoc->GetValue(6, 9, 0));
+    CPPUNIT_ASSERT_EQUAL(8.0, m_pDoc->GetValue(7, 9, 0));
+
+    m_pDoc->InsertMatrixFormula(9, 5, 9, 7, aMark, u"=ROW()"_ustr);
+    CPPUNIT_ASSERT_EQUAL(6.0, m_pDoc->GetValue(9, 5, 0));
+    CPPUNIT_ASSERT_EQUAL(7.0, m_pDoc->GetValue(9, 6, 0));
+    CPPUNIT_ASSERT_EQUAL(8.0, m_pDoc->GetValue(9, 7, 0));
+
+    m_pDoc->DeleteTab(2);
+    m_pDoc->DeleteTab(1);
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_PLUGIN_IMPLEMENT();
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

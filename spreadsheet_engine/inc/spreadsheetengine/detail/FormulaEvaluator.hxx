@@ -194,6 +194,8 @@ public:
 
     [[nodiscard]] api::ValueResult<api::ResolvedReference> resolveReferenceText(
         api::StringView rReference, api::SheetId nCurrentSheet) const;
+    [[nodiscard]] api::ValueResult<api::CellRange> resolveReferenceRangeText(
+        api::StringView rReference, api::SheetId nCurrentSheet) const;
 
     [[nodiscard]] api::ValueResult<api::ResolvedReference> resolveNamedRange(
         api::StringView rName, api::SheetId nScopeSheet) const;

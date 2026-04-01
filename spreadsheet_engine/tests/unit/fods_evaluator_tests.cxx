@@ -3979,8 +3979,18 @@ int main()
                                    / "spreadsheet" / "fods" / "sequence.fods";
         const auto aColumnsPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
                                   / "spreadsheet" / "fods" / "columns.fods";
+        const auto aColumnPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                 / "spreadsheet" / "fods" / "column.fods";
         const auto aRowsPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
                                / "spreadsheet" / "fods" / "rows.fods";
+        const auto aRowPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                              / "spreadsheet" / "fods" / "row.fods";
+        const auto aAreasPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                / "spreadsheet" / "fods" / "areas.fods";
+        const auto aSheetPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                / "spreadsheet" / "fods" / "sheet.fods";
+        const auto aSheetsPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
+                                 / "spreadsheet" / "fods" / "sheets.fods";
         const auto aConvertPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
                                   / "addin" / "fods" / "convert.fods";
         const auto aConvertAddPath = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions"
@@ -3993,7 +4003,12 @@ int main()
                                     / "mathematical" / "fods" / "aggregate.fods";
         const auto aSequenceLoad = spreadsheetengine::core::fods::loadWorkbook(aSequencePath.string());
         const auto aColumnsLoad = spreadsheetengine::core::fods::loadWorkbook(aColumnsPath.string());
+        const auto aColumnLoad = spreadsheetengine::core::fods::loadWorkbook(aColumnPath.string());
         const auto aRowsLoad = spreadsheetengine::core::fods::loadWorkbook(aRowsPath.string());
+        const auto aRowLoad = spreadsheetengine::core::fods::loadWorkbook(aRowPath.string());
+        const auto aAreasLoad = spreadsheetengine::core::fods::loadWorkbook(aAreasPath.string());
+        const auto aSheetLoad = spreadsheetengine::core::fods::loadWorkbook(aSheetPath.string());
+        const auto aSheetsLoad = spreadsheetengine::core::fods::loadWorkbook(aSheetsPath.string());
         const auto aConvertLoad = spreadsheetengine::core::fods::loadWorkbook(aConvertPath.string());
         const auto aConvertAddLoad
             = spreadsheetengine::core::fods::loadWorkbook(aConvertAddPath.string());
@@ -4004,8 +4019,18 @@ int main()
             return fail("spreadsheetengine_fods_evaluator_tests", "sequence.fods load failed");
         if (!aColumnsLoad)
             return fail("spreadsheetengine_fods_evaluator_tests", "columns.fods load failed");
+        if (!aColumnLoad)
+            return fail("spreadsheetengine_fods_evaluator_tests", "column.fods load failed");
         if (!aRowsLoad)
             return fail("spreadsheetengine_fods_evaluator_tests", "rows.fods load failed");
+        if (!aRowLoad)
+            return fail("spreadsheetengine_fods_evaluator_tests", "row.fods load failed");
+        if (!aAreasLoad)
+            return fail("spreadsheetengine_fods_evaluator_tests", "areas.fods load failed");
+        if (!aSheetLoad)
+            return fail("spreadsheetengine_fods_evaluator_tests", "sheet.fods load failed");
+        if (!aSheetsLoad)
+            return fail("spreadsheetengine_fods_evaluator_tests", "sheets.fods load failed");
         if (!aConvertLoad)
             return fail("spreadsheetengine_fods_evaluator_tests", "convert.fods load failed");
         if (!aConvertAddLoad)
@@ -4074,11 +4099,57 @@ int main()
             return false;
         }
 
+        Evaluator aColumnEvaluator(aColumnLoad.maValue.maWorkbook);
+        if (!checkNumericFormula(aColumnLoad.maValue.maWorkbook, aColumnEvaluator,
+                u"of:=COLUMN()", 1.0, "column.fods COLUMN() mismatch")
+            || !checkNumericFormula(aColumnLoad.maValue.maWorkbook, aColumnEvaluator,
+                u"of:=COLUMN([.B4:.C6])", 2.0, "column.fods multi-column mismatch"))
+        {
+            return false;
+        }
+
         Evaluator aRowsEvaluator(aRowsLoad.maValue.maWorkbook);
         if (!checkNumericFormula(aRowsLoad.maValue.maWorkbook, aRowsEvaluator,
                 u"of:=ROWS([.A10:.B12])", 3.0, "rows.fods 3-row range mismatch")
             || !checkNumericFormula(aRowsLoad.maValue.maWorkbook, aRowsEvaluator,
                 u"of:=ROWS({1;2;3|4;5;6})", 2.0, "rows.fods array ROWS mismatch"))
+        {
+            return false;
+        }
+
+        Evaluator aRowEvaluator(aRowLoad.maValue.maWorkbook);
+        if (!checkNumericFormula(aRowLoad.maValue.maWorkbook, aRowEvaluator,
+                u"of:=ROW()", 12.0, "row.fods ROW() mismatch")
+            || !checkNumericFormula(aRowLoad.maValue.maWorkbook, aRowEvaluator,
+                u"of:=ROW([.A10:.B12])", 10.0, "row.fods multi-row mismatch"))
+        {
+            return false;
+        }
+
+        Evaluator aAreasEvaluator(aAreasLoad.maValue.maWorkbook);
+        if (!checkNumericFormula(aAreasLoad.maValue.maWorkbook, aAreasEvaluator,
+                u"of:=AREAS(([.A1:.B3]~[.F2]~[.G1]))", 3.0, "areas.fods union mismatch")
+            || !checkNumericFormula(aAreasLoad.maValue.maWorkbook, aAreasEvaluator,
+                u"of:=AREAS(range)", 1.0, "areas.fods named range mismatch"))
+        {
+            return false;
+        }
+
+        Evaluator aSheetEvaluator(aSheetLoad.maValue.maWorkbook);
+        if (!checkNumericFormula(aSheetLoad.maValue.maWorkbook, aSheetEvaluator,
+                u"of:=SHEET()", 2.0, "sheet.fods SHEET() mismatch")
+            || !checkNumericFormula(aSheetLoad.maValue.maWorkbook, aSheetEvaluator,
+                u"of:=SHEET(\"Sheet3\")", 3.0, "sheet.fods SHEET(\"Sheet3\") mismatch"))
+        {
+            return false;
+        }
+
+        Evaluator aSheetsEvaluator(aSheetsLoad.maValue.maWorkbook);
+        if (!checkNumericFormula(aSheetsLoad.maValue.maWorkbook, aSheetsEvaluator,
+                u"of:=SHEETS()", 5.0, "sheets.fods SHEETS() mismatch")
+            || !checkNumericFormula(aSheetsLoad.maValue.maWorkbook, aSheetsEvaluator,
+                u"of:=SHEETS([Sheet1.A1:Sheet3.G12])", 3.0,
+                "sheets.fods cross-sheet mismatch"))
         {
             return false;
         }
