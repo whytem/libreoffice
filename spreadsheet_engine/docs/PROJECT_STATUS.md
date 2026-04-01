@@ -594,13 +594,14 @@ internals. This coupling is by design:
 - Start the implementation-ready recalculation-orchestration milestone in
   [RECALC_ORCHESTRATION_EXTRACTION.md](architecture/RECALC_ORCHESTRATION_EXTRACTION.md)
 
-### Active Milestone: Recalculation Orchestration Extraction
+### Active Milestone: Execution Backend Extraction
 
-The next extraction program is no longer replay promotion. It is the policy
-layer that decides what becomes dirty, what order recalculation runs in, and
-how grouped/shared execution behaves after edits.
+The recalc-orchestration milestone is now complete. The next extraction
+program starts from that stable boundary and targets the remaining
+Calc-owned execution shell: token walking, coercion, and
+reference-sensitive execution behavior.
 
-Phases 0-4 of that milestone are now complete:
+The completed recalc-orchestration milestone landed:
 
 - Phase 0 froze the zero-fallback replay baseline and the validation lanes
 - Phase 1 landed engine-owned recalc seeds, queue entries, plan results, and
@@ -615,27 +616,28 @@ Phases 0-4 of that milestone are now complete:
 - Phase 5 widened that pilot to whole-row / whole-column structural mutations
   plus named-range mutation flows, with rebuilt post-mutation queue planning
   for snapshot-rebuild cases
+- Phase 6 isolated Calc queue consumption behind a dedicated compat bridge and
+  opened the next execution-backend milestone from that stable boundary
 
-The active implementation frontier now starts at **Phase 6: Hand Off To
-Execution-Backend Extraction**.
+The active implementation frontier now starts at **Phase 0: Freeze The
+Orchestration Boundary** of the execution-backend milestone.
 
 The recommended active sequence is:
 
-1. Keep the completed scheduler-authority pilot green while execution slices
-   begin moving behind the engine boundary.
-2. Extract token walking, coercion, and reference-sensitive evaluator shell
-   logic in validated slices.
-3. Revisit broader workbook/storage authority only after execution authority is
-   stable.
+1. Freeze the completed orchestration boundary and inventory the first
+   duplicated execution helpers.
+2. Extract shared coercion and scalar execution helpers.
+3. Move token-walking and reference-sensitive execution slices only after the
+   helper layer is stable.
 
-### Medium-term: Extract Recalculation Orchestration On Top Of The Planner
+### Medium-term: Extract The Execution Backend On Top Of The Settled Scheduler Boundary
 
-- Keep the current engine-owned dirty-plan and queue pilot green across the
-  widened non-structural, structural, and named-range mutation surface
-- Keep Calc consuming engine-owned scheduler outputs while storage mutation and
-  actual formula execution remain Calc-hosted
-- Use the now-stable scheduler boundary as the prerequisite for evaluator-shell
-  extraction
+- Keep the completed engine-owned dirty-plan and queue boundary green while
+  execution slices move behind it
+- Extract shared coercion, argument normalization, and evaluator-shell helpers
+  where Calc and standalone still duplicate logic
+- Use explicit compat bridges where Calc still needs host-owned services during
+  the execution-backend transition
 - Use the completed shared-runtime convergence work as a prerequisite, not as a
   competing roadmap stream
 
@@ -651,7 +653,7 @@ authority decision:
 | Area | Current state | Next step |
 |------|---------------|-----------|
 | Compiler authority inside Calc | Standalone switchover is complete; Calc still uses `ScCompiler` for most production paths | Keep engine-first compile adoption expanding only where the bridge/diff lanes make it safe |
-| Recalculation orchestration | Engine-owned dirty planning and queue/scheduling authority are piloted across non-structural, structural, and named-range mutations | Keep the authority lane stable while execution-backend extraction builds on top |
+| Recalculation orchestration | Engine-owned dirty planning and queue/scheduling authority are complete for the current pilot surface | Keep the authority lane stable while execution-backend extraction builds on top |
 | Execution backend | `ScInterpreter` and execution backends are still Calc-owned, although the pure-computation runtime kernels are now substantially shared | Incrementally extract the remaining evaluator shell, coercion, and reference-sensitive execution logic behind strong differential validation |
 | Workbook/storage authority | Calc-backed facade exists and is validated | Defer any authority shift until scheduler and execution layers are stable |
 
@@ -660,19 +662,14 @@ authority decision:
 1. **Freeze and maintain the promoted replay baseline**
    - Keep the `0 / 50,661` cached-fallback result green
    - Keep compiled replay and lexical parity maintenance lanes green
-2. **Extract recalculation orchestration**
-   - Keep the completed authoritative planner/scheduler pilot green as the
-     stable precondition for execution extraction
-   - Continue using engine-owned queue/scheduling policy as the settled
-     orchestration boundary
-3. **Incrementally extract the CPU execution backend**
+2. **Incrementally extract the CPU execution backend**
    - Move token walking, coercion, and evaluation mechanics out of Calc in
      small validated slices
    - Continue broadening live function coverage as part of that extraction
-4. **Keep threading and OpenCL as backend adapters**
+3. **Keep threading and OpenCL as backend adapters**
    - Let Calc continue owning resource/runtime concerns while the engine owns
      more calculation semantics
-5. **Decide authority shift timing last**
+4. **Decide authority shift timing last**
    - Whether `ScDocument` remains a Calc-backed host or the engine workbook
      becomes more authoritative should only be decided after scheduler and
      execution layers stabilize

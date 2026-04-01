@@ -177,9 +177,9 @@ The milestone is now past the setup stage:
 - **Phase 3:** complete
 - **Phase 4:** complete
 - **Phase 5:** complete
-- **Phase 6:** still open
+- **Phase 6:** complete
 
-What landed through Phase 5:
+What landed through Phase 6:
 
 - engine-owned recalc planning types in
   `detail/dependency/RecalcPlanner.hxx`
@@ -195,6 +195,8 @@ What landed through Phase 5:
   mutations
 - named-range authority coverage through `SetAllRangeNames` and
   `InsertNewRangeName`
+- Calc queue consumption isolated behind
+  `compat/libreoffice/RecalcQueueExecution.hxx`
 - dedicated standalone and Calc validation lanes for queue planning and queue
   comparison
 - ordering-sensitive Calc authority tests for `SetValue`, `SetFormula`,
@@ -350,6 +352,8 @@ Implemented in:
 
 ### Phase 6: Hand Off To Execution-Backend Extraction
 
+Status: **Complete**
+
 Goals:
 
 - finish the orchestration milestone with a clean authority boundary for later
@@ -361,6 +365,12 @@ Completion handoff:
 - Calc remains storage and execution host
 - next milestone can focus on token walking, coercion, and
   reference-sensitive execution slices
+
+Implemented in:
+
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/RecalcQueueExecution.hxx`
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/RecalcAuthority.hxx`
+- `spreadsheet_engine/docs/architecture/EXECUTION_BACKEND_EXTRACTION.md`
 
 ## Validation Strategy
 
@@ -398,6 +408,8 @@ The milestone is complete when all of the following are true:
   and structural cases
 - the next execution-backend milestone can target a stable orchestration
   boundary instead of Calc-owned queue semantics
+
+Current status: **Complete**
 
 ## Risks
 

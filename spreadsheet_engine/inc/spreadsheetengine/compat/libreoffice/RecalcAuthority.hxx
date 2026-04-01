@@ -13,18 +13,14 @@
 #include <cstdlib>
 #include <cstring>
 #include <optional>
-#include <unordered_set>
 #include <utility>
-#include <vector>
 
 #include <sal/log.hxx>
 #include <osl/diagnose.h>
 
-#include <dociter.hxx>
 #include <document.hxx>
-#include <formulacell.hxx>
-#include <table.hxx>
 
+#include <spreadsheetengine/compat/libreoffice/RecalcQueueExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcShadow.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::recalcauthority
@@ -63,127 +59,6 @@ namespace detail
 {
     const char* pToggle = std::getenv("SPREADSHEET_ENGINE_RECALC_AUTHORITY_STRICT");
     return pToggle && *pToggle && std::strcmp(pToggle, "0") != 0;
-}
-
-struct FormulaStateSnapshot
-{
-    std::vector<api::CellAddress> maTreeOrder;
-    std::vector<api::CellAddress> maTrackOrder;
-    std::vector<api::CellAddress> maDirtyOnly;
-};
-
-[[nodiscard]] inline std::vector<ScFormulaCell*> collectFormulaCells(const ScDocument& rDoc)
-{
-    std::vector<ScFormulaCell*> aCells;
-    for (SCTAB nTab = 0; nTab < rDoc.GetTableCount(); ++nTab)
-    {
-        ScCellIterator aIter(const_cast<ScDocument&>(rDoc),
-            ScRange(0, 0, nTab, rDoc.MaxCol(), rDoc.MaxRow(), nTab));
-        for (bool bHas = aIter.first(); bHas; bHas = aIter.next())
-        {
-            if (aIter.getType() != CELLTYPE_FORMULA)
-                continue;
-            if (ScFormulaCell* pCell = aIter.getFormulaCell())
-                aCells.push_back(pCell);
-        }
-    }
-    return aCells;
-}
-
-[[nodiscard]] inline FormulaStateSnapshot captureFormulaState(const ScDocument& rDoc)
-{
-    FormulaStateSnapshot aSnapshot;
-    const auto aActualTree
-        = recalcshadow::detail::collectFormulaTreeAddresses(rDoc);
-    aSnapshot.maTreeOrder = aActualTree;
-
-    for (ScFormulaCell* pCell : collectFormulaCells(rDoc))
-    {
-        const auto aAddress = toApiCellAddress(pCell->aPos);
-        if (rDoc.IsInFormulaTrack(pCell))
-            aSnapshot.maTrackOrder.push_back(aAddress);
-        else if (pCell->GetDirty() || pCell->NeedsInterpret())
-            aSnapshot.maDirtyOnly.push_back(aAddress);
-    }
-
-    return aSnapshot;
-}
-
-[[nodiscard]] inline bool isCleanBaseline(const FormulaStateSnapshot& rSnapshot)
-{
-    return rSnapshot.maTreeOrder.empty() && rSnapshot.maTrackOrder.empty()
-           && rSnapshot.maDirtyOnly.empty();
-}
-
-[[nodiscard]] inline ScFormulaCell* getFormulaCell(ScDocument& rDoc, const api::CellAddress& rAddress)
-{
-    ScTable* pTable = rDoc.FetchTable(rAddress.mnSheet);
-    if (!pTable)
-        return nullptr;
-    return pTable->GetFormulaCell(rAddress.mnColumn, rAddress.mnRow);
-}
-
-inline void clearRuntimeFormulaState(ScDocument& rDoc)
-{
-    for (ScFormulaCell* pCell : collectFormulaCells(rDoc))
-    {
-        if (rDoc.IsInFormulaTrack(pCell))
-            rDoc.RemoveFromFormulaTrack(pCell);
-        if (rDoc.IsInFormulaTree(pCell))
-            rDoc.RemoveFromFormulaTree(pCell);
-        if (pCell->GetDirty() || pCell->NeedsInterpret())
-            pCell->ResetDirty();
-    }
-}
-
-inline void appendQueueAddressToTree(ScDocument& rDoc, const api::CellAddress& rAddress)
-{
-    ScFormulaCell* pCell = getFormulaCell(rDoc, rAddress);
-    if (!pCell)
-        return;
-
-    if (rDoc.IsInFormulaTrack(pCell))
-        rDoc.RemoveFromFormulaTrack(pCell);
-    if (rDoc.IsInFormulaTree(pCell))
-        rDoc.RemoveFromFormulaTree(pCell);
-
-    pCell->SetDirtyVar();
-    rDoc.PutInFormulaTree(pCell);
-}
-
-inline void restoreFormulaState(ScDocument& rDoc, const FormulaStateSnapshot& rSnapshot)
-{
-    clearRuntimeFormulaState(rDoc);
-
-    for (const auto& rAddress : rSnapshot.maTreeOrder)
-        appendQueueAddressToTree(rDoc, rAddress);
-
-    for (const auto& rAddress : rSnapshot.maTrackOrder)
-    {
-        ScFormulaCell* pCell = getFormulaCell(rDoc, rAddress);
-        if (!pCell)
-            continue;
-        pCell->SetDirtyVar();
-        rDoc.AppendToFormulaTrack(pCell);
-    }
-
-    for (const auto& rAddress : rSnapshot.maDirtyOnly)
-    {
-        ScFormulaCell* pCell = getFormulaCell(rDoc, rAddress);
-        if (!pCell)
-            continue;
-        if (!rDoc.IsInFormulaTree(pCell) && !rDoc.IsInFormulaTrack(pCell))
-            pCell->SetDirtyVar();
-    }
-}
-
-inline void applyRecalcPlan(ScDocument& rDoc,
-    const spreadsheetengine::detail::dependency::RecalcPlan& rPlan)
-{
-    clearRuntimeFormulaState(rDoc);
-
-    for (const auto& rEntry : rPlan.maQueue)
-        appendQueueAddressToTree(rDoc, rEntry.maAddress);
 }
 
 inline void assertSafeComparison(const recalcshadow::ShadowComparison& rComparison,
@@ -230,7 +105,7 @@ class ScopedRecalcAuthority
     bool mbCaptured = false;
     bool mbCleanBaseline = false;
     spreadsheetengine::detail::dependency::DependencySnapshot maSnapshot;
-    detail::FormulaStateSnapshot maBaselineState;
+    recalcqueue::FormulaStateSnapshot maBaselineState;
 
 public:
     ScopedRecalcAuthority() = default;
@@ -242,8 +117,8 @@ public:
 
         const CalcWorkbookFacade aFacade(rDoc, 0);
         maSnapshot = spreadsheetengine::detail::dependency::buildDependencySnapshot(aFacade);
-        maBaselineState = detail::captureFormulaState(rDoc);
-        mbCleanBaseline = detail::isCleanBaseline(maBaselineState);
+        maBaselineState = recalcqueue::captureFormulaState(rDoc);
+        mbCleanBaseline = recalcqueue::isCleanFormulaState(maBaselineState);
         mbCaptured = true;
     }
 
@@ -282,15 +157,15 @@ public:
             return aResult;
         }
 
-        const auto aActualBefore = detail::captureFormulaState(rDoc);
-        detail::applyRecalcPlan(rDoc, aResult.maPlan);
+        const auto aActualBefore = recalcqueue::captureFormulaState(rDoc);
+        recalcqueue::applyRecalcPlan(rDoc, aResult.maPlan);
 
         const CalcWorkbookFacade aAppliedFacade(rDoc, 0);
         aResult.moComparisonAfter
             = recalcshadow::detail::comparePlanToDocument(aResult.maPlan, aAppliedFacade, rDoc);
         if (aResult.moComparisonAfter->meKind != recalcshadow::ShadowComparisonKind::Exact)
         {
-            detail::restoreFormulaState(rDoc, aActualBefore);
+            recalcqueue::restoreFormulaState(rDoc, aActualBefore);
             aResult.meKind = PilotResultKind::RolledBackVerificationFailure;
             return aResult;
         }
