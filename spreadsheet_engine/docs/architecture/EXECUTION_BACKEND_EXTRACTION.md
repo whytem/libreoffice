@@ -45,7 +45,7 @@ The starting handoff from the completed recalc-orchestration milestone is:
 
 ## Current Status
 
-This milestone is now active with its first three phases complete.
+This milestone is now active with its first four phases complete.
 
 - Phase 0 is complete: the orchestration/execution boundary is explicitly
   documented, the first helper duplication inventory is frozen, and the Phase 1
@@ -56,7 +56,11 @@ This milestone is now active with its first three phases complete.
 - Phase 2 is complete: Calc's operator-dispatch shell now routes comparison
   operators, logical folds, unary matrix/scalar operators, and synthetic binary
   dispatch through shared interpreter-shell helpers with focused Calc coverage
-- Phase 3 is now the active implementation frontier
+- Phase 3 is complete: the first reference-sensitive execution slices now move
+  through explicit compat bridges for `MATCH` / `XMATCH` execution plus
+  `ADDRESS` / `OFFSET` / `INDEX` planning and formatting, while Calc still
+  owns stack movement and host-only services
+- Phase 4 is now the active implementation frontier
 
 The starting baseline for this milestone is:
 
@@ -461,6 +465,8 @@ Completion criteria for Phase 2, now met:
 
 ### Phase 3: Extract Reference-Sensitive Execution Slices
 
+Status: **Complete**
+
 Goals:
 
 - move the first reference-sensitive execution families behind the stable
@@ -471,6 +477,88 @@ Deliverables:
 - explicit bridge APIs for host-only services
 - extracted execution slices validated against Calc behavior
 - updated ownership map for remaining Calc-only execution logic
+
+Phase 3 shipped as three concrete workstreams.
+
+#### 3.1 Extract Explicit Reference/Lookup Compat Bridges
+
+The first bounded reference-sensitive helpers now live behind dedicated compat
+surfaces instead of remaining as duplicated local logic inside `ScInterpreter`.
+
+Landed bridge surfaces:
+
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/LookupExecution.hxx`
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx`
+- `spreadsheet_engine/inc/spreadsheetengine/runtime/ReferenceText.hxx`
+
+What moved behind those bridges:
+
+- `MATCH` / `XMATCH` vector materialization and index resolution
+- `ADDRESS` string formatting with Calc-shaped sheet-prefix behavior
+- `OFFSET` range planning
+- `INDEX` reference-area planning and area normalization
+
+These bridges are intentionally header-only because they depend on Calc-owned
+host symbols and need to compile in Calc translation units rather than inside
+`libspreadsheetenginelo`.
+
+#### 3.2 Rewire The First Calc Reference-Sensitive Families
+
+Calc now consumes the bounded bridges in:
+
+- `sc/source/core/tool/interpr1.cxx`
+- `sc/source/core/inc/interpre.hxx`
+
+The migrated Calc entry points are:
+
+- `ScMatch()` / `ScXMatch()`
+- `ScAddressFunc()`
+- `ScOffset()`
+- `ScIndex()`
+
+Calc still owns:
+
+- stack cursor movement and stack typing
+- external-name/name-resolution plumbing outside the bounded bridge surface
+- matrix/reference traversal outside the migrated `MATCH` / `XMATCH` /
+  `ADDRESS` / `OFFSET` / `INDEX` slice
+
+#### 3.3 Remove Duplicate Standalone Helper Tails
+
+Phase 3 also removed leftover duplicate reference-text helpers from:
+
+- `spreadsheet_engine/source/core/FormulaEvaluatorInternals.hxx`
+- `spreadsheet_engine/source/core/CompiledFormulaInflation.cxx`
+
+Those paths now use the shared `runtime/ReferenceText.hxx` helper layer.
+
+Completion criteria for Phase 3, now met:
+
+- the first reference-sensitive execution helpers are extracted behind explicit
+  compat bridges
+- Calc consumes those bridges for a bounded live function slice without moving
+  storage or queue authority
+- standalone reference/lookup tests, focused Calc lanes, evaluator tests, and
+  one-shot replay summary remain green
+- the remaining Calc-owned reference shell is explicitly narrowed to the next
+  bounded slice
+
+### Phase 4: Expand Bounded Lookup And Reference Traversal
+
+Goals:
+
+- move the next bounded lookup/reference walkers without reopening general
+  token walking
+- keep Calc host ownership for name resolution and document-backed services
+- continue replacing duplicated vector/reference traversal one family at a time
+
+Target surface:
+
+- `LOOKUP`, `VLOOKUP`, `HLOOKUP`, and `XLOOKUP` traversal helpers
+- bounded reference/name-resolution helpers that still sit directly in
+  `ScInterpreter`
+- additional workbook-address/string-reference glue only where a compat bridge
+  is clearly narrower than the existing Calc shell
 
 ## Validation Strategy
 
@@ -502,6 +590,16 @@ Suggested focused Calc lane for Phase 2:
 
 - `make -j4 CppunitTest_sc_ucalc_formula2`
 
+Suggested focused Calc lanes for Phase 3:
+
+- `make -j4 CppunitTest_sc_ucalc_shared_cases`
+- `make -j4 CppunitTest_sc_ucalc_formula2`
+
+Suggested standalone additions for Phase 3:
+
+- `spreadsheetengine_lookup_tests`
+- `spreadsheetengine_reference_tests`
+
 ## Critical Files
 
 | File | Role |
@@ -510,6 +608,8 @@ Suggested focused Calc lane for Phase 2:
 | [RECALC_ORCHESTRATION_EXTRACTION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/RECALC_ORCHESTRATION_EXTRACTION.md) | Completed orchestration milestone and handoff boundary |
 | [RecalcQueueExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/RecalcQueueExecution.hxx) | Calc bridge that consumes engine-owned recalc queue output |
 | [InterpreterDispatch.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx) | Shared compat support for Calc operator dispatch and logical-fold shell helpers |
+| [LookupExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/LookupExecution.hxx) | Calc compat bridge for bounded `MATCH` / `XMATCH` execution |
+| [ReferenceExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx) | Calc compat bridge for `ADDRESS` / `OFFSET` / `INDEX` planning and formatting |
 | [FormulaEvaluator.cxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/source/core/FormulaEvaluator.cxx) | Standalone execution shell reference point |
 | [FormulaEvaluatorInternals.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/source/core/FormulaEvaluatorInternals.hxx) | Current standalone coercion and evaluator-helper concentration point |
 | [formulacell.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/data/formulacell.cxx) | Calc formula-cell execution host |

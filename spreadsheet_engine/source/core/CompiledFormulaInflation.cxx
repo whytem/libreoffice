@@ -12,6 +12,7 @@
 
 #include <spreadsheetengine/detail/BuiltinExternalNames.hxx>
 #include <spreadsheetengine/detail/WorkbookCompilerLowering.hxx>
+#include <spreadsheetengine/runtime/ReferenceText.hxx>
 
 #include "FormulaEvaluatorUtils.hxx"
 
@@ -37,56 +38,6 @@ using spreadsheetengine::core::eval::detail::formatNumber;
             rWorkbook.maSheets.empty() ? 0 : rWorkbook.maSheets.size() - 1) };
 }
 
-[[nodiscard]] bool needsQuotedSheetName(spreadsheetengine::api::StringView rSheetName)
-{
-    if (rSheetName.empty())
-        return false;
-
-    for (const char16_t cChar : rSheetName)
-    {
-        const bool bAlphaNum = (cChar >= u'0' && cChar <= u'9')
-                               || (cChar >= u'A' && cChar <= u'Z')
-                               || (cChar >= u'a' && cChar <= u'z') || cChar == u'_';
-        if (!bAlphaNum)
-            return true;
-    }
-
-    return false;
-}
-
-[[nodiscard]] spreadsheetengine::api::String quoteSheetNameForFormula(
-    spreadsheetengine::api::StringView rSheetName)
-{
-    if (!needsQuotedSheetName(rSheetName))
-        return spreadsheetengine::api::String(rSheetName);
-
-    spreadsheetengine::api::String aQuoted;
-    aQuoted.reserve(rSheetName.size() + 2);
-    aQuoted.push_back(u'\'');
-    for (const char16_t cChar : rSheetName)
-    {
-        if (cChar == u'\'')
-            aQuoted.push_back(u'\'');
-        aQuoted.push_back(cChar);
-    }
-    aQuoted.push_back(u'\'');
-    return aQuoted;
-}
-
-[[nodiscard]] spreadsheetengine::api::String columnNameFromIndex(
-    spreadsheetengine::api::ColumnIndex nColumn)
-{
-    spreadsheetengine::api::String aName;
-    spreadsheetengine::api::ColumnIndex nCurrent = nColumn;
-    do
-    {
-        const spreadsheetengine::api::ColumnIndex nRemainder = nCurrent % 26;
-        aName.insert(aName.begin(), static_cast<char16_t>(u'A' + nRemainder));
-        nCurrent = (nCurrent / 26) - 1;
-    } while (nCurrent >= 0);
-    return aName;
-}
-
 [[nodiscard]] spreadsheetengine::api::String formatAbsoluteCellReferenceToken(
     const spreadsheetengine::api::CellAddress& rAddress,
     const spreadsheetengine::core::workbook::Workbook& rWorkbook,
@@ -104,12 +55,12 @@ using spreadsheetengine::core::eval::detail::formatNumber;
         {
             return {};
         }
-        aToken = quoteSheetNameForFormula(
+        aToken = spreadsheetengine::runtime::referencetext::quoteSheetNameForFormula(
             rWorkbook.maSheets[static_cast<std::size_t>(rAddress.mnSheet)].maName);
         aToken.push_back(u'.');
     }
 
-    aToken += columnNameFromIndex(rAddress.mnColumn);
+    aToken += spreadsheetengine::runtime::referencetext::columnNameFromIndex(rAddress.mnColumn);
     aToken += formatNumber(static_cast<double>(rAddress.mnRow + 1));
     return aToken;
 }

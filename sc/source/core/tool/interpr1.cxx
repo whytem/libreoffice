@@ -64,6 +64,8 @@
 #include <spreadsheetengine/api/Reference.hxx>
 #include <spreadsheetengine/api/StringReference.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
+#include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/runtime/MathAggregate.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
@@ -104,6 +106,8 @@ namespace seref = spreadsheetengine::api::reference;
 namespace sestringref = spreadsheetengine::api::stringreference;
 namespace seinterpre = spreadsheetengine::compat::libreoffice::interpreterdispatch;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
+namespace selookupexec = spreadsheetengine::compat::libreoffice::lookupexecution;
+namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 
 namespace
 {
@@ -209,6 +213,21 @@ utl::SearchParam::SearchType toCalcSearchType(selookup::PatternMode ePattern)
         case selookup::PatternMode::Normal:
         default:
             return utl::SearchParam::SearchType::Normal;
+    }
+}
+
+spreadsheetengine::api::query::SearchType toApiSearchType(utl::SearchParam::SearchType eSearchType)
+{
+    switch (eSearchType)
+    {
+        case utl::SearchParam::SearchType::Wildcard:
+            return spreadsheetengine::api::query::SearchType::Wildcard;
+        case utl::SearchParam::SearchType::Regexp:
+            return spreadsheetengine::api::query::SearchType::Regex;
+        case utl::SearchParam::SearchType::Normal:
+        case utl::SearchParam::SearchType::Unknown:
+        default:
+            return spreadsheetengine::api::query::SearchType::Normal;
     }
 }
 
@@ -1432,6 +1451,214 @@ void ScInterpreter::ScSyntheticBinaryOp(OpCode eOpCode, void (ScInterpreter::*pO
     (this->*pOperation)();
     pCur = pSaveCur;
     cPar = nSavePar;
+}
+
+void ScInterpreter::ScMatchOp(bool bExtended)
+{
+    const sal_uInt8 nParamCount = GetByte();
+    if (!MustHaveParamCount(nParamCount, 2, bExtended ? 4 : 3))
+        return;
+
+    selookupexec::MatchExecutionRequest aRequest;
+    aRequest.mbExtended = bExtended;
+    aRequest.mbAllowPatternMatch = bExtended;
+    aRequest.meSearchType = toApiSearchType(mrDoc.GetDocOptions().GetFormulaSearchType());
+
+    if (bExtended)
+    {
+        if (nParamCount == 4)
+        {
+            const auto aSearchMode = selookup::normalizeSearchMode(GetInt16());
+            if (!aSearchMode)
+            {
+                PushIllegalParameter();
+                return;
+            }
+            aRequest.meSearchMode = aSearchMode.maValue;
+        }
+
+        if (nParamCount >= 3)
+        {
+            const auto aMatchMode = selookup::normalizeExtendedMatchMode(GetInt16());
+            if (!aMatchMode)
+            {
+                PushIllegalParameter();
+                return;
+            }
+            aRequest.meMatchMode = aMatchMode.maValue;
+        }
+    }
+    else
+    {
+        const auto aModePlan = selookup::normalizeMatchType(nParamCount == 3 ? GetDouble() : 1.0);
+        if (!aModePlan)
+        {
+            PushIllegalParameter();
+            return;
+        }
+        aRequest.maLegacyModes = aModePlan.maValue;
+    }
+
+    switch (GetStackType())
+    {
+        case svSingleRef:
+        {
+            SCCOL nCol = 0;
+            SCROW nRow = 0;
+            SCTAB nTab = 0;
+            PopSingleRef(nCol, nRow, nTab);
+            aRequest.maSearchSource.moRange = ScRange(nCol, nRow, nTab, nCol, nRow, nTab);
+        }
+        break;
+        case svDoubleRef:
+        {
+            SCCOL nCol1 = 0;
+            SCROW nRow1 = 0;
+            SCTAB nTab1 = 0;
+            SCCOL nCol2 = 0;
+            SCROW nRow2 = 0;
+            SCTAB nTab2 = 0;
+            PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+            if (nTab1 != nTab2 || (nCol1 != nCol2 && nRow1 != nRow2))
+            {
+                PushIllegalParameter();
+                return;
+            }
+            aRequest.maSearchSource.moRange = ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+        }
+        break;
+        case svMatrix:
+        {
+            aRequest.maSearchSource.mpMatrix = PopMatrix();
+            if (!aRequest.maSearchSource.mpMatrix)
+            {
+                PushIllegalParameter();
+                return;
+            }
+        }
+        break;
+        case svExternalDoubleRef:
+        {
+            PopExternalDoubleRef(aRequest.maSearchSource.mpMatrix);
+            if (!aRequest.maSearchSource.mpMatrix)
+            {
+                PushIllegalParameter();
+                return;
+            }
+        }
+        break;
+        default:
+            PushIllegalParameter();
+            return;
+    }
+
+    if (nGlobalError != FormulaError::NONE)
+    {
+        PushIllegalParameter();
+        return;
+    }
+
+    const auto makeTextValue = [](const OUString& rText) {
+        return spreadsheetengine::api::CellValue::text(selibreoffice::toApiString(rText));
+    };
+
+    switch (bExtended ? GetRawStackType() : GetStackType())
+    {
+        case svMissing:
+        case svEmptyCell:
+        {
+            if (!bExtended)
+            {
+                PushIllegalParameter();
+                return;
+            }
+            Pop();
+            aRequest.maLookupValue = spreadsheetengine::api::CellValue::empty();
+        }
+        break;
+        case svDouble:
+            aRequest.maLookupValue = spreadsheetengine::api::CellValue::number(GetDouble());
+        break;
+        case svString:
+            aRequest.maLookupValue = makeTextValue(GetString().getString());
+        break;
+        case svDoubleRef:
+        case svSingleRef:
+        {
+            ScAddress aAddress;
+            if (!PopDoubleRefOrSingleRef(aAddress))
+            {
+                PushInt(0);
+                return;
+            }
+
+            ScRefCellValue aCell(mrDoc, aAddress);
+            if (aCell.hasNumeric())
+            {
+                aRequest.maLookupValue
+                    = spreadsheetengine::api::CellValue::number(GetCellValue(aAddress, aCell));
+            }
+            else
+            {
+                svl::SharedString aString;
+                GetCellString(aString, aCell);
+                aRequest.maLookupValue = makeTextValue(aString.getString());
+            }
+        }
+        break;
+        case svExternalSingleRef:
+        {
+            ScExternalRefCache::TokenRef pToken;
+            PopExternalSingleRef(pToken);
+            if (nGlobalError != FormulaError::NONE)
+            {
+                PushError(nGlobalError);
+                return;
+            }
+            if (pToken->GetType() == svDouble)
+                aRequest.maLookupValue
+                    = spreadsheetengine::api::CellValue::number(pToken->GetDouble());
+            else
+                aRequest.maLookupValue = makeTextValue(pToken->GetString().getString());
+        }
+        break;
+        case svExternalDoubleRef:
+        case svMatrix:
+        {
+            double fValue = 0.0;
+            svl::SharedString aString;
+            const ScMatValType nType = GetDoubleOrStringFromMatrix(fValue, aString);
+            if (nGlobalError != FormulaError::NONE)
+            {
+                PushError(nGlobalError);
+                return;
+            }
+
+            if (ScMatrix::IsNonValueType(nType))
+                aRequest.maLookupValue = makeTextValue(aString.getString());
+            else if (ScMatrix::IsBooleanType(nType))
+                aRequest.maLookupValue
+                    = spreadsheetengine::api::CellValue::boolean(fValue != 0.0);
+            else
+                aRequest.maLookupValue = spreadsheetengine::api::CellValue::number(fValue);
+        }
+        break;
+        default:
+            PushIllegalParameter();
+            return;
+    }
+
+    const auto aResolvedIndex = selookupexec::resolveMatchIndex(mrDoc, mrContext, aRequest);
+    if (!aResolvedIndex)
+    {
+        if (aResolvedIndex.meError == spreadsheetengine::api::Error::NotAvailable)
+            PushNA();
+        else
+            PushError(selibreoffice::toFormulaError(aResolvedIndex.meError));
+        return;
+    }
+
+    PushDouble(static_cast<double>(aResolvedIndex.maValue + 1));
 }
 
 void ScInterpreter::ScEqual()
@@ -4666,330 +4893,12 @@ void lcl_GetLastMatch( SCSIZE& rIndex, const VectorMatrixAccessor& rMat,
 
 void ScInterpreter::ScMatch()
 {
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 2, 3 ) )
-        return;
-
-    VectorSearchArguments vsa;
-    vsa.nSearchOpCode = SC_OPCODE_MATCH;
-
-    // get match mode
-    const auto aModePlan = selookup::normalizeMatchType(nParamCount == 3 ? GetDouble() : 1.0);
-    if (!aModePlan)
-    {
-        PushIllegalParameter();
-        return;
-    }
-    vsa.eMatchMode = toCalcMatchMode(aModePlan.maValue.meMatchMode);
-    vsa.eSearchMode = toCalcSearchMode(aModePlan.maValue.meSearchMode);
-
-    // get vector to be searched
-    switch (GetStackType())
-    {
-        case svSingleRef:
-            PopSingleRef( vsa.nCol1, vsa.nRow1, vsa.nTab1);
-            vsa.nCol2   = vsa.nCol1;
-            vsa.nRow2   = vsa.nRow1;
-            vsa.pMatSrc = nullptr;
-        break;
-        case svDoubleRef:
-        {
-            vsa.pMatSrc = nullptr;
-            SCTAB nTab2 = 0;
-            PopDoubleRef(vsa.nCol1, vsa.nRow1, vsa.nTab1, vsa.nCol2, vsa.nRow2, nTab2);
-            if (vsa.nTab1 != nTab2 || (vsa.nCol1 != vsa.nCol2 && vsa.nRow1 != vsa.nRow2))
-            {
-                PushIllegalParameter();
-                return;
-            }
-        }
-        break;
-        case svMatrix:
-        case svExternalDoubleRef:
-        {
-            if (GetStackType() == svMatrix)
-                vsa.pMatSrc = PopMatrix();
-            else
-                PopExternalDoubleRef(vsa.pMatSrc);
-
-            if (!vsa.pMatSrc)
-            {
-                PushIllegalParameter();
-                return;
-            }
-        }
-        break;
-        default:
-            PushIllegalParameter();
-            return;
-    }
-
-    // get search value
-    if (nGlobalError == FormulaError::NONE)
-    {
-        switch ( GetStackType() )
-        {
-            case svDouble:
-            {
-                vsa.isStringSearch = false;
-                vsa.fSearchVal = GetDouble();
-            }
-            break;
-            case svString:
-            {
-                vsa.isStringSearch = true;
-                vsa.sSearchStr = GetString();
-            }
-            break;
-            case svDoubleRef :
-            case svSingleRef :
-            {
-                ScAddress aAdr;
-                if ( !PopDoubleRefOrSingleRef( aAdr ) )
-                {
-                    PushInt(0);
-                    return ;
-                }
-                ScRefCellValue aCell(mrDoc, aAdr);
-                if (aCell.hasNumeric())
-                {
-                    vsa.isStringSearch = false;
-                    vsa.fSearchVal = GetCellValue(aAdr, aCell);
-                }
-                else
-                {
-                    vsa.isStringSearch = true;
-                    GetCellString(vsa.sSearchStr, aCell);
-                }
-            }
-            break;
-            case svExternalSingleRef:
-            {
-                ScExternalRefCache::TokenRef pToken;
-                PopExternalSingleRef(pToken);
-                if (nGlobalError != FormulaError::NONE)
-                {
-                    PushError( nGlobalError);
-                    return;
-                }
-                if (pToken->GetType() == svDouble)
-                {
-                    vsa.isStringSearch = false;
-                    vsa.fSearchVal = pToken->GetDouble();
-                }
-                else
-                {
-                    vsa.isStringSearch = true;
-                    vsa.sSearchStr = pToken->GetString();
-                }
-            }
-            break;
-            case svExternalDoubleRef:
-            case svMatrix :
-            {
-                ScMatValType nType = GetDoubleOrStringFromMatrix(
-                        vsa.fSearchVal, vsa.sSearchStr);
-                vsa.isStringSearch = ScMatrix::IsNonValueType(nType);
-            }
-            break;
-            default:
-            {
-                PushIllegalParameter();
-                return;
-            }
-        }
-
-        // execute search
-        if ( SearchVectorForValue( vsa ) )
-            PushDouble( vsa.nIndex );
-        else
-        {
-            if ( vsa.isResultNA )
-                PushNA();
-            else
-                return; // error occurred and has already been pushed
-        }
-    }
-    else
-        PushIllegalParameter();
+    ScMatchOp(false);
 }
 
 void ScInterpreter::ScXMatch()
 {
-    sal_uInt8 nParamCount = GetByte();
-    if (!MustHaveParamCount(nParamCount, 2, 4))
-        return;
-
-    VectorSearchArguments vsa;
-    vsa.nSearchOpCode = SC_OPCODE_X_MATCH;
-
-    // get search mode
-    if (nParamCount == 4)
-    {
-        const auto aSearchMode = selookup::normalizeSearchMode(GetInt16());
-        if (!aSearchMode)
-        {
-            PushIllegalParameter();
-            return;
-        }
-        vsa.eSearchMode = toCalcSearchMode(aSearchMode.maValue);
-    }
-    else
-        vsa.eSearchMode = LookupSearchMode::Forward;
-
-    // get match mode
-    if (nParamCount >= 3)
-    {
-        const auto aMatchMode = selookup::normalizeExtendedMatchMode(GetInt16());
-        if (!aMatchMode)
-        {
-            PushIllegalParameter();
-            return;
-        }
-        vsa.eMatchMode = toCalcMatchMode(aMatchMode.maValue);
-    }
-    else
-        vsa.eMatchMode = exactorNA;
-
-    // get vector to be searched
-    switch (GetStackType())
-    {
-        case svSingleRef:
-        {
-            PopSingleRef(vsa.nCol1, vsa.nRow1, vsa.nTab1);
-            vsa.nCol2 = vsa.nCol1;
-            vsa.nRow2 = vsa.nRow1;
-            vsa.pMatSrc = nullptr;
-        }
-        break;
-        case svDoubleRef:
-        {
-            vsa.pMatSrc = nullptr;
-            SCTAB nTab2 = 0;
-            PopDoubleRef(vsa.nCol1, vsa.nRow1, vsa.nTab1, vsa.nCol2, vsa.nRow2, nTab2);
-            if (vsa.nTab1 != nTab2 || (vsa.nCol1 != vsa.nCol2 && vsa.nRow1 != vsa.nRow2))
-            {
-                PushIllegalParameter();
-                return;
-            }
-        }
-        break;
-        case svMatrix:
-        case svExternalDoubleRef:
-        {
-            if (GetStackType() == svMatrix)
-                vsa.pMatSrc = PopMatrix();
-            else
-                PopExternalDoubleRef(vsa.pMatSrc);
-
-            if (!vsa.pMatSrc)
-            {
-                PushIllegalParameter();
-                return;
-            }
-        }
-        break;
-        default:
-            PushIllegalParameter();
-            return;
-    }
-
-    // get search value
-    if (nGlobalError == FormulaError::NONE)
-    {
-        switch (GetRawStackType())
-        {
-            case svMissing:
-            case svEmptyCell:
-            {
-                vsa.isEmptySearch = true;
-                vsa.isStringSearch = false;
-                vsa.sSearchStr = GetString();
-            }
-            break;
-            case svDouble:
-            {
-                vsa.isStringSearch = false;
-                vsa.fSearchVal = GetDouble();
-            }
-            break;
-            case svString:
-            {
-                vsa.isStringSearch = true;
-                vsa.sSearchStr = GetString();
-            }
-            break;
-            case svDoubleRef:
-            case svSingleRef:
-            {
-                ScAddress aAdr;
-                if (!PopDoubleRefOrSingleRef(aAdr))
-                {
-                    PushInt(0);
-                    return;
-                }
-                ScRefCellValue aCell(mrDoc, aAdr);
-                if (aCell.hasNumeric())
-                {
-                    vsa.isStringSearch = false;
-                    vsa.fSearchVal = GetCellValue(aAdr, aCell);
-                }
-                else
-                {
-                    vsa.isStringSearch = true;
-                    GetCellString(vsa.sSearchStr, aCell);
-                }
-            }
-            break;
-            case svExternalSingleRef:
-            {
-                ScExternalRefCache::TokenRef pToken;
-                PopExternalSingleRef(pToken);
-                if (nGlobalError != FormulaError::NONE)
-                {
-                    PushError(nGlobalError);
-                    return;
-                }
-                if (pToken->GetType() == svDouble)
-                {
-                    vsa.isStringSearch = false;
-                    vsa.fSearchVal = pToken->GetDouble();
-                }
-                else
-                {
-                    vsa.isStringSearch = true;
-                    vsa.sSearchStr = pToken->GetString();
-                }
-            }
-            break;
-            case svExternalDoubleRef:
-            case svMatrix:
-            {
-                ScMatValType nType = GetDoubleOrStringFromMatrix(
-                    vsa.fSearchVal, vsa.sSearchStr);
-                vsa.isStringSearch = ScMatrix::IsNonValueType(nType);
-            }
-            break;
-            default:
-            {
-                PushIllegalParameter();
-                return;
-            }
-        }
-
-        // execute search
-        if (SearchVectorForValue(vsa))
-            PushDouble(vsa.nIndex);
-        else
-        {
-            if (vsa.isResultNA)
-                PushNA();
-            else
-                return; // error occurred and has already been pushed
-        }
-    }
-    else
-        PushIllegalParameter();
+    ScMatchOp(true);
 }
 
 namespace {
@@ -10645,13 +10554,13 @@ void ScInterpreter::ScIndirect()
 
 void ScInterpreter::ScAddressFunc()
 {
-    OUString  sTabStr;
+    OUString sTabStr;
 
-    sal_uInt8    nParamCount = GetByte();
-    if( !MustHaveParamCount( nParamCount, 2, 5 ) )
+    sal_uInt8 nParamCount = GetByte();
+    if (!MustHaveParamCount(nParamCount, 2, 5))
         return;
 
-    if( nParamCount >= 5 )
+    if (nParamCount >= 5)
         sTabStr = GetString().getString();
 
     const bool bForceR1C1 = (nParamCount >= 4 && 0.0 == GetDoubleWithDefault( 1.0));
@@ -10661,24 +10570,36 @@ void ScInterpreter::ScAddressFunc()
                 selibreoffice::toApiAddressConvention(maCalcConfig.meStringRefAddressSyntax),
                 selibreoffice::toApiAddressConvention(mrDoc.GetAddressConvention()), bForceR1C1));
 
-    ScRefFlags  nFlags = ScRefFlags::COL_ABS | ScRefFlags::ROW_ABS;   // default
-    if( nParamCount >= 3 )
+    ScRefFlags nFlags = ScRefFlags::COL_ABS | ScRefFlags::ROW_ABS; // default
+    sal_Int32 nAbsMode = 1;
+    if (nParamCount >= 3)
     {
         sal_Int32 n = GetInt32WithDefault(1);
-        switch ( n )
+        switch (n)
         {
-            default :
+            default:
                 PushNoValue();
                 return;
 
             case 5:
-            case 1 : break; // default
+            case 1:
+                nAbsMode = n;
+                break;
             case 6:
-            case 2 : nFlags = ScRefFlags::ROW_ABS; break;
+            case 2:
+                nAbsMode = n;
+                nFlags = ScRefFlags::ROW_ABS;
+                break;
             case 7:
-            case 3 : nFlags = ScRefFlags::COL_ABS; break;
+            case 3:
+                nAbsMode = n;
+                nFlags = ScRefFlags::COL_ABS;
+                break;
             case 8:
-            case 4 : nFlags = ScRefFlags::ZERO; break; // both relative
+            case 4:
+                nAbsMode = n;
+                nFlags = ScRefFlags::ZERO;
+                break; // both relative
         }
     }
     nFlags |= ScRefFlags::VALID | ScRefFlags::ROW_VALID | ScRefFlags::COL_VALID;
@@ -10703,38 +10624,18 @@ void ScInterpreter::ScAddressFunc()
         return;
     }
 
-    const ScAddress::Details aDetails( eConv, aPos );
-    const ScAddress aAdr( nCol, nRow, 0);
-    OUString aRefStr(aAdr.Format(nFlags, &mrDoc, aDetails));
-
-    if( nParamCount >= 5 && !sTabStr.isEmpty() )
-    {
-        OUString aDoc;
-        if (eConv == FormulaGrammar::CONV_OOO)
-        {
-            // Isolate Tab from 'Doc'#Tab
-            sal_Int32 nPos = ScCompiler::GetDocTabPos( sTabStr);
-            if (nPos != -1)
-            {
-                if (sTabStr[nPos+1] == '$')
-                    ++nPos;     // also split 'Doc'#$Tab
-                aDoc = sTabStr.copy( 0, nPos+1);
-                sTabStr = sTabStr.copy( nPos+1);
-            }
-        }
-        /* TODO: yet unsupported external reference in CONV_XL_R1C1 syntax may
-         * need some extra handling to isolate Tab from Doc. */
-        if (sTabStr[0] != '\'' || !sTabStr.endsWith("'"))
-            ScCompiler::CheckTabQuotes( sTabStr, eConv);
-        if (!aDoc.isEmpty())
-            sTabStr = aDoc + sTabStr;
-        sTabStr += (eConv == FormulaGrammar::CONV_XL_R1C1 || eConv == FormulaGrammar::CONV_XL_A1) ?
-            std::u16string_view(u"!") : std::u16string_view(u".");
-        sTabStr += aRefStr;
-        PushString( sTabStr );
-    }
+    serefexec::AddressFunctionRequest aRequest;
+    aRequest.mnRow = nRow;
+    aRequest.mnColumn = nCol;
+    aRequest.mnAbsMode = nAbsMode;
+    aRequest.mbA1Style = eConv != FormulaGrammar::CONV_XL_R1C1;
+    aRequest.maSheetToken = sTabStr;
+    aRequest.meConvention = eConv;
+    const auto aAddress = serefexec::formatAddressFunctionResult(aRequest);
+    if (!aAddress)
+        PushIllegalArgument();
     else
-        PushString( aRefStr );
+        PushString(aAddress.maValue);
 }
 
 void ScInterpreter::ScOffset()
@@ -10793,15 +10694,15 @@ void ScInterpreter::ScOffset()
     case svSingleRef:
     {
         PopSingleRef(nCol1, nRow1, nTab1);
-        const auto aOffset = seref::planOffsetRange(
-            selibreoffice::toApiCellRange(ScRange(nCol1, nRow1, nTab1, nCol1, nRow1, nTab1)),
+        const auto aOffset = serefexec::planOffsetRange(
+            ScRange(nCol1, nRow1, nTab1, nCol1, nRow1, nTab1),
             nRowPlus, nColPlus, oNewHeight, oNewWidth, mrDoc.MaxCol(), mrDoc.MaxRow());
         if (!aOffset)
             PushIllegalArgument();
         else
         {
-            const ScRange aResult = selibreoffice::toLibreOfficeRange(aOffset.maValue);
-            if (aOffset.maValue.isSingleCell())
+            const ScRange aResult = aOffset.maValue;
+            if (aResult.aStart == aResult.aEnd)
                 PushSingleRef(aResult.aStart.Col(), aResult.aStart.Row(), aResult.aStart.Tab());
             else
                 PushDoubleRef(aResult.aStart.Col(), aResult.aStart.Row(), aResult.aStart.Tab(),
@@ -10819,15 +10720,15 @@ void ScInterpreter::ScOffset()
         nCol1 = aAbsRef.Col();
         nRow1 = aAbsRef.Row();
         nTab1 = aAbsRef.Tab();
-        const auto aOffset = seref::planOffsetRange(
-            selibreoffice::toApiCellRange(ScRange(nCol1, nRow1, nTab1, nCol1, nRow1, nTab1)),
+        const auto aOffset = serefexec::planOffsetRange(
+            ScRange(nCol1, nRow1, nTab1, nCol1, nRow1, nTab1),
             nRowPlus, nColPlus, oNewHeight, oNewWidth, mrDoc.MaxCol(), mrDoc.MaxRow());
         if (!aOffset)
             PushIllegalArgument();
         else
         {
-            const ScRange aResult = selibreoffice::toLibreOfficeRange(aOffset.maValue);
-            if (aOffset.maValue.isSingleCell())
+            const ScRange aResult = aOffset.maValue;
+            if (aResult.aStart == aResult.aEnd)
             {
                 PushExternalSingleRef(nFileId, aTabName, aResult.aStart.Col(), aResult.aStart.Row(),
                                       aResult.aStart.Tab());
@@ -10844,15 +10745,15 @@ void ScInterpreter::ScOffset()
     case svDoubleRef:
     {
         PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
-        const auto aOffset = seref::planOffsetRange(
-            selibreoffice::toApiCellRange(ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2)),
+        const auto aOffset = serefexec::planOffsetRange(
+            ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2),
             nRowPlus, nColPlus, oNewHeight, oNewWidth, mrDoc.MaxCol(), mrDoc.MaxRow());
         if (!aOffset)
             PushIllegalArgument();
         else
         {
-            const ScRange aResult = selibreoffice::toLibreOfficeRange(aOffset.maValue);
-            if (aOffset.maValue.isSingleCell())
+            const ScRange aResult = aOffset.maValue;
+            if (aResult.aStart == aResult.aEnd)
                 PushSingleRef(aResult.aStart.Col(), aResult.aStart.Row(), aResult.aStart.Tab());
             else
                 PushDoubleRef(aResult.aStart.Col(), aResult.aStart.Row(), aResult.aStart.Tab(),
@@ -10873,15 +10774,15 @@ void ScInterpreter::ScOffset()
         nCol2 = aAbs.aEnd.Col();
         nRow2 = aAbs.aEnd.Row();
         nTab2 = aAbs.aEnd.Tab();
-        const auto aOffset = seref::planOffsetRange(
-            selibreoffice::toApiCellRange(ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2)),
+        const auto aOffset = serefexec::planOffsetRange(
+            ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2),
             nRowPlus, nColPlus, oNewHeight, oNewWidth, mrDoc.MaxCol(), mrDoc.MaxRow());
         if (!aOffset)
             PushIllegalArgument();
         else
         {
-            const ScRange aResult = selibreoffice::toLibreOfficeRange(aOffset.maValue);
-            if (aOffset.maValue.isSingleCell())
+            const ScRange aResult = aOffset.maValue;
+            if (aResult.aStart == aResult.aEnd)
             {
                 PushExternalSingleRef(nFileId, aTabName, aResult.aStart.Col(), aResult.aStart.Row(),
                                       aResult.aStart.Tab());
@@ -10939,7 +10840,7 @@ void ScInterpreter::ScIndex()
         nAreaCount = (sp ? pStack[sp-1]->GetRefList()->size() : 0);
     else
         nAreaCount = 1;     // one reference or array or whatever
-    const auto aAreaSelection = seref::normalizeAreaSelection(nArea, nAreaCount);
+    const auto aAreaSelection = serefexec::normalizeAreaSelection(nArea, nAreaCount);
     if (nGlobalError != FormulaError::NONE || !aAreaSelection)
     {
         PushError( FormulaError::NoRef);
@@ -11027,8 +10928,8 @@ void ScInterpreter::ScIndex()
                 SCROW nRow1 = 0;
                 SCTAB nTab1 = 0;
                 PopSingleRef( nCol1, nRow1, nTab1);
-                const auto aSelection = seref::planIndexReferenceSelection(
-                    selibreoffice::toApiCellRange(ScRange(nCol1, nRow1, nTab1, nCol1, nRow1, nTab1)),
+                const auto aSelection = serefexec::planIndexReferenceSelection(
+                    ScRange(nCol1, nRow1, nTab1, nCol1, nRow1, nTab1),
                     nRow, nCol, nParamCount);
                 if (!aSelection)
                     PushError(FormulaError::NoRef);
@@ -11063,8 +10964,8 @@ void ScInterpreter::ScIndex()
                 else {
                     PopDoubleRef( nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
                 }
-                const auto aSelection = seref::planIndexReferenceSelection(
-                    selibreoffice::toApiCellRange(ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2)),
+                const auto aSelection = serefexec::planIndexReferenceSelection(
+                    ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2),
                     nRow, nCol, nParamCount);
                 if (!aSelection)
                     PushError( FormulaError::NoRef);

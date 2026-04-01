@@ -35,6 +35,7 @@
 #include "parclass.hxx"
 #include <lookupsearchmode.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
+#include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 
 #include <unordered_map>
@@ -758,6 +759,7 @@ private:
     void ScUnaryMatrixOrScalarOp(
         spreadsheetengine::compat::libreoffice::interpreterdispatch::UnaryMatrixScalarMode eMode);
     void ScSyntheticBinaryOp(OpCode eOpCode, void (ScInterpreter::*pOperation)());
+    void ScMatchOp(bool bExtended);
     void ScTextBeforeOrAfter(bool bBefore);
     void ScChooseColsOrRows(bool bCols);
     void ScToColOrRow(bool bCol);
