@@ -34,6 +34,7 @@
 #include <sortparam.hxx>
 #include "parclass.hxx"
 #include <lookupsearchmode.hxx>
+#include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 
 #include <unordered_map>
 #include <memory>
@@ -1194,33 +1195,21 @@ inline bool ScInterpreter::MustHaveParamCountMinWithStackCheck( short nAct, shor
 
 inline bool ScInterpreter::CheckStringPositionArgument( double & fVal )
 {
-    if (!std::isfinite( fVal))
-    {
-        fVal = -1.0;
-        return false;
-    }
-    else if (fVal < 0.0)
-    {
-        fVal = 0.0;
-        return false;
-    }
-    else if (fVal > SAL_MAX_INT32)
-    {
-        fVal = static_cast<double>(SAL_MAX_INT32);
-        return false;
-    }
-    return true;
+    const auto aChecked = spreadsheetengine::core::coercion::checkStringPositionArgument(fVal);
+    fVal = aChecked.mfSanitizedValue;
+    return aChecked.mbValid;
 }
 
 inline sal_Int32 ScInterpreter::GetStringPositionArgument()
 {
-    double fVal = rtl::math::approxFloor( GetDouble());
-    if (!CheckStringPositionArgument( fVal))
+    const auto aPosition
+        = spreadsheetengine::core::coercion::normalizeStringPositionArgument(GetDouble());
+    if (!aPosition)
     {
-        fVal = -1.0;
         SetError( FormulaError::IllegalArgument);
+        return -1;
     }
-    return static_cast<sal_Int32>(fVal);
+    return aPosition.maValue;
 }
 
 inline bool ScInterpreter::CheckStringResultLen( OUString& rResult, sal_Int32 nIncrease )

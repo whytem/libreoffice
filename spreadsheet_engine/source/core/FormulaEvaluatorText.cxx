@@ -583,10 +583,10 @@ if (aFunctionName == u"CONCATENATE")
                 = aContext.evaluateAnchoredNumericArgument(*rNode.maChildren[2], std::nullopt);
             if (!aStart)
                 return replayStoredOrFailure(aStart.meError);
-            const auto oWholeStart = toWholeNumber(aStart.maValue);
-            if (!oWholeStart || *oWholeStart < 1)
+            const auto oWholeStart = normalizeOneBasedStringPositionArgument(aStart.maValue);
+            if (!oWholeStart)
                 return replayStoredOrFailure(api::Error::IllegalArgument);
-            nStartIndex = static_cast<std::size_t>(*oWholeStart - 1);
+            nStartIndex = static_cast<std::size_t>(oWholeStart.maValue - 1);
         }
 
         const auto oFoundIndex = setext::findByteText(aNeedle.maValue, aHaystack.maValue,
@@ -633,13 +633,13 @@ if (aFunctionName == u"CONCATENATE")
         if (!aReplacement)
             return makeFailure(aReplacement.meError);
 
-        const auto oWholeStart = toWholeNumber(aStart.maValue);
-        const auto oWholeLength = toWholeNumber(aLength.maValue);
-        if (!oWholeStart || !oWholeLength || *oWholeStart < 1 || *oWholeLength < 0)
+        const auto oWholeStart = normalizeOneBasedStringPositionArgument(aStart.maValue);
+        const auto oWholeLength = normalizeNonNegativeLengthArgument(aLength.maValue);
+        if (!oWholeStart || !oWholeLength)
             return makeFailure(api::Error::IllegalArgument);
 
-        const std::size_t nStartIndex = static_cast<std::size_t>(*oWholeStart - 1);
-        const std::size_t nReplaceLength = static_cast<std::size_t>(*oWholeLength);
+        const std::size_t nStartIndex = static_cast<std::size_t>(oWholeStart.maValue - 1);
+        const std::size_t nReplaceLength = static_cast<std::size_t>(oWholeLength.maValue);
         const api::String aExpandedSource = setext::expandDbcsByteText(aSource.maValue, false);
         if (nStartIndex >= aExpandedSource.size()
             || nReplaceLength > aExpandedSource.size() - nStartIndex)
@@ -689,10 +689,11 @@ if (aFunctionName == u"CONCATENATE")
             const auto aInstance = aContext.evaluateNumericArgument(*rNode.maChildren[3], std::nullopt);
             if (!aInstance)
                 return makeFailure(aInstance.meError);
-            const auto oWholeInstance = toWholeNumber(aInstance.maValue);
-            if (!oWholeInstance || *oWholeInstance < 1)
+            const auto oWholeInstance
+                = normalizeOneBasedStringPositionArgument(aInstance.maValue);
+            if (!oWholeInstance)
                 return makeFailure(api::Error::IllegalArgument);
-            oInstance = *oWholeInstance;
+            oInstance = oWholeInstance.maValue;
         }
 
         return makeScalarResult(api::CellValue::text(
@@ -727,10 +728,10 @@ if (aFunctionName == u"CONCATENATE")
             const auto aStart = aContext.evaluateNumericArgument(*rNode.maChildren[2], std::nullopt);
             if (!aStart)
                 return makeFailure(aStart.meError);
-            const auto oWholeStart = toWholeNumber(aStart.maValue);
-            if (!oWholeStart || *oWholeStart < 1)
+            const auto oWholeStart = normalizeOneBasedStringPositionArgument(aStart.maValue);
+            if (!oWholeStart)
                 return makeFailure(api::Error::IllegalArgument);
-            nStart = *oWholeStart;
+            nStart = oWholeStart.maValue;
         }
 
         const auto oFoundIndex = setext::findText(
@@ -927,13 +928,13 @@ if (aFunctionName == u"CONCATENATE")
         if (!aLength)
             return makeFailure(aLength.meError);
 
-        const auto oWholeStart = toWholeNumber(aStart.maValue);
-        const auto oWholeLength = toWholeNumber(aLength.maValue);
-        if (!oWholeStart || !oWholeLength || *oWholeStart < 1 || *oWholeLength < 0)
+        const auto oWholeStart = normalizeOneBasedStringPositionArgument(aStart.maValue);
+        const auto oWholeLength = normalizeNonNegativeLengthArgument(aLength.maValue);
+        if (!oWholeStart || !oWholeLength)
             return makeFailure(api::Error::IllegalArgument);
 
         return makeScalarResult(api::CellValue::text(
-            setext::sliceText(aText.maValue, *oWholeStart - 1, *oWholeLength)));
+            setext::sliceText(aText.maValue, oWholeStart.maValue - 1, oWholeLength.maValue)));
     }
 
     if (aFunctionName == u"REPLACE")
@@ -971,13 +972,13 @@ if (aFunctionName == u"CONCATENATE")
         if (!aReplacement)
             return makeFailure(aReplacement.meError);
 
-        const auto oWholeStart = toWholeNumber(aStart.maValue);
-        const auto oWholeLength = toWholeNumber(aLength.maValue);
-        if (!oWholeStart || !oWholeLength || *oWholeStart < 1 || *oWholeLength < 0)
+        const auto oWholeStart = normalizeOneBasedStringPositionArgument(aStart.maValue);
+        const auto oWholeLength = normalizeNonNegativeLengthArgument(aLength.maValue);
+        if (!oWholeStart || !oWholeLength)
             return makeFailure(api::Error::IllegalArgument);
 
         return makeScalarResult(api::CellValue::text(setext::replaceText(
-            aSource.maValue, *oWholeStart - 1, *oWholeLength, aReplacement.maValue)));
+            aSource.maValue, oWholeStart.maValue - 1, oWholeLength.maValue, aReplacement.maValue)));
     }
 
     if (aFunctionName == u"LEFT" || aFunctionName == u"RIGHT")
@@ -1001,10 +1002,10 @@ if (aFunctionName == u"CONCATENATE")
             const auto aLength = aContext.evaluateNumericArgument(*rNode.maChildren[1], std::nullopt);
             if (!aLength)
                 return makeFailure(aLength.meError);
-            const auto oWholeLength = toWholeNumber(aLength.maValue);
-            if (!oWholeLength || *oWholeLength < 0)
+            const auto oWholeLength = normalizeNonNegativeLengthArgument(aLength.maValue);
+            if (!oWholeLength)
                 return makeFailure(api::Error::IllegalArgument);
-            nLength = *oWholeLength;
+            nLength = oWholeLength.maValue;
         }
 
         return makeScalarResult(api::CellValue::text(setext::sliceTextLeftRight(
@@ -1171,10 +1172,10 @@ if (aFunctionName == u"CONCATENATE")
                 const auto aOccurrence = coerceToNumber(aFlagsOrOccurrence.maValue.maValue);
                 if (!aOccurrence)
                     return makeScalarResult(api::CellValue::error(aOccurrence.meError));
-                const auto oWholeOccurrence = toWholeNumber(aOccurrence.maValue);
+                const auto oWholeOccurrence = normalizeStringPositionArgument(aOccurrence.maValue);
                 if (!oWholeOccurrence)
                     return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
-                nOccurrence = static_cast<sal_Int32>(*oWholeOccurrence);
+                nOccurrence = oWholeOccurrence.maValue;
             }
             else
             {

@@ -43,6 +43,7 @@ set(SPREADSHEETENGINE_STANDALONE_PUBLIC_RUNTIME_HEADERS
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/MathScalar.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/MathTranscendental.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/NumeralConversion.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/ScalarCoercion.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/TextCase.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/TextScalar.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/TextServices.hxx"

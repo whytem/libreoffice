@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <spreadsheetengine/detail/ExecutionContext.hxx>
+#include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 
 #include "TestSupport.hxx"
 
@@ -39,7 +40,40 @@ struct PoolEntry
 
 int main()
 {
+    using spreadsheetengine::api::CellValue;
+    using spreadsheetengine::api::Error;
+    using spreadsheetengine::core::coercion::coerceToBoolean;
+    using spreadsheetengine::core::coercion::coerceToNumber;
+    using spreadsheetengine::core::coercion::coerceToString;
+    using spreadsheetengine::core::coercion::normalizeNonNegativeLengthArgument;
+    using spreadsheetengine::core::coercion::normalizeOneBasedStringPositionArgument;
+    using spreadsheetengine::core::coercion::normalizeStringPositionArgument;
     using spreadsheetengine::standalone::test::fail;
+
+    const auto aNumericText = coerceToNumber(CellValue::text(u"12.5"));
+    const auto aInvalidNumericText = coerceToNumber(CellValue::text(u"abc"));
+    const auto aBooleanTrue = coerceToBoolean(CellValue::text(u"TRUE"));
+    const auto aBooleanNumeric = coerceToBoolean(CellValue::number(2.0));
+    const auto aStringNumber = coerceToString(CellValue::number(12.5));
+    const auto aStringBoolean = coerceToString(CellValue::boolean(true));
+    const auto aPosition = normalizeStringPositionArgument(2.9);
+    const auto aZeroLength = normalizeNonNegativeLengthArgument(0.9);
+    const auto aOneBasedPosition = normalizeOneBasedStringPositionArgument(1.9);
+    const auto aInvalidPosition = normalizeStringPositionArgument(-1.0);
+    const auto aInvalidOneBased = normalizeOneBasedStringPositionArgument(0.0);
+
+    if (!aNumericText || aNumericText.maValue != 12.5 || aInvalidNumericText
+        || aInvalidNumericText.meError != Error::IllegalArgument || !aBooleanTrue
+        || !aBooleanTrue.maValue || !aBooleanNumeric || !aBooleanNumeric.maValue || !aStringNumber
+        || aStringNumber.maValue != u"12.5" || !aStringBoolean
+        || aStringBoolean.maValue != u"TRUE" || !aPosition || aPosition.maValue != 2
+        || !aZeroLength || aZeroLength.maValue != 0 || !aOneBasedPosition
+        || aOneBasedPosition.maValue != 1 || aInvalidPosition
+        || aInvalidPosition.meError != Error::IllegalArgument || aInvalidOneBased
+        || aInvalidOneBased.meError != Error::IllegalArgument)
+    {
+        return fail("spreadsheetengine_execution_tests", "scalar coercion helper mismatch");
+    }
 
     std::size_t nReleasedCount = 0;
     std::vector<ReleaseToken*> aTokens(4, nullptr);

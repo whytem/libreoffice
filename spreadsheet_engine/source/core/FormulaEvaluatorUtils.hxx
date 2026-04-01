@@ -102,52 +102,11 @@ using spreadsheetengine::core::util::toWholeNumber;
     return aResult;
 }
 
-[[nodiscard]] inline api::ValueResult<bool> coerceToBoolean(const api::CellValue& rValue)
-{
-    switch (rValue.meKind)
-    {
-        case api::CellValueKind::Empty:
-            return api::ValueResult<bool>::success(false);
-        case api::CellValueKind::Number:
-        case api::CellValueKind::Boolean:
-            return api::ValueResult<bool>::success(rValue.mfNumber != 0.0);
-        case api::CellValueKind::Text:
-        {
-            const api::String aUpper = uppercaseAscii(rValue.maString);
-            if (aUpper == u"TRUE")
-                return api::ValueResult<bool>::success(true);
-            if (aUpper == u"FALSE")
-                return api::ValueResult<bool>::success(false);
-            if (auto oNumber = parseAsciiDouble(rValue.maString))
-                return api::ValueResult<bool>::success(*oNumber != 0.0);
-            return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
-        }
-        case api::CellValueKind::Error:
-            return api::ValueResult<bool>::failure(rValue.meError);
-    }
-
-    return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
-}
-
-[[nodiscard]] inline api::ValueResult<api::String> coerceToString(const api::CellValue& rValue)
-{
-    switch (rValue.meKind)
-    {
-        case api::CellValueKind::Empty:
-            return api::ValueResult<api::String>::success({});
-        case api::CellValueKind::Number:
-            return api::ValueResult<api::String>::success(formatNumber(rValue.mfNumber));
-        case api::CellValueKind::Boolean:
-            return api::ValueResult<api::String>::success(
-                rValue.mfNumber != 0.0 ? api::String(u"TRUE") : api::String(u"FALSE"));
-        case api::CellValueKind::Text:
-            return api::ValueResult<api::String>::success(rValue.maString);
-        case api::CellValueKind::Error:
-            return api::ValueResult<api::String>::failure(rValue.meError);
-    }
-
-    return api::ValueResult<api::String>::failure(api::Error::IllegalArgument);
-}
+using spreadsheetengine::core::coercion::coerceToBoolean;
+using spreadsheetengine::core::coercion::coerceToString;
+using spreadsheetengine::core::coercion::normalizeStringPositionArgument;
+using spreadsheetengine::core::coercion::normalizeOneBasedStringPositionArgument;
+using spreadsheetengine::core::coercion::normalizeNonNegativeLengthArgument;
 
 [[nodiscard]] inline EvaluationResult ensureScalarValue(Evaluator& rEvaluator, EvaluationResult aResult)
 {

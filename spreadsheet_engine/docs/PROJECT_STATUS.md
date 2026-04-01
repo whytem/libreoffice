@@ -43,15 +43,18 @@ is now also in closeout status.
 | Compiler switchover | **Complete** | Shared compiler plus compiled-token execution is now the default standalone replay path for all eleven enabled families, with zero hard compiler blockers remaining on the replay corpus |
 | Calc-backed workbook facade | **Complete** | Engine-owned workbook facade contract with Calc-backed and in-memory implementations, richer named-range mutation payloads, dedicated standalone/Calc validation lanes, and first live consumption through dependency-shadow runtime auditing |
 | Dependency and invalidation extraction | **Complete** | Engine-owned dependency snapshots, reverse dependency indexing, invalidation planning, structural rebuild scopes, workbook-scale Calc shadow corpus, maintenance-lane integration, and an opt-in runtime shadow audit are all in place |
+| Recalc orchestration extraction | **Complete** | Engine-owned recalc planning, queue construction, authority pilots, and Calc queue-consumption bridge are complete through the safe structural/named-range pilot surface |
 | FormulaEvaluator runtime modularization | **Complete** | The old evaluator monolith has been split across focused runtime and support modules such as `LookupRuntime`, `QueryRuntime`, `TextFunctionRuntime`, `DateTimeParse`, `FinancialRuntime`, `MathAggregate`, `MathFunctionRuntime`, and `ConversionRuntime` |
 | Calc pure-computation convergence | **Complete** | Calc now delegates the in-scope pure-computation statistical, aggregate, inverse-distribution, combinatoric, and error-function families to the same shared runtime modules used by standalone, with Calc-aligned algorithms adopted where behavior risk existed |
+| Execution backend extraction | **Active** | Phase 0 and Phase 1 are complete: the execution boundary is frozen, shared scalar coercion helpers are engine-owned, and Calc/standalone now share text-position normalization semantics while Phase 2 targets token-walking and stack-shell helpers |
 
 The immediate active frontier is now narrower and more practical:
 
 - keep the fully promoted replay corpus green across all eleven function
   families with zero cached-fallback cells
-- use the completed workbook facade plus dependency/invalidation planner as the
-  substrate for recalculation-orchestration extraction
+- continue the execution-backend milestone from the now-frozen recalc
+  orchestration boundary, with Phase 2 focused on token-walking and stack-shell
+  helper extraction
 - keep expanding engine-first adoption inside Calc only where differential
   validation keeps compiler/runtime behavior safe
 
@@ -578,7 +581,7 @@ internals. This coupling is by design:
 
 ## Forward Roadmap
 
-### Near-term: Freeze The Zero-Fallback Baseline And Start Recalc Extraction
+### Near-term: Hold The Zero-Fallback Baseline And Advance Execution Extraction
 
 - Keep the zero-cached-fallback replay result green across the full eleven-family
   promoted corpus (`500` workbooks / `50,661` formula cells)
@@ -589,10 +592,11 @@ internals. This coupling is by design:
     keep/remove decision
 - Keep the one-shot compiled `--summary` result authoritative as the published
   replay baseline
-- Use the now-completed pure-computation convergence work as the stable base
-  for later execution-backend extraction, not as an active backlog of its own
-- Start the implementation-ready recalculation-orchestration milestone in
-  [RECALC_ORCHESTRATION_EXTRACTION.md](architecture/RECALC_ORCHESTRATION_EXTRACTION.md)
+- Keep the now-completed recalc-orchestration boundary stable while the
+  execution backend moves behind it
+- Use the completed Phase 0/1 helper inventory and shared scalar-coercion layer
+  as the base for Phase 2 token-walking and stack-shell extraction in
+  [EXECUTION_BACKEND_EXTRACTION.md](architecture/EXECUTION_BACKEND_EXTRACTION.md)
 
 ### Active Milestone: Execution Backend Extraction
 
@@ -619,16 +623,16 @@ The completed recalc-orchestration milestone landed:
 - Phase 6 isolated Calc queue consumption behind a dedicated compat bridge and
   opened the next execution-backend milestone from that stable boundary
 
-The active implementation frontier now starts at **Phase 0: Freeze The
-Orchestration Boundary** of the execution-backend milestone.
+The active implementation frontier now starts at **Phase 2: Extract Token
+Walking / Stack Shell Helpers** of the execution-backend milestone.
 
 The recommended active sequence is:
 
-1. Freeze the completed orchestration boundary and inventory the first
-   duplicated execution helpers.
-2. Extract shared coercion and scalar execution helpers.
-3. Move token-walking and reference-sensitive execution slices only after the
-   helper layer is stable.
+1. Keep the completed Phase 0/1 helper layer stable and green.
+2. Extract token-walking and stack-shell helpers without re-opening queue or
+   storage authority.
+3. Move reference-sensitive execution slices only after the token-walking layer
+   is stable.
 
 ### Medium-term: Extract The Execution Backend On Top Of The Settled Scheduler Boundary
 

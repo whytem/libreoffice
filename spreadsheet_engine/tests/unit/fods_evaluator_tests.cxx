@@ -2325,21 +2325,37 @@ int main()
         const auto aLenb = aEvaluator.evaluateFormula(u"of:=LENB(\"ᄩA\")", { 0, 0, 0 });
         const auto aSearch
             = aEvaluator.evaluateFormula(u"of:=SEARCH(\"bc\";\"AbCd\")", { 0, 0, 0 });
+        const auto aSearchFraction
+            = aEvaluator.evaluateFormula(u"of:=SEARCH(\"b\";\"abcd\";2.9)", { 0, 0, 0 });
         const auto aFind
             = aEvaluator.evaluateFormula(u"of:=FIND(\"bc\";\"AbCd\")", { 0, 0, 0 });
         const auto aMid = aEvaluator.evaluateFormula(u"of:=MID(\"A😀BC\";2;2)", { 0, 0, 0 });
+        const auto aMidFraction
+            = aEvaluator.evaluateFormula(u"of:=MID(\"abcd\";2.9;1.9)", { 0, 0, 0 });
+        const auto aMidInvalid
+            = aEvaluator.evaluateFormula(u"of:=MID(\"abcd\";0;1)", { 0, 0, 0 });
         const auto aReplace
             = aEvaluator.evaluateFormula(u"of:=REPLACE(\"abcdef\";2;3;\"ZZ\")", { 0, 0, 0 });
+        const auto aReplaceFraction
+            = aEvaluator.evaluateFormula(u"of:=REPLACE(\"abcd\";2.9;1.9;\"X\")", { 0, 0, 0 });
         const auto aBase = aEvaluator.evaluateFormula(u"of:=BASE(255;16;4)", { 0, 0, 0 });
         const auto aRoman = aEvaluator.evaluateFormula(u"of:=ROMAN(499;4)", { 0, 0, 0 });
         const auto aLeft = aEvaluator.evaluateFormula(u"of:=LEFT(\"A😀BC\";2)", { 0, 0, 0 });
+        const auto aLeftFraction
+            = aEvaluator.evaluateFormula(u"of:=LEFT(\"abcd\";1.9)", { 0, 0, 0 });
+        const auto aLeftInvalid
+            = aEvaluator.evaluateFormula(u"of:=LEFT(\"abcd\";-1)", { 0, 0, 0 });
         const auto aRight = aEvaluator.evaluateFormula(u"of:=RIGHT(\"A😀BC\";2)", { 0, 0, 0 });
+        const auto aRightFraction
+            = aEvaluator.evaluateFormula(u"of:=RIGHT(\"abcd\";2.9)", { 0, 0, 0 });
         const auto aProper
             = aEvaluator.evaluateFormula(u"of:=PROPER(\"HELLO.THERE\")", { 0, 0, 0 });
         const auto aProperDigits
             = aEvaluator.evaluateFormula(u"of:=PROPER(\"76budget\")", { 0, 0, 0 });
         const auto aSubstitute = aEvaluator.evaluateFormula(
             u"of:=SUBSTITUTE(\"123123123\";\"3\";\"abc\";2)", { 0, 0, 0 });
+        const auto aSubstituteFraction = aEvaluator.evaluateFormula(
+            u"of:=SUBSTITUTE(\"banana\";\"a\";\"x\";1.9)", { 0, 0, 0 });
         const auto aT = aEvaluator.evaluateFormula(u"of:=T(7)", { 0, 0, 0 });
         const auto aTError = aEvaluator.evaluateFormula(u"of:=T(NA())", { 0, 0, 0 });
         const auto aConcat
@@ -2574,26 +2590,42 @@ int main()
             = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=LENB(\"ᄩA\")", { 0, 0, 0 });
         const auto aCompiledSearch = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=SEARCH(\"bc\";\"AbCd\")", { 0, 0, 0 });
+        const auto aCompiledSearchFraction = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=SEARCH(\"b\";\"abcd\";2.9)", { 0, 0, 0 });
         const auto aCompiledFind = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=FIND(\"bc\";\"AbCd\")", { 0, 0, 0 });
         const auto aCompiledMid = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=MID(\"A😀BC\";2;2)", { 0, 0, 0 });
+        const auto aCompiledMidFraction = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=MID(\"abcd\";2.9;1.9)", { 0, 0, 0 });
+        const auto aCompiledMidInvalid = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=MID(\"abcd\";0;1)", { 0, 0, 0 });
         const auto aCompiledReplace = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=REPLACE(\"abcdef\";2;3;\"ZZ\")", { 0, 0, 0 });
+        const auto aCompiledReplaceFraction = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=REPLACE(\"abcd\";2.9;1.9;\"X\")", { 0, 0, 0 });
         const auto aCompiledBase = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=BASE(255;16;4)", { 0, 0, 0 });
         const auto aCompiledRoman = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=ROMAN(499;4)", { 0, 0, 0 });
         const auto aCompiledLeft = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=LEFT(\"A😀BC\";2)", { 0, 0, 0 });
+        const auto aCompiledLeftFraction = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=LEFT(\"abcd\";1.9)", { 0, 0, 0 });
+        const auto aCompiledLeftInvalid = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=LEFT(\"abcd\";-1)", { 0, 0, 0 });
         const auto aCompiledRight = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=RIGHT(\"A😀BC\";2)", { 0, 0, 0 });
+        const auto aCompiledRightFraction = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=RIGHT(\"abcd\";2.9)", { 0, 0, 0 });
         const auto aCompiledProper = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=PROPER(\"HELLO.THERE\")", { 0, 0, 0 });
         const auto aCompiledProperDigits = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=PROPER(\"76budget\")", { 0, 0, 0 });
         const auto aCompiledSubstitute = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=SUBSTITUTE(\"123123123\";\"3\";\"abc\";2)", { 0, 0, 0 });
+        const auto aCompiledSubstituteFraction = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=SUBSTITUTE(\"banana\";\"a\";\"x\";1.9)", { 0, 0, 0 });
         const auto aCompiledT = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=T(7)", { 0, 0, 0 });
         const auto aCompiledTError = aEvaluator.evaluateFormulaViaCompiledTokens(
@@ -2836,16 +2868,26 @@ int main()
             || !checkNumber("LEN", aLen, 2.0)
             || !checkNumber("LENB", aLenb, 3.0)
             || !checkNumber("SEARCH", aSearch, 2.0)
+            || !checkNumber("SEARCH fractional start", aSearchFraction, 2.0)
             || !checkError("FIND", aFind, spreadsheetengine::api::Error::NotAvailable)
             || !checkText("MID", aMid, u"😀B")
+            || !checkText("MID fractional args", aMidFraction, u"b")
+            || !checkError(
+                "MID invalid start", aMidInvalid, spreadsheetengine::api::Error::IllegalArgument)
             || !checkText("REPLACE", aReplace, u"aZZef")
+            || !checkText("REPLACE fractional args", aReplaceFraction, u"aXcd")
             || !checkText("BASE", aBase, u"00FF")
             || !checkText("ROMAN", aRoman, u"ID")
             || !checkText("LEFT", aLeft, u"A😀")
+            || !checkText("LEFT fractional count", aLeftFraction, u"a")
+            || !checkError(
+                "LEFT invalid count", aLeftInvalid, spreadsheetengine::api::Error::IllegalArgument)
             || !checkText("RIGHT", aRight, u"BC")
+            || !checkText("RIGHT fractional count", aRightFraction, u"cd")
             || !checkText("PROPER", aProper, u"Hello.There")
             || !checkText("PROPER digits", aProperDigits, u"76Budget")
             || !checkText("SUBSTITUTE", aSubstitute, u"12312abc123")
+            || !checkText("SUBSTITUTE fractional instance", aSubstituteFraction, u"bxnana")
             || !checkText("T", aT, u"")
             || !checkError("T error", aTError, spreadsheetengine::api::Error::NotAvailable)
             || !checkText("CONCAT", aConcat, u"AACEG")
@@ -2982,17 +3024,28 @@ int main()
             || !checkNumber("compiled LEN", aCompiledLen, 2.0)
             || !checkNumber("compiled LENB", aCompiledLenb, 3.0)
             || !checkNumber("compiled SEARCH", aCompiledSearch, 2.0)
+            || !checkNumber("compiled SEARCH fractional start", aCompiledSearchFraction, 2.0)
             || !checkError(
                 "compiled FIND", aCompiledFind, spreadsheetengine::api::Error::NotAvailable)
             || !checkText("compiled MID", aCompiledMid, u"😀B")
+            || !checkText("compiled MID fractional args", aCompiledMidFraction, u"b")
+            || !checkError("compiled MID invalid start", aCompiledMidInvalid,
+                spreadsheetengine::api::Error::IllegalArgument)
             || !checkText("compiled REPLACE", aCompiledReplace, u"aZZef")
+            || !checkText("compiled REPLACE fractional args", aCompiledReplaceFraction, u"aXcd")
             || !checkText("compiled BASE", aCompiledBase, u"00FF")
             || !checkText("compiled ROMAN", aCompiledRoman, u"ID")
             || !checkText("compiled LEFT", aCompiledLeft, u"A😀")
+            || !checkText("compiled LEFT fractional count", aCompiledLeftFraction, u"a")
+            || !checkError("compiled LEFT invalid count", aCompiledLeftInvalid,
+                spreadsheetengine::api::Error::IllegalArgument)
             || !checkText("compiled RIGHT", aCompiledRight, u"BC")
+            || !checkText("compiled RIGHT fractional count", aCompiledRightFraction, u"cd")
             || !checkText("compiled PROPER", aCompiledProper, u"Hello.There")
             || !checkText("compiled PROPER digits", aCompiledProperDigits, u"76Budget")
             || !checkText("compiled SUBSTITUTE", aCompiledSubstitute, u"12312abc123")
+            || !checkText(
+                "compiled SUBSTITUTE fractional instance", aCompiledSubstituteFraction, u"bxnana")
             || !checkText("compiled T", aCompiledT, u"")
             || !checkError(
                 "compiled T error", aCompiledTError, spreadsheetengine::api::Error::NotAvailable)

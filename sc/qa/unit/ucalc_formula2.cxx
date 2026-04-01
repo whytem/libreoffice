@@ -712,6 +712,39 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncLEN)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedScalarCoercionAndPositionNormalization)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+
+    m_pDoc->InsertTab(0, u"Text"_ustr);
+
+    m_pDoc->SetString(ScAddress(0, 0, 0), u"=LEFT(\"abcd\";1.9)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"a"_ustr, m_pDoc->GetString(ScAddress(0, 0, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 1, 0), u"=RIGHT(\"abcd\";2.9)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"cd"_ustr, m_pDoc->GetString(ScAddress(0, 1, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 2, 0), u"=MID(\"abcd\";2.9;1.9)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"b"_ustr, m_pDoc->GetString(ScAddress(0, 2, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 3, 0), u"=SEARCH(\"b\";\"abcd\";2.9)"_ustr);
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(0, 3, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 4, 0), u"=REPLACE(\"abcd\";2.9;1.9;\"X\")"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"aXcd"_ustr, m_pDoc->GetString(ScAddress(0, 4, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 5, 0), u"=SUBSTITUTE(\"banana\";\"a\";\"x\";1.9)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"bxnana"_ustr, m_pDoc->GetString(ScAddress(0, 5, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 6, 0), u"=LEFT(\"abcd\";-1)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(0, 6, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 7, 0), u"=MID(\"abcd\";0;1)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(0, 7, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncLOOKUP)
 {
     FormulaGrammarSwitch aFGSwitch(m_pDoc, formula::FormulaGrammar::GRAM_ENGLISH_XL_R1C1);
