@@ -330,26 +330,20 @@ dedicated `fods` directories are now enabled for standalone replay.
 
 **Corpus metrics (frozen baseline):**
 
-- 426 workbooks across 8 families
-- 40,068 formula cells
-- 40,059 parsed formulas
-- 3,990 cached-fallback cells on the default promoted replay policy
-  (`9.95807%` of formula cells)
-- cached-fallback family split:
-  `statistical:1241`, `financial:680`, `spreadsheet:665`,
-  `mathematical:589`, `date_time:305`, `text:280`, `information:126`,
-  `logical:104`
-- cached-fallback top categories:
-  `named_ref:87`, `binary_op:eq:cell:57`, `PRICE:53`,
-  `binary_op:div:literal:49`, `SUM:48`, `GETPIVOTDATA:40`,
-  `cell_ref:33`, `CHOOSECOLS:31`, `CHOOSEROWS:31`, `CONVERT:31`
-- 43,165 function-call nodes
-- 55,552 cell-reference nodes, 5,219 range-reference nodes, 340 named-reference nodes
-- 394 array-constant nodes
+- 500 workbooks across the 11 promoted families
+- 50,661 formula cells
+- 50,652 parsed formulas
+- 0 cached-fallback cells on the default promoted replay policy
+  (`0%` of formula cells)
+- cached-fallback family split: none
+- cached-fallback top categories: none
+- 57,239 function-call nodes
+- 72,217 cell-reference nodes, 6,219 range-reference nodes, 398 named-reference nodes
+- 446 array-constant nodes
 
 The replay summary now measures fallback through the same compiled replay path
 used by the promoted families and emits per-family plus top-category fallback
-breakdowns for reduction work.
+breakdowns for maintenance and regression tracking.
 
 ---
 
@@ -409,7 +403,7 @@ expected-error formulas**, all of which already cache the expected workbook
 error result. Later promotion of the `financial` and `statistical` families
 kept the shared compiler path green through direct family replay and compiled
 replay validation, and the default standalone replay lane now passes
-`426 / 426` promoted workbooks.
+`500 / 500` promoted workbooks.
 
 Exact lexical token-stream parity is still maintained on a representative mixed
 subset rather than asserted on the full corpus, and the standalone execution
@@ -583,62 +577,40 @@ internals. This coupling is by design:
 
 ## Forward Roadmap
 
-### Near-term: Broaden Standalone Replay And Keep Zero-Fallback Green
+### Near-term: Freeze The Zero-Fallback Baseline And Start Recalc Extraction
 
 - Keep the zero-cached-fallback replay result green across the full eleven-family
-  promoted corpus
+  promoted corpus (`500` workbooks / `50,661` formula cells)
 - Keep the compiler-switchover maintenance lanes green:
   - representative Calc lexical parity smoke
   - compiled replay diff smoke
   - the `--legacy-only` escape hatch until we make an explicit long-term
     keep/remove decision
-- Broaden the shared built-in external/add-in catalog and standalone evaluator
-  coverage only where it advances replay-family enablement or removes
-  high-volume fallback paths
+- Keep the one-shot compiled `--summary` result authoritative as the published
+  replay baseline
 - Use the now-completed pure-computation convergence work as the stable base
   for later execution-backend extraction, not as an active backlog of its own
+- Start the implementation-ready recalculation-orchestration milestone in
+  [RECALC_ORCHESTRATION_EXTRACTION.md](architecture/RECALC_ORCHESTRATION_EXTRACTION.md)
 
-### Active Fallback Reduction Task List
+### Active Milestone: Recalculation Orchestration Extraction
 
-1. **Keep the fallback summary authoritative**
-   - Use the compiled-path `--summary` output as the single published fallback
-     metric for promoted families
-   - Re-freeze the family split and top-category list after each reduction
-     cluster lands
-2. **Burn down the current named/reference-heavy tail**
-   - Prioritize `named_ref`, `cell_ref`, and the remaining
-     `binary_op:eq:cell` / `binary_op:div:literal` wrappers that still exit to
-     cached results
-3. **Reduce the highest remaining function buckets**
-   - Target the current leaders from the live summary: `PRICE`, `SUM`,
-     `GETPIVOTDATA`, `CHOOSECOLS`, `CHOOSEROWS`, and `CONVERT`
-   - Separate "supported function, unsupported shape" from "function not yet
-     implemented" so each category gets the right follow-up work
-4. **Align add-in promotion with fallback work**
-   - Expand the built-in external-name catalog and standalone evaluator only
-     where it helps `addin` promotion or removes current high-volume fallback
-     categories
-5. **Re-baseline before the next family promotion**
-   - Record the new compiled-path fallback rate
-   - Confirm raw replay and compiled-diff stay green
-   - Only then move on to the next promotion candidate, starting with `addin`
+The next extraction program is no longer replay promotion. It is the policy
+layer that decides what becomes dirty, what order recalculation runs in, and
+how grouped/shared execution behaves after edits.
 
-### Promotion Gate For The Next Families
+The recommended active sequence is:
 
-Before promoting any additional Calc FODS family into the default standalone
-replay corpus:
-
-1. The family must have **zero hard preflight blockers**.
-2. Full raw standalone replay for the family must be **green**.
-3. Family compiled-diff must be **green**, with no execution mismatches.
-4. The replay summary must capture the family's **compiled-path fallback**
-   counts and top categories.
-5. The family must either:
-   - land below the current compiled-path fallback threshold agreed for
-     promotion, or
-   - carry an explicit reviewed waiver list for the remaining cached paths.
-6. The broader promoted corpus must remain green after the family is added to
-   the default replay lane.
+1. Define engine-owned recalc-plan and scheduler types on top of the completed
+   workbook facade and invalidation planner.
+2. Run the scheduler in shadow mode inside Calc and compare dirty sets, queue
+   ordering, and group/fallback behavior after representative edits.
+3. Promote selected safe mutation families to engine-owned dirty planning while
+   Calc still performs execution.
+4. Promote selected safe mutation families to engine-owned queue/scheduling
+   policy.
+5. Expand to structural and named-range mutations only after the non-structural
+   shadow lane is stable.
 
 ### Medium-term: Extract Recalculation Orchestration On Top Of The Planner
 
@@ -671,9 +643,8 @@ authority decision:
 
 **Recommended sequencing:**
 
-1. **Broaden standalone replay coverage**
-   - Enable the add-in family
-   - Reduce cached-fallback-heavy paths on the promoted corpus
+1. **Freeze and maintain the promoted replay baseline**
+   - Keep the `0 / 50,661` cached-fallback result green
    - Keep compiled replay and lexical parity maintenance lanes green
 2. **Extract recalculation orchestration**
    - Promote the current planner from shadow auditing to authoritative dirty
@@ -738,6 +709,8 @@ The engine should not absorb:
   master extraction roadmap with detailed per-phase status (Phases 0-11)
 - [docs/architecture/README.md](architecture/README.md) — pointer for active
   living architecture notes vs archived milestone plans
+- [RECALC_ORCHESTRATION_EXTRACTION.md](architecture/RECALC_ORCHESTRATION_EXTRACTION.md) —
+  active implementation-ready milestone for recalc/scheduler extraction
 - [BASIC_FODS_SUPPORT.md](archive/BASIC_FODS_SUPPORT.md) — archived FODS loader/
   evaluator milestone plan
 - [TOKEN_COMPILER_HOST_MODEL.md](archive/TOKEN_COMPILER_HOST_MODEL.md) —
