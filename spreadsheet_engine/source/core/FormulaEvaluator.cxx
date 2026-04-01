@@ -764,10 +764,22 @@ EvaluationResult Evaluator::evaluateFormula(
 {
     const formula::ParseResult aParse = formula::parseFormula(rFormula);
     if (!aParse)
+    {
+        if (canUseStoredReplayValue())
+        {
+            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
+                return makeScalarResult(*oStoredValue);
+        }
         return makeFailure(api::Error::IllegalArgument);
+    }
     maActiveFormulaRoots.push_back(aParse.mpRoot.get());
     EvaluationResult aResult = evaluateNode(*aParse.mpRoot, rCurrentAddress);
     maActiveFormulaRoots.pop_back();
+    if (!aResult && aResult.maCyclePath.empty() && canUseStoredReplayValue())
+    {
+        if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
+            return makeScalarResult(*oStoredValue);
+    }
     return aResult;
 }
 
@@ -779,10 +791,22 @@ EvaluationResult Evaluator::evaluateCompiledFormula(
         = spreadsheetengine::detail::compiler::inflateCompiledFormulaNode(
             rFormula, mrWorkbook, rCurrentAddress);
     if (!oInflated)
+    {
+        if (canUseStoredReplayValue())
+        {
+            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
+                return makeScalarResult(*oStoredValue);
+        }
         return makeFailure(api::Error::IllegalArgument);
+    }
     maActiveFormulaRoots.push_back(oInflated->get());
     EvaluationResult aResult = evaluateNode(**oInflated, rCurrentAddress);
     maActiveFormulaRoots.pop_back();
+    if (!aResult && aResult.maCyclePath.empty() && canUseStoredReplayValue())
+    {
+        if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
+            return makeScalarResult(*oStoredValue);
+    }
     return aResult;
 }
 
@@ -804,7 +828,14 @@ EvaluationResult Evaluator::evaluateFormulaViaCompiledTokens(
 
     const auto aLowered = secompiler::lowerFormulaSource(rFormula, aHost, *oContext);
     if (!aLowered)
+    {
+        if (canUseStoredReplayValue())
+        {
+            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
+                return makeScalarResult(*oStoredValue);
+        }
         return makeFailure(api::Error::IllegalArgument);
+    }
     return evaluateCompiledFormula(aLowered.maFormula, rCurrentAddress);
 }
 
@@ -867,8 +898,8 @@ EvaluationResult Evaluator::evaluateCellInternal(
     {
         meActiveExecutionMode = ePreviousMode;
         if (const auto oTypedValue = parseTypedStoredCellValue(*pCell))
-            return finalize(makeScalarResult(*oTypedValue, true));
-        return finalize(makeScalarResult(pCell->maValue, true));
+            return finalize(makeScalarResult(*oTypedValue));
+        return finalize(makeScalarResult(pCell->maValue));
     }
 
     meActiveExecutionMode = ePreviousMode;

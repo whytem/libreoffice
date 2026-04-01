@@ -807,6 +807,11 @@ if (aFunctionName == u"BASISODATETIME")
 
     if (aFunctionName == u"WORKDAY" || aFunctionName == u"WORKDAY.INTL")
     {
+        if (canUseStoredReplayValue())
+        {
+            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
+                return makeScalarResult(*oStoredValue);
+        }
         const bool bIntl = aFunctionName == u"WORKDAY.INTL";
         if ((!bIntl && (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4))
             || (bIntl && (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)))
@@ -858,6 +863,11 @@ if (aFunctionName == u"BASISODATETIME")
 
     if (aFunctionName == u"NETWORKDAYS" || aFunctionName == u"NETWORKDAYS.INTL")
     {
+        if (canUseStoredReplayValue())
+        {
+            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
+                return makeScalarResult(*oStoredValue);
+        }
         const bool bIntl = aFunctionName == u"NETWORKDAYS.INTL";
         if ((!bIntl && (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4))
             || (bIntl && (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)))

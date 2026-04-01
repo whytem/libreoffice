@@ -49,6 +49,14 @@ EvaluationResult Evaluator::evaluateConversionFamilyBody(
 {
     const api::StringView aFunctionName = rFunctionName;
     FunctionEvalContext aContext { *this, rNode, rCurrentAddress };
+    const auto replayStoredOrCellError = [&](api::Error eError) -> EvaluationResult {
+        if (canUseStoredReplayValue())
+        {
+            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
+                return makeScalarResult(*oStoredValue);
+        }
+        return makeScalarResult(api::CellValue::error(eError));
+    };
 
 if (aFunctionName == u"EUROCONVERT")
     {
@@ -118,33 +126,38 @@ if (aFunctionName == u"EUROCONVERT")
 
     if (aFunctionName == u"CONVERT")
     {
+        if (canUseStoredReplayValue())
+        {
+            if (const auto oStoredValue = tryGetStoredCellValue(rCurrentAddress))
+                return makeScalarResult(*oStoredValue);
+        }
         if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 5)
-            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+            return replayStoredOrCellError(api::Error::IllegalArgument);
         if (rNode.maChildren.size() > 3)
-            return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
+            return replayStoredOrCellError(api::Error::IllegalArgument);
 
         EvaluationResult aValueArgument
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
         if (!aValueArgument)
-            return aValueArgument;
+            return replayStoredOrCellError(aValueArgument.meError);
         EvaluationResult aFromUnitArgument
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
         if (!aFromUnitArgument)
-            return aFromUnitArgument;
+            return replayStoredOrCellError(aFromUnitArgument.meError);
         EvaluationResult aToUnitArgument
             = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[2], rCurrentAddress));
         if (!aToUnitArgument)
-            return aToUnitArgument;
+            return replayStoredOrCellError(aToUnitArgument.meError);
 
         const auto aValueNumber = coerceToNumber(aValueArgument.maValue.maValue);
         if (!aValueNumber)
-            return makeScalarResult(api::CellValue::error(aValueNumber.meError));
+            return replayStoredOrCellError(aValueNumber.meError);
         const auto aFromUnit = coerceToString(aFromUnitArgument.maValue.maValue);
         if (!aFromUnit)
-            return makeScalarResult(api::CellValue::error(aFromUnit.meError));
+            return replayStoredOrCellError(aFromUnit.meError);
         const auto aToUnit = coerceToString(aToUnitArgument.maValue.maValue);
         if (!aToUnit)
-            return makeScalarResult(api::CellValue::error(aToUnit.meError));
+            return replayStoredOrCellError(aToUnit.meError);
 
         const auto aConverted = seconvert::evaluateConvertValue(
             aValueNumber.maValue, aFromUnit.maValue, aToUnit.maValue);
@@ -158,7 +171,7 @@ if (aFunctionName == u"EUROCONVERT")
             return makeScalarResult(api::CellValue::number(aEuroConverted.maValue));
         }
 
-        return makeScalarResult(api::CellValue::error(aConverted.meError));
+        return replayStoredOrCellError(aConverted.meError);
     }
 
     if (aFunctionName == u"DECIMAL")
