@@ -1021,6 +1021,20 @@ int main()
     }
 
     {
+        const auto aChooseResult
+            = aEvaluator.evaluateFormula(u"of:=CHOOSE(2;1;7;9)", { 0, 0, 0 });
+        const auto aCompiledChooseResult = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CHOOSE(2;1;7;9)", { 0, 0, 0 });
+        if (!aChooseResult || !aChooseResult.maValue.maValue.isNumber()
+            || !almostEqual(aChooseResult.maValue.maValue.mfNumber, 7.0) || !aCompiledChooseResult
+            || !aCompiledChooseResult.maValue.maValue.isNumber()
+            || !almostEqual(aCompiledChooseResult.maValue.maValue.mfNumber, 7.0))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "CHOOSE() mismatch");
+        }
+    }
+
+    {
         const auto aSumResult = aEvaluator.evaluateCell({ 0, 16, 0 });
         const auto aAverageResult = aEvaluator.evaluateCell({ 0, 17, 0 });
         if (!aSumResult || aSumResult.mbUsedCachedValue || !aSumResult.maValue.maValue.isNumber()

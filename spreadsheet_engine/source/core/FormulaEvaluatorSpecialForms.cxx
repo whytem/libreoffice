@@ -443,7 +443,8 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpecialForm(
     api::StringView rFunctionName, const formula::Node& rNode,
     const api::CellAddress& rCurrentAddress)
 {
-    if (!(rFunctionName == u"FORMULA" || rFunctionName == u"IF" || rFunctionName == u"LET"
+    if (!(rFunctionName == u"FORMULA" || rFunctionName == u"IF" || rFunctionName == u"CHOOSE"
+            || rFunctionName == u"LET"
             || rFunctionName == u"IFERROR" || rFunctionName == u"COM.MICROSOFT.IFERROR"
             || rFunctionName == u"IFNA" || rFunctionName == u"COM.MICROSOFT.IFNA"
             || rFunctionName == u"INDIRECT" || rFunctionName == u"HYPERLINK"
@@ -547,6 +548,29 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpecialForm(
             case api::logic::IfBranchAction::ReturnFalse:
                 return detail::makeScalarResult(api::CellValue::boolean(false));
         }
+    }
+
+    if (rFunctionName == u"CHOOSE")
+    {
+        if (rNode.maChildren.size() < 2)
+            return detail::makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aIndex
+            = detail::ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aIndex)
+            return aIndex;
+
+        const auto aNumber = detail::coerceToNumber(aIndex.maValue.maValue);
+        if (!aNumber)
+            return detail::makeFailure(aNumber.meError);
+
+        const auto oChoiceIndex = api::logic::normalizeChooseIndex(
+            aNumber.maValue, static_cast<std::int16_t>(rNode.maChildren.size()));
+        if (!oChoiceIndex)
+            return detail::makeFailure(api::Error::IllegalArgument);
+
+        return evaluateNode(*rNode.maChildren[static_cast<std::size_t>(*oChoiceIndex)],
+            rCurrentAddress);
     }
 
     if (rFunctionName == u"LET")

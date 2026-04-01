@@ -63,7 +63,9 @@
 #include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Reference.hxx>
 #include <spreadsheetengine/api/StringReference.hxx>
+#include <spreadsheetengine/compat/libreoffice/IndirectExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
+#include <spreadsheetengine/compat/libreoffice/JumpExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/runtime/MathAggregate.hxx>
@@ -104,7 +106,9 @@ namespace selogic = spreadsheetengine::api::logic;
 namespace selookup = spreadsheetengine::api::lookup;
 namespace seref = spreadsheetengine::api::reference;
 namespace sestringref = spreadsheetengine::api::stringreference;
+namespace seindirectexec = spreadsheetengine::compat::libreoffice::indirectexecution;
 namespace seinterpre = spreadsheetengine::compat::libreoffice::interpreterdispatch;
+namespace sejumpexec = spreadsheetengine::compat::libreoffice::jumpexecution;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace selookupexec = spreadsheetengine::compat::libreoffice::lookupexecution;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
@@ -497,27 +501,6 @@ void ScInterpreter::ScIfJumpNotMatrix( const short* pJump, short nJumpCount )
 }
 
 
-/** Store a matrix value in another matrix in the context of that other matrix
-    is the result matrix of a jump matrix. All arguments must be valid and are
-    not checked. */
-static void lcl_storeJumpMatResult(
-    const ScMatrix* pMat, ScJumpMatrix* pJumpMat, SCSIZE nC, SCSIZE nR )
-{
-    if ( pMat->IsValue( nC, nR ) )
-    {
-        double fVal = pMat->GetDouble( nC, nR );
-        pJumpMat->PutResultDouble( fVal, nC, nR );
-    }
-    else if ( pMat->IsEmpty( nC, nR ) )
-    {
-        pJumpMat->PutResultEmpty( nC, nR );
-    }
-    else
-    {
-        pJumpMat->PutResultString(pMat->GetString(nC, nR), nC, nR);
-    }
-}
-
 void ScInterpreter::ScIfError( bool bNAonly )
 {
     const short* pJump = pCur->GetJump();
@@ -562,13 +545,7 @@ void ScInterpreter::ScIfError( bool bNAonly )
 
                     ScRefCellValue aCell(mrDoc, aAdr);
                     nGlobalError = GetCellErrCode(aCell);
-                    if (selogic::matchesIfErrorPolicy(
-                            nGlobalError == FormulaError::NotAvailable
-                                ? spreadsheetengine::api::Error::NotAvailable
-                                : (nGlobalError == FormulaError::NONE
-                                       ? spreadsheetengine::api::Error::None
-                                       : spreadsheetengine::api::Error::IllegalArgument),
-                            bNAonly))
+                    if (sejumpexec::matchesIfErrorPolicy(nGlobalError, bNAonly))
                         bError = true;
                 }
             }
@@ -604,24 +581,12 @@ void ScInterpreter::ScIfError( bool bNAonly )
                     bError = true;
                     break;  // switch
                 }
-                for (SCSIZE nC=0; nC < nCols && !bError; ++nC)
+                if (const auto oFirstError
+                    = sejumpexec::findFirstIfErrorCoordinate(*pMat, bNAonly))
                 {
-                    for (SCSIZE nR=0; nR < nRows && !bError; ++nR)
-                    {
-                        FormulaError nErr = pMat->GetError( nC, nR );
-                        if (selogic::matchesIfErrorPolicy(
-                                nErr == FormulaError::NotAvailable
-                                    ? spreadsheetengine::api::Error::NotAvailable
-                                    : (nErr == FormulaError::NONE
-                                           ? spreadsheetengine::api::Error::None
-                                           : spreadsheetengine::api::Error::IllegalArgument),
-                                bNAonly))
-                        {
-                            bError = true;
-                            nErrorCol = nC;
-                            nErrorRow = nR;
-                        }
-                    }
+                    bError = true;
+                    nErrorCol = oFirstError->mnColumn;
+                    nErrorRow = oFirstError->mnRow;
                 }
                 if (!bError)
                     break;  // switch, we're done and have the result
@@ -634,48 +599,15 @@ void ScInterpreter::ScIfError( bool bNAonly )
                 }
                 else
                 {
-                    const ScMatrix* pMatPtr = pMat.get();
                     std::shared_ptr<ScJumpMatrix> pJumpMat( std::make_shared<ScJumpMatrix>(
                                 pCur->GetOpCode(), nCols, nRows));
                     // Init all jumps to no error to save single calls. Error
                     // is the exceptional condition.
                     const double fFlagResult = CreateDoubleError( FormulaError::JumpMatHasResult);
                     pJumpMat->SetAllJumps( fFlagResult, pJump[ nJumpCount ], pJump[ nJumpCount ] );
-                    // Up to first error position simply store results, no need
-                    // to evaluate error conditions again.
-                    SCSIZE nC = 0, nR = 0;
-                    for ( ; nC < nCols && (nC != nErrorCol || nR != nErrorRow); /*nop*/ )
-                    {
-                        for (nR = 0 ; nR < nRows && (nC != nErrorCol || nR != nErrorRow); ++nR)
-                        {
-                            lcl_storeJumpMatResult(pMatPtr, pJumpMat.get(), nC, nR);
-                        }
-                        if (nC != nErrorCol && nR != nErrorRow)
-                            ++nC;
-                    }
-                    // Now the mixed cases.
-                    for ( ; nC < nCols; ++nC)
-                    {
-                        for ( ; nR < nRows; ++nR)
-                        {
-                            FormulaError nErr = pMat->GetError( nC, nR );
-                            if (selogic::matchesIfErrorPolicy(
-                                    nErr == FormulaError::NotAvailable
-                                        ? spreadsheetengine::api::Error::NotAvailable
-                                        : (nErr == FormulaError::NONE
-                                               ? spreadsheetengine::api::Error::None
-                                               : spreadsheetengine::api::Error::IllegalArgument),
-                                    bNAonly))
-                            {   // TRUE, THEN path
-                                pJumpMat->SetJump( nC, nR, 1.0, pJump[ 1 ], pJump[ nJumpCount ] );
-                            }
-                            else
-                            {   // FALSE, EMPTY path, store result instead
-                                lcl_storeJumpMatResult(pMatPtr, pJumpMat.get(), nC, nR);
-                            }
-                        }
-                        nR = 0;
-                    }
+                    sejumpexec::initializeIfErrorJumpMatrix(
+                        *pMat, *pJumpMat, pJump, nJumpCount, bNAonly,
+                        { nErrorCol, nErrorRow });
                     xNew = new ScJumpMatrixToken(std::move(pJumpMat));
                     GetTokenMatrixMap().emplace( pCur, xNew );
                 }
@@ -741,48 +673,7 @@ void ScInterpreter::ScChooseJump()
                 {
                     std::shared_ptr<ScJumpMatrix> pJumpMat( std::make_shared<ScJumpMatrix>(
                                 pCur->GetOpCode(), nCols, nRows));
-                    for ( SCSIZE nC=0; nC < nCols; ++nC )
-                    {
-                        for ( SCSIZE nR=0; nR < nRows; ++nR )
-                        {
-                            double fVal;
-                            bool bIsValue = pMat->IsValue(nC, nR);
-                            if ( bIsValue )
-                            {
-                                fVal = pMat->GetDouble(nC, nR);
-                                if (const auto oJumpIndex = selogic::normalizeChooseIndex(fVal, nJumpCount))
-                                {
-                                    fVal = *oJumpIndex;
-                                }
-                                else
-                                {
-                                    bIsValue = false;
-                                    if (std::isfinite(fVal))
-                                    {
-                                        fVal = CreateDoubleError(
-                                            selibreoffice::toFormulaError(
-                                                spreadsheetengine::api::Error::IllegalArgument));
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                fVal = CreateDoubleError( FormulaError::NoValue);
-                            }
-                            if ( bIsValue )
-                            {
-                                pJumpMat->SetJump( nC, nR, fVal,
-                                        pJump[ static_cast<short>(fVal) ],
-                                        pJump[ nJumpCount ]);
-                            }
-                            else
-                            {
-                                pJumpMat->SetJump( nC, nR, fVal,
-                                        pJump[ nJumpCount ],
-                                        pJump[ nJumpCount ]);
-                            }
-                        }
-                    }
+                    sejumpexec::initializeChooseJumpMatrix(*pMat, *pJumpMat, pJump, nJumpCount);
                     xNew = new ScJumpMatrixToken(std::move(pJumpMat));
                     GetTokenMatrixMap().emplace(pCur, xNew);
                 }
@@ -1088,7 +979,7 @@ bool ScInterpreter::JumpMatrix( short nStackLevel )
                             // matrix, do not propagate an error from
                             // matrix->GetValue() as global error.
                             pMat->SetErrorInterpreter(nullptr);
-                            lcl_storeJumpMatResult(pMat.get(), pJumpMatrix, nC, nR);
+                            sejumpexec::storeJumpMatrixResult(*pMat, *pJumpMatrix, nC, nR);
                         }
                         lcl_AdjustJumpMatrix( pJumpMatrix, nCols, nRows );
                     }
@@ -9288,12 +9179,6 @@ void ScInterpreter::ScDBVarP()
     PushDouble(aResult.maValue);
 }
 
-static bool lcl_IsTableStructuredRef(const OUString& sRefStr, sal_Int32& nIndex)
-{
-    nIndex = ScGlobal::FindUnquoted(sRefStr, '[');
-    return (nIndex > 0 && ScGlobal::FindUnquoted(sRefStr, ']', nIndex + 1) > nIndex);
-}
-
 void ScInterpreter::ScIndirect()
 {
     sal_uInt8 nParamCount = GetByte();
@@ -9310,218 +9195,41 @@ void ScInterpreter::ScIndirect()
     const bool bTryXlA1 = aSyntaxPolicy.moFallback == spreadsheetengine::api::AddressConvention::XlA1;
 
     svl::SharedString sSharedRefStr = GetString();
-    const OUString & sRefStr = sSharedRefStr.getString();
-    if (sRefStr.isEmpty())
+    if (sSharedRefStr.getString().isEmpty())
     {
         // Bail out early for empty cells, rely on "we do have a string" below.
         PushError( FormulaError::NoRef);
         return;
     }
 
-    const ScAddress::Details aDetails( eConv, aPos );
-    const ScAddress::Details aDetailsXlA1( FormulaGrammar::CONV_XL_A1, aPos );
-    SCTAB nTab = aPos.Tab();
-
-    bool bTableRefNamed = false;
-    sal_Int32 nTableRefNamedIndex = -1;
-    OUString sTabRefStr;
-
-    // Named expressions and DB range names need to be tried first, as older 1K
-    // columns allowed names that would now match a 16k columns cell address.
-    do
+    const auto oResolved = seindirectexec::resolveIndirectReference(
+        mrDoc, aPos, sSharedRefStr, eConv, bTryXlA1);
+    if (!oResolved)
     {
-        ScRangeData* pData = ScRangeStringConverter::GetRangeDataFromString( sRefStr, nTab, mrDoc, eConv);
-        if (!pData)
-            break;
-
-        // We need this in order to obtain a good range.
-        pData->ValidateTabRefs();
-
-        ScRange aRange;
-
-        // This is the usual way to treat named ranges containing
-        // relative references.
-        if (!pData->IsReference(aRange, aPos))
-        {
-            sTabRefStr = pData->GetSymbol();
-            bTableRefNamed = lcl_IsTableStructuredRef(sTabRefStr, nTableRefNamedIndex);
-            // if bTableRefNamed is true, we have a name that maps to a table structured reference.
-            // Such a case is handled below.
-            break;
-        }
-
-        if (aRange.aStart == aRange.aEnd)
-            PushSingleRef( aRange.aStart.Col(), aRange.aStart.Row(),
-                    aRange.aStart.Tab());
-        else
-            PushDoubleRef( aRange.aStart.Col(), aRange.aStart.Row(),
-                    aRange.aStart.Tab(), aRange.aEnd.Col(),
-                    aRange.aEnd.Row(), aRange.aEnd.Tab());
-
-        // success!
+        PushError(FormulaError::NoRef);
         return;
     }
-    while (false);
 
-    do
+    switch (oResolved->meKind)
     {
-        if (bTableRefNamed)
-            break;
-
-        const OUString & aName( sSharedRefStr.getIgnoreCaseString() );
-        ScDBCollection::NamedDBs& rDBs = mrDoc.GetDBCollection()->getNamedDBs();
-        const ScDBData* pData = rDBs.findByUpperName( aName);
-        if (!pData)
-            break;
-
-        ScRange aRange;
-        pData->GetArea( aRange);
-
-        // In Excel, specifying a table name without [] resolves to the
-        // same as with [], a range that excludes header and totals
-        // rows and contains only data rows. Do the same.
-        if (pData->HasHeader())
-            aRange.aStart.IncRow();
-        if (pData->HasTotals())
-            aRange.aEnd.IncRow(-1);
-
-        if (aRange.aStart.Row() > aRange.aEnd.Row())
-            break;
-
-        if (aRange.aStart == aRange.aEnd)
-            PushSingleRef( aRange.aStart.Col(), aRange.aStart.Row(),
-                    aRange.aStart.Tab());
-        else
-            PushDoubleRef( aRange.aStart.Col(), aRange.aStart.Row(),
-                    aRange.aStart.Tab(), aRange.aEnd.Col(),
-                    aRange.aEnd.Row(), aRange.aEnd.Tab());
-
-        // success!
-        return;
-    }
-    while (false);
-
-    ScRefAddress aRefAd, aRefAd2;
-    ScAddress::ExternalInfo aExtInfo;
-    if ( !bTableRefNamed &&
-         (ConvertDoubleRef(mrDoc, sRefStr, nTab, aRefAd, aRefAd2, aDetails, &aExtInfo) ||
-            ( bTryXlA1 && ConvertDoubleRef(mrDoc, sRefStr, nTab, aRefAd,
-                                           aRefAd2, aDetailsXlA1, &aExtInfo) ) ) )
-    {
-        if (aExtInfo.mbExternal)
-        {
-            PushExternalDoubleRef(
-                aExtInfo.mnFileId, aExtInfo.maTabName,
-                aRefAd.Col(), aRefAd.Row(), aRefAd.Tab(),
-                aRefAd2.Col(), aRefAd2.Row(), aRefAd2.Tab());
-        }
-        else
-            PushDoubleRef( aRefAd, aRefAd2);
-    }
-    else if ( !bTableRefNamed &&
-              (ConvertSingleRef(mrDoc, sRefStr, nTab, aRefAd, aDetails, &aExtInfo) ||
-                ( bTryXlA1 && ConvertSingleRef (mrDoc, sRefStr, nTab, aRefAd,
-                                                aDetailsXlA1, &aExtInfo) ) ) )
-    {
-        if (aExtInfo.mbExternal)
-        {
-            PushExternalSingleRef(
-                aExtInfo.mnFileId, aExtInfo.maTabName, aRefAd.Col(), aRefAd.Row(), aRefAd.Tab());
-        }
-        else
-            PushSingleRef( aRefAd);
-    }
-    else
-    {
-        // It may be even a TableRef or an external name.
-        // Anything else that resolves to one reference could be added
-        // here, but we don't want to compile every arbitrary string. This
-        // is already nasty enough...
-        sal_Int32 nIndex = bTableRefNamed ? nTableRefNamedIndex : -1;
-        bool bTableRef = bTableRefNamed;
-        if (!bTableRefNamed)
-            bTableRef = lcl_IsTableStructuredRef(sRefStr, nIndex);
-        bool bExternalName = false;     // External references would had been consumed above already.
-        if (!bTableRef)
-        {
-            // This is our own file name reference representation centric.. but
-            // would work also for XL '[doc]'!name and also for
-            // '[doc]Sheet1'!name ... sickos.
-            if (sRefStr[0] == '\'')
-            {
-                // Minimum 'a'#name or 'a'!name
-                // bTryXlA1 means try both, first our own.
-                if (bTryXlA1 || eConv == FormulaGrammar::CONV_OOO)
-                {
-                    nIndex = ScGlobal::FindUnquoted( sRefStr, '#');
-                    if (nIndex >= 3 && sRefStr[nIndex-1] == '\'')
-                    {
-                        bExternalName = true;
-                        eConv = FormulaGrammar::CONV_OOO;
-                    }
-                }
-                if (!bExternalName && (bTryXlA1 || eConv != FormulaGrammar::CONV_OOO))
-                {
-                    nIndex = ScGlobal::FindUnquoted( sRefStr, '!');
-                    if (nIndex >= 3 && sRefStr[nIndex-1] == '\'')
-                    {
-                        bExternalName = true;
-                    }
-                }
-            }
-
-        }
-        if (bExternalName || bTableRef)
-        {
-            do
-            {
-                ScCompiler aComp( mrDoc, aPos, mrDoc.GetGrammar());
-                aComp.SetRefConvention( eConv);     // must be after grammar
-                std::unique_ptr<ScTokenArray> pTokArr( aComp.CompileString(bTableRefNamed ? sTabRefStr : sRefStr));
-
-                if (pTokArr->GetCodeError() != FormulaError::NONE || !pTokArr->GetLen())
-                    break;
-
-                // Whatever... use only the specific case.
-                if (bExternalName)
-                {
-                    const formula::FormulaToken* pTok = pTokArr->FirstToken();
-                    if (!pTok || pTok->GetType() != svExternalName)
-                        break;
-                }
-                else if (!pTokArr->HasOpCode( ocTableRef))
-                    break;
-
-                aComp.CompileTokenArray();
-
-                // A syntactically valid reference will generate exactly
-                // one RPN token, a reference or error. Discard everything
-                // else as error.
-                if (pTokArr->GetCodeLen() != 1)
-                    break;
-
-                ScTokenRef xTok( pTokArr->FirstRPNToken());
-                if (!xTok)
-                    break;
-
-                switch (xTok->GetType())
-                {
-                    case svSingleRef:
-                    case svDoubleRef:
-                    case svExternalSingleRef:
-                    case svExternalDoubleRef:
-                    case svError:
-                        PushTokenRef( xTok);
-                        // success!
-                        return;
-                    default:
-                        ;   // nothing
-                }
-            }
-            while (false);
-        }
-
-        PushError( FormulaError::NoRef);
+        case seindirectexec::IndirectExecutionResult::Kind::SingleRef:
+            PushSingleRef(oResolved->maRef1);
+            return;
+        case seindirectexec::IndirectExecutionResult::Kind::DoubleRef:
+            PushDoubleRef(oResolved->maRef1, oResolved->maRef2);
+            return;
+        case seindirectexec::IndirectExecutionResult::Kind::ExternalSingleRef:
+            PushExternalSingleRef(oResolved->mnFileId, oResolved->maTabName,
+                oResolved->maRef1.Col(), oResolved->maRef1.Row(), oResolved->maRef1.Tab());
+            return;
+        case seindirectexec::IndirectExecutionResult::Kind::ExternalDoubleRef:
+            PushExternalDoubleRef(oResolved->mnFileId, oResolved->maTabName,
+                oResolved->maRef1.Col(), oResolved->maRef1.Row(), oResolved->maRef1.Tab(),
+                oResolved->maRef2.Col(), oResolved->maRef2.Row(), oResolved->maRef2.Tab());
+            return;
+        case seindirectexec::IndirectExecutionResult::Kind::Token:
+            PushTokenRef(oResolved->mxToken);
+            return;
     }
 }
 

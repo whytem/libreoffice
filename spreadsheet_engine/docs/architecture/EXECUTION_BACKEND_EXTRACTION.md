@@ -45,9 +45,10 @@ The starting handoff from the completed recalc-orchestration milestone is:
 
 ## Current Status
 
-This milestone is now active with Phases 0 through 5 complete and the next
-bounded execution-shell slice narrowed to the remaining post-Phase-5
-token-walking, jump, and name/string-reference flows.
+This milestone is now active with Phases 0 through 6 complete and the next
+bounded execution-shell slice narrowed to the remaining generic jump-matrix
+cursor, broader token-walking, and residual name/string-reference compilation
+flows.
 
 - Phase 0 is complete: the orchestration/execution boundary is explicitly
   documented, the first helper duplication inventory is frozen, and the Phase 1
@@ -70,6 +71,12 @@ token-walking, jump, and name/string-reference flows.
   through shared helpers in standalone plus Calc compat bridges, leaving the
   remaining Calc-owned shell narrowed to later token-walking and jump/name
   flows
+- Phase 6 is complete: the bounded special-form shell now routes `CHOOSE`
+  through standalone special-form execution, and Calc's remaining `IFERROR` /
+  `IFNA` matrix planning, `CHOOSE` jump planning, and `INDIRECT`
+  name/string-reference resolution move behind dedicated compat helpers,
+  leaving the remaining Calc-owned shell narrowed to the generic jump-matrix
+  cursor and broader token-walking/name-compilation tail
 
 The starting baseline for this milestone is:
 
@@ -880,6 +887,52 @@ Phase 5 explicit defer list:
 - broad opcode-dispatch-table extraction
 - storage-sensitive database/matrix families
 - queue authority, listener ownership, or workbook-storage changes
+
+### Phase 6: Extract The Bounded Special-Form Jump And String-Reference Shell
+
+Status: **Complete**
+
+Goals:
+
+- move the remaining bounded special-form shell out of `ScInterpreter` after
+  the Phase 5 reference-shape slice
+- keep Calc as the stack and jump-matrix host while extracted compat helpers
+  own the decision logic for the migrated shell
+- align standalone special-form coverage with the same bounded function
+  surface
+
+Landed scope:
+
+- standalone `CHOOSE` execution in `FormulaEvaluatorSpecialForms.cxx`
+- Calc compat extraction for the bounded `IFERROR` / `IFNA` matrix decision
+  shell and `CHOOSE` jump-matrix decision shell
+- Calc compat extraction for the LO-specific `INDIRECT` resolver across named
+  ranges, DB ranges, direct refs, structured refs, and quoted external names
+
+Implemented in:
+
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/JumpExecution.hxx`
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/IndirectExecution.hxx`
+- `spreadsheet_engine/source/core/FormulaEvaluatorSpecialForms.cxx`
+- `sc/source/core/tool/interpr1.cxx`
+
+Completion criteria for Phase 6, now met:
+
+- the bounded jump/name shell no longer lives solely as Calc-local logic in
+  `interpr1.cxx`
+- standalone and Calc both cover the migrated `CHOOSE` / `IFERROR` /
+  `IFNA` / `INDIRECT` decision surface through shared or compat-owned helpers
+- the remaining Calc-owned execution shell is narrowed to generic jump-matrix
+  cursor behavior, broader token walking, and later name/string-reference
+  compilation flows
+- the replay baseline remains fully green
+
+Phase 6 closeout status:
+
+- complete
+- validated across the focused Calc and standalone lanes
+- one-shot replay baseline remains `500` workbooks, `50,661` formula cells,
+  `0` cached-fallback cells
 
 ## Validation Strategy
 

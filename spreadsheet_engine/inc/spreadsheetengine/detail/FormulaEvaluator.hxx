@@ -97,9 +97,6 @@ class Evaluator
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
     [[nodiscard]] EvaluationResult evaluateFunction(
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
-    [[nodiscard]] EvaluationResult evaluateFunctionIfChainDispatch(
-        api::StringView rFunctionName, const formula::Node& rNode,
-        const api::CellAddress& rCurrentAddress);
     [[nodiscard]] EvaluationResult evaluateAggregateCriteriaFamilyBody(
         api::StringView rFunctionName, const formula::Node& rNode,
         const api::CellAddress& rCurrentAddress);

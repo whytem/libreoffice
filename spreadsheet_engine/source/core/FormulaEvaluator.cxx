@@ -462,46 +462,6 @@ EvaluationResult Evaluator::evaluateFunction(
     return makeStoredReplayOrFailure(rNode, rCurrentAddress, api::Error::IllegalArgument);
 }
 
-EvaluationResult Evaluator::evaluateFunctionIfChainDispatch(
-    api::StringView rFunctionName, const formula::Node& rNode,
-    const api::CellAddress& rCurrentAddress)
-{
-    const api::StringView aFunctionName = rFunctionName;
-
-    if (aFunctionName == u"IFERROR" || aFunctionName == u"IFNA")
-    {
-        if (rNode.maChildren.size() != 2)
-            return makeFailure(api::Error::IllegalArgument);
-        if (rNode.maChildren[0]->meKind == formula::NodeKind::EmptyArgument)
-            return makeFailure(api::Error::IllegalArgument);
-
-        const bool bNAOnly = aFunctionName == u"IFNA";
-        EvaluationResult aPrimary = evaluateNode(*rNode.maChildren[0], rCurrentAddress);
-        if (!aPrimary)
-        {
-            const auto eAction
-                = api::logic::selectIfErrorAction(aPrimary.meError, bNAOnly);
-            if (eAction == api::logic::IfErrorAction::KeepPrimary)
-                return aPrimary;
-            return evaluateNode(*rNode.maChildren[1], rCurrentAddress);
-        }
-
-        if (aPrimary.maValue.isScalar() && aPrimary.maValue.maValue.isError())
-        {
-            const auto eAction = api::logic::selectIfErrorAction(
-                aPrimary.maValue.maValue.meError, bNAOnly);
-            if (eAction == api::logic::IfErrorAction::EvaluateAlternate)
-                return evaluateNode(*rNode.maChildren[1], rCurrentAddress);
-        }
-
-        return aPrimary;
-    }
-
-    return makeFailure(api::Error::IllegalArgument);
-}
-
-
-
 EvaluationResult Evaluator::evaluateNode(
     const formula::Node& rNode, const api::CellAddress& rCurrentAddress)
 {
