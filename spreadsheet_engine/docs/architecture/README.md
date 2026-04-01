@@ -8,5 +8,5 @@ documents live under [../archive/](../archive/).
 Active milestone docs:
 
 - [RECALC_ORCHESTRATION_EXTRACTION.md](RECALC_ORCHESTRATION_EXTRACTION.md) -
-  next implementation-ready milestone for engine-owned dirty planning and
-  recalc scheduling extraction
+  active milestone for expanding engine-owned recalc authority from the
+  completed non-structural pilot into structural and named-range mutations

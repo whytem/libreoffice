@@ -174,9 +174,11 @@ The milestone is now past the setup stage:
 - **Phase 0:** complete
 - **Phase 1:** complete
 - **Phase 2:** complete
-- **Phase 3+:** still open
+- **Phase 3:** complete
+- **Phase 4:** complete
+- **Phase 5+:** still open
 
-What landed through Phase 2:
+What landed through Phase 4:
 
 - engine-owned recalc planning types in
   `detail/dependency/RecalcPlanner.hxx`
@@ -184,9 +186,14 @@ What landed through Phase 2:
 - group-policy and structural-rebuild metadata on queue entries
 - Calc-side scheduler shadow comparison in
   `compat/libreoffice/RecalcShadow.hxx`
-- runtime shadow logging hooks for `SetValue`, `SetString`, and `SetEmptyCell`
+- opt-in authoritative dirty-plan and queue application in
+  `compat/libreoffice/RecalcAuthority.hxx`
+- runtime shadow and authority hooks for `SetValue`, `SetString`,
+  `SetEmptyCell`, and `ClearRange`
 - dedicated standalone and Calc validation lanes for queue planning and queue
   comparison
+- ordering-sensitive Calc authority tests for `SetValue`, `SetFormula`,
+  `ClearCell`, and `ClearRange`
 
 ## Proposed Phases
 
@@ -270,6 +277,8 @@ Likely initial mutation families:
 
 ### Phase 3: Authoritative Dirty-Plan Pilot
 
+Status: **Complete**
+
 Goals:
 
 - let engine planner decide the authoritative dirty set for selected safe
@@ -281,7 +290,15 @@ Deliverables:
 - runtime assertions comparing engine plan to Calc outcome
 - rollback/debug path if mismatch is detected
 
+Implemented in:
+
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/RecalcAuthority.hxx`
+- `sc/source/core/data/document.cxx`
+- `sc/qa/unit/ucalc_dependency_shadow.cxx`
+
 ### Phase 4: Authoritative Scheduling Pilot
+
+Status: **Complete**
 
 Goals:
 
@@ -293,6 +310,13 @@ Deliverables:
 - engine-generated recalc queue consumed by Calc
 - group/scalar scheduling policy validated in shadow then pilot mode
 - stronger differential tests around ordering-sensitive cases
+
+Implemented in:
+
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/RecalcAuthority.hxx`
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/RecalcShadow.hxx`
+- `sc/source/core/data/document.cxx`
+- `sc/qa/unit/ucalc_dependency_shadow.cxx`
 
 ### Phase 5: Expand To Structural And Named-Range Mutations
 

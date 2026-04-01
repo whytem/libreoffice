@@ -87,6 +87,7 @@
 #include <SparklineGroup.hxx>
 #include <SparklineList.hxx>
 #include <undomanager.hxx>
+#include <spreadsheetengine/compat/libreoffice/RecalcAuthority.hxx>
 #include <spreadsheetengine/compat/libreoffice/DependencyShadow.hxx>
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcShadow.hxx>
@@ -1930,7 +1931,15 @@ void ScDocument::DeleteArea(
     SCCOL nCol1, SCROW nRow1, SCCOL nCol2, SCROW nRow2, const ScMarkData& rMark,
     InsertDeleteFlags nDelFlag, bool bBroadcast, sc::ColumnSpanSet* pBroadcastSpans )
 {
+    using spreadsheetengine::compat::libreoffice::recalcauthority::ScopedRecalcAuthority;
+
     sc::AutoCalcSwitch aACSwitch(*this, false);
+    const bool bSingleSelectedTab = rMark.GetSelectCount() == 1;
+    const bool bAuthorityEligible
+        = nDelFlag == InsertDeleteFlags::CONTENTS && bSingleSelectedTab;
+    const auto aAuthority = bAuthorityEligible
+        ? ScopedRecalcAuthority::captureIfRuntimeEnabled(*this)
+        : ScopedRecalcAuthority();
 
     PutInOrder( nCol1, nCol2 );
     PutInOrder( nRow1, nRow2 );
@@ -1972,18 +1981,27 @@ void ScDocument::DeleteArea(
     // If formula groups were split their listeners were destroyed and may
     // need to be notified now that they're restored, ScTable::DeleteArea()
     // couldn't do that.
-    if (aGroupPos.empty())
-        return;
-
-    ScRange aRange(nCol1, nRow1, 0, nCol2, nRow2, 0);
-    for (SCTAB i = 0; i < GetTableCount(); i++)
+    if (!aGroupPos.empty())
     {
-        if (rMark.GetTableSelect(i))
+        ScRange aRange(nCol1, nRow1, 0, nCol2, nRow2, 0);
+        for (SCTAB i = 0; i < GetTableCount(); i++)
         {
-            aRange.aStart.SetTab(i);
-            aRange.aEnd.SetTab(i);
-            SetDirty( aRange, true);
+            if (rMark.GetTableSelect(i))
+            {
+                aRange.aStart.SetTab(i);
+                aRange.aEnd.SetTab(i);
+                SetDirty( aRange, true);
+            }
         }
+    }
+
+    if (bAuthorityEligible)
+    {
+        const SCTAB nTab = rMark.GetFirstSelected();
+        aAuthority.logAndApply(*this,
+            spreadsheetengine::compat::libreoffice::mutation::translateClearRange(
+                ScRange(nCol1, nRow1, nTab, nCol2, nRow2, nTab)),
+            "ScDocument::DeleteArea");
     }
 }
 
@@ -3473,6 +3491,7 @@ void ScDocument::FillTabMarked( SCTAB nSrcTab, const ScMarkData& rMark,
 bool ScDocument::SetString( SCCOL nCol, SCROW nRow, SCTAB nTab, const OUString& rString,
                             const ScSetStringParam* pParam )
 {
+    using spreadsheetengine::compat::libreoffice::recalcauthority::ScopedRecalcAuthority;
     using spreadsheetengine::compat::libreoffice::dependencyshadow::ScopedInvalidationShadow;
     using spreadsheetengine::compat::libreoffice::recalcshadow::ScopedRecalcShadow;
 
@@ -3481,6 +3500,7 @@ bool ScDocument::SetString( SCCOL nCol, SCROW nRow, SCTAB nTab, const OUString& 
         return false;
 
     const ScAddress aAddress(nCol, nRow, nTab);
+    const auto aAuthority = ScopedRecalcAuthority::captureIfRuntimeEnabled(*this);
     const auto aShadow = ScopedInvalidationShadow::captureIfRuntimeEnabled(*this);
     const auto aRecalcShadow = ScopedRecalcShadow::captureIfRuntimeEnabled(*this);
 
@@ -3525,6 +3545,29 @@ bool ScDocument::SetString( SCCOL nCol, SCROW nRow, SCTAB nTab, const OUString& 
             },
             "ScDocument::SetString");
         aRecalcShadow.log(*this,
+            [&aAddress, &rString](const spreadsheetengine::compat::libreoffice::CalcWorkbookFacade&
+                                      rAfterFacade) {
+                const auto aApiAddress
+                    = spreadsheetengine::compat::libreoffice::toApiCellAddress(aAddress);
+                if (rAfterFacade.getFormulaCellDescriptor(aApiAddress))
+                {
+                    return spreadsheetengine::compat::libreoffice::mutation::translateSetFormula(
+                        aAddress, rString);
+                }
+
+                const auto aCell = rAfterFacade.getCellDescriptor(aApiAddress);
+                if (aCell.meKind
+                    == spreadsheetengine::detail::facade::CellKind::Empty)
+                {
+                    return spreadsheetengine::compat::libreoffice::mutation::translateClearCell(
+                        aAddress);
+                }
+
+                return spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue(
+                    aAddress);
+            },
+            "ScDocument::SetString");
+        aAuthority.logAndApply(*this,
             [&aAddress, &rString](const spreadsheetengine::compat::libreoffice::CalcWorkbookFacade&
                                       rAfterFacade) {
                 const auto aApiAddress
@@ -3616,6 +3659,9 @@ void ScDocument::SetTextCell(const ScAddress& rPos, const OUString& rStr,
 
 void ScDocument::SetEmptyCell( const ScAddress& rPos )
 {
+    using spreadsheetengine::compat::libreoffice::recalcauthority::ScopedRecalcAuthority;
+
+    const auto aAuthority = ScopedRecalcAuthority::captureIfRuntimeEnabled(*this);
     const auto aShadow
         = spreadsheetengine::compat::libreoffice::dependencyshadow::ScopedInvalidationShadow::
             captureIfRuntimeEnabled(*this);
@@ -3631,6 +3677,9 @@ void ScDocument::SetEmptyCell( const ScAddress& rPos )
         aRecalcShadow.log(*this,
             spreadsheetengine::compat::libreoffice::mutation::translateClearCell(rPos),
             "ScDocument::SetEmptyCell");
+        aAuthority.logAndApply(*this,
+            spreadsheetengine::compat::libreoffice::mutation::translateClearCell(rPos),
+            "ScDocument::SetEmptyCell");
     }
 }
 
@@ -3641,6 +3690,9 @@ void ScDocument::SetValue( SCCOL nCol, SCROW nRow, SCTAB nTab, const double& rVa
 
 void ScDocument::SetValue( const ScAddress& rPos, double fVal )
 {
+    using spreadsheetengine::compat::libreoffice::recalcauthority::ScopedRecalcAuthority;
+
+    const auto aAuthority = ScopedRecalcAuthority::captureIfRuntimeEnabled(*this);
     const auto aShadow
         = spreadsheetengine::compat::libreoffice::dependencyshadow::ScopedInvalidationShadow::
             captureIfRuntimeEnabled(*this);
@@ -3670,6 +3722,9 @@ void ScDocument::SetValue( const ScAddress& rPos, double fVal )
         spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue(rPos),
         "ScDocument::SetValue");
     aRecalcShadow.log(*this,
+        spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue(rPos),
+        "ScDocument::SetValue");
+    aAuthority.logAndApply(*this,
         spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue(rPos),
         "ScDocument::SetValue");
 }

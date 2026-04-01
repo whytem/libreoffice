@@ -600,7 +600,7 @@ The next extraction program is no longer replay promotion. It is the policy
 layer that decides what becomes dirty, what order recalculation runs in, and
 how grouped/shared execution behaves after edits.
 
-Phases 0-2 of that milestone are now complete:
+Phases 0-4 of that milestone are now complete:
 
 - Phase 0 froze the zero-fallback replay baseline and the validation lanes
 - Phase 1 landed engine-owned recalc seeds, queue entries, plan results, and
@@ -608,29 +608,32 @@ Phases 0-2 of that milestone are now complete:
 - Phase 2 landed a Calc shadow adapter that compares engine queue membership,
   ordering, and group handling against Calc's live formula-tree state after
   representative non-structural edits
+- Phase 3 landed an opt-in authoritative dirty-plan pilot with rollback on
+  verification failure
+- Phase 4 landed engine-owned queue application for the same safe non-structural
+  mutation families, validated with ordering-sensitive Calc differential tests
 
-The active implementation frontier now starts at **Phase 3: Authoritative
-Dirty-Plan Pilot**.
+The active implementation frontier now starts at **Phase 5: Expand To
+Structural And Named-Range Mutations**.
 
 The recommended active sequence is:
 
-1. Promote selected safe mutation families to engine-owned dirty planning while
-   Calc still performs execution.
-2. Promote selected safe mutation families to engine-owned queue/scheduling
-   policy.
-3. Expand to structural and named-range mutations only after the non-structural
-   shadow lane is stable.
+1. Expand the authoritative planner/scheduler pilot from the safe
+   non-structural edits to structural and named-range mutations.
+2. Tighten shared-formula and structural ordering coverage around that wider
+   scheduler boundary.
+3. Only after scheduler authority is stable, continue into execution-backend
+   extraction.
 
 ### Medium-term: Extract Recalculation Orchestration On Top Of The Planner
 
-- Promote the engine invalidation planner from shadow auditing toward
-  authoritative dirty-set ownership for selected safe mutation families
-- Extract recalc queue/scheduling policy on top of the completed workbook
-  facade and dependency planner
-- Expand Calc runtime consumers beyond the current opt-in dependency-shadow and
-  recalc-shadow auditing hooks
-- Tighten structural-mutation and named-range mutation parity where scheduler
-  extraction exposes gaps
+- Expand the current opt-in authoritative dirty-plan and queue pilot from
+  non-structural edits to the structural and named-range mutation families
+  already modeled by the dependency planner
+- Keep Calc consuming engine-owned scheduler outputs while storage mutation and
+  actual formula execution remain Calc-hosted
+- Tighten structural-mutation, named-range, and shared-formula stability
+  coverage where scheduler extraction exposes gaps
 - Use the completed shared-runtime convergence work as a prerequisite, not as a
   competing roadmap stream
 
@@ -656,9 +659,10 @@ authority decision:
    - Keep the `0 / 50,661` cached-fallback result green
    - Keep compiled replay and lexical parity maintenance lanes green
 2. **Extract recalculation orchestration**
-   - Promote the current planner from shadow auditing to authoritative dirty
-     planning for selected safe edits
-   - Move recalc queue/scheduling policy onto engine-owned planner outputs
+   - Expand the completed authoritative pilot from safe non-structural edits
+     to structural and named-range mutation families
+   - Keep recalc queue/scheduling policy engine-owned as that authority
+     boundary widens
 3. **Incrementally extract the CPU execution backend**
    - Move token walking, coercion, and evaluation mechanics out of Calc in
      small validated slices
