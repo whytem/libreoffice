@@ -399,6 +399,21 @@ std::vector<std::filesystem::path> collectDefaultReplayCorpus()
     const auto aStatisticalFiles = collectFodsFiles(aStatisticalRoot);
     aFiles.insert(aFiles.end(), aStatisticalFiles.begin(), aStatisticalFiles.end());
 
+    const std::filesystem::path aAddinRoot
+        = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions" / "addin" / "fods";
+    const auto aAddinFiles = collectFodsFiles(aAddinRoot);
+    aFiles.insert(aFiles.end(), aAddinFiles.begin(), aAddinFiles.end());
+
+    const std::filesystem::path aArrayRoot
+        = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions" / "array" / "fods";
+    const auto aArrayFiles = collectFodsFiles(aArrayRoot);
+    aFiles.insert(aFiles.end(), aArrayFiles.begin(), aArrayFiles.end());
+
+    const std::filesystem::path aDatabaseRoot
+        = aRepoRoot / "sc" / "qa" / "unit" / "data" / "functions" / "database" / "fods";
+    const auto aDatabaseFiles = collectFodsFiles(aDatabaseRoot);
+    aFiles.insert(aFiles.end(), aDatabaseFiles.begin(), aDatabaseFiles.end());
+
     return aFiles;
 }
 
@@ -419,7 +434,8 @@ bool isCompiledReplayPromotedFamily(const std::string& rFamily)
 {
     return rFamily == "logical" || rFamily == "mathematical" || rFamily == "text"
            || rFamily == "date_time" || rFamily == "information" || rFamily == "spreadsheet"
-           || rFamily == "financial" || rFamily == "statistical";
+           || rFamily == "financial" || rFamily == "statistical" || rFamily == "addin"
+           || rFamily == "array" || rFamily == "database";
 }
 
 std::string stripFunctionNamespacePrefix(StringView rName)

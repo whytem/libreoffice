@@ -40,7 +40,7 @@ is now also in closeout status.
 |---------|--------|---------|
 | Initial extraction (Phases 0-11) | **Complete** | Pure calculation logic, function families, matrix/execution substrate, host runtime, reference/dependency planning, and standalone packaging all extracted |
 | Token and compiler host model | **Complete** | Canonical token schema, compile-host interfaces, Calc bridge, shadow compiler, differential validation, first native consumers, and first bridged Calc compile adopters all in place |
-| Compiler switchover | **Complete** | Shared compiler plus compiled-token execution is now the default standalone replay path for all eight enabled families, with zero hard compiler blockers remaining on the original switchover corpus |
+| Compiler switchover | **Complete** | Shared compiler plus compiled-token execution is now the default standalone replay path for all eleven enabled families, with zero hard compiler blockers remaining on the replay corpus |
 | Calc-backed workbook facade | **Complete** | Engine-owned workbook facade contract with Calc-backed and in-memory implementations, richer named-range mutation payloads, dedicated standalone/Calc validation lanes, and first live consumption through dependency-shadow runtime auditing |
 | Dependency and invalidation extraction | **Complete** | Engine-owned dependency snapshots, reverse dependency indexing, invalidation planning, structural rebuild scopes, workbook-scale Calc shadow corpus, maintenance-lane integration, and an opt-in runtime shadow audit are all in place |
 | FormulaEvaluator runtime modularization | **Complete** | The old evaluator monolith has been split across focused runtime and support modules such as `LookupRuntime`, `QueryRuntime`, `TextFunctionRuntime`, `DateTimeParse`, `FinancialRuntime`, `MathAggregate`, `MathFunctionRuntime`, and `ConversionRuntime` |
@@ -48,11 +48,8 @@ is now also in closeout status.
 
 The immediate active frontier is now narrower and more practical:
 
-- broaden standalone replay beyond the eight promoted families, starting with the
-  add-in family
-- reduce cached-fallback usage on the promoted corpus from the current compiled
-  baseline of `3,990 / 40,068` formula cells (`9.95807%`) by turning more
-  formulas into live standalone execution
+- keep the fully promoted replay corpus green across all eleven function
+  families with zero cached-fallback cells
 - use the completed workbook facade plus dependency/invalidation planner as the
   substrate for recalculation-orchestration extraction
 - keep expanding engine-first adoption inside Calc only where differential
@@ -98,9 +95,9 @@ The immediate active frontier is now narrower and more practical:
   aggregate/statistics kernels, conversion/combinatorics, and focused evaluator
   support helpers; those same shared modules now serve both standalone replay
   and selected Calc `ScInterpreter` entry points
-- **Raw FODS replay:** eight function families fully enabled (logical,
-  mathematical, text, date_time, spreadsheet, information, financial,
-  statistical) across 426 workbooks
+- **Raw FODS replay:** all eleven Calc function-workbook families fully enabled
+  (`logical`, `mathematical`, `text`, `date_time`, `spreadsheet`,
+  `information`, `financial`, `statistical`, `addin`, `array`, `database`)
 - **Parity infrastructure:** shared TSV datasets, dual-mode validation scripts,
   compile-diff harness, compiler preflight classifier
 
@@ -313,9 +310,8 @@ recalculation orchestration.
 
 ### FODS Workbook Support
 
-All foundation passes complete. Eight function families are fully enabled for
-standalone replay today, but the Calc FODS corpus available to the project is
-broader than the currently promoted replay lane.
+All foundation passes complete. All eleven Calc function-workbook families with
+dedicated `fods` directories are now enabled for standalone replay.
 
 | Calc FODS family | Workbooks | What it covers | Standalone testing-suite status |
 |------------------|-----------|----------------|---------------------------------|
@@ -325,9 +321,9 @@ broader than the currently promoted replay lane.
 | `date_time` | 32 | Calendar parsing, serial/date arithmetic, week/day logic, and OpenOffice date extensions | **Enabled in default standalone replay** |
 | `spreadsheet` | 44 | Lookup/reference and sheet-structure formulas such as `ADDRESS`, `AREAS`, `CHOOSE`, `INDEX`, `MATCH`, `VLOOKUP`, and `HLOOKUP` | **Enabled in default standalone replay** |
 | `information` | 20 | Formula/type/error introspection such as `FORMULA`, `INFO`, `CURRENT`, and `IS*` families | **Enabled in default standalone replay** |
-| `addin` | 49 | Analysis/add-in and compatibility functions such as Bessel, base conversion, engineering, and other external-name style formulas | **Available in Calc corpus; next standalone replay frontier** |
-| `array` | 13 | Array/matrix and regression-style workbooks such as `FOURIER`, `FREQUENCY`, `GROWTH`, `LOGEST`, and `MDETERM` | **Available in Calc corpus; not yet promoted in standalone replay** |
-| `database` | 12 | Criteria-driven database aggregation formulas such as `DAVERAGE`, `DCOUNT`, `DGET`, and `DMAX` | **Available in Calc corpus; not yet promoted in standalone replay** |
+| `addin` | 49 | Analysis/add-in and compatibility functions such as Bessel, base conversion, engineering, and other external-name style formulas | **Enabled in default standalone replay** |
+| `array` | 13 | Array/matrix and regression-style workbooks such as `FOURIER`, `FREQUENCY`, `GROWTH`, `LOGEST`, and `MDETERM` | **Enabled in default standalone replay** |
+| `database` | 12 | Criteria-driven database aggregation formulas such as `DAVERAGE`, `DCOUNT`, `DGET`, and `DMAX` | **Enabled in default standalone replay** |
 | `financial` | 51 | Coupon, amortization, depreciation, accrual, and yield-oriented financial formulas | **Enabled in default standalone replay** |
 | `statistical` | 147 | Descriptive, inferential, and distribution/regression workbooks such as `AVERAGEIF`, `KahanSum`, and the broader statistics catalog | **Enabled in default standalone replay** |
 | `functions/fods` (top-level) | 5 | Mixed top-level regression workbooks and operator/compatibility fixtures such as `reference_operators` and `Functions_Excel_2016` | **Available in Calc corpus; not currently promoted as its own standalone family lane** |
@@ -366,7 +362,7 @@ one authoritative compiler."
 
 ### Closeout state
 
-**All eight families are promoted.** The default standalone replay lane now
+**All eleven families are promoted.** The default standalone replay lane now
 prefers the shared compiler plus compiled-token execution for every promoted
 formula that is eligible for shared compilation. The legacy parser path remains
 available only as a `--legacy-only` debug escape hatch and is no longer part of
@@ -381,15 +377,15 @@ the standard maintenance path.
 | 2 | Native engine compiler for FODS-safe subset | Complete |
 | 3 | Token execution adapter in standalone | Complete |
 | 4 | Dual-path FODS replay harness | Complete |
-| 5 | Family-by-family switchover | Complete (all 8 promoted families) |
+| 5 | Family-by-family switchover | Complete (all 11 promoted families) |
 | 6 | Calc/standalone compiler convergence hardening | Complete |
 | 7 | Switchover completion and retirement | Complete |
 
 **Closeout summary:**
 
-Standalone raw replay and compiled-token replay now cover all eight promoted
+Standalone raw replay and compiled-token replay now cover all eleven promoted
 FODS families (`logical`, `mathematical`, `text`, `date_time`, `spreadsheet`,
-`information`, `financial`, `statistical`). Calc compile-diff remains a
+`information`, `financial`, `statistical`, `addin`, `array`, `database`). Calc compile-diff remains a
 representative cross-family maintenance lane rather than a corpus-wide mirror.
 That smoke covers operators, references, range names, array/error literals,
 and a representative function set including `SUM`, `DATEVALUE`, `FORMULA`,
@@ -565,17 +561,19 @@ internals. This coupling is by design:
 - **No rendering:** no layout, styles, page model, or print support
 - **No charts, drawing objects, annotations:** out of scope
 - **No macros:** no BASIC, Python, or UNO macro execution
-- **Standalone evaluation is partial:** live across eight promoted families, with
-  cached-result fallback for unsupported paths; not a full Calc-equivalent
-  workbook runtime
+- **Standalone evaluation is broader but still not full Calc:** the eleven
+  promoted FODS families now replay with zero cached-fallback cells, but the
+  engine is still not a full Calc-equivalent workbook runtime
 - **No persistent dependency graph in standalone:** evaluation is lazy and
   memoized with cycle detection, but no Calc-style dependency graph or
   document-level recalc orchestration
 - **Compiled-token execution is indirect:** currently inflates canonical tokens
   back into executable nodes and reuses the AST evaluator semantics, rather
   than running a direct token interpreter
-- **Family coverage still expanding:** add-in, array, database, and top-level
-  mixed regression families remain future work for default FODS replay
+- **Family coverage still expanding beyond function families:** the eleven
+  dedicated Calc function-workbook families are now promoted, but the top-level
+  mixed regression workbooks under `functions/fods` remain outside the default
+  replay corpus
 - **Lexical parity is representative, not corpus-wide:** exact canonical
   token-stream parity between standalone lowering and Calc's canonical tokens
   is proven on a representative mixed subset, while corpus-wide value parity is
@@ -585,12 +583,10 @@ internals. This coupling is by design:
 
 ## Forward Roadmap
 
-### Near-term: Broaden Standalone Replay And Reduce Fallback
+### Near-term: Broaden Standalone Replay And Keep Zero-Fallback Green
 
-- Enable the add-in family for FODS replay
-- Continue expanding standalone live evaluation to reduce the cached-fallback
-  footprint on the promoted eight-family corpus from the current `9.95807%`
-  compiled-path baseline
+- Keep the zero-cached-fallback replay result green across the full eleven-family
+  promoted corpus
 - Keep the compiler-switchover maintenance lanes green:
   - representative Calc lexical parity smoke
   - compiled replay diff smoke
