@@ -374,6 +374,8 @@ Closeout result:
 
 ### Phase 5. Mark Retain/Defer Host Paths Explicitly
 
+Status: complete
+
 Rename, isolate, and document the token/container paths that remain
 intentionally Calc-owned after the adopted seams land.
 
@@ -387,6 +389,15 @@ Closeout standard:
 
 - retained token/container helpers in the touched areas are obviously host-only
 - the code and docs agree on why they remain in Calc
+
+Closeout result:
+
+- the live interpreter token array/cursor state and the external-reference
+  token-array plumbing are now explicitly documented in code as Calc-owned
+  host seams
+- the touched retained paths no longer read like accidental leftovers; they
+  now carry an explicit ownership rationale tied to host cache/session access
+  or token-container lifetime
 
 ### Phase 6. Re-Run The Full Baseline And Close The Stream
 

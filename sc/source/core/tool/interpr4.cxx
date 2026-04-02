@@ -1255,6 +1255,8 @@ void ScInterpreter::PopExternalDoubleRef(sal_uInt16& rFileId, OUString& rTabName
 
 void ScInterpreter::PopExternalDoubleRef(ScExternalRefCache::TokenArrayRef& rArray)
 {
+    // Host-only by design: this path still crosses the document/session
+    // external-reference cache and returns Calc-owned token containers.
     sal_uInt16 nFileId;
     OUString aTabName;
     ScComplexRefData aData;
@@ -1291,6 +1293,8 @@ void ScInterpreter::PopExternalDoubleRef(ScMatrixRef& rMat)
 void ScInterpreter::GetExternalDoubleRef(
     sal_uInt16 nFileId, const OUString& rTabName, const ScComplexRefData& rData, ScExternalRefCache::TokenArrayRef& rArray)
 {
+    // Kept in Calc intentionally because the cache lookup and returned token
+    // arrays are still owned by the host interpreter/document layer.
     ScExternalRefManager* pRefMgr = mrDoc.GetExternalRefManager();
     const OUString* pFile = pRefMgr->getExternalFileName(nFileId);
     if (!pFile)

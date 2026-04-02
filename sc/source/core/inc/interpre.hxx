@@ -196,6 +196,8 @@ private:
     static thread_local bool                           bGlobalStackInUse;
 
     ScCalcConfig maCalcConfig;
+    // Calc intentionally retains ownership of the live token array plus token
+    // iterator/cursor state. This stream only extracts non-owning seams.
     formula::FormulaTokenIterator aCode;
     ScAddress   aPos;
     ScTokenArray* pArr;
@@ -391,6 +393,8 @@ private:
                               ScExternalRefCache::TokenRef& rToken, ScExternalRefCache::CellFormat* pFmt = nullptr);
 
     void PopExternalDoubleRef(sal_uInt16& rFileId, OUString& rTabName, ScComplexRefData& rRef);
+    // External-reference token arrays stay Calc-owned because they depend on
+    // the host external-reference cache and token-container lifetime.
     void PopExternalDoubleRef(ScExternalRefCache::TokenArrayRef& rArray);
     void PopExternalDoubleRef(ScMatrixRef& rMat);
     void GetExternalDoubleRef(sal_uInt16 nFileId, const OUString& rTabName, const ScComplexRefData& aData, ScExternalRefCache::TokenArrayRef& rArray);
