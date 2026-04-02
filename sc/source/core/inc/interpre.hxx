@@ -35,8 +35,10 @@
 #include "parclass.hxx"
 #include <lookupsearchmode.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
+#include <spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
+#include <spreadsheetengine/runtime/CellInspection.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 
 #include <unordered_map>

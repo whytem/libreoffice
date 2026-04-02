@@ -13,6 +13,7 @@
 #include <array>
 
 #include <spreadsheetengine/api/Reference.hxx>
+#include <spreadsheetengine/runtime/CellInspection.hxx>
 
 namespace spreadsheetengine::core::eval
 {
@@ -33,6 +34,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateInformationFamily(
     const api::CellAddress& rCurrentAddress)
 {
     static constexpr std::array kInformationFunctions{
+        api::StringView(u"CELL"),
         api::StringView(u"ISERROR"),
         api::StringView(u"ISERR"),
         api::StringView(u"ISNUMBER"),
@@ -121,6 +123,132 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
             mrWorkbook.maSheets.begin(), mrWorkbook.maSheets.end(),
             [](const auto& rSheet) { return !rSheet.moSource.has_value(); }));
     };
+    const auto resolveCellInspectionReference
+        = [&](const formula::Node& rArgument) -> api::ValueResult<api::ResolvedReference> {
+        if (rArgument.meKind == formula::NodeKind::CellReference)
+            return resolveReferenceText(rArgument.maPrimaryText, rCurrentAddress.mnSheet);
+
+        if (rArgument.meKind == formula::NodeKind::RangeReference)
+        {
+            api::String aAddress = rArgument.maPrimaryText;
+            aAddress.push_back(u':');
+            aAddress += rArgument.maSecondaryText;
+            return resolveReferenceText(aAddress, rCurrentAddress.mnSheet);
+        }
+
+        if (rArgument.meKind == formula::NodeKind::NamedReference)
+            return resolveNamedRange(rArgument.maPrimaryText, rCurrentAddress.mnSheet);
+
+        EvaluationResult aArgument = evaluateNode(rArgument, rCurrentAddress);
+        if (!aArgument)
+            return api::ValueResult<api::ResolvedReference>::failure(aArgument.meError);
+        if (!aArgument.maValue.isMatrixReference())
+            return api::ValueResult<api::ResolvedReference>::failure(api::Error::IllegalArgument);
+        return api::ValueResult<api::ResolvedReference>::success(aArgument.maValue.maReference);
+    };
+    const auto materializeCellInspectionValue
+        = [&](const formula::Node* pArgument, const api::CellAddress& rTarget)
+        -> api::ValueResult<api::CellValue> {
+        if (!pArgument || pArgument->meKind == formula::NodeKind::EmptyArgument)
+        {
+            const workbook::Cell* pCell = getCell(rTarget);
+            return api::ValueResult<api::CellValue>::success(
+                pCell ? pCell->maValue : api::CellValue::empty());
+        }
+
+        const auto aReference = resolveCellInspectionReference(*pArgument);
+        if (!aReference)
+            return api::ValueResult<api::CellValue>::failure(aReference.meError);
+
+        EvaluationResult aValue = materializeReferenceValue(aReference.maValue, 0, 0);
+        if (!aValue)
+            return api::ValueResult<api::CellValue>::failure(aValue.meError);
+        if (!aValue.maValue.isScalar())
+            return api::ValueResult<api::CellValue>::failure(api::Error::IllegalArgument);
+        return api::ValueResult<api::CellValue>::success(aValue.maValue.maValue);
+    };
+
+    if (aFunctionName == u"CELL")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aInfoTypeValue
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aInfoTypeValue)
+            return makeFailure(aInfoTypeValue.meError);
+
+        const auto aInfoType = coerceToString(aInfoTypeValue.maValue.maValue);
+        if (!aInfoType)
+            return makeFailure(aInfoType.meError);
+
+        const auto eInfoKind
+            = spreadsheetengine::runtime::cellinspection::classifyInfoType(aInfoType.maValue);
+        if (eInfoKind == spreadsheetengine::runtime::cellinspection::InfoKind::Unsupported)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const formula::Node* pTargetArgument = nullptr;
+        if (rNode.maChildren.size() == 2 && rNode.maChildren[1])
+            pTargetArgument = rNode.maChildren[1].get();
+
+        api::CellAddress aTargetAddress = rCurrentAddress;
+        if (pTargetArgument && pTargetArgument->meKind != formula::NodeKind::EmptyArgument)
+        {
+            const auto aReference = resolveCellInspectionReference(*pTargetArgument);
+            if (!aReference)
+                return makeFailure(aReference.meError);
+            aTargetAddress = aReference.maValue.maRange.maStart;
+        }
+
+        switch (eInfoKind)
+        {
+            case spreadsheetengine::runtime::cellinspection::InfoKind::Column:
+                return makeScalarResult(
+                    spreadsheetengine::runtime::cellinspection::columnValue(aTargetAddress));
+            case spreadsheetengine::runtime::cellinspection::InfoKind::Row:
+                return makeScalarResult(
+                    spreadsheetengine::runtime::cellinspection::rowValue(aTargetAddress));
+            case spreadsheetengine::runtime::cellinspection::InfoKind::Sheet:
+                return makeScalarResult(
+                    spreadsheetengine::runtime::cellinspection::sheetValue(aTargetAddress));
+            case spreadsheetengine::runtime::cellinspection::InfoKind::Address:
+            {
+                api::String aSheetName;
+                if (aTargetAddress.mnSheet != rCurrentAddress.mnSheet)
+                {
+                    const workbook::Sheet* pSheet = getSheet(aTargetAddress.mnSheet);
+                    if (!pSheet)
+                        return makeFailure(api::Error::IllegalArgument);
+                    aSheetName = pSheet->maName;
+                }
+
+                return makeScalarResult(api::CellValue::text(formatAddressFunctionResult(
+                    aTargetAddress.mnRow, aTargetAddress.mnColumn, 1, true, aSheetName)));
+            }
+            case spreadsheetengine::runtime::cellinspection::InfoKind::Contents:
+            {
+                const auto aCellValue
+                    = materializeCellInspectionValue(pTargetArgument, aTargetAddress);
+                if (!aCellValue)
+                    return makeFailure(aCellValue.meError);
+                return makeScalarResult(
+                    spreadsheetengine::runtime::cellinspection::contentsValue(aCellValue.maValue));
+            }
+            case spreadsheetengine::runtime::cellinspection::InfoKind::Type:
+            {
+                const auto aCellValue
+                    = materializeCellInspectionValue(pTargetArgument, aTargetAddress);
+                if (!aCellValue)
+                    return makeFailure(aCellValue.meError);
+                return makeScalarResult(
+                    spreadsheetengine::runtime::cellinspection::typeValue(aCellValue.maValue));
+            }
+            case spreadsheetengine::runtime::cellinspection::InfoKind::Unsupported:
+                break;
+        }
+
+        return makeFailure(api::Error::IllegalArgument);
+    }
 
     if (aFunctionName == u"ISERROR")
     {

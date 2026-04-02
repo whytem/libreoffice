@@ -301,6 +301,15 @@ int main()
         }
         return 0;
     };
+    auto requireTextFormula = [&](const auto& rResult, StringView rExpected,
+                                  const char* pMessage) -> int {
+        if (!rResult || rResult.mbUsedCachedValue || !rResult.maValue.maValue.isText()
+            || rResult.maValue.maValue.maString != rExpected)
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", pMessage);
+        }
+        return 0;
+    };
     {
         const auto aResult = aEvaluator.evaluateCell({ 0, 1, 0 });
         if (!aResult || !aResult.maValue.isScalar() || !aResult.maValue.maValue.isNumber()
@@ -376,6 +385,73 @@ int main()
             || !checkIsFormula("compiled ISFORMULA value-cell", aCompiledIsNotFormula, false))
         {
             return fail("spreadsheetengine_fods_evaluator_tests", "ISFORMULA() mismatch");
+        }
+    }
+
+    {
+        const auto aCellCol
+            = aEvaluator.evaluateFormula(u"of:=CELL(\"COL\";[.C1:.D2])", { 0, 0, 0 });
+        const auto aCompiledCellCol = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CELL(\"COL\";[.C1:.D2])", { 0, 0, 0 });
+        const auto aCellRow
+            = aEvaluator.evaluateFormula(u"of:=CELL(\"ROW\";[.C5:.E10])", { 0, 0, 0 });
+        const auto aCompiledCellRow = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CELL(\"ROW\";[.C5:.E10])", { 0, 0, 0 });
+        const auto aCellSheet
+            = aEvaluator.evaluateFormula(u"of:=CELL(\"SHEET\";[Sheet2.A1])", { 0, 0, 0 });
+        const auto aCompiledCellSheet = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CELL(\"SHEET\";[Sheet2.A1])", { 0, 0, 0 });
+        const auto aCellAddress
+            = aEvaluator.evaluateFormula(u"of:=CELL(\"ADDRESS\";[.C1])", { 0, 0, 0 });
+        const auto aCompiledCellAddress = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CELL(\"ADDRESS\";[.C1])", { 0, 0, 0 });
+        const auto aCellContentsNumber
+            = aEvaluator.evaluateFormula(u"of:=CELL(\"CONTENTS\";[.A1])", { 0, 0, 0 });
+        const auto aCompiledCellContentsNumber = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CELL(\"CONTENTS\";[.A1])", { 0, 0, 0 });
+        const auto aCellContentsText
+            = aEvaluator.evaluateFormula(u"of:=CELL(\"CONTENTS\";[.C1])", { 0, 0, 0 });
+        const auto aCompiledCellContentsText = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CELL(\"CONTENTS\";[.C1])", { 0, 0, 0 });
+        const auto aCellTypeBlank
+            = aEvaluator.evaluateFormula(u"of:=CELL(\"TYPE\";[.Z30])", { 0, 0, 0 });
+        const auto aCompiledCellTypeBlank = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CELL(\"TYPE\";[.Z30])", { 0, 0, 0 });
+        const auto aCellTypeValue
+            = aEvaluator.evaluateFormula(u"of:=CELL(\"TYPE\";[.A1])", { 0, 0, 0 });
+        const auto aCompiledCellTypeValue = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CELL(\"TYPE\";[.A1])", { 0, 0, 0 });
+        const auto aCellTypeText
+            = aEvaluator.evaluateFormula(u"of:=CELL(\"TYPE\";[.C1])", { 0, 0, 0 });
+        const auto aCompiledCellTypeText = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=CELL(\"TYPE\";[.C1])", { 0, 0, 0 });
+
+        if (requireNumericFormula(aCellCol, 3.0, "CELL(COL) mismatch")
+            || requireNumericFormula(aCompiledCellCol, 3.0, "compiled CELL(COL) mismatch")
+            || requireNumericFormula(aCellRow, 5.0, "CELL(ROW) mismatch")
+            || requireNumericFormula(aCompiledCellRow, 5.0, "compiled CELL(ROW) mismatch")
+            || requireNumericFormula(aCellSheet, 2.0, "CELL(SHEET) mismatch")
+            || requireNumericFormula(aCompiledCellSheet, 2.0, "compiled CELL(SHEET) mismatch")
+            || requireTextFormula(aCellAddress, u"$C$1", "CELL(ADDRESS) mismatch")
+            || requireTextFormula(
+                aCompiledCellAddress, u"$C$1", "compiled CELL(ADDRESS) mismatch")
+            || requireNumericFormula(aCellContentsNumber, 5.0, "CELL(CONTENTS number) mismatch")
+            || requireNumericFormula(aCompiledCellContentsNumber, 5.0,
+                "compiled CELL(CONTENTS number) mismatch")
+            || requireTextFormula(aCellContentsText, u"=A1+A2", "CELL(CONTENTS text) mismatch")
+            || requireTextFormula(aCompiledCellContentsText, u"=A1+A2",
+                "compiled CELL(CONTENTS text) mismatch")
+            || requireTextFormula(aCellTypeBlank, u"b", "CELL(TYPE blank) mismatch")
+            || requireTextFormula(
+                aCompiledCellTypeBlank, u"b", "compiled CELL(TYPE blank) mismatch")
+            || requireTextFormula(aCellTypeValue, u"v", "CELL(TYPE value) mismatch")
+            || requireTextFormula(
+                aCompiledCellTypeValue, u"v", "compiled CELL(TYPE value) mismatch")
+            || requireTextFormula(aCellTypeText, u"l", "CELL(TYPE text) mismatch")
+            || requireTextFormula(
+                aCompiledCellTypeText, u"l", "compiled CELL(TYPE text) mismatch"))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "CELL() mismatch");
         }
     }
 

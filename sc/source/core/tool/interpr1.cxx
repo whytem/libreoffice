@@ -63,6 +63,7 @@
 #include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Reference.hxx>
 #include <spreadsheetengine/api/StringReference.hxx>
+#include <spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/IndirectExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
@@ -109,6 +110,7 @@ namespace selogic = spreadsheetengine::api::logic;
 namespace selookup = spreadsheetengine::api::lookup;
 namespace seref = spreadsheetengine::api::reference;
 namespace sestringref = spreadsheetengine::api::stringreference;
+namespace secellexec = spreadsheetengine::compat::libreoffice::cellinspectionexecution;
 namespace seindirectexec = spreadsheetengine::compat::libreoffice::indirectexecution;
 namespace seinterpre = spreadsheetengine::compat::libreoffice::interpreterdispatch;
 namespace sejumpexec = spreadsheetengine::compat::libreoffice::jumpexecution;
@@ -2464,6 +2466,77 @@ void ScInterpreter::ScCell()
         ScRefCellValue aCell(mrDoc, aCellPos);
 
         ScCellKeywordTranslator::transKeyword(aInfoType, ScGlobal::GetLocale(), ocCell);
+        const auto makeApiCellValue = [&]() -> spreadsheetengine::api::CellValue {
+            if (aCell.isEmpty())
+                return spreadsheetengine::api::CellValue::empty();
+
+            if (aCell.hasError())
+            {
+                FormulaError eError = mrDoc.GetErrCode(aCellPos);
+                if (aCell.getType() == CELLTYPE_FORMULA && aCell.getFormula())
+                    eError = aCell.getFormula()->GetErrCode();
+                return spreadsheetengine::api::CellValue::error(selibreoffice::toApiError(eError));
+            }
+
+            if (aCell.hasString())
+            {
+                svl::SharedString aString;
+                GetCellString(aString, aCell);
+                return spreadsheetengine::api::CellValue::text(
+                    selibreoffice::toApiString(aString.getString()));
+            }
+
+            if (aCell.hasNumeric())
+                return spreadsheetengine::api::CellValue::number(GetCellValue(aCellPos, aCell));
+
+            return spreadsheetengine::api::CellValue::empty();
+        };
+        const auto pushApiCellValue = [&](const spreadsheetengine::api::CellValue& rValue) {
+            if (rValue.isError())
+            {
+                PushError(selibreoffice::toFormulaError(rValue.meError));
+                return;
+            }
+            if (rValue.isText())
+            {
+                PushString(selibreoffice::toLibreOfficeString(rValue.maString));
+                return;
+            }
+            PushDouble(rValue.mfNumber);
+        };
+        const auto resolveAddressConvention = [&]() {
+            FormulaGrammar::AddressConvention eConv = maCalcConfig.meStringRefAddressSyntax;
+            switch (eConv)
+            {
+                default:
+                    eConv = mrDoc.GetAddressConvention();
+                    break;
+                case FormulaGrammar::CONV_OOO:
+                case FormulaGrammar::CONV_XL_A1:
+                case FormulaGrammar::CONV_XL_R1C1:
+                    break;
+            }
+            return eConv;
+        };
+        const auto eBoundedInfoKind = secellexec::classifyInfoType(aInfoType);
+        if (eBoundedInfoKind != secellexec::InfoKind::Unsupported)
+        {
+            std::optional<OUString> oSheetName;
+            if (eBoundedInfoKind == secellexec::InfoKind::Address && aCellPos.Tab() != aPos.Tab())
+            {
+                OUString aSheetName;
+                mrDoc.GetName(aCellPos.Tab(), aSheetName);
+                oSheetName = aSheetName;
+            }
+
+            const auto aInfoResult = secellexec::evaluateBoundedCellInfo(eBoundedInfoKind, aCellPos,
+                makeApiCellValue(), resolveAddressConvention(), oSheetName);
+            if (!aInfoResult)
+                PushError(selibreoffice::toFormulaError(aInfoResult.meError));
+            else
+                pushApiCellValue(aInfoResult.maValue);
+            return;
+        }
 
 // *** ADDRESS INFO ***
         if( aInfoType == "COL" )

@@ -45,7 +45,7 @@ The starting handoff from the completed recalc-orchestration milestone is:
 
 ## Current Status
 
-This milestone is now active with Phases 0 through 10 complete and the next
+This milestone is now active with Phases 0 through 11 complete and the next
 bounded execution-shell slice narrowed to the broader token-walking shell.
 
 - Phase 0 is complete: the orchestration/execution boundary is explicitly
@@ -91,6 +91,12 @@ bounded execution-shell slice narrowed to the broader token-walking shell.
   reference-inspection range walk and matrix-shaping shell now route through a
   dedicated compat helper, leaving the remaining frontier focused on broader
   token walking and the host-heavy information shell
+- Phase 11 is complete: the bounded local-workbook `CELL` inspection subset
+  (`COL`, `ROW`, `SHEET`, `ADDRESS`, `CONTENTS`, `TYPE`) now routes through
+  shared runtime plus a Calc compat helper, leaving only the host-heavy
+  `CELL` tail (`FILENAME`, `FORMAT`, `WIDTH`, `PREFIX`, `PROTECT`, `COLOR`,
+  `PARENTHESES`, external-ref handling) and the broader token-walking shell in
+  Calc
 
 The starting baseline for this milestone is:
 
@@ -1109,6 +1115,53 @@ Completion criteria for Phase 10, now met:
 - the replay baseline remains fully green
 
 Phase 10 closeout status:
+
+- complete
+- validated across the focused Calc, standalone, and full replay lanes
+- one-shot replay baseline remains `500` workbooks, `50,661` formula cells,
+  `0` cached-fallback cells
+
+### Phase 11: Extract The Bounded CELL Inspection Shell
+
+Status: **Complete**
+
+Goals:
+
+- move the local-workbook, storage-independent `CELL` inspection subset behind
+  shared runtime and a Calc compat helper
+- keep Calc responsible only for the host-shaped `CELL` property tail and
+  external-reference handling
+- add focused standalone and Calc regression coverage for the migrated subset
+
+Landed scope:
+
+- shared runtime classification and result shaping for `CELL("COL")`,
+  `CELL("ROW")`, `CELL("SHEET")`, `CELL("ADDRESS")`,
+  `CELL("CONTENTS")`, and `CELL("TYPE")`
+- Calc compat execution helper for the bounded `CELL` subset, including
+  address-syntax-aware `ADDRESS` formatting
+- standalone evaluator support for the same bounded `CELL` subset
+- focused standalone and Calc regression coverage for direct and compiled
+  execution of the migrated subset
+
+Implemented in:
+
+- `spreadsheet_engine/inc/spreadsheetengine/runtime/CellInspection.hxx`
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx`
+- `spreadsheet_engine/source/core/FormulaEvaluatorInformation.cxx`
+- `sc/source/core/tool/interpr1.cxx`
+- `spreadsheet_engine/tests/unit/fods_evaluator_tests.cxx`
+- `sc/qa/unit/ucalc_formula2.cxx`
+
+Completion criteria for Phase 11, now met:
+
+- the bounded local-workbook `CELL` inspection subset no longer lives only
+  inside `ScInterpreter`
+- standalone and Calc share the same subtype classification and bounded result
+  shaping for the migrated subset
+- the replay baseline remains fully green
+
+Phase 11 closeout status:
 
 - complete
 - validated across the focused Calc, standalone, and full replay lanes

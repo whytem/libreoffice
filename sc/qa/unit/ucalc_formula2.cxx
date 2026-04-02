@@ -1216,6 +1216,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncMATCH)
 CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncCELL)
 {
     CPPUNIT_ASSERT_MESSAGE("failed to insert sheet", m_pDoc->InsertTab(0, u"foo"_ustr));
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet", m_pDoc->InsertTab(1, u"bar"_ustr));
 
     clearRange(m_pDoc, ScRange(0, 0, 0, 2, 20, 0)); // Clear A1:C21.
 
@@ -1231,7 +1232,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncCELL)
                 { "=CELL(\"SHEET\";C10)", "1" },         { "=CELL(\"ADDRESS\";C10)", "$C$10" },
                 { "=CELL(\"CONTENTS\";C10)", pContent }, { "=CELL(\"COLOR\";C10)", "0" },
                 { "=CELL(\"TYPE\";C9)", "b" },           { "=CELL(\"TYPE\";C10)", "l" },
-                { "=CELL(\"TYPE\";C1)", "v" },           { "=CELL(\"PARENTHESES\";C10)", "0" } };
+                { "=CELL(\"TYPE\";C1)", "v" },           { "=CELL(\"PARENTHESES\";C10)", "0" },
+                { "=CELL(\"SHEET\";bar.C10)", "2" } };
 
         for (size_t i = 0; i < SAL_N_ELEMENTS(aChecks); ++i)
             m_pDoc->SetString(0, i, 0, OUString::createFromAscii(aChecks[i].pVal));
@@ -1244,6 +1246,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncCELL)
         }
     }
 
+    m_pDoc->DeleteTab(1);
     m_pDoc->DeleteTab(0);
 }
 

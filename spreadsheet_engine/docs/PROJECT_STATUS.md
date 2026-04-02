@@ -46,7 +46,7 @@ is now also in closeout status.
 | Recalc orchestration extraction | **Complete** | Engine-owned recalc planning, queue construction, authority pilots, and Calc queue-consumption bridge are complete through the safe structural/named-range pilot surface |
 | FormulaEvaluator runtime modularization | **Complete** | The old evaluator monolith has been split across focused runtime and support modules such as `LookupRuntime`, `QueryRuntime`, `TextFunctionRuntime`, `DateTimeParse`, `FinancialRuntime`, `MathAggregate`, `MathFunctionRuntime`, and `ConversionRuntime` |
 | Calc pure-computation convergence | **Complete** | Calc now delegates the in-scope pure-computation statistical, aggregate, inverse-distribution, combinatoric, and error-function families to the same shared runtime modules used by standalone, with Calc-aligned algorithms adopted where behavior risk existed |
-| Execution backend extraction | **Active** | Phases 0 through 10 are complete: the execution boundary is frozen, shared scalar coercion and operator-shell helpers are engine-owned, the first reference-sensitive slices and bounded lookup traversal moved behind compat bridges, `ROW` / `COLUMN` / `ROWS` / `COLUMNS` / `AREAS` / `SHEET` / `SHEETS` now share bounded reference-shape logic, the bounded `CHOOSE` / `IFERROR` / `IFNA` / `INDIRECT` special-form shell now routes through shared or compat-owned helpers, Calc's bounded `LET` / `SWITCH` shell now routes through dedicated compat helpers, the generic jump-matrix cursor/finalization shell now routes through compat helpers, the final standalone `INDIRECT` string-reference normalization/parsing tail now lives in the shared reference-text layer, and Calc's bounded `FORMULA` / `ISFORMULA` inspection shell now routes through a dedicated compat helper |
+| Execution backend extraction | **Active** | Phases 0 through 11 are complete: the execution boundary is frozen, shared scalar coercion and operator-shell helpers are engine-owned, the first reference-sensitive slices and bounded lookup traversal moved behind compat bridges, `ROW` / `COLUMN` / `ROWS` / `COLUMNS` / `AREAS` / `SHEET` / `SHEETS` now share bounded reference-shape logic, the bounded `CHOOSE` / `IFERROR` / `IFNA` / `INDIRECT` special-form shell now routes through shared or compat-owned helpers, Calc's bounded `LET` / `SWITCH` shell now routes through dedicated compat helpers, the generic jump-matrix cursor/finalization shell now routes through compat helpers, the final standalone `INDIRECT` string-reference normalization/parsing tail now lives in the shared reference-text layer, Calc's bounded `FORMULA` / `ISFORMULA` inspection shell now routes through a dedicated compat helper, and the bounded local-workbook `CELL` inspection subset now routes through shared runtime plus a Calc compat helper |
 
 The immediate active frontier is now narrower and more practical:
 
@@ -59,7 +59,7 @@ The immediate active frontier is now narrower and more practical:
   `OFFSET` / `INDEX` / `LOOKUP` / `VLOOKUP` / `HLOOKUP` / `XLOOKUP` /
   `ROW` / `COLUMN` / `ROWS` / `COLUMNS` / `AREAS` / `SHEET` / `SHEETS` /
   `CHOOSE` / `IFERROR` / `IFNA` / `INDIRECT` / `LET` / `SWITCH` /
-  generic-jump-matrix / `FORMULA` / `ISFORMULA` boundary
+  generic-jump-matrix / `FORMULA` / `ISFORMULA` / bounded `CELL` boundary
 - keep expanding engine-first adoption inside Calc only where differential
   validation keeps compiler/runtime behavior safe
 
@@ -121,10 +121,11 @@ The immediate active frontier is now narrower and more practical:
   orchestration (the engine now owns shadow dependency snapshots and
   invalidation planning, but Calc still owns production side effects)
 - The production `ScInterpreter` evaluator shell for most runtime execution,
-  especially scheduling/database/matrix/storage-sensitive behavior and the
-  broader token-walking shell beyond the bounded lookup/reference slices now
-  extracted; selected pure-computation statistical and aggregate kernels now
-  delegate to shared engine runtime modules
+  especially scheduling/database/matrix/storage-sensitive behavior, the
+  broader token-walking shell, and the host-heavy `CELL` property tail beyond
+  the bounded inspection subset now extracted; selected pure-computation
+  statistical and aggregate kernels now delegate to shared engine runtime
+  modules
 - Threaded and OpenCL backend execution
 - UI, shell, persistence, import/export, UNO, rendering
 
