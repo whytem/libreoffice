@@ -246,6 +246,8 @@ Completion criteria:
 
 ### Phase 1. Freeze And Publish The Token Inventory
 
+Status: complete
+
 Create the explicit inventory table for the remaining in-scope token/container
 boundary.
 
@@ -263,6 +265,17 @@ Closeout standard:
 
 - the inventory is concrete, classified, and linked from the status docs
 - every later phase has a bounded landing surface
+
+Frozen inventory:
+
+| Candidate surface | Current file area | Boundary type | Planned outcome | Validation lanes | Owning later phase |
+| --- | --- | --- | --- | --- | --- |
+| Reference-like token kind checks for `INTERSECT` / `UNION` | `sc/source/core/tool/interpr2.cxx` (`ScIntersect`, `ScUnionFunc`) | non-owning token traversal | move repeated `svSingleRef` / `svDoubleRef` / `svRefList` inspection behind named compat helpers | `CppunitTest_sc_ucalc_formula2`, `CppunitTest_sc_ucalc_shared_cases` | Phase 2 |
+| Ref-list coercion and append policy for `INTERSECT` / `UNION` | `sc/source/core/tool/interpr2.cxx` | range/value-shape adaptation | move token-to-ref-list and ref-list append policy behind compat seams while keeping stack ownership local | `CppunitTest_sc_ucalc_formula2`, `CppunitTest_sc_ucalc_shared_cases`, replay zero-fallback | Phase 3 |
+| Ref-list area counting and legacy multi-area promotion | `sc/source/core/tool/interpr1.cxx` (`ScAreas`, `ScMultiArea`) | token-adjacent adaptation | align caller vocabulary and route through the same reference compat vocabulary used by the adopted seam | `CppunitTest_sc_ucalc_formula2`, replay zero-fallback | Phase 4 |
+| `PopDoubleRef(ScRange&, short&, size_t&)` ref-list cursor path | `sc/source/core/tool/interpr4.cxx` | token/container adaptation | keep stack mutation local but clarify/refactor the ref-list cursor path only if needed by adopted seams | `CppunitTest_sc_ucalc_formula2`, `CppunitTest_sc_ucalc_shared_cases` | retain for now / revisit after Phase 3 |
+| `PopExternalDoubleRef`, `GetExternalDoubleRef`, external token-array plumbing | `sc/source/core/tool/interpr4.cxx`, external-ref cache plumbing | host service plus token-container ownership | keep host-only and make boundary explicit; not in scope for shared-semantic extraction here | focused Calc coverage only | Phase 5 |
+| `pArr`, `aCode`, `pStack`, `sp`, and token cursor/stack ownership | `sc/source/core/inc/interpre.hxx` and interpreter core | Calc ownership and mutation | retain in Calc explicitly; not in scope for this stream | Calc formula Cppunit plus replay baseline | retain/defer |
 
 ### Phase 2. Land The First Non-Owning Token Traversal Seam
 
