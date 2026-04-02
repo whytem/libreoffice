@@ -21,11 +21,13 @@
 #include "analysis.hxx"
 #include <spreadsheetengine/api/Calendar.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
+#include <spreadsheetengine/compat/libreoffice/FinancialAddInExecution.hxx>
 #include <spreadsheetengine/runtime/FinancialRuntime.hxx>
 
 using namespace sca::analysis;
 
 namespace sefinance = spreadsheetengine::core::finance;
+namespace sefinanceexec = spreadsheetengine::compat::libreoffice::financialaddinexecution;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 
 namespace
@@ -122,7 +124,8 @@ double SAL_CALL AnalysisAddIn::getEffect( double fNominal, sal_Int32 nPeriods )
 {
     if( nPeriods < 1 || fNominal <= 0.0 )
         throw css::lang::IllegalArgumentException();
-    return valueOrThrow(sefinance::evaluateEffectiveAnnualRate(fNominal, nPeriods));
+    return valueOrThrow(sefinanceexec::DirectFinancialAddInAdapter::evaluateEffect(
+        fNominal, nPeriods));
 }
 
 
@@ -132,8 +135,9 @@ double SAL_CALL AnalysisAddIn::getCumprinc( double fRate, sal_Int32 nNumPeriods,
     if( nStartPer < 1 || nEndPer < nStartPer || fRate <= 0.0 || nEndPer > nNumPeriods ||
         fVal <= 0.0 || ( nPayType != 0 && nPayType != 1 ) )
         throw css::lang::IllegalArgumentException();
-    return valueOrThrow(sefinance::evaluateCumulativePrincipal(
-        fRate, nNumPeriods, fVal, nStartPer, nEndPer, nPayType != 0));
+    return valueOrThrow(
+        sefinanceexec::DirectFinancialAddInAdapter::evaluateCumulativePrincipal(
+            fRate, nNumPeriods, fVal, nStartPer, nEndPer, nPayType != 0));
 }
 
 
@@ -143,8 +147,9 @@ double SAL_CALL AnalysisAddIn::getCumipmt( double fRate, sal_Int32 nNumPeriods, 
     if( nStartPer < 1 || nEndPer < nStartPer || fRate <= 0.0 || nEndPer > nNumPeriods ||
         fVal <= 0.0 || ( nPayType != 0 && nPayType != 1 ) )
         throw css::lang::IllegalArgumentException();
-    return valueOrThrow(sefinance::evaluateCumulativeInterest(
-        fRate, nNumPeriods, fVal, nStartPer, nEndPer, nPayType != 0));
+    return valueOrThrow(
+        sefinanceexec::DirectFinancialAddInAdapter::evaluateCumulativeInterest(
+            fRate, nNumPeriods, fVal, nStartPer, nEndPer, nPayType != 0));
 }
 
 
@@ -193,7 +198,8 @@ double SAL_CALL AnalysisAddIn::getNominal( double fRate, sal_Int32 nPeriods )
 {
     if( fRate <= 0.0 || nPeriods < 0 )
         throw css::lang::IllegalArgumentException();
-    return valueOrThrow(sefinance::evaluateNominal(fRate, nPeriods));
+    return valueOrThrow(
+        sefinanceexec::DirectFinancialAddInAdapter::evaluateNominal(fRate, nPeriods));
 }
 
 
@@ -201,7 +207,8 @@ double SAL_CALL AnalysisAddIn::getDollarfr( double fDollarDec, sal_Int32 nFrac )
 {
     if( nFrac <= 0 )
         throw css::lang::IllegalArgumentException();
-    return valueOrThrow(sefinance::evaluateDollarFraction(fDollarDec, nFrac));
+    return valueOrThrow(
+        sefinanceexec::DirectFinancialAddInAdapter::evaluateDollarFraction(fDollarDec, nFrac));
 }
 
 
@@ -209,7 +216,8 @@ double SAL_CALL AnalysisAddIn::getDollarde( double fDollarFrac, sal_Int32 nFrac 
 {
     if( nFrac <= 0 )
         throw css::lang::IllegalArgumentException();
-    return valueOrThrow(sefinance::evaluateDollarDecimal(fDollarFrac, nFrac));
+    return valueOrThrow(
+        sefinanceexec::DirectFinancialAddInAdapter::evaluateDollarDecimal(fDollarFrac, nFrac));
 }
 
 
@@ -347,7 +355,7 @@ double SAL_CALL AnalysisAddIn::getXirr(
     const double fGuessRate = aAnyConv.getDouble( xOpt, rGuessRate, 0.1 );
     if( fGuessRate <= -1 )
         throw css::lang::IllegalArgumentException();
-    return valueOrThrow(sefinance::evaluateXirrNumbers(
+    return valueOrThrow(sefinanceexec::DirectFinancialAddInAdapter::evaluateXirrNumbers(
         toDoubleVector(aValues), selibreoffice::toApiDateSerials(toDoubleVector(aDates)),
         fGuessRate));
 }
@@ -365,7 +373,7 @@ double SAL_CALL AnalysisAddIn::getXnpv(
     sal_uInt32 nNum = aValList.Count();
     if( nNum != aDateList.Count() || nNum < 2 )
         throw css::lang::IllegalArgumentException();
-    return valueOrThrow(sefinance::evaluateXnpvNumbers(
+    return valueOrThrow(sefinanceexec::DirectFinancialAddInAdapter::evaluateXnpvNumbers(
         fRate, toDoubleVector(aValList), selibreoffice::toApiDateSerials(toDoubleVector(aDateList))));
 }
 
@@ -445,7 +453,9 @@ double SAL_CALL AnalysisAddIn::getFvschedule( double fPrinc, const css::uno::Seq
     ScaDoubleList aSchedList;
 
     aSchedList.Append( rSchedule );
-    return valueOrThrow(sefinance::evaluateFutureValueSchedule(fPrinc, toDoubleVector(aSchedList)));
+    return valueOrThrow(
+        sefinanceexec::DirectFinancialAddInAdapter::evaluateFutureValueSchedule(
+            fPrinc, toDoubleVector(aSchedList)));
 }
 
 
