@@ -2964,6 +2964,7 @@ void ScInterpreter::ScIsFormula()
 {
     nFuncFmtType = SvNumFormatType::LOGICAL;
     bool bRes = false;
+    seformulainspect::DirectFormulaInspectionAdapter aAdapter(mrDoc, mrContext);
     switch ( GetStackType() )
     {
         case svDoubleRef :
@@ -2985,7 +2986,7 @@ void ScInterpreter::ScIsFormula()
                 }
 
                 const auto aMatrixResult = seformulainspect::buildIsFormulaMatrix(
-                    mrDoc, ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2),
+                    aAdapter, ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2),
                     [this](SCSIZE nColumns, SCSIZE nRows) {
                         return GetNewMat(nColumns, nRows, true);
                     });
@@ -3012,7 +3013,7 @@ void ScInterpreter::ScIsFormula()
             if ( !PopDoubleRefOrSingleRef( aAdr ) )
                 break;
 
-            bRes = seformulainspect::isFormulaCell(mrDoc, aAdr);
+            bRes = aAdapter.isFormulaCell(aAdr);
         }
         break;
         default:
@@ -3025,6 +3026,7 @@ void ScInterpreter::ScIsFormula()
 void ScInterpreter::ScFormula()
 {
     OUString aFormula;
+    seformulainspect::DirectFormulaInspectionAdapter aAdapter(mrDoc, mrContext);
     switch ( GetStackType() )
     {
         case svDoubleRef :
@@ -3044,7 +3046,7 @@ void ScInterpreter::ScFormula()
                 }
 
                 const auto aMatrixResult = seformulainspect::buildFormulaTextMatrix(
-                    mrDoc, ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2), mrContext, mrStrPool,
+                    aAdapter, ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2), mrStrPool,
                     [this](SCSIZE nColumns, SCSIZE nRows) {
                         return GetNewMat(nColumns, nRows, true);
                     });
@@ -3068,7 +3070,7 @@ void ScInterpreter::ScFormula()
             if ( !PopDoubleRefOrSingleRef( aAdr ) )
                 break;
 
-            const auto aFormulaText = seformulainspect::formulaTextForCell(mrDoc, aAdr, mrContext);
+            const auto aFormulaText = aAdapter.formulaTextForCell(aAdr);
             if (!aFormulaText)
                 SetError(selibreoffice::toFormulaError(aFormulaText.meError));
             else

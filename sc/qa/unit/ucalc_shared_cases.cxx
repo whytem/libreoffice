@@ -13,6 +13,7 @@
 
 #include <formula/errorcodes.hxx>
 #include <interpretercontext.hxx>
+#include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/Host.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
 #include <spreadsheetengine/api/Host.hxx>
@@ -633,6 +634,31 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testDirectTextParsingAdapter)
     const auto aInvalidDate = aAdapter.evaluateDateValue(u"not a date"_ustr);
     CPPUNIT_ASSERT(!aInvalidDate);
     CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::Error::IllegalArgument, aInvalidDate.meError);
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testDirectFormulaInspectionAdapter)
+{
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"DirectFormulaInspection"_ustr);
+
+    m_pDoc->SetString(0, 0, 0, u"=1+1"_ustr);
+    setValueCell(m_pDoc, 1, 7.0);
+
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    spreadsheetengine::compat::libreoffice::formulainspection::DirectFormulaInspectionAdapter
+        aAdapter(*m_pDoc, rContext);
+
+    CPPUNIT_ASSERT(aAdapter.isFormulaCell(ScAddress(0, 0, 0)));
+    CPPUNIT_ASSERT(!aAdapter.isFormulaCell(ScAddress(1, 0, 0)));
+
+    const auto aFormulaText = aAdapter.formulaTextForCell(ScAddress(0, 0, 0));
+    CPPUNIT_ASSERT(aFormulaText);
+    CPPUNIT_ASSERT_EQUAL(u"=1+1"_ustr, aFormulaText.maValue);
+
+    const auto aMissingFormulaText = aAdapter.formulaTextForCell(ScAddress(1, 0, 0));
+    CPPUNIT_ASSERT(!aMissingFormulaText);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::NotAvailable, aMissingFormulaText.meError);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testLogicSharedCases)

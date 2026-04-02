@@ -22,7 +22,10 @@
 #include <svl/sharedstringpool.hxx>
 
 #include <spreadsheetengine/api/Error.hxx>
+#include <spreadsheetengine/compat/libreoffice/Address.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
+#include <spreadsheetengine/compat/libreoffice/String.hxx>
+#include <spreadsheetengine/runtime/FormulaInspection.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::formulainspection
 {
@@ -40,24 +43,80 @@ struct MatrixInspectionResult
     MatrixInspectionFailure meFailure = MatrixInspectionFailure::None;
 };
 
-[[nodiscard]] inline bool isFormulaCell(const ScDocument& rDocument, const ScAddress& rAddress)
+class CalcFormulaInspectionProvider final
+    : public spreadsheetengine::runtime::formulainspection::Provider
 {
-    return rDocument.GetFormulaCell(rAddress) != nullptr;
-}
+    const ScDocument& mrDocument;
+    ScInterpreterContext* mpContext;
 
-[[nodiscard]] inline spreadsheetengine::api::ValueResult<OUString> formulaTextForCell(
-    const ScDocument& rDocument, const ScAddress& rAddress, ScInterpreterContext& rContext)
-{
-    const ScFormulaCell* pCell = rDocument.GetFormulaCell(rAddress);
-    if (!pCell)
+public:
+    CalcFormulaInspectionProvider(const ScDocument& rDocument,
+        ScInterpreterContext* pContext = nullptr)
+        : mrDocument(rDocument)
+        , mpContext(pContext)
     {
-        return spreadsheetengine::api::ValueResult<OUString>::failure(
-            spreadsheetengine::api::Error::NotAvailable);
     }
 
-    return spreadsheetengine::api::ValueResult<OUString>::success(
-        pCell->GetFormula(formula::FormulaGrammar::GRAM_UNSPECIFIED, &rContext));
-}
+    [[nodiscard]] bool isFormulaCell(
+        const spreadsheetengine::api::CellAddress& rAddress) const override
+    {
+        return mrDocument.GetFormulaCell(toLibreOfficeAddress(rAddress)) != nullptr;
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<spreadsheetengine::api::String>
+    formulaTextForCell(const spreadsheetengine::api::CellAddress& rAddress) const override
+    {
+        const ScFormulaCell* pCell = mrDocument.GetFormulaCell(toLibreOfficeAddress(rAddress));
+        if (!pCell)
+        {
+            return spreadsheetengine::api::ValueResult<
+                spreadsheetengine::api::String>::failure(
+                spreadsheetengine::api::Error::NotAvailable);
+        }
+
+        return spreadsheetengine::api::ValueResult<spreadsheetengine::api::String>::success(
+            toApiString(
+                pCell->GetFormula(formula::FormulaGrammar::GRAM_UNSPECIFIED, mpContext)));
+    }
+};
+
+class DirectFormulaInspectionAdapter
+{
+    CalcFormulaInspectionProvider maProvider;
+
+public:
+    explicit DirectFormulaInspectionAdapter(const ScDocument& rDocument)
+        : maProvider(rDocument)
+    {
+    }
+
+    DirectFormulaInspectionAdapter(const ScDocument& rDocument, ScInterpreterContext& rContext)
+        : maProvider(rDocument, &rContext)
+    {
+    }
+
+    [[nodiscard]] bool isFormulaCell(const ScAddress& rAddress) const
+    {
+        return spreadsheetengine::runtime::formulainspection::isFormulaValue(
+                   maProvider, toApiCellAddress(rAddress))
+            .mfNumber
+               != 0.0;
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<OUString> formulaTextForCell(
+        const ScAddress& rAddress) const
+    {
+        const auto aResult = spreadsheetengine::runtime::formulainspection::formulaTextValue(
+            maProvider, toApiCellAddress(rAddress));
+        if (!aResult)
+        {
+            return spreadsheetengine::api::ValueResult<OUString>::failure(aResult.meError);
+        }
+
+        return spreadsheetengine::api::ValueResult<OUString>::success(
+            toLibreOfficeString(aResult.maValue));
+    }
+};
 
 template <typename MatrixFactory, typename CellWriter>
 [[nodiscard]] inline MatrixInspectionResult buildMatrixInspection(
@@ -101,24 +160,24 @@ template <typename MatrixFactory, typename CellWriter>
 
 template <typename MatrixFactory>
 [[nodiscard]] inline MatrixInspectionResult buildIsFormulaMatrix(
-    const ScDocument& rDocument, const ScRange& rRange, MatrixFactory&& rFactory)
+    const DirectFormulaInspectionAdapter& rAdapter, const ScRange& rRange, MatrixFactory&& rFactory)
 {
     return buildMatrixInspection(
         rRange, std::forward<MatrixFactory>(rFactory),
         [&](ScMatrix& rMatrix, SCSIZE nColumn, SCSIZE nRow, const ScAddress& rAddress) {
-            rMatrix.PutBoolean(isFormulaCell(rDocument, rAddress), nColumn, nRow);
+            rMatrix.PutBoolean(rAdapter.isFormulaCell(rAddress), nColumn, nRow);
         });
 }
 
 template <typename MatrixFactory>
-[[nodiscard]] inline MatrixInspectionResult buildFormulaTextMatrix(const ScDocument& rDocument,
-    const ScRange& rRange, ScInterpreterContext& rContext, svl::SharedStringPool& rStringPool,
-    MatrixFactory&& rFactory)
+[[nodiscard]] inline MatrixInspectionResult buildFormulaTextMatrix(
+    const DirectFormulaInspectionAdapter& rAdapter, const ScRange& rRange,
+    svl::SharedStringPool& rStringPool, MatrixFactory&& rFactory)
 {
     return buildMatrixInspection(
         rRange, std::forward<MatrixFactory>(rFactory),
         [&](ScMatrix& rMatrix, SCSIZE nColumn, SCSIZE nRow, const ScAddress& rAddress) {
-            const auto aFormulaText = formulaTextForCell(rDocument, rAddress, rContext);
+            const auto aFormulaText = rAdapter.formulaTextForCell(rAddress);
             if (!aFormulaText)
             {
                 rMatrix.PutError(toFormulaError(aFormulaText.meError), nColumn, nRow);
@@ -127,6 +186,34 @@ template <typename MatrixFactory>
 
             rMatrix.PutString(rStringPool.intern(aFormulaText.maValue), nColumn, nRow);
         });
+}
+
+[[nodiscard]] inline bool isFormulaCell(const ScDocument& rDocument, const ScAddress& rAddress)
+{
+    return CalcFormulaInspectionProvider(rDocument).isFormulaCell(toApiCellAddress(rAddress));
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<OUString> formulaTextForCell(
+    const ScDocument& rDocument, const ScAddress& rAddress, ScInterpreterContext& rContext)
+{
+    return DirectFormulaInspectionAdapter(rDocument, rContext).formulaTextForCell(rAddress);
+}
+
+template <typename MatrixFactory>
+[[nodiscard]] inline MatrixInspectionResult buildIsFormulaMatrix(
+    const ScDocument& rDocument, const ScRange& rRange, MatrixFactory&& rFactory)
+{
+    const DirectFormulaInspectionAdapter aAdapter(rDocument);
+    return buildIsFormulaMatrix(aAdapter, rRange, std::forward<MatrixFactory>(rFactory));
+}
+
+template <typename MatrixFactory>
+[[nodiscard]] inline MatrixInspectionResult buildFormulaTextMatrix(const ScDocument& rDocument,
+    const ScRange& rRange, ScInterpreterContext& rContext, svl::SharedStringPool& rStringPool,
+    MatrixFactory&& rFactory)
+{
+    DirectFormulaInspectionAdapter aAdapter(rDocument, rContext);
+    return buildFormulaTextMatrix(aAdapter, rRange, rStringPool, std::forward<MatrixFactory>(rFactory));
 }
 
 } // namespace spreadsheetengine::compat::libreoffice::formulainspection
