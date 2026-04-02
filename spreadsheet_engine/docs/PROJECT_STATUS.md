@@ -369,6 +369,10 @@ Those are valid future questions, but the right way to reach them is to start
 from the now-cleaner host boundary and choose the next bounded stream from a
 fresh inventory instead of carrying forward historical cleanup debt.
 
+The active implementation-ready plan for that reassessment is:
+
+- [COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md](architecture/COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md)
+
 ## Working Rules For The Next Stage
 
 The project should continue under these rules:
@@ -398,6 +402,7 @@ project is on track.
 
 The most relevant active docs are:
 
+- [COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md](architecture/COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md)
 - [HOST_SERVICE_FACADE_NARROWING_PLAN.md](architecture/HOST_SERVICE_FACADE_NARROWING_PLAN.md)
 - [ENGINE_ENTRY_WIDENING_PLAN.md](architecture/ENGINE_ENTRY_WIDENING_PLAN.md)
 - [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
