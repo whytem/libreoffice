@@ -2,8 +2,11 @@
 
 ## Purpose
 
-This document turns the remaining "finish the execution shell extraction"
-frontier into a concrete implementation plan.
+Status: **Complete**
+
+This document turned the remaining "finish the execution shell extraction"
+frontier into a concrete implementation plan and now serves as the closeout
+record for that program.
 
 The goal is not to move all of `ScInterpreter` into `spreadsheet_engine/`.
 The goal is to finish moving the remaining spreadsheet-specific execution
@@ -28,19 +31,18 @@ following are true:
 This closeout is therefore about boundary quality, not about reducing the raw
 line count of `ScInterpreter` at any cost.
 
-## Current Remaining Scope
+## Final Boundary
 
-After the completed execution-backend slices, the remaining execution shell is
-concentrated in four areas:
+After the completed execution-backend slices and closeout workstreams, the
+remaining Calc-owned surface is intentionally host-shaped:
 
-1. broader token-walking and frame interpretation inside `ScInterpreter`
-2. remaining reference/name/range traversal helpers that are still Calc-local
-3. host-heavy information/property inspection tails, especially the remaining
-   `CELL(...)` surface
-4. residual duplication where Calc still carries spreadsheet-semantic helpers
-   that should route through engine-owned runtime or compat code
+1. stack container mutation and token cursor ownership
+2. `ScTokenArray` construction and related token-container operations
+3. external-reference cache plumbing and document/session integration
+4. host-heavy information services such as `INFO(...)`
 
-These areas should be closed out in the order below.
+There is no remaining open in-scope execution-shell extraction surface in this
+program.
 
 ## Boundary Rules
 
@@ -328,6 +330,8 @@ Closeout status:
 
 ### Workstream 6: Close Out The Execution Shell Program
 
+Status: **Complete**
+
 Once the technical slices above are complete, perform the final closeout pass.
 
 Required outputs:
@@ -346,6 +350,20 @@ Exit criteria:
 - the active architecture docs no longer describe the same shell work as open
 - any remaining Calc-only code is intentionally host-owned, not just
   "not yet moved"
+
+Closeout status:
+
+- complete
+- [PROJECT_STATUS.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/PROJECT_STATUS.md)
+  now describes the finished steady-state boundary instead of an open shell
+  program
+- [EXECUTION_BACKEND_EXTRACTION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/EXECUTION_BACKEND_EXTRACTION.md)
+  is now a completed boundary record instead of an active extraction plan
+- [README.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/README.md)
+  now points to
+  [ENGINE_FIRST_CALC_ADOPTION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ENGINE_FIRST_CALC_ADOPTION.md)
+  as the active frontier
+- the remaining Calc-owned surface is explicitly documented as host-only
 
 ## Recommended Execution Order
 

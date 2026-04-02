@@ -53,10 +53,11 @@ Today:
   helpers for execution semantics
 - the promoted Calc FODS replay corpus is fully green with zero cached fallback
 
-The active work is no longer replay promotion or compiler switchover. The main
-frontier is shrinking the remaining Calc-owned execution shell, which is now
-reduced to an explicitly inventoried set of matrix/frame helpers, reference
-selection helpers, and the host-heavy `CELL(...)` property tail.
+The active work is no longer replay promotion, compiler switchover, or
+execution-shell extraction. Those programs are complete. The main frontier is
+now widening engine-first adoption inside Calc while keeping the host boundary
+clean and explicit. The active go-forward plan for that work lives in
+[ENGINE_FIRST_CALC_ADOPTION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ENGINE_FIRST_CALC_ADOPTION.md).
 
 ## Verified Baseline
 
@@ -148,6 +149,10 @@ execution semantics, including:
 - shared coercion and normalization helpers
 - bounded special-form and modern function shell helpers
 
+The execution-shell extraction program is now complete. Calc no longer carries
+an open in-scope spreadsheet-semantic interpreter tail that is waiting to be
+moved into `spreadsheet_engine/`.
+
 This means the project is no longer just extracting code for standalone use.
 It is actively changing what Calc runs in production.
 
@@ -162,16 +167,18 @@ intentionally still there:
 - UI, import/export, rendering, UNO, shell, and persistence
 - threaded and OpenCL backend execution
 
-There is also a remaining technical boundary that is still Calc-owned:
+There is also a remaining technical boundary that is intentionally still
+Calc-owned:
 
-- the broader `ScInterpreter` token-walking shell
-- stack-local execution mechanics that are still tightly coupled to Calc state
-- explicitly host-only execution cases such as `INFO(...)`, token-container
-  operations, and external-reference plumbing
-- other execution cases that still depend on Calc-local document services more
-  than on shared spreadsheet semantics
+- stack container mutation and formula-token cursor ownership
+- `ScTokenArray` construction, range/union token-container operations, and
+  other Calc-local token plumbing
+- external-reference cache integration and document/session lookup services
+- host-heavy inspection and environment services such as `INFO(...)`
+- printer, path, number-format, and other document-service integrations that
+  are not useful standalone engine semantics
 
-This is the main remaining extraction frontier.
+This is now a defined host boundary rather than an open extraction gap.
 
 ## Current Assessment
 
@@ -187,59 +194,46 @@ been answered:
 - Calc can consume extracted execution helpers safely through compat bridges
 
 Because of that, the next work does not need to prove the architecture again.
-It needs to steadily reduce the remaining Calc-owned execution shell while
-keeping the host boundary stable.
+It needs to broaden engine-first adoption inside Calc and keep the host
+boundary stable.
 
 In other words: the problem is now mostly one of disciplined boundary
 tightening, not of feasibility.
 
 One important cleanup milestone is also now true: within the execution-shell
-surface already extracted into `spreadsheet_engine`, there are no known
-remaining standalone-vs-Calc duplicate helper implementations. The open work
-is the still-Calc-owned shell, not duplicated semantics inside the migrated
-surface.
+surface extracted into `spreadsheet_engine`, there are no known remaining
+standalone-vs-Calc duplicate helper implementations. The remaining Calc-owned
+surface is explicitly host-shaped.
 
 ## Go-Forward Plan
 
 The next plan should be organized around the end-state boundary rather than
 around historical milestone names.
 
-### 1. Finish The Remaining Execution Shell Extraction
+### 1. Deepen Engine-First Execution Inside Calc
 
 This is the highest-priority stream.
 
-The goal is to keep moving spreadsheet semantics out of `ScInterpreter` and
-into engine-owned runtime or compat helpers, while leaving storage and host
+The goal is to make the extracted engine-owned execution helpers the default
+path in more production Calc call sites, while leaving storage and host
 services in Calc.
 
 The immediate target areas are:
 
-- the broader token-walking shell
-- remaining stack-local dispatch helpers that are still Calc-specific
-- any remaining bounded execution slices that can move without changing storage
-  ownership
-
-Success looks like a smaller, simpler Calc interpreter shell whose remaining
-logic is clearly host-only.
-
-### 2. Deepen Engine-First Execution Inside Calc
-
-Once each bounded helper is extracted, the next step is to make engine-owned
-execution code the default path in more Calc call sites.
-
-That means:
-
-- preferring shared runtime modules over Calc-local duplicates whenever the
-  semantics are already stable
-- continuing to collapse duplicated logic into engine-owned helpers
+- widening use of engine-owned runtime and compat helpers in Calc
+- removing legacy Calc-local call paths where the shared path is already
+  proven
 - keeping Calc adapters thin and explicit
 
-The key rule here is to expand authority only where differential validation
-keeps behavior safe.
+Success looks like a simpler Calc host shell whose remaining logic is clearly
+host-only and whose production execution paths rely on engine-owned semantics
+by default.
 
-### 3. Reduce Legacy Coupling At The Edges
+### 2. Consolidate The Host Boundary
 
-The project still has legacy coupling points that should continue to shrink:
+The project still has legacy coupling points that should continue to shrink,
+but they should now be treated as host-boundary cleanup rather than as
+unfinished shell extraction:
 
 - `ScTokenArray` as the pervasive Calc runtime token container
 - direct use of Calc or LibreOffice vocabulary in code that should instead use
@@ -250,7 +244,7 @@ The project still has legacy coupling points that should continue to shrink:
 This work is not primarily about adding new features. It is about making the
 boundary cleaner and easier to maintain.
 
-### 4. Keep The Zero-Fallback Baseline Stable
+### 3. Keep The Zero-Fallback Baseline Stable
 
 The zero-fallback promoted replay baseline is now an asset that needs to be
 protected continuously.
@@ -264,7 +258,7 @@ That means:
 
 This is now part of normal project maintenance, not a side effort.
 
-### 5. Reassess The Boundary Only After The Shell Is Smaller
+### 4. Reassess Deeper Authority Shifts Only After Adoption Widens
 
 There are bigger long-term questions that may eventually matter, but they
 should not drive near-term work:
@@ -276,7 +270,7 @@ should not drive near-term work:
   compiler model
 
 Those are valid future questions, but the right way to reach them is first to
-finish shrinking the remaining Calc-owned execution shell.
+keep widening proven engine-first adoption inside Calc.
 
 ## Working Rules For The Next Stage
 

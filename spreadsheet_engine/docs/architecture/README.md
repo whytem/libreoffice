@@ -5,16 +5,18 @@ This directory is reserved for active, living architecture references.
 Completed milestone plans, execution checklists, and historical closeout
 documents live under [../archive/](../archive/).
 
-Active milestone docs:
+Current architecture docs:
+
+- [ENGINE_FIRST_CALC_ADOPTION.md](ENGINE_FIRST_CALC_ADOPTION.md) -
+  active frontier for widening engine-first execution inside Calc and
+  consolidating the post-extraction host boundary
 
 - [EXECUTION_BACKEND_EXTRACTION.md](EXECUTION_BACKEND_EXTRACTION.md) -
-  active milestone for extracting evaluator-shell execution logic on top of the
-  completed orchestration boundary; Phases 0 through 12 are complete and the
-  next frontier is the broader token-walking shell plus the final closeout
-  cleanup
+  completed boundary record for evaluator-shell execution extraction on top of
+  the recalc-orchestration handoff
 - [EXECUTION_SHELL_CLOSEOUT_PLAN.md](EXECUTION_SHELL_CLOSEOUT_PLAN.md) -
-  implementation-ready plan for finishing the remaining Calc-owned execution
-  shell, including workstreams, validation lanes, and final exit criteria
+  completed closeout record for the final execution-shell cleanup,
+  validation lanes, and exit criteria
 - [RECALC_ORCHESTRATION_EXTRACTION.md](RECALC_ORCHESTRATION_EXTRACTION.md) -
   completed milestone for engine-owned recalc authority and queue/scheduling
   extraction

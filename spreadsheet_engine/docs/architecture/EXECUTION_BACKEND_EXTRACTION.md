@@ -2,15 +2,18 @@
 
 ## Purpose
 
-The recalculation-orchestration milestone is complete. The next extraction
-program starts from a stable authority boundary:
+Status: **Complete**
+
+The recalculation-orchestration milestone is complete, and this execution
+backend program is complete as well. This document now serves as the boundary
+record for the extracted execution-shell surface:
 
 - engine owns invalidation planning and recalc queue construction
 - Calc consumes engine queue output through a compat bridge
 - Calc still owns storage mutation and actual formula execution
 
-This milestone moves execution semantics out of Calc in small, validated
-slices while preserving that boundary.
+It moved execution semantics out of Calc in small, validated slices while
+preserving that boundary.
 
 ## Objectives
 
@@ -45,15 +48,10 @@ The starting handoff from the completed recalc-orchestration milestone is:
 
 ## Current Status
 
-This milestone is now active with Phases 0 through 11 complete and the
-execution-shell closeout inventory frozen. The remaining surface is now a
-small, explicitly classified set of clusters instead of a generic
-"interpreter tail":
+This milestone is complete. The extracted execution shell is now represented
+by the phase inventory below, and the remaining Calc-owned code is no longer
+an open spreadsheet-semantic interpreter tail:
 
-- matrix-condition and frame-conversion helpers in `interpr4.cxx`
-- scalar-reference and ref-list materialization helpers in `interpr4.cxx`
-- the host-heavy `CELL(...)` property tail plus external variants in
-  `interpr1.cxx`
 - intentionally host-owned `INFO(...)`, external-reference cache plumbing, and
   token-container construction helpers
 
@@ -127,7 +125,7 @@ small, explicitly classified set of clusters instead of a generic
   explicitly host-only `INFO(...)`, token-container, and external-reference
   plumbing
 
-The starting baseline for this milestone is:
+The verified steady-state baseline for this completed milestone is:
 
 - `500` promoted replay workbooks
 - `50,661` formula cells
