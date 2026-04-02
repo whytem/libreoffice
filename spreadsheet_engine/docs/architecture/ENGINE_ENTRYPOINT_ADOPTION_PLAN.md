@@ -267,6 +267,26 @@ Closeout standard:
 - the inventory is concrete, classified, and linked from the status docs
 - every later phase has a bounded landing surface
 
+Status: complete
+
+Frozen inventory for this stream:
+
+| Calc entry cluster | Owning files | Closest engine entry surface | Gap type | Classification | Owning phase | Validation lanes |
+| --- | --- | --- | --- | --- | --- | --- |
+| `VALUE`, `DATEVALUE`, `TIMEVALUE`, `NUMBERVALUE` | `sc/source/core/tool/interpr1.cxx`, `sc/source/core/tool/interpr2.cxx` | `api::parsing::*`, `api::text::parseNumberValue`, `DocumentEvaluationHost` | repeated host/context packaging and result projection | ready now | Phases 2-3 | `CppunitTest_sc_ucalc_formula2`, `spreadsheetengine_fods_evaluator_tests`, replay summary gate |
+| `ISFORMULA`, `FORMULA` | `sc/source/core/tool/interpr1.cxx` | formula-inspection compat seam plus engine runtime/value-shape helpers | thin direct-entry wrapper missing; matrix/result projection still Calc-local | ready now | Phase 4 | `CppunitTest_sc_ucalc_formula2`, `CppunitTest_sc_ucalc_shared_cases`, evaluator tests, replay summary gate |
+| bounded `CELL(...)` subset already routed through shared runtime (`COL`, `ROW`, `SHEET`, `ADDRESS`, `CONTENTS`, `TYPE`) | `sc/source/core/tool/interpr1.cxx` | `runtime::cellinspection`, `compat/libreoffice/CellInspectionExecution.hxx` | already adopted helper-by-helper; not the first direct-entry pilot | defer in this stream | retain | targeted Calc coverage only if touched incidentally |
+| host-heavy `CELL(...)` property tail (`FILENAME`, `WIDTH`, `PREFIX`, `PROTECT`, `FORMAT`, `COLOR`, `PARENTHESES`) | `sc/source/core/tool/interpr1.cxx` | host-only property readers plus bounded `cellinspection` helpers | true host service dependency | host-only | retain | `CppunitTest_sc_ucalc_formula2` if touched |
+| external/session-backed information paths (`CELL` external refs, `INFO(...)`, printer/path/session state) | `sc/source/core/tool/interpr1.cxx`, other Calc host code | none appropriate; depends on Calc document/session services | host service dependency | host-only | retain | existing Calc lanes only |
+| lookup/reference execution already extracted behind compat bridges (`MATCH`, `XMATCH`, `LOOKUP`, `VLOOKUP`, `HLOOKUP`, `XLOOKUP`, `INDEX`, `OFFSET`, `ADDRESS`) | `sc/source/core/tool/interpr1.cxx`, `sc/source/core/tool/interpr2.cxx` | existing lookup/reference compat and runtime seams | not a good first direct-entry pilot because the helper boundary is already stable | defer | new frontier after closeout | lookup/reference tests plus replay gate if later touched |
+
+Phase ownership in this inventory:
+
+- Phase 2 will land a shared direct-entry adapter for the text-parsing cluster.
+- Phase 3 will switch the text-parsing production callers onto that adapter.
+- Phase 4 will switch the formula-inspection production callers onto a bounded direct-entry seam.
+- Phase 5 will remove the superseded local orchestration left behind by those two adopted clusters.
+
 ### Phase 2. Land The First Entry Adapter Surface
 
 Start with the smallest viable adapter seam that packages Calc state for a
