@@ -230,6 +230,10 @@ Success looks like a simpler Calc host shell whose remaining logic is clearly
 host-only and whose production execution paths rely on engine-owned semantics
 by default.
 
+The detailed implementation guide for this stream is:
+
+- [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](architecture/DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md)
+
 ### 2. Consolidate The Host Boundary
 
 The project still has legacy coupling points that should continue to shrink,
@@ -302,6 +306,8 @@ project is on track.
 
 The most relevant active docs are:
 
+- [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](architecture/DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md)
+- [ENGINE_FIRST_CALC_ADOPTION.md](architecture/ENGINE_FIRST_CALC_ADOPTION.md)
 - [EXECUTION_BACKEND_EXTRACTION.md](architecture/EXECUTION_BACKEND_EXTRACTION.md)
 - [EXECUTION_SHELL_CLOSEOUT_PLAN.md](architecture/EXECUTION_SHELL_CLOSEOUT_PLAN.md)
 - [README.md](architecture/README.md)
