@@ -40,21 +40,32 @@ inline double finiteOrThrow(double d)
     return d;
 }
 
-inline spreadsheetengine::api::DateParts getNullDateParts(
-    const css::uno::Reference<css::beans::XPropertySet>& xOpt)
+inline spreadsheetengine::api::DateParts makeNullDatePartsFromSerial(sal_Int32 nNullDate)
 {
     sal_uInt16 nDay = 0;
     sal_uInt16 nMonth = 0;
     sal_uInt16 nYear = 0;
-    sca::analysis::DaysToDate(sca::analysis::GetNullDate(xOpt), nDay, nMonth, nYear);
+    sca::analysis::DaysToDate(nNullDate, nDay, nMonth, nYear);
     return { static_cast<std::int16_t>(nYear), static_cast<std::int16_t>(nMonth),
         static_cast<std::int16_t>(nDay) };
 }
 
+struct HostDateContext
+{
+    sal_Int32 mnNullDate = 0;
+    spreadsheetengine::api::DateParts maNullDate;
+};
+
 struct FinancialDateContext
 {
-    spreadsheetengine::api::DateParts maNullDate;
+    HostDateContext maHostDate;
     sal_Int32 mnBasis = 0;
+};
+
+struct WorkdayHostContext
+{
+    HostDateContext maHostDate;
+    std::vector<spreadsheetengine::api::DateSerial> maHolidaySerials;
 };
 
 inline sal_Int32 getRequiredHostNullDate(
@@ -62,6 +73,19 @@ inline sal_Int32 getRequiredHostNullDate(
 {
     // Host-only: this comes from the live document's NullDate property.
     return sca::analysis::GetNullDate(xOpt);
+}
+
+inline HostDateContext getHostDateContext(
+    const css::uno::Reference<css::beans::XPropertySet>& xOpt)
+{
+    const sal_Int32 nNullDate = getRequiredHostNullDate(xOpt);
+    return { nNullDate, makeNullDatePartsFromSerial(nNullDate) };
+}
+
+inline spreadsheetengine::api::DateParts getNullDateParts(
+    const css::uno::Reference<css::beans::XPropertySet>& xOpt)
+{
+    return getHostDateContext(xOpt).maNullDate;
 }
 
 inline void populateHostHolidayList(sca::analysis::ScaAnyConverter& rAnyConv,
@@ -75,7 +99,7 @@ inline void populateHostHolidayList(sca::analysis::ScaAnyConverter& rAnyConv,
 inline FinancialDateContext getFinancialDateContext(
     const css::uno::Reference<css::beans::XPropertySet>& xOpt, sal_Int32 nBasis)
 {
-    return { getNullDateParts(xOpt), nBasis };
+    return { getHostDateContext(xOpt), nBasis };
 }
 
 inline std::vector<spreadsheetengine::api::DateSerial> collectHostHolidaySerialsFromAddInInputs(
@@ -96,6 +120,16 @@ inline std::vector<spreadsheetengine::api::DateSerial> collectHostHolidaySerials
     return aHolidaySerials;
 }
 
+inline WorkdayHostContext getWorkdayHostContext(sca::analysis::ScaAnyConverter& rAnyConv,
+    const css::uno::Reference<css::beans::XPropertySet>& xOpt, const css::uno::Any& rHolidayAny)
+{
+    WorkdayHostContext aContext;
+    aContext.maHostDate = getHostDateContext(xOpt);
+    aContext.maHolidaySerials = collectHostHolidaySerialsFromAddInInputs(
+        rAnyConv, xOpt, rHolidayAny, aContext.maHostDate.mnNullDate);
+    return aContext;
+}
+
 inline double valueOrThrow(spreadsheetengine::api::ValueResult<double> aResult)
 {
     if (!aResult)
@@ -109,7 +143,7 @@ inline double evaluateFinancialWithDateMode(
     Function&& rFunction, Args&&... rArgs)
 {
     const auto aContext = getFinancialDateContext(xOpt, nBasis);
-    return valueOrThrow(std::invoke(std::forward<Function>(rFunction), aContext.maNullDate,
+    return valueOrThrow(std::invoke(std::forward<Function>(rFunction), aContext.maHostDate.maNullDate,
         std::forward<Args>(rArgs)..., aContext.mnBasis));
 }
 
@@ -118,8 +152,9 @@ inline double evaluateFinancialWithNullDate(
     const css::uno::Reference<css::beans::XPropertySet>& xOpt, Function&& rFunction,
     Args&&... rArgs)
 {
-    return valueOrThrow(std::invoke(
-        std::forward<Function>(rFunction), getNullDateParts(xOpt), std::forward<Args>(rArgs)...));
+    return valueOrThrow(
+        std::invoke(std::forward<Function>(rFunction), getHostDateContext(xOpt).maNullDate,
+            std::forward<Args>(rArgs)...));
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

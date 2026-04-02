@@ -340,21 +340,20 @@ sal_Int32 SAL_CALL AnalysisAddIn::getWorkday( const uno::Reference< beans::XProp
     if( !nDays )
         return nDate;
 
-    const sal_Int32 nNullDate = getRequiredHostNullDate( xOptions );
-    const auto aHolidaySerials
-        = collectHostHolidaySerialsFromAddInInputs( aAnyConv, xOptions, aHDay, nNullDate );
+    const auto aHostContext = getWorkdayHostContext(aAnyConv, xOptions, aHDay);
     return seworkday::advanceWorkday(
         static_cast<spreadsheetengine::api::DateSerial>( nDate ),
         static_cast<spreadsheetengine::api::DateSerial>( nDays ),
-        aHolidaySerials, seworkday::defaultWeekendMask() );
+        aHostContext.maHolidaySerials, seworkday::defaultWeekendMask() );
 }
 
 /** Yearfrac */
 double SAL_CALL AnalysisAddIn::getYearfrac( const uno::Reference< beans::XPropertySet >& xOpt,
     sal_Int32 nStartDate, sal_Int32 nEndDate, const uno::Any& rMode )
 {
+    const auto aHostDate = getHostDateContext(xOpt);
     return valueOrThrow(sefinance::evaluateYearFraction(
-        getNullDateParts(xOpt), nStartDate, nEndDate, getDateMode(xOpt, rMode)));
+        aHostDate.maNullDate, nStartDate, nEndDate, getDateMode(xOpt, rMode)));
 }
 
 sal_Int32 SAL_CALL AnalysisAddIn::getEdate( const uno::Reference< beans::XPropertySet >& /*xOpt*/, sal_Int32 nStartDate, sal_Int32 nMonths )
@@ -365,8 +364,9 @@ sal_Int32 SAL_CALL AnalysisAddIn::getEdate( const uno::Reference< beans::XProper
 
 sal_Int32 SAL_CALL AnalysisAddIn::getWeeknum( const uno::Reference< beans::XPropertySet >& xOpt, sal_Int32 nDate, sal_Int32 nMode )
 {
+    const auto aHostDate = getHostDateContext(xOpt);
     return secalendar::weeknumOOo(
-        getNullDateParts( xOpt ), nDate, static_cast<std::int16_t>( nMode == 1 ? 1 : 2 ) );
+        aHostDate.maNullDate, nDate, static_cast<std::int16_t>( nMode == 1 ? 1 : 2 ) );
 }
 
 sal_Int32 SAL_CALL AnalysisAddIn::getEomonth( const uno::Reference< beans::XPropertySet >& /*xOpt*/, sal_Int32 nDate, sal_Int32 nMonths )
@@ -378,13 +378,11 @@ sal_Int32 SAL_CALL AnalysisAddIn::getEomonth( const uno::Reference< beans::XProp
 sal_Int32 SAL_CALL AnalysisAddIn::getNetworkdays( const uno::Reference< beans::XPropertySet >& xOpt,
         sal_Int32 nStartDate, sal_Int32 nEndDate, const uno::Any& aHDay )
 {
-    const sal_Int32 nNullDate = getRequiredHostNullDate( xOpt );
-    const auto aHolidaySerials
-        = collectHostHolidaySerialsFromAddInInputs( aAnyConv, xOpt, aHDay, nNullDate );
+    const auto aHostContext = getWorkdayHostContext(aAnyConv, xOpt, aHDay);
     return seworkday::countWorkdays(
         static_cast<spreadsheetengine::api::DateSerial>( nStartDate ),
         static_cast<spreadsheetengine::api::DateSerial>( nEndDate ),
-        aHolidaySerials, seworkday::defaultWeekendMask() );
+        aHostContext.maHolidaySerials, seworkday::defaultWeekendMask() );
 }
 
 sal_Int32 SAL_CALL AnalysisAddIn::getIseven( sal_Int32 nVal )
