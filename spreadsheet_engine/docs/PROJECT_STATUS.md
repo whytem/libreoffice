@@ -218,7 +218,25 @@ surface is explicitly host-shaped.
 The next plan should be organized around the end-state boundary rather than
 around historical milestone names.
 
-### 1. Keep The Production Boundary Tight And Explicit
+### 1. Widen Direct Engine Entry Inside Calc
+
+The first bounded direct-entry adoption stream is complete, and the
+production-boundary tightening stream is complete.
+
+That leaves the next logical frontier as a fresh inventory-driven widening
+stream: more production Calc paths should enter `spreadsheet_engine` directly
+where the spreadsheet semantics are already engine-owned and the host boundary
+is now thin enough to audit.
+
+The active implementation-ready plan for that work is:
+
+- [ENGINE_ENTRY_WIDENING_PLAN.md](architecture/ENGINE_ENTRY_WIDENING_PLAN.md)
+
+The completed first-wave direct-entry closeout record remains:
+
+- [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
+
+### 2. Keep The Production Boundary Tight And Explicit
 
 The first bounded direct-entry adoption stream is complete, and the follow-on
 production-boundary tightening stream is complete.
@@ -237,7 +255,7 @@ The completed closeout records for those two streams are:
 - [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
 - [PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md](architecture/PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md)
 
-### 2. Keep The Remaining Token Boundary Explicit
+### 3. Keep The Remaining Token Boundary Explicit
 
 The bounded token-boundary reduction stream is complete.
 
@@ -253,7 +271,7 @@ The completed closeout record for that stream is:
 
 - [TOKEN_BOUNDARY_REDUCTION_PLAN.md](architecture/TOKEN_BOUNDARY_REDUCTION_PLAN.md)
 
-### 3. Deepen Engine-First Execution Inside Calc
+### 4. Deepen Engine-First Execution Inside Calc
 
 The current deepening stream is complete for the identified safe adoption
 surface.
@@ -269,7 +287,7 @@ The detailed implementation and closeout record for that stream is:
 
 - [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](architecture/DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md)
 
-### 4. Keep The Host Boundary Explicit And Stable
+### 5. Keep The Host Boundary Explicit And Stable
 
 The bounded host-boundary consolidation stream is complete.
 
@@ -286,7 +304,7 @@ The completed closeout record for that stream is:
 
 - [HOST_BOUNDARY_CONSOLIDATION_PLAN.md](architecture/HOST_BOUNDARY_CONSOLIDATION_PLAN.md)
 
-### 5. Keep The Zero-Fallback Baseline Stable
+### 6. Keep The Zero-Fallback Baseline Stable
 
 The zero-fallback promoted replay baseline is now an asset that needs to be
 protected continuously.
@@ -300,7 +318,7 @@ That means:
 
 This is now part of normal project maintenance, not a side effort.
 
-### 6. Reassess New Bounded Frontiers Only After A Fresh Inventory
+### 7. Reassess New Bounded Frontiers Only After A Fresh Inventory
 
 There are bigger long-term questions that may eventually matter, but they
 should not drive near-term work:
@@ -344,6 +362,7 @@ project is on track.
 
 The most relevant active docs are:
 
+- [ENGINE_ENTRY_WIDENING_PLAN.md](architecture/ENGINE_ENTRY_WIDENING_PLAN.md)
 - [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
 - [PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md](architecture/PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md)
 - [TOKEN_BOUNDARY_REDUCTION_PLAN.md](architecture/TOKEN_BOUNDARY_REDUCTION_PLAN.md)
