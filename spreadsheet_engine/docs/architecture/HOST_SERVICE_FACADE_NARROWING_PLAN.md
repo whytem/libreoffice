@@ -315,6 +315,8 @@ Phase 3 closeout notes:
 
 ### Phase 4. Narrow Host-Heavy Inspection Projection
 
+Status: complete
+
 Apply the same discipline to the retained host-heavy inspection shell.
 
 Preferred execution order:
@@ -323,6 +325,19 @@ Preferred execution order:
 2. bounded `INFO(...)` service projection where a small seam clarifies the
    boundary
 3. explicit documentation of what remains host-only after the slice
+
+Phase 4 closeout notes:
+
+- the retained local `CELL(...)` host-only property tail now runs through
+  [DirectHostCellInspectionAdapter](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx)
+  instead of open-coded projection in
+  [ScCell()](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx)
+- the bounded `INFO(...)` projection path now routes through
+  [DirectInfoInspectionAdapter](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InfoInspectionExecution.hxx),
+  leaving [ScInfo()](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr5.cxx)
+  with only request assembly and result pushing
+- the intentionally retained host-only tail after this slice is the service
+  ownership itself, not the caller-side projection logic
 
 ### Phase 5. Remove Superseded Host-Service Wrappers
 

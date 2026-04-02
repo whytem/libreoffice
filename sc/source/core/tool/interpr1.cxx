@@ -2500,63 +2500,21 @@ void ScInterpreter::ScCell()
             return;
         }
 
+        secellexec::DirectHostCellInspectionAdapter aHostCellAdapter(mrDoc, mrContext);
+        secellexec::LocalHostCellInfoRequest aHostRequest;
+        aHostRequest.maCellPos = aCellPos;
+        aHostRequest.mbHasString = aCell.hasString();
+        aHostRequest.meConvention = eAddressConvention;
+        aHostRequest.mnFormat = mrDoc.GetNumberFormat(ScRange(aCellPos));
+        const auto aHostEvaluation = aHostCellAdapter.evaluateLocalInfo(aInfoType, aHostRequest);
+        if (aHostEvaluation.mbHandled)
+        {
+            pushApiCellValue(aHostEvaluation.maValue);
+            return;
+        }
+
         switch (eBoundedInfoKind)
         {
-            case secellexec::InfoKind::Filename:
-            {
-                pushApiCellValue(secellexec::makeLocalFilenamePropertyValue(
-                    mrDoc, aCellPos.Tab(), eAddressConvention));
-                break;
-            }
-            case secellexec::InfoKind::Coord:
-            {   // address, lotus 1-2-3 formatted: $TABLE:$COL$ROW
-                // Yes, passing tab as col is intentional!
-                OUString aCellStr1 =
-                    ScAddress(static_cast<SCCOL>(aCellPos.Tab()), 0, 0)
-                        .Format((ScRefFlags::COL_ABS | ScRefFlags::COL_VALID), nullptr,
-                            mrDoc.GetAddressConvention());
-                OUString aCellStr2 = aCellPos.Format(
-                    (ScRefFlags::COL_ABS | ScRefFlags::COL_VALID | ScRefFlags::ROW_ABS
-                     | ScRefFlags::ROW_VALID),
-                    nullptr, mrDoc.GetAddressConvention());
-                OUString aFuncResult = aCellStr1 + ":" + aCellStr2;
-                PushString(aFuncResult);
-                break;
-            }
-            case secellexec::InfoKind::Width:
-            {
-                pushApiCellValue(secellexec::makeWidthPropertyValue(mrDoc, aCellPos));
-                break;
-            }
-            case secellexec::InfoKind::Prefix:
-            {
-                pushApiCellValue(
-                    secellexec::makePrefixPropertyValue(mrDoc, aCellPos, aCell.hasString()));
-                break;
-            }
-            case secellexec::InfoKind::Protect:
-            {
-                pushApiCellValue(secellexec::makeProtectPropertyValue(mrDoc, aCellPos));
-                break;
-            }
-            case secellexec::InfoKind::Format:
-            {
-                pushApiCellValue(
-                    secellexec::makeFormatPropertyValue(mrContext, mrDoc.GetNumberFormat(ScRange(aCellPos))));
-                break;
-            }
-            case secellexec::InfoKind::Color:
-            {
-                pushApiCellValue(
-                    secellexec::makeColorPropertyValue(mrContext, mrDoc.GetNumberFormat(ScRange(aCellPos))));
-                break;
-            }
-            case secellexec::InfoKind::Parentheses:
-            {
-                pushApiCellValue(secellexec::makeParenthesesPropertyValue(
-                    mrContext, mrDoc.GetNumberFormat(ScRange(aCellPos))));
-                break;
-            }
             case secellexec::InfoKind::Unsupported:
             case secellexec::InfoKind::Column:
             case secellexec::InfoKind::Row:
@@ -2564,6 +2522,14 @@ void ScInterpreter::ScCell()
             case secellexec::InfoKind::Address:
             case secellexec::InfoKind::Contents:
             case secellexec::InfoKind::Type:
+            case secellexec::InfoKind::Filename:
+            case secellexec::InfoKind::Coord:
+            case secellexec::InfoKind::Width:
+            case secellexec::InfoKind::Prefix:
+            case secellexec::InfoKind::Protect:
+            case secellexec::InfoKind::Format:
+            case secellexec::InfoKind::Color:
+            case secellexec::InfoKind::Parentheses:
                 PushIllegalArgument();
                 break;
         }

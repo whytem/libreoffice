@@ -3340,29 +3340,30 @@ void ScInterpreter::ScInfo()
 
     OUString aStr = GetString().getString();
     ScCellKeywordTranslator::transKeyword(aStr, ScGlobal::GetLocale(), ocInfo);
-    const auto eInfoKind = seinfoexec::classifyInfoType(aStr);
-    if (eInfoKind == seinfoexec::InfoKind::System)
-        PushString(selibreoffice::toLibreOfficeString(seinfoexec::makeStaticInfoValue(eInfoKind).maString));
-    else if( eInfoKind == seinfoexec::InfoKind::OSVersion )
-#if (defined LINUX || defined __FreeBSD__)
-        PushString(Application::GetOSVersion());
-#elif defined MACOSX
-        // TODO tdf#140286 handle MACOSX version to get result compatible to Excel
-        PushString("Windows (32-bit) NT 5.01");
-#else // handle Windows (WNT, WIN_NT, WIN32, _WIN32)
-        // TODO tdf#140286 handle Windows version to get a result compatible to Excel
-        PushString( "Windows (32-bit) NT 5.01" );
-#endif
-    else if( eInfoKind == seinfoexec::InfoKind::Release )
-        PushString( ::utl::Bootstrap::getBuildIdData( OUString() ) );
-    else if( eInfoKind == seinfoexec::InfoKind::NumFile )
-        PushDouble( seinfoexec::makeStaticInfoValue(eInfoKind).mfNumber );
-    else if( eInfoKind == seinfoexec::InfoKind::Recalc )
-        PushString( ScResId( mrDoc.GetAutoCalc() ? STR_RECALC_AUTO : STR_RECALC_MANUAL ) );
-    else if (seinfoexec::isUnavailableInfoKind(eInfoKind))
-        PushNA();
-    else
+    seinfoexec::DirectInfoInspectionRequest aRequest;
+    aRequest.mbAutoCalc = mrDoc.GetAutoCalc();
+    aRequest.maAutoRecalcLabel = selibreoffice::toApiString(ScResId(STR_RECALC_AUTO));
+    aRequest.maManualRecalcLabel = selibreoffice::toApiString(ScResId(STR_RECALC_MANUAL));
+
+    seinfoexec::DirectInfoInspectionAdapter aAdapter;
+    const auto aEvaluation = aAdapter.evaluateInfo(aStr, aRequest);
+    if (!aEvaluation.mbHandled)
+    {
         PushIllegalArgument();
+        return;
+    }
+
+    if (!aEvaluation.maResult)
+    {
+        PushError(selibreoffice::toFormulaError(aEvaluation.maResult.meError));
+        return;
+    }
+
+    const auto& rValue = aEvaluation.maResult.maValue;
+    if (rValue.isText())
+        PushString(selibreoffice::toLibreOfficeString(rValue.maString));
+    else
+        PushDouble(rValue.mfNumber);
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

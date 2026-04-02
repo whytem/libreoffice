@@ -61,6 +61,22 @@ struct DirectCellInfoEvaluation
     bool mbHandled = false;
 };
 
+struct LocalHostCellInfoRequest
+{
+    ScAddress maCellPos;
+    bool mbHasString = false;
+    formula::FormulaGrammar::AddressConvention meConvention
+        = formula::FormulaGrammar::CONV_OOO;
+    sal_uInt32 mnFormat = 0;
+};
+
+struct DirectHostCellInfoEvaluation
+{
+    InfoKind meKind = InfoKind::Unsupported;
+    CellValue maValue = CellValue::empty();
+    bool mbHandled = false;
+};
+
 struct ExternalCellInfoRequest
 {
     CellAddress maAddress;
@@ -99,6 +115,30 @@ struct DirectExternalCellInfoEvaluation
 [[nodiscard]] inline std::optional<spreadsheetengine::api::CellValue>
 makeExternalFilenamePropertyValue(ScExternalRefManager& rRefMgr, sal_uInt16 nFileId,
     const OUString& rTabName, formula::FormulaGrammar::AddressConvention eConvention);
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeCoordPropertyValue(
+    const ScDocument& rDoc, const ScAddress& rCellPos);
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeLocalFilenamePropertyValue(
+    const ScDocument& rDoc, SCTAB nTab, formula::FormulaGrammar::AddressConvention eConvention);
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeWidthPropertyValue(
+    ScDocument& rDoc, const ScAddress& rCellPos);
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makePrefixPropertyValue(
+    const ScDocument& rDoc, const ScAddress& rCellPos, bool bHasString);
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeProtectPropertyValue(
+    const ScDocument& rDoc, const ScAddress& rCellPos);
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeFormatPropertyValue(
+    const ScInterpreterContext& rContext, sal_uInt32 nFormat);
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeColorPropertyValue(
+    const ScInterpreterContext& rContext, sal_uInt32 nFormat);
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeParenthesesPropertyValue(
+    const ScInterpreterContext& rContext, sal_uInt32 nFormat);
 
 class DirectCellInspectionAdapter
 {
@@ -144,6 +184,76 @@ public:
         aInfoRequest.moSheetName = oSheetName;
         aEvaluation.maResult = evaluateBoundedCellInfo(aEvaluation.meKind, aInfoRequest);
         aEvaluation.mbHandled = true;
+        return aEvaluation;
+    }
+};
+
+class DirectHostCellInspectionAdapter
+{
+    const ScDocument& mrDocument;
+    const ScInterpreterContext& mrContext;
+
+public:
+    DirectHostCellInspectionAdapter(const ScDocument& rDocument,
+        const ScInterpreterContext& rContext)
+        : mrDocument(rDocument)
+        , mrContext(rContext)
+    {
+    }
+
+    [[nodiscard]] DirectHostCellInfoEvaluation evaluateLocalInfo(
+        const OUString& rInfoType, const LocalHostCellInfoRequest& rRequest) const
+    {
+        DirectHostCellInfoEvaluation aEvaluation;
+        aEvaluation.meKind = classifyInfoType(rInfoType);
+
+        switch (aEvaluation.meKind)
+        {
+            case InfoKind::Filename:
+                aEvaluation.maValue = makeLocalFilenamePropertyValue(
+                    mrDocument, rRequest.maCellPos.Tab(), rRequest.meConvention);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            case InfoKind::Coord:
+                aEvaluation.maValue = makeCoordPropertyValue(mrDocument, rRequest.maCellPos);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            case InfoKind::Width:
+                aEvaluation.maValue = makeWidthPropertyValue(
+                    const_cast<ScDocument&>(mrDocument), rRequest.maCellPos);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            case InfoKind::Prefix:
+                aEvaluation.maValue = makePrefixPropertyValue(
+                    mrDocument, rRequest.maCellPos, rRequest.mbHasString);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            case InfoKind::Protect:
+                aEvaluation.maValue = makeProtectPropertyValue(mrDocument, rRequest.maCellPos);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            case InfoKind::Format:
+                aEvaluation.maValue = makeFormatPropertyValue(mrContext, rRequest.mnFormat);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            case InfoKind::Color:
+                aEvaluation.maValue = makeColorPropertyValue(mrContext, rRequest.mnFormat);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            case InfoKind::Parentheses:
+                aEvaluation.maValue = makeParenthesesPropertyValue(mrContext, rRequest.mnFormat);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            case InfoKind::Unsupported:
+            case InfoKind::Column:
+            case InfoKind::Row:
+            case InfoKind::Sheet:
+            case InfoKind::Address:
+            case InfoKind::Contents:
+            case InfoKind::Type:
+                return aEvaluation;
+        }
+
         return aEvaluation;
     }
 };
@@ -376,6 +486,20 @@ makeExternalFilenamePropertyValue(ScExternalRefManager& rRefMgr, sal_uInt16 nFil
 [[nodiscard]] inline spreadsheetengine::api::CellValue makeFlagValue(bool bFlag)
 {
     return spreadsheetengine::runtime::cellinspection::numericPropertyValue(bFlag ? 1.0 : 0.0);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeCoordPropertyValue(
+    const ScDocument& rDoc, const ScAddress& rCellPos)
+{
+    OUString aCellStr1 = ScAddress(static_cast<SCCOL>(rCellPos.Tab()), 0, 0)
+                             .Format((ScRefFlags::COL_ABS | ScRefFlags::COL_VALID), nullptr,
+                                 rDoc.GetAddressConvention());
+    OUString aCellStr2 = rCellPos.Format(
+        (ScRefFlags::COL_ABS | ScRefFlags::COL_VALID | ScRefFlags::ROW_ABS
+         | ScRefFlags::ROW_VALID),
+        nullptr, rDoc.GetAddressConvention());
+    return spreadsheetengine::runtime::cellinspection::textPropertyValue(
+        toApiString(aCellStr1 + ":" + aCellStr2));
 }
 
 [[nodiscard]] inline spreadsheetengine::api::CellValue makePrefixValue(
