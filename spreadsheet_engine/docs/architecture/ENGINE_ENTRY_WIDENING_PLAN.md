@@ -258,6 +258,8 @@ Completion criteria:
 
 ### Phase 1. Freeze And Publish The Widening Inventory
 
+Status: complete
+
 Create the explicit candidate table for production Calc entry points that are
 now plausible second-wave direct engine-entry adopters.
 
@@ -265,17 +267,29 @@ Initial inventory targets:
 
 | Candidate | Owning file(s) | Current boundary problem | Classification | Target outcome | Validation lanes | Later phase |
 | --- | --- | --- | --- | --- | --- | --- |
-| direct engine entry for additional pure scalar text/date parsing surfaces adjacent to `VALUE`, `DATEVALUE`, `TIMEVALUE`, and `NUMBERVALUE` | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [interpr2.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr2.cxx) | semantics are engine-owned, but some adjacent callers may still package arguments and results locally instead of entering through a named seam | `ready now` or `needs small seam` | widen direct entry on the next small production parsing slice | `CppunitTest_sc_ucalc_formula2`, replay summary | Phase 3 |
-| additional formula-inspection or bounded information surfaces adjacent to `FORMULA` / `ISFORMULA` and the narrowed `CELL(...)` subset | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [interpr5.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr5.cxx) | some result shaping is shared, but caller packaging may still be broader than necessary | `needs small seam` or `intentionally host-only` | widen only where host services are already explicit and thin | `CppunitTest_sc_ucalc_formula2`, `CppunitTest_sc_ucalc_shared_cases`, replay summary | Phase 4 |
-| add-in callers using shared financial/calendar semantics but still stopping at helper-level adoption rather than direct entry | [analysis.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysis.cxx), [financial.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/financial.cxx) | local lifecycle and service setup may now be thinner than the semantic work still remaining in Calc-side code | `ready now` or `needs small seam` | widen direct entry where host setup is already normalized | `CppunitTest_scaddins_analysis`, replay summary | Phase 3 / 5 |
-| bounded reference-safe inspection or lookup entry paths already backed by compat seams | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), compat headers under [compat/libreoffice](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice) | reference-shape handling is shared, but production callers may still stop short of direct engine entry | `needs small seam` | adopt one bounded reference-safe direct-entry slice | `CppunitTest_sc_ucalc_formula2`, lookup/reference tests, replay summary | Phase 4 |
-| host-heavy inspection or environment surfaces such as `INFO(...)` and retained `CELL(...)` document-service properties | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [interpr5.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr5.cxx) | host service access is real and may dominate the path even after boundary tightening | `intentionally host-only` or `defer` | retain as Calc-owned unless a very small seam becomes obvious | focused Calc coverage only | retain / defer |
+| add-in financial callers already backed by shared engine runtime (`EFFECT`, `NOMINAL`, `DOLLARFR`, `DOLLARDE`, `CUMPRINC`, `CUMIPMT`, `TBILLEQ`, `TBILLPRICE`, `TBILLYIELD`) | [financial.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/financial.cxx), [analysisdefs.hxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysisdefs.hxx) | host setup is already normalized, but production callers still stop at helper-level adoption instead of using a named direct entry seam | `ready now` for the pure scalar subset, `needs small seam` for the null-date subset | add a direct add-in financial entry seam and adopt the proven pure/date cluster | `CppunitTest_scaddins_analysis`, replay summary | Phase 2 / 3 / 5 |
+| bounded local-workbook `CELL(...)` subset (`COL`, `ROW`, `SHEET`, `ADDRESS`, `CONTENTS`, `TYPE`) | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [CellInspectionExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx) | reference-shape and result shaping are already shared, but `ScCell()` still assembles the bounded request inline | `needs small seam` | move bounded local `CELL(...)` entry through one named direct helper | `CppunitTest_sc_ucalc_formula2`, `CppunitTest_sc_ucalc_shared_cases`, replay summary | Phase 2 / 4 |
+| bounded external-reference `CELL(...)` subset (`COL`, `ROW`, `SHEET`, `ADDRESS`, `CONTENTS`, `TYPE`, external filename/format/color/parentheses`) | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [CellInspectionExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx) | external cache ownership is intentionally host-only, but the external `CELL(...)` classification and projection shell is still local to `ScCellExternal()` | `needs small seam` | move the bounded external `CELL(...)` entry through the same direct helper family while keeping cache ownership in Calc | `CppunitTest_sc_ucalc_formula2`, replay summary | Phase 5 |
+| additional pure scalar text/date parsing surfaces adjacent to `VALUE`, `DATEVALUE`, `TIMEVALUE`, and `NUMBERVALUE` | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [interpr2.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr2.cxx) | direct entry is already adopted for the main production parsing slice and no adjacent production caller currently offers better payoff than the financial and `CELL(...)` targets | `defer` | leave unchanged for this stream unless a clearer production caller appears during implementation | `CppunitTest_sc_ucalc_formula2`, replay summary | defer |
+| host-heavy inspection or environment surfaces such as `INFO(...)` and retained local `CELL(...)` document-service properties (`WIDTH`, `PREFIX`, `PROTECT`, `FORMAT`, `COLOR`, `PARENTHESES`, `FILENAME`, `COORD`) | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [interpr5.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr5.cxx) | host service access dominates the path even after boundary tightening | `intentionally host-only` | retain as Calc-owned unless a very small future seam becomes obvious | focused Calc coverage only | retain |
 
 Phase completion questions:
 
 - Are all plausible second-wave direct-entry candidates explicitly classified?
 - Does each candidate have a concrete later phase or explicit retain/defer
   reason?
+
+Phase 1 closeout notes:
+
+- the highest-value widening targets are now explicitly narrowed to:
+  - shared add-in financial callers that still stop at helper-level adoption
+  - the bounded local and external `CELL(...)` subsets that already have thin
+    compat/runtime seams
+- adjacent parsing surfaces are explicitly deferred for this stream because the
+  remaining production payoff is lower than the financial and `CELL(...)`
+  slices
+- `INFO(...)` and the retained host-heavy `CELL(...)` property tail remain
+  intentionally Calc-owned
 
 ### Phase 2. Normalize The Second-Wave Host Adapters
 
