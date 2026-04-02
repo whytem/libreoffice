@@ -2469,10 +2469,6 @@ void ScInterpreter::ScCell()
         ScRefCellValue aCell(mrDoc, aCellPos);
 
         ScCellKeywordTranslator::transKeyword(aInfoType, ScGlobal::GetLocale(), ocCell);
-        const auto makeApiCellValue = [&]() -> spreadsheetengine::api::CellValue {
-            return selibreoffice::readHostDocumentCellValue(
-                mrDoc, aCellPos, aCell, selibreoffice::HostCellStringKind::Display);
-        };
         const auto pushApiCellValue = [&](const spreadsheetengine::api::CellValue& rValue) {
             if (rValue.isError())
             {
@@ -2488,31 +2484,19 @@ void ScInterpreter::ScCell()
         };
         const FormulaGrammar::AddressConvention eAddressConvention
             = resolveCellInfoAddressConvention(maCalcConfig, mrDoc);
-        const auto eBoundedInfoKind = secellexec::classifyInfoType(aInfoType);
-        if (eBoundedInfoKind != secellexec::InfoKind::Unsupported
-            && eBoundedInfoKind != secellexec::InfoKind::Coord
-            && !spreadsheetengine::runtime::cellinspection::isHostPropertyInfoKind(
-                eBoundedInfoKind))
+        secellexec::DirectCellInspectionAdapter aDirectCellAdapter(
+            mrDoc, aPos, eAddressConvention);
+        const auto aDirectEvaluation = aDirectCellAdapter.evaluateLocalInfo(
+            aInfoType, aCellPos,
+            selibreoffice::readHostDocumentCellValue(
+                mrDoc, aCellPos, aCell, selibreoffice::HostCellStringKind::Display));
+        const auto eBoundedInfoKind = aDirectEvaluation.meKind;
+        if (aDirectEvaluation.mbHandled)
         {
-            std::optional<spreadsheetengine::api::String> oSheetName;
-            if (eBoundedInfoKind == secellexec::InfoKind::Address && aCellPos.Tab() != aPos.Tab())
-            {
-                OUString aSheetName;
-                mrDoc.GetName(aCellPos.Tab(), aSheetName);
-                oSheetName = selibreoffice::toApiString(aSheetName);
-            }
-
-            secellexec::BoundedCellInfoRequest aInfoRequest;
-            aInfoRequest.maAddress = selibreoffice::toApiCellAddress(aCellPos);
-            aInfoRequest.maCellValue = makeApiCellValue();
-            aInfoRequest.meConvention = eAddressConvention;
-            aInfoRequest.moSheetName = oSheetName;
-            const auto aInfoResult
-                = secellexec::evaluateBoundedCellInfo(eBoundedInfoKind, aInfoRequest);
-            if (!aInfoResult)
-                PushError(selibreoffice::toFormulaError(aInfoResult.meError));
+            if (!aDirectEvaluation.maResult)
+                PushError(selibreoffice::toFormulaError(aDirectEvaluation.maResult.meError));
             else
-                pushApiCellValue(aInfoResult.maValue);
+                pushApiCellValue(aDirectEvaluation.maResult.maValue);
             return;
         }
 
