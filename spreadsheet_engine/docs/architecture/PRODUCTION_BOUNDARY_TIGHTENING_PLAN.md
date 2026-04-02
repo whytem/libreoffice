@@ -258,23 +258,38 @@ Completion criteria:
 
 ### Phase 1. Freeze And Publish The Production-Boundary Inventory
 
+Status: complete
+
 Create the explicit candidate table for production compiler/evaluation entry
 points that still package retained host-owned services.
 
 Initial inventory targets:
 
-| Candidate | Owning file(s) | Current boundary problem | Target outcome | Validation lanes | Later phase |
-| --- | --- | --- | --- | --- | --- |
-| retained `CELL(...)` property tail (`FILENAME`, `WIDTH`, `PREFIX`, `PROTECT`, `FORMAT`, `COLOR`, `PARENTHESES`) | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx) | host property reads mixed with result shaping and caller packaging | `needs thin adapter` | `CppunitTest_sc_ucalc_formula2`, replay summary | Phase 3 |
-| `INFO(...)` environment/session inspection | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx) | true host service, but result shaping and packaging may still be broader than needed | `host-only` with tighter projection seam | focused Calc coverage, replay summary | Phase 3 |
-| external-reference projection and session-backed fetch helpers | [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx) | cache/session ownership is host-only, but surrounding packaging may be repeated or broad | `needs thin adapter` / partial retain | focused Calc coverage, replay summary | Phase 4 |
-| add-in null-date and holiday-list packaging around shared financial/date semantics | [analysis.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysis.cxx), [analysishelper.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysishelper.cxx) | host inputs are real, but packaging may still be duplicated across adopted entry points | `needs thin adapter` | `CppunitTest_scaddins_analysis`, replay summary | Phase 2 / 5 |
-| repeated direct-entry context setup around existing engine entry adapters | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [interpr2.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr2.cxx), add-in callers | similar workbook/service packaging repeated at several production callers | `needs thin adapter` | focused Calc/add-in coverage, replay summary | Phase 5 |
+| Candidate | Owning file(s) | Current boundary problem | Classification | Target outcome | Validation lanes | Later phase |
+| --- | --- | --- | --- | --- | --- | --- |
+| retained local `CELL(...)` property tail (`FILENAME`, `WIDTH`, `PREFIX`, `PROTECT`, `FORMAT`, `COLOR`, `PARENTHESES`) | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx) | host property reads are real, but local helper and result-projection code is still broader than needed | `needs thin adapter` | keep host reads in Calc, move shaping/projection behind named seams | `CppunitTest_sc_ucalc_formula2`, `CppunitTest_sc_ucalc_shared_cases`, replay summary | Phase 3 |
+| `ScCellExternal()` packaging for external filename/format/color/parentheses | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx) | external-cache lookup is host-owned, but CELL-specific projection and property shaping is mixed into the caller | `needs thin adapter` | isolate external CELL packaging behind a named seam while keeping cache ownership in Calc | `CppunitTest_sc_ucalc_formula2`, replay summary | Phase 3 / 4 |
+| `INFO(...)` environment/session inspection | [interpr5.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr5.cxx) | most reads are truly host-owned, but classification and result projection are still entirely local | `host-only` with tighter projection seam | keep service lookup in Calc and tighten local result-shaping vocabulary | focused Calc coverage, replay summary | Phase 3 |
+| external single-ref fetch/projection path (`PopExternalSingleRef(...)`) | [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx) | cache/session ownership is host-only, but token/format fetch packaging is repeated and wider than necessary | `needs thin adapter` | isolate the fetch/projection shell behind one named compat seam | `CppunitTest_sc_ucalc_formula2`, replay summary | Phase 4 |
+| external double-ref fetch/projection path (`PopExternalDoubleRef(...)`, `GetExternalDoubleRef(...)`) | [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx) | cache ownership is host-only, but repeated token-array fetch/projection logic still sits in Calc | `needs thin adapter` | keep token-array ownership in Calc and move the fetch/projection shell behind one named seam | `CppunitTest_sc_ucalc_formula2`, replay summary | Phase 4 |
+| add-in null-date and holiday-list packaging around shared workday/calendar semantics | [analysis.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysis.cxx), [analysisdefs.hxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysisdefs.hxx) | host inputs are real, but null-date and holiday expansion are still packaged inline at multiple entry points | `needs thin adapter` | converge host date/calendar input extraction into one small context seam | `CppunitTest_scaddins_analysis`, replay summary | Phase 2 |
+| add-in null-date packaging around remaining shared financial/date entry points | [financial.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/financial.cxx), [analysisdefs.hxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysisdefs.hxx) | semantics are already shared, but caller-side context setup is still inconsistent across the adopted surface | `needs thin adapter` | normalize remaining caller packaging through the same host context vocabulary | `CppunitTest_scaddins_analysis`, replay summary | Phase 2 / 5 |
+| repeated direct-entry context setup around existing engine entry adapters | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [interpr2.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr2.cxx), add-in callers | similar workbook/service packaging is repeated at several production callers even after the first direct-entry stream | `needs thin adapter` | collapse remaining repeated packaging into one small adapter/context path per boundary cluster | focused Calc/add-in coverage, replay summary | Phase 5 |
 
 Phase completion questions:
 
 - Are all in-scope remaining production-boundary candidates classified?
 - Does each candidate have a concrete later phase or explicit retain reason?
+
+Phase 1 closeout notes:
+
+- the remaining in-scope boundary is now concretely centered on:
+  - retained `CELL(...)` / `INFO(...)` host inspection paths
+  - external-reference fetch and projection packaging
+  - add-in null-date and holiday-list packaging
+  - repeated production entry setup around already-adopted engine entry points
+- no additional open candidate was found in the touched files that needs to be
+  treated as a hidden "miscellaneous Calc tail"
 
 ### Phase 2. Extract Shared Host-Service Context Adapters
 
