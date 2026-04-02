@@ -212,7 +212,21 @@ surface is explicitly host-shaped.
 The next plan should be organized around the end-state boundary rather than
 around historical milestone names.
 
-### 1. Deepen Engine-First Execution Inside Calc
+### 1. Reduce The Remaining Calc Token Boundary
+
+The next active workstream should focus on the remaining Calc-local
+token/container shell around shared spreadsheet semantics.
+
+The goal is not to move token ownership out of Calc. It is to reduce direct
+`ScTokenArray`-shaped coupling in shared-semantic paths, extract narrower
+non-owning traversal and adaptation seams, and make the remaining token logic
+read plainly as host ownership or cursor management.
+
+The implementation-ready plan for that stream is:
+
+- [TOKEN_BOUNDARY_REDUCTION_PLAN.md](architecture/TOKEN_BOUNDARY_REDUCTION_PLAN.md)
+
+### 2. Deepen Engine-First Execution Inside Calc
 
 The current deepening stream is complete for the identified safe adoption
 surface.
@@ -228,7 +242,7 @@ The detailed implementation and closeout record for that stream is:
 
 - [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](architecture/DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md)
 
-### 2. Keep The Host Boundary Explicit And Stable
+### 3. Keep The Host Boundary Explicit And Stable
 
 The bounded host-boundary consolidation stream is complete.
 
@@ -245,7 +259,7 @@ The completed closeout record for that stream is:
 
 - [HOST_BOUNDARY_CONSOLIDATION_PLAN.md](architecture/HOST_BOUNDARY_CONSOLIDATION_PLAN.md)
 
-### 3. Keep The Zero-Fallback Baseline Stable
+### 4. Keep The Zero-Fallback Baseline Stable
 
 The zero-fallback promoted replay baseline is now an asset that needs to be
 protected continuously.
@@ -259,7 +273,7 @@ That means:
 
 This is now part of normal project maintenance, not a side effort.
 
-### 4. Reassess New Bounded Frontiers Only After A Fresh Inventory
+### 5. Reassess New Bounded Frontiers Only After A Fresh Inventory
 
 There are bigger long-term questions that may eventually matter, but they
 should not drive near-term work:
@@ -303,6 +317,7 @@ project is on track.
 
 The most relevant active docs are:
 
+- [TOKEN_BOUNDARY_REDUCTION_PLAN.md](architecture/TOKEN_BOUNDARY_REDUCTION_PLAN.md)
 - [HOST_BOUNDARY_CONSOLIDATION_PLAN.md](architecture/HOST_BOUNDARY_CONSOLIDATION_PLAN.md)
 - [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](architecture/DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md)
 - [ENGINE_FIRST_CALC_ADOPTION.md](architecture/ENGINE_FIRST_CALC_ADOPTION.md)
