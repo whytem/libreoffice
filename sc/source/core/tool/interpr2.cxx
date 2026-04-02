@@ -55,6 +55,7 @@
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
 #include <spreadsheetengine/compat/libreoffice/Parsing.hxx>
+#include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 
 #include <com/sun/star/sheet/DataPilotFieldFilter.hpp>
@@ -67,6 +68,7 @@ namespace sedatetime = spreadsheetengine::core::datetime;
 namespace semath = spreadsheetengine::core::math;
 namespace seconvert = spreadsheetengine::core::convert;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
+namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 
 #define SCdEpsilon                1.0E-7
 
@@ -1555,8 +1557,7 @@ void ScInterpreter::ScIntersect()
 
     StackVar sv1 = p1st->GetType();
     StackVar sv2 = p2nd->GetType();
-    if ((sv1 != svSingleRef && sv1 != svDoubleRef && sv1 != svRefList) ||
-        (sv2 != svSingleRef && sv2 != svDoubleRef && sv2 != svRefList))
+    if (!serefexec::isReferenceOperandType(sv1) || !serefexec::isReferenceOperandType(sv2))
     {
         PushIllegalArgument();
         return;
@@ -1722,8 +1723,7 @@ void ScInterpreter::ScUnionFunc()
 
     StackVar sv1 = p1st->GetType();
     StackVar sv2 = p2nd->GetType();
-    if ((sv1 != svSingleRef && sv1 != svDoubleRef && sv1 != svRefList) ||
-        (sv2 != svSingleRef && sv2 != svDoubleRef && sv2 != svRefList))
+    if (!serefexec::isReferenceOperandType(sv1) || !serefexec::isReferenceOperandType(sv2))
     {
         PushIllegalArgument();
         return;

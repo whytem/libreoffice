@@ -169,6 +169,17 @@ planReferenceListMaterialization(
         nEntryCount, bMatrixFormula, bAllSingleCellReferences);
 }
 
+[[nodiscard]] inline bool isReferenceOperandType(formula::StackVar eType)
+{
+    return eType == formula::svSingleRef || eType == formula::svDoubleRef
+           || eType == formula::svRefList;
+}
+
+[[nodiscard]] inline bool isReferenceOperandToken(const formula::FormulaToken& rToken)
+{
+    return isReferenceOperandType(rToken.GetType());
+}
+
 [[nodiscard]] inline bool allSingleCellReferences(const ScRefList& rReferences)
 {
     for (const auto& rRef : rReferences)

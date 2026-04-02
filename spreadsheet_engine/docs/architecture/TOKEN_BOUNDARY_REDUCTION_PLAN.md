@@ -279,6 +279,8 @@ Frozen inventory:
 
 ### Phase 2. Land The First Non-Owning Token Traversal Seam
 
+Status: complete
+
 Start with the smallest high-value repeated token-reading pattern.
 
 Target shape:
@@ -298,6 +300,15 @@ Closeout standard:
 
 - the touched token-reading logic now exists in one named seam
 - Calc callers are thinner and more obviously about cursor ownership
+
+Closeout result:
+
+- reference-operand token-kind checks for `INTERSECT` and `UNION` now route
+  through named helpers in
+  `compat/libreoffice/ReferenceExecution.hxx`
+- the interpreter callers in `interpr2.cxx` no longer hard-code the repeated
+  `svSingleRef` / `svDoubleRef` / `svRefList` classification inline at each
+  entry point
 
 ### Phase 3. Converge The First Range/Value Adaptation Cluster
 
