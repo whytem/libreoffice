@@ -114,6 +114,8 @@ intentionally host-owned.
 
 ### Workstream 2: Extract The Broader Token-Walking And Frame Shell
 
+Status: **Complete**
+
 This is the highest-value remaining technical slice.
 
 The target here is not raw stack mutation itself. The target is the
@@ -161,6 +163,16 @@ Exit criteria:
 - the targeted token-walking decision helpers no longer exist only inside Calc
 - standalone and Calc consume the same extracted planning/result-shaping logic
 - the remaining Calc-local token shell is visibly narrower and more host-only
+
+Closeout result:
+
+- matrix-condition conversion policy now routes through
+  `compat/libreoffice/MatrixFrameExecution.hxx`
+- `ConvertMatrixJumpConditionToMatrix()` and the matrix/reflist branches inside
+  `ConvertMatrixParameters()` no longer carry their spreadsheet-semantic
+  eligibility rules inline in Calc
+- the extracted frame-planning rules now have direct standalone unit coverage in
+  `spreadsheetengine_execution_tests`
 
 ### Workstream 3: Extract The Remaining Reference/Name Traversal Shell
 

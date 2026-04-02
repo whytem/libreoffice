@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include <spreadsheetengine/api/MatrixFrame.hxx>
 #include <spreadsheetengine/detail/ExecutionContext.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 
@@ -42,6 +43,14 @@ int main()
 {
     using spreadsheetengine::api::CellValue;
     using spreadsheetengine::api::Error;
+    using spreadsheetengine::api::matrixframe::allowsReferenceListParameter;
+    using spreadsheetengine::api::matrixframe::ParamKind;
+    using spreadsheetengine::api::matrixframe::shouldConvertDoubleRefParameter;
+    using spreadsheetengine::api::matrixframe::
+        shouldConvertExternalDoubleRefParameter;
+    using spreadsheetengine::api::matrixframe::shouldConvertJumpConditionToMatrix;
+    using spreadsheetengine::api::matrixframe::shouldTrackValueParameterDimensions;
+    using spreadsheetengine::api::matrixframe::StackKind;
     using spreadsheetengine::core::coercion::coerceToBoolean;
     using spreadsheetengine::core::coercion::coerceToNumber;
     using spreadsheetengine::core::coercion::coerceToString;
@@ -73,6 +82,27 @@ int main()
         || aInvalidOneBased.meError != Error::IllegalArgument)
     {
         return fail("spreadsheetengine_execution_tests", "scalar coercion helper mismatch");
+    }
+
+    if (!shouldConvertJumpConditionToMatrix(StackKind::DoubleRef, StackKind::Other)
+        || !shouldConvertJumpConditionToMatrix(StackKind::Other, StackKind::JumpMatrix)
+        || shouldConvertJumpConditionToMatrix(StackKind::Other, StackKind::Other)
+        || shouldConvertJumpConditionToMatrix(StackKind::Matrix, StackKind::JumpMatrix)
+        || !shouldTrackValueParameterDimensions(ParamKind::Value)
+        || shouldTrackValueParameterDimensions(ParamKind::Array)
+        || shouldConvertDoubleRefParameter(ParamKind::Reference, true)
+        || shouldConvertDoubleRefParameter(ParamKind::ReferenceOrRefArray, true)
+        || shouldConvertDoubleRefParameter(ParamKind::Value, false)
+        || !shouldConvertDoubleRefParameter(ParamKind::Value, true)
+        || !shouldConvertDoubleRefParameter(ParamKind::Array, false)
+        || !shouldConvertExternalDoubleRefParameter(ParamKind::Value)
+        || !shouldConvertExternalDoubleRefParameter(ParamKind::Array)
+        || shouldConvertExternalDoubleRefParameter(ParamKind::Reference)
+        || !allowsReferenceListParameter(ParamKind::ForceArray)
+        || !allowsReferenceListParameter(ParamKind::ReferenceOrForceArray)
+        || allowsReferenceListParameter(ParamKind::Value))
+    {
+        return fail("spreadsheetengine_execution_tests", "matrix frame planning mismatch");
     }
 
     std::size_t nReleasedCount = 0;

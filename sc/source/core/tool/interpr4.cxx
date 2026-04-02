@@ -69,6 +69,7 @@
 #include <queryparam.hxx>
 #include <tokenarray.hxx>
 #include <compiler.hxx>
+#include <spreadsheetengine/compat/libreoffice/MatrixFrameExecution.hxx>
 
 #include <map>
 #include <algorithm>
@@ -1447,7 +1448,8 @@ void ScInterpreter::ConvertMatrixJumpConditionToMatrix()
     if (eStackType == svMatrix)
         return;     // already matrix, nothing to do
 
-    if (eStackType != svDoubleRef && GetStackType(2) != svJumpMatrix)
+    if (!spreadsheetengine::compat::libreoffice::matrixframeexecution::
+            shouldConvertJumpConditionToMatrix(eStackType, GetStackType(2)))
         return;     // always convert svDoubleRef, others only in JumpMatrix context
 
     GetTokenMatrixMap();    // make sure it exists, create if not.
@@ -1488,8 +1490,9 @@ bool ScInterpreter::ConvertMatrixParameters()
                 break;
                 case svMatrix:
                 {
-                    if ( ScParameterClassification::GetParameterType( pCur, nParams - i)
-                            == formula::ParamClass::Value )
+                    if (spreadsheetengine::compat::libreoffice::matrixframeexecution::
+                            shouldTrackValueParameterDimensions(
+                                ScParameterClassification::GetParameterType(pCur, nParams - i)))
                     {   // only if single value expected
                         ScConstMatrixRef pMat = p->GetMatrix();
                         if ( !pMat )
@@ -1509,15 +1512,8 @@ bool ScInterpreter::ConvertMatrixParameters()
                 case svDoubleRef:
                 {
                     formula::ParamClass eType = ScParameterClassification::GetParameterType( pCur, nParams - i);
-                    if ( eType != formula::ParamClass::Reference &&
-                            eType != formula::ParamClass::ReferenceOrRefArray &&
-                            eType != formula::ParamClass::ReferenceOrForceArray &&
-                            // For scalar Value: convert to Array/JumpMatrix
-                            // only if in array formula context, else (function
-                            // has ForceArray or ReferenceOrForceArray
-                            // parameter *somewhere else*) pick a normal
-                            // position dependent implicit intersection later.
-                            (eType != formula::ParamClass::Value || IsInArrayContext()))
+                    if (spreadsheetengine::compat::libreoffice::matrixframeexecution::
+                            shouldConvertDoubleRefParameter(eType, IsInArrayContext()))
                     {
                         SCCOL nCol1, nCol2;
                         SCROW nRow1, nRow2;
@@ -1529,7 +1525,8 @@ bool ScInterpreter::ConvertMatrixParameters()
                                 nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
                         if (pMat)
                         {
-                            if ( eType == formula::ParamClass::Value )
+                            if (spreadsheetengine::compat::libreoffice::matrixframeexecution::
+                                    shouldTrackValueParameterDimensions(eType))
                             {   // only if single value expected
                                 if ( nJumpCols < o3tl::make_unsigned(nCol2 - nCol1 + 1) )
                                     nJumpCols = static_cast<SCSIZE>(nCol2 - nCol1 + 1);
@@ -1547,7 +1544,8 @@ bool ScInterpreter::ConvertMatrixParameters()
                 case svExternalDoubleRef:
                 {
                     formula::ParamClass eType = ScParameterClassification::GetParameterType( pCur, nParams - i);
-                    if (eType == formula::ParamClass::Value || eType == formula::ParamClass::Array)
+                    if (spreadsheetengine::compat::libreoffice::matrixframeexecution::
+                            shouldConvertExternalDoubleRefParameter(eType))
                     {
                         sal_uInt16 nFileId = p->GetIndex();
                         OUString aTabName = p->GetString().getString();
@@ -1563,7 +1561,8 @@ bool ScInterpreter::ConvertMatrixParameters()
                         ScMatrixRef pMat = pTemp->GetMatrix();
                         if (pMat)
                         {
-                            if (eType == formula::ParamClass::Value)
+                            if (spreadsheetengine::compat::libreoffice::matrixframeexecution::
+                                    shouldTrackValueParameterDimensions(eType))
                             {   // only if single value expected
                                 SCSIZE nC, nR;
                                 pMat->GetDimensions( nC, nR);
@@ -1583,10 +1582,8 @@ bool ScInterpreter::ConvertMatrixParameters()
                 case svRefList:
                 {
                     formula::ParamClass eType = ScParameterClassification::GetParameterType( pCur, nParams - i);
-                    if ( eType != formula::ParamClass::Reference &&
-                            eType != formula::ParamClass::ReferenceOrRefArray &&
-                            eType != formula::ParamClass::ReferenceOrForceArray &&
-                            eType != formula::ParamClass::ForceArray)
+                    if (!spreadsheetengine::compat::libreoffice::matrixframeexecution::
+                            allowsReferenceListParameter(eType))
                     {
                         // can't convert to matrix
                         SetError( FormulaError::NoRef);

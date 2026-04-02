@@ -106,6 +106,11 @@ small, explicitly classified set of clusters instead of a generic
   `CELL` tail (`FILENAME`, `FORMAT`, `WIDTH`, `PREFIX`, `PROTECT`, `COLOR`,
   `PARENTHESES`, external-ref handling) and the broader token-walking shell in
   Calc
+- the first closeout slice is complete: matrix-condition and parameter-frame
+  conversion policy now route through
+  `compat/libreoffice/MatrixFrameExecution.hxx`, narrowing the remaining Calc
+  shell further to reference scalarization, ref-list materialization, and the
+  host-heavy information tail
 
 The starting baseline for this milestone is:
 
