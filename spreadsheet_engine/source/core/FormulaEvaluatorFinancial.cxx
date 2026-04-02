@@ -64,6 +64,8 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateFinancialFamily(
         api::StringView(u"GETYEARFRAC"),
         api::StringView(u"PRICE"),
         api::StringView(u"GETPRICE"),
+        api::StringView(u"ACCRINT"),
+        api::StringView(u"GETACCRINT"),
         api::StringView(u"PRICEMAT"),
         api::StringView(u"GETPRICEMAT"),
         api::StringView(u"ACCRINTM"),
@@ -78,10 +80,14 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateFinancialFamily(
         api::StringView(u"GETINTRATE"),
         api::StringView(u"YIELDDISC"),
         api::StringView(u"GETYIELDDISC"),
+        api::StringView(u"DURATION"),
+        api::StringView(u"GETDURATION"),
         api::StringView(u"MDURATION"),
         api::StringView(u"GETMDURATION"),
         api::StringView(u"YIELD"),
         api::StringView(u"GETYIELD"),
+        api::StringView(u"YIELDMAT"),
+        api::StringView(u"GETYIELDMAT"),
         api::StringView(u"TBILLPRICE"),
         api::StringView(u"GETTBILLPRICE"),
         api::StringView(u"TBILLEQ"),
@@ -903,6 +909,48 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
         return makeScalarResult(api::CellValue::number(aPrice.maValue));
     }
 
+    if (aFunctionName == u"ACCRINT" || aFunctionName == u"GETACCRINT")
+    {
+        if (rNode.maChildren.size() < 6 || rNode.maChildren.size() > 7)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aIssue = aContext.evaluateRequiredDateArgument(*rNode.maChildren[0]);
+        if (!aIssue)
+            return makeFailure(aIssue.meError);
+        const auto aFirstInterest = aContext.evaluateRequiredDateArgument(*rNode.maChildren[1]);
+        if (!aFirstInterest)
+            return makeFailure(aFirstInterest.meError);
+        static_cast<void>(aFirstInterest);
+        const auto aSettlement = aContext.evaluateRequiredDateArgument(*rNode.maChildren[2]);
+        if (!aSettlement)
+            return makeFailure(aSettlement.meError);
+        const auto aRate = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[3]);
+        if (!aRate)
+            return makeFailure(aRate.meError);
+        const auto aParValue = aContext.evaluateNumericArgument(*rNode.maChildren[4], 1000.0);
+        if (!aParValue)
+            return makeFailure(aParValue.meError);
+        const auto aFrequency = aContext.evaluateRequiredWholeNumberArgument(*rNode.maChildren[5]);
+        if (!aFrequency)
+            return makeFailure(aFrequency.meError);
+
+        std::int32_t nBasis = 0;
+        if (rNode.maChildren.size() == 7)
+        {
+            const auto aBasis = aContext.evaluateOptionalWholeNumberArgument(*rNode.maChildren[6], 0);
+            if (!aBasis)
+                return makeFailure(aBasis.meError);
+            nBasis = aBasis.maValue;
+        }
+
+        const auto aAccrint = sefinance::evaluateAccrint(
+            sedatetime::defaultNullDate(), aIssue.maValue, aSettlement.maValue,
+            aRate.maValue, aParValue.maValue, aFrequency.maValue, nBasis);
+        if (!aAccrint)
+            return makeFailure(aAccrint.meError);
+        return makeScalarResult(api::CellValue::number(aAccrint.maValue));
+    }
+
     if (aFunctionName == u"PRICEMAT" || aFunctionName == u"GETPRICEMAT")
     {
         if (rNode.maChildren.size() < 5 || rNode.maChildren.size() > 6)
@@ -1157,6 +1205,44 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
         return makeScalarResult(api::CellValue::number(aYielddisc.maValue));
     }
 
+    if (aFunctionName == u"DURATION" || aFunctionName == u"GETDURATION")
+    {
+        if (rNode.maChildren.size() < 5 || rNode.maChildren.size() > 6)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aSettlement = aContext.evaluateRequiredDateArgument(*rNode.maChildren[0]);
+        if (!aSettlement)
+            return makeCellError(aSettlement.meError);
+        const auto aMaturity = aContext.evaluateRequiredDateArgument(*rNode.maChildren[1]);
+        if (!aMaturity)
+            return makeCellError(aMaturity.meError);
+        const auto aCoupon = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[2]);
+        if (!aCoupon)
+            return makeCellError(aCoupon.meError);
+        const auto aYield = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[3]);
+        if (!aYield)
+            return makeCellError(aYield.meError);
+        const auto aFrequency = aContext.evaluateRequiredWholeNumberArgument(*rNode.maChildren[4]);
+        if (!aFrequency)
+            return makeCellError(aFrequency.meError);
+
+        std::int32_t nBasis = 0;
+        if (rNode.maChildren.size() == 6)
+        {
+            const auto aBasis = aContext.evaluateOptionalWholeNumberArgument(*rNode.maChildren[5], 0);
+            if (!aBasis)
+                return makeCellError(aBasis.meError);
+            nBasis = aBasis.maValue;
+        }
+
+        const auto aDuration = sefinance::evaluateDuration(
+            sedatetime::defaultNullDate(), aSettlement.maValue, aMaturity.maValue,
+            aCoupon.maValue, aYield.maValue, aFrequency.maValue, nBasis);
+        if (!aDuration)
+            return makeCellError(aDuration.meError);
+        return makeScalarResult(api::CellValue::number(aDuration.maValue));
+    }
+
     if (aFunctionName == u"MDURATION" || aFunctionName == u"GETMDURATION")
     {
         if (rNode.maChildren.size() < 5 || rNode.maChildren.size() > 6)
@@ -1234,6 +1320,44 @@ if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
         if (!aYield)
             return makeCellError(aYield.meError);
         return makeScalarResult(api::CellValue::number(aYield.maValue));
+    }
+
+    if (aFunctionName == u"YIELDMAT" || aFunctionName == u"GETYIELDMAT")
+    {
+        if (rNode.maChildren.size() < 5 || rNode.maChildren.size() > 6)
+            return makeCellError(api::Error::IllegalArgument);
+
+        const auto aSettlement = aContext.evaluateRequiredDateArgument(*rNode.maChildren[0]);
+        if (!aSettlement)
+            return makeCellError(aSettlement.meError);
+        const auto aMaturity = aContext.evaluateRequiredDateArgument(*rNode.maChildren[1]);
+        if (!aMaturity)
+            return makeCellError(aMaturity.meError);
+        const auto aIssue = aContext.evaluateRequiredDateArgument(*rNode.maChildren[2]);
+        if (!aIssue)
+            return makeCellError(aIssue.meError);
+        const auto aRate = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[3]);
+        if (!aRate)
+            return makeCellError(aRate.meError);
+        const auto aPrice = aContext.evaluateRequiredNumberArgument(*rNode.maChildren[4]);
+        if (!aPrice)
+            return makeCellError(aPrice.meError);
+
+        std::int32_t nBasis = 0;
+        if (rNode.maChildren.size() == 6)
+        {
+            const auto aBasis = aContext.evaluateOptionalWholeNumberArgument(*rNode.maChildren[5], 0);
+            if (!aBasis)
+                return makeCellError(aBasis.meError);
+            nBasis = aBasis.maValue;
+        }
+
+        const auto aYieldmat = sefinance::evaluateYieldmat(
+            sedatetime::defaultNullDate(), aSettlement.maValue, aMaturity.maValue,
+            aIssue.maValue, aRate.maValue, aPrice.maValue, nBasis);
+        if (!aYieldmat)
+            return makeCellError(aYieldmat.meError);
+        return makeScalarResult(api::CellValue::number(aYieldmat.maValue));
     }
 
     if (aFunctionName == u"TBILLPRICE" || aFunctionName == u"GETTBILLPRICE")

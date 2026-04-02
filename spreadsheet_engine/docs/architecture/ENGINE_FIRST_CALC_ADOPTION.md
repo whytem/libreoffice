@@ -80,6 +80,88 @@ Every adoption slice should keep the verified boundary green:
 - one-shot `spreadsheetengine_fods_replay_tests --summary`
 - diff hygiene checks
 
+## Phased Implementation Approach
+
+### Phase 1. Default-Path Expansion
+
+Status: complete
+
+Route remaining Calc call sites that already have proven shared runtime
+semantics onto engine-owned helpers by default. The first landing scope is the
+financial add-in surface where Calc can call the same runtime already used by
+standalone execution.
+
+Initial landing scope:
+
+- `ACCRINT`
+- `DURATION`
+- `YIELDMAT`
+
+Validation:
+
+- focused Calc add-in coverage
+- standalone direct and compiled formula coverage
+- one-shot promoted-corpus replay summary
+
+### Phase 2. Adapter Convergence
+
+Status: pending
+
+Reduce repeated host-to-engine translation patterns so Calc reaches shared
+behavior through smaller, clearer adapter seams.
+
+Targets:
+
+- repeated null-date and basis translation in add-ins
+- repeated argument normalization around shared date-sensitive helpers
+- ad hoc adapter variants that can become one explicit compat vocabulary
+
+Validation:
+
+- focused Calc/add-in unit coverage for touched adapters
+- standalone regression coverage for the shared helper surface
+- one-shot promoted-corpus replay summary
+
+### Phase 3. Host-Boundary Consolidation
+
+Status: pending
+
+Tighten the remaining Calc-local execution surface until it is clearly
+host-only rather than a leftover duplicate implementation.
+
+Targets:
+
+- explicit host-only seams for document/session services
+- removal of residual in-scope local copies that now have shared helpers
+- doc/status updates that describe the retained Calc surface as host-shaped
+
+Validation:
+
+- Calc Cppunit coverage for touched host-boundary call sites
+- zero-fallback promoted replay summary
+- diff hygiene checks
+
+### Phase 4. Baseline Lock-In
+
+Status: pending
+
+Turn the zero-fallback promoted replay baseline into a stronger regression
+contract so wider engine-first adoption can proceed without silently weakening
+the settled boundary.
+
+Targets:
+
+- explicit replay-baseline assertions in standalone test tooling
+- doc/status closeout for the adoption program
+- stable validation steps for future engine-first slices
+
+Validation:
+
+- one-shot promoted-corpus replay summary with explicit zero-fallback
+  expectations
+- full focused Calc/standalone validation lane for touched surfaces
+- `git diff --check`
+
 ## Exit Direction
 
 This program is progressing well when:

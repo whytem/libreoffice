@@ -3352,6 +3352,11 @@ int main()
         const auto aDb = aEvaluator.evaluateFormula(u"of:=DB(25000;1000;36;1;6)", { 0, 0, 0 });
         const auto aDisc = aEvaluator.evaluateFormula(
             u"of:=DISC(\"2001-01-25\";\"2001-11-15\";97;100;3)", { 0, 0, 0 });
+        const auto aAccrint = aEvaluator.evaluateFormula(
+            u"of:=ACCRINT(DATE(2012;1;1);DATE(2012;7;1);DATE(2013;2;15);0.065;5000;2;3)",
+            { 0, 0, 0 });
+        const auto aDuration = aEvaluator.evaluateFormula(
+            u"of:=DURATION(\"2001-01-01\";\"2006-01-01\";0.08;0.09;2;3)", { 0, 0, 0 });
         const auto aMduration = aEvaluator.evaluateFormula(
             u"of:=MDURATION(\"2001-01-01\";\"2006-01-01\";0.08;0.09;2;3)", { 0, 0, 0 });
         const auto aYield = aEvaluator.evaluateFormula(
@@ -3392,6 +3397,11 @@ int main()
             u"of:=DB(25000;1000;36;1;6)", { 0, 0, 0 });
         const auto aCompiledDisc = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=DISC(\"2001-01-25\";\"2001-11-15\";97;100;3)", { 0, 0, 0 });
+        const auto aCompiledAccrint = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=ACCRINT(DATE(2012;1;1);DATE(2012;7;1);DATE(2013;2;15);0.065;5000;2;3)",
+            { 0, 0, 0 });
+        const auto aCompiledDuration = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=DURATION(\"2001-01-01\";\"2006-01-01\";0.08;0.09;2;3)", { 0, 0, 0 });
         const auto aCompiledMduration = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=MDURATION(\"2001-01-01\";\"2006-01-01\";0.08;0.09;2;3)", { 0, 0, 0 });
         const auto aCompiledYield = aEvaluator.evaluateFormulaViaCompiledTokens(
@@ -3428,6 +3438,9 @@ int main()
         const auto aSyd = aEvaluator.evaluateFormula(u"of:=SYD(50000;10000;5;1)", { 0, 0, 0 });
         const auto aAccrintm = aEvaluator.evaluateFormula(
             u"of:=ACCRINTM(DATE(2012;1;1);DATE(2013;2;15);0.065;5000;3)", { 0, 0, 0 });
+        const auto aYieldmat = aEvaluator.evaluateFormula(
+            u"of:=YIELDMAT(\"1999-02-15\";\"1999-04-13\";\"1998-11-11\";0.061;99.984498875557;0)",
+            { 0, 0, 0 });
         const auto aPricemat = aEvaluator.evaluateFormula(
             u"of:=PRICEMAT(\"1999-02-15\";\"1999-04-13\";\"1998-11-11\";0.061;0.061;0)",
             { 0, 0, 0 });
@@ -3481,6 +3494,9 @@ int main()
             u"of:=SYD(50000;10000;5;1)", { 0, 0, 0 });
         const auto aCompiledAccrintm = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=ACCRINTM(DATE(2012;1;1);DATE(2013;2;15);0.065;5000;3)", { 0, 0, 0 });
+        const auto aCompiledYieldmat = aEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:=YIELDMAT(\"1999-02-15\";\"1999-04-13\";\"1998-11-11\";0.061;99.984498875557;0)",
+            { 0, 0, 0 });
         const auto aCompiledPricemat = aEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=PRICEMAT(\"1999-02-15\";\"1999-04-13\";\"1998-11-11\";0.061;0.061;0)",
             { 0, 0, 0 });
@@ -3560,6 +3576,8 @@ int main()
             || !checkNumber("compiled CUMPRINC", aCompiledCumPrinc, -600.875855808337)
             || !checkNumber("DB", aDb, 1075.0)
             || !checkNumber("DISC", aDisc, 0.0372448979591837)
+            || !checkNumber("ACCRINT", aAccrint, 365.958904109589)
+            || !checkNumber("DURATION", aDuration, 4.20161802829783)
             || !checkNumber("MDURATION", aMduration, 4.02068710841898)
             || !checkNumber("YIELD", aYield, 0.0650000068807552)
             || !checkNumber("TBILLPRICE", aTbillprice, 98.4258888888889)
@@ -3567,6 +3585,8 @@ int main()
             || !checkNumber("ODDLPRICE", aOddlprice, 99.8782860147214)
             || !checkNumber("compiled DB", aCompiledDb, 1075.0)
             || !checkNumber("compiled DISC", aCompiledDisc, 0.0372448979591837)
+            || !checkNumber("compiled ACCRINT", aCompiledAccrint, 365.958904109589)
+            || !checkNumber("compiled DURATION", aCompiledDuration, 4.20161802829783)
             || !checkNumber("compiled MDURATION", aCompiledMduration, 4.02068710841898)
             || !checkNumber("compiled YIELD", aCompiledYield, 0.0650000068807552)
             || !checkNumber("compiled TBILLPRICE", aCompiledTbillprice, 98.4258888888889)
@@ -3587,6 +3607,7 @@ int main()
             || !checkNumber("SLN", aSln, 595.196428571429)
             || !checkNumber("SYD", aSyd, 13333.3333333333)
             || !checkNumber("ACCRINTM", aAccrintm, 365.958904109589)
+            || !checkNumber("YIELDMAT", aYieldmat, 0.061)
             || !checkNumber("PRICEMAT", aPricemat, 99.984498875557)
             || !checkNumber("YIELDDISC", aYielddisc, 0.0528225719868601)
             || !checkNumber("COUPDAYBS", aCoupdaybs, 71.0)
@@ -3613,6 +3634,7 @@ int main()
             || !checkNumber("compiled SLN", aCompiledSln, 595.196428571429)
             || !checkNumber("compiled SYD", aCompiledSyd, 13333.3333333333)
             || !checkNumber("compiled ACCRINTM", aCompiledAccrintm, 365.958904109589)
+            || !checkNumber("compiled YIELDMAT", aCompiledYieldmat, 0.061)
             || !checkNumber("compiled PRICEMAT", aCompiledPricemat, 99.984498875557)
             || !checkNumber("compiled YIELDDISC", aCompiledYielddisc, 0.0528225719868601)
             || !checkNumber("compiled COUPDAYBS", aCompiledCoupdaybs, 71.0)

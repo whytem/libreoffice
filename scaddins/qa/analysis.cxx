@@ -12,13 +12,29 @@
 #include <com/sun/star/lang/XMultiServiceFactory.hpp>
 #include <com/sun/star/sheet/addin/XAnalysis.hpp>
 #include <com/sun/star/uno/XInterface.hpp>
+#include <com/sun/star/util/Date.hpp>
 
 #include <com/sun/star/uno/Reference.hxx>
 
+#include <comphelper/genericpropertyset.hxx>
+#include <comphelper/propertysetinfo.hxx>
 #include <comphelper/processfactory.hxx>
 
 namespace
 {
+css::uno::Reference<css::beans::XPropertySet> makeAnalysisOptions()
+{
+    static const comphelper::PropertyMapEntry aEntries[] = {
+        { u"NullDate"_ustr, 0, cppu::UnoType<css::util::Date>::get(), 0, 0 },
+    };
+    auto* pInfo = new comphelper::PropertySetInfo(
+        std::span<const comphelper::PropertyMapEntry>(aEntries, std::size(aEntries)));
+    auto xOptions = comphelper::GenericPropertySet_CreateInstance(pInfo);
+    xOptions->setPropertyValue(
+        u"NullDate"_ustr, css::uno::Any(css::util::Date { 30, 12, 1899 }));
+    return xOptions;
+}
+
 class Test : public test::BootstrapFixture
 {
 public:
@@ -61,10 +77,37 @@ CPPUNIT_TEST_FIXTURE(Test, test_getDec2Hex)
 
 CPPUNIT_TEST_FIXTURE(Test, test_sharedFinancialRuntimeDelegates)
 {
+    const auto xOptions = makeAnalysisOptions();
+    const sal_Int32 nIssue = 40909;
+    const sal_Int32 nFirstInterest = 41091;
+    const sal_Int32 nSettlement = 41320;
+    const sal_Int32 nDurationSettlement = 36892;
+    const sal_Int32 nDurationMaturity = 38718;
+    const sal_Int32 nYieldmatSettlement = 36206;
+    const sal_Int32 nYieldmatMaturity = 36263;
+    const sal_Int32 nYieldmatIssue = 36110;
+
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0509453369140622, mxAnalysis->getEffect(0.05, 4), 1e-12);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.05, mxAnalysis->getNominal(0.0509453369140622, 4), 1e-12);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.02, mxAnalysis->getDollarfr(1.125, 16), 1e-12);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.125, mxAnalysis->getDollarde(1.02, 16), 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        365.958904109589, mxAnalysis->getAccrint(
+                               xOptions, nIssue, nFirstInterest, nSettlement, 0.065,
+                               css::uno::Any(5000.0), 2, css::uno::Any(sal_Int32(3))),
+        1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        4.20161802829783,
+        mxAnalysis->getDuration(
+            xOptions, nDurationSettlement, nDurationMaturity, 0.08, 0.09, 2,
+            css::uno::Any(sal_Int32(3))),
+        1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        0.061,
+        mxAnalysis->getYieldmat(
+            xOptions, nYieldmatSettlement, nYieldmatMaturity, nYieldmatIssue, 0.061,
+            99.984498875557, css::uno::Any(sal_Int32(0))),
+        1e-12);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(-600.875855808337,
                                  mxAnalysis->getCumprinc(0.055 / 12.0, 24, 5000, 4, 6, 1),
                                  1e-12);

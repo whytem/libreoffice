@@ -72,9 +72,8 @@ double SAL_CALL AnalysisAddIn::getAccrint( const css::uno::Reference< css::beans
 
     if( fRate <= 0.0 || fVal <= 0.0 || isFreqInvalid(nFreq) || nIssue >= nSettle)
         throw css::lang::IllegalArgumentException();
-
-    double fRet = fVal * fRate * GetYearDiff( GetNullDate( xOpt ), nIssue, nSettle, getDateMode( xOpt, rOB ) );
-    return finiteOrThrow( fRet );
+    return valueOrThrow(sefinance::evaluateAccrint(
+        getNullDateParts(xOpt), nIssue, nSettle, fRate, fVal, nFreq, getDateMode(xOpt, rOB)));
 }
 
 
@@ -114,9 +113,8 @@ double SAL_CALL AnalysisAddIn::getDuration( const css::uno::Reference< css::bean
 {
     if( fCoup < 0.0 || fYield < 0.0 || isFreqInvalid(nFreq) || nSettle >= nMat )
         throw css::lang::IllegalArgumentException();
-
-    double fRet = GetDuration( GetNullDate( xOpt ),  nSettle, nMat, fCoup, fYield, nFreq, getDateMode( xOpt, rOB ) );
-    return finiteOrThrow( fRet );
+    return valueOrThrow(sefinance::evaluateDuration(
+        getNullDateParts(xOpt), nSettle, nMat, fCoup, fYield, nFreq, getDateMode(xOpt, rOB)));
 }
 
 
@@ -240,9 +238,8 @@ double SAL_CALL AnalysisAddIn::getYieldmat( const css::uno::Reference< css::bean
 {
     if( fPrice <= 0.0 || fRate < 0.0 || nSettle >= nMat || nSettle < nIssue)
         throw css::lang::IllegalArgumentException();
-
-    double fRet = GetYieldmat( GetNullDate( xOpt ),  nSettle, nMat, nIssue, fRate, fPrice, getDateMode( xOpt, rOB ) );
-    return finiteOrThrow( fRet );
+    return valueOrThrow(sefinance::evaluateYieldmat(
+        getNullDateParts(xOpt), nSettle, nMat, nIssue, fRate, fPrice, getDateMode(xOpt, rOB)));
 }
 
 

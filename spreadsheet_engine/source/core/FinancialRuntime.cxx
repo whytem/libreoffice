@@ -1117,6 +1117,24 @@ api::ValueResult<double> evaluateAccrintm(
     return makeFiniteResult(fParValue * fRate * *oYearDifference);
 }
 
+api::ValueResult<double> evaluateAccrint(
+    const api::DateParts& rNullDate, api::DateSerial nIssue, api::DateSerial nSettlement,
+    double fRate, double fParValue, std::int32_t nFrequency, std::int32_t nBasis)
+{
+    if (fRate <= 0.0 || fParValue <= 0.0 || !isValidCouponFrequency(nFrequency)
+        || nIssue >= nSettlement || !isValidBasis(nBasis))
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    const auto oYearDifference = computeYearDifferenceValue(
+        rNullDate, nIssue, nSettlement, nBasis);
+    if (!oYearDifference)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return makeFiniteResult(fParValue * fRate * *oYearDifference);
+}
+
 api::ValueResult<double> evaluateDisc(
     const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
     double fPrice, double fRedemption, std::int32_t nBasis)
@@ -1206,6 +1224,24 @@ api::ValueResult<double> evaluateModifiedDuration(
         *oDuration / (1.0 + (fYield / static_cast<double>(nFrequency))));
 }
 
+api::ValueResult<double> evaluateDuration(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    double fCoupon, double fYield, std::int32_t nFrequency, std::int32_t nBasis)
+{
+    if (fCoupon < 0.0 || fYield < 0.0 || !isValidCouponFrequency(nFrequency)
+        || nSettlement >= nMaturity || !isValidBasis(nBasis))
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    const auto oDuration = computeDurationValue(
+        rNullDate, nSettlement, nMaturity, fCoupon, fYield, nFrequency, nBasis);
+    if (!oDuration)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    return makeFiniteResult(*oDuration);
+}
+
 api::ValueResult<double> evaluateYield(
     const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
     double fCoupon, double fPrice, double fRedemption, std::int32_t nFrequency, std::int32_t nBasis)
@@ -1284,6 +1320,31 @@ api::ValueResult<double> evaluateYield(
         return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 
     return makeFiniteResult(fYieldMid);
+}
+
+api::ValueResult<double> evaluateYieldmat(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    api::DateSerial nIssue, double fRate, double fPrice, std::int32_t nBasis)
+{
+    if (fRate < 0.0 || !(fPrice > 0.0) || nSettlement >= nMaturity || !isValidBasis(nBasis))
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    const auto oIssueToMaturity
+        = computeYearFractionValue(rNullDate, nIssue, nMaturity, nBasis);
+    const auto oIssueToSettlement
+        = computeYearFractionValue(rNullDate, nIssue, nSettlement, nBasis);
+    const auto oSettlementToMaturity
+        = computeYearFractionValue(rNullDate, nSettlement, nMaturity, nBasis);
+    if (!oIssueToMaturity || !oIssueToSettlement || !oSettlementToMaturity
+        || fp::approxEqual(*oSettlementToMaturity, 0.0))
+    {
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    }
+
+    double fYieldResult = 1.0 + *oIssueToMaturity * fRate;
+    fYieldResult /= (fPrice / 100.0) + *oIssueToSettlement * fRate;
+    fYieldResult -= 1.0;
+    return makeFiniteResult(fYieldResult / *oSettlementToMaturity);
 }
 
 api::ValueResult<double> evaluateTbillPrice(

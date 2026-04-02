@@ -58,6 +58,8 @@ inline constexpr std::uint16_t kBuiltinExternalNameCatalogId = 1;
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETSERIESSUM");
     if (equalLookupText(rSymbol, u"QUOTIENT"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETQUOTIENT");
+    if (equalLookupText(rSymbol, u"ACCRINT"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETACCRINT");
     if (equalLookupText(rSymbol, u"ACCRINTM"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETACCRINTM");
     if (equalLookupText(rSymbol, u"CONVERT")
@@ -85,10 +87,14 @@ inline constexpr std::uint16_t kBuiltinExternalNameCatalogId = 1;
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETINTRATE");
     if (equalLookupText(rSymbol, u"YIELDDISC"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYIELDDISC");
+    if (equalLookupText(rSymbol, u"DURATION"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDURATION");
     if (equalLookupText(rSymbol, u"MDURATION"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETMDURATION");
     if (equalLookupText(rSymbol, u"YIELD"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYIELD");
+    if (equalLookupText(rSymbol, u"YIELDMAT"))
+        return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYIELDMAT");
     if (equalLookupText(rSymbol, u"TBILLPRICE"))
         return api::String(u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETTBILLPRICE");
     if (equalLookupText(rSymbol, u"TBILLEQ"))
@@ -151,6 +157,8 @@ inline constexpr std::uint16_t kBuiltinExternalNameCatalogId = 1;
         return api::String(u"SERIESSUM");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETQUOTIENT"))
         return api::String(u"QUOTIENT");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETACCRINT"))
+        return api::String(u"ACCRINT");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETACCRINTM"))
         return api::String(u"ACCRINTM");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETCONVERT"))
@@ -175,10 +183,14 @@ inline constexpr std::uint16_t kBuiltinExternalNameCatalogId = 1;
         return api::String(u"INTRATE");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYIELDDISC"))
         return api::String(u"YIELDDISC");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDURATION"))
+        return api::String(u"DURATION");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETMDURATION"))
         return api::String(u"MDURATION");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYIELD"))
         return api::String(u"YIELD");
+    if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETYIELDMAT"))
+        return api::String(u"YIELDMAT");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETTBILLPRICE"))
         return api::String(u"TBILLPRICE");
     if (equalLookupText(rName, u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETTBILLEQ"))

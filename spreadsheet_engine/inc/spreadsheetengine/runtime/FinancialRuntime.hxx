@@ -115,6 +115,10 @@ SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateAccrintm(
     const api::DateParts& rNullDate, api::DateSerial nIssue, api::DateSerial nSettlement,
     double fRate, double fParValue, sal_Int32 nBasis);
 
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateAccrint(
+    const api::DateParts& rNullDate, api::DateSerial nIssue, api::DateSerial nSettlement,
+    double fRate, double fParValue, sal_Int32 nFrequency, sal_Int32 nBasis);
+
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateDisc(
     const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
     double fPrice, double fRedemption, sal_Int32 nBasis);
@@ -135,9 +139,17 @@ SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateModifiedDuration(
     const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
     double fCoupon, double fYield, sal_Int32 nFrequency, sal_Int32 nBasis);
 
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateDuration(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    double fCoupon, double fYield, sal_Int32 nFrequency, sal_Int32 nBasis);
+
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateYield(
     const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
     double fCoupon, double fPrice, double fRedemption, sal_Int32 nFrequency, sal_Int32 nBasis);
+
+SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateYieldmat(
+    const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
+    api::DateSerial nIssue, double fRate, double fPrice, sal_Int32 nBasis);
 
 SPREADSHEETENGINE_DLLPUBLIC api::ValueResult<double> evaluateTbillPrice(
     const api::DateParts& rNullDate, api::DateSerial nSettlement, api::DateSerial nMaturity,
