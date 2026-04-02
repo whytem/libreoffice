@@ -112,6 +112,32 @@ public:
             fParValue, nFrequency);
     }
 
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateAccrintm(
+        spreadsheetengine::api::DateSerial nIssue, spreadsheetengine::api::DateSerial nSettlement,
+        double fRate, double fParValue) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateAccrintm, nIssue,
+            nSettlement, fRate, fParValue);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateAmordegrc(double fCost,
+        spreadsheetengine::api::DateSerial nPurchaseDate,
+        spreadsheetengine::api::DateSerial nFirstPeriodEndDate, double fSalvage, double fPeriod,
+        double fRate) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateAmordegrc, fCost,
+            nPurchaseDate, nFirstPeriodEndDate, fSalvage, fPeriod, fRate);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateAmorlinc(double fCost,
+        spreadsheetengine::api::DateSerial nPurchaseDate,
+        spreadsheetengine::api::DateSerial nFirstPeriodEndDate, double fSalvage, double fPeriod,
+        double fRate) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateAmorlinc, fCost,
+            nPurchaseDate, nFirstPeriodEndDate, fSalvage, fPeriod, fRate);
+    }
+
     [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateDuration(
         spreadsheetengine::api::DateSerial nSettlement,
         spreadsheetengine::api::DateSerial nMaturity, double fCoupon, double fYield,
@@ -120,6 +146,70 @@ public:
         return evaluateWithDateMode(
             spreadsheetengine::core::finance::evaluateDuration, nSettlement, nMaturity, fCoupon,
             fYield, nFrequency);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateDisc(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity, double fPrice,
+        double fRedemption) const
+    {
+        return evaluateWithDateMode(
+            spreadsheetengine::core::finance::evaluateDisc, nSettlement, nMaturity, fPrice,
+            fRedemption);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateIntrate(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity, double fInvestment,
+        double fRedemption) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateIntrate,
+            nSettlement, nMaturity, fInvestment, fRedemption);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateModifiedDuration(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity, double fCoupon, double fYield,
+        sal_Int32 nFrequency) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateModifiedDuration,
+            nSettlement, nMaturity, fCoupon, fYield, nFrequency);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluatePrice(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity, double fRate, double fYield,
+        double fRedemption, sal_Int32 nFrequency) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluatePrice, nSettlement,
+            nMaturity, fRate, fYield, fRedemption, nFrequency);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluatePricedisc(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity, double fDiscount,
+        double fRedemption) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluatePricedisc,
+            nSettlement, nMaturity, fDiscount, fRedemption);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluatePricemat(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity, spreadsheetengine::api::DateSerial nIssue,
+        double fRate, double fYield) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluatePricemat,
+            nSettlement, nMaturity, nIssue, fRate, fYield);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateReceived(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity, double fInvestment,
+        double fDiscount) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateReceived,
+            nSettlement, nMaturity, fInvestment, fDiscount);
     }
 
     [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateYieldmat(
@@ -153,6 +243,92 @@ public:
     {
         return evaluateWithNullDate(spreadsheetengine::core::finance::evaluateTbillYield,
             nSettlement, nMaturity, fPrice);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateYield(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity, double fCoupon, double fPrice,
+        double fRedemption, sal_Int32 nFrequency) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateYield,
+            nSettlement, nMaturity, fCoupon, fPrice, fRedemption, nFrequency);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateYielddisc(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity, double fPrice,
+        double fRedemption) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateYielddisc,
+            nSettlement, nMaturity, fPrice, fRedemption);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateOddlprice(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity,
+        spreadsheetengine::api::DateSerial nLastInterest, double fRate, double fYield,
+        double fRedemption, sal_Int32 nFrequency) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateOddlprice,
+            nSettlement, nMaturity, nLastInterest, fRate, fYield, fRedemption, nFrequency);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateOddlyield(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity,
+        spreadsheetengine::api::DateSerial nLastInterest, double fRate, double fPrice,
+        double fRedemption, sal_Int32 nFrequency) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateOddlyield,
+            nSettlement, nMaturity, nLastInterest, fRate, fPrice, fRedemption, nFrequency);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateCoupdaybs(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity, sal_Int32 nFrequency) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateCoupdaybs,
+            nSettlement, nMaturity, nFrequency);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateCoupdays(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity, sal_Int32 nFrequency) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateCoupdays,
+            nSettlement, nMaturity, nFrequency);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateCoupdaysnc(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity, sal_Int32 nFrequency) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateCoupdaysnc,
+            nSettlement, nMaturity, nFrequency);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateCouppcd(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity, sal_Int32 nFrequency) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateCouppcd,
+            nSettlement, nMaturity, nFrequency);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateCoupncd(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity, sal_Int32 nFrequency) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateCoupncd,
+            nSettlement, nMaturity, nFrequency);
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> evaluateCoupnum(
+        spreadsheetengine::api::DateSerial nSettlement,
+        spreadsheetengine::api::DateSerial nMaturity, sal_Int32 nFrequency) const
+    {
+        return evaluateWithDateMode(spreadsheetengine::core::finance::evaluateCoupnum,
+            nSettlement, nMaturity, nFrequency);
     }
 
 private:

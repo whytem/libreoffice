@@ -161,9 +161,16 @@ CPPUNIT_TEST_FIXTURE(Test, testDirectFinancialAddInAdapter)
     const sal_Int32 nSettlement = 41320;
     const sal_Int32 nDurationSettlement = 36892;
     const sal_Int32 nDurationMaturity = 38718;
+    const sal_Int32 nPriceSettlement = 36206;
+    const sal_Int32 nPriceMaturity = 39401;
     const sal_Int32 nYieldmatSettlement = 36206;
     const sal_Int32 nYieldmatMaturity = 36263;
     const sal_Int32 nYieldmatIssue = 36110;
+    const sal_Int32 nOddlyieldSettlement = 36270;
+    const sal_Int32 nOddlyieldMaturity = 36326;
+    const sal_Int32 nOddlyieldLastInterest = 36083;
+    const sal_Int32 nCouponSettlement = 36916;
+    const sal_Int32 nCouponMaturity = 37210;
 
     const auto aEffect = sefinanceexec::DirectFinancialAddInAdapter::evaluateEffect(0.05, 4);
     CPPUNIT_ASSERT(aEffect);
@@ -200,16 +207,37 @@ CPPUNIT_TEST_FIXTURE(Test, testDirectFinancialAddInAdapter)
     CPPUNIT_ASSERT(aAccrint);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(365.958904109589, aAccrint.maValue, 1e-12);
 
+    const auto aAccrintm
+        = aBasisThreeAdapter.evaluateAccrintm(nIssue, nSettlement, 0.065, 5000.0);
+    CPPUNIT_ASSERT(aAccrintm);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(365.958904109589, aAccrintm.maValue, 1e-12);
+
     const auto aDuration = aBasisThreeAdapter.evaluateDuration(
         nDurationSettlement, nDurationMaturity, 0.08, 0.09, 2);
     CPPUNIT_ASSERT(aDuration);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(4.20161802829783, aDuration.maValue, 1e-12);
 
     sefinanceexec::DirectFinancialAddInAdapter aBasisZeroAdapter(aNullDate, 0);
+    const auto aPrice = aBasisZeroAdapter.evaluatePrice(
+        nPriceSettlement, nPriceMaturity, 0.0575, 0.065, 100.0, 2);
+    CPPUNIT_ASSERT(aPrice);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(95.0428743993921, aPrice.maValue, 1e-12);
+
     const auto aYieldmat = aBasisZeroAdapter.evaluateYieldmat(
         nYieldmatSettlement, nYieldmatMaturity, nYieldmatIssue, 0.061, 99.984498875557);
     CPPUNIT_ASSERT(aYieldmat);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.061, aYieldmat.maValue, 1e-12);
+
+    const auto aOddlyield = aBasisZeroAdapter.evaluateOddlyield(
+        nOddlyieldSettlement, nOddlyieldMaturity, nOddlyieldLastInterest, 0.0375, 99.875, 100.0,
+        2);
+    CPPUNIT_ASSERT(aOddlyield);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0448731663302424, aOddlyield.maValue, 1e-12);
+
+    const auto aCoupnum
+        = aBasisThreeAdapter.evaluateCoupnum(nCouponSettlement, nCouponMaturity, 2);
+    CPPUNIT_ASSERT(aCoupnum);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aCoupnum.maValue, 1e-12);
 
     sefinanceexec::DirectFinancialAddInAdapter aNullDateAdapter(aNullDate);
     const auto aTbillEq = aNullDateAdapter.evaluateTbillEq(36250, 36260, 0.0914);
