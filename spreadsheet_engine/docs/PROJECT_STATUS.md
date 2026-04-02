@@ -228,22 +228,20 @@ The detailed implementation and closeout record for that stream is:
 
 - [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](architecture/DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md)
 
-### 2. Consolidate The Host Boundary
+### 2. Keep The Host Boundary Explicit And Stable
 
-The project still has legacy coupling points that should continue to shrink,
-but they should now be treated as host-boundary cleanup rather than as
-unfinished shell extraction:
+The bounded host-boundary consolidation stream is complete.
 
-- `ScTokenArray` as the pervasive Calc runtime token container
-- direct use of Calc or LibreOffice vocabulary in code that should instead use
-  engine-owned types
-- compatibility logic spread across too many call sites instead of being
-  concentrated in narrow adapters
+That work froze the remaining execution-adjacent Calc surface into an explicit
+inventory, narrowed the touched compat vocabulary, collapsed the first
+translation seam, isolated the in-scope host-backed `CELL(...)` services, and
+removed the known duplicate helper in the touched boundary.
 
-This work is not primarily about adding new features. It is about making the
-boundary cleaner and easier to maintain.
+The remaining Calc-owned surfaces are now treated as intentional host concerns
+or explicit defer items, not as an ambiguous backlog of unfinished shell
+extraction.
 
-The implementation-ready plan for that next stream is:
+The completed closeout record for that stream is:
 
 - [HOST_BOUNDARY_CONSOLIDATION_PLAN.md](architecture/HOST_BOUNDARY_CONSOLIDATION_PLAN.md)
 
@@ -261,7 +259,7 @@ That means:
 
 This is now part of normal project maintenance, not a side effort.
 
-### 4. Reassess Deeper Authority Shifts Only After Adoption Widens
+### 4. Reassess New Bounded Frontiers Only After A Fresh Inventory
 
 There are bigger long-term questions that may eventually matter, but they
 should not drive near-term work:
@@ -272,8 +270,9 @@ should not drive near-term work:
 - whether the production compiler path should tighten further around the shared
   compiler model
 
-Those are valid future questions, but the right way to reach them is first to
-keep widening proven engine-first adoption inside Calc.
+Those are valid future questions, but the right way to reach them is to start
+from the now-cleaner host boundary and choose the next bounded stream from a
+fresh inventory instead of carrying forward historical cleanup debt.
 
 ## Working Rules For The Next Stage
 

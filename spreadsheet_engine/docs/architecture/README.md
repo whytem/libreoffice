@@ -8,9 +8,9 @@ documents live under [../archive/](../archive/).
 Current architecture docs:
 
 - [HOST_BOUNDARY_CONSOLIDATION_PLAN.md](HOST_BOUNDARY_CONSOLIDATION_PLAN.md) -
-  active implementation plan for shrinking legacy token/container coupling and
-  making the remaining Calc-owned execution-adjacent surface more explicitly
-  host-only
+  completed implementation and closeout record for shrinking legacy
+  token/container coupling and making the remaining Calc-owned
+  execution-adjacent surface more explicitly host-only
 - [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md) -
   completed implementation and closeout record for widening engine-owned
   execution as the default path in more production Calc call sites

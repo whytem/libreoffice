@@ -1,5 +1,7 @@
 # Host Boundary Consolidation Plan
 
+Status: complete
+
 ## Purpose
 
 The extraction, replay-promotion, recalc-orchestration, execution-shell, and
@@ -384,6 +386,8 @@ Closeout result:
 
 ### Phase 6. Close The Boundary Stream
 
+Status: complete
+
 Re-run the full standing validation contract, update the status and architecture
 docs in present tense, and mark the stream complete.
 
@@ -392,6 +396,15 @@ Closeout standard:
 - replay baseline remains at zero fallback
 - docs describe a stable host boundary
 - the next frontier is clearly defined
+
+Closeout result:
+
+- the host-boundary inventory is now frozen and classified, with in-scope
+  cleanup completed and retain/defer items called out explicitly
+- the touched Calc/compat seams now read as host infrastructure with narrower
+  engine-facing vocabulary and named adapter surfaces
+- the project status and architecture docs now describe this stream in present
+  tense as completed boundary cleanup rather than as an active extraction gap
 
 ## Validation Contract
 
