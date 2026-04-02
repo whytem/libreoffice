@@ -248,6 +248,8 @@ Completion criteria:
 
 ### Phase 1. Freeze And Publish The Host-Boundary Inventory
 
+Status: complete
+
 Create the explicit inventory table for the remaining token/container,
 vocabulary, and host-service boundary.
 
@@ -264,6 +266,17 @@ Closeout standard:
 
 - the inventory is concrete, classified, and linked from the status docs
 - every later phase has a bounded landing surface
+
+Frozen inventory:
+
+| Candidate surface | Current file area | Boundary type | Planned outcome | Validation lanes | Owning later phase |
+| --- | --- | --- | --- | --- | --- |
+| Bounded `CELL(...)` semantic helper still taking Calc-native address/name inputs | `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx`, `sc/source/core/tool/interpr1.cxx` | vocabulary leakage | move helper request surface toward engine-owned API types while keeping Calc grammar/service access in compat | `CppunitTest_sc_ucalc_formula2`, `spreadsheetengine_fods_evaluator_tests`, replay zero-fallback | Phase 2 |
+| Ref-list materialization from interpreter stack into single ref or column vector | `sc/source/core/tool/interpr4.cxx` | token/container translation | move planning/materialization seam behind named compat helper; keep stack mutation in Calc | `CppunitTest_sc_ucalc_formula2`, `CppunitTest_sc_ucalc_shared_cases`, replay zero-fallback | Phase 3 |
+| Local and external `CELL(...)` host property lookups (`FILENAME`, `FORMAT`, `WIDTH`, `PREFIX`, `PROTECT`, `COLOR`, `PARENTHESES`) | `sc/source/core/tool/interpr1.cxx` | host service access | isolate into explicit host-service compat helpers | `CppunitTest_sc_ucalc_formula2`, replay zero-fallback, diff hygiene | Phase 4 |
+| Calc-side document cell-to-engine value conversion duplicated across host bridge and interpreter call sites | `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/Host.hxx`, `sc/source/core/tool/interpr1.cxx` | ambiguous helper duplication | centralize in one compat helper and remove local duplicate semantics | `CppunitTest_sc_ucalc_formula2`, `spreadsheetengine_fods_evaluator_tests`, replay zero-fallback | Phase 5 |
+| `ScRangeFunc`, `ScUnionFunc`, `ScMultiArea`, raw `ScTokenArray` ownership/mutation | `sc/source/core/tool/interpr2.cxx`, `sc/source/core/tool/interpr1.cxx` | Calc token-container ownership | keep host-only and document explicitly; not in scope for this stream | Calc formula Cppunit plus replay baseline only | retain/defer |
+| External-reference cache/session lookup services and heavy environment inspection (`INFO(...)`) | `sc/source/core/tool/interpr1.cxx`, external-ref plumbing | host service | keep host-only and make boundary explicit in docs | focused Calc coverage plus replay baseline | Phase 4 / final docs |
 
 ### Phase 2. Adopt Engine-Owned Vocabulary In The Easiest Shared Seams
 
