@@ -120,6 +120,12 @@ small, explicitly classified set of clusters instead of a generic
   result-shaping helpers, leaving the open shell focused on the broader
   token-walking layer plus explicitly host-only `INFO(...)`, token-container,
   and external-reference plumbing
+- the fourth closeout slice is complete: dead Calc-local helper tails for the
+  extracted `CELL(...)` surface are removed and the remaining external
+  `CELL(...)` dispatch now uses the shared `InfoKind` contract, leaving the
+  remaining open shell focused on the broader token-walking layer plus
+  explicitly host-only `INFO(...)`, token-container, and external-reference
+  plumbing
 
 The starting baseline for this milestone is:
 

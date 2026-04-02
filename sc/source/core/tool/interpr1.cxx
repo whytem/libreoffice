@@ -2531,155 +2531,123 @@ void ScInterpreter::ScCell()
             return;
         }
 
-// *** ADDRESS INFO ***
-        if( aInfoType == "COL" )
-        {   // column number (1-based)
-            PushInt( aCellPos.Col() + 1 );
-        }
-        else if( aInfoType == "ROW" )
-        {   // row number (1-based)
-            PushInt( aCellPos.Row() + 1 );
-        }
-        else if( aInfoType == "SHEET" )
-        {   // table number (1-based)
-            PushInt( aCellPos.Tab() + 1 );
-        }
-        else if( aInfoType == "ADDRESS" )
-        {   // address formatted as [['FILENAME'#]$TABLE.]$COL$ROW
-
-            // Follow the configurable string reference address syntax as also
-            // used by INDIRECT() (and ADDRESS() for the sheet separator).
-            FormulaGrammar::AddressConvention eConv = maCalcConfig.meStringRefAddressSyntax;
-            switch (eConv)
-            {
-                default:
-                    // Use the current address syntax if unspecified or says
-                    // one or the other or one we don't explicitly handle.
-                    eConv = mrDoc.GetAddressConvention();
-                break;
-                case FormulaGrammar::CONV_OOO:
-                case FormulaGrammar::CONV_XL_A1:
-                case FormulaGrammar::CONV_XL_R1C1:
-                    // Use that.
-                break;
-            }
-
-            ScRefFlags nFlags = (aCellPos.Tab() == aPos.Tab()) ? ScRefFlags::ADDR_ABS : ScRefFlags::ADDR_ABS_3D;
-            OUString aStr(aCellPos.Format(nFlags, &mrDoc, eConv));
-            PushString(aStr);
-        }
-        else if (eBoundedInfoKind == secellexec::InfoKind::Filename)
+        switch (eBoundedInfoKind)
         {
-            SCTAB nTab = aCellPos.Tab();
-            OUString aFuncResult;
-            if( nTab < mrDoc.GetTableCount() )
+            case secellexec::InfoKind::Filename:
             {
-                if( mrDoc.GetLinkMode( nTab ) == ScLinkMode::VALUE )
-                    mrDoc.GetName( nTab, aFuncResult );
-                else
+                SCTAB nTab = aCellPos.Tab();
+                OUString aFuncResult;
+                if( nTab < mrDoc.GetTableCount() )
                 {
-                    ScDocShell* pShell = mrDoc.GetDocumentShell();
-                    if( pShell && pShell->GetMedium() )
+                    if( mrDoc.GetLinkMode( nTab ) == ScLinkMode::VALUE )
+                        mrDoc.GetName( nTab, aFuncResult );
+                    else
                     {
-                        const INetURLObject& rURLObj = pShell->GetMedium()->GetURLObject();
-                        OUString aTabName;
-                        mrDoc.GetName( nTab, aTabName );
+                        ScDocShell* pShell = mrDoc.GetDocumentShell();
+                        if( pShell && pShell->GetMedium() )
+                        {
+                            const INetURLObject& rURLObj = pShell->GetMedium()->GetURLObject();
+                            OUString aTabName;
+                            mrDoc.GetName( nTab, aTabName );
 
-                        FormulaGrammar::AddressConvention eConv = maCalcConfig.meStringRefAddressSyntax;
-                        if (eConv == FormulaGrammar::CONV_UNSPECIFIED)
-                            eConv = mrDoc.GetAddressConvention();
+                            FormulaGrammar::AddressConvention eConv
+                                = maCalcConfig.meStringRefAddressSyntax;
+                            if (eConv == FormulaGrammar::CONV_UNSPECIFIED)
+                                eConv = mrDoc.GetAddressConvention();
 
-                        aFuncResult = secellexec::formatLocalFilenameInfo(
-                            rURLObj, aTabName, eConv, comphelper::LibreOfficeKit::isActive());
+                            aFuncResult = secellexec::formatLocalFilenameInfo(
+                                rURLObj, aTabName, eConv,
+                                comphelper::LibreOfficeKit::isActive());
+                        }
                     }
                 }
+                pushApiCellValue(secellexec::makeFilenameValue(aFuncResult));
+                break;
             }
-            pushApiCellValue(secellexec::makeFilenameValue(aFuncResult));
-        }
-        else if (eBoundedInfoKind == secellexec::InfoKind::Coord)
-        {   // address, lotus 1-2-3 formatted: $TABLE:$COL$ROW
-            // Yes, passing tab as col is intentional!
-            OUString aCellStr1 =
-                ScAddress( static_cast<SCCOL>(aCellPos.Tab()), 0, 0 ).Format(
-                    (ScRefFlags::COL_ABS|ScRefFlags::COL_VALID), nullptr, mrDoc.GetAddressConvention() );
-            OUString aCellStr2 =
-                aCellPos.Format((ScRefFlags::COL_ABS|ScRefFlags::COL_VALID|ScRefFlags::ROW_ABS|ScRefFlags::ROW_VALID),
-                             nullptr, mrDoc.GetAddressConvention());
-            OUString aFuncResult = aCellStr1 + ":" + aCellStr2;
-            PushString( aFuncResult );
-        }
-
-// *** CELL PROPERTIES ***
-        else if( aInfoType == "CONTENTS" )
-        {   // contents of the cell, no formatting
-            if (aCell.hasString())
-            {
-                svl::SharedString aStr;
-                GetCellString(aStr, aCell);
-                PushString( aStr );
+            case secellexec::InfoKind::Coord:
+            {   // address, lotus 1-2-3 formatted: $TABLE:$COL$ROW
+                // Yes, passing tab as col is intentional!
+                OUString aCellStr1 =
+                    ScAddress(static_cast<SCCOL>(aCellPos.Tab()), 0, 0)
+                        .Format((ScRefFlags::COL_ABS | ScRefFlags::COL_VALID), nullptr,
+                            mrDoc.GetAddressConvention());
+                OUString aCellStr2 = aCellPos.Format(
+                    (ScRefFlags::COL_ABS | ScRefFlags::COL_VALID | ScRefFlags::ROW_ABS
+                     | ScRefFlags::ROW_VALID),
+                    nullptr, mrDoc.GetAddressConvention());
+                OUString aFuncResult = aCellStr1 + ":" + aCellStr2;
+                PushString(aFuncResult);
+                break;
             }
-            else
-                PushDouble(GetCellValue(aCellPos, aCell));
-        }
-        else if( aInfoType == "TYPE" )
-        {   // b = blank; l = string (label); v = otherwise (value)
-            sal_Unicode c;
-            if (aCell.hasString())
-                c = 'l';
-            else
-                c = aCell.hasNumeric() ? 'v' : 'b';
-            PushString( OUString(c) );
-        }
-        else if (eBoundedInfoKind == secellexec::InfoKind::Width)
-        {   // column width (rounded off as count of zero characters in standard font and size)
-            Printer*    pPrinter = mrDoc.GetPrinter();
-            MapMode     aOldMode( pPrinter->GetMapMode() );
-            vcl::Font   aOldFont( pPrinter->GetFont() );
-            vcl::Font   aDefFont;
+            case secellexec::InfoKind::Width:
+            {   // column width (rounded off as count of zero characters in standard font and size)
+                Printer* pPrinter = mrDoc.GetPrinter();
+                MapMode aOldMode(pPrinter->GetMapMode());
+                vcl::Font aOldFont(pPrinter->GetFont());
+                vcl::Font aDefFont;
 
-            pPrinter->SetMapMode(MapMode(MapUnit::MapTwip));
-            // font color doesn't matter here
-            mrDoc.getCellAttributeHelper().getDefaultCellAttribute().fillFontOnly(aDefFont, pPrinter);
-            pPrinter->SetFont(aDefFont);
-            tools::Long nZeroWidth = pPrinter->GetTextWidth( OUString( '0' ) );
-            assert(nZeroWidth != 0);
-            pPrinter->SetFont( aOldFont );
-            pPrinter->SetMapMode( aOldMode );
-            int nZeroCount = static_cast<int>(mrDoc.GetColWidth( aCellPos.Col(), aCellPos.Tab() ) / nZeroWidth);
-            pushApiCellValue(secellexec::makeWidthValue(nZeroCount));
+                pPrinter->SetMapMode(MapMode(MapUnit::MapTwip));
+                // font color doesn't matter here
+                mrDoc.getCellAttributeHelper().getDefaultCellAttribute().fillFontOnly(aDefFont,
+                    pPrinter);
+                pPrinter->SetFont(aDefFont);
+                tools::Long nZeroWidth = pPrinter->GetTextWidth(OUString('0'));
+                assert(nZeroWidth != 0);
+                pPrinter->SetFont(aOldFont);
+                pPrinter->SetMapMode(aOldMode);
+                int nZeroCount
+                    = static_cast<int>(mrDoc.GetColWidth(aCellPos.Col(), aCellPos.Tab())
+                                       / nZeroWidth);
+                pushApiCellValue(secellexec::makeWidthValue(nZeroCount));
+                break;
+            }
+            case secellexec::InfoKind::Prefix:
+            {   // ' = left; " = right; ^ = centered
+                const SvxHorJustifyItem& rJustAttr = mrDoc.GetAttr(aCellPos, ATTR_HOR_JUSTIFY);
+                pushApiCellValue(
+                    secellexec::makePrefixValue(aCell.hasString(), rJustAttr.GetValue()));
+                break;
+            }
+            case secellexec::InfoKind::Protect:
+            {   // 1 = cell locked
+                const ScProtectionAttr& rProtAttr = mrDoc.GetAttr(aCellPos, ATTR_PROTECTION);
+                pushApiCellValue(secellexec::makeFlagValue(rProtAttr.GetProtection()));
+                break;
+            }
+            case secellexec::InfoKind::Format:
+            {   // specific format code for standard formats
+                OUString aFuncResult;
+                sal_uInt32 nFormat = mrDoc.GetNumberFormat(ScRange(aCellPos));
+                getFormatString(mrContext, nFormat, aFuncResult);
+                pushApiCellValue(secellexec::makeFormatValue(aFuncResult));
+                break;
+            }
+            case secellexec::InfoKind::Color:
+            {   // 1 = negative values are colored, otherwise 0
+                const SvNumberformat* pFormat
+                    = mrContext.NFGetFormatEntry(mrDoc.GetNumberFormat(ScRange(aCellPos)));
+                pushApiCellValue(
+                    secellexec::makeFlagValue(secellexec::formatHasNegativeColor(pFormat)));
+                break;
+            }
+            case secellexec::InfoKind::Parentheses:
+            {   // 1 = format string contains a '(' character, otherwise 0
+                const SvNumberformat* pFormat
+                    = mrContext.NFGetFormatEntry(mrDoc.GetNumberFormat(ScRange(aCellPos)));
+                pushApiCellValue(
+                    secellexec::makeFlagValue(secellexec::formatHasOpenParenthesis(pFormat)));
+                break;
+            }
+            case secellexec::InfoKind::Unsupported:
+            case secellexec::InfoKind::Column:
+            case secellexec::InfoKind::Row:
+            case secellexec::InfoKind::Sheet:
+            case secellexec::InfoKind::Address:
+            case secellexec::InfoKind::Contents:
+            case secellexec::InfoKind::Type:
+                PushIllegalArgument();
+                break;
         }
-        else if (eBoundedInfoKind == secellexec::InfoKind::Prefix)
-        {   // ' = left; " = right; ^ = centered
-            const SvxHorJustifyItem& rJustAttr = mrDoc.GetAttr( aCellPos, ATTR_HOR_JUSTIFY );
-            pushApiCellValue(secellexec::makePrefixValue(aCell.hasString(), rJustAttr.GetValue()));
-        }
-        else if (eBoundedInfoKind == secellexec::InfoKind::Protect)
-        {   // 1 = cell locked
-            const ScProtectionAttr& rProtAttr = mrDoc.GetAttr( aCellPos, ATTR_PROTECTION );
-            pushApiCellValue(secellexec::makeFlagValue(rProtAttr.GetProtection()));
-        }
-
-// *** FORMATTING ***
-        else if (eBoundedInfoKind == secellexec::InfoKind::Format)
-        {   // specific format code for standard formats
-            OUString aFuncResult;
-            sal_uInt32 nFormat = mrDoc.GetNumberFormat( ScRange(aCellPos) );
-            getFormatString(mrContext, nFormat, aFuncResult);
-            pushApiCellValue(secellexec::makeFormatValue(aFuncResult));
-        }
-        else if (eBoundedInfoKind == secellexec::InfoKind::Color)
-        {   // 1 = negative values are colored, otherwise 0
-            const SvNumberformat* pFormat = mrContext.NFGetFormatEntry( mrDoc.GetNumberFormat( ScRange(aCellPos) ) );
-            pushApiCellValue(secellexec::makeFlagValue(secellexec::formatHasNegativeColor(pFormat)));
-        }
-        else if (eBoundedInfoKind == secellexec::InfoKind::Parentheses)
-        {   // 1 = format string contains a '(' character, otherwise 0
-            const SvNumberformat* pFormat = mrContext.NFGetFormatEntry( mrDoc.GetNumberFormat( ScRange(aCellPos) ) );
-            pushApiCellValue(
-                secellexec::makeFlagValue(secellexec::formatHasOpenParenthesis(pFormat)));
-        }
-        else
-            PushIllegalArgument();
     }
 }
 
@@ -2733,105 +2701,122 @@ void ScInterpreter::ScCellExternal()
         PushDouble(rValue.mfNumber);
     };
 
-    if ( aInfoType == "COL" )
-        PushInt(nCol + 1);
-    else if ( aInfoType == "ROW" )
-        PushInt(nRow + 1);
-    else if ( aInfoType == "SHEET" )
+    const spreadsheetengine::api::CellAddress aExternalAddress{ 0, nCol, nRow };
+    switch (eInfoKind)
     {
-        // For SHEET, No idea what number we should set, but let's always set
-        // 1 if the external sheet exists, no matter what sheet.  Excel does
-        // the same.
-        if (pRefMgr->getCacheTable(nFileId, aTabName, false))
-            PushInt(1);
-        else
-            SetError(FormulaError::NoName);
-    }
-    else if ( aInfoType == "ADDRESS" )
-    {
-        // ODF 1.2 says we need to always display address using the ODF A1 grammar.
-        ScTokenArray aArray(mrDoc);
-        aArray.AddExternalSingleReference(nFileId, svl::SharedString( aTabName), aRef); // string not interned
-        ScCompiler aComp(mrDoc, aPos, aArray, formula::FormulaGrammar::GRAM_ODFF_A1);
-        OUString aStr;
-        aComp.CreateStringFromTokenArray(aStr);
-        PushString(aStr);
-    }
-    else if ( eInfoKind == secellexec::InfoKind::Filename )
-    {
-        const OUString* p = pRefMgr->getExternalFileName(nFileId);
-        if (!p)
+        case secellexec::InfoKind::Column:
+            pushApiCellValue(
+                spreadsheetengine::runtime::cellinspection::columnValue(aExternalAddress));
+            break;
+        case secellexec::InfoKind::Row:
+            pushApiCellValue(
+                spreadsheetengine::runtime::cellinspection::rowValue(aExternalAddress));
+            break;
+        case secellexec::InfoKind::Sheet:
+            // For SHEET, No idea what number we should set, but let's always
+            // set 1 if the external sheet exists, no matter what sheet. Excel
+            // does the same.
+            if (pRefMgr->getCacheTable(nFileId, aTabName, false))
+                PushInt(1);
+            else
+                SetError(FormulaError::NoName);
+            break;
+        case secellexec::InfoKind::Address:
         {
-            // In theory this should never happen...
-            SetError(FormulaError::NoName);
-            return;
+            // ODF 1.2 says we need to always display address using the ODF A1 grammar.
+            ScTokenArray aArray(mrDoc);
+            aArray.AddExternalSingleReference(nFileId, svl::SharedString(aTabName),
+                aRef); // string not interned
+            ScCompiler aComp(mrDoc, aPos, aArray, formula::FormulaGrammar::GRAM_ODFF_A1);
+            OUString aStr;
+            aComp.CreateStringFromTokenArray(aStr);
+            PushString(aStr);
+            break;
         }
+        case secellexec::InfoKind::Filename:
+        {
+            const OUString* p = pRefMgr->getExternalFileName(nFileId);
+            if (!p)
+            {
+                // In theory this should never happen...
+                SetError(FormulaError::NoName);
+                return;
+            }
 
-        FormulaGrammar::AddressConvention eConv = maCalcConfig.meStringRefAddressSyntax;
-        if (eConv == FormulaGrammar::CONV_UNSPECIFIED)
-            eConv = mrDoc.GetAddressConvention();
+            FormulaGrammar::AddressConvention eConv = maCalcConfig.meStringRefAddressSyntax;
+            if (eConv == FormulaGrammar::CONV_UNSPECIFIED)
+                eConv = mrDoc.GetAddressConvention();
 
-        pushApiCellValue(secellexec::makeFilenameValue(
-            secellexec::formatExternalFilenameInfo(*p, aTabName, eConv)));
-    }
-    else if ( aInfoType == "CONTENTS" )
-    {
-        switch (pToken->GetType())
-        {
-            case svString:
-                PushString(pToken->GetString());
+            pushApiCellValue(secellexec::makeFilenameValue(
+                secellexec::formatExternalFilenameInfo(*p, aTabName, eConv)));
             break;
-            case svDouble:
-                PushString(OUString::number(pToken->GetDouble()));
-            break;
-            case svError:
-                PushString(ScGlobal::GetErrorString(pToken->GetError()));
-            break;
-            default:
-                PushString(OUString());
         }
-    }
-    else if ( aInfoType == "TYPE" )
-    {
-        sal_Unicode c = 'v';
-        switch (pToken->GetType())
+        case secellexec::InfoKind::Contents:
+            switch (pToken->GetType())
+            {
+                case svString:
+                    PushString(pToken->GetString());
+                    break;
+                case svDouble:
+                    PushString(OUString::number(pToken->GetDouble()));
+                    break;
+                case svError:
+                    PushString(ScGlobal::GetErrorString(pToken->GetError()));
+                    break;
+                default:
+                    PushString(OUString());
+                    break;
+            }
+            break;
+        case secellexec::InfoKind::Type:
         {
-            case svString:
-                c = 'l';
+            sal_Unicode c = 'v';
+            switch (pToken->GetType())
+            {
+                case svString:
+                    c = 'l';
+                    break;
+                case svEmptyCell:
+                    c = 'b';
+                    break;
+                default:
+                    break;
+            }
+            PushString(OUString(c));
             break;
-            case svEmptyCell:
-                c = 'b';
-            break;
-            default:
-                ;
         }
-        PushString(OUString(c));
+        case secellexec::InfoKind::Format:
+        {
+            OUString aFmtStr;
+            sal_uLong nFmt = aFmt.mbIsSet ? aFmt.mnIndex : 0;
+            getFormatString(mrContext, nFmt, aFmtStr);
+            pushApiCellValue(secellexec::makeFormatValue(aFmtStr));
+            break;
+        }
+        case secellexec::InfoKind::Color:
+        {
+            const SvNumberformat* pFormat
+                = aFmt.mbIsSet ? mrContext.NFGetFormatEntry(aFmt.mnIndex) : nullptr;
+            pushApiCellValue(
+                secellexec::makeFlagValue(secellexec::formatHasNegativeColor(pFormat)));
+            break;
+        }
+        case secellexec::InfoKind::Parentheses:
+        {
+            const SvNumberformat* pFormat
+                = aFmt.mbIsSet ? mrContext.NFGetFormatEntry(aFmt.mnIndex) : nullptr;
+            pushApiCellValue(
+                secellexec::makeFlagValue(secellexec::formatHasOpenParenthesis(pFormat)));
+            break;
+        }
+        case secellexec::InfoKind::Coord:
+        case secellexec::InfoKind::Width:
+        case secellexec::InfoKind::Prefix:
+        case secellexec::InfoKind::Protect:
+        case secellexec::InfoKind::Unsupported:
+            PushIllegalParameter();
+            break;
     }
-    else if ( eInfoKind == secellexec::InfoKind::Format )
-    {
-        OUString aFmtStr;
-        sal_uLong nFmt = aFmt.mbIsSet ? aFmt.mnIndex : 0;
-        getFormatString(mrContext, nFmt, aFmtStr);
-        pushApiCellValue(secellexec::makeFormatValue(aFmtStr));
-    }
-    else if ( eInfoKind == secellexec::InfoKind::Color )
-    {
-        // 1 = negative values are colored, otherwise 0
-        const SvNumberformat* pFormat
-            = aFmt.mbIsSet ? mrContext.NFGetFormatEntry(aFmt.mnIndex) : nullptr;
-        pushApiCellValue(
-            secellexec::makeFlagValue(secellexec::formatHasNegativeColor(pFormat)));
-    }
-    else if ( eInfoKind == secellexec::InfoKind::Parentheses )
-    {
-        // 1 = format string contains a '(' character, otherwise 0
-        const SvNumberformat* pFormat
-            = aFmt.mbIsSet ? mrContext.NFGetFormatEntry(aFmt.mnIndex) : nullptr;
-        pushApiCellValue(
-            secellexec::makeFlagValue(secellexec::formatHasOpenParenthesis(pFormat)));
-    }
-    else
-        PushIllegalParameter();
 }
 
 void ScInterpreter::ScIsRef()

@@ -193,6 +193,12 @@ keeping the host boundary stable.
 In other words: the problem is now mostly one of disciplined boundary
 tightening, not of feasibility.
 
+One important cleanup milestone is also now true: within the execution-shell
+surface already extracted into `spreadsheet_engine`, there are no known
+remaining standalone-vs-Calc duplicate helper implementations. The open work
+is the still-Calc-owned shell, not duplicated semantics inside the migrated
+surface.
+
 ## Go-Forward Plan
 
 The next plan should be organized around the end-state boundary rather than

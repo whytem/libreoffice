@@ -285,6 +285,8 @@ Closeout status:
 
 ### Workstream 5: Eliminate Residual Duplicate Implementations
 
+Status: **Complete**
+
 After the remaining shell helpers are extracted, perform a cleanup pass focused
 on duplication.
 
@@ -313,6 +315,16 @@ Exit criteria:
   standalone and Calc
 - any intentionally retained Calc-local helper is explicitly host-only
 - the remaining interpreter shell is smaller and easier to explain
+
+Closeout status:
+
+- complete
+- the dead Calc-local `ScCell()` branch tree for already-extracted
+  `COL` / `ROW` / `SHEET` / `ADDRESS` / `CONTENTS` / `TYPE` handling is gone
+- `ScCellExternal()` now dispatches through the shared `InfoKind` contract
+  instead of duplicating keyword matching inline
+- no known in-scope duplicate execution helpers remain for the extracted
+  `CELL(...)` shell surface
 
 ### Workstream 6: Close Out The Execution Shell Program
 
