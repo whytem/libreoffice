@@ -1,5 +1,7 @@
 # Engine Entrypoint Adoption Plan
 
+Status: complete
+
 ## Purpose
 
 The extraction, replay-promotion, recalc-orchestration, execution-shell,
@@ -303,6 +305,8 @@ Closeout standard:
 - the touched call sites no longer package entry context inline
 - the adapter edge is explicit and easy to trace
 
+Status: complete
+
 ### Phase 3. Adopt The First Pure-Computation Production Slice
 
 Move one ready-now pure-computation slice onto direct engine entry.
@@ -317,6 +321,8 @@ Closeout standard:
 
 - the chosen production path routes through engine entry by default
 - the touched Calc-local semantic tail is gone or reduced to a thin wrapper
+
+Status: complete
 
 ### Phase 4. Adopt The First Reference-Safe Production Slice
 
@@ -334,6 +340,8 @@ Closeout standard:
 - the chosen reference-safe path now uses direct engine entry
 - retained local code is visibly host-oriented
 
+Status: complete
+
 ### Phase 5. Remove Superseded Local Orchestration
 
 Delete or isolate the old orchestration layers in the touched scope once the
@@ -350,6 +358,8 @@ Closeout standard:
 - no known duplicate orchestration remains in the touched scope
 - retained helpers are explicitly host-only
 
+Status: complete
+
 ### Phase 6. Re-Run The Full Baseline And Close The Stream
 
 Re-run the standing validation contract, update the status and architecture
@@ -360,6 +370,8 @@ Closeout standard:
 - replay baseline remains at zero fallback
 - docs describe the widened direct-entry boundary as stable
 - the next frontier is clearly defined
+
+Status: complete
 
 ## Validation Contract
 
@@ -389,3 +401,47 @@ This stream can be closed when:
 At that point, the project can reassess the next frontier from a production
 Calc that relies more directly on engine entry points instead of helper-level
 adoption alone.
+
+## Closeout Summary
+
+This stream is complete.
+
+What landed:
+
+- Calc text parsing now enters the engine through the explicit
+  [TextParsingExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx)
+  adapter for `VALUE`, `DATEVALUE`, `TIMEVALUE`, and `NUMBERVALUE`, with the
+  production callers switched in
+  [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx)
+  and
+  [interpr2.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr2.cxx).
+- Calc formula inspection now enters the engine through the bounded
+  [FormulaInspection.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/runtime/FormulaInspection.hxx)
+  and
+  [FormulaInspectionExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx)
+  seam for `ISFORMULA` and `FORMULA`, with the production callers switched in
+  [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx).
+- superseded local orchestration in the touched scope was removed, including
+  the retired `compat/libreoffice/Parsing.hxx` wrapper layer
+- direct adapter coverage was added in
+  [ucalc_shared_cases.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_shared_cases.cxx)
+
+Final validation:
+
+- `CppunitTest_sc_ucalc_formula2`
+- `CppunitTest_sc_ucalc_shared_cases`
+- `spreadsheetengine_fods_evaluator_tests`
+- `spreadsheetengine_fods_replay_tests --summary --assert-zero-fallback`
+- `git diff --check`
+
+Verified standing baseline at closeout:
+
+- `workbooks=500`
+- `formula_cells=50661`
+- `parsed_formulas=50652`
+- `cached_fallback_cells=0`
+- `cached_fallback_rate=0`
+
+The next frontier is no longer more cleanup inside this stream. It is a fresh
+follow-on boundary-tightening pass around production compiler/evaluation entry
+use for the remaining explicitly host-owned surfaces.

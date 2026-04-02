@@ -58,6 +58,9 @@ execution-shell extraction. Those programs are complete. The engine-first Calc
 adoption program is also complete as a bounded workstream, and its standing
 guardrails now live in
 [ENGINE_FIRST_CALC_ADOPTION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ENGINE_FIRST_CALC_ADOPTION.md).
+The first bounded direct-entry adoption stream is also complete and now lives
+as a closeout record in
+[ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md).
 
 ## Verified Baseline
 
@@ -196,8 +199,8 @@ been answered:
 - Calc can consume extracted execution helpers safely through compat bridges
 
 Because of that, the next work does not need to prove the architecture again.
-It needs to broaden engine-first adoption inside Calc and keep the host
-boundary stable.
+It needs to keep tightening the production compiler/evaluation boundary while
+keeping the host boundary stable.
 
 In other words: the problem is now mostly one of disciplined boundary
 tightening, not of feasibility.
@@ -212,17 +215,20 @@ surface is explicitly host-shaped.
 The next plan should be organized around the end-state boundary rather than
 around historical milestone names.
 
-### 1. Widen Direct Engine Entrypoint Use Inside Calc
+### 1. Tighten Production Compiler And Entrypoint Boundaries
 
-The next active workstream should focus on moving bounded production Calc paths
-from helper-level adoption to direct engine entry-point adoption.
+The first bounded direct-entry adoption stream is complete.
 
-The goal is not to move storage or token ownership into the engine. It is to
-let more real Calc evaluation call into stable engine entry surfaces through
-thin host adapters, while leaving document lifecycle and host services in
-Calc.
+That work switched Calc's text-parsing and formula-inspection production paths
+onto explicit engine entry adapters, removed the superseded wrapper tail in the
+touched scope, and left the remaining retained surfaces explicitly host-owned.
 
-The implementation-ready plan for that stream is:
+The next work should not reopen that stream. It should start from the now-clean
+baseline and identify the next production boundary that can be tightened
+without moving storage, token ownership, or session-heavy services into the
+engine.
+
+The completed closeout record for the direct-entry stream is:
 
 - [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
 
