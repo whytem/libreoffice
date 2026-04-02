@@ -45,10 +45,9 @@ The starting handoff from the completed recalc-orchestration milestone is:
 
 ## Current Status
 
-This milestone is now active with Phases 0 through 7 complete and the next
-bounded execution-shell slice narrowed to the remaining generic jump-matrix
-cursor, broader token-walking, and final residual string-reference
-compilation flows.
+This milestone is now active with Phases 0 through 8 complete and the next
+bounded execution-shell slice narrowed to the broader token-walking shell and
+final residual string-reference compilation flows.
 
 - Phase 0 is complete: the orchestration/execution boundary is explicitly
   documented, the first helper duplication inventory is frozen, and the Phase 1
@@ -81,6 +80,10 @@ compilation flows.
   `SWITCH` comparison shell now route through dedicated compat helpers,
   leaving the remaining Calc-owned shell narrowed to the generic jump-matrix
   cursor and broader token-walking/final string-compilation tail
+- Phase 8 is complete: Calc's generic jump-matrix cursor advancement, result
+  resize policy, and reference-list finalization decision now route through a
+  dedicated compat helper, leaving the remaining Calc-owned shell narrowed to
+  the broader token-walking and final string-compilation tail
 
 The starting baseline for this milestone is:
 
@@ -977,6 +980,45 @@ Completion criteria for Phase 7, now met:
 - the replay baseline remains fully green
 
 Phase 7 closeout status:
+
+- complete
+- validated across the focused Calc and standalone lanes
+- one-shot replay baseline remains `500` workbooks, `50,661` formula cells,
+  `0` cached-fallback cells
+
+### Phase 8: Extract The Generic Jump-Matrix Cursor And Finalization Shell
+
+Status: **Complete**
+
+Goals:
+
+- move the generic `JumpMatrix()` cursor advancement shell out of Calc-local
+  logic
+- move jump-matrix result resize policy and reference-list finalization
+  decisions behind compat helpers without changing Calc stack ownership
+- keep the already-migrated jump-family slices green on top of the shared
+  cursor/finalization layer
+
+Landed scope:
+
+- compat extraction for jump-matrix result resize policy
+- compat extraction for cursor advancement over no-path entries
+- compat extraction for the bounded reference-list finalization decision
+
+Implemented in:
+
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/JumpMatrixExecution.hxx`
+- `sc/source/core/tool/interpr1.cxx`
+
+Completion criteria for Phase 8, now met:
+
+- Calc-local generic jump-matrix resize/cursor/finalization logic no longer
+  lives solely inside `JumpMatrix()`
+- existing jump-family Calc coverage remains green on top of the extracted
+  compat layer
+- the replay baseline remains fully green
+
+Phase 8 closeout status:
 
 - complete
 - validated across the focused Calc and standalone lanes

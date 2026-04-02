@@ -66,6 +66,7 @@
 #include <spreadsheetengine/compat/libreoffice/IndirectExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
 #include <spreadsheetengine/compat/libreoffice/JumpExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/JumpMatrixExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/LetExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
@@ -110,6 +111,7 @@ namespace sestringref = spreadsheetengine::api::stringreference;
 namespace seindirectexec = spreadsheetengine::compat::libreoffice::indirectexecution;
 namespace seinterpre = spreadsheetengine::compat::libreoffice::interpreterdispatch;
 namespace sejumpexec = spreadsheetengine::compat::libreoffice::jumpexecution;
+namespace sejumpmatrixexec = spreadsheetengine::compat::libreoffice::jumpmatrixexecution;
 namespace seletexec = spreadsheetengine::compat::libreoffice::letexecution;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace selookupexec = spreadsheetengine::compat::libreoffice::lookupexecution;
@@ -706,35 +708,6 @@ void ScInterpreter::ScChooseJump()
         aCode.Jump( pJump[ nJumpCount ], pJump[ nJumpCount ] );
 }
 
-static void lcl_AdjustJumpMatrix( ScJumpMatrix* pJumpM, SCSIZE nParmCols, SCSIZE nParmRows )
-{
-    SCSIZE nJumpCols, nJumpRows;
-    SCSIZE nResCols, nResRows;
-    SCSIZE nAdjustCols, nAdjustRows;
-    pJumpM->GetDimensions( nJumpCols, nJumpRows );
-    pJumpM->GetResMatDimensions( nResCols, nResRows );
-    if (!(( nJumpCols == 1 && nParmCols > nResCols ) ||
-        ( nJumpRows == 1 && nParmRows > nResRows )))
-        return;
-
-    if ( nJumpCols == 1 && nJumpRows == 1 )
-    {
-        nAdjustCols = std::max(nParmCols, nResCols);
-        nAdjustRows = std::max(nParmRows, nResRows);
-    }
-    else if ( nJumpCols == 1 )
-    {
-        nAdjustCols = nParmCols;
-        nAdjustRows = nResRows;
-    }
-    else
-    {
-        nAdjustCols = nResCols;
-        nAdjustRows = nParmRows;
-    }
-    pJumpM->SetNewResMat( nAdjustCols, nAdjustRows );
-}
-
 bool ScInterpreter::JumpMatrix( short nStackLevel )
 {
     pJumpMatrix = pStack[sp-nStackLevel]->GetJumpMatrix();
@@ -904,7 +877,8 @@ bool ScInterpreter::JumpMatrix( short nStackLevel )
                         }
                         SCSIZE nParmCols = aRange.aEnd.Col() - aRange.aStart.Col() + 1;
                         SCSIZE nParmRows = aRange.aEnd.Row() - aRange.aStart.Row() + 1;
-                        lcl_AdjustJumpMatrix( pJumpMatrix, nParmCols, nParmRows );
+                        sejumpmatrixexec::adjustResultMatrixDimensions(
+                            *pJumpMatrix, nParmCols, nParmRows);
                     }
 
                     formula::ParamClass eReturnType = ScParameterClassification::GetParameterType( pCur, SAL_MAX_UINT16);
@@ -983,7 +957,8 @@ bool ScInterpreter::JumpMatrix( short nStackLevel )
                             pMat->SetErrorInterpreter(nullptr);
                             sejumpexec::storeJumpMatrixResult(*pMat, *pJumpMatrix, nC, nR);
                         }
-                        lcl_AdjustJumpMatrix( pJumpMatrix, nCols, nRows );
+                        sejumpmatrixexec::adjustResultMatrixDimensions(
+                            *pJumpMatrix, nCols, nRows);
                     }
                 }
                 break;
@@ -1004,75 +979,55 @@ bool ScInterpreter::JumpMatrix( short nStackLevel )
             }
         }
     }
-    bool bCont = pJumpMatrix->Next( nC, nR );
-    if ( bCont )
+    const auto aPendingJump = sejumpmatrixexec::advanceToPendingJump(*pJumpMatrix, bHasResMat);
+    if (aPendingJump.mbHasPendingJump)
     {
-        double fBool;
-        short nStart, nNext, nStop;
-        pJumpMatrix->GetJump( nC, nR, fBool, nStart, nNext, nStop );
-        while ( bCont && nStart == nNext )
-        {   // push all results that have no jump path
-            if ( bHasResMat && (GetDoubleErrorValue( fBool) != FormulaError::JumpMatHasResult) )
-            {
-                // a false without path results in an empty path value
-                if ( fBool == 0.0 )
-                    pJumpMatrix->PutResultEmptyPath( nC, nR );
-                else
-                    pJumpMatrix->PutResultDouble( fBool, nC, nR );
-            }
-            bCont = pJumpMatrix->Next( nC, nR );
-            if ( bCont )
-                pJumpMatrix->GetJump( nC, nR, fBool, nStart, nNext, nStop );
-        }
-        if ( bCont && nStart != nNext )
+        const ScTokenVec & rParams = pJumpMatrix->GetJumpParameters();
+        for ( auto const & i : rParams )
         {
-            const ScTokenVec & rParams = pJumpMatrix->GetJumpParameters();
-            for ( auto const & i : rParams )
-            {
-                // This is not the current state of the interpreter, so
-                // push without error, and elements' errors are coded into
-                // double.
-                PushWithoutError(*i);
-            }
-            aCode.Jump( nStart, nNext, nStop );
+            // This is not the current state of the interpreter, so
+            // push without error, and elements' errors are coded into
+            // double.
+            PushWithoutError(*i);
         }
+        aCode.Jump(aPendingJump.mnStart, aPendingJump.mnNext, aPendingJump.mnStop);
+        return false;
     }
-    if ( !bCont )
-    {   // We're done with it, throw away jump matrix, keep result.
-        // For an intermediate result of Reference use the array of references
-        // if there are more than one reference and the current ForceArray
-        // context is ReferenceOrRefArray.
-        // Else (also for a final result of Reference) use the matrix.
-        // Treat the result of a jump command as final and use the matrix (see
-        // tdf#115493 for why).
-        if (pCur->GetInForceArray() == ParamClass::ReferenceOrRefArray &&
-                pJumpMatrix->GetRefList().size() > 1 &&
-                ScParameterClassification::GetParameterType( pCur, SAL_MAX_UINT16) == ParamClass::Reference &&
-                !FormulaCompiler::IsOpCodeJumpCommand( pJumpMatrix->GetOpCode()) &&
-                aCode.PeekNextOperator())
-        {
-            FormulaTokenRef xRef = new ScRefListToken(true);
-            *(xRef->GetRefList()) = pJumpMatrix->GetRefList();
-            pJumpMatrix = nullptr;
-            Pop();
-            PushTokenRef( xRef);
-            maTokenMatrixMap.erase( pCur);
-            // There's no result matrix to remember in this case.
-        }
-        else
-        {
-            ScMatrix* pResMat = pJumpMatrix->GetResultMatrix();
-            pJumpMatrix = nullptr;
-            Pop();
-            PushMatrix( pResMat );
-            // Remove jump matrix from map and remember result matrix in case it
-            // could be reused in another path of the same condition.
-            maTokenMatrixMap.erase( pCur);
-            maTokenMatrixMap.emplace(pCur, pStack[sp-1]);
-        }
-        return true;
+    // We're done with it, throw away jump matrix, keep result.
+    // For an intermediate result of Reference use the array of references
+    // if there are more than one reference and the current ForceArray
+    // context is ReferenceOrRefArray.
+    // Else (also for a final result of Reference) use the matrix.
+    // Treat the result of a jump command as final and use the matrix (see
+    // tdf#115493 for why).
+    if (sejumpmatrixexec::shouldReturnReferenceList(
+            pCur->GetInForceArray() == ParamClass::ReferenceOrRefArray,
+            pJumpMatrix->GetRefList().size(),
+            ScParameterClassification::GetParameterType(pCur, SAL_MAX_UINT16)
+                == ParamClass::Reference,
+            FormulaCompiler::IsOpCodeJumpCommand(pJumpMatrix->GetOpCode()),
+            aCode.PeekNextOperator()))
+    {
+        FormulaTokenRef xRef = new ScRefListToken(true);
+        *(xRef->GetRefList()) = pJumpMatrix->GetRefList();
+        pJumpMatrix = nullptr;
+        Pop();
+        PushTokenRef( xRef);
+        maTokenMatrixMap.erase( pCur);
+        // There's no result matrix to remember in this case.
     }
-    return false;
+    else
+    {
+        ScMatrix* pResMat = pJumpMatrix->GetResultMatrix();
+        pJumpMatrix = nullptr;
+        Pop();
+        PushMatrix( pResMat );
+        // Remove jump matrix from map and remember result matrix in case it
+        // could be reused in another path of the same condition.
+        maTokenMatrixMap.erase( pCur);
+        maTokenMatrixMap.emplace(pCur, pStack[sp-1]);
+    }
+    return true;
 }
 
 double ScInterpreter::Compare( ScQueryOp eOp )
