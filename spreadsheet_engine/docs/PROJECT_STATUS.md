@@ -250,6 +250,20 @@ The completed direct-entry closeout records are:
 - [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
 - [ENGINE_ENTRY_WIDENING_PLAN.md](architecture/ENGINE_ENTRY_WIDENING_PLAN.md)
 
+### 1A. Narrow The Remaining Host-Service Facades
+
+The next logical bounded stream is to narrow the packaging around the
+retained host-owned services that still sit at the Calc boundary.
+
+The goal is not to move those services into the engine. It is to make the
+boundary smaller and clearer by separating true host ownership from repeated
+projection, context assembly, and service-packaging logic that can still be
+collapsed behind named compat facades.
+
+The active implementation-ready plan for that work is:
+
+- [HOST_SERVICE_FACADE_NARROWING_PLAN.md](architecture/HOST_SERVICE_FACADE_NARROWING_PLAN.md)
+
 ### 2. Keep The Production Boundary Tight And Explicit
 
 The first bounded direct-entry adoption stream is complete, and the follow-on
@@ -376,6 +390,7 @@ project is on track.
 
 The most relevant active docs are:
 
+- [HOST_SERVICE_FACADE_NARROWING_PLAN.md](architecture/HOST_SERVICE_FACADE_NARROWING_PLAN.md)
 - [ENGINE_ENTRY_WIDENING_PLAN.md](architecture/ENGINE_ENTRY_WIDENING_PLAN.md)
 - [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
 - [PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md](architecture/PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md)
