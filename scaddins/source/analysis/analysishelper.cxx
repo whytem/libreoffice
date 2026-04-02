@@ -258,6 +258,9 @@ void DaysToDate( sal_Int32 nDays, sal_uInt16& rDay, sal_uInt16& rMonth, sal_uInt
  * is the number of days between 01/01/0001 and the date
  * this function returns this internal Date value for the document null date
  *
+ * This remains deliberately host-owned: the value comes from the live
+ * document's property set rather than from engine-owned spreadsheet semantics.
+ *
  */
 
 sal_Int32 GetNullDate( const uno::Reference< beans::XPropertySet >& xOpt )

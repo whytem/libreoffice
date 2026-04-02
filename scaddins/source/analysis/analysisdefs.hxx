@@ -54,6 +54,21 @@ struct FinancialDateContext
     sal_Int32 mnBasis = 0;
 };
 
+inline sal_Int32 getRequiredHostNullDate(
+    const css::uno::Reference<css::beans::XPropertySet>& xOpt)
+{
+    // Host-only: this comes from the live document's NullDate property.
+    return sca::analysis::GetNullDate(xOpt);
+}
+
+inline void populateHostHolidayList(sca::analysis::ScaAnyConverter& rAnyConv,
+    const css::uno::Reference<css::beans::XPropertySet>& xOpt, const css::uno::Any& rHolidayAny,
+    sal_Int32 nNullDate, sca::analysis::SortedIndividualInt32List& rHolidayList)
+{
+    // Host-only: holiday expansion depends on document-facing add-in inputs.
+    rHolidayList.InsertHolidayList(rAnyConv, xOpt, rHolidayAny, nNullDate);
+}
+
 inline FinancialDateContext getFinancialDateContext(
     const css::uno::Reference<css::beans::XPropertySet>& xOpt, sal_Int32 nBasis)
 {
@@ -82,8 +97,8 @@ inline double evaluateFinancialWithNullDate(
     const css::uno::Reference<css::beans::XPropertySet>& xOpt, Function&& rFunction,
     Args&&... rArgs)
 {
-    return valueOrThrow(std::invoke(std::forward<Function>(rFunction), getNullDateParts(xOpt),
-        std::forward<Args>(rArgs)...));
+    return valueOrThrow(std::invoke(
+        std::forward<Function>(rFunction), getNullDateParts(xOpt), std::forward<Args>(rArgs)...));
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

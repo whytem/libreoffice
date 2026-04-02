@@ -336,11 +336,10 @@ sal_Int32 SAL_CALL AnalysisAddIn::getWorkday( const uno::Reference< beans::XProp
     if( !nDays )
         return nDate;
 
-    sal_Int32                   nNullDate = GetNullDate( xOptions );
+    sal_Int32                   nNullDate = getRequiredHostNullDate( xOptions );
 
     SortedIndividualInt32List   aSrtLst;
-
-    aSrtLst.InsertHolidayList( aAnyConv, xOptions, aHDay, nNullDate );
+    populateHostHolidayList( aAnyConv, xOptions, aHDay, nNullDate, aSrtLst );
 
     sal_Int32                   nActDate = nDate + nNullDate;
 
@@ -396,7 +395,7 @@ double SAL_CALL AnalysisAddIn::getYearfrac( const uno::Reference< beans::XProper
 
 sal_Int32 SAL_CALL AnalysisAddIn::getEdate( const uno::Reference< beans::XPropertySet >& xOpt, sal_Int32 nStartDate, sal_Int32 nMonths )
 {
-    sal_Int32 nNullDate = GetNullDate( xOpt );
+    sal_Int32 nNullDate = getRequiredHostNullDate( xOpt );
     ScaDate aDate( nNullDate, nStartDate, 5 );
     aDate.addMonths( nMonths );
     return aDate.getDate( nNullDate );
@@ -404,7 +403,7 @@ sal_Int32 SAL_CALL AnalysisAddIn::getEdate( const uno::Reference< beans::XProper
 
 sal_Int32 SAL_CALL AnalysisAddIn::getWeeknum( const uno::Reference< beans::XPropertySet >& xOpt, sal_Int32 nDate, sal_Int32 nMode )
 {
-    nDate += GetNullDate( xOpt );
+    nDate += getRequiredHostNullDate( xOpt );
 
     sal_uInt16  nDay, nMonth, nYear;
     DaysToDate( nDate, nDay, nMonth, nYear );
@@ -417,7 +416,7 @@ sal_Int32 SAL_CALL AnalysisAddIn::getWeeknum( const uno::Reference< beans::XProp
 
 sal_Int32 SAL_CALL AnalysisAddIn::getEomonth( const uno::Reference< beans::XPropertySet >& xOpt, sal_Int32 nDate, sal_Int32 nMonths )
 {
-    sal_Int32   nNullDate = GetNullDate( xOpt );
+    sal_Int32   nNullDate = getRequiredHostNullDate( xOpt );
     nDate += nNullDate;
     sal_uInt16  nDay, nMonth, nYear;
     DaysToDate( nDate, nDay, nMonth, nYear );
@@ -444,11 +443,10 @@ sal_Int32 SAL_CALL AnalysisAddIn::getEomonth( const uno::Reference< beans::XProp
 sal_Int32 SAL_CALL AnalysisAddIn::getNetworkdays( const uno::Reference< beans::XPropertySet >& xOpt,
         sal_Int32 nStartDate, sal_Int32 nEndDate, const uno::Any& aHDay )
 {
-    sal_Int32                   nNullDate = GetNullDate( xOpt );
+    sal_Int32                   nNullDate = getRequiredHostNullDate( xOpt );
 
     SortedIndividualInt32List   aSrtLst;
-
-    aSrtLst.InsertHolidayList( aAnyConv, xOpt, aHDay, nNullDate );
+    populateHostHolidayList( aAnyConv, xOpt, aHDay, nNullDate, aSrtLst );
 
     sal_Int32                   nActDate = nStartDate + nNullDate;
     sal_Int32                   nStopDate = nEndDate + nNullDate;

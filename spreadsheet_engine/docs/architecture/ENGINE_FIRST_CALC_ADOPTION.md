@@ -124,7 +124,7 @@ Validation:
 
 ### Phase 3. Host-Boundary Consolidation
 
-Status: pending
+Status: complete
 
 Tighten the remaining Calc-local execution surface until it is clearly
 host-only rather than a leftover duplicate implementation.

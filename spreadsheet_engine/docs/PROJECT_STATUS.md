@@ -174,6 +174,7 @@ Calc-owned:
 - `ScTokenArray` construction, range/union token-container operations, and
   other Calc-local token plumbing
 - external-reference cache integration and document/session lookup services
+- document null-date and holiday-list services used by host-owned add-ins
 - host-heavy inspection and environment services such as `INFO(...)`
 - printer, path, number-format, and other document-service integrations that
   are not useful standalone engine semantics
