@@ -333,6 +333,8 @@ Closeout result:
 
 ### Phase 4. Make Host Services Explicit
 
+Status: complete
+
 Rename, document, and isolate the touched host-service helpers so their
 ownership is unmistakable.
 
@@ -346,6 +348,15 @@ Closeout standard:
 
 - touched helpers can be explained quickly as host infrastructure
 - no semantic/host ambiguity remains in the touched areas
+
+Closeout result:
+
+- the remaining host-backed `CELL(...)` property lookups now route through
+  explicitly named local host helpers in `interpr1.cxx`
+- printer, number-format, protection, and local/external filename service
+  access is now localized in helpers whose names describe them as host
+  property lookups instead of leaving those service calls inline in the main
+  interpreter switch
 
 ### Phase 5. Remove Residual Duplicate Helpers In Scope
 
