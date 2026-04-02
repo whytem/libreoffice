@@ -10,6 +10,7 @@
 #pragma once
 
 #include <optional>
+#include <vector>
 
 #include <address.hxx>
 #include <cellvalue.hxx>
@@ -178,6 +179,39 @@ planReferenceListMaterialization(
 [[nodiscard]] inline bool isReferenceOperandToken(const formula::FormulaToken& rToken)
 {
     return isReferenceOperandType(rToken.GetType());
+}
+
+inline void appendReferenceOperandEntries(ScRefList& rReferences, const formula::FormulaToken& rToken)
+{
+    switch (rToken.GetType())
+    {
+        case formula::svSingleRef:
+        {
+            ScComplexRefData aRef;
+            aRef.Ref1 = aRef.Ref2 = *rToken.GetSingleRef();
+            rReferences.push_back(aRef);
+            break;
+        }
+        case formula::svDoubleRef:
+            rReferences.push_back(*rToken.GetDoubleRef());
+            break;
+        case formula::svRefList:
+        {
+            const ScRefList* pReferences = rToken.GetRefList();
+            rReferences.insert(rReferences.end(), pReferences->begin(), pReferences->end());
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+[[nodiscard]] inline ScRefList collectReferenceOperandEntries(
+    const formula::FormulaToken& rToken)
+{
+    ScRefList aReferences;
+    appendReferenceOperandEntries(aReferences, rToken);
+    return aReferences;
 }
 
 [[nodiscard]] inline bool allSingleCellReferences(const ScRefList& rReferences)

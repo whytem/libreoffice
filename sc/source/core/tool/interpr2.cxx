@@ -1567,42 +1567,16 @@ void ScInterpreter::ScIntersect()
     const formula::FormulaToken* x2 = p2nd.get();
     if (sv1 == svRefList || sv2 == svRefList)
     {
-        // Now this is a bit nasty but it simplifies things, and having
-        // intersections with lists isn't too common, if at all...
-        // Convert a reference to list.
-        const formula::FormulaToken* xt[2] = { x1, x2 };
-        StackVar sv[2] = { sv1, sv2 };
-        // There may only be one reference; the other is necessarily a list
-        // Ensure converted list proper destruction
-        std::unique_ptr<formula::FormulaToken> p;
-        for (size_t i=0; i<2; ++i)
-        {
-            if (sv[i] == svSingleRef)
-            {
-                ScComplexRefData aRef;
-                aRef.Ref1 = aRef.Ref2 = *xt[i]->GetSingleRef();
-                p.reset(new ScRefListToken);
-                p->GetRefList()->push_back( aRef);
-                xt[i] = p.get();
-            }
-            else if (sv[i] == svDoubleRef)
-            {
-                ScComplexRefData aRef = *xt[i]->GetDoubleRef();
-                p.reset(new ScRefListToken);
-                p->GetRefList()->push_back( aRef);
-                xt[i] = p.get();
-            }
-        }
-        x1 = xt[0];
-        x2 = xt[1];
+        const auto aReferences1 = serefexec::collectReferenceOperandEntries(*x1);
+        const auto aReferences2 = serefexec::collectReferenceOperandEntries(*x2);
 
         ScTokenRef xRes = new ScRefListToken;
         ScRefList* pRefList = xRes->GetRefList();
-        for (const auto& rRef1 : *x1->GetRefList())
+        for (const auto& rRef1 : aReferences1)
         {
             const ScAddress r11 = rRef1.Ref1.toAbs(mrDoc, aPos);
             const ScAddress r12 = rRef1.Ref2.toAbs(mrDoc, aPos);
-            for (const auto& rRef2 : *x2->GetRefList())
+            for (const auto& rRef2 : aReferences2)
             {
                 const ScAddress r21 = rRef2.Ref1.toAbs(mrDoc, aPos);
                 const ScAddress r22 = rRef2.Ref2.toAbs(mrDoc, aPos);
@@ -1733,51 +1707,25 @@ void ScInterpreter::ScUnionFunc()
     const formula::FormulaToken* x2 = p2nd.get();
 
     ScTokenRef xRes;
-    // Append to an existing RefList if there is one.
+    bool bHandledFirst = false;
+    bool bHandledSecond = false;
     if (sv1 == svRefList)
     {
         xRes = x1->Clone();
-        sv1 = svUnknown;    // mark as handled
+        bHandledFirst = true;
     }
     else if (sv2 == svRefList)
     {
         xRes = x2->Clone();
-        sv2 = svUnknown;    // mark as handled
+        bHandledSecond = true;
     }
     else
         xRes = new ScRefListToken;
     ScRefList* pRes = xRes->GetRefList();
-    const formula::FormulaToken* pt[2] = { x1, x2 };
-    StackVar sv[2] = { sv1, sv2 };
-    for (size_t i=0; i<2; ++i)
-    {
-        if (pt[i] == xRes)
-            continue;
-        switch (sv[i])
-        {
-            case svSingleRef:
-                {
-                    ScComplexRefData aRef;
-                    aRef.Ref1 = aRef.Ref2 = *pt[i]->GetSingleRef();
-                    pRes->push_back( aRef);
-                }
-                break;
-            case svDoubleRef:
-                pRes->push_back( *pt[i]->GetDoubleRef());
-                break;
-            case svRefList:
-                {
-                    const ScRefList* p = pt[i]->GetRefList();
-                    for (const auto& rRef : *p)
-                    {
-                        pRes->push_back( rRef);
-                    }
-                }
-                break;
-            default:
-                ;   // nothing, prevent compiler warning
-        }
-    }
+    if (!bHandledFirst)
+        serefexec::appendReferenceOperandEntries(*pRes, *x1);
+    if (!bHandledSecond)
+        serefexec::appendReferenceOperandEntries(*pRes, *x2);
     ValidateRef( *pRes);    // set #REF! if needed
     PushTokenRef( xRes);
 }

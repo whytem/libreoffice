@@ -312,6 +312,8 @@ Closeout result:
 
 ### Phase 3. Converge The First Range/Value Adaptation Cluster
 
+Status: complete
+
 Move the next repeated range/union or value-shape translation pattern behind a
 named compat seam.
 
@@ -332,6 +334,14 @@ Closeout standard:
 - the touched translation cluster is no longer duplicated across interpreter
   call sites
 - the remaining Calc-local code is clearly about ownership/finalization only
+
+Closeout result:
+
+- `INTERSECT` and `UNION` now share named ref-list coercion and append helpers
+  in `compat/libreoffice/ReferenceExecution.hxx`
+- the interpreter bodies in `interpr2.cxx` no longer inline the single-ref,
+  double-ref, and ref-list conversion policy before doing their Calc-local
+  result push/finalization work
 
 ### Phase 4. Normalize The Touched Helper Vocabulary
 
