@@ -54,7 +54,9 @@ Today:
 - the promoted Calc FODS replay corpus is fully green with zero cached fallback
 
 The active work is no longer replay promotion or compiler switchover. The main
-frontier is shrinking the remaining Calc-owned execution shell.
+frontier is shrinking the remaining Calc-owned execution shell, which is now
+reduced to an explicitly inventoried set of matrix/frame helpers, reference
+selection helpers, and the host-heavy `CELL(...)` property tail.
 
 ## Verified Baseline
 
@@ -300,6 +302,7 @@ project is on track.
 The most relevant active docs are:
 
 - [EXECUTION_BACKEND_EXTRACTION.md](architecture/EXECUTION_BACKEND_EXTRACTION.md)
+- [EXECUTION_SHELL_CLOSEOUT_PLAN.md](architecture/EXECUTION_SHELL_CLOSEOUT_PLAN.md)
 - [README.md](architecture/README.md)
 
 Historical extraction records and completed workplans live under:

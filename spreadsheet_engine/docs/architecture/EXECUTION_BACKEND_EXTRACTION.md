@@ -45,8 +45,17 @@ The starting handoff from the completed recalc-orchestration milestone is:
 
 ## Current Status
 
-This milestone is now active with Phases 0 through 11 complete and the next
-bounded execution-shell slice narrowed to the broader token-walking shell.
+This milestone is now active with Phases 0 through 11 complete and the
+execution-shell closeout inventory frozen. The remaining surface is now a
+small, explicitly classified set of clusters instead of a generic
+"interpreter tail":
+
+- matrix-condition and frame-conversion helpers in `interpr4.cxx`
+- scalar-reference and ref-list materialization helpers in `interpr4.cxx`
+- the host-heavy `CELL(...)` property tail plus external variants in
+  `interpr1.cxx`
+- intentionally host-owned `INFO(...)`, external-reference cache plumbing, and
+  token-container construction helpers
 
 - Phase 0 is complete: the orchestration/execution boundary is explicitly
   documented, the first helper duplication inventory is frozen, and the Phase 1
