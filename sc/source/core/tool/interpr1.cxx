@@ -2514,16 +2514,21 @@ void ScInterpreter::ScCell()
             && !spreadsheetengine::runtime::cellinspection::isHostPropertyInfoKind(
                 eBoundedInfoKind))
         {
-            std::optional<OUString> oSheetName;
+            std::optional<spreadsheetengine::api::String> oSheetName;
             if (eBoundedInfoKind == secellexec::InfoKind::Address && aCellPos.Tab() != aPos.Tab())
             {
                 OUString aSheetName;
                 mrDoc.GetName(aCellPos.Tab(), aSheetName);
-                oSheetName = aSheetName;
+                oSheetName = selibreoffice::toApiString(aSheetName);
             }
 
-            const auto aInfoResult = secellexec::evaluateBoundedCellInfo(eBoundedInfoKind, aCellPos,
-                makeApiCellValue(), resolveAddressConvention(), oSheetName);
+            secellexec::BoundedCellInfoRequest aInfoRequest;
+            aInfoRequest.maAddress = selibreoffice::toApiCellAddress(aCellPos);
+            aInfoRequest.maCellValue = makeApiCellValue();
+            aInfoRequest.meConvention = resolveAddressConvention();
+            aInfoRequest.moSheetName = oSheetName;
+            const auto aInfoResult
+                = secellexec::evaluateBoundedCellInfo(eBoundedInfoKind, aInfoRequest);
             if (!aInfoResult)
                 PushError(selibreoffice::toFormulaError(aInfoResult.meError));
             else

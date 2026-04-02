@@ -27,6 +27,17 @@ namespace spreadsheetengine::compat::libreoffice::cellinspectionexecution
 {
 
 using InfoKind = spreadsheetengine::runtime::cellinspection::InfoKind;
+using CellAddress = spreadsheetengine::api::CellAddress;
+using CellValue = spreadsheetengine::api::CellValue;
+
+struct BoundedCellInfoRequest
+{
+    CellAddress maAddress;
+    CellValue maCellValue;
+    formula::FormulaGrammar::AddressConvention meConvention
+        = formula::FormulaGrammar::CONV_OOO;
+    std::optional<spreadsheetengine::api::String> moSheetName;
+};
 
 [[nodiscard]] inline InfoKind classifyInfoType(const OUString& rInfoType)
 {
@@ -133,37 +144,31 @@ using InfoKind = spreadsheetengine::runtime::cellinspection::InfoKind;
     return "'" + rFileName + "'#$" + rTabName;
 }
 
-[[nodiscard]] inline spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>
-evaluateBoundedCellInfo(InfoKind eKind, const ScAddress& rAddress,
-    const spreadsheetengine::api::CellValue& rCellValue, formula::FormulaGrammar::AddressConvention eConvention,
-    const std::optional<OUString>& roSheetName = std::nullopt)
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<CellValue> evaluateBoundedCellInfo(
+    InfoKind eKind, const BoundedCellInfoRequest& rRequest)
 {
-    using spreadsheetengine::api::CellValue;
-
     switch (eKind)
     {
         case InfoKind::Column:
             return spreadsheetengine::api::ValueResult<CellValue>::success(
                 spreadsheetengine::runtime::cellinspection::columnValue(
-                    { rAddress.Tab(), rAddress.Col(), rAddress.Row() }));
+                    rRequest.maAddress));
         case InfoKind::Row:
             return spreadsheetengine::api::ValueResult<CellValue>::success(
-                spreadsheetengine::runtime::cellinspection::rowValue(
-                    { rAddress.Tab(), rAddress.Col(), rAddress.Row() }));
+                spreadsheetengine::runtime::cellinspection::rowValue(rRequest.maAddress));
         case InfoKind::Sheet:
             return spreadsheetengine::api::ValueResult<CellValue>::success(
-                spreadsheetengine::runtime::cellinspection::sheetValue(
-                    { rAddress.Tab(), rAddress.Col(), rAddress.Row() }));
+                spreadsheetengine::runtime::cellinspection::sheetValue(rRequest.maAddress));
         case InfoKind::Address:
         {
             referenceexecution::AddressFunctionRequest aRequest;
-            aRequest.mnRow = rAddress.Row();
-            aRequest.mnColumn = rAddress.Col();
+            aRequest.mnRow = rRequest.maAddress.mnRow;
+            aRequest.mnColumn = rRequest.maAddress.mnColumn;
             aRequest.mnAbsMode = 1;
-            aRequest.mbA1Style = eConvention != formula::FormulaGrammar::CONV_XL_R1C1;
-            aRequest.meConvention = eConvention;
-            if (roSheetName)
-                aRequest.maSheetToken = *roSheetName;
+            aRequest.mbA1Style = rRequest.meConvention != formula::FormulaGrammar::CONV_XL_R1C1;
+            aRequest.meConvention = rRequest.meConvention;
+            if (rRequest.moSheetName)
+                aRequest.maSheetToken = toLibreOfficeString(*rRequest.moSheetName);
 
             const auto aAddress = referenceexecution::formatAddressFunctionResult(aRequest);
             if (!aAddress)
@@ -175,10 +180,10 @@ evaluateBoundedCellInfo(InfoKind eKind, const ScAddress& rAddress,
         }
         case InfoKind::Contents:
             return spreadsheetengine::api::ValueResult<CellValue>::success(
-                spreadsheetengine::runtime::cellinspection::contentsValue(rCellValue));
+                spreadsheetengine::runtime::cellinspection::contentsValue(rRequest.maCellValue));
         case InfoKind::Type:
             return spreadsheetengine::api::ValueResult<CellValue>::success(
-                spreadsheetengine::runtime::cellinspection::typeValue(rCellValue));
+                spreadsheetengine::runtime::cellinspection::typeValue(rRequest.maCellValue));
         case InfoKind::Coord:
         case InfoKind::Filename:
         case InfoKind::Width:

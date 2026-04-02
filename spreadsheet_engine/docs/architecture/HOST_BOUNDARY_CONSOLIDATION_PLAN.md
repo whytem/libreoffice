@@ -280,6 +280,8 @@ Frozen inventory:
 
 ### Phase 2. Adopt Engine-Owned Vocabulary In The Easiest Shared Seams
 
+Status: complete
+
 Start with the safest surfaces where semantics are already shared and the
 remaining problem is mostly vocabulary/adapter shape.
 
@@ -293,6 +295,15 @@ Closeout standard:
 
 - touched helper surfaces read in engine vocabulary first
 - Calc-specific types are pushed outward toward the adapter edge
+
+Closeout result:
+
+- the bounded `CELL(...)` compat request now crosses the helper boundary as an
+  engine-owned `api::CellAddress`, `api::CellValue`, and optional engine
+  string sheet token instead of Calc-native address and sheet-name types
+- Calc now does the address/name conversion at the call edge in
+  `interpr1.cxx`, while `CellInspectionExecution.hxx` reads primarily in
+  engine vocabulary
 
 ### Phase 3. Land The First Token/Container Compat Seams
 
