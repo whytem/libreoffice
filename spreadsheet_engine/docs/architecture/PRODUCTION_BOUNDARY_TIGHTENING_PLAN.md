@@ -1,6 +1,6 @@
 # Production Boundary Tightening Plan
 
-Status: active implementation-ready plan
+Status: completed closeout record
 
 ## Purpose
 
@@ -8,12 +8,11 @@ The extraction, replay-promotion, recalc-orchestration, execution-shell,
 engine-first adoption, host-boundary consolidation, token-boundary reduction,
 and first direct-entry adoption streams are complete.
 
-The next implementation stream is to tighten the remaining production
-compiler/evaluation boundary around surfaces that are intentionally still
-host-owned.
+This stream tightened the remaining production compiler/evaluation boundary
+around surfaces that are intentionally still host-owned.
 
-This is not a replay-promotion effort, a storage migration, or a wholesale
-interpreter rewrite. It is a production-boundary quality program.
+It was not a replay-promotion effort, a storage migration, or a wholesale
+interpreter rewrite. It was a production-boundary quality program.
 
 ## What This Workstream Is For
 
@@ -276,151 +275,82 @@ Initial inventory targets:
 | add-in null-date packaging around remaining shared financial/date entry points | [financial.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/financial.cxx), [analysisdefs.hxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysisdefs.hxx) | semantics are already shared, but caller-side context setup is still inconsistent across the adopted surface | `needs thin adapter` | normalize remaining caller packaging through the same host context vocabulary | `CppunitTest_scaddins_analysis`, replay summary | Phase 2 / 5 |
 | repeated direct-entry context setup around existing engine entry adapters | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [interpr2.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr2.cxx), add-in callers | similar workbook/service packaging is repeated at several production callers even after the first direct-entry stream | `needs thin adapter` | collapse remaining repeated packaging into one small adapter/context path per boundary cluster | focused Calc/add-in coverage, replay summary | Phase 5 |
 
-Phase completion questions:
-
-- Are all in-scope remaining production-boundary candidates classified?
-- Does each candidate have a concrete later phase or explicit retain reason?
-
 Phase 1 closeout notes:
 
-- the remaining in-scope boundary is now concretely centered on:
+- the remaining in-scope boundary was concretely centered on:
   - retained `CELL(...)` / `INFO(...)` host inspection paths
   - external-reference fetch and projection packaging
   - add-in null-date and holiday-list packaging
   - repeated production entry setup around already-adopted engine entry points
-- no additional open candidate was found in the touched files that needs to be
-  treated as a hidden "miscellaneous Calc tail"
+- no additional open candidate was found in the touched files that needed to
+  be treated as a hidden miscellaneous Calc tail
 
-### Phase 2. Extract Shared Host-Service Context Adapters
+### Phase 2. Isolate Host-Service Context Packaging
 
-Introduce or tighten the named adapters/context providers needed by later
-production-boundary slices.
+Status: complete
 
-Preferred first targets:
+The add-in null-date and holiday-list inputs are now packaged through named
+host context adapters instead of repeated inline extraction. The touched
+financial and calendar entry points now share the same host vocabulary for
+null-date access and expanded holiday serials.
 
-- null-date packaging
-- holiday-list and calendar host inputs
-- small document/session inspection contexts used by more than one entry point
+### Phase 3. Tighten Information And Inspection Entry Surfaces
 
-Phase completion questions:
+Status: complete
 
-- Are repeated host-service reads replaced by one named adapter seam?
-- Does the touched code stop leaking host packaging details into semantic
-  callers?
+The retained in-scope `CELL(...)` property tail and the bounded `INFO(...)`
+projection surface now use shared classification and result-shaping helpers,
+while the truly host-only environment reads remain local and explicit.
 
-### Phase 3. Shrink The Information/Inspection Boundary
+### Phase 4. Tighten External-Reference And Session-Backed Packaging
 
-Apply the new packaging discipline to retained information and inspection
-surfaces.
+Status: complete
 
-Preferred execution order:
+The repeated external single-ref and double-ref fetch/projection wrappers now
+route through named compat seams. External-reference cache ownership and
+session access remain in Calc, but the packaging layer is no longer duplicated
+at the call sites.
 
-1. retained `CELL(...)` property tail
-2. bounded `INFO(...)` result projection and caller packaging
-3. any adjacent inspection helper that becomes obviously reducible after the
-   first two slices
+### Phase 5. Tighten Production Compiler/Evaluation Entry Packaging
 
-Phase completion questions:
+Status: complete
 
-- Is the touched inspection code now clearly split between host service access
-  and semantic/result shaping?
-- Has the Calc-owned shell gotten smaller without moving true host inspection
-  into the engine?
+The repeated direct-entry setup for text parsing and formula inspection now
+routes through small helper entry surfaces in the existing compat headers.
+Production callers no longer construct the same direct adapters inline at
+multiple Calc entry points.
 
-### Phase 4. Shrink The External/Session Packaging Boundary
+### Phase 6. Lock The Boundary And Close The Stream
 
-Apply the same discipline to external-reference and session-backed packaging.
+Status: complete
 
-Preferred execution order:
+This stream is now closed. The remaining production boundary is described in
+present tense as intentional host ownership rather than as unfinished cleanup.
 
-1. the narrowest repeated projection/helper seam in
-   [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx)
-2. any adjacent external/session-backed packaging that can reuse the same seam
-3. documentation of what remains intentionally host-only after the slice
+Final validation for the closeout batch:
 
-Phase completion questions:
-
-- Is the touched code now mostly cache/session ownership plus named adapter
-  calls?
-- Are duplicated projection or shaping steps gone from the touched call sites?
-
-### Phase 5. Collapse Residual Entry Packaging
-
-With the host-service seams stable, collapse remaining repeated production
-compiler/evaluation entry setup in the adopted areas.
-
-Target outcome:
-
-- one small adapter or context-preparation path per retained production
-  boundary cluster
-- no ambiguous wrapper tails in the touched scope
-
-Phase completion questions:
-
-- Are multiple production entry points reusing the same packaging seam?
-- Has the superseded local orchestration tail been removed or reduced to thin
-  host wrappers?
-
-### Phase 6. Revalidate And Close The Stream
-
-After the production-boundary slices land:
-
-- rerun the standing Calc/add-in and standalone lanes
-- rerun one-shot replay with `--assert-zero-fallback`
-- update [PROJECT_STATUS.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/PROJECT_STATUS.md) and [README.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/README.md)
-- record what remains intentionally host-only after the stream
-
-Phase completion questions:
-
-- Is the remaining production boundary easier to describe in present tense?
-- Are future questions clearly a new frontier rather than unfinished cleanup
-  from this stream?
-
-## Validation Contract
-
-Every implementation slice in this stream should use the smallest validation
-set that proves both boundary correctness and replay stability.
-
-Per-slice default contract:
-
-- focused Calc or add-in coverage for the touched production entry points
-- standalone coverage if a shared helper or runtime surface changed
-- `spreadsheetengine_fods_evaluator_tests` if evaluator-facing code changed
-- `spreadsheetengine_fods_replay_tests --summary --assert-zero-fallback`
-  whenever the touched slice changes shared evaluation behavior
-- `git diff --check`
-
-Recommended high-signal lanes:
-
+- `CppunitTest_scaddins_analysis`
 - `CppunitTest_sc_ucalc_formula2`
 - `CppunitTest_sc_ucalc_shared_cases`
-- `CppunitTest_scaddins_analysis`
-- `spreadsheetengine_fods_evaluator_tests`
 - `spreadsheetengine_fods_replay_tests --summary --assert-zero-fallback`
+- `git diff --check`
 
-## Exit Criteria
+Final standing replay baseline:
 
-This stream should only be considered complete when:
+- `workbooks=500`
+- `formula_cells=50661`
+- `parsed_formulas=50652`
+- `cached_fallback_cells=0`
+- `cached_fallback_rate=0`
 
-1. the remaining in-scope production compiler/evaluation boundary has been
-   explicitly inventoried and classified
-2. repeated host-service packaging in the touched scope has been collapsed
-   into named seams
-3. retained information, inspection, external-reference, and add-in host
-   packaging surfaces in scope have smaller Calc/add-in shells than they do
-   today
-4. no known ambiguous local orchestration tail remains in the touched scope
-5. the promoted replay corpus still reports:
-   - `workbooks=500`
-   - `formula_cells=50661`
-   - `parsed_formulas=50652`
-   - `cached_fallback_cells=0`
-   - `cached_fallback_rate=0`
-6. the status docs describe the post-stream boundary as current state and make
-   the next frontier explicit
+Closeout summary:
 
-At that point, the project can reassess whether the next frontier should be:
-
-- another bounded direct-entry widening stream
-- tighter production compiler-path adoption
-- or continued maintenance of the now-explicit host-owned production boundary
+- host-service context packaging is converged behind named adapters
+- retained `CELL(...)` and `INFO(...)` inspection packaging is thinner and
+  more clearly host-only
+- external-reference fetch/projection packaging is isolated behind explicit
+  compat seams
+- repeated direct-entry setup around text parsing and formula inspection is
+  collapsed
+- the promoted replay corpus remains at zero cached fallback under the strict
+  assertion gate

@@ -61,6 +61,9 @@ guardrails now live in
 The first bounded direct-entry adoption stream is also complete and now lives
 as a closeout record in
 [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md).
+The follow-on production-boundary tightening stream is now complete as well,
+and the remaining retained production boundary is explicitly documented as an
+intentional host-owned surface rather than an open cleanup tail.
 
 ## Verified Baseline
 
@@ -215,26 +218,24 @@ surface is explicitly host-shaped.
 The next plan should be organized around the end-state boundary rather than
 around historical milestone names.
 
-### 1. Run A Production Boundary Tightening Stream
+### 1. Keep The Production Boundary Tight And Explicit
 
-The first bounded direct-entry adoption stream is complete.
+The first bounded direct-entry adoption stream is complete, and the follow-on
+production-boundary tightening stream is complete.
 
-That work switched Calc's text-parsing and formula-inspection production paths
-onto explicit engine entry adapters, removed the superseded wrapper tail in the
-touched scope, and left the remaining retained surfaces explicitly host-owned.
+Together, that work switched Calc's text-parsing and formula-inspection
+production paths onto explicit engine entry adapters, converged host-service
+context packaging, tightened retained `CELL(...)` and `INFO(...)` result
+projection, isolated external-reference fetch/projection seams, and collapsed
+the repeated direct-entry setup that still remained in Calc callers.
 
-The next work should not reopen that stream. It should start from the now-clean
-baseline and tighten the remaining production compiler/evaluation boundary
-around the explicitly host-owned surfaces that are still packaged more broadly
-than necessary.
+This means the remaining retained production boundary now reads as deliberate
+host ownership rather than unfinished compiler/evaluation packaging.
 
-The active implementation-ready plan for that work is:
-
-- [PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md](architecture/PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md)
-
-The completed closeout record for the direct-entry stream is:
+The completed closeout records for those two streams are:
 
 - [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
+- [PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md](architecture/PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md)
 
 ### 2. Keep The Remaining Token Boundary Explicit
 
@@ -343,8 +344,8 @@ project is on track.
 
 The most relevant active docs are:
 
-- [PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md](architecture/PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md)
 - [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
+- [PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md](architecture/PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md)
 - [TOKEN_BOUNDARY_REDUCTION_PLAN.md](architecture/TOKEN_BOUNDARY_REDUCTION_PLAN.md)
 - [HOST_BOUNDARY_CONSOLIDATION_PLAN.md](architecture/HOST_BOUNDARY_CONSOLIDATION_PLAN.md)
 - [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](architecture/DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md)
