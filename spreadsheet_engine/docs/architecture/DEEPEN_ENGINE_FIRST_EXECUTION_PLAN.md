@@ -313,7 +313,7 @@ surface in this area is now the explicit host/defer subset such as
 
 ### Phase 5. Make The Remaining Host Boundary Explicit
 
-Status: pending
+Status: complete
 
 After local semantic copies are retired, make the retained Calc/add-in code read
 clearly as host-only infrastructure.
@@ -328,6 +328,14 @@ Closeout standard:
 
 - the remaining local helpers in the touched surface are obviously host-shaped
 - code and docs describe the same boundary
+
+Phase 5 made that retained boundary explicit in both code and docs:
+
+- add-in holiday expansion is now named as a host-only input seam
+- `EDATE` / `EOMONTH` explicitly read as host-independent once serial inputs
+  are supplied
+- the status docs now describe the remaining add-in null-date and holiday
+  services in present tense as retained host infrastructure
 
 ### Phase 6. Revalidate And Close The Stream
 

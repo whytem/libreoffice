@@ -78,10 +78,11 @@ inline FinancialDateContext getFinancialDateContext(
     return { getNullDateParts(xOpt), nBasis };
 }
 
-inline std::vector<spreadsheetengine::api::DateSerial> collectHostHolidaySerials(
+inline std::vector<spreadsheetengine::api::DateSerial> collectHostHolidaySerialsFromAddInInputs(
     sca::analysis::ScaAnyConverter& rAnyConv, const css::uno::Reference<css::beans::XPropertySet>& xOpt,
     const css::uno::Any& rHolidayAny, sal_Int32 nNullDate)
 {
+    // Host-only: this still depends on UNO/add-in holiday inputs from the live document.
     sca::analysis::SortedIndividualInt32List aHolidayList;
     populateHostHolidayList(rAnyConv, xOpt, rHolidayAny, nNullDate, aHolidayList);
 

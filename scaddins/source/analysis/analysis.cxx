@@ -341,7 +341,8 @@ sal_Int32 SAL_CALL AnalysisAddIn::getWorkday( const uno::Reference< beans::XProp
         return nDate;
 
     const sal_Int32 nNullDate = getRequiredHostNullDate( xOptions );
-    const auto aHolidaySerials = collectHostHolidaySerials( aAnyConv, xOptions, aHDay, nNullDate );
+    const auto aHolidaySerials
+        = collectHostHolidaySerialsFromAddInInputs( aAnyConv, xOptions, aHDay, nNullDate );
     return seworkday::advanceWorkday(
         static_cast<spreadsheetengine::api::DateSerial>( nDate ),
         static_cast<spreadsheetengine::api::DateSerial>( nDays ),
@@ -356,8 +357,9 @@ double SAL_CALL AnalysisAddIn::getYearfrac( const uno::Reference< beans::XProper
         getNullDateParts(xOpt), nStartDate, nEndDate, getDateMode(xOpt, rMode)));
 }
 
-sal_Int32 SAL_CALL AnalysisAddIn::getEdate( const uno::Reference< beans::XPropertySet >& xOpt, sal_Int32 nStartDate, sal_Int32 nMonths )
+sal_Int32 SAL_CALL AnalysisAddIn::getEdate( const uno::Reference< beans::XPropertySet >& /*xOpt*/, sal_Int32 nStartDate, sal_Int32 nMonths )
 {
+    // Host-independent once the caller provides spreadsheet date serials.
     return static_cast<sal_Int32>(valueOrThrow(secalendar::shiftMonthSerial(nStartDate, nMonths, false)));
 }
 
@@ -367,8 +369,9 @@ sal_Int32 SAL_CALL AnalysisAddIn::getWeeknum( const uno::Reference< beans::XProp
         getNullDateParts( xOpt ), nDate, static_cast<std::int16_t>( nMode == 1 ? 1 : 2 ) );
 }
 
-sal_Int32 SAL_CALL AnalysisAddIn::getEomonth( const uno::Reference< beans::XPropertySet >& xOpt, sal_Int32 nDate, sal_Int32 nMonths )
+sal_Int32 SAL_CALL AnalysisAddIn::getEomonth( const uno::Reference< beans::XPropertySet >& /*xOpt*/, sal_Int32 nDate, sal_Int32 nMonths )
 {
+    // Host-independent once the caller provides spreadsheet date serials.
     return static_cast<sal_Int32>(valueOrThrow(secalendar::shiftMonthSerial(nDate, nMonths, true)));
 }
 
@@ -376,7 +379,8 @@ sal_Int32 SAL_CALL AnalysisAddIn::getNetworkdays( const uno::Reference< beans::X
         sal_Int32 nStartDate, sal_Int32 nEndDate, const uno::Any& aHDay )
 {
     const sal_Int32 nNullDate = getRequiredHostNullDate( xOpt );
-    const auto aHolidaySerials = collectHostHolidaySerials( aAnyConv, xOpt, aHDay, nNullDate );
+    const auto aHolidaySerials
+        = collectHostHolidaySerialsFromAddInInputs( aAnyConv, xOpt, aHDay, nNullDate );
     return seworkday::countWorkdays(
         static_cast<spreadsheetengine::api::DateSerial>( nStartDate ),
         static_cast<spreadsheetengine::api::DateSerial>( nEndDate ),
