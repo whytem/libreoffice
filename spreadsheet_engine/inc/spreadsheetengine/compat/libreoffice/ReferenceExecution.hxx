@@ -12,10 +12,12 @@
 #include <optional>
 
 #include <address.hxx>
+#include <cellvalue.hxx>
 #include <compiler.hxx>
 #include <document.hxx>
 #include <formula/grammar.hxx>
 #include <scmatrix.hxx>
+#include <token.hxx>
 
 #include <spreadsheetengine/api/Reference.hxx>
 #include <spreadsheetengine/compat/libreoffice/Address.hxx>
@@ -165,6 +167,46 @@ planReferenceListMaterialization(
 {
     return spreadsheetengine::api::reference::planReferenceListMaterialization(
         nEntryCount, bMatrixFormula, bAllSingleCellReferences);
+}
+
+[[nodiscard]] inline bool allSingleCellReferences(const ScRefList& rReferences)
+{
+    for (const auto& rRef : rReferences)
+    {
+        if (rRef.Ref1 != rRef.Ref2)
+            return false;
+    }
+    return true;
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<ScMatrixRef>
+materializeReferenceListColumnVector(
+    const ScDocument& rDocument, const ScAddress& rFormulaPos, const ScRefList& rReferences)
+{
+    if (rReferences.empty() || !ScMatrix::IsSizeAllocatable(1, rReferences.size()))
+    {
+        return spreadsheetengine::api::ValueResult<ScMatrixRef>::failure(
+            spreadsheetengine::api::Error::IllegalArgument);
+    }
+
+    ScMatrixRef xMatrix(new ScMatrix(1, rReferences.size()));
+    for (std::size_t i = 0; i < rReferences.size(); ++i)
+    {
+        const ScAddress aAddress = rReferences[i].Ref1.toAbs(rDocument, rFormulaPos);
+        ScRefCellValue aCell(const_cast<ScDocument&>(rDocument), aAddress);
+        if (aCell.hasError())
+        {
+            xMatrix->PutError(rDocument.GetErrCode(aAddress), 0, i);
+        }
+        else if (aCell.hasEmptyValue())
+            xMatrix->PutEmpty(0, i);
+        else if (aCell.hasString())
+            xMatrix->PutString(svl::SharedString(aCell.getRawString(rDocument)), 0, i);
+        else
+            xMatrix->PutDouble(aCell.getRawValue(), 0, i);
+    }
+
+    return spreadsheetengine::api::ValueResult<ScMatrixRef>::success(xMatrix);
 }
 
 [[nodiscard]] inline spreadsheetengine::api::ValueResult<double> sheetOrdinal(

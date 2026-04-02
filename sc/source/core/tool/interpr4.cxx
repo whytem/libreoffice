@@ -1391,18 +1391,8 @@ void ScInterpreter::PopRefListPushMatrixOrRef()
         if (pv)
         {
             const size_t nEntries = pv->size();
-            bool bAllSingleCellReferences = true;
-            for (const auto& rRef : *pv)
-            {
-                if (rRef.Ref1 != rRef.Ref2)
-                {
-                    bAllSingleCellReferences = false;
-                    break;
-                }
-            }
-
             const auto aPlan = serefexec::planReferenceListMaterialization(
-                nEntries, bMatrixFormula, bAllSingleCellReferences);
+                nEntries, bMatrixFormula, serefexec::allSingleCellReferences(*pv));
             if (!aPlan)
             {
                 SetError(selibreoffice::toFormulaError(aPlan.meError));
@@ -1418,34 +1408,15 @@ void ScInterpreter::PopRefListPushMatrixOrRef()
             else if (aPlan.maValue.meKind
                      == spreadsheetengine::api::reference::ReferenceListMaterializationKind::ColumnVector)
             {
-                ScMatrixRef xMat = GetNewMat(1, nEntries, true);   // init empty
-                if (!xMat)
-                    return;
-                for (size_t i=0; i < nEntries; ++i)
+                const auto aMatrix
+                    = serefexec::materializeReferenceListColumnVector(mrDoc, aPos, *pv);
+                if (!aMatrix)
                 {
-                    SCCOL nCol; SCROW nRow; SCTAB nTab;
-                    SingleRefToVars( (*pv)[i].Ref1, nCol, nRow, nTab);
-                    if (nGlobalError == FormulaError::NONE)
-                    {
-                        ScAddress aAdr( nCol, nRow, nTab);
-                        ScRefCellValue aCell(mrDoc, aAdr);
-                        if (aCell.hasError())
-                            xMat->PutError( aCell.getFormula()->GetErrCode(), 0, i);
-                        else if (aCell.hasEmptyValue())
-                            xMat->PutEmpty( 0, i);
-                        else if (aCell.hasString())
-                            xMat->PutString( mrStrPool.intern( aCell.getString(mrDoc)), 0, i);
-                        else
-                            xMat->PutDouble( aCell.getValue(), 0, i);
-                    }
-                    else
-                    {
-                        xMat->PutError( nGlobalError, 0, i);
-                        nGlobalError = FormulaError::NONE;
-                    }
+                    SetError(selibreoffice::toFormulaError(aMatrix.meError));
+                    return;
                 }
                 --sp;
-                PushMatrix( xMat);
+                PushMatrix(aMatrix.maValue);
             }
         }
         // else: keep token on stack, something will handle the error

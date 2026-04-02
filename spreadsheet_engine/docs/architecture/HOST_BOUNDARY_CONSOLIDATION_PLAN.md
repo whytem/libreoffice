@@ -307,6 +307,8 @@ Closeout result:
 
 ### Phase 3. Land The First Token/Container Compat Seams
 
+Status: complete
+
 Extract the first repeated token/container translation patterns into named
 compat helpers while keeping ownership and mutation in Calc.
 
@@ -319,6 +321,15 @@ Closeout standard:
 
 - the touched translation logic exists in one seam
 - Calc callers are thinner and more obviously host-owned
+
+Closeout result:
+
+- ref-list single-cell detection and column-vector materialization now route
+  through named helpers in
+  `compat/libreoffice/ReferenceExecution.hxx`
+- `PopRefListPushMatrixOrRef()` in `interpr4.cxx` now keeps only the stack
+  mutation and push/pop behavior locally while the translation/materialization
+  policy lives behind the compat seam
 
 ### Phase 4. Make Host Services Explicit
 
