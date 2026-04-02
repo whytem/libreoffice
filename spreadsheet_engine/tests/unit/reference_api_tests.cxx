@@ -51,6 +51,29 @@ int main()
     const auto aMatrixRowCount = spreadsheetengine::api::reference::countMatrixAxisSpan(
         MatrixDimensions { 4, 2 }, spreadsheetengine::api::reference::ReferenceAxis::Row);
     const auto aAreaCount = spreadsheetengine::api::reference::countAreas(3);
+    const auto aScalarSingle = spreadsheetengine::api::reference::selectScalarReferenceCell(
+        CellRange { CellAddress { 0, 3, 4 }, CellAddress { 0, 3, 4 } },
+        CellAddress { 0, 1, 1 });
+    const auto aScalarColumn = spreadsheetengine::api::reference::selectScalarReferenceCell(
+        CellRange { CellAddress { 0, 2, 3 }, CellAddress { 0, 2, 6 } },
+        CellAddress { 0, 9, 4 });
+    const auto aScalarJump = spreadsheetengine::api::reference::selectScalarReferenceCell(
+        CellRange { CellAddress { 2, 5, 7 }, CellAddress { 2, 7, 9 } },
+        CellAddress { 2, 0, 0 }, spreadsheetengine::api::MatrixCoordinate { 1, 1 });
+    const auto aScalarBadJump = spreadsheetengine::api::reference::selectScalarReferenceCell(
+        CellRange { CellAddress { 2, 5, 7 }, CellAddress { 2, 7, 9 } },
+        CellAddress { 2, 0, 0 }, spreadsheetengine::api::MatrixCoordinate { 4, 0 });
+    const auto aScalarMiss = spreadsheetengine::api::reference::selectScalarReferenceCell(
+        CellRange { CellAddress { 0, 2, 3 }, CellAddress { 0, 4, 6 } },
+        CellAddress { 0, 20, 20 });
+    const auto aRefListSingle = spreadsheetengine::api::reference::planReferenceListMaterialization(
+        1, false, true);
+    const auto aRefListKeep = spreadsheetengine::api::reference::planReferenceListMaterialization(
+        3, false, true);
+    const auto aRefListColumnVector
+        = spreadsheetengine::api::reference::planReferenceListMaterialization(3, true, true);
+    const auto aRefListMixed = spreadsheetengine::api::reference::planReferenceListMaterialization(
+        3, true, false);
     const auto aSheetOrdinal
         = spreadsheetengine::api::reference::sheetOrdinalFromReference(aSheetSpan);
     const auto aSheetCount
@@ -64,7 +87,24 @@ int main()
         || !almostEqual(aMatrixRowCount.maValue, 2.0) || !aAreaCount
         || !almostEqual(aAreaCount.maValue, 3.0) || !aSheetOrdinal
         || !almostEqual(aSheetOrdinal.maValue, 2.0) || !aSheetCount
-        || !almostEqual(aSheetCount.maValue, 3.0))
+        || !almostEqual(aSheetCount.maValue, 3.0) || !aScalarSingle
+        || aScalarSingle.maValue != CellAddress { 0, 3, 4 } || !aScalarColumn
+        || aScalarColumn.maValue != CellAddress { 0, 2, 4 } || !aScalarJump
+        || aScalarJump.maValue != CellAddress { 2, 6, 8 } || aScalarBadJump
+        || aScalarBadJump.meError != Error::NoValue || aScalarMiss
+        || aScalarMiss.meError != Error::NoValue || !aRefListSingle
+        || aRefListSingle.maValue.meKind
+               != spreadsheetengine::api::reference::ReferenceListMaterializationKind::SingleReference
+        || !aRefListKeep
+        || aRefListKeep.maValue.meKind
+               != spreadsheetengine::api::reference::ReferenceListMaterializationKind::KeepList
+        || !aRefListColumnVector
+        || aRefListColumnVector.maValue.meKind
+               != spreadsheetengine::api::reference::ReferenceListMaterializationKind::ColumnVector
+        || aRefListColumnVector.maValue.maMatrixDimensions != MatrixDimensions { 1, 3 }
+        || !aRefListMixed
+        || aRefListMixed.maValue.meKind
+               != spreadsheetengine::api::reference::ReferenceListMaterializationKind::KeepList)
     {
         return fail("spreadsheetengine_reference_tests", "reference shape planning mismatch");
     }

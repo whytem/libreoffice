@@ -68,6 +68,23 @@ struct IndexReferenceSelection
     [[nodiscard]] constexpr bool operator==(const IndexReferenceSelection& rOther) const = default;
 };
 
+enum class ReferenceListMaterializationKind : std::uint8_t
+{
+    KeepList,
+    SingleReference,
+    ColumnVector
+};
+
+struct ReferenceListMaterializationPlan
+{
+    ReferenceListMaterializationKind meKind
+        = ReferenceListMaterializationKind::KeepList;
+    MatrixDimensions maMatrixDimensions { 0, 0 };
+
+    [[nodiscard]] constexpr bool operator==(
+        const ReferenceListMaterializationPlan& rOther) const = default;
+};
+
 [[nodiscard]] inline bool hasOrderedBounds(const CellRange& rRange)
 {
     return rRange.maStart.mnSheet <= rRange.maEnd.mnSheet
@@ -174,6 +191,118 @@ struct IndexReferenceSelection
         return ValueResult<std::size_t>::failure(Error::NotAvailable);
 
     return ValueResult<std::size_t>::success(static_cast<std::size_t>(nArea - 1));
+}
+
+[[nodiscard]] inline ValueResult<CellAddress> selectScalarReferenceCell(
+    const CellRange& rRange, const CellAddress& rFormulaPos,
+    const std::optional<MatrixCoordinate>& oJumpCoordinate = std::nullopt)
+{
+    if (!hasOrderedBounds(rRange))
+        return ValueResult<CellAddress>::failure(Error::IllegalArgument);
+
+    if (rRange.maStart == rRange.maEnd)
+        return ValueResult<CellAddress>::success(rRange.maStart);
+
+    if (oJumpCoordinate)
+    {
+        if (rRange.maStart.mnSheet != rRange.maEnd.mnSheet || oJumpCoordinate->mnColumn < 0
+            || oJumpCoordinate->mnRow < 0)
+        {
+            return ValueResult<CellAddress>::failure(Error::IllegalArgument);
+        }
+
+        const ColumnIndex nColumn = rRange.maStart.mnColumn + oJumpCoordinate->mnColumn;
+        const RowIndex nRow = rRange.maStart.mnRow + oJumpCoordinate->mnRow;
+        if (nColumn < rRange.maStart.mnColumn || nColumn > rRange.maEnd.mnColumn
+            || nRow < rRange.maStart.mnRow || nRow > rRange.maEnd.mnRow)
+        {
+            return ValueResult<CellAddress>::failure(Error::NoValue);
+        }
+
+        return ValueResult<CellAddress>::success(
+            { rRange.maStart.mnSheet, nColumn, nRow });
+    }
+
+    bool bOk = false;
+    ColumnIndex nColumn = 0;
+    RowIndex nRow = 0;
+    SheetId nSheet = rRange.maStart.mnSheet;
+
+    if (rRange.maStart.mnColumn <= rFormulaPos.mnColumn
+        && rFormulaPos.mnColumn <= rRange.maEnd.mnColumn)
+    {
+        nRow = rRange.maStart.mnRow;
+        if (nRow == rRange.maEnd.mnRow)
+        {
+            bOk = true;
+            nColumn = rFormulaPos.mnColumn;
+        }
+        else if (nSheet != rFormulaPos.mnSheet && nSheet == rRange.maEnd.mnSheet
+                 && rRange.maStart.mnRow <= rFormulaPos.mnRow
+                 && rFormulaPos.mnRow <= rRange.maEnd.mnRow)
+        {
+            bOk = true;
+            nColumn = rFormulaPos.mnColumn;
+            nRow = rFormulaPos.mnRow;
+        }
+    }
+    else if (rRange.maStart.mnRow <= rFormulaPos.mnRow
+             && rFormulaPos.mnRow <= rRange.maEnd.mnRow)
+    {
+        nColumn = rRange.maStart.mnColumn;
+        if (nColumn == rRange.maEnd.mnColumn)
+        {
+            bOk = true;
+            nRow = rFormulaPos.mnRow;
+        }
+        else if (nSheet != rFormulaPos.mnSheet && nSheet == rRange.maEnd.mnSheet
+                 && rRange.maStart.mnColumn <= rFormulaPos.mnColumn
+                 && rFormulaPos.mnColumn <= rRange.maEnd.mnColumn)
+        {
+            bOk = true;
+            nColumn = rFormulaPos.mnColumn;
+            nRow = rFormulaPos.mnRow;
+        }
+    }
+
+    if (!bOk)
+        return ValueResult<CellAddress>::failure(Error::NoValue);
+
+    if (nSheet != rRange.maEnd.mnSheet)
+    {
+        if (nSheet <= rFormulaPos.mnSheet && rFormulaPos.mnSheet <= rRange.maEnd.mnSheet)
+            nSheet = rFormulaPos.mnSheet;
+        else
+            return ValueResult<CellAddress>::failure(Error::NoValue);
+    }
+
+    return ValueResult<CellAddress>::success({ nSheet, nColumn, nRow });
+}
+
+[[nodiscard]] inline ValueResult<ReferenceListMaterializationPlan>
+planReferenceListMaterialization(
+    std::size_t nEntryCount, bool bMatrixFormula, bool bAllSingleCellReferences)
+{
+    if (nEntryCount == 0)
+    {
+        return ValueResult<ReferenceListMaterializationPlan>::failure(Error::IllegalArgument);
+    }
+
+    if (nEntryCount == 1)
+    {
+        return ValueResult<ReferenceListMaterializationPlan>::success(
+            { ReferenceListMaterializationKind::SingleReference, { 1, 1 } });
+    }
+
+    if (!bMatrixFormula || !bAllSingleCellReferences)
+    {
+        return ValueResult<ReferenceListMaterializationPlan>::success(
+            { ReferenceListMaterializationKind::KeepList, { 0, 0 } });
+    }
+
+    return ValueResult<ReferenceListMaterializationPlan>::success(
+        { ReferenceListMaterializationKind::ColumnVector,
+            { 1, static_cast<MatrixSize>(nEntryCount) } });
 }
 
 [[nodiscard]] inline ValueResult<CellRange> planOffsetRange(const CellRange& rBaseRange,

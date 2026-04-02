@@ -146,6 +146,27 @@ struct AddressFunctionRequest
     return spreadsheetengine::api::reference::countAreas(nAreaCount);
 }
 
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<ScAddress> selectScalarReferenceCell(
+    const ScRange& rRange, const ScAddress& rFormulaPos,
+    const std::optional<spreadsheetengine::api::MatrixCoordinate>& oJumpCoordinate = std::nullopt)
+{
+    const auto aSelection = spreadsheetengine::api::reference::selectScalarReferenceCell(
+        toApiCellRange(rRange), toApiCellAddress(rFormulaPos), oJumpCoordinate);
+    if (!aSelection)
+        return spreadsheetengine::api::ValueResult<ScAddress>::failure(aSelection.meError);
+    return spreadsheetengine::api::ValueResult<ScAddress>::success(
+        toLibreOfficeAddress(aSelection.maValue));
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<
+    spreadsheetengine::api::reference::ReferenceListMaterializationPlan>
+planReferenceListMaterialization(
+    std::size_t nEntryCount, bool bMatrixFormula, bool bAllSingleCellReferences)
+{
+    return spreadsheetengine::api::reference::planReferenceListMaterialization(
+        nEntryCount, bMatrixFormula, bAllSingleCellReferences);
+}
+
 [[nodiscard]] inline spreadsheetengine::api::ValueResult<double> sheetOrdinal(
     const ScRange& rRange)
 {

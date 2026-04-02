@@ -111,6 +111,10 @@ small, explicitly classified set of clusters instead of a generic
   `compat/libreoffice/MatrixFrameExecution.hxx`, narrowing the remaining Calc
   shell further to reference scalarization, ref-list materialization, and the
   host-heavy information tail
+- the second closeout slice is complete: scalar-reference selection and
+  ref-list materialization policy now route through shared reference helpers,
+  leaving the remaining open shell focused on the host-heavy information tail
+  plus explicitly host-owned token-container and external-reference plumbing
 
 The starting baseline for this milestone is:
 

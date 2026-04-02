@@ -79,6 +79,8 @@
 
 using namespace com::sun::star;
 using namespace formula;
+namespace selibreoffice = spreadsheetengine::compat::libreoffice;
+namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 
 #define ADDIN_MAXSTRLEN 256
 
@@ -1389,22 +1391,34 @@ void ScInterpreter::PopRefListPushMatrixOrRef()
         if (pv)
         {
             const size_t nEntries = pv->size();
-            if (nEntries == 1)
+            bool bAllSingleCellReferences = true;
+            for (const auto& rRef : *pv)
+            {
+                if (rRef.Ref1 != rRef.Ref2)
+                {
+                    bAllSingleCellReferences = false;
+                    break;
+                }
+            }
+
+            const auto aPlan = serefexec::planReferenceListMaterialization(
+                nEntries, bMatrixFormula, bAllSingleCellReferences);
+            if (!aPlan)
+            {
+                SetError(selibreoffice::toFormulaError(aPlan.meError));
+                return;
+            }
+
+            if (aPlan.maValue.meKind
+                == spreadsheetengine::api::reference::ReferenceListMaterializationKind::SingleReference)
             {
                 --sp;
-                PushTempTokenWithoutError( new ScDoubleRefToken( mrDoc.GetSheetLimits(), (*pv)[0] ));
+                PushTempTokenWithoutError(new ScDoubleRefToken(mrDoc.GetSheetLimits(), (*pv)[0]));
             }
-            else if (bMatrixFormula)
+            else if (aPlan.maValue.meKind
+                     == spreadsheetengine::api::reference::ReferenceListMaterializationKind::ColumnVector)
             {
-                // Only single cells can be stuffed into a column vector.
-                // XXX NOTE: Excel doesn't do this but returns #VALUE! instead.
-                // Though there's no compelling reason not to...
-                for (const auto & rRef : *pv)
-                {
-                    if (rRef.Ref1 != rRef.Ref2)
-                        return;
-                }
-                ScMatrixRef xMat = GetNewMat( 1, nEntries, true);   // init empty
+                ScMatrixRef xMat = GetNewMat(1, nEntries, true);   // init empty
                 if (!xMat)
                     return;
                 for (size_t i=0; i < nEntries; ++i)
@@ -2011,41 +2025,32 @@ void ScInterpreter::ReverseStack( sal_uInt8 nParamCount )
 
 bool ScInterpreter::DoubleRefToPosSingleRef( const ScRange& rRange, ScAddress& rAdr )
 {
-    // Check for a singleton first - no implicit intersection for them.
-    if( rRange.aStart == rRange.aEnd )
+    if ( pJumpMatrix )
     {
-        rAdr = rRange.aStart;
+        SCSIZE nC = 0;
+        SCSIZE nR = 0;
+        pJumpMatrix->GetPos( nC, nR);
+        const auto aSelection = serefexec::selectScalarReferenceCell(
+            rRange, aPos,
+            spreadsheetengine::api::MatrixCoordinate { static_cast<spreadsheetengine::api::MatrixSize>(nC),
+                static_cast<spreadsheetengine::api::MatrixSize>(nR) });
+        if (!aSelection)
+        {
+            SetError(selibreoffice::toFormulaError(aSelection.meError));
+            return false;
+        }
+        rAdr = aSelection.maValue;
         return true;
     }
 
-    bool bOk = false;
-
-    if ( pJumpMatrix )
+    const auto aSelection = serefexec::selectScalarReferenceCell(rRange, aPos);
+    if (!aSelection)
     {
-        bOk = rRange.aStart.Tab() == rRange.aEnd.Tab();
-        if ( !bOk )
-            SetError( FormulaError::IllegalArgument);
-        else
-        {
-            SCSIZE nC, nR;
-            pJumpMatrix->GetPos( nC, nR);
-            rAdr.SetCol( sal::static_int_cast<SCCOL>( rRange.aStart.Col() + nC ) );
-            rAdr.SetRow( sal::static_int_cast<SCROW>( rRange.aStart.Row() + nR ) );
-            rAdr.SetTab( rRange.aStart.Tab());
-            bOk = rRange.aStart.Col() <= rAdr.Col() && rAdr.Col() <=
-                rRange.aEnd.Col() && rRange.aStart.Row() <= rAdr.Row() &&
-                rAdr.Row() <= rRange.aEnd.Row();
-            if ( !bOk )
-                SetError( FormulaError::NoValue);
-        }
-        return bOk;
+        SetError(selibreoffice::toFormulaError(aSelection.meError));
+        return false;
     }
-
-    bOk = ScCompiler::DoubleRefToPosSingleRefScalarCase(rRange, rAdr, aPos);
-
-    if ( !bOk )
-        SetError( FormulaError::NoValue );
-    return bOk;
+    rAdr = aSelection.maValue;
+    return true;
 }
 
 double ScInterpreter::GetDoubleFromMatrix(const ScMatrixRef& pMat)

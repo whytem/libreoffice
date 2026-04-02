@@ -176,6 +176,8 @@ Closeout result:
 
 ### Workstream 3: Extract The Remaining Reference/Name Traversal Shell
 
+Status: **Complete**
+
 This workstream closes the remaining reference-sensitive helpers that still
 behave like spreadsheet semantics rather than like storage services.
 
@@ -210,6 +212,16 @@ Exit criteria:
 - Calc-local helpers in this area are reduced to document-backed service calls
 - no duplicate standalone-vs-Calc semantic helpers remain for the migrated
   reference/name surface
+
+Closeout result:
+
+- scalar-reference selection now routes through shared helper planning in
+  `api/Reference.hxx` and Calc compat adapters in
+  `compat/libreoffice/ReferenceExecution.hxx`
+- ref-list materialization policy (`keep list` vs `single ref` vs `column
+  vector`) is now shared instead of being decided inline in `ScInterpreter`
+- the remaining Calc-local code in these call sites is limited to stack
+  mutation and document-backed cell fetches
 
 ### Workstream 4: Finish The Host-Heavy Inspection And Property Tail
 
