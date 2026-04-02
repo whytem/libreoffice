@@ -243,6 +243,10 @@ unfinished shell extraction:
 This work is not primarily about adding new features. It is about making the
 boundary cleaner and easier to maintain.
 
+The implementation-ready plan for that next stream is:
+
+- [HOST_BOUNDARY_CONSOLIDATION_PLAN.md](architecture/HOST_BOUNDARY_CONSOLIDATION_PLAN.md)
+
 ### 3. Keep The Zero-Fallback Baseline Stable
 
 The zero-fallback promoted replay baseline is now an asset that needs to be
@@ -300,6 +304,7 @@ project is on track.
 
 The most relevant active docs are:
 
+- [HOST_BOUNDARY_CONSOLIDATION_PLAN.md](architecture/HOST_BOUNDARY_CONSOLIDATION_PLAN.md)
 - [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](architecture/DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md)
 - [ENGINE_FIRST_CALC_ADOPTION.md](architecture/ENGINE_FIRST_CALC_ADOPTION.md)
 - [EXECUTION_BACKEND_EXTRACTION.md](architecture/EXECUTION_BACKEND_EXTRACTION.md)
