@@ -40,6 +40,18 @@ std::vector<double> toDoubleVector(const ScaDoubleList& rValues)
         aValues.push_back(rValues.Get(nIndex));
     return aValues;
 }
+
+sefinanceexec::DirectFinancialAddInAdapter makeDateModeFinancialAdapter(
+    const css::uno::Reference<css::beans::XPropertySet>& xOpt, sal_Int32 nBasis)
+{
+    return sefinanceexec::DirectFinancialAddInAdapter(getNullDateParts(xOpt), nBasis);
+}
+
+sefinanceexec::DirectFinancialAddInAdapter makeNullDateFinancialAdapter(
+    const css::uno::Reference<css::beans::XPropertySet>& xOpt)
+{
+    return sefinanceexec::DirectFinancialAddInAdapter(getNullDateParts(xOpt));
+}
 }
 
 double SAL_CALL AnalysisAddIn::getAmordegrc( const css::uno::Reference< css::beans::XPropertySet >& xOpt,
@@ -74,8 +86,8 @@ double SAL_CALL AnalysisAddIn::getAccrint( const css::uno::Reference< css::beans
 
     if( fRate <= 0.0 || fVal <= 0.0 || isFreqInvalid(nFreq) || nIssue >= nSettle)
         throw css::lang::IllegalArgumentException();
-    return evaluateFinancialWithDateMode(
-        xOpt, getDateMode(xOpt, rOB), sefinance::evaluateAccrint, nIssue, nSettle, fRate, fVal, nFreq);
+    return valueOrThrow(makeDateModeFinancialAdapter(xOpt, getDateMode(xOpt, rOB))
+                            .evaluateAccrint(nIssue, nSettle, fRate, fVal, nFreq));
 }
 
 
@@ -115,8 +127,8 @@ double SAL_CALL AnalysisAddIn::getDuration( const css::uno::Reference< css::bean
 {
     if( fCoup < 0.0 || fYield < 0.0 || isFreqInvalid(nFreq) || nSettle >= nMat )
         throw css::lang::IllegalArgumentException();
-    return evaluateFinancialWithDateMode(
-        xOpt, getDateMode(xOpt, rOB), sefinance::evaluateDuration, nSettle, nMat, fCoup, fYield, nFreq);
+    return valueOrThrow(makeDateModeFinancialAdapter(xOpt, getDateMode(xOpt, rOB))
+                            .evaluateDuration(nSettle, nMat, fCoup, fYield, nFreq));
 }
 
 
@@ -246,8 +258,8 @@ double SAL_CALL AnalysisAddIn::getYieldmat( const css::uno::Reference< css::bean
 {
     if( fPrice <= 0.0 || fRate < 0.0 || nSettle >= nMat || nSettle < nIssue)
         throw css::lang::IllegalArgumentException();
-    return evaluateFinancialWithDateMode(
-        xOpt, getDateMode(xOpt, rOB), sefinance::evaluateYieldmat, nSettle, nMat, nIssue, fRate, fPrice);
+    return valueOrThrow(makeDateModeFinancialAdapter(xOpt, getDateMode(xOpt, rOB))
+                            .evaluateYieldmat(nSettle, nMat, nIssue, fRate, fPrice));
 }
 
 
@@ -259,7 +271,8 @@ double SAL_CALL AnalysisAddIn::getTbilleq( const css::uno::Reference< css::beans
         getNullDateParts(xOpt), nSettle, nMat, false));
     if( fDisc <= 0.0 || nSettle >= nMat || nDiff > 360 )
         throw css::lang::IllegalArgumentException();
-    return evaluateFinancialWithNullDate(xOpt, sefinance::evaluateTbillEq, nSettle, nMat, fDisc);
+    return valueOrThrow(
+        makeNullDateFinancialAdapter(xOpt).evaluateTbillEq(nSettle, nMat, fDisc));
 }
 
 
@@ -268,7 +281,8 @@ double SAL_CALL AnalysisAddIn::getTbillprice( const css::uno::Reference< css::be
 {
     if( fDisc <= 0.0 || nSettle > nMat )
         throw css::lang::IllegalArgumentException();
-    return evaluateFinancialWithNullDate(xOpt, sefinance::evaluateTbillPrice, nSettle, nMat, fDisc);
+    return valueOrThrow(
+        makeNullDateFinancialAdapter(xOpt).evaluateTbillPrice(nSettle, nMat, fDisc));
 }
 
 
@@ -279,7 +293,8 @@ double SAL_CALL AnalysisAddIn::getTbillyield( const css::uno::Reference< css::be
     nDiff++;
     if( fPrice <= 0.0 || nSettle >= nMat || nDiff > 360 )
         throw css::lang::IllegalArgumentException();
-    return evaluateFinancialWithNullDate(xOpt, sefinance::evaluateTbillYield, nSettle, nMat, fPrice);
+    return valueOrThrow(
+        makeNullDateFinancialAdapter(xOpt).evaluateTbillYield(nSettle, nMat, fPrice));
 }
 
 // Encapsulation violation: We *know* that GetOddfprice() always
