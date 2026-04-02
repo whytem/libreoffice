@@ -215,7 +215,7 @@ surface is explicitly host-shaped.
 The next plan should be organized around the end-state boundary rather than
 around historical milestone names.
 
-### 1. Tighten Production Compiler And Entrypoint Boundaries
+### 1. Run A Production Boundary Tightening Stream
 
 The first bounded direct-entry adoption stream is complete.
 
@@ -224,9 +224,13 @@ onto explicit engine entry adapters, removed the superseded wrapper tail in the
 touched scope, and left the remaining retained surfaces explicitly host-owned.
 
 The next work should not reopen that stream. It should start from the now-clean
-baseline and identify the next production boundary that can be tightened
-without moving storage, token ownership, or session-heavy services into the
-engine.
+baseline and tighten the remaining production compiler/evaluation boundary
+around the explicitly host-owned surfaces that are still packaged more broadly
+than necessary.
+
+The active implementation-ready plan for that work is:
+
+- [PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md](architecture/PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md)
 
 The completed closeout record for the direct-entry stream is:
 
@@ -339,6 +343,7 @@ project is on track.
 
 The most relevant active docs are:
 
+- [PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md](architecture/PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md)
 - [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
 - [TOKEN_BOUNDARY_REDUCTION_PLAN.md](architecture/TOKEN_BOUNDARY_REDUCTION_PLAN.md)
 - [HOST_BOUNDARY_CONSOLIDATION_PLAN.md](architecture/HOST_BOUNDARY_CONSOLIDATION_PLAN.md)

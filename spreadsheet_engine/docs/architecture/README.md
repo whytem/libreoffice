@@ -7,6 +7,10 @@ documents live under [../archive/](../archive/).
 
 Current architecture docs:
 
+- [PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md](PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md) -
+  active implementation-ready plan for tightening the remaining production
+  compiler/evaluation boundary around explicitly host-owned Calc and add-in
+  surfaces
 - [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](ENGINE_ENTRYPOINT_ADOPTION_PLAN.md) -
   completed implementation and closeout record for moving the first bounded
   production Calc evaluation paths onto direct engine entry points through
