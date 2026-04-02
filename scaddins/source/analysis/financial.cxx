@@ -44,13 +44,15 @@ std::vector<double> toDoubleVector(const ScaDoubleList& rValues)
 sefinanceexec::DirectFinancialAddInAdapter makeDateModeFinancialAdapter(
     const css::uno::Reference<css::beans::XPropertySet>& xOpt, sal_Int32 nBasis)
 {
-    return sefinanceexec::DirectFinancialAddInAdapter(getNullDateParts(xOpt), nBasis);
+    return sefinanceexec::DirectFinancialAddInAdapter(
+        getAddInDateServiceContext(xOpt).maHostDate.maNullDate, nBasis);
 }
 
 sefinanceexec::DirectFinancialAddInAdapter makeNullDateFinancialAdapter(
     const css::uno::Reference<css::beans::XPropertySet>& xOpt)
 {
-    return sefinanceexec::DirectFinancialAddInAdapter(getNullDateParts(xOpt));
+    return sefinanceexec::DirectFinancialAddInAdapter(
+        getAddInDateServiceContext(xOpt).maHostDate.maNullDate);
 }
 }
 

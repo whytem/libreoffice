@@ -226,6 +226,8 @@ CPPUNIT_TEST_FIXTURE(Test, test_sharedCalendarRuntimeDelegates)
                          mxAnalysis->getWorkday(xOptions, 41944, 5, aHolidays));
     CPPUNIT_ASSERT_EQUAL(sal_Int32(18),
                          mxAnalysis->getNetworkdays(xOptions, 41944, 41973, aHolidays));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        1.0, mxAnalysis->getYearfrac(xOptions, 41640, 42005, css::uno::Any(sal_Int32(0))), 1e-12);
     CPPUNIT_ASSERT_EQUAL(sal_Int32(1),
                          mxAnalysis->getWeeknum(xOptions, 42370, 1)); // 2016-01-01
     CPPUNIT_ASSERT_EQUAL(sal_Int32(37011),

@@ -68,6 +68,12 @@ struct WorkdayHostContext
     std::vector<spreadsheetengine::api::DateSerial> maHolidaySerials;
 };
 
+struct AddInDateServiceContext
+{
+    HostDateContext maHostDate;
+    std::vector<spreadsheetengine::api::DateSerial> maHolidaySerials;
+};
+
 inline sal_Int32 getRequiredHostNullDate(
     const css::uno::Reference<css::beans::XPropertySet>& xOpt)
 {
@@ -82,10 +88,18 @@ inline HostDateContext getHostDateContext(
     return { nNullDate, makeNullDatePartsFromSerial(nNullDate) };
 }
 
+inline AddInDateServiceContext getAddInDateServiceContext(
+    const css::uno::Reference<css::beans::XPropertySet>& xOpt)
+{
+    AddInDateServiceContext aContext;
+    aContext.maHostDate = getHostDateContext(xOpt);
+    return aContext;
+}
+
 inline spreadsheetengine::api::DateParts getNullDateParts(
     const css::uno::Reference<css::beans::XPropertySet>& xOpt)
 {
-    return getHostDateContext(xOpt).maNullDate;
+    return getAddInDateServiceContext(xOpt).maHostDate.maNullDate;
 }
 
 inline void populateHostHolidayList(sca::analysis::ScaAnyConverter& rAnyConv,
@@ -124,7 +138,16 @@ inline WorkdayHostContext getWorkdayHostContext(sca::analysis::ScaAnyConverter& 
     const css::uno::Reference<css::beans::XPropertySet>& xOpt, const css::uno::Any& rHolidayAny)
 {
     WorkdayHostContext aContext;
-    aContext.maHostDate = getHostDateContext(xOpt);
+    aContext.maHostDate = getAddInDateServiceContext(xOpt).maHostDate;
+    aContext.maHolidaySerials = collectHostHolidaySerialsFromAddInInputs(
+        rAnyConv, xOpt, rHolidayAny, aContext.maHostDate.mnNullDate);
+    return aContext;
+}
+
+inline AddInDateServiceContext getAddInDateServiceContext(sca::analysis::ScaAnyConverter& rAnyConv,
+    const css::uno::Reference<css::beans::XPropertySet>& xOpt, const css::uno::Any& rHolidayAny)
+{
+    AddInDateServiceContext aContext = getAddInDateServiceContext(xOpt);
     aContext.maHolidaySerials = collectHostHolidaySerialsFromAddInInputs(
         rAnyConv, xOpt, rHolidayAny, aContext.maHostDate.mnNullDate);
     return aContext;
@@ -142,9 +165,9 @@ inline double evaluateFinancialWithDateMode(
     const css::uno::Reference<css::beans::XPropertySet>& xOpt, sal_Int32 nBasis,
     Function&& rFunction, Args&&... rArgs)
 {
-    const auto aContext = getFinancialDateContext(xOpt, nBasis);
-    return valueOrThrow(std::invoke(std::forward<Function>(rFunction), aContext.maHostDate.maNullDate,
-        std::forward<Args>(rArgs)..., aContext.mnBasis));
+    const auto aDateContext = getAddInDateServiceContext(xOpt);
+    return valueOrThrow(std::invoke(std::forward<Function>(rFunction),
+        aDateContext.maHostDate.maNullDate, std::forward<Args>(rArgs)..., nBasis));
 }
 
 template <typename Function, typename... Args>
@@ -152,9 +175,9 @@ inline double evaluateFinancialWithNullDate(
     const css::uno::Reference<css::beans::XPropertySet>& xOpt, Function&& rFunction,
     Args&&... rArgs)
 {
-    return valueOrThrow(
-        std::invoke(std::forward<Function>(rFunction), getHostDateContext(xOpt).maNullDate,
-            std::forward<Args>(rArgs)...));
+    const auto aDateContext = getAddInDateServiceContext(xOpt);
+    return valueOrThrow(std::invoke(std::forward<Function>(rFunction),
+        aDateContext.maHostDate.maNullDate, std::forward<Args>(rArgs)...));
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

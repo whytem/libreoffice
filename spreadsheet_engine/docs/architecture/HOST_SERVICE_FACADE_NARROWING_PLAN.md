@@ -289,6 +289,8 @@ Phase 2 closeout notes:
 
 ### Phase 3. Narrow The Add-In Service Context Facade
 
+Status: complete
+
 Collapse repeated add-in host-service assembly into one named context seam.
 
 Preferred execution order:
@@ -296,6 +298,20 @@ Preferred execution order:
 1. null-date service packaging
 2. holiday-list expansion packaging
 3. context reuse in the selected add-in entry clusters
+
+Phase 3 closeout notes:
+
+- the remaining add-in null-date and holiday packaging now converges on
+  [AddInDateServiceContext](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysisdefs.hxx)
+  and the paired
+  [getAddInDateServiceContext()](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysisdefs.hxx)
+  helpers
+- [analysis.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysis.cxx)
+  now reuses that single seam for `WORKDAY`, `NETWORKDAYS`, `YEARFRAC`, and
+  `WEEKNUM`
+- [financial.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/financial.cxx)
+  now builds its date-mode and null-date adapters from the same add-in host
+  context instead of assembling separate null-date paths
 
 ### Phase 4. Narrow Host-Heavy Inspection Projection
 
