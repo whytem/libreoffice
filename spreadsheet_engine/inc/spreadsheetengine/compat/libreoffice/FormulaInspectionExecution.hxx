@@ -188,34 +188,6 @@ template <typename MatrixFactory>
         });
 }
 
-[[nodiscard]] inline bool isFormulaCell(const ScDocument& rDocument, const ScAddress& rAddress)
-{
-    return CalcFormulaInspectionProvider(rDocument).isFormulaCell(toApiCellAddress(rAddress));
-}
-
-[[nodiscard]] inline spreadsheetengine::api::ValueResult<OUString> formulaTextForCell(
-    const ScDocument& rDocument, const ScAddress& rAddress, ScInterpreterContext& rContext)
-{
-    return DirectFormulaInspectionAdapter(rDocument, rContext).formulaTextForCell(rAddress);
-}
-
-template <typename MatrixFactory>
-[[nodiscard]] inline MatrixInspectionResult buildIsFormulaMatrix(
-    const ScDocument& rDocument, const ScRange& rRange, MatrixFactory&& rFactory)
-{
-    const DirectFormulaInspectionAdapter aAdapter(rDocument);
-    return buildIsFormulaMatrix(aAdapter, rRange, std::forward<MatrixFactory>(rFactory));
-}
-
-template <typename MatrixFactory>
-[[nodiscard]] inline MatrixInspectionResult buildFormulaTextMatrix(const ScDocument& rDocument,
-    const ScRange& rRange, ScInterpreterContext& rContext, svl::SharedStringPool& rStringPool,
-    MatrixFactory&& rFactory)
-{
-    DirectFormulaInspectionAdapter aAdapter(rDocument, rContext);
-    return buildFormulaTextMatrix(aAdapter, rRange, rStringPool, std::forward<MatrixFactory>(rFactory));
-}
-
 } // namespace spreadsheetengine::compat::libreoffice::formulainspection
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
