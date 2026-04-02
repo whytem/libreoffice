@@ -13,7 +13,6 @@
 #include <optional>
 
 #include <address.hxx>
-#include <compiler.hxx>
 #include <document.hxx>
 #include <externalrefmgr.hxx>
 #include <formula/types.hxx>
@@ -22,6 +21,8 @@
 #include <rangenam.hxx>
 #include <svl/sharedstring.hxx>
 #include <tokenarray.hxx>
+
+#include <spreadsheetengine/compat/libreoffice/CompileHost.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::indirectexecution
 {
@@ -232,10 +233,9 @@ namespace detail
     if (!bExternalName && !bTableRef)
         return std::nullopt;
 
-    ScCompiler aCompiler(rDocument, rPosition, rDocument.GetGrammar());
-    aCompiler.SetRefConvention(eConvention);
-    std::unique_ptr<ScTokenArray> pTokenArray(
-        aCompiler.CompileString(bTableRefNamed ? aTableRefNamedSymbol : rRefText));
+    std::unique_ptr<ScTokenArray> pTokenArray(compilehost::compileFormulaText(
+        rDocument, rPosition, rDocument.GetGrammar(), eConvention,
+        bTableRefNamed ? aTableRefNamedSymbol : rRefText));
     if (pTokenArray->GetCodeError() != FormulaError::NONE || !pTokenArray->GetLen())
         return std::nullopt;
 
@@ -250,7 +250,8 @@ namespace detail
         return std::nullopt;
     }
 
-    aCompiler.CompileTokenArray();
+    compilehost::lowerTokenArray(
+        rDocument, rPosition, rDocument.GetGrammar(), eConvention, *pTokenArray);
     if (pTokenArray->GetCodeLen() != 1)
         return std::nullopt;
 

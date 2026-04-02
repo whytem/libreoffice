@@ -32,6 +32,40 @@
 namespace spreadsheetengine::compat::libreoffice
 {
 
+namespace compilehost
+{
+
+inline std::unique_ptr<ScTokenArray> compileFormulaText(
+    ScDocument& rDocument, const ScAddress& rBaseAddress,
+    formula::FormulaGrammar::Grammar eGrammar,
+    formula::FormulaGrammar::AddressConvention eConvention, const OUString& rFormula)
+{
+    ScCompiler aCompiler(rDocument, rBaseAddress, eGrammar);
+    aCompiler.SetRefConvention(eConvention);
+    return aCompiler.CompileString(rFormula);
+}
+
+inline void lowerTokenArray(ScDocument& rDocument, const ScAddress& rBaseAddress,
+    formula::FormulaGrammar::Grammar eGrammar,
+    formula::FormulaGrammar::AddressConvention eConvention, ScTokenArray& rArray)
+{
+    ScCompiler aCompiler(rDocument, rBaseAddress, rArray, eGrammar);
+    aCompiler.SetRefConvention(eConvention);
+    aCompiler.CompileTokenArray();
+}
+
+inline OUString createFormulaStringFromTokenArray(const ScDocument& rDocument,
+    const ScAddress& rBaseAddress, ScTokenArray& rArray,
+    formula::FormulaGrammar::Grammar eGrammar)
+{
+    ScCompiler aCompiler(const_cast<ScDocument&>(rDocument), rBaseAddress, rArray, eGrammar);
+    OUString aFormula;
+    aCompiler.CreateStringFromTokenArray(aFormula);
+    return aFormula;
+}
+
+} // namespace compilehost
+
 inline spreadsheetengine::detail::compiler::CompileContext makeCompileContext(
     const ScAddress& rBaseAddress, formula::FormulaGrammar::Grammar eGrammar,
     bool bForPersistence = false, bool bAllowExternalReferences = true,

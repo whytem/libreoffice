@@ -27,11 +27,11 @@
 #include <svl/zformat.hxx>
 #include <tools/urlobj.hxx>
 
-#include <compiler.hxx>
 #include <global.hxx>
 #include <tokenarray.hxx>
 
 #include <spreadsheetengine/api/Host.hxx>
+#include <spreadsheetengine/compat/libreoffice/CompileHost.hxx>
 #include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/runtime/CellInspection.hxx>
@@ -428,10 +428,8 @@ public:
 {
     ScTokenArray aArray(rDoc);
     aArray.AddExternalSingleReference(nFileId, svl::SharedString(rTabName), rReference);
-    ScCompiler aCompiler(const_cast<ScDocument&>(rDoc), rFormulaPos, aArray,
-        formula::FormulaGrammar::GRAM_ODFF_A1);
-    OUString aString;
-    aCompiler.CreateStringFromTokenArray(aString);
+    const OUString aString = compilehost::createFormulaStringFromTokenArray(
+        rDoc, rFormulaPos, aArray, formula::FormulaGrammar::GRAM_ODFF_A1);
     return spreadsheetengine::runtime::cellinspection::textPropertyValue(toApiString(aString));
 }
 

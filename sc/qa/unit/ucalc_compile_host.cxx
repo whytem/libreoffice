@@ -18,6 +18,7 @@
 #include <rangenam.hxx>
 #include <spreadsheetengine/api/ReferenceData.hxx>
 #include <spreadsheetengine/compat/libreoffice/CompileHost.hxx>
+#include <spreadsheetengine/compat/libreoffice/TokenBridge.hxx>
 #include <spreadsheetengine/detail/BuiltinExternalNames.hxx>
 
 namespace
@@ -201,6 +202,85 @@ CPPUNIT_TEST_FIXTURE(TestCompileHost, testColRowNameLookup)
     CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::SheetId(0), aAbsolute.mnSheet);
     CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::ColumnIndex(0), aAbsolute.mnColumn);
     CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::RowIndex(0), aAbsolute.mnRow);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestCompileHost, testCompileHelperBuildsExternalNameRpn)
+{
+    using spreadsheetengine::compat::libreoffice::compilehost::compileFormulaText;
+    using spreadsheetengine::compat::libreoffice::compilehost::lowerTokenArray;
+
+    m_pDoc->InsertTab(0, u"Sheet1"_ustr);
+
+    static OUString constexpr aExternalFile(u"file:///token-compile-helper-external.fake"_ustr);
+    ScExternalRefManager* pRefMgr = m_pDoc->GetExternalRefManager();
+    CPPUNIT_ASSERT(pRefMgr);
+    const sal_uInt16 nFileId = pRefMgr->getExternalFileId(aExternalFile);
+
+    ScTokenArray aRangeTokens(*m_pDoc);
+    aRangeTokens.AddDouble(42.0);
+    pRefMgr->storeRangeNameTokens(nFileId, u"ExternalMetric"_ustr, aRangeTokens);
+
+    const ScCompiler::Convention* pConvention
+        = ScCompiler::GetRefConvention(formula::FormulaGrammar::CONV_OOO);
+    CPPUNIT_ASSERT(pConvention);
+    const OUString aSymbol
+        = pConvention->makeExternalNameStr(nFileId, aExternalFile, u"ExternalMetric"_ustr);
+
+    std::unique_ptr<ScTokenArray> xTokens(compileFormulaText(*m_pDoc, ScAddress(0, 0, 0),
+        getEnglishOooGrammar(), formula::FormulaGrammar::CONV_OOO, aSymbol));
+    CPPUNIT_ASSERT(xTokens);
+    CPPUNIT_ASSERT_EQUAL(FormulaError::NONE, xTokens->GetCodeError());
+    CPPUNIT_ASSERT(xTokens->GetLen() > 0);
+    CPPUNIT_ASSERT(xTokens->FirstToken());
+    CPPUNIT_ASSERT_EQUAL(formula::svExternalName, xTokens->FirstToken()->GetType());
+
+    ScCompiler aLegacyCompiler(*m_pDoc, ScAddress(0, 0, 0), getEnglishOooGrammar());
+    aLegacyCompiler.SetRefConvention(formula::FormulaGrammar::CONV_OOO);
+    std::unique_ptr<ScTokenArray> xLegacyTokens(aLegacyCompiler.CompileString(aSymbol));
+    CPPUNIT_ASSERT(xLegacyTokens);
+    CPPUNIT_ASSERT_EQUAL(FormulaError::NONE, xLegacyTokens->GetCodeError());
+
+    lowerTokenArray(*m_pDoc, ScAddress(0, 0, 0), getEnglishOooGrammar(),
+        formula::FormulaGrammar::CONV_OOO, *xTokens);
+    aLegacyCompiler.CompileTokenArray();
+    CPPUNIT_ASSERT_EQUAL(xLegacyTokens->GetCodeLen(), xTokens->GetCodeLen());
+    CPPUNIT_ASSERT(
+        spreadsheetengine::compat::libreoffice::tokenArraysEqualForBridge(*xLegacyTokens, *xTokens));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestCompileHost, testStringifyTokenArrayHelperMatchesLegacyCompiler)
+{
+    using spreadsheetengine::compat::libreoffice::compilehost::createFormulaStringFromTokenArray;
+
+    m_pDoc->InsertTab(0, u"Sheet1"_ustr);
+
+    static OUString constexpr aExternalFile(u"file:///token-stringify-helper-external.fake"_ustr);
+    ScExternalRefManager* pRefMgr = m_pDoc->GetExternalRefManager();
+    CPPUNIT_ASSERT(pRefMgr);
+    const sal_uInt16 nFileId = pRefMgr->getExternalFileId(aExternalFile);
+
+    ScSingleRefData aReference;
+    aReference.InitAddress(ScAddress(3, 4, 0));
+
+    ScTokenArray aLegacyTokens(*m_pDoc);
+    aLegacyTokens.AddExternalSingleReference(
+        nFileId, svl::SharedString(u"ExtSheet"_ustr), aReference);
+    ScCompiler aCompiler(*m_pDoc, ScAddress(1, 1, 0), aLegacyTokens,
+        formula::FormulaGrammar::GRAM_ODFF_A1);
+    OUString aLegacyString;
+    aCompiler.CreateStringFromTokenArray(aLegacyString);
+
+    ScTokenArray aHelperTokens(*m_pDoc);
+    aHelperTokens.AddExternalSingleReference(
+        nFileId, svl::SharedString(u"ExtSheet"_ustr), aReference);
+    const OUString aHelperString = createFormulaStringFromTokenArray(
+        *m_pDoc, ScAddress(1, 1, 0), aHelperTokens, formula::FormulaGrammar::GRAM_ODFF_A1);
+
+    CPPUNIT_ASSERT_EQUAL(aLegacyString, aHelperString);
 
     m_pDoc->DeleteTab(0);
 }
