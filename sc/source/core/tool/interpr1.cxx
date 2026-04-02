@@ -63,6 +63,7 @@
 #include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Reference.hxx>
 #include <spreadsheetengine/api/StringReference.hxx>
+#include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/IndirectExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
 #include <spreadsheetengine/compat/libreoffice/JumpExecution.hxx>
@@ -113,6 +114,7 @@ namespace seinterpre = spreadsheetengine::compat::libreoffice::interpreterdispat
 namespace sejumpexec = spreadsheetengine::compat::libreoffice::jumpexecution;
 namespace sejumpmatrixexec = spreadsheetengine::compat::libreoffice::jumpmatrixexecution;
 namespace seletexec = spreadsheetengine::compat::libreoffice::letexecution;
+namespace seformulainspect = spreadsheetengine::compat::libreoffice::formulainspection;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace selookupexec = spreadsheetengine::compat::libreoffice::lookupexecution;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
@@ -2951,32 +2953,25 @@ void ScInterpreter::ScIsFormula()
                     return;
                 }
 
-                ScMatrixRef pResMat = GetNewMat( static_cast<SCSIZE>(nCol2 - nCol1 + 1),
-                        static_cast<SCSIZE>(nRow2 - nRow1 + 1), true);
-                if (!pResMat)
+                const auto aMatrixResult = seformulainspect::buildIsFormulaMatrix(
+                    mrDoc, ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2),
+                    [this](SCSIZE nColumns, SCSIZE nRows) {
+                        return GetNewMat(nColumns, nRows, true);
+                    });
+                if (aMatrixResult.meFailure
+                    == seformulainspect::MatrixInspectionFailure::IllegalArgument)
+                {
+                    PushIllegalArgument();
+                    return;
+                }
+                if (aMatrixResult.meFailure
+                    == seformulainspect::MatrixInspectionFailure::MatrixSize)
                 {
                     PushError( FormulaError::MatrixSize);
                     return;
                 }
 
-                /* TODO: we really should have a gap-aware cell iterator. */
-                SCSIZE i=0, j=0;
-                ScAddress aAdr( 0, 0, nTab1);
-                for (SCCOL nCol = nCol1; nCol <= nCol2; ++nCol)
-                {
-                    aAdr.SetCol(nCol);
-                    for (SCROW nRow = nRow1; nRow <= nRow2; ++nRow)
-                    {
-                        aAdr.SetRow(nRow);
-                        ScRefCellValue aCell(mrDoc, aAdr);
-                        pResMat->PutBoolean( (aCell.getType() == CELLTYPE_FORMULA), i,j);
-                        ++j;
-                    }
-                    ++i;
-                    j = 0;
-                }
-
-                PushMatrix( pResMat);
+                PushMatrix(aMatrixResult.mpMatrix);
                 return;
             }
         [[fallthrough]];
@@ -2986,7 +2981,7 @@ void ScInterpreter::ScIsFormula()
             if ( !PopDoubleRefOrSingleRef( aAdr ) )
                 break;
 
-            bRes = (mrDoc.GetCellType(aAdr) == CELLTYPE_FORMULA);
+            bRes = seformulainspect::isFormulaCell(mrDoc, aAdr);
         }
         break;
         default:
@@ -3017,36 +3012,22 @@ void ScInterpreter::ScFormula()
                     break;
                 }
 
-                ScMatrixRef pResMat = GetNewMat( nCol2 - nCol1 + 1, nRow2 - nRow1 + 1, true);
-                if (!pResMat)
+                const auto aMatrixResult = seformulainspect::buildFormulaTextMatrix(
+                    mrDoc, ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2), mrContext, mrStrPool,
+                    [this](SCSIZE nColumns, SCSIZE nRows) {
+                        return GetNewMat(nColumns, nRows, true);
+                    });
+                if (aMatrixResult.meFailure
+                    == seformulainspect::MatrixInspectionFailure::IllegalArgument)
+                {
+                    SetError( FormulaError::IllegalArgument);
+                    break;
+                }
+                if (aMatrixResult.meFailure
+                    == seformulainspect::MatrixInspectionFailure::MatrixSize)
                     break;
 
-                /* TODO: use a column iterator instead? */
-                SCSIZE i=0, j=0;
-                ScAddress aAdr(0,0,nTab1);
-                for (SCCOL nCol = nCol1; nCol <= nCol2; ++nCol)
-                {
-                    aAdr.SetCol(nCol);
-                    for (SCROW nRow = nRow1; nRow <= nRow2; ++nRow)
-                    {
-                        aAdr.SetRow(nRow);
-                        ScRefCellValue aCell(mrDoc, aAdr);
-                        switch (aCell.getType())
-                        {
-                            case CELLTYPE_FORMULA :
-                                aFormula = aCell.getFormula()->GetFormula(formula::FormulaGrammar::GRAM_UNSPECIFIED, &mrContext);
-                                pResMat->PutString( mrStrPool.intern( aFormula), i,j);
-                                break;
-                            default:
-                                pResMat->PutError( FormulaError::NotAvailable, i,j);
-                        }
-                        ++j;
-                    }
-                    ++i;
-                    j = 0;
-                }
-
-                PushMatrix( pResMat);
+                PushMatrix(aMatrixResult.mpMatrix);
                 return;
             }
             [[fallthrough]];
@@ -3056,15 +3037,11 @@ void ScInterpreter::ScFormula()
             if ( !PopDoubleRefOrSingleRef( aAdr ) )
                 break;
 
-            ScRefCellValue aCell(mrDoc, aAdr);
-            switch (aCell.getType())
-            {
-                case CELLTYPE_FORMULA :
-                    aFormula = aCell.getFormula()->GetFormula(formula::FormulaGrammar::GRAM_UNSPECIFIED, &mrContext);
-                break;
-                default:
-                    SetError( FormulaError::NotAvailable );
-            }
+            const auto aFormulaText = seformulainspect::formulaTextForCell(mrDoc, aAdr, mrContext);
+            if (!aFormulaText)
+                SetError(selibreoffice::toFormulaError(aFormulaText.meError));
+            else
+                aFormula = aFormulaText.maValue;
         }
         break;
         default:

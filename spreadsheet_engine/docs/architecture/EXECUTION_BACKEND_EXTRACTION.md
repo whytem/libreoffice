@@ -45,7 +45,7 @@ The starting handoff from the completed recalc-orchestration milestone is:
 
 ## Current Status
 
-This milestone is now active with Phases 0 through 9 complete and the next
+This milestone is now active with Phases 0 through 10 complete and the next
 bounded execution-shell slice narrowed to the broader token-walking shell.
 
 - Phase 0 is complete: the orchestration/execution boundary is explicitly
@@ -87,6 +87,10 @@ bounded execution-shell slice narrowed to the broader token-walking shell.
   string-reference normalization and parsing helpers now live in the shared
   reference-text layer instead of as evaluator-local special-form helpers,
   leaving the remaining shell frontier focused on broader token walking
+- Phase 10 is complete: Calc's bounded `FORMULA` / `ISFORMULA`
+  reference-inspection range walk and matrix-shaping shell now route through a
+  dedicated compat helper, leaving the remaining frontier focused on broader
+  token walking and the host-heavy information shell
 
 The starting baseline for this milestone is:
 
@@ -1066,6 +1070,48 @@ Phase 9 closeout status:
 
 - complete
 - validated across the focused standalone and full replay lanes
+- one-shot replay baseline remains `500` workbooks, `50,661` formula cells,
+  `0` cached-fallback cells
+
+### Phase 10: Extract The Bounded Formula-Inspection Shell
+
+Status: **Complete**
+
+Goals:
+
+- move Calc's `FORMULA` / `ISFORMULA` reference-inspection range walk and
+  matrix-shaping logic behind a compat helper
+- keep Calc as the stack and matrix host while the extracted helper owns the
+  bounded range traversal and result population rules
+- add direct focused coverage for the migrated inspection semantics
+
+Landed scope:
+
+- compat extraction for `ISFORMULA` scalar and matrix inspection helpers
+- compat extraction for `FORMULA` scalar and matrix formula-text inspection
+  helpers
+- focused standalone evaluator coverage for `ISFORMULA`
+- focused Calc unit coverage for scalar and matrix `ISFORMULA`
+
+Implemented in:
+
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx`
+- `sc/source/core/tool/interpr1.cxx`
+- `spreadsheet_engine/tests/unit/fods_evaluator_tests.cxx`
+- `sc/qa/unit/ucalc_formula2.cxx`
+
+Completion criteria for Phase 10, now met:
+
+- Calc-local `FORMULA` / `ISFORMULA` range walk and matrix result population no
+  longer live only inside `ScInterpreter`
+- the migrated inspection slice has direct standalone and Calc regression
+  coverage
+- the replay baseline remains fully green
+
+Phase 10 closeout status:
+
+- complete
+- validated across the focused Calc, standalone, and full replay lanes
 - one-shot replay baseline remains `500` workbooks, `50,661` formula cells,
   `0` cached-fallback cells
 

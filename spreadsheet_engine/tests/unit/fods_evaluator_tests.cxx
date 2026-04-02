@@ -349,6 +349,37 @@ int main()
     }
 
     {
+        const auto aDirectIsFormula
+            = aEvaluator.evaluateFormula(u"of:=ISFORMULA([.B1])", { 0, 0, 0 });
+        const auto aDirectIsNotFormula
+            = aEvaluator.evaluateFormula(u"of:=ISFORMULA([.A1])", { 0, 0, 0 });
+        const auto aCompiledIsFormula
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=ISFORMULA([.B1])", { 0, 0, 0 });
+        const auto aCompiledIsNotFormula
+            = aEvaluator.evaluateFormulaViaCompiledTokens(u"of:=ISFORMULA([.A1])", { 0, 0, 0 });
+
+        const auto checkIsFormula = [&](const char* pLabel, const auto& rResult,
+                                        bool bExpected) -> bool {
+            if (!rResult || !rResult.maValue.maValue.isBoolean() || rResult.mbUsedCachedValue
+                || !almostEqual(rResult.maValue.maValue.mfNumber, bExpected ? 1.0 : 0.0))
+            {
+                std::fprintf(stderr, "%s: %s mismatch\n",
+                    "spreadsheetengine_fods_evaluator_tests", pLabel);
+                return false;
+            }
+            return true;
+        };
+
+        if (!checkIsFormula("direct ISFORMULA formula-cell", aDirectIsFormula, true)
+            || !checkIsFormula("direct ISFORMULA value-cell", aDirectIsNotFormula, false)
+            || !checkIsFormula("compiled ISFORMULA formula-cell", aCompiledIsFormula, true)
+            || !checkIsFormula("compiled ISFORMULA value-cell", aCompiledIsNotFormula, false))
+        {
+            return fail("spreadsheetengine_fods_evaluator_tests", "ISFORMULA() mismatch");
+        }
+    }
+
+    {
         const auto aResult = aEvaluator.evaluateCell({ 0, 3, 0 });
         if (!aResult || !aResult.maValue.maValue.isNumber()
             || !almostEqual(aResult.maValue.maValue.mfNumber, 4.0))

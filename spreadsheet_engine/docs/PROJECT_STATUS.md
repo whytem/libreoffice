@@ -46,7 +46,7 @@ is now also in closeout status.
 | Recalc orchestration extraction | **Complete** | Engine-owned recalc planning, queue construction, authority pilots, and Calc queue-consumption bridge are complete through the safe structural/named-range pilot surface |
 | FormulaEvaluator runtime modularization | **Complete** | The old evaluator monolith has been split across focused runtime and support modules such as `LookupRuntime`, `QueryRuntime`, `TextFunctionRuntime`, `DateTimeParse`, `FinancialRuntime`, `MathAggregate`, `MathFunctionRuntime`, and `ConversionRuntime` |
 | Calc pure-computation convergence | **Complete** | Calc now delegates the in-scope pure-computation statistical, aggregate, inverse-distribution, combinatoric, and error-function families to the same shared runtime modules used by standalone, with Calc-aligned algorithms adopted where behavior risk existed |
-| Execution backend extraction | **Active** | Phases 0 through 9 are complete: the execution boundary is frozen, shared scalar coercion and operator-shell helpers are engine-owned, the first reference-sensitive slices and bounded lookup traversal moved behind compat bridges, `ROW` / `COLUMN` / `ROWS` / `COLUMNS` / `AREAS` / `SHEET` / `SHEETS` now share bounded reference-shape logic, the bounded `CHOOSE` / `IFERROR` / `IFNA` / `INDIRECT` special-form shell now routes through shared or compat-owned helpers, Calc's bounded `LET` / `SWITCH` shell now routes through dedicated compat helpers, the generic jump-matrix cursor/finalization shell now routes through compat helpers, and the final standalone `INDIRECT` string-reference normalization/parsing tail now lives in the shared reference-text layer |
+| Execution backend extraction | **Active** | Phases 0 through 10 are complete: the execution boundary is frozen, shared scalar coercion and operator-shell helpers are engine-owned, the first reference-sensitive slices and bounded lookup traversal moved behind compat bridges, `ROW` / `COLUMN` / `ROWS` / `COLUMNS` / `AREAS` / `SHEET` / `SHEETS` now share bounded reference-shape logic, the bounded `CHOOSE` / `IFERROR` / `IFNA` / `INDIRECT` special-form shell now routes through shared or compat-owned helpers, Calc's bounded `LET` / `SWITCH` shell now routes through dedicated compat helpers, the generic jump-matrix cursor/finalization shell now routes through compat helpers, the final standalone `INDIRECT` string-reference normalization/parsing tail now lives in the shared reference-text layer, and Calc's bounded `FORMULA` / `ISFORMULA` inspection shell now routes through a dedicated compat helper |
 
 The immediate active frontier is now narrower and more practical:
 
@@ -59,7 +59,7 @@ The immediate active frontier is now narrower and more practical:
   `OFFSET` / `INDEX` / `LOOKUP` / `VLOOKUP` / `HLOOKUP` / `XLOOKUP` /
   `ROW` / `COLUMN` / `ROWS` / `COLUMNS` / `AREAS` / `SHEET` / `SHEETS` /
   `CHOOSE` / `IFERROR` / `IFNA` / `INDIRECT` / `LET` / `SWITCH` /
-  generic-jump-matrix boundary
+  generic-jump-matrix / `FORMULA` / `ISFORMULA` boundary
 - keep expanding engine-first adoption inside Calc only where differential
   validation keeps compiler/runtime behavior safe
 
@@ -630,13 +630,13 @@ The completed recalc-orchestration milestone landed:
 - Phase 6 isolated Calc queue consumption behind a dedicated compat bridge and
   opened the next execution-backend milestone from that stable boundary
 
-The active implementation frontier is now the **post-Phase-9 broader
+The active implementation frontier is now the **post-Phase-10 broader
 token-walking shell** in the
 execution-backend milestone.
 
 The recommended active sequence is:
 
-1. Keep the completed Phase 0-9 helper and compat-bridge layers stable and
+1. Keep the completed Phase 0-10 helper and compat-bridge layers stable and
    green.
 2. Extract the next bounded token-walking shell slice without reopening general
    opcode-dispatch or storage concerns.

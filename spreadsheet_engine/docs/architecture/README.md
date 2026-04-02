@@ -9,7 +9,7 @@ Active milestone docs:
 
 - [EXECUTION_BACKEND_EXTRACTION.md](EXECUTION_BACKEND_EXTRACTION.md) -
   active milestone for extracting evaluator-shell execution logic on top of the
-  completed orchestration boundary; Phases 0 through 9 are complete and the
+  completed orchestration boundary; Phases 0 through 10 are complete and the
   next frontier is the broader token-walking shell
 - [RECALC_ORCHESTRATION_EXTRACTION.md](RECALC_ORCHESTRATION_EXTRACTION.md) -
   completed milestone for engine-owned recalc authority and queue/scheduling

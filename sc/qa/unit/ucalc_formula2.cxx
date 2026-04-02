@@ -2510,6 +2510,16 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncFORMULA)
         CPPUNIT_ASSERT_EQUAL(OUString::createFromAscii(aChecks[i]), m_pDoc->GetString(3, i + 3, 0));
     }
 
+    m_pDoc->SetString(4, 0, 0, u"=ISFORMULA(B1)"_ustr);
+    m_pDoc->SetString(4, 1, 0, u"=ISFORMULA(B2)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(1.0, m_pDoc->GetValue(4, 0, 0));
+    CPPUNIT_ASSERT_EQUAL(0.0, m_pDoc->GetValue(4, 1, 0));
+
+    m_pDoc->InsertMatrixFormula(4, 3, 4, 5, aMark, u"=ISFORMULA(B1:B3)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(1.0, m_pDoc->GetValue(4, 3, 0));
+    CPPUNIT_ASSERT_EQUAL(0.0, m_pDoc->GetValue(4, 4, 0));
+    CPPUNIT_ASSERT_EQUAL(1.0, m_pDoc->GetValue(4, 5, 0));
+
     m_pDoc->DeleteTab(0);
 }
 
