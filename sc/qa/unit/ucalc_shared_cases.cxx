@@ -14,6 +14,7 @@
 #include <formula/errorcodes.hxx>
 #include <interpretercontext.hxx>
 #include <spreadsheetengine/compat/libreoffice/Host.hxx>
+#include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
 #include <spreadsheetengine/api/Host.hxx>
 #include <spreadsheetengine/api/Parsing.hxx>
 #include <spreadsheetengine/detail/HostValueAccess.hxx>
@@ -599,6 +600,39 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testLocaleParsingSharedCases)
                 parseDouble(rRow.maColumns[4]), m_pDoc->GetValue(aFormulaPos), 1e-12);
         }
     }
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testDirectTextParsingAdapter)
+{
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"DirectTextParsing"_ustr);
+
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    spreadsheetengine::compat::libreoffice::textparsingexecution::DirectTextParsingAdapter
+        aAdapter(*m_pDoc, rContext, false);
+
+    const auto aValue = aAdapter.evaluateValue(u"42.5"_ustr);
+    CPPUNIT_ASSERT(aValue);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(42.5, aValue.maValue, 1e-12);
+
+    const auto aDateValue = aAdapter.evaluateDateValue(u"1954-07-20"_ustr);
+    CPPUNIT_ASSERT(aDateValue);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(19925.0, aDateValue.maValue, 1e-12);
+
+    const auto aTimeValue = aAdapter.evaluateTimeValue(u"16:30:01"_ustr);
+    CPPUNIT_ASSERT(aTimeValue);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL((16.0 * 3600.0 + 30.0 * 60.0 + 1.0) / 86400.0,
+        aTimeValue.maValue, 1e-12);
+
+    const auto aNumberValue
+        = aAdapter.evaluateNumberValue(
+            u"1,234.5%"_ustr, std::optional(u"."_ustr), std::optional(u","_ustr));
+    CPPUNIT_ASSERT(aNumberValue);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(12.345, aNumberValue.maValue, 1e-12);
+
+    const auto aInvalidDate = aAdapter.evaluateDateValue(u"not a date"_ustr);
+    CPPUNIT_ASSERT(!aInvalidDate);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::Error::IllegalArgument, aInvalidDate.meError);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testLogicSharedCases)
