@@ -152,8 +152,7 @@ void ScInterpreter::ScGetHour()
 void ScInterpreter::ScGetDateValue()
 {
     OUString aInputString = GetString().getString();
-    const setextparseexec::DirectTextParsingAdapter aAdapter(mrDoc, mrContext);
-    const auto aResult = aAdapter.evaluateDateValue(aInputString);
+    const auto aResult = setextparseexec::evaluateDateValue(mrDoc, mrContext, aInputString);
     if (aResult)
     {
         nFuncFmtType = SvNumFormatType::DATE;
@@ -532,8 +531,7 @@ void ScInterpreter::ScGetDateDif()
 void ScInterpreter::ScGetTimeValue()
 {
     OUString aInputString = GetString().getString();
-    const setextparseexec::DirectTextParsingAdapter aAdapter(mrDoc, mrContext);
-    const auto aResult = aAdapter.evaluateTimeValue(aInputString);
+    const auto aResult = setextparseexec::evaluateTimeValue(mrDoc, mrContext, aInputString);
     if (aResult)
     {
         nFuncFmtType = SvNumFormatType::TIME;

@@ -64,6 +64,33 @@ public:
     }
 };
 
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<double> evaluateValue(
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const OUString& rInput)
+{
+    return DirectTextParsingAdapter(rDoc, rContext).evaluateValue(rInput);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<double> evaluateDateValue(
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const OUString& rInput)
+{
+    return DirectTextParsingAdapter(rDoc, rContext).evaluateDateValue(rInput);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<double> evaluateTimeValue(
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const OUString& rInput)
+{
+    return DirectTextParsingAdapter(rDoc, rContext).evaluateTimeValue(rInput);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<double> evaluateNumberValue(
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const OUString& rInput,
+    const std::optional<OUString>& roDecimalSeparator,
+    const std::optional<OUString>& roGroupSeparator, bool bEmptyStringAsZero = false)
+{
+    return DirectTextParsingAdapter(rDoc, rContext, bEmptyStringAsZero)
+        .evaluateNumberValue(rInput, roDecimalSeparator, roGroupSeparator);
+}
+
 } // namespace spreadsheetengine::compat::libreoffice::textparsingexecution
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

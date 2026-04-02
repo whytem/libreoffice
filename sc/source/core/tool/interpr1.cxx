@@ -2869,7 +2869,6 @@ void ScInterpreter::ScIsFormula()
 {
     nFuncFmtType = SvNumFormatType::LOGICAL;
     bool bRes = false;
-    seformulainspect::DirectFormulaInspectionAdapter aAdapter(mrDoc, mrContext);
     switch ( GetStackType() )
     {
         case svDoubleRef :
@@ -2891,7 +2890,7 @@ void ScInterpreter::ScIsFormula()
                 }
 
                 const auto aMatrixResult = seformulainspect::buildIsFormulaMatrix(
-                    aAdapter, ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2),
+                    mrDoc, mrContext, ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2),
                     [this](SCSIZE nColumns, SCSIZE nRows) {
                         return GetNewMat(nColumns, nRows, true);
                     });
@@ -2918,7 +2917,7 @@ void ScInterpreter::ScIsFormula()
             if ( !PopDoubleRefOrSingleRef( aAdr ) )
                 break;
 
-            bRes = aAdapter.isFormulaCell(aAdr);
+            bRes = seformulainspect::isFormulaCell(mrDoc, mrContext, aAdr);
         }
         break;
         default:
@@ -2931,7 +2930,6 @@ void ScInterpreter::ScIsFormula()
 void ScInterpreter::ScFormula()
 {
     OUString aFormula;
-    seformulainspect::DirectFormulaInspectionAdapter aAdapter(mrDoc, mrContext);
     switch ( GetStackType() )
     {
         case svDoubleRef :
@@ -2951,7 +2949,8 @@ void ScInterpreter::ScFormula()
                 }
 
                 const auto aMatrixResult = seformulainspect::buildFormulaTextMatrix(
-                    aAdapter, ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2), mrStrPool,
+                    mrDoc, mrContext, ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2),
+                    mrStrPool,
                     [this](SCSIZE nColumns, SCSIZE nRows) {
                         return GetNewMat(nColumns, nRows, true);
                     });
@@ -2975,7 +2974,7 @@ void ScInterpreter::ScFormula()
             if ( !PopDoubleRefOrSingleRef( aAdr ) )
                 break;
 
-            const auto aFormulaText = aAdapter.formulaTextForCell(aAdr);
+            const auto aFormulaText = seformulainspect::formulaTextForCell(mrDoc, mrContext, aAdr);
             if (!aFormulaText)
                 SetError(selibreoffice::toFormulaError(aFormulaText.meError));
             else
@@ -3453,8 +3452,7 @@ void ScInterpreter::ScValue()
             break;
     }
 
-    const setextparseexec::DirectTextParsingAdapter aAdapter(mrDoc, mrContext);
-    const auto aResult = aAdapter.evaluateValue(aInputString);
+    const auto aResult = setextparseexec::evaluateValue(mrDoc, mrContext, aInputString);
     if (aResult)
         PushDouble(aResult.maValue);
     else
@@ -3489,10 +3487,9 @@ void ScInterpreter::ScNumberValue()
         return;
     }
 
-    const setextparseexec::DirectTextParsingAdapter aAdapter(
-        mrDoc, mrContext, maCalcConfig.mbEmptyStringAsZero);
-    const auto aResult = aAdapter.evaluateNumberValue(
-        aInputString, oDecimalSeparator, oGroupSeparator);
+    const auto aResult = setextparseexec::evaluateNumberValue(
+        mrDoc, mrContext, aInputString, oDecimalSeparator, oGroupSeparator,
+        maCalcConfig.mbEmptyStringAsZero);
     if (aResult)
     {
         PushDouble(aResult.maValue);

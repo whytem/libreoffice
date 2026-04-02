@@ -118,6 +118,18 @@ public:
     }
 };
 
+[[nodiscard]] inline bool isFormulaCell(
+    const ScDocument& rDocument, ScInterpreterContext& rContext, const ScAddress& rAddress)
+{
+    return DirectFormulaInspectionAdapter(rDocument, rContext).isFormulaCell(rAddress);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<OUString> formulaTextForCell(
+    const ScDocument& rDocument, ScInterpreterContext& rContext, const ScAddress& rAddress)
+{
+    return DirectFormulaInspectionAdapter(rDocument, rContext).formulaTextForCell(rAddress);
+}
+
 template <typename MatrixFactory, typename CellWriter>
 [[nodiscard]] inline MatrixInspectionResult buildMatrixInspection(
     const ScRange& rRange, MatrixFactory&& rFactory, CellWriter&& rWriter)
@@ -170,6 +182,16 @@ template <typename MatrixFactory>
 }
 
 template <typename MatrixFactory>
+[[nodiscard]] inline MatrixInspectionResult buildIsFormulaMatrix(
+    const ScDocument& rDocument, ScInterpreterContext& rContext, const ScRange& rRange,
+    MatrixFactory&& rFactory)
+{
+    return buildIsFormulaMatrix(
+        DirectFormulaInspectionAdapter(rDocument, rContext), rRange,
+        std::forward<MatrixFactory>(rFactory));
+}
+
+template <typename MatrixFactory>
 [[nodiscard]] inline MatrixInspectionResult buildFormulaTextMatrix(
     const DirectFormulaInspectionAdapter& rAdapter, const ScRange& rRange,
     svl::SharedStringPool& rStringPool, MatrixFactory&& rFactory)
@@ -184,8 +206,18 @@ template <typename MatrixFactory>
                 return;
             }
 
-            rMatrix.PutString(rStringPool.intern(aFormulaText.maValue), nColumn, nRow);
+                rMatrix.PutString(rStringPool.intern(aFormulaText.maValue), nColumn, nRow);
         });
+}
+
+template <typename MatrixFactory>
+[[nodiscard]] inline MatrixInspectionResult buildFormulaTextMatrix(
+    const ScDocument& rDocument, ScInterpreterContext& rContext, const ScRange& rRange,
+    svl::SharedStringPool& rStringPool, MatrixFactory&& rFactory)
+{
+    return buildFormulaTextMatrix(
+        DirectFormulaInspectionAdapter(rDocument, rContext), rRange, rStringPool,
+        std::forward<MatrixFactory>(rFactory));
 }
 
 } // namespace spreadsheetengine::compat::libreoffice::formulainspection
