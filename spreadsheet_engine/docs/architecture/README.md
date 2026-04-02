@@ -8,9 +8,9 @@ documents live under [../archive/](../archive/).
 Current architecture docs:
 
 - [HOST_SERVICE_FACADE_NARROWING_PLAN.md](HOST_SERVICE_FACADE_NARROWING_PLAN.md) -
-  active implementation-ready plan for narrowing the remaining host-service
-  packaging around intentionally Calc-owned production surfaces without moving
-  service ownership out of Calc
+  completed implementation and closeout record for narrowing the remaining
+  host-service packaging around intentionally Calc-owned production surfaces
+  without moving service ownership out of Calc
 - [ENGINE_ENTRY_WIDENING_PLAN.md](ENGINE_ENTRY_WIDENING_PLAN.md) -
   completed implementation and closeout record for the second-wave widening
   of direct engine-entry use inside Calc, including the selected add-in

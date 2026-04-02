@@ -1,6 +1,6 @@
 # Host Service Facade Narrowing Plan
 
-Status: active implementation-ready plan
+Status: completed closeout record
 
 ## Purpose
 
@@ -368,6 +368,8 @@ Phase 5 closeout notes:
 
 ### Phase 6. Revalidate And Close The Stream
 
+Status: complete
+
 After the narrowing slices land:
 
 - rerun the standing Calc/add-in and standalone lanes
@@ -376,6 +378,18 @@ After the narrowing slices land:
   [PROJECT_STATUS.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/PROJECT_STATUS.md)
   and [README.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/README.md)
 - record what remains intentionally host-only after the stream
+
+Phase 6 closeout notes:
+
+- final validation is green across the touched Calc and add-in lanes, the
+  standalone evaluator lane, strict one-shot replay with
+  `--assert-zero-fallback`, and `git diff --check`
+- the retained host-only surfaces after this stream are explicit: external
+  cache ownership and the remaining external `CELL(...)` format-style tail,
+  live null-date and holiday-input ownership in the add-in layer, and the
+  inherently host-bound environment services behind `INFO(...)`
+- any further tightening in this area should be treated as a new bounded
+  frontier, not as unfinished host-service facade cleanup
 
 ## Validation Contract
 

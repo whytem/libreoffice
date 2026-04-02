@@ -252,15 +252,23 @@ The completed direct-entry closeout records are:
 
 ### 1A. Narrow The Remaining Host-Service Facades
 
-The next logical bounded stream is to narrow the packaging around the
-retained host-owned services that still sit at the Calc boundary.
+The host-service facade narrowing stream is complete.
 
-The goal is not to move those services into the engine. It is to make the
-boundary smaller and clearer by separating true host ownership from repeated
-projection, context assembly, and service-packaging logic that can still be
-collapsed behind named compat facades.
+That stream narrowed the bounded external `CELL(...)` projection subset,
+converged add-in null-date and holiday assembly on one named context seam,
+moved the retained local `CELL(...)` host-property tail and bounded
+`INFO(...)` projection behind explicit compat adapters, and removed the
+superseded wrapper layer that used to sit alongside those facades.
 
-The active implementation-ready plan for that work is:
+What remains in this area is now an explicit host-owned tail rather than an
+open packaging cleanup stream:
+
+- external-reference cache ownership and the remaining external `CELL(...)`
+  format-style projection
+- live null-date and holiday-input ownership in the add-in layer
+- inherently host-bound environment services behind `INFO(...)`
+
+The completed closeout record for that stream is:
 
 - [HOST_SERVICE_FACADE_NARROWING_PLAN.md](architecture/HOST_SERVICE_FACADE_NARROWING_PLAN.md)
 
