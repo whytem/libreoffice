@@ -144,6 +144,18 @@ Completion criteria:
 - the inventory can be read as a next-action map rather than a raw audit log
 - there is no ambiguous touched candidate that lacks an end-state label
 
+Phase 2 classification map:
+
+| Candidate cluster | End-state | Why this is the correct end-state | Owning next action |
+| --- | --- | --- | --- |
+| `CELL(...)` address/file projection stringification in `CellInspectionExecution.hxx` | `ready for bounded extraction` | the spreadsheet semantics are already shared and the remaining local work is only `ScCompiler`/`ScTokenArray` packaging around formula string creation | Phase 3 |
+| `INDIRECT` structured-reference and quoted external-name compilation in `IndirectExecution.hxx` | `ready for bounded extraction` | the remaining local work is compiler-entry setup and token lowering; token ownership stays in Calc, but the packaging can move behind a named compile helper | Phase 3 |
+| date-mode financial add-in callers still using `evaluateFinancialWithDateMode(...)` | `ready for direct engine entry` | host work is already thin and limited to null-date / basis acquisition; the spreadsheet semantics already live in the engine adapter/runtime surface | Phase 4 |
+| local `CELL(...)` host-property tail (`FILENAME`, `WIDTH`, `PREFIX`, `FORMAT`, `COLOR`, `PARENTHESES`, `PROTECT`, `COORD`) | `intentionally host-only` | these still require live document formatting, document shell, number-format, or view-facing services that are correctly owned by Calc | retain and document |
+| bounded `INFO(...)` projection | `intentionally host-only` | even with the narrowed adapter, the remaining values depend on environment/process/document labels rather than pure spreadsheet semantics | retain and document |
+| external-reference cache fetch and projection packaging | `intentionally host-only` | ownership of external sessions, external cache lookup, and document integration remains a Calc host responsibility | retain and document |
+| broad token ownership, stack mutation, and general interpreter orchestration | `defer` | this stream is intentionally narrower than another interpreter rewrite; those surfaces remain outside the bounded reassessment scope | explicit defer |
+
 ### 3. Tighten Production Compiler-Path Adoption
 
 Take the first bounded slice where Calc still packages or routes production
