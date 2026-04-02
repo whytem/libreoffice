@@ -60,12 +60,6 @@ sal_Int32           DateToDays( sal_uInt16 nDay, sal_uInt16 nMonth, sal_uInt16 n
 void                DaysToDate( sal_Int32 nDays, sal_uInt16& rDay, sal_uInt16& rMonth, sal_uInt16& rYear );
 /// @throws css::uno::RuntimeException
 sal_Int32           GetNullDate( const css::uno::Reference< css::beans::XPropertySet >& xOptions );
-sal_Int32           GetDiffDate360(
-                        sal_uInt16 nDay1, sal_uInt16 nMonth1, sal_uInt16 nYear1, bool bLeapYear1,
-                        sal_uInt16 nDay2, sal_uInt16 nMonth2, sal_uInt16 nYear2,
-                        bool bUSAMethod );
-inline sal_Int32    GetDiffDate360( const css::uno::Reference< css::beans::XPropertySet >& xOpt, sal_Int32 nDate1, sal_Int32 nDate2, bool bUSAMethod );
-sal_Int32           GetDiffDate360( sal_Int32 nNullDate, sal_Int32 nDate1, sal_Int32 nDate2, bool bUSAMethod );
 
 sal_Int32           GetDaysInYears( sal_uInt16 nYear1, sal_uInt16 nYear2 );
 inline sal_Int16    GetDayOfWeek( sal_Int32 nDate );
@@ -79,12 +73,6 @@ double              GetYearDiff( sal_Int32 nNullDate, sal_Int32 nStartDate, sal_
 /// @throws css::uno::RuntimeException
 /// @throws css::lang::IllegalArgumentException
 sal_Int32           GetDaysInYear( sal_Int32 nNullDate, sal_Int32 nDate, sal_Int32 nMode );
-/// @throws css::uno::RuntimeException
-/// @throws css::lang::IllegalArgumentException
-double              GetYearFrac( sal_Int32 nNullDate, sal_Int32 nStartDate, sal_Int32 nEndDate, sal_Int32 nMode );
-/// @throws css::uno::RuntimeException
-/// @throws css::lang::IllegalArgumentException
-inline double       GetYearFrac( const css::uno::Reference< css::beans::XPropertySet >& xOpt, sal_Int32 nStartDate, sal_Int32 nEndDate, sal_Int32 nMode );
 
 double              BinomialCoefficient( double n, double k );
 double              GetGcd( double f1, double f2 );
@@ -103,46 +91,14 @@ OUString            GetString( double fNumber, bool bLeadingSign, sal_uInt16 nMa
 
 /// @throws css::uno::RuntimeException
 /// @throws css::lang::IllegalArgumentException
-double              GetAmordegrc( sal_Int32 nNullDate, double fCost, sal_Int32 nDate, sal_Int32 nFirstPer,
-                                double fRestVal, double fPer, double fRate, sal_Int32 nBase );
-/// @throws css::uno::RuntimeException
-/// @throws css::lang::IllegalArgumentException
-double              GetAmorlinc( sal_Int32 nNullDate, double fCost, sal_Int32 nDate, sal_Int32 nFirstPer,
-                                double fRestVal, double fPer, double fRate, sal_Int32 nBase );
-/// @throws css::uno::RuntimeException
-/// @throws css::lang::IllegalArgumentException
-double              GetDuration( sal_Int32 nNullDate, sal_Int32 nSettle, sal_Int32 nMat, double fCoup,
-                                double fYield, sal_Int32 nFreq, sal_Int32 nBase );
-/// @throws css::uno::RuntimeException
-/// @throws css::lang::IllegalArgumentException
-double              GetYieldmat( sal_Int32 nNullDate, sal_Int32 nSettle, sal_Int32 nMat, sal_Int32 nIssue,
-                                double fRate, double fPrice, sal_Int32 nBase );
-/// @throws css::uno::RuntimeException
-/// @throws css::lang::IllegalArgumentException
 double              GetOddfprice( sal_Int32 nNullDate, sal_Int32 nSettle, sal_Int32 nMat, sal_Int32 nIssue,
                                 sal_Int32 nFirstCoup, double fRate, double fYield, double fRedemp,
                                 sal_Int32 nFreq, sal_Int32 nBase );
 /// @throws css::uno::RuntimeException
 /// @throws css::lang::IllegalArgumentException
-double              getYield_( sal_Int32 nNullDate, sal_Int32 nSettle, sal_Int32 nMat, double fCoup, double fPrice,
-                                double fRedemp, sal_Int32 nFreq, sal_Int32 nBase );
-/// @throws css::uno::RuntimeException
-/// @throws css::lang::IllegalArgumentException
-double              getPrice_( sal_Int32 nNullDate, sal_Int32 nSettle, sal_Int32 nMat, double fRate, double fYield,
-                                double fRedemp, sal_Int32 nFreq, sal_Int32 nBase );
-/// @throws css::uno::RuntimeException
-/// @throws css::lang::IllegalArgumentException
 double              GetOddfyield( sal_Int32 nNullDate, sal_Int32 nSettle, sal_Int32 nMat, sal_Int32 nIssue,
                                 sal_Int32 nFirstCoup, double fRate, double fPrice, double fRedemp,
                                 sal_Int32 nFreq, sal_Int32 nBase );
-/// @throws css::uno::RuntimeException
-/// @throws css::lang::IllegalArgumentException
-double              GetOddlprice( sal_Int32 nNullDate, sal_Int32 nSettle, sal_Int32 nMat, sal_Int32 nLastInterest,
-                                double fRate, double fYield, double fRedemp, sal_Int32 nFreq, sal_Int32 nBase );
-/// @throws css::uno::RuntimeException
-/// @throws css::lang::IllegalArgumentException
-double              GetOddlyield( sal_Int32 nNullDate, sal_Int32 nSettle, sal_Int32 nMat, sal_Int32 nLastInterest,
-                                double fRate, double fPrice, double fRedemp, sal_Int32 nFreq, sal_Int32 nBase );
 double              GetPmt( double fRate, double fNper, double fPv, double fFv, sal_Int32 nPayType );
 double              GetFv( double fRate, double fNper, double fPmt, double fPv, sal_Int32 nPayType );
 
@@ -568,21 +524,9 @@ inline bool IsLeapYear( sal_uInt16 n )
 }
 
 
-inline sal_Int32 GetDiffDate360( const css::uno::Reference< css::beans::XPropertySet >& xOpt, sal_Int32 nDate1, sal_Int32 nDate2, bool bUSAMethod )
-{
-    return GetDiffDate360( GetNullDate( xOpt ), nDate1, nDate2, bUSAMethod );
-}
-
-
 inline sal_Int16 GetDayOfWeek( sal_Int32 n )
 {   // monday = 0, ..., sunday = 6
     return static_cast< sal_Int16 >( ( n - 1 ) % 7 );
-}
-
-
-inline double GetYearFrac( const css::uno::Reference< css::beans::XPropertySet >& xOpt, sal_Int32 nStartDate, sal_Int32 nEndDate, sal_Int32 nMode )
-{
-    return GetYearFrac( GetNullDate( xOpt ), nStartDate, nEndDate, nMode );
 }
 
 

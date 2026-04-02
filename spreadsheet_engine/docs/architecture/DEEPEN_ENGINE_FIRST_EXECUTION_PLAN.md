@@ -290,7 +290,7 @@ Phase 3 landed that seam set:
 
 ### Phase 4. Remove Superseded Local Semantic Copies
 
-Status: pending
+Status: complete
 
 Once the shared paths are the default production path, delete or isolate the
 now-obsolete local copies in `analysishelper.[ch]xx`.
@@ -305,6 +305,11 @@ Closeout standard:
 
 - no touched local helper remains only as a silent semantic duplicate
 - any retained helper has a concrete host-only or deferred reason
+
+Phase 4 removed the dead `analysishelper` semantic tail that had been
+superseded by engine-owned runtime and compat helpers. The retained local
+surface in this area is now the explicit host/defer subset such as
+`ODDFPRICE` / `ODDFYIELD`.
 
 ### Phase 5. Make The Remaining Host Boundary Explicit
 
