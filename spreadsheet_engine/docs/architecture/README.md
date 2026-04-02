@@ -8,9 +8,9 @@ documents live under [../archive/](../archive/).
 Current architecture docs:
 
 - [TOKEN_BOUNDARY_REDUCTION_PLAN.md](TOKEN_BOUNDARY_REDUCTION_PLAN.md) -
-  active implementation plan for reducing the remaining Calc-local
-  token/container shell around shared spreadsheet semantics without moving
-  token ownership out of Calc
+  completed implementation and closeout record for reducing the remaining
+  Calc-local token/container shell around shared spreadsheet semantics without
+  moving token ownership out of Calc
 - [HOST_BOUNDARY_CONSOLIDATION_PLAN.md](HOST_BOUNDARY_CONSOLIDATION_PLAN.md) -
   completed implementation and closeout record for shrinking legacy
   token/container coupling and making the remaining Calc-owned

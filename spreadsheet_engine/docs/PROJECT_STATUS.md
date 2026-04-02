@@ -212,17 +212,19 @@ surface is explicitly host-shaped.
 The next plan should be organized around the end-state boundary rather than
 around historical milestone names.
 
-### 1. Reduce The Remaining Calc Token Boundary
+### 1. Keep The Remaining Token Boundary Explicit
 
-The next active workstream should focus on the remaining Calc-local
-token/container shell around shared spreadsheet semantics.
+The bounded token-boundary reduction stream is complete.
 
-The goal is not to move token ownership out of Calc. It is to reduce direct
-`ScTokenArray`-shaped coupling in shared-semantic paths, extract narrower
-non-owning traversal and adaptation seams, and make the remaining token logic
-read plainly as host ownership or cursor management.
+That work froze the remaining token/container inventory, extracted the in-scope
+non-owning reference-token traversal and adaptation seams, normalized the
+touched `AREAS` caller vocabulary, and marked the retained token-array and
+external-reference paths explicitly as Calc-owned host seams.
 
-The implementation-ready plan for that stream is:
+The remaining token/container surface is now treated as intentional host
+ownership or explicit defer scope, not as an open cleanup tail.
+
+The completed closeout record for that stream is:
 
 - [TOKEN_BOUNDARY_REDUCTION_PLAN.md](architecture/TOKEN_BOUNDARY_REDUCTION_PLAN.md)
 

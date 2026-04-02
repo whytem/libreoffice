@@ -1,5 +1,7 @@
 # Token Boundary Reduction Plan
 
+Status: complete
+
 ## Purpose
 
 The extraction, replay-promotion, recalc-orchestration, execution-shell,
@@ -401,6 +403,8 @@ Closeout result:
 
 ### Phase 6. Re-Run The Full Baseline And Close The Stream
 
+Status: complete
+
 Re-run the standing validation contract, update the status and architecture
 docs in present tense, and close the stream.
 
@@ -409,6 +413,14 @@ Closeout standard:
 - replay baseline remains at zero fallback
 - docs describe the remaining token/container boundary as stable
 - the next frontier is clearly defined
+
+Closeout result:
+
+- the token-boundary inventory is now frozen, the in-scope traversal and
+  adaptation seams are extracted, and the remaining retained token/container
+  surface is documented as intentional host ownership
+- the status and architecture docs now describe this stream in present tense
+  as completed boundary reduction rather than as an active cleanup plan
 
 ## Validation Contract
 
