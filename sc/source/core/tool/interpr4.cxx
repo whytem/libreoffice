@@ -69,6 +69,7 @@
 #include <queryparam.hxx>
 #include <tokenarray.hxx>
 #include <compiler.hxx>
+#include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/MatrixFrameExecution.hxx>
 
 #include <map>
@@ -79,6 +80,7 @@
 
 using namespace com::sun::star;
 using namespace formula;
+namespace seexternalexec = spreadsheetengine::compat::libreoffice::externalreferenceexecution;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 
@@ -1190,38 +1192,10 @@ void ScInterpreter::PopExternalSingleRef(
     if (nGlobalError != FormulaError::NONE)
         return;
 
-    ScExternalRefManager* pRefMgr = mrDoc.GetExternalRefManager();
-    const OUString* pFile = pRefMgr->getExternalFileName(rFileId);
-    if (!pFile)
-    {
-        SetError(FormulaError::NoName);
-        return;
-    }
-
-    if (rRef.IsTabRel())
-    {
-        OSL_FAIL("ScCompiler::GetToken: external single reference must have an absolute table reference!");
-        SetError(FormulaError::NoRef);
-        return;
-    }
-
-    ScAddress aAddr = rRef.toAbs(mrDoc, aPos);
-    ScExternalRefCache::CellFormat aFmt;
-    ScExternalRefCache::TokenRef xNew = pRefMgr->getSingleRefToken(
-        rFileId, rTabName, aAddr, &aPos, nullptr, &aFmt);
-
-    if (!xNew)
-    {
-        SetError(FormulaError::NoRef);
-        return;
-    }
-
-    if (xNew->GetType() == svError)
-        SetError( xNew->GetError());
-
-    rToken = std::move(xNew);
-    if (pFmt)
-        *pFmt = aFmt;
+    const FormulaError eError = seexternalexec::fetchExternalSingleRefToken(
+        mrDoc, aPos, rFileId, rTabName, rRef, rToken, pFmt);
+    if (eError != FormulaError::NONE)
+        SetError(eError);
 }
 
 void ScInterpreter::PopExternalDoubleRef(sal_uInt16& rFileId, OUString& rTabName, ScComplexRefData& rRef)
@@ -1295,59 +1269,10 @@ void ScInterpreter::GetExternalDoubleRef(
 {
     // Kept in Calc intentionally because the cache lookup and returned token
     // arrays are still owned by the host interpreter/document layer.
-    ScExternalRefManager* pRefMgr = mrDoc.GetExternalRefManager();
-    const OUString* pFile = pRefMgr->getExternalFileName(nFileId);
-    if (!pFile)
-    {
-        SetError(FormulaError::NoName);
-        return;
-    }
-    if (rData.Ref1.IsTabRel() || rData.Ref2.IsTabRel())
-    {
-        OSL_FAIL("ScCompiler::GetToken: external double reference must have an absolute table reference!");
-        SetError(FormulaError::NoRef);
-        return;
-    }
-
-    ScComplexRefData aData(rData);
-    ScRange aRange = aData.toAbs(mrDoc, aPos);
-    if (!mrDoc.ValidColRow(aRange.aStart.Col(), aRange.aStart.Row()) || !mrDoc.ValidColRow(aRange.aEnd.Col(), aRange.aEnd.Row()))
-    {
-        SetError(FormulaError::NoRef);
-        return;
-    }
-
-    ScExternalRefCache::TokenArrayRef pArray = pRefMgr->getDoubleRefTokens(
-        nFileId, rTabName, aRange, &aPos);
-
-    if (!pArray)
-    {
-        SetError(FormulaError::IllegalArgument);
-        return;
-    }
-
-    formula::FormulaTokenArrayPlainIterator aIter(*pArray);
-    formula::FormulaToken* pToken = aIter.First();
-    assert(pToken);
-    if (pToken->GetType() == svError)
-    {
-        SetError( pToken->GetError());
-        return;
-    }
-    if (pToken->GetType() != svMatrix)
-    {
-        SetError(FormulaError::IllegalArgument);
-        return;
-    }
-
-    if (aIter.Next())
-    {
-        // Can't handle more than one matrix per parameter.
-        SetError( FormulaError::IllegalArgument);
-        return;
-    }
-
-    rArray = std::move(pArray);
+    const FormulaError eError = seexternalexec::fetchExternalDoubleRefTokens(
+        mrDoc, aPos, nFileId, rTabName, rData, rArray);
+    if (eError != FormulaError::NONE)
+        SetError(eError);
 }
 
 bool ScInterpreter::PopDoubleRefOrSingleRef( ScAddress& rAdr )
