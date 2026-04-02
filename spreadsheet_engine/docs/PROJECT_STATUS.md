@@ -212,7 +212,21 @@ surface is explicitly host-shaped.
 The next plan should be organized around the end-state boundary rather than
 around historical milestone names.
 
-### 1. Keep The Remaining Token Boundary Explicit
+### 1. Widen Direct Engine Entrypoint Use Inside Calc
+
+The next active workstream should focus on moving bounded production Calc paths
+from helper-level adoption to direct engine entry-point adoption.
+
+The goal is not to move storage or token ownership into the engine. It is to
+let more real Calc evaluation call into stable engine entry surfaces through
+thin host adapters, while leaving document lifecycle and host services in
+Calc.
+
+The implementation-ready plan for that stream is:
+
+- [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
+
+### 2. Keep The Remaining Token Boundary Explicit
 
 The bounded token-boundary reduction stream is complete.
 
@@ -228,7 +242,7 @@ The completed closeout record for that stream is:
 
 - [TOKEN_BOUNDARY_REDUCTION_PLAN.md](architecture/TOKEN_BOUNDARY_REDUCTION_PLAN.md)
 
-### 2. Deepen Engine-First Execution Inside Calc
+### 3. Deepen Engine-First Execution Inside Calc
 
 The current deepening stream is complete for the identified safe adoption
 surface.
@@ -244,7 +258,7 @@ The detailed implementation and closeout record for that stream is:
 
 - [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](architecture/DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md)
 
-### 3. Keep The Host Boundary Explicit And Stable
+### 4. Keep The Host Boundary Explicit And Stable
 
 The bounded host-boundary consolidation stream is complete.
 
@@ -261,7 +275,7 @@ The completed closeout record for that stream is:
 
 - [HOST_BOUNDARY_CONSOLIDATION_PLAN.md](architecture/HOST_BOUNDARY_CONSOLIDATION_PLAN.md)
 
-### 4. Keep The Zero-Fallback Baseline Stable
+### 5. Keep The Zero-Fallback Baseline Stable
 
 The zero-fallback promoted replay baseline is now an asset that needs to be
 protected continuously.
@@ -275,7 +289,7 @@ That means:
 
 This is now part of normal project maintenance, not a side effort.
 
-### 5. Reassess New Bounded Frontiers Only After A Fresh Inventory
+### 6. Reassess New Bounded Frontiers Only After A Fresh Inventory
 
 There are bigger long-term questions that may eventually matter, but they
 should not drive near-term work:
@@ -319,6 +333,7 @@ project is on track.
 
 The most relevant active docs are:
 
+- [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
 - [TOKEN_BOUNDARY_REDUCTION_PLAN.md](architecture/TOKEN_BOUNDARY_REDUCTION_PLAN.md)
 - [HOST_BOUNDARY_CONSOLIDATION_PLAN.md](architecture/HOST_BOUNDARY_CONSOLIDATION_PLAN.md)
 - [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](architecture/DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md)

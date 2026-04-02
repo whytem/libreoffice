@@ -7,6 +7,9 @@ documents live under [../archive/](../archive/).
 
 Current architecture docs:
 
+- [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](ENGINE_ENTRYPOINT_ADOPTION_PLAN.md) -
+  active implementation plan for moving more bounded production Calc
+  evaluation paths onto direct engine entry points through thin host adapters
 - [TOKEN_BOUNDARY_REDUCTION_PLAN.md](TOKEN_BOUNDARY_REDUCTION_PLAN.md) -
   completed implementation and closeout record for reducing the remaining
   Calc-local token/container shell around shared spreadsheet semantics without
