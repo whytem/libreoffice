@@ -28,8 +28,6 @@
 
 #include <com/sun/star/lang/IllegalArgumentException.hpp>
 #include <cmath>
-#include <functional>
-#include <utility>
 #include <vector>
 
 inline bool isFreqInvalid(sal_Int32 nFreq) { return nFreq != 1 && nFreq != 2 && nFreq != 4; }
@@ -124,26 +122,6 @@ inline double valueOrThrow(spreadsheetengine::api::ValueResult<double> aResult)
     if (!aResult)
         throw css::lang::IllegalArgumentException();
     return finiteOrThrow(aResult.maValue);
-}
-
-template <typename Function, typename... Args>
-inline double evaluateFinancialWithDateMode(
-    const css::uno::Reference<css::beans::XPropertySet>& xOpt, sal_Int32 nBasis,
-    Function&& rFunction, Args&&... rArgs)
-{
-    const auto aDateContext = getAddInDateServiceContext(xOpt);
-    return valueOrThrow(std::invoke(std::forward<Function>(rFunction),
-        aDateContext.maHostDate.maNullDate, std::forward<Args>(rArgs)..., nBasis));
-}
-
-template <typename Function, typename... Args>
-inline double evaluateFinancialWithNullDate(
-    const css::uno::Reference<css::beans::XPropertySet>& xOpt, Function&& rFunction,
-    Args&&... rArgs)
-{
-    const auto aDateContext = getAddInDateServiceContext(xOpt);
-    return valueOrThrow(std::invoke(std::forward<Function>(rFunction),
-        aDateContext.maHostDate.maNullDate, std::forward<Args>(rArgs)...));
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
