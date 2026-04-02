@@ -45,9 +45,8 @@ The starting handoff from the completed recalc-orchestration milestone is:
 
 ## Current Status
 
-This milestone is now active with Phases 0 through 8 complete and the next
-bounded execution-shell slice narrowed to the broader token-walking shell and
-final residual string-reference compilation flows.
+This milestone is now active with Phases 0 through 9 complete and the next
+bounded execution-shell slice narrowed to the broader token-walking shell.
 
 - Phase 0 is complete: the orchestration/execution boundary is explicitly
   documented, the first helper duplication inventory is frozen, and the Phase 1
@@ -84,6 +83,10 @@ final residual string-reference compilation flows.
   resize policy, and reference-list finalization decision now route through a
   dedicated compat helper, leaving the remaining Calc-owned shell narrowed to
   the broader token-walking and final string-compilation tail
+- Phase 9 is complete: the final standalone `INDIRECT` A1 / R1C1
+  string-reference normalization and parsing helpers now live in the shared
+  reference-text layer instead of as evaluator-local special-form helpers,
+  leaving the remaining shell frontier focused on broader token walking
 
 The starting baseline for this milestone is:
 
@@ -1022,6 +1025,47 @@ Phase 8 closeout status:
 
 - complete
 - validated across the focused Calc and standalone lanes
+- one-shot replay baseline remains `500` workbooks, `50,661` formula cells,
+  `0` cached-fallback cells
+
+### Phase 9: Extract The Final Residual String-Reference Compilation Tail
+
+Status: **Complete**
+
+Goals:
+
+- remove the last evaluator-local `INDIRECT` string-reference normalization and
+  R1C1 parsing helpers from the standalone special-form shell
+- keep A1 and R1C1 `INDIRECT` behavior shared through the same reference-text
+  helper layer that already owns address/text formatting utilities
+- leave the remaining execution frontier centered on broader token-walking
+  shell work rather than residual string-reference compilation glue
+
+Landed scope:
+
+- shared extraction of `INDIRECT` A1 normalization helpers
+- shared extraction of `INDIRECT` R1C1 parsing helpers
+- removal of the standalone evaluator-local duplicate helper tail
+- direct standalone API coverage for the extracted helper surface
+
+Implemented in:
+
+- `spreadsheet_engine/inc/spreadsheetengine/runtime/ReferenceText.hxx`
+- `spreadsheet_engine/source/core/FormulaEvaluatorSpecialForms.cxx`
+- `spreadsheet_engine/tests/unit/reference_api_tests.cxx`
+
+Completion criteria for Phase 9, now met:
+
+- `FormulaEvaluatorSpecialForms.cxx` no longer owns private `INDIRECT`
+  string-reference normalization/parsing helpers
+- the extracted helper surface has direct standalone regression coverage in
+  addition to evaluator-level `INDIRECT` tests
+- the replay baseline remains fully green
+
+Phase 9 closeout status:
+
+- complete
+- validated across the focused standalone and full replay lanes
 - one-shot replay baseline remains `500` workbooks, `50,661` formula cells,
   `0` cached-fallback cells
 

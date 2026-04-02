@@ -6,6 +6,7 @@
 #include <spreadsheetengine/api/Reference.hxx>
 #include <spreadsheetengine/api/ReferenceData.hxx>
 #include <spreadsheetengine/api/ReferenceUpdate.hxx>
+#include <spreadsheetengine/runtime/ReferenceText.hxx>
 
 #include "SharedCaseSupport.hxx"
 #include "TestSupport.hxx"
@@ -19,6 +20,8 @@ int main()
     using spreadsheetengine::api::RowIndex;
     using spreadsheetengine::api::ColumnIndex;
     using spreadsheetengine::api::reference::IndexSelectionKind;
+    using spreadsheetengine::core::workbook::Sheet;
+    using spreadsheetengine::core::workbook::Workbook;
     using spreadsheetengine::standalone::test::almostEqual;
     using spreadsheetengine::standalone::test::loadSharedCaseRows;
     using spreadsheetengine::standalone::test::parseDouble;
@@ -64,6 +67,55 @@ int main()
         || !almostEqual(aSheetCount.maValue, 3.0))
     {
         return fail("spreadsheetengine_reference_tests", "reference shape planning mismatch");
+    }
+
+    {
+        const auto oNormalizedSingle
+            = spreadsheetengine::runtime::referencetext::normalizeIndirectA1ReferenceText(u"A1");
+        const auto oNormalizedAbsolute
+            = spreadsheetengine::runtime::referencetext::normalizeIndirectA1ReferenceText(
+                u"$B$3");
+        const auto oNormalizedSheet
+            = spreadsheetengine::runtime::referencetext::normalizeIndirectA1ReferenceText(
+                u"Sheet2!C4");
+        const auto oNormalizedRange
+            = spreadsheetengine::runtime::referencetext::normalizeIndirectA1ReferenceText(
+                u"A1:B2");
+        const auto oRejected
+            = spreadsheetengine::runtime::referencetext::normalizeIndirectA1ReferenceText(
+                u"named_range");
+
+        Workbook aWorkbook;
+        Sheet aSheet0;
+        aSheet0.maName = u"Sheet1";
+        Sheet aSheet1;
+        aSheet1.maName = u"Quarter's Data";
+        aWorkbook.maSheets.push_back(aSheet0);
+        aWorkbook.maSheets.push_back(aSheet1);
+
+        const auto oR1C1Implicit
+            = spreadsheetengine::runtime::referencetext::parseIndirectR1C1ReferenceText(
+                u"R2C3", aWorkbook, 0);
+        const auto oR1C1QuotedSheet
+            = spreadsheetengine::runtime::referencetext::parseIndirectR1C1ReferenceText(
+                u"'Quarter''s Data'!R4C2", aWorkbook, 0);
+        const auto oR1C1Rejected
+            = spreadsheetengine::runtime::referencetext::parseIndirectR1C1ReferenceText(
+                u"R[1]C[2]", aWorkbook, 0);
+
+        if (!oNormalizedSingle || *oNormalizedSingle != u".A1" || !oNormalizedAbsolute
+            || *oNormalizedAbsolute != u".$B$3" || !oNormalizedSheet
+            || *oNormalizedSheet != u"Sheet2.C4" || !oNormalizedRange
+            || *oNormalizedRange != u".A1:.B2" || oRejected || !oR1C1Implicit
+            || oR1C1Implicit->maRange.maStart != CellAddress { 0, 2, 1 }
+            || oR1C1Implicit->maRange.maEnd != CellAddress { 0, 2, 1 }
+            || !oR1C1QuotedSheet
+            || oR1C1QuotedSheet->maRange.maStart != CellAddress { 1, 1, 3 }
+            || oR1C1QuotedSheet->maRange.maEnd != CellAddress { 1, 1, 3 }
+            || oR1C1Rejected)
+        {
+            return fail("spreadsheetengine_reference_tests", "INDIRECT reference text mismatch");
+        }
     }
 
     const CellRange aBaseRange { CellAddress { 0, 2, 3 }, CellAddress { 0, 4, 5 } };
