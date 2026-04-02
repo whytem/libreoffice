@@ -8,9 +8,9 @@ documents live under [../archive/](../archive/).
 Current architecture docs:
 
 - [ENGINE_ENTRY_WIDENING_PLAN.md](ENGINE_ENTRY_WIDENING_PLAN.md) -
-  active implementation-ready plan for widening direct engine-entry use inside
-  Calc from the first bounded adoption slice to a larger set of production
-  paths whose spreadsheet semantics are already engine-owned
+  completed implementation and closeout record for the second-wave widening
+  of direct engine-entry use inside Calc, including the selected add-in
+  financial callers and bounded local `CELL(...)` inspection path
 - [PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md](PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md) -
   completed implementation and closeout record for tightening the remaining
   production compiler/evaluation boundary around explicitly host-owned Calc

@@ -1,6 +1,6 @@
 # Engine Entrypoint Widening Plan
 
-Status: active implementation-ready plan
+Status: completed implementation and closeout record
 
 ## Purpose
 
@@ -15,6 +15,30 @@ already have engine-owned semantics and a now-thin host boundary.
 This is not a storage migration, a recalc-boundary rewrite, or a wholesale
 replacement of `ScInterpreter`. It is a second-wave production adoption
 program.
+
+## Closeout Summary
+
+This stream is complete.
+
+It landed three concrete widening results:
+
+- a named direct add-in financial entry seam in
+  [FinancialAddInExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/FinancialAddInExecution.hxx)
+  and adoption of the selected `AnalysisAddIn` callers in
+  [financial.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/financial.cxx)
+- a named direct bounded local `CELL(...)` inspection seam in
+  [CellInspectionExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx)
+  and default production adoption in
+  [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx)
+- retirement of the touched caller-side financial packaging tail so the
+  selected production paths now enter engine-owned semantics through one
+  stable compat family instead of repeated inline orchestration
+
+The bounded external-reference `CELL(...)` candidate was reassessed during the
+closeout pass and left as a future widening candidate rather than forced into
+this stream. External cache ownership and host-shaped address/file projection
+still dominate that path enough that it belongs in a later fresh inventory,
+not as unfinished residue inside this completed stream.
 
 ## What This Workstream Is For
 
@@ -269,7 +293,7 @@ Initial inventory targets:
 | --- | --- | --- | --- | --- | --- | --- |
 | add-in financial callers already backed by shared engine runtime (`EFFECT`, `NOMINAL`, `DOLLARFR`, `DOLLARDE`, `CUMPRINC`, `CUMIPMT`, `TBILLEQ`, `TBILLPRICE`, `TBILLYIELD`) | [financial.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/financial.cxx), [analysisdefs.hxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysisdefs.hxx) | host setup is already normalized, but production callers still stop at helper-level adoption instead of using a named direct entry seam | `ready now` for the pure scalar subset, `needs small seam` for the null-date subset | add a direct add-in financial entry seam and adopt the proven pure/date cluster | `CppunitTest_scaddins_analysis`, replay summary | Phase 2 / 3 / 5 |
 | bounded local-workbook `CELL(...)` subset (`COL`, `ROW`, `SHEET`, `ADDRESS`, `CONTENTS`, `TYPE`) | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [CellInspectionExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx) | reference-shape and result shaping are already shared, but `ScCell()` still assembles the bounded request inline | `needs small seam` | move bounded local `CELL(...)` entry through one named direct helper | `CppunitTest_sc_ucalc_formula2`, `CppunitTest_sc_ucalc_shared_cases`, replay summary | Phase 2 / 4 |
-| bounded external-reference `CELL(...)` subset (`COL`, `ROW`, `SHEET`, `ADDRESS`, `CONTENTS`, `TYPE`, external filename/format/color/parentheses`) | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [CellInspectionExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx) | external cache ownership is intentionally host-only, but the external `CELL(...)` classification and projection shell is still local to `ScCellExternal()` | `needs small seam` | move the bounded external `CELL(...)` entry through the same direct helper family while keeping cache ownership in Calc | `CppunitTest_sc_ucalc_formula2`, replay summary | Phase 5 |
+| bounded external-reference `CELL(...)` subset (`COL`, `ROW`, `SHEET`, `ADDRESS`, `CONTENTS`, `TYPE`, external filename/format/color/parentheses`) | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [CellInspectionExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx) | external cache ownership is intentionally host-only, and the remaining projection shell still carries enough host-shaped address/file/cache behavior that the payoff is lower than the selected local `CELL(...)` and add-in financial slices | `defer after reassessment` | leave unchanged in this completed stream and carry it only as a future widening candidate if a later fresh inventory still ranks it highly | `CppunitTest_sc_ucalc_formula2`, replay summary | defer |
 | additional pure scalar text/date parsing surfaces adjacent to `VALUE`, `DATEVALUE`, `TIMEVALUE`, and `NUMBERVALUE` | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [interpr2.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr2.cxx) | direct entry is already adopted for the main production parsing slice and no adjacent production caller currently offers better payoff than the financial and `CELL(...)` targets | `defer` | leave unchanged for this stream unless a clearer production caller appears during implementation | `CppunitTest_sc_ucalc_formula2`, replay summary | defer |
 | host-heavy inspection or environment surfaces such as `INFO(...)` and retained local `CELL(...)` document-service properties (`WIDTH`, `PREFIX`, `PROTECT`, `FORMAT`, `COLOR`, `PARENTHESES`, `FILENAME`, `COORD`) | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [interpr5.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr5.cxx) | host service access dominates the path even after boundary tightening | `intentionally host-only` | retain as Calc-owned unless a very small future seam becomes obvious | focused Calc coverage only | retain |
 
@@ -293,6 +317,8 @@ Phase 1 closeout notes:
 
 ### Phase 2. Normalize The Second-Wave Host Adapters
 
+Status: complete
+
 Converge the minimal adapter or context surface needed by the selected
 second-wave entry slices.
 
@@ -307,7 +333,17 @@ Phase completion questions:
 - Are repeated host/context setup steps replaced by one named adapter seam?
 - Does the touched code stop leaking packaging details into semantic callers?
 
+Phase 2 closeout notes:
+
+- added the direct add-in financial entry seam in
+  [FinancialAddInExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/FinancialAddInExecution.hxx)
+- added the direct bounded local `CELL(...)` inspection seam in
+  [CellInspectionExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx)
+- added focused Calc and add-in coverage for both adapter surfaces
+
 ### Phase 3. Adopt The Next Pure-Computation Direct Entrypoints
+
+Status: complete
 
 Apply the new packaging discipline to the highest-confidence pure-computation
 production paths.
@@ -325,7 +361,17 @@ Phase completion questions:
 - Has the local orchestration tail in the touched scope gotten meaningfully
   smaller?
 
+Phase 3 closeout notes:
+
+- the selected `AnalysisAddIn` pure-computation financial callers now enter
+  shared engine semantics through
+  [FinancialAddInExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/FinancialAddInExecution.hxx)
+- the adopted production callers are `EFFECT`, `NOMINAL`, `DOLLARFR`,
+  `DOLLARDE`, `CUMPRINC`, `CUMIPMT`, `FVSCHEDULE`, `XIRR`, and `XNPV`
+
 ### Phase 4. Adopt The Next Reference-Safe Direct Entrypoint Slice
+
+Status: complete
 
 Use the already-extracted compat/value-shape machinery to widen one bounded
 reference-safe production path.
@@ -343,7 +389,18 @@ Phase completion questions:
 - Is the touched reference-safe path entering the engine directly by default?
 - Is the retained Calc code now obviously host orchestration only?
 
+Phase 4 closeout notes:
+
+- the bounded local-workbook `CELL(...)` subset now enters the engine through
+  the direct adapter in
+  [CellInspectionExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx)
+- `ScCell()` in
+  [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx)
+  now keeps only the host-heavy property tail and result pushing locally
+
 ### Phase 5. Remove Superseded Local Orchestration
+
+Status: complete
 
 Once direct entry is the default path for the selected slices, remove or
 isolate the old caller-side orchestration.
@@ -359,7 +416,18 @@ Phase completion questions:
 - Has the superseded local orchestration tail been removed or reduced to thin
   host wrappers?
 
+Phase 5 closeout notes:
+
+- the remaining selected add-in financial wrappers that still packaged
+  null-date or date-mode context now reuse the same direct adapter family
+- the adopted production callers in this pass are `ACCRINT`, `DURATION`,
+  `YIELDMAT`, `TBILLEQ`, `TBILLPRICE`, and `TBILLYIELD`
+- the external `CELL(...)` candidate was explicitly deferred instead of left
+  as an ambiguous half-finished tail
+
 ### Phase 6. Revalidate And Close The Stream
+
+Status: complete
 
 After the widening slices land:
 
@@ -375,6 +443,19 @@ Phase completion questions:
 - Is the widened direct-entry boundary easier to describe in present tense?
 - Are future adoption questions clearly a new frontier rather than unfinished
   second-wave cleanup?
+
+Phase 6 closeout notes:
+
+- final validation stayed green across the touched add-in, Calc, and replay
+  lanes
+- the standing replay baseline remained:
+  - `workbooks=500`
+  - `formula_cells=50661`
+  - `parsed_formulas=50652`
+  - `cached_fallback_cells=0`
+  - `cached_fallback_rate=0`
+- the stream is now closed; any further widening should start from a fresh
+  inventory rather than by carrying forward this record as an active plan
 
 ## Validation Contract
 

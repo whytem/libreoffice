@@ -63,7 +63,10 @@ as a closeout record in
 [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md).
 The follow-on production-boundary tightening stream is now complete as well,
 and the remaining retained production boundary is explicitly documented as an
-intentional host-owned surface rather than an open cleanup tail.
+intentional host-owned surface rather than an open cleanup tail. The
+second-wave engine-entry widening stream is complete too, and widened direct
+production entry further for the selected add-in financial and bounded local
+`CELL(...)` paths.
 
 ## Verified Baseline
 
@@ -220,21 +223,32 @@ around historical milestone names.
 
 ### 1. Widen Direct Engine Entry Inside Calc
 
-The first bounded direct-entry adoption stream is complete, and the
-production-boundary tightening stream is complete.
+The first bounded direct-entry adoption stream is complete, the
+production-boundary tightening stream is complete, and the second-wave
+engine-entry widening stream is complete.
 
-That leaves the next logical frontier as a fresh inventory-driven widening
-stream: more production Calc paths should enter `spreadsheet_engine` directly
-where the spreadsheet semantics are already engine-owned and the host boundary
-is now thin enough to audit.
+Together, those streams moved Calc from a small first-wave of direct engine
+entry to a broader production set that now includes:
 
-The active implementation-ready plan for that work is:
+- direct text parsing entry adoption
+- direct formula inspection entry adoption
+- second-wave add-in financial direct entry for the selected pure-computation,
+  date-mode, and null-date callers
+- direct bounded local `CELL(...)` inspection entry for the local-workbook
+  subset
 
-- [ENGINE_ENTRY_WIDENING_PLAN.md](architecture/ENGINE_ENTRY_WIDENING_PLAN.md)
+The bounded external-reference `CELL(...)` inspection candidate was explicitly
+reassessed and deferred rather than left as an ambiguous open tail, because
+external cache ownership and host-shaped address/file projection still dominate
+that surface.
 
-The completed first-wave direct-entry closeout record remains:
+Future direct-entry widening should now start from a fresh inventory rather
+than by treating the second-wave stream as still active.
+
+The completed direct-entry closeout records are:
 
 - [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
+- [ENGINE_ENTRY_WIDENING_PLAN.md](architecture/ENGINE_ENTRY_WIDENING_PLAN.md)
 
 ### 2. Keep The Production Boundary Tight And Explicit
 
