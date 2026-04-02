@@ -12,7 +12,11 @@
 #include <optional>
 
 #include <address.hxx>
+#include <editeng/justifyitem.hxx>
 #include <formula/grammar.hxx>
+#include <svl/numformat.hxx>
+#include <svl/zformat.hxx>
+#include <tools/urlobj.hxx>
 
 #include <spreadsheetengine/api/Host.hxx>
 #include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
@@ -27,6 +31,106 @@ using InfoKind = spreadsheetengine::runtime::cellinspection::InfoKind;
 [[nodiscard]] inline InfoKind classifyInfoType(const OUString& rInfoType)
 {
     return spreadsheetengine::runtime::cellinspection::classifyInfoType(toApiString(rInfoType));
+}
+
+[[nodiscard]] inline bool formatHasNegativeColor(const SvNumberformat* pFormat)
+{
+    return pFormat && pFormat->GetColor(1);
+}
+
+[[nodiscard]] inline bool formatHasOpenParenthesis(const SvNumberformat* pFormat)
+{
+    return pFormat && (pFormat->GetFormatstring().indexOf('(') != -1);
+}
+
+[[nodiscard]] inline spreadsheetengine::runtime::cellinspection::PrefixStyle toPrefixStyle(
+    SvxCellHorJustify eJustify)
+{
+    switch (eJustify)
+    {
+        case SvxCellHorJustify::Standard:
+        case SvxCellHorJustify::Left:
+        case SvxCellHorJustify::Block:
+            return spreadsheetengine::runtime::cellinspection::PrefixStyle::Left;
+        case SvxCellHorJustify::Center:
+            return spreadsheetengine::runtime::cellinspection::PrefixStyle::Center;
+        case SvxCellHorJustify::Right:
+            return spreadsheetengine::runtime::cellinspection::PrefixStyle::Right;
+        case SvxCellHorJustify::Repeat:
+            return spreadsheetengine::runtime::cellinspection::PrefixStyle::Repeat;
+    }
+    return spreadsheetengine::runtime::cellinspection::PrefixStyle::None;
+}
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeFilenameValue(const OUString& rValue)
+{
+    return spreadsheetengine::runtime::cellinspection::textPropertyValue(toApiString(rValue));
+}
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeFormatValue(const OUString& rValue)
+{
+    return spreadsheetengine::runtime::cellinspection::textPropertyValue(toApiString(rValue));
+}
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeWidthValue(sal_Int32 nZeroCount)
+{
+    return spreadsheetengine::runtime::cellinspection::numericPropertyValue(
+        static_cast<double>(nZeroCount));
+}
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeFlagValue(bool bFlag)
+{
+    return spreadsheetengine::runtime::cellinspection::numericPropertyValue(bFlag ? 1.0 : 0.0);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makePrefixValue(
+    bool bHasString, SvxCellHorJustify eJustify)
+{
+    if (!bHasString)
+        return spreadsheetengine::runtime::cellinspection::textPropertyValue(u"");
+    return spreadsheetengine::runtime::cellinspection::prefixValue(toPrefixStyle(eJustify));
+}
+
+[[nodiscard]] inline OUString formatLocalFilenameInfo(
+    const INetURLObject& rUrlObject, const OUString& rTabName,
+    formula::FormulaGrammar::AddressConvention eConvention, bool bLibreOfficeKitActive)
+{
+    if (eConvention == formula::FormulaGrammar::CONV_XL_A1
+        || eConvention == formula::FormulaGrammar::CONV_XL_R1C1
+        || eConvention == formula::FormulaGrammar::CONV_XL_OOX)
+    {
+        OUString aResult;
+        if (!bLibreOfficeKitActive)
+            aResult = rUrlObject.GetPartBeforeLastName();
+        aResult += "["
+                   + rUrlObject.GetLastName(INetURLObject::DecodeMechanism::Unambiguous) + "]"
+                   + rTabName;
+        return aResult;
+    }
+
+    OUString aResult = "'";
+    if (!bLibreOfficeKitActive)
+        aResult += rUrlObject.GetMainURL(INetURLObject::DecodeMechanism::Unambiguous);
+    else
+        aResult += rUrlObject.GetLastName(INetURLObject::DecodeMechanism::Unambiguous);
+    aResult += "'#$" + rTabName;
+    return aResult;
+}
+
+[[nodiscard]] inline OUString formatExternalFilenameInfo(
+    const OUString& rFileName, const OUString& rTabName,
+    formula::FormulaGrammar::AddressConvention eConvention)
+{
+    if (eConvention == formula::FormulaGrammar::CONV_XL_A1
+        || eConvention == formula::FormulaGrammar::CONV_XL_R1C1
+        || eConvention == formula::FormulaGrammar::CONV_XL_OOX)
+    {
+        const sal_Int32 nPos = rFileName.lastIndexOf('/');
+        return OUString::Concat(rFileName.subView(0, nPos + 1)) + "["
+               + rFileName.subView(nPos + 1) + "]" + rTabName;
+    }
+
+    return "'" + rFileName + "'#$" + rTabName;
 }
 
 [[nodiscard]] inline spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>
@@ -75,6 +179,14 @@ evaluateBoundedCellInfo(InfoKind eKind, const ScAddress& rAddress,
         case InfoKind::Type:
             return spreadsheetengine::api::ValueResult<CellValue>::success(
                 spreadsheetengine::runtime::cellinspection::typeValue(rCellValue));
+        case InfoKind::Coord:
+        case InfoKind::Filename:
+        case InfoKind::Width:
+        case InfoKind::Prefix:
+        case InfoKind::Protect:
+        case InfoKind::Format:
+        case InfoKind::Color:
+        case InfoKind::Parentheses:
         case InfoKind::Unsupported:
             break;
     }

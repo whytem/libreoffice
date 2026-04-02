@@ -9,9 +9,9 @@ Active milestone docs:
 
 - [EXECUTION_BACKEND_EXTRACTION.md](EXECUTION_BACKEND_EXTRACTION.md) -
   active milestone for extracting evaluator-shell execution logic on top of the
-  completed orchestration boundary; Phases 0 through 11 are complete and the
-  next frontier is the broader token-walking shell plus the remaining
-  host-heavy `CELL` property tail
+  completed orchestration boundary; Phases 0 through 12 are complete and the
+  next frontier is the broader token-walking shell plus the final closeout
+  cleanup
 - [EXECUTION_SHELL_CLOSEOUT_PLAN.md](EXECUTION_SHELL_CLOSEOUT_PLAN.md) -
   implementation-ready plan for finishing the remaining Calc-owned execution
   shell, including workstreams, validation lanes, and final exit criteria

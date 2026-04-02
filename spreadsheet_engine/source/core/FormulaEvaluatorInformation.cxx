@@ -243,6 +243,14 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
                 return makeScalarResult(
                     spreadsheetengine::runtime::cellinspection::typeValue(aCellValue.maValue));
             }
+            case spreadsheetengine::runtime::cellinspection::InfoKind::Coord:
+            case spreadsheetengine::runtime::cellinspection::InfoKind::Filename:
+            case spreadsheetengine::runtime::cellinspection::InfoKind::Width:
+            case spreadsheetengine::runtime::cellinspection::InfoKind::Prefix:
+            case spreadsheetengine::runtime::cellinspection::InfoKind::Protect:
+            case spreadsheetengine::runtime::cellinspection::InfoKind::Format:
+            case spreadsheetengine::runtime::cellinspection::InfoKind::Color:
+            case spreadsheetengine::runtime::cellinspection::InfoKind::Parentheses:
             case spreadsheetengine::runtime::cellinspection::InfoKind::Unsupported:
                 break;
         }

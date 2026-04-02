@@ -1225,12 +1225,13 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncCELL)
         m_pDoc->SetString(2, 9, 0, OUString::createFromAscii(pContent)); // Set this value to C10.
         m_pDoc->SetValue(2, 0, 0, 1.2); // Set numeric value to C1;
 
-        // We don't test: FILENAME, FORMAT, WIDTH, PROTECT, PREFIX
+        // We don't test: FILENAME, FORMAT, WIDTH
         StrStrCheck aChecks[]
             = { { "=CELL(\"COL\";C10)", "3" },           { "=CELL(\"COL\";C5:C10)", "3" },
                 { "=CELL(\"ROW\";C10)", "10" },          { "=CELL(\"ROW\";C10:E10)", "10" },
                 { "=CELL(\"SHEET\";C10)", "1" },         { "=CELL(\"ADDRESS\";C10)", "$C$10" },
                 { "=CELL(\"CONTENTS\";C10)", pContent }, { "=CELL(\"COLOR\";C10)", "0" },
+                { "=CELL(\"PREFIX\";C10)", "'" },        { "=CELL(\"PROTECT\";C10)", "1" },
                 { "=CELL(\"TYPE\";C9)", "b" },           { "=CELL(\"TYPE\";C10)", "l" },
                 { "=CELL(\"TYPE\";C1)", "v" },           { "=CELL(\"PARENTHESES\";C10)", "0" },
                 { "=CELL(\"SHEET\";bar.C10)", "2" } };

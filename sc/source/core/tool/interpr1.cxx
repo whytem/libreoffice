@@ -2404,16 +2404,6 @@ void ScInterpreter::ScType()
     PushInt( nType );
 }
 
-static bool lcl_FormatHasNegColor( const SvNumberformat* pFormat )
-{
-    return pFormat && pFormat->GetColor( 1 );
-}
-
-static bool lcl_FormatHasOpenPar( const SvNumberformat* pFormat )
-{
-    return pFormat && (pFormat->GetFormatstring().indexOf('(') != -1);
-}
-
 namespace {
 
 void getFormatString(const ScInterpreterContext& rContext, sal_uLong nFormat, OUString& rFmtStr)
@@ -2519,7 +2509,10 @@ void ScInterpreter::ScCell()
             return eConv;
         };
         const auto eBoundedInfoKind = secellexec::classifyInfoType(aInfoType);
-        if (eBoundedInfoKind != secellexec::InfoKind::Unsupported)
+        if (eBoundedInfoKind != secellexec::InfoKind::Unsupported
+            && eBoundedInfoKind != secellexec::InfoKind::Coord
+            && !spreadsheetengine::runtime::cellinspection::isHostPropertyInfoKind(
+                eBoundedInfoKind))
         {
             std::optional<OUString> oSheetName;
             if (eBoundedInfoKind == secellexec::InfoKind::Address && aCellPos.Tab() != aPos.Tab())
@@ -2575,7 +2568,7 @@ void ScInterpreter::ScCell()
             OUString aStr(aCellPos.Format(nFlags, &mrDoc, eConv));
             PushString(aStr);
         }
-        else if( aInfoType == "FILENAME" )
+        else if (eBoundedInfoKind == secellexec::InfoKind::Filename)
         {
             SCTAB nTab = aCellPos.Tab();
             OUString aFuncResult;
@@ -2596,32 +2589,14 @@ void ScInterpreter::ScCell()
                         if (eConv == FormulaGrammar::CONV_UNSPECIFIED)
                             eConv = mrDoc.GetAddressConvention();
 
-                        if (eConv == FormulaGrammar::CONV_XL_A1 ||
-                            eConv == FormulaGrammar::CONV_XL_R1C1 ||
-                            eConv == FormulaGrammar::CONV_XL_OOX)
-                        {
-                            // file name and table name: FILEPATH/[FILENAME]TABLE
-                            if (!comphelper::LibreOfficeKit::isActive())
-                                aFuncResult = rURLObj.GetPartBeforeLastName();
-                            aFuncResult += "[" + rURLObj.GetLastName(INetURLObject::DecodeMechanism::Unambiguous) +
-                                           "]" + aTabName;
-                        }
-                        else
-                        {
-                            // file name and table name: 'FILEPATH/FILENAME'#$TABLE
-                            aFuncResult = "'";
-                            if (!comphelper::LibreOfficeKit::isActive())
-                                aFuncResult += rURLObj.GetMainURL(INetURLObject::DecodeMechanism::Unambiguous);
-                            else
-                                aFuncResult += rURLObj.GetLastName(INetURLObject::DecodeMechanism::Unambiguous);
-                            aFuncResult += "'#$" + aTabName;
-                        }
+                        aFuncResult = secellexec::formatLocalFilenameInfo(
+                            rURLObj, aTabName, eConv, comphelper::LibreOfficeKit::isActive());
                     }
                 }
             }
-            PushString( aFuncResult );
+            pushApiCellValue(secellexec::makeFilenameValue(aFuncResult));
         }
-        else if( aInfoType == "COORD" )
+        else if (eBoundedInfoKind == secellexec::InfoKind::Coord)
         {   // address, lotus 1-2-3 formatted: $TABLE:$COL$ROW
             // Yes, passing tab as col is intentional!
             OUString aCellStr1 =
@@ -2655,7 +2630,7 @@ void ScInterpreter::ScCell()
                 c = aCell.hasNumeric() ? 'v' : 'b';
             PushString( OUString(c) );
         }
-        else if( aInfoType == "WIDTH" )
+        else if (eBoundedInfoKind == secellexec::InfoKind::Width)
         {   // column width (rounded off as count of zero characters in standard font and size)
             Printer*    pPrinter = mrDoc.GetPrinter();
             MapMode     aOldMode( pPrinter->GetMapMode() );
@@ -2671,49 +2646,37 @@ void ScInterpreter::ScCell()
             pPrinter->SetFont( aOldFont );
             pPrinter->SetMapMode( aOldMode );
             int nZeroCount = static_cast<int>(mrDoc.GetColWidth( aCellPos.Col(), aCellPos.Tab() ) / nZeroWidth);
-            PushInt( nZeroCount );
+            pushApiCellValue(secellexec::makeWidthValue(nZeroCount));
         }
-        else if( aInfoType == "PREFIX" )
+        else if (eBoundedInfoKind == secellexec::InfoKind::Prefix)
         {   // ' = left; " = right; ^ = centered
-            sal_Unicode c = 0;
-            if (aCell.hasString())
-            {
-                const SvxHorJustifyItem& rJustAttr = mrDoc.GetAttr( aCellPos, ATTR_HOR_JUSTIFY );
-                switch( rJustAttr.GetValue() )
-                {
-                    case SvxCellHorJustify::Standard:
-                    case SvxCellHorJustify::Left:
-                    case SvxCellHorJustify::Block:     c = '\''; break;
-                    case SvxCellHorJustify::Center:    c = '^';  break;
-                    case SvxCellHorJustify::Right:     c = '"';  break;
-                    case SvxCellHorJustify::Repeat:    c = '\\'; break;
-                }
-            }
-            PushString( OUString(c) );
+            const SvxHorJustifyItem& rJustAttr = mrDoc.GetAttr( aCellPos, ATTR_HOR_JUSTIFY );
+            pushApiCellValue(secellexec::makePrefixValue(aCell.hasString(), rJustAttr.GetValue()));
         }
-        else if( aInfoType == "PROTECT" )
+        else if (eBoundedInfoKind == secellexec::InfoKind::Protect)
         {   // 1 = cell locked
             const ScProtectionAttr& rProtAttr = mrDoc.GetAttr( aCellPos, ATTR_PROTECTION );
-            PushInt( rProtAttr.GetProtection() ? 1 : 0 );
+            pushApiCellValue(secellexec::makeFlagValue(rProtAttr.GetProtection()));
         }
 
 // *** FORMATTING ***
-        else if( aInfoType == "FORMAT" )
+        else if (eBoundedInfoKind == secellexec::InfoKind::Format)
         {   // specific format code for standard formats
             OUString aFuncResult;
             sal_uInt32 nFormat = mrDoc.GetNumberFormat( ScRange(aCellPos) );
             getFormatString(mrContext, nFormat, aFuncResult);
-            PushString( aFuncResult );
+            pushApiCellValue(secellexec::makeFormatValue(aFuncResult));
         }
-        else if( aInfoType == "COLOR" )
+        else if (eBoundedInfoKind == secellexec::InfoKind::Color)
         {   // 1 = negative values are colored, otherwise 0
             const SvNumberformat* pFormat = mrContext.NFGetFormatEntry( mrDoc.GetNumberFormat( ScRange(aCellPos) ) );
-            PushInt( lcl_FormatHasNegColor( pFormat ) ? 1 : 0 );
+            pushApiCellValue(secellexec::makeFlagValue(secellexec::formatHasNegativeColor(pFormat)));
         }
-        else if( aInfoType == "PARENTHESES" )
+        else if (eBoundedInfoKind == secellexec::InfoKind::Parentheses)
         {   // 1 = format string contains a '(' character, otherwise 0
             const SvNumberformat* pFormat = mrContext.NFGetFormatEntry( mrDoc.GetNumberFormat( ScRange(aCellPos) ) );
-            PushInt( lcl_FormatHasOpenPar( pFormat ) ? 1 : 0 );
+            pushApiCellValue(
+                secellexec::makeFlagValue(secellexec::formatHasOpenParenthesis(pFormat)));
         }
         else
             PushIllegalArgument();
@@ -2754,7 +2717,21 @@ void ScInterpreter::ScCellExternal()
     aRef.SetAbsTab(-1); // revert the value.
 
     ScCellKeywordTranslator::transKeyword(aInfoType, ScGlobal::GetLocale(), ocCell);
+    const auto eInfoKind = secellexec::classifyInfoType(aInfoType);
     ScExternalRefManager* pRefMgr = mrDoc.GetExternalRefManager();
+    const auto pushApiCellValue = [&](const spreadsheetengine::api::CellValue& rValue) {
+        if (rValue.isError())
+        {
+            PushError(selibreoffice::toFormulaError(rValue.meError));
+            return;
+        }
+        if (rValue.isText())
+        {
+            PushString(selibreoffice::toLibreOfficeString(rValue.maString));
+            return;
+        }
+        PushDouble(rValue.mfNumber);
+    };
 
     if ( aInfoType == "COL" )
         PushInt(nCol + 1);
@@ -2780,7 +2757,7 @@ void ScInterpreter::ScCellExternal()
         aComp.CreateStringFromTokenArray(aStr);
         PushString(aStr);
     }
-    else if ( aInfoType == "FILENAME" )
+    else if ( eInfoKind == secellexec::InfoKind::Filename )
     {
         const OUString* p = pRefMgr->getExternalFileName(nFileId);
         if (!p)
@@ -2790,28 +2767,12 @@ void ScInterpreter::ScCellExternal()
             return;
         }
 
-        OUString aBuf;
         FormulaGrammar::AddressConvention eConv = maCalcConfig.meStringRefAddressSyntax;
         if (eConv == FormulaGrammar::CONV_UNSPECIFIED)
             eConv = mrDoc.GetAddressConvention();
 
-        if (eConv == FormulaGrammar::CONV_XL_A1 ||
-            eConv == FormulaGrammar::CONV_XL_R1C1 ||
-            eConv == FormulaGrammar::CONV_XL_OOX)
-        {
-            // 'file URI/[FileName]SheetName
-            sal_Int32 nPos = p->lastIndexOf('/');
-            aBuf = OUString::Concat(p->subView(0, nPos + 1))
-                + "[" + p->subView(nPos + 1) + "]"
-                + aTabName;
-        }
-        else
-        {
-            // 'file URI'#$SheetName
-            aBuf = "'" + *p + "'#$" + aTabName;
-        }
-
-        PushString(aBuf);
+        pushApiCellValue(secellexec::makeFilenameValue(
+            secellexec::formatExternalFilenameInfo(*p, aTabName, eConv)));
     }
     else if ( aInfoType == "CONTENTS" )
     {
@@ -2846,34 +2807,28 @@ void ScInterpreter::ScCellExternal()
         }
         PushString(OUString(c));
     }
-    else if ( aInfoType == "FORMAT" )
+    else if ( eInfoKind == secellexec::InfoKind::Format )
     {
         OUString aFmtStr;
         sal_uLong nFmt = aFmt.mbIsSet ? aFmt.mnIndex : 0;
         getFormatString(mrContext, nFmt, aFmtStr);
-        PushString(aFmtStr);
+        pushApiCellValue(secellexec::makeFormatValue(aFmtStr));
     }
-    else if ( aInfoType == "COLOR" )
+    else if ( eInfoKind == secellexec::InfoKind::Color )
     {
         // 1 = negative values are colored, otherwise 0
-        int nVal = 0;
-        if (aFmt.mbIsSet)
-        {
-            const SvNumberformat* pFormat = mrContext.NFGetFormatEntry(aFmt.mnIndex);
-            nVal = lcl_FormatHasNegColor(pFormat) ? 1 : 0;
-        }
-        PushInt(nVal);
+        const SvNumberformat* pFormat
+            = aFmt.mbIsSet ? mrContext.NFGetFormatEntry(aFmt.mnIndex) : nullptr;
+        pushApiCellValue(
+            secellexec::makeFlagValue(secellexec::formatHasNegativeColor(pFormat)));
     }
-    else if ( aInfoType == "PARENTHESES" )
+    else if ( eInfoKind == secellexec::InfoKind::Parentheses )
     {
         // 1 = format string contains a '(' character, otherwise 0
-        int nVal = 0;
-        if (aFmt.mbIsSet)
-        {
-            const SvNumberformat* pFormat = mrContext.NFGetFormatEntry(aFmt.mnIndex);
-            nVal = lcl_FormatHasOpenPar(pFormat) ? 1 : 0;
-        }
-        PushInt(nVal);
+        const SvNumberformat* pFormat
+            = aFmt.mbIsSet ? mrContext.NFGetFormatEntry(aFmt.mnIndex) : nullptr;
+        pushApiCellValue(
+            secellexec::makeFlagValue(secellexec::formatHasOpenParenthesis(pFormat)));
     }
     else
         PushIllegalParameter();

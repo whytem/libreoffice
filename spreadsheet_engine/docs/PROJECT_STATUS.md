@@ -166,7 +166,8 @@ There is also a remaining technical boundary that is still Calc-owned:
 
 - the broader `ScInterpreter` token-walking shell
 - stack-local execution mechanics that are still tightly coupled to Calc state
-- host-heavy information/property inspection tails
+- explicitly host-only execution cases such as `INFO(...)`, token-container
+  operations, and external-reference plumbing
 - other execution cases that still depend on Calc-local document services more
   than on shared spreadsheet semantics
 
@@ -209,7 +210,6 @@ The immediate target areas are:
 
 - the broader token-walking shell
 - remaining stack-local dispatch helpers that are still Calc-specific
-- the remaining host-heavy `CELL` property tail and similar inspection cases
 - any remaining bounded execution slices that can move without changing storage
   ownership
 

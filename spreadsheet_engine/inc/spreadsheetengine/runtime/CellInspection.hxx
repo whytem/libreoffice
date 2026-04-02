@@ -23,8 +23,25 @@ enum class InfoKind : std::uint8_t
     Row,
     Sheet,
     Address,
+    Coord,
     Contents,
-    Type
+    Type,
+    Filename,
+    Width,
+    Prefix,
+    Protect,
+    Format,
+    Color,
+    Parentheses
+};
+
+enum class PrefixStyle : std::uint8_t
+{
+    None,
+    Left,
+    Center,
+    Right,
+    Repeat
 };
 
 [[nodiscard]] inline api::String uppercaseAscii(api::StringView rText)
@@ -52,11 +69,52 @@ enum class InfoKind : std::uint8_t
         return InfoKind::Sheet;
     if (aUpper == u"ADDRESS")
         return InfoKind::Address;
+    if (aUpper == u"COORD")
+        return InfoKind::Coord;
     if (aUpper == u"CONTENTS")
         return InfoKind::Contents;
     if (aUpper == u"TYPE")
         return InfoKind::Type;
+    if (aUpper == u"FILENAME")
+        return InfoKind::Filename;
+    if (aUpper == u"WIDTH")
+        return InfoKind::Width;
+    if (aUpper == u"PREFIX")
+        return InfoKind::Prefix;
+    if (aUpper == u"PROTECT")
+        return InfoKind::Protect;
+    if (aUpper == u"FORMAT")
+        return InfoKind::Format;
+    if (aUpper == u"COLOR")
+        return InfoKind::Color;
+    if (aUpper == u"PARENTHESES")
+        return InfoKind::Parentheses;
     return InfoKind::Unsupported;
+}
+
+[[nodiscard]] inline bool isHostPropertyInfoKind(InfoKind eKind)
+{
+    switch (eKind)
+    {
+        case InfoKind::Filename:
+        case InfoKind::Width:
+        case InfoKind::Prefix:
+        case InfoKind::Protect:
+        case InfoKind::Format:
+        case InfoKind::Color:
+        case InfoKind::Parentheses:
+            return true;
+        case InfoKind::Unsupported:
+        case InfoKind::Column:
+        case InfoKind::Row:
+        case InfoKind::Sheet:
+        case InfoKind::Address:
+        case InfoKind::Coord:
+        case InfoKind::Contents:
+        case InfoKind::Type:
+            return false;
+    }
+    return false;
 }
 
 [[nodiscard]] inline api::CellValue columnValue(const api::CellAddress& rAddress)
@@ -95,6 +153,43 @@ enum class InfoKind : std::uint8_t
 
     api::String aResult;
     aResult.push_back(cType);
+    return api::CellValue::text(aResult);
+}
+
+[[nodiscard]] inline api::CellValue numericPropertyValue(double fValue)
+{
+    return api::CellValue::number(fValue);
+}
+
+[[nodiscard]] inline api::CellValue textPropertyValue(api::StringView rText)
+{
+    return api::CellValue::text(api::String(rText));
+}
+
+[[nodiscard]] inline api::CellValue prefixValue(PrefixStyle eStyle)
+{
+    char16_t cPrefix = 0;
+    switch (eStyle)
+    {
+        case PrefixStyle::Left:
+            cPrefix = u'\'';
+            break;
+        case PrefixStyle::Center:
+            cPrefix = u'^';
+            break;
+        case PrefixStyle::Right:
+            cPrefix = u'"';
+            break;
+        case PrefixStyle::Repeat:
+            cPrefix = u'\\';
+            break;
+        case PrefixStyle::None:
+            break;
+    }
+
+    api::String aResult;
+    if (cPrefix != 0)
+        aResult.push_back(cPrefix);
     return api::CellValue::text(aResult);
 }
 

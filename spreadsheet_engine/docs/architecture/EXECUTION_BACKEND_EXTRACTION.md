@@ -115,6 +115,11 @@ small, explicitly classified set of clusters instead of a generic
   ref-list materialization policy now route through shared reference helpers,
   leaving the remaining open shell focused on the host-heavy information tail
   plus explicitly host-owned token-container and external-reference plumbing
+- the third closeout slice is complete: the remaining in-scope `CELL(...)`
+  property tail now routes through shared subtype classification and compat
+  result-shaping helpers, leaving the open shell focused on the broader
+  token-walking layer plus explicitly host-only `INFO(...)`, token-container,
+  and external-reference plumbing
 
 The starting baseline for this milestone is:
 
@@ -1180,6 +1185,55 @@ Completion criteria for Phase 11, now met:
 - the replay baseline remains fully green
 
 Phase 11 closeout status:
+
+- complete
+- validated across the focused Calc, standalone, and full replay lanes
+- one-shot replay baseline remains `500` workbooks, `50,661` formula cells,
+  `0` cached-fallback cells
+
+### Phase 12: Close The Remaining In-Scope CELL Property Tail
+
+Status: **Complete**
+
+Goals:
+
+- move the remaining in-scope `CELL(...)` property tail behind shared subtype
+  classification and compat result shaping
+- keep host-backed document, number-format, printer, and path access in Calc
+  adapters instead of duplicating spreadsheet semantics inline
+- leave only explicitly host-only information surfaces open after the slice
+
+Landed scope:
+
+- shared runtime `InfoKind` coverage for `COORD`, `FILENAME`, `WIDTH`,
+  `PREFIX`, `PROTECT`, `FORMAT`, `COLOR`, and `PARENTHESES`
+- Calc compat helpers for local and external filename shaping, width/prefix
+  result construction, protection flags, and number-format driven `COLOR` /
+  `PARENTHESES` inspection
+- Calc `ScCell()` and `ScCellExternal()` rewired to use the shared subtype
+  contract and compat result-shaping helpers
+- standalone evaluator explicitly classifies the same `CELL(...)` subtypes and
+  rejects the host-backed tail consistently
+- focused Calc regression coverage for the migrated property tail
+
+Implemented in:
+
+- `spreadsheet_engine/inc/spreadsheetengine/runtime/CellInspection.hxx`
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx`
+- `spreadsheet_engine/source/core/FormulaEvaluatorInformation.cxx`
+- `sc/source/core/tool/interpr1.cxx`
+- `sc/qa/unit/ucalc_formula2.cxx`
+
+Completion criteria for Phase 12, now met:
+
+- the remaining in-scope `CELL(...)` property tail no longer depends on
+  split standalone/Calc subtype logic
+- Calc property-result shaping for the migrated `CELL(...)` tail routes
+  through compat helpers instead of inline local helper tails
+- only explicitly host-only inspection surfaces remain open
+- the replay baseline remains fully green
+
+Phase 12 closeout status:
 
 - complete
 - validated across the focused Calc, standalone, and full replay lanes

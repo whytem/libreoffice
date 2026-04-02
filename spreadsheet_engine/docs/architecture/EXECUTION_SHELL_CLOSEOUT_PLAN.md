@@ -225,6 +225,8 @@ Closeout result:
 
 ### Workstream 4: Finish The Host-Heavy Inspection And Property Tail
 
+Status: **Complete**
+
 This workstream closes the remaining inspection/property shell that still sits
 in Calc because it depends on host state.
 
@@ -269,6 +271,17 @@ Exit criteria:
 - the `CELL(...)` subtype contract is centralized instead of split across
   standalone and Calc
 - replay and focused Calc tests remain green
+
+Closeout status:
+
+- complete
+- `CELL(...)` subtype classification now lives in shared
+  [CellInspection.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/runtime/CellInspection.hxx)
+- Calc property-tail shaping now routes through
+  [CellInspectionExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx)
+- the remaining open shell is no longer the `CELL(...)` tail; it is the
+  broader token-walking shell plus explicitly host-only information,
+  token-container, and external-reference plumbing
 
 ### Workstream 5: Eliminate Residual Duplicate Implementations
 
