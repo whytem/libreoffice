@@ -1,6 +1,6 @@
 # Compiler And Evaluation Boundary Reassessment Plan
 
-Status: active implementation-ready plan
+Status: completed implementation and closeout record
 
 ## Purpose
 
@@ -23,6 +23,35 @@ The next useful stream is therefore not another historical cleanup pass. It is
 an explicit reassessment of the remaining compiler/evaluation boundary so the
 project can choose the next bounded production moves from current facts rather
 than from legacy phase debt.
+
+## Closeout Summary
+
+This reassessment is now complete.
+
+What it closed out:
+
+- the remaining production compiler/evaluation boundary was frozen as an
+  explicit inventory instead of being carried forward as implied cleanup debt
+- the remaining touched candidates were classified as either
+  `ready for bounded extraction`, `ready for direct engine entry`,
+  `intentionally host-only`, or `defer`
+- the retained local compiler packaging in
+  `CellInspectionExecution.hxx` and `IndirectExecution.hxx` now routes through
+  named compile helpers in
+  [CompileHost.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CompileHost.hxx)
+- the date-mode financial add-in family now uses the direct adapter surface in
+  [FinancialAddInExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/FinancialAddInExecution.hxx)
+  as its default production path
+- the superseded generic financial wrapper orchestration in
+  [analysisdefs.hxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysisdefs.hxx)
+  was removed
+
+What remains intentionally host-owned or deferred after this stream:
+
+- local `CELL(...)` host-property projection
+- bounded `INFO(...)` projection
+- external-reference cache and session-backed fetch/projection packaging
+- broad token ownership, stack mutation, and general interpreter orchestration
 
 ## What This Workstream Is For
 

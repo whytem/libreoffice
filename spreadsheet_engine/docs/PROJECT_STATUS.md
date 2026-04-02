@@ -369,9 +369,25 @@ Those are valid future questions, but the right way to reach them is to start
 from the now-cleaner host boundary and choose the next bounded stream from a
 fresh inventory instead of carrying forward historical cleanup debt.
 
-The active implementation-ready plan for that reassessment is:
+That reassessment is now complete and recorded in:
 
 - [COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md](architecture/COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md)
+
+The completed reassessment established three stable outcomes:
+
+- the remaining local compiler packaging around `CELL(...)` address projection
+  and `INDIRECT` reference compilation was tightened behind named compile
+  helpers instead of staying open-coded in production callers
+- the remaining date-mode financial add-in family now uses the direct engine
+  adapter path by default
+- the still-local `CELL(...)` host-property tail, bounded `INFO(...)`
+  projection, and external-reference cache/session packaging remain explicit
+  Calc-owned host services rather than ambiguous extraction residue
+
+There is no new pre-committed follow-on stream from that reassessment. Future
+work should again begin from a fresh inventory of the intentionally retained
+host boundary instead of treating the completed reassessment as open-ended
+cleanup.
 
 ## Working Rules For The Next Stage
 

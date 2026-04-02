@@ -8,9 +8,10 @@ documents live under [../archive/](../archive/).
 Current architecture docs:
 
 - [COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md](COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md) -
-  active implementation-ready plan for reassessing the remaining production
-  compiler/evaluation boundary, selecting the next safe direct-entry and
-  compiler-tightening slices from a fresh inventory
+  completed implementation and closeout record for the fresh compiler and
+  evaluation boundary reassessment, including the selected compiler-entry
+  tightening slice, direct financial add-in entry widening, and retained
+  host-owned defer list
 - [HOST_SERVICE_FACADE_NARROWING_PLAN.md](HOST_SERVICE_FACADE_NARROWING_PLAN.md) -
   completed implementation and closeout record for narrowing the remaining
   host-service packaging around intentionally Calc-owned production surfaces
