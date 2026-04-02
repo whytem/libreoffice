@@ -45,10 +45,10 @@ The starting handoff from the completed recalc-orchestration milestone is:
 
 ## Current Status
 
-This milestone is now active with Phases 0 through 6 complete and the next
+This milestone is now active with Phases 0 through 7 complete and the next
 bounded execution-shell slice narrowed to the remaining generic jump-matrix
-cursor, broader token-walking, and residual name/string-reference compilation
-flows.
+cursor, broader token-walking, and final residual string-reference
+compilation flows.
 
 - Phase 0 is complete: the orchestration/execution boundary is explicitly
   documented, the first helper duplication inventory is frozen, and the Phase 1
@@ -77,6 +77,10 @@ flows.
   name/string-reference resolution move behind dedicated compat helpers,
   leaving the remaining Calc-owned shell narrowed to the generic jump-matrix
   cursor and broader token-walking/name-compilation tail
+- Phase 7 is complete: Calc's bounded `LET` token rewrite/slice helpers and
+  `SWITCH` comparison shell now route through dedicated compat helpers,
+  leaving the remaining Calc-owned shell narrowed to the generic jump-matrix
+  cursor and broader token-walking/final string-compilation tail
 
 The starting baseline for this milestone is:
 
@@ -928,6 +932,51 @@ Completion criteria for Phase 6, now met:
 - the replay baseline remains fully green
 
 Phase 6 closeout status:
+
+- complete
+- validated across the focused Calc and standalone lanes
+- one-shot replay baseline remains `500` workbooks, `50,661` formula cells,
+  `0` cached-fallback cells
+
+### Phase 7: Extract The Bounded Modern Logical And Name Shell
+
+Status: **Complete**
+
+Goals:
+
+- move the remaining bounded `LET` token rewrite and token-slice helpers out
+  of `ScInterpreter`
+- move Calc's bounded `SWITCH` comparison shell behind dedicated compat
+  helpers while preserving Calc stack and coercion ownership
+- keep standalone `LET` / `IFS` / `SWITCH` execution green while adding
+  focused Calc coverage for the migrated shell
+
+Landed scope:
+
+- compat extraction for `LET` local-name token replacement and bounded token
+  slicing
+- compat extraction for the bounded `SWITCH` comparison shell
+- focused Calc coverage for `LET` and `SWITCH`, plus the existing `IFS`
+  shared-case lane kept green
+
+Implemented in:
+
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/LetExecution.hxx`
+- `spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/SwitchExecution.hxx`
+- `sc/source/core/tool/interpr1.cxx`
+- `sc/source/core/tool/interpr8.cxx`
+
+Completion criteria for Phase 7, now met:
+
+- Calc-local `LET` token rewrite/slice helpers no longer live as interpreter
+  member helpers
+- Calc's bounded `SWITCH` comparison shell no longer lives solely as local
+  logic in `interpr8.cxx`
+- focused Calc coverage directly exercises the migrated `LET` / `SWITCH`
+  surface while `IFS` stays green on the existing shared-case lane
+- the replay baseline remains fully green
+
+Phase 7 closeout status:
 
 - complete
 - validated across the focused Calc and standalone lanes

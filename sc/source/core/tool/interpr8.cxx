@@ -16,12 +16,14 @@
 #include <sal/log.hxx>
 #include <svl/numformat.hxx>
 #include <spreadsheetengine/api/Logic.hxx>
+#include <spreadsheetengine/compat/libreoffice/SwitchExecution.hxx>
 
 #include <cmath>
 #include <memory>
 #include <vector>
 
 using namespace formula;
+namespace seswitchexec = spreadsheetengine::compat::libreoffice::switchexecution;
 
 namespace {
 
@@ -1898,18 +1900,14 @@ void ScInterpreter::ScSwitch_MS()
     ReverseStack( nParamCount );
 
     nGlobalError = FormulaError::NONE;   // propagate only for match or active result path
-    bool isValue = false;
-    double fRefVal = 0;
-    svl::SharedString aRefStr;
+    seswitchexec::SwitchValue aReference;
     switch ( GetStackType() )
     {
         case svDouble:
-            isValue = true;
-            fRefVal = GetDouble();
+            aReference = seswitchexec::makeNumericSwitchValue(GetDouble());
             break;
         case svString:
-            isValue = false;
-            aRefStr = GetString();
+            aReference = seswitchexec::makeTextSwitchValue(GetString());
             break;
         case svSingleRef :
         case svDoubleRef :
@@ -1918,17 +1916,27 @@ void ScInterpreter::ScSwitch_MS()
                 if (!PopDoubleRefOrSingleRef( aAdr ))
                     break;
                 ScRefCellValue aCell( mrDoc, aAdr );
-                isValue = !( aCell.hasString() || aCell.hasEmptyValue() || aCell.isEmpty() );
-                if ( isValue )
-                    fRefVal = GetCellValue( aAdr, aCell);
+                if (!( aCell.hasString() || aCell.hasEmptyValue() || aCell.isEmpty() ))
+                    aReference = seswitchexec::makeNumericSwitchValue(GetCellValue(aAdr, aCell));
                 else
-                    GetCellString( aRefStr, aCell);
+                {
+                    svl::SharedString aRefStr;
+                    GetCellString(aRefStr, aCell);
+                    aReference = seswitchexec::makeTextSwitchValue(aRefStr);
+                }
             }
             break;
         case svExternalSingleRef:
         case svExternalDoubleRef:
         case svMatrix:
-            isValue = ScMatrix::IsValueType( GetDoubleOrStringFromMatrix( fRefVal, aRefStr ) );
+        {
+            double fRefVal = 0.0;
+            svl::SharedString aRefStr;
+            if (ScMatrix::IsValueType(GetDoubleOrStringFromMatrix(fRefVal, aRefStr)))
+                aReference = seswitchexec::makeNumericSwitchValue(fRefVal);
+            else
+                aReference = seswitchexec::makeTextSwitchValue(aRefStr);
+        }
             break;
         default :
             PopError();
@@ -1939,16 +1947,14 @@ void ScInterpreter::ScSwitch_MS()
     bool bFinished = false;
     while ( nParamCount > 1 && !bFinished && nGlobalError == FormulaError::NONE )
     {
-        double fVal = 0;
-        svl::SharedString aStr;
-        if ( isValue )
-            fVal = GetDouble();
+        seswitchexec::SwitchValue aCandidate;
+        if ( aReference.mbNumeric )
+            aCandidate = seswitchexec::makeNumericSwitchValue(GetDouble());
         else
-            aStr = GetString();
+            aCandidate = seswitchexec::makeTextSwitchValue(GetString());
         nParamCount--;
         if ((nGlobalError != FormulaError::NONE && nParamCount < 2)
-                || (isValue && rtl::math::approxEqual( fRefVal, fVal))
-                || (!isValue && aRefStr.getDataIgnoreCase() == aStr.getDataIgnoreCase()))
+                || seswitchexec::matchesSwitchCase(aReference, aCandidate))
         {
             // TRUE
             bFinished = true;

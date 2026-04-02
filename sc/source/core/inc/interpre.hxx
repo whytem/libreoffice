@@ -482,12 +482,6 @@ private:
     ScMatrixRef GetMatrix( short & rParam, size_t & rInRefList );
     sc::RangeMatrix GetRangeMatrix();
 
-    // Get tokens at specific parameters for LET (lambda) function
-    static void replaceNamesToResult( const std::unordered_map<OUString, formula::FormulaToken*>& rResultIndexes,
-        ScTokenArray& rTokens, short nStartPos, short nEndPos );
-    ScTokenArray checkPushTokens( const ScTokenArray& rTokens,
-        short nStartPos, short nEndPos );
-
     void ScTableOp();                                       // repeated operations
 
     // common helper functions

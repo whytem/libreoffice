@@ -66,6 +66,7 @@
 #include <spreadsheetengine/compat/libreoffice/IndirectExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
 #include <spreadsheetengine/compat/libreoffice/JumpExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/LetExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/runtime/MathAggregate.hxx>
@@ -109,6 +110,7 @@ namespace sestringref = spreadsheetengine::api::stringreference;
 namespace seindirectexec = spreadsheetengine::compat::libreoffice::indirectexecution;
 namespace seinterpre = spreadsheetengine::compat::libreoffice::interpreterdispatch;
 namespace sejumpexec = spreadsheetengine::compat::libreoffice::jumpexecution;
+namespace seletexec = spreadsheetengine::compat::libreoffice::letexecution;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace selookupexec = spreadsheetengine::compat::libreoffice::lookupexecution;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
@@ -8348,36 +8350,6 @@ void ScInterpreter::ScUnique()
     PushMatrix(pResMat);
 }
 
-void ScInterpreter::replaceNamesToResult( const std::unordered_map<OUString, formula::FormulaToken*>& rResultIndexes,
-    ScTokenArray& rTokens, short nStartPos, short nEndPos )
-{
-    formula::FormulaTokenArrayPlainIterator aIterResult(rTokens);
-    aIterResult.Jump(nStartPos + 1);
-    for (FormulaToken* t = aIterResult.GetNextStringName(); t; t = aIterResult.GetNextStringName())
-    {
-        if (aIterResult.GetIndex() > nEndPos)
-            break;
-        auto iRes = rResultIndexes.find(t->GetString().getString());
-        if (iRes != rResultIndexes.end())
-            rTokens.ReplaceRPNToken(aIterResult.GetIndex() - 1, iRes->second->Clone());
-    }
-}
-
-ScTokenArray ScInterpreter::checkPushTokens(const ScTokenArray& rTokens, short nStartPos, short nEndPos)
-{
-    formula::FormulaTokenArrayPlainIterator aIterResult(rTokens);
-    aIterResult.Jump(nStartPos + 1);
-    ScTokenArray aTempTokens(mrDoc);
-    for (FormulaToken* t = aIterResult.NextRPN(); t; t = aIterResult.NextRPN())
-    {
-        if (aIterResult.GetIndex() > nEndPos)
-            break;
-
-        aTempTokens.AddToken(*t->Clone());
-    }
-    return aTempTokens;
-}
-
 void ScInterpreter::ScLet()
 {
     const short* pJump = pCur->GetJump();
@@ -8419,9 +8391,13 @@ void ScInterpreter::ScLet()
         nJumpCount--;
 
         // replace names with result tokens
-        replaceNamesToResult(nResultIndexes, aValueTokens, pJump[nOrgJumpCount - nJumpCount], pJump[nOrgJumpCount - nJumpCount + 1]);
+        seletexec::replaceNamesToResult(
+            nResultIndexes, aValueTokens, pJump[nOrgJumpCount - nJumpCount],
+            pJump[nOrgJumpCount - nJumpCount + 1]);
 
-        ScTokenArray aTempTokens = checkPushTokens(aValueTokens, pJump[nOrgJumpCount - nJumpCount], pJump[nOrgJumpCount - nJumpCount + 1]);
+        ScTokenArray aTempTokens = seletexec::copyTokenSlice(
+            mrDoc, aValueTokens, pJump[nOrgJumpCount - nJumpCount],
+            pJump[nOrgJumpCount - nJumpCount + 1]);
 
         // calculate the inner results unless we already have a push result token
         if (aTempTokens.GetLen() == 0)
@@ -8478,7 +8454,9 @@ void ScInterpreter::ScLet()
 
     // last parameter: calculation
     // replace names with result tokens
-    replaceNamesToResult(nResultIndexes, aValueTokens, pJump[nOrgJumpCount - nJumpCount], pJump[nOrgJumpCount - nJumpCount + 1]);
+    seletexec::replaceNamesToResult(
+        nResultIndexes, aValueTokens, pJump[nOrgJumpCount - nJumpCount],
+        pJump[nOrgJumpCount - nJumpCount + 1]);
 
     // calculate the final result
     ScInterpreter aInt(mrDoc.GetFormulaCell(aPos), mrDoc, mrContext, aPos, aValueTokens);

@@ -5081,6 +5081,21 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testReferenceShapePhase5)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testModernLogicalNameShellPhase7)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+
+    CPPUNIT_ASSERT(m_pDoc->InsertTab(0, u"Modern"_ustr));
+
+    m_pDoc->SetString(ScAddress(0, 0, 0), u"=SWITCH(2;1;\"one\";2;\"two\";\"other\")"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(ScAddress(0, 0, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 1, 0), u"=LET(first;5;second;first+7;second)"_ustr);
+    ASSERT_DOUBLES_EQUAL(12.0, m_pDoc->GetValue(ScAddress(0, 1, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_PLUGIN_IMPLEMENT();
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
