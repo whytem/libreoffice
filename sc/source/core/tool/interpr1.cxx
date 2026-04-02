@@ -2604,8 +2604,6 @@ void ScInterpreter::ScCellExternal()
     aRef.SetAbsTab(-1); // revert the value.
 
     ScCellKeywordTranslator::transKeyword(aInfoType, ScGlobal::GetLocale(), ocCell);
-    const auto eInfoKind = secellexec::classifyInfoType(aInfoType);
-    ScExternalRefManager* pRefMgr = mrDoc.GetExternalRefManager();
     const auto pushApiCellValue = [&](const spreadsheetengine::api::CellValue& rValue) {
         if (rValue.isError())
         {
@@ -2619,85 +2617,32 @@ void ScInterpreter::ScCellExternal()
         }
         PushDouble(rValue.mfNumber);
     };
+    const FormulaGrammar::AddressConvention eAddressConvention
+        = resolveCellInfoAddressConvention(maCalcConfig, mrDoc);
+    secellexec::DirectExternalCellInspectionAdapter aDirectExternalAdapter(mrDoc, aPos);
+    secellexec::ExternalCellInfoRequest aExternalRequest;
+    aExternalRequest.maAddress = { 0, nCol, nRow };
+    aExternalRequest.mnFileId = nFileId;
+    aExternalRequest.maTabName = aTabName;
+    aExternalRequest.maReference = aRef;
+    aExternalRequest.mxToken = pToken;
+    aExternalRequest.maFormat = aFmt;
+    aExternalRequest.meConvention = eAddressConvention;
+    const auto aDirectEvaluation = aDirectExternalAdapter.evaluateInfo(aInfoType, aExternalRequest);
+    const auto eInfoKind = aDirectEvaluation.meKind;
+    if (aDirectEvaluation.mbHandled)
+    {
+        if (aDirectEvaluation.meError != FormulaError::NONE)
+        {
+            PushError(aDirectEvaluation.meError);
+            return;
+        }
+        pushApiCellValue(aDirectEvaluation.maValue);
+        return;
+    }
 
-    const spreadsheetengine::api::CellAddress aExternalAddress{ 0, nCol, nRow };
     switch (eInfoKind)
     {
-        case secellexec::InfoKind::Column:
-            pushApiCellValue(
-                spreadsheetengine::runtime::cellinspection::columnValue(aExternalAddress));
-            break;
-        case secellexec::InfoKind::Row:
-            pushApiCellValue(
-                spreadsheetengine::runtime::cellinspection::rowValue(aExternalAddress));
-            break;
-        case secellexec::InfoKind::Sheet:
-            // For SHEET, No idea what number we should set, but let's always
-            // set 1 if the external sheet exists, no matter what sheet. Excel
-            // does the same.
-            if (pRefMgr->getCacheTable(nFileId, aTabName, false))
-                PushInt(1);
-            else
-                SetError(FormulaError::NoName);
-            break;
-        case secellexec::InfoKind::Address:
-        {
-            // ODF 1.2 says we need to always display address using the ODF A1 grammar.
-            ScTokenArray aArray(mrDoc);
-            aArray.AddExternalSingleReference(nFileId, svl::SharedString(aTabName),
-                aRef); // string not interned
-            ScCompiler aComp(mrDoc, aPos, aArray, formula::FormulaGrammar::GRAM_ODFF_A1);
-            OUString aStr;
-            aComp.CreateStringFromTokenArray(aStr);
-            PushString(aStr);
-            break;
-        }
-        case secellexec::InfoKind::Filename:
-        {
-            const auto aValue = secellexec::makeExternalFilenamePropertyValue(
-                *pRefMgr, nFileId, aTabName, resolveCellInfoAddressConvention(maCalcConfig, mrDoc));
-            if (!aValue)
-            {
-                SetError(FormulaError::NoName);
-                return;
-            }
-            pushApiCellValue(*aValue);
-            break;
-        }
-        case secellexec::InfoKind::Contents:
-            switch (pToken->GetType())
-            {
-                case svString:
-                    PushString(pToken->GetString());
-                    break;
-                case svDouble:
-                    PushString(OUString::number(pToken->GetDouble()));
-                    break;
-                case svError:
-                    PushString(ScGlobal::GetErrorString(pToken->GetError()));
-                    break;
-                default:
-                    PushString(OUString());
-                    break;
-            }
-            break;
-        case secellexec::InfoKind::Type:
-        {
-            sal_Unicode c = 'v';
-            switch (pToken->GetType())
-            {
-                case svString:
-                    c = 'l';
-                    break;
-                case svEmptyCell:
-                    c = 'b';
-                    break;
-                default:
-                    break;
-            }
-            PushString(OUString(c));
-            break;
-        }
         case secellexec::InfoKind::Format:
         {
             pushApiCellValue(
@@ -2721,6 +2666,13 @@ void ScInterpreter::ScCellExternal()
         case secellexec::InfoKind::Prefix:
         case secellexec::InfoKind::Protect:
         case secellexec::InfoKind::Unsupported:
+        case secellexec::InfoKind::Column:
+        case secellexec::InfoKind::Row:
+        case secellexec::InfoKind::Sheet:
+        case secellexec::InfoKind::Address:
+        case secellexec::InfoKind::Filename:
+        case secellexec::InfoKind::Contents:
+        case secellexec::InfoKind::Type:
             PushIllegalParameter();
             break;
     }

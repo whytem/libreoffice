@@ -2053,6 +2053,22 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testExternalRef)
     CPPUNIT_ASSERT_EQUAL_MESSAGE("Unexpected cached data range.", SCROW(3),
                                  aCachedRange.aEnd.Row());
 
+    m_pDoc->SetString(4, 0, 0, u"=CELL(\"COL\";'file:///extdata.fake'#Data1.B2)"_ustr);
+    ASSERT_DOUBLES_EQUAL_MESSAGE("Unexpected external CELL(\"COL\") result.", 2.0,
+                                 m_pDoc->GetValue(4, 0, 0));
+    m_pDoc->SetString(4, 1, 0, u"=CELL(\"ROW\";'file:///extdata.fake'#Data1.B2)"_ustr);
+    ASSERT_DOUBLES_EQUAL_MESSAGE("Unexpected external CELL(\"ROW\") result.", 2.0,
+                                 m_pDoc->GetValue(4, 1, 0));
+    m_pDoc->SetString(4, 2, 0, u"=CELL(\"SHEET\";'file:///extdata.fake'#Data1.B2)"_ustr);
+    ASSERT_DOUBLES_EQUAL_MESSAGE("Unexpected external CELL(\"SHEET\") result.", 1.0,
+                                 m_pDoc->GetValue(4, 2, 0));
+    m_pDoc->SetString(4, 3, 0, u"=CELL(\"CONTENTS\";'file:///extdata.fake'#Data1.A2)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"Andy"_ustr, m_pDoc->GetString(4, 3, 0));
+    m_pDoc->SetString(4, 4, 0, u"=CELL(\"TYPE\";'file:///extdata.fake'#Data1.A2)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"l"_ustr, m_pDoc->GetString(4, 4, 0));
+    m_pDoc->SetString(4, 5, 0, u"=CELL(\"TYPE\";'file:///extdata.fake'#Data1.B2)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"v"_ustr, m_pDoc->GetString(4, 5, 0));
+
     // Unload the external document shell.
     xExtDocSh->DoClose();
     CPPUNIT_ASSERT_MESSAGE("external document instance should have been unloaded.",

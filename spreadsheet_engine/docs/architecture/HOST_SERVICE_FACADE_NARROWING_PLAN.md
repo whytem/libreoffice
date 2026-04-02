@@ -263,6 +263,8 @@ Phase 1 closeout notes:
 
 ### Phase 2. Narrow The External-Reference Facade
 
+Status: complete
+
 Adopt the smallest useful external-reference service seam.
 
 Preferred execution order:
@@ -270,6 +272,20 @@ Preferred execution order:
 1. external `CELL(...)` classification/projection helper packaging
 2. external filename/address/value-shape projection reuse
 3. documentation of what remains intentionally cache-owned afterward
+
+Phase 2 closeout notes:
+
+- the bounded external `CELL(...)` service shell in
+  [ScCellExternal()](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx)
+  now routes `COL`, `ROW`, `SHEET`, `ADDRESS`, `FILENAME`, `CONTENTS`, and
+  `TYPE` through
+  [DirectExternalCellInspectionAdapter](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx)
+- external cache ownership, token extraction, and the remaining
+  format/color/parentheses projection stay in Calc as the intentionally
+  host-owned tail for this slice
+- focused external-reference coverage now lives in
+  [testExternalRef()](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_formula2.cxx)
+  and validates the narrowed `CELL(...)` projection subset directly
 
 ### Phase 3. Narrow The Add-In Service Context Facade
 

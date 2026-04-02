@@ -17,6 +17,7 @@
 #include <docsh.hxx>
 #include <editeng/justifyitem.hxx>
 #include <externalrefmgr.hxx>
+#include <formula/errorcodes.hxx>
 #include <formula/grammar.hxx>
 #include <interpretercontext.hxx>
 #include <patattr.hxx>
@@ -25,6 +26,10 @@
 #include <svl/numformat.hxx>
 #include <svl/zformat.hxx>
 #include <tools/urlobj.hxx>
+
+#include <compiler.hxx>
+#include <global.hxx>
+#include <tokenarray.hxx>
 
 #include <spreadsheetengine/api/Host.hxx>
 #include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
@@ -56,10 +61,44 @@ struct DirectCellInfoEvaluation
     bool mbHandled = false;
 };
 
+struct ExternalCellInfoRequest
+{
+    CellAddress maAddress;
+    sal_uInt16 mnFileId = 0;
+    OUString maTabName;
+    ScSingleRefData maReference;
+    ScExternalRefCache::TokenRef mxToken;
+    ScExternalRefCache::CellFormat maFormat;
+    formula::FormulaGrammar::AddressConvention meConvention
+        = formula::FormulaGrammar::CONV_OOO;
+};
+
+struct DirectExternalCellInfoEvaluation
+{
+    InfoKind meKind = InfoKind::Unsupported;
+    FormulaError meError = FormulaError::NONE;
+    CellValue maValue = CellValue::empty();
+    bool mbHandled = false;
+};
+
 [[nodiscard]] inline InfoKind classifyInfoType(const OUString& rInfoType);
 
 [[nodiscard]] inline spreadsheetengine::api::ValueResult<CellValue> evaluateBoundedCellInfo(
     InfoKind eKind, const BoundedCellInfoRequest& rRequest);
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeExternalContentsValue(
+    const formula::FormulaToken& rToken);
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeExternalTypeValue(
+    const formula::FormulaToken& rToken);
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeExternalAddressValue(
+    const ScDocument& rDoc, const ScAddress& rFormulaPos, sal_uInt16 nFileId,
+    const OUString& rTabName, const ScSingleRefData& rReference);
+
+[[nodiscard]] inline std::optional<spreadsheetengine::api::CellValue>
+makeExternalFilenamePropertyValue(ScExternalRefManager& rRefMgr, sal_uInt16 nFileId,
+    const OUString& rTabName, formula::FormulaGrammar::AddressConvention eConvention);
 
 class DirectCellInspectionAdapter
 {
@@ -109,6 +148,95 @@ public:
     }
 };
 
+class DirectExternalCellInspectionAdapter
+{
+    const ScDocument& mrDocument;
+    ScAddress maFormulaPos;
+
+public:
+    DirectExternalCellInspectionAdapter(const ScDocument& rDocument, const ScAddress& rFormulaPos)
+        : mrDocument(rDocument)
+        , maFormulaPos(rFormulaPos)
+    {
+    }
+
+    [[nodiscard]] DirectExternalCellInfoEvaluation evaluateInfo(
+        const OUString& rInfoType, const ExternalCellInfoRequest& rRequest) const
+    {
+        DirectExternalCellInfoEvaluation aEvaluation;
+        aEvaluation.meKind = classifyInfoType(rInfoType);
+
+        switch (aEvaluation.meKind)
+        {
+            case InfoKind::Column:
+                aEvaluation.maValue = spreadsheetengine::runtime::cellinspection::columnValue(
+                    rRequest.maAddress);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            case InfoKind::Row:
+                aEvaluation.maValue = spreadsheetengine::runtime::cellinspection::rowValue(
+                    rRequest.maAddress);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            case InfoKind::Sheet:
+            {
+                ScExternalRefManager* pRefMgr = mrDocument.GetExternalRefManager();
+                aEvaluation.mbHandled = true;
+                if (pRefMgr && pRefMgr->getCacheTable(rRequest.mnFileId, rRequest.maTabName, false))
+                    aEvaluation.maValue
+                        = spreadsheetengine::runtime::cellinspection::sheetValue(rRequest.maAddress);
+                else
+                    aEvaluation.meError = FormulaError::NoName;
+                return aEvaluation;
+            }
+            case InfoKind::Address:
+            {
+                aEvaluation.maValue = makeExternalAddressValue(
+                    mrDocument, maFormulaPos, rRequest.mnFileId, rRequest.maTabName,
+                    rRequest.maReference);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            }
+            case InfoKind::Filename:
+            {
+                ScExternalRefManager* pRefMgr = mrDocument.GetExternalRefManager();
+                aEvaluation.mbHandled = true;
+                if (!pRefMgr)
+                    aEvaluation.meError = FormulaError::NoName;
+                else
+                {
+                    const auto aValue = makeExternalFilenamePropertyValue(
+                        *pRefMgr, rRequest.mnFileId, rRequest.maTabName, rRequest.meConvention);
+                    if (!aValue)
+                        aEvaluation.meError = FormulaError::NoName;
+                    else
+                        aEvaluation.maValue = *aValue;
+                }
+                return aEvaluation;
+            }
+            case InfoKind::Contents:
+                aEvaluation.maValue = makeExternalContentsValue(*rRequest.mxToken);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            case InfoKind::Type:
+                aEvaluation.maValue = makeExternalTypeValue(*rRequest.mxToken);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            case InfoKind::Coord:
+            case InfoKind::Width:
+            case InfoKind::Prefix:
+            case InfoKind::Protect:
+            case InfoKind::Format:
+            case InfoKind::Color:
+            case InfoKind::Parentheses:
+            case InfoKind::Unsupported:
+                return aEvaluation;
+        }
+
+        return aEvaluation;
+    }
+};
+
 [[nodiscard]] inline InfoKind classifyInfoType(const OUString& rInfoType)
 {
     return spreadsheetengine::runtime::cellinspection::classifyInfoType(toApiString(rInfoType));
@@ -151,6 +279,50 @@ public:
 [[nodiscard]] inline spreadsheetengine::api::CellValue makeFormatValue(const OUString& rValue)
 {
     return spreadsheetengine::runtime::cellinspection::textPropertyValue(toApiString(rValue));
+}
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeExternalContentsValue(
+    const formula::FormulaToken& rToken)
+{
+    switch (rToken.GetType())
+    {
+        case formula::svString:
+            return spreadsheetengine::runtime::cellinspection::textPropertyValue(
+                toApiString(rToken.GetString().getString()));
+        case formula::svDouble:
+            return spreadsheetengine::runtime::cellinspection::textPropertyValue(
+                toApiString(OUString::number(rToken.GetDouble())));
+        case formula::svError:
+            return spreadsheetengine::runtime::cellinspection::textPropertyValue(
+                toApiString(ScGlobal::GetErrorString(rToken.GetError())));
+        default:
+            return spreadsheetengine::runtime::cellinspection::textPropertyValue(u"");
+    }
+}
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeExternalTypeValue(
+    const formula::FormulaToken& rToken)
+{
+    sal_Unicode c = 'v';
+    if (rToken.GetType() == formula::svString)
+        c = 'l';
+    else if (rToken.GetType() == formula::svEmptyCell)
+        c = 'b';
+    return spreadsheetengine::runtime::cellinspection::textPropertyValue(
+        toApiString(OUString(c)));
+}
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeExternalAddressValue(
+    const ScDocument& rDoc, const ScAddress& rFormulaPos, sal_uInt16 nFileId,
+    const OUString& rTabName, const ScSingleRefData& rReference)
+{
+    ScTokenArray aArray(rDoc);
+    aArray.AddExternalSingleReference(nFileId, svl::SharedString(rTabName), rReference);
+    ScCompiler aCompiler(const_cast<ScDocument&>(rDoc), rFormulaPos, aArray,
+        formula::FormulaGrammar::GRAM_ODFF_A1);
+    OUString aString;
+    aCompiler.CreateStringFromTokenArray(aString);
+    return spreadsheetengine::runtime::cellinspection::textPropertyValue(toApiString(aString));
 }
 
 [[nodiscard]] inline OUString formatLocalFilenameInfo(
