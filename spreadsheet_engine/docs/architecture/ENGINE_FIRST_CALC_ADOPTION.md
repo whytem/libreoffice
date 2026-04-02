@@ -105,7 +105,7 @@ Validation:
 
 ### Phase 2. Adapter Convergence
 
-Status: pending
+Status: complete
 
 Reduce repeated host-to-engine translation patterns so Calc reaches shared
 behavior through smaller, clearer adapter seams.
