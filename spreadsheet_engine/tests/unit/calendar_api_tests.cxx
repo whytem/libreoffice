@@ -49,8 +49,18 @@ int main()
     if (countWorkdays(1, 10, aHolidaySerials, aDefaultWeekendMask) != 7)
         return fail("spreadsheetengine_calendar_tests", "countWorkdays() mismatch");
 
-    if (advanceWorkday(5, 1, aHolidaySerials, aDefaultWeekendMask) != 9)
+    if (advanceWorkday(5, 1, aHolidaySerials, aDefaultWeekendMask) != 6)
         return fail("spreadsheetengine_calendar_tests", "advanceWorkday() mismatch");
+
+    const std::vector<DateSerial> aNovemberHolidaySerials { 41945, 41946, 41947 };
+    if (advanceWorkday(41944, 5, aNovemberHolidaySerials, aDefaultWeekendMask) != 41954)
+    {
+        return fail("spreadsheetengine_calendar_tests", "advanceWorkday() November mismatch");
+    }
+    if (countWorkdays(41944, 41973, aNovemberHolidaySerials, aDefaultWeekendMask) != 18)
+    {
+        return fail("spreadsheetengine_calendar_tests", "countWorkdays() November mismatch");
+    }
 
     const DateParts aNullDate { 1899, 12, 30 };
     const auto aJan1 = makeDateSerial(aNullDate, 1900, 1, 1, true);
@@ -130,6 +140,20 @@ int main()
     {
         return fail("spreadsheetengine_calendar_tests", "dateDif() mismatch");
     }
+
+    const auto aMarch31_2001 = makeDateSerial(aNullDate, 2001, 3, 31, true);
+    if (!aMarch31_2001)
+        return fail("spreadsheetengine_calendar_tests", "makeDateSerial() 2001-03-31 mismatch");
+    const auto aShiftedEdate = shiftMonthSerial(static_cast<DateSerial>(aMarch31_2001.maValue), 1, false);
+    if (!aShiftedEdate || !almostEqual(aShiftedEdate.maValue, 37011.0))
+        return fail("spreadsheetengine_calendar_tests", "shiftMonthSerial() EDATE mismatch");
+
+    const auto aJan11_2015 = makeDateSerial(aNullDate, 2015, 1, 11, true);
+    if (!aJan11_2015)
+        return fail("spreadsheetengine_calendar_tests", "makeDateSerial() 2015-01-11 mismatch");
+    const auto aShiftedEomonth = shiftMonthSerial(static_cast<DateSerial>(aJan11_2015.maValue), 1, true);
+    if (!aShiftedEomonth || !almostEqual(aShiftedEomonth.maValue, 42063.0))
+        return fail("spreadsheetengine_calendar_tests", "shiftMonthSerial() EOMONTH mismatch");
 
     const auto maskToString = [](const spreadsheetengine::api::WeekendMask& rMask) {
         std::string aMask(7, '0');

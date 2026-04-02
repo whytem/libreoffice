@@ -17,6 +17,7 @@
 #include <spreadsheetengine/api/Error.hxx>
 #include <spreadsheetengine/api/String.hxx>
 #include <spreadsheetengine/runtime/DateTimeParts.hxx>
+#include <spreadsheetengine/runtime/DateTimeParse.hxx>
 #include <spreadsheetengine/runtime/DateTimeWeek.hxx>
 
 namespace spreadsheetengine::api::calendar
@@ -96,6 +97,17 @@ inline api::ValueResult<double> dateDif(const api::DateParts& rNullDate,
 {
     if (auto oValue = spreadsheetengine::core::datetime::computeDateDif(rNullDate, nDate1, nDate2, rInterval))
         return api::ValueResult<double>::success(*oValue);
+    return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+}
+
+inline api::ValueResult<double> shiftMonthSerial(
+    api::DateSerial nDateSerial, sal_Int32 nMonthOffset, bool bEndOfMonth)
+{
+    if (auto oValue
+        = spreadsheetengine::core::datetime::shiftMonthSerial(nDateSerial, nMonthOffset, bEndOfMonth))
+    {
+        return api::ValueResult<double>::success(*oValue);
+    }
     return api::ValueResult<double>::failure(api::Error::IllegalArgument);
 }
 

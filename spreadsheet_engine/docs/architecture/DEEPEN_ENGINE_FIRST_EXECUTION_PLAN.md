@@ -266,7 +266,7 @@ small shared seam to preserve the proven Calc/FODS edge behavior.
 
 ### Phase 3. Add The Missing Small Seams
 
-Status: pending
+Status: complete
 
 Close the small adapter gaps exposed by Phase 2:
 
@@ -281,6 +281,12 @@ Closeout standard:
 - repeated translation patterns collapse into named helpers
 - add-in date functions can use shared helpers without reintroducing local
   semantic code
+
+Phase 3 landed that seam set:
+
+- `WORKDAY` / `NETWORKDAYS` now use the corrected shared workday runtime
+- `EDATE` / `EOMONTH` now use a public engine month-shift wrapper
+- holiday-list conversion for add-in callers is concentrated in one named helper
 
 ### Phase 4. Remove Superseded Local Semantic Copies
 

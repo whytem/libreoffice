@@ -35,6 +35,16 @@ css::uno::Reference<css::beans::XPropertySet> makeAnalysisOptions()
     return xOptions;
 }
 
+css::uno::Any makeHolidayMatrix(std::initializer_list<sal_Int32> aDays)
+{
+    css::uno::Sequence<css::uno::Sequence<css::uno::Any>> aMatrix(1);
+    aMatrix.getArray()[0].realloc(aDays.size());
+    sal_Int32 nIndex = 0;
+    for (sal_Int32 nDay : aDays)
+        aMatrix.getArray()[0].getArray()[nIndex++] = css::uno::Any(nDay);
+    return css::uno::Any(aMatrix);
+}
+
 class Test : public test::BootstrapFixture
 {
 public:
@@ -144,8 +154,18 @@ CPPUNIT_TEST_FIXTURE(Test, test_sharedFinancialRuntimeDelegates)
 CPPUNIT_TEST_FIXTURE(Test, test_sharedCalendarRuntimeDelegates)
 {
     const auto xOptions = makeAnalysisOptions();
+    const auto aHolidays = makeHolidayMatrix({ 41945, 41946, 41947 }); // 2014-11-02..04
+
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(41954), // 2014-11-11
+                         mxAnalysis->getWorkday(xOptions, 41944, 5, aHolidays));
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(18),
+                         mxAnalysis->getNetworkdays(xOptions, 41944, 41973, aHolidays));
     CPPUNIT_ASSERT_EQUAL(sal_Int32(1),
                          mxAnalysis->getWeeknum(xOptions, 42370, 1)); // 2016-01-01
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(37011),
+                         mxAnalysis->getEdate(xOptions, 36981, 1)); // 2001-03-31 -> 2001-04-30
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(42063),
+                         mxAnalysis->getEomonth(xOptions, 42015, 1)); // 2015-01-11 -> 2015-02-28
     CPPUNIT_ASSERT_THROW(mxAnalysis->getTbilleq(xOptions, 36250, 36678, 0.0914),
                          css::lang::IllegalArgumentException); // >360 days
 }

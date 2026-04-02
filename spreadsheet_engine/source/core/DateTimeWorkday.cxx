@@ -29,7 +29,7 @@ constexpr std::size_t SUNDAY_INDEX = 6;
 
 std::size_t getNormalizedDayOfWeek(spreadsheetengine::api::DateSerial nDate)
 {
-    auto nDay = static_cast<int>((nDate - 1) % 7);
+    auto nDay = static_cast<int>((nDate + 5) % 7);
     if (nDay < 0)
         nDay += 7;
     return static_cast<std::size_t>(nDay);

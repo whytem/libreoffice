@@ -21,13 +21,16 @@
 
 #include "analysishelper.hxx"
 
+#include <spreadsheetengine/api/Calendar.hxx>
 #include <spreadsheetengine/api/Date.hxx>
 #include <spreadsheetengine/api/Error.hxx>
+#include <spreadsheetengine/api/Workday.hxx>
 
 #include <com/sun/star/lang/IllegalArgumentException.hpp>
 #include <cmath>
 #include <functional>
 #include <utility>
+#include <vector>
 
 inline bool isFreqInvalid(sal_Int32 nFreq) { return nFreq != 1 && nFreq != 2 && nFreq != 4; }
 inline double finiteOrThrow(double d)
@@ -73,6 +76,23 @@ inline FinancialDateContext getFinancialDateContext(
     const css::uno::Reference<css::beans::XPropertySet>& xOpt, sal_Int32 nBasis)
 {
     return { getNullDateParts(xOpt), nBasis };
+}
+
+inline std::vector<spreadsheetengine::api::DateSerial> collectHostHolidaySerials(
+    sca::analysis::ScaAnyConverter& rAnyConv, const css::uno::Reference<css::beans::XPropertySet>& xOpt,
+    const css::uno::Any& rHolidayAny, sal_Int32 nNullDate)
+{
+    sca::analysis::SortedIndividualInt32List aHolidayList;
+    populateHostHolidayList(rAnyConv, xOpt, rHolidayAny, nNullDate, aHolidayList);
+
+    std::vector<spreadsheetengine::api::DateSerial> aHolidaySerials;
+    aHolidaySerials.reserve(aHolidayList.Count());
+    for (sal_uInt32 nIndex = 0; nIndex < aHolidayList.Count(); ++nIndex)
+    {
+        aHolidaySerials.push_back(static_cast<spreadsheetengine::api::DateSerial>(
+            aHolidayList.Get(nIndex) - nNullDate));
+    }
+    return aHolidaySerials;
 }
 
 inline double valueOrThrow(spreadsheetengine::api::ValueResult<double> aResult)

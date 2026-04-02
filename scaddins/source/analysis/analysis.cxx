@@ -21,6 +21,7 @@
 #include "analysis.hxx"
 #include "bessel.hxx"
 #include <spreadsheetengine/api/Calendar.hxx>
+#include <spreadsheetengine/api/Workday.hxx>
 #include <spreadsheetengine/runtime/FinancialRuntime.hxx>
 #include <comphelper/random.hxx>
 #include <cppuhelper/supportsservice.hxx>
@@ -43,6 +44,7 @@ using namespace sca::analysis;
 
 namespace sefinance = spreadsheetengine::core::finance;
 namespace secalendar = spreadsheetengine::api::calendar;
+namespace seworkday = spreadsheetengine::api::workday;
 
 OUString AnalysisAddIn::GetFuncDescrStr(const TranslateId* pResId, sal_uInt16 nStrIndex)
 {
@@ -338,53 +340,12 @@ sal_Int32 SAL_CALL AnalysisAddIn::getWorkday( const uno::Reference< beans::XProp
     if( !nDays )
         return nDate;
 
-    sal_Int32                   nNullDate = getRequiredHostNullDate( xOptions );
-
-    SortedIndividualInt32List   aSrtLst;
-    populateHostHolidayList( aAnyConv, xOptions, aHDay, nNullDate, aSrtLst );
-
-    sal_Int32                   nActDate = nDate + nNullDate;
-
-    if( nDays > 0 )
-    {
-        if( GetDayOfWeek( nActDate ) == 5 )
-            // when starting on Saturday, assuming we're starting on Sunday to get the jump over the weekend
-            nActDate++;
-
-        while( nDays )
-        {
-            nActDate++;
-
-            if( GetDayOfWeek( nActDate ) < 5 )
-            {
-                if( !aSrtLst.Find( nActDate ) )
-                    nDays--;
-            }
-            else
-                nActDate++;     // jump over weekend
-        }
-    }
-    else
-    {
-        if( GetDayOfWeek( nActDate ) == 6 )
-            // when starting on Sunday, assuming we're starting on Saturday to get the jump over the weekend
-            nActDate--;
-
-        while( nDays )
-        {
-            nActDate--;
-
-            if( GetDayOfWeek( nActDate ) < 5 )
-            {
-                if( !aSrtLst.Find( nActDate ) )
-                    nDays++;
-            }
-            else
-                nActDate--;     // jump over weekend
-        }
-    }
-
-    return nActDate - nNullDate;
+    const sal_Int32 nNullDate = getRequiredHostNullDate( xOptions );
+    const auto aHolidaySerials = collectHostHolidaySerials( aAnyConv, xOptions, aHDay, nNullDate );
+    return seworkday::advanceWorkday(
+        static_cast<spreadsheetengine::api::DateSerial>( nDate ),
+        static_cast<spreadsheetengine::api::DateSerial>( nDays ),
+        aHolidaySerials, seworkday::defaultWeekendMask() );
 }
 
 /** Yearfrac */
@@ -397,10 +358,7 @@ double SAL_CALL AnalysisAddIn::getYearfrac( const uno::Reference< beans::XProper
 
 sal_Int32 SAL_CALL AnalysisAddIn::getEdate( const uno::Reference< beans::XPropertySet >& xOpt, sal_Int32 nStartDate, sal_Int32 nMonths )
 {
-    sal_Int32 nNullDate = getRequiredHostNullDate( xOpt );
-    ScaDate aDate( nNullDate, nStartDate, 5 );
-    aDate.addMonths( nMonths );
-    return aDate.getDate( nNullDate );
+    return static_cast<sal_Int32>(valueOrThrow(secalendar::shiftMonthSerial(nStartDate, nMonths, false)));
 }
 
 sal_Int32 SAL_CALL AnalysisAddIn::getWeeknum( const uno::Reference< beans::XPropertySet >& xOpt, sal_Int32 nDate, sal_Int32 nMode )
@@ -411,64 +369,18 @@ sal_Int32 SAL_CALL AnalysisAddIn::getWeeknum( const uno::Reference< beans::XProp
 
 sal_Int32 SAL_CALL AnalysisAddIn::getEomonth( const uno::Reference< beans::XPropertySet >& xOpt, sal_Int32 nDate, sal_Int32 nMonths )
 {
-    sal_Int32   nNullDate = getRequiredHostNullDate( xOpt );
-    nDate += nNullDate;
-    sal_uInt16  nDay, nMonth, nYear;
-    DaysToDate( nDate, nDay, nMonth, nYear );
-
-    sal_Int32   nNewMonth = nMonth + nMonths;
-
-    if( nNewMonth > 12 )
-    {
-        nYear = sal::static_int_cast<sal_uInt16>( nYear + ( nNewMonth / 12 ) );
-        nNewMonth %= 12;
-    }
-    else if( nNewMonth < 1 )
-    {
-        nNewMonth = -nNewMonth;
-        nYear = sal::static_int_cast<sal_uInt16>( nYear - ( nNewMonth / 12 ) );
-        nYear--;
-        nNewMonth %= 12;
-        nNewMonth = 12 - nNewMonth;
-    }
-
-    return DateToDays( DaysInMonth( sal_uInt16( nNewMonth ), nYear ), sal_uInt16( nNewMonth ), nYear ) - nNullDate;
+    return static_cast<sal_Int32>(valueOrThrow(secalendar::shiftMonthSerial(nDate, nMonths, true)));
 }
 
 sal_Int32 SAL_CALL AnalysisAddIn::getNetworkdays( const uno::Reference< beans::XPropertySet >& xOpt,
         sal_Int32 nStartDate, sal_Int32 nEndDate, const uno::Any& aHDay )
 {
-    sal_Int32                   nNullDate = getRequiredHostNullDate( xOpt );
-
-    SortedIndividualInt32List   aSrtLst;
-    populateHostHolidayList( aAnyConv, xOpt, aHDay, nNullDate, aSrtLst );
-
-    sal_Int32                   nActDate = nStartDate + nNullDate;
-    sal_Int32                   nStopDate = nEndDate + nNullDate;
-    sal_Int32                   nCnt = 0;
-
-    if( nActDate <= nStopDate )
-    {
-        while( nActDate <= nStopDate )
-        {
-            if( GetDayOfWeek( nActDate ) < 5 && !aSrtLst.Find( nActDate ) )
-                nCnt++;
-
-            nActDate++;
-        }
-    }
-    else
-    {
-        while( nActDate >= nStopDate )
-        {
-            if( GetDayOfWeek( nActDate ) < 5 && !aSrtLst.Find( nActDate ) )
-                nCnt--;
-
-            nActDate--;
-        }
-    }
-
-    return nCnt;
+    const sal_Int32 nNullDate = getRequiredHostNullDate( xOpt );
+    const auto aHolidaySerials = collectHostHolidaySerials( aAnyConv, xOpt, aHDay, nNullDate );
+    return seworkday::countWorkdays(
+        static_cast<spreadsheetengine::api::DateSerial>( nStartDate ),
+        static_cast<spreadsheetengine::api::DateSerial>( nEndDate ),
+        aHolidaySerials, seworkday::defaultWeekendMask() );
 }
 
 sal_Int32 SAL_CALL AnalysisAddIn::getIseven( sal_Int32 nVal )
