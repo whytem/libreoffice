@@ -19,6 +19,7 @@
 
 #include "analysisdefs.hxx"
 #include "analysis.hxx"
+#include <spreadsheetengine/api/Calendar.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
 #include <spreadsheetengine/runtime/FinancialRuntime.hxx>
 
@@ -246,7 +247,8 @@ double SAL_CALL AnalysisAddIn::getTbilleq( const css::uno::Reference< css::beans
     sal_Int32 nSettle, sal_Int32 nMat, double fDisc )
 {
     nMat++;
-    sal_Int32 nDiff = GetDiffDate360( xOpt, nSettle, nMat, true );
+    sal_Int32 nDiff = static_cast<sal_Int32>(spreadsheetengine::api::calendar::diffDate360(
+        getNullDateParts(xOpt), nSettle, nMat, false));
     if( fDisc <= 0.0 || nSettle >= nMat || nDiff > 360 )
         throw css::lang::IllegalArgumentException();
     return evaluateFinancialWithNullDate(xOpt, sefinance::evaluateTbillEq, nSettle, nMat, fDisc);
@@ -264,7 +266,8 @@ double SAL_CALL AnalysisAddIn::getTbillprice( const css::uno::Reference< css::be
 
 double SAL_CALL AnalysisAddIn::getTbillyield( const css::uno::Reference< css::beans::XPropertySet >& xOpt, sal_Int32 nSettle, sal_Int32 nMat, double fPrice )
 {
-    sal_Int32 nDiff = GetDiffDate360( xOpt, nSettle, nMat, true );
+    sal_Int32 nDiff = static_cast<sal_Int32>(spreadsheetengine::api::calendar::diffDate360(
+        getNullDateParts(xOpt), nSettle, nMat, false));
     nDiff++;
     if( fPrice <= 0.0 || nSettle >= nMat || nDiff > 360 )
         throw css::lang::IllegalArgumentException();

@@ -20,6 +20,7 @@
 #include "analysisdefs.hxx"
 #include "analysis.hxx"
 #include "bessel.hxx"
+#include <spreadsheetengine/api/Calendar.hxx>
 #include <spreadsheetengine/runtime/FinancialRuntime.hxx>
 #include <comphelper/random.hxx>
 #include <cppuhelper/supportsservice.hxx>
@@ -41,6 +42,7 @@ using namespace                 ::com::sun::star;
 using namespace sca::analysis;
 
 namespace sefinance = spreadsheetengine::core::finance;
+namespace secalendar = spreadsheetengine::api::calendar;
 
 OUString AnalysisAddIn::GetFuncDescrStr(const TranslateId* pResId, sal_uInt16 nStrIndex)
 {
@@ -403,15 +405,8 @@ sal_Int32 SAL_CALL AnalysisAddIn::getEdate( const uno::Reference< beans::XProper
 
 sal_Int32 SAL_CALL AnalysisAddIn::getWeeknum( const uno::Reference< beans::XPropertySet >& xOpt, sal_Int32 nDate, sal_Int32 nMode )
 {
-    nDate += getRequiredHostNullDate( xOpt );
-
-    sal_uInt16  nDay, nMonth, nYear;
-    DaysToDate( nDate, nDay, nMonth, nYear );
-
-    sal_Int32   nFirstInYear = DateToDays( 1, 1, nYear );
-    sal_uInt16  nFirstDayInYear = GetDayOfWeek( nFirstInYear );
-
-    return ( nDate - nFirstInYear + ( ( nMode == 1 )? ( nFirstDayInYear + 1 ) % 7 : nFirstDayInYear ) ) / 7 + 1;
+    return secalendar::weeknumOOo(
+        getNullDateParts( xOpt ), nDate, static_cast<std::int16_t>( nMode == 1 ? 1 : 2 ) );
 }
 
 sal_Int32 SAL_CALL AnalysisAddIn::getEomonth( const uno::Reference< beans::XPropertySet >& xOpt, sal_Int32 nDate, sal_Int32 nMonths )

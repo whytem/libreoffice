@@ -229,7 +229,7 @@ Initial candidate inventory:
 
 | Candidate | Calc entry point(s) | Shared helper status | Classification | Validation lanes |
 | --- | --- | --- | --- | --- |
-| Analysis add-in `WORKDAY` / `NETWORKDAYS` | `scaddins/source/analysis/analysis.cxx` | Engine `api::workday` helpers already exist | `Ready now` | `CppunitTest_scaddins_analysis`, `spreadsheetengine_calendar_tests`, replay zero-fallback |
+| Analysis add-in `WORKDAY` / `NETWORKDAYS` | `scaddins/source/analysis/analysis.cxx` | Generic engine workday helpers exist, but Calc/FODS edge behavior still needs a narrow shared seam | `Needs small seam` | `CppunitTest_scaddins_analysis`, `spreadsheetengine_calendar_tests`, replay zero-fallback |
 | Analysis add-in `WEEKNUM` | `scaddins/source/analysis/analysis.cxx` | Engine `api::calendar::weeknumOOo` already exists | `Ready now` | `CppunitTest_scaddins_analysis`, `spreadsheetengine_calendar_tests`, replay zero-fallback |
 | Analysis add-in `EDATE` / `EOMONTH` | `scaddins/source/analysis/analysis.cxx` | Runtime month-shift helper exists but needs API seam | `Needs small seam` | `CppunitTest_scaddins_analysis`, `spreadsheetengine_calendar_tests`, replay zero-fallback |
 | Add-in TBILL guard logic | `scaddins/source/analysis/financial.cxx` | Engine `api::calendar::diffDate360` exists | `Ready now` | `CppunitTest_scaddins_analysis`, replay zero-fallback |
@@ -247,11 +247,10 @@ Completion target for this phase:
 
 ### Phase 2. Adopt Ready-Now Runtime Paths
 
-Status: pending
+Status: complete
 
 Land the highest-confidence production-path adoptions first:
 
-- move analysis add-in `WORKDAY` / `NETWORKDAYS` onto engine `api::workday`
 - move analysis add-in `WEEKNUM` onto engine `api::calendar::weeknumOOo`
 - replace the local TBILL day-count guard with engine `api::calendar::diffDate360`
 
@@ -261,12 +260,18 @@ Closeout standard:
 - focused add-in tests prove the production path
 - strict replay summary stays at zero fallback
 
+Phase 2 landed exactly those two ready-now slices. `WORKDAY` / `NETWORKDAYS`
+remain in scope for the next phase because the generic runtime helper needs a
+small shared seam to preserve the proven Calc/FODS edge behavior.
+
 ### Phase 3. Add The Missing Small Seams
 
 Status: pending
 
 Close the small adapter gaps exposed by Phase 2:
 
+- add a Calc-shaped shared workday/networkdays seam for holiday-aware date
+  traversal
 - publish a clean engine-facing month-shift seam for `EDATE` / `EOMONTH`
 - add named helpers for holiday-list conversion and weekend-mask packaging
 - reduce repeated null-date to `DateParts` translation in touched add-in code

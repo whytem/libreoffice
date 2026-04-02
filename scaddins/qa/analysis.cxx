@@ -140,6 +140,15 @@ CPPUNIT_TEST_FIXTURE(Test, test_sharedFinancialRuntimeDelegates)
                                  mxAnalysis->getXirr({}, aIrrValues, aDates, css::uno::Any(0.1)),
                                  1e-12);
 }
+
+CPPUNIT_TEST_FIXTURE(Test, test_sharedCalendarRuntimeDelegates)
+{
+    const auto xOptions = makeAnalysisOptions();
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(1),
+                         mxAnalysis->getWeeknum(xOptions, 42370, 1)); // 2016-01-01
+    CPPUNIT_ASSERT_THROW(mxAnalysis->getTbilleq(xOptions, 36250, 36678, 0.0914),
+                         css::lang::IllegalArgumentException); // >360 days
+}
 }
 
 CPPUNIT_PLUGIN_IMPLEMENT();
