@@ -19,6 +19,7 @@
 #include <comphelper/genericpropertyset.hxx>
 #include <comphelper/propertysetinfo.hxx>
 #include <comphelper/processfactory.hxx>
+#include <spreadsheetengine/compat/libreoffice/FinancialAddInExecution.hxx>
 
 namespace
 {
@@ -149,6 +150,71 @@ CPPUNIT_TEST_FIXTURE(Test, test_sharedFinancialRuntimeDelegates)
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.1,
                                  mxAnalysis->getXirr({}, aIrrValues, aDates, css::uno::Any(0.1)),
                                  1e-12);
+}
+
+CPPUNIT_TEST_FIXTURE(Test, testDirectFinancialAddInAdapter)
+{
+    namespace sefinanceexec = spreadsheetengine::compat::libreoffice::financialaddinexecution;
+
+    const spreadsheetengine::api::DateParts aNullDate{ 1899, 12, 30 };
+    const sal_Int32 nIssue = 40909;
+    const sal_Int32 nSettlement = 41320;
+    const sal_Int32 nDurationSettlement = 36892;
+    const sal_Int32 nDurationMaturity = 38718;
+    const sal_Int32 nYieldmatSettlement = 36206;
+    const sal_Int32 nYieldmatMaturity = 36263;
+    const sal_Int32 nYieldmatIssue = 36110;
+
+    const auto aEffect = sefinanceexec::DirectFinancialAddInAdapter::evaluateEffect(0.05, 4);
+    CPPUNIT_ASSERT(aEffect);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0509453369140622, aEffect.maValue, 1e-12);
+
+    const auto aNominal
+        = sefinanceexec::DirectFinancialAddInAdapter::evaluateNominal(0.0509453369140622, 4);
+    CPPUNIT_ASSERT(aNominal);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.05, aNominal.maValue, 1e-12);
+
+    const auto aDollarFr
+        = sefinanceexec::DirectFinancialAddInAdapter::evaluateDollarFraction(1.125, 16);
+    CPPUNIT_ASSERT(aDollarFr);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.02, aDollarFr.maValue, 1e-12);
+
+    const auto aDollarDe
+        = sefinanceexec::DirectFinancialAddInAdapter::evaluateDollarDecimal(1.02, 16);
+    CPPUNIT_ASSERT(aDollarDe);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.125, aDollarDe.maValue, 1e-12);
+
+    const auto aCumprinc = sefinanceexec::DirectFinancialAddInAdapter::evaluateCumulativePrincipal(
+        0.055 / 12.0, 24, 5000, 4, 6, true);
+    CPPUNIT_ASSERT(aCumprinc);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-600.875855808337, aCumprinc.maValue, 1e-12);
+
+    const auto aCumipmt = sefinanceexec::DirectFinancialAddInAdapter::evaluateCumulativeInterest(
+        0.055 / 12.0, 24, 5000, 4, 6, true);
+    CPPUNIT_ASSERT(aCumipmt);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-57.5412415342252, aCumipmt.maValue, 1e-12);
+
+    sefinanceexec::DirectFinancialAddInAdapter aBasisThreeAdapter(aNullDate, 3);
+    const auto aAccrint
+        = aBasisThreeAdapter.evaluateAccrint(nIssue, nSettlement, 0.065, 5000.0, 2);
+    CPPUNIT_ASSERT(aAccrint);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(365.958904109589, aAccrint.maValue, 1e-12);
+
+    const auto aDuration = aBasisThreeAdapter.evaluateDuration(
+        nDurationSettlement, nDurationMaturity, 0.08, 0.09, 2);
+    CPPUNIT_ASSERT(aDuration);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.20161802829783, aDuration.maValue, 1e-12);
+
+    sefinanceexec::DirectFinancialAddInAdapter aBasisZeroAdapter(aNullDate, 0);
+    const auto aYieldmat = aBasisZeroAdapter.evaluateYieldmat(
+        nYieldmatSettlement, nYieldmatMaturity, nYieldmatIssue, 0.061, 99.984498875557);
+    CPPUNIT_ASSERT(aYieldmat);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.061, aYieldmat.maValue, 1e-12);
+
+    sefinanceexec::DirectFinancialAddInAdapter aNullDateAdapter(aNullDate);
+    const auto aTbillEq = aNullDateAdapter.evaluateTbillEq(36250, 36260, 0.0914);
+    CPPUNIT_ASSERT(aTbillEq);
+    CPPUNIT_ASSERT(aTbillEq.maValue > 0.0);
 }
 
 CPPUNIT_TEST_FIXTURE(Test, test_sharedCalendarRuntimeDelegates)

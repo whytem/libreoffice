@@ -47,6 +47,68 @@ struct BoundedCellInfoRequest
     std::optional<spreadsheetengine::api::String> moSheetName;
 };
 
+struct DirectCellInfoEvaluation
+{
+    InfoKind meKind = InfoKind::Unsupported;
+    spreadsheetengine::api::ValueResult<CellValue> maResult
+        = spreadsheetengine::api::ValueResult<CellValue>::failure(
+            spreadsheetengine::api::Error::IllegalArgument);
+    bool mbHandled = false;
+};
+
+[[nodiscard]] inline InfoKind classifyInfoType(const OUString& rInfoType);
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<CellValue> evaluateBoundedCellInfo(
+    InfoKind eKind, const BoundedCellInfoRequest& rRequest);
+
+class DirectCellInspectionAdapter
+{
+    const ScDocument& mrDocument;
+    ScAddress maFormulaPos;
+    formula::FormulaGrammar::AddressConvention meConvention
+        = formula::FormulaGrammar::CONV_OOO;
+
+public:
+    DirectCellInspectionAdapter(const ScDocument& rDocument, const ScAddress& rFormulaPos,
+        formula::FormulaGrammar::AddressConvention eConvention)
+        : mrDocument(rDocument)
+        , maFormulaPos(rFormulaPos)
+        , meConvention(eConvention)
+    {
+    }
+
+    [[nodiscard]] DirectCellInfoEvaluation evaluateLocalInfo(
+        const OUString& rInfoType, const ScAddress& rCellPos, const CellValue& rCellValue) const
+    {
+        DirectCellInfoEvaluation aEvaluation;
+        aEvaluation.meKind = classifyInfoType(rInfoType);
+        if (aEvaluation.meKind == InfoKind::Unsupported
+            || aEvaluation.meKind == InfoKind::Coord
+            || spreadsheetengine::runtime::cellinspection::isHostPropertyInfoKind(
+                aEvaluation.meKind))
+        {
+            return aEvaluation;
+        }
+
+        std::optional<spreadsheetengine::api::String> oSheetName;
+        if (aEvaluation.meKind == InfoKind::Address && rCellPos.Tab() != maFormulaPos.Tab())
+        {
+            OUString aSheetName;
+            mrDocument.GetName(rCellPos.Tab(), aSheetName);
+            oSheetName = toApiString(aSheetName);
+        }
+
+        BoundedCellInfoRequest aInfoRequest;
+        aInfoRequest.maAddress = toApiCellAddress(rCellPos);
+        aInfoRequest.maCellValue = rCellValue;
+        aInfoRequest.meConvention = meConvention;
+        aInfoRequest.moSheetName = oSheetName;
+        aEvaluation.maResult = evaluateBoundedCellInfo(aEvaluation.meKind, aInfoRequest);
+        aEvaluation.mbHandled = true;
+        return aEvaluation;
+    }
+};
+
 [[nodiscard]] inline InfoKind classifyInfoType(const OUString& rInfoType)
 {
     return spreadsheetengine::runtime::cellinspection::classifyInfoType(toApiString(rInfoType));

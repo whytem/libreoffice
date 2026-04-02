@@ -13,6 +13,7 @@
 
 #include <formula/errorcodes.hxx>
 #include <interpretercontext.hxx>
+#include <spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/Host.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
@@ -659,6 +660,82 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testDirectFormulaInspectionAdapter)
     CPPUNIT_ASSERT(!aMissingFormulaText);
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::Error::NotAvailable, aMissingFormulaText.meError);
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testDirectCellInspectionAdapter)
+{
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"DirectCellInspection"_ustr);
+    m_pDoc->InsertTab(1, u"bar"_ustr);
+
+    setValueCell(m_pDoc, 0, 42.5);
+    setTextCell(m_pDoc, 1, u"hello"_ustr);
+
+    const ScAddress aFormulaPos(0, 0, 0);
+    const ScAddress aValuePos(0, 0, 0);
+    const ScAddress aTextPos(1, 0, 0);
+    const ScAddress aOtherSheetPos(2, 9, 1);
+
+    spreadsheetengine::compat::libreoffice::cellinspectionexecution::
+        DirectCellInspectionAdapter aAdapter(
+            *m_pDoc, aFormulaPos, formula::FormulaGrammar::CONV_OOO);
+
+    auto getCellValue = [this](const ScAddress& rPos,
+                            spreadsheetengine::compat::libreoffice::HostCellStringKind eKind
+                                = spreadsheetengine::compat::libreoffice::HostCellStringKind::Raw)
+    {
+        const auto aValue
+            = spreadsheetengine::compat::libreoffice::readHostDocumentCellValue(*m_pDoc, rPos, eKind);
+        CPPUNIT_ASSERT(aValue);
+        return aValue.maValue;
+    };
+
+    const auto aColumn = aAdapter.evaluateLocalInfo(
+        u"COL"_ustr, aValuePos, getCellValue(aValuePos));
+    CPPUNIT_ASSERT(aColumn.mbHandled);
+    CPPUNIT_ASSERT(aColumn.maResult);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aColumn.maResult.maValue.mfNumber, 1e-12);
+
+    const auto aAddress = aAdapter.evaluateLocalInfo(
+        u"ADDRESS"_ustr, aValuePos, getCellValue(aValuePos));
+    CPPUNIT_ASSERT(aAddress.mbHandled);
+    CPPUNIT_ASSERT(aAddress.maResult);
+    CPPUNIT_ASSERT_EQUAL(u"$A$1"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aAddress.maResult.maValue.maString));
+
+    const auto aContents = aAdapter.evaluateLocalInfo(
+        u"CONTENTS"_ustr, aTextPos,
+        getCellValue(aTextPos, spreadsheetengine::compat::libreoffice::HostCellStringKind::Display));
+    CPPUNIT_ASSERT(aContents.mbHandled);
+    CPPUNIT_ASSERT(aContents.maResult);
+    CPPUNIT_ASSERT_EQUAL(u"hello"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aContents.maResult.maValue.maString));
+
+    const auto aType = aAdapter.evaluateLocalInfo(
+        u"TYPE"_ustr, aTextPos,
+        getCellValue(aTextPos, spreadsheetengine::compat::libreoffice::HostCellStringKind::Display));
+    CPPUNIT_ASSERT(aType.mbHandled);
+    CPPUNIT_ASSERT(aType.maResult);
+    CPPUNIT_ASSERT_EQUAL(u"l"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aType.maResult.maValue.maString));
+
+    const auto aSheet = aAdapter.evaluateLocalInfo(
+        u"SHEET"_ustr, aOtherSheetPos,
+        getCellValue(aOtherSheetPos,
+            spreadsheetengine::compat::libreoffice::HostCellStringKind::Display));
+    CPPUNIT_ASSERT(aSheet.mbHandled);
+    CPPUNIT_ASSERT(aSheet.maResult);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aSheet.maResult.maValue.mfNumber, 1e-12);
+
+    const auto aDeferred = aAdapter.evaluateLocalInfo(
+        u"WIDTH"_ustr, aValuePos, getCellValue(aValuePos));
+    CPPUNIT_ASSERT(!aDeferred.mbHandled);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::compat::libreoffice::cellinspectionexecution::InfoKind::Width,
+        aDeferred.meKind);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testLogicSharedCases)

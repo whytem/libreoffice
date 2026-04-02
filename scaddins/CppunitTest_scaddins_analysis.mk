@@ -9,6 +9,11 @@
 
 $(eval $(call gb_CppunitTest_CppunitTest,scaddins_analysis))
 
+$(eval $(call gb_CppunitTest_set_include,scaddins_analysis,\
+    $$(INCLUDE) \
+    -I$(SRCDIR)/spreadsheet_engine/inc \
+))
+
 $(eval $(call gb_CppunitTest_add_exception_objects,scaddins_analysis, \
     scaddins/qa/analysis \
 ))
@@ -16,6 +21,7 @@ $(eval $(call gb_CppunitTest_add_exception_objects,scaddins_analysis, \
 $(eval $(call gb_CppunitTest_use_libraries,scaddins_analysis, \
     comphelper \
     cppu \
+    spreadsheetengine \
     sal \
     test \
     unotest \
