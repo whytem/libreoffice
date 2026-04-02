@@ -77,27 +77,6 @@ struct DirectInfoInspectionEvaluation
     return InfoKind::Unsupported;
 }
 
-[[nodiscard]] inline bool isUnavailableInfoKind(InfoKind eKind)
-{
-    switch (eKind)
-    {
-        case InfoKind::Directory:
-        case InfoKind::MemAvail:
-        case InfoKind::MemUsed:
-        case InfoKind::Origin:
-        case InfoKind::TotMem:
-            return true;
-        case InfoKind::Unsupported:
-        case InfoKind::System:
-        case InfoKind::OSVersion:
-        case InfoKind::Release:
-        case InfoKind::NumFile:
-        case InfoKind::Recalc:
-            return false;
-    }
-    return false;
-}
-
 [[nodiscard]] inline spreadsheetengine::api::CellValue makeStaticInfoValue(InfoKind eKind)
 {
     switch (eKind)

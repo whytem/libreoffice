@@ -341,6 +341,8 @@ Phase 4 closeout notes:
 
 ### Phase 5. Remove Superseded Host-Service Wrappers
 
+Status: complete
+
 Delete or isolate the old packaging tail now that the selected facades are in
 place.
 
@@ -348,6 +350,21 @@ Target outcome:
 
 - one named host-service facade per touched boundary cluster
 - no ambiguous wrapper layers in the touched scope
+
+Phase 5 closeout notes:
+
+- the superseded add-in wrapper layer in
+  [analysisdefs.hxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysisdefs.hxx)
+  is gone: `FinancialDateContext`, `WorkdayHostContext`,
+  `getFinancialDateContext()`, `getWorkdayHostContext()`, and the old
+  `getNullDateParts()` helper no longer sit alongside the new
+  `AddInDateServiceContext` seam
+- the remaining TBILL host-date callers in
+  [financial.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/financial.cxx)
+  now use the add-in date-service context directly
+- the old `isUnavailableInfoKind()` helper was retired from
+  [InfoInspectionExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InfoInspectionExecution.hxx)
+  because the direct info adapter now owns that projection decision
 
 ### Phase 6. Revalidate And Close The Stream
 

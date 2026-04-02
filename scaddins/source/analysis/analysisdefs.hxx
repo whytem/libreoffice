@@ -56,18 +56,6 @@ struct HostDateContext
     spreadsheetengine::api::DateParts maNullDate;
 };
 
-struct FinancialDateContext
-{
-    HostDateContext maHostDate;
-    sal_Int32 mnBasis = 0;
-};
-
-struct WorkdayHostContext
-{
-    HostDateContext maHostDate;
-    std::vector<spreadsheetengine::api::DateSerial> maHolidaySerials;
-};
-
 struct AddInDateServiceContext
 {
     HostDateContext maHostDate;
@@ -96,24 +84,12 @@ inline AddInDateServiceContext getAddInDateServiceContext(
     return aContext;
 }
 
-inline spreadsheetengine::api::DateParts getNullDateParts(
-    const css::uno::Reference<css::beans::XPropertySet>& xOpt)
-{
-    return getAddInDateServiceContext(xOpt).maHostDate.maNullDate;
-}
-
 inline void populateHostHolidayList(sca::analysis::ScaAnyConverter& rAnyConv,
     const css::uno::Reference<css::beans::XPropertySet>& xOpt, const css::uno::Any& rHolidayAny,
     sal_Int32 nNullDate, sca::analysis::SortedIndividualInt32List& rHolidayList)
 {
     // Host-only: holiday expansion depends on document-facing add-in inputs.
     rHolidayList.InsertHolidayList(rAnyConv, xOpt, rHolidayAny, nNullDate);
-}
-
-inline FinancialDateContext getFinancialDateContext(
-    const css::uno::Reference<css::beans::XPropertySet>& xOpt, sal_Int32 nBasis)
-{
-    return { getHostDateContext(xOpt), nBasis };
 }
 
 inline std::vector<spreadsheetengine::api::DateSerial> collectHostHolidaySerialsFromAddInInputs(
@@ -132,16 +108,6 @@ inline std::vector<spreadsheetengine::api::DateSerial> collectHostHolidaySerials
             aHolidayList.Get(nIndex) - nNullDate));
     }
     return aHolidaySerials;
-}
-
-inline WorkdayHostContext getWorkdayHostContext(sca::analysis::ScaAnyConverter& rAnyConv,
-    const css::uno::Reference<css::beans::XPropertySet>& xOpt, const css::uno::Any& rHolidayAny)
-{
-    WorkdayHostContext aContext;
-    aContext.maHostDate = getAddInDateServiceContext(xOpt).maHostDate;
-    aContext.maHolidaySerials = collectHostHolidaySerialsFromAddInInputs(
-        rAnyConv, xOpt, rHolidayAny, aContext.maHostDate.mnNullDate);
-    return aContext;
 }
 
 inline AddInDateServiceContext getAddInDateServiceContext(sca::analysis::ScaAnyConverter& rAnyConv,

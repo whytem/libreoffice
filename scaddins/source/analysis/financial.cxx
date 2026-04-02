@@ -269,8 +269,9 @@ double SAL_CALL AnalysisAddIn::getTbilleq( const css::uno::Reference< css::beans
     sal_Int32 nSettle, sal_Int32 nMat, double fDisc )
 {
     nMat++;
+    const auto aHostContext = getAddInDateServiceContext(xOpt);
     sal_Int32 nDiff = static_cast<sal_Int32>(spreadsheetengine::api::calendar::diffDate360(
-        getNullDateParts(xOpt), nSettle, nMat, false));
+        aHostContext.maHostDate.maNullDate, nSettle, nMat, false));
     if( fDisc <= 0.0 || nSettle >= nMat || nDiff > 360 )
         throw css::lang::IllegalArgumentException();
     return valueOrThrow(
@@ -290,8 +291,9 @@ double SAL_CALL AnalysisAddIn::getTbillprice( const css::uno::Reference< css::be
 
 double SAL_CALL AnalysisAddIn::getTbillyield( const css::uno::Reference< css::beans::XPropertySet >& xOpt, sal_Int32 nSettle, sal_Int32 nMat, double fPrice )
 {
+    const auto aHostContext = getAddInDateServiceContext(xOpt);
     sal_Int32 nDiff = static_cast<sal_Int32>(spreadsheetengine::api::calendar::diffDate360(
-        getNullDateParts(xOpt), nSettle, nMat, false));
+        aHostContext.maHostDate.maNullDate, nSettle, nMat, false));
     nDiff++;
     if( fPrice <= 0.0 || nSettle >= nMat || nDiff > 360 )
         throw css::lang::IllegalArgumentException();
