@@ -8,8 +8,8 @@ documents live under [../archive/](../archive/).
 Current architecture docs:
 
 - [ENGINE_FIRST_CALC_ADOPTION.md](ENGINE_FIRST_CALC_ADOPTION.md) -
-  active frontier for widening engine-first execution inside Calc and
-  consolidating the post-extraction host boundary
+  completed adoption record and standing guardrails for widening engine-first
+  execution inside Calc while keeping the post-extraction host boundary clean
 
 - [EXECUTION_BACKEND_EXTRACTION.md](EXECUTION_BACKEND_EXTRACTION.md) -
   completed boundary record for evaluator-shell execution extraction on top of

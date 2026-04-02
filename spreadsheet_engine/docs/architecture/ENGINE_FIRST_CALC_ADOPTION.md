@@ -143,7 +143,7 @@ Validation:
 
 ### Phase 4. Baseline Lock-In
 
-Status: pending
+Status: complete
 
 Turn the zero-fallback promoted replay baseline into a stronger regression
 contract so wider engine-first adoption can proceed without silently weakening
@@ -158,9 +158,17 @@ Targets:
 Validation:
 
 - one-shot promoted-corpus replay summary with explicit zero-fallback
-  expectations
+  expectations via `spreadsheetengine_fods_replay_tests --summary
+  --assert-zero-fallback`
 - full focused Calc/standalone validation lane for touched surfaces
 - `git diff --check`
+
+## Current Standing Guardrail
+
+The adoption program is complete as a bounded implementation stream. The
+standing regression contract for the promoted replay corpus is now:
+
+`spreadsheetengine_fods_replay_tests --summary --assert-zero-fallback`
 
 ## Exit Direction
 

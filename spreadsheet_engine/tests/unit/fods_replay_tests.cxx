@@ -1471,6 +1471,7 @@ int main(int argc, char** argv)
     bool bNativeLowerSmoke = false;
     bool bCompiledDiff = false;
     bool bLegacyOnly = false;
+    bool bAssertZeroFallback = false;
     bool bSawPathArgument = false;
     if (argc > 1)
     {
@@ -1499,6 +1500,12 @@ int main(int argc, char** argv)
             if (std::string_view(argv[nIndex]) == "--legacy-only")
             {
                 bLegacyOnly = true;
+                continue;
+            }
+            if (std::string_view(argv[nIndex]) == "--assert-zero-fallback")
+            {
+                bAssertZeroFallback = true;
+                bSummary = true;
                 continue;
             }
 
@@ -1538,6 +1545,11 @@ int main(int argc, char** argv)
         }
 
         printSummary(aSummary);
+        if (bAssertZeroFallback && aSummary.mnCachedFallbackCells != 0)
+        {
+            return fail("spreadsheetengine_fods_replay_tests",
+                "cached fallback remained in promoted replay corpus");
+        }
         return EXIT_SUCCESS;
     }
 

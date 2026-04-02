@@ -54,9 +54,9 @@ Today:
 - the promoted Calc FODS replay corpus is fully green with zero cached fallback
 
 The active work is no longer replay promotion, compiler switchover, or
-execution-shell extraction. Those programs are complete. The main frontier is
-now widening engine-first adoption inside Calc while keeping the host boundary
-clean and explicit. The active go-forward plan for that work lives in
+execution-shell extraction. Those programs are complete. The engine-first Calc
+adoption program is also complete as a bounded workstream, and its standing
+guardrails now live in
 [ENGINE_FIRST_CALC_ADOPTION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ENGINE_FIRST_CALC_ADOPTION.md).
 
 ## Verified Baseline
@@ -87,7 +87,7 @@ This baseline is maintained by a combined validation lane that includes:
 
 - standalone evaluator and runtime unit tests
 - Calc Cppunit coverage for extracted bridges and shared behavior
-- one-shot `spreadsheetengine_fods_replay_tests --summary`
+- one-shot `spreadsheetengine_fods_replay_tests --summary --assert-zero-fallback`
 - diff hygiene checks
 
 ## What The Engine Owns Today
