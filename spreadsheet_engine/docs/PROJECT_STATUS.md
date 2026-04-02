@@ -214,24 +214,17 @@ around historical milestone names.
 
 ### 1. Deepen Engine-First Execution Inside Calc
 
-This is the highest-priority stream.
+The current deepening stream is complete for the identified safe adoption
+surface.
 
-The goal is to make the extracted engine-owned execution helpers the default
-path in more production Calc call sites, while leaving storage and host
-services in Calc.
+That work widened default Calc use of engine-owned calendar, financial, and
+execution helpers, removed the superseded local semantic tail in the touched
+add-in surface, and left the remaining local code explicitly host-only.
 
-The immediate target areas are:
+Future widening should continue, but now as new bounded slices selected from a
+fresh inventory rather than as unfinished work from the current plan.
 
-- widening use of engine-owned runtime and compat helpers in Calc
-- removing legacy Calc-local call paths where the shared path is already
-  proven
-- keeping Calc adapters thin and explicit
-
-Success looks like a simpler Calc host shell whose remaining logic is clearly
-host-only and whose production execution paths rely on engine-owned semantics
-by default.
-
-The detailed implementation guide for this stream is:
+The detailed implementation and closeout record for that stream is:
 
 - [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](architecture/DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md)
 

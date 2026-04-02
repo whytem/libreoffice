@@ -12,7 +12,7 @@ document and application host.
 This is not a new replay or extraction program. It is an adoption and boundary
 consolidation program.
 
-The detailed implementation plan for the next execution-widening stream lives
+The detailed implementation and closeout record for the next execution-widening stream lives
 in [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md).
 
 ## Goals

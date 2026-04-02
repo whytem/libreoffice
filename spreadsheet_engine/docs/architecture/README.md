@@ -8,8 +8,8 @@ documents live under [../archive/](../archive/).
 Current architecture docs:
 
 - [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md) -
-  detailed implementation plan for widening engine-owned execution as the
-  default path in more production Calc call sites
+  completed implementation and closeout record for widening engine-owned
+  execution as the default path in more production Calc call sites
 - [ENGINE_FIRST_CALC_ADOPTION.md](ENGINE_FIRST_CALC_ADOPTION.md) -
   completed adoption record and standing guardrails for widening engine-first
   execution inside Calc while keeping the post-extraction host boundary clean

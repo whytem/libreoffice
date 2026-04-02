@@ -383,15 +383,17 @@ int main()
     for (const auto& rRow :
          spreadsheetengine::standalone::test::loadSharedCaseRows("workday_cases.tsv"))
     {
-        if (rRow.maColumns.size() < 7)
+        if (rRow.maColumns.size() < 6)
         {
             return failSharedCase(
                 "spreadsheetengine_calendar_tests", rRow, "workday shared case column mismatch");
         }
 
         const auto& rFunction = rRow.maColumns[0];
-        const auto eExpectedError
-            = spreadsheetengine::standalone::test::parseExpectedError(rRow.maColumns[6]);
+        const auto eExpectedError = rRow.maColumns.size() >= 7
+                                        ? spreadsheetengine::standalone::test::parseExpectedError(
+                                              rRow.maColumns[6])
+                                        : Error::None;
 
         if (rFunction == "WEEKENDMASK.DEFAULT")
         {

@@ -43,6 +43,8 @@ The program is complete when all of the following are true:
 5. Calc and standalone validation lanes remain green for every widened
    engine-first slice
 
+Status: complete
+
 ## Workstreams
 
 ### 1. Freeze The Remaining Adoption Inventory
@@ -339,7 +341,7 @@ Phase 5 made that retained boundary explicit in both code and docs:
 
 ### Phase 6. Revalidate And Close The Stream
 
-Status: pending
+Status: complete
 
 Run the full standing validation contract, then close the stream in the docs as
 completed rather than active.
@@ -350,6 +352,10 @@ Closeout standard:
 - zero-fallback replay remains enforced
 - the docs describe the deepened engine-first boundary in present tense
 - any remaining work is a genuinely new frontier
+
+Phase 6 revalidated the settled baseline and closes this stream as complete.
+Further widening work should now be treated as new bounded adoption slices
+rather than unfinished cleanup from this plan.
 
 ## Recommended Execution Order
 
