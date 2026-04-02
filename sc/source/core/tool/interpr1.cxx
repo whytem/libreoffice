@@ -73,13 +73,13 @@
 #include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/Host.hxx>
+#include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
 #include <spreadsheetengine/runtime/MathAggregate.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
 #include <spreadsheetengine/compat/libreoffice/Address.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <spreadsheetengine/compat/libreoffice/Grammar.hxx>
-#include <spreadsheetengine/compat/libreoffice/Parsing.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextServices.hxx>
 #include <rangeutl.hxx>
@@ -121,6 +121,7 @@ namespace seformulainspect = spreadsheetengine::compat::libreoffice::formulainsp
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace selookupexec = spreadsheetengine::compat::libreoffice::lookupexecution;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
+namespace setextparseexec = spreadsheetengine::compat::libreoffice::textparsingexecution;
 
 namespace
 {
@@ -3545,7 +3546,8 @@ void ScInterpreter::ScValue()
             break;
     }
 
-    const auto aResult = selibreoffice::parseValueFromText(mrDoc, mrContext, aInputString);
+    const setextparseexec::DirectTextParsingAdapter aAdapter(mrDoc, mrContext);
+    const auto aResult = aAdapter.evaluateValue(aInputString);
     if (aResult)
         PushDouble(aResult.maValue);
     else
@@ -3580,8 +3582,10 @@ void ScInterpreter::ScNumberValue()
         return;
     }
 
-    const auto aResult = selibreoffice::parseNumberValue(
-        aInputString, oDecimalSeparator, oGroupSeparator, maCalcConfig.mbEmptyStringAsZero);
+    const setextparseexec::DirectTextParsingAdapter aAdapter(
+        mrDoc, mrContext, maCalcConfig.mbEmptyStringAsZero);
+    const auto aResult = aAdapter.evaluateNumberValue(
+        aInputString, oDecimalSeparator, oGroupSeparator);
     if (aResult)
     {
         PushDouble(aResult.maValue);

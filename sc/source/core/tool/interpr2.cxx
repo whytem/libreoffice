@@ -54,9 +54,9 @@
 #include <spreadsheetengine/runtime/MathScalar.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
-#include <spreadsheetengine/compat/libreoffice/Parsing.hxx>
 #include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
+#include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
 
 #include <com/sun/star/sheet/DataPilotFieldFilter.hpp>
 
@@ -69,6 +69,7 @@ namespace semath = spreadsheetengine::core::math;
 namespace seconvert = spreadsheetengine::core::convert;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
+namespace setextparseexec = spreadsheetengine::compat::libreoffice::textparsingexecution;
 
 #define SCdEpsilon                1.0E-7
 
@@ -151,7 +152,8 @@ void ScInterpreter::ScGetHour()
 void ScInterpreter::ScGetDateValue()
 {
     OUString aInputString = GetString().getString();
-    const auto aResult = selibreoffice::parseDateValueFromText(mrDoc, mrContext, aInputString);
+    const setextparseexec::DirectTextParsingAdapter aAdapter(mrDoc, mrContext);
+    const auto aResult = aAdapter.evaluateDateValue(aInputString);
     if (aResult)
     {
         nFuncFmtType = SvNumFormatType::DATE;
@@ -530,7 +532,8 @@ void ScInterpreter::ScGetDateDif()
 void ScInterpreter::ScGetTimeValue()
 {
     OUString aInputString = GetString().getString();
-    const auto aResult = selibreoffice::parseTimeValueFromText(mrDoc, mrContext, aInputString);
+    const setextparseexec::DirectTextParsingAdapter aAdapter(mrDoc, mrContext);
+    const auto aResult = aAdapter.evaluateTimeValue(aInputString);
     if (aResult)
     {
         nFuncFmtType = SvNumFormatType::TIME;
