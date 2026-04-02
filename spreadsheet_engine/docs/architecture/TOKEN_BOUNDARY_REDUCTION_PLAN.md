@@ -345,6 +345,8 @@ Closeout result:
 
 ### Phase 4. Normalize The Touched Helper Vocabulary
 
+Status: complete
+
 Once the first seams are in place, clean up the helper signatures and naming so
 the adopted surfaces read as engine/compat contracts rather than Calc-local
 internals.
@@ -361,6 +363,14 @@ Closeout standard:
   vocabulary
 - code review of the touched surfaces no longer requires deep Calc-internal
   context to understand the seam
+
+Closeout result:
+
+- `AREAS` now asks the compat layer for `referenceOperandAreaCount(...)`
+  instead of open-coding its token-type-to-area-count mapping in the
+  interpreter body
+- the touched area-count logic now speaks in reference-operand terms through
+  `ReferenceExecution.hxx` rather than as a Calc-local token switch
 
 ### Phase 5. Mark Retain/Defer Host Paths Explicitly
 

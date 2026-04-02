@@ -9627,44 +9627,36 @@ void ScInterpreter::ScAreas()
     if (!MustHaveParamCount( nParamCount, 1))
         return;
 
-    double fCount = 0.0;
-    switch (GetStackType())
+    FormulaConstTokenRef xT = PopToken();
+    if (!xT || !serefexec::isReferenceOperandToken(*xT))
     {
-        case svSingleRef:
-            {
-                FormulaConstTokenRef xT = PopToken();
-                ValidateRef( *xT->GetSingleRef());
-                const auto aCount = serefexec::countAreas(1);
-                if (!aCount)
-                    SetError(selibreoffice::toFormulaError(aCount.meError));
-                else
-                    fCount = aCount.maValue;
-            }
+        SetError(FormulaError::IllegalParameter);
+        PushDouble(0.0);
+        return;
+    }
+
+    double fCount = 0.0;
+    switch (xT->GetType())
+    {
+        case formula::svSingleRef:
+            ValidateRef(*xT->GetSingleRef());
             break;
-        case svDoubleRef:
-            {
-                FormulaConstTokenRef xT = PopToken();
-                ValidateRef( *xT->GetDoubleRef());
-                const auto aCount = serefexec::countAreas(1);
-                if (!aCount)
-                    SetError(selibreoffice::toFormulaError(aCount.meError));
-                else
-                    fCount = aCount.maValue;
-            }
+        case formula::svDoubleRef:
+            ValidateRef(*xT->GetDoubleRef());
             break;
-        case svRefList:
-            {
-                FormulaConstTokenRef xT = PopToken();
-                ValidateRef( *(xT->GetRefList()));
-                const auto aCount = serefexec::countAreas(xT->GetRefList()->size());
-                if (!aCount)
-                    SetError(selibreoffice::toFormulaError(aCount.meError));
-                else
-                    fCount = aCount.maValue;
-            }
+        case formula::svRefList:
+            ValidateRef(*xT->GetRefList());
             break;
         default:
-            SetError( FormulaError::IllegalParameter);
+            break;
+    }
+
+    const auto aCount = serefexec::referenceOperandAreaCount(*xT);
+    if (!aCount)
+        SetError(selibreoffice::toFormulaError(aCount.meError));
+    else
+    {
+        fCount = aCount.maValue;
     }
     PushDouble(fCount);
 }

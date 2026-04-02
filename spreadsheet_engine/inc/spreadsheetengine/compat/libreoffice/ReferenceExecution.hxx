@@ -214,6 +214,22 @@ inline void appendReferenceOperandEntries(ScRefList& rReferences, const formula:
     return aReferences;
 }
 
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<double> referenceOperandAreaCount(
+    const formula::FormulaToken& rToken)
+{
+    switch (rToken.GetType())
+    {
+        case formula::svSingleRef:
+        case formula::svDoubleRef:
+            return countAreas(1);
+        case formula::svRefList:
+            return countAreas(rToken.GetRefList()->size());
+        default:
+            return spreadsheetengine::api::ValueResult<double>::failure(
+                spreadsheetengine::api::Error::IllegalArgument);
+    }
+}
+
 [[nodiscard]] inline bool allSingleCellReferences(const ScRefList& rReferences)
 {
     for (const auto& rRef : rReferences)
