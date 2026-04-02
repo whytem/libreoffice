@@ -1251,6 +1251,20 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncCELL)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncINFO)
+{
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet", m_pDoc->InsertTab(0, u"foo"_ustr));
+
+    m_pDoc->SetString(0, 0, 0, u"=INFO(\"NUMFILE\")"_ustr);
+    m_pDoc->SetString(0, 1, 0, u"=INFO(\"MEMAVAIL\")"_ustr);
+    m_pDoc->CalcAll();
+
+    CPPUNIT_ASSERT_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
+    CPPUNIT_ASSERT_EQUAL(u"#N/A"_ustr, m_pDoc->GetString(ScAddress(0, 1, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
 /** See also test case document fdo#44456 sheet cpearson */
 CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncDATEDIF)
 {

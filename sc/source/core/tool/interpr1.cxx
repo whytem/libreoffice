@@ -65,6 +65,7 @@
 #include <spreadsheetengine/api/StringReference.hxx>
 #include <spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/InfoInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/IndirectExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
 #include <spreadsheetengine/compat/libreoffice/JumpExecution.hxx>
@@ -2408,11 +2409,6 @@ void ScInterpreter::ScType()
 
 namespace {
 
-void getFormatString(const ScInterpreterContext& rContext, sal_uLong nFormat, OUString& rFmtStr)
-{
-    rFmtStr = rContext.NFGetCalcCellReturn(nFormat);
-}
-
 FormulaGrammar::AddressConvention resolveCellInfoAddressConvention(
     const ScCalcConfig& rConfig, const ScDocument& rDoc)
 {
@@ -2426,97 +2422,6 @@ FormulaGrammar::AddressConvention resolveCellInfoAddressConvention(
         case FormulaGrammar::CONV_XL_R1C1:
             return eConv;
     }
-}
-
-spreadsheetengine::api::CellValue makeHostLocalCellFilenamePropertyValue(
-    const ScDocument& rDoc, SCTAB nTab, FormulaGrammar::AddressConvention eConvention)
-{
-    OUString aFuncResult;
-    if (nTab >= rDoc.GetTableCount())
-        return secellexec::makeFilenameValue(aFuncResult);
-
-    if (rDoc.GetLinkMode(nTab) == ScLinkMode::VALUE)
-        rDoc.GetName(nTab, aFuncResult);
-    else
-    {
-        ScDocShell* pShell = rDoc.GetDocumentShell();
-        if (pShell && pShell->GetMedium())
-        {
-            const INetURLObject& rURLObj = pShell->GetMedium()->GetURLObject();
-            OUString aTabName;
-            rDoc.GetName(nTab, aTabName);
-            aFuncResult = secellexec::formatLocalFilenameInfo(
-                rURLObj, aTabName, eConvention, comphelper::LibreOfficeKit::isActive());
-        }
-    }
-    return secellexec::makeFilenameValue(aFuncResult);
-}
-
-std::optional<spreadsheetengine::api::CellValue> makeHostExternalCellFilenamePropertyValue(
-    ScExternalRefManager& rRefMgr, sal_uInt16 nFileId, const OUString& rTabName,
-    FormulaGrammar::AddressConvention eConvention)
-{
-    const OUString* pFileName = rRefMgr.getExternalFileName(nFileId);
-    if (!pFileName)
-        return std::nullopt;
-    return secellexec::makeFilenameValue(
-        secellexec::formatExternalFilenameInfo(*pFileName, rTabName, eConvention));
-}
-
-spreadsheetengine::api::CellValue makeHostCellWidthPropertyValue(
-    ScDocument& rDoc, const ScAddress& rCellPos)
-{
-    Printer* pPrinter = rDoc.GetPrinter();
-    MapMode aOldMode(pPrinter->GetMapMode());
-    vcl::Font aOldFont(pPrinter->GetFont());
-    vcl::Font aDefFont;
-
-    pPrinter->SetMapMode(MapMode(MapUnit::MapTwip));
-    rDoc.getCellAttributeHelper().getDefaultCellAttribute().fillFontOnly(aDefFont, pPrinter);
-    pPrinter->SetFont(aDefFont);
-    const tools::Long nZeroWidth = pPrinter->GetTextWidth(OUString('0'));
-    assert(nZeroWidth != 0);
-    pPrinter->SetFont(aOldFont);
-    pPrinter->SetMapMode(aOldMode);
-    const int nZeroCount
-        = static_cast<int>(rDoc.GetColWidth(rCellPos.Col(), rCellPos.Tab()) / nZeroWidth);
-    return secellexec::makeWidthValue(nZeroCount);
-}
-
-spreadsheetengine::api::CellValue makeHostCellPrefixPropertyValue(
-    const ScDocument& rDoc, const ScAddress& rCellPos, bool bHasString)
-{
-    const SvxHorJustifyItem& rJustAttr = rDoc.GetAttr(rCellPos, ATTR_HOR_JUSTIFY);
-    return secellexec::makePrefixValue(bHasString, rJustAttr.GetValue());
-}
-
-spreadsheetengine::api::CellValue makeHostCellProtectPropertyValue(
-    const ScDocument& rDoc, const ScAddress& rCellPos)
-{
-    const ScProtectionAttr& rProtAttr = rDoc.GetAttr(rCellPos, ATTR_PROTECTION);
-    return secellexec::makeFlagValue(rProtAttr.GetProtection());
-}
-
-spreadsheetengine::api::CellValue makeHostCellFormatPropertyValue(
-    const ScInterpreterContext& rContext, sal_uInt32 nFormat)
-{
-    OUString aFuncResult;
-    getFormatString(rContext, nFormat, aFuncResult);
-    return secellexec::makeFormatValue(aFuncResult);
-}
-
-spreadsheetengine::api::CellValue makeHostCellColorPropertyValue(
-    const ScInterpreterContext& rContext, sal_uInt32 nFormat)
-{
-    const SvNumberformat* pFormat = rContext.NFGetFormatEntry(nFormat);
-    return secellexec::makeFlagValue(secellexec::formatHasNegativeColor(pFormat));
-}
-
-spreadsheetengine::api::CellValue makeHostCellParenthesesPropertyValue(
-    const ScInterpreterContext& rContext, sal_uInt32 nFormat)
-{
-    const SvNumberformat* pFormat = rContext.NFGetFormatEntry(nFormat);
-    return secellexec::makeFlagValue(secellexec::formatHasOpenParenthesis(pFormat));
 }
 
 }
@@ -2615,7 +2520,7 @@ void ScInterpreter::ScCell()
         {
             case secellexec::InfoKind::Filename:
             {
-                pushApiCellValue(makeHostLocalCellFilenamePropertyValue(
+                pushApiCellValue(secellexec::makeLocalFilenamePropertyValue(
                     mrDoc, aCellPos.Tab(), eAddressConvention));
                 break;
             }
@@ -2636,35 +2541,35 @@ void ScInterpreter::ScCell()
             }
             case secellexec::InfoKind::Width:
             {
-                pushApiCellValue(makeHostCellWidthPropertyValue(mrDoc, aCellPos));
+                pushApiCellValue(secellexec::makeWidthPropertyValue(mrDoc, aCellPos));
                 break;
             }
             case secellexec::InfoKind::Prefix:
             {
                 pushApiCellValue(
-                    makeHostCellPrefixPropertyValue(mrDoc, aCellPos, aCell.hasString()));
+                    secellexec::makePrefixPropertyValue(mrDoc, aCellPos, aCell.hasString()));
                 break;
             }
             case secellexec::InfoKind::Protect:
             {
-                pushApiCellValue(makeHostCellProtectPropertyValue(mrDoc, aCellPos));
+                pushApiCellValue(secellexec::makeProtectPropertyValue(mrDoc, aCellPos));
                 break;
             }
             case secellexec::InfoKind::Format:
             {
                 pushApiCellValue(
-                    makeHostCellFormatPropertyValue(mrContext, mrDoc.GetNumberFormat(ScRange(aCellPos))));
+                    secellexec::makeFormatPropertyValue(mrContext, mrDoc.GetNumberFormat(ScRange(aCellPos))));
                 break;
             }
             case secellexec::InfoKind::Color:
             {
                 pushApiCellValue(
-                    makeHostCellColorPropertyValue(mrContext, mrDoc.GetNumberFormat(ScRange(aCellPos))));
+                    secellexec::makeColorPropertyValue(mrContext, mrDoc.GetNumberFormat(ScRange(aCellPos))));
                 break;
             }
             case secellexec::InfoKind::Parentheses:
             {
-                pushApiCellValue(makeHostCellParenthesesPropertyValue(
+                pushApiCellValue(secellexec::makeParenthesesPropertyValue(
                     mrContext, mrDoc.GetNumberFormat(ScRange(aCellPos))));
                 break;
             }
@@ -2765,7 +2670,7 @@ void ScInterpreter::ScCellExternal()
         }
         case secellexec::InfoKind::Filename:
         {
-            const auto aValue = makeHostExternalCellFilenamePropertyValue(
+            const auto aValue = secellexec::makeExternalFilenamePropertyValue(
                 *pRefMgr, nFileId, aTabName, resolveCellInfoAddressConvention(maCalcConfig, mrDoc));
             if (!aValue)
             {
@@ -2812,18 +2717,18 @@ void ScInterpreter::ScCellExternal()
         case secellexec::InfoKind::Format:
         {
             pushApiCellValue(
-                makeHostCellFormatPropertyValue(mrContext, aFmt.mbIsSet ? aFmt.mnIndex : 0));
+                secellexec::makeFormatPropertyValue(mrContext, aFmt.mbIsSet ? aFmt.mnIndex : 0));
             break;
         }
         case secellexec::InfoKind::Color:
         {
             pushApiCellValue(
-                makeHostCellColorPropertyValue(mrContext, aFmt.mbIsSet ? aFmt.mnIndex : 0));
+                secellexec::makeColorPropertyValue(mrContext, aFmt.mbIsSet ? aFmt.mnIndex : 0));
             break;
         }
         case secellexec::InfoKind::Parentheses:
         {
-            pushApiCellValue(makeHostCellParenthesesPropertyValue(
+            pushApiCellValue(secellexec::makeParenthesesPropertyValue(
                 mrContext, aFmt.mbIsSet ? aFmt.mnIndex : 0));
             break;
         }

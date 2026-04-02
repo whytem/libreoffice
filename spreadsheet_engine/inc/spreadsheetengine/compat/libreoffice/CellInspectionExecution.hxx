@@ -12,8 +12,16 @@
 #include <optional>
 
 #include <address.hxx>
+#include <comphelper/lok.hxx>
+#include <document.hxx>
+#include <docsh.hxx>
 #include <editeng/justifyitem.hxx>
+#include <externalrefmgr.hxx>
 #include <formula/grammar.hxx>
+#include <interpretercontext.hxx>
+#include <patattr.hxx>
+#include <sfx2/docfile.hxx>
+#include <sfx2/printer.hxx>
 #include <svl/numformat.hxx>
 #include <svl/zformat.hxx>
 #include <tools/urlobj.hxx>
@@ -81,6 +89,48 @@ struct BoundedCellInfoRequest
 [[nodiscard]] inline spreadsheetengine::api::CellValue makeFormatValue(const OUString& rValue)
 {
     return spreadsheetengine::runtime::cellinspection::textPropertyValue(toApiString(rValue));
+}
+
+[[nodiscard]] inline OUString formatLocalFilenameInfo(
+    const INetURLObject& rUrlObject, const OUString& rTabName,
+    formula::FormulaGrammar::AddressConvention eConvention, bool bLibreOfficeKitActive);
+
+[[nodiscard]] inline OUString formatExternalFilenameInfo(
+    const OUString& rFileName, const OUString& rTabName,
+    formula::FormulaGrammar::AddressConvention eConvention);
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeLocalFilenamePropertyValue(
+    const ScDocument& rDoc, SCTAB nTab, formula::FormulaGrammar::AddressConvention eConvention)
+{
+    OUString aFuncResult;
+    if (nTab >= rDoc.GetTableCount())
+        return makeFilenameValue(aFuncResult);
+
+    if (rDoc.GetLinkMode(nTab) == ScLinkMode::VALUE)
+        rDoc.GetName(nTab, aFuncResult);
+    else
+    {
+        ScDocShell* pShell = rDoc.GetDocumentShell();
+        if (pShell && pShell->GetMedium())
+        {
+            const INetURLObject& rUrlObject = pShell->GetMedium()->GetURLObject();
+            OUString aTabName;
+            rDoc.GetName(nTab, aTabName);
+            aFuncResult = formatLocalFilenameInfo(
+                rUrlObject, aTabName, eConvention, comphelper::LibreOfficeKit::isActive());
+        }
+    }
+    return makeFilenameValue(aFuncResult);
+}
+
+[[nodiscard]] inline std::optional<spreadsheetengine::api::CellValue>
+makeExternalFilenamePropertyValue(ScExternalRefManager& rRefMgr, sal_uInt16 nFileId,
+    const OUString& rTabName, formula::FormulaGrammar::AddressConvention eConvention)
+{
+    const OUString* pFileName = rRefMgr.getExternalFileName(nFileId);
+    if (!pFileName)
+        return std::nullopt;
+    return makeFilenameValue(formatExternalFilenameInfo(*pFileName, rTabName, eConvention));
 }
 
 [[nodiscard]] inline spreadsheetengine::api::CellValue makeWidthValue(sal_Int32 nZeroCount)
@@ -198,6 +248,60 @@ struct BoundedCellInfoRequest
 
     return spreadsheetengine::api::ValueResult<CellValue>::failure(
         spreadsheetengine::api::Error::IllegalArgument);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeWidthPropertyValue(
+    ScDocument& rDoc, const ScAddress& rCellPos)
+{
+    Printer* pPrinter = rDoc.GetPrinter();
+    MapMode aOldMode(pPrinter->GetMapMode());
+    vcl::Font aOldFont(pPrinter->GetFont());
+    vcl::Font aDefFont;
+
+    pPrinter->SetMapMode(MapMode(MapUnit::MapTwip));
+    rDoc.getCellAttributeHelper().getDefaultCellAttribute().fillFontOnly(aDefFont, pPrinter);
+    pPrinter->SetFont(aDefFont);
+    const tools::Long nZeroWidth = pPrinter->GetTextWidth(OUString('0'));
+    assert(nZeroWidth != 0);
+    pPrinter->SetFont(aOldFont);
+    pPrinter->SetMapMode(aOldMode);
+    const int nZeroCount
+        = static_cast<int>(rDoc.GetColWidth(rCellPos.Col(), rCellPos.Tab()) / nZeroWidth);
+    return makeWidthValue(nZeroCount);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makePrefixPropertyValue(
+    const ScDocument& rDoc, const ScAddress& rCellPos, bool bHasString)
+{
+    const SvxHorJustifyItem& rJustAttr = rDoc.GetAttr(rCellPos, ATTR_HOR_JUSTIFY);
+    return makePrefixValue(bHasString, rJustAttr.GetValue());
+}
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeProtectPropertyValue(
+    const ScDocument& rDoc, const ScAddress& rCellPos)
+{
+    const ScProtectionAttr& rProtAttr = rDoc.GetAttr(rCellPos, ATTR_PROTECTION);
+    return makeFlagValue(rProtAttr.GetProtection());
+}
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeFormatPropertyValue(
+    const ScInterpreterContext& rContext, sal_uInt32 nFormat)
+{
+    return makeFormatValue(rContext.NFGetCalcCellReturn(nFormat));
+}
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeColorPropertyValue(
+    const ScInterpreterContext& rContext, sal_uInt32 nFormat)
+{
+    const SvNumberformat* pFormat = rContext.NFGetFormatEntry(nFormat);
+    return makeFlagValue(formatHasNegativeColor(pFormat));
+}
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue makeParenthesesPropertyValue(
+    const ScInterpreterContext& rContext, sal_uInt32 nFormat)
+{
+    const SvNumberformat* pFormat = rContext.NFGetFormatEntry(nFormat);
+    return makeFlagValue(formatHasOpenParenthesis(pFormat));
 }
 
 } // namespace spreadsheetengine::compat::libreoffice::cellinspectionexecution

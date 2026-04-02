@@ -40,10 +40,14 @@
 #include <cellkeytranslator.hxx>
 #include <formulagroup.hxx>
 #include <vcl/svapp.hxx> //Application::
+#include <spreadsheetengine/compat/libreoffice/InfoInspectionExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/String.hxx>
 
 #include <vector>
 
 using namespace formula;
+namespace selibreoffice = spreadsheetengine::compat::libreoffice;
+namespace seinfoexec = spreadsheetengine::compat::libreoffice::infoinspectionexecution;
 
 namespace {
 
@@ -3336,9 +3340,10 @@ void ScInterpreter::ScInfo()
 
     OUString aStr = GetString().getString();
     ScCellKeywordTranslator::transKeyword(aStr, ScGlobal::GetLocale(), ocInfo);
-    if( aStr == "SYSTEM" )
-        PushString( u"" SC_INFO_OSVERSION ""_ustr );
-    else if( aStr == "OSVERSION" )
+    const auto eInfoKind = seinfoexec::classifyInfoType(aStr);
+    if (eInfoKind == seinfoexec::InfoKind::System)
+        PushString(selibreoffice::toLibreOfficeString(seinfoexec::makeStaticInfoValue(eInfoKind).maString));
+    else if( eInfoKind == seinfoexec::InfoKind::OSVersion )
 #if (defined LINUX || defined __FreeBSD__)
         PushString(Application::GetOSVersion());
 #elif defined MACOSX
@@ -3348,13 +3353,13 @@ void ScInterpreter::ScInfo()
         // TODO tdf#140286 handle Windows version to get a result compatible to Excel
         PushString( "Windows (32-bit) NT 5.01" );
 #endif
-    else if( aStr == "RELEASE" )
+    else if( eInfoKind == seinfoexec::InfoKind::Release )
         PushString( ::utl::Bootstrap::getBuildIdData( OUString() ) );
-    else if( aStr == "NUMFILE" )
-        PushDouble( 1 );
-    else if( aStr == "RECALC" )
+    else if( eInfoKind == seinfoexec::InfoKind::NumFile )
+        PushDouble( seinfoexec::makeStaticInfoValue(eInfoKind).mfNumber );
+    else if( eInfoKind == seinfoexec::InfoKind::Recalc )
         PushString( ScResId( mrDoc.GetAutoCalc() ? STR_RECALC_AUTO : STR_RECALC_MANUAL ) );
-    else if (aStr == "DIRECTORY" || aStr == "MEMAVAIL" || aStr == "MEMUSED" || aStr == "ORIGIN" || aStr == "TOTMEM")
+    else if (seinfoexec::isUnavailableInfoKind(eInfoKind))
         PushNA();
     else
         PushIllegalArgument();
