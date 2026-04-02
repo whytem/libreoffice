@@ -228,6 +228,8 @@ Completion criteria:
 
 ### Phase 1. Freeze And Publish The Host-Service Inventory
 
+Status: complete
+
 Create the explicit candidate table for retained host-service-heavy production
 paths.
 
@@ -239,6 +241,25 @@ Initial inventory targets:
 | add-in null-date and holiday-list service assembly | [analysis.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysis.cxx), [analysisdefs.hxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysisdefs.hxx) | repeated host-service assembly still appears in multiple add-in entry clusters | `needs small seam` | converge onto one explicit host-service context seam | `CppunitTest_scaddins_analysis`, replay summary | Phase 3 |
 | retained host-heavy `CELL(...)` property and bounded `INFO(...)` projection tail | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx), [interpr5.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr5.cxx) | ownership is intentionally host-only, but service projection can still be narrowed | `needs small seam` | move the touched projection/setup behind smaller named host facades | `CppunitTest_sc_ucalc_formula2`, replay summary | Phase 4 |
 | pure environment services with no spreadsheet-semantic payoff outside Calc | [interpr5.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr5.cxx) and supporting document-service files | ownership is fully host-only and packaging is already minimal enough | `intentionally host-only` | retain in Calc and document why | focused Calc coverage only | retain |
+
+Phase 1 closeout notes:
+
+- the external-reference candidate is now narrowed to the production shell in
+  [ScCellExternal()](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx)
+  plus the adjacent filename/address/format projection helpers in
+  [CellInspectionExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx)
+- the add-in service candidate is confirmed as the remaining null-date and
+  holiday-list context assembly in
+  [analysisdefs.hxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysisdefs.hxx)
+  and
+  [analysis.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysis.cxx)
+- the host-heavy inspection candidate is confirmed as the retained local
+  `CELL(...)` property tail in
+  [ScCell()](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx)
+  and the bounded `INFO(...)` projection path in
+  [ScInfo()](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr5.cxx)
+- pure environment services with no spreadsheet-semantic payoff outside Calc
+  are explicitly retained as host-only for this stream
 
 ### Phase 2. Narrow The External-Reference Facade
 
