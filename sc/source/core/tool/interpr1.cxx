@@ -72,6 +72,7 @@
 #include <spreadsheetengine/compat/libreoffice/LetExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/Host.hxx>
 #include <spreadsheetengine/runtime/MathAggregate.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
@@ -2563,29 +2564,8 @@ void ScInterpreter::ScCell()
 
         ScCellKeywordTranslator::transKeyword(aInfoType, ScGlobal::GetLocale(), ocCell);
         const auto makeApiCellValue = [&]() -> spreadsheetengine::api::CellValue {
-            if (aCell.isEmpty())
-                return spreadsheetengine::api::CellValue::empty();
-
-            if (aCell.hasError())
-            {
-                FormulaError eError = mrDoc.GetErrCode(aCellPos);
-                if (aCell.getType() == CELLTYPE_FORMULA && aCell.getFormula())
-                    eError = aCell.getFormula()->GetErrCode();
-                return spreadsheetengine::api::CellValue::error(selibreoffice::toApiError(eError));
-            }
-
-            if (aCell.hasString())
-            {
-                svl::SharedString aString;
-                GetCellString(aString, aCell);
-                return spreadsheetengine::api::CellValue::text(
-                    selibreoffice::toApiString(aString.getString()));
-            }
-
-            if (aCell.hasNumeric())
-                return spreadsheetengine::api::CellValue::number(GetCellValue(aCellPos, aCell));
-
-            return spreadsheetengine::api::CellValue::empty();
+            return selibreoffice::readHostDocumentCellValue(
+                mrDoc, aCellPos, aCell, selibreoffice::HostCellStringKind::Display);
         };
         const auto pushApiCellValue = [&](const spreadsheetengine::api::CellValue& rValue) {
             if (rValue.isError())

@@ -360,6 +360,8 @@ Closeout result:
 
 ### Phase 5. Remove Residual Duplicate Helpers In Scope
 
+Status: complete
+
 With the seams proven, delete or isolate the no-longer-needed local helpers in
 the touched scope.
 
@@ -371,6 +373,14 @@ Target shape:
 Closeout standard:
 
 - the touched scope has no known silent duplicate helper implementations
+
+Closeout result:
+
+- Calc-side document cell-to-engine `CellValue` conversion is now centralized
+  in `compat/libreoffice/Host.hxx`
+- the Calc-backed evaluation host and the `CELL(...)` interpreter path now use
+  the same named host helper, with an explicit raw-vs-display string mode
+  where their retained host behavior differs
 
 ### Phase 6. Close The Boundary Stream
 

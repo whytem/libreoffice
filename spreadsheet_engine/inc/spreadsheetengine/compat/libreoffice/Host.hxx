@@ -35,53 +35,57 @@ inline spreadsheetengine::api::NumberParseResult::Kind toApiParseKind(SvNumForma
     return spreadsheetengine::api::NumberParseResult::Kind::Number;
 }
 
+enum class HostCellStringKind : std::uint8_t
+{
+    Raw,
+    Display
+};
+
+[[nodiscard]] inline spreadsheetengine::api::CellValue readHostDocumentCellValue(
+    const ScDocument& rDoc, const ScAddress& rAddress, const ScRefCellValue& rCell,
+    HostCellStringKind eStringKind = HostCellStringKind::Raw)
+{
+    if (rCell.isEmpty())
+        return spreadsheetengine::api::CellValue::empty();
+
+    if (rCell.hasError())
+        return spreadsheetengine::api::CellValue::error(toApiError(rDoc.GetErrCode(rAddress)));
+
+    if (rCell.hasNumeric())
+        return spreadsheetengine::api::CellValue::number(rCell.getRawValue());
+
+    if (rCell.hasString())
+    {
+        const OUString aString = eStringKind == HostCellStringKind::Display
+                                     ? rCell.getString(rDoc)
+                                     : rCell.getRawString(rDoc);
+        return spreadsheetengine::api::CellValue::text(toApiString(aString));
+    }
+
+    return spreadsheetengine::api::CellValue::empty();
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>
+readHostDocumentCellValue(
+    const ScDocument& rDoc, const ScAddress& rAddress,
+    HostCellStringKind eStringKind = HostCellStringKind::Raw)
+{
+    if (!rDoc.ValidAddress(rAddress) || !rDoc.HasTable(rAddress.Tab()))
+    {
+        return spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>::failure(
+            spreadsheetengine::api::Error::IllegalArgument);
+    }
+
+    ScRefCellValue aCell(const_cast<ScDocument&>(rDoc), rAddress);
+    return spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>::success(
+        readHostDocumentCellValue(rDoc, rAddress, aCell, eStringKind));
+}
+
 class DocumentEvaluationHost final : public spreadsheetengine::api::EvaluationHost
 {
     const ScDocument& mrDoc;
     ScInterpreterContext* mpContext;
     spreadsheetengine::api::String maLocaleTag;
-
-    [[nodiscard]] spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>
-    readCellValue(const ScAddress& rAddress) const
-    {
-        if (!mrDoc.ValidAddress(rAddress) || !mrDoc.HasTable(rAddress.Tab()))
-        {
-            return spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>::failure(
-                spreadsheetengine::api::Error::IllegalArgument);
-        }
-
-        ScRefCellValue aCell(const_cast<ScDocument&>(mrDoc), rAddress);
-        if (aCell.isEmpty())
-        {
-            return spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>::success(
-                spreadsheetengine::api::CellValue::empty());
-        }
-
-        if (aCell.hasError())
-        {
-            FormulaError eError = mrDoc.GetErrCode(rAddress);
-            if (aCell.getType() == CELLTYPE_FORMULA && aCell.getFormula())
-                eError = aCell.getFormula()->GetErrCode();
-
-            return spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>::success(
-                spreadsheetengine::api::CellValue::error(toApiError(eError)));
-        }
-
-        if (aCell.hasNumeric())
-        {
-            return spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>::success(
-                spreadsheetengine::api::CellValue::number(aCell.getRawValue()));
-        }
-
-        if (aCell.hasString())
-        {
-            return spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>::success(
-                spreadsheetengine::api::CellValue::text(toApiString(aCell.getRawString(mrDoc))));
-        }
-
-        return spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>::success(
-            spreadsheetengine::api::CellValue::empty());
-    }
 
 public:
     explicit DocumentEvaluationHost(
@@ -134,7 +138,8 @@ public:
     [[nodiscard]] spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>
     getCellValue(const spreadsheetengine::api::CellAddress& rAddress) const override
     {
-        return readCellValue(toLibreOfficeAddress(rAddress));
+        return spreadsheetengine::compat::libreoffice::readHostDocumentCellValue(
+            mrDoc, toLibreOfficeAddress(rAddress));
     }
 
     [[nodiscard]] spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>
@@ -148,8 +153,9 @@ public:
                 spreadsheetengine::api::Error::IllegalArgument);
         }
 
-        return readCellValue(ScAddress(rRange.maStart.mnColumn + nColumnOffset,
-            rRange.maStart.mnRow + nRowOffset, rRange.maStart.mnSheet));
+        return spreadsheetengine::compat::libreoffice::readHostDocumentCellValue(mrDoc,
+            ScAddress(rRange.maStart.mnColumn + nColumnOffset, rRange.maStart.mnRow + nRowOffset,
+                rRange.maStart.mnSheet));
     }
 
     [[nodiscard]] spreadsheetengine::api::ValueResult<spreadsheetengine::api::ResolvedReference>
