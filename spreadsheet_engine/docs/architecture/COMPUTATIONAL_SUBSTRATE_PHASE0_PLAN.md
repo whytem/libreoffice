@@ -99,6 +99,10 @@ Required artifact:
   - normalized-equivalent match
   - unacceptable divergence
 
+The checked-in comparison schema artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE0_OBSERVABLE_STATE_MODEL.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_OBSERVABLE_STATE_MODEL.md)
+
 ### 0.3 Add Targeted Runtime Instrumentation
 
 Instrument the Calc-owned computational state so it can be captured cheaply
