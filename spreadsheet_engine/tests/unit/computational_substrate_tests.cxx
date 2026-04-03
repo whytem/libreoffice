@@ -636,6 +636,133 @@ int main()
             }
         }
 
+        {
+            InMemoryWorkbookFacade aBeforeFacade;
+            aBeforeFacade.setGrammar(aFacade.getGrammar());
+            aBeforeFacade.setGeneration(71);
+            const auto nSheet = aBeforeFacade.addSheet(u"Pilot");
+            aBeforeFacade.setCell({ nSheet, 0, 0 }, CellValue::number(1.0));
+            aBeforeFacade.setCell({ nSheet, 0, 1 }, CellValue::number(2.0));
+            aBeforeFacade.setFormulaCell(
+                { nSheet, 2, 0 }, u"=SUM(Metrics)", CellValue::number(3.0));
+            aBeforeFacade.addNamedRange(
+                u"Metrics", std::nullopt, { nSheet, 0, 0 }, u"$A$1:$A$2");
+
+            ComputationalObservationState aBeforeObservation;
+            aBeforeObservation.maFormulaTree = { { nSheet, 2, 0 } };
+            aBeforeObservation.maAreaBroadcasters.push_back({
+                { { nSheet, 0, 0 }, { nSheet, 0, 1 } },
+                { { ListenerAnchorKind::FormulaCell, { nSheet, 2, 0 }, 1 } } });
+            const auto aBeforeShadow = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+            const auto aBeforeGraph = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+            const auto aBeforeIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aBeforeShadow, aBeforeFacade);
+
+            InMemoryWorkbookFacade aAfterFacade;
+            aAfterFacade.setGrammar(aBeforeFacade.getGrammar());
+            aAfterFacade.setGeneration(72);
+            aAfterFacade.addSheet(u"Pilot");
+            aAfterFacade.setCell({ nSheet, 1, 0 }, CellValue::number(1.0));
+            aAfterFacade.setCell({ nSheet, 1, 1 }, CellValue::number(2.0));
+            aAfterFacade.setFormulaCell(
+                { nSheet, 3, 0 }, u"=SUM(Metrics)", CellValue::number(3.0));
+            aAfterFacade.addNamedRange(
+                u"Metrics", std::nullopt, { nSheet, 0, 0 }, u"$B$1:$B$2");
+
+            ComputationalObservationState aAfterObservation;
+            aAfterObservation.maFormulaTree = { { nSheet, 3, 0 } };
+            aAfterObservation.maAreaBroadcasters.push_back({
+                { { nSheet, 1, 0 }, { nSheet, 1, 1 } },
+                { { ListenerAnchorKind::FormulaCell, { nSheet, 3, 0 }, 1 } } });
+            const auto aAfterShadow = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
+            const auto aAfterIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aAfterShadow, aAfterFacade);
+
+            const auto aPredicted = structuralbuilddetail::buildPredictedStructuralComputationalShadow(
+                aBeforeShadow, MutationEvent::insertColumns(nSheet, 0, 1), aAfterShadow);
+            if (aPredicted.maNamedRanges != aAfterShadow.maNamedRanges)
+            {
+                return fail("computational_substrate",
+                    "named-range structural prediction mismatch");
+            }
+
+            StructuralPilotInput aStructuralInput;
+            aStructuralInput.maComputationalShadow = aBeforeShadow;
+            aStructuralInput.maGraphShadow = aBeforeGraph;
+            aStructuralInput.maIrShadow = aBeforeIr;
+            aStructuralInput.maObservedAfterComputationalShadow = aAfterShadow;
+            aStructuralInput.maObservedAfterIrShadow = aAfterIr;
+            aStructuralInput.maMutation = MutationEvent::insertColumns(nSheet, 0, 1);
+            aStructuralInput.mbCleanBaseline = true;
+
+            const auto aStructuralPlan = buildStructuralPilotTransition(aStructuralInput,
+                aAfterFacade, aAfterObservation, StructuralPilotBuildMode::Validation);
+            if (aStructuralPlan.meVerdict != StructuralPilotVerdict::Applicable
+                || aStructuralPlan.maContract.meMutationClass
+                       != StructuralMutationClass::ValidationOnly
+                || aStructuralPlan.maSyncActions.size() != 1
+                || aStructuralPlan.maGraphAfter.getEdgeCount() < 1)
+            {
+                return fail("computational_substrate",
+                    "named-range validation-only structural transition mismatch");
+            }
+        }
+
+        {
+            InMemoryWorkbookFacade aBeforeFacade;
+            aBeforeFacade.setGrammar(aFacade.getGrammar());
+            aBeforeFacade.setGeneration(81);
+            const auto nSheet = aBeforeFacade.addSheet(u"Pilot");
+            aBeforeFacade.setCell({ nSheet, 0, 0 }, CellValue::number(1.0));
+            aBeforeFacade.setCell({ nSheet, 0, 1 }, CellValue::number(2.0));
+            aBeforeFacade.setFormulaCell(
+                { nSheet, 2, 0 }, u"=SUM(Metrics)", CellValue::number(3.0));
+            aBeforeFacade.addNamedRange(u"Metrics", std::nullopt, { nSheet, 0, 0 },
+                u"$A$1:$A$1~$A$2:$A$2");
+
+            ComputationalObservationState aBeforeObservation;
+            aBeforeObservation.maFormulaTree = { { nSheet, 2, 0 } };
+            const auto aBeforeShadow = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+            const auto aBeforeGraph = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+            const auto aBeforeIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aBeforeShadow, aBeforeFacade);
+
+            InMemoryWorkbookFacade aAfterFacade;
+            aAfterFacade.setGrammar(aBeforeFacade.getGrammar());
+            aAfterFacade.setGeneration(82);
+            aAfterFacade.addSheet(u"Pilot");
+            aAfterFacade.setCell({ nSheet, 1, 0 }, CellValue::number(1.0));
+            aAfterFacade.setCell({ nSheet, 1, 1 }, CellValue::number(2.0));
+            aAfterFacade.setFormulaCell(
+                { nSheet, 3, 0 }, u"=SUM(Metrics)", CellValue::number(3.0));
+            aAfterFacade.addNamedRange(u"Metrics", std::nullopt, { nSheet, 0, 0 },
+                u"$B$1:$B$1~$B$2:$B$2");
+
+            ComputationalObservationState aAfterObservation;
+            aAfterObservation.maFormulaTree = { { nSheet, 3, 0 } };
+            const auto aAfterShadow = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
+            const auto aAfterIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aAfterShadow, aAfterFacade);
+
+            StructuralPilotInput aStructuralInput;
+            aStructuralInput.maComputationalShadow = aBeforeShadow;
+            aStructuralInput.maGraphShadow = aBeforeGraph;
+            aStructuralInput.maIrShadow = aBeforeIr;
+            aStructuralInput.maObservedAfterComputationalShadow = aAfterShadow;
+            aStructuralInput.maObservedAfterIrShadow = aAfterIr;
+            aStructuralInput.maMutation = MutationEvent::insertColumns(nSheet, 0, 1);
+            aStructuralInput.mbCleanBaseline = true;
+
+            const auto aStructuralPlan = buildStructuralPilotTransition(aStructuralInput,
+                aAfterFacade, aAfterObservation, StructuralPilotBuildMode::Validation);
+            if (aStructuralPlan.meVerdict != StructuralPilotVerdict::RejectedOutOfContract
+                || aStructuralPlan.maReason != u"structural_slice_out_of_contract")
+            {
+                return fail("computational_substrate",
+                    "named-range multi-area structural rejection mismatch");
+            }
+        }
+
     // --- Safe mutation rebuild path ---
     {
         aFacade.setCell({ nData, 0, 0 }, CellValue::number(11.0));

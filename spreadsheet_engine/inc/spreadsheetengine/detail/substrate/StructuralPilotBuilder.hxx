@@ -10,7 +10,9 @@
 #pragma once
 
 #include <map>
+#include <set>
 
+#include <spreadsheetengine/runtime/ReferenceText.hxx>
 #include <spreadsheetengine/api/ReferenceUpdate.hxx>
 #include <spreadsheetengine/detail/dependency/DependencySnapshot.hxx>
 #include <spreadsheetengine/detail/dependency/InvalidationPlanner.hxx>
@@ -59,6 +61,280 @@ using spreadsheetengine::detail::substrate::detail::sortNamedRanges;
     }
 
     return true;
+}
+
+[[nodiscard]] inline std::optional<api::SheetId> findSheetIdByName(
+    const ComputationalWorkbookShadow& rShadow, api::StringView rSheetName)
+{
+    for (const auto& rSheet : rShadow.maSheets)
+    {
+        if (rSheet.maSheet.maName == rSheetName)
+            return rSheet.maSheet.mnId;
+    }
+    return std::nullopt;
+}
+
+[[nodiscard]] inline const facade::SheetDescriptor* findSheetDescriptor(
+    const ComputationalWorkbookShadow& rShadow, api::SheetId nSheet)
+{
+    for (const auto& rSheet : rShadow.maSheets)
+    {
+        if (rSheet.maSheet.mnId == nSheet)
+            return &rSheet.maSheet;
+    }
+    return nullptr;
+}
+
+[[nodiscard]] inline std::optional<api::ColumnIndex> parseStructuralColumnName(
+    api::StringView rColumnName)
+{
+    if (rColumnName.empty())
+        return std::nullopt;
+
+    std::int64_t nColumn = 0;
+    for (char16_t cChar : rColumnName)
+    {
+        if (cChar >= u'a' && cChar <= u'z')
+            cChar = static_cast<char16_t>(cChar - u'a' + u'A');
+        if (cChar < u'A' || cChar > u'Z')
+            return std::nullopt;
+        nColumn = (nColumn * 26) + (cChar - u'A' + 1);
+    }
+
+    return static_cast<api::ColumnIndex>(nColumn - 1);
+}
+
+[[nodiscard]] inline bool isAbsoluteAddressToken(api::StringView rToken)
+{
+    if (rToken.empty())
+        return false;
+
+    const std::size_t nDotPos = rToken.rfind(u'.');
+    api::StringView aAddressToken
+        = nDotPos == api::StringView::npos ? rToken : rToken.substr(nDotPos + 1);
+    if (aAddressToken.empty() || aAddressToken.front() != u'$')
+        return false;
+
+    aAddressToken.remove_prefix(1);
+    std::size_t nColumnEnd = 0;
+    while (nColumnEnd < aAddressToken.size())
+    {
+        const char16_t cChar = aAddressToken[nColumnEnd];
+        const bool bAlpha = (cChar >= u'A' && cChar <= u'Z') || (cChar >= u'a' && cChar <= u'z');
+        if (!bAlpha)
+            break;
+        ++nColumnEnd;
+    }
+
+    if (nColumnEnd == 0 || nColumnEnd >= aAddressToken.size() || aAddressToken[nColumnEnd] != u'$')
+        return false;
+
+    api::StringView aRowToken = aAddressToken.substr(nColumnEnd + 1);
+    if (aRowToken.empty())
+        return false;
+
+    return std::all_of(aRowToken.begin(), aRowToken.end(), [](char16_t cChar) {
+        return cChar >= u'0' && cChar <= u'9';
+    });
+}
+
+[[nodiscard]] inline std::optional<api::CellAddress> parseAbsoluteNamedRangeAddressToken(
+    const ComputationalWorkbookShadow& rShadow, api::StringView rToken, api::SheetId nImplicitSheet)
+{
+    const std::size_t nDotPos = rToken.rfind(u'.');
+    api::SheetId nSheet = nImplicitSheet;
+    api::StringView aAddressToken = rToken;
+    if (nDotPos != api::StringView::npos)
+    {
+        api::StringView aSheetToken = rToken.substr(0, nDotPos);
+        while (!aSheetToken.empty() && aSheetToken.front() == u'$')
+            aSheetToken.remove_prefix(1);
+        if (!aSheetToken.empty())
+        {
+            const auto oSheet
+                = findSheetIdByName(rShadow, runtime::referencetext::unquoteSheetName(aSheetToken));
+            if (!oSheet)
+                return std::nullopt;
+            nSheet = *oSheet;
+        }
+        aAddressToken = rToken.substr(nDotPos + 1);
+    }
+
+    if (!isAbsoluteAddressToken(aAddressToken))
+        return std::nullopt;
+
+    aAddressToken.remove_prefix(1); // leading $
+    std::size_t nColumnEnd = 0;
+    while (nColumnEnd < aAddressToken.size())
+    {
+        const char16_t cChar = aAddressToken[nColumnEnd];
+        const bool bAlpha = (cChar >= u'A' && cChar <= u'Z') || (cChar >= u'a' && cChar <= u'z');
+        if (!bAlpha)
+            break;
+        ++nColumnEnd;
+    }
+
+    const auto oColumn = parseStructuralColumnName(aAddressToken.substr(0, nColumnEnd));
+    if (!oColumn)
+        return std::nullopt;
+
+    api::StringView aRowToken = aAddressToken.substr(nColumnEnd + 1);
+    std::int64_t nRow = 0;
+    for (const char16_t cChar : aRowToken)
+        nRow = (nRow * 10) + (cChar - u'0');
+
+    if (nRow <= 0)
+        return std::nullopt;
+
+    return api::CellAddress { nSheet, *oColumn, static_cast<api::RowIndex>(nRow - 1) };
+}
+
+[[nodiscard]] inline std::optional<api::CellRange> parseSingleAreaNamedRangeTarget(
+    const ComputationalWorkbookShadow& rShadow, const facade::NamedRangeDescriptor& rNamedRange)
+{
+    if (rNamedRange.maTargetExpression.find(u'~') != api::StringView::npos
+        || rNamedRange.maTargetExpression.find(u';') != api::StringView::npos
+        || rNamedRange.maTargetExpression.find(u',') != api::StringView::npos)
+    {
+        return std::nullopt;
+    }
+
+    const std::size_t nColonPos = rNamedRange.maTargetExpression.find(u':');
+    if (nColonPos != api::StringView::npos
+        && rNamedRange.maTargetExpression.find(u':', nColonPos + 1) != api::StringView::npos)
+    {
+        return std::nullopt;
+    }
+
+    if (nColonPos == api::StringView::npos)
+    {
+        const auto oSingle = parseAbsoluteNamedRangeAddressToken(
+            rShadow, rNamedRange.maTargetExpression, rNamedRange.maBaseAddress.mnSheet);
+        if (!oSingle)
+            return std::nullopt;
+        return api::CellRange { *oSingle, *oSingle };
+    }
+
+    const auto oStart = parseAbsoluteNamedRangeAddressToken(
+        rShadow, rNamedRange.maTargetExpression.substr(0, nColonPos), rNamedRange.maBaseAddress.mnSheet);
+    if (!oStart)
+        return std::nullopt;
+
+    const auto oEnd = parseAbsoluteNamedRangeAddressToken(
+        rShadow, rNamedRange.maTargetExpression.substr(nColonPos + 1), oStart->mnSheet);
+    if (!oEnd)
+        return std::nullopt;
+
+    api::CellRange aRange { *oStart, *oEnd };
+    if (aRange.maStart.mnSheet != aRange.maEnd.mnSheet)
+        return std::nullopt;
+
+    return dependency::detail::normalizeRange(aRange);
+}
+
+[[nodiscard]] inline api::String formatAbsoluteNamedRangeAddressToken(
+    const ComputationalWorkbookShadow& rShadow, const api::CellAddress& rAddress, bool bIncludeSheet)
+{
+    api::String aToken;
+    if (bIncludeSheet)
+    {
+        const auto* pSheet = findSheetDescriptor(rShadow, rAddress.mnSheet);
+        if (pSheet)
+        {
+            aToken.push_back(u'$');
+            aToken += runtime::referencetext::quoteSheetNameForFormula(pSheet->maName);
+            aToken.push_back(u'.');
+        }
+    }
+
+    aToken.push_back(u'$');
+    aToken += runtime::referencetext::columnNameFromIndex(rAddress.mnColumn);
+    aToken.push_back(u'$');
+    aToken += runtime::referencetext::formatPositiveInteger(
+        static_cast<std::int64_t>(rAddress.mnRow) + 1);
+    return aToken;
+}
+
+[[nodiscard]] inline api::String formatSingleAreaNamedRangeTarget(
+    const ComputationalWorkbookShadow& rShadow,
+    const facade::NamedRangeDescriptor& rNamedRange,
+    const api::CellRange& rRange)
+{
+    const std::size_t nColonPos = rNamedRange.maTargetExpression.find(u':');
+    const api::StringView aStartToken
+        = nColonPos == api::StringView::npos ? api::StringView(rNamedRange.maTargetExpression)
+                                             : api::StringView(rNamedRange.maTargetExpression)
+                                                   .substr(0, nColonPos);
+    const bool bIncludeStartSheet = aStartToken.rfind(u'.') != api::StringView::npos;
+
+    api::String aResult = formatAbsoluteNamedRangeAddressToken(
+        rShadow, rRange.maStart, bIncludeStartSheet);
+    if (rRange.maStart == rRange.maEnd)
+        return aResult;
+
+    aResult.push_back(u':');
+    aResult += formatAbsoluteNamedRangeAddressToken(
+        rShadow, rRange.maEnd, rRange.maEnd.mnSheet != rRange.maStart.mnSheet);
+    return aResult;
+}
+
+[[nodiscard]] inline std::optional<facade::NamedRangeDescriptor> findNamedRangeById(
+    const std::vector<facade::NamedRangeDescriptor>& rNamedRanges,
+    const facade::NamedRangeId& rId)
+{
+    auto it = std::find_if(rNamedRanges.begin(), rNamedRanges.end(),
+        [&rId](const facade::NamedRangeDescriptor& rDescriptor) {
+            return rDescriptor.maId == rId;
+        });
+    if (it == rNamedRanges.end())
+        return std::nullopt;
+    return *it;
+}
+
+[[nodiscard]] inline bool hasNamedRangeScopeAmbiguity(
+    const std::vector<facade::NamedRangeDescriptor>& rNamedRanges)
+{
+    std::set<api::String> aSeenNames;
+    for (const auto& rNamedRange : rNamedRanges)
+    {
+        api::String aFolded = rNamedRange.maName;
+        std::transform(aFolded.begin(), aFolded.end(), aFolded.begin(), [](char16_t cChar) {
+            if (cChar >= u'a' && cChar <= u'z')
+                return static_cast<char16_t>(cChar - u'a' + u'A');
+            return cChar;
+        });
+
+        if (!aSeenNames.insert(aFolded).second)
+            return true;
+    }
+
+    return false;
+}
+
+[[nodiscard]] inline bool isNamedRangeStructuralValidationSlice(
+    const ComputationalWorkbookShadow& rShadow)
+{
+    if (rShadow.maNamedRanges.empty() || !rShadow.maFormulaGroups.empty()
+        || hasNamedRangeScopeAmbiguity(rShadow.maNamedRanges))
+    {
+        return false;
+    }
+
+    for (const auto& rSheet : rShadow.maSheets)
+    {
+        for (const auto& rCell : rSheet.maCells)
+        {
+            if (!rCell.hasFormula())
+                continue;
+            if (!isOrdinaryScalarFormulaCell(rCell))
+                return false;
+        }
+    }
+
+    return std::all_of(rShadow.maNamedRanges.begin(), rShadow.maNamedRanges.end(),
+        [&rShadow](const facade::NamedRangeDescriptor& rNamedRange) {
+            return parseSingleAreaNamedRangeTarget(rShadow, rNamedRange).has_value();
+        });
 }
 
 [[nodiscard]] inline std::optional<api::CellAddress> shiftAddress(
@@ -169,12 +445,11 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
 
 [[nodiscard]] inline ComputationalWorkbookShadow buildPredictedStructuralComputationalShadow(
     const ComputationalWorkbookShadow& rBefore, const facade::MutationEvent& rMutation,
-    const facade::WorkbookSnapshotInfo& rAfterSnapshot)
+    const ComputationalWorkbookShadow& rObservedAfter)
 {
     ComputationalWorkbookShadow aPredicted = rBefore;
-    aPredicted.maSnapshot = rAfterSnapshot;
+    aPredicted.maSnapshot = rObservedAfter.maSnapshot;
     aPredicted.maFormulaGroups.clear();
-    aPredicted.maNamedRanges.clear();
     aPredicted.maCellBroadcasters.clear();
     aPredicted.maAreaBroadcasters.clear();
     aPredicted.maFormulaTree.clear();
@@ -211,6 +486,34 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
     {
         if (const auto oShifted = shiftAddress(rMutation, rAddress))
             aPredicted.maFormulaTrack.push_back(*oShifted);
+    }
+
+    aPredicted.maNamedRanges.clear();
+    if (!rBefore.maNamedRanges.empty())
+    {
+        for (const auto& rNamedRange : rBefore.maNamedRanges)
+        {
+            const auto oObservedAfter
+                = findNamedRangeById(rObservedAfter.maNamedRanges, rNamedRange.maId);
+            const auto oTarget = parseSingleAreaNamedRangeTarget(rBefore, rNamedRange);
+            if (!oObservedAfter || !oTarget)
+            {
+                aPredicted.maNamedRanges.clear();
+                return aPredicted;
+            }
+
+            const auto oShiftedTarget = shiftRange(rMutation, *oTarget);
+            if (!oShiftedTarget)
+            {
+                aPredicted.maNamedRanges.clear();
+                return aPredicted;
+            }
+
+            facade::NamedRangeDescriptor aShifted = *oObservedAfter;
+            aShifted.maTargetExpression
+                = formatSingleAreaNamedRangeTarget(rObservedAfter, rNamedRange, *oShiftedTarget);
+            aPredicted.maNamedRanges.push_back(std::move(aShifted));
+        }
     }
 
     for (const auto& rBroadcaster : rBefore.maCellBroadcasters)
@@ -388,14 +691,6 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
     StructuralPilotTransition aTransition;
     aTransition.maInput = rInput;
     aTransition.maContract = structuraldetail::classifyStructuralMutation(rInput.maMutation);
-    aTransition.maVerification = structuraldetail::makeStructuralVerification(aTransition.maContract);
-
-    if (!aTransition.maContract.isAllowedInBuildMode(eBuildMode))
-    {
-        aTransition.meVerdict = StructuralPilotVerdict::RejectedOutOfContract;
-        aTransition.maReason = u"mutation_out_of_contract";
-        return aTransition;
-    }
 
     if (aTransition.maContract.mbRequiresCleanBaseline && !rInput.mbCleanBaseline)
     {
@@ -404,9 +699,35 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
         return aTransition;
     }
 
-    if (!structuralbuilddetail::isAdmittedStructuralSlice(rInput.maComputationalShadow)
-        || !structuralbuilddetail::isAdmittedStructuralSlice(rInput.maObservedAfterComputationalShadow)
-        || !rInput.maIrShadow.maBuildFailures.empty()
+    const bool bAdmittedStructuralSlice
+        = structuralbuilddetail::isAdmittedStructuralSlice(rInput.maComputationalShadow)
+        && structuralbuilddetail::isAdmittedStructuralSlice(rInput.maObservedAfterComputationalShadow);
+    const bool bNamedRangeValidationSlice
+        = structuralbuilddetail::isNamedRangeStructuralValidationSlice(rInput.maComputationalShadow)
+        && structuralbuilddetail::isNamedRangeStructuralValidationSlice(
+            rInput.maObservedAfterComputationalShadow);
+
+    if (!bAdmittedStructuralSlice)
+    {
+        if (eBuildMode == StructuralPilotBuildMode::Validation && bNamedRangeValidationSlice)
+            aTransition.maContract.meMutationClass = StructuralMutationClass::ValidationOnly;
+        else
+        {
+            aTransition.meVerdict = StructuralPilotVerdict::RejectedOutOfContract;
+            aTransition.maReason = u"structural_slice_out_of_contract";
+            return aTransition;
+        }
+    }
+
+    aTransition.maVerification = structuraldetail::makeStructuralVerification(aTransition.maContract);
+    if (!aTransition.maContract.isAllowedInBuildMode(eBuildMode))
+    {
+        aTransition.meVerdict = StructuralPilotVerdict::RejectedOutOfContract;
+        aTransition.maReason = u"mutation_out_of_contract";
+        return aTransition;
+    }
+
+    if (!rInput.maIrShadow.maBuildFailures.empty()
         || !rInput.maObservedAfterIrShadow.maBuildFailures.empty())
     {
         aTransition.meVerdict = StructuralPilotVerdict::RejectedOutOfContract;
@@ -442,8 +763,7 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
 
     const auto aPredictedComputational
         = structuralbuilddetail::buildPredictedStructuralComputationalShadow(
-            rInput.maComputationalShadow, rInput.maMutation,
-            rInput.maObservedAfterComputationalShadow.maSnapshot);
+            rInput.maComputationalShadow, rInput.maMutation, rInput.maObservedAfterComputationalShadow);
     if (!structuralbuilddetail::matchesPredictedStructuralPopulation(
             aPredictedComputational, rInput.maObservedAfterComputationalShadow))
     {

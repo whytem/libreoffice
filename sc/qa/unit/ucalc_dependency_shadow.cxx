@@ -1918,6 +1918,93 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalStructuralValidateGlobalNamedRangeSlice)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertColumns;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetString(2, 0, 0, u"=SUM(Metrics)"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$A$1:$A$2"_ustr)));
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalStructural aStructural(*m_pDoc, true);
+    CPPUNIT_ASSERT(aStructural.canApplyStructural());
+
+    m_pDoc->InsertCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
+    const auto oResult = aStructural.validateCandidate(*m_pDoc, translateInsertColumns(0, 0, 1));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::detail::substrate::StructuralMutationClass::ValidationOnly,
+        oResult->maTransition.maContract.meMutationClass);
+    CPPUNIT_ASSERT(oResult->meKind != ComputationalStructuralResultKind::RejectedOutOfContract);
+    CPPUNIT_ASSERT(oResult->meKind != ComputationalStructuralResultKind::RejectedDirtyBaseline);
+    CPPUNIT_ASSERT(oResult->moQueueComparison.has_value()
+        || oResult->meKind == ComputationalStructuralResultKind::RepairDetected);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalStructuralLocalNamedRangeStaysDeferred)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertColumns;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 4.0);
+    m_pDoc->SetString(2, 0, 0, u"=SUM(LocalMetric)"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName(0)->insert(
+        new ScRangeData(*m_pDoc, u"LocalMetric"_ustr, u"$A$1:$A$1"_ustr)));
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalStructural aStructural(*m_pDoc, true);
+    CPPUNIT_ASSERT(aStructural.canApplyStructural());
+
+    m_pDoc->InsertCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
+    const auto oResult = aStructural.validateCandidate(*m_pDoc, translateInsertColumns(0, 0, 1));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalStructuralResultKind::RejectedOutOfContract, oResult->meKind);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalStructuralValidateMultiAreaNamedRangeRejects)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertColumns;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetString(2, 0, 0, u"=SUM(Metrics)"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$A$1:$A$1~$A$2:$A$2"_ustr)));
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalStructural aStructural(*m_pDoc, true);
+    CPPUNIT_ASSERT(aStructural.canApplyStructural());
+
+    m_pDoc->InsertCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
+    const auto oResult = aStructural.validateCandidate(*m_pDoc, translateInsertColumns(0, 0, 1));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalStructuralResultKind::RejectedOutOfContract, oResult->meKind);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralRepairDetectedRollback)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
