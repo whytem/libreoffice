@@ -5,6 +5,7 @@
 #include <spreadsheetengine/detail/substrate/AuthorityPilot.hxx>
 #include <spreadsheetengine/detail/substrate/AuthorityPilotBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/LifecyclePilot.hxx>
+#include <spreadsheetengine/detail/substrate/LifecyclePilotBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/ExecutionIr.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowComparison.hxx>
@@ -286,6 +287,59 @@ int main()
             || aLifecycleTransition.maSyncActions.size() != 1)
         {
             return fail("computational_substrate", "lifecycle transition schema mismatch");
+        }
+
+        LifecyclePilotInput aLifecycleInsertInput;
+        aLifecycleInsertInput.maComputationalShadow = aPilotShadow;
+        aLifecycleInsertInput.maGraphShadow = aAuthorityInput.maGraphShadow;
+        aLifecycleInsertInput.maIrShadow = aAuthorityInput.maIrShadow;
+        aLifecycleInsertInput.maMutation
+            = MutationEvent::setFormula({ nPilotSheet, 3, 0 }, u"=A1+B1");
+        aLifecycleInsertInput.mbCleanBaseline = true;
+
+        const auto aLifecycleInsertPlan = buildLifecyclePilotTransition(aLifecycleInsertInput);
+        if (aLifecycleInsertPlan.meVerdict != LifecyclePilotVerdict::Applicable
+            || aLifecycleInsertPlan.maSyncActions.size() != 1
+            || aLifecycleInsertPlan.maSyncActions.front().meKind
+                   != LifecycleSyncActionKind::InsertFormulaCell
+            || !aLifecycleInsertPlan.maComputationalAfter.findCell({ nPilotSheet, 3, 0 }))
+        {
+            return fail("computational_substrate", "lifecycle insertion transition mismatch");
+        }
+
+        LifecyclePilotInput aLifecycleReplaceInput;
+        aLifecycleReplaceInput.maComputationalShadow = aPilotShadow;
+        aLifecycleReplaceInput.maGraphShadow = aAuthorityInput.maGraphShadow;
+        aLifecycleReplaceInput.maIrShadow = aAuthorityInput.maIrShadow;
+        aLifecycleReplaceInput.maMutation
+            = MutationEvent::setFormula({ nPilotSheet, 1, 0 }, u"=A1*3");
+        aLifecycleReplaceInput.mbCleanBaseline = true;
+
+        const auto aLifecycleReplacePlan = buildLifecyclePilotTransition(aLifecycleReplaceInput);
+        if (aLifecycleReplacePlan.meVerdict != LifecyclePilotVerdict::Applicable
+            || aLifecycleReplacePlan.maSyncActions.size() != 1
+            || aLifecycleReplacePlan.maSyncActions.front().meKind
+                   != LifecycleSyncActionKind::ReplaceFormulaCell
+            || !aLifecycleReplacePlan.maComputationalAfter.findCell({ nPilotSheet, 1, 0 }))
+        {
+            return fail("computational_substrate", "lifecycle replacement transition mismatch");
+        }
+
+        LifecyclePilotInput aLifecycleRemoveInput;
+        aLifecycleRemoveInput.maComputationalShadow = aPilotShadow;
+        aLifecycleRemoveInput.maGraphShadow = aAuthorityInput.maGraphShadow;
+        aLifecycleRemoveInput.maIrShadow = aAuthorityInput.maIrShadow;
+        aLifecycleRemoveInput.maMutation = MutationEvent::clearCell({ nPilotSheet, 1, 0 });
+        aLifecycleRemoveInput.mbCleanBaseline = true;
+
+        const auto aLifecycleRemovePlan = buildLifecyclePilotTransition(aLifecycleRemoveInput);
+        if (aLifecycleRemovePlan.meVerdict != LifecyclePilotVerdict::Applicable
+            || aLifecycleRemovePlan.maSyncActions.size() != 1
+            || aLifecycleRemovePlan.maSyncActions.front().meKind
+                   != LifecycleSyncActionKind::RemoveFormulaCell
+            || aLifecycleRemovePlan.maComputationalAfter.findCell({ nPilotSheet, 1, 0 }))
+        {
+            return fail("computational_substrate", "lifecycle removal transition mismatch");
         }
 
     // --- Safe mutation rebuild path ---
