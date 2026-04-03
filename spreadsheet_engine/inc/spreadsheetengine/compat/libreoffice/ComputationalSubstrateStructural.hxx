@@ -213,6 +213,18 @@ inline void rollbackStructuralMutation(ScDocument& rDoc,
                     it->mnStartRow + it->mnCount - 1, it->mnSheet));
                 break;
             }
+            case spreadsheetengine::detail::substrate::StructuralSyncActionKind::DeleteRows:
+            {
+                rDoc.InsertRow(ScRange(0, it->mnStartRow, it->mnSheet, rDoc.MaxCol(),
+                    it->mnStartRow + it->mnCount - 1, it->mnSheet));
+                break;
+            }
+            case spreadsheetengine::detail::substrate::StructuralSyncActionKind::InsertColumns:
+            {
+                rDoc.DeleteCol(ScRange(it->mnStartColumn, 0, it->mnSheet,
+                    it->mnStartColumn + it->mnCount - 1, rDoc.MaxRow(), it->mnSheet));
+                break;
+            }
             case spreadsheetengine::detail::substrate::StructuralSyncActionKind::DeleteColumns:
             {
                 rDoc.InsertCol(ScRange(it->mnStartColumn, 0, it->mnSheet,
@@ -264,6 +276,22 @@ public:
     [[nodiscard]] std::optional<StructuralResult> apply(
         ScDocument& rDoc, const spreadsheetengine::detail::facade::MutationEvent& rMutation) const
     {
+        return run(rDoc, rMutation,
+            spreadsheetengine::detail::substrate::StructuralPilotBuildMode::AuthorityOnly);
+    }
+
+    [[nodiscard]] std::optional<StructuralResult> validateCandidate(
+        ScDocument& rDoc, const spreadsheetengine::detail::facade::MutationEvent& rMutation) const
+    {
+        return run(rDoc, rMutation,
+            spreadsheetengine::detail::substrate::StructuralPilotBuildMode::Validation);
+    }
+
+private:
+    [[nodiscard]] std::optional<StructuralResult> run(ScDocument& rDoc,
+        const spreadsheetengine::detail::facade::MutationEvent& rMutation,
+        spreadsheetengine::detail::substrate::StructuralPilotBuildMode eBuildMode) const
+    {
         if (!mbCaptured)
             return std::nullopt;
 
@@ -273,7 +301,8 @@ public:
         aResult.maTransition = spreadsheetengine::detail::substrate::buildStructuralPilotTransition(
             detail::prepareStructuralInput(maComputationalShadow, maGraphShadow, maIrShadow,
                 rMutation, aAfterFacade, rDoc, mbCleanBaseline),
-            aAfterFacade, makeComputationalObservationState(substrateobs::collectLiveComputationalState(rDoc)));
+            aAfterFacade, makeComputationalObservationState(substrateobs::collectLiveComputationalState(rDoc)),
+            eBuildMode);
 
         switch (aResult.maTransition.meVerdict)
         {

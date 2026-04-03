@@ -361,6 +361,15 @@ int main()
             return fail("computational_substrate", "structural contract validation-only mismatch");
         }
 
+        const auto aStructuralInsertColumnValidationOnly
+            = classifyStructuralMutation(MutationEvent::insertColumns(nPilotSheet, 1, 1));
+        if (aStructuralInsertColumnValidationOnly.meMutationClass
+            != StructuralMutationClass::ValidationOnly)
+        {
+            return fail("computational_substrate",
+                "structural insert-column validation-only mismatch");
+        }
+
         const auto aStructuralRejected
             = classifyStructuralMutation(MutationEvent::setFormula({ nPilotSheet, 1, 0 }, u"=A1"));
         if (aStructuralRejected.meMutationClass != StructuralMutationClass::Rejected)
@@ -497,6 +506,134 @@ int main()
             {
                 return fail("computational_substrate",
                     "structural delete-column transition mismatch");
+            }
+        }
+
+        {
+            InMemoryWorkbookFacade aBeforeFacade;
+            aBeforeFacade.setGrammar(aFacade.getGrammar());
+            aBeforeFacade.setGeneration(51);
+            const auto nSheet = aBeforeFacade.addSheet(u"Pilot");
+            aBeforeFacade.setCell({ nSheet, 0, 0 }, CellValue::number(10.0));
+            aBeforeFacade.setCell({ nSheet, 0, 1 }, CellValue::number(20.0));
+            aBeforeFacade.setFormulaCell(
+                { nSheet, 0, 2 }, u"=$A$2*1", CellValue::number(20.0));
+
+            ComputationalObservationState aBeforeObservation;
+            aBeforeObservation.maFormulaTree = { { nSheet, 0, 2 } };
+            aBeforeObservation.maCellBroadcasters.push_back({
+                { nSheet, 0, 1 },
+                { { ListenerAnchorKind::FormulaCell, { nSheet, 0, 2 }, 1 } } });
+            const auto aBeforeShadow = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+            const auto aBeforeGraph = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+            const auto aBeforeIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aBeforeShadow, aBeforeFacade);
+
+            InMemoryWorkbookFacade aAfterFacade;
+            aAfterFacade.setGrammar(aBeforeFacade.getGrammar());
+            aAfterFacade.setGeneration(52);
+            aAfterFacade.addSheet(u"Pilot");
+            aAfterFacade.setCell({ nSheet, 0, 0 }, CellValue::number(20.0));
+            aAfterFacade.setFormulaCell(
+                { nSheet, 0, 1 }, u"=$A$1*1", CellValue::number(20.0));
+
+            ComputationalObservationState aAfterObservation;
+            aAfterObservation.maFormulaTree = { { nSheet, 0, 1 } };
+            aAfterObservation.maCellBroadcasters.push_back({
+                { nSheet, 0, 0 },
+                { { ListenerAnchorKind::FormulaCell, { nSheet, 0, 1 }, 1 } } });
+            const auto aAfterShadow = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
+            const auto aAfterIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aAfterShadow, aAfterFacade);
+
+            StructuralPilotInput aStructuralInput;
+            aStructuralInput.maComputationalShadow = aBeforeShadow;
+            aStructuralInput.maGraphShadow = aBeforeGraph;
+            aStructuralInput.maIrShadow = aBeforeIr;
+            aStructuralInput.maObservedAfterComputationalShadow = aAfterShadow;
+            aStructuralInput.maObservedAfterIrShadow = aAfterIr;
+            aStructuralInput.maMutation = MutationEvent::deleteRows(nSheet, 0, 1);
+            aStructuralInput.mbCleanBaseline = true;
+
+            const auto aStructuralPlan = buildStructuralPilotTransition(aStructuralInput, aAfterFacade,
+                aAfterObservation, StructuralPilotBuildMode::Validation);
+            if (aStructuralPlan.meVerdict != StructuralPilotVerdict::Applicable
+                || aStructuralPlan.maSyncActions.size() != 1
+                || aStructuralPlan.maSyncActions.front().meKind
+                       != StructuralSyncActionKind::DeleteRows
+                || aStructuralPlan.maComputationalAfter.getFormulaCellCount() != 1
+                || aStructuralPlan.maRecalcPlan.maQueue.size() != 1
+                || aStructuralPlan.maGraphAfter.getEdgeCount() < 1
+                || aStructuralPlan.maReferenceUpdates.size() != 1
+                || !aStructuralPlan.maReferenceUpdates.front().moAfterId.has_value()
+                || !(aStructuralPlan.maReferenceUpdates.front().moAfterId->maAddress
+                     == spreadsheetengine::api::CellAddress { nSheet, 0, 1 }))
+            {
+                return fail("computational_substrate", "structural delete-row transition mismatch");
+            }
+        }
+
+        {
+            InMemoryWorkbookFacade aBeforeFacade;
+            aBeforeFacade.setGrammar(aFacade.getGrammar());
+            aBeforeFacade.setGeneration(61);
+            const auto nSheet = aBeforeFacade.addSheet(u"Pilot");
+            aBeforeFacade.setCell({ nSheet, 0, 0 }, CellValue::number(1.0));
+            aBeforeFacade.setFormulaCell(
+                { nSheet, 1, 0 }, u"=$A$1+1", CellValue::number(2.0));
+
+            ComputationalObservationState aBeforeObservation;
+            aBeforeObservation.maFormulaTree = { { nSheet, 1, 0 } };
+            aBeforeObservation.maCellBroadcasters.push_back({
+                { nSheet, 0, 0 },
+                { { ListenerAnchorKind::FormulaCell, { nSheet, 1, 0 }, 1 } } });
+            const auto aBeforeShadow = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+            const auto aBeforeGraph = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+            const auto aBeforeIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aBeforeShadow, aBeforeFacade);
+
+            InMemoryWorkbookFacade aAfterFacade;
+            aAfterFacade.setGrammar(aBeforeFacade.getGrammar());
+            aAfterFacade.setGeneration(62);
+            aAfterFacade.addSheet(u"Pilot");
+            aAfterFacade.setCell({ nSheet, 1, 0 }, CellValue::number(1.0));
+            aAfterFacade.setFormulaCell(
+                { nSheet, 2, 0 }, u"=$B$1+1", CellValue::number(2.0));
+
+            ComputationalObservationState aAfterObservation;
+            aAfterObservation.maFormulaTree = { { nSheet, 2, 0 } };
+            aAfterObservation.maCellBroadcasters.push_back({
+                { nSheet, 1, 0 },
+                { { ListenerAnchorKind::FormulaCell, { nSheet, 2, 0 }, 1 } } });
+            const auto aAfterShadow = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
+            const auto aAfterIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aAfterShadow, aAfterFacade);
+
+            StructuralPilotInput aStructuralInput;
+            aStructuralInput.maComputationalShadow = aBeforeShadow;
+            aStructuralInput.maGraphShadow = aBeforeGraph;
+            aStructuralInput.maIrShadow = aBeforeIr;
+            aStructuralInput.maObservedAfterComputationalShadow = aAfterShadow;
+            aStructuralInput.maObservedAfterIrShadow = aAfterIr;
+            aStructuralInput.maMutation = MutationEvent::insertColumns(nSheet, 0, 1);
+            aStructuralInput.mbCleanBaseline = true;
+
+            const auto aStructuralPlan = buildStructuralPilotTransition(aStructuralInput, aAfterFacade,
+                aAfterObservation, StructuralPilotBuildMode::Validation);
+            if (aStructuralPlan.meVerdict != StructuralPilotVerdict::Applicable
+                || aStructuralPlan.maSyncActions.size() != 1
+                || aStructuralPlan.maSyncActions.front().meKind
+                       != StructuralSyncActionKind::InsertColumns
+                || aStructuralPlan.maComputationalAfter.getFormulaCellCount() != 1
+                || aStructuralPlan.maRecalcPlan.maQueue.size() != 1
+                || aStructuralPlan.maGraphAfter.getEdgeCount() < 1
+                || aStructuralPlan.maReferenceUpdates.size() != 1
+                || !aStructuralPlan.maReferenceUpdates.front().moAfterId.has_value()
+                || !(aStructuralPlan.maReferenceUpdates.front().moAfterId->maAddress
+                     == spreadsheetengine::api::CellAddress { nSheet, 2, 0 }))
+            {
+                return fail("computational_substrate",
+                    "structural insert-column transition mismatch");
             }
         }
 

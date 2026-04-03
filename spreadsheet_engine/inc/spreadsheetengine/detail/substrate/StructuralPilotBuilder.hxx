@@ -74,6 +74,24 @@ using spreadsheetengine::detail::substrate::detail::sortNamedRanges;
                 return api::CellAddress { rAddress.mnSheet, rAddress.mnColumn,
                     static_cast<api::RowIndex>(rAddress.mnRow + rMutation.mnCount) };
             return rAddress;
+        case facade::MutationKind::DeleteRows:
+            if (rAddress.mnRow >= rMutation.maAddress.mnRow
+                && rAddress.mnRow < rMutation.maAddress.mnRow + rMutation.mnCount)
+            {
+                return std::nullopt;
+            }
+            if (rAddress.mnRow >= rMutation.maAddress.mnRow + rMutation.mnCount)
+            {
+                return api::CellAddress { rAddress.mnSheet, rAddress.mnColumn,
+                    static_cast<api::RowIndex>(rAddress.mnRow - rMutation.mnCount) };
+            }
+            return rAddress;
+        case facade::MutationKind::InsertColumns:
+            if (rAddress.mnColumn >= rMutation.maAddress.mnColumn)
+                return api::CellAddress { rAddress.mnSheet,
+                    static_cast<api::ColumnIndex>(rAddress.mnColumn + rMutation.mnCount),
+                    rAddress.mnRow };
+            return rAddress;
         case facade::MutationKind::DeleteColumns:
             if (rAddress.mnColumn >= rMutation.maAddress.mnColumn
                 && rAddress.mnColumn < rMutation.maAddress.mnColumn + rMutation.mnCount)
@@ -364,14 +382,15 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
 
 [[nodiscard]] inline StructuralPilotTransition buildStructuralPilotTransition(
     const StructuralPilotInput& rInput, const facade::WorkbookFacade& rAfterFacade,
-    const ComputationalObservationState&)
+    const ComputationalObservationState&,
+    StructuralPilotBuildMode eBuildMode = StructuralPilotBuildMode::AuthorityOnly)
 {
     StructuralPilotTransition aTransition;
     aTransition.maInput = rInput;
     aTransition.maContract = structuraldetail::classifyStructuralMutation(rInput.maMutation);
     aTransition.maVerification = structuraldetail::makeStructuralVerification(aTransition.maContract);
 
-    if (!aTransition.maContract.isAdmitted())
+    if (!aTransition.maContract.isAllowedInBuildMode(eBuildMode))
     {
         aTransition.meVerdict = StructuralPilotVerdict::RejectedOutOfContract;
         aTransition.maReason = u"mutation_out_of_contract";
@@ -404,6 +423,12 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
     {
         case facade::MutationKind::InsertRows:
             aSyncAction.meKind = StructuralSyncActionKind::InsertRows;
+            break;
+        case facade::MutationKind::DeleteRows:
+            aSyncAction.meKind = StructuralSyncActionKind::DeleteRows;
+            break;
+        case facade::MutationKind::InsertColumns:
+            aSyncAction.meKind = StructuralSyncActionKind::InsertColumns;
             break;
         case facade::MutationKind::DeleteColumns:
             aSyncAction.meKind = StructuralSyncActionKind::DeleteColumns;

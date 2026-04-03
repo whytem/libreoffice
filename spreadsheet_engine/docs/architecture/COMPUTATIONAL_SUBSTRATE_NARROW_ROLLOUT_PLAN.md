@@ -151,6 +151,10 @@ Required artifact:
 
 - one checked-in widening evidence note
 
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_EVIDENCE.md)
+
 ### 5. Freeze Bounded Rollout Evidence
 
 Capture the state of the admitted rollout after bounded experimental bake

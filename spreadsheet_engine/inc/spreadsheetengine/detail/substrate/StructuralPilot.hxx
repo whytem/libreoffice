@@ -33,6 +33,12 @@ enum class StructuralVerificationMode : std::uint8_t
     AllowNormalizedEquivalent
 };
 
+enum class StructuralPilotBuildMode : std::uint8_t
+{
+    AuthorityOnly,
+    Validation
+};
+
 enum class StructuralPilotVerdict : std::uint8_t
 {
     RejectedOutOfContract,
@@ -47,6 +53,8 @@ enum class StructuralPilotVerdict : std::uint8_t
 enum class StructuralSyncActionKind : std::uint8_t
 {
     InsertRows,
+    DeleteRows,
+    InsertColumns,
     DeleteColumns
 };
 
@@ -64,6 +72,18 @@ struct StructuralPilotContract
     [[nodiscard]] constexpr bool isAdmitted() const
     {
         return meMutationClass == StructuralMutationClass::Admitted;
+    }
+    [[nodiscard]] constexpr bool isAllowedInBuildMode(StructuralPilotBuildMode eMode) const
+    {
+        switch (eMode)
+        {
+            case StructuralPilotBuildMode::AuthorityOnly:
+                return isAdmitted();
+            case StructuralPilotBuildMode::Validation:
+                return meMutationClass != StructuralMutationClass::Rejected;
+        }
+
+        return false;
     }
 };
 

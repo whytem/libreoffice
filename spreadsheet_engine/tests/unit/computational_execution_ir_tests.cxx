@@ -271,6 +271,114 @@ int main()
     }
 
     {
+        const auto aLowered
+            = secompiler::lowerFormulaSource(u"of:=[.$A$2]", aHost, *oContext);
+        if (!aLowered)
+        {
+            return fail("spreadsheetengine_computational_ir_tests",
+                "reference-update row delete lowering mismatch");
+        }
+
+        auto aIr = lowerCompiledFormulaToExecutionIr(aLowered.maFormula,
+            { { { 0, 0, 2 } }, std::nullopt, { u"=$A$2", {} }, false, false });
+        if (!aIr)
+        {
+            return fail("spreadsheetengine_computational_ir_tests",
+                "reference-update row delete IR mismatch");
+        }
+
+        const auto oPlan = makeExecutionIrStructuralUpdatePlan(
+            spreadsheetengine::detail::facade::MutationEvent::deleteRows(0, 0, 1),
+            { 1023, 65535, 15 });
+        if (!oPlan)
+        {
+            return fail("spreadsheetengine_computational_ir_tests",
+                "reference-update row delete plan mismatch");
+        }
+
+        const auto aSummary = updateExecutionIrFormulaReferences(
+            aIr.maFormula, { 0, 0, 2 }, { 1023, 65535, 15 }, *oPlan);
+        if (!aSummary.mbChanged
+            || aSummary.meResult != spreadsheetengine::api::refupdate::UpdateResult::Updated)
+        {
+            return fail("spreadsheetengine_computational_ir_tests",
+                "reference-update row delete summary mismatch");
+        }
+
+        const auto itRef = std::find_if(aIr.maFormula.maInstructions.begin(),
+            aIr.maFormula.maInstructions.end(), [](const auto& rInstruction) {
+                return rInstruction.meKind == ExecutionIrInstructionKind::SingleReference;
+            });
+        if (itRef == aIr.maFormula.maInstructions.end())
+        {
+            return fail("spreadsheetengine_computational_ir_tests",
+                "reference-update row delete instruction mismatch");
+        }
+        const auto aAbsolute = spreadsheetengine::api::refdata::toAbsoluteAddress(
+            std::get<spreadsheetengine::api::refdata::SingleRefData>(itRef->maPayload),
+            { 1023, 65535, 15 }, { 0, 0, 1 });
+        if (aAbsolute != spreadsheetengine::api::CellAddress { 0, 0, 0 })
+        {
+            return fail("spreadsheetengine_computational_ir_tests",
+                "reference-update row delete absolute-address mismatch");
+        }
+    }
+
+    {
+        const auto aLowered
+            = secompiler::lowerFormulaSource(u"of:=[.$A$1]", aHost, *oContext);
+        if (!aLowered)
+        {
+            return fail("spreadsheetengine_computational_ir_tests",
+                "reference-update column insert lowering mismatch");
+        }
+
+        auto aIr = lowerCompiledFormulaToExecutionIr(aLowered.maFormula,
+            { { { 0, 1, 0 } }, std::nullopt, { u"=$A$1", {} }, false, false });
+        if (!aIr)
+        {
+            return fail("spreadsheetengine_computational_ir_tests",
+                "reference-update column insert IR mismatch");
+        }
+
+        const auto oPlan = makeExecutionIrStructuralUpdatePlan(
+            spreadsheetengine::detail::facade::MutationEvent::insertColumns(0, 0, 1),
+            { 1023, 65535, 15 });
+        if (!oPlan)
+        {
+            return fail("spreadsheetengine_computational_ir_tests",
+                "reference-update column insert plan mismatch");
+        }
+
+        const auto aSummary = updateExecutionIrFormulaReferences(
+            aIr.maFormula, { 0, 1, 0 }, { 1023, 65535, 15 }, *oPlan);
+        if (!aSummary.mbChanged
+            || aSummary.meResult != spreadsheetengine::api::refupdate::UpdateResult::Updated)
+        {
+            return fail("spreadsheetengine_computational_ir_tests",
+                "reference-update column insert summary mismatch");
+        }
+
+        const auto itRef = std::find_if(aIr.maFormula.maInstructions.begin(),
+            aIr.maFormula.maInstructions.end(), [](const auto& rInstruction) {
+                return rInstruction.meKind == ExecutionIrInstructionKind::SingleReference;
+            });
+        if (itRef == aIr.maFormula.maInstructions.end())
+        {
+            return fail("spreadsheetengine_computational_ir_tests",
+                "reference-update column insert instruction mismatch");
+        }
+        const auto aAbsolute = spreadsheetengine::api::refdata::toAbsoluteAddress(
+            std::get<spreadsheetengine::api::refdata::SingleRefData>(itRef->maPayload),
+            { 1023, 65535, 15 }, { 0, 2, 0 });
+        if (aAbsolute != spreadsheetengine::api::CellAddress { 0, 1, 0 })
+        {
+            return fail("spreadsheetengine_computational_ir_tests",
+                "reference-update column insert absolute-address mismatch");
+        }
+    }
+
+    {
         spreadsheetengine::detail::facade::InMemoryWorkbookFacade aFacade;
         aFacade.setGrammar(secompiler::kDefaultWorkbookCompileGrammar);
         aFacade.setGeneration(13);

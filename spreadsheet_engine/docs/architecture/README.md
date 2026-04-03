@@ -134,6 +134,10 @@ Current architecture docs:
 - [COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_CONTRACT.md) -
   active widening contract note for the first bolder promotion candidates,
   freezing the proof threshold for `DeleteRows` and `InsertColumns`
+- [COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_EVIDENCE.md) -
+  active widening evidence note for the first bolder promotion candidates,
+  recording the exact validation, rejection, and rollback proof for
+  `DeleteRows` and `InsertColumns`
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for
