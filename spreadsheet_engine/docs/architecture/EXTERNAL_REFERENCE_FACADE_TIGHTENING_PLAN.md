@@ -141,6 +141,16 @@ Completion criteria:
 - the next implementation slices are chosen from the highest-confidence
   packaging candidates, not from broad host-owned internals
 
+Initial boundary classification:
+
+| Candidate | Classification | Reason | Planned action |
+| --- | --- | --- | --- |
+| external `CELL(...)` request/projection path in [ScCellExternal()](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx#L2539) | `ready now` | the remaining gap is mostly request assembly and result/property projection around an already compat-owned semantic surface | Phase 3 |
+| external single-ref fetch packaging in [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx#L1179) | `ready now` | cache ownership stays in Calc, but the fetched token/format result shape is narrow and can live behind one clearer facade | Phase 4 |
+| external double-ref matrix/token-array packaging in [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx#L1230) | `ready now` | matrix extraction and token-array projection are bounded and adjacent to an existing compat fetch seam | Phase 4 |
+| external cache/session ownership and document linkage | `intentionally host-only` | ownership of external sessions, external cache lookup, and document integration remains a Calc host responsibility | retain and document |
+| broad token-array lifetime, stack mutation, and interpreter cursor state around external refs | `defer` | that surface belongs to the wider token/interpreter host boundary and is outside this bounded stream | explicit defer |
+
 ### 3. Narrow External `CELL(...)` Projection Packaging
 
 Take the external `CELL(...)` path first if the boundary map confirms that the
