@@ -199,6 +199,7 @@ The active path is:
 - [COMPUTATIONAL_SUBSTRATE_PHASE1_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE1_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE2_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE2_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md)
 
 This is a major second-stage architecture program. Its target end state is not
 just "more helpers extracted" or "more direct engine entry adoption." The goal
@@ -221,9 +222,13 @@ The program has now completed:
 - Phase 0 observability and scope-freeze on a narrowed subset
 - Phase 1 engine-owned computational storage shadowing for that subset,
   including representative row-insert and column-delete rebuild coverage
+- Phase 2 live dependency-graph shadowing on that admitted subset, including
+  exact-or-normalized graph comparisons, delayed-state handling, and
+  representative structural rebuild validation
 
-The next frontier is Phase 2 live dependency-graph shadowing on the admitted
-Phase 1 subset rather than a broad authority jump.
+The next frontier is Phase 3 planning and execution on the narrowed graph
+subset admitted by the completed Phase 2 decision record rather than a broad
+authority jump.
 
 ## Why This Path Was Chosen
 

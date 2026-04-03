@@ -1,6 +1,6 @@
 # Computational Substrate Phase 2 Plan
 
-Status: active implementation-ready Phase 2 plan
+Status: completed implementation and closeout record for Phase 2
 
 ## Purpose
 
@@ -18,6 +18,25 @@ truth.
 
 Phase 2 begins from the proceed boundary recorded in
 [COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md).
+
+The checked-in closeout decision now lives in
+[COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md).
+
+## Outcome
+
+Phase 2 is complete.
+
+The project can proceed to Phase 3 only on the narrowed subset validated here:
+
+- engine-owned graph shadow nodes for formula cells, formula groups,
+  listener anchors, and cell/area broadcasters
+- broadcaster-to-listener edge reconstruction
+- exact-or-normalized graph comparisons on the safe mutation set
+- explicit delayed listener / delayed broadcaster handling
+- representative single-row insert and single-column delete rebuild coverage
+
+Phase 2 did not make the graph authoritative, and it did not widen into
+copy/move, clipboard, load-time, BASM layout, or Calc container migration.
 
 ## Phase 2 Goal
 

@@ -214,6 +214,10 @@ depends on Calc storage ownership for correctness.
 The detailed execution-ready work for this phase now lives in:
 
 - [COMPUTATIONAL_SUBSTRATE_PHASE2_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE2_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md)
+
+Status: complete on the narrowed Phase 1 subset, with exact-or-normalized
+graph matches and representative delayed/structural coverage
 
 ### Goal
 
@@ -253,6 +257,10 @@ Recommended threshold:
 - no persistent unexplained under- or over-registration of listeners
 
 Stop if correctness requires too much Calc-owned special casing.
+
+Phase 3 may proceed, but only from the narrowed graph subset admitted by the
+Phase 2 decision record rather than by assuming broad graph or storage
+authority.
 
 ## Phase 3: Engine-Owned Execution IR Boundary
 

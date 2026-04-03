@@ -38,8 +38,20 @@ Current architecture docs:
   plus representative row-insert and column-delete widening as the entry
   surface for Phase 2
 - [COMPUTATIONAL_SUBSTRATE_PHASE2_PLAN.md](COMPUTATIONAL_SUBSTRATE_PHASE2_PLAN.md) -
-  active implementation-ready plan for Phase 2 live dependency-graph
-  shadowing on the admitted Phase 1 subset
+  completed implementation and closeout record for Phase 2 live
+  dependency-graph shadowing on the admitted Phase 1 subset
+- [COMPUTATIONAL_SUBSTRATE_PHASE2_GRAPH_SCHEMA.md](COMPUTATIONAL_SUBSTRATE_PHASE2_GRAPH_SCHEMA.md) -
+  completed Phase 2 schema note for graph nodes, listener anchors,
+  broadcaster nodes, and edge identity
+- [COMPUTATIONAL_SUBSTRATE_PHASE2_GRAPH_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_PHASE2_GRAPH_MAPPING_RULES.md) -
+  completed Phase 2 mapping and equivalence reference for graph ids,
+  normalized comparisons, and forbidden Calc identity shortcuts
+- [COMPUTATIONAL_SUBSTRATE_PHASE2_SPECIAL_CASE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_PHASE2_SPECIAL_CASE_EVIDENCE.md) -
+  completed Phase 2 evidence note for delayed listener startup, delayed
+  broadcaster deletion, and representative structural rebuild coverage
+- [COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md) -
+  completed proceed-on-narrowed-subset decision for Phase 2, recording the
+  admitted graph shadow surface and the retained defer boundaries
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for
