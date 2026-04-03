@@ -73,21 +73,6 @@ struct ExternalDoubleRefMatrixProjection
     return aFetch;
 }
 
-[[nodiscard]] inline FormulaError fetchExternalSingleRefToken(const ScDocument& rDoc,
-    const ScAddress& rFormulaPos, sal_uInt16 nFileId, const OUString& rTabName,
-    const ScSingleRefData& rRef, ScExternalRefCache::TokenRef& rToken,
-    ScExternalRefCache::CellFormat* pFormat = nullptr)
-{
-    const auto aFetch = fetchExternalSingleRef(rDoc, rFormulaPos, nFileId, rTabName, rRef);
-    if (aFetch.meError != FormulaError::NONE)
-        return aFetch.meError;
-
-    rToken = aFetch.mxToken;
-    if (pFormat)
-        *pFormat = aFetch.maFormat;
-    return FormulaError::NONE;
-}
-
 [[nodiscard]] inline ExternalDoubleRefFetch fetchExternalDoubleRef(const ScDocument& rDoc,
     const ScAddress& rFormulaPos, sal_uInt16 nFileId, const OUString& rTabName,
     const ScComplexRefData& rData)
@@ -144,18 +129,6 @@ struct ExternalDoubleRefMatrixProjection
 
     aFetch.mxArray = std::move(xArray);
     return aFetch;
-}
-
-[[nodiscard]] inline FormulaError fetchExternalDoubleRefTokens(const ScDocument& rDoc,
-    const ScAddress& rFormulaPos, sal_uInt16 nFileId, const OUString& rTabName,
-    const ScComplexRefData& rData, ScExternalRefCache::TokenArrayRef& rArray)
-{
-    const auto aFetch = fetchExternalDoubleRef(rDoc, rFormulaPos, nFileId, rTabName, rData);
-    if (aFetch.meError != FormulaError::NONE)
-        return aFetch.meError;
-
-    rArray = aFetch.mxArray;
-    return FormulaError::NONE;
 }
 
 [[nodiscard]] inline ExternalDoubleRefMatrixProjection projectExternalDoubleRefMatrix(
