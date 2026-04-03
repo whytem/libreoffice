@@ -4,6 +4,7 @@
 
 #include <spreadsheetengine/detail/substrate/AuthorityPilot.hxx>
 #include <spreadsheetengine/detail/substrate/AuthorityPilotBuilder.hxx>
+#include <spreadsheetengine/detail/substrate/LifecyclePilot.hxx>
 #include <spreadsheetengine/detail/substrate/ExecutionIr.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowComparison.hxx>
@@ -21,6 +22,8 @@ int main()
     using namespace spreadsheetengine::detail::substrate;
     using spreadsheetengine::detail::substrate::authoritydetail::classifyAuthorityMutation;
     using spreadsheetengine::detail::substrate::authoritydetail::makeAuthorityVerification;
+    using spreadsheetengine::detail::substrate::lifecycledetail::classifyLifecycleMutation;
+    using spreadsheetengine::detail::substrate::lifecycledetail::makeLifecycleVerification;
     namespace mapping = spreadsheetengine::detail::substrate::mapping;
     using spreadsheetengine::api::CellValue;
     using spreadsheetengine::standalone::test::fail;
@@ -247,6 +250,42 @@ int main()
             || !pAuthorityFormula->mbInFormulaTree)
         {
             return fail("computational_substrate", "authority projected shadow mismatch");
+        }
+
+        const auto aLifecycleAdmitted
+            = classifyLifecycleMutation(MutationEvent::setFormula({ nPilotSheet, 3, 0 }, u"=A1+B1"));
+        if (!aLifecycleAdmitted.isAdmitted() || !aLifecycleAdmitted.mbRequiresFormulaLifecycleShape)
+            return fail("computational_substrate", "lifecycle contract admission mismatch");
+
+        const auto aLifecycleRejected
+            = classifyLifecycleMutation(MutationEvent::setScalarValue({ nPilotSheet, 0, 0 }));
+        if (aLifecycleRejected.meMutationClass != LifecycleMutationClass::Rejected)
+            return fail("computational_substrate", "lifecycle contract rejection mismatch");
+
+        LifecyclePilotInput aLifecycleInput;
+        aLifecycleInput.maComputationalShadow = aPilotShadow;
+        aLifecycleInput.maGraphShadow = aAuthorityInput.maGraphShadow;
+        aLifecycleInput.maIrShadow = aAuthorityInput.maIrShadow;
+        aLifecycleInput.maMutation = MutationEvent::clearCell({ nPilotSheet, 1, 0 });
+        aLifecycleInput.mbCleanBaseline = true;
+
+        LifecyclePilotTransition aLifecycleTransition;
+        aLifecycleTransition.maInput = aLifecycleInput;
+        aLifecycleTransition.maContract = classifyLifecycleMutation(aLifecycleInput.maMutation);
+        aLifecycleTransition.maVerification = makeLifecycleVerification(aLifecycleTransition.maContract);
+        aLifecycleTransition.maSyncActions.push_back({
+            LifecycleSyncActionKind::RemoveFormulaCell, { nPilotSheet, 1, 0 }, std::nullopt,
+            std::nullopt, true, false });
+        aLifecycleTransition.meVerdict = LifecyclePilotVerdict::Applicable;
+
+        if (aLifecycleTransition.isRejected()
+            || aLifecycleTransition.maVerification.meComputationalMode
+                   != LifecycleVerificationMode::Exact
+            || !aLifecycleTransition.maVerification.mbObserveIrOnly
+            || aLifecycleTransition.meVerdict != LifecyclePilotVerdict::Applicable
+            || aLifecycleTransition.maSyncActions.size() != 1)
+        {
+            return fail("computational_substrate", "lifecycle transition schema mismatch");
         }
 
     // --- Safe mutation rebuild path ---

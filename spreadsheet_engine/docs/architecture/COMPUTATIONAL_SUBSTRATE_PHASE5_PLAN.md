@@ -170,6 +170,10 @@ Required artifact:
 - one checked-in schema or API note for the Phase 5 lifecycle state and sync
   model
 
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE5_LIFECYCLE_SCHEMA.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_LIFECYCLE_SCHEMA.md)
+
 ### 5.3 Build The Engine-Authored Lifecycle Transition Path
 
 Implement the engine-owned lifecycle transition path for the admitted subset.
