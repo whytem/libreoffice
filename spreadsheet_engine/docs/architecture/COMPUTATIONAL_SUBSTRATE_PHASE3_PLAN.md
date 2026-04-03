@@ -141,6 +141,7 @@ Required artifact:
 
 - one checked-in schema or API note naming the Phase 3 IR types and their
   ownership rules
+- [COMPUTATIONAL_SUBSTRATE_PHASE3_IR_SCHEMA.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE3_IR_SCHEMA.md)
 
 ### 3.3 Build Lowering From Current Compiler Output Into The IR
 

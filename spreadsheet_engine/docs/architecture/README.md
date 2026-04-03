@@ -59,6 +59,9 @@ Current architecture docs:
   active contract note for the first execution-facing IR slice, freezing the
   admitted semantic surface, normalization rules, and defer list before the
   Phase 3 schema and lowering work
+- [COMPUTATIONAL_SUBSTRATE_PHASE3_IR_SCHEMA.md](COMPUTATIONAL_SUBSTRATE_PHASE3_IR_SCHEMA.md) -
+  active schema note for the first engine-owned execution IR types, payloads,
+  and workbook/formula ownership rules on the admitted Phase 3 subset
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include <spreadsheetengine/detail/substrate/ExecutionIr.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowComparison.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowMapping.hxx>
@@ -18,6 +19,42 @@ int main()
     namespace mapping = spreadsheetengine::detail::substrate::mapping;
     using spreadsheetengine::api::CellValue;
     using spreadsheetengine::standalone::test::fail;
+
+    {
+        ExecutionIrInstruction aInstruction {
+            ExecutionIrInstructionKind::SingleReference,
+            spreadsheetengine::detail::token::kOpCodePush,
+            spreadsheetengine::api::refdata::SingleRefData {}
+        };
+        if (!aInstruction.carriesReference())
+            return fail("computational_substrate", "execution ir reference classification mismatch");
+
+        ExecutionIrFormulaRecord aFormula;
+        aFormula.maId = { { 0, 1, 2 } };
+        aFormula.maSource = { u"=A1", {} };
+        aFormula.maInstructions.push_back(aInstruction);
+        aFormula.maInstructions.push_back({
+            ExecutionIrInstructionKind::PlainOpcode,
+            spreadsheetengine::detail::token::kOpCodeAdd,
+            {}
+        });
+        aFormula.mbInFormulaTree = true;
+
+        ExecutionIrWorkbookShadow aIrShadow;
+        aIrShadow.maFormulaRecords.push_back(aFormula);
+        if (aIrShadow.getFormulaCount() != 1 || aIrShadow.getInstructionCount() != 2
+            || !aIrShadow.findFormula({ 0, 1, 2 }) || !aIrShadow.isFullyLowered()
+            || aIrShadow.findFormula({ 0, 2, 2 }))
+        {
+            return fail("computational_substrate", "execution ir schema lookup mismatch");
+        }
+        if (aIrShadow.findFormula({ 0, 1, 2 })->getReferenceInstructionCount() != 1)
+            return fail("computational_substrate", "execution ir reference count mismatch");
+
+        aIrShadow.maBuildFailures.push_back({ { { 0, 3, 4 } }, u"=BAD()", u"lower failed" });
+        if (aIrShadow.isFullyLowered())
+            return fail("computational_substrate", "execution ir failure tracking mismatch");
+    }
 
     if (!(mapping::makeShadowCellId({ 3, 4, 5 }) == ShadowCellId { { 3, 4, 5 } }))
         return fail("computational_substrate", "shadow cell id mapping mismatch");
