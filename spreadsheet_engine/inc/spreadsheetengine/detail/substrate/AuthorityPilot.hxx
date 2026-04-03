@@ -74,6 +74,8 @@ struct AuthorityPilotInput
     DependencyGraphShadow maGraphShadow;
     ExecutionIrWorkbookShadow maIrShadow;
     facade::MutationEvent maMutation;
+    std::optional<api::CellValue> moScalarValueAfter;
+    std::optional<api::CellValue> moFormulaCachedValueAfter;
     bool mbCleanBaseline = false;
 
     [[nodiscard]] constexpr bool operator==(const AuthorityPilotInput& rOther) const = default;

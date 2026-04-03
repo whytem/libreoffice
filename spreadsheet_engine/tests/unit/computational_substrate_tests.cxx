@@ -3,10 +3,12 @@
 #include <iostream>
 
 #include <spreadsheetengine/detail/substrate/AuthorityPilot.hxx>
+#include <spreadsheetengine/detail/substrate/AuthorityPilotBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/ExecutionIr.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowComparison.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowMapping.hxx>
+#include <spreadsheetengine/detail/substrate/DependencyGraphShadowBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/DependencyGraphShadow.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowMutation.hxx>
 #include <spreadsheetengine/detail/workbook/InMemoryWorkbookFacade.hxx>
@@ -189,6 +191,62 @@ int main()
             || aTransition.meVerdict != AuthorityPilotVerdict::Applicable)
         {
             return fail("computational_substrate", "authority transition schema mismatch");
+        }
+
+        InMemoryWorkbookFacade aPilotFacade;
+        aPilotFacade.setGrammar(aFacade.getGrammar());
+        aPilotFacade.setGeneration(21);
+        const auto nPilotSheet = aPilotFacade.addSheet(u"Pilot");
+        aPilotFacade.setCell({ nPilotSheet, 0, 0 }, CellValue::number(10.0));
+        aPilotFacade.setFormulaCell({ nPilotSheet, 1, 0 }, u"=A1*2", CellValue::number(20.0));
+        aPilotFacade.setFormulaCell({ nPilotSheet, 2, 0 }, u"=B1+1", CellValue::number(21.0));
+
+        ComputationalObservationState aPilotObservation;
+        aPilotObservation.maFormulaTree = { { nPilotSheet, 1, 0 }, { nPilotSheet, 2, 0 } };
+        aPilotObservation.maCellBroadcasters.push_back({
+            { nPilotSheet, 0, 0 },
+            { { ListenerAnchorKind::FormulaCell, { nPilotSheet, 1, 0 }, 1 } } });
+        aPilotObservation.maCellBroadcasters.push_back({
+            { nPilotSheet, 1, 0 },
+            { { ListenerAnchorKind::FormulaCell, { nPilotSheet, 2, 0 }, 1 } } });
+
+        const auto aPilotShadow = buildComputationalWorkbookShadow(aPilotFacade, aPilotObservation);
+        aAuthorityInput.maComputationalShadow = aPilotShadow;
+        aAuthorityInput.maGraphShadow = buildDependencyGraphShadow(aPilotShadow, aPilotObservation);
+        aAuthorityInput.maIrShadow
+            = authoritybuilddetail::buildAuthorityExecutionIrShadow(aPilotShadow, aPilotFacade);
+        aAuthorityInput.maMutation = MutationEvent::setScalarValue({ nPilotSheet, 0, 0 });
+        aAuthorityInput.moScalarValueAfter = CellValue::number(99.0);
+
+        const auto aAuthorityPlan = buildAuthorityPilotTransition(aAuthorityInput);
+        if (aAuthorityPlan.meVerdict != AuthorityPilotVerdict::Applicable)
+        {
+            if (aAuthorityPlan.maReason == u"mutation_out_of_contract")
+                return fail("computational_substrate", "authority verdict out-of-contract");
+            if (aAuthorityPlan.maReason == u"dirty_baseline")
+                return fail("computational_substrate", "authority verdict dirty baseline");
+            if (aAuthorityPlan.maReason == u"opaque_dependency_surface")
+                return fail("computational_substrate", "authority verdict opaque dependency");
+            if (aAuthorityPlan.maReason == u"missing_scalar_value_after")
+                return fail("computational_substrate", "authority verdict missing scalar value");
+            return fail("computational_substrate", "authority verdict mismatch");
+        }
+        if (aAuthorityPlan.maRecalcPlan.maQueue.size() != 2)
+            return fail("computational_substrate", "authority queue size mismatch");
+        if (aAuthorityPlan.maGraphAfter.getEdgeCount() < 2)
+            return fail("computational_substrate", "authority graph edge mismatch");
+        if (aAuthorityPlan.maIrAfter.getFormulaCount() != 2)
+            return fail("computational_substrate", "authority ir rebuild mismatch");
+
+        const auto* pAuthorityScalar
+            = aAuthorityPlan.maComputationalAfter.findCell({ nPilotSheet, 0, 0 });
+        const auto* pAuthorityFormula
+            = aAuthorityPlan.maComputationalAfter.findCell({ nPilotSheet, 1, 0 });
+        if (!pAuthorityScalar || !pAuthorityScalar->maCell.maValue.isNumber()
+            || pAuthorityScalar->maCell.maValue.mfNumber != 99.0 || !pAuthorityFormula
+            || !pAuthorityFormula->mbInFormulaTree)
+        {
+            return fail("computational_substrate", "authority projected shadow mismatch");
         }
 
     // --- Safe mutation rebuild path ---
