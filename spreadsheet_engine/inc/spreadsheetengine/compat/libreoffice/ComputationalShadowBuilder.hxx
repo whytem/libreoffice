@@ -13,6 +13,7 @@
 
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObservation.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowBuilder.hxx>
+#include <spreadsheetengine/detail/substrate/ComputationalShadowMapping.hxx>
 
 namespace spreadsheetengine::compat::libreoffice
 {
@@ -38,11 +39,8 @@ namespace builderdetail
 [[nodiscard]] inline spreadsheetengine::detail::substrate::ListenerAnchorId toShadowListenerAnchor(
     const substrateobs::ListenerSnapshot& rSnapshot)
 {
-    spreadsheetengine::detail::substrate::ListenerAnchorId aAnchor;
-    aAnchor.meKind = toShadowListenerKind(rSnapshot.meKind);
-    aAnchor.maAnchor = rSnapshot.maAnchor;
-    aAnchor.mnLength = rSnapshot.mnLength;
-    return aAnchor;
+    return spreadsheetengine::detail::substrate::mapping::makeListenerAnchorId(
+        toShadowListenerKind(rSnapshot.meKind), rSnapshot.maAnchor, rSnapshot.mnLength);
 }
 
 template <typename InputContainer, typename OutputContainer>

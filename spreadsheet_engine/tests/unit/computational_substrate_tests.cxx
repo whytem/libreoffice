@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include <spreadsheetengine/detail/substrate/ComputationalShadowBuilder.hxx>
+#include <spreadsheetengine/detail/substrate/ComputationalShadowMapping.hxx>
 #include <spreadsheetengine/detail/workbook/InMemoryWorkbookFacade.hxx>
 
 #include "TestSupport.hxx"
@@ -11,8 +12,21 @@ int main()
 {
     using namespace spreadsheetengine::detail::facade;
     using namespace spreadsheetengine::detail::substrate;
+    namespace mapping = spreadsheetengine::detail::substrate::mapping;
     using spreadsheetengine::api::CellValue;
     using spreadsheetengine::standalone::test::fail;
+
+    if (!(mapping::makeShadowCellId({ 3, 4, 5 }) == ShadowCellId { { 3, 4, 5 } }))
+        return fail("computational_substrate", "shadow cell id mapping mismatch");
+
+    {
+        const FormulaGroupDescriptor aDescriptor { { 0, 1, 2 }, 4, true };
+        if (!(mapping::makeShadowFormulaGroupId(aDescriptor)
+              == ShadowFormulaGroupId { { 0, 1, 2 }, 4 }))
+        {
+            return fail("computational_substrate", "shadow group id mapping mismatch");
+        }
+    }
 
     InMemoryWorkbookFacade aFacade;
     aFacade.setGrammar({ spreadsheetengine::api::FormulaLanguage::Odff,

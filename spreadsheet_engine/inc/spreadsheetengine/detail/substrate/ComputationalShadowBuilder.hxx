@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <spreadsheetengine/detail/substrate/ComputationalShadow.hxx>
+#include <spreadsheetengine/detail/substrate/ComputationalShadowMapping.hxx>
 #include <spreadsheetengine/detail/workbook/WorkbookFacade.hxx>
 
 namespace spreadsheetengine::detail::substrate
@@ -79,7 +80,7 @@ namespace detail
         aSheetShadow.maSheet = rSheet;
         rFacade.visitCells(rSheet.mnId, [&](const facade::CellDescriptor& rCell) {
             ShadowCellRecord aRecord;
-            aRecord.maId = ShadowCellId { rCell.maAddress };
+            aRecord.maId = mapping::makeShadowCellId(rCell.maAddress);
             aRecord.maCell = rCell;
             aRecord.moFormula = rFacade.getFormulaCellDescriptor(rCell.maAddress);
             aRecord.mbInFormulaTree
@@ -89,8 +90,7 @@ namespace detail
 
             if (const auto oGroup = rFacade.getFormulaGroupDescriptor(rCell.maAddress); oGroup)
             {
-                aRecord.moFormulaGroup = ShadowFormulaGroupId {
-                    oGroup->maAnchor, oGroup->mnLength };
+                aRecord.moFormulaGroup = mapping::makeShadowFormulaGroupId(*oGroup);
                 auto aGroupIt = detail::findOrCreateGroupRecord(aShadow.maFormulaGroups,
                     *aRecord.moFormulaGroup, *oGroup);
                 aGroupIt->maMembers.push_back(aRecord.maId);
