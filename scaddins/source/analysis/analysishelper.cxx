@@ -767,28 +767,6 @@ OUString GetString( double f, bool bLeadingSign, sal_uInt16 nMaxDig )
     return aRet;
 }
 
-
-double GetOddfprice( sal_Int32 /*nNullDate*/, sal_Int32 /*nSettle*/, sal_Int32 /*nMat*/, sal_Int32 /*nIssue*/,
-    sal_Int32 /*nFirstCoup*/, double /*fRate*/, double /*fYield*/, double /*fRedemp*/, sal_Int32 /*nFreq*/,
-    sal_Int32 /*nBase*/ )
-{
-    // If you change this to not unconditionally throw, the
-    // SAL_WNOUNREACHABLE_CODE_PUSH/POP around the caller in
-    // financial.cxx can be removed.
-    throw uno::RuntimeException();
-}
-
-
-double GetOddfyield( sal_Int32 /*nNullDate*/, sal_Int32 /*nSettle*/, sal_Int32 /*nMat*/, sal_Int32 /*nIssue*/,
-    sal_Int32 /*nFirstCoup*/, double /*fRate*/, double /*fPrice*/, double /*fRedemp*/, sal_Int32 /*nFreq*/,
-    sal_Int32 /*nBase*/ )
-{
-    // If you change this to not unconditionally throw, the
-    // SAL_WNOUNREACHABLE_CODE_PUSH/POP around the caller in
-    // financial.cxx can be removed.
-    throw uno::RuntimeException();
-}
-
 double GetPmt( double fRate, double fNper, double fPv, double fFv, sal_Int32 nPayType )
 {
     double      fPmt;

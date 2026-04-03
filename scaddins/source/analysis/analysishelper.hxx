@@ -89,16 +89,6 @@ double              Erfc( double fX );
 bool                ParseDouble( const sal_Unicode*& rpDoubleAsString, double& rReturn );
 OUString            GetString( double fNumber, bool bLeadingSign, sal_uInt16 nMaxNumOfDigits = 15 );
 
-/// @throws css::uno::RuntimeException
-/// @throws css::lang::IllegalArgumentException
-double              GetOddfprice( sal_Int32 nNullDate, sal_Int32 nSettle, sal_Int32 nMat, sal_Int32 nIssue,
-                                sal_Int32 nFirstCoup, double fRate, double fYield, double fRedemp,
-                                sal_Int32 nFreq, sal_Int32 nBase );
-/// @throws css::uno::RuntimeException
-/// @throws css::lang::IllegalArgumentException
-double              GetOddfyield( sal_Int32 nNullDate, sal_Int32 nSettle, sal_Int32 nMat, sal_Int32 nIssue,
-                                sal_Int32 nFirstCoup, double fRate, double fPrice, double fRedemp,
-                                sal_Int32 nFreq, sal_Int32 nBase );
 double              GetPmt( double fRate, double fNper, double fPv, double fFv, sal_Int32 nPayType );
 double              GetFv( double fRate, double fNper, double fPmt, double fPv, sal_Int32 nPayType );
 
