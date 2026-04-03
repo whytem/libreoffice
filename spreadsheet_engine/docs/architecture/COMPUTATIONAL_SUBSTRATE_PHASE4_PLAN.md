@@ -217,6 +217,10 @@ Required artifact:
 - one checked-in differential surface with explicit verdict categories for
   applied, normalized-equivalent, rolled back, and rejected pilot cases
 
+The checked-in differential artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE4_DIFFERENTIAL_SURFACE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_DIFFERENTIAL_SURFACE.md)
+
 ### 4.6 Freeze Phase 4 Closeout And The Proceed Decision
 
 Phase 4 closes only with a checked-in decision record that says one of:

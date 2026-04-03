@@ -62,6 +62,7 @@ using spreadsheetengine::compat::libreoffice::substrateauthority::ScopedComputat
 using spreadsheetengine::compat::libreoffice::recalcauthority::PilotResultKind;
 using spreadsheetengine::compat::libreoffice::recalcauthority::ScopedRecalcAuthority;
 using spreadsheetengine::compat::libreoffice::recalcshadow::ScopedRecalcShadow;
+using spreadsheetengine::compat::libreoffice::recalcqueue::FormulaStateSnapshot;
 using RecalcShadowComparisonKind
     = spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparisonKind;
 using spreadsheetengine::compat::libreoffice::substrateobs::BroadcasterStateSnapshot;
@@ -341,6 +342,14 @@ void assertComparableExecutionIr(
 {
     CPPUNIT_ASSERT(rComparison.mbFullMatch);
     CPPUNIT_ASSERT(rComparison.meKind != ExecutionIrComparisonKind::Mismatch);
+}
+
+void assertFormulaStateEqual(
+    const FormulaStateSnapshot& rExpected, const FormulaStateSnapshot& rActual)
+{
+    CPPUNIT_ASSERT(rExpected.maTreeOrder == rActual.maTreeOrder);
+    CPPUNIT_ASSERT(rExpected.maTrackOrder == rActual.maTrackOrder);
+    CPPUNIT_ASSERT(rExpected.maDirtyOnly == rActual.maDirtyOnly);
 }
 
 [[nodiscard]] bool hasGraphEdge(
@@ -990,6 +999,105 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalAuthorityRejectsDirt
         ComputationalPilotResultKind::RejectedDirtyBaseline, oResult->meKind);
 
     m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalAuthorityRejectsValidationOnlyMutation)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+    using spreadsheetengine::compat::libreoffice::recalcqueue::captureFormulaState;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetString(1, 0, 0, u"=SUM(A1:A2)"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=B1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalAuthority aAuthority(*m_pDoc, true);
+    CPPUNIT_ASSERT(aAuthority.canApplyAuthority());
+
+    m_pDoc->InsertRow(ScRange(0, 1, 0, m_pDoc->MaxCol(), 1, 0));
+    const auto aBeforeApply = captureFormulaState(*m_pDoc);
+    const auto oResult = aAuthority.apply(*m_pDoc, translateInsertRows(0, 1, 1));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalPilotResultKind::RejectedOutOfContract, oResult->meKind);
+    assertFormulaStateEqual(aBeforeApply, captureFormulaState(*m_pDoc));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalAuthorityRollsBackVerificationFailure)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+    using spreadsheetengine::compat::libreoffice::recalcqueue::captureFormulaState;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=B1+1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalAuthority aAuthority(*m_pDoc, true);
+    CPPUNIT_ASSERT(aAuthority.canApplyAuthority());
+
+    m_pDoc->SetValue(0, 0, 0, 9.0);
+    m_pDoc->SetString(2, 0, 0, u"=A1+1"_ustr);
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(2, 0, 0), ScAddress(1, 0, 0) });
+
+    const auto aBeforeApply = captureFormulaState(*m_pDoc);
+    const auto oResult = aAuthority.apply(*m_pDoc, translateSetScalarValue(ScAddress(0, 0, 0)));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalPilotResultKind::RolledBackVerificationFailure, oResult->meKind);
+    CPPUNIT_ASSERT(oResult->moQueueComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moGraphComparison.has_value());
+    CPPUNIT_ASSERT_EQUAL(GraphComparisonKind::Mismatch, oResult->moGraphComparison->meKind);
+    assertFormulaStateEqual(aBeforeApply, captureFormulaState(*m_pDoc));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalAuthorityClassifiesNormalizedEquivalent)
+{
+    using spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparison;
+    using spreadsheetengine::compat::libreoffice::substrateauthority::PilotResult;
+    using spreadsheetengine::compat::libreoffice::substrateauthority::detail::
+        classifyVerifiedPilotResult;
+
+    PilotResult aResult;
+    aResult.maTransition.meVerdict
+        = spreadsheetengine::detail::substrate::AuthorityPilotVerdict::Applicable;
+    aResult.maTransition.maVerification.meQueueMode
+        = spreadsheetengine::detail::substrate::AuthorityVerificationMode::Exact;
+    aResult.maTransition.maVerification.meGraphMode
+        = spreadsheetengine::detail::substrate::AuthorityVerificationMode::Exact;
+    aResult.maTransition.maVerification.meIrMode
+        = spreadsheetengine::detail::substrate::AuthorityVerificationMode::AllowNormalizedEquivalent;
+
+    ShadowComparison aQueueComparison;
+    aQueueComparison.meKind = RecalcShadowComparisonKind::Exact;
+    aResult.moQueueComparison = aQueueComparison;
+
+    spreadsheetengine::detail::substrate::DependencyGraphShadowComparison aGraphComparison;
+    aGraphComparison.meKind = GraphComparisonKind::Exact;
+    aGraphComparison.mbFullMatch = true;
+    aResult.moGraphComparison = aGraphComparison;
+
+    spreadsheetengine::detail::substrate::ExecutionIrWorkbookComparison aIrComparison;
+    aIrComparison.meKind = ExecutionIrComparisonKind::NormalizedEquivalent;
+    aIrComparison.mbFullMatch = true;
+    aResult.moIrComparison = aIrComparison;
+
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalPilotResultKind::AppliedNormalizedEquivalent,
+        classifyVerifiedPilotResult(aResult));
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalSubstrateScalarEditCapture)

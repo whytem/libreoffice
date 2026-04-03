@@ -102,6 +102,36 @@ namespace detail
                           NormalizedEquivalent);
 }
 
+[[nodiscard]] inline PilotResultKind classifyVerifiedPilotResult(const PilotResult& rResult)
+{
+    switch (rResult.maTransition.meVerdict)
+    {
+        case spreadsheetengine::detail::substrate::AuthorityPilotVerdict::RejectedOutOfContract:
+            return PilotResultKind::RejectedOutOfContract;
+        case spreadsheetengine::detail::substrate::AuthorityPilotVerdict::RejectedDirtyBaseline:
+            return PilotResultKind::RejectedDirtyBaseline;
+        case spreadsheetengine::detail::substrate::AuthorityPilotVerdict::Applicable:
+        case spreadsheetengine::detail::substrate::AuthorityPilotVerdict::Applied:
+        case spreadsheetengine::detail::substrate::AuthorityPilotVerdict::NormalizedEquivalent:
+        case spreadsheetengine::detail::substrate::AuthorityPilotVerdict::RolledBack:
+            break;
+    }
+
+    if (!rResult.moQueueComparison || !rResult.moGraphComparison || !rResult.moIrComparison)
+        return PilotResultKind::RolledBackVerificationFailure;
+
+    if (!acceptsQueueComparison(
+            *rResult.moQueueComparison, rResult.maTransition.maVerification.meQueueMode)
+        || !acceptsGraphComparison(
+            *rResult.moGraphComparison, rResult.maTransition.maVerification.meGraphMode))
+    {
+        return PilotResultKind::RolledBackVerificationFailure;
+    }
+
+    return anyNormalizedEquivalent(rResult) ? PilotResultKind::AppliedNormalizedEquivalent
+                                            : PilotResultKind::Applied;
+}
+
 [[nodiscard]] inline spreadsheetengine::detail::substrate::AuthorityPilotInput
 prepareAuthorityInput(
     const spreadsheetengine::detail::substrate::ComputationalWorkbookShadow& rComputationalShadow,
@@ -212,22 +242,13 @@ public:
         aResult.moIrComparison = spreadsheetengine::detail::substrate::compareExecutionIrWorkbookShadow(
             aResult.maTransition.maIrAfter, buildExecutionIrWorkbookShadow(aLiveComputationalShadow, rDoc));
 
-        const bool bAccepted = detail::acceptsQueueComparison(
-                                   *aResult.moQueueComparison,
-                                   aResult.maTransition.maVerification.meQueueMode)
-            && detail::acceptsGraphComparison(
-                *aResult.moGraphComparison, aResult.maTransition.maVerification.meGraphMode);
-
-        if (!bAccepted)
+        aResult.meKind = detail::classifyVerifiedPilotResult(aResult);
+        if (aResult.meKind == PilotResultKind::RolledBackVerificationFailure)
         {
             recalcqueue::restoreFormulaState(rDoc, aStateBeforeApply);
-            aResult.meKind = PilotResultKind::RolledBackVerificationFailure;
             return aResult;
         }
 
-        aResult.meKind = detail::anyNormalizedEquivalent(aResult)
-                             ? PilotResultKind::AppliedNormalizedEquivalent
-                             : PilotResultKind::Applied;
         return aResult;
     }
 };
