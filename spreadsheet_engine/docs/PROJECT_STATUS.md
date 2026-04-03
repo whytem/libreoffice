@@ -3,15 +3,11 @@
 This document is the current-state reference for the
 `spreadsheet_engine/` project.
 
-It is written around three questions:
-
-- what the engine owns today
-- what still intentionally lives in Calc
-- what the project is actively doing next
-
-Completed extraction streams and closeout records still matter, but they live
-in the architecture, archive, and extraction-history docs rather than
-structuring this status file.
+It is written as a settled-boundary snapshot rather than a milestone ledger.
+Completed plans, phase records, and historical closeout notes still matter,
+but they live under [architecture/](architecture/), [archive/](archive/),
+and [extraction-history/](extraction-history/) instead of structuring this
+status file.
 
 ## Project Objective
 
@@ -19,7 +15,7 @@ The long-term objective is to make `spreadsheet_engine/` the home for Calc's
 spreadsheet-specific computation engine while keeping Calc as the document and
 application host.
 
-In practical terms, the engine should own:
+In practical terms, the engine is intended to own:
 
 - formula compilation and compiler-host interfaces
 - token modeling and execution-facing compiler output
@@ -28,35 +24,31 @@ In practical terms, the engine should own:
 - dependency analysis, invalidation planning, and recalc planning
 - standalone workbook loading and evaluation
 
-Calc should continue to own:
+Calc is intended to remain responsible for:
 
 - UI, import/export, rendering, UNO, and shell integration
 - persistence and document-service integrations
-- host-only services that are not useful as standalone engine semantics
+- host-only services that do not make sense as standalone engine semantics
 
-The active program described below goes further than the original boundary and
-intentionally reopens some of the computational storage and lifecycle split,
-but it still does not change the goal of keeping Calc as the application host.
+## Current Status At A Glance
 
-## Current State
-
-The original extraction objective is close to being met.
+The original extraction objective is effectively achieved.
 
 Today:
 
 - the engine builds standalone with CMake and also builds inside LibreOffice
-- the engine owns the shared token model and compiler-host surface
+- the engine owns the shared compiler and token-model surface
 - the engine owns the standalone workbook model, FODS loader, parser, and
   evaluator
 - the engine owns dependency snapshots, invalidation planning, and recalc
   planning/queue construction
 - Calc already consumes a substantial body of engine-owned runtime and compat
-  code in production execution paths
+  logic in production execution paths
 - the promoted Calc FODS replay corpus is fully green with zero cached
   fallback
 
 `spreadsheet_engine/` is therefore already a real shared computation layer,
-not just a standalone harness.
+not just a standalone harness or experimental replay tool.
 
 ## Verified Baseline
 
@@ -120,8 +112,7 @@ spreadsheet semantics.
 
 ### Dependency And Recalc Planning
 
-The engine owns the calculation-facing planning layers above raw document
-storage:
+The engine owns the declarative planning layers above raw document storage:
 
 - workbook facade contracts with in-memory and Calc-backed implementations
 - formula-cell and named-range discovery surfaces
@@ -130,8 +121,8 @@ storage:
 - recalc planning and queue construction
 - Calc queue-consumption bridges for engine-owned recalc output
 
-This means the engine already owns the declarative dependency and recalc side
-of the computation stack.
+This means the engine already owns the dependency and recalc-planning side of
+the computation stack.
 
 ### Shared Execution Logic Used By Calc
 
@@ -162,16 +153,20 @@ Analysis add-in and related host adapters:
 - direct add-in adapters that package host services around engine-owned
   semantics instead of duplicating spreadsheet logic inside the add-in layer
 
-The remaining add-in-specific semantic gap is explicit rather than hidden:
-`ODDFPRICE` and `ODDFYIELD` are still deferred because there is no shared
-odd-first-period runtime implementation in the current engine or Calc tree.
+One explicit add-in defer remains:
 
-## Current Boundary With Calc
+- `ODDFPRICE`
+- `ODDFYIELD`
 
-Under the presently shipped architecture, Calc still owns:
+Those are still deferred because there is no shared odd-first-period runtime
+implementation in the current engine or Calc tree.
+
+## Settled Boundary With Calc
+
+Calc still intentionally owns:
 
 - `ScDocument`, `ScTable`, `ScColumn`, and formula-cell storage
-- document mutation and formula-tree ownership
+- document mutation APIs and formula-cell object lifetime
 - listener and broadcaster wiring plus host-side dependency side effects
 - stack container mutation and formula-token cursor ownership
 - `ScTokenArray` construction, range/union token-container operations, and
@@ -184,103 +179,41 @@ Under the presently shipped architecture, Calc still owns:
 - UI, import/export, rendering, UNO, shell, persistence, and threaded/OpenCL
   backends
 
-That boundary is clear and stable enough that the first-stage extraction can
-be considered successful on its own terms.
+That first-stage extraction boundary is clear and can be treated as
+successful on its own terms.
 
-## Active Execution Path
+## Settled Conclusions From The Computational Substrate Program
 
-The project has now made an explicit decision to proceed beyond that stable
-first-stage boundary.
+The computational-substrate architecture program is complete enough to support
+clear conclusions.
 
-The active path is:
+What it did justify:
 
-- [COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE1_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE1_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE2_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE2_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE3_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE3_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE3_IR_CONTRACT.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE3_IR_CONTRACT.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE3_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE3_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE4_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE4_AUTHORITY_CONTRACT.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_AUTHORITY_CONTRACT.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE4_PILOT_MUTATION_MATRIX.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_PILOT_MUTATION_MATRIX.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE4_DIFFERENTIAL_SURFACE.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_DIFFERENTIAL_SURFACE.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE4_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE5_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE5_DIFFERENTIAL_SURFACE.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_DIFFERENTIAL_SURFACE.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE5_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE6_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE6_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE7_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE7_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE7_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE7_DECISION_RECORD.md)
+- engine-authored shadow models for computational state, dependency graph,
+  and execution-facing IR on a narrowed subset
+- engine-authored authority for a bounded live compat slice
+- a real opt-in rollout path for that bounded authority slice
+- one bounded widening step beyond the original admitted structural surface
 
-This is a major second-stage architecture program. Its target end state is not
-just "more helpers extracted" or "more direct engine entry adoption." The goal
-is to make `spreadsheet_engine/` the intended owner of the live computational
-substrate that currently still sits in Calc, including:
+What it did not justify:
 
-- formula tree
-- broadcast track
-- broadcast-area machine
-- listener and broadcaster graph semantics
-- computation-facing table and column storage, if needed
-- an engine-owned execution-facing IR instead of long-term dependence on
-  `ScTokenArray` as the authoritative representation
+- broad storage migration
+- broad listener/broadcaster ownership transfer
+- broad token-container ownership transfer
+- shared-group-sensitive structural rollout
+- named-range-sensitive structural rollout
+- sheet-wide structural or document-wide authority transfer
 
-Calc would remain the application and document host, but the center of gravity
-for live computational state would move further into the engine.
+The result is intentionally narrow:
 
-The program has now completed:
+- not stop
+- not broad rollout
+- a bounded opt-in authority slice with exact verification and explicit
+  rollback
 
-- Phase 0 observability and scope-freeze on a narrowed subset
-- Phase 1 engine-owned computational storage shadowing for that subset,
-  including representative row-insert and column-delete rebuild coverage
-- Phase 2 live dependency-graph shadowing on that admitted subset, including
-  exact-or-normalized graph comparisons, delayed-state handling, and
-  representative structural rebuild validation
-- Phase 3 engine-owned execution IR shadowing on that admitted subset,
-  including deterministic lowering, representative structural update
-  coherence, and exact-or-normalized IR differential validation
-- Phase 4 engine-authoritative dependency-graph update and recalc-queue
-  derivation on a narrowed admitted subset, with deterministic rollback and
-  rejection lanes and execution-IR comparison retained as observation rather
-  than a hard rollback gate
-- Phase 5 engine-authored scalar formula lifecycle authority on a still
-  narrower admitted subset, with exact queue/computational/graph
-  verification, explicit dirty/out-of-contract rejection, rollback on
-  divergence, and repair-detected classification
-- Phase 6 engine-authored structural and reference-update authority on a
-  narrower admitted subset, limited to single-sheet row insert and column
-  delete on the ordinary-scalar-formula slice, with exact
-  queue/computational/graph verification and explicit repair-detected
-  rollback when Calc diverges from the admitted reference-update answer
-- Phase 7 host-boundary re-cut and rollout decision, closing the
-  computational-substrate architecture program with a narrow-proceed outcome
-  rather than either broad rollout or stop
+## Current Opt-In Narrow Rollout Surface
 
-The current recommendation is therefore:
-
-- keep the first-stage extraction boundary as the stable base
-- treat the admitted scalar lifecycle plus bounded single-sheet structural
-  slice as the current experimental rollout surface
-- keep broader structural, storage, and token-container migration deferred
-
-The bounded rollout closeout material is now:
-
-- [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_DECISION_RECORD.md)
-
-The completed rollout result keeps the Phase 7 decision intact while taking
-the selected bolder execution step to completion:
-
-- implement an opt-in experimental rollout for the already-admitted slice
-- validate `DeleteRows` and `InsertColumns` under the same exact
-  verification and rollback rules
-- widen the opt-in rollout by one bounded step once that proof is green
-
-The current opt-in rollout surface is therefore:
+The current admitted narrow rollout surface is:
 
 - admitted scalar lifecycle authority
 - single-sheet `InsertRows`
@@ -291,124 +224,84 @@ The current opt-in rollout surface is therefore:
 - clean baseline only
 - no shared groups
 - no named-range-sensitive structural behavior
-- exact queue, computational, and graph verification
+- exact queue verification
+- exact computational verification
+- exact graph verification
 - repair-detected rollback on structural divergence
 
-No broader structural or storage widening is currently admitted.
+This rollout remains opt-in and bounded. It is not evidence for broad
+computational storage migration by itself.
 
-## Why This Path Was Chosen
+Calc still owns the live host side of this slice:
 
-The first-stage extraction work answered the original feasibility questions:
+- document storage and mutation APIs
+- formula-cell object lifetime
+- listener and broadcaster container storage
+- final live verification and rollback mechanics
 
-- shared compiler infrastructure works
-- standalone packaging works
-- replay parity works
-- dependency and recalc planning extraction works
-- Calc can safely consume extracted execution logic through compat seams and
-  direct entry adapters
+That is acceptable because the current rollout is a compat-driven authority
+slice, not a blanket handoff of the computational document core.
 
-Because those questions are now settled, the next meaningful expansion is no
-longer another narrow helper-cleanup stream. The largest remaining
-computation-owned residue still sits where live dependency services, listener
-and broadcaster state, formula-tree ownership, and execution-facing token
-containers remain embedded in Calc storage.
+## Explicitly Deferred Surfaces
 
-That makes computational substrate extraction the clearest path if the project
-intends to keep moving the authoritative computation boundary outward.
+The following remain outside the admitted rollout and outside the settled
+engine-owned boundary:
 
-## Phase 0 Outcome
+- shared-group-sensitive structural behavior
+- named-range-sensitive structural behavior
+- sheet insert, delete, rename, or move
+- copy, move, clipboard, load-time, or undo-like structural flows
+- broader storage migration
+- token-container ownership transfer
+- broad listener/broadcaster ownership transfer
 
-The active program did not begin by shifting authority immediately. It began by
-proving that the live computational substrate could be observed precisely
-enough to justify later shadow work.
-
-That Phase 0 gate is now complete.
-
-The checked-in closeout material lives in:
-
-- [COMPUTATIONAL_SUBSTRATE_PHASE0_INVENTORY.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_INVENTORY.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE0_OBSERVABLE_STATE_MODEL.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_OBSERVABLE_STATE_MODEL.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE0_SCENARIO_MATRIX.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_SCENARIO_MATRIX.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_PHASE0_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_DECISION_RECORD.md)
-
-The outcome is:
-
-- proceed to Phase 1 on a narrower subset
-
-What Phase 0 established:
-
-- an exact ownership map for formula tree, broadcast track, BASM, listener
-  contexts, broadcaster storage, and `ScTokenArray` mutation/update sites
-- a stable observable-state model for formula-tree, formula-track,
-  broadcaster, listener, dependency, and recalc comparisons
-- checked-in capture helpers for live formula-tree, formula-track, and
-  normalized broadcaster state
-- a representative mutation scenario matrix
-- an automated differential lane covering scalar edits, formula edits,
-  delayed listener startup, and delayed broadcaster deletion
-
-What Phase 0 did not claim:
-
-- broad authority readiness for every structural edit, load-time setup, or
-  Calc container layout detail
-
-That is why the proceed decision is intentionally narrowed rather than broad.
+Any expansion into those surfaces should begin with a new explicit plan and
+proof cycle rather than being inferred from the current rollout.
 
 ## Current Assessment
 
-The project is in a strong position, but the active program is intentionally a
-higher-risk undertaking than the bounded extraction streams that came before
-it.
+The project is in a strong position:
 
-That should shape expectations:
+- the first-stage extraction is successful and operationally valuable on its
+  own
+- the zero-fallback replay baseline is stable
+- Calc and standalone share a large body of real spreadsheet semantics
+- the computational-substrate program produced a meaningful bounded authority
+  result without forcing a risky broad boundary flip
 
-- the current architecture is already successful without this second-stage
-  program
-- the computational substrate path is a deliberate expansion, not unfinished
-  first-stage work
-- each later phase must earn the next one through exact shadowing and
-  validation
-- stopping after Phase 0 or a later shadow phase remains a valid outcome if
-  the new boundary proves too costly or too tangled
+The current state should be read as:
 
-## Working Rules For The Active Program
+- a successful shared-engine project
+- plus a successful narrow second-stage authority experiment
+- but not as proof that a full computational storage migration is already
+  justified
 
-The project should continue under these rules:
+## Working Rules Going Forward
+
+Any further expansion should continue under these rules:
 
 - do not sacrifice the zero-fallback replay baseline
 - do not move UI, UNO, rendering, persistence, or environment services into
   the engine
 - do not accept a dual-authority model where Calc remains the hidden real
   authority
-- prefer exact shadowing and explicit rollback over optimistic authority
+- prefer exact verification and explicit rollback over optimistic authority
   shifts
 - treat memory and performance regressions as architecture issues, not
   follow-up polish
-- stop when a phase proves the new boundary is not worth the complexity
-
-## Definition Of Progress
-
-From this point forward, progress should be measured by questions like:
-
-- Is more of the live computational state engine-owned?
-- Is the dependency graph becoming engine-authoritative?
-- Is Calc becoming thinner as a computation host while still remaining the
-  application host?
-- Is the replay and differential validation baseline still intact?
-- Is the boundary getting cleaner rather than creating a tangled dual system?
-
-If those answers stay positive, the second-stage program is moving in the
-right direction.
+- require a new explicit plan before widening beyond the current admitted
+  rollout slice
 
 ## Reference Material
 
-For the active architecture path, see:
+For the current second-stage boundary and rollout closeout, see:
 
 - [COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_DECISION_RECORD.md)
 - [README.md](architecture/README.md)
 
 For completed plans, closeout records, and historical extraction context, see:
 
-- [docs/archive/](archive/)
-- [docs/extraction-history/](extraction-history/)
+- [archive/](archive/)
+- [extraction-history/](extraction-history/)
