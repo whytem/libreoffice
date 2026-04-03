@@ -177,6 +177,10 @@ Required artifact:
 
 - one checked-in global named-range equivalence rules note
 
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_EQUIVALENCE_RULES.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_EQUIVALENCE_RULES.md)
+
 ### 4. Build The Global Named-Range Live-Candidate Path
 
 Extend the existing structural authority harness so the bounded global
