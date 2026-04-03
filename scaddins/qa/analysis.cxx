@@ -265,6 +265,24 @@ CPPUNIT_TEST_FIXTURE(Test, test_sharedCalendarRuntimeDelegates)
     CPPUNIT_ASSERT_THROW(mxAnalysis->getTbilleq(xOptions, 36250, 36678, 0.0914),
                          css::lang::IllegalArgumentException); // >360 days
 }
+
+CPPUNIT_TEST_FIXTURE(Test, testOddFirstCouponFunctionsRemainExplicitlyDeferred)
+{
+    const auto xOptions = makeAnalysisOptions();
+    const sal_Int32 nIssue = 36000;
+    const sal_Int32 nSettlement = 36200;
+    const sal_Int32 nFirstCoupon = 36300;
+    const sal_Int32 nMaturity = 37000;
+
+    CPPUNIT_ASSERT_THROW(
+        mxAnalysis->getOddfprice(xOptions, nSettlement, nMaturity, nIssue, nFirstCoupon, 0.05,
+                                 0.06, 100.0, 2, css::uno::Any(sal_Int32(0))),
+        css::uno::RuntimeException);
+    CPPUNIT_ASSERT_THROW(
+        mxAnalysis->getOddfyield(xOptions, nSettlement, nMaturity, nIssue, nFirstCoupon, 0.05,
+                                 99.0, 100.0, 2, css::uno::Any(sal_Int32(0))),
+        css::uno::RuntimeException);
+}
 }
 
 CPPUNIT_PLUGIN_IMPLEMENT();
