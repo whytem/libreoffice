@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include <spreadsheetengine/detail/substrate/ComputationalShadowBuilder.hxx>
+#include <spreadsheetengine/detail/substrate/ComputationalShadowComparison.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowMapping.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowMutation.hxx>
 #include <spreadsheetengine/detail/workbook/InMemoryWorkbookFacade.hxx>
@@ -55,6 +56,7 @@ int main()
 
     const ComputationalWorkbookShadow aShadow
         = buildComputationalWorkbookShadow(aFacade, aObservation);
+    const auto aInitialComparison = compareComputationalShadow(aShadow, aFacade, aObservation);
 
     if (aShadow.maSnapshot.mnGeneration != 9)
         return fail("computational_substrate", "snapshot generation mismatch");
@@ -83,12 +85,16 @@ int main()
 
     if (aShadow.maFormulaGroups.front().maMembers.size() != 2)
         return fail("computational_substrate", "formula group membership mismatch");
+    if (!aInitialComparison.mbFullMatch)
+        return fail("computational_substrate", "initial shadow comparison mismatch");
 
     // --- Safe mutation rebuild path ---
     {
         aFacade.setCell({ nData, 0, 0 }, CellValue::number(11.0));
         auto aMutationState = rebuildComputationalShadowAfterMutation(
             aFacade, aObservation, MutationEvent::setScalarValue({ nData, 0, 0 }));
+        if (!compareComputationalShadow(aMutationState.maShadow, aFacade, aObservation).mbFullMatch)
+            return fail("computational_substrate", "scalar mutation comparison mismatch");
         const auto* pUpdatedScalar = aMutationState.maShadow.findCell({ nData, 0, 0 });
         if (!pUpdatedScalar || !pUpdatedScalar->maCell.maValue.isNumber()
             || pUpdatedScalar->maCell.maValue.mfNumber != 11.0)
@@ -99,6 +105,8 @@ int main()
         aFacade.setFormulaCell({ nData, 1, 0 }, u"=A1*4", CellValue::number(44.0));
         aMutationState = rebuildComputationalShadowAfterMutation(
             aFacade, aObservation, MutationEvent::setFormula({ nData, 1, 0 }, u"=A1*4"));
+        if (!compareComputationalShadow(aMutationState.maShadow, aFacade, aObservation).mbFullMatch)
+            return fail("computational_substrate", "formula edit comparison mismatch");
         const auto* pEditedFormula = aMutationState.maShadow.findCell({ nData, 1, 0 });
         if (!pEditedFormula || !pEditedFormula->moFormula
             || pEditedFormula->moFormula->maFormulaSource != u"=A1*4")
@@ -110,6 +118,8 @@ int main()
         aObservation.maFormulaTree.push_back({ nData, 2, 0 });
         aMutationState = rebuildComputationalShadowAfterMutation(
             aFacade, aObservation, MutationEvent::setFormula({ nData, 2, 0 }, u"=A1+B1"));
+        if (!compareComputationalShadow(aMutationState.maShadow, aFacade, aObservation).mbFullMatch)
+            return fail("computational_substrate", "formula insert comparison mismatch");
         if (aMutationState.maShadow.getFormulaCellCount() != 3
             || !aMutationState.maShadow.findCell({ nData, 2, 0 }))
         {
@@ -119,6 +129,8 @@ int main()
         aFacade.clearCell({ nData, 0, 1 });
         aMutationState = rebuildComputationalShadowAfterMutation(
             aFacade, aObservation, MutationEvent::clearCell({ nData, 0, 1 }));
+        if (!compareComputationalShadow(aMutationState.maShadow, aFacade, aObservation).mbFullMatch)
+            return fail("computational_substrate", "clear cell comparison mismatch");
         if (aMutationState.maShadow.findCell({ nData, 0, 1 }))
             return fail("computational_substrate", "clear cell rebuild mismatch");
 
@@ -128,6 +140,8 @@ int main()
         const auto aAfterRange = *aFacade.findNamedRange(u"MetricRenamed", std::nullopt);
         aMutationState = rebuildComputationalShadowAfterMutation(
             aFacade, aObservation, MutationEvent::renameNamedRange(aBeforeRange, aAfterRange));
+        if (!compareComputationalShadow(aMutationState.maShadow, aFacade, aObservation).mbFullMatch)
+            return fail("computational_substrate", "named range comparison mismatch");
         if (aMutationState.maShadow.maNamedRanges.size() != 1
             || aMutationState.maShadow.maNamedRanges.front().maName != u"MetricRenamed")
         {

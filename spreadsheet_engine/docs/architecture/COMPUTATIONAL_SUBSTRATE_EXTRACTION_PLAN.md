@@ -167,6 +167,10 @@ assuming broad structural or load-time authority immediately.
 The detailed execution-ready work for this phase now lives in:
 
 - [COMPUTATIONAL_SUBSTRATE_PHASE1_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE1_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md)
+
+Status: complete on the narrowed Phase 0 subset, widened to representative
+row-insert and column-delete rebuild coverage
 
 ### Goal
 

@@ -30,8 +30,13 @@ Current architecture docs:
   formula tree, broadcaster/listener graph, computation-facing table and
   column storage, and an engine-owned execution-facing IR
 - [COMPUTATIONAL_SUBSTRATE_PHASE1_PLAN.md](COMPUTATIONAL_SUBSTRATE_PHASE1_PLAN.md) -
-  active implementation-ready plan for Phase 1 shadow computational storage on
-  the narrowed subset admitted by the completed Phase 0 gate
+  completed implementation and closeout record for Phase 1 shadow
+  computational storage on the narrowed subset admitted by the completed
+  Phase 0 gate
+- [COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md) -
+  completed proceed record for Phase 1, admitting the rebuilt shadow subset
+  plus representative row-insert and column-delete widening as the entry
+  surface for Phase 2
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

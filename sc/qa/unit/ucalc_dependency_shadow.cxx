@@ -28,6 +28,7 @@
 #include <spreadsheetengine/compat/libreoffice/RecalcAuthority.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcShadow.hxx>
 #include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
+#include <spreadsheetengine/detail/substrate/ComputationalShadowComparison.hxx>
 #include <spreadsheetengine/detail/dependency/DependencySnapshot.hxx>
 #include <spreadsheetengine/detail/dependency/InvalidationPlanner.hxx>
 
@@ -1047,6 +1048,50 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalShadowRepresentative
     CPPUNIT_ASSERT(aDeleteColumnState.maShadow.findCell({ 0, 0, 2 }));
     CPPUNIT_ASSERT(aDeleteColumnState.maShadow.findCell({ 0, 1, 2 }));
     CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aDeleteColumnState.maShadow.getFormulaCellCount());
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalShadowDifferentialValidation)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateClearCell;
+    using spreadsheetengine::compat::libreoffice::mutation::translateDeleteColumns;
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+    using spreadsheetengine::compat::libreoffice::rebuildComputationalShadowAfterMutation;
+    using spreadsheetengine::detail::substrate::compareComputationalShadow;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    auto assertFullMatch = [&](const spreadsheetengine::detail::facade::MutationEvent& rMutation,
+                               sal_Int64 nGeneration) {
+        const CalcWorkbookFacade aFacade(*m_pDoc, nGeneration);
+        const auto aState = rebuildComputationalShadowAfterMutation(aFacade, *m_pDoc, rMutation);
+        const auto aComparison = compareComputationalShadow(aState.maShadow, aFacade, aState.maObservation);
+        CPPUNIT_ASSERT(aComparison.mbFullMatch);
+    };
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetValue(0, 1, 0, 2.0); // A2
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr); // B1
+    m_pDoc->CalcAll();
+
+    m_pDoc->SetValue(0, 0, 0, 7.0);
+    assertFullMatch(translateSetScalarValue(ScAddress(0, 0, 0)), 1);
+
+    m_pDoc->SetString(1, 0, 0, u"=A2*3"_ustr);
+    assertFullMatch(translateSetFormula(ScAddress(1, 0, 0), u"=A2*3"_ustr), 2);
+
+    m_pDoc->SetEmptyCell(ScAddress(0, 1, 0));
+    assertFullMatch(translateClearCell(ScAddress(0, 1, 0)), 3);
+
+    m_pDoc->InsertRow(ScRange(0, 1, 0, m_pDoc->MaxCol(), 1, 0));
+    assertFullMatch(translateInsertRows(0, 1, 1), 4);
+
+    m_pDoc->DeleteCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
+    assertFullMatch(translateDeleteColumns(0, 0, 1), 5);
 
     m_pDoc->DeleteTab(0);
 }

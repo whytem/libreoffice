@@ -196,6 +196,8 @@ The active path is:
 
 - [COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE1_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE1_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md)
 
 This is a major second-stage architecture program. Its target end state is not
 just "more helpers extracted" or "more direct engine entry adoption." The goal
@@ -212,6 +214,15 @@ substrate that currently still sits in Calc, including:
 
 Calc would remain the application and document host, but the center of gravity
 for live computational state would move further into the engine.
+
+The program has now completed:
+
+- Phase 0 observability and scope-freeze on a narrowed subset
+- Phase 1 engine-owned computational storage shadowing for that subset,
+  including representative row-insert and column-delete rebuild coverage
+
+The next frontier is Phase 2 live dependency-graph shadowing on the admitted
+Phase 1 subset rather than a broad authority jump.
 
 ## Why This Path Was Chosen
 

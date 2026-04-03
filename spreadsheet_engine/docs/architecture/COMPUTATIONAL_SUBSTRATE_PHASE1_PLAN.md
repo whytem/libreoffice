@@ -1,6 +1,6 @@
 # Computational Substrate Phase 1 Plan
 
-Status: active implementation-ready Phase 1 plan
+Status: completed Phase 1 implementation and closeout record
 
 ## Purpose
 
@@ -14,6 +14,9 @@ falling back to Calc-owned storage objects as the real source of truth.
 
 Phase 1 starts from the narrowed proceed boundary recorded in
 [COMPUTATIONAL_SUBSTRATE_PHASE0_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_DECISION_RECORD.md).
+
+The completed closeout decision now lives in
+[COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md).
 
 ## Phase 1 Goal
 
@@ -265,11 +268,12 @@ distorting the core shadow model before the narrowed safe subset is proven.
 
 ## Validation Contract
 
-Phase 1 should explicitly require:
+Phase 1 closeout explicitly required:
 
 - `git diff --check`
-- `make -j1 CppunitTest_sc_ucalc_dependency_shadow`
 - `make -j1 CppunitTest_sc_ucalc_workbook_facade`
+- targeted computational-substrate cases in
+  `CppunitTest_sc_ucalc_dependency_shadow`
 - new standalone shadow-model tests under `spreadsheet_engine/tests/unit/`
 - differential tests that compare shadow state against live Calc captures on:
   - `SetValue`
