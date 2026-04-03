@@ -1,6 +1,6 @@
 # Computational Substrate Extraction Plan
 
-Status: exploratory staged architecture plan
+Status: active staged architecture plan
 
 ## Purpose
 
@@ -141,6 +141,14 @@ state precisely enough to support exact shadowing.
 
 Stop if the substrate cannot be made observable without invasive behavior
 changes first.
+
+The detailed execution-ready work for this phase now lives in:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md)
+
+Phase 0 should not be treated as a soft preamble. It is the observability and
+scope-freeze gate for the whole program, and later phases should not begin
+until its exit criteria are met.
 
 ## Phase 1: Engine-Owned Computational Storage Shadow
 

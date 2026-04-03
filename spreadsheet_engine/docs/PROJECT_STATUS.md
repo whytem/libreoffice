@@ -3,11 +3,15 @@
 This document is the current-state reference for the
 `spreadsheet_engine/` project.
 
-It is intentionally written around the engine's present capabilities, the
-current boundary with Calc, and the remaining strategic choices. Completed
-implementation streams still matter, but they now live primarily as reference
-material in the architecture, archive, and extraction-history docs rather than
-as the structure for this status file.
+It is written around three questions:
+
+- what the engine owns today
+- what still intentionally lives in Calc
+- what the project is actively doing next
+
+Completed extraction streams and closeout records still matter, but they live
+in the architecture, archive, and extraction-history docs rather than
+structuring this status file.
 
 ## Project Objective
 
@@ -26,22 +30,17 @@ In practical terms, the engine should own:
 
 Calc should continue to own:
 
-- document storage and mutation
-- formula-cell lifecycle and host-side side effects
-- UI, import/export, UNO, rendering, and shell integration
+- UI, import/export, rendering, UNO, and shell integration
+- persistence and document-service integrations
 - host-only services that are not useful as standalone engine semantics
 
-This remains an incremental extraction, not a rewrite.
+The active program described below goes further than the original boundary and
+intentionally reopens some of the computational storage and lifecycle split,
+but it still does not change the goal of keeping Calc as the application host.
 
 ## Current State
 
-The original extraction objective is now close to being met.
-
-`spreadsheet_engine/` is no longer just a standalone experiment or a replay
-harness. It is a production-shared computation layer that builds both
-standalone and inside LibreOffice, and it already owns most of the
-spreadsheet-specific semantics that motivated the extraction in the first
-place.
+The original extraction objective is close to being met.
 
 Today:
 
@@ -56,13 +55,12 @@ Today:
 - the promoted Calc FODS replay corpus is fully green with zero cached
   fallback
 
-There is no longer a broad open extraction tail inside the in-scope execution
-surface. The remaining Calc-owned boundary is now mostly intentional and
-host-shaped.
+`spreadsheet_engine/` is therefore already a real shared computation layer,
+not just a standalone harness.
 
 ## Verified Baseline
 
-The current promoted replay baseline is:
+The standing promoted replay baseline is:
 
 - `500` workbooks
 - `50,661` formula cells
@@ -104,8 +102,6 @@ independently of Calc internals:
 - token bridge and shadow-compiler infrastructure
 - differential compiler comparison and diagnostics
 
-This is part of the authoritative computation stack, not scaffolding.
-
 ### Standalone Workbook Loading And Evaluation
 
 The engine can load and evaluate real spreadsheet workbooks without depending
@@ -134,11 +130,12 @@ storage:
 - recalc planning and queue construction
 - Calc queue-consumption bridges for engine-owned recalc output
 
-The boundary between planning and host execution is now explicit.
+This means the engine already owns the declarative dependency and recalc side
+of the computation stack.
 
 ### Shared Execution Logic Used By Calc
 
-Calc already runs a meaningful amount of engine-owned execution behavior in
+Calc already runs a substantial body of engine-owned execution behavior in
 production:
 
 - broad pure-computation runtime families
@@ -150,19 +147,18 @@ production:
 - narrowed compat facades for selected host-bound inspection and
   external-reference projection paths
 
-One important milestone is now true: within the extracted execution surface,
-there are no known remaining standalone-versus-Calc duplicate helper
-implementations for the in-scope spreadsheet semantics that have already been
-ported.
+Within the extracted execution surface, there are no known remaining
+standalone-versus-Calc duplicate helper implementations for the in-scope
+spreadsheet semantics that have already been ported.
 
 ### Add-In And Host Integration Surfaces
 
-The engine also now owns a meaningful part of the spreadsheet semantics used by
-the Analysis add-in and related host adapters:
+The engine now owns a meaningful part of the spreadsheet semantics used by the
+Analysis add-in and related host adapters:
 
 - shared financial runtime for the adopted financial surface
-- shared calendar/workday/month-shift semantics where the host provides
-  document services such as null date or holiday inputs
+- shared calendar/workday/month-shift semantics where the host provides null
+  date or holiday inputs
 - direct add-in adapters that package host services around engine-owned
   semantics instead of duplicating spreadsheet logic inside the add-in layer
 
@@ -172,22 +168,11 @@ odd-first-period runtime implementation in the current engine or Calc tree.
 
 ## Current Boundary With Calc
 
-The current boundary is defined less by "what has not been extracted yet" and
-more by "what is intentionally host-owned."
-
-### Calc-Owned By Design
-
-Calc remains the document and application host. The following responsibilities
-intentionally still live there:
+Under the presently shipped architecture, Calc still owns:
 
 - `ScDocument`, `ScTable`, `ScColumn`, and formula-cell storage
 - document mutation and formula-tree ownership
 - listener and broadcaster wiring plus host-side dependency side effects
-- UI, import/export, rendering, UNO, shell, and persistence
-- threaded and OpenCL backend execution
-
-There is also a remaining technical boundary that stays Calc-owned by design:
-
 - stack container mutation and formula-token cursor ownership
 - `ScTokenArray` construction, range/union token-container operations, and
   other Calc-local token plumbing
@@ -195,30 +180,42 @@ There is also a remaining technical boundary that stays Calc-owned by design:
   services
 - null-date acquisition and holiday-input expansion for host-owned add-ins
 - host-heavy inspection and environment services such as `INFO(...)`
-- printer, path, number-format, and other document-service integrations that
-  do not make useful standalone engine semantics
+- printer, path, number-format, and other document-service integrations
+- UI, import/export, rendering, UNO, shell, persistence, and threaded/OpenCL
+  backends
 
-### Explicitly Retained Or Deferred
+That boundary is clear and stable enough that the first-stage extraction can
+be considered successful on its own terms.
 
-The remaining non-adopted surfaces are now supposed to be explicit:
+## Active Execution Path
 
-- `ODDFPRICE` and `ODDFYIELD` are a deliberate defer item, not a hidden helper
-  path
-- the remaining host-heavy `CELL(...)`, `INFO(...)`, and external-reference
-  tails are retained because the dominant concerns there are host service,
-  document integration, or cache ownership
-- token ownership and interpreter stack mutation remain intentionally on the
-  Calc side unless a very narrow seam clearly justifies moving again
+The project has now made an explicit decision to proceed beyond that stable
+first-stage boundary.
 
-This means the project is no longer carrying an ambiguous "cleanup tail" in
-the main extracted execution surface.
+The active path is:
 
-## Current Assessment
+- [COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md)
 
-The project is in a strong position.
+This is a major second-stage architecture program. Its target end state is not
+just "more helpers extracted" or "more direct engine entry adoption." The goal
+is to make `spreadsheet_engine/` the intended owner of the live computational
+substrate that currently still sits in Calc, including:
 
-The major architectural questions that existed earlier in the extraction have
-already been answered positively:
+- formula tree
+- broadcast track
+- broadcast-area machine
+- listener and broadcaster graph semantics
+- computation-facing table and column storage, if needed
+- an engine-owned execution-facing IR instead of long-term dependence on
+  `ScTokenArray` as the authoritative representation
+
+Calc would remain the application and document host, but the center of gravity
+for live computational state would move further into the engine.
+
+## Why This Path Was Chosen
+
+The first-stage extraction work answered the original feasibility questions:
 
 - shared compiler infrastructure works
 - standalone packaging works
@@ -227,82 +224,95 @@ already been answered positively:
 - Calc can safely consume extracted execution logic through compat seams and
   direct entry adapters
 
-The remaining decisions are mostly about optional scope expansion, not about
-whether the extracted architecture is viable.
+Because those questions are now settled, the next meaningful expansion is no
+longer another narrow helper-cleanup stream. The largest remaining
+computation-owned residue still sits where live dependency services, listener
+and broadcaster state, formula-tree ownership, and execution-facing token
+containers remain embedded in Calc storage.
 
-If work stopped here, the project would already represent a successful
-extraction of Calc's spreadsheet-specific computation core into a standalone
-and shared engine with a well-defined host boundary.
+That makes computational substrate extraction the clearest path if the project
+intends to keep moving the authoritative computation boundary outward.
 
-## Options For Further Scope Expansion
+## What Phase 0 Must Prove
 
-If the goal is to move additional functionality out of Calc and into
-`spreadsheet_engine/`, the most plausible options are now narrower and more
-selective than the original extraction program.
+The active program does not begin by moving authority immediately.
 
-### Ranked Options
+Phase 0 is now the critical execution gate. It must prove that the project can
+observe and compare the live computational substrate precisely enough to make
+later shadowing and authority shifts safe.
 
-| Rank | Option | Value | Risk | Assessment |
-| --- | --- | --- | --- | --- |
-| 1 | Wider direct engine-entry adoption for safe production Calc paths | High | Medium | Best next expansion if the goal is to make Calc run more engine-owned code without reopening the host boundary. The spreadsheet semantics already exist in the engine; the work is mainly careful production adoption. |
-| 2 | Add new shared runtime implementations for explicitly deferred spreadsheet semantics | Medium to High | Medium | Best next expansion if the goal is semantic completeness rather than boundary cleanup. The odd-first-period financial pair is the clearest current example, but this would be real algorithm/runtime work, not simple rewiring. |
-| 3 | Deeper external-reference semantic extraction above the current facade | Medium | Medium to High | Still potentially useful, but the remaining complexity is dominated by host-owned cache, session, and document integration. Worth pursuing only if a fresh inventory reveals another narrow seam. |
-| 4 | Further compiler and evaluation entry tightening around retained production callers | Medium | Medium | There may still be some benefit in making production Calc callers thinner, but the payoff is now incremental rather than transformational. This should be inventory-driven rather than assumed. |
-| 5 | Additional reduction of Calc-local token and interpreter shell ownership | Low to Medium | High | Possible in theory, but the remaining token and stack surfaces are tightly coupled to Calc host ownership. The risk-to-payoff ratio is much worse now than it was earlier in the extraction. |
-| 6 | Migration of more host-heavy inspection or document-service behavior | Low | High | Full `INFO(...)`, host-heavy `CELL(...)`, printer/path, and number-format semantics are dominated by document and environment services. These are poor standalone-engine targets unless product requirements change. |
-| 7 | Storage, mutation, lifecycle, or recalc-execution migration | Very Low | Very High | Not recommended under the current architecture. This would move the project away from its successful "engine for spreadsheet semantics, Calc for document hosting" boundary. |
+The detailed execution reference for that work now lives in:
 
-There is now a dedicated architecture plan for the conditional boundary-shift
-version of option 7:
+- [COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md)
 
-- [COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md)
+Specifically, Phase 0 must produce:
 
-That document should be read as a major second-stage architecture program, not
-as the default next step for the current project boundary.
+- an exact ownership map for formula tree, broadcast track, BASM, listener
+  contexts, broadcaster storage, and `ScTokenArray` mutation/update sites
+- a clear split between computational state and genuinely host-only state
+- stable diagnostics for:
+  - live dependency graph shape
+  - broadcaster and listener state
+  - formula-tree membership
+  - recalc queue behavior after representative mutations
+- a validation lane capable of catching divergence before any authority shift
+  is attempted
 
-### Recommended Direction If Expansion Continues
+If Phase 0 cannot provide exact enough observability, the program should stop
+there instead of forcing a shadow architecture on top of opaque Calc state.
 
-If additional scope is desired, the most sensible default is:
+## Current Assessment
 
-1. look first for more safe direct engine-entry adoption opportunities in
-   production Calc callers
-2. only after that, consider new shared semantic implementations where there is
-   a clear product or interoperability reason to fill an explicitly deferred
-   gap
+The project is in a strong position, but the active program is intentionally a
+higher-risk undertaking than the bounded extraction streams that came before
+it.
 
-Everything below those two options now has materially worse payoff relative to
-its architectural risk.
+That should shape expectations:
 
-## Working Rules For Any Future Expansion
+- the current architecture is already successful without this second-stage
+  program
+- the computational substrate path is a deliberate expansion, not unfinished
+  first-stage work
+- each later phase must earn the next one through exact shadowing and
+  validation
+- stopping after Phase 0 or a later shadow phase remains a valid outcome if
+  the new boundary proves too costly or too tangled
 
-Future work should continue under these rules:
+## Working Rules For The Active Program
 
-- do not reopen the recalc authority boundary unless a concrete gap requires it
-- do not attempt to move document storage into the engine
-- do not rewrite `ScInterpreter` wholesale
-- prefer narrow compat bridges over broad cross-layer entanglement
-- keep one core implementation where semantics are spreadsheet-specific
-- validate every extraction slice in both standalone and Calc
+The project should continue under these rules:
+
+- do not sacrifice the zero-fallback replay baseline
+- do not move UI, UNO, rendering, persistence, or environment services into
+  the engine
+- do not accept a dual-authority model where Calc remains the hidden real
+  authority
+- prefer exact shadowing and explicit rollback over optimistic authority
+  shifts
+- treat memory and performance regressions as architecture issues, not
+  follow-up polish
+- stop when a phase proves the new boundary is not worth the complexity
 
 ## Definition Of Progress
 
-From this point forward, meaningful progress should be measured less by
-"completed phases" and more by these questions:
+From this point forward, progress should be measured by questions like:
 
-- Is more spreadsheet-specific execution logic engine-owned?
-- Is Calc thinner and more clearly host-only?
-- Is the zero-fallback replay baseline still intact?
-- Are duplicate implementations continuing to disappear?
-- Is the public and compat boundary getting simpler rather than more tangled?
+- Is more of the live computational state engine-owned?
+- Is the dependency graph becoming engine-authoritative?
+- Is Calc becoming thinner as a computation host while still remaining the
+  application host?
+- Is the replay and differential validation baseline still intact?
+- Is the boundary getting cleaner rather than creating a tangled dual system?
 
-If the answer to those questions keeps moving in the right direction, the
-project is still advancing.
+If those answers stay positive, the second-stage program is moving in the
+right direction.
 
 ## Reference Material
 
-For current architecture references, see:
+For the active architecture path, see:
 
-- [docs/architecture/README.md](architecture/README.md)
+- [COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md)
+- [README.md](architecture/README.md)
 
 For completed plans, closeout records, and historical extraction context, see:
 
