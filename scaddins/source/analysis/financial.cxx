@@ -23,6 +23,8 @@
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
 #include <spreadsheetengine/compat/libreoffice/FinancialAddInExecution.hxx>
 
+#include <rtl/ustring.hxx>
+
 using namespace sca::analysis;
 
 namespace sefinanceexec = spreadsheetengine::compat::libreoffice::financialaddinexecution;
@@ -51,6 +53,13 @@ sefinanceexec::DirectFinancialAddInAdapter makeNullDateFinancialAdapter(
 {
     return sefinanceexec::DirectFinancialAddInAdapter(
         getAddInDateServiceContext(xOpt).maHostDate.maNullDate);
+}
+
+[[noreturn]] void throwDeferredOddFirstCouponFunction(const OUString& rFunctionName)
+{
+    throw css::uno::RuntimeException(
+        u"Analysis add-in function "_ustr + rFunctionName
+        + u" remains deferred because odd first coupon pricing and yield do not yet have a shared spreadsheet engine runtime."_ustr);
 }
 }
 
@@ -302,28 +311,17 @@ double SAL_CALL AnalysisAddIn::getTbillyield( const css::uno::Reference< css::be
         makeNullDateFinancialAdapter(xOpt).evaluateTbillYield(nSettle, nMat, fPrice));
 }
 
-// Encapsulation violation: We *know* that GetOddfprice() always
-// throws.
-
-SAL_WNOUNREACHABLE_CODE_PUSH
-
 double SAL_CALL AnalysisAddIn::getOddfprice( const css::uno::Reference< css::beans::XPropertySet >& xOpt,
     sal_Int32 nSettle, sal_Int32 nMat, sal_Int32 nIssue, sal_Int32 nFirstCoup,
     double fRate, double fYield, double fRedemp, sal_Int32 nFreq, const css::uno::Any& rOB )
 {
     if( fRate < 0.0 || fYield < 0.0 || isFreqInvalid(nFreq) || nMat <= nFirstCoup || nFirstCoup <= nSettle || nSettle <= nIssue )
         throw css::lang::IllegalArgumentException();
-
-    double fRet = GetOddfprice( GetNullDate( xOpt ), nSettle, nMat, nIssue, nFirstCoup, fRate, fYield, fRedemp, nFreq, getDateMode( xOpt, rOB ) );
-    return finiteOrThrow( fRet );
+    (void)xOpt;
+    (void)rOB;
+    (void)fRedemp;
+    throwDeferredOddFirstCouponFunction(u"ODDFPRICE"_ustr);
 }
-
-SAL_WNOUNREACHABLE_CODE_POP
-
-// Encapsulation violation: We *know* that Getoddfyield() always
-// throws.
-
-SAL_WNOUNREACHABLE_CODE_PUSH
 
 double SAL_CALL AnalysisAddIn::getOddfyield( const css::uno::Reference< css::beans::XPropertySet >& xOpt,
     sal_Int32 nSettle, sal_Int32 nMat, sal_Int32 nIssue, sal_Int32 nFirstCoup,
@@ -331,13 +329,11 @@ double SAL_CALL AnalysisAddIn::getOddfyield( const css::uno::Reference< css::bea
 {
     if( fRate < 0.0 || fPrice <= 0.0 || isFreqInvalid(nFreq) || nMat <= nFirstCoup || nFirstCoup <= nSettle || nSettle <= nIssue )
         throw css::lang::IllegalArgumentException();
-
-    double fRet = GetOddfyield( GetNullDate( xOpt ), nSettle, nMat, nIssue, nFirstCoup, fRate, fPrice, fRedemp, nFreq,
-                        getDateMode( xOpt, rOB ) );
-    return finiteOrThrow( fRet );
+    (void)xOpt;
+    (void)rOB;
+    (void)fRedemp;
+    throwDeferredOddFirstCouponFunction(u"ODDFYIELD"_ustr);
 }
-
-SAL_WNOUNREACHABLE_CODE_POP
 
 double SAL_CALL AnalysisAddIn::getOddlprice( const css::uno::Reference< css::beans::XPropertySet >& xOpt,
     sal_Int32 nSettle, sal_Int32 nMat, sal_Int32 nLastInterest,
