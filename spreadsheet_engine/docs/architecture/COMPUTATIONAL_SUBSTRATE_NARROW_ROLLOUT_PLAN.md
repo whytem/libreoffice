@@ -130,6 +130,10 @@ Required artifact:
 
 - one checked-in widening contract note for `DeleteRows` and `InsertColumns`
 
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_CONTRACT.md)
+
 ### 4. Build Widening Validation And Promotion Evidence
 
 Run the bolder execution step in a controlled way.

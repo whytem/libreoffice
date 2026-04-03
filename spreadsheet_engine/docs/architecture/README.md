@@ -131,6 +131,9 @@ Current architecture docs:
 - [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_IMPLEMENTATION.md) -
   active implementation note for the first opt-in rollout step, including the
   umbrella rollout gate and per-surface override behavior
+- [COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_CONTRACT.md) -
+  active widening contract note for the first bolder promotion candidates,
+  freezing the proof threshold for `DeleteRows` and `InsertColumns`
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for
