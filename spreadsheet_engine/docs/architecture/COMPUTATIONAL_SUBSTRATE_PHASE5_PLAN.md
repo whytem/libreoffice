@@ -137,6 +137,11 @@ Required artifact:
 - one checked-in admitted/deferred lifecycle mutation matrix or equivalent
   classification
 
+The checked-in artifacts for this workstream are:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE5_LIFECYCLE_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_LIFECYCLE_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE5_LIFECYCLE_MATRIX.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_LIFECYCLE_MATRIX.md)
+
 ### 5.2 Define The Engine-Owned Lifecycle State And Sync Model
 
 Define the lifecycle-facing state model the engine will use for the pilot.
