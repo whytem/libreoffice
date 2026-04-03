@@ -138,6 +138,10 @@ Current architecture docs:
   active widening evidence note for the first bolder promotion candidates,
   recording the exact validation, rejection, and rollback proof for
   `DeleteRows` and `InsertColumns`
+- [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_EVIDENCE.md) -
+  active bounded rollout evidence note for the admitted rollout slice,
+  recording correctness, gate behavior, and the first measured operational
+  sample after opt-in rollout wiring
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

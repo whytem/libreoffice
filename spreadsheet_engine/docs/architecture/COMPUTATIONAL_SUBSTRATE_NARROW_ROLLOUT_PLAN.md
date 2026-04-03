@@ -172,6 +172,10 @@ Required artifact:
 
 - one checked-in bounded rollout evidence note
 
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_EVIDENCE.md)
+
 ### 6. Freeze The Rollout Decision
 
 Close the plan with an explicit decision record.
