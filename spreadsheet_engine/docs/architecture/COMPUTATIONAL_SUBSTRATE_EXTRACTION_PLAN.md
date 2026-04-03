@@ -364,8 +364,9 @@ Stop if the engine graph is still too dependent on Calc-owned repair logic.
 The detailed execution-ready work for this phase now lives in:
 
 - [COMPUTATIONAL_SUBSTRATE_PHASE5_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE5_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_DECISION_RECORD.md)
 
-Status: next frontier, but only on the narrower admitted Phase 4 subset
+Status: complete on a narrower scalar lifecycle-authoritative subset
 
 ### Goal
 
@@ -398,6 +399,19 @@ Calc silently repairing the state afterward.
 
 Stop if formula lifecycle remains inseparable from host-only document
 ownership.
+
+Phase 5 completed with a proceed decision, but only on a narrower admitted
+surface than the whole Phase 4 authority subset:
+
+- scalar formula insertion
+- scalar formula replacement that preserves single-cell shape
+- scalar formula removal through `ClearCell`
+- clean-baseline entry only
+- exact queue, computational, and graph verification
+- execution-IR comparison retained as observation data
+
+Shared-group lifecycle, structural widening, and repair-heavy mutation classes
+remain deferred.
 
 ## Phase 6: Structural Edit And Reference-Update Expansion
 

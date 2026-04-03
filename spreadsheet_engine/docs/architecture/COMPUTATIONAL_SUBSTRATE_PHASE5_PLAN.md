@@ -1,6 +1,6 @@
 # Computational Substrate Phase 5 Plan
 
-Status: active execution-ready plan for Phase 5
+Status: completed on the narrowed scalar formula lifecycle subset
 
 ## Purpose
 
@@ -243,6 +243,10 @@ Required artifact:
   applied, normalized-equivalent, rolled back, rejected, and repair-detected
   lifecycle cases
 
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE5_DIFFERENTIAL_SURFACE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_DIFFERENTIAL_SURFACE.md)
+
 ### 5.6 Freeze Phase 5 Closeout And The Proceed Decision
 
 Phase 5 closes only with a checked-in decision record that says one of:
@@ -264,6 +268,10 @@ Required artifact:
 
 - one checked-in Phase 5 decision record with explicit proceed or stop
   reasoning
+
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE5_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_DECISION_RECORD.md)
 
 ## Target Surfaces
 

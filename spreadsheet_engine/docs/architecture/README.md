@@ -93,8 +93,17 @@ Current architecture docs:
   graph-and-queue-authoritative subset and carrying a still-narrower surface
   into Phase 5
 - [COMPUTATIONAL_SUBSTRATE_PHASE5_PLAN.md](COMPUTATIONAL_SUBSTRATE_PHASE5_PLAN.md) -
-  active execution-ready plan for the first formula-lifecycle authority pilot
-  on top of the narrowed Phase 4 graph-and-queue-authoritative subset
+  completed implementation and closeout record for the first scalar
+  formula-lifecycle authority pilot on top of the narrowed Phase 4
+  graph-and-queue-authoritative subset
+- [COMPUTATIONAL_SUBSTRATE_PHASE5_DIFFERENTIAL_SURFACE.md](COMPUTATIONAL_SUBSTRATE_PHASE5_DIFFERENTIAL_SURFACE.md) -
+  completed differential-validation note for the Phase 5 lifecycle pilot,
+  freezing the explicit applied, normalized-equivalent, rejected,
+  rolled-back, and repair-detected verdict categories
+- [COMPUTATIONAL_SUBSTRATE_PHASE5_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_PHASE5_DECISION_RECORD.md) -
+  completed narrow-proceed decision for Phase 5, admitting only the scalar
+  lifecycle-authoritative subset into Phase 6 while keeping shared-group and
+  structural widening deferred
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

@@ -209,6 +209,8 @@ The active path is:
 - [COMPUTATIONAL_SUBSTRATE_PHASE4_DIFFERENTIAL_SURFACE.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_DIFFERENTIAL_SURFACE.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE4_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE5_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE5_DIFFERENTIAL_SURFACE.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_DIFFERENTIAL_SURFACE.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE5_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_DECISION_RECORD.md)
 
 This is a major second-stage architecture program. Its target end state is not
 just "more helpers extracted" or "more direct engine entry adoption." The goal
@@ -241,9 +243,14 @@ The program has now completed:
   derivation on a narrowed admitted subset, with deterministic rollback and
   rejection lanes and execution-IR comparison retained as observation rather
   than a hard rollback gate
+- Phase 5 engine-authored scalar formula lifecycle authority on a still
+  narrower admitted subset, with exact queue/computational/graph
+  verification, explicit dirty/out-of-contract rejection, rollback on
+  divergence, and repair-detected classification
 
-The next frontier is Phase 5: a still-narrower formula-lifecycle pilot on top
-of the admitted Phase 4 graph-and-queue-authoritative subset.
+The next frontier is Phase 6: structural and reference-update widening, but
+only from the narrower scalar lifecycle-authoritative subset admitted by the
+Phase 5 decision record.
 
 ## Why This Path Was Chosen
 
