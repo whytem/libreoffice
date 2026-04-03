@@ -1,6 +1,6 @@
 # Computational Substrate Phase 7 Performance And Memory Evidence
 
-Status: active performance and memory evidence note for Phase 7
+Status: completed performance and memory evidence note for Phase 7
 
 ## Purpose
 

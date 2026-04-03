@@ -1,6 +1,6 @@
 # Computational Substrate Phase 7 Decision Contract
 
-Status: active contract note for Phase 7
+Status: completed contract note for Phase 7
 
 ## Purpose
 

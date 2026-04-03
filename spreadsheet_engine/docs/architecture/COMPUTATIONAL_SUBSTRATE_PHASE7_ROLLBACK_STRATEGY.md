@@ -1,6 +1,6 @@
 # Computational Substrate Phase 7 Rollback Strategy
 
-Status: active rollback and deactivation strategy for Phase 7
+Status: completed rollback and deactivation strategy for Phase 7
 
 ## Purpose
 

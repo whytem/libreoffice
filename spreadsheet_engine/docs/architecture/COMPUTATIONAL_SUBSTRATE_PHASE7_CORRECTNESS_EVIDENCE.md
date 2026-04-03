@@ -1,6 +1,6 @@
 # Computational Substrate Phase 7 Correctness Evidence
 
-Status: active correctness evidence note for Phase 7
+Status: completed correctness evidence note for Phase 7
 
 ## Purpose
 

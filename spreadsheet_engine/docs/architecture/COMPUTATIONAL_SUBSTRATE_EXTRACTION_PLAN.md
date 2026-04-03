@@ -1,6 +1,6 @@
 # Computational Substrate Extraction Plan
 
-Status: active staged architecture plan
+Status: completed staged architecture plan with a narrow-proceed Phase 7 decision
 
 ## Purpose
 
@@ -479,6 +479,7 @@ Broader structural classes remain deferred into Phase 7 or later phases.
 The detailed execution-ready work for this phase now lives in:
 
 - [COMPUTATIONAL_SUBSTRATE_PHASE7_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE7_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE7_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE7_DECISION_RECORD.md)
 
 ### Goal
 
@@ -516,6 +517,15 @@ Do not roll forward into broad adoption unless all of the following are true:
 
 If those conditions are not met, the program should close as an exploratory
 architecture effort rather than force adoption.
+
+Phase 7 completed with a narrow-proceed decision:
+
+- the computational-substrate program does not justify broad rollout of the
+  full target boundary
+- it does justify a bounded rollout candidate on the admitted scalar
+  lifecycle plus single-sheet row-insert and column-delete slice
+- broader structural, shared-group, named-range, storage, and token-container
+  migration remain deferred
 
 ## Standing Validation Contract
 

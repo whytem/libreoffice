@@ -214,6 +214,7 @@ The active path is:
 - [COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE6_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE6_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE7_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE7_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE7_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE7_DECISION_RECORD.md)
 
 This is a major second-stage architecture program. Its target end state is not
 just "more helpers extracted" or "more direct engine entry adoption." The goal
@@ -255,10 +256,16 @@ The program has now completed:
   delete on the ordinary-scalar-formula slice, with exact
   queue/computational/graph verification and explicit repair-detected
   rollback when Calc diverges from the admitted reference-update answer
+- Phase 7 host-boundary re-cut and rollout decision, closing the
+  computational-substrate architecture program with a narrow-proceed outcome
+  rather than either broad rollout or stop
 
-The next frontier is Phase 7: host-boundary re-cut and rollout decision,
-starting only from the narrower structural-authoritative subset admitted by
-the Phase 6 decision record.
+The current recommendation is therefore:
+
+- keep the first-stage extraction boundary as the stable base
+- treat the admitted scalar lifecycle plus single-sheet structural slice as a
+  bounded rollout candidate
+- keep broader structural, storage, and token-container migration deferred
 
 ## Why This Path Was Chosen
 

@@ -1,6 +1,6 @@
 # Computational Substrate Phase 7 Ownership Map
 
-Status: active Phase 7 ownership map
+Status: completed Phase 7 ownership map
 
 ## Purpose
 

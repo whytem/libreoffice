@@ -114,9 +114,13 @@ Current architecture docs:
   delete on the ordinary-scalar-formula subset while keeping broader
   structural classes deferred into Phase 7
 - [COMPUTATIONAL_SUBSTRATE_PHASE7_PLAN.md](COMPUTATIONAL_SUBSTRATE_PHASE7_PLAN.md) -
-  active execution-ready plan for the host-boundary re-cut and rollout
-  decision phase, starting from the narrowed structural-authoritative subset
-  admitted by the completed Phase 6 decision
+  completed implementation and closeout record for the host-boundary re-cut
+  and rollout-decision phase, ending in a narrow-proceed recommendation
+  rather than a broad boundary flip
+- [COMPUTATIONAL_SUBSTRATE_PHASE7_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_PHASE7_DECISION_RECORD.md) -
+  completed final decision record for the computational-substrate program,
+  recommending narrow proceed on the admitted authority slice and deferring
+  broader structural, storage, and token-container rollout
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

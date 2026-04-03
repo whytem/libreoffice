@@ -1,6 +1,6 @@
 # Computational Substrate Phase 7 Retained Host Surfaces
 
-Status: active retained host-surface note for Phase 7
+Status: completed retained host-surface note for Phase 7
 
 ## Purpose
 

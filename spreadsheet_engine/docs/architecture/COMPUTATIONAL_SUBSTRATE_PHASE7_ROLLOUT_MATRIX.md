@@ -1,6 +1,6 @@
 # Computational Substrate Phase 7 Rollout Matrix
 
-Status: active rollout matrix for Phase 7
+Status: completed rollout matrix for Phase 7
 
 ## Purpose
 

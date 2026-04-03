@@ -1,6 +1,6 @@
 # Computational Substrate Phase 7 Plan
 
-Status: active execution-ready plan for Phase 7
+Status: completed with a narrow-proceed boundary decision
 
 ## Purpose
 
@@ -244,6 +244,10 @@ The closeout must explicitly classify:
 Required artifact:
 
 - one checked-in final Phase 7 decision record
+
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE7_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE7_DECISION_RECORD.md)
 
 ## Target Surfaces
 
