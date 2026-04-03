@@ -174,6 +174,10 @@ add_spreadsheetengine_test(spreadsheetengine_computational_graph_tests
     ${SPREADSHEETENGINE_STANDALONE_COMPUTATIONAL_GRAPH_TEST_SOURCES}
 )
 
+add_spreadsheetengine_test(spreadsheetengine_computational_ir_tests
+    ${SPREADSHEETENGINE_STANDALONE_COMPUTATIONAL_IR_TEST_SOURCES}
+)
+
 configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/spreadsheetengine-config.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/${SPREADSHEETENGINE_PACKAGE_NAME}-config.cmake"

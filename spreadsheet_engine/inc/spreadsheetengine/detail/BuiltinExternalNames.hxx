@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <optional>
 
 #include <spreadsheetengine/api/String.hxx>
