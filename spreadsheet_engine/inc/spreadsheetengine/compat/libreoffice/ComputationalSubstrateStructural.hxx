@@ -9,13 +9,12 @@
 
 #pragma once
 
-#include <cstdlib>
-#include <cstring>
 #include <optional>
 #include <set>
 
 #include <document.hxx>
 
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRollout.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalShadowBuilder.hxx>
 #include <spreadsheetengine/compat/libreoffice/DependencyGraphShadowBuilder.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExecutionIrBuilder.hxx>
@@ -60,11 +59,7 @@ namespace detail
 
 [[nodiscard]] inline bool isRuntimeEnabled(const ScDocument& rDoc)
 {
-    if (rDoc.GetAutoCalc())
-        return false;
-
-    const char* pToggle = std::getenv("SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL");
-    return pToggle && *pToggle && std::strcmp(pToggle, "0") != 0;
+    return substraterollout::isSurfaceEnabled(rDoc, substraterollout::RolloutSurface::Structural);
 }
 
 [[nodiscard]] inline bool acceptsQueueComparison(const recalcshadow::ShadowComparison& rComparison)

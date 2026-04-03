@@ -121,6 +121,16 @@ Current architecture docs:
   completed final decision record for the computational-substrate program,
   recommending narrow proceed on the admitted authority slice and deferring
   broader structural, storage, and token-container rollout
+- [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_PLAN.md](COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_PLAN.md) -
+  active implementation-ready plan for bounded rollout engineering after the
+  Phase 7 narrow-proceed decision, including the bolder validation and
+  promotion step for `DeleteRows` and `InsertColumns`
+- [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_CONTRACT.md) -
+  active contract note for the initial admitted rollout slice, freezing the
+  exact enabled surface, authority gates, and immediate deactivation rules
+- [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_IMPLEMENTATION.md) -
+  active implementation note for the first opt-in rollout step, including the
+  umbrella rollout gate and per-surface override behavior
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

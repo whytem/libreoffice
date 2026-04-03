@@ -267,6 +267,17 @@ The current recommendation is therefore:
   bounded rollout candidate
 - keep broader structural, storage, and token-container migration deferred
 
+The active next-step execution plan is:
+
+- [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_PLAN.md)
+
+That plan keeps the Phase 7 decision intact while taking a bolder execution
+step:
+
+- implement an opt-in experimental rollout for the already-admitted slice
+- aggressively validate `DeleteRows` and `InsertColumns` as the next
+  promotion candidates under the same exact verification and rollback rules
+
 ## Why This Path Was Chosen
 
 The first-stage extraction work answered the original feasibility questions:

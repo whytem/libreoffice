@@ -96,7 +96,10 @@ public:
         if (const char* pOriginal = std::getenv(pName))
             moOriginalValue = pOriginal;
 
-        setenv(maName.c_str(), pValue, 1);
+        if (pValue)
+            setenv(maName.c_str(), pValue, 1);
+        else
+            unsetenv(maName.c_str());
     }
 
     ~ScopedEnvironmentOverride()
@@ -1427,6 +1430,75 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalLifecycleClassifiesR
         classifyVerifiedLifecycleResult(aResult));
 }
 
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalNarrowRolloutDisabledByDefault)
+{
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "0");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", "0");
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", "0");
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", "0");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    const auto aAuthorityCapture
+        = ScopedComputationalAuthority::captureIfRuntimeEnabled(*m_pDoc);
+    const auto aLifecycleCapture
+        = ScopedComputationalLifecycle::captureIfRuntimeEnabled(*m_pDoc);
+    const auto aStructuralCapture
+        = ScopedComputationalStructural::captureIfRuntimeEnabled(*m_pDoc);
+
+    CPPUNIT_ASSERT(!aAuthorityCapture.isCaptured());
+    CPPUNIT_ASSERT(!aLifecycleCapture.isCaptured());
+    CPPUNIT_ASSERT(!aStructuralCapture.isCaptured());
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalNarrowRolloutLifecycleEnabledByUmbrella)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", nullptr);
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(1, 0, 0, 2.0);
+    m_pDoc->CalcAll();
+
+    const auto aAuthorityCapture
+        = ScopedComputationalAuthority::captureIfRuntimeEnabled(*m_pDoc);
+    const auto aLifecycleCapture
+        = ScopedComputationalLifecycle::captureIfRuntimeEnabled(*m_pDoc);
+    const auto aStructuralCapture
+        = ScopedComputationalStructural::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aAuthorityCapture.isCaptured());
+    CPPUNIT_ASSERT(aLifecycleCapture.isCaptured());
+    CPPUNIT_ASSERT(aStructuralCapture.isCaptured());
+    CPPUNIT_ASSERT(aLifecycleCapture.canApplyLifecycle());
+
+    m_pDoc->SetString(2, 0, 0, u"=A1+B1"_ustr);
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(2, 0, 0) });
+
+    const auto oResult = aLifecycleCapture.apply(
+        *m_pDoc, translateSetFormula(ScAddress(2, 0, 0), u"=A1+B1"_ustr));
+    assertComputationalLifecycleApplied(oResult, *m_pDoc);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralInsertRowPilot)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
@@ -1453,6 +1525,41 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralInsertRowP
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalNarrowRolloutStructuralEnabledByUmbrella)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", nullptr);
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 10.0);
+    m_pDoc->SetValue(0, 1, 0, 20.0);
+    m_pDoc->SetString(0, 2, 0, u"=$A$2*1"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aStructuralCapture
+        = ScopedComputationalStructural::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aStructuralCapture.isCaptured());
+    CPPUNIT_ASSERT(aStructuralCapture.canApplyStructural());
+
+    m_pDoc->InsertRow(ScRange(0, 1, 0, m_pDoc->MaxCol(), 1, 0));
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(0, 3, 0) });
+
+    const auto oResult = aStructuralCapture.apply(*m_pDoc, translateInsertRows(0, 1, 1));
+    assertComputationalStructuralApplied(oResult, *m_pDoc);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralDeleteColumnPilot)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateDeleteColumns;
@@ -1474,6 +1581,34 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralDeleteColu
     const auto oResult = aStructural.apply(*m_pDoc, translateDeleteColumns(0, 0, 1));
     assertComputationalStructuralApplied(oResult, *m_pDoc);
     CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(1, 0, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalNarrowRolloutStructuralOverrideBeatsUmbrella)
+{
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", "0");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    const auto aAuthorityCapture
+        = ScopedComputationalAuthority::captureIfRuntimeEnabled(*m_pDoc);
+    const auto aLifecycleCapture
+        = ScopedComputationalLifecycle::captureIfRuntimeEnabled(*m_pDoc);
+    const auto aStructuralCapture
+        = ScopedComputationalStructural::captureIfRuntimeEnabled(*m_pDoc);
+
+    CPPUNIT_ASSERT(aAuthorityCapture.isCaptured());
+    CPPUNIT_ASSERT(aLifecycleCapture.isCaptured());
+    CPPUNIT_ASSERT(!aStructuralCapture.isCaptured());
 
     m_pDoc->DeleteTab(0);
 }
