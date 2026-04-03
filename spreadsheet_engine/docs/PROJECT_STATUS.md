@@ -258,6 +258,21 @@ engine-owned boundary:
 Any expansion into those surfaces should begin with a new explicit plan and
 proof cycle rather than being inferred from the current rollout.
 
+## Next Explicit Planning Target
+
+The next adjacent concern selected for explicit planning is:
+
+- named-range-sensitive structural behavior
+
+That is the closest deferred surface to the current admitted rollout. It
+extends the existing structural authority proof path without immediately
+opening the larger shared-group, sheet-level, token-container, listener, or
+storage-migration fronts.
+
+The active implementation-ready reference for that next proof cycle is:
+
+- [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md)
+
 ## Current Assessment
 
 The project is in a strong position:

@@ -146,6 +146,10 @@ Current architecture docs:
   completed closeout decision for the narrow rollout plan, widening the
   structural rollout surface by one bounded step to include `DeleteRows` and
   `InsertColumns`
+- [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md) -
+  active implementation-ready plan for the next adjacent widening target
+  beyond the admitted narrow rollout, focusing on named-range-sensitive
+  structural behavior
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for
