@@ -4,6 +4,7 @@
 
 #include <spreadsheetengine/detail/substrate/ComputationalShadowBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/DependencyGraphShadowBuilder.hxx>
+#include <spreadsheetengine/detail/substrate/DependencyGraphShadowMapping.hxx>
 #include <spreadsheetengine/detail/workbook/InMemoryWorkbookFacade.hxx>
 
 #include "TestSupport.hxx"
@@ -64,6 +65,18 @@ int main()
         return fail("computational_graph", "group anchor missing");
     if (!aGraph.findBroadcasterNode(BroadcasterNodeId::forCell({ nData, 0, 0 })))
         return fail("computational_graph", "broadcaster node missing");
+
+    if (!graphmapping::hasNormalizedFormulaSubsetEquivalence(
+            { { { nData, 1, 1 } }, { { nData, 1, 0 } } }, aGraph.maFormulaTreeNodes))
+    {
+        return fail("computational_graph", "formula subset equivalence mismatch");
+    }
+
+    if (graphmapping::hasNormalizedGraphEdgeEquivalence(
+            { { BroadcasterNodeId::forCell({ nData, 0, 0 }), aGroupAnchor } }, aGraph.maEdges))
+    {
+        return fail("computational_graph", "graph edge equivalence should not collapse mismatch");
+    }
 
     std::cout << "computational_graph_tests passed\n";
     return EXIT_SUCCESS;

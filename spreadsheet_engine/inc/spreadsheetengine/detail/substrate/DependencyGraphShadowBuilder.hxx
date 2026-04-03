@@ -9,13 +9,12 @@
 
 #pragma once
 
-#include <algorithm>
 #include <optional>
 #include <utility>
 
 #include <spreadsheetengine/detail/substrate/ComputationalShadowBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/DependencyGraphShadow.hxx>
-#include <spreadsheetengine/detail/substrate/ComputationalShadowMapping.hxx>
+#include <spreadsheetengine/detail/substrate/DependencyGraphShadowMapping.hxx>
 
 namespace spreadsheetengine::detail::substrate
 {
@@ -23,87 +22,15 @@ namespace spreadsheetengine::detail::substrate
 namespace graphdetail
 {
 
-struct ShadowCellIdLess
-{
-    [[nodiscard]] bool operator()(const ShadowCellId& rLeft, const ShadowCellId& rRight) const
-    {
-        if (rLeft.maAddress.mnSheet != rRight.maAddress.mnSheet)
-            return rLeft.maAddress.mnSheet < rRight.maAddress.mnSheet;
-        if (rLeft.maAddress.mnColumn != rRight.maAddress.mnColumn)
-            return rLeft.maAddress.mnColumn < rRight.maAddress.mnColumn;
-        return rLeft.maAddress.mnRow < rRight.maAddress.mnRow;
-    }
-};
-
-struct ShadowFormulaGroupIdLess
-{
-    [[nodiscard]] bool operator()(const ShadowFormulaGroupId& rLeft,
-        const ShadowFormulaGroupId& rRight) const
-    {
-        if (rLeft.maAnchor != rRight.maAnchor)
-            return ShadowCellIdLess {}({ rLeft.maAnchor }, { rRight.maAnchor });
-        return rLeft.mnLength < rRight.mnLength;
-    }
-};
-
-struct ListenerAnchorIdLess
-{
-    [[nodiscard]] bool operator()(const ListenerAnchorId& rLeft,
-        const ListenerAnchorId& rRight) const
-    {
-        if (rLeft.meKind != rRight.meKind)
-            return rLeft.meKind < rRight.meKind;
-        if (!(rLeft.maAnchor == rRight.maAnchor))
-            return ShadowCellIdLess {}({ rLeft.maAnchor }, { rRight.maAnchor });
-        return rLeft.mnLength < rRight.mnLength;
-    }
-};
-
-struct BroadcasterNodeIdLess
-{
-    [[nodiscard]] bool operator()(const BroadcasterNodeId& rLeft,
-        const BroadcasterNodeId& rRight) const
-    {
-        if (rLeft.meKind != rRight.meKind)
-            return rLeft.meKind < rRight.meKind;
-
-        if (rLeft.meKind == BroadcasterNodeKind::Cell)
-            return ShadowCellIdLess {}({ rLeft.maCellAddress }, { rRight.maCellAddress });
-
-        if (rLeft.maAreaRange.maStart != rRight.maAreaRange.maStart)
-            return ShadowCellIdLess {}({ rLeft.maAreaRange.maStart }, { rRight.maAreaRange.maStart });
-        return ShadowCellIdLess {}({ rLeft.maAreaRange.maEnd }, { rRight.maAreaRange.maEnd });
-    }
-};
-
-struct GraphEdgeRecordLess
-{
-    [[nodiscard]] bool operator()(const GraphEdgeRecord& rLeft, const GraphEdgeRecord& rRight) const
-    {
-        if (!(rLeft.maBroadcaster == rRight.maBroadcaster))
-            return BroadcasterNodeIdLess {}(rLeft.maBroadcaster, rRight.maBroadcaster);
-        return ListenerAnchorIdLess {}(rLeft.maListenerAnchor, rRight.maListenerAnchor);
-    }
-};
-
 [[nodiscard]] inline ListenerAnchorId makeFormulaCellListenerAnchor(const ShadowCellRecord& rCell)
 {
-    return mapping::makeListenerAnchorId(
-        ListenerAnchorKind::FormulaCell, rCell.maId.maAddress, 1);
+    return graphmapping::makeGraphFormulaCellListenerAnchorId(rCell.maId.maAddress);
 }
 
 [[nodiscard]] inline ListenerAnchorId
 makeFormulaGroupListenerAnchor(const ShadowFormulaGroupRecord& rGroup)
 {
-    return mapping::makeListenerAnchorId(
-        ListenerAnchorKind::FormulaGroup, rGroup.maId.maAnchor, rGroup.maId.mnLength);
-}
-
-template <typename Container, typename Less>
-void sortAndUnique(Container& rContainer, Less aLess)
-{
-    std::sort(rContainer.begin(), rContainer.end(), aLess);
-    rContainer.erase(std::unique(rContainer.begin(), rContainer.end()), rContainer.end());
+    return graphmapping::makeGraphFormulaGroupListenerAnchorId(rGroup.maId);
 }
 
 [[nodiscard]] inline bool containsCellId(
@@ -176,7 +103,7 @@ inline void mergeListenerAnchorRecord(
     std::vector<ShadowCellId> aNodes;
     aNodes.reserve(rAddresses.size());
     for (const auto& rAddress : rAddresses)
-        aNodes.push_back(mapping::makeShadowCellId(rAddress));
+        aNodes.push_back(ShadowCellId { rAddress });
     return aNodes;
 }
 
@@ -214,7 +141,7 @@ inline void mergeListenerAnchorRecord(
     }
     std::sort(aGraph.maFormulaNodes.begin(), aGraph.maFormulaNodes.end(),
         [](const GraphFormulaNodeRecord& rLeft, const GraphFormulaNodeRecord& rRight) {
-            return graphdetail::ShadowCellIdLess {}(rLeft.maId, rRight.maId);
+            return graphmapping::ShadowCellIdLess {}(rLeft.maId, rRight.maId);
         });
 
     for (const auto& rGroup : rShadow.maFormulaGroups)
@@ -223,12 +150,12 @@ inline void mergeListenerAnchorRecord(
         aNode.maId = rGroup.maId;
         aNode.maListenerAnchor = graphdetail::makeFormulaGroupListenerAnchor(rGroup);
         aNode.maMembers = rGroup.maMembers;
-        graphdetail::sortAndUnique(aNode.maMembers, graphdetail::ShadowCellIdLess {});
+        graphmapping::sortAndUnique(aNode.maMembers, graphmapping::ShadowCellIdLess {});
         aGraph.maFormulaGroupNodes.push_back(aNode);
     }
     std::sort(aGraph.maFormulaGroupNodes.begin(), aGraph.maFormulaGroupNodes.end(),
         [](const GraphFormulaGroupNodeRecord& rLeft, const GraphFormulaGroupNodeRecord& rRight) {
-            return graphdetail::ShadowFormulaGroupIdLess {}(rLeft.maId, rRight.maId);
+            return graphmapping::ShadowFormulaGroupIdLess {}(rLeft.maId, rRight.maId);
         });
     for (const auto& rNode : aGraph.maFormulaGroupNodes)
     {
@@ -267,17 +194,15 @@ inline void mergeListenerAnchorRecord(
         }
     }
 
-    graphdetail::sortAndUnique(aGraph.maFormulaTreeNodes, graphdetail::ShadowCellIdLess {});
-    graphdetail::sortAndUnique(aGraph.maFormulaTrackNodes, graphdetail::ShadowCellIdLess {});
-    graphdetail::sortAndUnique(aGraph.maListenerAnchors,
-        [](const GraphListenerAnchorRecord& rLeft, const GraphListenerAnchorRecord& rRight) {
-            return graphdetail::ListenerAnchorIdLess {}(rLeft.maId, rRight.maId);
-        });
-    graphdetail::sortAndUnique(aGraph.maBroadcasterNodes,
-        [](const GraphBroadcasterNodeRecord& rLeft, const GraphBroadcasterNodeRecord& rRight) {
-            return graphdetail::BroadcasterNodeIdLess {}(rLeft.maId, rRight.maId);
-        });
-    graphdetail::sortAndUnique(aGraph.maEdges, graphdetail::GraphEdgeRecordLess {});
+    aGraph.maFormulaTreeNodes
+        = graphmapping::normalizeFormulaSubsetNodes(std::move(aGraph.maFormulaTreeNodes));
+    aGraph.maFormulaTrackNodes
+        = graphmapping::normalizeFormulaSubsetNodes(std::move(aGraph.maFormulaTrackNodes));
+    aGraph.maListenerAnchors
+        = graphmapping::normalizeListenerAnchors(std::move(aGraph.maListenerAnchors));
+    aGraph.maBroadcasterNodes
+        = graphmapping::normalizeBroadcasterNodes(std::move(aGraph.maBroadcasterNodes));
+    aGraph.maEdges = graphmapping::normalizeGraphEdges(std::move(aGraph.maEdges));
 
     return aGraph;
 }
