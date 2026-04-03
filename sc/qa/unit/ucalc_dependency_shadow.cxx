@@ -1018,6 +1018,39 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalShadowRebuildAfterSa
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalShadowRepresentativeStructuralWidening)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateDeleteColumns;
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+    using spreadsheetengine::compat::libreoffice::rebuildComputationalShadowAfterMutation;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetValue(1, 1, 0, 2.0); // B2
+    m_pDoc->SetString(2, 1, 0, u"=A1+B2"_ustr); // C2
+    m_pDoc->CalcAll();
+
+    m_pDoc->InsertRow(ScRange(0, 1, 0, m_pDoc->MaxCol(), 1, 0));
+    auto aRowInsertState = rebuildComputationalShadowAfterMutation(
+        CalcWorkbookFacade(*m_pDoc, 1), *m_pDoc, translateInsertRows(0, 1, 1));
+    CPPUNIT_ASSERT(aRowInsertState.maShadow.findCell({ 0, 0, 0 }));
+    CPPUNIT_ASSERT(aRowInsertState.maShadow.findCell({ 0, 1, 2 }));
+    CPPUNIT_ASSERT(aRowInsertState.maShadow.findCell({ 0, 2, 2 }));
+    CPPUNIT_ASSERT(!aRowInsertState.maShadow.findCell({ 0, 1, 1 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aRowInsertState.maShadow.getFormulaCellCount());
+
+    m_pDoc->DeleteCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
+    auto aDeleteColumnState = rebuildComputationalShadowAfterMutation(
+        CalcWorkbookFacade(*m_pDoc, 2), *m_pDoc, translateDeleteColumns(0, 0, 1));
+    CPPUNIT_ASSERT(aDeleteColumnState.maShadow.findCell({ 0, 0, 2 }));
+    CPPUNIT_ASSERT(aDeleteColumnState.maShadow.findCell({ 0, 1, 2 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aDeleteColumnState.maShadow.getFormulaCellCount());
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_PLUGIN_IMPLEMENT();
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
