@@ -238,10 +238,6 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
     const ComputationalWorkbookShadow& rObserved)
 {
     return collectShadowCellAddresses(rPredicted) == collectShadowCellAddresses(rObserved)
-           && rPredicted.maFormulaTree == rObserved.maFormulaTree
-           && rPredicted.maFormulaTrack == rObserved.maFormulaTrack
-           && rPredicted.maCellBroadcasters == rObserved.maCellBroadcasters
-           && rPredicted.maAreaBroadcasters == rObserved.maAreaBroadcasters
            && collectShadowFormulaGroups(rPredicted) == collectShadowFormulaGroups(rObserved)
            && sortNamedRanges(rPredicted.maNamedRanges) == sortNamedRanges(rObserved.maNamedRanges);
 }
@@ -417,6 +413,7 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
             aTransition.maReason = u"unsupported_structural_sync";
             return aTransition;
     }
+    aTransition.maSyncActions.push_back(aSyncAction);
 
     const auto aPredictedComputational
         = structuralbuilddetail::buildPredictedStructuralComputationalShadow(
@@ -484,7 +481,6 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
         = buildComputationalWorkbookShadow(rAfterFacade, aPredictedObservation);
     aTransition.maGraphAfter
         = buildDependencyGraphShadow(aTransition.maComputationalAfter, aPredictedObservation);
-    aTransition.maSyncActions.push_back(aSyncAction);
     aTransition.meVerdict = StructuralPilotVerdict::Applicable;
     aTransition.maReason = u"ready";
     return aTransition;

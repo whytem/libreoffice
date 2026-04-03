@@ -1478,6 +1478,91 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralDeleteColu
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralRejectsDirtyBaseline)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 10.0);
+    m_pDoc->SetValue(0, 1, 0, 20.0);
+    m_pDoc->SetString(0, 2, 0, u"=$A$2*1"_ustr);
+    m_pDoc->CalcAll();
+
+    ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(0, 2, 0));
+    CPPUNIT_ASSERT(pFormula);
+    pFormula->SetDirtyVar();
+    m_pDoc->PutInFormulaTree(pFormula);
+
+    const ScopedComputationalStructural aStructural(*m_pDoc, true);
+    CPPUNIT_ASSERT(aStructural.isCaptured());
+    CPPUNIT_ASSERT(!aStructural.canApplyStructural());
+
+    m_pDoc->InsertRow(ScRange(0, 1, 0, m_pDoc->MaxCol(), 1, 0));
+    const auto oResult = aStructural.apply(*m_pDoc, translateInsertRows(0, 1, 1));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalStructuralResultKind::RejectedDirtyBaseline, oResult->meKind);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralRejectsValidationOnlyMutation)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateDeleteRows;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 10.0);
+    m_pDoc->SetValue(0, 1, 0, 20.0);
+    m_pDoc->SetString(0, 2, 0, u"=$A$2*1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalStructural aStructural(*m_pDoc, true);
+    CPPUNIT_ASSERT(aStructural.canApplyStructural());
+
+    const auto oResult = aStructural.apply(*m_pDoc, translateDeleteRows(0, 1, 1));
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalStructuralResultKind::RejectedOutOfContract, oResult->meKind);
+
+    CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(0, 2, 0)));
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralRepairDetectedRollback)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 10.0);
+    m_pDoc->SetValue(0, 1, 0, 20.0);
+    m_pDoc->SetString(0, 2, 0, u"=$A$2*1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalStructural aStructural(*m_pDoc, true);
+    CPPUNIT_ASSERT(aStructural.canApplyStructural());
+
+    m_pDoc->InsertRow(ScRange(0, 1, 0, m_pDoc->MaxCol(), 1, 0));
+    m_pDoc->SetString(0, 3, 0, u"=$A$2*1"_ustr);
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(0, 3, 0) });
+
+    const auto oResult = aStructural.apply(*m_pDoc, translateInsertRows(0, 1, 1));
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalStructuralResultKind::RepairDetected, oResult->meKind);
+    CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(0, 2, 0)));
+    CPPUNIT_ASSERT(!m_pDoc->GetFormulaCell(ScAddress(0, 3, 0)));
+    CPPUNIT_ASSERT_EQUAL(20.0, m_pDoc->GetValue(ScAddress(0, 1, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalSubstrateScalarEditCapture)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;

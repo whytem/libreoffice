@@ -247,6 +247,10 @@ Required artifact:
   applied, normalized-equivalent, rolled back, rejected, and repair-detected
   structural cases
 
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE6_DIFFERENTIAL_SURFACE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE6_DIFFERENTIAL_SURFACE.md)
+
 ### 6.6 Freeze Phase 6 Closeout And The Proceed Decision
 
 Phase 6 closes only with a checked-in decision record that says one of:

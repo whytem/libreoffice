@@ -381,13 +381,14 @@ int main()
             aBeforeFacade.setGeneration(31);
             const auto nSheet = aBeforeFacade.addSheet(u"Pilot");
             aBeforeFacade.setCell({ nSheet, 0, 0 }, CellValue::number(10.0));
+            aBeforeFacade.setCell({ nSheet, 0, 1 }, CellValue::number(20.0));
             aBeforeFacade.setFormulaCell(
-                { nSheet, 0, 2 }, u"=SUM($A$1:$A$2)", CellValue::number(30.0));
+                { nSheet, 0, 2 }, u"=$A$2*1", CellValue::number(20.0));
 
             ComputationalObservationState aBeforeObservation;
             aBeforeObservation.maFormulaTree = { { nSheet, 0, 2 } };
             aBeforeObservation.maCellBroadcasters.push_back({
-                { nSheet, 0, 0 },
+                { nSheet, 0, 1 },
                 { { ListenerAnchorKind::FormulaCell, { nSheet, 0, 2 }, 1 } } });
             const auto aBeforeShadow = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
             const auto aBeforeGraph = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
@@ -399,13 +400,14 @@ int main()
             aAfterFacade.setGeneration(32);
             aAfterFacade.addSheet(u"Pilot");
             aAfterFacade.setCell({ nSheet, 0, 0 }, CellValue::number(10.0));
+            aAfterFacade.setCell({ nSheet, 0, 2 }, CellValue::number(20.0));
             aAfterFacade.setFormulaCell(
-                { nSheet, 0, 3 }, u"=SUM($A$1:$A$3)", CellValue::number(30.0));
+                { nSheet, 0, 3 }, u"=$A$3*1", CellValue::number(20.0));
 
             ComputationalObservationState aAfterObservation;
             aAfterObservation.maFormulaTree = { { nSheet, 0, 3 } };
             aAfterObservation.maCellBroadcasters.push_back({
-                { nSheet, 0, 0 },
+                { nSheet, 0, 2 },
                 { { ListenerAnchorKind::FormulaCell, { nSheet, 0, 3 }, 1 } } });
             const auto aAfterShadow = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
             const auto aAfterIr
