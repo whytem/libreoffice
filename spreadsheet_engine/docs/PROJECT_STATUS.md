@@ -218,10 +218,12 @@ projection tail, moved the selected single-ref and double-ref fetch packaging
 behind a named compat seam, and removed the superseded wrapper layer in that
 scope.
 
-The next fresh reassessment result is narrower still: the retained host
-boundary itself now looks largely stable, and the clearest remaining
-non-host-shaped residue is the final legacy pocket in the Analysis add-in
-financial surface around `ODDFPRICE` and `ODDFYIELD`.
+The latest fresh reassessment result was narrower still: the retained host
+boundary itself looked largely stable, and the clearest remaining
+non-host-shaped residue was the final legacy pocket in the Analysis add-in
+financial surface around `ODDFPRICE` and `ODDFYIELD`. That stream is now
+complete too, with the pair classified as an explicit defer boundary because
+no shared odd-first-period runtime exists in the current engine or Calc tree.
 
 One important cleanup milestone is also now true: within the execution-shell
 surface extracted into `spreadsheet_engine`, there are no known remaining
@@ -421,19 +423,24 @@ should again begin from a fresh inventory of the intentionally retained host
 boundary instead of treating the completed external-reference stream as an
 open cleanup tail.
 
-That latest reassessment identifies one new bounded follow-on stream:
+That latest reassessment identified one final bounded follow-on stream:
 
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](architecture/ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md)
 
-The reason for choosing it is straightforward:
+Its closeout outcome is now explicit:
 
-- `INFO(...)` and the local/external `CELL(...)` host tails are already thin
-  and explicitly host-owned
-- add-in null-date and holiday ownership is already explicit and stable
-- the remaining `ODDFPRICE` / `ODDFYIELD` path still stands out as legacy
-  semantic residue rather than a deliberate host seam
-- the neighboring Analysis financial surface already uses direct shared-runtime
-  adapters, so the payoff/risk ratio is favorable
+- no shared odd-first-period runtime or adapter path exists in the current
+  engine surface, so `ODDFPRICE` and `ODDFYIELD` were classified as an
+  explicit defer rather than a hidden "ready now" adoption slice
+- the legacy unconditional-throw helper declarations and definitions were
+  removed from the Analysis helper layer
+- the add-in callers now use a named explicit defer boundary instead of
+  depending on ambiguous helper stubs
+- focused regression coverage now locks that retained defer behavior in place
+
+There is no new pre-committed follow-on stream from that closeout. Future work
+should again begin from a fresh inventory of the intentionally retained Calc
+boundary rather than by assuming there is still an open add-in financial tail.
 
 ## Working Rules For The Next Stage
 

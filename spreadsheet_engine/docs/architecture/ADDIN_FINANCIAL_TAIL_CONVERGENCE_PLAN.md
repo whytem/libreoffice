@@ -1,6 +1,6 @@
 # Analysis Add-In Financial Tail Convergence Plan
 
-Status: implementation-ready plan
+Status: completed implementation and closeout record
 
 ## Purpose
 
@@ -21,6 +21,32 @@ Analysis add-in financial surface:
   are currently just unconditional throwing stubs
 
 This stream is for closing that residual semantic tail cleanly.
+
+## Final Outcome
+
+This stream is complete.
+
+The final result was not a new engine-runtime adoption slice. A fresh inventory
+and classification pass showed that there is no shared odd-first-period
+`ODDFPRICE` / `ODDFYIELD` implementation anywhere in the current engine or Calc
+tree.
+
+So the closeout result is:
+
+- the add-in callers in
+  [financial.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/financial.cxx)
+  now use one named explicit defer boundary instead of routing through a fake
+  helper path
+- the old unconditional-throw helper declarations and definitions were removed
+  from
+  [analysishelper.hxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysishelper.hxx)
+  and
+  [analysishelper.cxx](/home/ubuntu/repos/libreoffice/scaddins/source/analysis/analysishelper.cxx)
+- focused regression coverage now lives in
+  [analysis.cxx](/home/ubuntu/repos/libreoffice/scaddins/qa/analysis.cxx)
+
+That means the remaining Analysis add-in odd-first-period pair is now an
+explicitly deferred semantic gap rather than an ambiguous legacy residue.
 
 ## What This Workstream Is For
 

@@ -8,8 +8,10 @@ documents live under [../archive/](../archive/).
 Current architecture docs:
 
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
-  implementation-ready plan for converging the final residual Analysis add-in
-  financial semantic tail, centered on `ODDFPRICE` and `ODDFYIELD`
+  completed implementation and closeout record for the final residual
+  Analysis add-in financial tail, including explicit defer classification for
+  `ODDFPRICE` and `ODDFYIELD`, removal of the legacy helper stub path, and
+  focused regression coverage
 - [EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md](EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md) -
   completed implementation and closeout record for tightening the remaining
   external-reference fetch/projection facade while keeping external cache and
