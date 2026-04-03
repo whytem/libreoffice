@@ -15,6 +15,8 @@
 #include <set>
 #include <string>
 
+#include <rtl/string.hxx>
+
 #include <document.hxx>
 #include <globalnames.hxx>
 #include <listenercontext.hxx>
@@ -30,6 +32,7 @@
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateAuthority.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateLifecycle.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateStructural.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcAuthority.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcShadow.hxx>
 #include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
@@ -63,6 +66,9 @@ using spreadsheetengine::compat::libreoffice::substrateauthority::ScopedComputat
 using ComputationalLifecycleResultKind
     = spreadsheetengine::compat::libreoffice::substratelifecycle::LifecycleResultKind;
 using spreadsheetengine::compat::libreoffice::substratelifecycle::ScopedComputationalLifecycle;
+using ComputationalStructuralResultKind
+    = spreadsheetengine::compat::libreoffice::substratestructural::StructuralResultKind;
+using spreadsheetengine::compat::libreoffice::substratestructural::ScopedComputationalStructural;
 using spreadsheetengine::compat::libreoffice::recalcauthority::PilotResultKind;
 using spreadsheetengine::compat::libreoffice::recalcauthority::ScopedRecalcAuthority;
 using spreadsheetengine::compat::libreoffice::recalcshadow::ScopedRecalcShadow;
@@ -328,6 +334,38 @@ void assertComputationalLifecycleApplied(
         aResultMessage,
         oResult->meKind == ComputationalLifecycleResultKind::Applied
         || oResult->meKind == ComputationalLifecycleResultKind::AppliedNormalizedEquivalent);
+    CPPUNIT_ASSERT(oResult->moQueueComparison.has_value());
+    CPPUNIT_ASSERT_EQUAL(RecalcShadowComparisonKind::Exact, oResult->moQueueComparison->meKind);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbFullMatch);
+    CPPUNIT_ASSERT(oResult->moGraphComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moGraphComparison->mbFullMatch);
+    CPPUNIT_ASSERT(
+        spreadsheetengine::compat::libreoffice::recalcshadow::detail::collectPredictedQueueAddresses(
+            oResult->maTransition.maRecalcPlan)
+        == spreadsheetengine::compat::libreoffice::recalcshadow::detail::
+            collectFormulaTreeAddresses(rDoc));
+}
+
+void assertComputationalStructuralApplied(
+    const std::optional<
+        spreadsheetengine::compat::libreoffice::substratestructural::StructuralResult>& oResult,
+    const ScDocument& rDoc)
+{
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_MESSAGE(
+        "unexpected computational structural result kind="
+            + std::to_string(static_cast<int>(oResult->meKind))
+            + " verdict="
+            + std::to_string(static_cast<int>(oResult->maTransition.meVerdict))
+            + " reason="
+            + OUStringToOString(
+                  spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                      oResult->maTransition.maReason),
+                  RTL_TEXTENCODING_UTF8)
+                  .getStr(),
+        oResult->meKind == ComputationalStructuralResultKind::Applied
+            || oResult->meKind == ComputationalStructuralResultKind::AppliedNormalizedEquivalent);
     CPPUNIT_ASSERT(oResult->moQueueComparison.has_value());
     CPPUNIT_ASSERT_EQUAL(RecalcShadowComparisonKind::Exact, oResult->moQueueComparison->meKind);
     CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
@@ -1387,6 +1425,57 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalLifecycleClassifiesR
     CPPUNIT_ASSERT_EQUAL(
         ComputationalLifecycleResultKind::RepairDetected,
         classifyVerifiedLifecycleResult(aResult));
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralInsertRowPilot)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 10.0);
+    m_pDoc->SetValue(0, 1, 0, 20.0);
+    m_pDoc->SetString(0, 2, 0, u"=$A$2*1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalStructural aStructural(*m_pDoc, true);
+    CPPUNIT_ASSERT(aStructural.isCaptured());
+    CPPUNIT_ASSERT(aStructural.canApplyStructural());
+
+    m_pDoc->InsertRow(ScRange(0, 1, 0, m_pDoc->MaxCol(), 1, 0));
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(0, 3, 0) });
+
+    const auto oResult = aStructural.apply(*m_pDoc, translateInsertRows(0, 1, 1));
+    assertComputationalStructuralApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(0, 3, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralDeleteColumnPilot)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateDeleteColumns;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(1, 0, 0, 2.0);
+    m_pDoc->SetString(2, 0, 0, u"=$B$1+1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalStructural aStructural(*m_pDoc, true);
+    CPPUNIT_ASSERT(aStructural.canApplyStructural());
+
+    m_pDoc->DeleteCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(1, 0, 0) });
+
+    const auto oResult = aStructural.apply(*m_pDoc, translateDeleteColumns(0, 0, 1));
+    assertComputationalStructuralApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(1, 0, 0)));
+
+    m_pDoc->DeleteTab(0);
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalSubstrateScalarEditCapture)

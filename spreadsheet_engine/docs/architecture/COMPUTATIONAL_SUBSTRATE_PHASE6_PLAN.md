@@ -217,6 +217,11 @@ Required artifact:
 - one checked-in compat surface for authoritative structural apply, verify,
   silent-repair detection, and rollback on the admitted subset
 
+The checked-in artifacts for this workstream are:
+
+- [ComputationalSubstrateStructural.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/ComputationalSubstrateStructural.hxx)
+- [ucalc_dependency_shadow.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_dependency_shadow.cxx)
+
 ### 6.5 Add Structural Differential, Rejection, And Rollback Lanes
 
 Phase 6 must prove that admitted structural mutations work and that rejected
