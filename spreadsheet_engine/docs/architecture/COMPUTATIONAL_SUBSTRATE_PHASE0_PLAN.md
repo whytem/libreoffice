@@ -148,6 +148,10 @@ Required artifact:
   - expected comparison outputs
   - owning validation lanes
 
+The checked-in scenario artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE0_SCENARIO_MATRIX.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_SCENARIO_MATRIX.md)
+
 ### 0.5 Add Phase 0 Differential Validation Lanes
 
 Phase 0 must end with real automated checks, not just documents and manual

@@ -13,6 +13,9 @@ Current architecture docs:
 - [COMPUTATIONAL_SUBSTRATE_PHASE0_OBSERVABLE_STATE_MODEL.md](COMPUTATIONAL_SUBSTRATE_PHASE0_OBSERVABLE_STATE_MODEL.md) -
   active comparison schema for Phase 0, defining the stable observable shapes
   and verdict rules for formula-tree, broadcaster, and recalc-state captures
+- [COMPUTATIONAL_SUBSTRATE_PHASE0_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_PHASE0_SCENARIO_MATRIX.md) -
+  active representative mutation matrix for Phase 0, mapping edit classes to
+  required captures, expected outputs, and owning validation lanes
 - [COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md](COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md) -
   active implementation-ready plan for Phase 0 observability, inventory, and
   validation work in the computational substrate program
