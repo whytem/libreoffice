@@ -361,6 +361,10 @@ Stop if the engine graph is still too dependent on Calc-owned repair logic.
 
 ## Phase 5: Engine-Authoritative Formula Lifecycle Pilot
 
+The detailed execution-ready work for this phase now lives in:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE5_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_PLAN.md)
+
 Status: next frontier, but only on the narrower admitted Phase 4 subset
 
 ### Goal

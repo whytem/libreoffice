@@ -92,6 +92,9 @@ Current architecture docs:
   completed closeout decision for Phase 4, admitting the narrowed
   graph-and-queue-authoritative subset and carrying a still-narrower surface
   into Phase 5
+- [COMPUTATIONAL_SUBSTRATE_PHASE5_PLAN.md](COMPUTATIONAL_SUBSTRATE_PHASE5_PLAN.md) -
+  active execution-ready plan for the first formula-lifecycle authority pilot
+  on top of the narrowed Phase 4 graph-and-queue-authoritative subset
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for
