@@ -120,6 +120,10 @@ Required artifact:
 
 - one checked-in Phase 7 decision contract note
 
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE7_DECISION_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE7_DECISION_CONTRACT.md)
+
 ### 7.2 Produce The Final Ownership And Boundary Map
 
 Produce the concrete candidate long-term boundary for the computational
