@@ -1192,10 +1192,16 @@ void ScInterpreter::PopExternalSingleRef(
     if (nGlobalError != FormulaError::NONE)
         return;
 
-    const FormulaError eError = seexternalexec::fetchExternalSingleRefToken(
-        mrDoc, aPos, rFileId, rTabName, rRef, rToken, pFmt);
-    if (eError != FormulaError::NONE)
-        SetError(eError);
+    const auto aFetch = seexternalexec::fetchExternalSingleRef(mrDoc, aPos, rFileId, rTabName, rRef);
+    if (aFetch.meError != FormulaError::NONE)
+    {
+        SetError(aFetch.meError);
+        return;
+    }
+
+    rToken = aFetch.mxToken;
+    if (pFmt)
+        *pFmt = aFetch.maFormat;
 }
 
 void ScInterpreter::PopExternalDoubleRef(sal_uInt16& rFileId, OUString& rTabName, ScComplexRefData& rRef)
@@ -1250,17 +1256,12 @@ void ScInterpreter::PopExternalDoubleRef(ScMatrixRef& rMat)
     if (nGlobalError != FormulaError::NONE)
         return;
 
-    // For now, we only support single range data for external
-    // references, which means the array should only contain a
-    // single matrix token.
-    formula::FormulaToken* p = pArray->FirstToken();
-    if (!p || p->GetType() != svMatrix)
-        SetError( FormulaError::IllegalParameter);
+    const auto aProjection = seexternalexec::projectExternalDoubleRefMatrix(pArray);
+    if (aProjection.meError != FormulaError::NONE)
+        SetError(aProjection.meError);
     else
     {
-        rMat = p->GetMatrix();
-        if (!rMat)
-            SetError( FormulaError::UnknownVariable);
+        rMat = aProjection.mxMatrix;
     }
 }
 
@@ -1269,10 +1270,14 @@ void ScInterpreter::GetExternalDoubleRef(
 {
     // Kept in Calc intentionally because the cache lookup and returned token
     // arrays are still owned by the host interpreter/document layer.
-    const FormulaError eError = seexternalexec::fetchExternalDoubleRefTokens(
-        mrDoc, aPos, nFileId, rTabName, rData, rArray);
-    if (eError != FormulaError::NONE)
-        SetError(eError);
+    const auto aFetch = seexternalexec::fetchExternalDoubleRef(mrDoc, aPos, nFileId, rTabName, rData);
+    if (aFetch.meError != FormulaError::NONE)
+    {
+        SetError(aFetch.meError);
+        return;
+    }
+
+    rArray = aFetch.mxArray;
 }
 
 bool ScInterpreter::PopDoubleRefOrSingleRef( ScAddress& rAdr )

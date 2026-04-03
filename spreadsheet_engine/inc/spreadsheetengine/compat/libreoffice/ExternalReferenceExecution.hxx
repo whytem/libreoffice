@@ -13,73 +13,173 @@
 #include <document.hxx>
 #include <externalrefmgr.hxx>
 #include <tokenarray.hxx>
+#include <types.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::externalreferenceexecution
 {
+
+struct ExternalSingleRefFetch
+{
+    FormulaError meError = FormulaError::NONE;
+    ScExternalRefCache::TokenRef mxToken;
+    ScExternalRefCache::CellFormat maFormat;
+};
+
+struct ExternalDoubleRefFetch
+{
+    FormulaError meError = FormulaError::NONE;
+    ScExternalRefCache::TokenArrayRef mxArray;
+};
+
+struct ExternalDoubleRefMatrixProjection
+{
+    FormulaError meError = FormulaError::NONE;
+    ScMatrixRef mxMatrix;
+};
+
+[[nodiscard]] inline ExternalSingleRefFetch fetchExternalSingleRef(const ScDocument& rDoc,
+    const ScAddress& rFormulaPos, sal_uInt16 nFileId, const OUString& rTabName,
+    const ScSingleRefData& rRef)
+{
+    ExternalSingleRefFetch aFetch;
+    ScExternalRefManager* pRefMgr = rDoc.GetExternalRefManager();
+    if (!pRefMgr || !pRefMgr->getExternalFileName(nFileId))
+    {
+        aFetch.meError = FormulaError::NoName;
+        return aFetch;
+    }
+
+    if (rRef.IsTabRel())
+    {
+        aFetch.meError = FormulaError::NoRef;
+        return aFetch;
+    }
+
+    ScAddress aAddress = rRef.toAbs(rDoc, rFormulaPos);
+    ScExternalRefCache::TokenRef xToken = pRefMgr->getSingleRefToken(
+        nFileId, rTabName, aAddress, &rFormulaPos, nullptr, &aFetch.maFormat);
+    if (!xToken)
+    {
+        aFetch.meError = FormulaError::NoRef;
+        return aFetch;
+    }
+    if (xToken->GetType() == formula::svError)
+    {
+        aFetch.meError = xToken->GetError();
+        return aFetch;
+    }
+
+    aFetch.mxToken = std::move(xToken);
+    return aFetch;
+}
 
 [[nodiscard]] inline FormulaError fetchExternalSingleRefToken(const ScDocument& rDoc,
     const ScAddress& rFormulaPos, sal_uInt16 nFileId, const OUString& rTabName,
     const ScSingleRefData& rRef, ScExternalRefCache::TokenRef& rToken,
     ScExternalRefCache::CellFormat* pFormat = nullptr)
 {
-    ScExternalRefManager* pRefMgr = rDoc.GetExternalRefManager();
-    if (!pRefMgr || !pRefMgr->getExternalFileName(nFileId))
-        return FormulaError::NoName;
+    const auto aFetch = fetchExternalSingleRef(rDoc, rFormulaPos, nFileId, rTabName, rRef);
+    if (aFetch.meError != FormulaError::NONE)
+        return aFetch.meError;
 
-    if (rRef.IsTabRel())
-        return FormulaError::NoRef;
-
-    ScAddress aAddress = rRef.toAbs(rDoc, rFormulaPos);
-    ScExternalRefCache::CellFormat aFormat;
-    ScExternalRefCache::TokenRef xToken
-        = pRefMgr->getSingleRefToken(nFileId, rTabName, aAddress, &rFormulaPos, nullptr, &aFormat);
-    if (!xToken)
-        return FormulaError::NoRef;
-    if (xToken->GetType() == formula::svError)
-        return xToken->GetError();
-
-    rToken = std::move(xToken);
+    rToken = aFetch.mxToken;
     if (pFormat)
-        *pFormat = aFormat;
+        *pFormat = aFetch.maFormat;
     return FormulaError::NONE;
 }
 
-[[nodiscard]] inline FormulaError fetchExternalDoubleRefTokens(const ScDocument& rDoc,
+[[nodiscard]] inline ExternalDoubleRefFetch fetchExternalDoubleRef(const ScDocument& rDoc,
     const ScAddress& rFormulaPos, sal_uInt16 nFileId, const OUString& rTabName,
-    const ScComplexRefData& rData, ScExternalRefCache::TokenArrayRef& rArray)
+    const ScComplexRefData& rData)
 {
+    ExternalDoubleRefFetch aFetch;
     ScExternalRefManager* pRefMgr = rDoc.GetExternalRefManager();
     if (!pRefMgr || !pRefMgr->getExternalFileName(nFileId))
-        return FormulaError::NoName;
+    {
+        aFetch.meError = FormulaError::NoName;
+        return aFetch;
+    }
 
     if (rData.Ref1.IsTabRel() || rData.Ref2.IsTabRel())
-        return FormulaError::NoRef;
+    {
+        aFetch.meError = FormulaError::NoRef;
+        return aFetch;
+    }
 
     ScComplexRefData aData(rData);
     ScRange aRange = aData.toAbs(rDoc, rFormulaPos);
     if (!rDoc.ValidColRow(aRange.aStart.Col(), aRange.aStart.Row())
         || !rDoc.ValidColRow(aRange.aEnd.Col(), aRange.aEnd.Row()))
     {
-        return FormulaError::NoRef;
+        aFetch.meError = FormulaError::NoRef;
+        return aFetch;
     }
 
     ScExternalRefCache::TokenArrayRef xArray
         = pRefMgr->getDoubleRefTokens(nFileId, rTabName, aRange, &rFormulaPos);
     if (!xArray)
-        return FormulaError::IllegalArgument;
+    {
+        aFetch.meError = FormulaError::IllegalArgument;
+        return aFetch;
+    }
 
     formula::FormulaTokenArrayPlainIterator aIter(*xArray);
     formula::FormulaToken* pToken = aIter.First();
     assert(pToken);
     if (pToken->GetType() == formula::svError)
-        return pToken->GetError();
+    {
+        aFetch.meError = pToken->GetError();
+        return aFetch;
+    }
     if (pToken->GetType() != formula::svMatrix)
-        return FormulaError::IllegalArgument;
+    {
+        aFetch.meError = FormulaError::IllegalArgument;
+        return aFetch;
+    }
     if (aIter.Next())
-        return FormulaError::IllegalArgument;
+    {
+        aFetch.meError = FormulaError::IllegalArgument;
+        return aFetch;
+    }
 
-    rArray = std::move(xArray);
+    aFetch.mxArray = std::move(xArray);
+    return aFetch;
+}
+
+[[nodiscard]] inline FormulaError fetchExternalDoubleRefTokens(const ScDocument& rDoc,
+    const ScAddress& rFormulaPos, sal_uInt16 nFileId, const OUString& rTabName,
+    const ScComplexRefData& rData, ScExternalRefCache::TokenArrayRef& rArray)
+{
+    const auto aFetch = fetchExternalDoubleRef(rDoc, rFormulaPos, nFileId, rTabName, rData);
+    if (aFetch.meError != FormulaError::NONE)
+        return aFetch.meError;
+
+    rArray = aFetch.mxArray;
     return FormulaError::NONE;
+}
+
+[[nodiscard]] inline ExternalDoubleRefMatrixProjection projectExternalDoubleRefMatrix(
+    const ScExternalRefCache::TokenArrayRef& xArray)
+{
+    ExternalDoubleRefMatrixProjection aProjection;
+    if (!xArray)
+    {
+        aProjection.meError = FormulaError::IllegalArgument;
+        return aProjection;
+    }
+
+    formula::FormulaToken* pToken = xArray->FirstToken();
+    if (!pToken || pToken->GetType() != formula::svMatrix)
+    {
+        aProjection.meError = FormulaError::IllegalArgument;
+        return aProjection;
+    }
+
+    aProjection.mxMatrix = pToken->GetMatrix();
+    if (!aProjection.mxMatrix)
+        aProjection.meError = FormulaError::UnknownVariable;
+
+    return aProjection;
 }
 
 } // namespace spreadsheetengine::compat::libreoffice::externalreferenceexecution
