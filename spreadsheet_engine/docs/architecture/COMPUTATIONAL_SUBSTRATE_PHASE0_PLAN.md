@@ -1,6 +1,6 @@
 # Computational Substrate Phase 0 Plan
 
-Status: active implementation-ready Phase 0 plan
+Status: completed Phase 0 plan and closeout record
 
 ## Purpose
 
@@ -233,3 +233,20 @@ Phase 0 is successful only if all of the following are true:
 
 If any of those are missing, then the correct outcome is to keep working in
 Phase 0 rather than to start shadow storage work prematurely.
+
+## Closeout Outcome
+
+Phase 0 is now complete.
+
+The checked-in decision record is:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE0_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_DECISION_RECORD.md)
+
+The outcome is:
+
+- proceed to Phase 1 on a narrower subset
+
+The narrowed proceed boundary is intentional. Phase 0 proved exact enough
+observability for the safe mutation and live-state surfaces captured by the new
+lane, but it did not claim broad authority readiness for every structural,
+load-time, or container-layout detail in the full future substrate.

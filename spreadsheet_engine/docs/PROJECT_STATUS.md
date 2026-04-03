@@ -233,34 +233,44 @@ containers remain embedded in Calc storage.
 That makes computational substrate extraction the clearest path if the project
 intends to keep moving the authoritative computation boundary outward.
 
-## What Phase 0 Must Prove
+## Phase 0 Outcome
 
-The active program does not begin by moving authority immediately.
+The active program did not begin by shifting authority immediately. It began by
+proving that the live computational substrate could be observed precisely
+enough to justify later shadow work.
 
-Phase 0 is now the critical execution gate. It must prove that the project can
-observe and compare the live computational substrate precisely enough to make
-later shadowing and authority shifts safe.
+That Phase 0 gate is now complete.
 
-The detailed execution reference for that work now lives in:
+The checked-in closeout material lives in:
 
 - [COMPUTATIONAL_SUBSTRATE_PHASE0_INVENTORY.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_INVENTORY.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE0_OBSERVABLE_STATE_MODEL.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_OBSERVABLE_STATE_MODEL.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE0_SCENARIO_MATRIX.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_SCENARIO_MATRIX.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE0_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_DECISION_RECORD.md)
 
-Specifically, Phase 0 must produce:
+The outcome is:
+
+- proceed to Phase 1 on a narrower subset
+
+What Phase 0 established:
 
 - an exact ownership map for formula tree, broadcast track, BASM, listener
   contexts, broadcaster storage, and `ScTokenArray` mutation/update sites
-- a clear split between computational state and genuinely host-only state
-- stable diagnostics for:
-  - live dependency graph shape
-  - broadcaster and listener state
-  - formula-tree membership
-  - recalc queue behavior after representative mutations
-- a validation lane capable of catching divergence before any authority shift
-  is attempted
+- a stable observable-state model for formula-tree, formula-track,
+  broadcaster, listener, dependency, and recalc comparisons
+- checked-in capture helpers for live formula-tree, formula-track, and
+  normalized broadcaster state
+- a representative mutation scenario matrix
+- an automated differential lane covering scalar edits, formula edits,
+  delayed listener startup, and delayed broadcaster deletion
 
-If Phase 0 cannot provide exact enough observability, the program should stop
-there instead of forcing a shadow architecture on top of opaque Calc state.
+What Phase 0 did not claim:
+
+- broad authority readiness for every structural edit, load-time setup, or
+  Calc container layout detail
+
+That is why the proceed decision is intentionally narrowed rather than broad.
 
 ## Current Assessment
 

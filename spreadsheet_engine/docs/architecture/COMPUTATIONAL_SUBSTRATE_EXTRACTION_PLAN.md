@@ -103,6 +103,8 @@ is exact enough to justify it.
 
 ## Phase 0: Scope Freeze And Observability Foundation
 
+Status: complete on a narrowed proceed subset
+
 ### Goal
 
 Establish a precise, testable map of the live computational substrate that
@@ -145,10 +147,20 @@ changes first.
 The detailed execution-ready work for this phase now lives in:
 
 - [COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE0_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_DECISION_RECORD.md)
 
 Phase 0 should not be treated as a soft preamble. It is the observability and
 scope-freeze gate for the whole program, and later phases should not begin
 until its exit criteria are met.
+
+That gate is now met for a narrowed subset:
+
+- formula-tree and formula-track observation
+- normalized broadcaster and listener shape
+- dependency and recalc correspondence on the current safe mutation set
+
+Phase 1 may proceed, but it should start from that narrowed subset rather than
+assuming broad structural or load-time authority immediately.
 
 ## Phase 1: Engine-Owned Computational Storage Shadow
 
