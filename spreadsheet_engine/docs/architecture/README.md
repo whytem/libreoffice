@@ -52,6 +52,13 @@ Current architecture docs:
 - [COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md) -
   completed proceed-on-narrowed-subset decision for Phase 2, recording the
   admitted graph shadow surface and the retained defer boundaries
+- [COMPUTATIONAL_SUBSTRATE_PHASE3_PLAN.md](COMPUTATIONAL_SUBSTRATE_PHASE3_PLAN.md) -
+  active implementation-ready plan for defining the first engine-owned
+  execution IR boundary on top of the narrowed Phase 2 graph-shadow subset
+- [COMPUTATIONAL_SUBSTRATE_PHASE3_IR_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_PHASE3_IR_CONTRACT.md) -
+  active contract note for the first execution-facing IR slice, freezing the
+  admitted semantic surface, normalization rules, and defer list before the
+  Phase 3 schema and lowering work
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

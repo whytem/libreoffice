@@ -200,6 +200,8 @@ The active path is:
 - [COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE1_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE2_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE2_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE3_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE3_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE3_IR_CONTRACT.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE3_IR_CONTRACT.md)
 
 This is a major second-stage architecture program. Its target end state is not
 just "more helpers extracted" or "more direct engine entry adoption." The goal
@@ -226,9 +228,9 @@ The program has now completed:
   exact-or-normalized graph comparisons, delayed-state handling, and
   representative structural rebuild validation
 
-The next frontier is Phase 3 planning and execution on the narrowed graph
-subset admitted by the completed Phase 2 decision record rather than a broad
-authority jump.
+The next frontier is Phase 3 execution on the narrowed graph subset admitted
+by the completed Phase 2 decision record, starting from an explicit IR
+contract instead of a Calc-token-shaped default.
 
 ## Why This Path Was Chosen
 

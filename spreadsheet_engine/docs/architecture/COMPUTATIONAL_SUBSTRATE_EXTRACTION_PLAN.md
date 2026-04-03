@@ -264,6 +264,11 @@ authority.
 
 ## Phase 3: Engine-Owned Execution IR Boundary
 
+The detailed execution-ready work for this phase now lives in:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE3_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE3_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE3_IR_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE3_IR_CONTRACT.md)
+
 ### Goal
 
 Define the execution-facing representation that the engine will own instead of
