@@ -138,6 +138,11 @@ Required artifact:
 - one checked-in admitted/deferred structural mutation matrix or equivalent
   classification
 
+The checked-in artifacts for this workstream are:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE6_STRUCTURAL_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE6_STRUCTURAL_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE6_STRUCTURAL_MATRIX.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE6_STRUCTURAL_MATRIX.md)
+
 ### 6.2 Define The Engine-Owned Structural And Reference-Update State Model
 
 Define the structural-facing state model the engine will use for the pilot.
