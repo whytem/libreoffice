@@ -211,6 +211,12 @@ keeping the host boundary stable.
 In other words: the problem is now mostly one of disciplined boundary
 tightening, not of feasibility.
 
+The fresh retained-host-boundary analysis now points to one best bounded next
+candidate: the external-reference production seam. That surface still mixes
+intentional Calc-owned cache/session access with some fetch/projection
+packaging that may be shrinkable behind one more named compat facade without
+moving ownership out of Calc.
+
 One important cleanup milestone is also now true: within the execution-shell
 surface extracted into `spreadsheet_engine`, there are no known remaining
 standalone-vs-Calc duplicate helper implementations. The remaining Calc-owned
@@ -389,6 +395,21 @@ work should again begin from a fresh inventory of the intentionally retained
 host boundary instead of treating the completed reassessment as open-ended
 cleanup.
 
+That fresh inventory has now been done for the retained host boundary, and the
+selected next stream is:
+
+- [EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md](architecture/EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md)
+
+The reason for choosing it is straightforward:
+
+- local `CELL(...)` host-property handling is already thin and explicitly
+  host-owned
+- bounded `INFO(...)` projection is already thin and explicitly host-owned
+- add-in null-date and holiday ownership is already explicit and stable
+- the external-reference path in `interpr1.cxx` and `interpr4.cxx` still has
+  the clearest remaining opportunity to narrow packaging without disturbing
+  the settled host boundary
+
 ## Working Rules For The Next Stage
 
 The project should continue under these rules:
@@ -418,6 +439,7 @@ project is on track.
 
 The most relevant active docs are:
 
+- [EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md](architecture/EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md)
 - [COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md](architecture/COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md)
 - [HOST_SERVICE_FACADE_NARROWING_PLAN.md](architecture/HOST_SERVICE_FACADE_NARROWING_PLAN.md)
 - [ENGINE_ENTRY_WIDENING_PLAN.md](architecture/ENGINE_ENTRY_WIDENING_PLAN.md)
