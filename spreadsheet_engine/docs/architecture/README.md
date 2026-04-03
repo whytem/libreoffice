@@ -37,6 +37,9 @@ Current architecture docs:
   completed proceed record for Phase 1, admitting the rebuilt shadow subset
   plus representative row-insert and column-delete widening as the entry
   surface for Phase 2
+- [COMPUTATIONAL_SUBSTRATE_PHASE2_PLAN.md](COMPUTATIONAL_SUBSTRATE_PHASE2_PLAN.md) -
+  active implementation-ready plan for Phase 2 live dependency-graph
+  shadowing on the admitted Phase 1 subset
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

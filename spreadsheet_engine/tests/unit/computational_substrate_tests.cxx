@@ -5,6 +5,7 @@
 #include <spreadsheetengine/detail/substrate/ComputationalShadowBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowComparison.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowMapping.hxx>
+#include <spreadsheetengine/detail/substrate/DependencyGraphShadow.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowMutation.hxx>
 #include <spreadsheetengine/detail/workbook/InMemoryWorkbookFacade.hxx>
 
@@ -20,6 +21,34 @@ int main()
 
     if (!(mapping::makeShadowCellId({ 3, 4, 5 }) == ShadowCellId { { 3, 4, 5 } }))
         return fail("computational_substrate", "shadow cell id mapping mismatch");
+
+    {
+        const auto aCellBroadcaster = BroadcasterNodeId::forCell({ 0, 2, 1 });
+        if (aCellBroadcaster.meKind != BroadcasterNodeKind::Cell
+            || !(aCellBroadcaster.maCellAddress == spreadsheetengine::api::CellAddress { 0, 2, 1 }))
+        {
+            return fail("computational_substrate", "cell broadcaster id mapping mismatch");
+        }
+
+        const auto aAreaBroadcaster
+            = BroadcasterNodeId::forArea({ { 1, 3, 4 }, { 1, 5, 6 } });
+        if (aAreaBroadcaster.meKind != BroadcasterNodeKind::Area
+            || !(aAreaBroadcaster.maAreaRange
+                 == spreadsheetengine::api::CellRange { { 1, 3, 4 }, { 1, 5, 6 } }))
+        {
+            return fail("computational_substrate", "area broadcaster id mapping mismatch");
+        }
+
+        DependencyGraphShadow aGraph;
+        aGraph.maListenerAnchors.push_back({ mapping::makeListenerAnchorId(
+            ListenerAnchorKind::FormulaCell, { 0, 2, 1 }, 1) });
+        if (aGraph.getListenerAnchorCount() != 1
+            || !aGraph.findListenerAnchor(mapping::makeListenerAnchorId(
+                   ListenerAnchorKind::FormulaCell, { 0, 2, 1 }, 1)))
+        {
+            return fail("computational_substrate", "graph schema lookup mismatch");
+        }
+    }
 
     {
         const FormulaGroupDescriptor aDescriptor { { 0, 1, 2 }, 4, true };

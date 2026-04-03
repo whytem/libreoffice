@@ -211,6 +211,10 @@ depends on Calc storage ownership for correctness.
 
 ## Phase 2: Live Dependency Graph Shadow
 
+The detailed execution-ready work for this phase now lives in:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE2_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE2_PLAN.md)
+
 ### Goal
 
 Build an engine-owned live dependency graph on top of the shadow substrate and
