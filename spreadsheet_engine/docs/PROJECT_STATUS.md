@@ -211,6 +211,7 @@ The active path is:
 - [COMPUTATIONAL_SUBSTRATE_PHASE5_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE5_DIFFERENTIAL_SURFACE.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_DIFFERENTIAL_SURFACE.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE5_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md)
 
 This is a major second-stage architecture program. Its target end state is not
 just "more helpers extracted" or "more direct engine entry adoption." The goal

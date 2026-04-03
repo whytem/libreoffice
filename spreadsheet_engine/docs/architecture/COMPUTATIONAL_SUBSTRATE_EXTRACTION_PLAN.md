@@ -415,6 +415,10 @@ remain deferred.
 
 ## Phase 6: Structural Edit And Reference-Update Expansion
 
+The detailed execution-ready work for this phase now lives in:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md)
+
 ### Goal
 
 Expand from the safe pilot surface to the reference-update and structural-edit

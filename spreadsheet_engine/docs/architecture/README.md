@@ -104,6 +104,10 @@ Current architecture docs:
   completed narrow-proceed decision for Phase 5, admitting only the scalar
   lifecycle-authoritative subset into Phase 6 while keeping shared-group and
   structural widening deferred
+- [COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md](COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md) -
+  active execution-ready plan for the first structural-edit and
+  reference-update widening slice on top of the narrowed scalar
+  lifecycle-authoritative subset admitted by the completed Phase 5 decision
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for
