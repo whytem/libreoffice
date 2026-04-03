@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include <spreadsheetengine/detail/substrate/AuthorityPilot.hxx>
 #include <spreadsheetengine/detail/substrate/ExecutionIr.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowComparison.hxx>
@@ -16,6 +17,8 @@ int main()
 {
     using namespace spreadsheetengine::detail::facade;
     using namespace spreadsheetengine::detail::substrate;
+    using spreadsheetengine::detail::substrate::authoritydetail::classifyAuthorityMutation;
+    using spreadsheetengine::detail::substrate::authoritydetail::makeAuthorityVerification;
     namespace mapping = spreadsheetengine::detail::substrate::mapping;
     using spreadsheetengine::api::CellValue;
     using spreadsheetengine::standalone::test::fail;
@@ -149,10 +152,44 @@ int main()
         return fail("computational_substrate", "formula cell projection mismatch");
     }
 
-    if (aShadow.maFormulaGroups.front().maMembers.size() != 2)
-        return fail("computational_substrate", "formula group membership mismatch");
-    if (!aInitialComparison.mbFullMatch)
-        return fail("computational_substrate", "initial shadow comparison mismatch");
+        if (aShadow.maFormulaGroups.front().maMembers.size() != 2)
+            return fail("computational_substrate", "formula group membership mismatch");
+        if (!aInitialComparison.mbFullMatch)
+            return fail("computational_substrate", "initial shadow comparison mismatch");
+
+        const auto aAdmittedContract
+            = classifyAuthorityMutation(MutationEvent::setFormula({ nData, 1, 0 }, u"=A1*4"));
+        if (!aAdmittedContract.isAdmitted() || !aAdmittedContract.mbRequiresCleanBaseline)
+            return fail("computational_substrate", "authority contract admission mismatch");
+
+        const auto aValidationOnlyContract = classifyAuthorityMutation(
+            MutationEvent::renameNamedRange(aFacade.getNamedRangeDescriptors().front(),
+                aFacade.getNamedRangeDescriptors().front()));
+        if (aValidationOnlyContract.meMutationClass != AuthorityMutationClass::ValidationOnly)
+            return fail("computational_substrate", "authority contract validation-only mismatch");
+
+        const auto aRejectedContract
+            = classifyAuthorityMutation(MutationEvent::clearRange({ { nData, 0, 0 }, { nData, 1, 1 } }));
+        if (aRejectedContract.meMutationClass != AuthorityMutationClass::Rejected)
+            return fail("computational_substrate", "authority contract rejection mismatch");
+
+        AuthorityPilotInput aAuthorityInput;
+        aAuthorityInput.maComputationalShadow = aShadow;
+        aAuthorityInput.maMutation = MutationEvent::clearCell({ nData, 0, 1 });
+        aAuthorityInput.mbCleanBaseline = true;
+
+        AuthorityPilotTransition aTransition;
+        aTransition.maInput = aAuthorityInput;
+        aTransition.maContract = classifyAuthorityMutation(aAuthorityInput.maMutation);
+        aTransition.maVerification = makeAuthorityVerification(aTransition.maContract);
+        aTransition.meVerdict = AuthorityPilotVerdict::Applicable;
+
+        if (aTransition.isRejected()
+            || aTransition.maVerification.meQueueMode != AuthorityVerificationMode::Exact
+            || aTransition.meVerdict != AuthorityPilotVerdict::Applicable)
+        {
+            return fail("computational_substrate", "authority transition schema mismatch");
+        }
 
     // --- Safe mutation rebuild path ---
     {

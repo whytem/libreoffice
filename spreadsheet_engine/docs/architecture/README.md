@@ -82,6 +82,9 @@ Current architecture docs:
 - [COMPUTATIONAL_SUBSTRATE_PHASE4_PILOT_MUTATION_MATRIX.md](COMPUTATIONAL_SUBSTRATE_PHASE4_PILOT_MUTATION_MATRIX.md) -
   active mutation classification for the first authority pilot, separating
   admitted, validation-only, and rejected mutation classes
+- [COMPUTATIONAL_SUBSTRATE_PHASE4_AUTHORITY_SCHEMA.md](COMPUTATIONAL_SUBSTRATE_PHASE4_AUTHORITY_SCHEMA.md) -
+  active schema note for the first authority pilot, defining the engine-owned
+  transition, verification, and verdict records used by Phase 4
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for
