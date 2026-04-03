@@ -1,10 +1,10 @@
 # Computational Substrate Phase 4 Plan
 
-Status: active execution-ready plan for Phase 4
+Status: completed implementation and closeout record for Phase 4
 
 ## Purpose
 
-This document is the execution-ready plan for Phase 4 of
+This document is the implementation and closeout record for Phase 4 of
 [COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md).
 
 Phase 4 begins from the narrowed proceed boundary recorded in

@@ -206,6 +206,8 @@ The active path is:
 - [COMPUTATIONAL_SUBSTRATE_PHASE4_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE4_AUTHORITY_CONTRACT.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_AUTHORITY_CONTRACT.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE4_PILOT_MUTATION_MATRIX.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_PILOT_MUTATION_MATRIX.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE4_DIFFERENTIAL_SURFACE.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_DIFFERENTIAL_SURFACE.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE4_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_DECISION_RECORD.md)
 
 This is a major second-stage architecture program. Its target end state is not
 just "more helpers extracted" or "more direct engine entry adoption." The goal
@@ -234,10 +236,13 @@ The program has now completed:
 - Phase 3 engine-owned execution IR shadowing on that admitted subset,
   including deterministic lowering, representative structural update
   coherence, and exact-or-normalized IR differential validation
+- Phase 4 engine-authoritative dependency-graph update and recalc-queue
+  derivation on a narrowed admitted subset, with deterministic rollback and
+  rejection lanes and execution-IR comparison retained as observation rather
+  than a hard rollback gate
 
-The next frontier is Phase 4: an engine-authoritative dependency and recalc
-pilot on the narrowed IR-backed subset admitted by the completed Phase 3
-decision record.
+The next frontier is Phase 5: a still-narrower formula-lifecycle pilot on top
+of the admitted Phase 4 graph-and-queue-authoritative subset.
 
 ## Why This Path Was Chosen
 

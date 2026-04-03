@@ -72,19 +72,26 @@ Current architecture docs:
   engine-owned execution IR shadow boundary and carrying a narrowed subset
   into the Phase 4 authority pilot
 - [COMPUTATIONAL_SUBSTRATE_PHASE4_PLAN.md](COMPUTATIONAL_SUBSTRATE_PHASE4_PLAN.md) -
-  active execution-ready plan for the first engine-authoritative dependency
-  and recalc pilot on the narrowed IR-backed subset admitted by the completed
-  Phase 3 decision record
+  completed implementation and closeout record for the first
+  engine-authoritative dependency and recalc pilot on the narrowed IR-backed
+  subset admitted by the completed Phase 3 decision record
 - [COMPUTATIONAL_SUBSTRATE_PHASE4_AUTHORITY_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_PHASE4_AUTHORITY_CONTRACT.md) -
-  active authority-boundary note for the first engine-authoritative pilot,
+  completed authority-boundary note for the first engine-authoritative pilot,
   freezing the admitted mutation surface, preconditions, normalization rules,
   and rollback triggers
 - [COMPUTATIONAL_SUBSTRATE_PHASE4_PILOT_MUTATION_MATRIX.md](COMPUTATIONAL_SUBSTRATE_PHASE4_PILOT_MUTATION_MATRIX.md) -
-  active mutation classification for the first authority pilot, separating
+  completed mutation classification for the first authority pilot, separating
   admitted, validation-only, and rejected mutation classes
 - [COMPUTATIONAL_SUBSTRATE_PHASE4_AUTHORITY_SCHEMA.md](COMPUTATIONAL_SUBSTRATE_PHASE4_AUTHORITY_SCHEMA.md) -
-  active schema note for the first authority pilot, defining the engine-owned
+  completed schema note for the first authority pilot, defining the engine-owned
   transition, verification, and verdict records used by Phase 4
+- [COMPUTATIONAL_SUBSTRATE_PHASE4_DIFFERENTIAL_SURFACE.md](COMPUTATIONAL_SUBSTRATE_PHASE4_DIFFERENTIAL_SURFACE.md) -
+  completed differential-validation note for the authority pilot, freezing the
+  explicit applied, normalized, rolled-back, and rejected verdict categories
+- [COMPUTATIONAL_SUBSTRATE_PHASE4_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_PHASE4_DECISION_RECORD.md) -
+  completed closeout decision for Phase 4, admitting the narrowed
+  graph-and-queue-authoritative subset and carrying a still-narrower surface
+  into Phase 5
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

@@ -318,6 +318,11 @@ structural authority immediately.
 The detailed execution-ready work for this phase now lives in:
 
 - [COMPUTATIONAL_SUBSTRATE_PHASE4_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE4_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_DECISION_RECORD.md)
+
+Status: complete on the narrowed graph-and-queue-authoritative subset, with
+deterministic rollback/rejection and execution-IR comparison retained as
+observation data rather than a hard rollback gate
 
 ### Goal
 
@@ -355,6 +360,8 @@ or under-scheduling.
 Stop if the engine graph is still too dependent on Calc-owned repair logic.
 
 ## Phase 5: Engine-Authoritative Formula Lifecycle Pilot
+
+Status: next frontier, but only on the narrower admitted Phase 4 subset
 
 ### Goal
 
