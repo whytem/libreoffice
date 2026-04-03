@@ -1,6 +1,6 @@
 # Computational Substrate Named-Range Structural Widening Plan
 
-Status: active implementation-ready plan
+Status: complete closeout record
 
 ## Purpose
 
@@ -25,6 +25,14 @@ interact with formulas through named ranges.
 This plan is the implementation-ready path for deciding whether a bounded
 named-range-sensitive structural slice can be admitted into the same exact-
 verification, exact-rollback rollout model.
+
+This plan is now complete.
+
+Its closeout result is:
+
+- do not widen the live rollout
+- keep the bounded global single-area class as validation-only
+- keep sheet-local and multi-area named-range classes deferred
 
 ## Plan Goal
 

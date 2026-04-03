@@ -147,9 +147,13 @@ Current architecture docs:
   structural rollout surface by one bounded step to include `DeleteRows` and
   `InsertColumns`
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md) -
-  active implementation-ready plan for the next adjacent widening target
-  beyond the admitted narrow rollout, focusing on named-range-sensitive
-  structural behavior
+  completed closeout record for the named-range-sensitive structural widening
+  proof cycle, ending in a validation-only global single-area slice rather
+  than live rollout admission
+- [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md) -
+  completed closeout decision for the named-range-sensitive structural proof
+  cycle, keeping the live rollout unchanged while retaining a bounded
+  validation-only global named-range slice
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

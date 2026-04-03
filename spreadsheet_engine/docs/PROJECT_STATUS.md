@@ -255,23 +255,34 @@ engine-owned boundary:
 - token-container ownership transfer
 - broad listener/broadcaster ownership transfer
 
+The completed named-range widening proof cycle clarified that boundary rather
+than moving it:
+
+- the live rollout still excludes named-range-sensitive structural behavior
+- a bounded global single-area named-range class now exists only as a
+  validation-only pilot surface
+- sheet-local, multi-area, and scope-ambiguous named-range classes remain
+  explicitly deferred
+
 Any expansion into those surfaces should begin with a new explicit plan and
 proof cycle rather than being inferred from the current rollout.
 
-## Next Explicit Planning Target
+## Next Explicit Planning Posture
 
-The next adjacent concern selected for explicit planning is:
+There is no newly admitted widening target after the named-range proof cycle.
 
-- named-range-sensitive structural behavior
+The current recommendation is narrower:
 
-That is the closest deferred surface to the current admitted rollout. It
-extends the existing structural authority proof path without immediately
-opening the larger shared-group, sheet-level, token-container, listener, or
-storage-migration fronts.
+- keep the bounded global single-area named-range slice in validation-only
+  mode
+- treat any further widening as another bounded reassessment before opening
+  shared-group, sheet-level, token-container, listener, or storage-migration
+  fronts
 
-The active implementation-ready reference for that next proof cycle is:
+The current named-range closeout references are:
 
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md)
 
 ## Current Assessment
 
@@ -314,6 +325,8 @@ For the current second-stage boundary and rollout closeout, see:
 - [COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md)
 - [README.md](architecture/README.md)
 
 For completed plans, closeout records, and historical extraction context, see:
