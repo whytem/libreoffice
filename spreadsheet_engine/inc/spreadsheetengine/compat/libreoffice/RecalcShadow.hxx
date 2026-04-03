@@ -22,6 +22,7 @@
 #include <document.hxx>
 #include <formulacell.hxx>
 
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObservation.hxx>
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
 #include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
 #include <spreadsheetengine/detail/dependency/DependencySnapshot.hxx>
@@ -103,35 +104,7 @@ struct QueueGroup
 
 [[nodiscard]] inline std::vector<api::CellAddress> collectFormulaTreeAddresses(const ScDocument& rDoc)
 {
-    ScFormulaCell* pHead = nullptr;
-    std::vector<api::CellAddress> aFallback;
-
-    for (SCTAB nTab = 0; nTab < rDoc.GetTableCount(); ++nTab)
-    {
-        ScCellIterator aIter(const_cast<ScDocument&>(rDoc),
-            ScRange(0, 0, nTab, rDoc.MaxCol(), rDoc.MaxRow(), nTab));
-        for (bool bHas = aIter.first(); bHas; bHas = aIter.next())
-        {
-            if (aIter.getType() != CELLTYPE_FORMULA)
-                continue;
-
-            ScFormulaCell* pCell = aIter.getFormulaCell();
-            if (!pCell || !rDoc.IsInFormulaTree(pCell))
-                continue;
-
-            aFallback.push_back(spreadsheetengine::compat::libreoffice::toApiCellAddress(pCell->aPos));
-            if (!pCell->GetPrevious())
-                pHead = pCell;
-        }
-    }
-
-    if (!pHead)
-        return normalizeAddresses(std::move(aFallback));
-
-    std::vector<api::CellAddress> aAddresses;
-    for (const ScFormulaCell* pCell = pHead; pCell != nullptr; pCell = pCell->GetNext())
-        aAddresses.push_back(spreadsheetengine::compat::libreoffice::toApiCellAddress(pCell->aPos));
-    return aAddresses;
+    return substrateobs::collectFormulaTreeAddresses(rDoc);
 }
 
 [[nodiscard]] inline std::vector<api::CellAddress> collectPredictedQueueAddresses(
@@ -220,7 +193,7 @@ struct QueueGroup
     const CalcWorkbookFacade& rAfterFacade, const ScDocument& rDoc)
 {
     const auto aPredicted = collectPredictedQueueAddresses(rPlan);
-    const auto aActual = collectFormulaTreeAddresses(rDoc);
+    const auto aActual = substrateobs::collectFormulaTreeAddresses(rDoc);
     const auto aPredictedSorted = normalizeAddresses(aPredicted);
     const auto aActualSorted = normalizeAddresses(aActual);
 

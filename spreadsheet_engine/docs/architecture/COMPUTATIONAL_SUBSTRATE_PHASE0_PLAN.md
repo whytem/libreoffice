@@ -122,6 +122,10 @@ Required artifact:
 
 - stable capture helpers or debug-only snapshots suitable for automated tests
 
+The initial checked-in capture surface for this workstream is:
+
+- [ComputationalSubstrateObservation.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/ComputationalSubstrateObservation.hxx)
+
 ### 0.4 Build The Representative Mutation Scenario Set
 
 Define the mutation scenarios that later phases must shadow exactly.
