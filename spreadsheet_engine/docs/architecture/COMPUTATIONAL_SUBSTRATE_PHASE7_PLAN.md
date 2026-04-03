@@ -220,6 +220,10 @@ Required artifact:
 
 - one checked-in rollback and deactivation strategy note
 
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE7_ROLLBACK_STRATEGY.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE7_ROLLBACK_STRATEGY.md)
+
 ### 7.6 Freeze The Phase 7 Closeout And Program Decision
 
 Phase 7 closes only with a checked-in final decision record that says one of:
