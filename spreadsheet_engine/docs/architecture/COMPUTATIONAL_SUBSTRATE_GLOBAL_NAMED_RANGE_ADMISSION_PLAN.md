@@ -154,6 +154,10 @@ Required artifact:
 
 - one checked-in global named-range workbook and mutation matrix
 
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_MATRIX.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_MATRIX.md)
+
 ### 3. Freeze The Global Named-Range Equivalence Rules
 
 Define how Calc and engine-owned surfaces are compared for this promotion
