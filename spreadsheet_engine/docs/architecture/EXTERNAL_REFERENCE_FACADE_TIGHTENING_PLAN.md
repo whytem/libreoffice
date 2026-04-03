@@ -107,6 +107,15 @@ Completion criteria:
   touched surface
 - each candidate has an owning later slice or an explicit retain/defer reason
 
+Initial inventory table:
+
+| Candidate | Primary location | Current issue | Likely outcome | Validation lanes |
+| --- | --- | --- | --- | --- |
+| external `CELL(...)` caller and projection tail | [interpr1.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr1.cxx) | external cache access, `CELL(...)` request assembly, and property/result projection still meet in one production caller | Phase 3 narrowing candidate | `CppunitTest_sc_ucalc_formula2`, `CppunitTest_sc_ucalc_shared_cases`, replay summary |
+| external single-ref fetch plus token/format packaging | [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx) | fetch setup is named, but the returned token/format packaging is still shaped directly around interpreter methods | Phase 4 narrowing candidate | `CppunitTest_sc_ucalc_formula2`, replay summary |
+| external double-ref fetch plus matrix/token-array packaging | [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx) | token-array fetch is named, but matrix extraction and final caller shaping still live inline in Calc | Phase 4 narrowing candidate | `CppunitTest_sc_ucalc_formula2`, `spreadsheetengine_reference_tests`, replay summary |
+| external filename/address/value-shape helper tail | [CellInspectionExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx) | most semantics are already compat-owned, but the remaining external property split is not yet the smallest practical seam | Phase 3 / 5 cleanup candidate | `CppunitTest_sc_ucalc_formula2`, replay summary |
+
 ### 2. Classify The External-Reference Boundary Map
 
 Turn the inventory into an actionable boundary map.
@@ -284,4 +293,3 @@ This stream is fully closed when:
    - `0` cached-fallback rate
 6. status and architecture docs describe the external-reference boundary in
    present tense rather than as implied unfinished cleanup
-
