@@ -197,6 +197,11 @@ Required artifacts:
 - one checked-in decision evidence note for correctness scenarios
 - one checked-in performance and memory evidence note
 
+The checked-in artifacts for this workstream are:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE7_CORRECTNESS_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE7_CORRECTNESS_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE7_PERFORMANCE_MEMORY_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE7_PERFORMANCE_MEMORY_EVIDENCE.md)
+
 ### 7.5 Define Rollback, Deactivation, And Stop Conditions
 
 Before any rollout recommendation is made, Phase 7 must make explicit how the
