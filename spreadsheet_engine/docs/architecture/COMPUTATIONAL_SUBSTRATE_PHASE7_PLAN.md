@@ -175,6 +175,10 @@ Required artifact:
 - one checked-in rollout matrix covering workbook classes, mutation classes,
   toggles, and defer boundaries
 
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE7_ROLLOUT_MATRIX.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE7_ROLLOUT_MATRIX.md)
+
 ### 7.4 Add End-To-End Decision Evidence Lanes
 
 Phase 7 must gather evidence that the candidate boundary is operationally
