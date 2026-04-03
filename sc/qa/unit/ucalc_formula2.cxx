@@ -2068,6 +2068,16 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testExternalRef)
     CPPUNIT_ASSERT_EQUAL(u"l"_ustr, m_pDoc->GetString(4, 4, 0));
     m_pDoc->SetString(4, 5, 0, u"=CELL(\"TYPE\";'file:///extdata.fake'#Data1.B2)"_ustr);
     CPPUNIT_ASSERT_EQUAL(u"v"_ustr, m_pDoc->GetString(4, 5, 0));
+    m_pDoc->SetValue(5, 0, 0, 10.0);
+    m_pDoc->SetString(5, 1, 0, u"=CELL(\"FORMAT\";F1)"_ustr);
+    m_pDoc->SetString(5, 2, 0, u"=CELL(\"FORMAT\";'file:///extdata.fake'#Data1.B2)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(m_pDoc->GetString(5, 1, 0), m_pDoc->GetString(5, 2, 0));
+    m_pDoc->SetString(5, 3, 0, u"=CELL(\"COLOR\";F1)"_ustr);
+    m_pDoc->SetString(5, 4, 0, u"=CELL(\"COLOR\";'file:///extdata.fake'#Data1.B2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(m_pDoc->GetValue(5, 3, 0), m_pDoc->GetValue(5, 4, 0));
+    m_pDoc->SetString(5, 5, 0, u"=CELL(\"PARENTHESES\";F1)"_ustr);
+    m_pDoc->SetString(5, 6, 0, u"=CELL(\"PARENTHESES\";'file:///extdata.fake'#Data1.B2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(m_pDoc->GetValue(5, 5, 0), m_pDoc->GetValue(5, 6, 0));
 
     // Unload the external document shell.
     xExtDocSh->DoClose();

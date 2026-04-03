@@ -2595,7 +2595,6 @@ void ScInterpreter::ScCellExternal()
     aExternalRequest.maFormat = aFmt;
     aExternalRequest.meConvention = eAddressConvention;
     const auto aDirectEvaluation = aDirectExternalAdapter.evaluateInfo(aInfoType, aExternalRequest);
-    const auto eInfoKind = aDirectEvaluation.meKind;
     if (aDirectEvaluation.mbHandled)
     {
         if (aDirectEvaluation.meError != FormulaError::NONE)
@@ -2607,41 +2606,18 @@ void ScInterpreter::ScCellExternal()
         return;
     }
 
-    switch (eInfoKind)
+    secellexec::DirectExternalHostCellInspectionAdapter aHostExternalAdapter(mrContext);
+    secellexec::ExternalHostCellInfoRequest aHostExternalRequest;
+    aHostExternalRequest.mnFormat = aFmt.mbIsSet ? aFmt.mnIndex : 0;
+    const auto aHostEvaluation
+        = aHostExternalAdapter.evaluateInfo(aInfoType, aHostExternalRequest);
+    if (aHostEvaluation.mbHandled)
     {
-        case secellexec::InfoKind::Format:
-        {
-            pushApiCellValue(
-                secellexec::makeFormatPropertyValue(mrContext, aFmt.mbIsSet ? aFmt.mnIndex : 0));
-            break;
-        }
-        case secellexec::InfoKind::Color:
-        {
-            pushApiCellValue(
-                secellexec::makeColorPropertyValue(mrContext, aFmt.mbIsSet ? aFmt.mnIndex : 0));
-            break;
-        }
-        case secellexec::InfoKind::Parentheses:
-        {
-            pushApiCellValue(secellexec::makeParenthesesPropertyValue(
-                mrContext, aFmt.mbIsSet ? aFmt.mnIndex : 0));
-            break;
-        }
-        case secellexec::InfoKind::Coord:
-        case secellexec::InfoKind::Width:
-        case secellexec::InfoKind::Prefix:
-        case secellexec::InfoKind::Protect:
-        case secellexec::InfoKind::Unsupported:
-        case secellexec::InfoKind::Column:
-        case secellexec::InfoKind::Row:
-        case secellexec::InfoKind::Sheet:
-        case secellexec::InfoKind::Address:
-        case secellexec::InfoKind::Filename:
-        case secellexec::InfoKind::Contents:
-        case secellexec::InfoKind::Type:
-            PushIllegalParameter();
-            break;
+        pushApiCellValue(aHostEvaluation.maValue);
+        return;
     }
+
+    PushIllegalParameter();
 }
 
 void ScInterpreter::ScIsRef()

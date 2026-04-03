@@ -97,6 +97,18 @@ struct DirectExternalCellInfoEvaluation
     bool mbHandled = false;
 };
 
+struct ExternalHostCellInfoRequest
+{
+    sal_uInt32 mnFormat = 0;
+};
+
+struct DirectExternalHostCellInfoEvaluation
+{
+    InfoKind meKind = InfoKind::Unsupported;
+    CellValue maValue = CellValue::empty();
+    bool mbHandled = false;
+};
+
 [[nodiscard]] inline InfoKind classifyInfoType(const OUString& rInfoType);
 
 [[nodiscard]] inline spreadsheetengine::api::ValueResult<CellValue> evaluateBoundedCellInfo(
@@ -340,6 +352,55 @@ public:
             case InfoKind::Color:
             case InfoKind::Parentheses:
             case InfoKind::Unsupported:
+                return aEvaluation;
+        }
+
+        return aEvaluation;
+    }
+};
+
+class DirectExternalHostCellInspectionAdapter
+{
+    const ScInterpreterContext& mrContext;
+
+public:
+    explicit DirectExternalHostCellInspectionAdapter(const ScInterpreterContext& rContext)
+        : mrContext(rContext)
+    {
+    }
+
+    [[nodiscard]] DirectExternalHostCellInfoEvaluation evaluateInfo(
+        const OUString& rInfoType, const ExternalHostCellInfoRequest& rRequest) const
+    {
+        DirectExternalHostCellInfoEvaluation aEvaluation;
+        aEvaluation.meKind = classifyInfoType(rInfoType);
+
+        switch (aEvaluation.meKind)
+        {
+            case InfoKind::Format:
+                aEvaluation.maValue = makeFormatPropertyValue(mrContext, rRequest.mnFormat);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            case InfoKind::Color:
+                aEvaluation.maValue = makeColorPropertyValue(mrContext, rRequest.mnFormat);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            case InfoKind::Parentheses:
+                aEvaluation.maValue = makeParenthesesPropertyValue(mrContext, rRequest.mnFormat);
+                aEvaluation.mbHandled = true;
+                return aEvaluation;
+            case InfoKind::Unsupported:
+            case InfoKind::Column:
+            case InfoKind::Row:
+            case InfoKind::Sheet:
+            case InfoKind::Address:
+            case InfoKind::Filename:
+            case InfoKind::Contents:
+            case InfoKind::Type:
+            case InfoKind::Coord:
+            case InfoKind::Width:
+            case InfoKind::Prefix:
+            case InfoKind::Protect:
                 return aEvaluation;
         }
 
