@@ -62,6 +62,9 @@ Current architecture docs:
 - [COMPUTATIONAL_SUBSTRATE_PHASE3_IR_SCHEMA.md](COMPUTATIONAL_SUBSTRATE_PHASE3_IR_SCHEMA.md) -
   active schema note for the first engine-owned execution IR types, payloads,
   and workbook/formula ownership rules on the admitted Phase 3 subset
+- [COMPUTATIONAL_SUBSTRATE_PHASE3_REFERENCE_UPDATE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_PHASE3_REFERENCE_UPDATE_EVIDENCE.md) -
+  active evidence note for the admitted Phase 3 reference-shape and
+  representative structural-update semantics at the IR boundary
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

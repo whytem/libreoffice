@@ -183,6 +183,7 @@ Required artifact:
 
 - one checked-in mapping or evidence note for Phase 3 reference-update and
   structural-adjustment behavior on the admitted subset
+- [COMPUTATIONAL_SUBSTRATE_PHASE3_REFERENCE_UPDATE_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE3_REFERENCE_UPDATE_EVIDENCE.md)
 
 ### 3.5 Add IR Differential Validation Lanes
 
