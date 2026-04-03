@@ -218,6 +218,11 @@ projection tail, moved the selected single-ref and double-ref fetch packaging
 behind a named compat seam, and removed the superseded wrapper layer in that
 scope.
 
+The next fresh reassessment result is narrower still: the retained host
+boundary itself now looks largely stable, and the clearest remaining
+non-host-shaped residue is the final legacy pocket in the Analysis add-in
+financial surface around `ODDFPRICE` and `ODDFYIELD`.
+
 One important cleanup milestone is also now true: within the execution-shell
 surface extracted into `spreadsheet_engine`, there are no known remaining
 standalone-vs-Calc duplicate helper implementations. The remaining Calc-owned
@@ -416,6 +421,20 @@ should again begin from a fresh inventory of the intentionally retained host
 boundary instead of treating the completed external-reference stream as an
 open cleanup tail.
 
+That latest reassessment identifies one new bounded follow-on stream:
+
+- [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](architecture/ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md)
+
+The reason for choosing it is straightforward:
+
+- `INFO(...)` and the local/external `CELL(...)` host tails are already thin
+  and explicitly host-owned
+- add-in null-date and holiday ownership is already explicit and stable
+- the remaining `ODDFPRICE` / `ODDFYIELD` path still stands out as legacy
+  semantic residue rather than a deliberate host seam
+- the neighboring Analysis financial surface already uses direct shared-runtime
+  adapters, so the payoff/risk ratio is favorable
+
 ## Working Rules For The Next Stage
 
 The project should continue under these rules:
@@ -445,6 +464,7 @@ project is on track.
 
 The most relevant active docs are:
 
+- [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](architecture/ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md)
 - [EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md](architecture/EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md)
 - [COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md](architecture/COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md)
 - [HOST_SERVICE_FACADE_NARROWING_PLAN.md](architecture/HOST_SERVICE_FACADE_NARROWING_PLAN.md)
