@@ -1223,6 +1223,172 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalLifecycleRemoveFormu
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalLifecycleRejectsDirtyBaseline)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr);
+    m_pDoc->CalcAll();
+
+    ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(1, 0, 0));
+    CPPUNIT_ASSERT(pFormula);
+    pFormula->SetDirtyVar();
+    m_pDoc->PutInFormulaTree(pFormula);
+
+    const ScopedComputationalLifecycle aLifecycle(*m_pDoc, true);
+    CPPUNIT_ASSERT(aLifecycle.isCaptured());
+    CPPUNIT_ASSERT(!aLifecycle.canApplyLifecycle());
+
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    const auto oResult
+        = aLifecycle.apply(*m_pDoc, translateSetFormula(ScAddress(1, 0, 0), u"=A1*2"_ustr));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalLifecycleResultKind::RejectedDirtyBaseline, oResult->meKind);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalLifecycleRejectsOutOfContractMutation)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+    using spreadsheetengine::compat::libreoffice::recalcqueue::captureFormulaState;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalLifecycle aLifecycle(*m_pDoc, true);
+    CPPUNIT_ASSERT(aLifecycle.canApplyLifecycle());
+
+    m_pDoc->SetValue(0, 0, 0, 5.0);
+    const auto aBeforeApply = captureFormulaState(*m_pDoc);
+    const auto oResult = aLifecycle.apply(*m_pDoc, translateSetScalarValue(ScAddress(0, 0, 0)));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalLifecycleResultKind::RejectedOutOfContract, oResult->meKind);
+    assertFormulaStateEqual(aBeforeApply, captureFormulaState(*m_pDoc));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalLifecycleRollsBackVerificationFailure)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    using spreadsheetengine::compat::libreoffice::recalcqueue::captureFormulaState;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=B1+1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalLifecycle aLifecycle(*m_pDoc, true);
+    CPPUNIT_ASSERT(aLifecycle.canApplyLifecycle());
+
+    m_pDoc->SetString(1, 0, 0, u"=A1*3"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=A1+1"_ustr);
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(2, 0, 0), ScAddress(1, 0, 0) });
+
+    const auto aBeforeApply = captureFormulaState(*m_pDoc);
+    const auto oResult
+        = aLifecycle.apply(*m_pDoc, translateSetFormula(ScAddress(1, 0, 0), u"=A1*3"_ustr));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalLifecycleResultKind::RolledBackVerificationFailure, oResult->meKind);
+    CPPUNIT_ASSERT(oResult->moQueueComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moGraphComparison.has_value());
+    CPPUNIT_ASSERT_EQUAL(GraphComparisonKind::Mismatch, oResult->moGraphComparison->meKind);
+    assertFormulaStateEqual(aBeforeApply, captureFormulaState(*m_pDoc));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalLifecycleClassifiesNormalizedEquivalent)
+{
+    using spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparison;
+    using spreadsheetengine::compat::libreoffice::substratelifecycle::LifecycleResult;
+    using spreadsheetengine::compat::libreoffice::substratelifecycle::detail::
+        classifyVerifiedLifecycleResult;
+
+    LifecycleResult aResult;
+    aResult.maTransition.meVerdict
+        = spreadsheetengine::detail::substrate::LifecyclePilotVerdict::Applicable;
+    aResult.maTransition.maVerification.meComputationalMode
+        = spreadsheetengine::detail::substrate::LifecycleVerificationMode::Exact;
+    aResult.maTransition.maVerification.meGraphMode
+        = spreadsheetengine::detail::substrate::LifecycleVerificationMode::
+            AllowNormalizedEquivalent;
+    aResult.maTransition.maVerification.mbObserveIrOnly = true;
+
+    ShadowComparison aQueueComparison;
+    aQueueComparison.meKind = RecalcShadowComparisonKind::Exact;
+    aResult.moQueueComparison = aQueueComparison;
+
+    spreadsheetengine::detail::substrate::ComputationalShadowComparison aComputationalComparison;
+    aComputationalComparison.mbFullMatch = true;
+    aResult.moComputationalComparison = aComputationalComparison;
+
+    spreadsheetengine::detail::substrate::DependencyGraphShadowComparison aGraphComparison;
+    aGraphComparison.meKind = GraphComparisonKind::NormalizedEquivalent;
+    aGraphComparison.mbFullMatch = true;
+    aResult.moGraphComparison = aGraphComparison;
+
+    spreadsheetengine::detail::substrate::ExecutionIrWorkbookComparison aIrComparison;
+    aIrComparison.meKind = ExecutionIrComparisonKind::Exact;
+    aIrComparison.mbFullMatch = true;
+    aResult.moIrComparison = aIrComparison;
+
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalLifecycleResultKind::AppliedNormalizedEquivalent,
+        classifyVerifiedLifecycleResult(aResult));
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalLifecycleClassifiesRepairDetected)
+{
+    using spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparison;
+    using spreadsheetengine::compat::libreoffice::substratelifecycle::LifecycleResult;
+    using spreadsheetengine::compat::libreoffice::substratelifecycle::detail::
+        classifyVerifiedLifecycleResult;
+
+    LifecycleResult aResult;
+    aResult.maTransition.meVerdict
+        = spreadsheetengine::detail::substrate::LifecyclePilotVerdict::Applicable;
+    aResult.maTransition.maVerification.meComputationalMode
+        = spreadsheetengine::detail::substrate::LifecycleVerificationMode::Exact;
+    aResult.maTransition.maVerification.meGraphMode
+        = spreadsheetengine::detail::substrate::LifecycleVerificationMode::Exact;
+
+    ShadowComparison aQueueComparison;
+    aQueueComparison.meKind = RecalcShadowComparisonKind::Exact;
+    aResult.moQueueComparison = aQueueComparison;
+
+    spreadsheetengine::detail::substrate::ComputationalShadowComparison aComputationalComparison;
+    aComputationalComparison.mbFullMatch = false;
+    aResult.moComputationalComparison = aComputationalComparison;
+
+    spreadsheetengine::detail::substrate::DependencyGraphShadowComparison aGraphComparison;
+    aGraphComparison.meKind = GraphComparisonKind::Exact;
+    aGraphComparison.mbFullMatch = true;
+    aResult.moGraphComparison = aGraphComparison;
+
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalLifecycleResultKind::RepairDetected,
+        classifyVerifiedLifecycleResult(aResult));
+}
+
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalSubstrateScalarEditCapture)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
