@@ -269,20 +269,24 @@ proof cycle rather than being inferred from the current rollout.
 
 ## Next Explicit Planning Posture
 
-There is no newly admitted widening target after the named-range proof cycle.
+There is still no newly admitted widening target after the named-range proof
+cycle.
 
-The current recommendation is narrower:
+The next explicit planning target is narrower than another broad reassessment:
 
-- keep the bounded global single-area named-range slice in validation-only
-  mode
-- treat any further widening as another bounded reassessment before opening
-  shared-group, sheet-level, token-container, listener, or storage-migration
-  fronts
+- treat the bounded global single-area named-range slice as the next
+  promotion candidate
+- require a dedicated proof cycle for promoting that slice from
+  validation-only into the opt-in rollout
+- keep sheet-local, multi-area, shared-group, sheet-level, token-container,
+  listener, and storage-migration fronts closed until that narrower question
+  is answered
 
 The current named-range closeout references are:
 
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_PLAN.md)
 
 ## Current Assessment
 

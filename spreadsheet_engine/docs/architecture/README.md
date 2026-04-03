@@ -154,6 +154,10 @@ Current architecture docs:
   completed closeout decision for the named-range-sensitive structural proof
   cycle, keeping the live rollout unchanged while retaining a bounded
   validation-only global named-range slice
+- [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_PLAN.md) -
+  implementation-ready plan for the next bounded promotion proof cycle,
+  testing whether the validation-only global single-area named-range slice
+  can meet live opt-in rollout standards
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for
