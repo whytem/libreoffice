@@ -1951,6 +1951,73 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalStructuralValidateGlobalNamedRangeRejectsDirtyBaseline)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertColumns;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetString(2, 0, 0, u"=SUM(Metrics)"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$A$1:$A$2"_ustr)));
+    m_pDoc->CalcAll();
+
+    ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(2, 0, 0));
+    CPPUNIT_ASSERT(pFormula);
+    pFormula->SetDirtyVar();
+    m_pDoc->PutInFormulaTree(pFormula);
+
+    const ScopedComputationalStructural aStructural(*m_pDoc, true);
+    CPPUNIT_ASSERT(aStructural.isCaptured());
+    CPPUNIT_ASSERT(!aStructural.canApplyStructural());
+
+    m_pDoc->InsertCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
+    const auto oResult = aStructural.validateCandidate(*m_pDoc, translateInsertColumns(0, 0, 1));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalStructuralResultKind::RejectedDirtyBaseline, oResult->meKind);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalStructuralValidateGlobalNamedRangeRepairDetected)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertColumns;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetString(2, 0, 0, u"=SUM(Metrics)"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$A$1:$A$2"_ustr)));
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalStructural aStructural(*m_pDoc, true);
+    CPPUNIT_ASSERT(aStructural.canApplyStructural());
+
+    m_pDoc->InsertCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
+    m_pDoc->SetString(3, 0, 0, u"=SUM(Metrics)+1"_ustr);
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(3, 0, 0) });
+
+    const auto oResult = aStructural.validateCandidate(*m_pDoc, translateInsertColumns(0, 0, 1));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalStructuralResultKind::RepairDetected, oResult->meKind);
+    CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(2, 0, 0)));
+    CPPUNIT_ASSERT(!m_pDoc->GetFormulaCell(ScAddress(3, 0, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     testComputationalStructuralLocalNamedRangeStaysDeferred)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateInsertColumns;
