@@ -248,8 +248,45 @@ public:
         return aDesc;
     }
 
-    // --- Formula-cell iteration ---
+    void visitCells(detail::facade::SheetId nSheet,
+        const detail::facade::CellVisitor& rVisitor) const override
+    {
+        if (!mrDoc.HasTable(nSheet))
+            return;
 
+        ScCellIterator aIter(const_cast<ScDocument&>(mrDoc),
+            ScRange(0, 0, nSheet, mrDoc.MaxCol(), mrDoc.MaxRow(), nSheet));
+        for (bool bHas = aIter.first(); bHas; bHas = aIter.next())
+        {
+            const ScAddress& rPos = aIter.GetPos();
+            api::CellAddress aApiAddr { nSheet,
+                static_cast<api::ColumnIndex>(rPos.Col()),
+                static_cast<api::RowIndex>(rPos.Row()) };
+
+            const auto aDesc = getCellDescriptor(aApiAddr);
+            if (aDesc.meKind != detail::facade::CellKind::Empty && !rVisitor(aDesc))
+                return;
+        }
+    }
+
+    void visitAllCells(const detail::facade::CellVisitor& rVisitor) const override
+    {
+        bool bStopped = false;
+        const sal_Int32 nCount = mrDoc.GetTableCount();
+        for (sal_Int32 nSheet = 0; nSheet < nCount && !bStopped; ++nSheet)
+        {
+            visitCells(nSheet, [&rVisitor, &bStopped](const detail::facade::CellDescriptor& rDesc) {
+                if (!rVisitor(rDesc))
+                {
+                    bStopped = true;
+                    return false;
+                }
+                return true;
+            });
+        }
+    }
+
+    // --- Formula-cell iteration ---
     void visitFormulaCells(detail::facade::SheetId nSheet,
         const detail::facade::FormulaCellVisitor& rVisitor) const override
     {

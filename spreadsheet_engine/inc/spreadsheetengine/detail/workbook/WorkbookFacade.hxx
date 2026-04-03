@@ -20,6 +20,8 @@ namespace spreadsheetengine::detail::facade
 
 /// Callback type for formula-cell iteration.
 using FormulaCellVisitor = std::function<bool(const FormulaCellDescriptor&)>;
+/// Callback type for whole-cell iteration.
+using CellVisitor = std::function<bool(const CellDescriptor&)>;
 
 /// Engine-owned calculation-facing workbook contract.
 ///
@@ -71,6 +73,15 @@ public:
     /// contain a formula.
     [[nodiscard]] virtual std::optional<FormulaCellDescriptor> getFormulaCellDescriptor(
         const api::CellAddress& rAddress) const = 0;
+
+    // --- Whole-cell iteration ---
+
+    /// Iterate over all non-empty cells on a sheet. The visitor returns
+    /// true to continue, false to stop early.
+    virtual void visitCells(SheetId nSheet, const CellVisitor& rVisitor) const = 0;
+
+    /// Iterate over all non-empty cells in the workbook.
+    virtual void visitAllCells(const CellVisitor& rVisitor) const = 0;
 
     // --- Formula-cell iteration ---
 

@@ -272,6 +272,37 @@ public:
         return aDesc;
     }
 
+    void visitCells(SheetId nSheet, const CellVisitor& rVisitor) const override
+    {
+        if (nSheet < 0 || static_cast<std::size_t>(nSheet) >= maSheets.size())
+            return;
+
+        for (const auto& rCell : maSheets[nSheet].maCells)
+        {
+            api::CellAddress aAddr { nSheet, rCell.first.first, rCell.first.second };
+            const CellDescriptor aDesc = getCellDescriptor(aAddr);
+            if (aDesc.meKind != CellKind::Empty && !rVisitor(aDesc))
+                return;
+        }
+    }
+
+    void visitAllCells(const CellVisitor& rVisitor) const override
+    {
+        bool bStopped = false;
+        for (std::size_t nSheet = 0; nSheet < maSheets.size() && !bStopped; ++nSheet)
+        {
+            visitCells(static_cast<SheetId>(nSheet),
+                [&rVisitor, &bStopped](const CellDescriptor& rDesc) {
+                    if (!rVisitor(rDesc))
+                    {
+                        bStopped = true;
+                        return false;
+                    }
+                    return true;
+                });
+        }
+    }
+
     void visitFormulaCells(SheetId nSheet,
         const FormulaCellVisitor& rVisitor) const override
     {

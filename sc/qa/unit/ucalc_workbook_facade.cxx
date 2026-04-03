@@ -84,6 +84,14 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade, testCalcFacadeReadSurfaceAndConsumers)
     CPPUNIT_ASSERT_EQUAL(spreadsheetengine::detail::facade::FormulaCellKind::SharedGroupMember,
         oFormula->meKind);
 
+    sal_Int32 nWholeCellCount = 0;
+    aFacade.visitAllCells([&nWholeCellCount](
+                              const spreadsheetengine::detail::facade::CellDescriptor&) {
+        ++nWholeCellCount;
+        return true;
+    });
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(6), nWholeCellCount);
+
     const auto oGlobal = aFacade.findNamedRange(u"GlobalMetric", std::nullopt);
     CPPUNIT_ASSERT(oGlobal);
     CPPUNIT_ASSERT_EQUAL(spreadsheetengine::detail::facade::NamedRangeScope::Global,

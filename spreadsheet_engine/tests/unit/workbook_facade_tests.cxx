@@ -3,6 +3,7 @@
 #include <iostream>
 #include <optional>
 
+#include <spreadsheetengine/detail/substrate/ComputationalShadow.hxx>
 #include <spreadsheetengine/detail/workbook/FacadeConsumers.hxx>
 #include <spreadsheetengine/detail/workbook/InMemoryWorkbookFacade.hxx>
 #include <spreadsheetengine/detail/workbook/WorkbookFacade.hxx>
@@ -430,6 +431,25 @@ int main()
             return fail("facade_iteration", "early stop iteration mismatch");
     }
 
+    // --- Phase 2.5: Whole-cell iteration ---
+    {
+        sal_Int32 nSheet0CellCount = 0;
+        rFacade.visitCells(0, [&nSheet0CellCount](const CellDescriptor&) {
+            ++nSheet0CellCount;
+            return true;
+        });
+        if (nSheet0CellCount != 5)
+            return fail("facade_iteration", "sheet0 whole-cell count mismatch");
+
+        sal_Int32 nWorkbookCellCount = 0;
+        rFacade.visitAllCells([&nWorkbookCellCount](const CellDescriptor&) {
+            ++nWorkbookCellCount;
+            return true;
+        });
+        if (nWorkbookCellCount != 6)
+            return fail("facade_iteration", "workbook whole-cell count mismatch");
+    }
+
     // --- Phase 3: Named-range queries ---
     {
         if (rFacade.getNamedRangeCount() != 2)
@@ -550,6 +570,33 @@ int main()
         }
         if (!bFoundSum)
             return fail("facade_consumers", "corpus should contain SUM formula");
+    }
+
+    // --- Phase 1 substrate schema smoke ---
+    {
+        using spreadsheetengine::detail::substrate::ComputationalSheetShadow;
+        using spreadsheetengine::detail::substrate::ComputationalWorkbookShadow;
+        using spreadsheetengine::detail::substrate::ShadowFormulaGroupId;
+
+        ComputationalWorkbookShadow aShadow;
+        aShadow.maSnapshot = rFacade.getSnapshotInfo();
+        aShadow.maGrammar = rFacade.getGrammar();
+
+        ComputationalSheetShadow aSheetShadow;
+        aSheetShadow.maSheet = *rFacade.getSheetDescriptor(0);
+        aSheetShadow.maCells.push_back({
+            { { 0, 0, 2 } },
+            rFacade.getCellDescriptor({ 0, 0, 2 }),
+            rFacade.getFormulaCellDescriptor({ 0, 0, 2 }),
+            ShadowFormulaGroupId { { 0, 0, 2 }, 2 },
+            true,
+            false });
+        aShadow.maSheets.push_back(std::move(aSheetShadow));
+
+        if (aShadow.getCellCount() != 1 || aShadow.getFormulaCellCount() != 1)
+            return fail("substrate_schema", "shadow workbook counts mismatch");
+        if (!aShadow.findCell({ 0, 0, 2 }))
+            return fail("substrate_schema", "shadow cell lookup mismatch");
     }
 
     // =================================================================
