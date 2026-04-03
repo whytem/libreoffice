@@ -1,6 +1,6 @@
 # Computational Substrate Narrow Widening Contract
 
-Status: active widening contract note for the narrow rollout plan
+Status: complete widening contract note for the narrow rollout plan
 
 ## Purpose
 

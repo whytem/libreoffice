@@ -1,27 +1,29 @@
 # Computational Substrate Narrow Rollout Contract
 
-Status: active contract note for the narrow rollout plan
+Status: complete closeout contract note for the narrow rollout plan
 
 ## Purpose
 
-This note freezes the exact rollout contract for the already-admitted
-computational substrate authority slice.
+This note freezes the exact rollout contract for the completed narrow
+computational substrate rollout surface.
 
 It exists so bounded rollout engineering cannot silently widen beyond what the
 completed Phase 7 decision actually admitted.
 
 ## Admitted Rollout Surface
 
-The admitted rollout surface is:
+The admitted rollout surface is now:
 
 - admitted scalar lifecycle authority
 - admitted single-sheet `InsertRows`
+- admitted single-sheet `DeleteRows`
+- admitted single-sheet `InsertColumns`
 - admitted single-sheet `DeleteColumns`
 - the ordinary-scalar-formula slice only
 - no shared groups
 - no named-range-sensitive structural behavior
 
-This is the only surface that may be enabled by the initial narrow rollout.
+This is the only surface that may be enabled by the completed narrow rollout.
 
 ## Required Authority Gates
 
@@ -54,12 +56,11 @@ The narrow rollout must deactivate or remain disabled when:
 
 ## Explicit Non-Admission
 
-This contract does not admit:
+This contract still does not admit:
 
-- `DeleteRows`
-- `InsertColumns`
 - sheet insert, delete, rename, or move
 - copy, move, clipboard, load-time, or undo-like structural behavior
 - broader storage or token-container ownership transfer
 
-Those remain candidates for later validation, not part of the initial rollout.
+Those remain outside the rollout and require a future explicit decision before
+any widening beyond this closeout surface.

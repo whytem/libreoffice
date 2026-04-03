@@ -1,6 +1,6 @@
 # Computational Substrate Narrow Rollout Evidence
 
-Status: active bounded rollout evidence note for the narrow rollout plan
+Status: complete bounded rollout evidence note for the narrow rollout plan
 
 ## Purpose
 
@@ -33,6 +33,8 @@ The rollout-specific gate coverage is checked by:
 - `testComputationalNarrowRolloutDisabledByDefault`
 - `testComputationalNarrowRolloutLifecycleEnabledByUmbrella`
 - `testComputationalNarrowRolloutStructuralEnabledByUmbrella`
+- `testComputationalNarrowRolloutDeleteRowEnabledByUmbrella`
+- `testComputationalNarrowRolloutInsertColumnEnabledByUmbrella`
 - `testComputationalNarrowRolloutStructuralOverrideBeatsUmbrella`
 
 The standing applied and divergence lanes remain in:
@@ -119,11 +121,10 @@ The standing replay baseline remains unchanged:
 
 ## Workstream Interpretation
 
-This note supports the following closeout posture for the later decision
-workstream:
+This note supports the closeout posture that was taken in the final rollout
+decision:
 
-- keep the current narrow rollout in place
+- keep the rollout opt-in and bounded
 - do not narrow it again based on current bounded bake evidence
-- treat `DeleteRows` and `InsertColumns` as rollout-promotion candidates with
-  real supporting proof, not just nearby hypotheses
-
+- widen the admitted structural rollout by one step to include `DeleteRows`
+  and `InsertColumns`

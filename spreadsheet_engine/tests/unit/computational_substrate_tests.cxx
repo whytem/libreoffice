@@ -354,20 +354,19 @@ int main()
             return fail("computational_substrate", "structural contract admission mismatch");
         }
 
-        const auto aStructuralValidationOnly
+        const auto aStructuralDeleteRowAdmitted
             = classifyStructuralMutation(MutationEvent::deleteRows(nPilotSheet, 1, 1));
-        if (aStructuralValidationOnly.meMutationClass != StructuralMutationClass::ValidationOnly)
+        if (!aStructuralDeleteRowAdmitted.isAdmitted())
         {
-            return fail("computational_substrate", "structural contract validation-only mismatch");
+            return fail("computational_substrate", "structural delete-row admission mismatch");
         }
 
-        const auto aStructuralInsertColumnValidationOnly
+        const auto aStructuralInsertColumnAdmitted
             = classifyStructuralMutation(MutationEvent::insertColumns(nPilotSheet, 1, 1));
-        if (aStructuralInsertColumnValidationOnly.meMutationClass
-            != StructuralMutationClass::ValidationOnly)
+        if (!aStructuralInsertColumnAdmitted.isAdmitted())
         {
             return fail("computational_substrate",
-                "structural insert-column validation-only mismatch");
+                "structural insert-column admission mismatch");
         }
 
         const auto aStructuralRejected
@@ -555,8 +554,8 @@ int main()
             aStructuralInput.maMutation = MutationEvent::deleteRows(nSheet, 0, 1);
             aStructuralInput.mbCleanBaseline = true;
 
-            const auto aStructuralPlan = buildStructuralPilotTransition(aStructuralInput, aAfterFacade,
-                aAfterObservation, StructuralPilotBuildMode::Validation);
+            const auto aStructuralPlan
+                = buildStructuralPilotTransition(aStructuralInput, aAfterFacade, aAfterObservation);
             if (aStructuralPlan.meVerdict != StructuralPilotVerdict::Applicable
                 || aStructuralPlan.maSyncActions.size() != 1
                 || aStructuralPlan.maSyncActions.front().meKind
@@ -618,8 +617,8 @@ int main()
             aStructuralInput.maMutation = MutationEvent::insertColumns(nSheet, 0, 1);
             aStructuralInput.mbCleanBaseline = true;
 
-            const auto aStructuralPlan = buildStructuralPilotTransition(aStructuralInput, aAfterFacade,
-                aAfterObservation, StructuralPilotBuildMode::Validation);
+            const auto aStructuralPlan
+                = buildStructuralPilotTransition(aStructuralInput, aAfterFacade, aAfterObservation);
             if (aStructuralPlan.meVerdict != StructuralPilotVerdict::Applicable
                 || aStructuralPlan.maSyncActions.size() != 1
                 || aStructuralPlan.maSyncActions.front().meKind

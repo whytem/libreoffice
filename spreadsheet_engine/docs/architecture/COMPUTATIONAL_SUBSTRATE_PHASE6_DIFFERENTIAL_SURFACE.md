@@ -43,12 +43,12 @@ The structural pilot remains stricter than the Phase 5 scalar lifecycle lane:
 The structural pilot rejects intentionally when:
 
 - the captured baseline is dirty
-- the mutation class is validation-only or out of contract
+- the mutation class is out of contract
 
 Checked-in Calc differential lanes:
 
 - `testComputationalStructuralRejectsDirtyBaseline`
-- `testComputationalStructuralRejectsValidationOnlyMutation`
+- `testComputationalStructuralRejectsUnsupportedMutation`
 
 ## Repair-Detected Rollback Cases
 

@@ -1594,7 +1594,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralDeleteColu
     m_pDoc->DeleteTab(0);
 }
 
-CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralDeleteRowValidationCandidate)
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralDeleteRowPilot)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateDeleteRows;
 
@@ -1612,17 +1612,15 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralDeleteRowV
     m_pDoc->DeleteRow(ScRange(0, 0, 0, m_pDoc->MaxCol(), 0, 0));
     forceFormulaTreeOrder(*m_pDoc, { ScAddress(0, 1, 0) });
 
-    const auto oResult = aStructural.validateCandidate(*m_pDoc, translateDeleteRows(0, 0, 1));
+    const auto oResult = aStructural.apply(*m_pDoc, translateDeleteRows(0, 0, 1));
     assertComputationalStructuralAppliedExactly(oResult, *m_pDoc);
-    CPPUNIT_ASSERT_EQUAL(
-        spreadsheetengine::detail::substrate::StructuralMutationClass::ValidationOnly,
-        oResult->maTransition.maContract.meMutationClass);
+    CPPUNIT_ASSERT(oResult->maTransition.maContract.isAdmitted());
     CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(0, 1, 0)));
 
     m_pDoc->DeleteTab(0);
 }
 
-CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralInsertColumnValidationCandidate)
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralInsertColumnPilot)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateInsertColumns;
 
@@ -1639,12 +1637,81 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralInsertColu
     m_pDoc->InsertCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
     forceFormulaTreeOrder(*m_pDoc, { ScAddress(2, 0, 0) });
 
-    const auto oResult = aStructural.validateCandidate(*m_pDoc, translateInsertColumns(0, 0, 1));
+    const auto oResult = aStructural.apply(*m_pDoc, translateInsertColumns(0, 0, 1));
     assertComputationalStructuralAppliedExactly(oResult, *m_pDoc);
-    CPPUNIT_ASSERT_EQUAL(
-        spreadsheetengine::detail::substrate::StructuralMutationClass::ValidationOnly,
-        oResult->maTransition.maContract.meMutationClass);
+    CPPUNIT_ASSERT(oResult->maTransition.maContract.isAdmitted());
     CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(2, 0, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalNarrowRolloutDeleteRowEnabledByUmbrella)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateDeleteRows;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", nullptr);
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 10.0);
+    m_pDoc->SetValue(0, 1, 0, 20.0);
+    m_pDoc->SetString(0, 2, 0, u"=$A$2*1"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aStructuralCapture
+        = ScopedComputationalStructural::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aStructuralCapture.isCaptured());
+    CPPUNIT_ASSERT(aStructuralCapture.canApplyStructural());
+
+    m_pDoc->DeleteRow(ScRange(0, 0, 0, m_pDoc->MaxCol(), 0, 0));
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(0, 1, 0) });
+
+    const auto oResult = aStructuralCapture.apply(*m_pDoc, translateDeleteRows(0, 0, 1));
+    assertComputationalStructuralAppliedExactly(oResult, *m_pDoc);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalNarrowRolloutInsertColumnEnabledByUmbrella)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertColumns;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", nullptr);
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetString(1, 0, 0, u"=$A$1+1"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aStructuralCapture
+        = ScopedComputationalStructural::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aStructuralCapture.isCaptured());
+    CPPUNIT_ASSERT(aStructuralCapture.canApplyStructural());
+
+    m_pDoc->InsertCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(2, 0, 0) });
+
+    const auto oResult = aStructuralCapture.apply(*m_pDoc, translateInsertColumns(0, 0, 1));
+    assertComputationalStructuralAppliedExactly(oResult, *m_pDoc);
 
     m_pDoc->DeleteTab(0);
 }
@@ -1708,9 +1775,9 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralRejectsDir
     m_pDoc->DeleteTab(0);
 }
 
-CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralRejectsValidationOnlyMutation)
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralRejectsUnsupportedMutation)
 {
-    using spreadsheetengine::compat::libreoffice::mutation::translateDeleteRows;
+    using spreadsheetengine::compat::libreoffice::mutation::translateMoveRange;
 
     m_pDoc->InsertTab(0, u"Data"_ustr);
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
@@ -1723,7 +1790,8 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralRejectsVal
     const ScopedComputationalStructural aStructural(*m_pDoc, true);
     CPPUNIT_ASSERT(aStructural.canApplyStructural());
 
-    const auto oResult = aStructural.apply(*m_pDoc, translateDeleteRows(0, 1, 1));
+    const auto oResult = aStructural.apply(*m_pDoc,
+        translateMoveRange(ScRange(0, 0, 0, 0, 0, 0), ScRange(1, 0, 0, 1, 0, 0)));
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(
         ComputationalStructuralResultKind::RejectedOutOfContract, oResult->meKind);
@@ -1733,7 +1801,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralRejectsVal
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
-    testComputationalStructuralDeleteRowCandidateRejectsDirtyBaseline)
+    testComputationalStructuralDeleteRowRejectsDirtyBaseline)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateDeleteRows;
 
@@ -1755,7 +1823,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     CPPUNIT_ASSERT(!aStructural.canApplyStructural());
 
     m_pDoc->DeleteRow(ScRange(0, 0, 0, m_pDoc->MaxCol(), 0, 0));
-    const auto oResult = aStructural.validateCandidate(*m_pDoc, translateDeleteRows(0, 0, 1));
+    const auto oResult = aStructural.apply(*m_pDoc, translateDeleteRows(0, 0, 1));
 
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(
@@ -1765,7 +1833,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
-    testComputationalStructuralInsertColumnCandidateRejectsDirtyBaseline)
+    testComputationalStructuralInsertColumnRejectsDirtyBaseline)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateInsertColumns;
 
@@ -1786,8 +1854,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     CPPUNIT_ASSERT(!aStructural.canApplyStructural());
 
     m_pDoc->InsertCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
-    const auto oResult
-        = aStructural.validateCandidate(*m_pDoc, translateInsertColumns(0, 0, 1));
+    const auto oResult = aStructural.apply(*m_pDoc, translateInsertColumns(0, 0, 1));
 
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(
@@ -1797,7 +1864,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
-    testComputationalStructuralDeleteRowCandidateRejectsNamedRangeSlice)
+    testComputationalStructuralDeleteRowRejectsNamedRangeSlice)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateDeleteRows;
 
@@ -1815,7 +1882,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     CPPUNIT_ASSERT(aStructural.canApplyStructural());
 
     m_pDoc->DeleteRow(ScRange(0, 0, 0, m_pDoc->MaxCol(), 0, 0));
-    const auto oResult = aStructural.validateCandidate(*m_pDoc, translateDeleteRows(0, 0, 1));
+    const auto oResult = aStructural.apply(*m_pDoc, translateDeleteRows(0, 0, 1));
 
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(
@@ -1825,7 +1892,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
-    testComputationalStructuralInsertColumnCandidateRejectsNamedRangeSlice)
+    testComputationalStructuralInsertColumnRejectsNamedRangeSlice)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateInsertColumns;
 
@@ -1842,8 +1909,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     CPPUNIT_ASSERT(aStructural.canApplyStructural());
 
     m_pDoc->InsertCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
-    const auto oResult
-        = aStructural.validateCandidate(*m_pDoc, translateInsertColumns(0, 0, 1));
+    const auto oResult = aStructural.apply(*m_pDoc, translateInsertColumns(0, 0, 1));
 
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(
@@ -1883,7 +1949,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralRepairDete
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
-    testComputationalStructuralDeleteRowCandidateRepairDetectedRollback)
+    testComputationalStructuralDeleteRowRepairDetectedRollback)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateDeleteRows;
 
@@ -1902,7 +1968,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     m_pDoc->SetString(0, 1, 0, u"=$A$2*1"_ustr);
     forceFormulaTreeOrder(*m_pDoc, { ScAddress(0, 1, 0) });
 
-    const auto oResult = aStructural.validateCandidate(*m_pDoc, translateDeleteRows(0, 0, 1));
+    const auto oResult = aStructural.apply(*m_pDoc, translateDeleteRows(0, 0, 1));
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(
         ComputationalStructuralResultKind::RepairDetected, oResult->meKind);
@@ -1915,7 +1981,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
-    testComputationalStructuralInsertColumnCandidateRepairDetectedRollback)
+    testComputationalStructuralInsertColumnRepairDetectedRollback)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateInsertColumns;
 
@@ -1933,8 +1999,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     m_pDoc->SetString(2, 0, 0, u"=$A$1+1"_ustr);
     forceFormulaTreeOrder(*m_pDoc, { ScAddress(2, 0, 0) });
 
-    const auto oResult
-        = aStructural.validateCandidate(*m_pDoc, translateInsertColumns(0, 0, 1));
+    const auto oResult = aStructural.apply(*m_pDoc, translateInsertColumns(0, 0, 1));
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(
         ComputationalStructuralResultKind::RepairDetected, oResult->meKind);

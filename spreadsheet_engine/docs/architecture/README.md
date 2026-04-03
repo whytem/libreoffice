@@ -122,26 +122,30 @@ Current architecture docs:
   recommending narrow proceed on the admitted authority slice and deferring
   broader structural, storage, and token-container rollout
 - [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_PLAN.md](COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_PLAN.md) -
-  active implementation-ready plan for bounded rollout engineering after the
-  Phase 7 narrow-proceed decision, including the bolder validation and
-  promotion step for `DeleteRows` and `InsertColumns`
+  completed closeout record for bounded rollout engineering after the Phase 7
+  narrow-proceed decision, ending in a widened but still opt-in rollout
+  surface
 - [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_CONTRACT.md) -
-  active contract note for the initial admitted rollout slice, freezing the
-  exact enabled surface, authority gates, and immediate deactivation rules
+  completed closeout contract note for the widened narrow rollout surface,
+  freezing the exact enabled slice, authority gates, and deactivation rules
 - [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_IMPLEMENTATION.md) -
-  active implementation note for the first opt-in rollout step, including the
+  completed implementation note for the opt-in narrow rollout, including the
   umbrella rollout gate and per-surface override behavior
 - [COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_CONTRACT.md) -
-  active widening contract note for the first bolder promotion candidates,
+  completed widening contract note for the first bolder promotion candidates,
   freezing the proof threshold for `DeleteRows` and `InsertColumns`
 - [COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_EVIDENCE.md) -
-  active widening evidence note for the first bolder promotion candidates,
+  completed widening evidence note for the first bolder promotion candidates,
   recording the exact validation, rejection, and rollback proof for
   `DeleteRows` and `InsertColumns`
 - [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_EVIDENCE.md) -
-  active bounded rollout evidence note for the admitted rollout slice,
+  completed bounded rollout evidence note for the admitted rollout slice,
   recording correctness, gate behavior, and the first measured operational
   sample after opt-in rollout wiring
+- [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_DECISION_RECORD.md) -
+  completed closeout decision for the narrow rollout plan, widening the
+  structural rollout surface by one bounded step to include `DeleteRows` and
+  `InsertColumns`
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

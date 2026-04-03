@@ -1,6 +1,6 @@
 # Computational Substrate Narrow Rollout Plan
 
-Status: active implementation-ready plan
+Status: complete closeout record
 
 ## Purpose
 
@@ -19,6 +19,15 @@ after the Phase 7 closeout:
 - roll out that admitted slice behind explicit gates
 - in parallel, aggressively validate the nearest adjacent structural classes
   (`DeleteRows` and `InsertColumns`) as the first promotion candidates
+
+This plan is now complete.
+
+Its closeout result is:
+
+- keep the rollout opt-in and bounded
+- widen the admitted structural surface to include `DeleteRows` and
+  `InsertColumns`
+- keep broader structural and storage migration deferred
 
 ## Plan Goal
 
@@ -189,6 +198,10 @@ The closeout must say one of:
 Required artifact:
 
 - one checked-in rollout decision record
+
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_DECISION_RECORD.md)
 
 ## Bolder Execution Step
 

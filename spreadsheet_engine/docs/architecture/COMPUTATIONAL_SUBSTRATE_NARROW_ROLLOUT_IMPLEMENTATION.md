@@ -1,6 +1,6 @@
 # Computational Substrate Narrow Rollout Implementation
 
-Status: active implementation note for the narrow rollout plan
+Status: complete implementation note for the narrow rollout plan
 
 ## Purpose
 
@@ -37,7 +37,11 @@ override disables a component, the rollout enables:
 
 - admitted authority capture
 - admitted scalar lifecycle capture
-- admitted structural capture
+- admitted structural capture and application for:
+  - `InsertRows`
+  - `DeleteRows`
+  - `InsertColumns`
+  - `DeleteColumns`
 
 The admitted verification and rollback rules do not change:
 
@@ -51,6 +55,7 @@ The admitted verification and rollback rules do not change:
 The first rollout implementation is validated by:
 
 - disabled-by-default capture checks
-- umbrella-enabled lifecycle and structural application checks
+- umbrella-enabled lifecycle and structural application checks, including
+  widened delete-row and insert-column structural coverage
 - per-surface override checks proving the rollout can narrow again without
   disabling the whole feature set

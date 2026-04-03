@@ -171,12 +171,10 @@ namespace structuraldetail
     switch (rMutation.meKind)
     {
         case facade::MutationKind::InsertRows:
-        case facade::MutationKind::DeleteColumns:
-            aContract.meMutationClass = StructuralMutationClass::Admitted;
-            return aContract;
         case facade::MutationKind::DeleteRows:
         case facade::MutationKind::InsertColumns:
-            aContract.meMutationClass = StructuralMutationClass::ValidationOnly;
+        case facade::MutationKind::DeleteColumns:
+            aContract.meMutationClass = StructuralMutationClass::Admitted;
             return aContract;
         default:
             aContract.meMutationClass = StructuralMutationClass::Rejected;

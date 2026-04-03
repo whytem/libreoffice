@@ -263,20 +263,38 @@ The program has now completed:
 The current recommendation is therefore:
 
 - keep the first-stage extraction boundary as the stable base
-- treat the admitted scalar lifecycle plus single-sheet structural slice as a
-  bounded rollout candidate
+- treat the admitted scalar lifecycle plus bounded single-sheet structural
+  slice as the current experimental rollout surface
 - keep broader structural, storage, and token-container migration deferred
 
-The active next-step execution plan is:
+The bounded rollout closeout material is now:
 
 - [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_DECISION_RECORD.md)
 
-That plan keeps the Phase 7 decision intact while taking a bolder execution
-step:
+The completed rollout result keeps the Phase 7 decision intact while taking
+the selected bolder execution step to completion:
 
 - implement an opt-in experimental rollout for the already-admitted slice
-- aggressively validate `DeleteRows` and `InsertColumns` as the next
-  promotion candidates under the same exact verification and rollback rules
+- validate `DeleteRows` and `InsertColumns` under the same exact
+  verification and rollback rules
+- widen the opt-in rollout by one bounded step once that proof is green
+
+The current opt-in rollout surface is therefore:
+
+- admitted scalar lifecycle authority
+- single-sheet `InsertRows`
+- single-sheet `DeleteRows`
+- single-sheet `InsertColumns`
+- single-sheet `DeleteColumns`
+- ordinary scalar formulas only
+- clean baseline only
+- no shared groups
+- no named-range-sensitive structural behavior
+- exact queue, computational, and graph verification
+- repair-detected rollback on structural divergence
+
+No broader structural or storage widening is currently admitted.
 
 ## Why This Path Was Chosen
 

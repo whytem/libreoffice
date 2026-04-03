@@ -1,6 +1,6 @@
 # Computational Substrate Narrow Widening Evidence
 
-Status: active widening evidence note for the narrow rollout plan
+Status: complete widening evidence note for the narrow rollout plan
 
 ## Purpose
 
@@ -10,10 +10,10 @@ candidates in the narrow rollout plan:
 - `DeleteRows`
 - `InsertColumns`
 
-The goal is to classify each candidate honestly against the frozen proof
-threshold in
+The goal of this completed evidence pass was to classify each candidate
+honestly against the frozen proof threshold in
 [COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_NARROW_WIDENING_CONTRACT.md),
-without changing the live rollout boundary yet.
+before the rollout decision widened the live boundary.
 
 ## Evidence Summary
 
@@ -34,8 +34,7 @@ classification or hidden Calc repair.
 ### Standalone And Substrate Evidence
 
 - `spreadsheetengine_computational_substrate_tests`
-  - contract classification remains `ValidationOnly`
-  - `buildStructuralPilotTransition(..., Validation)` produces an exact
+  - the structural builder produced an exact
     applicable transition for the admitted scalar slice
 - `spreadsheetengine_computational_ir_tests`
   - delete-row reference-update lowering rewrites the surviving scalar
@@ -44,13 +43,13 @@ classification or hidden Calc repair.
 ### Calc Differential Evidence
 
 - exact happy path:
-  - `testComputationalStructuralDeleteRowValidationCandidate`
+  - `testComputationalStructuralDeleteRowPilot`
 - dirty-baseline rejection:
-  - `testComputationalStructuralDeleteRowCandidateRejectsDirtyBaseline`
+  - `testComputationalStructuralDeleteRowRejectsDirtyBaseline`
 - out-of-slice rejection:
-  - `testComputationalStructuralDeleteRowCandidateRejectsNamedRangeSlice`
+  - `testComputationalStructuralDeleteRowRejectsNamedRangeSlice`
 - repair-detected rollback:
-  - `testComputationalStructuralDeleteRowCandidateRepairDetectedRollback`
+  - `testComputationalStructuralDeleteRowRepairDetectedRollback`
 
 ### Classification
 
@@ -73,8 +72,7 @@ Reason:
 ### Standalone And Substrate Evidence
 
 - `spreadsheetengine_computational_substrate_tests`
-  - contract classification remains `ValidationOnly`
-  - `buildStructuralPilotTransition(..., Validation)` produces an exact
+  - the structural builder produced an exact
     applicable transition for the admitted scalar slice
 - `spreadsheetengine_computational_ir_tests`
   - insert-column reference-update lowering rewrites the surviving scalar
@@ -83,13 +81,13 @@ Reason:
 ### Calc Differential Evidence
 
 - exact happy path:
-  - `testComputationalStructuralInsertColumnValidationCandidate`
+  - `testComputationalStructuralInsertColumnPilot`
 - dirty-baseline rejection:
-  - `testComputationalStructuralInsertColumnCandidateRejectsDirtyBaseline`
+  - `testComputationalStructuralInsertColumnRejectsDirtyBaseline`
 - out-of-slice rejection:
-  - `testComputationalStructuralInsertColumnCandidateRejectsNamedRangeSlice`
+  - `testComputationalStructuralInsertColumnRejectsNamedRangeSlice`
 - repair-detected rollback:
-  - `testComputationalStructuralInsertColumnCandidateRepairDetectedRollback`
+  - `testComputationalStructuralInsertColumnRepairDetectedRollback`
 
 ### Classification
 
@@ -109,15 +107,8 @@ Reason:
 
 ## Interpretation
 
-This note does not itself widen the live rollout.
-
-What it establishes is narrower and more useful:
-
-- both candidates are stronger than mere validation-only hypotheses
-- neither candidate currently shows a proof-gap on the admitted scalar slice
-- the later rollout decision workstream may now choose to promote neither,
-  either, or both based on bounded rollout evidence rather than lack of
-  structural proof
+This note supplied the proof used by the later rollout decision to widen the
+live structural rollout surface by one bounded step.
 
 ## Standing Validation
 
@@ -127,4 +118,3 @@ The evidence above is backed by:
 - `spreadsheetengine_computational_substrate_tests`
 - `spreadsheetengine_computational_ir_tests`
 - `spreadsheetengine_fods_replay_tests --summary --assert-zero-fallback`
-
