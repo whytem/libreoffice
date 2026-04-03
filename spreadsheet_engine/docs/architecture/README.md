@@ -7,6 +7,11 @@ documents live under [../archive/](../archive/).
 
 Current architecture docs:
 
+- [COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md](COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md) -
+  staged architecture plan for the conditional next-level boundary shift where
+  `spreadsheet_engine/` would own the live computational substrate, including
+  formula tree, broadcaster/listener graph, and computation-facing table and
+  column storage
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

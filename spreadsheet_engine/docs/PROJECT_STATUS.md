@@ -1,14 +1,13 @@
 # Spreadsheet Engine: Project Status
 
-This document is the current-state reference for the `spreadsheet_engine/`
-project. It is intentionally written around the engine's present capabilities,
-remaining boundary, and forward direction rather than around the phase
-structure used to get here.
+This document is the current-state reference for the
+`spreadsheet_engine/` project.
 
-Historical implementation plans and closeout records still matter, but they
-live in the archive and milestone docs. This file is for answering a simpler
-question: what does the engine own today, what still lives in Calc, and what
-should happen next?
+It is intentionally written around the engine's present capabilities, the
+current boundary with Calc, and the remaining strategic choices. Completed
+implementation streams still matter, but they now live primarily as reference
+material in the architecture, archive, and extraction-history docs rather than
+as the structure for this status file.
 
 ## Project Objective
 
@@ -16,14 +15,13 @@ The long-term objective is to make `spreadsheet_engine/` the home for Calc's
 spreadsheet-specific computation engine while keeping Calc as the document and
 application host.
 
-In practical terms, that means the engine should increasingly own:
+In practical terms, the engine should own:
 
-- formula compilation
-- token modeling and compiler-host interfaces
-- formula evaluation semantics
-- lookup, reference, matrix, and scalar execution helpers
-- dependency analysis and invalidation planning
-- recalculation planning and queue construction
+- formula compilation and compiler-host interfaces
+- token modeling and execution-facing compiler output
+- spreadsheet evaluation semantics
+- lookup, reference, matrix, scalar, and coercion helpers
+- dependency analysis, invalidation planning, and recalc planning
 - standalone workbook loading and evaluation
 
 Calc should continue to own:
@@ -31,15 +29,19 @@ Calc should continue to own:
 - document storage and mutation
 - formula-cell lifecycle and host-side side effects
 - UI, import/export, UNO, rendering, and shell integration
-- host-only services that cannot sensibly move into a standalone engine
+- host-only services that are not useful as standalone engine semantics
 
 This remains an incremental extraction, not a rewrite.
 
-## Current Summary
+## Current State
 
-The project is past the "can this work?" stage. The engine now builds and runs
-both standalone and inside LibreOffice, and the strategic center of gravity has
-already moved into `spreadsheet_engine/`.
+The original extraction objective is now close to being met.
+
+`spreadsheet_engine/` is no longer just a standalone experiment or a replay
+harness. It is a production-shared computation layer that builds both
+standalone and inside LibreOffice, and it already owns most of the
+spreadsheet-specific semantics that motivated the extraction in the first
+place.
 
 Today:
 
@@ -49,24 +51,14 @@ Today:
   evaluator
 - the engine owns dependency snapshots, invalidation planning, and recalc
   planning/queue construction
-- Calc already consumes a growing set of engine-owned runtime and compat
-  helpers for execution semantics
-- the promoted Calc FODS replay corpus is fully green with zero cached fallback
+- Calc already consumes a substantial body of engine-owned runtime and compat
+  code in production execution paths
+- the promoted Calc FODS replay corpus is fully green with zero cached
+  fallback
 
-The active work is no longer replay promotion, compiler switchover, or
-execution-shell extraction. Those programs are complete. The engine-first Calc
-adoption program is also complete as a bounded workstream, and its standing
-guardrails now live in
-[ENGINE_FIRST_CALC_ADOPTION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ENGINE_FIRST_CALC_ADOPTION.md).
-The first bounded direct-entry adoption stream is also complete and now lives
-as a closeout record in
-[ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md).
-The follow-on production-boundary tightening stream is now complete as well,
-and the remaining retained production boundary is explicitly documented as an
-intentional host-owned surface rather than an open cleanup tail. The
-second-wave engine-entry widening stream is complete too, and widened direct
-production entry further for the selected add-in financial and bounded local
-`CELL(...)` paths.
+There is no longer a broad open extraction tail inside the in-scope execution
+surface. The remaining Calc-owned boundary is now mostly intentional and
+host-shaped.
 
 ## Verified Baseline
 
@@ -92,359 +84,198 @@ Enabled FODS function-workbook families in the promoted corpus:
 - `statistical`
 - `text`
 
-This baseline is maintained by a combined validation lane that includes:
+This baseline is maintained by a standing validation lane that includes:
 
 - standalone evaluator and runtime unit tests
 - Calc Cppunit coverage for extracted bridges and shared behavior
 - one-shot `spreadsheetengine_fods_replay_tests --summary --assert-zero-fallback`
 - diff hygiene checks
 
-## What The Engine Owns Today
+## Capabilities Now Owned By `spreadsheet_engine`
 
 ### Compiler And Token Infrastructure
 
-The engine now owns the shared compilation substrate used to reason about
-formulas independently of Calc internals:
+The engine owns the shared compilation substrate used to reason about formulas
+independently of Calc internals:
 
 - canonical token schema and token utilities
 - compile-host interfaces and Calc-backed host adapters
-- compile request/status pipeline
+- compile request and status plumbing
 - token bridge and shadow-compiler infrastructure
 - differential compiler comparison and diagnostics
 
-This is no longer experimental infrastructure. It is part of the current
-authoritative computation stack.
+This is part of the authoritative computation stack, not scaffolding.
 
-### Standalone Workbook And Evaluation Runtime
+### Standalone Workbook Loading And Evaluation
 
-The engine can load and evaluate real spreadsheet workbooks without LibreOffice
-runtime services:
+The engine can load and evaluate real spreadsheet workbooks without depending
+on LibreOffice runtime services:
 
 - sparse workbook model with sheets, cells, named ranges, and imported-sheet
   metadata
 - FODS loader and ODF formula parsing
 - lazy evaluator with memoization, cycle handling, compiled-token execution,
   and replay support
-- engine-owned runtime modules for lookup, query, text, date/time, financial,
+- shared runtime modules for lookup, query, text, date/time, financial,
   conversion, aggregate, statistical, reference, and scalar helper logic
 
-The standalone evaluator is not a toy harness anymore. It is the main
-regression oracle for shared spreadsheet semantics.
+The standalone evaluator now acts as a primary regression oracle for shared
+spreadsheet semantics.
 
-### Calculation-Facing Workbook And Recalc Planning
+### Dependency And Recalc Planning
 
-The engine now owns the calculation-facing planning layers that sit above raw
-document storage:
+The engine owns the calculation-facing planning layers above raw document
+storage:
 
-- workbook facade contract with in-memory and Calc-backed implementations
+- workbook facade contracts with in-memory and Calc-backed implementations
 - formula-cell and named-range discovery surfaces
 - dependency snapshot construction
 - reverse-dependency indexing and invalidation planning
 - recalc planning and queue construction
-- Calc queue-consumption bridge for applying engine-owned recalc output
+- Calc queue-consumption bridges for engine-owned recalc output
 
-At this point, the boundary between "planning" and "host execution" is explicit
-and stable.
+The boundary between planning and host execution is now explicit.
 
-### Shared Runtime And Execution Adoption Inside Calc
+### Shared Execution Logic Used By Calc
 
-Calc is already using engine-owned code for a substantial part of spreadsheet
-execution semantics, including:
+Calc already runs a meaningful amount of engine-owned execution behavior in
+production:
 
 - broad pure-computation runtime families
-- lookup and reference planning helpers
-- bounded execution-shell helpers for lookup, jump, reference-shape, and
-  inspection behavior
-- shared coercion and normalization helpers
-- bounded special-form and modern function shell helpers
+- lookup and reference helpers
+- coercion and normalization helpers
+- bounded jump, special-form, inspection, and reference-shape helpers
+- direct entry adapters for selected parsing, inspection, calendar, and
+  financial paths
+- narrowed compat facades for selected host-bound inspection and
+  external-reference projection paths
 
-The execution-shell extraction program is now complete. Calc no longer carries
-an open in-scope spreadsheet-semantic interpreter tail that is waiting to be
-moved into `spreadsheet_engine/`.
+One important milestone is now true: within the extracted execution surface,
+there are no known remaining standalone-versus-Calc duplicate helper
+implementations for the in-scope spreadsheet semantics that have already been
+ported.
 
-This means the project is no longer just extracting code for standalone use.
-It is actively changing what Calc runs in production.
+### Add-In And Host Integration Surfaces
 
-## What Still Lives In Calc
+The engine also now owns a meaningful part of the spreadsheet semantics used by
+the Analysis add-in and related host adapters:
 
-Calc remains the application and storage host, and some responsibilities are
-intentionally still there:
+- shared financial runtime for the adopted financial surface
+- shared calendar/workday/month-shift semantics where the host provides
+  document services such as null date or holiday inputs
+- direct add-in adapters that package host services around engine-owned
+  semantics instead of duplicating spreadsheet logic inside the add-in layer
+
+The remaining add-in-specific semantic gap is explicit rather than hidden:
+`ODDFPRICE` and `ODDFYIELD` are still deferred because there is no shared
+odd-first-period runtime implementation in the current engine or Calc tree.
+
+## Current Boundary With Calc
+
+The current boundary is defined less by "what has not been extracted yet" and
+more by "what is intentionally host-owned."
+
+### Calc-Owned By Design
+
+Calc remains the document and application host. The following responsibilities
+intentionally still live there:
 
 - `ScDocument`, `ScTable`, `ScColumn`, and formula-cell storage
-- listener/broadcaster wiring and host-side dependency side effects
 - document mutation and formula-tree ownership
+- listener and broadcaster wiring plus host-side dependency side effects
 - UI, import/export, rendering, UNO, shell, and persistence
 - threaded and OpenCL backend execution
 
-There is also a remaining technical boundary that is intentionally still
-Calc-owned:
+There is also a remaining technical boundary that stays Calc-owned by design:
 
 - stack container mutation and formula-token cursor ownership
 - `ScTokenArray` construction, range/union token-container operations, and
   other Calc-local token plumbing
-- external-reference cache integration and document/session lookup services
-- document null-date services and holiday-list expansion used by host-owned
-  add-ins
+- external-reference cache integration plus document and session lookup
+  services
+- null-date acquisition and holiday-input expansion for host-owned add-ins
 - host-heavy inspection and environment services such as `INFO(...)`
 - printer, path, number-format, and other document-service integrations that
-  are not useful standalone engine semantics
+  do not make useful standalone engine semantics
 
-This is now a defined host boundary rather than an open extraction gap.
+### Explicitly Retained Or Deferred
+
+The remaining non-adopted surfaces are now supposed to be explicit:
+
+- `ODDFPRICE` and `ODDFYIELD` are a deliberate defer item, not a hidden helper
+  path
+- the remaining host-heavy `CELL(...)`, `INFO(...)`, and external-reference
+  tails are retained because the dominant concerns there are host service,
+  document integration, or cache ownership
+- token ownership and interpreter stack mutation remain intentionally on the
+  Calc side unless a very narrow seam clearly justifies moving again
+
+This means the project is no longer carrying an ambiguous "cleanup tail" in
+the main extracted execution surface.
 
 ## Current Assessment
 
 The project is in a strong position.
 
-The big strategic questions that existed earlier in the project have largely
-been answered:
+The major architectural questions that existed earlier in the extraction have
+already been answered positively:
 
-- standalone packaging works
 - shared compiler infrastructure works
+- standalone packaging works
 - replay parity works
 - dependency and recalc planning extraction works
-- Calc can consume extracted execution helpers safely through compat bridges
+- Calc can safely consume extracted execution logic through compat seams and
+  direct entry adapters
 
-Because of that, the next work does not need to prove the architecture again.
-It needs to keep tightening the production compiler/evaluation boundary while
-keeping the host boundary stable.
+The remaining decisions are mostly about optional scope expansion, not about
+whether the extracted architecture is viable.
 
-In other words: the problem is now mostly one of disciplined boundary
-tightening, not of feasibility.
+If work stopped here, the project would already represent a successful
+extraction of Calc's spreadsheet-specific computation core into a standalone
+and shared engine with a well-defined host boundary.
 
-The last fresh retained-host-boundary analysis selected the
-external-reference production seam as the best next bounded candidate, and
-that stream is now complete. It narrowed the remaining external `CELL(...)`
-projection tail, moved the selected single-ref and double-ref fetch packaging
-behind a named compat seam, and removed the superseded wrapper layer in that
-scope.
+## Options For Further Scope Expansion
 
-The latest fresh reassessment result was narrower still: the retained host
-boundary itself looked largely stable, and the clearest remaining
-non-host-shaped residue was the final legacy pocket in the Analysis add-in
-financial surface around `ODDFPRICE` and `ODDFYIELD`. That stream is now
-complete too, with the pair classified as an explicit defer boundary because
-no shared odd-first-period runtime exists in the current engine or Calc tree.
+If the goal is to move additional functionality out of Calc and into
+`spreadsheet_engine/`, the most plausible options are now narrower and more
+selective than the original extraction program.
 
-One important cleanup milestone is also now true: within the execution-shell
-surface extracted into `spreadsheet_engine`, there are no known remaining
-standalone-vs-Calc duplicate helper implementations. The remaining Calc-owned
-surface is explicitly host-shaped.
+### Ranked Options
 
-## Go-Forward Plan
+| Rank | Option | Value | Risk | Assessment |
+| --- | --- | --- | --- | --- |
+| 1 | Wider direct engine-entry adoption for safe production Calc paths | High | Medium | Best next expansion if the goal is to make Calc run more engine-owned code without reopening the host boundary. The spreadsheet semantics already exist in the engine; the work is mainly careful production adoption. |
+| 2 | Add new shared runtime implementations for explicitly deferred spreadsheet semantics | Medium to High | Medium | Best next expansion if the goal is semantic completeness rather than boundary cleanup. The odd-first-period financial pair is the clearest current example, but this would be real algorithm/runtime work, not simple rewiring. |
+| 3 | Deeper external-reference semantic extraction above the current facade | Medium | Medium to High | Still potentially useful, but the remaining complexity is dominated by host-owned cache, session, and document integration. Worth pursuing only if a fresh inventory reveals another narrow seam. |
+| 4 | Further compiler and evaluation entry tightening around retained production callers | Medium | Medium | There may still be some benefit in making production Calc callers thinner, but the payoff is now incremental rather than transformational. This should be inventory-driven rather than assumed. |
+| 5 | Additional reduction of Calc-local token and interpreter shell ownership | Low to Medium | High | Possible in theory, but the remaining token and stack surfaces are tightly coupled to Calc host ownership. The risk-to-payoff ratio is much worse now than it was earlier in the extraction. |
+| 6 | Migration of more host-heavy inspection or document-service behavior | Low | High | Full `INFO(...)`, host-heavy `CELL(...)`, printer/path, and number-format semantics are dominated by document and environment services. These are poor standalone-engine targets unless product requirements change. |
+| 7 | Storage, mutation, lifecycle, or recalc-execution migration | Very Low | Very High | Not recommended under the current architecture. This would move the project away from its successful "engine for spreadsheet semantics, Calc for document hosting" boundary. |
 
-The next plan should be organized around the end-state boundary rather than
-around historical milestone names.
+There is now a dedicated architecture plan for the conditional boundary-shift
+version of option 7:
 
-### 1. Widen Direct Engine Entry Inside Calc
+- [COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_EXTRACTION_PLAN.md)
 
-The first bounded direct-entry adoption stream is complete, the
-production-boundary tightening stream is complete, and the second-wave
-engine-entry widening stream is complete.
+That document should be read as a major second-stage architecture program, not
+as the default next step for the current project boundary.
 
-Together, those streams moved Calc from a small first-wave of direct engine
-entry to a broader production set that now includes:
+### Recommended Direction If Expansion Continues
 
-- direct text parsing entry adoption
-- direct formula inspection entry adoption
-- second-wave add-in financial direct entry for the selected pure-computation,
-  date-mode, and null-date callers
-- direct bounded local `CELL(...)` inspection entry for the local-workbook
-  subset
+If additional scope is desired, the most sensible default is:
 
-The bounded external-reference `CELL(...)` inspection candidate was explicitly
-reassessed and deferred rather than left as an ambiguous open tail, because
-external cache ownership and host-shaped address/file projection still dominate
-that surface.
+1. look first for more safe direct engine-entry adoption opportunities in
+   production Calc callers
+2. only after that, consider new shared semantic implementations where there is
+   a clear product or interoperability reason to fill an explicitly deferred
+   gap
 
-Future direct-entry widening should now start from a fresh inventory rather
-than by treating the second-wave stream as still active.
+Everything below those two options now has materially worse payoff relative to
+its architectural risk.
 
-The completed direct-entry closeout records are:
+## Working Rules For Any Future Expansion
 
-- [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
-- [ENGINE_ENTRY_WIDENING_PLAN.md](architecture/ENGINE_ENTRY_WIDENING_PLAN.md)
-
-### 1A. Narrow The Remaining Host-Service Facades
-
-The host-service facade narrowing stream is complete.
-
-That stream narrowed the bounded external `CELL(...)` projection subset,
-converged add-in null-date and holiday assembly on one named context seam,
-moved the retained local `CELL(...)` host-property tail and bounded
-`INFO(...)` projection behind explicit compat adapters, and removed the
-superseded wrapper layer that used to sit alongside those facades.
-
-What remains in this area is now an explicit host-owned tail rather than an
-open packaging cleanup stream:
-
-- external-reference cache ownership and the remaining external `CELL(...)`
-  format-style projection
-- live null-date and holiday-input ownership in the add-in layer
-- inherently host-bound environment services behind `INFO(...)`
-
-The completed closeout record for that stream is:
-
-- [HOST_SERVICE_FACADE_NARROWING_PLAN.md](architecture/HOST_SERVICE_FACADE_NARROWING_PLAN.md)
-
-### 2. Keep The Production Boundary Tight And Explicit
-
-The first bounded direct-entry adoption stream is complete, and the follow-on
-production-boundary tightening stream is complete.
-
-Together, that work switched Calc's text-parsing and formula-inspection
-production paths onto explicit engine entry adapters, converged host-service
-context packaging, tightened retained `CELL(...)` and `INFO(...)` result
-projection, isolated external-reference fetch/projection seams, and collapsed
-the repeated direct-entry setup that still remained in Calc callers.
-
-This means the remaining retained production boundary now reads as deliberate
-host ownership rather than unfinished compiler/evaluation packaging.
-
-The completed closeout records for those two streams are:
-
-- [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
-- [PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md](architecture/PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md)
-
-### 3. Keep The Remaining Token Boundary Explicit
-
-The bounded token-boundary reduction stream is complete.
-
-That work froze the remaining token/container inventory, extracted the in-scope
-non-owning reference-token traversal and adaptation seams, normalized the
-touched `AREAS` caller vocabulary, and marked the retained token-array and
-external-reference paths explicitly as Calc-owned host seams.
-
-The remaining token/container surface is now treated as intentional host
-ownership or explicit defer scope, not as an open cleanup tail.
-
-The completed closeout record for that stream is:
-
-- [TOKEN_BOUNDARY_REDUCTION_PLAN.md](architecture/TOKEN_BOUNDARY_REDUCTION_PLAN.md)
-
-### 4. Deepen Engine-First Execution Inside Calc
-
-The current deepening stream is complete for the identified safe adoption
-surface.
-
-That work widened default Calc use of engine-owned calendar, financial, and
-execution helpers, removed the superseded local semantic tail in the touched
-add-in surface, and left the remaining local code explicitly host-only.
-
-Future widening should continue, but now as new bounded slices selected from a
-fresh inventory rather than as unfinished work from the current plan.
-
-The detailed implementation and closeout record for that stream is:
-
-- [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](architecture/DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md)
-
-### 5. Keep The Host Boundary Explicit And Stable
-
-The bounded host-boundary consolidation stream is complete.
-
-That work froze the remaining execution-adjacent Calc surface into an explicit
-inventory, narrowed the touched compat vocabulary, collapsed the first
-translation seam, isolated the in-scope host-backed `CELL(...)` services, and
-removed the known duplicate helper in the touched boundary.
-
-The remaining Calc-owned surfaces are now treated as intentional host concerns
-or explicit defer items, not as an ambiguous backlog of unfinished shell
-extraction.
-
-The completed closeout record for that stream is:
-
-- [HOST_BOUNDARY_CONSOLIDATION_PLAN.md](architecture/HOST_BOUNDARY_CONSOLIDATION_PLAN.md)
-
-### 6. Keep The Zero-Fallback Baseline Stable
-
-The zero-fallback promoted replay baseline is now an asset that needs to be
-protected continuously.
-
-That means:
-
-- keeping one-shot promoted replay green
-- adding focused regression coverage for every extracted execution slice
-- treating replay regressions as boundary regressions, not just test failures
-- keeping standalone and Calc validation lanes aligned
-
-This is now part of normal project maintenance, not a side effort.
-
-### 7. Reassess New Bounded Frontiers Only After A Fresh Inventory
-
-There are bigger long-term questions that may eventually matter, but they
-should not drive near-term work:
-
-- how much production Calc evaluation should directly route through engine
-  entry points
-- whether more of the remaining interpreter shell can become engine-owned
-- whether the production compiler path should tighten further around the shared
-  compiler model
-
-Those are valid future questions, but the right way to reach them is to start
-from the now-cleaner host boundary and choose the next bounded stream from a
-fresh inventory instead of carrying forward historical cleanup debt.
-
-That reassessment is now complete and recorded in:
-
-- [COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md](architecture/COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md)
-
-The completed reassessment established three stable outcomes:
-
-- the remaining local compiler packaging around `CELL(...)` address projection
-  and `INDIRECT` reference compilation was tightened behind named compile
-  helpers instead of staying open-coded in production callers
-- the remaining date-mode financial add-in family now uses the direct engine
-  adapter path by default
-- the still-local `CELL(...)` host-property tail, bounded `INFO(...)`
-  projection, and external-reference cache/session packaging remain explicit
-  Calc-owned host services rather than ambiguous extraction residue
-
-There is no new pre-committed follow-on stream from that reassessment. Future
-work should again begin from a fresh inventory of the intentionally retained
-host boundary instead of treating the completed reassessment as open-ended
-cleanup.
-
-That fresh inventory has now been done for the retained host boundary, and the
-selected external-reference stream is now complete:
-
-- [EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md](architecture/EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md)
-
-That completed stream established three stable outcomes:
-
-- the remaining external `CELL(...)` property/result projection tail now sits
-  behind the compat boundary instead of living inline in `ScCellExternal()`
-- external single-ref and double-ref fetch packaging now uses one named
-  result-shape seam in the compat layer
-- the remaining external-reference boundary is explicitly host-owned:
-  external cache/session access, document linkage, token-container lifetime,
-  and stack mutation stay in Calc
-
-There is no new pre-committed follow-on stream from that closeout. Future work
-should again begin from a fresh inventory of the intentionally retained host
-boundary instead of treating the completed external-reference stream as an
-open cleanup tail.
-
-That latest reassessment identified one final bounded follow-on stream:
-
-- [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](architecture/ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md)
-
-Its closeout outcome is now explicit:
-
-- no shared odd-first-period runtime or adapter path exists in the current
-  engine surface, so `ODDFPRICE` and `ODDFYIELD` were classified as an
-  explicit defer rather than a hidden "ready now" adoption slice
-- the legacy unconditional-throw helper declarations and definitions were
-  removed from the Analysis helper layer
-- the add-in callers now use a named explicit defer boundary instead of
-  depending on ambiguous helper stubs
-- focused regression coverage now locks that retained defer behavior in place
-
-There is no new pre-committed follow-on stream from that closeout. Future work
-should again begin from a fresh inventory of the intentionally retained Calc
-boundary rather than by assuming there is still an open add-in financial tail.
-
-## Working Rules For The Next Stage
-
-The project should continue under these rules:
+Future work should continue under these rules:
 
 - do not reopen the recalc authority boundary unless a concrete gap requires it
 - do not attempt to move document storage into the engine
@@ -462,31 +293,18 @@ From this point forward, meaningful progress should be measured less by
 - Is Calc thinner and more clearly host-only?
 - Is the zero-fallback replay baseline still intact?
 - Are duplicate implementations continuing to disappear?
-- Is the public/compat boundary getting simpler rather than more tangled?
+- Is the public and compat boundary getting simpler rather than more tangled?
 
 If the answer to those questions keeps moving in the right direction, the
-project is on track.
+project is still advancing.
 
-## Active Reference Docs
+## Reference Material
 
-The most relevant active docs are:
+For current architecture references, see:
 
-- [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](architecture/ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md)
-- [EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md](architecture/EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md)
-- [COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md](architecture/COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md)
-- [HOST_SERVICE_FACADE_NARROWING_PLAN.md](architecture/HOST_SERVICE_FACADE_NARROWING_PLAN.md)
-- [ENGINE_ENTRY_WIDENING_PLAN.md](architecture/ENGINE_ENTRY_WIDENING_PLAN.md)
-- [ENGINE_ENTRYPOINT_ADOPTION_PLAN.md](architecture/ENGINE_ENTRYPOINT_ADOPTION_PLAN.md)
-- [PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md](architecture/PRODUCTION_BOUNDARY_TIGHTENING_PLAN.md)
-- [TOKEN_BOUNDARY_REDUCTION_PLAN.md](architecture/TOKEN_BOUNDARY_REDUCTION_PLAN.md)
-- [HOST_BOUNDARY_CONSOLIDATION_PLAN.md](architecture/HOST_BOUNDARY_CONSOLIDATION_PLAN.md)
-- [DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md](architecture/DEEPEN_ENGINE_FIRST_EXECUTION_PLAN.md)
-- [ENGINE_FIRST_CALC_ADOPTION.md](architecture/ENGINE_FIRST_CALC_ADOPTION.md)
-- [EXECUTION_BACKEND_EXTRACTION.md](architecture/EXECUTION_BACKEND_EXTRACTION.md)
-- [EXECUTION_SHELL_CLOSEOUT_PLAN.md](architecture/EXECUTION_SHELL_CLOSEOUT_PLAN.md)
-- [README.md](architecture/README.md)
+- [docs/architecture/README.md](architecture/README.md)
 
-Historical extraction records and completed workplans live under:
+For completed plans, closeout records, and historical extraction context, see:
 
 - [docs/archive/](archive/)
 - [docs/extraction-history/](extraction-history/)
