@@ -155,9 +155,13 @@ Current architecture docs:
   cycle, keeping the live rollout unchanged while retaining a bounded
   validation-only global named-range slice
 - [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_PLAN.md) -
-  implementation-ready plan for the next bounded promotion proof cycle,
-  testing whether the validation-only global single-area named-range slice
-  can meet live opt-in rollout standards
+  completed closeout record for the bounded promotion proof cycle on the
+  validation-only global single-area named-range slice, ending without live
+  rollout admission
+- [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_DECISION_RECORD.md) -
+  completed closeout decision for the global named-range promotion cycle,
+  keeping the live rollout unchanged while recording exact standalone
+  prediction and a gated live-candidate path for the bounded global slice
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

@@ -264,29 +264,38 @@ than moving it:
 - sheet-local, multi-area, and scope-ambiguous named-range classes remain
   explicitly deferred
 
-Any expansion into those surfaces should begin with a new explicit plan and
-proof cycle rather than being inferred from the current rollout.
+The completed global-admission proof cycle narrowed that further:
+
+- the bounded global single-area class now has exact standalone prediction and
+  a separate gated live-candidate path
+- that same bounded class still does not meet live rollout standards
+- off-sheet global-name consumers do not stay inside the current promotion
+  surface
+
+Any expansion into named-range-sensitive structural behavior should therefore
+begin with another bounded reassessment rather than being inferred from the
+current rollout.
 
 ## Next Explicit Planning Posture
 
-There is still no newly admitted widening target after the named-range proof
-cycle.
+There is still no newly admitted widening target after the global
+named-range admission proof cycle.
 
-The next explicit planning target is narrower than another broad reassessment:
+The current recommendation is narrower again:
 
-- treat the bounded global single-area named-range slice as the next
-  promotion candidate
-- require a dedicated proof cycle for promoting that slice from
-  validation-only into the opt-in rollout
+- keep the bounded global single-area named-range slice out of the live
+  rollout
+- treat any further named-range widening as another bounded reassessment
 - keep sheet-local, multi-area, shared-group, sheet-level, token-container,
-  listener, and storage-migration fronts closed until that narrower question
-  is answered
+  listener, and storage-migration fronts closed until a narrower next proof
+  question is selected
 
 The current named-range closeout references are:
 
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_DECISION_RECORD.md)
 
 ## Current Assessment
 

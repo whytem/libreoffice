@@ -1,6 +1,6 @@
 # Computational Substrate Global Named-Range Admission Plan
 
-Status: implementation-ready planning doc
+Status: complete closeout record
 
 ## Purpose
 
@@ -21,6 +21,14 @@ question is narrower:
 
 This plan is therefore not another broad named-range widening effort. It is a
 promotion proof cycle for one already-separated candidate slice.
+
+This plan is now complete.
+
+Its closeout result is:
+
+- do not widen the live opt-in rollout
+- keep the bounded global single-area slice out of the live rollout
+- keep off-sheet, local, multi-area, and scope-ambiguous classes deferred
 
 ## Plan Goal
 
@@ -248,6 +256,10 @@ promotion question:
 Required artifact:
 
 - one checked-in global named-range admission decision record
+
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_DECISION_RECORD.md)
 
 ## Target Surfaces
 
