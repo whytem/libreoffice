@@ -73,6 +73,10 @@ Required artifact:
 - one checked-in reference document or appendix that records the full
   classification
 
+The checked-in inventory artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE0_INVENTORY.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_INVENTORY.md)
+
 ### 0.2 Define The Observable State Model
 
 Specify the exact live state that later phases must compare.

@@ -243,6 +243,7 @@ later shadowing and authority shifts safe.
 
 The detailed execution reference for that work now lives in:
 
+- [COMPUTATIONAL_SUBSTRATE_PHASE0_INVENTORY.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_INVENTORY.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md)
 
 Specifically, Phase 0 must produce:

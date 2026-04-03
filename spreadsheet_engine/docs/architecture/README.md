@@ -7,6 +7,9 @@ documents live under [../archive/](../archive/).
 
 Current architecture docs:
 
+- [COMPUTATIONAL_SUBSTRATE_PHASE0_INVENTORY.md](COMPUTATIONAL_SUBSTRATE_PHASE0_INVENTORY.md) -
+  active ownership map for Phase 0, classifying the live Calc computational
+  substrate into migration candidates, retained host surfaces, and mixed seams
 - [COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md](COMPUTATIONAL_SUBSTRATE_PHASE0_PLAN.md) -
   active implementation-ready plan for Phase 0 observability, inventory, and
   validation work in the computational substrate program
