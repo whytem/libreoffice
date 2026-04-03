@@ -192,6 +192,11 @@ Required artifact:
   Calc-backed lane that exercises the admitted row-insert and column-delete
   cases
 
+The checked-in artifacts for this workstream are:
+
+- [StructuralPilotBuilder.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/detail/substrate/StructuralPilotBuilder.hxx)
+- [computational_substrate_tests.cxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/tests/unit/computational_substrate_tests.cxx)
+
 ### 6.4 Wire The Calc Structural Sync And Repair-Detection Bridge
 
 Add the Calc-side bridge that consumes the Phase 6 structural answer.
