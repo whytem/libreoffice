@@ -8,9 +8,9 @@ documents live under [../archive/](../archive/).
 Current architecture docs:
 
 - [EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md](EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md) -
-  implementation-ready plan for the next bounded external-reference
-  host-boundary tightening stream, focused on narrowing fetch/projection
-  packaging while keeping external cache and token ownership in Calc
+  completed implementation and closeout record for tightening the remaining
+  external-reference fetch/projection facade while keeping external cache and
+  token ownership in Calc
 - [COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md](COMPILER_EVALUATION_BOUNDARY_REASSESSMENT_PLAN.md) -
   completed implementation and closeout record for the fresh compiler and
   evaluation boundary reassessment, including the selected compiler-entry

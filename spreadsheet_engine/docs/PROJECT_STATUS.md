@@ -211,11 +211,12 @@ keeping the host boundary stable.
 In other words: the problem is now mostly one of disciplined boundary
 tightening, not of feasibility.
 
-The fresh retained-host-boundary analysis now points to one best bounded next
-candidate: the external-reference production seam. That surface still mixes
-intentional Calc-owned cache/session access with some fetch/projection
-packaging that may be shrinkable behind one more named compat facade without
-moving ownership out of Calc.
+The last fresh retained-host-boundary analysis selected the
+external-reference production seam as the best next bounded candidate, and
+that stream is now complete. It narrowed the remaining external `CELL(...)`
+projection tail, moved the selected single-ref and double-ref fetch packaging
+behind a named compat seam, and removed the superseded wrapper layer in that
+scope.
 
 One important cleanup milestone is also now true: within the execution-shell
 surface extracted into `spreadsheet_engine`, there are no known remaining
@@ -396,19 +397,24 @@ host boundary instead of treating the completed reassessment as open-ended
 cleanup.
 
 That fresh inventory has now been done for the retained host boundary, and the
-selected next stream is:
+selected external-reference stream is now complete:
 
 - [EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md](architecture/EXTERNAL_REFERENCE_FACADE_TIGHTENING_PLAN.md)
 
-The reason for choosing it is straightforward:
+That completed stream established three stable outcomes:
 
-- local `CELL(...)` host-property handling is already thin and explicitly
-  host-owned
-- bounded `INFO(...)` projection is already thin and explicitly host-owned
-- add-in null-date and holiday ownership is already explicit and stable
-- the external-reference path in `interpr1.cxx` and `interpr4.cxx` still has
-  the clearest remaining opportunity to narrow packaging without disturbing
-  the settled host boundary
+- the remaining external `CELL(...)` property/result projection tail now sits
+  behind the compat boundary instead of living inline in `ScCellExternal()`
+- external single-ref and double-ref fetch packaging now uses one named
+  result-shape seam in the compat layer
+- the remaining external-reference boundary is explicitly host-owned:
+  external cache/session access, document linkage, token-container lifetime,
+  and stack mutation stay in Calc
+
+There is no new pre-committed follow-on stream from that closeout. Future work
+should again begin from a fresh inventory of the intentionally retained host
+boundary instead of treating the completed external-reference stream as an
+open cleanup tail.
 
 ## Working Rules For The Next Stage
 

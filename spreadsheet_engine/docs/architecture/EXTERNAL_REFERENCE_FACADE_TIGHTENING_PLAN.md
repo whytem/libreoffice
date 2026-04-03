@@ -1,6 +1,6 @@
 # External Reference Facade Tightening Plan
 
-Status: implementation-ready plan
+Status: completed closeout record
 
 ## Purpose
 
@@ -16,8 +16,25 @@ external-reference path:
 - but some fetch/projection and `CELL(...)`-specific shaping still sits close
   to production callers
 
-This plan narrows that external-reference facade without trying to move cache
+This stream narrowed that external-reference facade without trying to move cache
 ownership or token ownership into `spreadsheet_engine/`.
+
+## Closeout Summary
+
+This stream is now complete.
+
+The main outcomes are:
+
+- the external-reference boundary was frozen and explicitly classified
+- the remaining external `CELL(...)` projection tail was moved behind the
+  compat layer instead of staying open-coded in `ScCellExternal()`
+- external single-ref and double-ref fetch packaging now uses one named
+  result-shape seam in
+  [ExternalReferenceExecution.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx)
+- the superseded wrapper layer in that seam was removed
+- the remaining external-reference boundary is now explicit host ownership:
+  cache/session access, document linkage, token-array lifetime, and stack
+  mutation stay in Calc
 
 ## What This Workstream Is For
 
@@ -265,6 +282,8 @@ Run the stream in this order:
 5. retire superseded wrappers
 6. rerun the full validation contract and close the stream
 
+This order was completed as planned.
+
 ## Validation Contract
 
 Every implementation slice in this stream should, at minimum, run the focused
@@ -303,3 +322,5 @@ This stream is fully closed when:
    - `0` cached-fallback rate
 6. status and architecture docs describe the external-reference boundary in
    present tense rather than as implied unfinished cleanup
+
+These exit criteria are now satisfied.
