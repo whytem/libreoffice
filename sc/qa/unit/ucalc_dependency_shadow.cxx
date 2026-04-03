@@ -24,10 +24,12 @@
 #include <spreadsheetengine/compat/libreoffice/DependencyShadow.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalShadowMutation.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObservation.hxx>
+#include <spreadsheetengine/compat/libreoffice/DependencyGraphShadowMutation.hxx>
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcAuthority.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcShadow.hxx>
 #include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
+#include <spreadsheetengine/detail/substrate/DependencyGraphShadowComparison.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowComparison.hxx>
 #include <spreadsheetengine/detail/dependency/DependencySnapshot.hxx>
 #include <spreadsheetengine/detail/dependency/InvalidationPlanner.hxx>
@@ -1092,6 +1094,83 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalShadowDifferentialVa
 
     m_pDoc->DeleteCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
     assertFullMatch(translateDeleteColumns(0, 0, 1), 5);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testDependencyGraphShadowRebuildAfterSafeMutations)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateClearCell;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+    using spreadsheetengine::compat::libreoffice::rebuildDependencyGraphShadowAfterMutation;
+    using spreadsheetengine::detail::substrate::compareDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::graphmapping::GraphComparisonKind;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetValue(0, 1, 0, 2.0); // A2
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr); // B1
+    m_pDoc->SetString(2, 0, 0, u"=A1+A2"_ustr); // C1
+    m_pDoc->CalcAll();
+
+    auto assertGraphMatch = [&](const spreadsheetengine::detail::facade::MutationEvent& rMutation,
+                                sal_Int64 nGeneration) {
+        const CalcWorkbookFacade aFacade(*m_pDoc, nGeneration);
+        const auto aState = rebuildDependencyGraphShadowAfterMutation(aFacade, *m_pDoc, rMutation);
+        const auto aComparison = compareDependencyGraphShadow(
+            aState.maGraphShadow, aState.maComputationalShadow, aState.maObservation);
+        CPPUNIT_ASSERT(aComparison.mbFullMatch);
+        CPPUNIT_ASSERT(aComparison.meKind != GraphComparisonKind::Mismatch);
+    };
+
+    m_pDoc->SetValue(0, 0, 0, 7.0);
+    assertGraphMatch(translateSetScalarValue(ScAddress(0, 0, 0)), 1);
+
+    m_pDoc->SetString(1, 0, 0, u"=A2*3"_ustr);
+    assertGraphMatch(translateSetFormula(ScAddress(1, 0, 0), u"=A2*3"_ustr), 2);
+
+    m_pDoc->SetString(3, 0, 0, u"=B1+C1"_ustr);
+    assertGraphMatch(translateSetFormula(ScAddress(3, 0, 0), u"=B1+C1"_ustr), 3);
+
+    m_pDoc->SetEmptyCell(ScAddress(0, 1, 0));
+    assertGraphMatch(translateClearCell(ScAddress(0, 1, 0)), 4);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testDependencyGraphShadowNormalizedComparison)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
+    using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
+    using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::compareDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::graphmapping::GraphComparisonKind;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetValue(0, 1, 0, 2.0); // A2
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr); // B1
+    m_pDoc->SetString(2, 0, 0, u"=B1"_ustr); // C1
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aFacade(*m_pDoc, 1);
+    auto aObservation = makeComputationalObservationState(collectLiveComputationalState(*m_pDoc));
+    aObservation.maFormulaTree = { { 0, 2, 0 }, { 0, 1, 0 } };
+    const auto aShadow = buildComputationalWorkbookShadow(aFacade, aObservation);
+    const auto aGraph = buildDependencyGraphShadow(aShadow, aObservation);
+    const auto aComparison = compareDependencyGraphShadow(aGraph, aShadow, aObservation);
+
+    CPPUNIT_ASSERT_EQUAL(GraphComparisonKind::NormalizedEquivalent, aComparison.meKind);
+    CPPUNIT_ASSERT(aComparison.mbFullMatch);
+    CPPUNIT_ASSERT(!aComparison.mbFormulaTreeExactMatch);
+    CPPUNIT_ASSERT(aComparison.mbFormulaTreeNormalizedMatch);
 
     m_pDoc->DeleteTab(0);
 }
