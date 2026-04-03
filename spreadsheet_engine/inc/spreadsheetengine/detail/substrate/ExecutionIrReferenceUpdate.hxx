@@ -101,31 +101,32 @@ inline void foldUpdateResult(
 
 [[nodiscard]] inline std::optional<ExecutionIrStructuralUpdatePlan>
 makeExecutionIrStructuralUpdatePlan(
-    const detail::facade::MutationEvent& rMutation, const api::refdata::SheetLimits& rLimits)
+    const spreadsheetengine::detail::facade::MutationEvent& rMutation,
+    const api::refdata::SheetLimits& rLimits)
 {
     ExecutionIrStructuralUpdatePlan aPlan;
     aPlan.meMode = api::refupdate::UpdateMode::InsertDelete;
     switch (rMutation.meKind)
     {
-        case detail::facade::MutationKind::InsertRows:
+        case spreadsheetengine::detail::facade::MutationKind::InsertRows:
             aPlan.maWhere = { { rMutation.mnSheet, 0, rMutation.maAddress.mnRow },
                 { rMutation.mnSheet, rLimits.mnMaxColumn, rLimits.mnMaxRow } };
             aPlan.mnDy = rMutation.mnCount;
             aPlan.mbSupported = true;
             return aPlan;
-        case detail::facade::MutationKind::DeleteRows:
+        case spreadsheetengine::detail::facade::MutationKind::DeleteRows:
             aPlan.maWhere = { { rMutation.mnSheet, 0, rMutation.maAddress.mnRow },
                 { rMutation.mnSheet, rLimits.mnMaxColumn, rLimits.mnMaxRow } };
             aPlan.mnDy = -rMutation.mnCount;
             aPlan.mbSupported = true;
             return aPlan;
-        case detail::facade::MutationKind::InsertColumns:
+        case spreadsheetengine::detail::facade::MutationKind::InsertColumns:
             aPlan.maWhere = { { rMutation.mnSheet, rMutation.maAddress.mnColumn, 0 },
                 { rMutation.mnSheet, rLimits.mnMaxColumn, rLimits.mnMaxRow } };
             aPlan.mnDx = rMutation.mnCount;
             aPlan.mbSupported = true;
             return aPlan;
-        case detail::facade::MutationKind::DeleteColumns:
+        case spreadsheetengine::detail::facade::MutationKind::DeleteColumns:
             aPlan.maWhere = { { rMutation.mnSheet, rMutation.maAddress.mnColumn, 0 },
                 { rMutation.mnSheet, rLimits.mnMaxColumn, rLimits.mnMaxRow } };
             aPlan.mnDx = -rMutation.mnCount;

@@ -24,6 +24,11 @@
 namespace spreadsheetengine::compat::libreoffice
 {
 
+namespace detail
+{
+namespace facade = spreadsheetengine::detail::facade;
+}
+
 [[nodiscard]] inline detail::facade::NamedRangeDescriptor
 makeNamedRangeDescriptor(const ScDocument& rDoc, const ScRangeData& rData,
     std::optional<detail::facade::SheetId> oScopeSheet)

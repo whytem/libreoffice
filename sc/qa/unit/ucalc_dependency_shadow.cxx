@@ -25,12 +25,15 @@
 #include <spreadsheetengine/compat/libreoffice/ComputationalShadowMutation.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObservation.hxx>
 #include <spreadsheetengine/compat/libreoffice/DependencyGraphShadowMutation.hxx>
+#include <spreadsheetengine/compat/libreoffice/ExecutionIrBuilder.hxx>
+#include <spreadsheetengine/compat/libreoffice/ExecutionIrMutation.hxx>
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcAuthority.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcShadow.hxx>
 #include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
 #include <spreadsheetengine/detail/substrate/DependencyGraphShadowComparison.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowComparison.hxx>
+#include <spreadsheetengine/detail/substrate/ExecutionIrComparison.hxx>
 #include <spreadsheetengine/detail/dependency/DependencySnapshot.hxx>
 #include <spreadsheetengine/detail/dependency/InvalidationPlanner.hxx>
 
@@ -56,6 +59,8 @@ using spreadsheetengine::compat::libreoffice::substrateobs::ListenerKind;
 using spreadsheetengine::compat::libreoffice::substrateobs::LiveComputationalStateSnapshot;
 using spreadsheetengine::detail::dependency::DirtyFormulaCell;
 using GraphComparisonKind = spreadsheetengine::detail::substrate::graphmapping::GraphComparisonKind;
+using ExecutionIrComparisonKind
+    = spreadsheetengine::detail::substrate::ExecutionIrComparisonKind;
 
 class ScopedEnvironmentOverride
 {
@@ -276,6 +281,13 @@ void assertComparableGraph(
 {
     CPPUNIT_ASSERT(rComparison.mbFullMatch);
     CPPUNIT_ASSERT(rComparison.meKind != GraphComparisonKind::Mismatch);
+}
+
+void assertComparableExecutionIr(
+    const spreadsheetengine::detail::substrate::ExecutionIrWorkbookComparison& rComparison)
+{
+    CPPUNIT_ASSERT(rComparison.mbFullMatch);
+    CPPUNIT_ASSERT(rComparison.meKind != ExecutionIrComparisonKind::Mismatch);
 }
 
 [[nodiscard]] bool hasGraphEdge(
@@ -1346,6 +1358,128 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testDependencyGraphShadowStructuralGa
     assertComparableGraph(aDeleteColumnComparison);
     CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aDeleteColumnState.maGraphShadow.getFormulaNodeCount());
 
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testExecutionIrShadowRebuildAfterSafeMutations)
+{
+    using spreadsheetengine::compat::libreoffice::buildExecutionIrWorkbookShadow;
+    using spreadsheetengine::compat::libreoffice::mutation::translateClearCell;
+    using spreadsheetengine::compat::libreoffice::mutation::translateRenameNamedRange;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+    using spreadsheetengine::compat::libreoffice::rebuildExecutionIrShadowAfterMutation;
+    using spreadsheetengine::detail::substrate::compareExecutionIrWorkbookShadow;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetValue(0, 1, 0, 2.0); // A2
+    auto* pGlobalName
+        = new ScRangeData(*m_pDoc, u"Metric"_ustr, u"$Data.$A$1:$A$2"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(pGlobalName));
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr); // B1
+    m_pDoc->SetString(2, 0, 0, u"=SUM(Metric)"_ustr); // C1
+    m_pDoc->CalcAll();
+
+    auto assertIrMatch = [&](const spreadsheetengine::detail::facade::MutationEvent& rMutation,
+                             sal_Int64 nGeneration) {
+        const CalcWorkbookFacade aFacade(*m_pDoc, nGeneration);
+        const auto aState = rebuildExecutionIrShadowAfterMutation(aFacade, *m_pDoc, rMutation);
+        const auto aExpected = buildExecutionIrWorkbookShadow(aState.maComputationalShadow, *m_pDoc);
+        const auto aComparison = compareExecutionIrWorkbookShadow(aState.maIrShadow, aExpected);
+        assertComparableExecutionIr(aComparison);
+        CPPUNIT_ASSERT(aState.maIrShadow.maBuildFailures.empty());
+    };
+
+    m_pDoc->SetValue(0, 0, 0, 7.0);
+    assertIrMatch(translateSetScalarValue(ScAddress(0, 0, 0)), 1);
+
+    m_pDoc->SetString(1, 0, 0, u"=A2*3"_ustr);
+    assertIrMatch(translateSetFormula(ScAddress(1, 0, 0), u"=A2*3"_ustr), 2);
+
+    m_pDoc->SetString(3, 0, 0, u"=B1+C1"_ustr);
+    assertIrMatch(translateSetFormula(ScAddress(3, 0, 0), u"=B1+C1"_ustr), 3);
+
+    m_pDoc->SetEmptyCell(ScAddress(0, 1, 0));
+    assertIrMatch(translateClearCell(ScAddress(0, 1, 0)), 4);
+
+    pGlobalName->SetNewName(u"MetricRenamed"_ustr);
+    assertIrMatch(
+        translateRenameNamedRange(*m_pDoc, *pGlobalName, std::nullopt, u"Metric"_ustr), 5);
+
+    m_pDoc->DiscardFormulaGroupContext();
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testExecutionIrShadowNormalizedComparison)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    using spreadsheetengine::compat::libreoffice::buildExecutionIrWorkbookShadow;
+    using spreadsheetengine::detail::substrate::compareExecutionIrWorkbookShadow;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetValue(1, 0, 0, 2.0); // B1
+    m_pDoc->SetString(2, 0, 0, u"=A1+B1"_ustr); // C1
+    m_pDoc->SetString(3, 0, 0, u"=SUM(A1:B1)"_ustr); // D1
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aFacade(*m_pDoc, 1);
+    auto aIrShadow = buildExecutionIrWorkbookShadow(aFacade, *m_pDoc);
+    std::reverse(aIrShadow.maFormulaRecords.begin(), aIrShadow.maFormulaRecords.end());
+
+    const auto aExpected = buildExecutionIrWorkbookShadow(aFacade, *m_pDoc);
+    const auto aComparison = compareExecutionIrWorkbookShadow(aIrShadow, aExpected);
+
+    CPPUNIT_ASSERT_EQUAL(ExecutionIrComparisonKind::NormalizedEquivalent, aComparison.meKind);
+    CPPUNIT_ASSERT(aComparison.mbFullMatch);
+    CPPUNIT_ASSERT(!aComparison.mbFormulaRecordExactMatch);
+    CPPUNIT_ASSERT(aComparison.mbFormulaRecordNormalizedMatch);
+
+    m_pDoc->DiscardFormulaGroupContext();
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testExecutionIrShadowStructuralGateCoverage)
+{
+    using spreadsheetengine::compat::libreoffice::buildExecutionIrWorkbookShadow;
+    using spreadsheetengine::compat::libreoffice::mutation::translateDeleteColumns;
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+    using spreadsheetengine::compat::libreoffice::rebuildExecutionIrShadowAfterMutation;
+    using spreadsheetengine::detail::substrate::compareExecutionIrWorkbookShadow;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetValue(1, 1, 0, 2.0); // B2
+    m_pDoc->SetString(2, 1, 0, u"=A1+B2"_ustr); // C2
+    m_pDoc->CalcAll();
+
+    auto aRowInsertState = rebuildExecutionIrShadowAfterMutation(
+        CalcWorkbookFacade(*m_pDoc, 1), *m_pDoc, translateInsertRows(0, 1, 1));
+    const auto aRowInsertExpected
+        = buildExecutionIrWorkbookShadow(aRowInsertState.maComputationalShadow, *m_pDoc);
+    const auto aRowInsertComparison
+        = compareExecutionIrWorkbookShadow(aRowInsertState.maIrShadow, aRowInsertExpected);
+    assertComparableExecutionIr(aRowInsertComparison);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aRowInsertState.maIrShadow.getFormulaCount());
+
+    m_pDoc->DeleteCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
+    auto aDeleteColumnState = rebuildExecutionIrShadowAfterMutation(
+        CalcWorkbookFacade(*m_pDoc, 2), *m_pDoc, translateDeleteColumns(0, 0, 1));
+    const auto aDeleteColumnExpected
+        = buildExecutionIrWorkbookShadow(aDeleteColumnState.maComputationalShadow, *m_pDoc);
+    const auto aDeleteColumnComparison = compareExecutionIrWorkbookShadow(
+        aDeleteColumnState.maIrShadow, aDeleteColumnExpected);
+    assertComparableExecutionIr(aDeleteColumnComparison);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aDeleteColumnState.maIrShadow.getFormulaCount());
+
+    m_pDoc->DiscardFormulaGroupContext();
     m_pDoc->DeleteTab(0);
 }
 

@@ -16,6 +16,7 @@
 #include <rangenam.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalShadowBuilder.hxx>
 #include <spreadsheetengine/compat/libreoffice/DependencyGraphShadowBuilder.hxx>
+#include <spreadsheetengine/compat/libreoffice/ExecutionIrBuilder.hxx>
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
@@ -262,6 +263,45 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade, testDependencyGraphShadowBuildFromCalcD
         = mapping::makeListenerAnchorId(ListenerAnchorKind::FormulaCell, { 0, 1, 0 }, 1);
     CPPUNIT_ASSERT(aGraph.findListenerAnchor(aAnchor));
 
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade, testExecutionIrShadowBuildFromCalcDocument)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    using spreadsheetengine::compat::libreoffice::buildExecutionIrWorkbookShadow;
+    using spreadsheetengine::detail::substrate::ExecutionIrInstructionKind;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 100.0);
+    m_pDoc->SetValue(0, 1, 0, 50.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=SUM(Metric)"_ustr);
+    m_pDoc->CalcAll();
+
+    auto* pGlobalName
+        = new ScRangeData(*m_pDoc, u"Metric"_ustr, u"$Data.$A$1:$B$2"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(pGlobalName));
+
+    CalcWorkbookFacade aFacade(*m_pDoc, 41);
+    const auto aIrShadow = buildExecutionIrWorkbookShadow(aFacade, *m_pDoc);
+
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int64>(41), aIrShadow.maSnapshot.mnGeneration);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aIrShadow.getFormulaCount());
+    CPPUNIT_ASSERT(aIrShadow.maBuildFailures.empty());
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aIrShadow.maFormulaGroups.size());
+
+    const auto* pSumFormula = aIrShadow.findFormula({ 0, 2, 0 });
+    CPPUNIT_ASSERT(pSumFormula);
+    CPPUNIT_ASSERT(!pSumFormula->maInstructions.empty());
+    CPPUNIT_ASSERT(std::any_of(pSumFormula->maInstructions.begin(), pSumFormula->maInstructions.end(),
+        [](const auto& rInstruction) {
+            return rInstruction.meKind == ExecutionIrInstructionKind::RangeNameReference;
+        }));
+
+    m_pDoc->DiscardFormulaGroupContext();
     m_pDoc->DeleteTab(0);
 }
 

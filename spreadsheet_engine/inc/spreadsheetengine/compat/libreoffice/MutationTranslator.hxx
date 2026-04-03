@@ -21,6 +21,11 @@
 namespace spreadsheetengine::compat::libreoffice
 {
 
+namespace detail
+{
+namespace facade = spreadsheetengine::detail::facade;
+}
+
 /// Translate Calc document operations into engine-owned MutationEvent
 /// descriptions. These are normalized event descriptions for the
 /// dependency/invalidation shadow work — they do not themselves cause
