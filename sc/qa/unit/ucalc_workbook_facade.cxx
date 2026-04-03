@@ -9,9 +9,12 @@
 
 #include "helper/qahelper.hxx"
 
+#include <algorithm>
+
 #include <document.hxx>
 #include <formulacell.hxx>
 #include <rangenam.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalShadowBuilder.hxx>
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
@@ -182,6 +185,49 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade, testNamedRangeMutationTranslatorKeepsDe
         == aRename.moNamedRangeAfter->maTargetExpression);
     CPPUNIT_ASSERT(aRename.moNamedRangeBefore->maBaseAddress
         == aRename.moNamedRangeAfter->maBaseAddress);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade, testComputationalShadowBuildFromCalcDocument)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    using spreadsheetengine::compat::libreoffice::buildComputationalWorkbookShadow;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 100.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A1*3"_ustr);
+    m_pDoc->CalcAll();
+
+    auto* pGlobalName
+        = new ScRangeData(*m_pDoc, u"Metric"_ustr, u"$Data.$A$1:$B$2"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(pGlobalName));
+
+    CalcWorkbookFacade aFacade(*m_pDoc, 23);
+    const auto aLive
+        = spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState(
+            *m_pDoc);
+    const auto aShadow = buildComputationalWorkbookShadow(aFacade, *m_pDoc);
+
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int64>(23), aShadow.maSnapshot.mnGeneration);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aShadow.getCellCount());
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aShadow.getFormulaCellCount());
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aShadow.maNamedRanges.size());
+    CPPUNIT_ASSERT_EQUAL(aLive.maFormulaTree.size(), aShadow.maFormulaTree.size());
+    CPPUNIT_ASSERT_EQUAL(aLive.maFormulaTrack.size(), aShadow.maFormulaTrack.size());
+    CPPUNIT_ASSERT_EQUAL(aLive.maBroadcasters.maCellBroadcasters.size(),
+        aShadow.maCellBroadcasters.size());
+
+    const auto* pFormula = aShadow.findCell({ 0, 1, 0 });
+    CPPUNIT_ASSERT(pFormula);
+    CPPUNIT_ASSERT(pFormula->hasFormula());
+    CPPUNIT_ASSERT_EQUAL(
+        std::find(aLive.maFormulaTree.begin(), aLive.maFormulaTree.end(),
+            spreadsheetengine::api::CellAddress { 0, 1, 0 })
+            != aLive.maFormulaTree.end(),
+        pFormula->mbInFormulaTree);
 
     m_pDoc->DeleteTab(0);
 }

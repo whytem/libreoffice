@@ -166,6 +166,10 @@ add_spreadsheetengine_test(spreadsheetengine_recalc_planner_tests
     ${SPREADSHEETENGINE_STANDALONE_RECALC_PLANNER_TEST_SOURCES}
 )
 
+add_spreadsheetengine_test(spreadsheetengine_computational_substrate_tests
+    ${SPREADSHEETENGINE_STANDALONE_COMPUTATIONAL_SUBSTRATE_TEST_SOURCES}
+)
+
 configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/spreadsheetengine-config.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/${SPREADSHEETENGINE_PACKAGE_NAME}-config.cmake"
