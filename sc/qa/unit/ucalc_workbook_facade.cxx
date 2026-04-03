@@ -15,6 +15,7 @@
 #include <formulacell.hxx>
 #include <rangenam.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalShadowBuilder.hxx>
+#include <spreadsheetengine/compat/libreoffice/DependencyGraphShadowBuilder.hxx>
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
@@ -228,6 +229,38 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade, testComputationalShadowBuildFromCalcDoc
             spreadsheetengine::api::CellAddress { 0, 1, 0 })
             != aLive.maFormulaTree.end(),
         pFormula->mbInFormulaTree);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade, testDependencyGraphShadowBuildFromCalcDocument)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    using spreadsheetengine::compat::libreoffice::buildDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::BroadcasterNodeId;
+    using spreadsheetengine::detail::substrate::ListenerAnchorKind;
+    namespace mapping = spreadsheetengine::detail::substrate::mapping;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 100.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A1*3"_ustr);
+    m_pDoc->CalcAll();
+
+    CalcWorkbookFacade aFacade(*m_pDoc, 29);
+    const auto aGraph = buildDependencyGraphShadow(aFacade, *m_pDoc);
+
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int64>(29), aGraph.maSnapshot.mnGeneration);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aGraph.getFormulaNodeCount());
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aGraph.getListenerAnchorCount());
+    CPPUNIT_ASSERT(aGraph.getBroadcasterNodeCount() >= 1);
+    CPPUNIT_ASSERT(aGraph.getEdgeCount() >= 1);
+    CPPUNIT_ASSERT(aGraph.findBroadcasterNode(BroadcasterNodeId::forCell({ 0, 0, 0 })));
+
+    const auto aAnchor
+        = mapping::makeListenerAnchorId(ListenerAnchorKind::FormulaCell, { 0, 1, 0 }, 1);
+    CPPUNIT_ASSERT(aGraph.findListenerAnchor(aAnchor));
 
     m_pDoc->DeleteTab(0);
 }
