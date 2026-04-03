@@ -169,6 +169,10 @@ Required artifact:
 - one checked-in schema or API note for the Phase 6 structural and
   reference-update state model
 
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE6_STRUCTURAL_SCHEMA.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE6_STRUCTURAL_SCHEMA.md)
+
 ### 6.3 Build The Engine-Authored Structural Transition Path
 
 Implement the engine-owned transition path for the admitted structural subset.
