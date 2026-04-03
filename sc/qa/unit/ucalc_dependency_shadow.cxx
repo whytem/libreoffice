@@ -1835,6 +1835,51 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalNarrowRolloutGlobalNamedRangeOffSheetConsumerCandidate)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertColumns;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", nullptr);
+    ScopedEnvironmentOverride aGlobalNamedRange(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_GLOBAL_NAMED_RANGE", "1");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    m_pDoc->InsertTab(1, u"Summary"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetString(0, 0, 1, u"=SUM(Metrics)"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr)));
+    m_pDoc->CalcAll();
+
+    const auto aStructuralCapture
+        = ScopedComputationalStructural::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aStructuralCapture.isCaptured());
+    CPPUNIT_ASSERT(aStructuralCapture.canApplyStructural());
+
+    m_pDoc->InsertCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(0, 0, 1) });
+
+    const auto oResult = aStructuralCapture.apply(*m_pDoc, translateInsertColumns(0, 0, 1));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalStructuralResultKind::RejectedOutOfContract, oResult->meKind);
+
+    m_pDoc->DeleteTab(1);
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralRejectsDirtyBaseline)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;

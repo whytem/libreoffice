@@ -223,6 +223,10 @@ Required artifact:
 
 - one checked-in global named-range admission evidence note
 
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_EVIDENCE.md)
+
 ### 6. Freeze The Global Named-Range Admission Decision
 
 Close the plan with an explicit decision record.
