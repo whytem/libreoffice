@@ -29,6 +29,7 @@
 #include <spreadsheetengine/compat/libreoffice/ExecutionIrMutation.hxx>
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateAuthority.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateLifecycle.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcAuthority.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcShadow.hxx>
 #include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
@@ -59,6 +60,9 @@ using spreadsheetengine::compat::libreoffice::dependencyshadow::ShadowComparison
 using ComputationalPilotResultKind
     = spreadsheetengine::compat::libreoffice::substrateauthority::PilotResultKind;
 using spreadsheetengine::compat::libreoffice::substrateauthority::ScopedComputationalAuthority;
+using ComputationalLifecycleResultKind
+    = spreadsheetengine::compat::libreoffice::substratelifecycle::LifecycleResultKind;
+using spreadsheetengine::compat::libreoffice::substratelifecycle::ScopedComputationalLifecycle;
 using spreadsheetengine::compat::libreoffice::recalcauthority::PilotResultKind;
 using spreadsheetengine::compat::libreoffice::recalcauthority::ScopedRecalcAuthority;
 using spreadsheetengine::compat::libreoffice::recalcshadow::ScopedRecalcShadow;
@@ -286,6 +290,50 @@ void assertComputationalPilotApplied(
             + std::to_string(static_cast<int>(oResult->moGraphComparison->meKind)),
         oResult->moGraphComparison->mbFullMatch);
     CPPUNIT_ASSERT(oResult->moIrComparison.has_value());
+    CPPUNIT_ASSERT(
+        spreadsheetengine::compat::libreoffice::recalcshadow::detail::collectPredictedQueueAddresses(
+            oResult->maTransition.maRecalcPlan)
+        == spreadsheetengine::compat::libreoffice::recalcshadow::detail::
+            collectFormulaTreeAddresses(rDoc));
+}
+
+void assertComputationalLifecycleApplied(
+    const std::optional<
+        spreadsheetengine::compat::libreoffice::substratelifecycle::LifecycleResult>& oResult,
+    const ScDocument& rDoc)
+{
+    CPPUNIT_ASSERT(oResult.has_value());
+    const std::string aResultMessage
+        = "unexpected computational lifecycle result kind="
+          + std::to_string(static_cast<int>(oResult->meKind))
+          + " queue="
+          + (oResult->moQueueComparison
+                 ? std::to_string(static_cast<int>(oResult->moQueueComparison->meKind))
+                 : std::string("none"))
+          + " computational="
+          + (oResult->moComputationalComparison
+                 ? std::string(oResult->moComputationalComparison->mbFullMatch ? "1" : "0")
+                 : std::string("none"))
+          + " graph="
+          + (oResult->moGraphComparison
+                 ? std::to_string(static_cast<int>(oResult->moGraphComparison->meKind))
+                       + ":" + (oResult->moGraphComparison->mbFullMatch ? "1" : "0")
+                 : std::string("none"))
+          + " ir="
+          + (oResult->moIrComparison
+                 ? std::to_string(static_cast<int>(oResult->moIrComparison->meKind))
+                       + ":" + (oResult->moIrComparison->mbFullMatch ? "1" : "0")
+                 : std::string("none"));
+    CPPUNIT_ASSERT_MESSAGE(
+        aResultMessage,
+        oResult->meKind == ComputationalLifecycleResultKind::Applied
+        || oResult->meKind == ComputationalLifecycleResultKind::AppliedNormalizedEquivalent);
+    CPPUNIT_ASSERT(oResult->moQueueComparison.has_value());
+    CPPUNIT_ASSERT_EQUAL(RecalcShadowComparisonKind::Exact, oResult->moQueueComparison->meKind);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbFullMatch);
+    CPPUNIT_ASSERT(oResult->moGraphComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moGraphComparison->mbFullMatch);
     CPPUNIT_ASSERT(
         spreadsheetengine::compat::libreoffice::recalcshadow::detail::collectPredictedQueueAddresses(
             oResult->maTransition.maRecalcPlan)
@@ -1098,6 +1146,81 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalAuthorityClassifiesN
     CPPUNIT_ASSERT_EQUAL(
         ComputationalPilotResultKind::AppliedNormalizedEquivalent,
         classifyVerifiedPilotResult(aResult));
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalLifecycleInsertFormulaPilot)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(1, 0, 0, 2.0);
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalLifecycle aLifecycle(*m_pDoc, true);
+    CPPUNIT_ASSERT(aLifecycle.isCaptured());
+    CPPUNIT_ASSERT(aLifecycle.canApplyLifecycle());
+
+    m_pDoc->SetString(2, 0, 0, u"=A1+B1"_ustr);
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(2, 0, 0) });
+
+    const auto oResult
+        = aLifecycle.apply(*m_pDoc, translateSetFormula(ScAddress(2, 0, 0), u"=A1+B1"_ustr));
+    assertComputationalLifecycleApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(2, 0, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalLifecycleReplaceFormulaPilot)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=B1+1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalLifecycle aLifecycle(*m_pDoc, true);
+    CPPUNIT_ASSERT(aLifecycle.canApplyLifecycle());
+
+    m_pDoc->SetString(1, 0, 0, u"=A1*3"_ustr);
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(2, 0, 0), ScAddress(1, 0, 0) });
+
+    const auto oResult
+        = aLifecycle.apply(*m_pDoc, translateSetFormula(ScAddress(1, 0, 0), u"=A1*3"_ustr));
+    assertComputationalLifecycleApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(1, 0, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalLifecycleRemoveFormulaPilot)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateClearCell;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalLifecycle aLifecycle(*m_pDoc, true);
+    CPPUNIT_ASSERT(aLifecycle.canApplyLifecycle());
+
+    m_pDoc->SetEmptyCell(ScAddress(1, 0, 0));
+
+    const auto oResult = aLifecycle.apply(*m_pDoc, translateClearCell(ScAddress(1, 0, 0)));
+    assertComputationalLifecycleApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT(!m_pDoc->GetFormulaCell(ScAddress(1, 0, 0)));
+
+    m_pDoc->DeleteTab(0);
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalSubstrateScalarEditCapture)
