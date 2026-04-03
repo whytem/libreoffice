@@ -71,6 +71,17 @@ Current architecture docs:
   completed narrow-proceed decision for Phase 3, admitting the first
   engine-owned execution IR shadow boundary and carrying a narrowed subset
   into the Phase 4 authority pilot
+- [COMPUTATIONAL_SUBSTRATE_PHASE4_PLAN.md](COMPUTATIONAL_SUBSTRATE_PHASE4_PLAN.md) -
+  active execution-ready plan for the first engine-authoritative dependency
+  and recalc pilot on the narrowed IR-backed subset admitted by the completed
+  Phase 3 decision record
+- [COMPUTATIONAL_SUBSTRATE_PHASE4_AUTHORITY_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_PHASE4_AUTHORITY_CONTRACT.md) -
+  active authority-boundary note for the first engine-authoritative pilot,
+  freezing the admitted mutation surface, preconditions, normalization rules,
+  and rollback triggers
+- [COMPUTATIONAL_SUBSTRATE_PHASE4_PILOT_MUTATION_MATRIX.md](COMPUTATIONAL_SUBSTRATE_PHASE4_PILOT_MUTATION_MATRIX.md) -
+  active mutation classification for the first authority pilot, separating
+  admitted, validation-only, and rejected mutation classes
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

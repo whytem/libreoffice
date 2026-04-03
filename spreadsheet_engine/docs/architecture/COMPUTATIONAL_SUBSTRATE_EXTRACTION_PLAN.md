@@ -315,6 +315,10 @@ structural authority immediately.
 
 ## Phase 4: Engine-Authoritative Dependency And Recalc Pilot
 
+The detailed execution-ready work for this phase now lives in:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE4_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE4_PLAN.md)
+
 ### Goal
 
 Make the engine authoritative for live dependency graph updates and recalc
