@@ -1,6 +1,6 @@
 # Computational Substrate Phase 6 Differential Surface
 
-Status: active differential surface for Phase 6
+Status: completed differential surface for Phase 6
 
 ## Purpose
 

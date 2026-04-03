@@ -1,6 +1,6 @@
 # Computational Substrate Phase 6 Plan
 
-Status: active execution-ready plan for Phase 6
+Status: completed on the narrowed structural-authoritative subset
 
 ## Purpose
 
@@ -274,6 +274,10 @@ Required artifact:
 
 - one checked-in Phase 6 decision record with explicit proceed or stop
   reasoning
+
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE6_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE6_DECISION_RECORD.md)
 
 ## Target Surfaces
 

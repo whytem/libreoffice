@@ -105,9 +105,14 @@ Current architecture docs:
   lifecycle-authoritative subset into Phase 6 while keeping shared-group and
   structural widening deferred
 - [COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md](COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md) -
-  active execution-ready plan for the first structural-edit and
-  reference-update widening slice on top of the narrowed scalar
+  completed implementation and closeout record for the first structural-edit
+  and reference-update widening slice on top of the narrowed scalar
   lifecycle-authoritative subset admitted by the completed Phase 5 decision
+- [COMPUTATIONAL_SUBSTRATE_PHASE6_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_PHASE6_DECISION_RECORD.md) -
+  completed narrow-proceed decision for Phase 6, admitting only the first
+  structural-authoritative slice for single-sheet row insert and column
+  delete on the ordinary-scalar-formula subset while keeping broader
+  structural classes deferred into Phase 7
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

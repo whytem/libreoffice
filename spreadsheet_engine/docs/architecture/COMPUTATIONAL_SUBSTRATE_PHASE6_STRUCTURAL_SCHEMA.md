@@ -1,6 +1,6 @@
 # Computational Substrate Phase 6 Structural Schema
 
-Status: active Phase 6 schema artifact
+Status: completed Phase 6 schema artifact
 
 ## Purpose
 

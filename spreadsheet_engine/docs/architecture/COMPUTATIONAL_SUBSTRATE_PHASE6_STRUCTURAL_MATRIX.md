@@ -1,6 +1,6 @@
 # Computational Substrate Phase 6 Structural Matrix
 
-Status: active mutation matrix for Phase 6
+Status: completed mutation matrix for Phase 6
 
 ## Purpose
 

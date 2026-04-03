@@ -1,6 +1,6 @@
 # Computational Substrate Phase 6 Structural Contract
 
-Status: active contract note for Phase 6
+Status: completed contract note for Phase 6
 
 ## Purpose
 

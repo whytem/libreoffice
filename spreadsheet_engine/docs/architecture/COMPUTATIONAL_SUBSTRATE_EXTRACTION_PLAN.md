@@ -418,6 +418,11 @@ remain deferred.
 The detailed execution-ready work for this phase now lives in:
 
 - [COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE6_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE6_DECISION_RECORD.md)
+
+Status: complete on the narrowed structural-authoritative subset, admitting
+single-sheet row insert and column delete on the ordinary-scalar-formula slice
+with deterministic rejection, rollback, and repair-detected outcomes
 
 ### Goal
 
@@ -451,6 +456,23 @@ without unacceptable complexity or semantic drift.
 
 Stop if the token/reference update surface proves too Calc-specific to migrate
 cleanly.
+
+Phase 6 completed with a narrow proceed decision rather than broad structural
+admission.
+
+The admitted Phase 6 surface is:
+
+- single-sheet `InsertRows`
+- single-sheet `DeleteColumns`
+- clean-baseline entry only
+- ordinary scalar formulas only
+- no shared groups
+- no named ranges in the admitted structural slice
+- exact queue, computational, and graph verification
+- explicit repair-detected classification when reference-update expectations
+  diverge from the live after-state
+
+Broader structural classes remain deferred into Phase 7 or later phases.
 
 ## Phase 7: Host Boundary Re-Cut And Rollout Decision
 

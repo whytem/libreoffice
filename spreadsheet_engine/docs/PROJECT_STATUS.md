@@ -212,6 +212,7 @@ The active path is:
 - [COMPUTATIONAL_SUBSTRATE_PHASE5_DIFFERENTIAL_SURFACE.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_DIFFERENTIAL_SURFACE.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE5_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE5_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE6_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE6_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PHASE6_DECISION_RECORD.md)
 
 This is a major second-stage architecture program. Its target end state is not
 just "more helpers extracted" or "more direct engine entry adoption." The goal
@@ -248,10 +249,15 @@ The program has now completed:
   narrower admitted subset, with exact queue/computational/graph
   verification, explicit dirty/out-of-contract rejection, rollback on
   divergence, and repair-detected classification
+- Phase 6 engine-authored structural and reference-update authority on a
+  narrower admitted subset, limited to single-sheet row insert and column
+  delete on the ordinary-scalar-formula slice, with exact
+  queue/computational/graph verification and explicit repair-detected
+  rollback when Calc diverges from the admitted reference-update answer
 
-The next frontier is Phase 6: structural and reference-update widening, but
-only from the narrower scalar lifecycle-authoritative subset admitted by the
-Phase 5 decision record.
+The next frontier is Phase 7: host-boundary re-cut and rollout decision,
+starting only from the narrower structural-authoritative subset admitted by
+the Phase 6 decision record.
 
 ## Why This Path Was Chosen
 
