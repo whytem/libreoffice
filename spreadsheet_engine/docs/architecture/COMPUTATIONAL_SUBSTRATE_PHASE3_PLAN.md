@@ -1,6 +1,6 @@
 # Computational Substrate Phase 3 Plan
 
-Status: active implementation-ready Phase 3 plan
+Status: completed implementation and closeout record for Phase 3
 
 ## Purpose
 
@@ -9,6 +9,9 @@ This document is the execution-ready plan for Phase 3 of
 
 Phase 3 begins from the narrowed proceed boundary recorded in
 [COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE2_DECISION_RECORD.md).
+
+The checked-in closeout decision now lives in
+[COMPUTATIONAL_SUBSTRATE_PHASE3_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE3_DECISION_RECORD.md).
 
 Its job is to define and validate the first engine-owned execution-facing IR
 boundary for the admitted computational-substrate subset so the project can

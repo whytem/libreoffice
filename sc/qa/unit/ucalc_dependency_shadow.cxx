@@ -42,6 +42,13 @@ namespace
 
 class TestDependencyShadow : public ScUcalcTestBase
 {
+public:
+    void tearDown() override
+    {
+        if (m_pDoc)
+            m_pDoc->DiscardFormulaGroupContext();
+        ScUcalcTestBase::tearDown();
+    }
 };
 
 using spreadsheetengine::api::CellAddress;
@@ -576,6 +583,8 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testSetFormulaRecalcShadow)
 
     const ScopedRecalcShadow aShadow(*m_pDoc, true);
     m_pDoc->SetString(1, 0, 0, u"=A1*3"_ustr);
+    forceFormulaTreeOrder(*m_pDoc,
+        { ScAddress(1, 0, 0), ScAddress(2, 0, 0), ScAddress(3, 0, 0) });
 
     assertExactRecalcShadow(
         aShadow.compare(*m_pDoc, translateSetFormula(ScAddress(1, 0, 0), u"=A1*3"_ustr)));

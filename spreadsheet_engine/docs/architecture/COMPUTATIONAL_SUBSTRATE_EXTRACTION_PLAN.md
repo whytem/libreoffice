@@ -268,6 +268,11 @@ The detailed execution-ready work for this phase now lives in:
 
 - [COMPUTATIONAL_SUBSTRATE_PHASE3_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE3_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_PHASE3_IR_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE3_IR_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE3_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE3_DECISION_RECORD.md)
+
+Status: complete on the narrowed Phase 2 subset, with deterministic lowering,
+reference-shape coherence, representative structural-update coverage, and
+exact-or-normalized IR differential validation
 
 ### Goal
 
@@ -303,6 +308,10 @@ embedding `ScTokenArray` semantics wholesale forever.
 
 Stop if the only viable path is to keep Calc token containers as the real
 authority under a thin wrapper.
+
+Phase 4 may proceed, but only from the admitted IR-shadow subset recorded in
+the Phase 3 decision record rather than by assuming broad execution or
+structural authority immediately.
 
 ## Phase 4: Engine-Authoritative Dependency And Recalc Pilot
 

@@ -53,18 +53,24 @@ Current architecture docs:
   completed proceed-on-narrowed-subset decision for Phase 2, recording the
   admitted graph shadow surface and the retained defer boundaries
 - [COMPUTATIONAL_SUBSTRATE_PHASE3_PLAN.md](COMPUTATIONAL_SUBSTRATE_PHASE3_PLAN.md) -
-  active implementation-ready plan for defining the first engine-owned
-  execution IR boundary on top of the narrowed Phase 2 graph-shadow subset
+  completed implementation and closeout record for defining the first
+  engine-owned execution IR boundary on top of the narrowed Phase 2
+  graph-shadow subset
 - [COMPUTATIONAL_SUBSTRATE_PHASE3_IR_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_PHASE3_IR_CONTRACT.md) -
-  active contract note for the first execution-facing IR slice, freezing the
-  admitted semantic surface, normalization rules, and defer list before the
-  Phase 3 schema and lowering work
+  completed contract note for the first execution-facing IR slice, freezing
+  the admitted semantic surface, normalization rules, and defer list for the
+  completed Phase 3 boundary
 - [COMPUTATIONAL_SUBSTRATE_PHASE3_IR_SCHEMA.md](COMPUTATIONAL_SUBSTRATE_PHASE3_IR_SCHEMA.md) -
-  active schema note for the first engine-owned execution IR types, payloads,
-  and workbook/formula ownership rules on the admitted Phase 3 subset
+  completed schema note for the first engine-owned execution IR types,
+  payloads, and workbook/formula ownership rules on the admitted Phase 3
+  subset
 - [COMPUTATIONAL_SUBSTRATE_PHASE3_REFERENCE_UPDATE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_PHASE3_REFERENCE_UPDATE_EVIDENCE.md) -
-  active evidence note for the admitted Phase 3 reference-shape and
+  completed evidence note for the admitted Phase 3 reference-shape and
   representative structural-update semantics at the IR boundary
+- [COMPUTATIONAL_SUBSTRATE_PHASE3_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_PHASE3_DECISION_RECORD.md) -
+  completed narrow-proceed decision for Phase 3, admitting the first
+  engine-owned execution IR shadow boundary and carrying a narrowed subset
+  into the Phase 4 authority pilot
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for
