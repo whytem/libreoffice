@@ -152,6 +152,11 @@ Required artifacts:
 - one checked-in final ownership map
 - one checked-in retained host-service list or equivalent boundary note
 
+The checked-in artifacts for this workstream are:
+
+- [COMPUTATIONAL_SUBSTRATE_PHASE7_OWNERSHIP_MAP.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE7_OWNERSHIP_MAP.md)
+- [COMPUTATIONAL_SUBSTRATE_PHASE7_RETAINED_HOST_SURFACES.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PHASE7_RETAINED_HOST_SURFACES.md)
+
 ### 7.3 Define The Candidate Rollout Surface
 
 Translate the boundary map into an explicit rollout candidate instead of a
