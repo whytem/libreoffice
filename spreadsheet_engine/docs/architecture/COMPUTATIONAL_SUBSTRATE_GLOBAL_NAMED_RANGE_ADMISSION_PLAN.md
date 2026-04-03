@@ -201,6 +201,10 @@ Required artifact:
 - one checked-in implementation note for the global named-range
   live-candidate path
 
+The checked-in artifact for this workstream is:
+
+- [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_IMPLEMENTATION.md)
+
 ### 5. Freeze Global Named-Range Admission Evidence
 
 Run the bounded promotion proof cycle and record the results.

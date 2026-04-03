@@ -686,7 +686,8 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
 [[nodiscard]] inline StructuralPilotTransition buildStructuralPilotTransition(
     const StructuralPilotInput& rInput, const facade::WorkbookFacade& rAfterFacade,
     const ComputationalObservationState&,
-    StructuralPilotBuildMode eBuildMode = StructuralPilotBuildMode::AuthorityOnly)
+    StructuralPilotBuildMode eBuildMode = StructuralPilotBuildMode::AuthorityOnly,
+    bool bAllowNamedRangeAdmission = false)
 {
     StructuralPilotTransition aTransition;
     aTransition.maInput = rInput;
@@ -709,8 +710,19 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
 
     if (!bAdmittedStructuralSlice)
     {
-        if (eBuildMode == StructuralPilotBuildMode::Validation && bNamedRangeValidationSlice)
-            aTransition.maContract.meMutationClass = StructuralMutationClass::ValidationOnly;
+        if (bNamedRangeValidationSlice)
+        {
+            if (eBuildMode == StructuralPilotBuildMode::Validation)
+                aTransition.maContract.meMutationClass = StructuralMutationClass::ValidationOnly;
+            else if (bAllowNamedRangeAdmission)
+                aTransition.maContract.meMutationClass = StructuralMutationClass::Admitted;
+            else
+            {
+                aTransition.meVerdict = StructuralPilotVerdict::RejectedOutOfContract;
+                aTransition.maReason = u"structural_slice_out_of_contract";
+                return aTransition;
+            }
+        }
         else
         {
             aTransition.meVerdict = StructuralPilotVerdict::RejectedOutOfContract;

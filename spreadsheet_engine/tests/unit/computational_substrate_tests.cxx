@@ -706,6 +706,27 @@ int main()
                 return fail("computational_substrate",
                     "named-range validation-only structural transition mismatch");
             }
+
+            const auto aAuthorityRejected
+                = buildStructuralPilotTransition(aStructuralInput, aAfterFacade, aAfterObservation);
+            if (aAuthorityRejected.meVerdict != StructuralPilotVerdict::RejectedOutOfContract
+                || aAuthorityRejected.maReason != u"structural_slice_out_of_contract")
+            {
+                return fail("computational_substrate",
+                    "named-range structural authority rejection mismatch");
+            }
+
+            const auto aAuthorityCandidate = buildStructuralPilotTransition(aStructuralInput,
+                aAfterFacade, aAfterObservation, StructuralPilotBuildMode::AuthorityOnly, true);
+            if (aAuthorityCandidate.meVerdict != StructuralPilotVerdict::Applicable
+                || aAuthorityCandidate.maContract.meMutationClass
+                       != StructuralMutationClass::Admitted
+                || aAuthorityCandidate.maSyncActions.size() != 1
+                || aAuthorityCandidate.maGraphAfter.getEdgeCount() < 1)
+            {
+                return fail("computational_substrate",
+                    "named-range structural authority candidate mismatch");
+            }
         }
 
         {

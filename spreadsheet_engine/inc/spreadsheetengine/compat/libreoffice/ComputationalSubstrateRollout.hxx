@@ -21,7 +21,8 @@ enum class RolloutSurface : sal_uInt8
 {
     Authority,
     Lifecycle,
-    Structural
+    Structural,
+    GlobalNamedRangeStructural
 };
 
 namespace detail
@@ -40,6 +41,11 @@ namespace detail
     return envValueEnabled(std::getenv("SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT"));
 }
 
+[[nodiscard]] inline bool resolveExplicitSurfaceGate(const char* pSpecificName)
+{
+    return envValueEnabled(std::getenv(pSpecificName));
+}
+
 } // namespace detail
 
 [[nodiscard]] inline bool isSurfaceEnabled(const ScDocument& rDoc, RolloutSurface eSurface)
@@ -55,6 +61,9 @@ namespace detail
             return detail::resolveSurfaceGate("SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE");
         case RolloutSurface::Structural:
             return detail::resolveSurfaceGate("SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL");
+        case RolloutSurface::GlobalNamedRangeStructural:
+            return detail::resolveExplicitSurfaceGate(
+                "SPREADSHEET_ENGINE_COMPUTATIONAL_GLOBAL_NAMED_RANGE");
     }
 
     return false;
