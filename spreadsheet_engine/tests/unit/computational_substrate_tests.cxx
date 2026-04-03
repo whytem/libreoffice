@@ -4,6 +4,7 @@
 
 #include <spreadsheetengine/detail/substrate/ComputationalShadowBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowMapping.hxx>
+#include <spreadsheetengine/detail/substrate/ComputationalShadowMutation.hxx>
 #include <spreadsheetengine/detail/workbook/InMemoryWorkbookFacade.hxx>
 
 #include "TestSupport.hxx"
@@ -82,6 +83,57 @@ int main()
 
     if (aShadow.maFormulaGroups.front().maMembers.size() != 2)
         return fail("computational_substrate", "formula group membership mismatch");
+
+    // --- Safe mutation rebuild path ---
+    {
+        aFacade.setCell({ nData, 0, 0 }, CellValue::number(11.0));
+        auto aMutationState = rebuildComputationalShadowAfterMutation(
+            aFacade, aObservation, MutationEvent::setScalarValue({ nData, 0, 0 }));
+        const auto* pUpdatedScalar = aMutationState.maShadow.findCell({ nData, 0, 0 });
+        if (!pUpdatedScalar || !pUpdatedScalar->maCell.maValue.isNumber()
+            || pUpdatedScalar->maCell.maValue.mfNumber != 11.0)
+        {
+            return fail("computational_substrate", "scalar mutation rebuild mismatch");
+        }
+
+        aFacade.setFormulaCell({ nData, 1, 0 }, u"=A1*4", CellValue::number(44.0));
+        aMutationState = rebuildComputationalShadowAfterMutation(
+            aFacade, aObservation, MutationEvent::setFormula({ nData, 1, 0 }, u"=A1*4"));
+        const auto* pEditedFormula = aMutationState.maShadow.findCell({ nData, 1, 0 });
+        if (!pEditedFormula || !pEditedFormula->moFormula
+            || pEditedFormula->moFormula->maFormulaSource != u"=A1*4")
+        {
+            return fail("computational_substrate", "formula edit rebuild mismatch");
+        }
+
+        aFacade.setFormulaCell({ nData, 2, 0 }, u"=A1+B1", CellValue::number(55.0));
+        aObservation.maFormulaTree.push_back({ nData, 2, 0 });
+        aMutationState = rebuildComputationalShadowAfterMutation(
+            aFacade, aObservation, MutationEvent::setFormula({ nData, 2, 0 }, u"=A1+B1"));
+        if (aMutationState.maShadow.getFormulaCellCount() != 3
+            || !aMutationState.maShadow.findCell({ nData, 2, 0 }))
+        {
+            return fail("computational_substrate", "formula insertion rebuild mismatch");
+        }
+
+        aFacade.clearCell({ nData, 0, 1 });
+        aMutationState = rebuildComputationalShadowAfterMutation(
+            aFacade, aObservation, MutationEvent::clearCell({ nData, 0, 1 }));
+        if (aMutationState.maShadow.findCell({ nData, 0, 1 }))
+            return fail("computational_substrate", "clear cell rebuild mismatch");
+
+        const auto aBeforeRange = *aFacade.findNamedRange(u"Metric", std::nullopt);
+        if (!aFacade.renameNamedRange(u"Metric", u"MetricRenamed"))
+            return fail("computational_substrate", "named range rename setup failed");
+        const auto aAfterRange = *aFacade.findNamedRange(u"MetricRenamed", std::nullopt);
+        aMutationState = rebuildComputationalShadowAfterMutation(
+            aFacade, aObservation, MutationEvent::renameNamedRange(aBeforeRange, aAfterRange));
+        if (aMutationState.maShadow.maNamedRanges.size() != 1
+            || aMutationState.maShadow.maNamedRanges.front().maName != u"MetricRenamed")
+        {
+            return fail("computational_substrate", "named range rebuild mismatch");
+        }
+    }
 
     std::cout << "computational_substrate_tests passed\n";
     return EXIT_SUCCESS;

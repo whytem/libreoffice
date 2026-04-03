@@ -111,6 +111,15 @@ public:
             = std::move(aEntry);
     }
 
+    void clearCell(const api::CellAddress& rAddress)
+    {
+        if (rAddress.mnSheet < 0
+            || static_cast<std::size_t>(rAddress.mnSheet) >= maSheets.size())
+            return;
+
+        maSheets[rAddress.mnSheet].maCells.erase({ rAddress.mnColumn, rAddress.mnRow });
+    }
+
     void addNamedRange(api::StringView rName,
         std::optional<SheetId> oScopeSheet,
         const api::CellAddress& rBaseAddress,
@@ -122,6 +131,20 @@ public:
         aEntry.maBaseAddress = rBaseAddress;
         aEntry.maTargetExpression = api::String(rTargetExpression);
         maNamedRanges.push_back(std::move(aEntry));
+    }
+
+    bool renameNamedRange(api::StringView rOldName, api::StringView rNewName,
+        std::optional<SheetId> oScopeSheet = std::nullopt)
+    {
+        for (auto& rEntry : maNamedRanges)
+        {
+            if (rEntry.maName == rOldName && rEntry.moScopeSheet == oScopeSheet)
+            {
+                rEntry.maName = api::String(rNewName);
+                return true;
+            }
+        }
+        return false;
     }
 
     void addFormulaGroup(const api::CellAddress& rAnchor, sal_Int32 nLength,

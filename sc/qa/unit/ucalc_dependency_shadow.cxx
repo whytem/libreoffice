@@ -22,6 +22,7 @@
 #include <scopetools.hxx>
 #include <table.hxx>
 #include <spreadsheetengine/compat/libreoffice/DependencyShadow.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalShadowMutation.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObservation.hxx>
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcAuthority.hxx>
@@ -963,6 +964,56 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalSubstrateDelayedBroa
 
     const BroadcasterStateSnapshot aAfter = collectBroadcasterStateSnapshot(*m_pDoc);
     assertNoCellBroadcaster(aAfter, ScAddress(0, 0, 0));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalShadowRebuildAfterSafeMutations)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateClearCell;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+    using spreadsheetengine::compat::libreoffice::rebuildComputationalShadowAfterMutation;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetValue(0, 1, 0, 2.0); // A2
+    auto* pName = new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(pName));
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr); // B1
+    m_pDoc->SetString(2, 0, 0, u"=SUM(Metrics)"_ustr); // C1
+    m_pDoc->CalcAll();
+
+    m_pDoc->SetValue(0, 0, 0, 5.0);
+    auto aScalarState = rebuildComputationalShadowAfterMutation(
+        CalcWorkbookFacade(*m_pDoc, 1), *m_pDoc, translateSetScalarValue(ScAddress(0, 0, 0)));
+    const auto* pA1 = aScalarState.maShadow.findCell({ 0, 0, 0 });
+    CPPUNIT_ASSERT(pA1);
+    CPPUNIT_ASSERT(pA1->maCell.maValue.isNumber());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, pA1->maCell.maValue.mfNumber, 1e-12);
+
+    m_pDoc->SetString(1, 0, 0, u"=A1*4"_ustr);
+    auto aFormulaEditState = rebuildComputationalShadowAfterMutation(
+        CalcWorkbookFacade(*m_pDoc, 2), *m_pDoc,
+        translateSetFormula(ScAddress(1, 0, 0), u"=A1*4"_ustr));
+    const auto* pB1 = aFormulaEditState.maShadow.findCell({ 0, 1, 0 });
+    CPPUNIT_ASSERT(pB1);
+    CPPUNIT_ASSERT(pB1->moFormula.has_value());
+    CPPUNIT_ASSERT(pB1->moFormula->maFormulaSource == spreadsheetengine::api::String(u"=A1*4"));
+
+    m_pDoc->SetString(3, 0, 0, u"=B1+C1"_ustr);
+    auto aFormulaInsertState = rebuildComputationalShadowAfterMutation(
+        CalcWorkbookFacade(*m_pDoc, 3), *m_pDoc,
+        translateSetFormula(ScAddress(3, 0, 0), u"=B1+C1"_ustr));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aFormulaInsertState.maShadow.getFormulaCellCount());
+    CPPUNIT_ASSERT(aFormulaInsertState.maShadow.findCell({ 0, 3, 0 }));
+
+    m_pDoc->SetEmptyCell(ScAddress(0, 1, 0));
+    auto aClearState = rebuildComputationalShadowAfterMutation(
+        CalcWorkbookFacade(*m_pDoc, 4), *m_pDoc, translateClearCell(ScAddress(0, 1, 0)));
+    CPPUNIT_ASSERT(!aClearState.maShadow.findCell({ 0, 0, 1 }));
 
     m_pDoc->DeleteTab(0);
 }
