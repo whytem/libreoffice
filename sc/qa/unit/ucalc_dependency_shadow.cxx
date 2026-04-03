@@ -55,6 +55,7 @@ using spreadsheetengine::compat::libreoffice::substrateobs::CellBroadcasterSnaps
 using spreadsheetengine::compat::libreoffice::substrateobs::ListenerKind;
 using spreadsheetengine::compat::libreoffice::substrateobs::LiveComputationalStateSnapshot;
 using spreadsheetengine::detail::dependency::DirtyFormulaCell;
+using GraphComparisonKind = spreadsheetengine::detail::substrate::graphmapping::GraphComparisonKind;
 
 class ScopedEnvironmentOverride
 {
@@ -268,6 +269,24 @@ void assertHasEmptyCellBroadcaster(const BroadcasterStateSnapshot& rSnapshot, co
     const CellBroadcasterSnapshot* pEntry = findCellBroadcaster(rSnapshot, rAddress);
     CPPUNIT_ASSERT(pEntry);
     CPPUNIT_ASSERT(pEntry->maListeners.empty());
+}
+
+void assertComparableGraph(
+    const spreadsheetengine::detail::substrate::DependencyGraphShadowComparison& rComparison)
+{
+    CPPUNIT_ASSERT(rComparison.mbFullMatch);
+    CPPUNIT_ASSERT(rComparison.meKind != GraphComparisonKind::Mismatch);
+}
+
+[[nodiscard]] bool hasGraphEdge(
+    const spreadsheetengine::detail::substrate::DependencyGraphShadow& rGraph,
+    const spreadsheetengine::detail::substrate::BroadcasterNodeId& rBroadcaster,
+    const spreadsheetengine::detail::substrate::ListenerAnchorId& rListener)
+{
+    return std::any_of(rGraph.maEdges.begin(), rGraph.maEdges.end(),
+        [&rBroadcaster, &rListener](const auto& rEdge) {
+            return rEdge.maBroadcaster == rBroadcaster && rEdge.maListenerAnchor == rListener;
+        });
 }
 
 } // namespace
@@ -1171,6 +1190,161 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testDependencyGraphShadowNormalizedCo
     CPPUNIT_ASSERT(aComparison.mbFullMatch);
     CPPUNIT_ASSERT(!aComparison.mbFormulaTreeExactMatch);
     CPPUNIT_ASSERT(aComparison.mbFormulaTreeNormalizedMatch);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testDependencyGraphShadowDelayedListenerCoverage)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
+    using spreadsheetengine::detail::substrate::BroadcasterNodeId;
+    using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
+    using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::compareDependencyGraphShadow;
+    namespace graphmapping = spreadsheetengine::detail::substrate::graphmapping;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr); // B1
+    m_pDoc->CalcAll();
+
+    ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(1, 0, 0));
+    CPPUNIT_ASSERT(pFormula);
+
+    {
+        sc::EndListeningContext aEndCxt(*m_pDoc);
+        pFormula->EndListeningTo(aEndCxt);
+        aEndCxt.purgeEmptyBroadcasters();
+    }
+
+    ScTable* pTable = m_pDoc->FetchTable(0);
+    CPPUNIT_ASSERT(pTable);
+    ScColumn& rFormulaColumn = pTable->CreateColumnIfNotExists(1);
+
+    m_pDoc->EnableDelayStartListeningFormulaCells(&rFormulaColumn, true);
+    rFormulaColumn.StartListeningUnshared({ 0, 0 });
+
+    const CalcWorkbookFacade aDelayedFacade(*m_pDoc, 1);
+    const auto aDelayedObservation = makeComputationalObservationState(
+        collectLiveComputationalState(*m_pDoc));
+    const auto aDelayedShadow = buildComputationalWorkbookShadow(aDelayedFacade, aDelayedObservation);
+    const auto aDelayedGraph = buildDependencyGraphShadow(aDelayedShadow, aDelayedObservation);
+    const auto aDelayedComparison
+        = compareDependencyGraphShadow(aDelayedGraph, aDelayedShadow, aDelayedObservation);
+    assertComparableGraph(aDelayedComparison);
+
+    const auto aBroadcaster = BroadcasterNodeId::forCell({ 0, 0, 0 });
+    const auto aFormulaAnchor
+        = graphmapping::makeGraphFormulaCellListenerAnchorId({ 0, 1, 0 });
+    CPPUNIT_ASSERT(!hasGraphEdge(aDelayedGraph, aBroadcaster, aFormulaAnchor));
+
+    m_pDoc->EnableDelayStartListeningFormulaCells(&rFormulaColumn, false);
+
+    const CalcWorkbookFacade aRestoredFacade(*m_pDoc, 2);
+    const auto aRestoredObservation = makeComputationalObservationState(
+        collectLiveComputationalState(*m_pDoc));
+    const auto aRestoredShadow = buildComputationalWorkbookShadow(aRestoredFacade, aRestoredObservation);
+    const auto aRestoredGraph = buildDependencyGraphShadow(aRestoredShadow, aRestoredObservation);
+    const auto aRestoredComparison
+        = compareDependencyGraphShadow(aRestoredGraph, aRestoredShadow, aRestoredObservation);
+    assertComparableGraph(aRestoredComparison);
+    CPPUNIT_ASSERT(hasGraphEdge(aRestoredGraph, aBroadcaster, aFormulaAnchor));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testDependencyGraphShadowDelayedBroadcasterDeletionCoverage)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
+    using spreadsheetengine::detail::substrate::BroadcasterNodeId;
+    using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
+    using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::compareDependencyGraphShadow;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr); // B1
+    m_pDoc->CalcAll();
+
+    ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(1, 0, 0));
+    CPPUNIT_ASSERT(pFormula);
+
+    ScTable* pTable = m_pDoc->FetchTable(0);
+    CPPUNIT_ASSERT(pTable);
+    ScColumn& rSourceColumn = pTable->CreateColumnIfNotExists(0);
+    const auto aBroadcaster = BroadcasterNodeId::forCell({ 0, 0, 0 });
+
+    {
+        sc::DelayDeletingBroadcasters aDelay(*m_pDoc);
+        rSourceColumn.EndListening(*pFormula, 0);
+
+        const CalcWorkbookFacade aDelayedFacade(*m_pDoc, 1);
+        const auto aDelayedObservation = makeComputationalObservationState(
+            collectLiveComputationalState(*m_pDoc));
+        const auto aDelayedShadow
+            = buildComputationalWorkbookShadow(aDelayedFacade, aDelayedObservation);
+        const auto aDelayedGraph
+            = buildDependencyGraphShadow(aDelayedShadow, aDelayedObservation);
+        const auto aDelayedComparison
+            = compareDependencyGraphShadow(aDelayedGraph, aDelayedShadow, aDelayedObservation);
+        assertComparableGraph(aDelayedComparison);
+        const auto* pBroadcaster = aDelayedGraph.findBroadcasterNode(aBroadcaster);
+        CPPUNIT_ASSERT(pBroadcaster);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(0), pBroadcaster->mnListenerCount);
+    }
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 2);
+    const auto aAfterObservation = makeComputationalObservationState(
+        collectLiveComputationalState(*m_pDoc));
+    const auto aAfterShadow = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
+    const auto aAfterGraph = buildDependencyGraphShadow(aAfterShadow, aAfterObservation);
+    const auto aAfterComparison
+        = compareDependencyGraphShadow(aAfterGraph, aAfterShadow, aAfterObservation);
+    assertComparableGraph(aAfterComparison);
+    CPPUNIT_ASSERT(!aAfterGraph.findBroadcasterNode(aBroadcaster));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testDependencyGraphShadowStructuralGateCoverage)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateDeleteColumns;
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+    using spreadsheetengine::compat::libreoffice::rebuildDependencyGraphShadowAfterMutation;
+    using spreadsheetengine::detail::substrate::compareDependencyGraphShadow;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetValue(1, 1, 0, 2.0); // B2
+    m_pDoc->SetString(2, 1, 0, u"=A1+B2"_ustr); // C2
+    m_pDoc->CalcAll();
+
+    m_pDoc->InsertRow(ScRange(0, 1, 0, m_pDoc->MaxCol(), 1, 0));
+    auto aRowInsertState = rebuildDependencyGraphShadowAfterMutation(
+        CalcWorkbookFacade(*m_pDoc, 1), *m_pDoc, translateInsertRows(0, 1, 1));
+    const auto aRowInsertComparison = compareDependencyGraphShadow(
+        aRowInsertState.maGraphShadow, aRowInsertState.maComputationalShadow, aRowInsertState.maObservation);
+    assertComparableGraph(aRowInsertComparison);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aRowInsertState.maGraphShadow.getFormulaNodeCount());
+
+    m_pDoc->DeleteCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
+    auto aDeleteColumnState = rebuildDependencyGraphShadowAfterMutation(
+        CalcWorkbookFacade(*m_pDoc, 2), *m_pDoc, translateDeleteColumns(0, 0, 1));
+    const auto aDeleteColumnComparison = compareDependencyGraphShadow(
+        aDeleteColumnState.maGraphShadow, aDeleteColumnState.maComputationalShadow,
+        aDeleteColumnState.maObservation);
+    assertComparableGraph(aDeleteColumnComparison);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aDeleteColumnState.maGraphShadow.getFormulaNodeCount());
 
     m_pDoc->DeleteTab(0);
 }
