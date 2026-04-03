@@ -17,9 +17,12 @@
 
 #include <document.hxx>
 #include <globalnames.hxx>
+#include <listenercontext.hxx>
 #include <rangenam.hxx>
 #include <scopetools.hxx>
+#include <table.hxx>
 #include <spreadsheetengine/compat/libreoffice/DependencyShadow.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObservation.hxx>
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcAuthority.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcShadow.hxx>
@@ -43,6 +46,10 @@ using spreadsheetengine::compat::libreoffice::recalcauthority::ScopedRecalcAutho
 using spreadsheetengine::compat::libreoffice::recalcshadow::ScopedRecalcShadow;
 using RecalcShadowComparisonKind
     = spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparisonKind;
+using spreadsheetengine::compat::libreoffice::substrateobs::BroadcasterStateSnapshot;
+using spreadsheetengine::compat::libreoffice::substrateobs::CellBroadcasterSnapshot;
+using spreadsheetengine::compat::libreoffice::substrateobs::ListenerKind;
+using spreadsheetengine::compat::libreoffice::substrateobs::LiveComputationalStateSnapshot;
 using spreadsheetengine::detail::dependency::DirtyFormulaCell;
 
 class ScopedEnvironmentOverride
@@ -220,6 +227,43 @@ void assertPilotAppliedAndExactAfter(
             oResult->maPlan)
         == spreadsheetengine::compat::libreoffice::recalcshadow::detail::
             collectFormulaTreeAddresses(rDoc));
+}
+
+[[nodiscard]] const CellBroadcasterSnapshot* findCellBroadcaster(
+    const BroadcasterStateSnapshot& rSnapshot, const ScAddress& rAddress)
+{
+    const auto aTarget = spreadsheetengine::compat::libreoffice::toApiCellAddress(rAddress);
+    auto it = std::find_if(rSnapshot.maCellBroadcasters.begin(), rSnapshot.maCellBroadcasters.end(),
+        [&aTarget](const CellBroadcasterSnapshot& rEntry) {
+            return rEntry.maBroadcaster == aTarget;
+        });
+    return it == rSnapshot.maCellBroadcasters.end() ? nullptr : &*it;
+}
+
+[[nodiscard]] bool hasCellFormulaListener(const BroadcasterStateSnapshot& rSnapshot,
+    const ScAddress& rBroadcaster, const ScAddress& rFormula)
+{
+    const CellBroadcasterSnapshot* pEntry = findCellBroadcaster(rSnapshot, rBroadcaster);
+    if (!pEntry)
+        return false;
+
+    const auto aFormula = spreadsheetengine::compat::libreoffice::toApiCellAddress(rFormula);
+    return std::any_of(pEntry->maListeners.begin(), pEntry->maListeners.end(),
+        [&aFormula](const auto& rListener) {
+            return rListener.meKind == ListenerKind::FormulaCell && rListener.maAnchor == aFormula;
+        });
+}
+
+void assertNoCellBroadcaster(const BroadcasterStateSnapshot& rSnapshot, const ScAddress& rAddress)
+{
+    CPPUNIT_ASSERT(!findCellBroadcaster(rSnapshot, rAddress));
+}
+
+void assertHasEmptyCellBroadcaster(const BroadcasterStateSnapshot& rSnapshot, const ScAddress& rAddress)
+{
+    const CellBroadcasterSnapshot* pEntry = findCellBroadcaster(rSnapshot, rAddress);
+    CPPUNIT_ASSERT(pEntry);
+    CPPUNIT_ASSERT(pEntry->maListeners.empty());
 }
 
 } // namespace
@@ -772,6 +816,153 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testNamedRangeRenameRecalcAuthorityPi
             translateRenameNamedRange(*m_pDoc, *m_pDoc->GetRangeName()->findByIndex(pName->GetIndex()),
                 std::nullopt, u"Metrics"_ustr)),
         *m_pDoc);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalSubstrateScalarEditCapture)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
+    using spreadsheetengine::detail::dependency::buildDependencySnapshot;
+    using spreadsheetengine::detail::dependency::buildRecalcPlan;
+    using spreadsheetengine::detail::dependency::planInvalidation;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetValue(0, 1, 0, 2.0); // A2
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr); // B1
+    m_pDoc->SetString(2, 0, 0, u"=B1"_ustr); // C1
+    m_pDoc->SetString(3, 0, 0, u"=SUM(A1:A2)"_ustr); // D1
+    m_pDoc->CalcAll();
+
+    const LiveComputationalStateSnapshot aBefore = collectLiveComputationalState(*m_pDoc);
+    CPPUNIT_ASSERT(hasCellFormulaListener(aBefore.maBroadcasters, ScAddress(0, 0, 0),
+        ScAddress(1, 0, 0)));
+    CPPUNIT_ASSERT(hasCellFormulaListener(aBefore.maBroadcasters, ScAddress(1, 0, 0),
+        ScAddress(2, 0, 0)));
+
+    const CalcWorkbookFacade aFacade(*m_pDoc, 1);
+    const auto aDependencySnapshot = buildDependencySnapshot(aFacade);
+    const auto aInvalidationPlan
+        = planInvalidation(aDependencySnapshot, translateSetScalarValue(ScAddress(0, 0, 0)));
+    const auto aRecalcPlan = buildRecalcPlan(aDependencySnapshot, aInvalidationPlan);
+
+    m_pDoc->SetValue(0, 0, 0, 99.0);
+
+    const LiveComputationalStateSnapshot aAfter = collectLiveComputationalState(*m_pDoc);
+    CPPUNIT_ASSERT(aBefore.maBroadcasters == aAfter.maBroadcasters);
+    CPPUNIT_ASSERT(
+        spreadsheetengine::compat::libreoffice::recalcshadow::detail::collectPredictedQueueAddresses(
+            aRecalcPlan)
+        == aAfter.maFormulaTree);
+    CPPUNIT_ASSERT(aAfter.maFormulaTrack.empty());
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalSubstrateFormulaEditCapture)
+{
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetValue(0, 1, 0, 2.0); // A2
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr); // B1
+    m_pDoc->CalcAll();
+
+    const LiveComputationalStateSnapshot aBefore = collectLiveComputationalState(*m_pDoc);
+    CPPUNIT_ASSERT(hasCellFormulaListener(aBefore.maBroadcasters, ScAddress(0, 0, 0),
+        ScAddress(1, 0, 0)));
+
+    m_pDoc->SetString(1, 0, 0, u"=A2"_ustr);
+
+    const LiveComputationalStateSnapshot aAfter = collectLiveComputationalState(*m_pDoc);
+    CPPUNIT_ASSERT(!hasCellFormulaListener(aAfter.maBroadcasters, ScAddress(0, 0, 0),
+        ScAddress(1, 0, 0)));
+    CPPUNIT_ASSERT(hasCellFormulaListener(aAfter.maBroadcasters, ScAddress(0, 1, 0),
+        ScAddress(1, 0, 0)));
+    CPPUNIT_ASSERT(aAfter.maFormulaTrack.empty());
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalSubstrateDelayedStartListeningCapture)
+{
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr); // B1
+    m_pDoc->CalcAll();
+
+    ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(1, 0, 0));
+    CPPUNIT_ASSERT(pFormula);
+
+    {
+        sc::EndListeningContext aEndCxt(*m_pDoc);
+        pFormula->EndListeningTo(aEndCxt);
+        aEndCxt.purgeEmptyBroadcasters();
+    }
+
+    const LiveComputationalStateSnapshot aDetached = collectLiveComputationalState(*m_pDoc);
+    CPPUNIT_ASSERT(!hasCellFormulaListener(aDetached.maBroadcasters, ScAddress(0, 0, 0),
+        ScAddress(1, 0, 0)));
+
+    ScTable* pTable = m_pDoc->FetchTable(0);
+    CPPUNIT_ASSERT(pTable);
+    ScColumn& rFormulaColumn = pTable->CreateColumnIfNotExists(1);
+
+    m_pDoc->EnableDelayStartListeningFormulaCells(&rFormulaColumn, true);
+    rFormulaColumn.StartListeningUnshared({ 0, 0 });
+
+    const LiveComputationalStateSnapshot aDelayed = collectLiveComputationalState(*m_pDoc);
+    CPPUNIT_ASSERT(!hasCellFormulaListener(aDelayed.maBroadcasters, ScAddress(0, 0, 0),
+        ScAddress(1, 0, 0)));
+
+    m_pDoc->EnableDelayStartListeningFormulaCells(&rFormulaColumn, false);
+
+    const LiveComputationalStateSnapshot aRestored = collectLiveComputationalState(*m_pDoc);
+    CPPUNIT_ASSERT(hasCellFormulaListener(aRestored.maBroadcasters, ScAddress(0, 0, 0),
+        ScAddress(1, 0, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalSubstrateDelayedBroadcasterDeletionCapture)
+{
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectBroadcasterStateSnapshot;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr); // B1
+    m_pDoc->CalcAll();
+
+    ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(1, 0, 0));
+    CPPUNIT_ASSERT(pFormula);
+
+    ScTable* pTable = m_pDoc->FetchTable(0);
+    CPPUNIT_ASSERT(pTable);
+    ScColumn& rSourceColumn = pTable->CreateColumnIfNotExists(0);
+
+    {
+        sc::DelayDeletingBroadcasters aDelay(*m_pDoc);
+        rSourceColumn.EndListening(*pFormula, 0);
+
+        const BroadcasterStateSnapshot aDelayed = collectBroadcasterStateSnapshot(*m_pDoc);
+        assertHasEmptyCellBroadcaster(aDelayed, ScAddress(0, 0, 0));
+    }
+
+    const BroadcasterStateSnapshot aAfter = collectBroadcasterStateSnapshot(*m_pDoc);
+    assertNoCellBroadcaster(aAfter, ScAddress(0, 0, 0));
 
     m_pDoc->DeleteTab(0);
 }

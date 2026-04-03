@@ -173,6 +173,10 @@ Likely homes:
 - targeted standalone-or-compat tests where capture helpers cross the engine
   boundary
 
+The initial automated differential lane for this workstream now lives in:
+
+- [ucalc_dependency_shadow.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_dependency_shadow.cxx)
+
 ### 0.6 Freeze The Phase 0 Decision Record
 
 Phase 0 closes only when the project has one explicit answer to the question:
