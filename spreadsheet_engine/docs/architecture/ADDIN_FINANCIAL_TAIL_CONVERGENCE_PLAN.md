@@ -136,6 +136,29 @@ Completion criteria:
 - the next implementation slice is selected from the highest-confidence
   convergence target
 
+### Phase 2 Classification Result
+
+The current classification is:
+
+| Candidate | Disposition | Reason |
+| --- | --- | --- |
+| `ODDFPRICE` | `defer` | there is no shared odd-first-period runtime or adapter surface anywhere in `spreadsheet_engine/`, `scaddins/`, or `sc/`; the caller currently reaches only an unconditional-throw helper stub |
+| `ODDFYIELD` | `defer` | same as `ODDFPRICE`: no engine-owned implementation exists yet, so this is not a ready-now direct-entry widening slice |
+| odd-first-period helper tail | `ready now` | the helper itself is legacy residue and can be retired or replaced with an explicit named defer boundary immediately |
+| null-date and date-mode packaging | `host-only` | the remaining null-date/date-mode acquisition is already part of the explicit add-in host boundary and is not the problem to solve in this stream |
+
+That means the highest-confidence implementation slice for this stream is not a
+new finance algorithm. It is:
+
+1. replace the legacy helper path with an explicit named defer boundary at the
+   add-in caller surface
+2. remove the unconditional-throw helper declarations and definitions
+3. add regression coverage that makes the retained defer visible and stable
+
+This keeps the boundary honest: the odd-first-period pair is now treated as an
+explicitly deferred semantic gap rather than as an ambiguous helper path that
+looks converged but still just throws.
+
 ### 3. Land The Shared Runtime Or Direct Adapter Slice
 
 Implement the actual convergence slice for the selected residual financial
