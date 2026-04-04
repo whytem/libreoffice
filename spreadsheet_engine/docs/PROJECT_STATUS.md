@@ -298,12 +298,6 @@ It did not justify physical container residency migration. Calc still owns:
 That means the current boundary is stronger than a read-only shadow model but
 still narrower than a true storage transplant.
 
-The next explicit migration target after that closeout is:
-
-- admitted-slice physical cell-storage residency migration, with the engine
-  acting as the storage authority and Calc remaining the temporary mirror,
-  mutation-entry, and rollback host
-
 The key storage-and-wiring closeout references are:
 
 - [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_PLAN.md)
@@ -323,6 +317,40 @@ what stays outside this admitted storage-and-wiring slice:
 - [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_DECISION_RECORD.md)
 
+## Cell Storage Residency Outcome
+
+The first cell-storage residency proof cycle is now complete.
+
+It justified one additional bounded boundary shift:
+
+- the engine now owns resident admitted-slice cell storage
+- the engine still owns mutable computational state on that slice
+- the engine still owns graph and wiring target sets on that slice
+- Calc can mirror the admitted live cell surface from engine-owned resident
+  state and still pass exact computational and graph verification after
+  wiring replay
+
+It did not justify broad `ScDocument` storage migration. Calc still owns:
+
+- mutation entry and document mutation APIs
+- formula-cell object lifetime
+- live broadcaster/listener container residency
+- final rollback
+
+That means the current boundary is now stronger than the earlier
+mutable-sidecar-plus-host-storage split, but it is still narrower than a
+broad computational document transplant.
+
+The key cell-storage closeout references are:
+
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_SCHEMA.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_SCHEMA.md)
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_MIRRORING.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_MIRRORING.md)
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_DECISION_RECORD.md)
+
 ## Current Assessment
 
 The project is in a strong position:
@@ -339,6 +367,7 @@ The current state should be read as:
 - a successful shared-engine project
 - plus a successful narrow second-stage authority experiment
 - plus a successful bounded storage-and-wiring authority proof
+- plus a successful bounded admitted-slice cell-residency proof
 - but still not as proof that a full computational storage migration is
   already justified
 
@@ -356,7 +385,7 @@ Any further expansion should continue under these rules:
 - treat memory and performance regressions as architecture issues, not
   follow-up polish
 - require a new explicit plan before widening beyond the current admitted
-  rollout and storage-and-wiring slice
+  rollout, storage-and-wiring slice, and admitted cell-residency slice
 
 ## Reference Material
 
@@ -368,6 +397,7 @@ For the current second-stage boundary and rollout closeout, see:
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_DECISION_RECORD.md)
 - [README.md](architecture/README.md)
 
 For completed plans, closeout records, and historical extraction context, see:

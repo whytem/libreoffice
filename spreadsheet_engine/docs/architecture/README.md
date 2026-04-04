@@ -168,9 +168,31 @@ Current architecture docs:
   listener/broadcaster authority, ending in admitted mutable-sidecar and
   graph-target ownership on the bounded slice
 - [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_PLAN.md](COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_PLAN.md) -
-  active implementation-ready plan for the next bounded migration step,
-  testing engine-resident cell storage on the admitted slice while Calc
-  remains the mirror, mutation-entry, and rollback host
+  completed implementation and closeout record for the next bounded
+  migration step, admitting engine-resident cell storage on the admitted
+  slice while keeping formula-cell lifetime and live container residency in
+  Calc
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_CONTRACT.md) -
+  frozen authority contract for the first admitted-slice cell-residency
+  pilot, fixing the admitted mutation classes, engine-owned resident cell
+  surface, retained Calc host surfaces, and exact verification standard
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_SCHEMA.md](COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_SCHEMA.md) -
+  frozen schema note for admitted engine-resident cell records, address
+  identity, formula payload ownership, and exact storage comparison rules
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_IMPLEMENTATION.md) -
+  completed implementation note for the engine-owned admitted-slice cell
+  store, including bootstrap, reconciliation, and resident-state validation
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_MIRRORING.md](COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_MIRRORING.md) -
+  completed implementation note for Calc-side mirroring of admitted
+  engine-resident cells before wiring replay and final exact verification
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_EVIDENCE.md) -
+  frozen evidence note for the admitted cell-residency path, summarizing
+  exact mirror recovery, retained rollback coverage, and bounded operational
+  samples
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_DECISION_RECORD.md) -
+  completed closeout decision for the first cell-residency proof cycle,
+  admitting engine-resident cell storage on the bounded slice while keeping
+  formula-cell lifetime and live container residency in Calc
 - [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md) -
   frozen authority contract for the first storage-and-wiring pilot, fixing
   the admitted workbook slice, engine-owned sidecar state, engine-issued

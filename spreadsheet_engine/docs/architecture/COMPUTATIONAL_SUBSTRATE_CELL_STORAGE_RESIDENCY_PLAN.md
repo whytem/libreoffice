@@ -1,6 +1,6 @@
 # Computational Substrate Cell Storage Residency Plan
 
-Status: implementation-ready plan
+Status: complete closeout record
 
 ## Purpose
 
@@ -24,6 +24,15 @@ This plan is not a broad storage transplant. It is the first implementation
 plan for making engine-resident cell state the source of truth on the
 admitted slice while Calc temporarily remains the mirror, mutation-entry, and
 rollback host.
+
+This plan is now complete.
+
+Its closeout result is:
+
+- proceed with engine-resident admitted-slice cell storage
+- keep formula-cell object lifetime in Calc
+- keep live broadcaster/listener container residency in Calc
+- keep broader storage migration deferred
 
 ## Why This Is The Best Next Path
 
