@@ -171,6 +171,10 @@ Current architecture docs:
   frozen authority contract for the first storage-and-wiring pilot, fixing
   the admitted workbook slice, engine-owned sidecar state, engine-issued
   graph deltas, retained Calc host surfaces, and verification standard
+- [COMPUTATIONAL_SUBSTRATE_MUTABLE_SUBSTRATE_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_MUTABLE_SUBSTRATE_IMPLEMENTATION.md) -
+  completed implementation note for the engine-owned mutable sidecar
+  substrate, including the value-semantic state container, bootstrap path,
+  and transition-driven update model on the admitted slice
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

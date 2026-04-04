@@ -6,6 +6,7 @@
 #include <spreadsheetengine/detail/substrate/AuthorityPilotBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/LifecyclePilot.hxx>
 #include <spreadsheetengine/detail/substrate/LifecyclePilotBuilder.hxx>
+#include <spreadsheetengine/detail/substrate/MutableComputationalSubstrate.hxx>
 #include <spreadsheetengine/detail/substrate/StructuralPilot.hxx>
 #include <spreadsheetengine/detail/substrate/StructuralPilotBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/ExecutionIr.hxx>
@@ -257,6 +258,22 @@ int main()
             return fail("computational_substrate", "authority projected shadow mismatch");
         }
 
+        auto aMutableState = bootstrapMutableComputationalSubstrateState(aPilotShadow);
+        if (!applyMutableAuthorityTransition(aMutableState, aAuthorityPlan)
+            || aMutableState.mnAppliedMutationCount != 1
+            || !(aMutableState.maLastMutation == aAuthorityInput.maMutation))
+        {
+            return fail("computational_substrate", "mutable authority state mismatch");
+        }
+        const auto aMutableAuthorityComparison = compareComputationalShadow(
+            aMutableState.maShadow, aMutableState.maFacade, aMutableState.maObservation);
+        if (!aMutableAuthorityComparison.mbFullMatch)
+            return fail("computational_substrate", "mutable authority shadow mismatch");
+        const auto aMutableScalar
+            = aMutableState.maFacade.getCellDescriptor({ nPilotSheet, 0, 0 });
+        if (!aMutableScalar.maValue.isNumber() || aMutableScalar.maValue.mfNumber != 99.0)
+            return fail("computational_substrate", "mutable authority facade mismatch");
+
         const auto aLifecycleAdmitted
             = classifyLifecycleMutation(MutationEvent::setFormula({ nPilotSheet, 3, 0 }, u"=A1+B1"));
         if (!aLifecycleAdmitted.isAdmitted() || !aLifecycleAdmitted.mbRequiresFormulaLifecycleShape)
@@ -344,6 +361,24 @@ int main()
             || aLifecycleRemovePlan.maComputationalAfter.findCell({ nPilotSheet, 1, 0 }))
         {
             return fail("computational_substrate", "lifecycle removal transition mismatch");
+        }
+
+        auto aMutableLifecycleState = bootstrapMutableComputationalSubstrateState(aPilotShadow);
+        if (!applyMutableLifecycleTransition(aMutableLifecycleState, aLifecycleInsertPlan)
+            || aMutableLifecycleState.mnAppliedMutationCount != 1
+            || !aMutableLifecycleState.maFacade.getFormulaCellDescriptor({ nPilotSheet, 3, 0 }))
+        {
+            return fail("computational_substrate", "mutable lifecycle insertion mismatch");
+        }
+        const auto aLifecycleComparison = compareComputationalShadow(aMutableLifecycleState.maShadow,
+            aMutableLifecycleState.maFacade, aMutableLifecycleState.maObservation);
+        if (!aLifecycleComparison.mbFullMatch)
+            return fail("computational_substrate", "mutable lifecycle shadow mismatch");
+        if (!applyMutableLifecycleTransition(aMutableLifecycleState, aLifecycleRemovePlan)
+            || aMutableLifecycleState.mnAppliedMutationCount != 2
+            || aMutableLifecycleState.maFacade.getFormulaCellDescriptor({ nPilotSheet, 1, 0 }))
+        {
+            return fail("computational_substrate", "mutable lifecycle removal mismatch");
         }
 
         const auto aStructuralAdmitted
@@ -446,6 +481,19 @@ int main()
             {
                 return fail("computational_substrate", "structural insert-row transition mismatch");
             }
+
+            auto aMutableStructuralState = bootstrapMutableComputationalSubstrateState(aBeforeShadow);
+            if (!applyMutableStructuralTransition(aMutableStructuralState, aStructuralPlan)
+                || aMutableStructuralState.mnAppliedMutationCount != 1
+                || !aMutableStructuralState.maFacade.getFormulaCellDescriptor({ nSheet, 0, 3 }))
+            {
+                return fail("computational_substrate", "mutable structural state mismatch");
+            }
+            const auto aStructuralComparison = compareComputationalShadow(
+                aMutableStructuralState.maShadow, aMutableStructuralState.maFacade,
+                aMutableStructuralState.maObservation);
+            if (!aStructuralComparison.mbFullMatch)
+                return fail("computational_substrate", "mutable structural shadow mismatch");
         }
 
         {

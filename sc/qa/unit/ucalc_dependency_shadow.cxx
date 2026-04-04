@@ -30,6 +30,7 @@
 #include <spreadsheetengine/compat/libreoffice/ExecutionIrBuilder.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExecutionIrMutation.hxx>
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
+#include <spreadsheetengine/compat/libreoffice/MutableComputationalSubstrate.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateAuthority.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateLifecycle.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateStructural.hxx>
@@ -2570,6 +2571,84 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalShadowDifferentialVa
 
     m_pDoc->DeleteCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
     assertFullMatch(translateDeleteColumns(0, 0, 1), 5);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testMutableComputationalSubstrateTracksAdmittedSlice)
+{
+    using spreadsheetengine::compat::libreoffice::bootstrapMutableComputationalSubstrateState;
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+    using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
+    using spreadsheetengine::detail::substrate::applyMutableAuthorityTransition;
+    using spreadsheetengine::detail::substrate::applyMutableLifecycleTransition;
+    using spreadsheetengine::detail::substrate::applyMutableStructuralTransition;
+    using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
+    using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::buildLifecyclePilotTransition;
+    using spreadsheetengine::detail::substrate::buildStructuralPilotTransition;
+    using spreadsheetengine::detail::substrate::compareComputationalShadow;
+    using spreadsheetengine::detail::substrate::authoritybuilddetail::buildAuthorityExecutionIrShadow;
+    using spreadsheetengine::detail::substrate::buildAuthorityPilotTransition;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetValue(1, 0, 0, 2.0); // B1
+    m_pDoc->SetString(2, 0, 0, u"=A1+B1"_ustr); // C1
+    m_pDoc->CalcAll();
+
+    auto aMutableState = bootstrapMutableComputationalSubstrateState(*m_pDoc, 0);
+    CPPUNIT_ASSERT(aMutableState.mbBootstrapped);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aMutableState.maShadow.getFormulaCellCount());
+
+    m_pDoc->SetValue(0, 0, 0, 5.0);
+    {
+        spreadsheetengine::detail::substrate::AuthorityPilotInput aInput;
+        aInput.maComputationalShadow = aMutableState.maShadow;
+        aInput.maGraphShadow = buildDependencyGraphShadow(
+            aMutableState.maShadow, aMutableState.maObservation);
+        aInput.maIrShadow
+            = buildAuthorityExecutionIrShadow(aMutableState.maShadow, aMutableState.maFacade);
+        aInput.maMutation = translateSetScalarValue(ScAddress(0, 0, 0));
+        aInput.moScalarValueAfter = spreadsheetengine::api::CellValue::number(5.0);
+        aInput.mbCleanBaseline = true;
+
+        const auto aTransition = buildAuthorityPilotTransition(aInput);
+        CPPUNIT_ASSERT(applyMutableAuthorityTransition(aMutableState, aTransition));
+        const auto* pA1 = aMutableState.maShadow.findCell({ 0, 0, 0 });
+        CPPUNIT_ASSERT(pA1);
+        CPPUNIT_ASSERT(pA1->maCell.maValue.isNumber());
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, pA1->maCell.maValue.mfNumber, 1e-12);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aMutableState.mnAppliedMutationCount);
+    }
+
+    m_pDoc->SetString(1, 1, 0, u"=C1*2"_ustr); // B2
+    {
+        spreadsheetengine::detail::substrate::LifecyclePilotInput aInput;
+        aInput.maComputationalShadow = aMutableState.maShadow;
+        aInput.maGraphShadow = buildDependencyGraphShadow(
+            aMutableState.maShadow, aMutableState.maObservation);
+        aInput.maIrShadow
+            = buildAuthorityExecutionIrShadow(aMutableState.maShadow, aMutableState.maFacade);
+        aInput.maMutation = translateSetFormula(ScAddress(1, 1, 0), u"=C1*2"_ustr);
+        aInput.mbCleanBaseline = true;
+
+        const CalcWorkbookFacade aAfterFacade(*m_pDoc, 2);
+        const auto oFormula = aAfterFacade.getFormulaCellDescriptor({ 0, 1, 1 });
+        CPPUNIT_ASSERT(oFormula);
+        aInput.moFormulaCachedValueAfter = oFormula->maCachedValue;
+
+        const auto aTransition = buildLifecyclePilotTransition(aInput);
+        CPPUNIT_ASSERT(applyMutableLifecycleTransition(aMutableState, aTransition));
+        CPPUNIT_ASSERT(aMutableState.maShadow.findCell({ 0, 1, 1 }));
+        CPPUNIT_ASSERT(aMutableState.maFacade.getFormulaCellDescriptor({ 0, 1, 1 }).has_value());
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aMutableState.mnAppliedMutationCount);
+    }
 
     m_pDoc->DeleteTab(0);
 }

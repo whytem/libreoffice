@@ -159,7 +159,7 @@ This workstream should:
 
 Required artifact:
 
-- one checked-in implementation note for the mutable substrate state
+- [COMPUTATIONAL_SUBSTRATE_MUTABLE_SUBSTRATE_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_MUTABLE_SUBSTRATE_IMPLEMENTATION.md)
 
 ### 3. Build Engine-Owned Graph And Wiring Deltas
 
