@@ -167,6 +167,10 @@ Current architecture docs:
   storage-and-wiring proof cycle toward engine-owned cell storage and
   listener/broadcaster authority, ending in admitted mutable-sidecar and
   graph-target ownership on the bounded slice
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_PLAN.md](COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_PLAN.md) -
+  active implementation-ready plan for the next bounded migration step,
+  testing engine-resident cell storage on the admitted slice while Calc
+  remains the mirror, mutation-entry, and rollback host
 - [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md) -
   frozen authority contract for the first storage-and-wiring pilot, fixing
   the admitted workbook slice, engine-owned sidecar state, engine-issued

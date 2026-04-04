@@ -298,6 +298,12 @@ It did not justify physical container residency migration. Calc still owns:
 That means the current boundary is stronger than a read-only shadow model but
 still narrower than a true storage transplant.
 
+The next explicit migration target after that closeout is:
+
+- admitted-slice physical cell-storage residency migration, with the engine
+  acting as the storage authority and Calc remaining the temporary mirror,
+  mutation-entry, and rollback host
+
 The key storage-and-wiring closeout references are:
 
 - [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_PLAN.md)
@@ -307,6 +313,7 @@ The key storage-and-wiring closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_WIRING_APPLY_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_WIRING_APPLY_IMPLEMENTATION.md)
 - [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_PLAN.md)
 
 The named-range closeout references remain relevant because they still define
 what stays outside this admitted storage-and-wiring slice:
@@ -360,6 +367,7 @@ For the current second-stage boundary and rollout closeout, see:
 - [COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_NARROW_ROLLOUT_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_PLAN.md)
 - [README.md](architecture/README.md)
 
 For completed plans, closeout records, and historical extraction context, see:
