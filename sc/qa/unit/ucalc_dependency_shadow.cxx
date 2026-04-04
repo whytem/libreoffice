@@ -38,6 +38,7 @@
 #include <spreadsheetengine/compat/libreoffice/RecalcShadow.hxx>
 #include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
 #include <spreadsheetengine/detail/substrate/DependencyGraphShadowComparison.hxx>
+#include <spreadsheetengine/detail/substrate/GraphWiringDelta.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowComparison.hxx>
 #include <spreadsheetengine/detail/substrate/ExecutionIrComparison.hxx>
 #include <spreadsheetengine/detail/dependency/DependencySnapshot.hxx>
@@ -2692,6 +2693,62 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testDependencyGraphShadowRebuildAfter
 
     m_pDoc->SetEmptyCell(ScAddress(0, 1, 0));
     assertGraphMatch(translateClearCell(ScAddress(0, 1, 0)), 4);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testGraphWiringDeltaCapturesLifecycleAdds)
+{
+    using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
+    using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
+    using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::buildGraphWiringDelta;
+    using spreadsheetengine::detail::substrate::buildLifecyclePilotTransition;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr); // B1
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 0);
+    const auto aBeforeObservation = makeComputationalObservationState(
+        collectLiveComputationalState(*m_pDoc));
+    const auto aBeforeShadow = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+    const auto aBeforeGraph = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+    const auto aBeforeIr = spreadsheetengine::compat::libreoffice::buildExecutionIrWorkbookShadow(
+        aBeforeShadow, *m_pDoc);
+
+    m_pDoc->SetString(2, 0, 0, u"=B1+1"_ustr); // C1
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+
+    spreadsheetengine::detail::substrate::LifecyclePilotInput aInput;
+    aInput.maComputationalShadow = aBeforeShadow;
+    aInput.maGraphShadow = aBeforeGraph;
+    aInput.maIrShadow = aBeforeIr;
+    aInput.maMutation = translateSetFormula(ScAddress(2, 0, 0), u"=B1+1"_ustr);
+    aInput.mbCleanBaseline = true;
+
+    const auto oFormula = aAfterFacade.getFormulaCellDescriptor({ 0, 2, 0 });
+    CPPUNIT_ASSERT(oFormula);
+    aInput.moFormulaCachedValueAfter = oFormula->maCachedValue;
+
+    const auto aTransition = buildLifecyclePilotTransition(aInput);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::detail::substrate::LifecyclePilotVerdict::Applicable,
+        aTransition.meVerdict);
+
+    const auto aDelta = buildGraphWiringDelta(aTransition);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::detail::facade::MutationKind::SetFormula,
+        aDelta.maMutation.meKind);
+    CPPUNIT_ASSERT(!aDelta.maFormulaTreeDeltas.empty());
+    CPPUNIT_ASSERT(!aDelta.maBroadcasterNodeDeltas.empty());
+    CPPUNIT_ASSERT(!aDelta.maListenerEdgeDeltas.empty());
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(0), aDelta.getRemoveCount());
+    CPPUNIT_ASSERT(!aDelta.maRecalcPlan.maQueue.empty());
 
     m_pDoc->DeleteTab(0);
 }

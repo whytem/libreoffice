@@ -176,7 +176,7 @@ This workstream should:
 
 Required artifact:
 
-- one checked-in graph-delta schema or implementation note
+- [COMPUTATIONAL_SUBSTRATE_GRAPH_DELTA_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_GRAPH_DELTA_IMPLEMENTATION.md)
 
 ### 4. Build Calc Apply Adapters For Engine-Issued Deltas
 

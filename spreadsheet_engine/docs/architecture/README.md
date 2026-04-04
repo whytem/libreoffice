@@ -175,6 +175,10 @@ Current architecture docs:
   completed implementation note for the engine-owned mutable sidecar
   substrate, including the value-semantic state container, bootstrap path,
   and transition-driven update model on the admitted slice
+- [COMPUTATIONAL_SUBSTRATE_GRAPH_DELTA_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_GRAPH_DELTA_IMPLEMENTATION.md) -
+  completed implementation note for the engine-owned graph and wiring delta
+  surface, including listener-edge, broadcaster-node, formula-tree, and
+  formula-track deltas derived from before/after graph shadows
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

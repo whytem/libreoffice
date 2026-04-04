@@ -7,6 +7,9 @@
 #include <spreadsheetengine/detail/substrate/DependencyGraphShadowComparison.hxx>
 #include <spreadsheetengine/detail/substrate/DependencyGraphShadowMapping.hxx>
 #include <spreadsheetengine/detail/substrate/DependencyGraphShadowMutation.hxx>
+#include <spreadsheetengine/detail/substrate/GraphWiringDelta.hxx>
+#include <spreadsheetengine/detail/substrate/LifecyclePilotBuilder.hxx>
+#include <spreadsheetengine/detail/substrate/MutableComputationalSubstrate.hxx>
 #include <spreadsheetengine/detail/workbook/InMemoryWorkbookFacade.hxx>
 
 #include "TestSupport.hxx"
@@ -142,6 +145,60 @@ int main()
         != graphmapping::GraphComparisonKind::Exact)
     {
         return fail("computational_graph", "named range graph mutation mismatch");
+    }
+
+    {
+        InMemoryWorkbookFacade aPilotFacade;
+        aPilotFacade.setGrammar(aFacade.getGrammar());
+        aPilotFacade.setGeneration(21);
+        const auto nSheet = aPilotFacade.addSheet(u"Pilot");
+        aPilotFacade.setCell({ nSheet, 0, 0 }, CellValue::number(10.0));
+        aPilotFacade.setFormulaCell({ nSheet, 1, 0 }, u"=A1*2", CellValue::number(20.0));
+
+        ComputationalObservationState aPilotObservation;
+        aPilotObservation.maFormulaTree = { { nSheet, 1, 0 } };
+        aPilotObservation.maCellBroadcasters.push_back({
+            { nSheet, 0, 0 },
+            { { ListenerAnchorKind::FormulaCell, { nSheet, 1, 0 }, 1 } } });
+
+        const auto aPilotShadow = buildComputationalWorkbookShadow(aPilotFacade, aPilotObservation);
+        const auto aPilotGraph = buildDependencyGraphShadow(aPilotShadow, aPilotObservation);
+        const auto aPilotIr
+            = authoritybuilddetail::buildAuthorityExecutionIrShadow(aPilotShadow, aPilotFacade);
+
+        LifecyclePilotInput aLifecycleInput;
+        aLifecycleInput.maComputationalShadow = aPilotShadow;
+        aLifecycleInput.maGraphShadow = aPilotGraph;
+        aLifecycleInput.maIrShadow = aPilotIr;
+        aLifecycleInput.maMutation = MutationEvent::setFormula({ nSheet, 2, 0 }, u"=B1+1");
+        aLifecycleInput.mbCleanBaseline = true;
+
+        const auto aLifecycleTransition = buildLifecyclePilotTransition(aLifecycleInput);
+        if (aLifecycleTransition.meVerdict != LifecyclePilotVerdict::Applicable)
+            return fail("computational_graph", "graph delta lifecycle setup mismatch");
+
+        const auto aDelta = buildGraphWiringDelta(aLifecycleTransition);
+        if (aDelta.maMutation.meKind != MutationKind::SetFormula
+            || aDelta.maListenerEdgeDeltas.empty()
+            || aDelta.getAddCount() <= 0
+            || aDelta.maRecalcPlan.maQueue.empty())
+        {
+            return fail("computational_graph", "graph delta lifecycle projection mismatch");
+        }
+
+        auto aMutableState = bootstrapMutableComputationalSubstrateState(aPilotShadow);
+        if (!applyMutableLifecycleTransition(aMutableState, aLifecycleTransition))
+            return fail("computational_graph", "graph delta mutable lifecycle setup mismatch");
+
+        const auto aAdvancedGraph
+            = buildDependencyGraphShadow(aMutableState.maShadow, aMutableState.maObservation);
+        const auto aReplayDelta = buildGraphWiringDelta(
+            aPilotGraph, aAdvancedGraph, aLifecycleTransition.maRecalcPlan, aLifecycleInput.maMutation);
+        if (aReplayDelta.maListenerEdgeDeltas != aDelta.maListenerEdgeDeltas
+            || aReplayDelta.maBroadcasterNodeDeltas != aDelta.maBroadcasterNodeDeltas)
+        {
+            return fail("computational_graph", "graph delta replay mismatch");
+        }
     }
 
     std::cout << "computational_graph_tests passed\n";
