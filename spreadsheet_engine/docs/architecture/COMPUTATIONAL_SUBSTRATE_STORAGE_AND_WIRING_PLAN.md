@@ -1,6 +1,6 @@
 # Computational Substrate Storage And Wiring Plan
 
-Status: implementation-ready planning doc
+Status: completed implementation and closeout record
 
 ## Purpose
 
@@ -238,6 +238,10 @@ this path succeeds:
 
 - physical cell-storage residency migration
 - live broadcaster/listener container migration
+
+Required artifact:
+
+- [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_DECISION_RECORD.md)
 - or token-container authority reassessment
 
 Required artifact:

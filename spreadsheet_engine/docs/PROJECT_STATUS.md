@@ -276,32 +276,45 @@ Any expansion into named-range-sensitive structural behavior should therefore
 begin with another bounded reassessment rather than being inferred from the
 current rollout.
 
-## Next Explicit Planning Posture
+## Storage And Wiring Outcome
 
-There is still no newly admitted widening target after the global
-named-range admission proof cycle.
+The first storage-and-wiring proof cycle is now complete.
 
-The current recommendation is narrower again:
+It justified one additional bounded boundary shift:
 
-- keep the bounded global single-area named-range slice out of the live
-  rollout
-- treat any further named-range widening as another bounded reassessment
-- keep sheet-local, multi-area, shared-group, sheet-level, token-container,
-  listener, and storage-migration fronts closed until a narrower next proof
-  question is selected
+- the engine now owns the mutable sidecar state on the admitted slice
+- the engine now owns the listener/broadcaster, formula-tree, and
+  formula-track target sets on that same slice
+- Calc can clear and rebuild the admitted live listener/tree/track surface
+  from those engine-owned targets with exact graph verification
 
-The current named-range closeout references are:
+It did not justify physical container residency migration. Calc still owns:
+
+- `ScDocument` storage and mutation entry
+- formula-cell object lifetime
+- live broadcaster/listener container residency
+- final rollback
+
+That means the current boundary is stronger than a read-only shadow model but
+still narrower than a true storage transplant.
+
+The key storage-and-wiring closeout references are:
+
+- [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_MUTABLE_SUBSTRATE_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_MUTABLE_SUBSTRATE_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_GRAPH_DELTA_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_GRAPH_DELTA_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_WIRING_APPLY_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_WIRING_APPLY_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_DECISION_RECORD.md)
+
+The named-range closeout references remain relevant because they still define
+what stays outside this admitted storage-and-wiring slice:
 
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_WIDENING_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_DECISION_RECORD.md)
-
-For the larger follow-on path toward engine-owned cell storage and
-listener/broadcaster authority, the current practical implementation plan is:
-
-- [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md)
 
 ## Current Assessment
 
@@ -318,8 +331,9 @@ The current state should be read as:
 
 - a successful shared-engine project
 - plus a successful narrow second-stage authority experiment
-- but not as proof that a full computational storage migration is already
-  justified
+- plus a successful bounded storage-and-wiring authority proof
+- but still not as proof that a full computational storage migration is
+  already justified
 
 ## Working Rules Going Forward
 
@@ -335,7 +349,7 @@ Any further expansion should continue under these rules:
 - treat memory and performance regressions as architecture issues, not
   follow-up polish
 - require a new explicit plan before widening beyond the current admitted
-  rollout slice
+  rollout and storage-and-wiring slice
 
 ## Reference Material
 

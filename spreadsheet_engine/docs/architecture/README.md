@@ -163,10 +163,10 @@ Current architecture docs:
   keeping the live rollout unchanged while recording exact standalone
   prediction and a gated live-candidate path for the bounded global slice
 - [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_PLAN.md](COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_PLAN.md) -
-  implementation-ready plan for the most actionable next path toward
-  engine-owned cell storage and listener/broadcaster wiring, starting with a
-  mutable sidecar substrate and graph-delta authority pilot on the admitted
-  slice
+  completed implementation and closeout record for the first
+  storage-and-wiring proof cycle toward engine-owned cell storage and
+  listener/broadcaster authority, ending in admitted mutable-sidecar and
+  graph-target ownership on the bounded slice
 - [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md) -
   frozen authority contract for the first storage-and-wiring pilot, fixing
   the admitted workbook slice, engine-owned sidecar state, engine-issued
@@ -187,6 +187,10 @@ Current architecture docs:
   completed evidence note for the first storage-and-wiring proof cycle,
   summarizing exact host replay results, retained rollback coverage, and
   bounded operational samples
+- [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_DECISION_RECORD.md) -
+  completed closeout decision for the first storage-and-wiring proof cycle,
+  admitting engine-owned mutable sidecar state and graph/wiring targets on
+  the bounded slice while keeping physical container residency in Calc
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for
