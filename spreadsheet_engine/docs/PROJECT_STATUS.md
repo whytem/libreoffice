@@ -297,6 +297,12 @@ The current named-range closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_GLOBAL_NAMED_RANGE_ADMISSION_DECISION_RECORD.md)
 
+For the larger follow-on path toward engine-owned cell storage and
+listener/broadcaster authority, the current practical implementation plan is:
+
+- [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md)
+
 ## Current Assessment
 
 The project is in a strong position:

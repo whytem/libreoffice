@@ -162,6 +162,15 @@ Current architecture docs:
   completed closeout decision for the global named-range promotion cycle,
   keeping the live rollout unchanged while recording exact standalone
   prediction and a gated live-candidate path for the bounded global slice
+- [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_PLAN.md](COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_PLAN.md) -
+  implementation-ready plan for the most actionable next path toward
+  engine-owned cell storage and listener/broadcaster wiring, starting with a
+  mutable sidecar substrate and graph-delta authority pilot on the admitted
+  slice
+- [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md) -
+  frozen authority contract for the first storage-and-wiring pilot, fixing
+  the admitted workbook slice, engine-owned sidecar state, engine-issued
+  graph deltas, retained Calc host surfaces, and verification standard
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for
