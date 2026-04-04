@@ -2592,6 +2592,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testMutableComputationalSubstrateTrac
     using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
     using spreadsheetengine::detail::substrate::buildLifecyclePilotTransition;
     using spreadsheetengine::detail::substrate::buildStructuralPilotTransition;
+    using spreadsheetengine::detail::substrate::compareAdmittedCellStorage;
     using spreadsheetengine::detail::substrate::compareComputationalShadow;
     using spreadsheetengine::detail::substrate::authoritybuilddetail::buildAuthorityExecutionIrShadow;
     using spreadsheetengine::detail::substrate::buildAuthorityPilotTransition;
@@ -2607,6 +2608,8 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testMutableComputationalSubstrateTrac
     auto aMutableState = bootstrapMutableComputationalSubstrateState(*m_pDoc, 0);
     CPPUNIT_ASSERT(aMutableState.mbBootstrapped);
     CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aMutableState.maShadow.getFormulaCellCount());
+    CPPUNIT_ASSERT(compareAdmittedCellStorage(aMutableState.maCellStorage, aMutableState.maShadow)
+                       .mbFullMatch);
 
     m_pDoc->SetValue(0, 0, 0, 5.0);
     {
@@ -2627,6 +2630,9 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testMutableComputationalSubstrateTrac
         CPPUNIT_ASSERT(pA1->maCell.maValue.isNumber());
         CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, pA1->maCell.maValue.mfNumber, 1e-12);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aMutableState.mnAppliedMutationCount);
+        CPPUNIT_ASSERT(compareAdmittedCellStorage(aMutableState.maCellStorage,
+                           aTransition.maComputationalAfter)
+                           .mbFullMatch);
     }
 
     m_pDoc->SetString(1, 1, 0, u"=C1*2"_ustr); // B2
@@ -2650,6 +2656,9 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testMutableComputationalSubstrateTrac
         CPPUNIT_ASSERT(aMutableState.maShadow.findCell({ 0, 1, 1 }));
         CPPUNIT_ASSERT(aMutableState.maFacade.getFormulaCellDescriptor({ 0, 1, 1 }).has_value());
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aMutableState.mnAppliedMutationCount);
+        CPPUNIT_ASSERT(compareAdmittedCellStorage(aMutableState.maCellStorage,
+                           aTransition.maComputationalAfter)
+                           .mbFullMatch);
     }
 
     m_pDoc->DeleteTab(0);
