@@ -183,6 +183,10 @@ Current architecture docs:
   completed implementation note for the Calc-side apply adapters that replay
   the engine-owned admitted wiring target into retained host listener,
   formula-tree, and formula-track containers
+- [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_EVIDENCE.md) -
+  completed evidence note for the first storage-and-wiring proof cycle,
+  summarizing exact host replay results, retained rollback coverage, and
+  bounded operational samples
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

@@ -220,7 +220,7 @@ This evidence note should summarize:
 
 Required artifact:
 
-- one checked-in differential authority evidence note
+- [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_EVIDENCE.md)
 
 ### 6. Freeze The Storage And Wiring Decision
 
