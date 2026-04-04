@@ -179,6 +179,10 @@ Current architecture docs:
   completed implementation note for the engine-owned graph and wiring delta
   surface, including listener-edge, broadcaster-node, formula-tree, and
   formula-track deltas derived from before/after graph shadows
+- [COMPUTATIONAL_SUBSTRATE_WIRING_APPLY_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_WIRING_APPLY_IMPLEMENTATION.md) -
+  completed implementation note for the Calc-side apply adapters that replay
+  the engine-owned admitted wiring target into retained host listener,
+  formula-tree, and formula-track containers
 - [ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md](ADDIN_FINANCIAL_TAIL_CONVERGENCE_PLAN.md) -
   completed implementation and closeout record for the final residual
   Analysis add-in financial tail, including explicit defer classification for

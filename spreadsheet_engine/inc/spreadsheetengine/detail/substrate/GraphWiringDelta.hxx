@@ -65,6 +65,10 @@ struct GraphWiringDelta
     std::vector<FormulaSubsetDeltaRecord> maFormulaTrackDeltas;
     std::vector<BroadcasterNodeDeltaRecord> maBroadcasterNodeDeltas;
     std::vector<ListenerEdgeDeltaRecord> maListenerEdgeDeltas;
+    std::vector<ShadowCellId> maFormulaTreeAfter;
+    std::vector<ShadowCellId> maFormulaTrackAfter;
+    std::vector<GraphBroadcasterNodeRecord> maBroadcasterNodesAfter;
+    std::vector<GraphEdgeRecord> maListenerEdgesAfter;
     dependency::RecalcPlan maRecalcPlan;
 
     [[nodiscard]] sal_Int32 getAddCount() const
@@ -213,6 +217,10 @@ inline void appendSetDifference(const std::vector<Item>& rLeft, const std::vecto
         rBefore.maBroadcasterNodes, rAfter.maBroadcasterNodes);
     aDelta.maListenerEdgeDeltas = graphdeltadetail::buildListenerEdgeDeltas(
         rBefore.maEdges, rAfter.maEdges);
+    aDelta.maFormulaTreeAfter = rAfter.maFormulaTreeNodes;
+    aDelta.maFormulaTrackAfter = rAfter.maFormulaTrackNodes;
+    aDelta.maBroadcasterNodesAfter = rAfter.maBroadcasterNodes;
+    aDelta.maListenerEdgesAfter = rAfter.maEdges;
     aDelta.maRecalcPlan = rRecalcPlan;
     return aDelta;
 }

@@ -200,7 +200,7 @@ This workstream should:
 
 Required artifact:
 
-- one checked-in implementation note for the Calc apply-adapter layer
+- [COMPUTATIONAL_SUBSTRATE_WIRING_APPLY_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_WIRING_APPLY_IMPLEMENTATION.md)
 
 ### 5. Freeze Differential Authority Evidence
 
