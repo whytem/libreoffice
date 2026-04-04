@@ -31,6 +31,7 @@
 #include <spreadsheetengine/compat/libreoffice/ExecutionIrMutation.hxx>
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
 #include <spreadsheetengine/compat/libreoffice/MutableComputationalSubstrate.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateCellStorage.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateAuthority.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateLifecycle.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateStructural.hxx>
@@ -2886,6 +2887,170 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalWiringApplyRebuildsS
         = compareDependencyGraphShadow(aTransition.maGraphAfter, aLiveShadow, aLiveObservation);
     CPPUNIT_ASSERT_EQUAL(GraphComparisonKind::Exact, aComparison.meKind);
     CPPUNIT_ASSERT(aComparison.mbFullMatch);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalCellStorageMirrorRebuildsLifecycleState)
+{
+    using spreadsheetengine::compat::libreoffice::bootstrapMutableComputationalSubstrateState;
+    using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    using spreadsheetengine::compat::libreoffice::substratecellstorage::CellStorageMirrorResultKind;
+    using spreadsheetengine::compat::libreoffice::substratecellstorage::mirrorAdmittedCellStorage;
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
+    using spreadsheetengine::compat::libreoffice::substratewiring::WiringApplyResultKind;
+    using spreadsheetengine::compat::libreoffice::substratewiring::rebuildAdmittedLiveWiring;
+    using spreadsheetengine::detail::substrate::applyMutableLifecycleTransition;
+    using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
+    using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::buildGraphWiringDelta;
+    using spreadsheetengine::detail::substrate::buildLifecyclePilotTransition;
+    using spreadsheetengine::detail::substrate::compareComputationalShadow;
+    using spreadsheetengine::detail::substrate::compareDependencyGraphShadow;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr); // B1
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 0);
+    const auto aBeforeObservation = makeComputationalObservationState(
+        collectLiveComputationalState(*m_pDoc));
+    const auto aBeforeShadow = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+    const auto aBeforeGraph = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+    const auto aBeforeIr = spreadsheetengine::compat::libreoffice::buildExecutionIrWorkbookShadow(
+        aBeforeShadow, *m_pDoc);
+
+    m_pDoc->SetString(2, 0, 0, u"=B1+1"_ustr); // C1
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+
+    spreadsheetengine::detail::substrate::LifecyclePilotInput aInput;
+    aInput.maComputationalShadow = aBeforeShadow;
+    aInput.maGraphShadow = aBeforeGraph;
+    aInput.maIrShadow = aBeforeIr;
+    aInput.maMutation = translateSetFormula(ScAddress(2, 0, 0), u"=B1+1"_ustr);
+    aInput.mbCleanBaseline = true;
+    const auto oFormula = aAfterFacade.getFormulaCellDescriptor({ 0, 2, 0 });
+    CPPUNIT_ASSERT(oFormula);
+    aInput.moFormulaCachedValueAfter = oFormula->maCachedValue;
+
+    const auto aTransition = buildLifecyclePilotTransition(aInput);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::detail::substrate::LifecyclePilotVerdict::Applicable,
+        aTransition.meVerdict);
+
+    auto aMutableState = bootstrapMutableComputationalSubstrateState(aBeforeShadow);
+    CPPUNIT_ASSERT(applyMutableLifecycleTransition(aMutableState, aTransition));
+
+    m_pDoc->SetEmptyCell(ScAddress(2, 0, 0));
+
+    const auto aMirror = mirrorAdmittedCellStorage(*m_pDoc, aMutableState.maCellStorage);
+    CPPUNIT_ASSERT_EQUAL(CellStorageMirrorResultKind::Applied, aMirror.meKind);
+    m_pDoc->CalcAll();
+
+    const auto aDelta = buildGraphWiringDelta(aTransition);
+    const auto aApply = rebuildAdmittedLiveWiring(*m_pDoc, aDelta);
+    CPPUNIT_ASSERT_EQUAL(WiringApplyResultKind::Applied, aApply.meKind);
+
+    const CalcWorkbookFacade aLiveFacade(*m_pDoc, 1);
+    const auto aLiveObservation = makeComputationalObservationState(
+        collectLiveComputationalState(*m_pDoc));
+    const auto aComputationalComparison
+        = compareComputationalShadow(aTransition.maComputationalAfter, aLiveFacade, aLiveObservation);
+    CPPUNIT_ASSERT(aComputationalComparison.mbFullMatch);
+    const auto aLiveShadow = buildComputationalWorkbookShadow(aLiveFacade, aLiveObservation);
+    const auto aGraphComparison
+        = compareDependencyGraphShadow(aTransition.maGraphAfter, aLiveShadow, aLiveObservation);
+    CPPUNIT_ASSERT_EQUAL(GraphComparisonKind::Exact, aGraphComparison.meKind);
+    CPPUNIT_ASSERT(aGraphComparison.mbFullMatch);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalCellStorageMirrorRebuildsStructuralState)
+{
+    using spreadsheetengine::compat::libreoffice::bootstrapMutableComputationalSubstrateState;
+    using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+    using spreadsheetengine::compat::libreoffice::substratecellstorage::CellStorageMirrorResultKind;
+    using spreadsheetengine::compat::libreoffice::substratecellstorage::mirrorAdmittedCellStorage;
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
+    using spreadsheetengine::compat::libreoffice::substratewiring::WiringApplyResultKind;
+    using spreadsheetengine::compat::libreoffice::substratewiring::rebuildAdmittedLiveWiring;
+    using spreadsheetengine::detail::substrate::applyMutableStructuralTransition;
+    using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
+    using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::buildGraphWiringDelta;
+    using spreadsheetengine::detail::substrate::buildStructuralPilotTransition;
+    using spreadsheetengine::detail::substrate::compareComputationalShadow;
+    using spreadsheetengine::detail::substrate::compareDependencyGraphShadow;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 10.0); // A1
+    m_pDoc->SetValue(0, 1, 0, 20.0); // A2
+    m_pDoc->SetString(1, 0, 0, u"=A2*2"_ustr); // B1
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 0);
+    const auto aBeforeObservation = makeComputationalObservationState(
+        collectLiveComputationalState(*m_pDoc));
+    const auto aBeforeShadow = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+    const auto aBeforeGraph = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+    const auto aBeforeIr = spreadsheetengine::compat::libreoffice::buildExecutionIrWorkbookShadow(
+        aBeforeShadow, *m_pDoc);
+
+    m_pDoc->InsertRow(ScRange(0, 1, 0, m_pDoc->MaxCol(), 1, 0));
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+    const auto aAfterObservation = makeComputationalObservationState(
+        collectLiveComputationalState(*m_pDoc));
+
+    spreadsheetengine::detail::substrate::StructuralPilotInput aInput;
+    aInput.maComputationalShadow = aBeforeShadow;
+    aInput.maGraphShadow = aBeforeGraph;
+    aInput.maIrShadow = aBeforeIr;
+    aInput.maObservedAfterComputationalShadow
+        = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
+    aInput.maObservedAfterIrShadow
+        = spreadsheetengine::compat::libreoffice::buildExecutionIrWorkbookShadow(
+            aInput.maObservedAfterComputationalShadow, *m_pDoc);
+    aInput.maMutation = translateInsertRows(0, 1, 1);
+    aInput.mbCleanBaseline = true;
+
+    const auto aTransition = buildStructuralPilotTransition(aInput, aAfterFacade, aAfterObservation);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::detail::substrate::StructuralPilotVerdict::Applicable,
+        aTransition.meVerdict);
+
+    auto aMutableState = bootstrapMutableComputationalSubstrateState(aBeforeShadow);
+    CPPUNIT_ASSERT(applyMutableStructuralTransition(aMutableState, aTransition));
+
+    m_pDoc->SetEmptyCell(ScAddress(0, 2, 0));
+    m_pDoc->SetEmptyCell(ScAddress(1, 0, 0));
+
+    const auto aMirror = mirrorAdmittedCellStorage(*m_pDoc, aMutableState.maCellStorage);
+    CPPUNIT_ASSERT_EQUAL(CellStorageMirrorResultKind::Applied, aMirror.meKind);
+    m_pDoc->CalcAll();
+
+    const auto aDelta = buildGraphWiringDelta(aTransition);
+    const auto aApply = rebuildAdmittedLiveWiring(*m_pDoc, aDelta);
+    CPPUNIT_ASSERT_EQUAL(WiringApplyResultKind::Applied, aApply.meKind);
+
+    const CalcWorkbookFacade aLiveFacade(*m_pDoc, 1);
+    const auto aLiveObservation = makeComputationalObservationState(
+        collectLiveComputationalState(*m_pDoc));
+    const auto aComputationalComparison
+        = compareComputationalShadow(aTransition.maComputationalAfter, aLiveFacade, aLiveObservation);
+    CPPUNIT_ASSERT(aComputationalComparison.mbFullMatch);
+    const auto aLiveShadow = buildComputationalWorkbookShadow(aLiveFacade, aLiveObservation);
+    const auto aGraphComparison
+        = compareDependencyGraphShadow(aTransition.maGraphAfter, aLiveShadow, aLiveObservation);
+    CPPUNIT_ASSERT_EQUAL(GraphComparisonKind::Exact, aGraphComparison.meKind);
+    CPPUNIT_ASSERT(aGraphComparison.mbFullMatch);
 
     m_pDoc->DeleteTab(0);
 }
