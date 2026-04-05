@@ -19,28 +19,6 @@ namespace spreadsheetengine::detail::substrate
 namespace lifecyclebuilddetail
 {
 
-struct AddressLess
-{
-    [[nodiscard]] bool operator()(const api::CellAddress& rLeft, const api::CellAddress& rRight) const
-    {
-        if (rLeft.mnSheet != rRight.mnSheet)
-            return rLeft.mnSheet < rRight.mnSheet;
-        if (rLeft.mnColumn != rRight.mnColumn)
-            return rLeft.mnColumn < rRight.mnColumn;
-        return rLeft.mnRow < rRight.mnRow;
-    }
-};
-
-struct RangeLess
-{
-    [[nodiscard]] bool operator()(const api::CellRange& rLeft, const api::CellRange& rRight) const
-    {
-        if (!(rLeft.maStart == rRight.maStart))
-            return AddressLess {}(rLeft.maStart, rRight.maStart);
-        return AddressLess {}(rLeft.maEnd, rRight.maEnd);
-    }
-};
-
 [[nodiscard]] inline bool isSingleScalarFormulaCell(const ShadowCellRecord* pCell)
 {
     return pCell && pCell->hasFormula()
@@ -99,61 +77,6 @@ struct RangeLess
             rReason = u"mutation_not_supported";
             return false;
     }
-}
-
-[[nodiscard]] inline ComputationalObservationState buildLifecycleObservationState(
-    const dependency::DependencySnapshot& rSnapshot, const dependency::RecalcPlan& rPlan)
-{
-    ComputationalObservationState aObservation;
-    aObservation.maFormulaTree = authoritybuilddetail::collectQueueAddresses(rPlan);
-
-    std::map<api::CellAddress, std::vector<ListenerAnchorId>, AddressLess> aCellBroadcasters;
-    std::map<api::CellRange, std::vector<ListenerAnchorId>, RangeLess> aAreaBroadcasters;
-
-    for (const auto& rNode : rSnapshot.maNodes)
-    {
-        if (rNode.meKind != dependency::DependencyNodeKind::FormulaCell || !rNode.moOutputAddress)
-            continue;
-
-        const auto aListenerAnchor
-            = graphmapping::makeGraphFormulaCellListenerAnchorId(*rNode.moOutputAddress);
-        std::vector<facade::NamedRangeId> aVisitedNamedRanges;
-        std::vector<dependency::DependencySource> aResolvedSources;
-        for (const auto& rDependency : rSnapshot.getDependencies(rNode.maId))
-        {
-            authoritybuilddetail::collectResolvedDependencySources(
-                rSnapshot, rDependency.maSource, aVisitedNamedRanges, aResolvedSources);
-        }
-
-        for (const auto& rSource : aResolvedSources)
-        {
-            if (rSource.meKind == dependency::DependencySourceKind::Cell)
-            {
-                aCellBroadcasters[rSource.maCellAddress].push_back(aListenerAnchor);
-                continue;
-            }
-
-            if (rSource.meKind == dependency::DependencySourceKind::Range)
-            {
-                aAreaBroadcasters[dependency::detail::normalizeRange(rSource.maCellRange)].push_back(
-                    aListenerAnchor);
-            }
-        }
-    }
-
-    for (auto& [rAddress, rListeners] : aCellBroadcasters)
-    {
-        graphmapping::sortAndUnique(rListeners, graphmapping::ListenerAnchorIdLess {});
-        aObservation.maCellBroadcasters.push_back({ rAddress, std::move(rListeners) });
-    }
-
-    for (auto& [rRange, rListeners] : aAreaBroadcasters)
-    {
-        graphmapping::sortAndUnique(rListeners, graphmapping::ListenerAnchorIdLess {});
-        aObservation.maAreaBroadcasters.push_back({ rRange, std::move(rListeners) });
-    }
-
-    return aObservation;
 }
 
 } // namespace lifecyclebuilddetail
@@ -219,7 +142,7 @@ buildLifecyclePilotTransition(const LifecyclePilotInput& rInput)
         = dependency::planInvalidation(aTransition.maDependencySnapshot, rInput.maMutation);
     aTransition.maRecalcPlan
         = dependency::buildRecalcPlan(aTransition.maDependencySnapshot, aTransition.maInvalidationPlan);
-    const auto aObservation = lifecyclebuilddetail::buildLifecycleObservationState(
+    const auto aObservation = authoritybuilddetail::buildAuthorityObservationState(
         aTransition.maDependencySnapshot, aTransition.maRecalcPlan);
     aTransition.maComputationalAfter
         = buildComputationalWorkbookShadow(aFacade, aObservation);

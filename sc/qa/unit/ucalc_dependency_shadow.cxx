@@ -1596,15 +1596,16 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntrySetValu
     CPPUNIT_ASSERT(oResult->moComputationalComparison->mbCellPopulationMatch);
     CPPUNIT_ASSERT(oResult->moComputationalComparison->mbFormulaTreeMatch);
     CPPUNIT_ASSERT(oResult->moComputationalComparison->mbFormulaTrackMatch);
-    CPPUNIT_ASSERT(!oResult->moComputationalComparison->mbBroadcasterMatch);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbBroadcasterMatch);
     CPPUNIT_ASSERT(oResult->moComputationalComparison->mbGroupMatch);
     CPPUNIT_ASSERT(oResult->moComputationalComparison->mbNamedRangeMatch);
     CPPUNIT_ASSERT(oResult->moBroadcasterCanonicalization.has_value());
-    CPPUNIT_ASSERT(!oResult->moBroadcasterCanonicalization->mbExactMatch);
+    CPPUNIT_ASSERT(oResult->moBroadcasterCanonicalization->mbExactMatch);
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         describeBroadcasterCanonicalization(*oResult->moBroadcasterCanonicalization),
-        BroadcasterCanonicalizationKind::MissingExpectedBroadcasters,
+        BroadcasterCanonicalizationKind::Exact,
         oResult->moBroadcasterCanonicalization->meKind);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbFullMatch);
     CPPUNIT_ASSERT_EQUAL(9.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
 
     m_pDoc->DeleteTab(0);

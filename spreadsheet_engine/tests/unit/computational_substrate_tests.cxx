@@ -295,6 +295,12 @@ int main()
             return fail("computational_substrate", "authority graph edge mismatch");
         if (aAuthorityPlan.maIrAfter.getFormulaCount() != 2)
             return fail("computational_substrate", "authority ir rebuild mismatch");
+        if (aAuthorityPlan.maComputationalAfter.maCellBroadcasters.size() != 2
+            || !aAuthorityPlan.maComputationalAfter.maAreaBroadcasters.empty())
+        {
+            return fail("computational_substrate",
+                "authority computational broadcaster projection mismatch");
+        }
 
         const auto* pAuthorityScalar
             = aAuthorityPlan.maComputationalAfter.findCell({ nPilotSheet, 0, 0 });

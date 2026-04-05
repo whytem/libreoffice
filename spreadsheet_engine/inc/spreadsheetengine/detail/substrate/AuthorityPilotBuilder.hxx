@@ -24,6 +24,28 @@ namespace spreadsheetengine::detail::substrate
 namespace authoritybuilddetail
 {
 
+struct AddressLess
+{
+    [[nodiscard]] bool operator()(const api::CellAddress& rLeft, const api::CellAddress& rRight) const
+    {
+        if (rLeft.mnSheet != rRight.mnSheet)
+            return rLeft.mnSheet < rRight.mnSheet;
+        if (rLeft.mnColumn != rRight.mnColumn)
+            return rLeft.mnColumn < rRight.mnColumn;
+        return rLeft.mnRow < rRight.mnRow;
+    }
+};
+
+struct RangeLess
+{
+    [[nodiscard]] bool operator()(const api::CellRange& rLeft, const api::CellRange& rRight) const
+    {
+        if (!(rLeft.maStart == rRight.maStart))
+            return AddressLess {}(rLeft.maStart, rRight.maStart);
+        return AddressLess {}(rLeft.maEnd, rRight.maEnd);
+    }
+};
+
 class FacadeCompileHost
 {
     const facade::InMemoryWorkbookFacade& mrFacade;
@@ -159,11 +181,9 @@ materializeFacadeFromComputationalShadow(const ComputationalWorkbookShadow& rSha
 }
 
 [[nodiscard]] inline ComputationalWorkbookShadow buildAuthorityComputationalShadow(
-    const facade::InMemoryWorkbookFacade& rFacade, const dependency::RecalcPlan& rPlan)
+    const facade::InMemoryWorkbookFacade& rFacade, const ComputationalObservationState& rObservation)
 {
-    ComputationalObservationState aObservation;
-    aObservation.maFormulaTree = collectQueueAddresses(rPlan);
-    return buildComputationalWorkbookShadow(rFacade, aObservation);
+    return buildComputationalWorkbookShadow(rFacade, rObservation);
 }
 
 [[nodiscard]] inline ExecutionIrCompileArtifacts compileAuthorityFormula(
@@ -230,6 +250,59 @@ inline void collectResolvedDependencySources(const dependency::DependencySnapsho
         case dependency::DependencySourceKind::OpaqueWorkbook:
             return;
     }
+}
+
+[[nodiscard]] inline ComputationalObservationState buildAuthorityObservationState(
+    const dependency::DependencySnapshot& rSnapshot, const dependency::RecalcPlan& rPlan)
+{
+    ComputationalObservationState aObservation;
+    aObservation.maFormulaTree = collectQueueAddresses(rPlan);
+
+    std::map<api::CellAddress, std::vector<ListenerAnchorId>, AddressLess> aCellBroadcasters;
+    std::map<api::CellRange, std::vector<ListenerAnchorId>, RangeLess> aAreaBroadcasters;
+
+    for (const auto& rNode : rSnapshot.maNodes)
+    {
+        if (rNode.meKind != dependency::DependencyNodeKind::FormulaCell || !rNode.moOutputAddress)
+            continue;
+
+        const auto aListenerAnchor
+            = graphmapping::makeGraphFormulaCellListenerAnchorId(*rNode.moOutputAddress);
+        std::vector<facade::NamedRangeId> aVisitedNamedRanges;
+        std::vector<dependency::DependencySource> aResolvedSources;
+        for (const auto& rDependency : rSnapshot.getDependencies(rNode.maId))
+            collectResolvedDependencySources(
+                rSnapshot, rDependency.maSource, aVisitedNamedRanges, aResolvedSources);
+
+        for (const auto& rSource : aResolvedSources)
+        {
+            if (rSource.meKind == dependency::DependencySourceKind::Cell)
+            {
+                aCellBroadcasters[rSource.maCellAddress].push_back(aListenerAnchor);
+                continue;
+            }
+
+            if (rSource.meKind == dependency::DependencySourceKind::Range)
+            {
+                aAreaBroadcasters[dependency::detail::normalizeRange(rSource.maCellRange)].push_back(
+                    aListenerAnchor);
+            }
+        }
+    }
+
+    for (auto& [rAddress, rListeners] : aCellBroadcasters)
+    {
+        graphmapping::sortAndUnique(rListeners, graphmapping::ListenerAnchorIdLess {});
+        aObservation.maCellBroadcasters.push_back({ rAddress, std::move(rListeners) });
+    }
+
+    for (auto& [rRange, rListeners] : aAreaBroadcasters)
+    {
+        graphmapping::sortAndUnique(rListeners, graphmapping::ListenerAnchorIdLess {});
+        aObservation.maAreaBroadcasters.push_back({ rRange, std::move(rListeners) });
+    }
+
+    return aObservation;
 }
 
 [[nodiscard]] inline DependencyGraphShadow buildAuthorityGraphShadow(
@@ -397,8 +470,10 @@ buildAuthorityPilotTransition(const AuthorityPilotInput& rInput)
         = dependency::planInvalidation(aTransition.maDependencySnapshot, rInput.maMutation);
     aTransition.maRecalcPlan
         = dependency::buildRecalcPlan(aTransition.maDependencySnapshot, aTransition.maInvalidationPlan);
+    const auto aObservation = authoritybuilddetail::buildAuthorityObservationState(
+        aTransition.maDependencySnapshot, aTransition.maRecalcPlan);
     aTransition.maComputationalAfter
-        = authoritybuilddetail::buildAuthorityComputationalShadow(aFacade, aTransition.maRecalcPlan);
+        = authoritybuilddetail::buildAuthorityComputationalShadow(aFacade, aObservation);
     aTransition.maGraphAfter = authoritybuilddetail::buildAuthorityGraphShadow(
         aTransition.maComputationalAfter, aTransition.maDependencySnapshot, aTransition.maRecalcPlan);
     aTransition.maIrAfter

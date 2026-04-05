@@ -832,7 +832,7 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
     aTransition.maRecalcPlan
         = dependency::buildRecalcPlan(aTransition.maDependencySnapshot, aTransition.maInvalidationPlan);
 
-    const auto aPredictedObservation = lifecyclebuilddetail::buildLifecycleObservationState(
+    const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
         aTransition.maDependencySnapshot, aTransition.maRecalcPlan);
     aTransition.maComputationalAfter
         = buildComputationalWorkbookShadow(rAfterFacade, aPredictedObservation);
