@@ -193,6 +193,11 @@ Current architecture docs:
   completed closeout decision for the first cell-residency proof cycle,
   admitting engine-resident cell storage on the bounded slice while keeping
   formula-cell lifetime and live container residency in Calc
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_PLAN.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_PLAN.md) -
+  active implementation-ready plan for the next bounded migration step,
+  testing engine-resident live wiring container residency on the admitted
+  slice while Calc remains the mutation-entry, formula-cell-lifetime, and
+  rollback host
 - [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md) -
   frozen authority contract for the first storage-and-wiring pilot, fixing
   the admitted workbook slice, engine-owned sidecar state, engine-issued

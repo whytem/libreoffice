@@ -350,6 +350,7 @@ The key cell-storage closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_MIRRORING.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_MIRRORING.md)
 - [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_PLAN.md)
 
 ## Current Assessment
 
