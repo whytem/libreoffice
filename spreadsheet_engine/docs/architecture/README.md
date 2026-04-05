@@ -364,6 +364,11 @@ Current architecture docs:
   completed closeout decision for raw-mutation migration, admitting
   engine-authored raw mutation records on the bounded slice and naming
   broader live apply-shell reassessment as the next adjacent concern
+- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_REASSESSMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_REASSESSMENT_PLAN.md) -
+  implementation-ready plan for the next bounded reassessment after
+  raw-mutation closeout, focused on making admitted live apply sequencing
+  more explicitly engine-authored while Calc still owns the primitive
+  mutation APIs and final verification host shell
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

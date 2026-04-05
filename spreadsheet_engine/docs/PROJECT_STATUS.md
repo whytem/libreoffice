@@ -587,6 +587,10 @@ longer raw mutation identity. It is the retained live apply shell around the
 already-engine-authored resident, mutation-entry, realization, rollback, and
 raw-mutation surfaces.
 
+The implementation-ready plan for that next reassessment is:
+
+- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_REASSESSMENT_PLAN.md)
+
 ## Current Assessment
 
 The project is in a strong position:
