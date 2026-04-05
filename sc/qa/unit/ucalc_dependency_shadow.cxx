@@ -34,6 +34,7 @@
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateCellStorage.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFormulaCellLifetime.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObjectRealization.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRawMutation.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRollback.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateAuthority.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateLifecycle.hxx>
@@ -85,6 +86,8 @@ using ObjectRealizationObservationKind
         ObjectRealizationObservationKind;
 using RollbackObservationKind
     = spreadsheetengine::compat::libreoffice::substraterollback::RollbackObservationKind;
+using RawMutationObservationKind
+    = spreadsheetengine::compat::libreoffice::substraterawmutation::RawMutationObservationKind;
 using ComputationalStructuralResultKind
     = spreadsheetengine::compat::libreoffice::substratestructural::StructuralResultKind;
 using spreadsheetengine::compat::libreoffice::substratestructural::ScopedComputationalStructural;
@@ -415,6 +418,8 @@ void assertComputationalStructuralAppliedExactly(
         ObjectRealizationObservation& rObservation);
 [[nodiscard]] std::string describeRollbackObservation(
     const spreadsheetengine::compat::libreoffice::substraterollback::RollbackObservation& rObservation);
+[[nodiscard]] std::string describeRawMutationObservation(
+    const spreadsheetengine::compat::libreoffice::substraterawmutation::RawMutationObservation& rObservation);
 
 void assertComputationalMutationEntryApplied(
     const std::optional<
@@ -598,6 +603,22 @@ void assertComparableExecutionIr(
            + " broadcaster=" + (rObservation.mbBroadcasterExact ? "1" : "0")
            + " expected_broadcasters=" + std::to_string(rObservation.mnExpectedBroadcasters)
            + " live_broadcasters=" + std::to_string(rObservation.mnLiveBroadcasters);
+}
+
+[[nodiscard]] std::string describeRawMutationObservation(
+    const spreadsheetengine::compat::libreoffice::substraterawmutation::RawMutationObservation& rObservation)
+{
+    return std::string(spreadsheetengine::compat::libreoffice::substraterawmutation::toString(
+               rObservation.meKind))
+           + " reason="
+           + OUStringToOString(rObservation.maReason, RTL_TEXTENCODING_UTF8).getStr()
+           + " applied=" + (rObservation.mbMutationApplied ? "1" : "0")
+           + " rolled_back=" + (rObservation.mbRolledBack ? "1" : "0")
+           + " queue=" + (rObservation.mbQueueExact ? "1" : "0")
+           + " computational=" + (rObservation.mbComputationalFullMatch ? "1" : "0")
+           + " graph=" + (rObservation.mbGraphFullMatch ? "1" : "0")
+           + " object_realization=" + (rObservation.mbObjectRealizationExact ? "1" : "0")
+           + " rollback=" + (rObservation.mbRollbackExact ? "1" : "0");
 }
 
 void assertFormulaStateEqual(
@@ -4119,6 +4140,108 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
         RollbackObservationKind::MissingRestoredObjects, aRollbackObservation.meKind);
 
     m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalRawMutationObservationClassifierKinds)
+{
+    using spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparison;
+    using spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparisonKind;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::ObjectRealizationObservation;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::ObjectRealizationObservationKind;
+    using spreadsheetengine::compat::libreoffice::substraterawmutation::classifyRawMutationObservation;
+    using spreadsheetengine::compat::libreoffice::substraterollback::RollbackObservation;
+
+    ShadowComparison aQueue;
+    aQueue.meKind = ShadowComparisonKind::Exact;
+
+    spreadsheetengine::detail::substrate::ComputationalShadowComparison aComputational;
+    aComputational.mbCellPopulationMatch = true;
+    aComputational.mbFormulaTreeMatch = true;
+    aComputational.mbFormulaTrackMatch = true;
+    aComputational.mbBroadcasterMatch = true;
+    aComputational.mbGroupMatch = true;
+    aComputational.mbNamedRangeMatch = true;
+    aComputational.mbFullMatch = true;
+
+    spreadsheetengine::detail::substrate::DependencyGraphShadowComparison aGraph;
+    aGraph.meKind = GraphComparisonKind::Exact;
+    aGraph.mbFormulaNodeMatch = true;
+    aGraph.mbFormulaGroupNodeMatch = true;
+    aGraph.mbListenerAnchorMatch = true;
+    aGraph.mbBroadcasterNodeMatch = true;
+    aGraph.mbEdgeMatch = true;
+    aGraph.mbFormulaTreeExactMatch = true;
+    aGraph.mbFormulaTrackExactMatch = true;
+    aGraph.mbFormulaTreeNormalizedMatch = true;
+    aGraph.mbFormulaTrackNormalizedMatch = true;
+    aGraph.mbFullMatch = true;
+
+    ObjectRealizationObservation aObjectObservation;
+    aObjectObservation.meKind = ObjectRealizationObservationKind::Exact;
+
+    CPPUNIT_ASSERT_EQUAL(
+        RawMutationObservationKind::Exact,
+        classifyRawMutationObservation(true, false, aQueue, aComputational, aGraph, aObjectObservation,
+            std::nullopt)
+            .meKind);
+
+    aObjectObservation.meKind = ObjectRealizationObservationKind::OrderingOnly;
+    CPPUNIT_ASSERT_EQUAL(
+        RawMutationObservationKind::OrderingOnly,
+        classifyRawMutationObservation(true, false, aQueue, aComputational, aGraph, aObjectObservation,
+            std::nullopt)
+            .meKind);
+
+    aObjectObservation.meKind = ObjectRealizationObservationKind::MissingRealizedObjects;
+    CPPUNIT_ASSERT_EQUAL(
+        RawMutationObservationKind::MissingRealizedOrRolledBackObjects,
+        classifyRawMutationObservation(true, false, aQueue, aComputational, aGraph, aObjectObservation,
+            std::nullopt)
+            .meKind);
+
+    aObjectObservation.meKind = ObjectRealizationObservationKind::HostOnlyRepairOrReconstruction;
+    CPPUNIT_ASSERT_EQUAL(
+        RawMutationObservationKind::HiddenHostMutationReconstruction,
+        classifyRawMutationObservation(true, false, aQueue, aComputational, aGraph, aObjectObservation,
+            std::nullopt)
+            .meKind);
+
+    aObjectObservation.meKind = ObjectRealizationObservationKind::QueueOrStateMismatch;
+    CPPUNIT_ASSERT_EQUAL(
+        RawMutationObservationKind::QueueOrStateMismatch,
+        classifyRawMutationObservation(true, false, aQueue, aComputational, aGraph, aObjectObservation,
+            std::nullopt)
+            .meKind);
+
+    aObjectObservation.meKind = ObjectRealizationObservationKind::OutOfContract;
+    aObjectObservation.maReason = u"raw_out_of_contract";
+    CPPUNIT_ASSERT_EQUAL(
+        RawMutationObservationKind::OutOfContract,
+        classifyRawMutationObservation(true, false, aQueue, aComputational, aGraph, aObjectObservation,
+            std::nullopt)
+            .meKind);
+
+    RollbackObservation aRollbackObservation;
+    aRollbackObservation.meKind = RollbackObservationKind::Exact;
+    CPPUNIT_ASSERT_EQUAL(
+        RawMutationObservationKind::Exact,
+        classifyRawMutationObservation(true, true, aQueue, aComputational, aGraph, std::nullopt,
+            aRollbackObservation)
+            .meKind);
+
+    aRollbackObservation.meKind = RollbackObservationKind::HostOnlyRollbackReconstruction;
+    CPPUNIT_ASSERT_EQUAL(
+        RawMutationObservationKind::HiddenHostMutationReconstruction,
+        classifyRawMutationObservation(true, true, aQueue, aComputational, aGraph, std::nullopt,
+            aRollbackObservation)
+            .meKind);
+
+    CPPUNIT_ASSERT_EQUAL(
+        RawMutationObservationKind::OutOfContract,
+        classifyRawMutationObservation(false, false, aQueue, aComputational, aGraph, std::nullopt,
+            std::nullopt, u"missing_raw_mutation_record")
+            .meKind);
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
