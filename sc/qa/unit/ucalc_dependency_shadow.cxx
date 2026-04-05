@@ -1553,6 +1553,13 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntrySetValu
         = aEntry.apply(*m_pDoc, MutationEntryRequest::setScalarValue({ 0, 0, 0 },
                                          CellValue::number(9.0)));
     assertComputationalMutationEntryApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbCellPopulationMatch);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbFormulaTreeMatch);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbFormulaTrackMatch);
+    CPPUNIT_ASSERT(!oResult->moComputationalComparison->mbBroadcasterMatch);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbGroupMatch);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbNamedRangeMatch);
     CPPUNIT_ASSERT_EQUAL(9.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
 
     m_pDoc->DeleteTab(0);
@@ -1576,6 +1583,8 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntrySetForm
     const auto oResult
         = aEntry.apply(*m_pDoc, MutationEntryRequest::setFormula({ 0, 1, 0 }, u"=A1*3"));
     assertComputationalMutationEntryApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbFullMatch);
 
     ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(1, 0, 0));
     CPPUNIT_ASSERT(pFormula);
@@ -1601,6 +1610,8 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntryInsertR
 
     const auto oResult = aEntry.apply(*m_pDoc, MutationEntryRequest::insertRows(0, 1, 1));
     assertComputationalMutationEntryApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbFullMatch);
     CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(0, 3, 0)));
 
     m_pDoc->DeleteTab(0);
