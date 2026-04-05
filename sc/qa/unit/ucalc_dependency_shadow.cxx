@@ -3128,6 +3128,11 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 
     const auto aApply = realizeAdmittedWiringContainers(*m_pDoc, aMutableState.maWiringContainers);
     CPPUNIT_ASSERT_EQUAL(WiringApplyResultKind::Applied, aApply.meKind);
+    CPPUNIT_ASSERT(
+        spreadsheetengine::compat::libreoffice::recalcshadow::detail::collectPredictedQueueAddresses(
+            aTransition.maRecalcPlan)
+        == spreadsheetengine::compat::libreoffice::recalcshadow::detail::
+            collectFormulaTreeAddresses(*m_pDoc));
 
     const CalcWorkbookFacade aLiveFacade(*m_pDoc, 1);
     const auto aLiveObservation = makeComputationalObservationState(
@@ -3210,6 +3215,11 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 
     const auto aApply = realizeAdmittedWiringContainers(*m_pDoc, aMutableState.maWiringContainers);
     CPPUNIT_ASSERT_EQUAL(WiringApplyResultKind::Applied, aApply.meKind);
+    CPPUNIT_ASSERT(
+        spreadsheetengine::compat::libreoffice::recalcshadow::detail::collectPredictedQueueAddresses(
+            aTransition.maRecalcPlan)
+        == spreadsheetengine::compat::libreoffice::recalcshadow::detail::
+            collectFormulaTreeAddresses(*m_pDoc));
 
     const CalcWorkbookFacade aLiveFacade(*m_pDoc, 1);
     const auto aLiveObservation = makeComputationalObservationState(
@@ -3300,6 +3310,11 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 
     const auto aApply = realizeAdmittedWiringContainers(*m_pDoc, aMutableState.maWiringContainers);
     CPPUNIT_ASSERT_EQUAL(WiringApplyResultKind::Applied, aApply.meKind);
+    CPPUNIT_ASSERT(
+        spreadsheetengine::compat::libreoffice::recalcshadow::detail::collectPredictedQueueAddresses(
+            aTransition.maRecalcPlan)
+        == spreadsheetengine::compat::libreoffice::recalcshadow::detail::
+            collectFormulaTreeAddresses(*m_pDoc));
 
     const CalcWorkbookFacade aLiveFacade(*m_pDoc, 1);
     const auto aLiveObservation = makeComputationalObservationState(
