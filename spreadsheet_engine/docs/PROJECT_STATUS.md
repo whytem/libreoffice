@@ -477,6 +477,10 @@ That next step should be treated as another bounded reassessment, not as
 license to widen directly into broader mutation authority or broader object
 or container migration.
 
+That reassessment is now tracked in:
+
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md)
+
 ## Current Assessment
 
 The project is in a strong position:
@@ -534,6 +538,7 @@ For the current second-stage boundary and rollout closeout, see:
 - [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md)
 - [README.md](architecture/README.md)
 
 For completed plans, closeout records, and historical extraction context, see:

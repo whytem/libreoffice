@@ -262,6 +262,10 @@ Current architecture docs:
   completed closeout decision for the mutation-entry proof cycle, keeping
   direct mutation entry validation-only and naming scalar broadcaster
   canonicalization convergence as the next adjacent concern
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md) -
+  active implementation-ready plan for the next bounded reassessment,
+  targeting exact scalar-entry broadcaster canonicalization convergence on
+  the admitted mutation-entry slice
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded
