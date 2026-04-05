@@ -575,21 +575,52 @@ The key raw-mutation closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_DECISION_RECORD.md)
 
+## Live Apply-Shell Outcome
+
+The live apply-shell reassessment is now complete.
+
+It justifies one additional bounded boundary shift:
+
+- the engine now owns the admitted live apply plan on the bounded slice
+- admitted scalar, formula, clear, and narrow structural entry now carry
+  that explicit engine-authored apply plan before exact verification
+  completes
+- applied admitted mutation-entry results now carry explicit live-apply
+  observation instead of relying on hidden host sequencing
+- dirty-baseline rejection and rollback stay exact through the live
+  apply-plan path
+
+It still does not justify broad host independence. Calc still owns:
+
+- the underlying raw document mutation APIs used to execute the admitted
+  plan stages
+- the primitive realization and rollback host operations
+- the final verification host shell around those primitive operations
+
+That means the current boundary is now stronger than the earlier
+resident-state-plus-host-apply-shell split, but it is still narrower than a
+broad computational document transplant.
+
+The key live apply-shell closeout references are:
+
+- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_REASSESSMENT_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_SCHEMA.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_SCHEMA.md)
+- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_OBSERVATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_OBSERVATION.md)
+- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_DECISION_RECORD.md)
+
 ## Next Explicit Reassessment Target
 
 The next explicit bounded concern is:
 
-- broader live apply-shell reassessment on the admitted slice
+- raw document mutation API migration on the admitted slice
 
-The raw-mutation reassessment is now closed with a bounded proceed result.
-The most actionable remaining host-owned surface on the admitted slice is no
-longer raw mutation identity. It is the retained live apply shell around the
-already-engine-authored resident, mutation-entry, realization, rollback, and
-raw-mutation surfaces.
-
-The implementation-ready plan for that next reassessment is:
-
-- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_REASSESSMENT_PLAN.md)
+The live apply-shell reassessment is now closed with a bounded proceed
+result. The most actionable remaining host-owned surface on the admitted
+slice is no longer stage identity or stage ordering. It is the underlying
+raw document mutation shell that still executes the admitted plan.
 
 ## Current Assessment
 
@@ -613,6 +644,7 @@ The current state should be read as:
 - plus a successful bounded admitted-slice object-realization proof
 - plus a successful bounded admitted-slice final-rollback proof
 - plus a successful bounded admitted-slice raw-mutation proof
+- plus a successful bounded admitted-slice live-apply-shell proof
 - but still not as proof that a full computational storage migration is
   already justified
 
@@ -632,7 +664,8 @@ Any further expansion should continue under these rules:
 - require a new explicit plan before widening beyond the current admitted
   rollout, storage-and-wiring slice, admitted cell-residency slice, and
   admitted wiring-container residency slice, admitted formula-cell-lifetime
-  slice, and admitted object-realization slice
+  slice, admitted object-realization slice, and admitted live-apply-shell
+  slice
 
 ## Reference Material
 

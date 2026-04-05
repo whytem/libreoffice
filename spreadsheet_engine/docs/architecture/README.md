@@ -365,10 +365,32 @@ Current architecture docs:
   engine-authored raw mutation records on the bounded slice and naming
   broader live apply-shell reassessment as the next adjacent concern
 - [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_REASSESSMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_REASSESSMENT_PLAN.md) -
-  implementation-ready plan for the next bounded reassessment after
-  raw-mutation closeout, focused on making admitted live apply sequencing
-  more explicitly engine-authored while Calc still owns the primitive
-  mutation APIs and final verification host shell
+  completed closeout record for the admitted live apply-shell reassessment,
+  proceeding with engine-authored live apply sequencing on the bounded slice
+  while leaving the primitive mutation APIs and final verification host shell
+  in Calc
+- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_CONTRACT.md) -
+  frozen contract note for the admitted live apply-shell slice, fixing the
+  covered stage families, retained Calc host surfaces, and exact success
+  standard
+- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_SCHEMA.md](COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_SCHEMA.md) -
+  frozen schema note for the admitted live apply plan, stable stage
+  identity, stage ordering, and forbidden host orchestration shortcuts
+- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_OBSERVATION.md](COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_OBSERVATION.md) -
+  completed observation note for live apply-shell drift classification,
+  introducing exact, ordering-only, hidden-orchestration, missing-object,
+  mismatch, and out-of-contract result families
+- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_IMPLEMENTATION.md) -
+  completed implementation note for the engine-authored admitted live apply
+  plan and the mutation-entry path that carries it
+- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_EVIDENCE.md) -
+  frozen evidence note for the live apply-shell proof cycle, recording exact
+  admitted apply, exact dirty-baseline rollback, bounded runtime samples,
+  and the narrowed host shell
+- [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_DECISION_RECORD.md) -
+  completed closeout decision for live apply-shell migration, admitting
+  engine-authored admitted apply plans on the bounded slice and naming raw
+  document mutation API migration as the next adjacent concern
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

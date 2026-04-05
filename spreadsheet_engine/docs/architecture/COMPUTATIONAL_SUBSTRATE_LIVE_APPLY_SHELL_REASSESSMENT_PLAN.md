@@ -1,6 +1,6 @@
 # Computational Substrate Live Apply-Shell Reassessment Plan
 
-Status: implementation-ready plan
+Status: completed closeout record
 
 ## Purpose
 
