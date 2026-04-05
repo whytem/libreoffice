@@ -18,6 +18,7 @@
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateCellStorage.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFormulaCellLifetime.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObjectRealization.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRollback.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateLifecycle.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRollout.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateStructural.hxx>
@@ -60,6 +61,7 @@ struct MutationEntryResult
         moBroadcasterCanonicalization;
     std::optional<substrateobjectrealization::ObjectRealizationObservation>
         moObjectRealizationObservation;
+    std::optional<substraterollback::RollbackObservation> moRollbackObservation;
 };
 
 namespace detail
@@ -373,13 +375,34 @@ struct RealizationResult
 }
 
 inline void rollbackToBeforeState(ScDocument& rDoc,
-    const spreadsheetengine::detail::substrate::MutableComputationalSubstrateState& rBeforeState,
-    const recalcqueue::FormulaStateSnapshot& rBeforeFormulaState)
+    const substraterollback::AdmittedRollbackRecord& rRollback,
+    substraterollback::RollbackResult& rResult)
 {
-    const auto aBeforeRealization
-        = substrateobjectrealization::buildAdmittedObjectRealization(rBeforeState);
-    (void)substrateobjectrealization::realizeAdmittedObjectRealization(rDoc, aBeforeRealization);
-    recalcqueue::restoreFormulaState(rDoc, rBeforeFormulaState);
+    rResult = substraterollback::applyAdmittedRollback(rDoc, rRollback);
+}
+
+[[nodiscard]] inline substraterollback::RollbackObservation observeRolledBackState(
+    ScDocument& rDoc, const spreadsheetengine::detail::substrate::MutableComputationalSubstrateState& rBeforeState,
+    const recalcqueue::FormulaStateSnapshot& rBeforeFormulaState,
+    const substraterollback::RollbackResult& rRollback)
+{
+    const CalcWorkbookFacade aRollbackFacade(rDoc, rBeforeState.maShadow.maSnapshot.mnGeneration);
+    const auto aRollbackObservationState = makeComputationalObservationState(
+        substrateobs::collectLiveComputationalState(rDoc));
+    const auto aQueueComparison
+        = substraterollback::compareRollbackQueueToDocument(rBeforeFormulaState, rDoc);
+    const auto aComputationalComparison = spreadsheetengine::detail::substrate::compareComputationalShadow(
+        rBeforeState.maShadow, aRollbackFacade, aRollbackObservationState);
+    const auto aRollbackShadow = spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow(
+        aRollbackFacade, aRollbackObservationState);
+    const auto aGraphComparison = spreadsheetengine::detail::substrate::compareDependencyGraphShadow(
+        rBeforeState.maGraphShadow, aRollbackShadow, aRollbackObservationState);
+    const auto aBroadcasterComparison
+        = spreadsheetengine::detail::substrate::detail::compareBroadcasterCanonicalization(
+            rBeforeState.maShadow, aRollbackObservationState);
+    return substraterollback::classifyRollbackObservation(
+        rRollback, aQueueComparison, aComputationalComparison, aGraphComparison,
+        aBroadcasterComparison);
 }
 
 } // namespace detail
@@ -429,6 +452,8 @@ public:
         const auto aBeforeMutableState
             = spreadsheetengine::detail::substrate::bootstrapMutableComputationalSubstrateState(
                 maComputationalShadow);
+        const auto aBeforeRollback
+            = substraterollback::buildAdmittedRollbackRecord(aBeforeMutableState, maFormulaState);
         auto aMutableState = aBeforeMutableState;
 
         api::String aApplyReason;
@@ -461,7 +486,10 @@ public:
         if (const auto oImmediateKind = detail::classifyImmediateResultKind(aResult.maTransition))
         {
             aResult.meKind = *oImmediateKind;
-            detail::rollbackToBeforeState(rDoc, aBeforeMutableState, maFormulaState);
+            substraterollback::RollbackResult aRollback;
+            detail::rollbackToBeforeState(rDoc, aBeforeRollback, aRollback);
+            aResult.moRollbackObservation
+                = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
             return aResult;
         }
 
@@ -469,7 +497,10 @@ public:
                 aMutableState, aResult.maTransition))
         {
             aResult.meKind = MutationEntryResultKind::RolledBackVerificationFailure;
-            detail::rollbackToBeforeState(rDoc, aBeforeMutableState, maFormulaState);
+            substraterollback::RollbackResult aRollback;
+            detail::rollbackToBeforeState(rDoc, aBeforeRollback, aRollback);
+            aResult.moRollbackObservation
+                = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
             return aResult;
         }
 
@@ -478,7 +509,10 @@ public:
         {
             aResult.meKind = MutationEntryResultKind::RolledBackVerificationFailure;
             aResult.maTransition.maReason = aRealization.maReason;
-            detail::rollbackToBeforeState(rDoc, aBeforeMutableState, maFormulaState);
+            substraterollback::RollbackResult aRollback;
+            detail::rollbackToBeforeState(rDoc, aBeforeRollback, aRollback);
+            aResult.moRollbackObservation
+                = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
             return aResult;
         }
 
@@ -494,7 +528,10 @@ public:
         if (!pPlan || !pComputationalAfter || !pGraphAfter || !pIrAfter)
         {
             aResult.meKind = MutationEntryResultKind::RolledBackVerificationFailure;
-            detail::rollbackToBeforeState(rDoc, aBeforeMutableState, maFormulaState);
+            substraterollback::RollbackResult aRollback;
+            detail::rollbackToBeforeState(rDoc, aBeforeRollback, aRollback);
+            aResult.moRollbackObservation
+                = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
             return aResult;
         }
 
@@ -529,7 +566,10 @@ public:
         if (aResult.meKind == MutationEntryResultKind::RolledBackVerificationFailure
             || aResult.meKind == MutationEntryResultKind::RepairDetected)
         {
-            detail::rollbackToBeforeState(rDoc, aBeforeMutableState, maFormulaState);
+            substraterollback::RollbackResult aRollback;
+            detail::rollbackToBeforeState(rDoc, aBeforeRollback, aRollback);
+            aResult.moRollbackObservation
+                = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
         }
 
         return aResult;

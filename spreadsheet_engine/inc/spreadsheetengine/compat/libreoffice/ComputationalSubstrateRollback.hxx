@@ -46,6 +46,43 @@ struct RollbackObservation
     [[nodiscard]] constexpr bool operator==(const RollbackObservation& rOther) const = default;
 };
 
+enum class RollbackResultKind : sal_uInt8
+{
+    Applied,
+    RejectedOutOfContract
+};
+
+struct AdmittedRollbackRecord
+{
+    std::int64_t mnGeneration = 0;
+    substrateobjectrealization::AdmittedObjectRealization maObjectRealization;
+    recalcqueue::FormulaStateSnapshot maFormulaState;
+
+    [[nodiscard]] constexpr bool operator==(const AdmittedRollbackRecord& rOther) const = default;
+
+    [[nodiscard]] sal_Int32 getFormulaCellCount() const
+    {
+        return maObjectRealization.getFormulaCellCount();
+    }
+
+    [[nodiscard]] sal_Int32 getCellCount() const
+    {
+        return maObjectRealization.getCellCount();
+    }
+
+    [[nodiscard]] sal_Int32 getBroadcasterNodeCount() const
+    {
+        return maObjectRealization.getBroadcasterNodeCount();
+    }
+};
+
+struct RollbackResult
+{
+    RollbackResultKind meKind = RollbackResultKind::RejectedOutOfContract;
+    api::String maReason;
+    substrateobjectrealization::ObjectRealizationResult maObjectRealization;
+};
+
 namespace detail
 {
 
@@ -196,6 +233,55 @@ namespace detail
     else
         aObservation.maReason = u"rollback_state_mismatch";
     return aObservation;
+}
+
+[[nodiscard]] inline RollbackObservation classifyRollbackObservation(
+    const RollbackResult& rResult, const recalcshadow::ShadowComparison& rQueue,
+    const spreadsheetengine::detail::substrate::ComputationalShadowComparison& rComputational,
+    const spreadsheetengine::detail::substrate::DependencyGraphShadowComparison& rGraph,
+    const spreadsheetengine::detail::substrate::BroadcasterCanonicalizationComparison& rBroadcasters)
+{
+    if (rResult.meKind != RollbackResultKind::Applied)
+    {
+        RollbackObservation aObservation;
+        aObservation.meKind = RollbackObservationKind::OutOfContract;
+        aObservation.maReason = rResult.maReason;
+        return aObservation;
+    }
+
+    return classifyRollbackObservation(
+        rResult.maObjectRealization, rQueue, rComputational, rGraph, rBroadcasters);
+}
+
+[[nodiscard]] inline AdmittedRollbackRecord buildAdmittedRollbackRecord(
+    const spreadsheetengine::detail::substrate::MutableComputationalSubstrateState& rState,
+    const recalcqueue::FormulaStateSnapshot& rFormulaState)
+{
+    AdmittedRollbackRecord aRecord;
+    aRecord.mnGeneration = std::max({ rState.maFormulaCellLifetime.mnGeneration,
+        rState.maCellStorage.mnGeneration, rState.maWiringContainers.mnGeneration });
+    aRecord.maObjectRealization = substrateobjectrealization::buildAdmittedObjectRealization(rState);
+    aRecord.maFormulaState = rFormulaState;
+    return aRecord;
+}
+
+[[nodiscard]] inline RollbackResult applyAdmittedRollback(
+    ScDocument& rDoc, const AdmittedRollbackRecord& rRollback)
+{
+    RollbackResult aResult;
+    aResult.maObjectRealization
+        = substrateobjectrealization::realizeAdmittedObjectRealization(
+            rDoc, rRollback.maObjectRealization);
+    if (aResult.maObjectRealization.meKind
+        != substrateobjectrealization::ObjectRealizationResultKind::Applied)
+    {
+        aResult.maReason = aResult.maObjectRealization.maReason;
+        return aResult;
+    }
+
+    recalcqueue::restoreFormulaState(rDoc, rRollback.maFormulaState);
+    aResult.meKind = RollbackResultKind::Applied;
+    return aResult;
 }
 
 [[nodiscard]] inline const char* toString(RollbackObservationKind eKind)

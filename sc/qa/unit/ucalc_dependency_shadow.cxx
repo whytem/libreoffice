@@ -1751,6 +1751,10 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntryRejects
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(
         ComputationalMutationEntryResultKind::RejectedDirtyBaseline, oResult->meKind);
+    CPPUNIT_ASSERT(oResult->moRollbackObservation.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        describeRollbackObservation(*oResult->moRollbackObservation),
+        RollbackObservationKind::Exact, oResult->moRollbackObservation->meKind);
     CPPUNIT_ASSERT_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
     assertFormulaStateEqual(aBeforeApply, captureFormulaState(*m_pDoc));
 
@@ -3999,11 +4003,8 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     using spreadsheetengine::compat::libreoffice::bootstrapMutableComputationalSubstrateState;
     using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
     using spreadsheetengine::compat::libreoffice::recalcqueue::captureFormulaState;
-    using spreadsheetengine::compat::libreoffice::recalcqueue::restoreFormulaState;
-    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
-        buildAdmittedObjectRealization;
-    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
-        realizeAdmittedObjectRealization;
+    using spreadsheetengine::compat::libreoffice::substraterollback::applyAdmittedRollback;
+    using spreadsheetengine::compat::libreoffice::substraterollback::buildAdmittedRollbackRecord;
     using spreadsheetengine::compat::libreoffice::substraterollback::classifyRollbackObservation;
     using spreadsheetengine::compat::libreoffice::substraterollback::compareRollbackQueueToDocument;
     using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
@@ -4028,14 +4029,13 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     const auto aBeforeGraph = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
     const auto aBeforeFormulaState = captureFormulaState(*m_pDoc);
     const auto aBeforeMutableState = bootstrapMutableComputationalSubstrateState(aBeforeShadow);
-    const auto aBeforeRealization = buildAdmittedObjectRealization(aBeforeMutableState);
+    const auto aBeforeRollback = buildAdmittedRollbackRecord(aBeforeMutableState, aBeforeFormulaState);
 
     m_pDoc->SetValue(0, 0, 0, 9.0);
     m_pDoc->SetValue(1, 0, 0, 99.0);
     m_pDoc->SetEmptyCell(ScAddress(2, 0, 0));
 
-    const auto aRollbackRealization = realizeAdmittedObjectRealization(*m_pDoc, aBeforeRealization);
-    restoreFormulaState(*m_pDoc, aBeforeFormulaState);
+    const auto aRollbackResult = applyAdmittedRollback(*m_pDoc, aBeforeRollback);
 
     const CalcWorkbookFacade aRestoredFacade(*m_pDoc, 0);
     const auto aRestoredObservation = makeComputationalObservationState(
@@ -4049,7 +4049,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     const auto aBroadcasterComparison
         = compareBroadcasterCanonicalization(aBeforeMutableState.maShadow, aRestoredObservation);
     const auto aRollbackObservation = classifyRollbackObservation(
-        aRollbackRealization, aQueueComparison, aComputationalComparison, aGraphComparison,
+        aRollbackResult, aQueueComparison, aComputationalComparison, aGraphComparison,
         aBroadcasterComparison);
 
     CPPUNIT_ASSERT_EQUAL_MESSAGE(describeRollbackObservation(aRollbackObservation),
@@ -4065,11 +4065,8 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     using spreadsheetengine::compat::libreoffice::bootstrapMutableComputationalSubstrateState;
     using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
     using spreadsheetengine::compat::libreoffice::recalcqueue::captureFormulaState;
-    using spreadsheetengine::compat::libreoffice::recalcqueue::restoreFormulaState;
-    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
-        buildAdmittedObjectRealization;
-    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
-        realizeAdmittedObjectRealization;
+    using spreadsheetengine::compat::libreoffice::substraterollback::applyAdmittedRollback;
+    using spreadsheetengine::compat::libreoffice::substraterollback::buildAdmittedRollbackRecord;
     using spreadsheetengine::compat::libreoffice::substraterollback::classifyRollbackObservation;
     using spreadsheetengine::compat::libreoffice::substraterollback::compareRollbackQueueToDocument;
     using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
@@ -4094,14 +4091,13 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     const auto aBeforeGraph = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
     const auto aBeforeFormulaState = captureFormulaState(*m_pDoc);
     const auto aBeforeMutableState = bootstrapMutableComputationalSubstrateState(aBeforeShadow);
-    const auto aBeforeRealization = buildAdmittedObjectRealization(aBeforeMutableState);
+    const auto aBeforeRollback = buildAdmittedRollbackRecord(aBeforeMutableState, aBeforeFormulaState);
 
     m_pDoc->SetValue(0, 0, 0, 9.0);
     m_pDoc->SetValue(1, 0, 0, 99.0);
     m_pDoc->SetEmptyCell(ScAddress(2, 0, 0));
 
-    const auto aRollbackRealization = realizeAdmittedObjectRealization(*m_pDoc, aBeforeRealization);
-    restoreFormulaState(*m_pDoc, aBeforeFormulaState);
+    const auto aRollbackResult = applyAdmittedRollback(*m_pDoc, aBeforeRollback);
     m_pDoc->SetEmptyCell(ScAddress(2, 0, 0));
 
     const CalcWorkbookFacade aRestoredFacade(*m_pDoc, 0);
@@ -4116,7 +4112,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     const auto aBroadcasterComparison
         = compareBroadcasterCanonicalization(aBeforeMutableState.maShadow, aRestoredObservation);
     const auto aRollbackObservation = classifyRollbackObservation(
-        aRollbackRealization, aQueueComparison, aComputationalComparison, aGraphComparison,
+        aRollbackResult, aQueueComparison, aComputationalComparison, aGraphComparison,
         aBroadcasterComparison);
 
     CPPUNIT_ASSERT_EQUAL_MESSAGE(describeRollbackObservation(aRollbackObservation),
