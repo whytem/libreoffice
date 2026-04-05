@@ -1,10 +1,10 @@
 # Computational Substrate Scalar Mutation Entry Convergence Plan
 
-Status: implementation-ready plan
+Status: completed closeout record
 
 ## Purpose
 
-This document defines the next bounded proof cycle after the completed
+This document records the completed bounded proof cycle after the completed
 [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md).
 
 That closeout left one narrow blocker between the current validation-only
@@ -16,8 +16,12 @@ mutation-entry surface and a settled live mutation-entry boundary:
 - graph comparison already remains exact and full-match
 - IR comparison already remains accepted
 
-The next adjacent concern is therefore not broader mutation authority. It is
-scalar-entry broadcaster-canonicalization convergence.
+The scalar-entry broadcaster blocker named there is now closed. The final
+closeout decision is recorded in
+[COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_DECISION_RECORD.md).
+
+The bounded concern addressed by this plan was scalar-entry
+broadcaster-canonicalization convergence.
 
 This plan is not a general mutation-entry rewrite. It is a narrowly bounded
 reassessment of whether direct admitted-slice `SetScalarValue` can be brought

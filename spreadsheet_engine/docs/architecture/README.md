@@ -259,13 +259,33 @@ Current architecture docs:
   summarizing exact formula and structural entry results plus the remaining
   broadcaster-canonicalization caveat on scalar entry
 - [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md) -
-  completed closeout decision for the mutation-entry proof cycle, keeping
-  direct mutation entry validation-only and naming scalar broadcaster
-  canonicalization convergence as the next adjacent concern
+  completed historical closeout decision for the first mutation-entry proof
+  cycle, which kept direct mutation entry validation-only before the scalar
+  convergence reassessment was completed
 - [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md) -
-  active implementation-ready plan for the next bounded reassessment,
-  targeting exact scalar-entry broadcaster canonicalization convergence on
-  the admitted mutation-entry slice
+  completed closeout record for the bounded scalar broadcaster-convergence
+  reassessment, ending in admitted live scalar mutation entry on the bounded
+  slice
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_CONTRACT.md) -
+  frozen contract note for the scalar convergence cycle, fixing the admitted
+  scalar mutation surface, exact success standard, and immediate defer
+  triggers
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CANONICALIZATION_MATRIX.md](COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CANONICALIZATION_MATRIX.md) -
+  frozen matrix note for scalar broadcaster canonicalization, defining the
+  covered listener shapes, diagnostic categories, and forbidden shortcuts
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_OBSERVATION.md](COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_OBSERVATION.md) -
+  completed observation note for the scalar mismatch classification layer,
+  recording the original `missing_expected_broadcasters` diagnosis
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_IMPLEMENTATION.md) -
+  completed implementation note for the scalar convergence fix, aligning the
+  authority after-state with the dependency-derived broadcaster surface
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_EVIDENCE.md) -
+  frozen evidence note for the scalar convergence cycle, recording the
+  before/after broadcaster result and the green bounded validation contract
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_DECISION_RECORD.md) -
+  completed closeout decision for scalar mutation-entry convergence,
+  admitting direct scalar mutation entry on the bounded slice and naming
+  broader object realization as the next adjacent concern
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

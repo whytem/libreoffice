@@ -218,6 +218,7 @@ The result is intentionally narrow:
 The current admitted narrow rollout surface is:
 
 - admitted scalar lifecycle authority
+- admitted scalar mutation entry
 - single-sheet `InsertRows`
 - single-sheet `DeleteRows`
 - single-sheet `InsertColumns`
@@ -237,7 +238,7 @@ computational storage migration by itself.
 
 Calc still owns the live host side of this slice:
 
-- document mutation APIs
+- raw document mutation APIs
 - live object realization
 - final live verification and rollback mechanics
 
@@ -428,34 +429,27 @@ The key formula-cell-lifetime closeout references are:
 
 ## Mutation Entry Outcome
 
-The first mutation-entry proof cycle is now complete.
+The first mutation-entry proof cycle and the completed scalar convergence
+reassessment are now both complete.
 
-It justified:
+Together they justify one additional bounded boundary shift:
 
-- an engine-owned admitted mutation request shape
-- engine-owned request-to-path classification on the admitted slice
-- Calc-side apply and realization from engine-owned mutation-entry output
-- exact live formula-entry proof on the admitted slice
-- exact live admitted structural-entry proof on the admitted slice
-- explicit dirty-baseline rejection and rollback
+- the engine now owns admitted scalar mutation-entry request shape and
+  routing on the bounded slice
+- the engine now owns admitted scalar mutation-entry after-state decisions on
+  that slice
+- direct scalar mutation entry now closes with exact queue, computational,
+  graph, and broadcaster verification after Calc realization
+- the already-proven direct formula-entry and admitted structural-entry lanes
+  remain green
+- explicit dirty-baseline rejection and rollback remain in place
 
-It did not justify settled live admission of direct mutation entry across the
-whole admitted slice.
+They still do not justify broad host-independent mutation application. Calc
+still owns:
 
-The blocking gap is narrow but real:
-
-- direct scalar mutation entry still closes with a broadcaster-only
-  computational mismatch after live realization
-- queue verification remains exact
-- graph verification remains exact and full-match
-- the live computational comparison still does not fully converge because
-  broadcaster canonicalization differs on the Calc side
-
-The current settled boundary after this closeout is therefore:
-
-- the engine owns a validation-only admitted mutation-entry surface
-- Calc still owns the settled live mutation-entry boundary
-- Calc still owns live realization and final rollback
+- raw document mutation APIs
+- live object realization
+- final rollback
 
 The key mutation-entry closeout references are:
 
@@ -466,20 +460,24 @@ The key mutation-entry closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_REALIZATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_REALIZATION.md)
 - [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CANONICALIZATION_MATRIX.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CANONICALIZATION_MATRIX.md)
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_OBSERVATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_OBSERVATION.md)
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_DECISION_RECORD.md)
 
 ## Next Explicit Reassessment Target
 
 The next explicit bounded concern is:
 
-- admitted-slice scalar-entry broadcaster-canonicalization convergence
+- broader object-realization reassessment
 
-That next step should be treated as another bounded reassessment, not as
-license to widen directly into broader mutation authority or broader object
-or container migration.
-
-That reassessment is now tracked in:
-
-- [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md)
+The scalar mutation-entry blocker is now closed. The most actionable
+remaining host-owned surface on the bounded slice is Calc-side live object
+realization and final rollback, not mutation-request routing or
+broadcaster-canonicalization convergence.
 
 ## Current Assessment
 
