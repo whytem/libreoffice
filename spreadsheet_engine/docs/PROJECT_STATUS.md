@@ -167,7 +167,8 @@ Calc still intentionally owns:
 
 - broad `ScDocument`, `ScTable`, and `ScColumn` storage outside the admitted
   slice
-- document mutation APIs and formula-cell object lifetime
+- document mutation APIs and broad formula-cell object lifetime outside the
+  admitted slice
 - live host realization and rollback of dependency side effects
 - stack container mutation and formula-token cursor ownership
 - `ScTokenArray` construction, range/union token-container operations, and
@@ -222,6 +223,7 @@ The current admitted narrow rollout surface is:
 - single-sheet `InsertColumns`
 - single-sheet `DeleteColumns`
 - ordinary scalar formulas only
+- engine-owned admitted-slice formula-cell lifetime decisions
 - clean baseline only
 - no shared groups
 - no named-range-sensitive structural behavior
@@ -236,7 +238,7 @@ computational storage migration by itself.
 Calc still owns the live host side of this slice:
 
 - document mutation APIs
-- formula-cell object lifetime
+- live object realization
 - final live verification and rollback mechanics
 
 That is acceptable because the current rollout is a compat-driven authority
@@ -252,7 +254,7 @@ engine-owned boundary:
 - sheet insert, delete, rename, or move
 - copy, move, clipboard, load-time, or undo-like structural flows
 - broader storage migration
-- formula-cell object lifetime migration
+- broad formula-cell object lifetime migration outside the admitted slice
 - token-container ownership transfer
 - broad listener/broadcaster ownership transfer
 
@@ -388,6 +390,55 @@ The key wiring-container closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md)
 
+## Formula-Cell Lifetime Outcome
+
+The first formula-cell lifetime proof cycle is now complete.
+
+It justified one additional bounded boundary shift:
+
+- the engine now owns admitted-slice formula-cell lifetime decisions
+- the engine still owns resident admitted-slice cell storage
+- the engine still owns resident admitted-slice wiring containers
+- the engine still owns mutable computational state plus graph, wiring, and
+  queue decisions on that slice
+- Calc can realize admitted live `ScFormulaCell` objects from engine-owned
+  lifetime state and still pass exact computational, graph, and queue
+  verification
+
+It did not justify direct mutation-entry migration or broad formula-cell
+object migration outside the admitted slice. Calc still owns:
+
+- mutation entry and document mutation APIs
+- live object realization
+- final rollback
+
+That means the current boundary is now stronger than the earlier
+resident-cell-plus-host-lifetime split, but it is still narrower than a
+broad computational document transplant.
+
+The key formula-cell-lifetime closeout references are:
+
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_SCHEMA.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_SCHEMA.md)
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_REALIZATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_REALIZATION.md)
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_DECISION_RECORD.md)
+
+## Next Explicit Migration Target
+
+The next explicit bounded migration target is:
+
+- direct admitted-slice mutation entry
+
+The working rule for that next step is unchanged:
+
+- keep the admitted scalar lifecycle and structural slice narrow
+- keep rollback in Calc
+- require the same exact computational, graph, and queue verification before
+  any mutation-entry admission decision
+
 ## Current Assessment
 
 The project is in a strong position:
@@ -406,6 +457,7 @@ The current state should be read as:
 - plus a successful bounded storage-and-wiring authority proof
 - plus a successful bounded admitted-slice cell-residency proof
 - plus a successful bounded admitted-slice wiring-container residency proof
+- plus a successful bounded admitted-slice formula-cell lifetime proof
 - but still not as proof that a full computational storage migration is
   already justified
 
@@ -424,7 +476,8 @@ Any further expansion should continue under these rules:
   follow-up polish
 - require a new explicit plan before widening beyond the current admitted
   rollout, storage-and-wiring slice, admitted cell-residency slice, and
-  admitted wiring-container residency slice
+  admitted wiring-container residency slice, and admitted formula-cell-
+  lifetime slice
 
 ## Reference Material
 
@@ -439,6 +492,8 @@ For the current second-stage boundary and rollout closeout, see:
 - [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_DECISION_RECORD.md)
 - [README.md](architecture/README.md)
 
 For completed plans, closeout records, and historical extraction context, see:

@@ -218,6 +218,31 @@ Current architecture docs:
   frozen evidence note for the admitted wiring-container residency path,
   summarizing exact resident realization, retained rollback coverage, and
   bounded operational samples
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_PLAN.md](COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_PLAN.md) -
+  completed implementation and closeout record for the admitted-slice
+  formula-cell lifetime proof cycle, admitting engine-owned lifetime
+  decisions while keeping mutation entry and rollback in Calc
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_CONTRACT.md) -
+  frozen contract note for the admitted formula-cell lifetime slice, fixing
+  the admitted workbook classes, retained host surfaces, and exact success
+  criteria
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_SCHEMA.md](COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_SCHEMA.md) -
+  frozen schema note for engine-owned admitted formula-cell lifetime
+  records, stable identity, replace/remove semantics, and equivalence rules
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_IMPLEMENTATION.md) -
+  completed implementation note for the engine-owned admitted lifetime
+  store, including bootstrap and transition-driven reconciliation
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_REALIZATION.md](COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_REALIZATION.md) -
+  completed implementation note for Calc-side realization of admitted live
+  `ScFormulaCell` objects from engine-owned lifetime state
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_EVIDENCE.md) -
+  frozen evidence note for the admitted formula-cell lifetime path,
+  summarizing exact realization, retained rollback coverage, and bounded
+  operational samples
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_DECISION_RECORD.md) -
+  completed closeout decision for the admitted formula-cell lifetime proof
+  cycle, admitting engine-owned lifetime decisions while keeping mutation
+  entry and live realization in Calc
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded
