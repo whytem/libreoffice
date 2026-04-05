@@ -244,12 +244,24 @@ Current architecture docs:
   cycle, admitting engine-owned lifetime decisions while keeping mutation
   entry and live realization in Calc
 - [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_PLAN.md](COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_PLAN.md) -
-  active implementation-ready plan for the next bounded migration step,
-  testing engine-owned admitted-slice mutation entry while keeping live
-  realization and rollback in Calc
+  completed closeout record for the first admitted-slice mutation-entry
+  proof cycle, ending in a validation-only result rather than settled live
+  admission
 - [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_CONTRACT.md) -
-  reserved contract note for the admitted mutation-entry slice, to be frozen
-  when plan execution begins
+  frozen contract note for the admitted mutation-entry slice, fixing the
+  admitted request classes, retained Calc host surfaces, and exact success
+  criteria for the completed proof cycle
+- [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_REALIZATION.md](COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_REALIZATION.md) -
+  completed implementation note for Calc-side apply and realization of
+  engine-owned mutation-entry output on the admitted slice
+- [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_EVIDENCE.md) -
+  frozen evidence note for the admitted mutation-entry proof cycle,
+  summarizing exact formula and structural entry results plus the remaining
+  broadcaster-canonicalization caveat on scalar entry
+- [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md) -
+  completed closeout decision for the mutation-entry proof cycle, keeping
+  direct mutation entry validation-only and naming scalar broadcaster
+  canonicalization convergence as the next adjacent concern
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

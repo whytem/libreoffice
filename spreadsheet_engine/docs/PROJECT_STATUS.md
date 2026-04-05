@@ -426,22 +426,56 @@ The key formula-cell-lifetime closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_DECISION_RECORD.md)
 
-## Next Explicit Migration Target
+## Mutation Entry Outcome
 
-The next explicit bounded migration target is:
+The first mutation-entry proof cycle is now complete.
 
-- direct admitted-slice mutation entry
+It justified:
 
-That target is now tracked in:
+- an engine-owned admitted mutation request shape
+- engine-owned request-to-path classification on the admitted slice
+- Calc-side apply and realization from engine-owned mutation-entry output
+- exact live formula-entry proof on the admitted slice
+- exact live admitted structural-entry proof on the admitted slice
+- explicit dirty-baseline rejection and rollback
+
+It did not justify settled live admission of direct mutation entry across the
+whole admitted slice.
+
+The blocking gap is narrow but real:
+
+- direct scalar mutation entry still closes with a broadcaster-only
+  computational mismatch after live realization
+- queue verification remains exact
+- graph verification remains exact and full-match
+- the live computational comparison still does not fully converge because
+  broadcaster canonicalization differs on the Calc side
+
+The current settled boundary after this closeout is therefore:
+
+- the engine owns a validation-only admitted mutation-entry surface
+- Calc still owns the settled live mutation-entry boundary
+- Calc still owns live realization and final rollback
+
+The key mutation-entry closeout references are:
 
 - [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_SCHEMA.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_SCHEMA.md)
+- [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_REALIZATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_REALIZATION.md)
+- [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md)
 
-The working rule for that next step is unchanged:
+## Next Explicit Reassessment Target
 
-- keep the admitted scalar lifecycle and structural slice narrow
-- keep rollback in Calc
-- require the same exact computational, graph, and queue verification before
-  any mutation-entry admission decision
+The next explicit bounded concern is:
+
+- admitted-slice scalar-entry broadcaster-canonicalization convergence
+
+That next step should be treated as another bounded reassessment, not as
+license to widen directly into broader mutation authority or broader object
+or container migration.
 
 ## Current Assessment
 
@@ -499,6 +533,7 @@ For the current second-stage boundary and rollout closeout, see:
 - [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_CELL_LIFETIME_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md)
 - [README.md](architecture/README.md)
 
 For completed plans, closeout records, and historical extraction context, see:
