@@ -544,7 +544,9 @@ The key final-rollback closeout references are:
 
 The next explicit bounded concern is:
 
-- broader raw mutation API migration on the admitted slice
+- broader raw mutation API migration on the admitted slice, with the
+  implementation-ready plan in
+  [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_MIGRATION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_MIGRATION_PLAN.md)
 
 The final-rollback reassessment is now closed with a bounded proceed result.
 The most actionable remaining host-owned surface on the admitted slice is no
