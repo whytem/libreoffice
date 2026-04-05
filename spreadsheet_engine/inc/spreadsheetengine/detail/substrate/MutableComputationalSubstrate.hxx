@@ -11,6 +11,8 @@
 
 #include <spreadsheetengine/detail/substrate/AuthorityPilotBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowBuilder.hxx>
+#include <spreadsheetengine/detail/substrate/DependencyGraphShadowBuilder.hxx>
+#include <spreadsheetengine/detail/substrate/GraphWiringDelta.hxx>
 #include <spreadsheetengine/detail/substrate/LifecyclePilot.hxx>
 #include <spreadsheetengine/detail/substrate/StructuralPilot.hxx>
 
@@ -66,12 +68,61 @@ struct AdmittedCellStorageComparison
         = default;
 };
 
+struct AdmittedWiringContainers
+{
+    std::int64_t mnGeneration = 0;
+    std::vector<GraphBroadcasterNodeRecord> maBroadcasterNodes;
+    std::vector<GraphEdgeRecord> maListenerEdges;
+    std::vector<ShadowCellId> maFormulaTreeNodes;
+    std::vector<ShadowCellId> maFormulaTrackNodes;
+
+    [[nodiscard]] constexpr bool operator==(const AdmittedWiringContainers& rOther) const = default;
+
+    [[nodiscard]] sal_Int32 getBroadcasterNodeCount() const
+    {
+        return static_cast<sal_Int32>(maBroadcasterNodes.size());
+    }
+
+    [[nodiscard]] sal_Int32 getListenerEdgeCount() const
+    {
+        return static_cast<sal_Int32>(maListenerEdges.size());
+    }
+
+    [[nodiscard]] const GraphBroadcasterNodeRecord* findBroadcasterNode(
+        const BroadcasterNodeId& rId) const
+    {
+        auto aIt = std::find_if(maBroadcasterNodes.begin(), maBroadcasterNodes.end(),
+            [&rId](const GraphBroadcasterNodeRecord& rNode) { return rNode.maId == rId; });
+        return aIt == maBroadcasterNodes.end() ? nullptr : &*aIt;
+    }
+
+    [[nodiscard]] const GraphEdgeRecord* findListenerEdge(const GraphEdgeRecord& rEdge) const
+    {
+        auto aIt = std::find_if(maListenerEdges.begin(), maListenerEdges.end(),
+            [&rEdge](const GraphEdgeRecord& rCandidate) { return rCandidate == rEdge; });
+        return aIt == maListenerEdges.end() ? nullptr : &*aIt;
+    }
+};
+
+struct AdmittedWiringContainerComparison
+{
+    bool mbPopulationMatch = false;
+    bool mbPayloadMatch = false;
+    bool mbGenerationMatch = false;
+    bool mbFullMatch = false;
+
+    [[nodiscard]] constexpr bool operator==(const AdmittedWiringContainerComparison& rOther) const
+        = default;
+};
+
 struct MutableComputationalSubstrateState
 {
     facade::InMemoryWorkbookFacade maFacade;
     ComputationalObservationState maObservation;
     ComputationalWorkbookShadow maShadow;
+    DependencyGraphShadow maGraphShadow;
     AdmittedCellStorage maCellStorage;
+    AdmittedWiringContainers maWiringContainers;
     facade::MutationEvent maLastMutation;
     sal_Int32 mnAppliedMutationCount = 0;
     bool mbBootstrapped = false;
@@ -183,6 +234,101 @@ inline void reconcileAdmittedCellStorage(
     return aComparison;
 }
 
+[[nodiscard]] inline AdmittedWiringContainers
+buildAdmittedWiringContainers(const DependencyGraphShadow& rGraph)
+{
+    AdmittedWiringContainers aStore;
+    aStore.mnGeneration = rGraph.maSnapshot.mnGeneration;
+    aStore.maBroadcasterNodes = rGraph.maBroadcasterNodes;
+    aStore.maListenerEdges = rGraph.maEdges;
+    aStore.maFormulaTreeNodes = rGraph.maFormulaTreeNodes;
+    aStore.maFormulaTrackNodes = rGraph.maFormulaTrackNodes;
+
+    std::sort(aStore.maBroadcasterNodes.begin(), aStore.maBroadcasterNodes.end(),
+        [](const GraphBroadcasterNodeRecord& rLeft, const GraphBroadcasterNodeRecord& rRight) {
+            return graphmapping::BroadcasterNodeIdLess {}(rLeft.maId, rRight.maId);
+        });
+    std::sort(aStore.maListenerEdges.begin(), aStore.maListenerEdges.end(),
+        graphmapping::GraphEdgeRecordLess {});
+    return aStore;
+}
+
+inline void upsertBroadcasterNode(AdmittedWiringContainers& rStore,
+    const BroadcasterNodeDeltaRecord& rDelta)
+{
+    auto aIt = std::remove_if(rStore.maBroadcasterNodes.begin(), rStore.maBroadcasterNodes.end(),
+        [&rDelta](const GraphBroadcasterNodeRecord& rNode) { return rNode.maId == rDelta.maNode; });
+    rStore.maBroadcasterNodes.erase(aIt, rStore.maBroadcasterNodes.end());
+
+    if (rDelta.meAction == GraphDeltaAction::Add)
+    {
+        GraphBroadcasterNodeRecord aNode;
+        aNode.maId = rDelta.maNode;
+        aNode.mnListenerCount = rDelta.mnListenerCount;
+        rStore.maBroadcasterNodes.insert(
+            std::lower_bound(rStore.maBroadcasterNodes.begin(), rStore.maBroadcasterNodes.end(),
+                aNode,
+                [](const GraphBroadcasterNodeRecord& rLeft,
+                    const GraphBroadcasterNodeRecord& rRight) {
+                    return graphmapping::BroadcasterNodeIdLess {}(rLeft.maId, rRight.maId);
+                }),
+            aNode);
+    }
+}
+
+inline void upsertListenerEdge(
+    AdmittedWiringContainers& rStore, const ListenerEdgeDeltaRecord& rDelta)
+{
+    auto aIt = std::remove(rStore.maListenerEdges.begin(), rStore.maListenerEdges.end(), rDelta.maEdge);
+    rStore.maListenerEdges.erase(aIt, rStore.maListenerEdges.end());
+
+    if (rDelta.meAction == GraphDeltaAction::Add)
+    {
+        rStore.maListenerEdges.insert(
+            std::lower_bound(rStore.maListenerEdges.begin(), rStore.maListenerEdges.end(),
+                rDelta.maEdge, graphmapping::GraphEdgeRecordLess {}),
+            rDelta.maEdge);
+    }
+}
+
+inline void reconcileAdmittedWiringContainers(AdmittedWiringContainers& rStore,
+    const GraphWiringDelta& rDelta, const DependencyGraphShadow& rGraphAfter)
+{
+    for (const auto& rNodeDelta : rDelta.maBroadcasterNodeDeltas)
+        upsertBroadcasterNode(rStore, rNodeDelta);
+    for (const auto& rEdgeDelta : rDelta.maListenerEdgeDeltas)
+        upsertListenerEdge(rStore, rEdgeDelta);
+
+    rStore.maBroadcasterNodes = rGraphAfter.maBroadcasterNodes;
+    std::sort(rStore.maBroadcasterNodes.begin(), rStore.maBroadcasterNodes.end(),
+        [](const GraphBroadcasterNodeRecord& rLeft, const GraphBroadcasterNodeRecord& rRight) {
+            return graphmapping::BroadcasterNodeIdLess {}(rLeft.maId, rRight.maId);
+        });
+    rStore.maFormulaTreeNodes = rDelta.maFormulaTreeAfter;
+    rStore.maFormulaTrackNodes = rDelta.maFormulaTrackAfter;
+    rStore.mnGeneration = rGraphAfter.maSnapshot.mnGeneration;
+}
+
+[[nodiscard]] inline AdmittedWiringContainerComparison compareAdmittedWiringContainers(
+    const AdmittedWiringContainers& rStore, const DependencyGraphShadow& rGraph)
+{
+    const auto aExpected = buildAdmittedWiringContainers(rGraph);
+
+    AdmittedWiringContainerComparison aComparison;
+    aComparison.mbPopulationMatch = rStore.getBroadcasterNodeCount() == aExpected.getBroadcasterNodeCount()
+        && rStore.getListenerEdgeCount() == aExpected.getListenerEdgeCount()
+        && rStore.maFormulaTreeNodes.size() == aExpected.maFormulaTreeNodes.size()
+        && rStore.maFormulaTrackNodes.size() == aExpected.maFormulaTrackNodes.size();
+    aComparison.mbPayloadMatch = rStore.maBroadcasterNodes == aExpected.maBroadcasterNodes
+        && rStore.maListenerEdges == aExpected.maListenerEdges
+        && rStore.maFormulaTreeNodes == aExpected.maFormulaTreeNodes
+        && rStore.maFormulaTrackNodes == aExpected.maFormulaTrackNodes;
+    aComparison.mbGenerationMatch = rStore.mnGeneration == aExpected.mnGeneration;
+    aComparison.mbFullMatch = aComparison.mbPopulationMatch && aComparison.mbPayloadMatch
+        && aComparison.mbGenerationMatch;
+    return aComparison;
+}
+
 [[nodiscard]] inline ComputationalObservationState
 makeObservationStateFromShadow(const ComputationalWorkbookShadow& rShadow)
 {
@@ -199,7 +345,9 @@ inline void setStateFromShadow(MutableComputationalSubstrateState& rState,
 {
     rState.maObservation = makeObservationStateFromShadow(rShadow);
     rState.maShadow = rShadow;
+    rState.maGraphShadow = buildDependencyGraphShadow(rShadow, rState.maObservation);
     rState.maCellStorage = buildAdmittedCellStorage(rShadow);
+    rState.maWiringContainers = buildAdmittedWiringContainers(rState.maGraphShadow);
     rState.maFacade = authoritybuilddetail::materializeFacadeFromComputationalShadow(rShadow);
     rState.mbBootstrapped = true;
 }
@@ -253,6 +401,18 @@ buildAdmittedCellStorage(const ComputationalWorkbookShadow& rShadow)
     return mutablesubstratedetail::compareAdmittedCellStorage(rStore, rShadow);
 }
 
+[[nodiscard]] inline AdmittedWiringContainers
+buildAdmittedWiringContainers(const DependencyGraphShadow& rGraph)
+{
+    return mutablesubstratedetail::buildAdmittedWiringContainers(rGraph);
+}
+
+[[nodiscard]] inline AdmittedWiringContainerComparison compareAdmittedWiringContainers(
+    const AdmittedWiringContainers& rStore, const DependencyGraphShadow& rGraph)
+{
+    return mutablesubstratedetail::compareAdmittedWiringContainers(rStore, rGraph);
+}
+
 [[nodiscard]] inline bool applyMutableAuthorityTransition(
     MutableComputationalSubstrateState& rState, const AuthorityPilotTransition& rTransition)
 {
@@ -275,12 +435,18 @@ buildAdmittedCellStorage(const ComputationalWorkbookShadow& rShadow)
     if (!authoritybuilddetail::applyAuthorityMutationToFacade(rState.maFacade, aFacadeInput, aIgnoredReason))
         return false;
 
+    const auto aWiringDelta = buildGraphWiringDelta(
+        rState.maGraphShadow, rTransition.maGraphAfter, rTransition.maRecalcPlan,
+        rTransition.maInput.maMutation);
     rState.maFacade.setGeneration(rTransition.maComputationalAfter.maSnapshot.mnGeneration);
     rState.maObservation
         = mutablesubstratedetail::makeObservationStateFromShadow(rTransition.maComputationalAfter);
     rState.maShadow = rTransition.maComputationalAfter;
+    rState.maGraphShadow = rTransition.maGraphAfter;
     mutablesubstratedetail::reconcileAdmittedCellStorage(
         rState.maCellStorage, rTransition.maComputationalAfter);
+    mutablesubstratedetail::reconcileAdmittedWiringContainers(
+        rState.maWiringContainers, aWiringDelta, rTransition.maGraphAfter);
     rState.maLastMutation = rTransition.maInput.maMutation;
     ++rState.mnAppliedMutationCount;
     return true;
@@ -302,12 +468,18 @@ buildAdmittedCellStorage(const ComputationalWorkbookShadow& rShadow)
     for (const auto& rAction : rTransition.maSyncActions)
         mutablesubstratedetail::applyLifecycleSyncAction(rState.maFacade, rAction);
 
+    const auto aWiringDelta = buildGraphWiringDelta(
+        rState.maGraphShadow, rTransition.maGraphAfter, rTransition.maRecalcPlan,
+        rTransition.maInput.maMutation);
     rState.maFacade.setGeneration(rTransition.maComputationalAfter.maSnapshot.mnGeneration);
     rState.maObservation
         = mutablesubstratedetail::makeObservationStateFromShadow(rTransition.maComputationalAfter);
     rState.maShadow = rTransition.maComputationalAfter;
+    rState.maGraphShadow = rTransition.maGraphAfter;
     mutablesubstratedetail::reconcileAdmittedCellStorage(
         rState.maCellStorage, rTransition.maComputationalAfter);
+    mutablesubstratedetail::reconcileAdmittedWiringContainers(
+        rState.maWiringContainers, aWiringDelta, rTransition.maGraphAfter);
     rState.maLastMutation = rTransition.maInput.maMutation;
     ++rState.mnAppliedMutationCount;
     return true;
@@ -323,9 +495,22 @@ buildAdmittedCellStorage(const ComputationalWorkbookShadow& rShadow)
         return false;
     }
 
-    mutablesubstratedetail::setStateFromShadow(rState, rTransition.maComputationalAfter);
+    if (!rState.mbBootstrapped)
+        mutablesubstratedetail::setStateFromShadow(rState, rTransition.maInput.maComputationalShadow);
+
+    const auto aWiringDelta = buildGraphWiringDelta(
+        rState.maGraphShadow, rTransition.maGraphAfter, rTransition.maRecalcPlan,
+        rTransition.maInput.maMutation);
+    rState.maFacade = authoritybuilddetail::materializeFacadeFromComputationalShadow(
+        rTransition.maComputationalAfter);
+    rState.maObservation
+        = mutablesubstratedetail::makeObservationStateFromShadow(rTransition.maComputationalAfter);
+    rState.maShadow = rTransition.maComputationalAfter;
+    rState.maGraphShadow = rTransition.maGraphAfter;
     mutablesubstratedetail::reconcileAdmittedCellStorage(
         rState.maCellStorage, rTransition.maComputationalAfter);
+    mutablesubstratedetail::reconcileAdmittedWiringContainers(
+        rState.maWiringContainers, aWiringDelta, rTransition.maGraphAfter);
     rState.maLastMutation = rTransition.maInput.maMutation;
     ++rState.mnAppliedMutationCount;
     return true;

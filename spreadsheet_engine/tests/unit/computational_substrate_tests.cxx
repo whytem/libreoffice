@@ -261,6 +261,12 @@ int main()
         auto aMutableState = bootstrapMutableComputationalSubstrateState(aPilotShadow);
         if (!compareAdmittedCellStorage(aMutableState.maCellStorage, aPilotShadow).mbFullMatch)
             return fail("computational_substrate", "bootstrap cell storage mismatch");
+        if (!compareAdmittedWiringContainers(aMutableState.maWiringContainers,
+                aAuthorityInput.maGraphShadow)
+                 .mbFullMatch)
+        {
+            return fail("computational_substrate", "bootstrap wiring container mismatch");
+        }
         if (!applyMutableAuthorityTransition(aMutableState, aAuthorityPlan)
             || aMutableState.mnAppliedMutationCount != 1
             || !(aMutableState.maLastMutation == aAuthorityInput.maMutation))
@@ -276,6 +282,12 @@ int main()
                  .mbFullMatch)
         {
             return fail("computational_substrate", "mutable authority cell storage mismatch");
+        }
+        if (!compareAdmittedWiringContainers(aMutableState.maWiringContainers,
+                aAuthorityPlan.maGraphAfter)
+                 .mbFullMatch)
+        {
+            return fail("computational_substrate", "mutable authority wiring container mismatch");
         }
         const auto aMutableScalar
             = aMutableState.maFacade.getCellDescriptor({ nPilotSheet, 0, 0 });
@@ -388,6 +400,13 @@ int main()
         {
             return fail("computational_substrate", "mutable lifecycle insertion storage mismatch");
         }
+        if (!compareAdmittedWiringContainers(aMutableLifecycleState.maWiringContainers,
+                aLifecycleInsertPlan.maGraphAfter)
+                 .mbFullMatch)
+        {
+            return fail("computational_substrate",
+                "mutable lifecycle insertion wiring mismatch");
+        }
         if (!applyMutableLifecycleTransition(aMutableLifecycleState, aLifecycleRemovePlan)
             || aMutableLifecycleState.mnAppliedMutationCount != 2
             || aMutableLifecycleState.maFacade.getFormulaCellDescriptor({ nPilotSheet, 1, 0 }))
@@ -399,6 +418,13 @@ int main()
                  .mbFullMatch)
         {
             return fail("computational_substrate", "mutable lifecycle removal storage mismatch");
+        }
+        if (!compareAdmittedWiringContainers(aMutableLifecycleState.maWiringContainers,
+                aLifecycleRemovePlan.maGraphAfter)
+                 .mbFullMatch)
+        {
+            return fail("computational_substrate",
+                "mutable lifecycle removal wiring mismatch");
         }
 
         const auto aStructuralAdmitted
@@ -519,6 +545,13 @@ int main()
                      .mbFullMatch)
             {
                 return fail("computational_substrate", "mutable structural storage mismatch");
+            }
+            if (!compareAdmittedWiringContainers(aMutableStructuralState.maWiringContainers,
+                    aStructuralPlan.maGraphAfter)
+                     .mbFullMatch)
+            {
+                return fail("computational_substrate",
+                    "mutable structural wiring mismatch");
             }
         }
 

@@ -187,8 +187,16 @@ int main()
         }
 
         auto aMutableState = bootstrapMutableComputationalSubstrateState(aPilotShadow);
+        if (!compareAdmittedWiringContainers(aMutableState.maWiringContainers, aPilotGraph).mbFullMatch)
+            return fail("computational_graph", "bootstrap wiring container mismatch");
         if (!applyMutableLifecycleTransition(aMutableState, aLifecycleTransition))
             return fail("computational_graph", "graph delta mutable lifecycle setup mismatch");
+        if (!compareAdmittedWiringContainers(aMutableState.maWiringContainers,
+                aLifecycleTransition.maGraphAfter)
+                 .mbFullMatch)
+        {
+            return fail("computational_graph", "mutable wiring container update mismatch");
+        }
 
         const auto aAdvancedGraph
             = buildDependencyGraphShadow(aMutableState.maShadow, aMutableState.maObservation);
