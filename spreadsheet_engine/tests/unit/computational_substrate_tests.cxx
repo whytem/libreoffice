@@ -261,6 +261,11 @@ int main()
         auto aMutableState = bootstrapMutableComputationalSubstrateState(aPilotShadow);
         if (!compareAdmittedCellStorage(aMutableState.maCellStorage, aPilotShadow).mbFullMatch)
             return fail("computational_substrate", "bootstrap cell storage mismatch");
+        if (!compareAdmittedFormulaCellLifetime(aMutableState.maFormulaCellLifetime, aPilotShadow)
+                 .mbFullMatch)
+        {
+            return fail("computational_substrate", "bootstrap formula lifetime mismatch");
+        }
         if (!compareAdmittedWiringContainers(aMutableState.maWiringContainers,
                 aAuthorityInput.maGraphShadow)
                  .mbFullMatch)
@@ -282,6 +287,12 @@ int main()
                  .mbFullMatch)
         {
             return fail("computational_substrate", "mutable authority cell storage mismatch");
+        }
+        if (!compareAdmittedFormulaCellLifetime(aMutableState.maFormulaCellLifetime,
+                aAuthorityPlan.maComputationalAfter)
+                 .mbFullMatch)
+        {
+            return fail("computational_substrate", "mutable authority formula lifetime mismatch");
         }
         if (!compareAdmittedWiringContainers(aMutableState.maWiringContainers,
                 aAuthorityPlan.maGraphAfter)
@@ -400,6 +411,13 @@ int main()
         {
             return fail("computational_substrate", "mutable lifecycle insertion storage mismatch");
         }
+        if (!compareAdmittedFormulaCellLifetime(aMutableLifecycleState.maFormulaCellLifetime,
+                aLifecycleInsertPlan.maComputationalAfter)
+                 .mbFullMatch)
+        {
+            return fail("computational_substrate",
+                "mutable lifecycle insertion formula lifetime mismatch");
+        }
         if (!compareAdmittedWiringContainers(aMutableLifecycleState.maWiringContainers,
                 aLifecycleInsertPlan.maGraphAfter)
                  .mbFullMatch)
@@ -418,6 +436,13 @@ int main()
                  .mbFullMatch)
         {
             return fail("computational_substrate", "mutable lifecycle removal storage mismatch");
+        }
+        if (!compareAdmittedFormulaCellLifetime(aMutableLifecycleState.maFormulaCellLifetime,
+                aLifecycleRemovePlan.maComputationalAfter)
+                 .mbFullMatch)
+        {
+            return fail("computational_substrate",
+                "mutable lifecycle removal formula lifetime mismatch");
         }
         if (!compareAdmittedWiringContainers(aMutableLifecycleState.maWiringContainers,
                 aLifecycleRemovePlan.maGraphAfter)
@@ -545,6 +570,13 @@ int main()
                      .mbFullMatch)
             {
                 return fail("computational_substrate", "mutable structural storage mismatch");
+            }
+            if (!compareAdmittedFormulaCellLifetime(aMutableStructuralState.maFormulaCellLifetime,
+                    aStructuralPlan.maComputationalAfter)
+                     .mbFullMatch)
+            {
+                return fail("computational_substrate",
+                    "mutable structural formula lifetime mismatch");
             }
             if (!compareAdmittedWiringContainers(aMutableStructuralState.maWiringContainers,
                     aStructuralPlan.maGraphAfter)

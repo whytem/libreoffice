@@ -68,6 +68,49 @@ struct AdmittedCellStorageComparison
         = default;
 };
 
+struct AdmittedFormulaCellLifetimeRecord
+{
+    ShadowCellId maId;
+    api::String maFormulaSource;
+
+    [[nodiscard]] constexpr bool operator==(const AdmittedFormulaCellLifetimeRecord& rOther) const
+        = default;
+};
+
+struct AdmittedFormulaCellLifetime
+{
+    std::int64_t mnGeneration = 0;
+    std::vector<AdmittedFormulaCellLifetimeRecord> maFormulaCells;
+
+    [[nodiscard]] constexpr bool operator==(const AdmittedFormulaCellLifetime& rOther) const = default;
+
+    [[nodiscard]] sal_Int32 getFormulaCellCount() const
+    {
+        return static_cast<sal_Int32>(maFormulaCells.size());
+    }
+
+    [[nodiscard]] const AdmittedFormulaCellLifetimeRecord* findFormulaCell(
+        const api::CellAddress& rAddress) const
+    {
+        auto aIt = std::find_if(maFormulaCells.begin(), maFormulaCells.end(),
+            [&rAddress](const AdmittedFormulaCellLifetimeRecord& rCell) {
+                return rCell.maId.maAddress == rAddress;
+            });
+        return aIt == maFormulaCells.end() ? nullptr : &*aIt;
+    }
+};
+
+struct AdmittedFormulaCellLifetimeComparison
+{
+    bool mbPopulationMatch = false;
+    bool mbPayloadMatch = false;
+    bool mbGenerationMatch = false;
+    bool mbFullMatch = false;
+
+    [[nodiscard]] constexpr bool operator==(
+        const AdmittedFormulaCellLifetimeComparison& rOther) const = default;
+};
+
 struct AdmittedWiringContainers
 {
     std::int64_t mnGeneration = 0;
@@ -122,6 +165,7 @@ struct MutableComputationalSubstrateState
     ComputationalWorkbookShadow maShadow;
     DependencyGraphShadow maGraphShadow;
     AdmittedCellStorage maCellStorage;
+    AdmittedFormulaCellLifetime maFormulaCellLifetime;
     AdmittedWiringContainers maWiringContainers;
     facade::MutationEvent maLastMutation;
     sal_Int32 mnAppliedMutationCount = 0;
@@ -228,6 +272,101 @@ inline void reconcileAdmittedCellStorage(
     aComparison.mbPopulationMatch = rStore.getCellCount() == aExpected.getCellCount()
         && rStore.getFormulaCellCount() == aExpected.getFormulaCellCount();
     aComparison.mbPayloadMatch = rStore.maCells == aExpected.maCells;
+    aComparison.mbGenerationMatch = rStore.mnGeneration == aExpected.mnGeneration;
+    aComparison.mbFullMatch = aComparison.mbPopulationMatch && aComparison.mbPayloadMatch
+        && aComparison.mbGenerationMatch;
+    return aComparison;
+}
+
+[[nodiscard]] inline bool isAdmittedFormulaLifetimeCell(const ShadowCellRecord& rCell)
+{
+    return rCell.hasFormula()
+           && rCell.moFormula->meKind == facade::FormulaCellKind::Ordinary
+           && !rCell.moFormulaGroup.has_value();
+}
+
+[[nodiscard]] inline AdmittedFormulaCellLifetime
+buildAdmittedFormulaCellLifetime(const ComputationalWorkbookShadow& rShadow)
+{
+    AdmittedFormulaCellLifetime aStore;
+    aStore.mnGeneration = rShadow.maSnapshot.mnGeneration;
+
+    for (const auto& rSheet : rShadow.maSheets)
+    {
+        for (const auto& rCell : rSheet.maCells)
+        {
+            if (!isAdmittedFormulaLifetimeCell(rCell))
+                continue;
+
+            aStore.maFormulaCells.push_back({ rCell.maId, rCell.moFormula->maFormulaSource });
+        }
+    }
+
+    std::sort(aStore.maFormulaCells.begin(), aStore.maFormulaCells.end(),
+        [](const AdmittedFormulaCellLifetimeRecord& rLeft,
+            const AdmittedFormulaCellLifetimeRecord& rRight) {
+            return AddressLess {}(rLeft.maId.maAddress, rRight.maId.maAddress);
+        });
+    return aStore;
+}
+
+inline void reconcileAdmittedFormulaCellLifetime(
+    AdmittedFormulaCellLifetime& rStore, const ComputationalWorkbookShadow& rShadow)
+{
+    const auto aAfter = buildAdmittedFormulaCellLifetime(rShadow);
+
+    std::vector<AdmittedFormulaCellLifetimeRecord> aMerged;
+    aMerged.reserve(aAfter.maFormulaCells.size());
+
+    std::size_t nBeforeIndex = 0;
+    std::size_t nAfterIndex = 0;
+    while (nBeforeIndex < rStore.maFormulaCells.size()
+           || nAfterIndex < aAfter.maFormulaCells.size())
+    {
+        if (nBeforeIndex >= rStore.maFormulaCells.size())
+        {
+            aMerged.push_back(aAfter.maFormulaCells[nAfterIndex++]);
+            continue;
+        }
+        if (nAfterIndex >= aAfter.maFormulaCells.size())
+        {
+            ++nBeforeIndex;
+            continue;
+        }
+
+        const auto& rBefore = rStore.maFormulaCells[nBeforeIndex];
+        const auto& rAfter = aAfter.maFormulaCells[nAfterIndex];
+
+        if (AddressLess {}(rBefore.maId.maAddress, rAfter.maId.maAddress))
+        {
+            ++nBeforeIndex;
+            continue;
+        }
+        if (AddressLess {}(rAfter.maId.maAddress, rBefore.maId.maAddress))
+        {
+            aMerged.push_back(rAfter);
+            ++nAfterIndex;
+            continue;
+        }
+
+        aMerged.push_back(rAfter);
+        ++nBeforeIndex;
+        ++nAfterIndex;
+    }
+
+    rStore.mnGeneration = aAfter.mnGeneration;
+    rStore.maFormulaCells = std::move(aMerged);
+}
+
+[[nodiscard]] inline AdmittedFormulaCellLifetimeComparison compareAdmittedFormulaCellLifetime(
+    const AdmittedFormulaCellLifetime& rStore, const ComputationalWorkbookShadow& rShadow)
+{
+    const auto aExpected = buildAdmittedFormulaCellLifetime(rShadow);
+
+    AdmittedFormulaCellLifetimeComparison aComparison;
+    aComparison.mbPopulationMatch
+        = rStore.getFormulaCellCount() == aExpected.getFormulaCellCount();
+    aComparison.mbPayloadMatch = rStore.maFormulaCells == aExpected.maFormulaCells;
     aComparison.mbGenerationMatch = rStore.mnGeneration == aExpected.mnGeneration;
     aComparison.mbFullMatch = aComparison.mbPopulationMatch && aComparison.mbPayloadMatch
         && aComparison.mbGenerationMatch;
@@ -347,6 +486,7 @@ inline void setStateFromShadow(MutableComputationalSubstrateState& rState,
     rState.maShadow = rShadow;
     rState.maGraphShadow = buildDependencyGraphShadow(rShadow, rState.maObservation);
     rState.maCellStorage = buildAdmittedCellStorage(rShadow);
+    rState.maFormulaCellLifetime = buildAdmittedFormulaCellLifetime(rShadow);
     rState.maWiringContainers = buildAdmittedWiringContainers(rState.maGraphShadow);
     rState.maFacade = authoritybuilddetail::materializeFacadeFromComputationalShadow(rShadow);
     rState.mbBootstrapped = true;
@@ -401,6 +541,18 @@ buildAdmittedCellStorage(const ComputationalWorkbookShadow& rShadow)
     return mutablesubstratedetail::compareAdmittedCellStorage(rStore, rShadow);
 }
 
+[[nodiscard]] inline AdmittedFormulaCellLifetime
+buildAdmittedFormulaCellLifetime(const ComputationalWorkbookShadow& rShadow)
+{
+    return mutablesubstratedetail::buildAdmittedFormulaCellLifetime(rShadow);
+}
+
+[[nodiscard]] inline AdmittedFormulaCellLifetimeComparison compareAdmittedFormulaCellLifetime(
+    const AdmittedFormulaCellLifetime& rStore, const ComputationalWorkbookShadow& rShadow)
+{
+    return mutablesubstratedetail::compareAdmittedFormulaCellLifetime(rStore, rShadow);
+}
+
 [[nodiscard]] inline AdmittedWiringContainers
 buildAdmittedWiringContainers(const DependencyGraphShadow& rGraph)
 {
@@ -445,6 +597,8 @@ buildAdmittedWiringContainers(const DependencyGraphShadow& rGraph)
     rState.maGraphShadow = rTransition.maGraphAfter;
     mutablesubstratedetail::reconcileAdmittedCellStorage(
         rState.maCellStorage, rTransition.maComputationalAfter);
+    mutablesubstratedetail::reconcileAdmittedFormulaCellLifetime(
+        rState.maFormulaCellLifetime, rTransition.maComputationalAfter);
     mutablesubstratedetail::reconcileAdmittedWiringContainers(
         rState.maWiringContainers, aWiringDelta, rTransition.maGraphAfter);
     rState.maLastMutation = rTransition.maInput.maMutation;
@@ -478,6 +632,8 @@ buildAdmittedWiringContainers(const DependencyGraphShadow& rGraph)
     rState.maGraphShadow = rTransition.maGraphAfter;
     mutablesubstratedetail::reconcileAdmittedCellStorage(
         rState.maCellStorage, rTransition.maComputationalAfter);
+    mutablesubstratedetail::reconcileAdmittedFormulaCellLifetime(
+        rState.maFormulaCellLifetime, rTransition.maComputationalAfter);
     mutablesubstratedetail::reconcileAdmittedWiringContainers(
         rState.maWiringContainers, aWiringDelta, rTransition.maGraphAfter);
     rState.maLastMutation = rTransition.maInput.maMutation;
@@ -509,6 +665,8 @@ buildAdmittedWiringContainers(const DependencyGraphShadow& rGraph)
     rState.maGraphShadow = rTransition.maGraphAfter;
     mutablesubstratedetail::reconcileAdmittedCellStorage(
         rState.maCellStorage, rTransition.maComputationalAfter);
+    mutablesubstratedetail::reconcileAdmittedFormulaCellLifetime(
+        rState.maFormulaCellLifetime, rTransition.maComputationalAfter);
     mutablesubstratedetail::reconcileAdmittedWiringContainers(
         rState.maWiringContainers, aWiringDelta, rTransition.maGraphAfter);
     rState.maLastMutation = rTransition.maInput.maMutation;
