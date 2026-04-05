@@ -1,0 +1,224 @@
+/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/*
+ * This file is part of the LibreOffice project.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+#pragma once
+
+#include <algorithm>
+#include <iterator>
+#include <set>
+#include <vector>
+
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObjectRealization.hxx>
+#include <spreadsheetengine/compat/libreoffice/RecalcQueueExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/RecalcShadow.hxx>
+
+namespace spreadsheetengine::compat::libreoffice::substraterollback
+{
+
+enum class RollbackObservationKind : sal_uInt8
+{
+    Exact,
+    OrderingOnly,
+    MissingRestoredObjects,
+    HostOnlyRollbackReconstruction,
+    QueueOrStateMismatch,
+    OutOfContract
+};
+
+struct RollbackObservation
+{
+    RollbackObservationKind meKind = RollbackObservationKind::OutOfContract;
+    api::String maReason;
+    sal_Int32 mnExpectedBroadcasters = 0;
+    sal_Int32 mnLiveBroadcasters = 0;
+    bool mbObjectRealizationApplied = false;
+    bool mbQueueExact = false;
+    bool mbComputationalFullMatch = false;
+    bool mbGraphFullMatch = false;
+    bool mbBroadcasterExact = false;
+
+    [[nodiscard]] constexpr bool operator==(const RollbackObservation& rOther) const = default;
+};
+
+namespace detail
+{
+
+[[nodiscard]] inline bool isHostOnlyRollbackKind(
+    spreadsheetengine::detail::substrate::BroadcasterCanonicalizationKind eKind)
+{
+    using spreadsheetengine::detail::substrate::BroadcasterCanonicalizationKind;
+
+    switch (eKind)
+    {
+        case BroadcasterCanonicalizationKind::DuplicateMaterializationOnly:
+        case BroadcasterCanonicalizationKind::EmptyBroadcastersOnly:
+        case BroadcasterCanonicalizationKind::DuplicateAndEmptyBroadcasters:
+        case BroadcasterCanonicalizationKind::ListenerAnchorCanonicalizationOnly:
+        case BroadcasterCanonicalizationKind::UnexpectedHostListeners:
+        case BroadcasterCanonicalizationKind::Mixed:
+            return true;
+        case BroadcasterCanonicalizationKind::Exact:
+        case BroadcasterCanonicalizationKind::OrderingOnly:
+        case BroadcasterCanonicalizationKind::MissingExpectedBroadcasters:
+        case BroadcasterCanonicalizationKind::Unknown:
+            return false;
+    }
+
+    return false;
+}
+
+} // namespace detail
+
+[[nodiscard]] inline recalcshadow::ShadowComparison compareRollbackQueueToDocument(
+    const recalcqueue::FormulaStateSnapshot& rSnapshot, const ScDocument& rDoc)
+{
+    using spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparison;
+    using spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparisonKind;
+
+    const auto aExpected = rSnapshot.maTreeOrder;
+    const auto aActual = recalcshadow::detail::collectFormulaTreeAddresses(rDoc);
+    const auto aExpectedSorted = recalcshadow::detail::normalizeAddresses(aExpected);
+    const auto aActualSorted = recalcshadow::detail::normalizeAddresses(aActual);
+
+    std::vector<api::CellAddress> aMissing;
+    std::vector<api::CellAddress> aExtra;
+    std::set_difference(aActualSorted.begin(), aActualSorted.end(), aExpectedSorted.begin(),
+        aExpectedSorted.end(), std::back_inserter(aMissing), recalcshadow::detail::AddressLess {});
+    std::set_difference(aExpectedSorted.begin(), aExpectedSorted.end(), aActualSorted.begin(),
+        aActualSorted.end(), std::back_inserter(aExtra), recalcshadow::detail::AddressLess {});
+
+    const auto aExpectedFiltered
+        = recalcshadow::detail::filterPredictedToActualOrder(aExpected, aActual);
+
+    ShadowComparison aComparison;
+    aComparison.mnPredictedQueueCount = static_cast<sal_Int32>(aExpected.size());
+    aComparison.mnActualQueueCount = static_cast<sal_Int32>(aActual.size());
+    aComparison.mnMissingQueueCount = static_cast<sal_Int32>(aMissing.size());
+    aComparison.mnExtraQueueCount = static_cast<sal_Int32>(aExtra.size());
+
+    for (std::size_t nIndex = 0; nIndex < std::min(aExpectedFiltered.size(), aActual.size()); ++nIndex)
+    {
+        if (aExpectedFiltered[nIndex] != aActual[nIndex])
+        {
+            aComparison.mnFirstOrderMismatchIndex = static_cast<sal_Int32>(nIndex);
+            aComparison.moPredictedOrderAddress = aExpectedFiltered[nIndex];
+            aComparison.moActualOrderAddress = aActual[nIndex];
+            break;
+        }
+    }
+
+    if (!aMissing.empty())
+        aComparison.meKind = ShadowComparisonKind::UnderScheduling;
+    else if (aComparison.mnFirstOrderMismatchIndex >= 0)
+        aComparison.meKind = ShadowComparisonKind::OrderMismatch;
+    else if (!aExtra.empty())
+        aComparison.meKind = ShadowComparisonKind::ConservativeSuperset;
+    else
+        aComparison.meKind = ShadowComparisonKind::Exact;
+
+    return aComparison;
+}
+
+[[nodiscard]] inline RollbackObservation classifyRollbackObservation(
+    const substrateobjectrealization::ObjectRealizationResult& rRealization,
+    const recalcshadow::ShadowComparison& rQueue,
+    const spreadsheetengine::detail::substrate::ComputationalShadowComparison& rComputational,
+    const spreadsheetengine::detail::substrate::DependencyGraphShadowComparison& rGraph,
+    const spreadsheetengine::detail::substrate::BroadcasterCanonicalizationComparison& rBroadcasters)
+{
+    using spreadsheetengine::detail::substrate::BroadcasterCanonicalizationKind;
+
+    RollbackObservation aObservation;
+    aObservation.mnExpectedBroadcasters
+        = rBroadcasters.mnExpectedCellBroadcasters + rBroadcasters.mnExpectedAreaBroadcasters;
+    aObservation.mnLiveBroadcasters
+        = rBroadcasters.mnLiveCellBroadcasters + rBroadcasters.mnLiveAreaBroadcasters;
+    aObservation.mbObjectRealizationApplied
+        = rRealization.meKind == substrateobjectrealization::ObjectRealizationResultKind::Applied;
+    aObservation.mbQueueExact = rQueue.meKind == recalcshadow::ShadowComparisonKind::Exact;
+    aObservation.mbComputationalFullMatch = rComputational.mbFullMatch;
+    aObservation.mbGraphFullMatch = rGraph.mbFullMatch;
+    aObservation.mbBroadcasterExact = rBroadcasters.mbExactMatch;
+
+    if (!aObservation.mbObjectRealizationApplied)
+    {
+        aObservation.meKind = RollbackObservationKind::OutOfContract;
+        aObservation.maReason = rRealization.maReason;
+        return aObservation;
+    }
+
+    if (aObservation.mbQueueExact && aObservation.mbComputationalFullMatch
+        && aObservation.mbGraphFullMatch && aObservation.mbBroadcasterExact)
+    {
+        aObservation.meKind = RollbackObservationKind::Exact;
+        return aObservation;
+    }
+
+    if (rQueue.meKind == recalcshadow::ShadowComparisonKind::OrderMismatch
+        && rComputational.mbFullMatch && rGraph.mbFullMatch
+        && (rBroadcasters.meKind == BroadcasterCanonicalizationKind::OrderingOnly
+            || rBroadcasters.mbOrderingEquivalent))
+    {
+        aObservation.meKind = RollbackObservationKind::OrderingOnly;
+        aObservation.maReason = u"rollback_ordering_only";
+        return aObservation;
+    }
+
+    if (!rComputational.mbCellPopulationMatch
+        || aObservation.mnLiveBroadcasters < aObservation.mnExpectedBroadcasters
+        || rBroadcasters.meKind == BroadcasterCanonicalizationKind::MissingExpectedBroadcasters)
+    {
+        aObservation.meKind = RollbackObservationKind::MissingRestoredObjects;
+        aObservation.maReason = u"missing_restored_objects";
+        return aObservation;
+    }
+
+    if (detail::isHostOnlyRollbackKind(rBroadcasters.meKind))
+    {
+        aObservation.meKind = RollbackObservationKind::HostOnlyRollbackReconstruction;
+        aObservation.maReason = u"host_only_rollback_reconstruction";
+        return aObservation;
+    }
+
+    aObservation.meKind = RollbackObservationKind::QueueOrStateMismatch;
+    if (rQueue.meKind != recalcshadow::ShadowComparisonKind::Exact)
+        aObservation.maReason = u"rollback_queue_mismatch";
+    else if (!rComputational.mbFullMatch)
+        aObservation.maReason = u"rollback_computational_mismatch";
+    else if (!rGraph.mbFullMatch)
+        aObservation.maReason = u"rollback_graph_mismatch";
+    else
+        aObservation.maReason = u"rollback_state_mismatch";
+    return aObservation;
+}
+
+[[nodiscard]] inline const char* toString(RollbackObservationKind eKind)
+{
+    switch (eKind)
+    {
+        case RollbackObservationKind::Exact:
+            return "exact";
+        case RollbackObservationKind::OrderingOnly:
+            return "ordering_only";
+        case RollbackObservationKind::MissingRestoredObjects:
+            return "missing_restored_objects";
+        case RollbackObservationKind::HostOnlyRollbackReconstruction:
+            return "host_only_rollback_reconstruction";
+        case RollbackObservationKind::QueueOrStateMismatch:
+            return "queue_or_state_mismatch";
+        case RollbackObservationKind::OutOfContract:
+            return "out_of_contract";
+    }
+
+    return "unknown";
+}
+
+} // namespace spreadsheetengine::compat::libreoffice::substraterollback
+
+/* vim:set shiftwidth=4 softtabstop=4 expandtab: */
