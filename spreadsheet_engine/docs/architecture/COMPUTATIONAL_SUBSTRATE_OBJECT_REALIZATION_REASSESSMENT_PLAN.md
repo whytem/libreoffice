@@ -1,11 +1,19 @@
 # Computational Substrate Object Realization Reassessment Plan
 
-Status: implementation-ready plan
+Status: completed closeout record
 
 ## Purpose
 
 This document defines the next explicit proof cycle after the completed
 [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_DECISION_RECORD.md).
+
+This plan is now complete.
+
+Its closeout result is:
+
+- proceed with engine-authored admitted-slice object realization
+- keep raw document mutation APIs and final rollback in Calc
+- name final rollback reassessment as the next adjacent concern
 
 That closeout moved the bounded admitted slice to its strongest proven
 position so far:
@@ -28,6 +36,15 @@ This plan is not a broad document-host transplant. It is the next bounded
 reassessment of whether admitted-slice live object realization can move
 further toward engine-authored authority without reopening broader storage,
 mutation, or workbook-scope migration.
+
+The closeout references are:
+
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_MATRIX.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_MATRIX.md)
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_OBSERVATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_OBSERVATION.md)
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_DECISION_RECORD.md)
 
 ## Why This Is The Best Next Path
 

@@ -239,7 +239,7 @@ computational storage migration by itself.
 Calc still owns the live host side of this slice:
 
 - raw document mutation APIs
-- live object realization
+- final application of engine-authored realization records
 - final live verification and rollback mechanics
 
 That is acceptable because the current rollout is a compat-driven authority
@@ -407,11 +407,15 @@ It justified one additional bounded boundary shift:
   verification
 
 It did not justify direct mutation-entry migration or broad formula-cell
-object migration outside the admitted slice. Calc still owns:
+object migration outside the admitted slice. On the current settled
+boundary, Calc still owns:
 
 - mutation entry and document mutation APIs
-- live object realization
 - final rollback
+
+The admitted live object-realization surface named there has since been
+pulled further into the engine by the completed object-realization
+reassessment.
 
 That means the current boundary is now stronger than the earlier
 resident-cell-plus-host-lifetime split, but it is still narrower than a
@@ -448,7 +452,6 @@ They still do not justify broad host-independent mutation application. Calc
 still owns:
 
 - raw document mutation APIs
-- live object realization
 - final rollback
 
 The key mutation-entry closeout references are:
@@ -468,18 +471,51 @@ The key mutation-entry closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_DECISION_RECORD.md)
 
+## Object Realization Outcome
+
+The object-realization reassessment is now complete.
+
+It justifies one additional bounded boundary shift:
+
+- the engine now owns the admitted live object-realization record on the
+  bounded slice
+- Calc realizes admitted formula-cell, wiring, formula-tree, and
+  formula-track live objects from that engine-authored record
+- applied admitted mutation-entry results now carry explicit
+  object-realization observations
+- admitted exact cases close with exact object realization on the bounded
+  slice
+
+It still does not justify broad host independence. Calc still owns:
+
+- raw document mutation APIs
+- final rollback
+
+That means the current boundary is stronger than the earlier resident-state-
+plus-host-realization split, but it is still narrower than a broad
+computational document transplant.
+
+The key object-realization closeout references are:
+
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_REASSESSMENT_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_MATRIX.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_MATRIX.md)
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_OBSERVATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_OBSERVATION.md)
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_DECISION_RECORD.md)
+
 ## Next Explicit Reassessment Target
 
 The next explicit bounded concern is:
 
-- broader object-realization reassessment, with the implementation-ready
-  plan in
-  [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_REASSESSMENT_PLAN.md)
+- final rollback reassessment
 
-The scalar mutation-entry blocker is now closed. The most actionable
-remaining host-owned surface on the bounded slice is Calc-side live object
-realization and final rollback, not mutation-request routing or
-broadcaster-canonicalization convergence.
+The object-realization reassessment is now closed with a bounded proceed
+result. The most actionable remaining host-owned surface on the admitted
+slice is no longer live realization. It is the retained rollback boundary
+around the already-engine-authored resident, mutation-entry, and realization
+surfaces.
 
 ## Current Assessment
 
@@ -500,6 +536,7 @@ The current state should be read as:
 - plus a successful bounded admitted-slice cell-residency proof
 - plus a successful bounded admitted-slice wiring-container residency proof
 - plus a successful bounded admitted-slice formula-cell lifetime proof
+- plus a successful bounded admitted-slice object-realization proof
 - but still not as proof that a full computational storage migration is
   already justified
 
@@ -518,8 +555,8 @@ Any further expansion should continue under these rules:
   follow-up polish
 - require a new explicit plan before widening beyond the current admitted
   rollout, storage-and-wiring slice, admitted cell-residency slice, and
-  admitted wiring-container residency slice, and admitted formula-cell-
-  lifetime slice
+  admitted wiring-container residency slice, admitted formula-cell-lifetime
+  slice, and admitted object-realization slice
 
 ## Reference Material
 

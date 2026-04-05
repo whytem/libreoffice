@@ -287,9 +287,32 @@ Current architecture docs:
   admitting direct scalar mutation entry on the bounded slice and naming
   broader object realization as the next adjacent concern
 - [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_REASSESSMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_REASSESSMENT_PLAN.md) -
-  implementation-ready plan for the next bounded reassessment after scalar
-  mutation-entry convergence, focused on admitted-slice live object
-  realization while Calc still owns raw mutation APIs and final rollback
+  completed closeout record for the bounded object-realization
+  reassessment, proceeding with engine-authored admitted-slice live object
+  realization and naming final rollback reassessment as the next adjacent
+  concern
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_CONTRACT.md) -
+  frozen contract note for the admitted object-realization slice, fixing the
+  covered live object classes, retained Calc host surfaces, and exact
+  success standard
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_MATRIX.md](COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_MATRIX.md) -
+  frozen scenario matrix for admitted object realization, classifying
+  candidate, validation-only, and deferred realization cases
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_OBSERVATION.md](COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_OBSERVATION.md) -
+  completed observation note for object-realization drift classification,
+  introducing exact, ordering-only, missing-object, host-repair, mismatch,
+  and out-of-contract result families
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_IMPLEMENTATION.md) -
+  completed implementation note for the engine-authored admitted
+  object-realization record and the Calc realization path that consumes it
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_EVIDENCE.md) -
+  frozen evidence note for the object-realization proof cycle, recording
+  exact admitted realization, missing-object classification, retained
+  rollback coverage, and a bounded runtime sample
+- [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_DECISION_RECORD.md) -
+  completed closeout decision for object-realization reassessment,
+  admitting engine-authored object realization on the bounded slice while
+  leaving raw mutation APIs and final rollback in Calc
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded
