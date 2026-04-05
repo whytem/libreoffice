@@ -35,6 +35,7 @@
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFormulaCellLifetime.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateAuthority.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateLifecycle.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateMutationEntry.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateStructural.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateWiring.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcAuthority.hxx>
@@ -71,6 +72,10 @@ using spreadsheetengine::compat::libreoffice::substrateauthority::ScopedComputat
 using ComputationalLifecycleResultKind
     = spreadsheetengine::compat::libreoffice::substratelifecycle::LifecycleResultKind;
 using spreadsheetengine::compat::libreoffice::substratelifecycle::ScopedComputationalLifecycle;
+using ComputationalMutationEntryResultKind
+    = spreadsheetengine::compat::libreoffice::substratemutationentry::MutationEntryResultKind;
+using spreadsheetengine::compat::libreoffice::substratemutationentry::
+    ScopedComputationalMutationEntry;
 using ComputationalStructuralResultKind
     = spreadsheetengine::compat::libreoffice::substratestructural::StructuralResultKind;
 using spreadsheetengine::compat::libreoffice::substratestructural::ScopedComputationalStructural;
@@ -394,6 +399,58 @@ void assertComputationalStructuralAppliedExactly(
 {
     assertComputationalStructuralApplied(oResult, rDoc);
     CPPUNIT_ASSERT_EQUAL(ComputationalStructuralResultKind::Applied, oResult->meKind);
+}
+
+void assertComputationalMutationEntryApplied(
+    const std::optional<
+        spreadsheetengine::compat::libreoffice::substratemutationentry::MutationEntryResult>&
+        oResult,
+    const ScDocument& rDoc)
+{
+    CPPUNIT_ASSERT(oResult.has_value());
+    const std::string aResultMessage
+        = "unexpected computational mutation-entry result kind="
+          + std::to_string(static_cast<int>(oResult->meKind))
+          + " path="
+          + std::to_string(static_cast<int>(oResult->maTransition.mePath))
+          + " queue="
+          + (oResult->moQueueComparison
+                 ? std::to_string(static_cast<int>(oResult->moQueueComparison->meKind))
+                 : std::string("none"))
+          + " computational="
+          + (oResult->moComputationalComparison
+                 ? std::string(oResult->moComputationalComparison->mbFullMatch ? "1" : "0")
+                       + ":" + (oResult->moComputationalComparison->mbCellPopulationMatch ? "1" : "0")
+                       + ":" + (oResult->moComputationalComparison->mbFormulaTreeMatch ? "1" : "0")
+                       + ":" + (oResult->moComputationalComparison->mbFormulaTrackMatch ? "1" : "0")
+                       + ":" + (oResult->moComputationalComparison->mbBroadcasterMatch ? "1" : "0")
+                       + ":" + (oResult->moComputationalComparison->mbGroupMatch ? "1" : "0")
+                       + ":" + (oResult->moComputationalComparison->mbNamedRangeMatch ? "1" : "0")
+                 : std::string("none"))
+          + " graph="
+          + (oResult->moGraphComparison
+                 ? std::to_string(static_cast<int>(oResult->moGraphComparison->meKind))
+                       + ":" + (oResult->moGraphComparison->mbFullMatch ? "1" : "0")
+                 : std::string("none"));
+    CPPUNIT_ASSERT_MESSAGE(
+        aResultMessage,
+        oResult->meKind == ComputationalMutationEntryResultKind::Applied
+            || oResult->meKind
+                   == ComputationalMutationEntryResultKind::AppliedNormalizedEquivalent);
+    CPPUNIT_ASSERT(oResult->moQueueComparison.has_value());
+    CPPUNIT_ASSERT_EQUAL(RecalcShadowComparisonKind::Exact, oResult->moQueueComparison->meKind);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moGraphComparison.has_value());
+    CPPUNIT_ASSERT_MESSAGE(aResultMessage, oResult->moGraphComparison->mbFullMatch);
+
+    const auto* pPlan
+        = spreadsheetengine::detail::substrate::findMutationEntryRecalcPlan(oResult->maTransition);
+    CPPUNIT_ASSERT(pPlan);
+    CPPUNIT_ASSERT(
+        spreadsheetengine::compat::libreoffice::recalcshadow::detail::collectPredictedQueueAddresses(
+            *pPlan)
+        == spreadsheetengine::compat::libreoffice::recalcshadow::detail::
+            collectFormulaTreeAddresses(rDoc));
 }
 
 [[nodiscard]] const CellBroadcasterSnapshot* findCellBroadcaster(
@@ -1442,6 +1499,188 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalLifecycleClassifiesR
     CPPUNIT_ASSERT_EQUAL(
         ComputationalLifecycleResultKind::RepairDetected,
         classifyVerifiedLifecycleResult(aResult));
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntryRuntimeExplicitGate)
+{
+    {
+        ScopedEnvironmentOverride aMutationEntry(
+            "SPREADSHEET_ENGINE_COMPUTATIONAL_MUTATION_ENTRY", "0");
+
+        m_pDoc->InsertTab(0, u"Data"_ustr);
+        sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+        const auto aCapture
+            = ScopedComputationalMutationEntry::captureIfRuntimeEnabled(*m_pDoc);
+        CPPUNIT_ASSERT(!aCapture.isCaptured());
+
+        m_pDoc->DeleteTab(0);
+    }
+
+    {
+        ScopedEnvironmentOverride aMutationEntry(
+            "SPREADSHEET_ENGINE_COMPUTATIONAL_MUTATION_ENTRY", "1");
+
+        m_pDoc->InsertTab(0, u"Data"_ustr);
+        sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+        const auto aCapture
+            = ScopedComputationalMutationEntry::captureIfRuntimeEnabled(*m_pDoc);
+        CPPUNIT_ASSERT(aCapture.isCaptured());
+
+        m_pDoc->DeleteTab(0);
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntrySetValue)
+{
+    using spreadsheetengine::api::CellValue;
+    using spreadsheetengine::detail::substrate::MutationEntryRequest;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=B1+1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalMutationEntry aEntry(*m_pDoc, true);
+    CPPUNIT_ASSERT(aEntry.isCaptured());
+    CPPUNIT_ASSERT(aEntry.canApplyMutationEntry());
+
+    const auto oResult
+        = aEntry.apply(*m_pDoc, MutationEntryRequest::setScalarValue({ 0, 0, 0 },
+                                         CellValue::number(9.0)));
+    assertComputationalMutationEntryApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT_EQUAL(9.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntrySetFormula)
+{
+    using spreadsheetengine::detail::substrate::MutationEntryRequest;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=B1+1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalMutationEntry aEntry(*m_pDoc, true);
+    CPPUNIT_ASSERT(aEntry.canApplyMutationEntry());
+
+    const auto oResult
+        = aEntry.apply(*m_pDoc, MutationEntryRequest::setFormula({ 0, 1, 0 }, u"=A1*3"));
+    assertComputationalMutationEntryApplied(oResult, *m_pDoc);
+
+    ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(1, 0, 0));
+    CPPUNIT_ASSERT(pFormula);
+    CPPUNIT_ASSERT_EQUAL(u"=A1*3"_ustr, pFormula->GetFormula());
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntryInsertRows)
+{
+    using spreadsheetengine::detail::substrate::MutationEntryRequest;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 10.0);
+    m_pDoc->SetValue(0, 1, 0, 20.0);
+    m_pDoc->SetString(0, 2, 0, u"=$A$2*1"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalMutationEntry aEntry(*m_pDoc, true);
+    CPPUNIT_ASSERT(aEntry.canApplyMutationEntry());
+
+    const auto oResult = aEntry.apply(*m_pDoc, MutationEntryRequest::insertRows(0, 1, 1));
+    assertComputationalMutationEntryApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(0, 3, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntryRejectsDirtyBaseline)
+{
+    using spreadsheetengine::api::CellValue;
+    using spreadsheetengine::compat::libreoffice::recalcqueue::captureFormulaState;
+    using spreadsheetengine::detail::substrate::MutationEntryRequest;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr);
+    m_pDoc->CalcAll();
+
+    ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(1, 0, 0));
+    CPPUNIT_ASSERT(pFormula);
+    pFormula->SetDirtyVar();
+    m_pDoc->PutInFormulaTree(pFormula);
+
+    const auto aBeforeApply = captureFormulaState(*m_pDoc);
+
+    const ScopedComputationalMutationEntry aEntry(*m_pDoc, true);
+    CPPUNIT_ASSERT(aEntry.isCaptured());
+    CPPUNIT_ASSERT(!aEntry.canApplyMutationEntry());
+
+    const auto oResult
+        = aEntry.apply(*m_pDoc, MutationEntryRequest::setScalarValue({ 0, 0, 0 },
+                                         CellValue::number(5.0)));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalMutationEntryResultKind::RejectedDirtyBaseline, oResult->meKind);
+    CPPUNIT_ASSERT_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
+    assertFormulaStateEqual(aBeforeApply, captureFormulaState(*m_pDoc));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntryClassifiesRepairDetected)
+{
+    using spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparison;
+    using spreadsheetengine::compat::libreoffice::substratemutationentry::MutationEntryResult;
+    using spreadsheetengine::compat::libreoffice::substratemutationentry::detail::
+        classifyVerifiedMutationEntryResult;
+
+    MutationEntryResult aResult;
+    aResult.maTransition.mePath = spreadsheetengine::detail::substrate::MutationEntryPath::Lifecycle;
+    aResult.maTransition.moLifecycleTransition.emplace();
+    aResult.maTransition.moLifecycleTransition->meVerdict
+        = spreadsheetengine::detail::substrate::LifecyclePilotVerdict::Applicable;
+    aResult.maTransition.moLifecycleTransition->maVerification.meComputationalMode
+        = spreadsheetengine::detail::substrate::LifecycleVerificationMode::Exact;
+    aResult.maTransition.moLifecycleTransition->maVerification.meGraphMode
+        = spreadsheetengine::detail::substrate::LifecycleVerificationMode::Exact;
+
+    ShadowComparison aQueueComparison;
+    aQueueComparison.meKind = RecalcShadowComparisonKind::Exact;
+    aResult.moQueueComparison = aQueueComparison;
+
+    spreadsheetengine::detail::substrate::ComputationalShadowComparison aComputationalComparison;
+    aComputationalComparison.mbFullMatch = false;
+    aResult.moComputationalComparison = aComputationalComparison;
+
+    spreadsheetengine::detail::substrate::DependencyGraphShadowComparison aGraphComparison;
+    aGraphComparison.meKind = GraphComparisonKind::Exact;
+    aGraphComparison.mbFullMatch = true;
+    aResult.moGraphComparison = aGraphComparison;
+
+    spreadsheetengine::detail::substrate::ExecutionIrWorkbookComparison aIrComparison;
+    aIrComparison.meKind = ExecutionIrComparisonKind::Exact;
+    aIrComparison.mbFullMatch = true;
+    aResult.moIrComparison = aIrComparison;
+
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalMutationEntryResultKind::RepairDetected,
+        classifyVerifiedMutationEntryResult(aResult));
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalNarrowRolloutDisabledByDefault)

@@ -19,6 +19,7 @@ namespace spreadsheetengine::compat::libreoffice::substraterollout
 
 enum class RolloutSurface : sal_uInt8
 {
+    MutationEntry,
     Authority,
     Lifecycle,
     Structural,
@@ -55,6 +56,9 @@ namespace detail
 
     switch (eSurface)
     {
+        case RolloutSurface::MutationEntry:
+            return detail::resolveExplicitSurfaceGate(
+                "SPREADSHEET_ENGINE_COMPUTATIONAL_MUTATION_ENTRY");
         case RolloutSurface::Authority:
             return detail::resolveSurfaceGate("SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY");
         case RolloutSurface::Lifecycle:
