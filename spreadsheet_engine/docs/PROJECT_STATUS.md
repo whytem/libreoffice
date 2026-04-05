@@ -165,9 +165,10 @@ implementation in the current engine or Calc tree.
 
 Calc still intentionally owns:
 
-- `ScDocument`, `ScTable`, `ScColumn`, and formula-cell storage
+- broad `ScDocument`, `ScTable`, and `ScColumn` storage outside the admitted
+  slice
 - document mutation APIs and formula-cell object lifetime
-- listener and broadcaster wiring plus host-side dependency side effects
+- live host realization and rollback of dependency side effects
 - stack container mutation and formula-token cursor ownership
 - `ScTokenArray` construction, range/union token-container operations, and
   other Calc-local token plumbing
@@ -234,9 +235,8 @@ computational storage migration by itself.
 
 Calc still owns the live host side of this slice:
 
-- document storage and mutation APIs
+- document mutation APIs
 - formula-cell object lifetime
-- listener and broadcaster container storage
 - final live verification and rollback mechanics
 
 That is acceptable because the current rollout is a compat-driven authority
@@ -252,6 +252,7 @@ engine-owned boundary:
 - sheet insert, delete, rename, or move
 - copy, move, clipboard, load-time, or undo-like structural flows
 - broader storage migration
+- formula-cell object lifetime migration
 - token-container ownership transfer
 - broad listener/broadcaster ownership transfer
 
@@ -352,6 +353,41 @@ The key cell-storage closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_PLAN.md)
 
+## Wiring Container Residency Outcome
+
+The first wiring-container residency proof cycle is now complete.
+
+It justified one additional bounded boundary shift:
+
+- the engine now owns resident admitted-slice wiring containers
+- the engine still owns resident admitted-slice cell storage
+- the engine still owns mutable computational state plus graph, wiring, and
+  queue decisions on that slice
+- Calc can realize the admitted live wiring surface from engine-owned
+  resident wiring state and still pass exact computational and graph
+  verification
+
+It did not justify formula-cell object lifetime migration or broad
+dependency-container migration. Calc still owns:
+
+- mutation entry and document mutation APIs
+- formula-cell object lifetime
+- final rollback
+
+That means the current boundary is now stronger than the earlier
+resident-cell-plus-host-wiring split, but it is still narrower than a broad
+computational document transplant.
+
+The key wiring-container closeout references are:
+
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_SCHEMA.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_SCHEMA.md)
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_REALIZATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_REALIZATION.md)
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md)
+
 ## Current Assessment
 
 The project is in a strong position:
@@ -369,6 +405,7 @@ The current state should be read as:
 - plus a successful narrow second-stage authority experiment
 - plus a successful bounded storage-and-wiring authority proof
 - plus a successful bounded admitted-slice cell-residency proof
+- plus a successful bounded admitted-slice wiring-container residency proof
 - but still not as proof that a full computational storage migration is
   already justified
 
@@ -386,7 +423,8 @@ Any further expansion should continue under these rules:
 - treat memory and performance regressions as architecture issues, not
   follow-up polish
 - require a new explicit plan before widening beyond the current admitted
-  rollout, storage-and-wiring slice, and admitted cell-residency slice
+  rollout, storage-and-wiring slice, admitted cell-residency slice, and
+  admitted wiring-container residency slice
 
 ## Reference Material
 
@@ -399,6 +437,8 @@ For the current second-stage boundary and rollout closeout, see:
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_RESIDENCY_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_CELL_STORAGE_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md)
 - [README.md](architecture/README.md)
 
 For completed plans, closeout records, and historical extraction context, see:

@@ -194,10 +194,34 @@ Current architecture docs:
   admitting engine-resident cell storage on the bounded slice while keeping
   formula-cell lifetime and live container residency in Calc
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_PLAN.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_PLAN.md) -
-  active implementation-ready plan for the next bounded migration step,
-  testing engine-resident live wiring container residency on the admitted
-  slice while Calc remains the mutation-entry, formula-cell-lifetime, and
-  rollback host
+  completed closeout record for the next bounded migration step, admitting
+  engine-resident live wiring-container residency on the admitted slice while
+  keeping formula-cell object lifetime, mutation entry, and rollback in Calc
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_RESIDENCY_CONTRACT.md) -
+  frozen authority contract for the first admitted-slice wiring-container
+  residency pilot, fixing the admitted mutation classes, engine-owned
+  resident wiring surface, retained Calc host surfaces, and exact
+  verification standard
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_SCHEMA.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_SCHEMA.md) -
+  frozen schema note for admitted engine-resident broadcaster nodes,
+  listener edges, formula-tree and formula-track realized order, and exact
+  wiring comparison rules
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_IMPLEMENTATION.md) -
+  completed implementation note for the engine-owned admitted-slice wiring
+  store, including bootstrap, graph-delta reconciliation, and resident-state
+  validation
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_REALIZATION.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_REALIZATION.md) -
+  completed implementation note for Calc-side realization of admitted
+  engine-resident wiring containers before exact computational and graph
+  verification
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_EVIDENCE.md) -
+  frozen evidence note for the admitted wiring-container residency path,
+  summarizing exact resident realization, retained rollback coverage, and
+  bounded operational samples
+- [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
+  completed closeout decision for the first wiring-container residency proof
+  cycle, admitting engine-resident live wiring containers on the bounded
+  slice while keeping formula-cell object lifetime and mutation entry in Calc
 - [COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_STORAGE_AND_WIRING_CONTRACT.md) -
   frozen authority contract for the first storage-and-wiring pilot, fixing
   the admitted workbook slice, engine-owned sidecar state, engine-issued

@@ -1,6 +1,6 @@
 # Computational Substrate Wiring Container Residency Plan
 
-Status: implementation-ready plan
+Status: complete closeout record
 
 ## Purpose
 
@@ -24,6 +24,15 @@ This plan is not a broad dependency-substrate transplant. It is the first
 implementation plan for making engine-resident wiring containers the source
 of truth on the admitted slice while Calc temporarily remains the mutation-
 entry, formula-cell-lifetime, and rollback host.
+
+This plan is now complete.
+
+Its closeout result is:
+
+- proceed with engine-resident admitted-slice wiring containers
+- keep formula-cell object lifetime in Calc
+- keep mutation entry and final rollback in Calc
+- keep broader dependency-container migration deferred
 
 ## Why This Is The Best Next Path
 
