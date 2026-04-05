@@ -33,6 +33,7 @@
 #include <spreadsheetengine/compat/libreoffice/MutableComputationalSubstrate.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateCellStorage.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFormulaCellLifetime.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObjectRealization.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateAuthority.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateLifecycle.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateMutationEntry.hxx>
@@ -78,6 +79,9 @@ using spreadsheetengine::compat::libreoffice::substratemutationentry::
     ScopedComputationalMutationEntry;
 using BroadcasterCanonicalizationKind
     = spreadsheetengine::detail::substrate::BroadcasterCanonicalizationKind;
+using ObjectRealizationObservationKind
+    = spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        ObjectRealizationObservationKind;
 using ComputationalStructuralResultKind
     = spreadsheetengine::compat::libreoffice::substratestructural::StructuralResultKind;
 using spreadsheetengine::compat::libreoffice::substratestructural::ScopedComputationalStructural;
@@ -541,6 +545,25 @@ void assertComparableExecutionIr(
            + " live_cells=" + std::to_string(rComparison.mnLiveCellBroadcasters)
            + " expected_areas=" + std::to_string(rComparison.mnExpectedAreaBroadcasters)
            + " live_areas=" + std::to_string(rComparison.mnLiveAreaBroadcasters);
+}
+
+[[nodiscard]] std::string describeObjectRealizationObservation(
+    const spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        ObjectRealizationObservation& rObservation)
+{
+    return std::string(spreadsheetengine::compat::libreoffice::substrateobjectrealization::toString(
+               rObservation.meKind))
+           + " reason="
+           + OUStringToOString(rObservation.maReason, RTL_TEXTENCODING_UTF8).getStr()
+           + " lifetime=" + (rObservation.mbFormulaCellLifetimeApplied ? "1" : "0")
+           + " cell_storage=" + (rObservation.mbCellStorageApplied ? "1" : "0")
+           + " wiring=" + (rObservation.mbWiringApplied ? "1" : "0")
+           + " queue=" + (rObservation.mbQueueExact ? "1" : "0")
+           + " computational=" + (rObservation.mbComputationalFullMatch ? "1" : "0")
+           + " graph=" + (rObservation.mbGraphFullMatch ? "1" : "0")
+           + " broadcaster=" + (rObservation.mbBroadcasterExact ? "1" : "0")
+           + " expected_broadcasters=" + std::to_string(rObservation.mnExpectedBroadcasters)
+           + " live_broadcasters=" + std::to_string(rObservation.mnLiveBroadcasters);
 }
 
 void assertFormulaStateEqual(
@@ -3623,6 +3646,309 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
         = compareDependencyGraphShadow(aMutableState.maGraphShadow, aLiveShadow, aLiveObservation);
     CPPUNIT_ASSERT_EQUAL(GraphComparisonKind::Exact, aGraphComparison.meKind);
     CPPUNIT_ASSERT(aGraphComparison.mbFullMatch);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalObjectRealizationClassifierKinds)
+{
+    using spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparison;
+    using spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparisonKind;
+    using spreadsheetengine::compat::libreoffice::substratecellstorage::CellStorageMirrorResult;
+    using spreadsheetengine::compat::libreoffice::substratecellstorage::CellStorageMirrorResultKind;
+    using spreadsheetengine::compat::libreoffice::substrateformulalifetime::FormulaCellLifetimeResult;
+    using spreadsheetengine::compat::libreoffice::substrateformulalifetime::FormulaCellLifetimeResultKind;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        classifyObjectRealizationObservation;
+    using spreadsheetengine::compat::libreoffice::substratewiring::WiringApplyResult;
+    using spreadsheetengine::compat::libreoffice::substratewiring::WiringApplyResultKind;
+
+    FormulaCellLifetimeResult aLifetime;
+    aLifetime.meKind = FormulaCellLifetimeResultKind::Applied;
+    CellStorageMirrorResult aCellStorage;
+    aCellStorage.meKind = CellStorageMirrorResultKind::Applied;
+    WiringApplyResult aWiring;
+    aWiring.meKind = WiringApplyResultKind::Applied;
+
+    ShadowComparison aQueue;
+    aQueue.meKind = ShadowComparisonKind::Exact;
+
+    spreadsheetengine::detail::substrate::ComputationalShadowComparison aComputational;
+    aComputational.mbCellPopulationMatch = true;
+    aComputational.mbFormulaTreeMatch = true;
+    aComputational.mbFormulaTrackMatch = true;
+    aComputational.mbBroadcasterMatch = true;
+    aComputational.mbGroupMatch = true;
+    aComputational.mbNamedRangeMatch = true;
+    aComputational.mbFullMatch = true;
+
+    spreadsheetengine::detail::substrate::DependencyGraphShadowComparison aGraph;
+    aGraph.meKind = GraphComparisonKind::Exact;
+    aGraph.mbFormulaNodeMatch = true;
+    aGraph.mbFormulaGroupNodeMatch = true;
+    aGraph.mbListenerAnchorMatch = true;
+    aGraph.mbBroadcasterNodeMatch = true;
+    aGraph.mbEdgeMatch = true;
+    aGraph.mbFormulaTreeExactMatch = true;
+    aGraph.mbFormulaTrackExactMatch = true;
+    aGraph.mbFormulaTreeNormalizedMatch = true;
+    aGraph.mbFormulaTrackNormalizedMatch = true;
+    aGraph.mbFullMatch = true;
+
+    spreadsheetengine::detail::substrate::BroadcasterCanonicalizationComparison aBroadcasters;
+    aBroadcasters.meKind = BroadcasterCanonicalizationKind::Exact;
+    aBroadcasters.mbExactMatch = true;
+    aBroadcasters.mnExpectedCellBroadcasters = 1;
+    aBroadcasters.mnLiveCellBroadcasters = 1;
+
+    CPPUNIT_ASSERT_EQUAL(
+        ObjectRealizationObservationKind::Exact,
+        classifyObjectRealizationObservation(
+            aLifetime, aCellStorage, aWiring, aQueue, aComputational, aGraph, aBroadcasters)
+            .meKind);
+
+    aQueue.meKind = ShadowComparisonKind::OrderMismatch;
+    aBroadcasters.meKind = BroadcasterCanonicalizationKind::OrderingOnly;
+    aBroadcasters.mbExactMatch = false;
+    aBroadcasters.mbOrderingEquivalent = true;
+    CPPUNIT_ASSERT_EQUAL(
+        ObjectRealizationObservationKind::OrderingOnly,
+        classifyObjectRealizationObservation(
+            aLifetime, aCellStorage, aWiring, aQueue, aComputational, aGraph, aBroadcasters)
+            .meKind);
+
+    aQueue.meKind = ShadowComparisonKind::Exact;
+    aBroadcasters.meKind = BroadcasterCanonicalizationKind::Unknown;
+    aBroadcasters.mbOrderingEquivalent = false;
+    aBroadcasters.mnExpectedCellBroadcasters = 2;
+    aBroadcasters.mnLiveCellBroadcasters = 1;
+    CPPUNIT_ASSERT_EQUAL(
+        ObjectRealizationObservationKind::MissingRealizedObjects,
+        classifyObjectRealizationObservation(
+            aLifetime, aCellStorage, aWiring, aQueue, aComputational, aGraph, aBroadcasters)
+            .meKind);
+
+    aBroadcasters.meKind = BroadcasterCanonicalizationKind::DuplicateMaterializationOnly;
+    aBroadcasters.mnExpectedCellBroadcasters = 1;
+    aBroadcasters.mnLiveCellBroadcasters = 1;
+    aBroadcasters.mnLiveDuplicateBroadcasterCount = 1;
+    CPPUNIT_ASSERT_EQUAL(
+        ObjectRealizationObservationKind::HostOnlyRepairOrReconstruction,
+        classifyObjectRealizationObservation(
+            aLifetime, aCellStorage, aWiring, aQueue, aComputational, aGraph, aBroadcasters)
+            .meKind);
+
+    aBroadcasters.meKind = BroadcasterCanonicalizationKind::Exact;
+    aBroadcasters.mbExactMatch = true;
+    aBroadcasters.mnLiveDuplicateBroadcasterCount = 0;
+    aComputational.mbFullMatch = false;
+    CPPUNIT_ASSERT_EQUAL(
+        ObjectRealizationObservationKind::QueueOrStateMismatch,
+        classifyObjectRealizationObservation(
+            aLifetime, aCellStorage, aWiring, aQueue, aComputational, aGraph, aBroadcasters)
+            .meKind);
+
+    aComputational.mbFullMatch = true;
+    aLifetime.meKind = FormulaCellLifetimeResultKind::RejectedOutOfContract;
+    CPPUNIT_ASSERT_EQUAL(
+        ObjectRealizationObservationKind::OutOfContract,
+        classifyObjectRealizationObservation(
+            aLifetime, aCellStorage, aWiring, aQueue, aComputational, aGraph, aBroadcasters)
+            .meKind);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalObjectRealizationObservationExactState)
+{
+    using spreadsheetengine::compat::libreoffice::bootstrapMutableComputationalSubstrateState;
+    using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    using spreadsheetengine::compat::libreoffice::recalcshadow::detail::comparePlanToDocument;
+    using spreadsheetengine::compat::libreoffice::substratecellstorage::CellStorageMirrorResultKind;
+    using spreadsheetengine::compat::libreoffice::substratecellstorage::mirrorAdmittedScalarCellStorage;
+    using spreadsheetengine::compat::libreoffice::substrateformulalifetime::FormulaCellLifetimeResultKind;
+    using spreadsheetengine::compat::libreoffice::substrateformulalifetime::
+        realizeAdmittedFormulaCellLifetime;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        classifyObjectRealizationObservation;
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
+    using spreadsheetengine::compat::libreoffice::substratewiring::WiringApplyResultKind;
+    using spreadsheetengine::compat::libreoffice::substratewiring::realizeAdmittedWiringContainers;
+    using spreadsheetengine::detail::substrate::applyMutableLifecycleTransition;
+    using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
+    using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::buildLifecyclePilotTransition;
+    using spreadsheetengine::detail::substrate::compareComputationalShadow;
+    using spreadsheetengine::detail::substrate::compareDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::detail::compareBroadcasterCanonicalization;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr); // B1
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 0);
+    const auto aBeforeObservation = makeComputationalObservationState(
+        collectLiveComputationalState(*m_pDoc));
+    const auto aBeforeShadow = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+    const auto aBeforeGraph = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+    const auto aBeforeIr = spreadsheetengine::compat::libreoffice::buildExecutionIrWorkbookShadow(
+        aBeforeShadow, *m_pDoc);
+
+    m_pDoc->SetString(2, 0, 0, u"=B1+1"_ustr); // C1
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+
+    spreadsheetengine::detail::substrate::LifecyclePilotInput aInput;
+    aInput.maComputationalShadow = aBeforeShadow;
+    aInput.maGraphShadow = aBeforeGraph;
+    aInput.maIrShadow = aBeforeIr;
+    aInput.maMutation = translateSetFormula(ScAddress(2, 0, 0), u"=B1+1"_ustr);
+    aInput.mbCleanBaseline = true;
+    const auto oFormula = aAfterFacade.getFormulaCellDescriptor({ 0, 2, 0 });
+    CPPUNIT_ASSERT(oFormula);
+    aInput.moFormulaCachedValueAfter = oFormula->maCachedValue;
+
+    const auto aTransition = buildLifecyclePilotTransition(aInput);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::detail::substrate::LifecyclePilotVerdict::Applicable,
+        aTransition.meVerdict);
+
+    auto aMutableState = bootstrapMutableComputationalSubstrateState(aBeforeShadow);
+    CPPUNIT_ASSERT(applyMutableLifecycleTransition(aMutableState, aTransition));
+
+    m_pDoc->SetValue(1, 0, 0, 99.0); // B1 no longer a formula cell
+    m_pDoc->SetEmptyCell(ScAddress(2, 0, 0)); // C1 removed
+
+    const auto aLifetime
+        = realizeAdmittedFormulaCellLifetime(*m_pDoc, aMutableState.maFormulaCellLifetime);
+    CPPUNIT_ASSERT_EQUAL(FormulaCellLifetimeResultKind::Applied, aLifetime.meKind);
+
+    const auto aMirror = mirrorAdmittedScalarCellStorage(*m_pDoc, aMutableState.maCellStorage);
+    CPPUNIT_ASSERT_EQUAL(CellStorageMirrorResultKind::Applied, aMirror.meKind);
+    m_pDoc->CalcAll();
+
+    const auto aApply = realizeAdmittedWiringContainers(*m_pDoc, aMutableState.maWiringContainers);
+    CPPUNIT_ASSERT_EQUAL(WiringApplyResultKind::Applied, aApply.meKind);
+
+    const CalcWorkbookFacade aLiveFacade(*m_pDoc, 1);
+    const auto aLiveObservation = makeComputationalObservationState(
+        collectLiveComputationalState(*m_pDoc));
+    const auto aQueueComparison = comparePlanToDocument(aTransition.maRecalcPlan, aLiveFacade, *m_pDoc);
+    const auto aComputationalComparison
+        = compareComputationalShadow(aMutableState.maShadow, aLiveFacade, aLiveObservation);
+    const auto aLiveShadow = buildComputationalWorkbookShadow(aLiveFacade, aLiveObservation);
+    const auto aGraphComparison
+        = compareDependencyGraphShadow(aMutableState.maGraphShadow, aLiveShadow, aLiveObservation);
+    const auto aBroadcasterComparison
+        = compareBroadcasterCanonicalization(aMutableState.maShadow, aLiveObservation);
+    const auto aObjectObservation = classifyObjectRealizationObservation(
+        aLifetime, aMirror, aApply, aQueueComparison, aComputationalComparison, aGraphComparison,
+        aBroadcasterComparison);
+
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        describeObjectRealizationObservation(aObjectObservation), ObjectRealizationObservationKind::Exact,
+        aObjectObservation.meKind);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalObjectRealizationObservationClassifiesMissingObjects)
+{
+    using spreadsheetengine::compat::libreoffice::bootstrapMutableComputationalSubstrateState;
+    using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    using spreadsheetengine::compat::libreoffice::recalcshadow::detail::comparePlanToDocument;
+    using spreadsheetengine::compat::libreoffice::substratecellstorage::CellStorageMirrorResultKind;
+    using spreadsheetengine::compat::libreoffice::substratecellstorage::mirrorAdmittedScalarCellStorage;
+    using spreadsheetengine::compat::libreoffice::substrateformulalifetime::FormulaCellLifetimeResultKind;
+    using spreadsheetengine::compat::libreoffice::substrateformulalifetime::
+        realizeAdmittedFormulaCellLifetime;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        classifyObjectRealizationObservation;
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
+    using spreadsheetengine::compat::libreoffice::substratewiring::WiringApplyResultKind;
+    using spreadsheetengine::compat::libreoffice::substratewiring::realizeAdmittedWiringContainers;
+    using spreadsheetengine::detail::substrate::applyMutableLifecycleTransition;
+    using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
+    using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::buildLifecyclePilotTransition;
+    using spreadsheetengine::detail::substrate::compareComputationalShadow;
+    using spreadsheetengine::detail::substrate::compareDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::detail::compareBroadcasterCanonicalization;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0); // A1
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr); // B1
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 0);
+    const auto aBeforeObservation = makeComputationalObservationState(
+        collectLiveComputationalState(*m_pDoc));
+    const auto aBeforeShadow = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+    const auto aBeforeGraph = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+    const auto aBeforeIr = spreadsheetengine::compat::libreoffice::buildExecutionIrWorkbookShadow(
+        aBeforeShadow, *m_pDoc);
+
+    m_pDoc->SetString(2, 0, 0, u"=B1+1"_ustr); // C1
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+
+    spreadsheetengine::detail::substrate::LifecyclePilotInput aInput;
+    aInput.maComputationalShadow = aBeforeShadow;
+    aInput.maGraphShadow = aBeforeGraph;
+    aInput.maIrShadow = aBeforeIr;
+    aInput.maMutation = translateSetFormula(ScAddress(2, 0, 0), u"=B1+1"_ustr);
+    aInput.mbCleanBaseline = true;
+    const auto oFormula = aAfterFacade.getFormulaCellDescriptor({ 0, 2, 0 });
+    CPPUNIT_ASSERT(oFormula);
+    aInput.moFormulaCachedValueAfter = oFormula->maCachedValue;
+
+    const auto aTransition = buildLifecyclePilotTransition(aInput);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::detail::substrate::LifecyclePilotVerdict::Applicable,
+        aTransition.meVerdict);
+
+    auto aMutableState = bootstrapMutableComputationalSubstrateState(aBeforeShadow);
+    CPPUNIT_ASSERT(applyMutableLifecycleTransition(aMutableState, aTransition));
+
+    m_pDoc->SetValue(1, 0, 0, 99.0); // B1 no longer a formula cell
+    m_pDoc->SetEmptyCell(ScAddress(2, 0, 0)); // C1 removed
+
+    const auto aLifetime
+        = realizeAdmittedFormulaCellLifetime(*m_pDoc, aMutableState.maFormulaCellLifetime);
+    CPPUNIT_ASSERT_EQUAL(FormulaCellLifetimeResultKind::Applied, aLifetime.meKind);
+
+    const auto aMirror = mirrorAdmittedScalarCellStorage(*m_pDoc, aMutableState.maCellStorage);
+    CPPUNIT_ASSERT_EQUAL(CellStorageMirrorResultKind::Applied, aMirror.meKind);
+    m_pDoc->CalcAll();
+
+    const auto aApply = realizeAdmittedWiringContainers(*m_pDoc, aMutableState.maWiringContainers);
+    CPPUNIT_ASSERT_EQUAL(WiringApplyResultKind::Applied, aApply.meKind);
+
+    m_pDoc->SetEmptyCell(ScAddress(2, 0, 0)); // remove a realized formula object
+
+    const CalcWorkbookFacade aLiveFacade(*m_pDoc, 1);
+    const auto aLiveObservation = makeComputationalObservationState(
+        collectLiveComputationalState(*m_pDoc));
+    const auto aQueueComparison = comparePlanToDocument(aTransition.maRecalcPlan, aLiveFacade, *m_pDoc);
+    const auto aComputationalComparison
+        = compareComputationalShadow(aMutableState.maShadow, aLiveFacade, aLiveObservation);
+    const auto aLiveShadow = buildComputationalWorkbookShadow(aLiveFacade, aLiveObservation);
+    const auto aGraphComparison
+        = compareDependencyGraphShadow(aMutableState.maGraphShadow, aLiveShadow, aLiveObservation);
+    const auto aBroadcasterComparison
+        = compareBroadcasterCanonicalization(aMutableState.maShadow, aLiveObservation);
+    const auto aObjectObservation = classifyObjectRealizationObservation(
+        aLifetime, aMirror, aApply, aQueueComparison, aComputationalComparison, aGraphComparison,
+        aBroadcasterComparison);
+
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describeObjectRealizationObservation(aObjectObservation),
+        ObjectRealizationObservationKind::MissingRealizedObjects, aObjectObservation.meKind);
 
     m_pDoc->DeleteTab(0);
 }
