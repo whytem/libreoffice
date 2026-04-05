@@ -86,12 +86,15 @@ inline void clearRemovedLiveCells(ScDocument& rDoc,
 
 inline void applyMirroredRecord(ScDocument& rDoc,
     const spreadsheetengine::detail::substrate::AdmittedCellStorageRecord& rRecord,
-    CellStorageMirrorResult& rResult)
+    CellStorageMirrorResult& rResult, bool bApplyFormulaRecords)
 {
     const ScAddress aAddress = toLibreOfficeAddress(rRecord.maId.maAddress);
 
     if (rRecord.hasFormula())
     {
+        if (!bApplyFormulaRecords)
+            return;
+
         if (rRecord.moFormula->meKind
             != spreadsheetengine::detail::facade::FormulaCellKind::Ordinary)
         {
@@ -140,7 +143,28 @@ inline void applyMirroredRecord(ScDocument& rDoc,
     detail::clearRemovedLiveCells(rDoc, aLiveAddresses, rStore, aResult);
     for (const auto& rRecord : rStore.maCells)
     {
-        detail::applyMirroredRecord(rDoc, rRecord, aResult);
+        detail::applyMirroredRecord(rDoc, rRecord, aResult, true);
+        if (!aResult.maReason.empty())
+            return aResult;
+    }
+
+    aResult.meKind = CellStorageMirrorResultKind::Applied;
+    return aResult;
+}
+
+[[nodiscard]] inline CellStorageMirrorResult mirrorAdmittedScalarCellStorage(
+    ScDocument& rDoc, const spreadsheetengine::detail::substrate::AdmittedCellStorage& rStore)
+{
+    CellStorageMirrorResult aResult;
+
+    std::vector<ScAddress> aLiveAddresses;
+    if (!detail::collectAdmittedLiveCellAddresses(rDoc, aLiveAddresses, aResult.maReason))
+        return aResult;
+
+    detail::clearRemovedLiveCells(rDoc, aLiveAddresses, rStore, aResult);
+    for (const auto& rRecord : rStore.maCells)
+    {
+        detail::applyMirroredRecord(rDoc, rRecord, aResult, false);
         if (!aResult.maReason.empty())
             return aResult;
     }
