@@ -19,6 +19,7 @@
 #include <spreadsheetengine/api/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/Address.hxx>
 #include <spreadsheetengine/detail/substrate/GraphWiringDelta.hxx>
+#include <spreadsheetengine/detail/substrate/MutableComputationalSubstrate.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::substratewiring
 {
@@ -33,6 +34,7 @@ struct WiringApplyResult
 {
     WiringApplyResultKind meKind = WiringApplyResultKind::RejectedOutOfContract;
     api::String maReason;
+    sal_Int32 mnBroadcasterNodesRealized = 0;
     sal_Int32 mnListenerEdgesApplied = 0;
     sal_Int32 mnFormulaTreeNodesApplied = 0;
     sal_Int32 mnFormulaTrackNodesApplied = 0;
@@ -150,20 +152,69 @@ inline void applyListenerEdgeTarget(ScDocument& rDoc,
     }
 }
 
+[[nodiscard]] inline bool validateResidentWiringStore(
+    ScDocument& rDoc,
+    const spreadsheetengine::detail::substrate::AdmittedWiringContainers& rStore,
+    api::String& rReason)
+{
+    for (const auto& rEdge : rStore.maListenerEdges)
+    {
+        if (!rStore.findBroadcasterNode(rEdge.maBroadcaster))
+        {
+            rReason = u"wiring_store_missing_broadcaster";
+            return false;
+        }
+        if (!resolveFormulaCell(rDoc, rEdge.maListenerAnchor, rReason))
+            return false;
+    }
+
+    for (const auto& rNode : rStore.maFormulaTreeNodes)
+    {
+        if (!resolveFormulaCell(rDoc, rNode, rReason))
+            return false;
+    }
+
+    for (const auto& rNode : rStore.maFormulaTrackNodes)
+    {
+        if (!resolveFormulaCell(rDoc, rNode, rReason))
+            return false;
+    }
+
+    for (const auto& rBroadcaster : rStore.maBroadcasterNodes)
+    {
+        const sal_Int32 nObservedListeners = static_cast<sal_Int32>(
+            std::count_if(rStore.maListenerEdges.begin(), rStore.maListenerEdges.end(),
+                [&rBroadcaster](const spreadsheetengine::detail::substrate::GraphEdgeRecord& rEdge) {
+                    return rEdge.maBroadcaster == rBroadcaster.maId;
+                }));
+        if (nObservedListeners != rBroadcaster.mnListenerCount)
+        {
+            rReason = u"wiring_store_listener_count_mismatch";
+            return false;
+        }
+    }
+
+    return true;
+}
+
 } // namespace detail
 
-[[nodiscard]] inline WiringApplyResult rebuildAdmittedLiveWiring(
-    ScDocument& rDoc, const spreadsheetengine::detail::substrate::GraphWiringDelta& rDelta)
+[[nodiscard]] inline WiringApplyResult realizeAdmittedWiringContainers(
+    ScDocument& rDoc,
+    const spreadsheetengine::detail::substrate::AdmittedWiringContainers& rStore)
 {
     WiringApplyResult aResult;
 
     std::vector<ScFormulaCell*> aCells;
     if (!detail::collectAdmittedFormulaCells(rDoc, aCells, aResult.maReason))
         return aResult;
+    if (!detail::validateResidentWiringStore(rDoc, rStore, aResult.maReason))
+        return aResult;
 
     detail::clearAdmittedLiveWiring(rDoc, aCells);
 
-    for (const auto& rEdge : rDelta.maListenerEdgesAfter)
+    aResult.mnBroadcasterNodesRealized = rStore.getBroadcasterNodeCount();
+    for (const auto& rEdge : rStore.maListenerEdges)
     {
         detail::applyListenerEdgeTarget(rDoc, rEdge, aResult.maReason);
         if (!aResult.maReason.empty())
@@ -171,7 +222,7 @@ inline void applyListenerEdgeTarget(ScDocument& rDoc,
         ++aResult.mnListenerEdgesApplied;
     }
 
-    for (const auto& rNode : rDelta.maFormulaTreeAfter)
+    for (const auto& rNode : rStore.maFormulaTreeNodes)
     {
         ScFormulaCell* pCell = detail::resolveFormulaCell(rDoc, rNode, aResult.maReason);
         if (!pCell)
@@ -180,7 +231,7 @@ inline void applyListenerEdgeTarget(ScDocument& rDoc,
         ++aResult.mnFormulaTreeNodesApplied;
     }
 
-    for (const auto& rNode : rDelta.maFormulaTrackAfter)
+    for (const auto& rNode : rStore.maFormulaTrackNodes)
     {
         ScFormulaCell* pCell = detail::resolveFormulaCell(rDoc, rNode, aResult.maReason);
         if (!pCell)
@@ -191,6 +242,17 @@ inline void applyListenerEdgeTarget(ScDocument& rDoc,
 
     aResult.meKind = WiringApplyResultKind::Applied;
     return aResult;
+}
+
+[[nodiscard]] inline WiringApplyResult rebuildAdmittedLiveWiring(
+    ScDocument& rDoc, const spreadsheetengine::detail::substrate::GraphWiringDelta& rDelta)
+{
+    spreadsheetengine::detail::substrate::AdmittedWiringContainers aStore;
+    aStore.maBroadcasterNodes = rDelta.maBroadcasterNodesAfter;
+    aStore.maListenerEdges = rDelta.maListenerEdgesAfter;
+    aStore.maFormulaTreeNodes = rDelta.maFormulaTreeAfter;
+    aStore.maFormulaTrackNodes = rDelta.maFormulaTrackAfter;
+    return realizeAdmittedWiringContainers(rDoc, aStore);
 }
 
 } // namespace spreadsheetengine::compat::libreoffice::substratewiring

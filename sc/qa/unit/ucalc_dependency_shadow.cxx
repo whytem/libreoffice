@@ -2900,11 +2900,10 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalCellStorageMirrorReb
     using spreadsheetengine::compat::libreoffice::substratecellstorage::mirrorAdmittedCellStorage;
     using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
     using spreadsheetengine::compat::libreoffice::substratewiring::WiringApplyResultKind;
-    using spreadsheetengine::compat::libreoffice::substratewiring::rebuildAdmittedLiveWiring;
+    using spreadsheetengine::compat::libreoffice::substratewiring::realizeAdmittedWiringContainers;
     using spreadsheetengine::detail::substrate::applyMutableLifecycleTransition;
     using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
     using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
-    using spreadsheetengine::detail::substrate::buildGraphWiringDelta;
     using spreadsheetengine::detail::substrate::buildLifecyclePilotTransition;
     using spreadsheetengine::detail::substrate::compareComputationalShadow;
     using spreadsheetengine::detail::substrate::compareDependencyGraphShadow;
@@ -2951,19 +2950,20 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalCellStorageMirrorReb
     CPPUNIT_ASSERT_EQUAL(CellStorageMirrorResultKind::Applied, aMirror.meKind);
     m_pDoc->CalcAll();
 
-    const auto aDelta = buildGraphWiringDelta(aTransition);
-    const auto aApply = rebuildAdmittedLiveWiring(*m_pDoc, aDelta);
+    const auto aApply = realizeAdmittedWiringContainers(*m_pDoc, aMutableState.maWiringContainers);
     CPPUNIT_ASSERT_EQUAL(WiringApplyResultKind::Applied, aApply.meKind);
+    CPPUNIT_ASSERT_EQUAL(aMutableState.maWiringContainers.getBroadcasterNodeCount(),
+        aApply.mnBroadcasterNodesRealized);
 
     const CalcWorkbookFacade aLiveFacade(*m_pDoc, 1);
     const auto aLiveObservation = makeComputationalObservationState(
         collectLiveComputationalState(*m_pDoc));
     const auto aComputationalComparison
-        = compareComputationalShadow(aTransition.maComputationalAfter, aLiveFacade, aLiveObservation);
+        = compareComputationalShadow(aMutableState.maShadow, aLiveFacade, aLiveObservation);
     CPPUNIT_ASSERT(aComputationalComparison.mbFullMatch);
     const auto aLiveShadow = buildComputationalWorkbookShadow(aLiveFacade, aLiveObservation);
     const auto aGraphComparison
-        = compareDependencyGraphShadow(aTransition.maGraphAfter, aLiveShadow, aLiveObservation);
+        = compareDependencyGraphShadow(aMutableState.maGraphShadow, aLiveShadow, aLiveObservation);
     CPPUNIT_ASSERT_EQUAL(GraphComparisonKind::Exact, aGraphComparison.meKind);
     CPPUNIT_ASSERT(aGraphComparison.mbFullMatch);
 
@@ -2979,11 +2979,10 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalCellStorageMirrorReb
     using spreadsheetengine::compat::libreoffice::substratecellstorage::mirrorAdmittedCellStorage;
     using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
     using spreadsheetengine::compat::libreoffice::substratewiring::WiringApplyResultKind;
-    using spreadsheetengine::compat::libreoffice::substratewiring::rebuildAdmittedLiveWiring;
+    using spreadsheetengine::compat::libreoffice::substratewiring::realizeAdmittedWiringContainers;
     using spreadsheetengine::detail::substrate::applyMutableStructuralTransition;
     using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
     using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
-    using spreadsheetengine::detail::substrate::buildGraphWiringDelta;
     using spreadsheetengine::detail::substrate::buildStructuralPilotTransition;
     using spreadsheetengine::detail::substrate::compareComputationalShadow;
     using spreadsheetengine::detail::substrate::compareDependencyGraphShadow;
@@ -3036,19 +3035,20 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalCellStorageMirrorReb
     CPPUNIT_ASSERT_EQUAL(CellStorageMirrorResultKind::Applied, aMirror.meKind);
     m_pDoc->CalcAll();
 
-    const auto aDelta = buildGraphWiringDelta(aTransition);
-    const auto aApply = rebuildAdmittedLiveWiring(*m_pDoc, aDelta);
+    const auto aApply = realizeAdmittedWiringContainers(*m_pDoc, aMutableState.maWiringContainers);
     CPPUNIT_ASSERT_EQUAL(WiringApplyResultKind::Applied, aApply.meKind);
+    CPPUNIT_ASSERT_EQUAL(aMutableState.maWiringContainers.getBroadcasterNodeCount(),
+        aApply.mnBroadcasterNodesRealized);
 
     const CalcWorkbookFacade aLiveFacade(*m_pDoc, 1);
     const auto aLiveObservation = makeComputationalObservationState(
         collectLiveComputationalState(*m_pDoc));
     const auto aComputationalComparison
-        = compareComputationalShadow(aTransition.maComputationalAfter, aLiveFacade, aLiveObservation);
+        = compareComputationalShadow(aMutableState.maShadow, aLiveFacade, aLiveObservation);
     CPPUNIT_ASSERT(aComputationalComparison.mbFullMatch);
     const auto aLiveShadow = buildComputationalWorkbookShadow(aLiveFacade, aLiveObservation);
     const auto aGraphComparison
-        = compareDependencyGraphShadow(aTransition.maGraphAfter, aLiveShadow, aLiveObservation);
+        = compareDependencyGraphShadow(aMutableState.maGraphShadow, aLiveShadow, aLiveObservation);
     CPPUNIT_ASSERT_EQUAL(GraphComparisonKind::Exact, aGraphComparison.meKind);
     CPPUNIT_ASSERT(aGraphComparison.mbFullMatch);
 
