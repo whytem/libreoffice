@@ -239,8 +239,8 @@ computational storage migration by itself.
 Calc still owns the live host side of this slice:
 
 - raw document mutation APIs
-- final application of engine-authored realization records
-- final live verification and rollback mechanics
+- final application of engine-authored realization and rollback records
+- final live verification shell around those records
 
 That is acceptable because the current rollout is a compat-driven authority
 slice, not a blanket handoff of the computational document core.
@@ -297,7 +297,7 @@ It did not justify physical container residency migration. Calc still owns:
 - `ScDocument` storage and mutation entry
 - formula-cell object lifetime
 - live broadcaster/listener container residency
-- final rollback
+- the final live apply shell around engine-authored rollback records
 
 That means the current boundary is stronger than a read-only shadow model but
 still narrower than a true storage transplant.
@@ -339,7 +339,7 @@ It did not justify broad `ScDocument` storage migration. Calc still owns:
 - mutation entry and document mutation APIs
 - formula-cell object lifetime
 - live broadcaster/listener container residency
-- final rollback
+- the final live apply shell around engine-authored rollback records
 
 That means the current boundary is now stronger than the earlier
 mutable-sidecar-plus-host-storage split, but it is still narrower than a
@@ -375,7 +375,7 @@ dependency-container migration. Calc still owns:
 
 - mutation entry and document mutation APIs
 - formula-cell object lifetime
-- final rollback
+- the final live apply shell around engine-authored rollback records
 
 That means the current boundary is now stronger than the earlier
 resident-cell-plus-host-wiring split, but it is still narrower than a broad
@@ -411,7 +411,7 @@ object migration outside the admitted slice. On the current settled
 boundary, Calc still owns:
 
 - mutation entry and document mutation APIs
-- final rollback
+- the final live apply shell around engine-authored rollback records
 
 The admitted live object-realization surface named there has since been
 pulled further into the engine by the completed object-realization
@@ -452,7 +452,7 @@ They still do not justify broad host-independent mutation application. Calc
 still owns:
 
 - raw document mutation APIs
-- final rollback
+- the final live apply shell around engine-authored rollback records
 
 The key mutation-entry closeout references are:
 
@@ -489,7 +489,7 @@ It justifies one additional bounded boundary shift:
 It still does not justify broad host independence. Calc still owns:
 
 - raw document mutation APIs
-- final rollback
+- the final live apply shell around engine-authored rollback records
 
 That means the current boundary is stronger than the earlier resident-state-
 plus-host-realization split, but it is still narrower than a broad
@@ -505,18 +505,52 @@ The key object-realization closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_DECISION_RECORD.md)
 
+## Final Rollback Outcome
+
+The final-rollback reassessment is now complete.
+
+It justifies one additional bounded boundary shift:
+
+- the engine now owns the admitted rollback record on the bounded slice
+- mutation entry now reuses that explicit rollback record for
+  dirty-baseline rejection, verification failure, and repair-detected
+  rollback
+- admitted rollback now reports explicit rollback observation instead of
+  silently restoring through an ad hoc host path
+- helper-level and admitted runtime rollback proof lanes close exactly on the
+  bounded slice
+
+It still does not justify broad host independence. Calc still owns:
+
+- raw document mutation APIs
+- the final live apply shell that executes engine-authored realization and
+  rollback records
+
+That means the current boundary is now stronger than the earlier
+resident-state-plus-host-rollback split, but it is still narrower than a
+broad computational document transplant.
+
+The key final-rollback closeout references are:
+
+- [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_REASSESSMENT_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_MATRIX.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_MATRIX.md)
+- [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_OBSERVATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_OBSERVATION.md)
+- [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_DECISION_RECORD.md)
+
 ## Next Explicit Reassessment Target
 
 The next explicit bounded concern is:
 
-- final rollback reassessment, with the implementation-ready plan in
-  [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_REASSESSMENT_PLAN.md)
+- broader raw mutation API migration on the admitted slice
 
-The object-realization reassessment is now closed with a bounded proceed
-result. The most actionable remaining host-owned surface on the admitted
-slice is no longer live realization. It is the retained rollback boundary
-around the already-engine-authored resident, mutation-entry, and realization
-surfaces.
+The final-rollback reassessment is now closed with a bounded proceed result.
+The most actionable remaining host-owned surface on the admitted slice is no
+longer rollback authority. It is the retained raw mutation shell and the
+final live apply shell around the already-engine-authored resident,
+mutation-entry, realization, and rollback surfaces.
 
 ## Current Assessment
 
@@ -538,6 +572,7 @@ The current state should be read as:
 - plus a successful bounded admitted-slice wiring-container residency proof
 - plus a successful bounded admitted-slice formula-cell lifetime proof
 - plus a successful bounded admitted-slice object-realization proof
+- plus a successful bounded admitted-slice final-rollback proof
 - but still not as proof that a full computational storage migration is
   already justified
 

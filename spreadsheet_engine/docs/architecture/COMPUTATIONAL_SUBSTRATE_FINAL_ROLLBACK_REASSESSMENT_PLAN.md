@@ -1,11 +1,14 @@
 # Computational Substrate Final Rollback Reassessment Plan
 
-Status: implementation-ready plan
+Status: completed closeout record
 
 ## Purpose
 
-This document defines the next explicit proof cycle after the completed
+This document defined the next explicit proof cycle after the completed
 [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_DECISION_RECORD.md).
+
+That proof cycle is now complete. The closeout is recorded in
+[COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_DECISION_RECORD.md).
 
 That closeout moved the admitted slice to its strongest proven position so
 far:

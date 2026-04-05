@@ -314,9 +314,30 @@ Current architecture docs:
   admitting engine-authored object realization on the bounded slice while
   leaving raw mutation APIs and final rollback in Calc
 - [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_REASSESSMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_REASSESSMENT_PLAN.md) -
-  implementation-ready plan for the next bounded reassessment after
-  object-realization closeout, focused on engine-authored admitted-slice
-  rollback while Calc still owns raw mutation APIs
+  completed closeout record for the bounded final-rollback reassessment,
+  proceeding with engine-authored admitted-slice rollback and naming broader
+  raw mutation API migration as the next adjacent concern
+- [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_CONTRACT.md) -
+  frozen contract note for the admitted rollback slice, fixing covered
+  rollback classes, retained Calc host surfaces, and exact success standard
+- [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_MATRIX.md](COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_MATRIX.md) -
+  frozen scenario matrix for admitted rollback, classifying candidate,
+  validation-only, and deferred rollback cases
+- [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_OBSERVATION.md](COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_OBSERVATION.md) -
+  completed observation note for rollback drift classification, introducing
+  exact, ordering-only, missing-restored-object, host-reconstruction,
+  mismatch, and out-of-contract result families
+- [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_IMPLEMENTATION.md) -
+  completed implementation note for the engine-authored admitted rollback
+  record and the Calc rollback shell that consumes it
+- [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_EVIDENCE.md) -
+  frozen evidence note for the final-rollback proof cycle, recording exact
+  admitted rollback restore, runtime rollback observation, and replay
+  stability
+- [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_DECISION_RECORD.md) -
+  completed closeout decision for final rollback reassessment, admitting
+  engine-authored rollback on the bounded slice while leaving raw mutation
+  APIs in Calc
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded
