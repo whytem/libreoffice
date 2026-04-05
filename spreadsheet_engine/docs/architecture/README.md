@@ -243,6 +243,13 @@ Current architecture docs:
   completed closeout decision for the admitted formula-cell lifetime proof
   cycle, admitting engine-owned lifetime decisions while keeping mutation
   entry and live realization in Calc
+- [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_PLAN.md](COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_PLAN.md) -
+  active implementation-ready plan for the next bounded migration step,
+  testing engine-owned admitted-slice mutation entry while keeping live
+  realization and rollback in Calc
+- [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_CONTRACT.md) -
+  reserved contract note for the admitted mutation-entry slice, to be frozen
+  when plan execution begins
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded
