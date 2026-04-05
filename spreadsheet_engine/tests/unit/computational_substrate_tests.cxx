@@ -6,6 +6,7 @@
 #include <spreadsheetengine/detail/substrate/AuthorityPilotBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/LifecyclePilot.hxx>
 #include <spreadsheetengine/detail/substrate/LifecyclePilotBuilder.hxx>
+#include <spreadsheetengine/detail/substrate/MutationEntry.hxx>
 #include <spreadsheetengine/detail/substrate/MutableComputationalSubstrate.hxx>
 #include <spreadsheetengine/detail/substrate/StructuralPilot.hxx>
 #include <spreadsheetengine/detail/substrate/StructuralPilotBuilder.hxx>
@@ -28,6 +29,7 @@ int main()
     using spreadsheetengine::detail::substrate::authoritydetail::makeAuthorityVerification;
     using spreadsheetengine::detail::substrate::lifecycledetail::classifyLifecycleMutation;
     using spreadsheetengine::detail::substrate::lifecycledetail::makeLifecycleVerification;
+    using spreadsheetengine::detail::substrate::mutationentrydetail::classifyMutationEntryPath;
     using spreadsheetengine::detail::substrate::structuraldetail::classifyStructuralMutation;
     using spreadsheetengine::detail::substrate::structuraldetail::makeStructuralVerification;
     namespace mapping = spreadsheetengine::detail::substrate::mapping;
@@ -305,6 +307,40 @@ int main()
         if (!aMutableScalar.maValue.isNumber() || aMutableScalar.maValue.mfNumber != 99.0)
             return fail("computational_substrate", "mutable authority facade mismatch");
 
+        {
+            MutationEntryBuildInput aEntryInput;
+            aEntryInput.maComputationalShadow = aPilotShadow;
+            aEntryInput.maGraphShadow = aAuthorityInput.maGraphShadow;
+            aEntryInput.maIrShadow = aAuthorityInput.maIrShadow;
+            aEntryInput.maRequest
+                = MutationEntryRequest::setScalarValue({ nPilotSheet, 0, 0 }, CellValue::number(99.0));
+            aEntryInput.mbCleanBaseline = true;
+
+            const auto oPath = classifyMutationEntryPath(aEntryInput);
+            if (!oPath || *oPath != MutationEntryPath::Authority)
+                return fail("computational_substrate", "mutation entry authority routing mismatch");
+
+            const auto aEntryTransition = buildMutationEntryTransition(
+                aEntryInput, aPilotFacade, aPilotObservation);
+            if (!aEntryTransition.moAuthorityTransition
+                || aEntryTransition.moAuthorityTransition->meVerdict
+                       != AuthorityPilotVerdict::Applicable)
+            {
+                return fail("computational_substrate", "mutation entry authority build mismatch");
+            }
+
+            auto aEntryState = bootstrapMutableComputationalSubstrateState(aPilotShadow);
+            if (!applyMutableMutationEntryTransition(aEntryState, aEntryTransition))
+                return fail("computational_substrate", "mutation entry authority apply mismatch");
+            if (!findMutationEntryComputationalAfter(aEntryTransition)
+                || !compareAdmittedCellStorage(aEntryState.maCellStorage,
+                       *findMutationEntryComputationalAfter(aEntryTransition))
+                        .mbFullMatch)
+            {
+                return fail("computational_substrate", "mutation entry authority storage mismatch");
+            }
+        }
+
         const auto aLifecycleAdmitted
             = classifyLifecycleMutation(MutationEvent::setFormula({ nPilotSheet, 3, 0 }, u"=A1+B1"));
         if (!aLifecycleAdmitted.isAdmitted() || !aLifecycleAdmitted.mbRequiresFormulaLifecycleShape)
@@ -452,6 +488,43 @@ int main()
                 "mutable lifecycle removal wiring mismatch");
         }
 
+        {
+            MutationEntryBuildInput aEntryInput;
+            aEntryInput.maComputationalShadow = aPilotShadow;
+            aEntryInput.maGraphShadow = aAuthorityInput.maGraphShadow;
+            aEntryInput.maIrShadow = aAuthorityInput.maIrShadow;
+            aEntryInput.maRequest
+                = MutationEntryRequest::setFormula({ nPilotSheet, 3, 0 }, u"=A1+B1",
+                    CellValue::number(119.0));
+            aEntryInput.mbCleanBaseline = true;
+
+            const auto oPath = classifyMutationEntryPath(aEntryInput);
+            if (!oPath || *oPath != MutationEntryPath::Lifecycle)
+                return fail("computational_substrate", "mutation entry lifecycle routing mismatch");
+
+            const auto aEntryTransition = buildMutationEntryTransition(
+                aEntryInput, aPilotFacade, aPilotObservation);
+            if (!aEntryTransition.moLifecycleTransition
+                || aEntryTransition.moLifecycleTransition->meVerdict
+                       != LifecyclePilotVerdict::Applicable
+                || aEntryTransition.moLifecycleTransition->maSyncActions.empty())
+            {
+                return fail("computational_substrate", "mutation entry lifecycle build mismatch");
+            }
+
+            auto aEntryState = bootstrapMutableComputationalSubstrateState(aPilotShadow);
+            if (!applyMutableMutationEntryTransition(aEntryState, aEntryTransition))
+                return fail("computational_substrate", "mutation entry lifecycle apply mismatch");
+            if (!findMutationEntryComputationalAfter(aEntryTransition)
+                || !compareAdmittedFormulaCellLifetime(aEntryState.maFormulaCellLifetime,
+                       *findMutationEntryComputationalAfter(aEntryTransition))
+                        .mbFullMatch)
+            {
+                return fail("computational_substrate",
+                    "mutation entry lifecycle lifetime mismatch");
+            }
+        }
+
         const auto aStructuralAdmitted
             = classifyStructuralMutation(MutationEvent::insertRows(nPilotSheet, 1, 1));
         if (!aStructuralAdmitted.isAdmitted()
@@ -584,6 +657,39 @@ int main()
             {
                 return fail("computational_substrate",
                     "mutable structural wiring mismatch");
+            }
+
+            MutationEntryBuildInput aEntryInput;
+            aEntryInput.maComputationalShadow = aBeforeShadow;
+            aEntryInput.maGraphShadow = aBeforeGraph;
+            aEntryInput.maIrShadow = aBeforeIr;
+            aEntryInput.maRequest = MutationEntryRequest::insertRows(nSheet, 1, 1);
+            aEntryInput.moObservedAfterComputationalShadow = aAfterShadow;
+            aEntryInput.moObservedAfterIrShadow = aAfterIr;
+            aEntryInput.mbCleanBaseline = true;
+
+            const auto oPath = classifyMutationEntryPath(aEntryInput);
+            if (!oPath || *oPath != MutationEntryPath::Structural)
+                return fail("computational_substrate", "mutation entry structural routing mismatch");
+
+            const auto aEntryTransition = buildMutationEntryTransition(
+                aEntryInput, aAfterFacade, aAfterObservation);
+            if (!aEntryTransition.moStructuralTransition
+                || aEntryTransition.moStructuralTransition->meVerdict
+                       != StructuralPilotVerdict::Applicable)
+            {
+                return fail("computational_substrate", "mutation entry structural build mismatch");
+            }
+
+            auto aEntryState = bootstrapMutableComputationalSubstrateState(aBeforeShadow);
+            if (!applyMutableMutationEntryTransition(aEntryState, aEntryTransition))
+                return fail("computational_substrate", "mutation entry structural apply mismatch");
+            if (!findMutationEntryGraphAfter(aEntryTransition)
+                || !compareAdmittedWiringContainers(aEntryState.maWiringContainers,
+                       *findMutationEntryGraphAfter(aEntryTransition))
+                        .mbFullMatch)
+            {
+                return fail("computational_substrate", "mutation entry structural wiring mismatch");
             }
         }
 
