@@ -472,7 +472,9 @@ The key mutation-entry closeout references are:
 
 The next explicit bounded concern is:
 
-- broader object-realization reassessment
+- broader object-realization reassessment, with the implementation-ready
+  plan in
+  [COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_OBJECT_REALIZATION_REASSESSMENT_PLAN.md)
 
 The scalar mutation-entry blocker is now closed. The most actionable
 remaining host-owned surface on the bounded slice is Calc-side live object
