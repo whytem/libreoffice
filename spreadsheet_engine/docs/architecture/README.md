@@ -339,9 +339,31 @@ Current architecture docs:
   engine-authored rollback on the bounded slice while leaving raw mutation
   APIs in Calc
 - [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_MIGRATION_PLAN.md](COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_MIGRATION_PLAN.md) -
-  implementation-ready plan for the next bounded reassessment after
-  final-rollback closeout, focused on engine-authored admitted-slice raw
-  mutation entry while Calc still owns the final live apply shell
+  completed closeout record for the admitted raw-mutation reassessment,
+  proceeding with engine-authored raw mutation records on the bounded slice
+  while leaving the broader live apply shell in Calc
+- [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_CONTRACT.md) -
+  frozen contract note for the admitted raw-mutation slice, fixing the
+  covered mutation classes, retained Calc host surfaces, and exact success
+  standard
+- [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_SCHEMA.md](COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_SCHEMA.md) -
+  frozen schema note for the admitted raw-mutation record, stable mutation
+  identity, payload rules, and forbidden host shortcuts
+- [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_OBSERVATION.md](COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_OBSERVATION.md) -
+  completed observation note for raw-mutation-shell drift classification,
+  introducing exact, ordering-only, hidden-reconstruction, missing-object,
+  mismatch, and out-of-contract result families
+- [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_IMPLEMENTATION.md) -
+  completed implementation note for the engine-authored admitted raw
+  mutation record and the Calc host apply path that consumes it
+- [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_EVIDENCE.md) -
+  frozen evidence note for the raw-mutation proof cycle, recording exact
+  admitted apply, exact dirty-baseline rollback, bounded runtime samples,
+  and the narrowed host shell
+- [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_DECISION_RECORD.md) -
+  completed closeout decision for raw-mutation migration, admitting
+  engine-authored raw mutation records on the bounded slice and naming
+  broader live apply-shell reassessment as the next adjacent concern
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

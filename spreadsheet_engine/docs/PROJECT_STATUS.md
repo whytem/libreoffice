@@ -540,19 +540,52 @@ The key final-rollback closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_DECISION_RECORD.md)
 
+## Raw Mutation API Outcome
+
+The raw-mutation reassessment is now complete.
+
+It justifies one additional bounded boundary shift:
+
+- the engine now owns the admitted raw mutation record on the bounded slice
+- admitted scalar, formula, clear, and narrow structural entry now pass
+  through that explicit engine-authored record before live apply
+- admitted exact apply lanes now carry explicit raw-mutation observation
+  instead of relying on hidden host-originated mutation identity
+- dirty-baseline rejection and rollback stay exact through the raw-mutation
+  path
+
+It still does not justify broad host independence. Calc still owns:
+
+- the underlying raw document mutation APIs used to execute the admitted
+  record
+- the final live apply shell that executes engine-authored raw mutation,
+  realization, and rollback records
+
+That means the current boundary is now stronger than the earlier
+resident-state-plus-host-raw-mutation split, but it is still narrower than a
+broad computational document transplant.
+
+The key raw-mutation closeout references are:
+
+- [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_MIGRATION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_MIGRATION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_SCHEMA.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_SCHEMA.md)
+- [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_OBSERVATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_OBSERVATION.md)
+- [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_DECISION_RECORD.md)
+
 ## Next Explicit Reassessment Target
 
 The next explicit bounded concern is:
 
-- broader raw mutation API migration on the admitted slice, with the
-  implementation-ready plan in
-  [COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_MIGRATION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_MUTATION_API_MIGRATION_PLAN.md)
+- broader live apply-shell reassessment on the admitted slice
 
-The final-rollback reassessment is now closed with a bounded proceed result.
+The raw-mutation reassessment is now closed with a bounded proceed result.
 The most actionable remaining host-owned surface on the admitted slice is no
-longer rollback authority. It is the retained raw mutation shell and the
-final live apply shell around the already-engine-authored resident,
-mutation-entry, realization, and rollback surfaces.
+longer raw mutation identity. It is the retained live apply shell around the
+already-engine-authored resident, mutation-entry, realization, rollback, and
+raw-mutation surfaces.
 
 ## Current Assessment
 
@@ -575,6 +608,7 @@ The current state should be read as:
 - plus a successful bounded admitted-slice formula-cell lifetime proof
 - plus a successful bounded admitted-slice object-realization proof
 - plus a successful bounded admitted-slice final-rollback proof
+- plus a successful bounded admitted-slice raw-mutation proof
 - but still not as proof that a full computational storage migration is
   already justified
 
