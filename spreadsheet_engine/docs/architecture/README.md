@@ -313,6 +313,10 @@ Current architecture docs:
   completed closeout decision for object-realization reassessment,
   admitting engine-authored object realization on the bounded slice while
   leaving raw mutation APIs and final rollback in Calc
+- [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_REASSESSMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_REASSESSMENT_PLAN.md) -
+  implementation-ready plan for the next bounded reassessment after
+  object-realization closeout, focused on engine-authored admitted-slice
+  rollback while Calc still owns raw mutation APIs
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

@@ -509,7 +509,8 @@ The key object-realization closeout references are:
 
 The next explicit bounded concern is:
 
-- final rollback reassessment
+- final rollback reassessment, with the implementation-ready plan in
+  [COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_ROLLBACK_REASSESSMENT_PLAN.md)
 
 The object-realization reassessment is now closed with a bounded proceed
 result. The most actionable remaining host-owned surface on the admitted
