@@ -17,6 +17,7 @@
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateAuthority.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateCellStorage.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFormulaCellLifetime.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObjectRealization.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateLifecycle.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRollout.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateStructural.hxx>
@@ -57,6 +58,8 @@ struct MutationEntryResult
         moIrComparison;
     std::optional<spreadsheetengine::detail::substrate::BroadcasterCanonicalizationComparison>
         moBroadcasterCanonicalization;
+    std::optional<substrateobjectrealization::ObjectRealizationObservation>
+        moObjectRealizationObservation;
 };
 
 namespace detail
@@ -66,6 +69,7 @@ struct RealizationResult
 {
     bool mbApplied = false;
     api::String maReason;
+    substrateobjectrealization::ObjectRealizationResult maObjectRealization;
 };
 
 [[nodiscard]] inline bool isRuntimeEnabled(const ScDocument& rDoc)
@@ -353,27 +357,14 @@ struct RealizationResult
 {
     RealizationResult aResult;
 
-    const auto aLifetime
-        = substrateformulalifetime::realizeAdmittedFormulaCellLifetime(rDoc, rState.maFormulaCellLifetime);
-    if (aLifetime.meKind != substrateformulalifetime::FormulaCellLifetimeResultKind::Applied)
+    const auto aObjectRealization
+        = substrateobjectrealization::buildAdmittedObjectRealization(rState);
+    aResult.maObjectRealization
+        = substrateobjectrealization::realizeAdmittedObjectRealization(rDoc, aObjectRealization);
+    if (aResult.maObjectRealization.meKind
+        != substrateobjectrealization::ObjectRealizationResultKind::Applied)
     {
-        aResult.maReason = aLifetime.maReason;
-        return aResult;
-    }
-
-    const auto aMirror = substratecellstorage::mirrorAdmittedScalarCellStorage(rDoc, rState.maCellStorage);
-    if (aMirror.meKind != substratecellstorage::CellStorageMirrorResultKind::Applied)
-    {
-        aResult.maReason = aMirror.maReason;
-        return aResult;
-    }
-
-    rDoc.CalcAll();
-
-    const auto aWiring = substratewiring::realizeAdmittedWiringContainers(rDoc, rState.maWiringContainers);
-    if (aWiring.meKind != substratewiring::WiringApplyResultKind::Applied)
-    {
-        aResult.maReason = aWiring.maReason;
+        aResult.maReason = aResult.maObjectRealization.maReason;
         return aResult;
     }
 
@@ -385,11 +376,9 @@ inline void rollbackToBeforeState(ScDocument& rDoc,
     const spreadsheetengine::detail::substrate::MutableComputationalSubstrateState& rBeforeState,
     const recalcqueue::FormulaStateSnapshot& rBeforeFormulaState)
 {
-    (void)substrateformulalifetime::realizeAdmittedFormulaCellLifetime(
-        rDoc, rBeforeState.maFormulaCellLifetime);
-    (void)substratecellstorage::mirrorAdmittedScalarCellStorage(rDoc, rBeforeState.maCellStorage);
-    rDoc.CalcAll();
-    (void)substratewiring::realizeAdmittedWiringContainers(rDoc, rBeforeState.maWiringContainers);
+    const auto aBeforeRealization
+        = substrateobjectrealization::buildAdmittedObjectRealization(rBeforeState);
+    (void)substrateobjectrealization::realizeAdmittedObjectRealization(rDoc, aBeforeRealization);
     recalcqueue::restoreFormulaState(rDoc, rBeforeFormulaState);
 }
 
@@ -530,6 +519,11 @@ public:
         aResult.moBroadcasterCanonicalization
             = spreadsheetengine::detail::substrate::detail::compareBroadcasterCanonicalization(
                 *pComputationalAfter, aLiveObservation);
+        aResult.moObjectRealizationObservation
+            = substrateobjectrealization::classifyObjectRealizationObservation(
+                aRealization.maObjectRealization, *aResult.moQueueComparison,
+                *aResult.moComputationalComparison, *aResult.moGraphComparison,
+                *aResult.moBroadcasterCanonicalization);
 
         aResult.meKind = detail::classifyVerifiedMutationEntryResult(aResult);
         if (aResult.meKind == MutationEntryResultKind::RolledBackVerificationFailure

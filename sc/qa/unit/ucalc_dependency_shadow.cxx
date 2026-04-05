@@ -407,6 +407,10 @@ void assertComputationalStructuralAppliedExactly(
     CPPUNIT_ASSERT_EQUAL(ComputationalStructuralResultKind::Applied, oResult->meKind);
 }
 
+[[nodiscard]] std::string describeObjectRealizationObservation(
+    const spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        ObjectRealizationObservation& rObservation);
+
 void assertComputationalMutationEntryApplied(
     const std::optional<
         spreadsheetengine::compat::libreoffice::substratemutationentry::MutationEntryResult>&
@@ -453,7 +457,13 @@ void assertComputationalMutationEntryApplied(
                     + ":" + std::to_string(
                         oResult->moBroadcasterCanonicalization->mnLiveHostUnknownListenerCount)
               : std::string(" broadcaster=none");
-    const std::string aFullMessage = aResultMessage + aBroadcasterMessage;
+    const std::string aObjectRealizationMessage
+        = oResult->moObjectRealizationObservation
+              ? std::string(" object_realization=")
+                    + describeObjectRealizationObservation(*oResult->moObjectRealizationObservation)
+              : std::string(" object_realization=none");
+    const std::string aFullMessage
+        = aResultMessage + aBroadcasterMessage + aObjectRealizationMessage;
     CPPUNIT_ASSERT_MESSAGE(
         aFullMessage,
         oResult->meKind == ComputationalMutationEntryResultKind::Applied
@@ -464,6 +474,9 @@ void assertComputationalMutationEntryApplied(
     CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
     CPPUNIT_ASSERT(oResult->moGraphComparison.has_value());
     CPPUNIT_ASSERT_MESSAGE(aFullMessage, oResult->moGraphComparison->mbFullMatch);
+    CPPUNIT_ASSERT(oResult->moObjectRealizationObservation.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, ObjectRealizationObservationKind::Exact,
+        oResult->moObjectRealizationObservation->meKind);
 
     const auto* pPlan
         = spreadsheetengine::detail::substrate::findMutationEntryRecalcPlan(oResult->maTransition);
@@ -3765,16 +3778,17 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
     using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
     using spreadsheetengine::compat::libreoffice::recalcshadow::detail::comparePlanToDocument;
-    using spreadsheetengine::compat::libreoffice::substratecellstorage::CellStorageMirrorResultKind;
-    using spreadsheetengine::compat::libreoffice::substratecellstorage::mirrorAdmittedScalarCellStorage;
-    using spreadsheetengine::compat::libreoffice::substrateformulalifetime::FormulaCellLifetimeResultKind;
-    using spreadsheetengine::compat::libreoffice::substrateformulalifetime::
-        realizeAdmittedFormulaCellLifetime;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        AdmittedObjectRealization;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        ObjectRealizationResultKind;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        buildAdmittedObjectRealization;
     using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
         classifyObjectRealizationObservation;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        realizeAdmittedObjectRealization;
     using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
-    using spreadsheetengine::compat::libreoffice::substratewiring::WiringApplyResultKind;
-    using spreadsheetengine::compat::libreoffice::substratewiring::realizeAdmittedWiringContainers;
     using spreadsheetengine::detail::substrate::applyMutableLifecycleTransition;
     using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
     using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
@@ -3818,20 +3832,14 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 
     auto aMutableState = bootstrapMutableComputationalSubstrateState(aBeforeShadow);
     CPPUNIT_ASSERT(applyMutableLifecycleTransition(aMutableState, aTransition));
+    const AdmittedObjectRealization aObjectRealization
+        = buildAdmittedObjectRealization(aMutableState);
 
     m_pDoc->SetValue(1, 0, 0, 99.0); // B1 no longer a formula cell
     m_pDoc->SetEmptyCell(ScAddress(2, 0, 0)); // C1 removed
 
-    const auto aLifetime
-        = realizeAdmittedFormulaCellLifetime(*m_pDoc, aMutableState.maFormulaCellLifetime);
-    CPPUNIT_ASSERT_EQUAL(FormulaCellLifetimeResultKind::Applied, aLifetime.meKind);
-
-    const auto aMirror = mirrorAdmittedScalarCellStorage(*m_pDoc, aMutableState.maCellStorage);
-    CPPUNIT_ASSERT_EQUAL(CellStorageMirrorResultKind::Applied, aMirror.meKind);
-    m_pDoc->CalcAll();
-
-    const auto aApply = realizeAdmittedWiringContainers(*m_pDoc, aMutableState.maWiringContainers);
-    CPPUNIT_ASSERT_EQUAL(WiringApplyResultKind::Applied, aApply.meKind);
+    const auto aRealization = realizeAdmittedObjectRealization(*m_pDoc, aObjectRealization);
+    CPPUNIT_ASSERT_EQUAL(ObjectRealizationResultKind::Applied, aRealization.meKind);
 
     const CalcWorkbookFacade aLiveFacade(*m_pDoc, 1);
     const auto aLiveObservation = makeComputationalObservationState(
@@ -3845,7 +3853,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     const auto aBroadcasterComparison
         = compareBroadcasterCanonicalization(aMutableState.maShadow, aLiveObservation);
     const auto aObjectObservation = classifyObjectRealizationObservation(
-        aLifetime, aMirror, aApply, aQueueComparison, aComputationalComparison, aGraphComparison,
+        aRealization, aQueueComparison, aComputationalComparison, aGraphComparison,
         aBroadcasterComparison);
 
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
@@ -3862,16 +3870,17 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
     using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
     using spreadsheetengine::compat::libreoffice::recalcshadow::detail::comparePlanToDocument;
-    using spreadsheetengine::compat::libreoffice::substratecellstorage::CellStorageMirrorResultKind;
-    using spreadsheetengine::compat::libreoffice::substratecellstorage::mirrorAdmittedScalarCellStorage;
-    using spreadsheetengine::compat::libreoffice::substrateformulalifetime::FormulaCellLifetimeResultKind;
-    using spreadsheetengine::compat::libreoffice::substrateformulalifetime::
-        realizeAdmittedFormulaCellLifetime;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        AdmittedObjectRealization;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        ObjectRealizationResultKind;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        buildAdmittedObjectRealization;
     using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
         classifyObjectRealizationObservation;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        realizeAdmittedObjectRealization;
     using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
-    using spreadsheetengine::compat::libreoffice::substratewiring::WiringApplyResultKind;
-    using spreadsheetengine::compat::libreoffice::substratewiring::realizeAdmittedWiringContainers;
     using spreadsheetengine::detail::substrate::applyMutableLifecycleTransition;
     using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
     using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
@@ -3915,20 +3924,14 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 
     auto aMutableState = bootstrapMutableComputationalSubstrateState(aBeforeShadow);
     CPPUNIT_ASSERT(applyMutableLifecycleTransition(aMutableState, aTransition));
+    const AdmittedObjectRealization aObjectRealization
+        = buildAdmittedObjectRealization(aMutableState);
 
     m_pDoc->SetValue(1, 0, 0, 99.0); // B1 no longer a formula cell
     m_pDoc->SetEmptyCell(ScAddress(2, 0, 0)); // C1 removed
 
-    const auto aLifetime
-        = realizeAdmittedFormulaCellLifetime(*m_pDoc, aMutableState.maFormulaCellLifetime);
-    CPPUNIT_ASSERT_EQUAL(FormulaCellLifetimeResultKind::Applied, aLifetime.meKind);
-
-    const auto aMirror = mirrorAdmittedScalarCellStorage(*m_pDoc, aMutableState.maCellStorage);
-    CPPUNIT_ASSERT_EQUAL(CellStorageMirrorResultKind::Applied, aMirror.meKind);
-    m_pDoc->CalcAll();
-
-    const auto aApply = realizeAdmittedWiringContainers(*m_pDoc, aMutableState.maWiringContainers);
-    CPPUNIT_ASSERT_EQUAL(WiringApplyResultKind::Applied, aApply.meKind);
+    const auto aRealization = realizeAdmittedObjectRealization(*m_pDoc, aObjectRealization);
+    CPPUNIT_ASSERT_EQUAL(ObjectRealizationResultKind::Applied, aRealization.meKind);
 
     m_pDoc->SetEmptyCell(ScAddress(2, 0, 0)); // remove a realized formula object
 
@@ -3944,7 +3947,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     const auto aBroadcasterComparison
         = compareBroadcasterCanonicalization(aMutableState.maShadow, aLiveObservation);
     const auto aObjectObservation = classifyObjectRealizationObservation(
-        aLifetime, aMirror, aApply, aQueueComparison, aComputationalComparison, aGraphComparison,
+        aRealization, aQueueComparison, aComputationalComparison, aGraphComparison,
         aBroadcasterComparison);
 
     CPPUNIT_ASSERT_EQUAL_MESSAGE(describeObjectRealizationObservation(aObjectObservation),

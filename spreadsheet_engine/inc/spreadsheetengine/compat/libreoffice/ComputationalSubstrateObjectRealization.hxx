@@ -9,12 +9,15 @@
 
 #pragma once
 
+#include <algorithm>
+
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateCellStorage.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFormulaCellLifetime.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateWiring.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcShadow.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowComparison.hxx>
 #include <spreadsheetengine/detail/substrate/DependencyGraphShadowComparison.hxx>
+#include <spreadsheetengine/detail/substrate/MutableComputationalSubstrate.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::substrateobjectrealization
 {
@@ -45,6 +48,46 @@ struct ObjectRealizationObservation
 
     [[nodiscard]] constexpr bool operator==(const ObjectRealizationObservation& rOther) const
         = default;
+};
+
+enum class ObjectRealizationResultKind : sal_uInt8
+{
+    Applied,
+    RejectedOutOfContract
+};
+
+struct AdmittedObjectRealization
+{
+    std::int64_t mnGeneration = 0;
+    spreadsheetengine::detail::substrate::AdmittedFormulaCellLifetime maFormulaCellLifetime;
+    spreadsheetengine::detail::substrate::AdmittedCellStorage maCellStorage;
+    spreadsheetengine::detail::substrate::AdmittedWiringContainers maWiringContainers;
+
+    [[nodiscard]] constexpr bool operator==(const AdmittedObjectRealization& rOther) const = default;
+
+    [[nodiscard]] sal_Int32 getFormulaCellCount() const
+    {
+        return maFormulaCellLifetime.getFormulaCellCount();
+    }
+
+    [[nodiscard]] sal_Int32 getCellCount() const
+    {
+        return maCellStorage.getCellCount();
+    }
+
+    [[nodiscard]] sal_Int32 getBroadcasterNodeCount() const
+    {
+        return maWiringContainers.getBroadcasterNodeCount();
+    }
+};
+
+struct ObjectRealizationResult
+{
+    ObjectRealizationResultKind meKind = ObjectRealizationResultKind::RejectedOutOfContract;
+    api::String maReason;
+    substrateformulalifetime::FormulaCellLifetimeResult maFormulaCellLifetime;
+    substratecellstorage::CellStorageMirrorResult maCellStorage;
+    substratewiring::WiringApplyResult maWiring;
 };
 
 namespace detail
@@ -165,6 +208,67 @@ namespace detail
     else
         aObservation.maReason = u"object_realization_mismatch";
     return aObservation;
+}
+
+[[nodiscard]] inline ObjectRealizationObservation classifyObjectRealizationObservation(
+    const ObjectRealizationResult& rResult, const recalcshadow::ShadowComparison& rQueue,
+    const spreadsheetengine::detail::substrate::ComputationalShadowComparison& rComputational,
+    const spreadsheetengine::detail::substrate::DependencyGraphShadowComparison& rGraph,
+    const spreadsheetengine::detail::substrate::BroadcasterCanonicalizationComparison& rBroadcasters)
+{
+    return classifyObjectRealizationObservation(rResult.maFormulaCellLifetime, rResult.maCellStorage,
+        rResult.maWiring, rQueue, rComputational, rGraph, rBroadcasters);
+}
+
+[[nodiscard]] inline AdmittedObjectRealization buildAdmittedObjectRealization(
+    const spreadsheetengine::detail::substrate::MutableComputationalSubstrateState& rState)
+{
+    AdmittedObjectRealization aRealization;
+    aRealization.mnGeneration
+        = std::max({ rState.maFormulaCellLifetime.mnGeneration, rState.maCellStorage.mnGeneration,
+            rState.maWiringContainers.mnGeneration });
+    aRealization.maFormulaCellLifetime = rState.maFormulaCellLifetime;
+    aRealization.maCellStorage = rState.maCellStorage;
+    aRealization.maWiringContainers = rState.maWiringContainers;
+    return aRealization;
+}
+
+[[nodiscard]] inline ObjectRealizationResult realizeAdmittedObjectRealization(
+    ScDocument& rDoc, const AdmittedObjectRealization& rRealization)
+{
+    ObjectRealizationResult aResult;
+
+    aResult.maFormulaCellLifetime
+        = substrateformulalifetime::realizeAdmittedFormulaCellLifetime(
+            rDoc, rRealization.maFormulaCellLifetime);
+    if (aResult.maFormulaCellLifetime.meKind
+        != substrateformulalifetime::FormulaCellLifetimeResultKind::Applied)
+    {
+        aResult.maReason = aResult.maFormulaCellLifetime.maReason;
+        return aResult;
+    }
+
+    aResult.maCellStorage
+        = substratecellstorage::mirrorAdmittedScalarCellStorage(rDoc, rRealization.maCellStorage);
+    if (aResult.maCellStorage.meKind
+        != substratecellstorage::CellStorageMirrorResultKind::Applied)
+    {
+        aResult.maReason = aResult.maCellStorage.maReason;
+        return aResult;
+    }
+
+    rDoc.CalcAll();
+
+    aResult.maWiring
+        = substratewiring::realizeAdmittedWiringContainers(rDoc, rRealization.maWiringContainers);
+    if (aResult.maWiring.meKind != substratewiring::WiringApplyResultKind::Applied)
+    {
+        aResult.maReason = aResult.maWiring.maReason;
+        return aResult;
+    }
+
+    aResult.meKind = ObjectRealizationResultKind::Applied;
+    return aResult;
 }
 
 [[nodiscard]] inline const char* toString(ObjectRealizationObservationKind eKind)
