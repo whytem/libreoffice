@@ -18,6 +18,7 @@
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateCellStorage.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFormulaCellLifetime.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObjectRealization.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRawMutation.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRollback.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateLifecycle.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRollout.hxx>
@@ -62,6 +63,8 @@ struct MutationEntryResult
     std::optional<substrateobjectrealization::ObjectRealizationObservation>
         moObjectRealizationObservation;
     std::optional<substraterollback::RollbackObservation> moRollbackObservation;
+    std::optional<substraterawmutation::AdmittedRawMutationRecord> moRawMutationRecord;
+    std::optional<substraterawmutation::RawMutationObservation> moRawMutationObservation;
 };
 
 namespace detail
@@ -267,90 +270,18 @@ struct RealizationResult
     return MutationEntryResultKind::RolledBackVerificationFailure;
 }
 
-[[nodiscard]] inline bool applyScalarCellValue(
-    ScDocument& rDoc, const ScAddress& rAddress, const api::CellValue& rValue, api::String& rReason)
+[[nodiscard]] inline substraterawmutation::RawMutationObservation observeRawMutationApply(
+    const std::optional<substrateobjectrealization::ObjectRealizationObservation>& oObjectRealization)
 {
-    if (rValue.isNumber() || rValue.isBoolean())
-    {
-        rDoc.SetValue(rAddress, rValue.mfNumber);
-        return true;
-    }
-    if (rValue.isText())
-    {
-        rDoc.SetString(rAddress, toLibreOfficeString(rValue.maString));
-        return true;
-    }
-
-    rReason = u"scalar_value_out_of_contract";
-    return false;
+    return substraterawmutation::classifyRawMutationObservation(
+        true, false, oObjectRealization, std::nullopt);
 }
 
-[[nodiscard]] inline bool applyRequestToDocument(
-    ScDocument& rDoc, const spreadsheetengine::detail::substrate::MutationEntryRequest& rRequest,
-    api::String& rReason)
+[[nodiscard]] inline substraterawmutation::RawMutationObservation observeRawMutationRollback(
+    const std::optional<substraterollback::RollbackObservation>& oRollback)
 {
-    const auto& rMutation = rRequest.maMutation;
-    const ScAddress aAddress = toLibreOfficeAddress(rMutation.maAddress);
-    switch (rMutation.meKind)
-    {
-        case spreadsheetengine::detail::facade::MutationKind::SetScalarValue:
-            if (!rRequest.moScalarValueAfter)
-            {
-                rReason = u"missing_scalar_value_after";
-                return false;
-            }
-            return applyScalarCellValue(rDoc, aAddress, *rRequest.moScalarValueAfter, rReason);
-        case spreadsheetengine::detail::facade::MutationKind::SetFormula:
-            if (rMutation.maText.empty())
-            {
-                rReason = u"formula_source_out_of_contract";
-                return false;
-            }
-            rDoc.SetString(aAddress, toLibreOfficeString(rMutation.maText));
-            return true;
-        case spreadsheetengine::detail::facade::MutationKind::ClearCell:
-            rDoc.SetEmptyCell(aAddress);
-            return true;
-        case spreadsheetengine::detail::facade::MutationKind::InsertRows:
-            if (rMutation.mnCount <= 0)
-            {
-                rReason = u"structural_count_out_of_contract";
-                return false;
-            }
-            rDoc.InsertRow(ScRange(0, rMutation.maAddress.mnRow, rMutation.mnSheet, rDoc.MaxCol(),
-                rMutation.maAddress.mnRow + rMutation.mnCount - 1, rMutation.mnSheet));
-            return true;
-        case spreadsheetengine::detail::facade::MutationKind::DeleteRows:
-            if (rMutation.mnCount <= 0)
-            {
-                rReason = u"structural_count_out_of_contract";
-                return false;
-            }
-            rDoc.DeleteRow(ScRange(0, rMutation.maAddress.mnRow, rMutation.mnSheet, rDoc.MaxCol(),
-                rMutation.maAddress.mnRow + rMutation.mnCount - 1, rMutation.mnSheet));
-            return true;
-        case spreadsheetengine::detail::facade::MutationKind::InsertColumns:
-            if (rMutation.mnCount <= 0)
-            {
-                rReason = u"structural_count_out_of_contract";
-                return false;
-            }
-            rDoc.InsertCol(ScRange(rMutation.maAddress.mnColumn, 0, rMutation.mnSheet,
-                rMutation.maAddress.mnColumn + rMutation.mnCount - 1, rDoc.MaxRow(), rMutation.mnSheet));
-            return true;
-        case spreadsheetengine::detail::facade::MutationKind::DeleteColumns:
-            if (rMutation.mnCount <= 0)
-            {
-                rReason = u"structural_count_out_of_contract";
-                return false;
-            }
-            rDoc.DeleteCol(ScRange(rMutation.maAddress.mnColumn, 0, rMutation.mnSheet,
-                rMutation.maAddress.mnColumn + rMutation.mnCount - 1, rDoc.MaxRow(), rMutation.mnSheet));
-            return true;
-        default:
-            rReason = u"mutation_out_of_contract";
-            return false;
-    }
+    return substraterawmutation::classifyRawMutationObservation(
+        true, true, std::nullopt, oRollback);
 }
 
 [[nodiscard]] inline RealizationResult realizeResidentAfterState(
@@ -456,11 +387,26 @@ public:
             = substraterollback::buildAdmittedRollbackRecord(aBeforeMutableState, maFormulaState);
         auto aMutableState = aBeforeMutableState;
 
-        api::String aApplyReason;
-        if (!detail::applyRequestToDocument(rDoc, rRequest, aApplyReason))
+        const auto aRawMutationRecord = substraterawmutation::buildAdmittedRawMutationRecord(rRequest);
+        if (aRawMutationRecord.meKind
+            != substraterawmutation::RawMutationRecordResultKind::Built)
         {
             aResult.meKind = MutationEntryResultKind::RejectedOutOfContract;
-            aResult.maTransition.maReason = aApplyReason;
+            aResult.maTransition.maReason = aRawMutationRecord.maReason;
+            aResult.moRawMutationObservation = substraterawmutation::classifyRawMutationObservation(
+                false, false, std::nullopt, std::nullopt, aRawMutationRecord.maReason);
+            return aResult;
+        }
+        aResult.moRawMutationRecord = aRawMutationRecord.maRecord;
+
+        const auto aRawApply
+            = substraterawmutation::applyAdmittedRawMutationRecord(rDoc, aRawMutationRecord.maRecord);
+        if (aRawApply.meKind != substraterawmutation::RawMutationApplyResultKind::Applied)
+        {
+            aResult.meKind = MutationEntryResultKind::RejectedOutOfContract;
+            aResult.maTransition.maReason = aRawApply.maReason;
+            aResult.moRawMutationObservation = substraterawmutation::classifyRawMutationObservation(
+                false, false, std::nullopt, std::nullopt, aRawApply.maReason);
             return aResult;
         }
 
@@ -490,6 +436,8 @@ public:
             detail::rollbackToBeforeState(rDoc, aBeforeRollback, aRollback);
             aResult.moRollbackObservation
                 = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
+            aResult.moRawMutationObservation = detail::observeRawMutationRollback(
+                aResult.moRollbackObservation);
             return aResult;
         }
 
@@ -501,6 +449,8 @@ public:
             detail::rollbackToBeforeState(rDoc, aBeforeRollback, aRollback);
             aResult.moRollbackObservation
                 = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
+            aResult.moRawMutationObservation = detail::observeRawMutationRollback(
+                aResult.moRollbackObservation);
             return aResult;
         }
 
@@ -513,6 +463,8 @@ public:
             detail::rollbackToBeforeState(rDoc, aBeforeRollback, aRollback);
             aResult.moRollbackObservation
                 = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
+            aResult.moRawMutationObservation = detail::observeRawMutationRollback(
+                aResult.moRollbackObservation);
             return aResult;
         }
 
@@ -532,6 +484,8 @@ public:
             detail::rollbackToBeforeState(rDoc, aBeforeRollback, aRollback);
             aResult.moRollbackObservation
                 = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
+            aResult.moRawMutationObservation = detail::observeRawMutationRollback(
+                aResult.moRollbackObservation);
             return aResult;
         }
 
@@ -561,6 +515,8 @@ public:
                 aRealization.maObjectRealization, *aResult.moQueueComparison,
                 *aResult.moComputationalComparison, *aResult.moGraphComparison,
                 *aResult.moBroadcasterCanonicalization);
+        aResult.moRawMutationObservation
+            = detail::observeRawMutationApply(aResult.moObjectRealizationObservation);
 
         aResult.meKind = detail::classifyVerifiedMutationEntryResult(aResult);
         if (aResult.meKind == MutationEntryResultKind::RolledBackVerificationFailure
@@ -570,6 +526,8 @@ public:
             detail::rollbackToBeforeState(rDoc, aBeforeRollback, aRollback);
             aResult.moRollbackObservation
                 = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
+            aResult.moRawMutationObservation = detail::observeRawMutationRollback(
+                aResult.moRollbackObservation);
         }
 
         return aResult;

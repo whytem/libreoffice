@@ -472,8 +472,13 @@ void assertComputationalMutationEntryApplied(
               ? std::string(" object_realization=")
                     + describeObjectRealizationObservation(*oResult->moObjectRealizationObservation)
               : std::string(" object_realization=none");
+    const std::string aRawMutationMessage
+        = oResult->moRawMutationObservation
+              ? std::string(" raw_mutation=")
+                    + describeRawMutationObservation(*oResult->moRawMutationObservation)
+              : std::string(" raw_mutation=none");
     const std::string aFullMessage
-        = aResultMessage + aBroadcasterMessage + aObjectRealizationMessage;
+        = aResultMessage + aBroadcasterMessage + aObjectRealizationMessage + aRawMutationMessage;
     CPPUNIT_ASSERT_MESSAGE(
         aFullMessage,
         oResult->meKind == ComputationalMutationEntryResultKind::Applied
@@ -487,6 +492,9 @@ void assertComputationalMutationEntryApplied(
     CPPUNIT_ASSERT(oResult->moObjectRealizationObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, ObjectRealizationObservationKind::Exact,
         oResult->moObjectRealizationObservation->meKind);
+    CPPUNIT_ASSERT(oResult->moRawMutationObservation.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, RawMutationObservationKind::Exact,
+        oResult->moRawMutationObservation->meKind);
 
     const auto* pPlan
         = spreadsheetengine::detail::substrate::findMutationEntryRecalcPlan(oResult->maTransition);
@@ -1772,6 +1780,10 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntryRejects
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(
         ComputationalMutationEntryResultKind::RejectedDirtyBaseline, oResult->meKind);
+    CPPUNIT_ASSERT(oResult->moRawMutationObservation.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        describeRawMutationObservation(*oResult->moRawMutationObservation),
+        RawMutationObservationKind::Exact, oResult->moRawMutationObservation->meKind);
     CPPUNIT_ASSERT(oResult->moRollbackObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         describeRollbackObservation(*oResult->moRollbackObservation),
