@@ -482,8 +482,14 @@ void assertComputationalMutationEntryApplied(
               ? std::string(" raw_mutation=")
                     + describeRawMutationObservation(*oResult->moRawMutationObservation)
               : std::string(" raw_mutation=none");
+    const std::string aLiveApplyMessage
+        = oResult->moLiveApplyObservation
+              ? std::string(" live_apply=")
+                    + describeLiveApplyObservation(*oResult->moLiveApplyObservation)
+              : std::string(" live_apply=none");
     const std::string aFullMessage
-        = aResultMessage + aBroadcasterMessage + aObjectRealizationMessage + aRawMutationMessage;
+        = aResultMessage + aBroadcasterMessage + aObjectRealizationMessage + aRawMutationMessage
+          + aLiveApplyMessage;
     CPPUNIT_ASSERT_MESSAGE(
         aFullMessage,
         oResult->meKind == ComputationalMutationEntryResultKind::Applied
@@ -500,6 +506,36 @@ void assertComputationalMutationEntryApplied(
     CPPUNIT_ASSERT(oResult->moRawMutationObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, RawMutationObservationKind::Exact,
         oResult->moRawMutationObservation->meKind);
+    CPPUNIT_ASSERT(oResult->moLiveApplyPlan.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, static_cast<sal_uInt8>(3),
+        oResult->moLiveApplyPlan->mnStageCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        aFullMessage,
+        spreadsheetengine::compat::libreoffice::substrateliveapply::hasStage(
+            *oResult->moLiveApplyPlan,
+            spreadsheetengine::compat::libreoffice::substrateliveapply::LiveApplyStageKind::
+                RawMutation));
+    CPPUNIT_ASSERT_MESSAGE(
+        aFullMessage,
+        spreadsheetengine::compat::libreoffice::substrateliveapply::hasStage(
+            *oResult->moLiveApplyPlan,
+            spreadsheetengine::compat::libreoffice::substrateliveapply::LiveApplyStageKind::
+                Realization));
+    CPPUNIT_ASSERT_MESSAGE(
+        aFullMessage,
+        spreadsheetengine::compat::libreoffice::substrateliveapply::hasStage(
+            *oResult->moLiveApplyPlan,
+            spreadsheetengine::compat::libreoffice::substrateliveapply::LiveApplyStageKind::
+                Verification));
+    CPPUNIT_ASSERT_MESSAGE(
+        aFullMessage,
+        !spreadsheetengine::compat::libreoffice::substrateliveapply::hasStage(
+            *oResult->moLiveApplyPlan,
+            spreadsheetengine::compat::libreoffice::substrateliveapply::LiveApplyStageKind::
+                Rollback));
+    CPPUNIT_ASSERT(oResult->moLiveApplyObservation.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, LiveApplyObservationKind::Exact,
+        oResult->moLiveApplyObservation->meKind);
 
     const auto* pPlan
         = spreadsheetengine::detail::substrate::findMutationEntryRecalcPlan(oResult->maTransition);
@@ -1805,6 +1841,25 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntryRejects
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         describeRawMutationObservation(*oResult->moRawMutationObservation),
         RawMutationObservationKind::Exact, oResult->moRawMutationObservation->meKind);
+    CPPUNIT_ASSERT(oResult->moLiveApplyPlan.has_value());
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt8>(2), oResult->moLiveApplyPlan->mnStageCount);
+    CPPUNIT_ASSERT(
+        spreadsheetengine::compat::libreoffice::substrateliveapply::hasStage(
+            *oResult->moLiveApplyPlan,
+            spreadsheetengine::compat::libreoffice::substrateliveapply::LiveApplyStageKind::
+                RawMutation));
+    CPPUNIT_ASSERT(
+        spreadsheetengine::compat::libreoffice::substrateliveapply::hasStage(
+            *oResult->moLiveApplyPlan,
+            spreadsheetengine::compat::libreoffice::substrateliveapply::LiveApplyStageKind::
+                Rollback));
+    CPPUNIT_ASSERT(!spreadsheetengine::compat::libreoffice::substrateliveapply::hasStage(
+        *oResult->moLiveApplyPlan,
+        spreadsheetengine::compat::libreoffice::substrateliveapply::LiveApplyStageKind::
+            Verification));
+    CPPUNIT_ASSERT(oResult->moLiveApplyObservation.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describeLiveApplyObservation(*oResult->moLiveApplyObservation),
+        LiveApplyObservationKind::Exact, oResult->moLiveApplyObservation->meKind);
     CPPUNIT_ASSERT(oResult->moRollbackObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         describeRollbackObservation(*oResult->moRollbackObservation),

@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <optional>
 
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObjectRealization.hxx>
@@ -43,6 +45,83 @@ struct LiveApplyObservation
 
     [[nodiscard]] constexpr bool operator==(const LiveApplyObservation& rOther) const = default;
 };
+
+enum class LiveApplyStageKind : sal_uInt8
+{
+    RawMutation,
+    Realization,
+    Verification,
+    Rollback
+};
+
+struct AdmittedLiveApplyPlan
+{
+    substraterawmutation::AdmittedRawMutationRecord maRawMutation;
+    std::optional<substrateobjectrealization::AdmittedObjectRealization> moObjectRealization;
+    substraterollback::AdmittedRollbackRecord maRollback;
+    std::array<LiveApplyStageKind, 4> maStageOrder{ LiveApplyStageKind::RawMutation,
+        LiveApplyStageKind::Verification, LiveApplyStageKind::Rollback,
+        LiveApplyStageKind::Rollback };
+    sal_uInt8 mnStageCount = 0;
+    bool mbRolledBack = false;
+    bool mbVerificationRequired = false;
+
+    [[nodiscard]] constexpr bool operator==(const AdmittedLiveApplyPlan& rOther) const = default;
+};
+
+enum class LiveApplyPlanBuildResultKind : sal_uInt8
+{
+    Built,
+    RejectedOutOfContract
+};
+
+struct LiveApplyPlanBuildResult
+{
+    LiveApplyPlanBuildResultKind meKind = LiveApplyPlanBuildResultKind::RejectedOutOfContract;
+    api::String maReason;
+    AdmittedLiveApplyPlan maPlan;
+};
+
+[[nodiscard]] inline bool hasStage(
+    const AdmittedLiveApplyPlan& rPlan, LiveApplyStageKind eStage)
+{
+    return std::find(rPlan.maStageOrder.begin(), rPlan.maStageOrder.begin() + rPlan.mnStageCount, eStage)
+           != rPlan.maStageOrder.begin() + rPlan.mnStageCount;
+}
+
+[[nodiscard]] inline LiveApplyPlanBuildResult buildAdmittedLiveApplyPlan(
+    const substraterawmutation::AdmittedRawMutationRecord& rRawMutation,
+    const std::optional<substrateobjectrealization::AdmittedObjectRealization>& oObjectRealization,
+    const substraterollback::AdmittedRollbackRecord& rRollback, bool bRolledBack)
+{
+    LiveApplyPlanBuildResult aResult;
+    aResult.meKind = LiveApplyPlanBuildResultKind::Built;
+    aResult.maPlan.maRawMutation = rRawMutation;
+    aResult.maPlan.moObjectRealization = oObjectRealization;
+    aResult.maPlan.maRollback = rRollback;
+    aResult.maPlan.mbRolledBack = bRolledBack;
+    aResult.maPlan.maStageOrder[aResult.maPlan.mnStageCount++] = LiveApplyStageKind::RawMutation;
+
+    if (oObjectRealization)
+        aResult.maPlan.maStageOrder[aResult.maPlan.mnStageCount++] = LiveApplyStageKind::Realization;
+
+    if (bRolledBack)
+    {
+        aResult.maPlan.maStageOrder[aResult.maPlan.mnStageCount++] = LiveApplyStageKind::Rollback;
+        return aResult;
+    }
+
+    if (!oObjectRealization)
+    {
+        aResult.meKind = LiveApplyPlanBuildResultKind::RejectedOutOfContract;
+        aResult.maReason = u"missing_object_realization_for_apply_plan";
+        return aResult;
+    }
+
+    aResult.maPlan.mbVerificationRequired = true;
+    aResult.maPlan.maStageOrder[aResult.maPlan.mnStageCount++] = LiveApplyStageKind::Verification;
+    return aResult;
+}
 
 [[nodiscard]] inline LiveApplyObservation classifyLiveApplyObservation(
     const substraterawmutation::RawMutationObservation& rRawMutation,
@@ -183,6 +262,23 @@ struct LiveApplyObservation
             return "queue_or_state_mismatch";
         case LiveApplyObservationKind::OutOfContract:
             return "out_of_contract";
+    }
+
+    return "unknown";
+}
+
+[[nodiscard]] inline const char* toString(LiveApplyStageKind eKind)
+{
+    switch (eKind)
+    {
+        case LiveApplyStageKind::RawMutation:
+            return "raw_mutation";
+        case LiveApplyStageKind::Realization:
+            return "realization";
+        case LiveApplyStageKind::Verification:
+            return "verification";
+        case LiveApplyStageKind::Rollback:
+            return "rollback";
     }
 
     return "unknown";
