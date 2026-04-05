@@ -76,6 +76,8 @@ using ComputationalMutationEntryResultKind
     = spreadsheetengine::compat::libreoffice::substratemutationentry::MutationEntryResultKind;
 using spreadsheetengine::compat::libreoffice::substratemutationentry::
     ScopedComputationalMutationEntry;
+using BroadcasterCanonicalizationKind
+    = spreadsheetengine::detail::substrate::BroadcasterCanonicalizationKind;
 using ComputationalStructuralResultKind
     = spreadsheetengine::compat::libreoffice::substratestructural::StructuralResultKind;
 using spreadsheetengine::compat::libreoffice::substratestructural::ScopedComputationalStructural;
@@ -432,8 +434,24 @@ void assertComputationalMutationEntryApplied(
                  ? std::to_string(static_cast<int>(oResult->moGraphComparison->meKind))
                        + ":" + (oResult->moGraphComparison->mbFullMatch ? "1" : "0")
                  : std::string("none"));
+    const std::string aBroadcasterMessage
+        = oResult->moBroadcasterCanonicalization
+              ? std::string(" broadcaster=")
+                    + spreadsheetengine::detail::substrate::detail::toString(
+                        oResult->moBroadcasterCanonicalization->meKind)
+                    + ":" + (oResult->moBroadcasterCanonicalization->mbExactMatch ? "1" : "0")
+                    + ":" + std::to_string(
+                        oResult->moBroadcasterCanonicalization->mnLiveDuplicateBroadcasterCount)
+                    + ":" + std::to_string(
+                        oResult->moBroadcasterCanonicalization->mnLiveDuplicateListenerCount)
+                    + ":" + std::to_string(
+                        oResult->moBroadcasterCanonicalization->mnLiveEmptyBroadcasterCount)
+                    + ":" + std::to_string(
+                        oResult->moBroadcasterCanonicalization->mnLiveHostUnknownListenerCount)
+              : std::string(" broadcaster=none");
+    const std::string aFullMessage = aResultMessage + aBroadcasterMessage;
     CPPUNIT_ASSERT_MESSAGE(
-        aResultMessage,
+        aFullMessage,
         oResult->meKind == ComputationalMutationEntryResultKind::Applied
             || oResult->meKind
                    == ComputationalMutationEntryResultKind::AppliedNormalizedEquivalent);
@@ -441,7 +459,7 @@ void assertComputationalMutationEntryApplied(
     CPPUNIT_ASSERT_EQUAL(RecalcShadowComparisonKind::Exact, oResult->moQueueComparison->meKind);
     CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
     CPPUNIT_ASSERT(oResult->moGraphComparison.has_value());
-    CPPUNIT_ASSERT_MESSAGE(aResultMessage, oResult->moGraphComparison->mbFullMatch);
+    CPPUNIT_ASSERT_MESSAGE(aFullMessage, oResult->moGraphComparison->mbFullMatch);
 
     const auto* pPlan
         = spreadsheetengine::detail::substrate::findMutationEntryRecalcPlan(oResult->maTransition);
@@ -502,6 +520,27 @@ void assertComparableExecutionIr(
 {
     CPPUNIT_ASSERT(rComparison.mbFullMatch);
     CPPUNIT_ASSERT(rComparison.meKind != ExecutionIrComparisonKind::Mismatch);
+}
+
+[[nodiscard]] std::string describeBroadcasterCanonicalization(
+    const spreadsheetengine::detail::substrate::BroadcasterCanonicalizationComparison& rComparison)
+{
+    return std::string(
+               spreadsheetengine::detail::substrate::detail::toString(rComparison.meKind))
+           + " exact=" + (rComparison.mbExactMatch ? "1" : "0")
+           + " order=" + (rComparison.mbOrderingEquivalent ? "1" : "0")
+           + " dedupe=" + (rComparison.mbDeduplicatedEquivalent ? "1" : "0")
+           + " drop_empty=" + (rComparison.mbDropEmptyEquivalent ? "1" : "0")
+           + " ignore_kind=" + (rComparison.mbIgnoreListenerKindEquivalent ? "1" : "0")
+           + " diagnostic=" + (rComparison.mbDiagnosticCanonicalEquivalent ? "1" : "0")
+           + " dup_broadcasters=" + std::to_string(rComparison.mnLiveDuplicateBroadcasterCount)
+           + " dup_listeners=" + std::to_string(rComparison.mnLiveDuplicateListenerCount)
+           + " empty=" + std::to_string(rComparison.mnLiveEmptyBroadcasterCount)
+           + " host_unknown=" + std::to_string(rComparison.mnLiveHostUnknownListenerCount)
+           + " expected_cells=" + std::to_string(rComparison.mnExpectedCellBroadcasters)
+           + " live_cells=" + std::to_string(rComparison.mnLiveCellBroadcasters)
+           + " expected_areas=" + std::to_string(rComparison.mnExpectedAreaBroadcasters)
+           + " live_areas=" + std::to_string(rComparison.mnLiveAreaBroadcasters);
 }
 
 void assertFormulaStateEqual(
@@ -1560,6 +1599,12 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntrySetValu
     CPPUNIT_ASSERT(!oResult->moComputationalComparison->mbBroadcasterMatch);
     CPPUNIT_ASSERT(oResult->moComputationalComparison->mbGroupMatch);
     CPPUNIT_ASSERT(oResult->moComputationalComparison->mbNamedRangeMatch);
+    CPPUNIT_ASSERT(oResult->moBroadcasterCanonicalization.has_value());
+    CPPUNIT_ASSERT(!oResult->moBroadcasterCanonicalization->mbExactMatch);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        describeBroadcasterCanonicalization(*oResult->moBroadcasterCanonicalization),
+        BroadcasterCanonicalizationKind::MissingExpectedBroadcasters,
+        oResult->moBroadcasterCanonicalization->meKind);
     CPPUNIT_ASSERT_EQUAL(9.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
 
     m_pDoc->DeleteTab(0);

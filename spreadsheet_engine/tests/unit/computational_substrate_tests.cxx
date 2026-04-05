@@ -139,6 +139,9 @@ int main()
     const ComputationalWorkbookShadow aShadow
         = buildComputationalWorkbookShadow(aFacade, aObservation);
     const auto aInitialComparison = compareComputationalShadow(aShadow, aFacade, aObservation);
+    const auto aInitialBroadcasterCanonicalization
+        = spreadsheetengine::detail::substrate::detail::compareBroadcasterCanonicalization(
+            aShadow, aObservation);
 
     if (aShadow.maSnapshot.mnGeneration != 9)
         return fail("computational_substrate", "snapshot generation mismatch");
@@ -169,6 +172,50 @@ int main()
             return fail("computational_substrate", "formula group membership mismatch");
         if (!aInitialComparison.mbFullMatch)
             return fail("computational_substrate", "initial shadow comparison mismatch");
+        if (!aInitialBroadcasterCanonicalization.mbExactMatch
+            || aInitialBroadcasterCanonicalization.meKind
+                   != BroadcasterCanonicalizationKind::Exact)
+        {
+            return fail("computational_substrate",
+                "initial broadcaster canonicalization mismatch");
+        }
+
+        {
+            ComputationalObservationState aDuplicateObservation = aObservation;
+            aDuplicateObservation.maCellBroadcasters.front().maListeners.push_back(
+                aDuplicateObservation.maCellBroadcasters.front().maListeners.front());
+
+            const auto aDuplicateComparison
+                = spreadsheetengine::detail::substrate::detail::compareBroadcasterCanonicalization(
+                    aShadow, aDuplicateObservation);
+            if (aDuplicateComparison.meKind
+                    != BroadcasterCanonicalizationKind::DuplicateMaterializationOnly
+                || !aDuplicateComparison.mbDeduplicatedEquivalent
+                || aDuplicateComparison.mnLiveDuplicateListenerCount <= 0
+                || aDuplicateComparison.mbExactMatch)
+            {
+                return fail("computational_substrate",
+                    "duplicate broadcaster canonicalization mismatch");
+            }
+        }
+
+        {
+            ComputationalObservationState aEmptyObservation = aObservation;
+            aEmptyObservation.maCellBroadcasters.push_back({ { nData, 4, 4 }, {} });
+
+            const auto aEmptyComparison
+                = spreadsheetengine::detail::substrate::detail::compareBroadcasterCanonicalization(
+                    aShadow, aEmptyObservation);
+            if (aEmptyComparison.meKind
+                    != BroadcasterCanonicalizationKind::EmptyBroadcastersOnly
+                || !aEmptyComparison.mbDropEmptyEquivalent
+                || aEmptyComparison.mnLiveEmptyBroadcasterCount <= 0
+                || aEmptyComparison.mbExactMatch)
+            {
+                return fail("computational_substrate",
+                    "empty broadcaster canonicalization mismatch");
+            }
+        }
 
         const auto aAdmittedContract
             = classifyAuthorityMutation(MutationEvent::setFormula({ nData, 1, 0 }, u"=A1*4"));

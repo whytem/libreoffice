@@ -55,6 +55,8 @@ struct MutationEntryResult
         moGraphComparison;
     std::optional<spreadsheetengine::detail::substrate::ExecutionIrWorkbookComparison>
         moIrComparison;
+    std::optional<spreadsheetengine::detail::substrate::BroadcasterCanonicalizationComparison>
+        moBroadcasterCanonicalization;
 };
 
 namespace detail
@@ -525,6 +527,9 @@ public:
         aResult.moIrComparison
             = spreadsheetengine::detail::substrate::compareExecutionIrWorkbookShadow(
                 *pIrAfter, buildExecutionIrWorkbookShadow(aLiveComputationalShadow, rDoc));
+        aResult.moBroadcasterCanonicalization
+            = spreadsheetengine::detail::substrate::detail::compareBroadcasterCanonicalization(
+                *pComputationalAfter, aLiveObservation);
 
         aResult.meKind = detail::classifyVerifiedMutationEntryResult(aResult);
         if (aResult.meKind == MutationEntryResultKind::RolledBackVerificationFailure
