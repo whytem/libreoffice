@@ -517,7 +517,12 @@ void assertComputationalMutationEntryApplied(
     CPPUNIT_ASSERT(oResult->moRawMutationObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, RawMutationObservationKind::Exact,
         oResult->moRawMutationObservation->meKind);
+    CPPUNIT_ASSERT(oResult->moRawMutationRecord.has_value());
     CPPUNIT_ASSERT(oResult->moRawDocumentMutationRecord.has_value());
+    CPPUNIT_ASSERT_MESSAGE(aFullMessage,
+        oResult->moRawDocumentMutationRecord->maRawMutation == *oResult->moRawMutationRecord);
+    CPPUNIT_ASSERT_MESSAGE(aFullMessage,
+        oResult->moRawDocumentMutationRecord->mbUsesPrimitiveDocumentMutation);
     CPPUNIT_ASSERT(oResult->moRawDocumentMutationObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, RawDocumentMutationObservationKind::Exact,
         oResult->moRawDocumentMutationObservation->meKind);
@@ -1873,7 +1878,10 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntryRejects
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         describeRawMutationObservation(*oResult->moRawMutationObservation),
         RawMutationObservationKind::Exact, oResult->moRawMutationObservation->meKind);
+    CPPUNIT_ASSERT(oResult->moRawMutationRecord.has_value());
     CPPUNIT_ASSERT(oResult->moRawDocumentMutationRecord.has_value());
+    CPPUNIT_ASSERT(
+        oResult->moRawDocumentMutationRecord->maRawMutation == *oResult->moRawMutationRecord);
     CPPUNIT_ASSERT(oResult->moRawDocumentMutationObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         describeRawDocumentMutationObservation(*oResult->moRawDocumentMutationObservation),
