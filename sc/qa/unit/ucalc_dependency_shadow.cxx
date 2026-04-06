@@ -35,6 +35,7 @@
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFinalVerification.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFormulaCellLifetime.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObjectRealization.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstratePrimitiveExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRawMutation.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateLiveApply.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRollback.hxx>
@@ -103,6 +104,9 @@ using LiveApplyObservationKind
 using FinalVerificationObservationKind
     = spreadsheetengine::compat::libreoffice::substratefinalverification::
         FinalVerificationObservationKind;
+using PrimitiveExecutionObservationKind
+    = spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::
+        PrimitiveExecutionObservationKind;
 using ComputationalStructuralResultKind
     = spreadsheetengine::compat::libreoffice::substratestructural::StructuralResultKind;
 using spreadsheetengine::compat::libreoffice::substratestructural::ScopedComputationalStructural;
@@ -449,6 +453,9 @@ void assertComputationalStructuralAppliedExactly(
 [[nodiscard]] std::string describeFinalVerificationObservation(
     const spreadsheetengine::compat::libreoffice::substratefinalverification::
         FinalVerificationObservation& rObservation);
+[[nodiscard]] std::string describePrimitiveExecutionObservation(
+    const spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::
+        PrimitiveExecutionObservation& rObservation);
 
 void assertComputationalMutationEntryApplied(
     const std::optional<
@@ -839,6 +846,30 @@ void assertComparableExecutionIr(
            + " primitive_realization="
            + (rObservation.mbPrimitiveRealizationExact ? "1" : "0")
            + " primitive_rollback=" + (rObservation.mbPrimitiveRollbackExact ? "1" : "0");
+}
+
+[[nodiscard]] std::string describePrimitiveExecutionObservation(
+    const spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::
+        PrimitiveExecutionObservation& rObservation)
+{
+    return std::string(spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::toString(
+               rObservation.meKind))
+           + " reason="
+           + OUStringToOString(rObservation.maReason, RTL_TEXTENCODING_UTF8).getStr()
+           + " applied=" + (rObservation.mbPrimitiveExecutionApplied ? "1" : "0")
+           + " rolled_back=" + (rObservation.mbRolledBack ? "1" : "0")
+           + " raw_document_mutation="
+           + (rObservation.mbRawDocumentMutationExact ? "1" : "0")
+           + " primitive_realization="
+           + (rObservation.mbPrimitiveRealizationExact ? "1" : "0")
+           + " primitive_rollback=" + (rObservation.mbPrimitiveRollbackExact ? "1" : "0")
+           + " final_verification_exact="
+           + (rObservation.mbFinalVerificationExact ? "1" : "0")
+           + " final_verification_normalized="
+           + (rObservation.mbFinalVerificationNormalizedEquivalent ? "1" : "0")
+           + " queue=" + (rObservation.mbQueueExact ? "1" : "0")
+           + " computational=" + (rObservation.mbComputationalFullMatch ? "1" : "0")
+           + " graph=" + (rObservation.mbGraphFullMatch ? "1" : "0");
 }
 
 void assertFormulaStateEqual(
@@ -4877,6 +4908,113 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
         RawDocumentMutationObservationKind::OutOfContract,
         classifyRawDocumentMutationObservation(false, std::nullopt, u"missing_primitive_mutation")
             .meKind);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalPrimitiveExecutionObservationClassifierKinds)
+{
+    using spreadsheetengine::compat::libreoffice::substratefinalverification::
+        FinalVerificationObservation;
+    using spreadsheetengine::compat::libreoffice::substratefinalverification::
+        FinalVerificationObservationKind;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        PrimitiveRealizationObservation;
+    using spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::
+        classifyPrimitiveExecutionObservation;
+    using spreadsheetengine::compat::libreoffice::substraterawmutation::
+        RawDocumentMutationObservation;
+    using spreadsheetengine::compat::libreoffice::substraterollback::
+        PrimitiveRollbackObservation;
+
+    RawDocumentMutationObservation aRawDocument;
+    aRawDocument.meKind = RawDocumentMutationObservationKind::Exact;
+    aRawDocument.mbPrimitiveMutationApplied = true;
+    aRawDocument.mbRawMutationExact = true;
+    aRawDocument.mbQueueExact = true;
+    aRawDocument.mbComputationalFullMatch = true;
+    aRawDocument.mbGraphFullMatch = true;
+    aRawDocument.mbObjectRealizationExact = true;
+
+    PrimitiveRealizationObservation aPrimitiveRealization;
+    aPrimitiveRealization.meKind = PrimitiveRealizationObservationKind::Exact;
+    aPrimitiveRealization.mbPrimitiveRealizationApplied = true;
+    aPrimitiveRealization.mbObjectRealizationExact = true;
+    aPrimitiveRealization.mbQueueExact = true;
+    aPrimitiveRealization.mbComputationalFullMatch = true;
+    aPrimitiveRealization.mbGraphFullMatch = true;
+    aPrimitiveRealization.mbBroadcasterExact = true;
+
+    FinalVerificationObservation aFinalVerification;
+    aFinalVerification.meKind = FinalVerificationObservationKind::Exact;
+    aFinalVerification.mbVerificationExecuted = true;
+    aFinalVerification.mbQueueExact = true;
+    aFinalVerification.mbComputationalFullMatch = true;
+    aFinalVerification.mbGraphFullMatch = true;
+    aFinalVerification.mbIrExact = true;
+    aFinalVerification.mbBroadcasterExact = true;
+    aFinalVerification.mbLiveApplyExact = true;
+    aFinalVerification.mbPrimitiveRealizationExact = true;
+
+    auto aExact = classifyPrimitiveExecutionObservation(
+        true, aRawDocument, aPrimitiveRealization, std::nullopt, aFinalVerification);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveExecutionObservation(aExact),
+        PrimitiveExecutionObservationKind::Exact, aExact.meKind);
+
+    aFinalVerification.meKind = FinalVerificationObservationKind::NormalizedEquivalent;
+    auto aNormalized = classifyPrimitiveExecutionObservation(
+        true, aRawDocument, aPrimitiveRealization, std::nullopt, aFinalVerification);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveExecutionObservation(aNormalized),
+        PrimitiveExecutionObservationKind::NormalizedEquivalent, aNormalized.meKind);
+
+    aFinalVerification.meKind = FinalVerificationObservationKind::Exact;
+    aRawDocument.meKind = RawDocumentMutationObservationKind::OrderingOnly;
+    auto aOrdering = classifyPrimitiveExecutionObservation(
+        true, aRawDocument, aPrimitiveRealization, std::nullopt, aFinalVerification);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveExecutionObservation(aOrdering),
+        PrimitiveExecutionObservationKind::OrderingOnly, aOrdering.meKind);
+
+    aRawDocument.meKind = RawDocumentMutationObservationKind::Exact;
+    aPrimitiveRealization.meKind
+        = PrimitiveRealizationObservationKind::HiddenHostRealizationOrchestration;
+    auto aHiddenHost = classifyPrimitiveExecutionObservation(
+        true, aRawDocument, aPrimitiveRealization, std::nullopt, aFinalVerification);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveExecutionObservation(aHiddenHost),
+        PrimitiveExecutionObservationKind::HiddenHostPrimitiveExecutionOrchestration,
+        aHiddenHost.meKind);
+
+    aPrimitiveRealization.meKind = PrimitiveRealizationObservationKind::MissingRealizedObjects;
+    auto aMissing = classifyPrimitiveExecutionObservation(
+        true, aRawDocument, aPrimitiveRealization, std::nullopt, aFinalVerification);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveExecutionObservation(aMissing),
+        PrimitiveExecutionObservationKind::MissingPrimitiveExecutionInputs, aMissing.meKind);
+
+    aPrimitiveRealization.meKind = PrimitiveRealizationObservationKind::Exact;
+    aFinalVerification.meKind = FinalVerificationObservationKind::QueueOrStateMismatch;
+    auto aMismatch = classifyPrimitiveExecutionObservation(
+        true, aRawDocument, aPrimitiveRealization, std::nullopt, aFinalVerification);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveExecutionObservation(aMismatch),
+        PrimitiveExecutionObservationKind::QueueOrStateMismatch, aMismatch.meKind);
+
+    PrimitiveRollbackObservation aPrimitiveRollback;
+    aPrimitiveRollback.meKind = PrimitiveRollbackObservationKind::Exact;
+    aPrimitiveRollback.mbPrimitiveRollbackApplied = true;
+    aPrimitiveRollback.mbRollbackExact = true;
+    aPrimitiveRollback.mbQueueExact = true;
+    aPrimitiveRollback.mbComputationalFullMatch = true;
+    aPrimitiveRollback.mbGraphFullMatch = true;
+    aPrimitiveRollback.mbBroadcasterExact = true;
+    aFinalVerification.meKind = FinalVerificationObservationKind::Exact;
+    aFinalVerification.mbPrimitiveRollbackExact = true;
+    auto aRollbackExact = classifyPrimitiveExecutionObservation(
+        true, aRawDocument, std::nullopt, aPrimitiveRollback, aFinalVerification);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveExecutionObservation(aRollbackExact),
+        PrimitiveExecutionObservationKind::Exact, aRollbackExact.meKind);
+
+    const auto aOutOfContract = classifyPrimitiveExecutionObservation(
+        false, std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+        u"primitive_execution_not_applied");
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveExecutionObservation(aOutOfContract),
+        PrimitiveExecutionObservationKind::OutOfContract, aOutOfContract.meKind);
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
