@@ -753,17 +753,47 @@ The key primitive execution host closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_DECISION_RECORD.md)
 
-## Next Explicit Reassessment Target
+## Admitted Slice Ownership Closeout Outcome
 
-The next explicit bounded concern is:
+The admitted-slice ownership closeout is now complete.
 
-- primitive host-call executor reassessment on the admitted slice
+It justifies one additional bounded boundary shift:
 
-The primitive execution host reassessment is now closed with a bounded
-proceed result. The most actionable remaining host-owned surface on the
-admitted slice is no longer primitive execution identity or stage
-sequencing. It is the retained primitive host-call executor around that
-already-engine-authored admitted state.
+- the engine now owns the explicit admitted primitive host-call executor
+  plan on the bounded slice
+- applied admitted mutation-entry results now carry explicit primitive
+  host-call executor observation instead of relying only on the narrower raw
+  document mutation, primitive execution, realization or rollback, and
+  final verification surfaces
+- dirty-baseline rollback admitted mutation-entry results now also carry
+  explicit primitive host-call executor observation on the bounded slice
+- the verified admitted mutation-entry result now consumes that host-call
+  executor observation as part of the bounded exactness gate
+
+This closes the remaining substantive ownership seam on the current
+admitted slice. Calc still executes the low-level primitive calls on that
+slice, but it no longer retains hidden authority over the identity of that
+executor shell.
+
+The key admitted-slice ownership closeout references are:
+
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_PLAN.md)
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_CONTRACT.md)
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_SCHEMA.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_SCHEMA.md)
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_OBSERVATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_OBSERVATION.md)
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_IMPLEMENTATION.md)
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_EVIDENCE.md)
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_DECISION_RECORD.md)
+
+## Next Roadmap Category
+
+The next explicit roadmap category is:
+
+- widening the admitted slice on top of an ownership-complete boundary
+
+The most actionable remaining work is no longer another current-slice
+ownership seam. It is a new bounded widening plan for broader workbook
+classes.
 
 ## Current Assessment
 
@@ -791,6 +821,7 @@ The current state should be read as:
 - plus a successful bounded admitted-slice raw-document-mutation proof
 - plus a successful bounded admitted-slice primitive-realization-and-rollback proof
 - plus a successful bounded admitted-slice primitive-execution proof
+- plus a successful admitted-slice ownership-closeout proof
 - but still not as proof that a full computational storage migration is
   already justified
 
@@ -812,7 +843,8 @@ Any further expansion should continue under these rules:
   admitted wiring-container residency slice, admitted formula-cell-lifetime
   slice, admitted object-realization slice, admitted live-apply-shell
   slice, admitted raw-document-mutation slice, and admitted primitive-
-  realization-and-rollback slice, and admitted primitive-execution slice
+  realization-and-rollback slice, admitted primitive-execution slice, and
+  admitted ownership-complete slice
 
 ## Reference Material
 
@@ -838,6 +870,8 @@ For the current second-stage boundary and rollout closeout, see:
 - [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_REASSESSMENT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_REASSESSMENT_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_DECISION_RECORD.md)
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_PLAN.md](architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_PLAN.md)
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_DECISION_RECORD.md](architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_DECISION_RECORD.md)
 - [README.md](architecture/README.md)
 
 For completed plans, closeout records, and historical extraction context, see:

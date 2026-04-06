@@ -508,6 +508,33 @@ Current architecture docs:
   engine-authored admitted primitive execution on the bounded slice while
   naming primitive host-call executor reassessment as the next adjacent
   concern
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_PLAN.md](ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_PLAN.md) -
+  completed implementation and closeout record for finishing substantive
+  ownership on the current admitted slice, ending in an ownership-complete
+  boundary on that slice while leaving Calc as only a thin primitive-call
+  host
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_CONTRACT.md](ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_CONTRACT.md) -
+  frozen contract note for the ownership-closeout cycle, fixing the bounded
+  workbook surface, retained primitive host-call shell, and success
+  standard for current-slice completion
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_SCHEMA.md](ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_SCHEMA.md) -
+  frozen schema note for the admitted primitive host-call executor plan,
+  stable executor identity, and verdict families
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_OBSERVATION.md](ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_OBSERVATION.md) -
+  completed observation note for primitive host-call drift classification,
+  distinguishing exact, normalized, ordering-only, hidden-host,
+  missing-input, mismatch, and out-of-contract outcomes
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_IMPLEMENTATION.md](ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_IMPLEMENTATION.md) -
+  completed implementation note for the engine-authored primitive host-call
+  executor path, mutation-entry integration, and verified-result gating
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_EVIDENCE.md](ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_EVIDENCE.md) -
+  frozen evidence note for the ownership-closeout proof cycle, recording
+  exact admitted apply and rollback lanes, bounded runtime samples, and the
+  smaller retained host shell
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_DECISION_RECORD.md](ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_DECISION_RECORD.md) -
+  completed closeout decision for current-slice ownership completion,
+  marking the admitted slice as substantively ownership-complete and
+  shifting the roadmap to slice widening
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

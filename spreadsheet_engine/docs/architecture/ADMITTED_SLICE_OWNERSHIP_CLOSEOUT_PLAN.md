@@ -1,6 +1,21 @@
 # Admitted Slice Ownership Closeout Plan
 
-Status: implementation-ready plan
+Status: completed closeout decision
+
+## Closeout Result
+
+This plan is now complete.
+
+The bounded proof cycle closed with a completion decision:
+
+- substantive ownership of the current admitted slice is complete
+- Calc remains only a thin primitive-call host on that slice
+- the roadmap now shifts from finishing ownership on the current slice to
+  widening the slice safely
+
+The final closeout record is:
+
+- [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_DECISION_RECORD.md)
 
 ## Purpose
 
