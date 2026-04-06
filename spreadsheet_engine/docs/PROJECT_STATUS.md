@@ -719,21 +719,51 @@ The key final verification host-shell closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_DECISION_RECORD.md)
 
+## Primitive Execution Host Outcome
+
+The primitive execution host reassessment is now complete.
+
+It justifies one additional bounded boundary shift:
+
+- the engine now owns the explicit admitted primitive execution plan on the
+  bounded slice
+- applied admitted mutation-entry results now carry explicit primitive
+  execution observation instead of relying only on the narrower raw
+  document mutation, primitive realization or rollback, and final
+  verification surfaces
+- dirty-baseline rollback admitted mutation-entry results now also carry
+  explicit primitive execution observation on the bounded slice
+
+It still does not justify broad host independence. Calc still owns:
+
+- the primitive host calls that execute admitted low-level document
+  mutation, realization, and rollback work
+
+That means the current boundary is now stronger than the earlier
+engine-authored-state-plus-host-primitive split, but it is still narrower
+than a broad computational document transplant.
+
+The key primitive execution host closeout references are:
+
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_REASSESSMENT_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_SCHEMA.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_SCHEMA.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_OBSERVATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_OBSERVATION.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_DECISION_RECORD.md)
+
 ## Next Explicit Reassessment Target
 
 The next explicit bounded concern is:
 
-- primitive execution host-operation reassessment on the admitted slice
+- primitive host-call executor reassessment on the admitted slice
 
-The final verification host-shell reassessment is now closed with a bounded
+The primitive execution host reassessment is now closed with a bounded
 proceed result. The most actionable remaining host-owned surface on the
-admitted slice is no longer verification identity. It is the retained
-primitive execution host shell around that already-engine-authored admitted
-state.
-
-The implementation-ready plan for that next reassessment is:
-
-- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_REASSESSMENT_PLAN.md)
+admitted slice is no longer primitive execution identity or stage
+sequencing. It is the retained primitive host-call executor around that
+already-engine-authored admitted state.
 
 ## Current Assessment
 
@@ -760,6 +790,7 @@ The current state should be read as:
 - plus a successful bounded admitted-slice live-apply-shell proof
 - plus a successful bounded admitted-slice raw-document-mutation proof
 - plus a successful bounded admitted-slice primitive-realization-and-rollback proof
+- plus a successful bounded admitted-slice primitive-execution proof
 - but still not as proof that a full computational storage migration is
   already justified
 
@@ -781,7 +812,7 @@ Any further expansion should continue under these rules:
   admitted wiring-container residency slice, admitted formula-cell-lifetime
   slice, admitted object-realization slice, admitted live-apply-shell
   slice, admitted raw-document-mutation slice, and admitted primitive-
-  realization-and-rollback slice
+  realization-and-rollback slice, and admitted primitive-execution slice
 
 ## Reference Material
 
@@ -805,6 +836,8 @@ For the current second-stage boundary and rollout closeout, see:
 - [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_REASSESSMENT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_REASSESSMENT_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_REASSESSMENT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_REASSESSMENT_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_DECISION_RECORD.md)
 - [README.md](architecture/README.md)
 
 For completed plans, closeout records, and historical extraction context, see:

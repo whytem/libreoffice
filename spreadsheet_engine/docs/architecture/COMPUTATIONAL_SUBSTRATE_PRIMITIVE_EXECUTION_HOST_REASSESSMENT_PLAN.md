@@ -1,6 +1,6 @@
 # Computational Substrate Primitive Execution Host-Operation Reassessment Plan
 
-Status: implementation-ready plan
+Status: completed closeout record
 
 ## Purpose
 

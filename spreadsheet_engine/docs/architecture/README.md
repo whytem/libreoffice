@@ -480,9 +480,34 @@ Current architecture docs:
   naming primitive execution host-operation reassessment as the next
   adjacent concern
 - [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_REASSESSMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_REASSESSMENT_PLAN.md) -
-  implementation-ready plan for the next bounded reassessment after final
-  verification closeout, targeting the retained primitive execution
-  host-operation shell on the admitted slice
+  completed implementation and closeout record for the primitive execution
+  host reassessment, admitting an explicit primitive execution plan and
+  observation on the bounded slice while keeping the primitive host-call
+  executor in Calc
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_CONTRACT.md) -
+  frozen contract note for the admitted primitive execution slice, fixing
+  the bounded workbook surface, retained Calc host shell, and exact success
+  standard
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_SCHEMA.md](COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_SCHEMA.md) -
+  frozen schema note for the admitted primitive execution plan, stable
+  primitive execution identity, and verdict families
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_OBSERVATION.md](COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_OBSERVATION.md) -
+  completed observation note for primitive execution drift classification,
+  distinguishing exact, normalized, ordering-only, hidden-host,
+  missing-input, mismatch, and out-of-contract outcomes
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_IMPLEMENTATION.md) -
+  completed implementation note for the engine-authored admitted primitive
+  execution plan, mutation-entry integration, and bounded host-shell
+  reduction
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_EVIDENCE.md) -
+  frozen evidence note for the primitive execution proof cycle, recording
+  exact admitted apply and rollback lanes, bounded runtime samples, and the
+  narrower retained host shell
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_DECISION_RECORD.md) -
+  completed closeout decision for primitive execution migration, admitting
+  engine-authored admitted primitive execution on the bounded slice while
+  naming primitive host-call executor reassessment as the next adjacent
+  concern
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded
