@@ -450,6 +450,10 @@ Current architecture docs:
   migration, admitting engine-authored admitted primitive realization and
   rollback records and apply verdicts on the bounded slice while naming
   final verification host-shell reassessment as the next adjacent concern
+- [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_REASSESSMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_REASSESSMENT_PLAN.md) -
+  implementation-ready plan for the next bounded reassessment after
+  primitive realization and rollback closeout, targeting the retained final
+  verification host shell on the admitted slice
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded
