@@ -20,6 +20,7 @@
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFormulaCellLifetime.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateLiveApply.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObjectRealization.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstratePrimitiveExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRawMutation.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRollback.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateLifecycle.hxx>
@@ -78,6 +79,10 @@ struct MutationEntryResult
     std::optional<substraterawmutation::RawMutationObservation> moRawMutationObservation;
     std::optional<substraterawmutation::RawDocumentMutationObservation>
         moRawDocumentMutationObservation;
+    std::optional<substrateprimitiveexecution::AdmittedPrimitiveExecutionPlan>
+        moPrimitiveExecutionPlan;
+    std::optional<substrateprimitiveexecution::PrimitiveExecutionObservation>
+        moPrimitiveExecutionObservation;
     std::optional<substrateliveapply::AdmittedLiveApplyPlan> moLiveApplyPlan;
     std::optional<substrateliveapply::LiveApplyObservation> moLiveApplyObservation;
     std::optional<substratefinalverification::AdmittedFinalVerificationRecord>
@@ -449,6 +454,30 @@ buildLiveApplyPlanOrReject(
     return aPlan.maPlan;
 }
 
+[[nodiscard]] inline std::optional<substrateprimitiveexecution::AdmittedPrimitiveExecutionPlan>
+buildPrimitiveExecutionPlanOrReject(
+    MutationEntryResult& rResult,
+    const substraterawmutation::AdmittedRawDocumentMutationRecord& rRawDocumentMutationRecord,
+    const std::optional<substrateobjectrealization::AdmittedPrimitiveRealizationRecord>&
+        oPrimitiveRealization,
+    const std::optional<substraterollback::AdmittedPrimitiveRollbackRecord>& oPrimitiveRollback,
+    bool bRequireFinalVerification)
+{
+    const auto aPlan = substrateprimitiveexecution::buildAdmittedPrimitiveExecutionPlan(
+        rRawDocumentMutationRecord, oPrimitiveRealization, oPrimitiveRollback,
+        bRequireFinalVerification);
+    if (aPlan.meKind
+        != substrateprimitiveexecution::PrimitiveExecutionPlanBuildResultKind::Built)
+    {
+        rResult.meKind = MutationEntryResultKind::RejectedOutOfContract;
+        rResult.maTransition.maReason = aPlan.maReason;
+        return std::nullopt;
+    }
+
+    rResult.moPrimitiveExecutionPlan = aPlan.maPlan;
+    return aPlan.maPlan;
+}
+
 [[nodiscard]] inline std::optional<substratefinalverification::AdmittedFinalVerificationRecord>
 buildFinalVerificationOrReject(
     MutationEntryResult& rResult, const substrateliveapply::AdmittedLiveApplyPlan& rLiveApplyPlan,
@@ -474,9 +503,13 @@ inline void populateRollbackExecution(
     MutationEntryResult& rResult, ScDocument& rDoc,
     const spreadsheetengine::detail::substrate::MutableComputationalSubstrateState& rBeforeState,
     const recalcqueue::FormulaStateSnapshot& rBeforeFormulaState,
+    const substraterawmutation::AdmittedRawDocumentMutationRecord& rRawDocumentMutationRecord,
     const substraterollback::AdmittedPrimitiveRollbackRecord& rPrimitiveRollback,
     const std::optional<substrateliveapply::AdmittedLiveApplyPlan>& oRolledBackLiveApplyPlan)
 {
+    const auto oPrimitiveExecutionPlan = buildPrimitiveExecutionPlanOrReject(
+        rResult, rRawDocumentMutationRecord, std::nullopt, rPrimitiveRollback,
+        oRolledBackLiveApplyPlan.has_value());
     rResult.moPrimitiveRollbackRecord = rPrimitiveRollback;
     substraterollback::PrimitiveRollbackApplyResult aRollback;
     rollbackToBeforeState(rDoc, rPrimitiveRollback, aRollback);
@@ -511,6 +544,15 @@ inline void populateRollbackExecution(
                 rResult.moLiveApplyObservation, std::nullopt, rResult.moPrimitiveRollbackObservation);
             rResult.moFinalVerificationObservation = aVerification.maObservation;
         }
+    }
+
+    if (oPrimitiveExecutionPlan && rResult.moRawDocumentMutationObservation
+        && rResult.moFinalVerificationObservation)
+    {
+        rResult.moPrimitiveExecutionObservation
+            = substrateprimitiveexecution::classifyPrimitiveExecutionObservation(
+                true, rResult.moRawDocumentMutationObservation, std::nullopt,
+                rResult.moPrimitiveRollbackObservation, rResult.moFinalVerificationObservation);
     }
 }
 
@@ -656,7 +698,8 @@ public:
                 = detail::buildLiveApplyPlanOrReject(
                 aResult, aRawMutationRecord.maRecord, std::nullopt, aBeforeRollback, true);
             detail::populateRollbackExecution(
-                aResult, rDoc, aBeforeMutableState, maFormulaState, aPrimitiveBeforeRollback.maRecord,
+                aResult, rDoc, aBeforeMutableState, maFormulaState,
+                aRawDocumentMutationRecord.maRecord, aPrimitiveBeforeRollback.maRecord,
                 oRolledBackLiveApplyPlan);
             return aResult;
         }
@@ -669,7 +712,8 @@ public:
                 = detail::buildLiveApplyPlanOrReject(
                 aResult, aRawMutationRecord.maRecord, std::nullopt, aBeforeRollback, true);
             detail::populateRollbackExecution(
-                aResult, rDoc, aBeforeMutableState, maFormulaState, aPrimitiveBeforeRollback.maRecord,
+                aResult, rDoc, aBeforeMutableState, maFormulaState,
+                aRawDocumentMutationRecord.maRecord, aPrimitiveBeforeRollback.maRecord,
                 oRolledBackLiveApplyPlan);
             return aResult;
         }
@@ -707,6 +751,20 @@ public:
             return aResult;
         }
         aResult.moPrimitiveRealizationRecord = aPrimitiveRealization.maRecord;
+        const auto oPrimitiveExecutionPlan = detail::buildPrimitiveExecutionPlanOrReject(
+            aResult, aRawDocumentMutationRecord.maRecord, aResult.moPrimitiveRealizationRecord,
+            std::nullopt, true);
+        if (!oPrimitiveExecutionPlan)
+        {
+            aResult.moRawMutationObservation = substraterawmutation::classifyRawMutationObservation(
+                false, false, std::nullopt, std::nullopt, aResult.maTransition.maReason);
+            aResult.moRawDocumentMutationObservation
+                = substraterawmutation::classifyRawDocumentMutationObservation(
+                    false, std::nullopt, aResult.maTransition.maReason);
+            aResult.moLiveApplyObservation = substrateliveapply::classifyLiveApplyObservation(
+                *aResult.moRawMutationObservation, std::nullopt, std::nullopt);
+            return aResult;
+        }
 
         const auto aRealization = detail::realizeObjectRealization(rDoc, aPrimitiveRealization.maRecord);
         if (!aRealization.mbApplied)
@@ -717,7 +775,8 @@ public:
                 = detail::buildLiveApplyPlanOrReject(
                 aResult, aRawMutationRecord.maRecord, aObjectRealization, aBeforeRollback, true);
             detail::populateRollbackExecution(
-                aResult, rDoc, aBeforeMutableState, maFormulaState, aPrimitiveBeforeRollback.maRecord,
+                aResult, rDoc, aBeforeMutableState, maFormulaState,
+                aRawDocumentMutationRecord.maRecord, aPrimitiveBeforeRollback.maRecord,
                 oRolledBackLiveApplyPlan);
             return aResult;
         }
@@ -738,7 +797,8 @@ public:
                 = detail::buildLiveApplyPlanOrReject(
                 aResult, aRawMutationRecord.maRecord, aObjectRealization, aBeforeRollback, true);
             detail::populateRollbackExecution(
-                aResult, rDoc, aBeforeMutableState, maFormulaState, aPrimitiveBeforeRollback.maRecord,
+                aResult, rDoc, aBeforeMutableState, maFormulaState,
+                aRawDocumentMutationRecord.maRecord, aPrimitiveBeforeRollback.maRecord,
                 oRolledBackLiveApplyPlan);
             return aResult;
         }
@@ -785,7 +845,8 @@ public:
             const auto oRolledBackLiveApplyPlan = detail::buildLiveApplyPlanOrReject(
                 aResult, aRawMutationRecord.maRecord, aObjectRealization, aBeforeRollback, true);
             detail::populateRollbackExecution(
-                aResult, rDoc, aBeforeMutableState, maFormulaState, aPrimitiveBeforeRollback.maRecord,
+                aResult, rDoc, aBeforeMutableState, maFormulaState,
+                aRawDocumentMutationRecord.maRecord, aPrimitiveBeforeRollback.maRecord,
                 oRolledBackLiveApplyPlan);
             return aResult;
         }
@@ -798,6 +859,11 @@ public:
             aResult.moLiveApplyObservation, aResult.moPrimitiveRealizationObservation,
             std::nullopt);
         aResult.moFinalVerificationObservation = oFinalVerificationApply->maObservation;
+        aResult.moPrimitiveExecutionObservation
+            = substrateprimitiveexecution::classifyPrimitiveExecutionObservation(
+                true, aResult.moRawDocumentMutationObservation,
+                aResult.moPrimitiveRealizationObservation, std::nullopt,
+                aResult.moFinalVerificationObservation);
 
         const auto eVerifiedKind = detail::classifyVerifiedMutationEntryResult(aResult);
         aResult.meKind
@@ -810,7 +876,8 @@ public:
                 = detail::buildLiveApplyPlanOrReject(
                 aResult, aRawMutationRecord.maRecord, aObjectRealization, aBeforeRollback, true);
             detail::populateRollbackExecution(
-                aResult, rDoc, aBeforeMutableState, maFormulaState, aPrimitiveBeforeRollback.maRecord,
+                aResult, rDoc, aBeforeMutableState, maFormulaState,
+                aRawDocumentMutationRecord.maRecord, aPrimitiveBeforeRollback.maRecord,
                 oRolledBackLiveApplyPlan);
         }
 

@@ -542,10 +542,17 @@ void assertComputationalMutationEntryApplied(
                     + describeFinalVerificationObservation(
                         *oResult->moFinalVerificationObservation)
               : std::string(" final_verification=none");
+    const std::string aPrimitiveExecutionMessage
+        = oResult->moPrimitiveExecutionObservation
+              ? std::string(" primitive_execution=")
+                    + describePrimitiveExecutionObservation(
+                        *oResult->moPrimitiveExecutionObservation)
+              : std::string(" primitive_execution=none");
     const std::string aFullMessage
         = aResultMessage + aBroadcasterMessage + aObjectRealizationMessage
           + aPrimitiveRealizationMessage + aPrimitiveRollbackMessage + aRawMutationMessage
-          + aRawDocumentMutationMessage + aLiveApplyMessage + aFinalVerificationMessage;
+          + aRawDocumentMutationMessage + aLiveApplyMessage + aFinalVerificationMessage
+          + aPrimitiveExecutionMessage;
     CPPUNIT_ASSERT_MESSAGE(
         aFullMessage,
         oResult->meKind == ComputationalMutationEntryResultKind::Applied
@@ -582,6 +589,35 @@ void assertComputationalMutationEntryApplied(
     CPPUNIT_ASSERT(oResult->moRawDocumentMutationObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, RawDocumentMutationObservationKind::Exact,
         oResult->moRawDocumentMutationObservation->meKind);
+    CPPUNIT_ASSERT(oResult->moPrimitiveExecutionPlan.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, static_cast<sal_uInt8>(3),
+        oResult->moPrimitiveExecutionPlan->mnStageCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        aFullMessage,
+        spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::hasStage(
+            *oResult->moPrimitiveExecutionPlan,
+            spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::
+                PrimitiveExecutionStageKind::RawDocumentMutation));
+    CPPUNIT_ASSERT_MESSAGE(
+        aFullMessage,
+        spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::hasStage(
+            *oResult->moPrimitiveExecutionPlan,
+            spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::
+                PrimitiveExecutionStageKind::PrimitiveRealization));
+    CPPUNIT_ASSERT_MESSAGE(
+        aFullMessage,
+        spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::hasStage(
+            *oResult->moPrimitiveExecutionPlan,
+            spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::
+                PrimitiveExecutionStageKind::FinalVerification));
+    CPPUNIT_ASSERT_MESSAGE(
+        aFullMessage,
+        !spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::hasStage(
+            *oResult->moPrimitiveExecutionPlan,
+            spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::
+                PrimitiveExecutionStageKind::PrimitiveRollback));
+    CPPUNIT_ASSERT_MESSAGE(aFullMessage,
+        oResult->moPrimitiveExecutionPlan->mbUsesPrimitiveExecution);
     CPPUNIT_ASSERT(oResult->moLiveApplyPlan.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, static_cast<sal_uInt8>(3),
         oResult->moLiveApplyPlan->mnStageCount);
@@ -624,6 +660,9 @@ void assertComputationalMutationEntryApplied(
     CPPUNIT_ASSERT(oResult->moFinalVerificationObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, FinalVerificationObservationKind::Exact,
         oResult->moFinalVerificationObservation->meKind);
+    CPPUNIT_ASSERT(oResult->moPrimitiveExecutionObservation.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, PrimitiveExecutionObservationKind::Exact,
+        oResult->moPrimitiveExecutionObservation->meKind);
 
     const auto* pPlan
         = spreadsheetengine::detail::substrate::findMutationEntryRecalcPlan(oResult->maTransition);
@@ -2036,6 +2075,27 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntryRejects
         describeRawDocumentMutationObservation(*oResult->moRawDocumentMutationObservation),
         RawDocumentMutationObservationKind::Exact,
         oResult->moRawDocumentMutationObservation->meKind);
+    CPPUNIT_ASSERT(oResult->moPrimitiveExecutionPlan.has_value());
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt8>(3), oResult->moPrimitiveExecutionPlan->mnStageCount);
+    CPPUNIT_ASSERT(
+        spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::hasStage(
+            *oResult->moPrimitiveExecutionPlan,
+            spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::
+                PrimitiveExecutionStageKind::RawDocumentMutation));
+    CPPUNIT_ASSERT(
+        spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::hasStage(
+            *oResult->moPrimitiveExecutionPlan,
+            spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::
+                PrimitiveExecutionStageKind::PrimitiveRollback));
+    CPPUNIT_ASSERT(
+        spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::hasStage(
+            *oResult->moPrimitiveExecutionPlan,
+            spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::
+                PrimitiveExecutionStageKind::FinalVerification));
+    CPPUNIT_ASSERT(!spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::hasStage(
+        *oResult->moPrimitiveExecutionPlan,
+        spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::
+            PrimitiveExecutionStageKind::PrimitiveRealization));
     CPPUNIT_ASSERT(oResult->moLiveApplyPlan.has_value());
     CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt8>(2), oResult->moLiveApplyPlan->mnStageCount);
     CPPUNIT_ASSERT(
@@ -2063,6 +2123,11 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntryRejects
         oResult->moFinalVerificationRecord->maLiveApplyPlan.mbRolledBack
         == oResult->moLiveApplyPlan->mbRolledBack);
     CPPUNIT_ASSERT(oResult->moFinalVerificationRecord->mbUsesFinalVerification);
+    CPPUNIT_ASSERT(oResult->moPrimitiveExecutionObservation.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        describePrimitiveExecutionObservation(*oResult->moPrimitiveExecutionObservation),
+        PrimitiveExecutionObservationKind::Exact,
+        oResult->moPrimitiveExecutionObservation->meKind);
     CPPUNIT_ASSERT(oResult->moFinalVerificationObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         describeFinalVerificationObservation(*oResult->moFinalVerificationObservation),
