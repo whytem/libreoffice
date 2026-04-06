@@ -425,6 +425,9 @@ void assertComputationalStructuralAppliedExactly(
     const spreadsheetengine::compat::libreoffice::substraterollback::RollbackObservation& rObservation);
 [[nodiscard]] std::string describeRawMutationObservation(
     const spreadsheetengine::compat::libreoffice::substraterawmutation::RawMutationObservation& rObservation);
+[[nodiscard]] std::string describeRawDocumentMutationObservation(
+    const spreadsheetengine::compat::libreoffice::substraterawmutation::
+        RawDocumentMutationObservation& rObservation);
 [[nodiscard]] std::string describeLiveApplyObservation(
     const spreadsheetengine::compat::libreoffice::substrateliveapply::LiveApplyObservation& rObservation);
 
@@ -484,6 +487,12 @@ void assertComputationalMutationEntryApplied(
               ? std::string(" raw_mutation=")
                     + describeRawMutationObservation(*oResult->moRawMutationObservation)
               : std::string(" raw_mutation=none");
+    const std::string aRawDocumentMutationMessage
+        = oResult->moRawDocumentMutationObservation
+              ? std::string(" raw_document_mutation=")
+                    + describeRawDocumentMutationObservation(
+                        *oResult->moRawDocumentMutationObservation)
+              : std::string(" raw_document_mutation=none");
     const std::string aLiveApplyMessage
         = oResult->moLiveApplyObservation
               ? std::string(" live_apply=")
@@ -491,7 +500,7 @@ void assertComputationalMutationEntryApplied(
               : std::string(" live_apply=none");
     const std::string aFullMessage
         = aResultMessage + aBroadcasterMessage + aObjectRealizationMessage + aRawMutationMessage
-          + aLiveApplyMessage;
+          + aRawDocumentMutationMessage + aLiveApplyMessage;
     CPPUNIT_ASSERT_MESSAGE(
         aFullMessage,
         oResult->meKind == ComputationalMutationEntryResultKind::Applied
@@ -508,6 +517,10 @@ void assertComputationalMutationEntryApplied(
     CPPUNIT_ASSERT(oResult->moRawMutationObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, RawMutationObservationKind::Exact,
         oResult->moRawMutationObservation->meKind);
+    CPPUNIT_ASSERT(oResult->moRawDocumentMutationRecord.has_value());
+    CPPUNIT_ASSERT(oResult->moRawDocumentMutationObservation.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, RawDocumentMutationObservationKind::Exact,
+        oResult->moRawDocumentMutationObservation->meKind);
     CPPUNIT_ASSERT(oResult->moLiveApplyPlan.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, static_cast<sal_uInt8>(3),
         oResult->moLiveApplyPlan->mnStageCount);
@@ -1860,6 +1873,12 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntryRejects
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         describeRawMutationObservation(*oResult->moRawMutationObservation),
         RawMutationObservationKind::Exact, oResult->moRawMutationObservation->meKind);
+    CPPUNIT_ASSERT(oResult->moRawDocumentMutationRecord.has_value());
+    CPPUNIT_ASSERT(oResult->moRawDocumentMutationObservation.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        describeRawDocumentMutationObservation(*oResult->moRawDocumentMutationObservation),
+        RawDocumentMutationObservationKind::Exact,
+        oResult->moRawDocumentMutationObservation->meKind);
     CPPUNIT_ASSERT(oResult->moLiveApplyPlan.has_value());
     CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt8>(2), oResult->moLiveApplyPlan->mnStageCount);
     CPPUNIT_ASSERT(

@@ -65,7 +65,11 @@ struct MutationEntryResult
         moObjectRealizationObservation;
     std::optional<substraterollback::RollbackObservation> moRollbackObservation;
     std::optional<substraterawmutation::AdmittedRawMutationRecord> moRawMutationRecord;
+    std::optional<substraterawmutation::AdmittedRawDocumentMutationRecord>
+        moRawDocumentMutationRecord;
     std::optional<substraterawmutation::RawMutationObservation> moRawMutationObservation;
+    std::optional<substraterawmutation::RawDocumentMutationObservation>
+        moRawDocumentMutationObservation;
     std::optional<substrateliveapply::AdmittedLiveApplyPlan> moLiveApplyPlan;
     std::optional<substrateliveapply::LiveApplyObservation> moLiveApplyObservation;
 };
@@ -280,11 +284,27 @@ struct RealizationResult
         true, false, oObjectRealization, std::nullopt);
 }
 
+[[nodiscard]] inline substraterawmutation::RawDocumentMutationObservation
+observeRawDocumentMutationApply(
+    const std::optional<substraterawmutation::RawMutationObservation>& oRawMutation)
+{
+    return substraterawmutation::classifyRawDocumentMutationObservation(
+        true, oRawMutation);
+}
+
 [[nodiscard]] inline substraterawmutation::RawMutationObservation observeRawMutationRollback(
     const std::optional<substraterollback::RollbackObservation>& oRollback)
 {
     return substraterawmutation::classifyRawMutationObservation(
         true, true, std::nullopt, oRollback);
+}
+
+[[nodiscard]] inline substraterawmutation::RawDocumentMutationObservation
+observeRawDocumentMutationRollback(
+    const std::optional<substraterawmutation::RawMutationObservation>& oRawMutation)
+{
+    return substraterawmutation::classifyRawDocumentMutationObservation(
+        true, oRawMutation);
 }
 
 [[nodiscard]] inline RealizationResult realizeObjectRealization(
@@ -421,14 +441,35 @@ public:
         }
         aResult.moRawMutationRecord = aRawMutationRecord.maRecord;
 
-        const auto aRawApply
-            = substraterawmutation::applyAdmittedRawMutationRecord(rDoc, aRawMutationRecord.maRecord);
-        if (aRawApply.meKind != substraterawmutation::RawMutationApplyResultKind::Applied)
+        const auto aRawDocumentMutationRecord
+            = substraterawmutation::buildAdmittedRawDocumentMutationRecord(aRawMutationRecord.maRecord);
+        if (aRawDocumentMutationRecord.meKind
+            != substraterawmutation::RawDocumentMutationRecordResultKind::Built)
+        {
+            aResult.meKind = MutationEntryResultKind::RejectedOutOfContract;
+            aResult.maTransition.maReason = aRawDocumentMutationRecord.maReason;
+            aResult.moRawMutationObservation = substraterawmutation::classifyRawMutationObservation(
+                false, false, std::nullopt, std::nullopt, aRawDocumentMutationRecord.maReason);
+            aResult.moRawDocumentMutationObservation
+                = substraterawmutation::classifyRawDocumentMutationObservation(
+                    false, std::nullopt, aRawDocumentMutationRecord.maReason);
+            aResult.moLiveApplyObservation = substrateliveapply::classifyLiveApplyObservation(
+                *aResult.moRawMutationObservation, std::nullopt, std::nullopt);
+            return aResult;
+        }
+        aResult.moRawDocumentMutationRecord = aRawDocumentMutationRecord.maRecord;
+
+        const auto aRawApply = substraterawmutation::applyAdmittedRawDocumentMutationRecord(
+            rDoc, aRawDocumentMutationRecord.maRecord);
+        if (aRawApply.meKind != substraterawmutation::RawDocumentMutationApplyResultKind::Applied)
         {
             aResult.meKind = MutationEntryResultKind::RejectedOutOfContract;
             aResult.maTransition.maReason = aRawApply.maReason;
             aResult.moRawMutationObservation = substraterawmutation::classifyRawMutationObservation(
                 false, false, std::nullopt, std::nullopt, aRawApply.maReason);
+            aResult.moRawDocumentMutationObservation
+                = substraterawmutation::classifyRawDocumentMutationObservation(
+                    false, std::nullopt, aRawApply.maReason);
             aResult.moLiveApplyObservation = substrateliveapply::classifyLiveApplyObservation(
                 *aResult.moRawMutationObservation, std::nullopt, std::nullopt);
             return aResult;
@@ -465,6 +506,8 @@ public:
                 = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
             aResult.moRawMutationObservation = detail::observeRawMutationRollback(
                 aResult.moRollbackObservation);
+            aResult.moRawDocumentMutationObservation = detail::observeRawDocumentMutationRollback(
+                aResult.moRawMutationObservation);
             aResult.moLiveApplyObservation = substrateliveapply::classifyLiveApplyObservation(
                 *aResult.moRawMutationObservation, std::nullopt, aResult.moRollbackObservation);
             return aResult;
@@ -483,6 +526,8 @@ public:
                 = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
             aResult.moRawMutationObservation = detail::observeRawMutationRollback(
                 aResult.moRollbackObservation);
+            aResult.moRawDocumentMutationObservation = detail::observeRawDocumentMutationRollback(
+                aResult.moRawMutationObservation);
             aResult.moLiveApplyObservation = substrateliveapply::classifyLiveApplyObservation(
                 *aResult.moRawMutationObservation, std::nullopt, aResult.moRollbackObservation);
             return aResult;
@@ -496,6 +541,9 @@ public:
         {
             aResult.moRawMutationObservation = substraterawmutation::classifyRawMutationObservation(
                 false, false, std::nullopt, std::nullopt, aResult.maTransition.maReason);
+            aResult.moRawDocumentMutationObservation
+                = substraterawmutation::classifyRawDocumentMutationObservation(
+                    false, std::nullopt, aResult.maTransition.maReason);
             aResult.moLiveApplyObservation = substrateliveapply::classifyLiveApplyObservation(
                 *aResult.moRawMutationObservation, std::nullopt, std::nullopt);
             return aResult;
@@ -515,6 +563,8 @@ public:
                 = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
             aResult.moRawMutationObservation = detail::observeRawMutationRollback(
                 aResult.moRollbackObservation);
+            aResult.moRawDocumentMutationObservation = detail::observeRawDocumentMutationRollback(
+                aResult.moRawMutationObservation);
             aResult.moLiveApplyObservation = substrateliveapply::classifyLiveApplyObservation(
                 *aResult.moRawMutationObservation, std::nullopt, aResult.moRollbackObservation);
             return aResult;
@@ -574,6 +624,8 @@ public:
                 *aResult.moBroadcasterCanonicalization);
         aResult.moRawMutationObservation
             = detail::observeRawMutationApply(aResult.moObjectRealizationObservation);
+        aResult.moRawDocumentMutationObservation = detail::observeRawDocumentMutationApply(
+            aResult.moRawMutationObservation);
         aResult.moLiveApplyObservation = substrateliveapply::classifyLiveApplyObservation(
             *aResult.moRawMutationObservation, aResult.moObjectRealizationObservation, std::nullopt);
 
@@ -590,6 +642,8 @@ public:
                 = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
             aResult.moRawMutationObservation = detail::observeRawMutationRollback(
                 aResult.moRollbackObservation);
+            aResult.moRawDocumentMutationObservation = detail::observeRawDocumentMutationRollback(
+                aResult.moRawMutationObservation);
             aResult.moLiveApplyObservation = substrateliveapply::classifyLiveApplyObservation(
                 *aResult.moRawMutationObservation, std::nullopt, aResult.moRollbackObservation);
         }

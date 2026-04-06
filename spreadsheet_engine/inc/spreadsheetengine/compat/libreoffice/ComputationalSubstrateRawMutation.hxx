@@ -125,6 +125,43 @@ struct RawMutationApplyResult
     api::String maReason;
 };
 
+enum class RawDocumentMutationRecordResultKind : sal_uInt8
+{
+    Built,
+    RejectedOutOfContract
+};
+
+struct AdmittedRawDocumentMutationRecord
+{
+    AdmittedRawMutationRecord maRawMutation;
+    bool mbUsesPrimitiveDocumentMutation = true;
+
+    [[nodiscard]] constexpr bool operator==(const AdmittedRawDocumentMutationRecord& rOther) const
+        = default;
+};
+
+struct RawDocumentMutationRecordResult
+{
+    RawDocumentMutationRecordResultKind meKind
+        = RawDocumentMutationRecordResultKind::RejectedOutOfContract;
+    api::String maReason;
+    AdmittedRawDocumentMutationRecord maRecord;
+};
+
+enum class RawDocumentMutationApplyResultKind : sal_uInt8
+{
+    Applied,
+    RejectedOutOfContract
+};
+
+struct RawDocumentMutationApplyResult
+{
+    RawDocumentMutationApplyResultKind meKind
+        = RawDocumentMutationApplyResultKind::RejectedOutOfContract;
+    api::String maReason;
+    RawMutationApplyResult maRawMutationApply;
+};
+
 [[nodiscard]] inline RawMutationObservation classifyRawMutationObservation(
     bool bMutationApplied, bool bRolledBack, const recalcshadow::ShadowComparison& rQueue,
     const spreadsheetengine::detail::substrate::ComputationalShadowComparison& rComputational,
@@ -401,6 +438,49 @@ struct RawMutationApplyResult
     }
 }
 
+[[nodiscard]] inline RawDocumentMutationRecordResult buildAdmittedRawDocumentMutationRecord(
+    const AdmittedRawMutationRecord& rRawMutation)
+{
+    RawDocumentMutationRecordResult aResult;
+
+    switch (rRawMutation.meKind)
+    {
+        case RawMutationRecordKind::SetScalarValue:
+            if (!rRawMutation.moScalarValue
+                || (!rRawMutation.moScalarValue->isNumber()
+                    && !rRawMutation.moScalarValue->isBoolean()
+                    && !rRawMutation.moScalarValue->isText()))
+            {
+                aResult.maReason = u"scalar_value_out_of_contract";
+                return aResult;
+            }
+            break;
+        case RawMutationRecordKind::SetFormula:
+            if (rRawMutation.maFormulaSource.empty())
+            {
+                aResult.maReason = u"formula_source_out_of_contract";
+                return aResult;
+            }
+            break;
+        case RawMutationRecordKind::ClearCell:
+            break;
+        case RawMutationRecordKind::InsertRows:
+        case RawMutationRecordKind::DeleteRows:
+        case RawMutationRecordKind::InsertColumns:
+        case RawMutationRecordKind::DeleteColumns:
+            if (rRawMutation.mnCount <= 0)
+            {
+                aResult.maReason = u"structural_count_out_of_contract";
+                return aResult;
+            }
+            break;
+    }
+
+    aResult.meKind = RawDocumentMutationRecordResultKind::Built;
+    aResult.maRecord.maRawMutation = rRawMutation;
+    return aResult;
+}
+
 namespace detail
 {
 
@@ -496,6 +576,21 @@ namespace detail
     }
 
     aResult.maReason = u"mutation_out_of_contract";
+    return aResult;
+}
+
+[[nodiscard]] inline RawDocumentMutationApplyResult applyAdmittedRawDocumentMutationRecord(
+    ScDocument& rDoc, const AdmittedRawDocumentMutationRecord& rRecord)
+{
+    RawDocumentMutationApplyResult aResult;
+    aResult.maRawMutationApply = applyAdmittedRawMutationRecord(rDoc, rRecord.maRawMutation);
+    if (aResult.maRawMutationApply.meKind != RawMutationApplyResultKind::Applied)
+    {
+        aResult.maReason = aResult.maRawMutationApply.maReason;
+        return aResult;
+    }
+
+    aResult.meKind = RawDocumentMutationApplyResultKind::Applied;
     return aResult;
 }
 
