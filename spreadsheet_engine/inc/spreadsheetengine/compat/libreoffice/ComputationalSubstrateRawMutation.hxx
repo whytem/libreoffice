@@ -50,6 +50,33 @@ struct RawMutationObservation
     [[nodiscard]] constexpr bool operator==(const RawMutationObservation& rOther) const = default;
 };
 
+enum class RawDocumentMutationObservationKind : sal_uInt8
+{
+    Exact,
+    OrderingOnly,
+    HiddenHostMutationOrchestration,
+    MissingRealizedOrRolledBackObjects,
+    QueueOrStateMismatch,
+    OutOfContract
+};
+
+struct RawDocumentMutationObservation
+{
+    RawDocumentMutationObservationKind meKind
+        = RawDocumentMutationObservationKind::OutOfContract;
+    api::String maReason;
+    bool mbPrimitiveMutationApplied = false;
+    bool mbRawMutationExact = false;
+    bool mbQueueExact = false;
+    bool mbComputationalFullMatch = false;
+    bool mbGraphFullMatch = false;
+    bool mbObjectRealizationExact = false;
+    bool mbRollbackExact = false;
+
+    [[nodiscard]] constexpr bool operator==(const RawDocumentMutationObservation& rOther) const
+        = default;
+};
+
 enum class RawMutationRecordKind : sal_uInt8
 {
     SetScalarValue,
@@ -230,6 +257,59 @@ struct RawMutationApplyResult
     return classifyRawMutationObservation(
         bMutationApplied, bRolledBack, aQueue, aComputational, aGraph,
         oObjectRealization, oRollback, rReasonIfOutOfContract);
+}
+
+[[nodiscard]] inline RawDocumentMutationObservation classifyRawDocumentMutationObservation(
+    bool bPrimitiveMutationApplied, const std::optional<RawMutationObservation>& oRawMutation,
+    api::StringView rReasonIfOutOfContract = {})
+{
+    RawDocumentMutationObservation aObservation;
+    aObservation.mbPrimitiveMutationApplied = bPrimitiveMutationApplied;
+
+    if (!bPrimitiveMutationApplied || !oRawMutation)
+    {
+        aObservation.meKind = RawDocumentMutationObservationKind::OutOfContract;
+        aObservation.maReason = rReasonIfOutOfContract;
+        return aObservation;
+    }
+
+    aObservation.mbRawMutationExact = oRawMutation->meKind == RawMutationObservationKind::Exact;
+    aObservation.mbQueueExact = oRawMutation->mbQueueExact;
+    aObservation.mbComputationalFullMatch = oRawMutation->mbComputationalFullMatch;
+    aObservation.mbGraphFullMatch = oRawMutation->mbGraphFullMatch;
+    aObservation.mbObjectRealizationExact = oRawMutation->mbObjectRealizationExact;
+    aObservation.mbRollbackExact = oRawMutation->mbRollbackExact;
+
+    switch (oRawMutation->meKind)
+    {
+        case RawMutationObservationKind::Exact:
+            aObservation.meKind = RawDocumentMutationObservationKind::Exact;
+            return aObservation;
+        case RawMutationObservationKind::OrderingOnly:
+            aObservation.meKind = RawDocumentMutationObservationKind::OrderingOnly;
+            aObservation.maReason = u"primitive_mutation_ordering_only";
+            return aObservation;
+        case RawMutationObservationKind::HiddenHostMutationReconstruction:
+            aObservation.meKind = RawDocumentMutationObservationKind::HiddenHostMutationOrchestration;
+            aObservation.maReason = u"host_only_primitive_mutation_orchestration";
+            return aObservation;
+        case RawMutationObservationKind::MissingRealizedOrRolledBackObjects:
+            aObservation.meKind = RawDocumentMutationObservationKind::MissingRealizedOrRolledBackObjects;
+            aObservation.maReason = u"primitive_mutation_missing_objects";
+            return aObservation;
+        case RawMutationObservationKind::QueueOrStateMismatch:
+            aObservation.meKind = RawDocumentMutationObservationKind::QueueOrStateMismatch;
+            aObservation.maReason = u"primitive_mutation_queue_or_state_mismatch";
+            return aObservation;
+        case RawMutationObservationKind::OutOfContract:
+            aObservation.meKind = RawDocumentMutationObservationKind::OutOfContract;
+            aObservation.maReason = oRawMutation->maReason;
+            return aObservation;
+    }
+
+    aObservation.meKind = RawDocumentMutationObservationKind::OutOfContract;
+    aObservation.maReason = u"raw_document_mutation_observation_unknown";
+    return aObservation;
 }
 
 [[nodiscard]] inline RawMutationRecordResult buildAdmittedRawMutationRecord(
@@ -434,6 +514,27 @@ namespace detail
         case RawMutationObservationKind::QueueOrStateMismatch:
             return "queue_or_state_mismatch";
         case RawMutationObservationKind::OutOfContract:
+            return "out_of_contract";
+    }
+
+    return "unknown";
+}
+
+[[nodiscard]] inline const char* toString(RawDocumentMutationObservationKind eKind)
+{
+    switch (eKind)
+    {
+        case RawDocumentMutationObservationKind::Exact:
+            return "exact";
+        case RawDocumentMutationObservationKind::OrderingOnly:
+            return "ordering_only";
+        case RawDocumentMutationObservationKind::HiddenHostMutationOrchestration:
+            return "hidden_host_mutation_orchestration";
+        case RawDocumentMutationObservationKind::MissingRealizedOrRolledBackObjects:
+            return "missing_realized_or_rolled_back_objects";
+        case RawDocumentMutationObservationKind::QueueOrStateMismatch:
+            return "queue_or_state_mismatch";
+        case RawDocumentMutationObservationKind::OutOfContract:
             return "out_of_contract";
     }
 
