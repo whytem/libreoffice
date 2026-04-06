@@ -795,6 +795,13 @@ The most actionable remaining work is no longer another current-slice
 ownership seam. It is a new bounded widening plan for broader workbook
 classes.
 
+The next explicit widening target is:
+
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_PLAN.md)
+
+That plan treats shared-group lifecycle and repair on the already-admitted
+mutation set as the next adjacent workbook-class expansion.
+
 ## Current Assessment
 
 The project is in a strong position:
@@ -872,6 +879,7 @@ For the current second-stage boundary and rollout closeout, see:
 - [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_EXECUTION_HOST_DECISION_RECORD.md)
 - [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_PLAN.md](architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_PLAN.md)
 - [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_DECISION_RECORD.md](architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_PLAN.md)
 - [README.md](architecture/README.md)
 
 For completed plans, closeout records, and historical extraction context, see:

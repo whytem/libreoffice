@@ -535,6 +535,11 @@ Current architecture docs:
   completed closeout decision for current-slice ownership completion,
   marking the admitted slice as substantively ownership-complete and
   shifting the roadmap to slice widening
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_PLAN.md) -
+  implementation-ready plan for the next workbook-class widening cycle,
+  targeting shared-group lifecycle and repair on the already-admitted
+  mutation set while keeping named-range, sheet-level, and broader document
+  flows out of scope
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded
