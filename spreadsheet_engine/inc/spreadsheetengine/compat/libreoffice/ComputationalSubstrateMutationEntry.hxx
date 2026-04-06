@@ -20,6 +20,7 @@
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFormulaCellLifetime.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateLiveApply.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObjectRealization.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstratePrimitiveHostExecutor.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstratePrimitiveExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRawMutation.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRollback.hxx>
@@ -83,6 +84,10 @@ struct MutationEntryResult
         moPrimitiveExecutionPlan;
     std::optional<substrateprimitiveexecution::PrimitiveExecutionObservation>
         moPrimitiveExecutionObservation;
+    std::optional<substrateprimitivehostexecutor::AdmittedPrimitiveHostExecutorPlan>
+        moPrimitiveHostExecutorPlan;
+    std::optional<substrateprimitivehostexecutor::PrimitiveHostExecutorObservation>
+        moPrimitiveHostExecutorObservation;
     std::optional<substrateliveapply::AdmittedLiveApplyPlan> moLiveApplyPlan;
     std::optional<substrateliveapply::LiveApplyObservation> moLiveApplyObservation;
     std::optional<substratefinalverification::AdmittedFinalVerificationRecord>
@@ -334,6 +339,42 @@ struct RollbackObservationSurface
     return MutationEntryResultKind::RolledBackVerificationFailure;
 }
 
+[[nodiscard]] inline MutationEntryResultKind finalizePrimitiveHostExecutorResult(
+    MutationEntryResultKind eLegacyKind,
+    const std::optional<substrateprimitivehostexecutor::PrimitiveHostExecutorObservation>&
+        oPrimitiveHostExecutor)
+{
+    if (!oPrimitiveHostExecutor)
+        return eLegacyKind;
+
+    if (eLegacyKind != MutationEntryResultKind::Applied
+        && eLegacyKind != MutationEntryResultKind::AppliedNormalizedEquivalent)
+    {
+        return eLegacyKind;
+    }
+
+    switch (oPrimitiveHostExecutor->meKind)
+    {
+        case substrateprimitivehostexecutor::PrimitiveHostExecutorObservationKind::Exact:
+            return eLegacyKind;
+        case substrateprimitivehostexecutor::PrimitiveHostExecutorObservationKind::
+            NormalizedEquivalent:
+        case substrateprimitivehostexecutor::PrimitiveHostExecutorObservationKind::OrderingOnly:
+            return MutationEntryResultKind::AppliedNormalizedEquivalent;
+        case substrateprimitivehostexecutor::PrimitiveHostExecutorObservationKind::
+            HiddenHostCallOrchestration:
+        case substrateprimitivehostexecutor::PrimitiveHostExecutorObservationKind::
+            MissingHostCallInputs:
+        case substrateprimitivehostexecutor::PrimitiveHostExecutorObservationKind::
+            QueueOrStateMismatch:
+            return MutationEntryResultKind::RolledBackVerificationFailure;
+        case substrateprimitivehostexecutor::PrimitiveHostExecutorObservationKind::OutOfContract:
+            return MutationEntryResultKind::RejectedOutOfContract;
+    }
+
+    return MutationEntryResultKind::RolledBackVerificationFailure;
+}
+
 [[nodiscard]] inline substraterawmutation::RawMutationObservation observeRawMutationApply(
     const std::optional<substrateobjectrealization::ObjectRealizationObservation>& oObjectRealization)
 {
@@ -499,6 +540,32 @@ buildFinalVerificationOrReject(
     return aRecord.maRecord;
 }
 
+[[nodiscard]] inline std::optional<substrateprimitivehostexecutor::
+        AdmittedPrimitiveHostExecutorPlan>
+buildPrimitiveHostExecutorPlanOrReject(
+    MutationEntryResult& rResult,
+    const substraterawmutation::AdmittedRawDocumentMutationRecord& rRawDocumentMutationRecord,
+    const substrateprimitiveexecution::AdmittedPrimitiveExecutionPlan& rPrimitiveExecutionPlan,
+    const std::optional<substrateobjectrealization::AdmittedPrimitiveRealizationRecord>&
+        oPrimitiveRealization,
+    const std::optional<substraterollback::AdmittedPrimitiveRollbackRecord>& oPrimitiveRollback,
+    const substratefinalverification::AdmittedFinalVerificationRecord& rFinalVerificationRecord)
+{
+    const auto aPlan = substrateprimitivehostexecutor::buildAdmittedPrimitiveHostExecutorPlan(
+        rRawDocumentMutationRecord, rPrimitiveExecutionPlan, oPrimitiveRealization,
+        oPrimitiveRollback, rFinalVerificationRecord);
+    if (aPlan.meKind
+        != substrateprimitivehostexecutor::PrimitiveHostExecutorPlanBuildResultKind::Built)
+    {
+        rResult.meKind = MutationEntryResultKind::RejectedOutOfContract;
+        rResult.maTransition.maReason = aPlan.maReason;
+        return std::nullopt;
+    }
+
+    rResult.moPrimitiveHostExecutorPlan = aPlan.maPlan;
+    return aPlan.maPlan;
+}
+
 inline void populateRollbackExecution(
     MutationEntryResult& rResult, ScDocument& rDoc,
     const spreadsheetengine::detail::substrate::MutableComputationalSubstrateState& rBeforeState,
@@ -553,6 +620,24 @@ inline void populateRollbackExecution(
             = substrateprimitiveexecution::classifyPrimitiveExecutionObservation(
                 true, rResult.moRawDocumentMutationObservation, std::nullopt,
                 rResult.moPrimitiveRollbackObservation, rResult.moFinalVerificationObservation);
+    }
+
+    if (oPrimitiveExecutionPlan && rResult.moFinalVerificationRecord
+        && rResult.moRawDocumentMutationObservation && rResult.moPrimitiveExecutionObservation
+        && rResult.moFinalVerificationObservation)
+    {
+        const auto oPrimitiveHostExecutorPlan = buildPrimitiveHostExecutorPlanOrReject(
+            rResult, rRawDocumentMutationRecord, *oPrimitiveExecutionPlan, std::nullopt,
+            rResult.moPrimitiveRollbackRecord, *rResult.moFinalVerificationRecord);
+        if (oPrimitiveHostExecutorPlan)
+        {
+            rResult.moPrimitiveHostExecutorObservation
+                = substrateprimitivehostexecutor::classifyPrimitiveHostExecutorObservation(
+                    true, rResult.moRawDocumentMutationObservation,
+                    rResult.moPrimitiveExecutionObservation, std::nullopt,
+                    rResult.moPrimitiveRollbackObservation,
+                    rResult.moFinalVerificationObservation);
+        }
     }
 }
 
@@ -865,9 +950,30 @@ public:
                 aResult.moPrimitiveRealizationObservation, std::nullopt,
                 aResult.moFinalVerificationObservation);
 
+        const auto oPrimitiveHostExecutorPlan = detail::buildPrimitiveHostExecutorPlanOrReject(
+            aResult, aRawDocumentMutationRecord.maRecord, *oPrimitiveExecutionPlan,
+            aResult.moPrimitiveRealizationRecord, std::nullopt, *oFinalVerificationRecord);
+        if (!oPrimitiveHostExecutorPlan)
+        {
+            const auto oRolledBackLiveApplyPlan = detail::buildLiveApplyPlanOrReject(
+                aResult, aRawMutationRecord.maRecord, aObjectRealization, aBeforeRollback, true);
+            detail::populateRollbackExecution(
+                aResult, rDoc, aBeforeMutableState, maFormulaState,
+                aRawDocumentMutationRecord.maRecord, aPrimitiveBeforeRollback.maRecord,
+                oRolledBackLiveApplyPlan);
+            return aResult;
+        }
+        aResult.moPrimitiveHostExecutorObservation
+            = substrateprimitivehostexecutor::classifyPrimitiveHostExecutorObservation(
+                true, aResult.moRawDocumentMutationObservation, aResult.moPrimitiveExecutionObservation,
+                aResult.moPrimitiveRealizationObservation, std::nullopt,
+                aResult.moFinalVerificationObservation);
+
         const auto eVerifiedKind = detail::classifyVerifiedMutationEntryResult(aResult);
         aResult.meKind
             = detail::finalizeVerifiedMutationEntryResult(eVerifiedKind, oFinalVerificationApply);
+        aResult.meKind = detail::finalizePrimitiveHostExecutorResult(
+            aResult.meKind, aResult.moPrimitiveHostExecutorObservation);
         if (aResult.meKind == MutationEntryResultKind::RolledBackVerificationFailure
             || aResult.meKind == MutationEntryResultKind::RepairDetected
             || aResult.meKind == MutationEntryResultKind::RejectedOutOfContract)
