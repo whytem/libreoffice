@@ -56,6 +56,54 @@ struct FinalVerificationObservation
         = default;
 };
 
+enum class FinalVerificationRecordResultKind : sal_uInt8
+{
+    Built,
+    RejectedOutOfContract
+};
+
+struct AdmittedFinalVerificationRecord
+{
+    substrateliveapply::AdmittedLiveApplyPlan maLiveApplyPlan;
+    std::optional<substrateobjectrealization::AdmittedPrimitiveRealizationRecord>
+        moPrimitiveRealization;
+    std::optional<substraterollback::AdmittedPrimitiveRollbackRecord> moPrimitiveRollback;
+    bool mbRequireExactQueue = true;
+    bool mbRequireExactComputational = true;
+    bool mbRequireExactGraph = true;
+    bool mbAllowNormalizedGraph = true;
+    bool mbAllowNormalizedIr = true;
+    bool mbRequireExactBroadcasters = true;
+    bool mbUsesFinalVerification = true;
+
+    [[nodiscard]] constexpr bool operator==(const AdmittedFinalVerificationRecord& rOther) const
+        = default;
+};
+
+struct FinalVerificationRecordResult
+{
+    FinalVerificationRecordResultKind meKind
+        = FinalVerificationRecordResultKind::RejectedOutOfContract;
+    api::String maReason;
+    AdmittedFinalVerificationRecord maRecord;
+};
+
+enum class FinalVerificationApplyResultKind : sal_uInt8
+{
+    VerifiedExact,
+    VerifiedNormalizedEquivalent,
+    RejectedVerificationFailure,
+    RejectedOutOfContract
+};
+
+struct FinalVerificationApplyResult
+{
+    FinalVerificationApplyResultKind meKind
+        = FinalVerificationApplyResultKind::RejectedOutOfContract;
+    api::String maReason;
+    FinalVerificationObservation maObservation;
+};
+
 namespace detail
 {
 
@@ -131,6 +179,55 @@ namespace detail
 }
 
 } // namespace detail
+
+[[nodiscard]] inline FinalVerificationRecordResult buildAdmittedFinalVerificationRecord(
+    const substrateliveapply::AdmittedLiveApplyPlan& rLiveApplyPlan,
+    const std::optional<substrateobjectrealization::AdmittedPrimitiveRealizationRecord>&
+        oPrimitiveRealization,
+    const std::optional<substraterollback::AdmittedPrimitiveRollbackRecord>& oPrimitiveRollback)
+{
+    FinalVerificationRecordResult aResult;
+    aResult.maRecord.maLiveApplyPlan = rLiveApplyPlan;
+    aResult.maRecord.moPrimitiveRealization = oPrimitiveRealization;
+    aResult.maRecord.moPrimitiveRollback = oPrimitiveRollback;
+
+    if (oPrimitiveRealization && oPrimitiveRollback)
+    {
+        aResult.maReason = u"conflicting_primitive_final_verification_records";
+        return aResult;
+    }
+
+    if (!oPrimitiveRealization && !oPrimitiveRollback)
+    {
+        aResult.maReason = u"missing_primitive_final_verification_record";
+        return aResult;
+    }
+
+    if (rLiveApplyPlan.mbRolledBack != oPrimitiveRollback.has_value())
+    {
+        aResult.maReason = u"live_apply_and_primitive_verification_path_mismatch";
+        return aResult;
+    }
+
+    if (oPrimitiveRealization
+        && !substrateliveapply::hasStage(
+            rLiveApplyPlan, substrateliveapply::LiveApplyStageKind::Verification))
+    {
+        aResult.maReason = u"missing_verification_stage_for_apply_final_verification";
+        return aResult;
+    }
+
+    if (oPrimitiveRollback
+        && !substrateliveapply::hasStage(
+            rLiveApplyPlan, substrateliveapply::LiveApplyStageKind::Rollback))
+    {
+        aResult.maReason = u"missing_rollback_stage_for_rollback_final_verification";
+        return aResult;
+    }
+
+    aResult.meKind = FinalVerificationRecordResultKind::Built;
+    return aResult;
+}
 
 [[nodiscard]] inline FinalVerificationObservation classifyFinalVerificationObservation(
     bool bVerificationExecuted, const recalcshadow::ShadowComparison& rQueue,
@@ -272,7 +369,7 @@ namespace detail
         && aObservation.mbGraphFullMatch && aObservation.mbLiveApplyExact
         && (aObservation.mbPrimitiveRealizationExact || aObservation.mbPrimitiveRollbackExact)
         && aObservation.mbBroadcasterExact
-        && !detail::isNormalizedEquivalent(rGraph, oIr) && aObservation.mbIrExact)
+        && !detail::isNormalizedEquivalent(rGraph, oIr))
     {
         aObservation.meKind = FinalVerificationObservationKind::Exact;
         return aObservation;
@@ -292,8 +389,7 @@ namespace detail
     if (detail::isOrderingOnly(rQueue, oBroadcasters)
         && aObservation.mbComputationalFullMatch && aObservation.mbGraphFullMatch
         && aObservation.mbLiveApplyExact
-        && (aObservation.mbPrimitiveRealizationExact || aObservation.mbPrimitiveRollbackExact)
-        && (!oIr || oIr->meKind != spreadsheetengine::detail::substrate::ExecutionIrComparisonKind::Mismatch))
+        && (aObservation.mbPrimitiveRealizationExact || aObservation.mbPrimitiveRollbackExact))
     {
         aObservation.meKind = FinalVerificationObservationKind::OrderingOnly;
         aObservation.maReason = u"final_verification_ordering_only";
@@ -307,11 +403,72 @@ namespace detail
         aObservation.maReason = u"final_verification_computational_mismatch";
     else if (!rGraph.mbFullMatch)
         aObservation.maReason = u"final_verification_graph_mismatch";
-    else if (oIr && oIr->meKind == spreadsheetengine::detail::substrate::ExecutionIrComparisonKind::Mismatch)
-        aObservation.maReason = u"final_verification_ir_mismatch";
     else
         aObservation.maReason = u"final_verification_state_mismatch";
     return aObservation;
+}
+
+[[nodiscard]] inline FinalVerificationApplyResult applyAdmittedFinalVerificationRecord(
+    const AdmittedFinalVerificationRecord& rRecord, bool bVerificationExecuted,
+    const recalcshadow::ShadowComparison& rQueue,
+    const spreadsheetengine::detail::substrate::ComputationalShadowComparison& rComputational,
+    const spreadsheetengine::detail::substrate::DependencyGraphShadowComparison& rGraph,
+    const std::optional<spreadsheetengine::detail::substrate::ExecutionIrWorkbookComparison>& oIr,
+    const std::optional<spreadsheetengine::detail::substrate::BroadcasterCanonicalizationComparison>&
+        oBroadcasters,
+    const std::optional<substrateliveapply::LiveApplyObservation>& oLiveApply,
+    const std::optional<substrateobjectrealization::PrimitiveRealizationObservation>&
+        oPrimitiveRealization,
+    const std::optional<substraterollback::PrimitiveRollbackObservation>& oPrimitiveRollback)
+{
+    FinalVerificationApplyResult aResult;
+    aResult.maObservation = classifyFinalVerificationObservation(bVerificationExecuted, rQueue,
+        rComputational, rGraph, oIr, oBroadcasters, oLiveApply, oPrimitiveRealization,
+        oPrimitiveRollback);
+
+    if (!rRecord.mbUsesFinalVerification)
+    {
+        aResult.meKind = FinalVerificationApplyResultKind::RejectedOutOfContract;
+        aResult.maReason = u"final_verification_record_disabled";
+        return aResult;
+    }
+
+    switch (aResult.maObservation.meKind)
+    {
+        case FinalVerificationObservationKind::Exact:
+            aResult.meKind = FinalVerificationApplyResultKind::VerifiedExact;
+            return aResult;
+        case FinalVerificationObservationKind::NormalizedEquivalent:
+            if (!rRecord.mbAllowNormalizedGraph && aResult.maObservation.mbGraphNormalizedEquivalent)
+            {
+                aResult.meKind = FinalVerificationApplyResultKind::RejectedVerificationFailure;
+                aResult.maReason = u"normalized_graph_not_permitted";
+                return aResult;
+            }
+            if (!rRecord.mbAllowNormalizedIr && aResult.maObservation.mbIrNormalizedEquivalent)
+            {
+                aResult.meKind = FinalVerificationApplyResultKind::RejectedVerificationFailure;
+                aResult.maReason = u"normalized_ir_not_permitted";
+                return aResult;
+            }
+            aResult.meKind = FinalVerificationApplyResultKind::VerifiedNormalizedEquivalent;
+            return aResult;
+        case FinalVerificationObservationKind::OrderingOnly:
+        case FinalVerificationObservationKind::HiddenHostVerificationOrchestration:
+        case FinalVerificationObservationKind::MissingVerificationInputs:
+        case FinalVerificationObservationKind::QueueOrStateMismatch:
+            aResult.meKind = FinalVerificationApplyResultKind::RejectedVerificationFailure;
+            aResult.maReason = aResult.maObservation.maReason;
+            return aResult;
+        case FinalVerificationObservationKind::OutOfContract:
+            aResult.meKind = FinalVerificationApplyResultKind::RejectedOutOfContract;
+            aResult.maReason = aResult.maObservation.maReason;
+            return aResult;
+    }
+
+    aResult.meKind = FinalVerificationApplyResultKind::RejectedOutOfContract;
+    aResult.maReason = u"final_verification_apply_unknown";
+    return aResult;
 }
 
 [[nodiscard]] inline const char* toString(FinalVerificationObservationKind eKind)

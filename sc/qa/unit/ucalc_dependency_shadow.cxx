@@ -529,10 +529,16 @@ void assertComputationalMutationEntryApplied(
               ? std::string(" live_apply=")
                     + describeLiveApplyObservation(*oResult->moLiveApplyObservation)
               : std::string(" live_apply=none");
+    const std::string aFinalVerificationMessage
+        = oResult->moFinalVerificationObservation
+              ? std::string(" final_verification=")
+                    + describeFinalVerificationObservation(
+                        *oResult->moFinalVerificationObservation)
+              : std::string(" final_verification=none");
     const std::string aFullMessage
         = aResultMessage + aBroadcasterMessage + aObjectRealizationMessage
           + aPrimitiveRealizationMessage + aPrimitiveRollbackMessage + aRawMutationMessage
-          + aRawDocumentMutationMessage + aLiveApplyMessage;
+          + aRawDocumentMutationMessage + aLiveApplyMessage + aFinalVerificationMessage;
     CPPUNIT_ASSERT_MESSAGE(
         aFullMessage,
         oResult->meKind == ComputationalMutationEntryResultKind::Applied
@@ -599,6 +605,18 @@ void assertComputationalMutationEntryApplied(
     CPPUNIT_ASSERT(oResult->moLiveApplyObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, LiveApplyObservationKind::Exact,
         oResult->moLiveApplyObservation->meKind);
+    CPPUNIT_ASSERT(oResult->moFinalVerificationRecord.has_value());
+    CPPUNIT_ASSERT_MESSAGE(aFullMessage,
+        oResult->moFinalVerificationRecord->maLiveApplyPlan.mnStageCount
+        == oResult->moLiveApplyPlan->mnStageCount);
+    CPPUNIT_ASSERT_MESSAGE(aFullMessage,
+        oResult->moFinalVerificationRecord->maLiveApplyPlan.mbRolledBack
+        == oResult->moLiveApplyPlan->mbRolledBack);
+    CPPUNIT_ASSERT_MESSAGE(aFullMessage,
+        oResult->moFinalVerificationRecord->mbUsesFinalVerification);
+    CPPUNIT_ASSERT(oResult->moFinalVerificationObservation.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, FinalVerificationObservationKind::Exact,
+        oResult->moFinalVerificationObservation->meKind);
 
     const auto* pPlan
         = spreadsheetengine::detail::substrate::findMutationEntryRecalcPlan(oResult->maTransition);
@@ -2006,6 +2024,19 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntryRejects
     CPPUNIT_ASSERT(oResult->moLiveApplyObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(describeLiveApplyObservation(*oResult->moLiveApplyObservation),
         LiveApplyObservationKind::Exact, oResult->moLiveApplyObservation->meKind);
+    CPPUNIT_ASSERT(oResult->moFinalVerificationRecord.has_value());
+    CPPUNIT_ASSERT(
+        oResult->moFinalVerificationRecord->maLiveApplyPlan.mnStageCount
+        == oResult->moLiveApplyPlan->mnStageCount);
+    CPPUNIT_ASSERT(
+        oResult->moFinalVerificationRecord->maLiveApplyPlan.mbRolledBack
+        == oResult->moLiveApplyPlan->mbRolledBack);
+    CPPUNIT_ASSERT(oResult->moFinalVerificationRecord->mbUsesFinalVerification);
+    CPPUNIT_ASSERT(oResult->moFinalVerificationObservation.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        describeFinalVerificationObservation(*oResult->moFinalVerificationObservation),
+        FinalVerificationObservationKind::Exact,
+        oResult->moFinalVerificationObservation->meKind);
     CPPUNIT_ASSERT(!oResult->moPrimitiveRealizationRecord.has_value());
     CPPUNIT_ASSERT(!oResult->moPrimitiveRealizationObservation.has_value());
     CPPUNIT_ASSERT(oResult->moPrimitiveRollbackRecord.has_value());
