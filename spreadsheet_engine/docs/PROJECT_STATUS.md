@@ -198,13 +198,15 @@ What it did justify:
 - one bounded widening step beyond the original admitted structural surface
 - one bounded shared-group structural authority expansion beyond the
   ownership-complete slice
+- one bounded shared-group non-structural member-exit expansion on top of
+  that structural slice
 
 What it did not justify:
 
 - broad storage migration
 - broad listener/broadcaster ownership transfer
 - broad token-container ownership transfer
-- broad shared-group-sensitive structural rollout
+- broad shared-group-sensitive rollout
 - named-range-sensitive structural rollout
 - sheet-wide structural or document-wide authority transfer
 
@@ -228,6 +230,9 @@ The current admitted narrow rollout surface is:
 - ordinary scalar formulas plus exact same-sheet shareable shared-group
   structural `Preserve`, `Split`, and `Rebuild` cases behind the dedicated
   shared-group gate
+- exact same-sheet shareable shared-group non-structural member-exit
+  `SetScalarValue`, `SetFormula`, and `ClearCell` cases behind the dedicated
+  non-structural shared-group gate
 - engine-owned admitted-slice formula-cell lifetime decisions
 - clean baseline only
 - no named-range-sensitive structural behavior
@@ -254,7 +259,7 @@ The following remain outside the admitted rollout and outside the settled
 engine-owned boundary:
 
 - shared-group-sensitive structural behavior outside the bounded same-sheet
-  shareable exact structural `Preserve`/`Split`/`Rebuild` slice
+  shareable exact structural plus non-structural member-exit slice
 - named-range-sensitive structural behavior
 - sheet insert, delete, rename, or move
 - copy, move, clipboard, load-time, or undo-like structural flows
@@ -285,21 +290,25 @@ begin with another bounded reassessment rather than being inferred from the
 current rollout.
 
 The completed shared-group widening cycle now promotes one bounded
-shared-group class while keeping the rest of the boundary explicit:
+shared-group family while keeping the rest of the boundary explicit:
 
 - same-sheet shareable shared-group preserve, split, and rebuild outcomes now
   have explicit facade-side classification
 - same-sheet shareable structural preserve, split, and rebuild cases now
   reach the admitted live structural lane when both structural gates are
   enabled
-- non-exact or non-structural shared-group classes still fall back to the
-  validation-only pilot lane
+- same-sheet shareable non-structural member-exit scalar, formula, and clear
+  cases now reach the admitted authority/lifecycle lane when the dedicated
+  non-structural shared-group gate is enabled
+- non-exact or broader shared-group classes still fall back to the
+  validation-only pilot lane or stay deferred
 - gate-off and named-range-combined shared-group classes reject
   deterministically
 - repair-sensitive shared-group divergence remains repair-detected and
   rollback-capable
-- broader shared-group live rollout still stays deferred because the
-  remaining classes still depend on the retained validation-only fallback
+- broader shared-group live rollout still stays deferred because regroup,
+  merge, named-range-combined, and broader repair-sensitive classes are not
+  yet engine-authored
 
 ## Storage And Wiring Outcome
 
@@ -831,6 +840,10 @@ The key shared-group closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_IMPLEMENTATION.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_ADMISSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_DECISION_RECORD.md)
 
 ## Next Roadmap Category
 
@@ -843,14 +856,9 @@ workbook-class push.
 
 The next adjacent concern is:
 
-- whether non-structural shared-group split or rebuild classes can replace
-  the remaining validation-only observed-topology fallback with exact
-  engine-authored state and therefore meet the same live verification
-  standard as the admitted structural family
-
-That next bounded cycle is now captured in:
-
-- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_ADMISSION_PLAN.md)
+- whether regroup, merge, named-range-combined, or broader repair-sensitive
+  shared-group classes can be expressed without falling back to retained
+  host-only behavior
 
 ## Current Assessment
 

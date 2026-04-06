@@ -26,6 +26,22 @@ namespace lifecyclebuilddetail
            && !pCell->moFormulaGroup.has_value();
 }
 
+[[nodiscard]] inline AuthorityPilotInput
+makeAuthorityInput(const LifecyclePilotInput& rInput)
+{
+    AuthorityPilotInput aAuthorityInput;
+    aAuthorityInput.maComputationalShadow = rInput.maComputationalShadow;
+    aAuthorityInput.maGraphShadow = rInput.maGraphShadow;
+    aAuthorityInput.maIrShadow = rInput.maIrShadow;
+    aAuthorityInput.maMutation = rInput.maMutation;
+    aAuthorityInput.moFormulaCachedValueAfter = rInput.moFormulaCachedValueAfter;
+    aAuthorityInput.moObservedAfterComputationalShadow = rInput.moObservedAfterComputationalShadow;
+    aAuthorityInput.mbAllowSharedGroupNonStructuralAdmission
+        = rInput.mbAllowSharedGroupNonStructuralAdmission;
+    aAuthorityInput.mbCleanBaseline = rInput.mbCleanBaseline;
+    return aAuthorityInput;
+}
+
 [[nodiscard]] inline bool classifyLifecycleShape(
     const LifecyclePilotInput& rInput, LifecycleSyncAction& rAction, api::String& rReason)
 {
@@ -50,6 +66,26 @@ namespace lifecyclebuilddetail
 
             if (!isSingleScalarFormulaCell(pBeforeCell))
             {
+                if (pBeforeCell && pBeforeCell->hasFormula() && pBeforeCell->moFormulaGroup)
+                {
+                    const auto aAuthorityInput = makeAuthorityInput(rInput);
+                    const ShadowCellRecord* pSharedCell = nullptr;
+                    const ShadowFormulaGroupRecord* pTouchedGroup = nullptr;
+                    api::String aSharedGroupReason;
+                    if (authoritybuilddetail::isSharedGroupNonStructuralCandidate(
+                            aAuthorityInput, pSharedCell, pTouchedGroup, aSharedGroupReason))
+                    {
+                        rAction.meKind = LifecycleSyncActionKind::ReplaceFormulaCell;
+                        rAction.mbFormulaPresentBefore = true;
+                        rAction.mbFormulaPresentAfter = true;
+                        return true;
+                    }
+
+                    rReason = aSharedGroupReason.empty() ? api::String(u"formula_shape_out_of_contract")
+                                                         : aSharedGroupReason;
+                    return false;
+                }
+
                 rReason = u"formula_shape_out_of_contract";
                 return false;
             }
@@ -63,6 +99,27 @@ namespace lifecyclebuilddetail
         {
             if (!isSingleScalarFormulaCell(pBeforeCell))
             {
+                if (pBeforeCell && pBeforeCell->hasFormula() && pBeforeCell->moFormulaGroup)
+                {
+                    const auto aAuthorityInput = makeAuthorityInput(rInput);
+                    const ShadowCellRecord* pSharedCell = nullptr;
+                    const ShadowFormulaGroupRecord* pTouchedGroup = nullptr;
+                    api::String aSharedGroupReason;
+                    if (authoritybuilddetail::isSharedGroupNonStructuralCandidate(
+                            aAuthorityInput, pSharedCell, pTouchedGroup, aSharedGroupReason))
+                    {
+                        rAction.meKind = LifecycleSyncActionKind::RemoveFormulaCell;
+                        rAction.maAddress = rInput.maMutation.maAddress;
+                        rAction.mbFormulaPresentBefore = true;
+                        rAction.mbFormulaPresentAfter = false;
+                        return true;
+                    }
+
+                    rReason = aSharedGroupReason.empty() ? api::String(u"formula_shape_out_of_contract")
+                                                         : aSharedGroupReason;
+                    return false;
+                }
+
                 rReason = u"formula_shape_out_of_contract";
                 return false;
             }
@@ -110,6 +167,17 @@ buildLifecyclePilotTransition(const LifecyclePilotInput& rInput)
         return aTransition;
     }
 
+    api::String aSharedGroupReason;
+    const auto oPredictedSharedGroupShadow
+        = authoritybuilddetail::buildPredictedSharedGroupNonStructuralComputationalShadow(
+            lifecyclebuilddetail::makeAuthorityInput(rInput), aSharedGroupReason);
+    if (!oPredictedSharedGroupShadow && !aSharedGroupReason.empty())
+    {
+        aTransition.meVerdict = LifecyclePilotVerdict::RejectedOutOfContract;
+        aTransition.maReason = aSharedGroupReason;
+        return aTransition;
+    }
+
     auto aFacade
         = authoritybuilddetail::materializeFacadeFromComputationalShadow(rInput.maComputationalShadow);
     aFacade.setGeneration(rInput.maComputationalShadow.maSnapshot.mnGeneration + 1);
@@ -144,11 +212,22 @@ buildLifecyclePilotTransition(const LifecyclePilotInput& rInput)
         = dependency::buildRecalcPlan(aTransition.maDependencySnapshot, aTransition.maInvalidationPlan);
     const auto aObservation = authoritybuilddetail::buildAuthorityObservationState(
         aTransition.maDependencySnapshot, aTransition.maRecalcPlan);
-    aTransition.maComputationalAfter
-        = buildComputationalWorkbookShadow(aFacade, aObservation);
+    if (oPredictedSharedGroupShadow)
+    {
+        aTransition.maComputationalAfter
+            = authoritybuilddetail::applyObservationStateToSharedGroupNonStructuralShadow(
+                *oPredictedSharedGroupShadow, aObservation);
+    }
+    else
+    {
+        aTransition.maComputationalAfter = buildComputationalWorkbookShadow(aFacade, aObservation);
+    }
     aTransition.maGraphAfter = buildDependencyGraphShadow(aTransition.maComputationalAfter, aObservation);
+    auto aIrFacade = authoritybuilddetail::materializeFacadeFromComputationalShadow(
+        aTransition.maComputationalAfter);
     aTransition.maIrAfter
-        = authoritybuilddetail::buildAuthorityExecutionIrShadow(aTransition.maComputationalAfter, aFacade);
+        = authoritybuilddetail::buildAuthorityExecutionIrShadow(
+            aTransition.maComputationalAfter, aIrFacade);
     aTransition.maSyncActions.push_back(std::move(aSyncAction));
     aTransition.meVerdict = LifecyclePilotVerdict::Applicable;
     aTransition.maReason = u"ready";

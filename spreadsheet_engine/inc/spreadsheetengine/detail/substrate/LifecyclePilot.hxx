@@ -96,6 +96,8 @@ struct LifecyclePilotInput
     ExecutionIrWorkbookShadow maIrShadow;
     facade::MutationEvent maMutation;
     std::optional<api::CellValue> moFormulaCachedValueAfter;
+    std::optional<ComputationalWorkbookShadow> moObservedAfterComputationalShadow;
+    bool mbAllowSharedGroupNonStructuralAdmission = false;
     bool mbCleanBaseline = false;
 
     [[nodiscard]] constexpr bool operator==(const LifecyclePilotInput& rOther) const = default;

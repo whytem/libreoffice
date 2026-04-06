@@ -280,9 +280,7 @@ inline void reconcileAdmittedCellStorage(
 
 [[nodiscard]] inline bool isAdmittedFormulaLifetimeCell(const ShadowCellRecord& rCell)
 {
-    return rCell.hasFormula()
-           && rCell.moFormula->meKind == facade::FormulaCellKind::Ordinary
-           && !rCell.moFormulaGroup.has_value();
+    return authoritybuilddetail::isAdmittedNonMatrixFormulaCell(rCell);
 }
 
 [[nodiscard]] inline AdmittedFormulaCellLifetime
@@ -578,19 +576,11 @@ buildAdmittedWiringContainers(const DependencyGraphShadow& rGraph)
     if (!rState.mbBootstrapped)
         mutablesubstratedetail::setStateFromShadow(rState, rTransition.maInput.maComputationalShadow);
 
-    AuthorityPilotInput aFacadeInput;
-    aFacadeInput.maMutation = rTransition.maInput.maMutation;
-    aFacadeInput.moScalarValueAfter = rTransition.maInput.moScalarValueAfter;
-    aFacadeInput.moFormulaCachedValueAfter = rTransition.maInput.moFormulaCachedValueAfter;
-
-    api::String aIgnoredReason;
-    if (!authoritybuilddetail::applyAuthorityMutationToFacade(rState.maFacade, aFacadeInput, aIgnoredReason))
-        return false;
-
     const auto aWiringDelta = buildGraphWiringDelta(
         rState.maGraphShadow, rTransition.maGraphAfter, rTransition.maRecalcPlan,
         rTransition.maInput.maMutation);
-    rState.maFacade.setGeneration(rTransition.maComputationalAfter.maSnapshot.mnGeneration);
+    rState.maFacade = authoritybuilddetail::materializeFacadeFromComputationalShadow(
+        rTransition.maComputationalAfter);
     rState.maObservation
         = mutablesubstratedetail::makeObservationStateFromShadow(rTransition.maComputationalAfter);
     rState.maShadow = rTransition.maComputationalAfter;
@@ -619,13 +609,11 @@ buildAdmittedWiringContainers(const DependencyGraphShadow& rGraph)
     if (!rState.mbBootstrapped)
         mutablesubstratedetail::setStateFromShadow(rState, rTransition.maInput.maComputationalShadow);
 
-    for (const auto& rAction : rTransition.maSyncActions)
-        mutablesubstratedetail::applyLifecycleSyncAction(rState.maFacade, rAction);
-
     const auto aWiringDelta = buildGraphWiringDelta(
         rState.maGraphShadow, rTransition.maGraphAfter, rTransition.maRecalcPlan,
         rTransition.maInput.maMutation);
-    rState.maFacade.setGeneration(rTransition.maComputationalAfter.maSnapshot.mnGeneration);
+    rState.maFacade = authoritybuilddetail::materializeFacadeFromComputationalShadow(
+        rTransition.maComputationalAfter);
     rState.maObservation
         = mutablesubstratedetail::makeObservationStateFromShadow(rTransition.maComputationalAfter);
     rState.maShadow = rTransition.maComputationalAfter;

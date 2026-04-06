@@ -1,6 +1,31 @@
 # Computational Substrate Shared-Group Non-Structural Admission Plan
 
-Status: active implementation plan
+Status: complete closeout record for the non-structural shared-group admission cycle
+
+## Closeout Result
+
+This plan is now complete.
+
+The bounded promotion result is:
+
+- admit same-sheet shareable shared-group non-structural member-exit
+  `SetScalarValue`, `SetFormula`, and `ClearCell` cases into the live
+  authority and lifecycle slice behind a dedicated non-structural
+  shared-group gate
+- carry that same bounded slice through the mutation-entry path behind the
+  existing explicit mutation-entry gate plus the dedicated non-structural
+  shared-group gate
+- keep regroup, merge, same-text preserve, named-range-combined,
+  repair-sensitive, off-sheet, and broader workbook classes deferred
+
+The closeout references are now:
+
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_ADMISSION_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_ADMISSION_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_SCENARIO_MATRIX.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_SCENARIO_MATRIX.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MAPPING_RULES.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MAPPING_RULES.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_DECISION_RECORD.md)
 
 ## Purpose
 

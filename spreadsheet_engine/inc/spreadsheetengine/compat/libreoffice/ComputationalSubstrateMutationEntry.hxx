@@ -121,6 +121,12 @@ struct RollbackObservationSurface
     return substraterollout::isSurfaceEnabled(rDoc, substraterollout::RolloutSurface::MutationEntry);
 }
 
+[[nodiscard]] inline bool isSharedGroupNonStructuralCandidateEnabled(const ScDocument& rDoc)
+{
+    return substraterollout::isSurfaceEnabled(
+        rDoc, substraterollout::RolloutSurface::SharedGroupNonStructural);
+}
+
 [[nodiscard]] inline MutationEntryResultKind mapAuthorityKind(
     substrateauthority::PilotResultKind eKind)
 {
@@ -771,6 +777,8 @@ public:
             = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
         aInput.moObservedAfterIrShadow
             = buildExecutionIrWorkbookShadow(*aInput.moObservedAfterComputationalShadow, rDoc);
+        aInput.mbAllowSharedGroupNonStructuralAdmission
+            = detail::isSharedGroupNonStructuralCandidateEnabled(rDoc);
         aInput.mbCleanBaseline = mbCleanBaseline;
 
         aResult.maTransition = spreadsheetengine::detail::substrate::buildMutationEntryTransition(

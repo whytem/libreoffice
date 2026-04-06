@@ -1,16 +1,20 @@
 # Computational Substrate Shared-Group Implementation
 
-Status: bounded structural preserve, split, and rebuild authority slice implemented
+Status: bounded structural plus non-structural shared-group slice implemented
 
 ## What Landed
 
-The shared-group widening cycle now has one bounded live structural authority
-family on top of the ownership-complete admitted slice.
+The shared-group widening cycle now has one bounded live structural family
+plus one bounded live non-structural member-exit family on top of the
+ownership-complete admitted slice.
 
 The workstream is now closed out by:
 
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_DECISION_RECORD.md)
 
 The implementation stays intentionally narrow:
 
@@ -18,6 +22,9 @@ The implementation stays intentionally narrow:
   shared-group structural topology cases
 - that exact family now includes bounded `Preserve`, `Split`, and `Rebuild`
   outcomes
+- it also widens the live admitted slice for exact same-sheet shareable
+  non-structural member-exit `SetScalarValue`, `SetFormula`, and
+  `ClearCell` cases
 - it keeps non-exact, named-range-sensitive, off-sheet, regrouping, and
   repair-sensitive shared-group classes outside live admission
 
@@ -26,7 +33,12 @@ The implementation stays intentionally narrow:
 The landed path is centered in:
 
 - [FacadeConsumers.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/detail/workbook/FacadeConsumers.hxx)
+- [AuthorityPilotBuilder.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/detail/substrate/AuthorityPilotBuilder.hxx)
+- [LifecyclePilotBuilder.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/detail/substrate/LifecyclePilotBuilder.hxx)
 - [StructuralPilotBuilder.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/detail/substrate/StructuralPilotBuilder.hxx)
+- [ComputationalSubstrateAuthority.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/ComputationalSubstrateAuthority.hxx)
+- [ComputationalSubstrateLifecycle.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/ComputationalSubstrateLifecycle.hxx)
+- [ComputationalSubstrateMutationEntry.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/ComputationalSubstrateMutationEntry.hxx)
 - [ComputationalSubstrateStructural.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/ComputationalSubstrateStructural.hxx)
 - [ComputationalSubstrateRollout.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/ComputationalSubstrateRollout.hxx)
 
@@ -71,6 +83,19 @@ Within that gate, the behavior now splits cleanly:
   repair-sensitive shared-group outcomes
 - authority mode admits exact same-sheet shareable structural topology
   candidates
+
+The adjacent non-structural shared-group member-exit slice is now guarded by:
+
+- `SPREADSHEET_ENGINE_COMPUTATIONAL_SHARED_GROUP_NON_STRUCTURAL=1`
+
+Within that gate, the admitted family is:
+
+- `SetScalarValue` through the authority lane
+- `SetFormula` through the lifecycle lane
+- `ClearCell` through the lifecycle lane
+
+but only when the touched same-sheet shareable shared-group member exits the
+group and surviving members can be repartitioned into exact contiguous runs.
 
 ## Engine-Predicted Structural Topology
 
@@ -126,11 +151,25 @@ The landed path:
 That is why the preserve, split, and rebuild slices can now close exact
 queue, computational, graph, and IR checks on the live narrow rollout path.
 
+The non-structural member-exit slice now closes through the same carry-through
+shape:
+
+- the predictor removes the touched member from the before-group
+- surviving members are repartitioned into exact contiguous runs
+- observation state is rehydrated from the predicted dependency snapshot and
+  recalc plan
+- mutable-substrate facade state is materialized from the admitted
+  after-shadow so shared-group bindings stay exact after apply
+- mutation entry no longer rejects resident non-matrix shared formulas on
+  this admitted slice
+
 ## Test Coverage Added
 
 The checked-in coverage now includes:
 
 - facade consumer coverage for shifted structural `Preserve`, `Split`, and
+  `Rebuild` classification
+- facade consumer coverage for non-structural shared-group `Split` and
   `Rebuild` classification
 - standalone proof that exact structural split prediction does not depend on
   observed shared-group topology
@@ -138,16 +177,18 @@ The checked-in coverage now includes:
   on observed shared-group topology
 - standalone proof that exact structural preserve, split, and rebuild
   authority candidates close exact computational, graph, and IR state
+- standalone proof that exact non-structural shared-group authority and
+  lifecycle candidates close exact computational, graph, and IR state
 - structural shared-group rejection when the dedicated candidate gate is off
 - structural shared-group preserve, split, and rebuild live-apply coverage
   when the dedicated shared-group gate is on
+- non-structural shared-group authority and lifecycle live-apply coverage
+  when the dedicated non-structural shared-group gate is on
+- non-structural shared-group mutation-entry coverage on the same bounded
+  slice
 - structural shared-group-plus-named-range defer coverage
 - structural shared-group repair-detected coverage when the group shape is
   perturbed after the structural mutation
 
-The result is one bounded admitted structural family, not a broad
-shared-group rollout.
-
-The next adjacent reassessment is now captured in:
-
-- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_ADMISSION_PLAN.md)
+The result is still bounded shared-group admission, not a broad shared-group
+rollout.

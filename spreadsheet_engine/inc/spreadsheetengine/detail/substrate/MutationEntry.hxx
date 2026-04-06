@@ -103,6 +103,7 @@ struct MutationEntryBuildInput
     std::optional<ExecutionIrWorkbookShadow> moObservedAfterIrShadow;
     StructuralPilotBuildMode meStructuralBuildMode = StructuralPilotBuildMode::AuthorityOnly;
     bool mbAllowNamedRangeAdmission = false;
+    bool mbAllowSharedGroupNonStructuralAdmission = false;
     bool mbCleanBaseline = false;
 
     [[nodiscard]] constexpr bool operator==(const MutationEntryBuildInput& rOther) const = default;
@@ -217,6 +218,9 @@ namespace mutationentrydetail
                 = mutationentrydetail::resolveScalarValueAfter(rInput, rAfterFacade);
             aAuthorityInput.moFormulaCachedValueAfter
                 = mutationentrydetail::resolveFormulaCachedValueAfter(rInput, rAfterFacade);
+            aAuthorityInput.moObservedAfterComputationalShadow = rInput.moObservedAfterComputationalShadow;
+            aAuthorityInput.mbAllowSharedGroupNonStructuralAdmission
+                = rInput.mbAllowSharedGroupNonStructuralAdmission;
             aAuthorityInput.mbCleanBaseline = rInput.mbCleanBaseline;
             aTransition.moAuthorityTransition = buildAuthorityPilotTransition(aAuthorityInput);
             aTransition.maReason = aTransition.moAuthorityTransition->maReason;
@@ -231,6 +235,9 @@ namespace mutationentrydetail
             aLifecycleInput.maMutation = rInput.maRequest.maMutation;
             aLifecycleInput.moFormulaCachedValueAfter
                 = mutationentrydetail::resolveFormulaCachedValueAfter(rInput, rAfterFacade);
+            aLifecycleInput.moObservedAfterComputationalShadow = rInput.moObservedAfterComputationalShadow;
+            aLifecycleInput.mbAllowSharedGroupNonStructuralAdmission
+                = rInput.mbAllowSharedGroupNonStructuralAdmission;
             aLifecycleInput.mbCleanBaseline = rInput.mbCleanBaseline;
             aTransition.moLifecycleTransition = buildLifecyclePilotTransition(aLifecycleInput);
             aTransition.maReason = aTransition.moLifecycleTransition->maReason;

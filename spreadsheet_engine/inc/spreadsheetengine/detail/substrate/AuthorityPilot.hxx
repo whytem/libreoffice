@@ -76,6 +76,8 @@ struct AuthorityPilotInput
     facade::MutationEvent maMutation;
     std::optional<api::CellValue> moScalarValueAfter;
     std::optional<api::CellValue> moFormulaCachedValueAfter;
+    std::optional<ComputationalWorkbookShadow> moObservedAfterComputationalShadow;
+    bool mbAllowSharedGroupNonStructuralAdmission = false;
     bool mbCleanBaseline = false;
 
     [[nodiscard]] constexpr bool operator==(const AuthorityPilotInput& rOther) const = default;

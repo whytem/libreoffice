@@ -45,7 +45,7 @@ namespace detail
 
 [[nodiscard]] inline bool isAdmittedFormulaCell(const ScFormulaCell& rCell)
 {
-    return !rCell.IsShared() && rCell.GetMatrixFlag() == ScMatrixMode::NONE;
+    return rCell.GetMatrixFlag() == ScMatrixMode::NONE;
 }
 
 [[nodiscard]] inline bool collectAdmittedFormulaCells(

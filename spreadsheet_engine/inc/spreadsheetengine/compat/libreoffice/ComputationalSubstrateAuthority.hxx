@@ -56,6 +56,13 @@ namespace detail
     return substraterollout::isSurfaceEnabled(rDoc, substraterollout::RolloutSurface::Authority);
 }
 
+[[nodiscard]] inline bool isSharedGroupNonStructuralCandidateEnabled(const ScDocument& rDoc)
+{
+    return isRuntimeEnabled(rDoc)
+           && substraterollout::isSurfaceEnabled(
+               rDoc, substraterollout::RolloutSurface::SharedGroupNonStructural);
+}
+
 [[nodiscard]] inline bool acceptsQueueComparison(
     const recalcshadow::ShadowComparison& rComparison,
     spreadsheetengine::detail::substrate::AuthorityVerificationMode)
@@ -133,13 +140,19 @@ prepareAuthorityInput(
     const spreadsheetengine::detail::substrate::DependencyGraphShadow& rGraphShadow,
     const spreadsheetengine::detail::substrate::ExecutionIrWorkbookShadow& rIrShadow,
     const spreadsheetengine::detail::facade::MutationEvent& rMutation,
-    const spreadsheetengine::detail::facade::WorkbookFacade& rAfterFacade, bool bCleanBaseline)
+    const spreadsheetengine::detail::facade::WorkbookFacade& rAfterFacade,
+    const spreadsheetengine::detail::substrate::ComputationalWorkbookShadow&
+        rObservedAfterComputationalShadow,
+    bool bAllowSharedGroupNonStructuralAdmission, bool bCleanBaseline)
 {
     spreadsheetengine::detail::substrate::AuthorityPilotInput aInput;
     aInput.maComputationalShadow = rComputationalShadow;
     aInput.maGraphShadow = rGraphShadow;
     aInput.maIrShadow = rIrShadow;
     aInput.maMutation = rMutation;
+    aInput.moObservedAfterComputationalShadow = rObservedAfterComputationalShadow;
+    aInput.mbAllowSharedGroupNonStructuralAdmission
+        = bAllowSharedGroupNonStructuralAdmission;
     aInput.mbCleanBaseline = bCleanBaseline;
 
     switch (rMutation.meKind)
@@ -201,9 +214,14 @@ public:
         PilotResult aResult;
         const sal_Int64 nAfterGeneration = maComputationalShadow.maSnapshot.mnGeneration + 1;
         const CalcWorkbookFacade aAfterFacade(rDoc, nAfterGeneration);
+        const auto aAfterObservation = makeComputationalObservationState(
+            substrateobs::collectLiveComputationalState(rDoc));
+        const auto aObservedAfterComputationalShadow
+            = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
         aResult.maTransition = spreadsheetengine::detail::substrate::buildAuthorityPilotTransition(
             detail::prepareAuthorityInput(maComputationalShadow, maGraphShadow, maIrShadow,
-                rMutation, aAfterFacade, mbCleanBaseline));
+                rMutation, aAfterFacade, aObservedAfterComputationalShadow,
+                detail::isSharedGroupNonStructuralCandidateEnabled(rDoc), mbCleanBaseline));
 
         switch (aResult.maTransition.meVerdict)
         {

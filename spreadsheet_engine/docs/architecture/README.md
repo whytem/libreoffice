@@ -566,9 +566,22 @@ Current architecture docs:
   the bounded structural preserve/split/rebuild family while naming the
   remaining non-exact and non-structural fallback boundary explicitly
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_ADMISSION_PLAN.md) -
-  active implementation plan for the next bounded shared-group promotion
-  cycle, targeting same-sheet shareable non-structural member-local
-  split/rebuild admission through the lifecycle and authority path
+  completed closeout record for the bounded non-structural shared-group
+  promotion cycle, ending in live admission for the exact same-sheet
+  shareable member-exit slice
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_IMPLEMENTATION.md) -
+  completed implementation note for the bounded non-structural shared-group
+  member-exit authority, lifecycle, and mutation-entry slice plus the
+  dedicated non-structural gate
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_EVIDENCE.md) -
+  completed evidence note for the bounded non-structural shared-group
+  promotion cycle, recording exact authority, lifecycle, mutation-entry,
+  gate-off rejection, and replay outcomes
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_DECISION_RECORD.md) -
+  completed closeout decision for the bounded non-structural shared-group
+  promotion cycle, admitting same-sheet shareable member-exit scalar,
+  formula, and clear behavior while keeping broader regrouping classes
+  deferred
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

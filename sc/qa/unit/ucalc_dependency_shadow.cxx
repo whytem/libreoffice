@@ -1608,6 +1608,102 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalAuthoritySetFormulaP
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalNarrowRolloutSharedGroupNonStructuralAuthorityEnabledByCandidateGate)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", nullptr);
+    ScopedEnvironmentOverride aSharedGroupNonStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_SHARED_GROUP_NON_STRUCTURAL", "1");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=A3*2"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aAuthorityCapture
+        = ScopedComputationalAuthority::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aAuthorityCapture.isCaptured());
+    CPPUNIT_ASSERT(aAuthorityCapture.canApplyAuthority());
+
+    m_pDoc->SetValue(1, 0, 0, 9.0);
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(1, 1, 0), ScAddress(1, 2, 0) });
+
+    const auto oResult
+        = aAuthorityCapture.apply(*m_pDoc, translateSetScalarValue(ScAddress(1, 0, 0)));
+    assertComputationalPilotApplied(oResult, *m_pDoc);
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
+    const CellAddress aExpectedAnchor { 0, 1, 1 };
+    CPPUNIT_ASSERT(aAfterGroups.front().maAnchor == aExpectedAnchor);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aAfterGroups.front().mnLength);
+    CPPUNIT_ASSERT(!m_pDoc->GetFormulaCell(ScAddress(1, 0, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalNarrowRolloutSharedGroupNonStructuralAuthorityStaysRejectedWithoutCandidateGate)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
+    using spreadsheetengine::compat::libreoffice::recalcqueue::captureFormulaState;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", nullptr);
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=A3*2"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aAuthorityCapture
+        = ScopedComputationalAuthority::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aAuthorityCapture.isCaptured());
+    CPPUNIT_ASSERT(aAuthorityCapture.canApplyAuthority());
+
+    m_pDoc->SetValue(1, 0, 0, 9.0);
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(1, 1, 0), ScAddress(1, 2, 0) });
+    const auto aBeforeApply = captureFormulaState(*m_pDoc);
+
+    const auto oResult
+        = aAuthorityCapture.apply(*m_pDoc, translateSetScalarValue(ScAddress(1, 0, 0)));
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalPilotResultKind::RejectedOutOfContract, oResult->meKind);
+    assertFormulaStateEqual(aBeforeApply, captureFormulaState(*m_pDoc));
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalAuthorityRejectsDirtyBaseline)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateSetScalarValue;
@@ -1809,6 +1905,57 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalLifecycleRemoveFormu
     const auto oResult = aLifecycle.apply(*m_pDoc, translateClearCell(ScAddress(1, 0, 0)));
     assertComputationalLifecycleApplied(oResult, *m_pDoc);
     CPPUNIT_ASSERT(!m_pDoc->GetFormulaCell(ScAddress(1, 0, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalNarrowRolloutSharedGroupNonStructuralLifecycleEnabledByCandidateGate)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", nullptr);
+    ScopedEnvironmentOverride aSharedGroupNonStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_SHARED_GROUP_NON_STRUCTURAL", "1");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=A3*2"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aLifecycleCapture
+        = ScopedComputationalLifecycle::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aLifecycleCapture.isCaptured());
+    CPPUNIT_ASSERT(aLifecycleCapture.canApplyLifecycle());
+
+    m_pDoc->SetString(1, 1, 0, u"=A2*5"_ustr);
+    forceFormulaTreeOrder(*m_pDoc,
+        { ScAddress(1, 0, 0), ScAddress(1, 1, 0), ScAddress(1, 2, 0) });
+
+    const auto oResult = aLifecycleCapture.apply(
+        *m_pDoc, translateSetFormula(ScAddress(1, 1, 0), u"=A2*5"_ustr));
+    assertComputationalLifecycleApplied(oResult, *m_pDoc);
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT(aAfterGroups.empty());
+    ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(1, 1, 0));
+    CPPUNIT_ASSERT(pFormula);
+    CPPUNIT_ASSERT_EQUAL(u"=A2*5"_ustr, pFormula->GetFormula());
 
     m_pDoc->DeleteTab(0);
 }
@@ -2074,6 +2221,96 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntrySetForm
     ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(1, 0, 0));
     CPPUNIT_ASSERT(pFormula);
     CPPUNIT_ASSERT_EQUAL(u"=A1*3"_ustr, pFormula->GetFormula());
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalMutationEntrySharedGroupNonStructuralAuthority)
+{
+    using spreadsheetengine::api::CellValue;
+    using spreadsheetengine::detail::substrate::MutationEntryRequest;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+
+    ScopedEnvironmentOverride aMutationEntry(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_MUTATION_ENTRY", "1");
+    ScopedEnvironmentOverride aSharedGroupNonStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_SHARED_GROUP_NON_STRUCTURAL", "1");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=A3*2"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aEntryCapture
+        = ScopedComputationalMutationEntry::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aEntryCapture.isCaptured());
+    CPPUNIT_ASSERT(aEntryCapture.canApplyMutationEntry());
+
+    const auto oResult = aEntryCapture.apply(*m_pDoc,
+        MutationEntryRequest::setScalarValue({ 0, 1, 0 }, CellValue::number(9.0)));
+    assertComputationalMutationEntryApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbGroupMatch);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbFullMatch);
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
+    const CellAddress aExpectedAnchor { 0, 1, 1 };
+    CPPUNIT_ASSERT(aAfterGroups.front().maAnchor == aExpectedAnchor);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aAfterGroups.front().mnLength);
+    CPPUNIT_ASSERT(!m_pDoc->GetFormulaCell(ScAddress(1, 0, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalMutationEntrySharedGroupNonStructuralLifecycle)
+{
+    using spreadsheetengine::detail::substrate::MutationEntryRequest;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+
+    ScopedEnvironmentOverride aMutationEntry(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_MUTATION_ENTRY", "1");
+    ScopedEnvironmentOverride aSharedGroupNonStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_SHARED_GROUP_NON_STRUCTURAL", "1");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=A3*2"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aEntryCapture
+        = ScopedComputationalMutationEntry::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aEntryCapture.isCaptured());
+    CPPUNIT_ASSERT(aEntryCapture.canApplyMutationEntry());
+
+    const auto oResult = aEntryCapture.apply(
+        *m_pDoc, MutationEntryRequest::setFormula({ 0, 1, 1 }, u"=A2*5"));
+    assertComputationalMutationEntryApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbGroupMatch);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbFullMatch);
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT(aAfterGroups.empty());
+    ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(1, 1, 0));
+    CPPUNIT_ASSERT(pFormula);
+    CPPUNIT_ASSERT_EQUAL(u"=A2*5"_ustr, pFormula->GetFormula());
 
     m_pDoc->DeleteTab(0);
 }
