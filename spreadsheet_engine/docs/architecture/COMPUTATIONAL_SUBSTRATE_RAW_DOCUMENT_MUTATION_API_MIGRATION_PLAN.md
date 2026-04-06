@@ -1,6 +1,6 @@
 # Computational Substrate Raw Document Mutation API Migration Plan
 
-Status: implementation-ready plan
+Status: completed closeout record
 
 ## Purpose
 

@@ -611,20 +611,61 @@ The key live apply-shell closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_LIVE_APPLY_SHELL_DECISION_RECORD.md)
 
+## Raw Document Mutation Outcome
+
+The raw document mutation reassessment is now complete.
+
+It justifies one additional bounded boundary shift:
+
+- the engine now owns the explicit admitted raw document mutation record on
+  the bounded slice
+- admitted scalar, formula, clear, and narrow structural entry now carries
+  that explicit engine-authored primitive mutation record before the
+  retained primitive host shell completes
+- applied admitted mutation-entry results now carry explicit raw document
+  mutation observation instead of relying only on the broader raw-mutation
+  observation
+- dirty-baseline rejection and rollback keep the primitive mutation layer
+  explicit and exact on the bounded slice
+
+It still does not justify broad host independence. Calc still owns:
+
+- the primitive realization host operations around admitted primitive
+  execution
+- the primitive rollback host operations around admitted primitive
+  execution
+- the final verification host shell around those primitive operations
+
+That means the current boundary is now stronger than the earlier
+resident-state-plus-host-primitive-mutation split, but it is still narrower
+than a broad computational document transplant.
+
+The key raw document mutation closeout references are:
+
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_MIGRATION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_MIGRATION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_SCHEMA.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_SCHEMA.md)
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_OBSERVATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_OBSERVATION.md)
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_DECISION_RECORD.md)
+
 ## Next Explicit Reassessment Target
 
 The next explicit bounded concern is:
 
-- raw document mutation API migration on the admitted slice
+- primitive realization and rollback shell reassessment on the admitted
+  slice
 
-The live apply-shell reassessment is now closed with a bounded proceed
+The raw document mutation reassessment is now closed with a bounded proceed
 result. The most actionable remaining host-owned surface on the admitted
-slice is no longer stage identity or stage ordering. It is the underlying
-raw document mutation shell that still executes the admitted plan.
+slice is no longer primitive mutation identity or primitive mutation intent.
+It is the retained primitive realization and rollback shell around that
+already-engine-authored admitted state.
 
 The implementation-ready plan for that next reassessment is:
 
-- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_MIGRATION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_MIGRATION_PLAN.md)
+- not yet written
 
 ## Current Assessment
 
@@ -649,6 +690,7 @@ The current state should be read as:
 - plus a successful bounded admitted-slice final-rollback proof
 - plus a successful bounded admitted-slice raw-mutation proof
 - plus a successful bounded admitted-slice live-apply-shell proof
+- plus a successful bounded admitted-slice raw-document-mutation proof
 - but still not as proof that a full computational storage migration is
   already justified
 
@@ -668,8 +710,8 @@ Any further expansion should continue under these rules:
 - require a new explicit plan before widening beyond the current admitted
   rollout, storage-and-wiring slice, admitted cell-residency slice, and
   admitted wiring-container residency slice, admitted formula-cell-lifetime
-  slice, admitted object-realization slice, and admitted live-apply-shell
-  slice
+  slice, admitted object-realization slice, admitted live-apply-shell
+  slice, and admitted raw-document-mutation slice
 
 ## Reference Material
 
@@ -689,6 +731,8 @@ For the current second-stage boundary and rollout closeout, see:
 - [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_MUTATION_ENTRY_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_MIGRATION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_MIGRATION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_DECISION_RECORD.md)
 - [README.md](architecture/README.md)
 
 For completed plans, closeout records, and historical extraction context, see:

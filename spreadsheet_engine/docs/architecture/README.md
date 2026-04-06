@@ -392,10 +392,33 @@ Current architecture docs:
   engine-authored admitted apply plans on the bounded slice and naming raw
   document mutation API migration as the next adjacent concern
 - [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_MIGRATION_PLAN.md](COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_MIGRATION_PLAN.md) -
-  implementation-ready plan for the next bounded reassessment after
-  live-apply closeout, focused on making admitted primitive mutation
-  execution more explicitly engine-authored while Calc still owns the
-  primitive realization, rollback, and final verification host shell
+  completed implementation and closeout record for the bounded reassessment
+  after live-apply closeout, ending in admitted engine-authored primitive
+  mutation records and apply verdicts on the bounded slice
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_CONTRACT.md) -
+  frozen authority contract for the admitted primitive document-mutation
+  shell, fixing the bounded mutation classes, retained Calc host surfaces,
+  and exact success standard
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_SCHEMA.md](COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_SCHEMA.md) -
+  frozen schema note for admitted primitive mutation records, stable
+  identity, normalized payload rules, and top-level verdict families
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_OBSERVATION.md](COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_OBSERVATION.md) -
+  completed observation note for primitive document-mutation drift
+  classification, introducing the bounded exact, ordering-only,
+  hidden-orchestration, missing-object, mismatch, and out-of-contract
+  families for primitive execution
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_IMPLEMENTATION.md) -
+  completed implementation note for the engine-authored primitive
+  document-mutation record, apply result, and mutation-entry integration
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_EVIDENCE.md) -
+  frozen evidence note for the raw document mutation proof cycle, recording
+  exact admitted primitive execution, exact dirty-baseline rollback
+  carriage, bounded runtime samples, and the narrowed host shell
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_DECISION_RECORD.md) -
+  completed closeout decision for raw document mutation migration, admitting
+  engine-authored admitted primitive mutation records and apply verdicts on
+  the bounded slice while naming primitive realization and rollback shell
+  reassessment as the next adjacent concern
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded
