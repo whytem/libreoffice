@@ -419,6 +419,11 @@ Current architecture docs:
   engine-authored admitted primitive mutation records and apply verdicts on
   the bounded slice while naming primitive realization and rollback shell
   reassessment as the next adjacent concern
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_REASSESSMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_REASSESSMENT_PLAN.md) -
+  implementation-ready plan for the next bounded reassessment after raw
+  document mutation closeout, focused on making admitted primitive
+  realization and rollback execution more explicitly engine-authored while
+  Calc still owns final verification on the bounded slice
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

@@ -665,7 +665,7 @@ already-engine-authored admitted state.
 
 The implementation-ready plan for that next reassessment is:
 
-- not yet written
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_REASSESSMENT_PLAN.md)
 
 ## Current Assessment
 
