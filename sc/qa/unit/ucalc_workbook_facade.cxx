@@ -123,6 +123,9 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade, testCalcFacadeReadSurfaceAndConsumers)
     const auto aGroups = consumers::summarizeFormulaGroups(aFacade);
     CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aGroups.mnGroupCount);
     CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aGroups.mnTotalGroupLength);
+    const auto aGroupDescriptors = consumers::collectFormulaGroupDescriptors(aFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aGroupDescriptors.size());
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::RowIndex(0), aGroupDescriptors.front().maAnchor.mnRow);
 
     const auto aInventory = consumers::inventoryNamedRanges(aFacade);
     CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aInventory.mnGlobalCount);
@@ -133,6 +136,40 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade, testCalcFacadeReadSurfaceAndConsumers)
 
     m_pDoc->DeleteTab(2);
     m_pDoc->DeleteTab(1);
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade, testCalcFacadeSharedGroupTransitionConsumer)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+    using spreadsheetengine::detail::facade::MutationEvent;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 100.0);
+    m_pDoc->SetValue(0, 1, 0, 200.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
+    m_pDoc->CalcAll();
+
+    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 31);
+    const auto aBeforeGroups = consumers::collectFormulaGroupDescriptors(aBeforeFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aBeforeGroups.size());
+
+    m_pDoc->InsertRow(ScRange(0, 0, 0, m_pDoc->MaxCol(), 0, 0));
+
+    CalcWorkbookFacade aAfterFacade(*m_pDoc, 32);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
+
+    const auto aTransition = consumers::classifyFormulaGroupTransition(
+        aBeforeGroups, aAfterGroups, MutationEvent::insertRows(0, 0, 1));
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaGroupTransitionKind::Preserve, aTransition.meKind);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aTransition.mnBeforeGroupCount);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aTransition.mnAfterGroupCount);
+    CPPUNIT_ASSERT(!aTransition.mbShareableChanged);
+
     m_pDoc->DeleteTab(0);
 }
 

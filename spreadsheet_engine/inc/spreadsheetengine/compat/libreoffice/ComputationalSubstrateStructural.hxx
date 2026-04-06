@@ -69,6 +69,13 @@ namespace detail
                rDoc, substraterollout::RolloutSurface::GlobalNamedRangeStructural);
 }
 
+[[nodiscard]] inline bool isSharedGroupCandidateEnabled(const ScDocument& rDoc)
+{
+    return isRuntimeEnabled(rDoc)
+           && substraterollout::isSurfaceEnabled(
+               rDoc, substraterollout::RolloutSurface::SharedGroupStructural);
+}
+
 [[nodiscard]] inline bool acceptsQueueComparison(const recalcshadow::ShadowComparison& rComparison)
 {
     return rComparison.meKind == recalcshadow::ShadowComparisonKind::Exact;
@@ -309,7 +316,8 @@ private:
             detail::prepareStructuralInput(maComputationalShadow, maGraphShadow, maIrShadow,
                 rMutation, aAfterFacade, rDoc, mbCleanBaseline),
             aAfterFacade, makeComputationalObservationState(substrateobs::collectLiveComputationalState(rDoc)),
-            eBuildMode, detail::isGlobalNamedRangeCandidateEnabled(rDoc));
+            eBuildMode, detail::isGlobalNamedRangeCandidateEnabled(rDoc),
+            detail::isSharedGroupCandidateEnabled(rDoc));
 
         switch (aResult.maTransition.meVerdict)
         {

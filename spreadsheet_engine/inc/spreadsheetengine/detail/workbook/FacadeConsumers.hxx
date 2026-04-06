@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <algorithm>
+#include <optional>
 #include <vector>
 
 #include <spreadsheetengine/detail/workbook/WorkbookFacade.hxx>
@@ -71,6 +73,191 @@ struct SharedFormulaGroupSummary
     sal_Int32 mnShareableGroups = 0;
 };
 
+[[nodiscard]] inline std::vector<FormulaGroupDescriptor>
+collectFormulaGroupDescriptors(const WorkbookFacade& rFacade)
+{
+    std::vector<FormulaGroupDescriptor> aGroups;
+
+    rFacade.visitAllFormulaCells([&](const FormulaCellDescriptor& rDesc) {
+        auto oGroup = rFacade.getFormulaGroupDescriptor(rDesc.maId.maAddress);
+        if (!oGroup)
+            return true;
+
+        if (std::find(aGroups.begin(), aGroups.end(), *oGroup) == aGroups.end())
+            aGroups.push_back(*oGroup);
+        return true;
+    });
+
+    std::sort(aGroups.begin(), aGroups.end(),
+        [](const FormulaGroupDescriptor& rLeft, const FormulaGroupDescriptor& rRight) {
+            if (rLeft.maAnchor.mnSheet != rRight.maAnchor.mnSheet)
+                return rLeft.maAnchor.mnSheet < rRight.maAnchor.mnSheet;
+            if (rLeft.maAnchor.mnColumn != rRight.maAnchor.mnColumn)
+                return rLeft.maAnchor.mnColumn < rRight.maAnchor.mnColumn;
+            if (rLeft.maAnchor.mnRow != rRight.maAnchor.mnRow)
+                return rLeft.maAnchor.mnRow < rRight.maAnchor.mnRow;
+            if (rLeft.mnLength != rRight.mnLength)
+                return rLeft.mnLength < rRight.mnLength;
+            return rLeft.mbShareable < rRight.mbShareable;
+        });
+    return aGroups;
+}
+
+enum class SharedFormulaGroupTransitionKind : std::uint8_t
+{
+    None,
+    Preserve,
+    Rebuild,
+    Split
+};
+
+struct SharedFormulaGroupTransition
+{
+    SharedFormulaGroupTransitionKind meKind = SharedFormulaGroupTransitionKind::None;
+    sal_Int32 mnBeforeGroupCount = 0;
+    sal_Int32 mnAfterGroupCount = 0;
+    bool mbShareableChanged = false;
+
+    [[nodiscard]] constexpr bool operator==(const SharedFormulaGroupTransition& rOther) const
+        = default;
+};
+
+namespace detail
+{
+
+[[nodiscard]] inline std::optional<FormulaGroupDescriptor> shiftFormulaGroupDescriptor(
+    const FormulaGroupDescriptor& rDescriptor, const MutationEvent& rMutation)
+{
+    FormulaGroupDescriptor aShifted = rDescriptor;
+    switch (rMutation.meKind)
+    {
+        case MutationKind::InsertRows:
+            if (aShifted.maAnchor.mnSheet == rMutation.mnSheet
+                && aShifted.maAnchor.mnRow >= rMutation.maAddress.mnRow)
+            {
+                aShifted.maAnchor.mnRow = static_cast<api::RowIndex>(
+                    aShifted.maAnchor.mnRow + rMutation.mnCount);
+            }
+            return aShifted;
+        case MutationKind::DeleteRows:
+            if (aShifted.maAnchor.mnSheet == rMutation.mnSheet)
+            {
+                if (aShifted.maAnchor.mnRow >= rMutation.maAddress.mnRow
+                    && aShifted.maAnchor.mnRow < rMutation.maAddress.mnRow + rMutation.mnCount)
+                {
+                    return std::nullopt;
+                }
+                if (aShifted.maAnchor.mnRow >= rMutation.maAddress.mnRow + rMutation.mnCount)
+                {
+                    aShifted.maAnchor.mnRow = static_cast<api::RowIndex>(
+                        aShifted.maAnchor.mnRow - rMutation.mnCount);
+                }
+            }
+            return aShifted;
+        case MutationKind::InsertColumns:
+            if (aShifted.maAnchor.mnSheet == rMutation.mnSheet
+                && aShifted.maAnchor.mnColumn >= rMutation.maAddress.mnColumn)
+            {
+                aShifted.maAnchor.mnColumn = static_cast<api::ColumnIndex>(
+                    aShifted.maAnchor.mnColumn + rMutation.mnCount);
+            }
+            return aShifted;
+        case MutationKind::DeleteColumns:
+            if (aShifted.maAnchor.mnSheet == rMutation.mnSheet)
+            {
+                if (aShifted.maAnchor.mnColumn >= rMutation.maAddress.mnColumn
+                    && aShifted.maAnchor.mnColumn
+                           < rMutation.maAddress.mnColumn + rMutation.mnCount)
+                {
+                    return std::nullopt;
+                }
+                if (aShifted.maAnchor.mnColumn
+                    >= rMutation.maAddress.mnColumn + rMutation.mnCount)
+                {
+                    aShifted.maAnchor.mnColumn = static_cast<api::ColumnIndex>(
+                        aShifted.maAnchor.mnColumn - rMutation.mnCount);
+                }
+            }
+            return aShifted;
+        default:
+            return aShifted;
+    }
+}
+
+} // namespace detail
+
+[[nodiscard]] inline SharedFormulaGroupTransition classifyFormulaGroupTransition(
+    std::vector<FormulaGroupDescriptor> aBeforeGroups,
+    std::vector<FormulaGroupDescriptor> aAfterGroups,
+    const std::optional<MutationEvent>& oMutation = std::nullopt)
+{
+    SharedFormulaGroupTransition aTransition;
+    aTransition.mnBeforeGroupCount = static_cast<sal_Int32>(aBeforeGroups.size());
+    aTransition.mnAfterGroupCount = static_cast<sal_Int32>(aAfterGroups.size());
+
+    auto lSort = [](std::vector<FormulaGroupDescriptor>& rGroups) {
+        std::sort(rGroups.begin(), rGroups.end(),
+            [](const FormulaGroupDescriptor& rLeft, const FormulaGroupDescriptor& rRight) {
+                if (rLeft.maAnchor.mnSheet != rRight.maAnchor.mnSheet)
+                    return rLeft.maAnchor.mnSheet < rRight.maAnchor.mnSheet;
+                if (rLeft.maAnchor.mnColumn != rRight.maAnchor.mnColumn)
+                    return rLeft.maAnchor.mnColumn < rRight.maAnchor.mnColumn;
+                if (rLeft.maAnchor.mnRow != rRight.maAnchor.mnRow)
+                    return rLeft.maAnchor.mnRow < rRight.maAnchor.mnRow;
+                if (rLeft.mnLength != rRight.mnLength)
+                    return rLeft.mnLength < rRight.mnLength;
+                return rLeft.mbShareable < rRight.mbShareable;
+            });
+    };
+
+    std::vector<FormulaGroupDescriptor> aExpectedGroups;
+    aExpectedGroups.reserve(aBeforeGroups.size());
+    for (const auto& rGroup : aBeforeGroups)
+    {
+        const auto oShifted = oMutation ? detail::shiftFormulaGroupDescriptor(rGroup, *oMutation)
+                                        : std::optional<FormulaGroupDescriptor>(rGroup);
+        if (!oShifted)
+            continue;
+        aExpectedGroups.push_back(*oShifted);
+    }
+
+    lSort(aExpectedGroups);
+    lSort(aAfterGroups);
+
+    if (aExpectedGroups.empty() && aAfterGroups.empty())
+        return aTransition;
+
+    if (aExpectedGroups == aAfterGroups)
+    {
+        aTransition.meKind = SharedFormulaGroupTransitionKind::Preserve;
+        return aTransition;
+    }
+
+    const auto bSameCount = aExpectedGroups.size() == aAfterGroups.size();
+    bool bAnyShareableChanged = false;
+    if (bSameCount)
+    {
+        for (std::size_t nIndex = 0; nIndex < aExpectedGroups.size(); ++nIndex)
+        {
+            if (aExpectedGroups[nIndex].mbShareable != aAfterGroups[nIndex].mbShareable)
+            {
+                bAnyShareableChanged = true;
+                break;
+            }
+        }
+    }
+    aTransition.mbShareableChanged = bAnyShareableChanged;
+
+    if (aAfterGroups.empty() || aAfterGroups.size() < aExpectedGroups.size())
+    {
+        aTransition.meKind = SharedFormulaGroupTransitionKind::Split;
+        return aTransition;
+    }
+
+    aTransition.meKind = SharedFormulaGroupTransitionKind::Rebuild;
+    return aTransition;
+}
+
 /// Scan all formula cells and summarize shared-formula groups.
 /// This is a low-risk direct consumer that uses the facade's group
 /// descriptor query.
@@ -78,47 +265,13 @@ struct SharedFormulaGroupSummary
 summarizeFormulaGroups(const WorkbookFacade& rFacade)
 {
     SharedFormulaGroupSummary aSummary;
-
-    // Track seen group anchors to avoid double-counting.
-    struct AnchorKey
+    for (const auto& rGroup : collectFormulaGroupDescriptors(rFacade))
     {
-        api::SheetId mnSheet;
-        api::ColumnIndex mnColumn;
-        api::RowIndex mnRow;
-        bool operator==(const AnchorKey& rOther) const = default;
-    };
-    std::vector<AnchorKey> aSeenAnchors;
-
-    rFacade.visitAllFormulaCells([&](const FormulaCellDescriptor& rDesc) {
-        auto oGroup = rFacade.getFormulaGroupDescriptor(rDesc.maId.maAddress);
-        if (!oGroup)
-            return true;
-
-        AnchorKey aKey { oGroup->maAnchor.mnSheet,
-            oGroup->maAnchor.mnColumn, oGroup->maAnchor.mnRow };
-
-        // Check if we've already counted this group.
-        bool bSeen = false;
-        for (const auto& rSeen : aSeenAnchors)
-        {
-            if (rSeen == aKey)
-            {
-                bSeen = true;
-                break;
-            }
-        }
-
-        if (!bSeen)
-        {
-            aSeenAnchors.push_back(aKey);
-            ++aSummary.mnGroupCount;
-            aSummary.mnTotalGroupLength += oGroup->mnLength;
-            if (oGroup->mbShareable)
-                ++aSummary.mnShareableGroups;
-        }
-
-        return true;
-    });
+        ++aSummary.mnGroupCount;
+        aSummary.mnTotalGroupLength += rGroup.mnLength;
+        if (rGroup.mbShareable)
+            ++aSummary.mnShareableGroups;
+    }
 
     return aSummary;
 }

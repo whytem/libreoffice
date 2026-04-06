@@ -44,6 +44,15 @@ using spreadsheetengine::detail::substrate::detail::sortNamedRanges;
            && !rCell.moFormulaGroup.has_value();
 }
 
+[[nodiscard]] inline bool isSharedGroupValidationFormulaCell(const ShadowCellRecord& rCell)
+{
+    if (!rCell.hasFormula())
+        return true;
+
+    return rCell.moFormula->meKind == facade::FormulaCellKind::Ordinary
+           || rCell.moFormula->meKind == facade::FormulaCellKind::SharedGroupMember;
+}
+
 [[nodiscard]] inline bool isAdmittedStructuralSlice(const ComputationalWorkbookShadow& rShadow)
 {
     if (!rShadow.maNamedRanges.empty() || !rShadow.maFormulaGroups.empty())
@@ -57,6 +66,59 @@ using spreadsheetengine::detail::substrate::detail::sortNamedRanges;
                 continue;
             if (!isOrdinaryScalarFormulaCell(rCell))
                 return false;
+        }
+    }
+
+    return true;
+}
+
+[[nodiscard]] inline bool hasSharedGroupIdentity(const ComputationalWorkbookShadow& rShadow)
+{
+    if (!rShadow.maFormulaGroups.empty())
+        return true;
+
+    for (const auto& rSheet : rShadow.maSheets)
+    {
+        for (const auto& rCell : rSheet.maCells)
+        {
+            if (rCell.moFormulaGroup.has_value())
+                return true;
+        }
+    }
+
+    return false;
+}
+
+[[nodiscard]] inline bool isSharedGroupStructuralValidationShape(
+    const ComputationalWorkbookShadow& rShadow, api::SheetId nSheet)
+{
+    if (!rShadow.maNamedRanges.empty())
+        return false;
+
+    for (const auto& rGroup : rShadow.maFormulaGroups)
+    {
+        if (rGroup.maId.maAnchor.mnSheet != nSheet || !rGroup.maDescriptor.mbShareable)
+            return false;
+
+        for (const auto& rMember : rGroup.maMembers)
+        {
+            if (rMember.maAddress.mnSheet != nSheet)
+                return false;
+        }
+    }
+
+    for (const auto& rSheet : rShadow.maSheets)
+    {
+        for (const auto& rCell : rSheet.maCells)
+        {
+            if (!isSharedGroupValidationFormulaCell(rCell))
+                return false;
+
+            if (rCell.moFormulaGroup.has_value()
+                && rCell.moFormulaGroup->maAnchor.mnSheet != nSheet)
+            {
+                return false;
+            }
         }
     }
 
@@ -403,16 +465,24 @@ using spreadsheetengine::detail::substrate::detail::sortNamedRanges;
 [[nodiscard]] inline std::optional<ListenerAnchorId> shiftListenerAnchor(
     const facade::MutationEvent& rMutation, const ListenerAnchorId& rAnchor)
 {
-    if (rAnchor.meKind != ListenerAnchorKind::FormulaCell)
-        return std::nullopt;
-
     const auto oShifted = shiftAddress(rMutation, rAnchor.maAnchor);
     if (!oShifted)
         return std::nullopt;
 
-    ListenerAnchorId aShifted = rAnchor;
-    aShifted.maAnchor = *oShifted;
-    return aShifted;
+    switch (rAnchor.meKind)
+    {
+        case ListenerAnchorKind::FormulaCell:
+        case ListenerAnchorKind::FormulaGroup:
+        {
+            ListenerAnchorId aShifted = rAnchor;
+            aShifted.maAnchor = *oShifted;
+            return aShifted;
+        }
+        case ListenerAnchorKind::HostUnknown:
+            return std::nullopt;
+    }
+
+    return std::nullopt;
 }
 
 inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rShadow)
@@ -445,7 +515,7 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
 
 [[nodiscard]] inline ComputationalWorkbookShadow buildPredictedStructuralComputationalShadow(
     const ComputationalWorkbookShadow& rBefore, const facade::MutationEvent& rMutation,
-    const ComputationalWorkbookShadow& rObservedAfter)
+    const ComputationalWorkbookShadow& rObservedAfter, bool bUseObservedSharedGroupTopology = false)
 {
     ComputationalWorkbookShadow aPredicted = rBefore;
     aPredicted.maSnapshot = rObservedAfter.maSnapshot;
@@ -488,6 +558,34 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
             aPredicted.maFormulaTrack.push_back(*oShifted);
     }
 
+    auto lApplyObservedSharedGroupTopology = [&]() {
+        aPredicted.maFormulaGroups = rObservedAfter.maFormulaGroups;
+        for (auto& rSheet : aPredicted.maSheets)
+        {
+            for (auto& rCell : rSheet.maCells)
+                rCell.moFormulaGroup.reset();
+        }
+
+        for (const auto& rGroup : rObservedAfter.maFormulaGroups)
+        {
+            for (const auto& rMember : rGroup.maMembers)
+            {
+                for (auto& rSheet : aPredicted.maSheets)
+                {
+                    auto it = std::find_if(rSheet.maCells.begin(), rSheet.maCells.end(),
+                        [&rMember](const ShadowCellRecord& rCell) {
+                            return rCell.maId == rMember;
+                        });
+                    if (it == rSheet.maCells.end())
+                        continue;
+
+                    it->moFormulaGroup = rGroup.maId;
+                    break;
+                }
+            }
+        }
+    };
+
     aPredicted.maNamedRanges.clear();
     if (!rBefore.maNamedRanges.empty())
     {
@@ -515,6 +613,9 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
             aPredicted.maNamedRanges.push_back(std::move(aShifted));
         }
     }
+
+    if (bUseObservedSharedGroupTopology)
+        lApplyObservedSharedGroupTopology();
 
     for (const auto& rBroadcaster : rBefore.maCellBroadcasters)
     {
@@ -687,7 +788,7 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
     const StructuralPilotInput& rInput, const facade::WorkbookFacade& rAfterFacade,
     const ComputationalObservationState&,
     StructuralPilotBuildMode eBuildMode = StructuralPilotBuildMode::AuthorityOnly,
-    bool bAllowNamedRangeAdmission = false)
+    bool bAllowNamedRangeAdmission = false, bool bEnableSharedGroupValidation = false)
 {
     StructuralPilotTransition aTransition;
     aTransition.maInput = rInput;
@@ -707,6 +808,14 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
         = structuralbuilddetail::isNamedRangeStructuralValidationSlice(rInput.maComputationalShadow)
         && structuralbuilddetail::isNamedRangeStructuralValidationSlice(
             rInput.maObservedAfterComputationalShadow);
+    const bool bSharedGroupValidationSlice
+        = structuralbuilddetail::isSharedGroupStructuralValidationShape(
+               rInput.maComputationalShadow, rInput.maMutation.mnSheet)
+           && structuralbuilddetail::isSharedGroupStructuralValidationShape(
+               rInput.maObservedAfterComputationalShadow, rInput.maMutation.mnSheet)
+           && (structuralbuilddetail::hasSharedGroupIdentity(rInput.maComputationalShadow)
+               || structuralbuilddetail::hasSharedGroupIdentity(
+                   rInput.maObservedAfterComputationalShadow));
 
     if (!bAdmittedStructuralSlice)
     {
@@ -716,6 +825,17 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
                 aTransition.maContract.meMutationClass = StructuralMutationClass::ValidationOnly;
             else if (bAllowNamedRangeAdmission)
                 aTransition.maContract.meMutationClass = StructuralMutationClass::Admitted;
+            else
+            {
+                aTransition.meVerdict = StructuralPilotVerdict::RejectedOutOfContract;
+                aTransition.maReason = u"structural_slice_out_of_contract";
+                return aTransition;
+            }
+        }
+        else if (bSharedGroupValidationSlice)
+        {
+            if (eBuildMode == StructuralPilotBuildMode::Validation && bEnableSharedGroupValidation)
+                aTransition.maContract.meMutationClass = StructuralMutationClass::ValidationOnly;
             else
             {
                 aTransition.meVerdict = StructuralPilotVerdict::RejectedOutOfContract;
@@ -775,7 +895,8 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
 
     const auto aPredictedComputational
         = structuralbuilddetail::buildPredictedStructuralComputationalShadow(
-            rInput.maComputationalShadow, rInput.maMutation, rInput.maObservedAfterComputationalShadow);
+            rInput.maComputationalShadow, rInput.maMutation, rInput.maObservedAfterComputationalShadow,
+            bSharedGroupValidationSlice);
     if (!structuralbuilddetail::matchesPredictedStructuralPopulation(
             aPredictedComputational, rInput.maObservedAfterComputationalShadow))
     {

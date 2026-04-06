@@ -23,7 +23,8 @@ enum class RolloutSurface : sal_uInt8
     Authority,
     Lifecycle,
     Structural,
-    GlobalNamedRangeStructural
+    GlobalNamedRangeStructural,
+    SharedGroupStructural
 };
 
 namespace detail
@@ -68,6 +69,9 @@ namespace detail
         case RolloutSurface::GlobalNamedRangeStructural:
             return detail::resolveExplicitSurfaceGate(
                 "SPREADSHEET_ENGINE_COMPUTATIONAL_GLOBAL_NAMED_RANGE");
+        case RolloutSurface::SharedGroupStructural:
+            return detail::resolveExplicitSurfaceGate(
+                "SPREADSHEET_ENGINE_COMPUTATIONAL_SHARED_GROUP");
     }
 
     return false;

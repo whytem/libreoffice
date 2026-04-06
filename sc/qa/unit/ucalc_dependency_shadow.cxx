@@ -48,6 +48,7 @@
 #include <spreadsheetengine/compat/libreoffice/RecalcAuthority.hxx>
 #include <spreadsheetengine/compat/libreoffice/RecalcShadow.hxx>
 #include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
+#include <spreadsheetengine/detail/workbook/FacadeConsumers.hxx>
 #include <spreadsheetengine/detail/substrate/DependencyGraphShadowComparison.hxx>
 #include <spreadsheetengine/detail/substrate/GraphWiringDelta.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowComparison.hxx>
@@ -3053,6 +3054,141 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(
         ComputationalStructuralResultKind::RejectedOutOfContract, oResult->meKind);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalStructuralSharedGroupStaysRejectedWithoutCandidateGate)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
+    m_pDoc->CalcAll();
+
+    const ScopedComputationalStructural aStructural(*m_pDoc, true);
+    CPPUNIT_ASSERT(aStructural.canApplyStructural());
+
+    m_pDoc->InsertRow(ScRange(0, 0, 0, m_pDoc->MaxCol(), 0, 0));
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(1, 1, 0), ScAddress(1, 2, 0) });
+
+    const auto oResult = aStructural.validateCandidate(*m_pDoc, translateInsertRows(0, 0, 1));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalStructuralResultKind::RejectedOutOfContract, oResult->meKind);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalStructuralValidateSharedGroupPreserveCandidate)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", "1");
+    ScopedEnvironmentOverride aSharedGroup(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_SHARED_GROUP", "1");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 0);
+    const auto aBeforeGroups = consumers::collectFormulaGroupDescriptors(aBeforeFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aBeforeGroups.size());
+
+    const ScopedComputationalStructural aStructuralCapture(*m_pDoc, true);
+    CPPUNIT_ASSERT(aStructuralCapture.canApplyStructural());
+
+    m_pDoc->InsertRow(ScRange(0, 0, 0, m_pDoc->MaxCol(), 0, 0));
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(1, 1, 0), ScAddress(1, 2, 0) });
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    const auto aGroupTransition = consumers::classifyFormulaGroupTransition(
+        aBeforeGroups, aAfterGroups,
+        spreadsheetengine::detail::facade::MutationEvent::insertRows(0, 0, 1));
+
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::detail::facade::consumers::SharedFormulaGroupTransitionKind::Preserve,
+        aGroupTransition.meKind);
+
+    const auto oResult
+        = aStructuralCapture.validateCandidate(*m_pDoc, translateInsertRows(0, 0, 1));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::detail::substrate::StructuralMutationClass::ValidationOnly,
+        oResult->maTransition.maContract.meMutationClass);
+    CPPUNIT_ASSERT(oResult->meKind
+        != ComputationalStructuralResultKind::RejectedOutOfContract);
+    CPPUNIT_ASSERT(oResult->meKind
+        != ComputationalStructuralResultKind::RejectedDirtyBaseline);
+    CPPUNIT_ASSERT(oResult->moQueueComparison.has_value()
+        || oResult->meKind == ComputationalStructuralResultKind::RepairDetected);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalStructuralValidateSharedGroupRepairDetected)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", "1");
+    ScopedEnvironmentOverride aSharedGroup(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_SHARED_GROUP", "1");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 0);
+    const auto aBeforeGroups = consumers::collectFormulaGroupDescriptors(aBeforeFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aBeforeGroups.size());
+
+    const ScopedComputationalStructural aStructuralCapture(*m_pDoc, true);
+    CPPUNIT_ASSERT(aStructuralCapture.canApplyStructural());
+
+    m_pDoc->InsertRow(ScRange(0, 0, 0, m_pDoc->MaxCol(), 0, 0));
+    m_pDoc->SetString(1, 2, 0, u"=A3*3"_ustr);
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(1, 1, 0), ScAddress(1, 2, 0) });
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    const auto aGroupTransition = consumers::classifyFormulaGroupTransition(
+        aBeforeGroups, aAfterGroups,
+        spreadsheetengine::detail::facade::MutationEvent::insertRows(0, 0, 1));
+
+    CPPUNIT_ASSERT(aGroupTransition.meKind
+        != spreadsheetengine::detail::facade::consumers::SharedFormulaGroupTransitionKind::Preserve);
+
+    const auto oResult
+        = aStructuralCapture.validateCandidate(*m_pDoc, translateInsertRows(0, 0, 1));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalStructuralResultKind::RepairDetected, oResult->meKind);
 
     m_pDoc->DeleteTab(0);
 }
