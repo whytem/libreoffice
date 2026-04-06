@@ -35,6 +35,7 @@
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFinalVerification.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFormulaCellLifetime.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObjectRealization.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstratePrimitiveHostExecutor.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstratePrimitiveExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRawMutation.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateLiveApply.hxx>
@@ -107,6 +108,9 @@ using FinalVerificationObservationKind
 using PrimitiveExecutionObservationKind
     = spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::
         PrimitiveExecutionObservationKind;
+using PrimitiveHostExecutorObservationKind
+    = spreadsheetengine::compat::libreoffice::substrateprimitivehostexecutor::
+        PrimitiveHostExecutorObservationKind;
 using ComputationalStructuralResultKind
     = spreadsheetengine::compat::libreoffice::substratestructural::StructuralResultKind;
 using spreadsheetengine::compat::libreoffice::substratestructural::ScopedComputationalStructural;
@@ -456,6 +460,9 @@ void assertComputationalStructuralAppliedExactly(
 [[nodiscard]] std::string describePrimitiveExecutionObservation(
     const spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::
         PrimitiveExecutionObservation& rObservation);
+[[nodiscard]] std::string describePrimitiveHostExecutorObservation(
+    const spreadsheetengine::compat::libreoffice::substrateprimitivehostexecutor::
+        PrimitiveHostExecutorObservation& rObservation);
 
 void assertComputationalMutationEntryApplied(
     const std::optional<
@@ -899,6 +906,31 @@ void assertComparableExecutionIr(
            + " rolled_back=" + (rObservation.mbRolledBack ? "1" : "0")
            + " raw_document_mutation="
            + (rObservation.mbRawDocumentMutationExact ? "1" : "0")
+           + " primitive_realization="
+           + (rObservation.mbPrimitiveRealizationExact ? "1" : "0")
+           + " primitive_rollback=" + (rObservation.mbPrimitiveRollbackExact ? "1" : "0")
+           + " final_verification_exact="
+           + (rObservation.mbFinalVerificationExact ? "1" : "0")
+           + " final_verification_normalized="
+           + (rObservation.mbFinalVerificationNormalizedEquivalent ? "1" : "0")
+           + " queue=" + (rObservation.mbQueueExact ? "1" : "0")
+           + " computational=" + (rObservation.mbComputationalFullMatch ? "1" : "0")
+           + " graph=" + (rObservation.mbGraphFullMatch ? "1" : "0");
+}
+
+[[nodiscard]] std::string describePrimitiveHostExecutorObservation(
+    const spreadsheetengine::compat::libreoffice::substrateprimitivehostexecutor::
+        PrimitiveHostExecutorObservation& rObservation)
+{
+    return std::string(spreadsheetengine::compat::libreoffice::substrateprimitivehostexecutor::
+                           toString(rObservation.meKind))
+           + " reason="
+           + OUStringToOString(rObservation.maReason, RTL_TEXTENCODING_UTF8).getStr()
+           + " applied=" + (rObservation.mbPrimitiveHostExecutorApplied ? "1" : "0")
+           + " rolled_back=" + (rObservation.mbRolledBack ? "1" : "0")
+           + " raw_document_mutation="
+           + (rObservation.mbRawDocumentMutationExact ? "1" : "0")
+           + " primitive_execution=" + (rObservation.mbPrimitiveExecutionExact ? "1" : "0")
            + " primitive_realization="
            + (rObservation.mbPrimitiveRealizationExact ? "1" : "0")
            + " primitive_rollback=" + (rObservation.mbPrimitiveRollbackExact ? "1" : "0")
@@ -5080,6 +5112,139 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
         u"primitive_execution_not_applied");
     CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveExecutionObservation(aOutOfContract),
         PrimitiveExecutionObservationKind::OutOfContract, aOutOfContract.meKind);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalPrimitiveHostExecutorObservationClassifierKinds)
+{
+    using spreadsheetengine::compat::libreoffice::substratefinalverification::
+        FinalVerificationObservation;
+    using spreadsheetengine::compat::libreoffice::substratefinalverification::
+        FinalVerificationObservationKind;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        PrimitiveRealizationObservation;
+    using spreadsheetengine::compat::libreoffice::substrateprimitiveexecution::
+        PrimitiveExecutionObservation;
+    using spreadsheetengine::compat::libreoffice::substrateprimitivehostexecutor::
+        classifyPrimitiveHostExecutorObservation;
+    using spreadsheetengine::compat::libreoffice::substraterawmutation::
+        RawDocumentMutationObservation;
+    using spreadsheetengine::compat::libreoffice::substraterollback::
+        PrimitiveRollbackObservation;
+
+    RawDocumentMutationObservation aRawDocument;
+    aRawDocument.meKind = RawDocumentMutationObservationKind::Exact;
+    aRawDocument.mbPrimitiveMutationApplied = true;
+    aRawDocument.mbRawMutationExact = true;
+    aRawDocument.mbQueueExact = true;
+    aRawDocument.mbComputationalFullMatch = true;
+    aRawDocument.mbGraphFullMatch = true;
+    aRawDocument.mbObjectRealizationExact = true;
+
+    PrimitiveExecutionObservation aPrimitiveExecution;
+    aPrimitiveExecution.meKind = PrimitiveExecutionObservationKind::Exact;
+    aPrimitiveExecution.mbPrimitiveExecutionApplied = true;
+    aPrimitiveExecution.mbRawDocumentMutationExact = true;
+    aPrimitiveExecution.mbPrimitiveRealizationExact = true;
+    aPrimitiveExecution.mbFinalVerificationExact = true;
+    aPrimitiveExecution.mbQueueExact = true;
+    aPrimitiveExecution.mbComputationalFullMatch = true;
+    aPrimitiveExecution.mbGraphFullMatch = true;
+
+    PrimitiveRealizationObservation aPrimitiveRealization;
+    aPrimitiveRealization.meKind = PrimitiveRealizationObservationKind::Exact;
+    aPrimitiveRealization.mbPrimitiveRealizationApplied = true;
+    aPrimitiveRealization.mbObjectRealizationExact = true;
+    aPrimitiveRealization.mbQueueExact = true;
+    aPrimitiveRealization.mbComputationalFullMatch = true;
+    aPrimitiveRealization.mbGraphFullMatch = true;
+    aPrimitiveRealization.mbBroadcasterExact = true;
+
+    FinalVerificationObservation aFinalVerification;
+    aFinalVerification.meKind = FinalVerificationObservationKind::Exact;
+    aFinalVerification.mbVerificationExecuted = true;
+    aFinalVerification.mbQueueExact = true;
+    aFinalVerification.mbComputationalFullMatch = true;
+    aFinalVerification.mbGraphFullMatch = true;
+    aFinalVerification.mbIrExact = true;
+    aFinalVerification.mbBroadcasterExact = true;
+    aFinalVerification.mbLiveApplyExact = true;
+    aFinalVerification.mbPrimitiveRealizationExact = true;
+
+    auto aExact = classifyPrimitiveHostExecutorObservation(
+        true, aRawDocument, aPrimitiveExecution, aPrimitiveRealization, std::nullopt,
+        aFinalVerification);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveHostExecutorObservation(aExact),
+        PrimitiveHostExecutorObservationKind::Exact, aExact.meKind);
+
+    aPrimitiveExecution.meKind = PrimitiveExecutionObservationKind::NormalizedEquivalent;
+    aFinalVerification.meKind = FinalVerificationObservationKind::NormalizedEquivalent;
+    auto aNormalized = classifyPrimitiveHostExecutorObservation(
+        true, aRawDocument, aPrimitiveExecution, aPrimitiveRealization, std::nullopt,
+        aFinalVerification);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveHostExecutorObservation(aNormalized),
+        PrimitiveHostExecutorObservationKind::NormalizedEquivalent, aNormalized.meKind);
+
+    aPrimitiveExecution.meKind = PrimitiveExecutionObservationKind::Exact;
+    aFinalVerification.meKind = FinalVerificationObservationKind::Exact;
+    aRawDocument.meKind = RawDocumentMutationObservationKind::OrderingOnly;
+    auto aOrdering = classifyPrimitiveHostExecutorObservation(
+        true, aRawDocument, aPrimitiveExecution, aPrimitiveRealization, std::nullopt,
+        aFinalVerification);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveHostExecutorObservation(aOrdering),
+        PrimitiveHostExecutorObservationKind::OrderingOnly, aOrdering.meKind);
+
+    aRawDocument.meKind = RawDocumentMutationObservationKind::Exact;
+    aPrimitiveExecution.meKind
+        = PrimitiveExecutionObservationKind::HiddenHostPrimitiveExecutionOrchestration;
+    auto aHiddenHost = classifyPrimitiveHostExecutorObservation(
+        true, aRawDocument, aPrimitiveExecution, aPrimitiveRealization, std::nullopt,
+        aFinalVerification);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveHostExecutorObservation(aHiddenHost),
+        PrimitiveHostExecutorObservationKind::HiddenHostCallOrchestration,
+        aHiddenHost.meKind);
+
+    aPrimitiveExecution.meKind = PrimitiveExecutionObservationKind::Exact;
+    aPrimitiveRealization.meKind = PrimitiveRealizationObservationKind::MissingRealizedObjects;
+    auto aMissing = classifyPrimitiveHostExecutorObservation(
+        true, aRawDocument, aPrimitiveExecution, aPrimitiveRealization, std::nullopt,
+        aFinalVerification);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveHostExecutorObservation(aMissing),
+        PrimitiveHostExecutorObservationKind::MissingHostCallInputs, aMissing.meKind);
+
+    aPrimitiveRealization.meKind = PrimitiveRealizationObservationKind::Exact;
+    aFinalVerification.meKind = FinalVerificationObservationKind::QueueOrStateMismatch;
+    auto aMismatch = classifyPrimitiveHostExecutorObservation(
+        true, aRawDocument, aPrimitiveExecution, aPrimitiveRealization, std::nullopt,
+        aFinalVerification);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveHostExecutorObservation(aMismatch),
+        PrimitiveHostExecutorObservationKind::QueueOrStateMismatch, aMismatch.meKind);
+
+    PrimitiveRollbackObservation aPrimitiveRollback;
+    aPrimitiveRollback.meKind = PrimitiveRollbackObservationKind::Exact;
+    aPrimitiveRollback.mbPrimitiveRollbackApplied = true;
+    aPrimitiveRollback.mbRollbackExact = true;
+    aPrimitiveRollback.mbQueueExact = true;
+    aPrimitiveRollback.mbComputationalFullMatch = true;
+    aPrimitiveRollback.mbGraphFullMatch = true;
+    aPrimitiveRollback.mbBroadcasterExact = true;
+    aPrimitiveExecution.mbRolledBack = true;
+    aPrimitiveExecution.mbPrimitiveRealizationExact = false;
+    aPrimitiveExecution.mbPrimitiveRollbackExact = true;
+    aFinalVerification.meKind = FinalVerificationObservationKind::Exact;
+    aFinalVerification.mbPrimitiveRealizationExact = false;
+    aFinalVerification.mbPrimitiveRollbackExact = true;
+    auto aRollbackExact = classifyPrimitiveHostExecutorObservation(
+        true, aRawDocument, aPrimitiveExecution, std::nullopt, aPrimitiveRollback,
+        aFinalVerification);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveHostExecutorObservation(aRollbackExact),
+        PrimitiveHostExecutorObservationKind::Exact, aRollbackExact.meKind);
+
+    const auto aOutOfContract = classifyPrimitiveHostExecutorObservation(
+        false, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+        u"primitive_host_executor_not_applied");
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describePrimitiveHostExecutorObservation(aOutOfContract),
+        PrimitiveHostExecutorObservationKind::OutOfContract, aOutOfContract.meKind);
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
