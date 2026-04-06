@@ -1,6 +1,6 @@
 # Computational Substrate Final Verification Host-Shell Reassessment Plan
 
-Status: implementation-ready plan
+Status: completed closeout record
 
 ## Purpose
 

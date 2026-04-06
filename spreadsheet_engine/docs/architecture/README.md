@@ -451,9 +451,34 @@ Current architecture docs:
   rollback records and apply verdicts on the bounded slice while naming
   final verification host-shell reassessment as the next adjacent concern
 - [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_REASSESSMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_REASSESSMENT_PLAN.md) -
-  implementation-ready plan for the next bounded reassessment after
-  primitive realization and rollback closeout, targeting the retained final
-  verification host shell on the admitted slice
+  completed closeout record for the final verification host-shell
+  reassessment, proceeding with engine-authored admitted final
+  verification on the bounded slice while naming primitive execution
+  host-operation reassessment as the next adjacent concern
+- [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_CONTRACT.md) -
+  frozen authority contract for the admitted final verification slice,
+  fixing the bounded workbook surface, retained Calc host shell, and exact
+  success standard
+- [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_SCHEMA.md](COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_SCHEMA.md) -
+  frozen schema note for the admitted final verification record, stable
+  verification identity, and verdict families
+- [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_OBSERVATION.md](COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_OBSERVATION.md) -
+  completed observation note for final verification drift classification,
+  distinguishing exact, normalized, ordering-only, hidden-host, missing
+  input, mismatch, and out-of-contract outcomes
+- [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_IMPLEMENTATION.md) -
+  completed implementation note for the engine-authored admitted final
+  verification record, rollback comparison carriage, and mutation-entry
+  integration
+- [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_EVIDENCE.md) -
+  frozen evidence note for the final verification proof cycle, recording
+  exact admitted apply and rollback lanes, bounded runtime samples, and the
+  narrower retained host shell
+- [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_DECISION_RECORD.md) -
+  completed closeout decision for final verification migration, admitting
+  engine-authored admitted final verification on the bounded slice while
+  naming primitive execution host-operation reassessment as the next
+  adjacent concern
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

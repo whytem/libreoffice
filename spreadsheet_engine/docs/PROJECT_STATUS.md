@@ -686,21 +686,54 @@ The key primitive realization and rollback closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_DECISION_RECORD.md)
 
+## Final Verification Host-Shell Outcome
+
+The final verification host-shell reassessment is now complete.
+
+It justifies one additional bounded boundary shift:
+
+- the engine now owns the explicit admitted final verification record on the
+  bounded slice
+- applied admitted mutation-entry results now carry explicit final
+  verification observation instead of relying only on the implicit
+  path-specific verification outcome
+- dirty-baseline rollback admitted mutation-entry results now also carry
+  explicit final verification observation on the bounded slice
+
+It still does not justify broad host independence. Calc still owns:
+
+- the primitive execution host operations around admitted mutation,
+  realization, and rollback execution
+
+That means the current boundary is now stronger than the earlier
+resident-state-plus-host-verification split, but it is still narrower than
+a broad computational document transplant.
+
+The key final verification host-shell closeout references are:
+
+- [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_REASSESSMENT_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_SCHEMA.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_SCHEMA.md)
+- [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_OBSERVATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_OBSERVATION.md)
+- [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_DECISION_RECORD.md)
+
 ## Next Explicit Reassessment Target
 
 The next explicit bounded concern is:
 
-- final verification host-shell reassessment on the admitted slice
+- primitive execution host-operation reassessment on the admitted slice
 
-The primitive realization and rollback reassessment is now closed with a
-bounded proceed result. The most actionable remaining host-owned surface on
-the admitted slice is no longer primitive mutation, realization, or rollback
-intent. It is the retained final verification host shell around that
-already-engine-authored admitted state.
+The final verification host-shell reassessment is now closed with a bounded
+proceed result. The most actionable remaining host-owned surface on the
+admitted slice is no longer verification identity. It is the retained
+primitive execution host shell around that already-engine-authored admitted
+state.
 
 The implementation-ready plan for that next reassessment is:
 
-- [COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FINAL_VERIFICATION_HOST_SHELL_REASSESSMENT_PLAN.md)
+- not yet written
 
 ## Current Assessment
 
