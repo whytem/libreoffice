@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <optional>
 #include <set>
 #include <vector>
 
@@ -44,6 +45,32 @@ struct RollbackObservation
     bool mbBroadcasterExact = false;
 
     [[nodiscard]] constexpr bool operator==(const RollbackObservation& rOther) const = default;
+};
+
+enum class PrimitiveRollbackObservationKind : sal_uInt8
+{
+    Exact,
+    OrderingOnly,
+    HiddenHostRollbackOrchestration,
+    MissingRestoredObjects,
+    QueueOrStateMismatch,
+    OutOfContract
+};
+
+struct PrimitiveRollbackObservation
+{
+    PrimitiveRollbackObservationKind meKind
+        = PrimitiveRollbackObservationKind::OutOfContract;
+    api::String maReason;
+    bool mbPrimitiveRollbackApplied = false;
+    bool mbRollbackExact = false;
+    bool mbQueueExact = false;
+    bool mbComputationalFullMatch = false;
+    bool mbGraphFullMatch = false;
+    bool mbBroadcasterExact = false;
+
+    [[nodiscard]] constexpr bool operator==(const PrimitiveRollbackObservation& rOther) const
+        = default;
 };
 
 enum class RollbackResultKind : sal_uInt8
@@ -253,6 +280,59 @@ namespace detail
         rResult.maObjectRealization, rQueue, rComputational, rGraph, rBroadcasters);
 }
 
+[[nodiscard]] inline PrimitiveRollbackObservation classifyPrimitiveRollbackObservation(
+    bool bPrimitiveRollbackApplied, const std::optional<RollbackObservation>& oRollback,
+    api::StringView rReasonIfOutOfContract = {})
+{
+    PrimitiveRollbackObservation aObservation;
+    aObservation.mbPrimitiveRollbackApplied = bPrimitiveRollbackApplied;
+
+    if (!bPrimitiveRollbackApplied || !oRollback)
+    {
+        aObservation.meKind = PrimitiveRollbackObservationKind::OutOfContract;
+        aObservation.maReason = rReasonIfOutOfContract;
+        return aObservation;
+    }
+
+    aObservation.mbRollbackExact = oRollback->meKind == RollbackObservationKind::Exact;
+    aObservation.mbQueueExact = oRollback->mbQueueExact;
+    aObservation.mbComputationalFullMatch = oRollback->mbComputationalFullMatch;
+    aObservation.mbGraphFullMatch = oRollback->mbGraphFullMatch;
+    aObservation.mbBroadcasterExact = oRollback->mbBroadcasterExact;
+
+    switch (oRollback->meKind)
+    {
+        case RollbackObservationKind::Exact:
+            aObservation.meKind = PrimitiveRollbackObservationKind::Exact;
+            return aObservation;
+        case RollbackObservationKind::OrderingOnly:
+            aObservation.meKind = PrimitiveRollbackObservationKind::OrderingOnly;
+            aObservation.maReason = u"primitive_rollback_ordering_only";
+            return aObservation;
+        case RollbackObservationKind::MissingRestoredObjects:
+            aObservation.meKind = PrimitiveRollbackObservationKind::MissingRestoredObjects;
+            aObservation.maReason = u"primitive_rollback_missing_restored_objects";
+            return aObservation;
+        case RollbackObservationKind::HostOnlyRollbackReconstruction:
+            aObservation.meKind
+                = PrimitiveRollbackObservationKind::HiddenHostRollbackOrchestration;
+            aObservation.maReason = u"host_only_primitive_rollback_orchestration";
+            return aObservation;
+        case RollbackObservationKind::QueueOrStateMismatch:
+            aObservation.meKind = PrimitiveRollbackObservationKind::QueueOrStateMismatch;
+            aObservation.maReason = u"primitive_rollback_queue_or_state_mismatch";
+            return aObservation;
+        case RollbackObservationKind::OutOfContract:
+            aObservation.meKind = PrimitiveRollbackObservationKind::OutOfContract;
+            aObservation.maReason = oRollback->maReason;
+            return aObservation;
+    }
+
+    aObservation.meKind = PrimitiveRollbackObservationKind::OutOfContract;
+    aObservation.maReason = u"primitive_rollback_observation_unknown";
+    return aObservation;
+}
+
 [[nodiscard]] inline AdmittedRollbackRecord buildAdmittedRollbackRecord(
     const spreadsheetengine::detail::substrate::MutableComputationalSubstrateState& rState,
     const recalcqueue::FormulaStateSnapshot& rFormulaState)
@@ -299,6 +379,27 @@ namespace detail
         case RollbackObservationKind::QueueOrStateMismatch:
             return "queue_or_state_mismatch";
         case RollbackObservationKind::OutOfContract:
+            return "out_of_contract";
+    }
+
+    return "unknown";
+}
+
+[[nodiscard]] inline const char* toString(PrimitiveRollbackObservationKind eKind)
+{
+    switch (eKind)
+    {
+        case PrimitiveRollbackObservationKind::Exact:
+            return "exact";
+        case PrimitiveRollbackObservationKind::OrderingOnly:
+            return "ordering_only";
+        case PrimitiveRollbackObservationKind::HiddenHostRollbackOrchestration:
+            return "hidden_host_rollback_orchestration";
+        case PrimitiveRollbackObservationKind::MissingRestoredObjects:
+            return "missing_restored_objects";
+        case PrimitiveRollbackObservationKind::QueueOrStateMismatch:
+            return "queue_or_state_mismatch";
+        case PrimitiveRollbackObservationKind::OutOfContract:
             return "out_of_contract";
     }
 

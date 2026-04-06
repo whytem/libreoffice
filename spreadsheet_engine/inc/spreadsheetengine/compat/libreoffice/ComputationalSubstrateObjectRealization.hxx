@@ -10,6 +10,7 @@
 #pragma once
 
 #include <algorithm>
+#include <optional>
 
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateCellStorage.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFormulaCellLifetime.hxx>
@@ -47,6 +48,32 @@ struct ObjectRealizationObservation
     bool mbBroadcasterExact = false;
 
     [[nodiscard]] constexpr bool operator==(const ObjectRealizationObservation& rOther) const
+        = default;
+};
+
+enum class PrimitiveRealizationObservationKind : sal_uInt8
+{
+    Exact,
+    OrderingOnly,
+    HiddenHostRealizationOrchestration,
+    MissingRealizedObjects,
+    QueueOrStateMismatch,
+    OutOfContract
+};
+
+struct PrimitiveRealizationObservation
+{
+    PrimitiveRealizationObservationKind meKind
+        = PrimitiveRealizationObservationKind::OutOfContract;
+    api::String maReason;
+    bool mbPrimitiveRealizationApplied = false;
+    bool mbObjectRealizationExact = false;
+    bool mbQueueExact = false;
+    bool mbComputationalFullMatch = false;
+    bool mbGraphFullMatch = false;
+    bool mbBroadcasterExact = false;
+
+    [[nodiscard]] constexpr bool operator==(const PrimitiveRealizationObservation& rOther) const
         = default;
 };
 
@@ -220,6 +247,61 @@ namespace detail
         rResult.maWiring, rQueue, rComputational, rGraph, rBroadcasters);
 }
 
+[[nodiscard]] inline PrimitiveRealizationObservation classifyPrimitiveRealizationObservation(
+    bool bPrimitiveRealizationApplied,
+    const std::optional<ObjectRealizationObservation>& oObjectRealization,
+    api::StringView rReasonIfOutOfContract = {})
+{
+    PrimitiveRealizationObservation aObservation;
+    aObservation.mbPrimitiveRealizationApplied = bPrimitiveRealizationApplied;
+
+    if (!bPrimitiveRealizationApplied || !oObjectRealization)
+    {
+        aObservation.meKind = PrimitiveRealizationObservationKind::OutOfContract;
+        aObservation.maReason = rReasonIfOutOfContract;
+        return aObservation;
+    }
+
+    aObservation.mbObjectRealizationExact
+        = oObjectRealization->meKind == ObjectRealizationObservationKind::Exact;
+    aObservation.mbQueueExact = oObjectRealization->mbQueueExact;
+    aObservation.mbComputationalFullMatch = oObjectRealization->mbComputationalFullMatch;
+    aObservation.mbGraphFullMatch = oObjectRealization->mbGraphFullMatch;
+    aObservation.mbBroadcasterExact = oObjectRealization->mbBroadcasterExact;
+
+    switch (oObjectRealization->meKind)
+    {
+        case ObjectRealizationObservationKind::Exact:
+            aObservation.meKind = PrimitiveRealizationObservationKind::Exact;
+            return aObservation;
+        case ObjectRealizationObservationKind::OrderingOnly:
+            aObservation.meKind = PrimitiveRealizationObservationKind::OrderingOnly;
+            aObservation.maReason = u"primitive_realization_ordering_only";
+            return aObservation;
+        case ObjectRealizationObservationKind::MissingRealizedObjects:
+            aObservation.meKind = PrimitiveRealizationObservationKind::MissingRealizedObjects;
+            aObservation.maReason = u"primitive_realization_missing_objects";
+            return aObservation;
+        case ObjectRealizationObservationKind::HostOnlyRepairOrReconstruction:
+            aObservation.meKind
+                = PrimitiveRealizationObservationKind::HiddenHostRealizationOrchestration;
+            aObservation.maReason = u"host_only_primitive_realization_orchestration";
+            return aObservation;
+        case ObjectRealizationObservationKind::QueueOrStateMismatch:
+            aObservation.meKind = PrimitiveRealizationObservationKind::QueueOrStateMismatch;
+            aObservation.maReason = u"primitive_realization_queue_or_state_mismatch";
+            return aObservation;
+        case ObjectRealizationObservationKind::OutOfContract:
+            aObservation.meKind = PrimitiveRealizationObservationKind::OutOfContract;
+            aObservation.maReason = oObjectRealization->maReason;
+            return aObservation;
+    }
+
+    aObservation.meKind = PrimitiveRealizationObservationKind::OutOfContract;
+    aObservation.maReason = u"primitive_realization_observation_unknown";
+    return aObservation;
+}
+
 [[nodiscard]] inline AdmittedObjectRealization buildAdmittedObjectRealization(
     const spreadsheetengine::detail::substrate::MutableComputationalSubstrateState& rState)
 {
@@ -286,6 +368,27 @@ namespace detail
         case ObjectRealizationObservationKind::QueueOrStateMismatch:
             return "queue_or_state_mismatch";
         case ObjectRealizationObservationKind::OutOfContract:
+            return "out_of_contract";
+    }
+
+    return "out_of_contract";
+}
+
+[[nodiscard]] inline const char* toString(PrimitiveRealizationObservationKind eKind)
+{
+    switch (eKind)
+    {
+        case PrimitiveRealizationObservationKind::Exact:
+            return "exact";
+        case PrimitiveRealizationObservationKind::OrderingOnly:
+            return "ordering_only";
+        case PrimitiveRealizationObservationKind::HiddenHostRealizationOrchestration:
+            return "hidden_host_realization_orchestration";
+        case PrimitiveRealizationObservationKind::MissingRealizedObjects:
+            return "missing_realized_objects";
+        case PrimitiveRealizationObservationKind::QueueOrStateMismatch:
+            return "queue_or_state_mismatch";
+        case PrimitiveRealizationObservationKind::OutOfContract:
             return "out_of_contract";
     }
 
