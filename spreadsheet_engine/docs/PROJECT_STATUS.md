@@ -196,7 +196,7 @@ What it did justify:
 - engine-authored authority for a bounded live compat slice
 - a real opt-in rollout path for that bounded authority slice
 - one bounded widening step beyond the original admitted structural surface
-- one bounded shared-group validation-only proof surface beyond the
+- one bounded shared-group structural authority expansion beyond the
   ownership-complete slice
 
 What it did not justify:
@@ -204,7 +204,7 @@ What it did not justify:
 - broad storage migration
 - broad listener/broadcaster ownership transfer
 - broad token-container ownership transfer
-- shared-group-sensitive structural rollout
+- broad shared-group-sensitive structural rollout
 - named-range-sensitive structural rollout
 - sheet-wide structural or document-wide authority transfer
 
@@ -225,10 +225,11 @@ The current admitted narrow rollout surface is:
 - single-sheet `DeleteRows`
 - single-sheet `InsertColumns`
 - single-sheet `DeleteColumns`
-- ordinary scalar formulas only
+- ordinary scalar formulas plus exact same-sheet shareable shared-group
+  structural `Preserve`, `Split`, and `Rebuild` cases behind the dedicated
+  shared-group gate
 - engine-owned admitted-slice formula-cell lifetime decisions
 - clean baseline only
-- no shared groups
 - no named-range-sensitive structural behavior
 - exact queue verification
 - exact computational verification
@@ -252,7 +253,8 @@ slice, not a blanket handoff of the computational document core.
 The following remain outside the admitted rollout and outside the settled
 engine-owned boundary:
 
-- shared-group-sensitive structural behavior
+- shared-group-sensitive structural behavior outside the bounded same-sheet
+  shareable exact structural `Preserve`/`Split`/`Rebuild` slice
 - named-range-sensitive structural behavior
 - sheet insert, delete, rename, or move
 - copy, move, clipboard, load-time, or undo-like structural flows
@@ -282,20 +284,22 @@ Any expansion into named-range-sensitive structural behavior should therefore
 begin with another bounded reassessment rather than being inferred from the
 current rollout.
 
-The completed shared-group widening cycle narrowed the shared-group boundary
-without promoting it:
+The completed shared-group widening cycle now promotes one bounded
+shared-group class while keeping the rest of the boundary explicit:
 
-- same-sheet shareable shared-group preserve and split outcomes now have
-  explicit facade-side classification
-- one bounded same-sheet structural preserve class now reaches a dedicated
-  validation-only shared-group pilot when both structural gates are enabled
+- same-sheet shareable shared-group preserve, split, and rebuild outcomes now
+  have explicit facade-side classification
+- same-sheet shareable structural preserve, split, and rebuild cases now
+  reach the admitted live structural lane when both structural gates are
+  enabled
+- non-exact or non-structural shared-group classes still fall back to the
+  validation-only pilot lane
 - gate-off and named-range-combined shared-group classes reject
   deterministically
 - repair-sensitive shared-group divergence remains repair-detected and
   rollback-capable
-- the live rollout still excludes shared-group-sensitive structural behavior
-  because the pilot still depends on host-observed after-state shared-group
-  topology
+- broader shared-group live rollout still stays deferred because the
+  remaining classes still depend on the retained validation-only fallback
 
 ## Storage And Wiring Outcome
 
@@ -806,13 +810,15 @@ The key admitted-slice ownership closeout references are:
 
 The shared-group widening cycle is now complete.
 
-It did not justify a live rollout expansion, but it did justify one bounded
-new proof surface:
+It justified one bounded live rollout expansion and kept the rest of the
+shared-group boundary explicit:
 
 - explicit shared-group preserve, rebuild, split, and none classification
   through the workbook facade
-- a dedicated validation-only shared-group structural pilot for bounded
-  same-sheet shareable cases
+- a dedicated admitted shared-group structural preserve/split/rebuild lane
+  for bounded same-sheet shareable exact-topology cases
+- a retained validation-only fallback lane for non-exact or non-structural
+  shared-group cases
 - deterministic reject and repair-detected handling for classes that stay
   outside that pilot
 
@@ -837,9 +843,14 @@ workbook-class push.
 
 The next adjacent concern is:
 
-- whether the same-sheet shareable shared-group preserve slice can replace
-  host-observed after-state topology with exact engine-predicted topology
-  and therefore meet the existing live verification standard
+- whether non-structural shared-group split or rebuild classes can replace
+  the remaining validation-only observed-topology fallback with exact
+  engine-authored state and therefore meet the same live verification
+  standard as the admitted structural family
+
+That next bounded cycle is now captured in:
+
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_ADMISSION_PLAN.md)
 
 ## Current Assessment
 
@@ -868,8 +879,7 @@ The current state should be read as:
 - plus a successful bounded admitted-slice primitive-realization-and-rollback proof
 - plus a successful bounded admitted-slice primitive-execution proof
 - plus a successful admitted-slice ownership-closeout proof
-- plus a successful bounded shared-group widening proof that still closes as
-  validation-only
+- plus a successful bounded shared-group structural authority widening proof
 - but still not as proof that a full computational storage migration is
   already justified
 

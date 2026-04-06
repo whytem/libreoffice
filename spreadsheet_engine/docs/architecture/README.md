@@ -537,9 +537,9 @@ Current architecture docs:
   shifting the roadmap to slice widening
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_PLAN.md) -
   completed implementation and closeout record for the bounded shared-group
-  widening cycle, keeping the shared-group pilot validation-only because the
-  current structural path still depends on host-observed after-state group
-  topology
+  widening cycle, admitting the bounded same-sheet shareable structural
+  preserve/split/rebuild family while keeping broader shared-group classes
+  outside live rollout
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_CONTRACT.md) -
   frozen widening contract for the shared-group cycle, fixing the carried-
   forward mutation vocabulary, same-sheet reassessment surface, retained
@@ -550,19 +550,25 @@ Current architecture docs:
   surface
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_MAPPING_RULES.md) -
   frozen identity and equivalence note for shared-group anchor, length,
-  shareable-status, preserve, rebuild, split, and forbidden host shortcuts
+  shareable-status, exact structural preserve/rebuild/split rules, and
+  forbidden host shortcuts
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_IMPLEMENTATION.md) -
-  completed implementation note for the bounded shared-group validation-only
-  pilot, facade transition classification surfaces, and dedicated structural
-  gate
+  completed implementation note for the bounded shared-group structural
+  preserve/split/rebuild authority slice, the retained validation fallback
+  boundary, and the dedicated structural gate
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_EVIDENCE.md) -
   completed evidence note for the shared-group widening cycle, recording the
-  positive classification surface, validation-only preserve lane,
-  reject/defer classes, repair-detected rollback, and exact replay baseline
+  positive classification surface, admitted structural preserve/split/rebuild
+  lanes, validation-only fallback boundary, reject/defer classes,
+  repair-detected rollback, and exact replay baseline
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_DECISION_RECORD.md) -
-  completed closeout decision for the shared-group widening cycle, keeping
-  shared-group behavior out of the live rollout while naming the remaining
-  host-observed after-topology dependency explicitly
+  completed closeout decision for the shared-group widening cycle, admitting
+  the bounded structural preserve/split/rebuild family while naming the
+  remaining non-exact and non-structural fallback boundary explicitly
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_ADMISSION_PLAN.md) -
+  active implementation plan for the next bounded shared-group promotion
+  cycle, targeting same-sheet shareable non-structural member-local
+  split/rebuild admission through the lifecycle and authority path
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

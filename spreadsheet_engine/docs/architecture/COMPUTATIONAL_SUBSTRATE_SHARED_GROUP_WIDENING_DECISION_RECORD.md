@@ -4,49 +4,60 @@ Status: complete closeout decision for the shared-group widening plan
 
 ## Decision
 
-Do not widen the live opt-in rollout.
+Widen the live opt-in rollout, but only on one bounded shared-group
+structural family.
 
-The bounded shared-group widening cycle closes with a narrower result:
+The bounded shared-group widening cycle closes with this narrower result:
 
-- keep shared-group-sensitive structural behavior out of the live rollout
-- keep the bounded same-sheet shared-group lane as validation-only
-- keep the dedicated shared-group gate as a proof surface rather than as a
-  live promotion gate
+- admit exact same-sheet shareable structural shared-group `Preserve`,
+  `Split`, and `Rebuild` cases on the already-admitted mutation vocabulary
+- keep non-exact shared-group behavior on the validation-only lane
+- keep the dedicated shared-group gate as the explicit promotion boundary for
+  this slice
 
-## Why The Cycle Stays Validation-Only
+## Why The Structural Family Now Admits
 
-The evidence is strong enough to justify one bounded result, but not a live
-authority expansion.
+The cycle now establishes the exact condition that was still partial after
+the earlier preserve-first widening step:
 
-What the cycle did establish:
+- exact engine-predicted ownership of after-mutation shared-group topology on
+  the bounded structural slice
+- exact live apply on that slice through queue, computational, graph, and IR
+  verification
+- a materializable after-state that keeps live observed cell and formula
+  payloads by address while preserving engine-authored group identity
 
-- the workbook facade now exposes explicit shared-group transition
-  classification for preserve, rebuild, split, and none
-- same-shape `SetFormula` preserve and `ClearCell` split outcomes are now
-  checked in as explicit proof buckets
-- same-sheet shareable structural preserve cases can enter the structural
-  pilot when the dedicated shared-group gate is enabled
-- gate-off and named-range-combined classes reject deterministically
-- repair-sensitive divergence is still repair-detected and rollback-capable
+The key boundary shift is specific:
 
-What the cycle did not establish:
+- the admitted structural path now predicts after-topology by shifting
+  surviving shared-group members and partitioning them into contiguous runs
+- that exact rule family naturally covers preserve, split, and rebuild
+  outcomes
+- the host-observed topology overlay remains only as a validation fallback
+  for non-exact cases
 
-- exact engine-predicted ownership of after-mutation shared-group topology
-- an exact live apply on any shared-group-containing slice
-- a proof surface that no longer depends on host-observed after-state group
-  topology
+That is enough for one bounded promotion into the live rollout.
 
-That last point is the one bounded reason this cycle cannot promote into the
-live rollout:
+## What The Cycle Still Does Not Establish
 
-- the current pilot still uses host-observed after-state shared-group
-  topology for group identity comparison
+The cycle still does not establish live admission for broader shared-group
+behavior.
 
-So the cycle closes as validation-only rather than as live admission.
+What remains unsettled:
+
+- non-structural shared-group split or rebuild outcomes from scalar, formula,
+  or clear mutations
+- exact live authority for regroup or merge outcomes across prior groups
+- repair-sensitive shared-group divergence beyond repair-detected rollback
+- shared-group behavior combined with named-range-sensitive structure
+- off-sheet or broader workbook classes outside the bounded same-sheet slice
+
+Those classes do not yet have the same engine-predicted authority closure as
+the admitted structural family.
 
 ## Final Boundary
 
-The live admitted rollout therefore remains:
+The live admitted rollout therefore becomes:
 
 - admitted scalar lifecycle authority
 - admitted scalar mutation entry
@@ -54,27 +65,28 @@ The live admitted rollout therefore remains:
 - single-sheet `DeleteRows`
 - single-sheet `InsertColumns`
 - single-sheet `DeleteColumns`
-- ordinary scalar formulas only
+- ordinary scalar formulas plus exact same-sheet shareable shared-group
+  structural `Preserve`, `Split`, and `Rebuild` cases
 - clean baseline only
-- no shared groups
 - no named-range-sensitive structural behavior
 
-The only new settled shared-group conclusion is narrower than rollout
-admission:
+The widened shared-group structural family is still explicitly bounded by:
 
-- a bounded same-sheet shareable shared-group class now has explicit facade
-  classification and a dedicated validation-only structural pilot lane
+- `SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL=1`
+- `SPREADSHEET_ENGINE_COMPUTATIONAL_SHARED_GROUP=1`
 
 ## Classes Left Deferred
 
 The following remain explicitly deferred:
 
-- all live shared-group structural rollout
+- non-exact shared-group split, rebuild, regroup, and broader repair-sensitive
+  live rollout
+- non-structural shared-group split or rebuild behavior
 - shared-group behavior combined with named-range-sensitive structure
 - host-only regrouping or repair that is not representable through the
   current seams
 - off-sheet or broader workbook classes outside the bounded single-sheet
-  pilot
+  structural slice
 - sheet insert, delete, rename, or move
 - copy, move, clipboard, load-time, or undo-like structural flows
 
@@ -90,14 +102,15 @@ This decision is supported by:
 
 ## Next Adjacent Concern
 
-The next adjacent concern should be narrower than another broad workbook-class
-push.
+The next adjacent concern should stay narrower than another broad
+workbook-class push.
 
 The right next question is:
 
-- whether the same-sheet shareable preserve slice can replace
-  host-observed after-state shared-group topology with exact engine-predicted
-  topology and therefore meet the existing live verification standard
+- whether non-structural shared-group split or rebuild outcomes can replace
+  their remaining validation-only observed-topology dependency with exact
+  engine-authored state and therefore earn the same live verification
+  standard as the admitted structural family
 
 The evidence does not support jumping directly from this result into broader
 shared-group repair, named-range-combined classes, or another implicit

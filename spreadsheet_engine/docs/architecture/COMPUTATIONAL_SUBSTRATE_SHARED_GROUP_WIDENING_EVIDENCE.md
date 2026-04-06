@@ -7,77 +7,82 @@ Status: complete evidence note for the shared-group widening plan
 This note records the checked-in proof outcomes for the bounded shared-group
 widening cycle.
 
-Its job is to say what was observed, what stayed stable, and what still keeps
-shared-group-containing workbooks out of the live opt-in rollout.
+Its job is to say what now admits, what stays stable, and what still keeps
+broader shared-group-containing workbooks out of the live opt-in rollout.
 
 ## Evidence Summary
 
-The current proof surface separates into five classes:
+The current proof surface separates into six classes:
 
-- exact facade-side transition classification for preserve and split outcomes
-- one same-sheet shareable structural preserve class that reaches the
-  validation-only pilot
+- exact facade-side transition classification for preserve, split, and
+  rebuild outcomes
+- one exact same-sheet shareable structural preserve class in the admitted
+  lane
+- one exact same-sheet shareable structural split class in the admitted lane
+- one exact same-sheet shareable structural rebuild class in the admitted
+  lane
 - deterministic reject and defer classes that stay out of contract
-- one repair-detected structural divergence class that rolls back
-- no live-admission class that proves exact engine-owned shared-group
-  authority
+- one repair-detected structural divergence class that still rolls back
 
-That is useful closeout evidence, but it is still not live-admission
-evidence.
+That is now live-admission evidence for one bounded shared-group structural
+family, but not for broad shared-group behavior.
 
 ## Exact Classification Evidence
 
-The strongest positive result in this cycle is the explicit shared-group
+The first strong result in this cycle is the explicit shared-group
 classification surface now exposed through the workbook facade.
 
 The checked-in Calc-side coverage proves that:
 
-- same-shape `SetFormula` replacement on a shared-group member can still be
+- same-shape `SetFormula` replacement on a shared-group member can be
   classified explicitly as `Preserve`
-- `ClearCell` on a shared-group member is classified explicitly as `Split`
-- shifted row-structural preserve outcomes can be described through the same
-  descriptor-based transition lane
+- `ClearCell` on a shared-group member can be classified explicitly as
+  `Split`
+- row-structural shared-group mutations can now be classified explicitly as
+  `Preserve`, `Split`, or `Rebuild`
 
 This matters because the widening cycle no longer depends on hidden Calc-local
 interpretation just to describe what happened to a group.
 
-## Validation-Only Structural Evidence
+## Exact Structural Authority Evidence
 
-Calc differential evidence now shows that one bounded shared-group class can
-enter the structural pilot when both structural gates are enabled:
+The key new result is that one bounded family of structural shared-group
+cases now closes exact authority-style verification.
 
-- same-sheet only
-- shareable shared-group topology
-- carried-forward structural mutation vocabulary
-- no named ranges
-- clean baseline
+The checked-in positive proof buckets are:
 
-The checked-in preserve case is:
+- same-sheet shareable `Preserve` after shifted structure
+- same-sheet shareable `Split` after inserting through a two-cell group
+- same-sheet shareable `Rebuild` after inserting through a longer group
 
-- single-sheet `InsertRows`
-- shared-group preserve after address shifting
-- contract class `ValidationOnly`
+Those candidates now prove all of the following:
 
-This is a real pilot lane, but it is still explicitly validation-only.
+- the structural predictor carries after-topology forward by shifting
+  surviving members and partitioning them into contiguous runs
+- the predictor still succeeds when observed after-topology is deliberately
+  corrupted and the authority-path fallback is disabled
+- the authority candidate closes exact queue, computational, graph, and IR
+  state
+- the live Calc narrow-rollout path applies the candidate and leaves the
+  expected after-group topology in the document
+
+That is the bounded live-admission result this cycle was aiming for.
 
 ## Reject And Deferred Evidence
 
-The widening cycle now has deterministic negative-path coverage for two
-important classes:
+The widening cycle still has deterministic negative-path coverage for the
+important deferred classes:
 
 - gate-off shared-group structural candidate entry rejects out-of-contract
 - shared-group behavior combined with named-range-sensitive structure rejects
   out-of-contract even with the dedicated shared-group gate enabled
 
-That is the right result for this cycle.
-
-It means the shared-group pilot did not widen the live slice by implication,
-and the named-range-combined class stayed explicitly deferred rather than
-being silently absorbed into a broader pilot.
+That keeps the widened boundary explicit instead of inferred.
 
 ## Rollback And Repair Evidence
 
-The widening cycle also preserved the existing structural safety model.
+The widening cycle also preserved the structural safety model outside the
+admitted exact-topology slice.
 
 The checked-in repair-sensitive case shows that:
 
@@ -86,30 +91,31 @@ The checked-in repair-sensitive case shows that:
 - the structural path rolls back rather than accepting divergent shared-group
   topology
 
-This keeps the pilot honest around host repair and regrouping behavior.
+This keeps the boundary honest around host repair and regrouping behavior.
 
-## Exact Closure And Live Admission
+## Exact Closure And Remaining Limits
 
-The current evidence does not show a meaningful shared-group subset that now
-meets the live-admission standard for exact engine-owned authority.
+The current evidence now shows one meaningful shared-group subset that meets
+the live-admission standard for exact engine-owned authority:
 
-The bounded reason is explicit:
+- exact same-sheet shareable structural shared-group topology cases predicted
+  by shifting surviving members and partitioning them into contiguous runs
 
-- the validation-only pilot still uses host-observed after-state shared-group
-  topology for group identity comparison
+The current evidence does not show live-admission closure for:
 
-That means the cycle can classify preserve, split, rebuild, repair, and defer
-outcomes honestly, but it does not yet prove that the engine can own the
-after-mutation shared-group topology itself on the live path.
+- non-structural shared-group split or rebuild outcomes from scalar, formula,
+  or clear mutations
+- shared-group regrouping that merges distinct prior groups
+- broader repair-sensitive shared-group behavior
+- named-range-combined shared-group structure
+- off-sheet or broader workbook classes
 
-So the cycle did not establish exact live closure for:
+The bounded remaining reason is explicit:
 
-- resident cell state
-- resident wiring state
-- lifetime and realization
-- rollback and final verification
+- the observed-topology overlay still exists for non-exact validation cases
 
-on any shared-group-containing live-admission slice.
+So the cycle established one admitted structural family, not broad
+shared-group rollout.
 
 ## Memory And Performance Observations
 
@@ -117,10 +123,10 @@ No material regression signal was observed in the standing closeout checks.
 
 The bounded observations are:
 
-- the shared-group pilot is behind dedicated structural and shared-group
-  gates
-- the extra shared-group topology overlay is used only inside the
-  validation-only pilot path
+- the widened shared-group structural family is still behind dedicated
+  structural and shared-group gates
+- the observed shared-group topology overlay is now limited to the
+  validation-only fallback path
 - the replay baseline remained exact with zero cached fallback
 
 That last point is the strongest standing operational signal:
@@ -135,13 +141,13 @@ That last point is the strongest standing operational signal:
 
 This evidence supports only the following closeout conclusion:
 
-- keep the live rollout unchanged
-- keep the bounded shared-group structural lane as validation-only
-- keep named-range-combined, repair-sensitive, and broader shared-group
-  classes explicitly deferred
+- widen the live rollout on exact same-sheet shareable structural shared-group
+  preserve, split, and rebuild cases
+- keep non-exact, non-structural, named-range-combined, repair-sensitive,
+  and broader shared-group classes outside the admitted slice
 
-It does not support live rollout admission of shared-group-containing
-workbooks yet.
+It does not support broad live rollout admission of shared-group-containing
+workbooks.
 
 ## Standing Validation
 

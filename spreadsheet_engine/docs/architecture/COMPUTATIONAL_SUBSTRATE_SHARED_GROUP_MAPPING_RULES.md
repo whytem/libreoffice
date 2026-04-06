@@ -75,8 +75,19 @@ An outcome is exact preserve only if:
 
 ### Normalized Rebuild
 
+An exact rebuild may count toward admission only if:
+
+- the engine predicts the rebuilt after-topology from shifted surviving
+  members without copying host-observed group identity
+- the rebuilt group is still observable as one or more explicit contiguous
+  same-sheet shared runs
+- every surviving rebuilt group has an explicit anchor, length, and member
+  population
+- computational, graph, queue, realization, rollback, and verification
+  remain exact
+
 A rebuild may count as normalized-equivalent only in validation or hybrid
-analysis, never by silent admission, and only if:
+analysis when those exact conditions do not hold, and only if:
 
 - the mutation semantics clearly imply a rebuilt same-sheet group
 - the rebuilt group is still observable as one contiguous shared group
@@ -85,15 +96,27 @@ analysis, never by silent admission, and only if:
   verification comparisons still close
 
 Normalized rebuild is not sufficient on its own for admission. It is an
-explicit evidence category.
+explicit evidence category for the remaining deferred classes.
 
 ### Split
 
-A split is not equivalent to preserve.
+An exact split is not equivalent to preserve, but it may still be admitted
+on the bounded structural slice if:
+
+- the engine predicts the surviving shifted member population itself
+- the predicted after-topology explicitly says which survivors remain grouped
+  and which become unshared
+- the predicted group records or explicit no-group result match the observed
+  after-state exactly
+- computational, graph, queue, realization, rollback, and verification
+  remain exact
+
+If those conditions do not hold, a split remains outside live admission.
 
 If a shared group splits into non-group cells or into multiple distinct
 groups after the mutation, the outcome must be classified as:
 
+- admitted exact split
 - validation-only split
 - repair-detected
 - or deferred

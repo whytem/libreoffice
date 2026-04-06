@@ -12,7 +12,7 @@ The goal of this cycle is not broad rollout. It is to answer one bounded
 question:
 
 - can the ownership-complete admitted slice be widened to include a
-  meaningful shared-group workbook class without reopening already-settled
+  meaningful shared-group structural class without reopening already-settled
   ownership seams
 
 ## Carried-Forward Admitted Mutation Vocabulary
@@ -100,11 +100,14 @@ This cycle may close in exactly one of three ways.
 ### Success
 
 Bounded shared-group behavior is admitted only if all of the following hold
-on a meaningful shared-group subset:
+on a meaningful same-sheet shared-group subset:
 
 - the subset stays inside the carried-forward mutation vocabulary
 - preserve, split, rebuild, or repair outcomes are explicit rather than
   hidden
+- after-mutation shared-group topology is predicted by the engine from the
+  before-state by shifting surviving members and partitioning them into
+  explicit contiguous runs rather than by copying host-observed topology
 - resident cell state, resident wiring state, lifetime, realization,
   rollback, and verification still close exactly
 - the retained hybrid reason is not needed for the admitted subset
@@ -115,8 +118,8 @@ The cycle closes as hybrid or validation-only if:
 
 - shared-group behavior can be exercised and classified through the current
   engine-owned seams
-- but at least one narrow shared-group lifecycle or repair concern still
-  requires host-observed or host-owned behavior
+- but at least one narrow shared-group lifecycle, regroup, or repair concern
+  still requires host-observed or host-owned behavior
 
 In that case the closeout must name the one bounded reason precisely.
 

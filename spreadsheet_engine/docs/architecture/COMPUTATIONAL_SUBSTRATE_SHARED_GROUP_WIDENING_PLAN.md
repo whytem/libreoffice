@@ -26,11 +26,13 @@ This plan is now complete.
 
 Its closeout result is:
 
-- do not widen the live rollout
-- keep the bounded same-sheet shareable shared-group slice as
-  validation-only
-- keep shared-group widening out of live admission until the pilot no longer
-  depends on host-observed after-state group topology
+- widen the live rollout on one bounded structural family:
+  exact same-sheet shareable shared-group `Preserve`, `Split`, and `Rebuild`
+  cases
+- keep non-exact or non-structural shared-group behavior validation-only or
+  deferred
+- keep broader shared-group widening out of live admission until exact
+  engine-predicted topology extends beyond that structural family
 
 ## Why This Plan Exists
 

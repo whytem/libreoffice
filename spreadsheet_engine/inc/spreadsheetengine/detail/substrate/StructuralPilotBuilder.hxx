@@ -485,6 +485,8 @@ using spreadsheetengine::detail::substrate::detail::sortNamedRanges;
     return std::nullopt;
 }
 
+inline void normalizeShadowFormulaGroups(std::vector<ShadowFormulaGroupRecord>& rGroups);
+
 inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rShadow)
 {
     for (auto& rSheet : rShadow.maSheets)
@@ -507,15 +509,192 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
                 return AddressLess {}(rLeft.maBroadcaster.maStart, rRight.maBroadcaster.maStart);
             return AddressLess {}(rLeft.maBroadcaster.maEnd, rRight.maBroadcaster.maEnd);
         });
+    normalizeShadowFormulaGroups(rShadow.maFormulaGroups);
     for (auto& rRecord : rShadow.maCellBroadcasters)
         graphmapping::sortAndUnique(rRecord.maListeners, graphmapping::ListenerAnchorIdLess {});
     for (auto& rRecord : rShadow.maAreaBroadcasters)
         graphmapping::sortAndUnique(rRecord.maListeners, graphmapping::ListenerAnchorIdLess {});
 }
 
+inline void normalizeShadowFormulaGroups(std::vector<ShadowFormulaGroupRecord>& rGroups)
+{
+    for (auto& rGroup : rGroups)
+        graphmapping::sortAndUnique(rGroup.maMembers, graphmapping::ShadowCellIdLess {});
+
+    std::sort(rGroups.begin(), rGroups.end(),
+        [](const ShadowFormulaGroupRecord& rLeft, const ShadowFormulaGroupRecord& rRight) {
+            return graphmapping::ShadowFormulaGroupIdLess {}(rLeft.maId, rRight.maId);
+        });
+}
+
+inline void clearPredictedSharedGroupBindings(ComputationalWorkbookShadow& rShadow)
+{
+    rShadow.maFormulaGroups.clear();
+    for (auto& rSheet : rShadow.maSheets)
+    {
+        for (auto& rCell : rSheet.maCells)
+            rCell.moFormulaGroup.reset();
+    }
+}
+
+[[nodiscard]] inline bool tryBuildShiftedSharedGroupTopologyRecords(
+    const ComputationalWorkbookShadow& rBefore, const facade::MutationEvent& rMutation,
+    std::vector<ShadowFormulaGroupRecord>& rGroups)
+{
+    rGroups.clear();
+    rGroups.reserve(rBefore.maFormulaGroups.size());
+
+    if (rBefore.maFormulaGroups.empty())
+        return false;
+
+    for (const auto& rGroup : rBefore.maFormulaGroups)
+    {
+        if (!rGroup.maDescriptor.mbShareable)
+            return false;
+
+        std::vector<ShadowCellId> aSortedMembers = rGroup.maMembers;
+        graphmapping::sortAndUnique(aSortedMembers, graphmapping::ShadowCellIdLess {});
+        if (aSortedMembers.size() != rGroup.maMembers.size())
+            return false;
+
+        if (static_cast<sal_Int32>(aSortedMembers.size()) != rGroup.maId.mnLength)
+            return false;
+
+        std::vector<ShadowCellId> aShiftedMembers;
+        aShiftedMembers.reserve(aSortedMembers.size());
+        for (const auto& rMember : aSortedMembers)
+        {
+            const auto oShiftedMember = shiftAddress(rMutation, rMember.maAddress);
+            if (!oShiftedMember)
+                continue;
+
+            aShiftedMembers.push_back({ *oShiftedMember });
+        }
+
+        graphmapping::sortAndUnique(aShiftedMembers, graphmapping::ShadowCellIdLess {});
+        for (std::size_t nIndex = 0; nIndex < aShiftedMembers.size();)
+        {
+            std::vector<ShadowCellId> aRun;
+            aRun.push_back(aShiftedMembers[nIndex]);
+            ++nIndex;
+
+            while (nIndex < aShiftedMembers.size())
+            {
+                const auto& rPrevious = aRun.back().maAddress;
+                const auto& rCurrent = aShiftedMembers[nIndex].maAddress;
+                if (rCurrent.mnSheet != rPrevious.mnSheet || rCurrent.mnColumn != rPrevious.mnColumn
+                    || rCurrent.mnRow != static_cast<api::RowIndex>(rPrevious.mnRow + 1))
+                {
+                    break;
+                }
+
+                aRun.push_back(aShiftedMembers[nIndex]);
+                ++nIndex;
+            }
+
+            if (aRun.size() <= 1)
+                continue;
+
+            const auto& rRunAnchor = aRun.front().maAddress;
+            ShadowFormulaGroupRecord aShiftedGroup;
+            aShiftedGroup.maId = { rRunAnchor, static_cast<sal_Int32>(aRun.size()) };
+            aShiftedGroup.maDescriptor = rGroup.maDescriptor;
+            aShiftedGroup.maDescriptor.maAnchor = rRunAnchor;
+            aShiftedGroup.maDescriptor.mnLength = static_cast<sal_Int32>(aRun.size());
+            aShiftedGroup.maMembers = std::move(aRun);
+            rGroups.push_back(std::move(aShiftedGroup));
+        }
+    }
+
+    normalizeShadowFormulaGroups(rGroups);
+    return true;
+}
+
+[[nodiscard]] inline bool applyPredictedSharedGroupTopology(
+    ComputationalWorkbookShadow& rPredicted, const ComputationalWorkbookShadow& rBefore,
+    const facade::MutationEvent& rMutation)
+{
+    clearPredictedSharedGroupBindings(rPredicted);
+
+    std::vector<ShadowFormulaGroupRecord> aPredictedGroups;
+    if (!tryBuildShiftedSharedGroupTopologyRecords(rBefore, rMutation, aPredictedGroups))
+        return false;
+
+    for (const auto& rGroup : aPredictedGroups)
+    {
+        for (const auto& rMember : rGroup.maMembers)
+        {
+            bool bFoundMember = false;
+            for (auto& rSheet : rPredicted.maSheets)
+            {
+                auto it = std::find_if(rSheet.maCells.begin(), rSheet.maCells.end(),
+                    [&rMember](const ShadowCellRecord& rCell) { return rCell.maId == rMember; });
+                if (it == rSheet.maCells.end())
+                    continue;
+
+                if (!it->hasFormula())
+                    return false;
+
+                it->moFormulaGroup = rGroup.maId;
+                bFoundMember = true;
+                break;
+            }
+
+            if (!bFoundMember)
+                return false;
+        }
+    }
+
+    rPredicted.maFormulaGroups = std::move(aPredictedGroups);
+    return true;
+}
+
+inline void overlayObservedCellPayloads(ComputationalWorkbookShadow& rPredicted,
+    const ComputationalWorkbookShadow& rObservedAfter)
+{
+    std::map<api::CellAddress, const ShadowCellRecord*, AddressLess> aObservedCellsByAddress;
+    for (const auto& rSheet : rObservedAfter.maSheets)
+    {
+        for (const auto& rCell : rSheet.maCells)
+            aObservedCellsByAddress.emplace(rCell.maId.maAddress, &rCell);
+    }
+
+    for (auto& rSheet : rPredicted.maSheets)
+    {
+        for (auto& rCell : rSheet.maCells)
+        {
+            const auto itObserved = aObservedCellsByAddress.find(rCell.maId.maAddress);
+            if (itObserved == aObservedCellsByAddress.end())
+                continue;
+
+            const auto oPredictedFormulaGroup = rCell.moFormulaGroup;
+            const auto& rObservedCell = *itObserved->second;
+            rCell.maCell = rObservedCell.maCell;
+            rCell.moFormula = rObservedCell.moFormula;
+            rCell.mbInFormulaTree = rObservedCell.mbInFormulaTree;
+            rCell.mbInFormulaTrack = rObservedCell.mbInFormulaTrack;
+            rCell.moFormulaGroup = oPredictedFormulaGroup;
+        }
+    }
+}
+
+[[nodiscard]] inline bool hasExactPredictedSharedGroupTopology(
+    const ComputationalWorkbookShadow& rBefore, const facade::MutationEvent& rMutation,
+    const ComputationalWorkbookShadow& rObservedAfter)
+{
+    std::vector<ShadowFormulaGroupRecord> aPredictedGroups;
+    if (!tryBuildShiftedSharedGroupTopologyRecords(rBefore, rMutation, aPredictedGroups))
+        return false;
+
+    std::vector<ShadowFormulaGroupRecord> aObservedGroups = rObservedAfter.maFormulaGroups;
+    normalizeShadowFormulaGroups(aObservedGroups);
+    return aPredictedGroups == aObservedGroups;
+}
+
 [[nodiscard]] inline ComputationalWorkbookShadow buildPredictedStructuralComputationalShadow(
     const ComputationalWorkbookShadow& rBefore, const facade::MutationEvent& rMutation,
-    const ComputationalWorkbookShadow& rObservedAfter, bool bUseObservedSharedGroupTopology = false)
+    const ComputationalWorkbookShadow& rObservedAfter,
+    bool bAllowObservedSharedGroupTopologyFallback = false)
 {
     ComputationalWorkbookShadow aPredicted = rBefore;
     aPredicted.maSnapshot = rObservedAfter.maSnapshot;
@@ -559,12 +738,8 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
     }
 
     auto lApplyObservedSharedGroupTopology = [&]() {
+        clearPredictedSharedGroupBindings(aPredicted);
         aPredicted.maFormulaGroups = rObservedAfter.maFormulaGroups;
-        for (auto& rSheet : aPredicted.maSheets)
-        {
-            for (auto& rCell : rSheet.maCells)
-                rCell.moFormulaGroup.reset();
-        }
 
         for (const auto& rGroup : rObservedAfter.maFormulaGroups)
         {
@@ -584,6 +759,8 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
                 }
             }
         }
+
+        normalizeShadowFormulaGroups(aPredicted.maFormulaGroups);
     };
 
     aPredicted.maNamedRanges.clear();
@@ -614,8 +791,22 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
         }
     }
 
-    if (bUseObservedSharedGroupTopology)
+    const bool bPredictedSharedGroupTopology
+        = applyPredictedSharedGroupTopology(aPredicted, rBefore, rMutation);
+    if (bPredictedSharedGroupTopology)
+    {
+        auto aPredictedGroups = aPredicted.maFormulaGroups;
+        auto aObservedGroups = rObservedAfter.maFormulaGroups;
+        normalizeShadowFormulaGroups(aPredictedGroups);
+        normalizeShadowFormulaGroups(aObservedGroups);
+        if (bAllowObservedSharedGroupTopologyFallback && aPredictedGroups != aObservedGroups)
+            lApplyObservedSharedGroupTopology();
+    }
+    else if (bAllowObservedSharedGroupTopologyFallback)
+    {
         lApplyObservedSharedGroupTopology();
+    }
+    overlayObservedCellPayloads(aPredicted, rObservedAfter);
 
     for (const auto& rBroadcaster : rBefore.maCellBroadcasters)
     {
@@ -660,8 +851,34 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
     const ComputationalWorkbookShadow& rObserved)
 {
     return collectShadowCellAddresses(rPredicted) == collectShadowCellAddresses(rObserved)
-           && collectShadowFormulaGroups(rPredicted) == collectShadowFormulaGroups(rObserved)
+           && [&]() {
+                  auto aPredictedGroups = rPredicted.maFormulaGroups;
+                  auto aObservedGroups = rObserved.maFormulaGroups;
+                  normalizeShadowFormulaGroups(aPredictedGroups);
+                  normalizeShadowFormulaGroups(aObservedGroups);
+                  return aPredictedGroups == aObservedGroups;
+              }()
            && sortNamedRanges(rPredicted.maNamedRanges) == sortNamedRanges(rObserved.maNamedRanges);
+}
+
+[[nodiscard]] inline ComputationalWorkbookShadow applyObservationStateToStructuralShadow(
+    ComputationalWorkbookShadow aShadow, const ComputationalObservationState& rObservation)
+{
+    aShadow.maCellBroadcasters = rObservation.maCellBroadcasters;
+    aShadow.maAreaBroadcasters = rObservation.maAreaBroadcasters;
+    aShadow.maFormulaTree = rObservation.maFormulaTree;
+    aShadow.maFormulaTrack = rObservation.maFormulaTrack;
+    for (auto& rSheet : aShadow.maSheets)
+    {
+        for (auto& rCell : rSheet.maCells)
+        {
+            rCell.mbInFormulaTree = detail::containsAddress(rObservation.maFormulaTree, rCell.maId.maAddress);
+            rCell.mbInFormulaTrack
+                = detail::containsAddress(rObservation.maFormulaTrack, rCell.maId.maAddress);
+        }
+    }
+    sortComputationalShadowForComparison(aShadow);
+    return aShadow;
 }
 
 [[nodiscard]] inline ExecutionIrReferenceUpdateSummary updateShiftedFormulaReferences(
@@ -728,12 +945,13 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
 }
 
 [[nodiscard]] inline ExecutionIrWorkbookShadow buildPredictedStructuralIrShadow(
-    const StructuralPilotInput& rInput)
+    const StructuralPilotInput& rInput, const ComputationalWorkbookShadow& rPredictedComputational)
 {
     ExecutionIrWorkbookShadow aPredicted;
     aPredicted.maSnapshot = rInput.maObservedAfterIrShadow.maSnapshot;
     aPredicted.maGrammar = rInput.maIrShadow.maGrammar;
-    aPredicted.maFormulaGroups = rInput.maObservedAfterIrShadow.maFormulaGroups;
+    aPredicted.maFormulaGroups = rPredictedComputational.maFormulaGroups;
+    irdetail::normalizeFormulaGroups(aPredicted.maFormulaGroups);
     aPredicted.maBuildFailures = rInput.maObservedAfterIrShadow.maBuildFailures;
 
     const auto oPlan
@@ -742,6 +960,18 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
     std::map<api::CellAddress, const ExecutionIrFormulaRecord*, AddressLess> aObservedAfterByAddress;
     for (const auto& rFormula : rInput.maObservedAfterIrShadow.maFormulaRecords)
         aObservedAfterByAddress[rFormula.maId.maAddress] = &rFormula;
+
+    std::map<api::CellAddress, std::optional<ShadowFormulaGroupId>, AddressLess>
+        aPredictedGroupsByAddress;
+    for (const auto& rSheet : rPredictedComputational.maSheets)
+    {
+        for (const auto& rCell : rSheet.maCells)
+        {
+            if (!rCell.hasFormula())
+                continue;
+            aPredictedGroupsByAddress[rCell.maId.maAddress] = rCell.moFormulaGroup;
+        }
+    }
 
     for (const auto& rFormula : rInput.maIrShadow.maFormulaRecords)
     {
@@ -757,6 +987,15 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
         }
 
         aPredictedRecord.maId.maAddress = *oShifted;
+        if (const auto itGroup = aPredictedGroupsByAddress.find(*oShifted);
+            itGroup != aPredictedGroupsByAddress.end())
+        {
+            aPredictedRecord.moFormulaGroup = itGroup->second;
+        }
+        else
+        {
+            aPredictedRecord.moFormulaGroup.reset();
+        }
         if (oPlan)
         {
             aPredictedRecord.maInstructions = rFormula.maInstructions;
@@ -816,6 +1055,11 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
            && (structuralbuilddetail::hasSharedGroupIdentity(rInput.maComputationalShadow)
                || structuralbuilddetail::hasSharedGroupIdentity(
                    rInput.maObservedAfterComputationalShadow));
+    const bool bSharedGroupStructuralCandidate
+        = bEnableSharedGroupValidation && bSharedGroupValidationSlice
+          && structuralbuilddetail::hasExactPredictedSharedGroupTopology(
+              rInput.maComputationalShadow, rInput.maMutation,
+              rInput.maObservedAfterComputationalShadow);
 
     if (!bAdmittedStructuralSlice)
     {
@@ -836,6 +1080,11 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
         {
             if (eBuildMode == StructuralPilotBuildMode::Validation && bEnableSharedGroupValidation)
                 aTransition.maContract.meMutationClass = StructuralMutationClass::ValidationOnly;
+            else if (eBuildMode == StructuralPilotBuildMode::AuthorityOnly
+                     && bSharedGroupStructuralCandidate)
+            {
+                aTransition.maContract.meMutationClass = StructuralMutationClass::Admitted;
+            }
             else
             {
                 aTransition.meVerdict = StructuralPilotVerdict::RejectedOutOfContract;
@@ -896,7 +1145,8 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
     const auto aPredictedComputational
         = structuralbuilddetail::buildPredictedStructuralComputationalShadow(
             rInput.maComputationalShadow, rInput.maMutation, rInput.maObservedAfterComputationalShadow,
-            bSharedGroupValidationSlice);
+            bSharedGroupValidationSlice
+                && aTransition.maContract.meMutationClass != StructuralMutationClass::Admitted);
     if (!structuralbuilddetail::matchesPredictedStructuralPopulation(
             aPredictedComputational, rInput.maObservedAfterComputationalShadow))
     {
@@ -905,7 +1155,8 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
         return aTransition;
     }
 
-    aTransition.maIrAfter = structuralbuilddetail::buildPredictedStructuralIrShadow(rInput);
+    aTransition.maIrAfter
+        = structuralbuilddetail::buildPredictedStructuralIrShadow(rInput, aPredictedComputational);
     const auto aIrComparison
         = compareExecutionIrWorkbookShadow(aTransition.maIrAfter, rInput.maObservedAfterIrShadow);
     if (aIrComparison.meKind == ExecutionIrComparisonKind::Mismatch)
@@ -955,8 +1206,17 @@ inline void sortComputationalShadowForComparison(ComputationalWorkbookShadow& rS
 
     const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
         aTransition.maDependencySnapshot, aTransition.maRecalcPlan);
-    aTransition.maComputationalAfter
-        = buildComputationalWorkbookShadow(rAfterFacade, aPredictedObservation);
+    if (bSharedGroupStructuralCandidate)
+    {
+        aTransition.maComputationalAfter
+            = structuralbuilddetail::applyObservationStateToStructuralShadow(
+                aPredictedComputational, aPredictedObservation);
+    }
+    else
+    {
+        aTransition.maComputationalAfter
+            = buildComputationalWorkbookShadow(rAfterFacade, aPredictedObservation);
+    }
     aTransition.maGraphAfter
         = buildDependencyGraphShadow(aTransition.maComputationalAfter, aPredictedObservation);
     aTransition.meVerdict = StructuralPilotVerdict::Applicable;

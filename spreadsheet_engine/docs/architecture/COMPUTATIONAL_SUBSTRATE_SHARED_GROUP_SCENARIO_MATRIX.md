@@ -14,7 +14,7 @@ is scoped only to the mutation vocabulary and workbook classes frozen in
 ## Classification Legend
 
 - `candidate`: may be eligible for bounded admission if the exact proof
-  holds
+  holds and the after-topology is engine-predicted rather than host-copied
 - `validation-only`: must be exercised and classified, but is not presumed
   safe for live admission in this cycle
 - `deferred`: immediately outside the widening surface for this cycle
@@ -32,9 +32,10 @@ is scoped only to the mutation vocabulary and workbook classes frozen in
 | `sg_clear_member` | `ClearCell` | clear a shared-group member | explicit split or repair signal | `validation-only` |
 | `sg_clear_anchor` | `ClearCell` | clear a shared-group anchor | explicit split or repair signal | `validation-only` |
 | `sg_insert_rows_preserve` | `InsertRows` | row insertion outside the group that preserves same-sheet group identity | preserved group with shifted addresses | `candidate` |
-| `sg_insert_rows_split` | `InsertRows` | row insertion through or adjacent to the group causing split behavior | explicit split or repair signal | `validation-only` |
+| `sg_insert_rows_split` | `InsertRows` | row insertion through a two-cell group leaving only unshared survivors | explicit split with no surviving shared group | `candidate` |
+| `sg_insert_rows_rebuild` | `InsertRows` | row insertion through a longer group leaving one surviving lower shared run | rebuild with shorter same-sheet group identity | `candidate` |
 | `sg_delete_rows_preserve` | `DeleteRows` | row deletion outside the group that preserves same-sheet group identity | preserved group with shifted addresses | `candidate` |
-| `sg_delete_rows_rebuild` | `DeleteRows` | row deletion that forces group rebuild but keeps a meaningful same-sheet group | rebuild with normalized identity or repair signal | `validation-only` |
+| `sg_delete_rows_rebuild` | `DeleteRows` | row deletion that forces group rebuild but keeps a meaningful same-sheet group | rebuild with shorter or shifted exact identity, or repair signal | `candidate` |
 | `sg_insert_columns_preserve` | `InsertColumns` | column insertion outside the group preserving identity | preserved group with shifted references | `candidate` |
 | `sg_insert_columns_split` | `InsertColumns` | column insertion that breaks shared-group membership | explicit split or repair signal | `validation-only` |
 | `sg_delete_columns_preserve` | `DeleteColumns` | column deletion outside the group preserving identity | preserved group with shifted references | `candidate` |
@@ -60,6 +61,8 @@ The runtime and evidence cycle must cover at least:
 - one preserve case from `SetFormula`
 - one split case from scalar or clear mutation
 - one preserve case from row or column structure
+- one admitted split structural case
+- one admitted rebuild structural case
 - one rebuild or repair-sensitive structural case
 - one explicit deferred case
 
