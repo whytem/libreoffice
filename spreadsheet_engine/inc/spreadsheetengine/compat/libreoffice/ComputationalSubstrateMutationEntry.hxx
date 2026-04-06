@@ -63,7 +63,14 @@ struct MutationEntryResult
         moBroadcasterCanonicalization;
     std::optional<substrateobjectrealization::ObjectRealizationObservation>
         moObjectRealizationObservation;
+    std::optional<substrateobjectrealization::AdmittedPrimitiveRealizationRecord>
+        moPrimitiveRealizationRecord;
+    std::optional<substrateobjectrealization::PrimitiveRealizationObservation>
+        moPrimitiveRealizationObservation;
     std::optional<substraterollback::RollbackObservation> moRollbackObservation;
+    std::optional<substraterollback::AdmittedPrimitiveRollbackRecord> moPrimitiveRollbackRecord;
+    std::optional<substraterollback::PrimitiveRollbackObservation>
+        moPrimitiveRollbackObservation;
     std::optional<substraterawmutation::AdmittedRawMutationRecord> moRawMutationRecord;
     std::optional<substraterawmutation::AdmittedRawDocumentMutationRecord>
         moRawDocumentMutationRecord;
@@ -81,7 +88,7 @@ struct RealizationResult
 {
     bool mbApplied = false;
     api::String maReason;
-    substrateobjectrealization::ObjectRealizationResult maObjectRealization;
+    substrateobjectrealization::PrimitiveRealizationApplyResult maPrimitiveRealization;
 };
 
 [[nodiscard]] inline bool isRuntimeEnabled(const ScDocument& rDoc)
@@ -307,17 +314,34 @@ observeRawDocumentMutationRollback(
         true, oRawMutation);
 }
 
+[[nodiscard]] inline substrateobjectrealization::PrimitiveRealizationObservation
+observePrimitiveRealizationApply(
+    const std::optional<substrateobjectrealization::ObjectRealizationObservation>& oObjectRealization)
+{
+    return substrateobjectrealization::classifyPrimitiveRealizationObservation(
+        true, oObjectRealization);
+}
+
+[[nodiscard]] inline substraterollback::PrimitiveRollbackObservation
+observePrimitiveRollbackApply(
+    const std::optional<substraterollback::RollbackObservation>& oRollback)
+{
+    return substraterollback::classifyPrimitiveRollbackObservation(
+        true, oRollback);
+}
+
 [[nodiscard]] inline RealizationResult realizeObjectRealization(
     ScDocument& rDoc,
-    const substrateobjectrealization::AdmittedObjectRealization& rObjectRealization)
+    const substrateobjectrealization::AdmittedPrimitiveRealizationRecord& rObjectRealization)
 {
     RealizationResult aResult;
-    aResult.maObjectRealization
-        = substrateobjectrealization::realizeAdmittedObjectRealization(rDoc, rObjectRealization);
-    if (aResult.maObjectRealization.meKind
-        != substrateobjectrealization::ObjectRealizationResultKind::Applied)
+    aResult.maPrimitiveRealization
+        = substrateobjectrealization::applyAdmittedPrimitiveRealizationRecord(
+            rDoc, rObjectRealization);
+    if (aResult.maPrimitiveRealization.meKind
+        != substrateobjectrealization::PrimitiveRealizationApplyResultKind::Applied)
     {
-        aResult.maReason = aResult.maObjectRealization.maReason;
+        aResult.maReason = aResult.maPrimitiveRealization.maReason;
         return aResult;
     }
 
@@ -326,16 +350,16 @@ observeRawDocumentMutationRollback(
 }
 
 inline void rollbackToBeforeState(ScDocument& rDoc,
-    const substraterollback::AdmittedRollbackRecord& rRollback,
-    substraterollback::RollbackResult& rResult)
+    const substraterollback::AdmittedPrimitiveRollbackRecord& rRollback,
+    substraterollback::PrimitiveRollbackApplyResult& rResult)
 {
-    rResult = substraterollback::applyAdmittedRollback(rDoc, rRollback);
+    rResult = substraterollback::applyAdmittedPrimitiveRollbackRecord(rDoc, rRollback);
 }
 
 [[nodiscard]] inline substraterollback::RollbackObservation observeRolledBackState(
     ScDocument& rDoc, const spreadsheetengine::detail::substrate::MutableComputationalSubstrateState& rBeforeState,
     const recalcqueue::FormulaStateSnapshot& rBeforeFormulaState,
-    const substraterollback::RollbackResult& rRollback)
+    const substraterollback::PrimitiveRollbackApplyResult& rRollback)
 {
     const CalcWorkbookFacade aRollbackFacade(rDoc, rBeforeState.maShadow.maSnapshot.mnGeneration);
     const auto aRollbackObservationState = makeComputationalObservationState(
@@ -352,7 +376,7 @@ inline void rollbackToBeforeState(ScDocument& rDoc,
         = spreadsheetengine::detail::substrate::detail::compareBroadcasterCanonicalization(
             rBeforeState.maShadow, aRollbackObservationState);
     return substraterollback::classifyRollbackObservation(
-        rRollback, aQueueComparison, aComputationalComparison, aGraphComparison,
+        rRollback.maRollback, aQueueComparison, aComputationalComparison, aGraphComparison,
         aBroadcasterComparison);
 }
 
@@ -425,6 +449,8 @@ public:
                 maComputationalShadow);
         const auto aBeforeRollback
             = substraterollback::buildAdmittedRollbackRecord(aBeforeMutableState, maFormulaState);
+        const auto aPrimitiveBeforeRollback
+            = substraterollback::buildAdmittedPrimitiveRollbackRecord(aBeforeRollback);
         auto aMutableState = aBeforeMutableState;
 
         const auto aRawMutationRecord = substraterawmutation::buildAdmittedRawMutationRecord(rRequest);
@@ -458,6 +484,21 @@ public:
             return aResult;
         }
         aResult.moRawDocumentMutationRecord = aRawDocumentMutationRecord.maRecord;
+
+        if (aPrimitiveBeforeRollback.meKind
+            != substraterollback::PrimitiveRollbackRecordResultKind::Built)
+        {
+            aResult.meKind = MutationEntryResultKind::RejectedOutOfContract;
+            aResult.maTransition.maReason = aPrimitiveBeforeRollback.maReason;
+            aResult.moRawMutationObservation = substraterawmutation::classifyRawMutationObservation(
+                false, false, std::nullopt, std::nullopt, aPrimitiveBeforeRollback.maReason);
+            aResult.moRawDocumentMutationObservation
+                = substraterawmutation::classifyRawDocumentMutationObservation(
+                    false, std::nullopt, aPrimitiveBeforeRollback.maReason);
+            aResult.moLiveApplyObservation = substrateliveapply::classifyLiveApplyObservation(
+                *aResult.moRawMutationObservation, std::nullopt, std::nullopt);
+            return aResult;
+        }
 
         const auto aRawApply = substraterawmutation::applyAdmittedRawDocumentMutationRecord(
             rDoc, aRawDocumentMutationRecord.maRecord);
@@ -500,10 +541,13 @@ public:
             [[maybe_unused]] const auto oRolledBackLiveApplyPlan
                 = detail::buildLiveApplyPlanOrReject(
                 aResult, aRawMutationRecord.maRecord, std::nullopt, aBeforeRollback, true);
-            substraterollback::RollbackResult aRollback;
-            detail::rollbackToBeforeState(rDoc, aBeforeRollback, aRollback);
+            aResult.moPrimitiveRollbackRecord = aPrimitiveBeforeRollback.maRecord;
+            substraterollback::PrimitiveRollbackApplyResult aRollback;
+            detail::rollbackToBeforeState(rDoc, aPrimitiveBeforeRollback.maRecord, aRollback);
             aResult.moRollbackObservation
                 = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
+            aResult.moPrimitiveRollbackObservation = detail::observePrimitiveRollbackApply(
+                aResult.moRollbackObservation);
             aResult.moRawMutationObservation = detail::observeRawMutationRollback(
                 aResult.moRollbackObservation);
             aResult.moRawDocumentMutationObservation = detail::observeRawDocumentMutationRollback(
@@ -520,10 +564,13 @@ public:
             [[maybe_unused]] const auto oRolledBackLiveApplyPlan
                 = detail::buildLiveApplyPlanOrReject(
                 aResult, aRawMutationRecord.maRecord, std::nullopt, aBeforeRollback, true);
-            substraterollback::RollbackResult aRollback;
-            detail::rollbackToBeforeState(rDoc, aBeforeRollback, aRollback);
+            aResult.moPrimitiveRollbackRecord = aPrimitiveBeforeRollback.maRecord;
+            substraterollback::PrimitiveRollbackApplyResult aRollback;
+            detail::rollbackToBeforeState(rDoc, aPrimitiveBeforeRollback.maRecord, aRollback);
             aResult.moRollbackObservation
                 = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
+            aResult.moPrimitiveRollbackObservation = detail::observePrimitiveRollbackApply(
+                aResult.moRollbackObservation);
             aResult.moRawMutationObservation = detail::observeRawMutationRollback(
                 aResult.moRollbackObservation);
             aResult.moRawDocumentMutationObservation = detail::observeRawDocumentMutationRollback(
@@ -535,6 +582,8 @@ public:
 
         const auto aObjectRealization
             = substrateobjectrealization::buildAdmittedObjectRealization(aMutableState);
+        const auto aPrimitiveRealization
+            = substrateobjectrealization::buildAdmittedPrimitiveRealizationRecord(aObjectRealization);
         const auto oAppliedLiveApplyPlan = detail::buildLiveApplyPlanOrReject(
             aResult, aRawMutationRecord.maRecord, aObjectRealization, aBeforeRollback, false);
         if (!oAppliedLiveApplyPlan)
@@ -549,7 +598,23 @@ public:
             return aResult;
         }
 
-        const auto aRealization = detail::realizeObjectRealization(rDoc, aObjectRealization);
+        if (aPrimitiveRealization.meKind
+            != substrateobjectrealization::PrimitiveRealizationRecordResultKind::Built)
+        {
+            aResult.meKind = MutationEntryResultKind::RejectedOutOfContract;
+            aResult.maTransition.maReason = aPrimitiveRealization.maReason;
+            aResult.moRawMutationObservation = substraterawmutation::classifyRawMutationObservation(
+                false, false, std::nullopt, std::nullopt, aPrimitiveRealization.maReason);
+            aResult.moRawDocumentMutationObservation
+                = substraterawmutation::classifyRawDocumentMutationObservation(
+                    false, std::nullopt, aPrimitiveRealization.maReason);
+            aResult.moLiveApplyObservation = substrateliveapply::classifyLiveApplyObservation(
+                *aResult.moRawMutationObservation, std::nullopt, std::nullopt);
+            return aResult;
+        }
+        aResult.moPrimitiveRealizationRecord = aPrimitiveRealization.maRecord;
+
+        const auto aRealization = detail::realizeObjectRealization(rDoc, aPrimitiveRealization.maRecord);
         if (!aRealization.mbApplied)
         {
             aResult.meKind = MutationEntryResultKind::RolledBackVerificationFailure;
@@ -557,10 +622,13 @@ public:
             [[maybe_unused]] const auto oRolledBackLiveApplyPlan
                 = detail::buildLiveApplyPlanOrReject(
                 aResult, aRawMutationRecord.maRecord, aObjectRealization, aBeforeRollback, true);
-            substraterollback::RollbackResult aRollback;
-            detail::rollbackToBeforeState(rDoc, aBeforeRollback, aRollback);
+            aResult.moPrimitiveRollbackRecord = aPrimitiveBeforeRollback.maRecord;
+            substraterollback::PrimitiveRollbackApplyResult aRollback;
+            detail::rollbackToBeforeState(rDoc, aPrimitiveBeforeRollback.maRecord, aRollback);
             aResult.moRollbackObservation
                 = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
+            aResult.moPrimitiveRollbackObservation = detail::observePrimitiveRollbackApply(
+                aResult.moRollbackObservation);
             aResult.moRawMutationObservation = detail::observeRawMutationRollback(
                 aResult.moRollbackObservation);
             aResult.moRawDocumentMutationObservation = detail::observeRawDocumentMutationRollback(
@@ -585,10 +653,13 @@ public:
             [[maybe_unused]] const auto oRolledBackLiveApplyPlan
                 = detail::buildLiveApplyPlanOrReject(
                 aResult, aRawMutationRecord.maRecord, aObjectRealization, aBeforeRollback, true);
-            substraterollback::RollbackResult aRollback;
-            detail::rollbackToBeforeState(rDoc, aBeforeRollback, aRollback);
+            aResult.moPrimitiveRollbackRecord = aPrimitiveBeforeRollback.maRecord;
+            substraterollback::PrimitiveRollbackApplyResult aRollback;
+            detail::rollbackToBeforeState(rDoc, aPrimitiveBeforeRollback.maRecord, aRollback);
             aResult.moRollbackObservation
                 = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
+            aResult.moPrimitiveRollbackObservation = detail::observePrimitiveRollbackApply(
+                aResult.moRollbackObservation);
             aResult.moRawMutationObservation = detail::observeRawMutationRollback(
                 aResult.moRollbackObservation);
             aResult.moLiveApplyObservation = substrateliveapply::classifyLiveApplyObservation(
@@ -619,9 +690,11 @@ public:
                 *pComputationalAfter, aLiveObservation);
         aResult.moObjectRealizationObservation
             = substrateobjectrealization::classifyObjectRealizationObservation(
-                aRealization.maObjectRealization, *aResult.moQueueComparison,
+                aRealization.maPrimitiveRealization.maObjectRealization, *aResult.moQueueComparison,
                 *aResult.moComputationalComparison, *aResult.moGraphComparison,
                 *aResult.moBroadcasterCanonicalization);
+        aResult.moPrimitiveRealizationObservation = detail::observePrimitiveRealizationApply(
+            aResult.moObjectRealizationObservation);
         aResult.moRawMutationObservation
             = detail::observeRawMutationApply(aResult.moObjectRealizationObservation);
         aResult.moRawDocumentMutationObservation = detail::observeRawDocumentMutationApply(
@@ -636,10 +709,13 @@ public:
             [[maybe_unused]] const auto oRolledBackLiveApplyPlan
                 = detail::buildLiveApplyPlanOrReject(
                 aResult, aRawMutationRecord.maRecord, aObjectRealization, aBeforeRollback, true);
-            substraterollback::RollbackResult aRollback;
-            detail::rollbackToBeforeState(rDoc, aBeforeRollback, aRollback);
+            aResult.moPrimitiveRollbackRecord = aPrimitiveBeforeRollback.maRecord;
+            substraterollback::PrimitiveRollbackApplyResult aRollback;
+            detail::rollbackToBeforeState(rDoc, aPrimitiveBeforeRollback.maRecord, aRollback);
             aResult.moRollbackObservation
                 = detail::observeRolledBackState(rDoc, aBeforeMutableState, maFormulaState, aRollback);
+            aResult.moPrimitiveRollbackObservation = detail::observePrimitiveRollbackApply(
+                aResult.moRollbackObservation);
             aResult.moRawMutationObservation = detail::observeRawMutationRollback(
                 aResult.moRollbackObservation);
             aResult.moRawDocumentMutationObservation = detail::observeRawDocumentMutationRollback(

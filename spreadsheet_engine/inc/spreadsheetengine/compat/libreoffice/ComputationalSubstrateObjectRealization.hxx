@@ -83,6 +83,12 @@ enum class ObjectRealizationResultKind : sal_uInt8
     RejectedOutOfContract
 };
 
+enum class PrimitiveRealizationRecordResultKind : sal_uInt8
+{
+    Built,
+    RejectedOutOfContract
+};
+
 struct AdmittedObjectRealization
 {
     std::int64_t mnGeneration = 0;
@@ -108,6 +114,23 @@ struct AdmittedObjectRealization
     }
 };
 
+struct AdmittedPrimitiveRealizationRecord
+{
+    AdmittedObjectRealization maObjectRealization;
+    bool mbUsesPrimitiveRealization = true;
+
+    [[nodiscard]] constexpr bool operator==(const AdmittedPrimitiveRealizationRecord& rOther) const
+        = default;
+};
+
+struct PrimitiveRealizationRecordResult
+{
+    PrimitiveRealizationRecordResultKind meKind
+        = PrimitiveRealizationRecordResultKind::RejectedOutOfContract;
+    api::String maReason;
+    AdmittedPrimitiveRealizationRecord maRecord;
+};
+
 struct ObjectRealizationResult
 {
     ObjectRealizationResultKind meKind = ObjectRealizationResultKind::RejectedOutOfContract;
@@ -115,6 +138,20 @@ struct ObjectRealizationResult
     substrateformulalifetime::FormulaCellLifetimeResult maFormulaCellLifetime;
     substratecellstorage::CellStorageMirrorResult maCellStorage;
     substratewiring::WiringApplyResult maWiring;
+};
+
+enum class PrimitiveRealizationApplyResultKind : sal_uInt8
+{
+    Applied,
+    RejectedOutOfContract
+};
+
+struct PrimitiveRealizationApplyResult
+{
+    PrimitiveRealizationApplyResultKind meKind
+        = PrimitiveRealizationApplyResultKind::RejectedOutOfContract;
+    api::String maReason;
+    ObjectRealizationResult maObjectRealization;
 };
 
 namespace detail
@@ -302,6 +339,21 @@ namespace detail
     return aObservation;
 }
 
+[[nodiscard]] inline PrimitiveRealizationRecordResult buildAdmittedPrimitiveRealizationRecord(
+    const AdmittedObjectRealization& rObjectRealization)
+{
+    PrimitiveRealizationRecordResult aResult;
+    if (rObjectRealization.mnGeneration < 0)
+    {
+        aResult.maReason = u"realization_generation_out_of_contract";
+        return aResult;
+    }
+
+    aResult.meKind = PrimitiveRealizationRecordResultKind::Built;
+    aResult.maRecord.maObjectRealization = rObjectRealization;
+    return aResult;
+}
+
 [[nodiscard]] inline AdmittedObjectRealization buildAdmittedObjectRealization(
     const spreadsheetengine::detail::substrate::MutableComputationalSubstrateState& rState)
 {
@@ -350,6 +402,22 @@ namespace detail
     }
 
     aResult.meKind = ObjectRealizationResultKind::Applied;
+    return aResult;
+}
+
+[[nodiscard]] inline PrimitiveRealizationApplyResult applyAdmittedPrimitiveRealizationRecord(
+    ScDocument& rDoc, const AdmittedPrimitiveRealizationRecord& rRealization)
+{
+    PrimitiveRealizationApplyResult aResult;
+    aResult.maObjectRealization
+        = realizeAdmittedObjectRealization(rDoc, rRealization.maObjectRealization);
+    if (aResult.maObjectRealization.meKind != ObjectRealizationResultKind::Applied)
+    {
+        aResult.maReason = aResult.maObjectRealization.maReason;
+        return aResult;
+    }
+
+    aResult.meKind = PrimitiveRealizationApplyResultKind::Applied;
     return aResult;
 }
 

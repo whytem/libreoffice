@@ -79,6 +79,12 @@ enum class RollbackResultKind : sal_uInt8
     RejectedOutOfContract
 };
 
+enum class PrimitiveRollbackRecordResultKind : sal_uInt8
+{
+    Built,
+    RejectedOutOfContract
+};
+
 struct AdmittedRollbackRecord
 {
     std::int64_t mnGeneration = 0;
@@ -103,11 +109,42 @@ struct AdmittedRollbackRecord
     }
 };
 
+struct AdmittedPrimitiveRollbackRecord
+{
+    AdmittedRollbackRecord maRollback;
+    bool mbUsesPrimitiveRollback = true;
+
+    [[nodiscard]] constexpr bool operator==(const AdmittedPrimitiveRollbackRecord& rOther) const
+        = default;
+};
+
+struct PrimitiveRollbackRecordResult
+{
+    PrimitiveRollbackRecordResultKind meKind
+        = PrimitiveRollbackRecordResultKind::RejectedOutOfContract;
+    api::String maReason;
+    AdmittedPrimitiveRollbackRecord maRecord;
+};
+
 struct RollbackResult
 {
     RollbackResultKind meKind = RollbackResultKind::RejectedOutOfContract;
     api::String maReason;
     substrateobjectrealization::ObjectRealizationResult maObjectRealization;
+};
+
+enum class PrimitiveRollbackApplyResultKind : sal_uInt8
+{
+    Applied,
+    RejectedOutOfContract
+};
+
+struct PrimitiveRollbackApplyResult
+{
+    PrimitiveRollbackApplyResultKind meKind
+        = PrimitiveRollbackApplyResultKind::RejectedOutOfContract;
+    api::String maReason;
+    RollbackResult maRollback;
 };
 
 namespace detail
@@ -333,6 +370,21 @@ namespace detail
     return aObservation;
 }
 
+[[nodiscard]] inline PrimitiveRollbackRecordResult buildAdmittedPrimitiveRollbackRecord(
+    const AdmittedRollbackRecord& rRollback)
+{
+    PrimitiveRollbackRecordResult aResult;
+    if (rRollback.mnGeneration < 0)
+    {
+        aResult.maReason = u"rollback_generation_out_of_contract";
+        return aResult;
+    }
+
+    aResult.meKind = PrimitiveRollbackRecordResultKind::Built;
+    aResult.maRecord.maRollback = rRollback;
+    return aResult;
+}
+
 [[nodiscard]] inline AdmittedRollbackRecord buildAdmittedRollbackRecord(
     const spreadsheetengine::detail::substrate::MutableComputationalSubstrateState& rState,
     const recalcqueue::FormulaStateSnapshot& rFormulaState)
@@ -361,6 +413,21 @@ namespace detail
 
     recalcqueue::restoreFormulaState(rDoc, rRollback.maFormulaState);
     aResult.meKind = RollbackResultKind::Applied;
+    return aResult;
+}
+
+[[nodiscard]] inline PrimitiveRollbackApplyResult applyAdmittedPrimitiveRollbackRecord(
+    ScDocument& rDoc, const AdmittedPrimitiveRollbackRecord& rRollback)
+{
+    PrimitiveRollbackApplyResult aResult;
+    aResult.maRollback = applyAdmittedRollback(rDoc, rRollback.maRollback);
+    if (aResult.maRollback.meKind != RollbackResultKind::Applied)
+    {
+        aResult.maReason = aResult.maRollback.maReason;
+        return aResult;
+    }
+
+    aResult.meKind = PrimitiveRollbackApplyResultKind::Applied;
     return aResult;
 }
 

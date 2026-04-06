@@ -494,6 +494,18 @@ void assertComputationalMutationEntryApplied(
               ? std::string(" object_realization=")
                     + describeObjectRealizationObservation(*oResult->moObjectRealizationObservation)
               : std::string(" object_realization=none");
+    const std::string aPrimitiveRealizationMessage
+        = oResult->moPrimitiveRealizationObservation
+              ? std::string(" primitive_realization=")
+                    + describePrimitiveRealizationObservation(
+                        *oResult->moPrimitiveRealizationObservation)
+              : std::string(" primitive_realization=none");
+    const std::string aPrimitiveRollbackMessage
+        = oResult->moPrimitiveRollbackObservation
+              ? std::string(" primitive_rollback=")
+                    + describePrimitiveRollbackObservation(
+                        *oResult->moPrimitiveRollbackObservation)
+              : std::string(" primitive_rollback=none");
     const std::string aRawMutationMessage
         = oResult->moRawMutationObservation
               ? std::string(" raw_mutation=")
@@ -511,7 +523,8 @@ void assertComputationalMutationEntryApplied(
                     + describeLiveApplyObservation(*oResult->moLiveApplyObservation)
               : std::string(" live_apply=none");
     const std::string aFullMessage
-        = aResultMessage + aBroadcasterMessage + aObjectRealizationMessage + aRawMutationMessage
+        = aResultMessage + aBroadcasterMessage + aObjectRealizationMessage
+          + aPrimitiveRealizationMessage + aPrimitiveRollbackMessage + aRawMutationMessage
           + aRawDocumentMutationMessage + aLiveApplyMessage;
     CPPUNIT_ASSERT_MESSAGE(
         aFullMessage,
@@ -526,6 +539,17 @@ void assertComputationalMutationEntryApplied(
     CPPUNIT_ASSERT(oResult->moObjectRealizationObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, ObjectRealizationObservationKind::Exact,
         oResult->moObjectRealizationObservation->meKind);
+    CPPUNIT_ASSERT(oResult->moPrimitiveRealizationRecord.has_value());
+    CPPUNIT_ASSERT(oResult->moPrimitiveRealizationObservation.has_value());
+    CPPUNIT_ASSERT_MESSAGE(aFullMessage,
+        oResult->moPrimitiveRealizationRecord->maObjectRealization.getCellCount()
+        == oResult->moPrimitiveRealizationRecord->maObjectRealization.maCellStorage.getCellCount());
+    CPPUNIT_ASSERT_MESSAGE(aFullMessage,
+        oResult->moPrimitiveRealizationRecord->mbUsesPrimitiveRealization);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, PrimitiveRealizationObservationKind::Exact,
+        oResult->moPrimitiveRealizationObservation->meKind);
+    CPPUNIT_ASSERT(!oResult->moPrimitiveRollbackRecord.has_value());
+    CPPUNIT_ASSERT(!oResult->moPrimitiveRollbackObservation.has_value());
     CPPUNIT_ASSERT(oResult->moRawMutationObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(aFullMessage, RawMutationObservationKind::Exact,
         oResult->moRawMutationObservation->meKind);
@@ -1950,6 +1974,15 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalMutationEntryRejects
     CPPUNIT_ASSERT(oResult->moLiveApplyObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(describeLiveApplyObservation(*oResult->moLiveApplyObservation),
         LiveApplyObservationKind::Exact, oResult->moLiveApplyObservation->meKind);
+    CPPUNIT_ASSERT(!oResult->moPrimitiveRealizationRecord.has_value());
+    CPPUNIT_ASSERT(!oResult->moPrimitiveRealizationObservation.has_value());
+    CPPUNIT_ASSERT(oResult->moPrimitiveRollbackRecord.has_value());
+    CPPUNIT_ASSERT(oResult->moPrimitiveRollbackRecord->mbUsesPrimitiveRollback);
+    CPPUNIT_ASSERT(oResult->moPrimitiveRollbackObservation.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        describePrimitiveRollbackObservation(*oResult->moPrimitiveRollbackObservation),
+        PrimitiveRollbackObservationKind::Exact,
+        oResult->moPrimitiveRollbackObservation->meKind);
     CPPUNIT_ASSERT(oResult->moRollbackObservation.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         describeRollbackObservation(*oResult->moRollbackObservation),
