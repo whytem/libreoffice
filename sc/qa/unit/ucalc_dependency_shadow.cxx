@@ -32,6 +32,7 @@
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
 #include <spreadsheetengine/compat/libreoffice/MutableComputationalSubstrate.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateCellStorage.hxx>
+#include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFinalVerification.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateFormulaCellLifetime.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateObjectRealization.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRawMutation.hxx>
@@ -99,6 +100,9 @@ using RawDocumentMutationObservationKind
     = spreadsheetengine::compat::libreoffice::substraterawmutation::RawDocumentMutationObservationKind;
 using LiveApplyObservationKind
     = spreadsheetengine::compat::libreoffice::substrateliveapply::LiveApplyObservationKind;
+using FinalVerificationObservationKind
+    = spreadsheetengine::compat::libreoffice::substratefinalverification::
+        FinalVerificationObservationKind;
 using ComputationalStructuralResultKind
     = spreadsheetengine::compat::libreoffice::substratestructural::StructuralResultKind;
 using spreadsheetengine::compat::libreoffice::substratestructural::ScopedComputationalStructural;
@@ -442,6 +446,9 @@ void assertComputationalStructuralAppliedExactly(
         RawDocumentMutationObservation& rObservation);
 [[nodiscard]] std::string describeLiveApplyObservation(
     const spreadsheetengine::compat::libreoffice::substrateliveapply::LiveApplyObservation& rObservation);
+[[nodiscard]] std::string describeFinalVerificationObservation(
+    const spreadsheetengine::compat::libreoffice::substratefinalverification::
+        FinalVerificationObservation& rObservation);
 
 void assertComputationalMutationEntryApplied(
     const std::optional<
@@ -789,6 +796,31 @@ void assertComparableExecutionIr(
            + " queue=" + (rObservation.mbQueueExact ? "1" : "0")
            + " computational=" + (rObservation.mbComputationalFullMatch ? "1" : "0")
            + " graph=" + (rObservation.mbGraphFullMatch ? "1" : "0");
+}
+
+[[nodiscard]] std::string describeFinalVerificationObservation(
+    const spreadsheetengine::compat::libreoffice::substratefinalverification::
+        FinalVerificationObservation& rObservation)
+{
+    return std::string(spreadsheetengine::compat::libreoffice::substratefinalverification::toString(
+               rObservation.meKind))
+           + " reason="
+           + OUStringToOString(rObservation.maReason, RTL_TEXTENCODING_UTF8).getStr()
+           + " executed=" + (rObservation.mbVerificationExecuted ? "1" : "0")
+           + " rolled_back=" + (rObservation.mbRolledBack ? "1" : "0")
+           + " queue=" + (rObservation.mbQueueExact ? "1" : "0")
+           + " computational=" + (rObservation.mbComputationalFullMatch ? "1" : "0")
+           + " graph=" + (rObservation.mbGraphFullMatch ? "1" : "0")
+           + " graph_normalized=" + (rObservation.mbGraphNormalizedEquivalent ? "1" : "0")
+           + " ir_exact=" + (rObservation.mbIrExact ? "1" : "0")
+           + " ir_normalized=" + (rObservation.mbIrNormalizedEquivalent ? "1" : "0")
+           + " broadcasters_exact=" + (rObservation.mbBroadcasterExact ? "1" : "0")
+           + " broadcasters_ordering="
+           + (rObservation.mbBroadcasterOrderingEquivalent ? "1" : "0")
+           + " live_apply=" + (rObservation.mbLiveApplyExact ? "1" : "0")
+           + " primitive_realization="
+           + (rObservation.mbPrimitiveRealizationExact ? "1" : "0")
+           + " primitive_rollback=" + (rObservation.mbPrimitiveRollbackExact ? "1" : "0");
 }
 
 void assertFormulaStateEqual(
@@ -4625,6 +4657,144 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     CPPUNIT_ASSERT_EQUAL(
         LiveApplyObservationKind::OutOfContract,
         classifyLiveApplyObservation(aRawObservation, std::nullopt, std::nullopt).meKind);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalFinalVerificationObservationClassifierKinds)
+{
+    using spreadsheetengine::compat::libreoffice::substratefinalverification::
+        FinalVerificationObservation;
+    using spreadsheetengine::compat::libreoffice::substratefinalverification::
+        classifyFinalVerificationObservation;
+    using spreadsheetengine::compat::libreoffice::substrateliveapply::LiveApplyObservation;
+    using spreadsheetengine::compat::libreoffice::substrateliveapply::LiveApplyObservationKind;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        PrimitiveRealizationObservation;
+    using spreadsheetengine::compat::libreoffice::substraterollback::
+        PrimitiveRollbackObservation;
+
+    spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparison aQueue;
+    aQueue.meKind = RecalcShadowComparisonKind::Exact;
+
+    spreadsheetengine::detail::substrate::ComputationalShadowComparison aComputational;
+    aComputational.mbCellPopulationMatch = true;
+    aComputational.mbFormulaTreeMatch = true;
+    aComputational.mbFormulaTrackMatch = true;
+    aComputational.mbBroadcasterMatch = true;
+    aComputational.mbGroupMatch = true;
+    aComputational.mbNamedRangeMatch = true;
+    aComputational.mbFullMatch = true;
+
+    spreadsheetengine::detail::substrate::DependencyGraphShadowComparison aGraph;
+    aGraph.meKind = GraphComparisonKind::Exact;
+    aGraph.mbFormulaNodeMatch = true;
+    aGraph.mbFormulaGroupNodeMatch = true;
+    aGraph.mbListenerAnchorMatch = true;
+    aGraph.mbBroadcasterNodeMatch = true;
+    aGraph.mbEdgeMatch = true;
+    aGraph.mbFormulaTreeExactMatch = true;
+    aGraph.mbFormulaTrackExactMatch = true;
+    aGraph.mbFormulaTreeNormalizedMatch = true;
+    aGraph.mbFormulaTrackNormalizedMatch = true;
+    aGraph.mbFullMatch = true;
+
+    spreadsheetengine::detail::substrate::ExecutionIrWorkbookComparison aIr;
+    aIr.meKind = ExecutionIrComparisonKind::Exact;
+    aIr.mbSnapshotMatch = true;
+    aIr.mbGrammarMatch = true;
+    aIr.mbFormulaRecordExactMatch = true;
+    aIr.mbFormulaRecordNormalizedMatch = true;
+    aIr.mbFormulaGroupExactMatch = true;
+    aIr.mbFormulaGroupNormalizedMatch = true;
+    aIr.mbBuildFailureExactMatch = true;
+    aIr.mbBuildFailureNormalizedMatch = true;
+    aIr.mbFullMatch = true;
+
+    spreadsheetengine::detail::substrate::BroadcasterCanonicalizationComparison aBroadcasters;
+    aBroadcasters.meKind = BroadcasterCanonicalizationKind::Exact;
+    aBroadcasters.mbExactMatch = true;
+
+    LiveApplyObservation aLiveApply;
+    aLiveApply.meKind = LiveApplyObservationKind::Exact;
+    aLiveApply.mbQueueExact = true;
+    aLiveApply.mbComputationalFullMatch = true;
+    aLiveApply.mbGraphFullMatch = true;
+    aLiveApply.mbRawMutationExact = true;
+    aLiveApply.mbObjectRealizationExact = true;
+
+    PrimitiveRealizationObservation aPrimitiveRealization;
+    aPrimitiveRealization.meKind = PrimitiveRealizationObservationKind::Exact;
+    aPrimitiveRealization.mbPrimitiveRealizationApplied = true;
+    aPrimitiveRealization.mbObjectRealizationExact = true;
+    aPrimitiveRealization.mbQueueExact = true;
+    aPrimitiveRealization.mbComputationalFullMatch = true;
+    aPrimitiveRealization.mbGraphFullMatch = true;
+    aPrimitiveRealization.mbBroadcasterExact = true;
+
+    auto aExact = classifyFinalVerificationObservation(true, aQueue, aComputational, aGraph, aIr,
+        aBroadcasters, aLiveApply, aPrimitiveRealization, std::nullopt);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describeFinalVerificationObservation(aExact),
+        FinalVerificationObservationKind::Exact, aExact.meKind);
+
+    aGraph.meKind = GraphComparisonKind::NormalizedEquivalent;
+    auto aNormalized = classifyFinalVerificationObservation(true, aQueue, aComputational, aGraph, aIr,
+        aBroadcasters, aLiveApply, aPrimitiveRealization, std::nullopt);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describeFinalVerificationObservation(aNormalized),
+        FinalVerificationObservationKind::NormalizedEquivalent, aNormalized.meKind);
+
+    aGraph.meKind = GraphComparisonKind::Exact;
+    aQueue.meKind = RecalcShadowComparisonKind::OrderMismatch;
+    aBroadcasters.meKind = BroadcasterCanonicalizationKind::OrderingOnly;
+    aBroadcasters.mbExactMatch = false;
+    aBroadcasters.mbOrderingEquivalent = true;
+    auto aOrdering = classifyFinalVerificationObservation(true, aQueue, aComputational, aGraph, aIr,
+        aBroadcasters, aLiveApply, aPrimitiveRealization, std::nullopt);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describeFinalVerificationObservation(aOrdering),
+        FinalVerificationObservationKind::OrderingOnly, aOrdering.meKind);
+
+    aQueue.meKind = RecalcShadowComparisonKind::Exact;
+    aBroadcasters.meKind = BroadcasterCanonicalizationKind::Exact;
+    aBroadcasters.mbExactMatch = true;
+    aBroadcasters.mbOrderingEquivalent = false;
+    aLiveApply.meKind = LiveApplyObservationKind::HiddenHostApplyOrchestration;
+    auto aHiddenHost = classifyFinalVerificationObservation(true, aQueue, aComputational, aGraph, aIr,
+        aBroadcasters, aLiveApply, aPrimitiveRealization, std::nullopt);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describeFinalVerificationObservation(aHiddenHost),
+        FinalVerificationObservationKind::HiddenHostVerificationOrchestration, aHiddenHost.meKind);
+
+    aLiveApply.meKind = LiveApplyObservationKind::Exact;
+    aPrimitiveRealization.meKind = PrimitiveRealizationObservationKind::MissingRealizedObjects;
+    auto aMissing = classifyFinalVerificationObservation(true, aQueue, aComputational, aGraph, aIr,
+        aBroadcasters, aLiveApply, aPrimitiveRealization, std::nullopt);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describeFinalVerificationObservation(aMissing),
+        FinalVerificationObservationKind::MissingVerificationInputs, aMissing.meKind);
+
+    aPrimitiveRealization.meKind = PrimitiveRealizationObservationKind::Exact;
+    aLiveApply.meKind = LiveApplyObservationKind::QueueOrStateMismatch;
+    auto aMismatch = classifyFinalVerificationObservation(true, aQueue, aComputational, aGraph, aIr,
+        aBroadcasters, aLiveApply, aPrimitiveRealization, std::nullopt);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describeFinalVerificationObservation(aMismatch),
+        FinalVerificationObservationKind::QueueOrStateMismatch, aMismatch.meKind);
+
+    const auto aOutOfContract = classifyFinalVerificationObservation(
+        false, aQueue, aComputational, aGraph, aIr, aBroadcasters, std::nullopt, std::nullopt,
+        std::nullopt, u"verification_not_executed");
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describeFinalVerificationObservation(aOutOfContract),
+        FinalVerificationObservationKind::OutOfContract, aOutOfContract.meKind);
+
+    PrimitiveRollbackObservation aPrimitiveRollback;
+    aPrimitiveRollback.meKind = PrimitiveRollbackObservationKind::Exact;
+    aPrimitiveRollback.mbPrimitiveRollbackApplied = true;
+    aPrimitiveRollback.mbRollbackExact = true;
+    aPrimitiveRollback.mbQueueExact = true;
+    aPrimitiveRollback.mbComputationalFullMatch = true;
+    aPrimitiveRollback.mbGraphFullMatch = true;
+    aPrimitiveRollback.mbBroadcasterExact = true;
+    aLiveApply.meKind = LiveApplyObservationKind::Exact;
+    aExact = classifyFinalVerificationObservation(true, aQueue, aComputational, aGraph, aIr,
+        aBroadcasters, aLiveApply, std::nullopt, aPrimitiveRollback);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describeFinalVerificationObservation(aExact),
+        FinalVerificationObservationKind::Exact, aExact.meKind);
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
