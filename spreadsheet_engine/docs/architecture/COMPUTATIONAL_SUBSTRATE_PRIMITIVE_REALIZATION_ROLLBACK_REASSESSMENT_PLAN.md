@@ -1,6 +1,6 @@
 # Computational Substrate Primitive Realization And Rollback Shell Reassessment Plan
 
-Status: implementation-ready plan
+Status: completed closeout record
 
 ## Purpose
 

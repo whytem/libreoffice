@@ -420,10 +420,36 @@ Current architecture docs:
   the bounded slice while naming primitive realization and rollback shell
   reassessment as the next adjacent concern
 - [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_REASSESSMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_REASSESSMENT_PLAN.md) -
-  implementation-ready plan for the next bounded reassessment after raw
-  document mutation closeout, focused on making admitted primitive
-  realization and rollback execution more explicitly engine-authored while
-  Calc still owns final verification on the bounded slice
+  completed implementation and closeout record for the bounded reassessment
+  after raw document mutation closeout, ending in admitted engine-authored
+  primitive realization and rollback records and apply verdicts on the
+  bounded slice
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_CONTRACT.md) -
+  frozen authority contract for the admitted primitive realization and
+  rollback shell, fixing the bounded mutation classes, retained Calc host
+  surfaces, and exact success standard
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_SCHEMA.md](COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_SCHEMA.md) -
+  frozen schema note for admitted primitive realization and rollback
+  records, stable identity, normalized payload rules, and top-level verdict
+  families
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_OBSERVATION.md](COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_OBSERVATION.md) -
+  completed observation note for primitive realization and rollback drift
+  classification, introducing the bounded exact, ordering-only,
+  hidden-orchestration, missing-object, mismatch, and out-of-contract
+  families for primitive execution
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_IMPLEMENTATION.md) -
+  completed implementation note for the engine-authored primitive
+  realization and rollback records, apply results, and mutation-entry
+  integration
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_EVIDENCE.md) -
+  frozen evidence note for the primitive realization and rollback proof
+  cycle, recording exact admitted execution, exact dirty-baseline rollback
+  carriage, bounded runtime samples, and the narrowed host shell
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_DECISION_RECORD.md) -
+  completed closeout decision for primitive realization and rollback
+  migration, admitting engine-authored admitted primitive realization and
+  rollback records and apply verdicts on the bounded slice while naming
+  final verification host-shell reassessment as the next adjacent concern
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

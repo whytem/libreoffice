@@ -650,22 +650,57 @@ The key raw document mutation closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_DECISION_RECORD.md)
 
+## Primitive Realization And Rollback Outcome
+
+The primitive realization and rollback reassessment is now complete.
+
+It justifies one additional bounded boundary shift:
+
+- the engine now owns the explicit admitted primitive realization record on
+  the bounded slice
+- the engine now owns the explicit admitted primitive rollback record on
+  the bounded slice
+- applied admitted mutation-entry results now carry explicit primitive
+  realization observation instead of relying only on the broader
+  object-realization observation
+- rollback admitted mutation-entry results now carry explicit primitive
+  rollback observation instead of relying only on the broader rollback
+  observation
+
+It still does not justify broad host independence. Calc still owns:
+
+- the final verification host shell around admitted primitive realization
+  and rollback execution
+
+That means the current boundary is now stronger than the earlier
+resident-state-plus-host-realization-rollback split, but it is still
+narrower than a broad computational document transplant.
+
+The key primitive realization and rollback closeout references are:
+
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_REASSESSMENT_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_SCHEMA.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_SCHEMA.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_OBSERVATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_OBSERVATION.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_DECISION_RECORD.md)
+
 ## Next Explicit Reassessment Target
 
 The next explicit bounded concern is:
 
-- primitive realization and rollback shell reassessment on the admitted
-  slice
+- final verification host-shell reassessment on the admitted slice
 
-The raw document mutation reassessment is now closed with a bounded proceed
-result. The most actionable remaining host-owned surface on the admitted
-slice is no longer primitive mutation identity or primitive mutation intent.
-It is the retained primitive realization and rollback shell around that
+The primitive realization and rollback reassessment is now closed with a
+bounded proceed result. The most actionable remaining host-owned surface on
+the admitted slice is no longer primitive mutation, realization, or rollback
+intent. It is the retained final verification host shell around that
 already-engine-authored admitted state.
 
 The implementation-ready plan for that next reassessment is:
 
-- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_REASSESSMENT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_REASSESSMENT_PLAN.md)
+- not yet written
 
 ## Current Assessment
 
@@ -691,6 +726,7 @@ The current state should be read as:
 - plus a successful bounded admitted-slice raw-mutation proof
 - plus a successful bounded admitted-slice live-apply-shell proof
 - plus a successful bounded admitted-slice raw-document-mutation proof
+- plus a successful bounded admitted-slice primitive-realization-and-rollback proof
 - but still not as proof that a full computational storage migration is
   already justified
 
@@ -711,7 +747,8 @@ Any further expansion should continue under these rules:
   rollout, storage-and-wiring slice, admitted cell-residency slice, and
   admitted wiring-container residency slice, admitted formula-cell-lifetime
   slice, admitted object-realization slice, admitted live-apply-shell
-  slice, and admitted raw-document-mutation slice
+  slice, admitted raw-document-mutation slice, and admitted primitive-
+  realization-and-rollback slice
 
 ## Reference Material
 
@@ -733,6 +770,8 @@ For the current second-stage boundary and rollout closeout, see:
 - [COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_SCALAR_MUTATION_ENTRY_CONVERGENCE_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_MIGRATION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_MIGRATION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_REASSESSMENT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_REASSESSMENT_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_PRIMITIVE_REALIZATION_ROLLBACK_DECISION_RECORD.md)
 - [README.md](architecture/README.md)
 
 For completed plans, closeout records, and historical extraction context, see:
