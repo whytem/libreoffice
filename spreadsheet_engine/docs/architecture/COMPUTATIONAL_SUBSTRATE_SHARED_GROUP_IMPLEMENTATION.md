@@ -7,6 +7,11 @@ Status: validation-only pilot implemented
 The shared-group widening cycle now has a bounded validation-only pilot path
 on top of the ownership-complete admitted slice.
 
+The workstream is now closed out by:
+
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_DECISION_RECORD.md)
+
 The implementation stays intentionally narrow:
 
 - it does not widen the live admitted slice
@@ -84,9 +89,12 @@ The Calc-side coverage now includes:
 
 - facade consumer coverage for collected group descriptors and shifted
   preserve classification
+- facade consumer coverage for same-shape `SetFormula` preserve and
+  `ClearCell` split classification
 - structural shared-group rejection when the dedicated candidate gate is off
 - structural shared-group validation-only preserve candidate coverage when
   the gate is on
+- structural shared-group-plus-named-range defer coverage
 - structural shared-group repair-detected coverage when the group shape is
   perturbed after the structural mutation
 

@@ -196,6 +196,8 @@ What it did justify:
 - engine-authored authority for a bounded live compat slice
 - a real opt-in rollout path for that bounded authority slice
 - one bounded widening step beyond the original admitted structural surface
+- one bounded shared-group validation-only proof surface beyond the
+  ownership-complete slice
 
 What it did not justify:
 
@@ -279,6 +281,21 @@ The completed global-admission proof cycle narrowed that further:
 Any expansion into named-range-sensitive structural behavior should therefore
 begin with another bounded reassessment rather than being inferred from the
 current rollout.
+
+The completed shared-group widening cycle narrowed the shared-group boundary
+without promoting it:
+
+- same-sheet shareable shared-group preserve and split outcomes now have
+  explicit facade-side classification
+- one bounded same-sheet structural preserve class now reaches a dedicated
+  validation-only shared-group pilot when both structural gates are enabled
+- gate-off and named-range-combined shared-group classes reject
+  deterministically
+- repair-sensitive shared-group divergence remains repair-detected and
+  rollback-capable
+- the live rollout still excludes shared-group-sensitive structural behavior
+  because the pilot still depends on host-observed after-state shared-group
+  topology
 
 ## Storage And Wiring Outcome
 
@@ -785,22 +802,44 @@ The key admitted-slice ownership closeout references are:
 - [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_EVIDENCE.md)
 - [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_DECISION_RECORD.md)
 
+## Shared-Group Widening Outcome
+
+The shared-group widening cycle is now complete.
+
+It did not justify a live rollout expansion, but it did justify one bounded
+new proof surface:
+
+- explicit shared-group preserve, rebuild, split, and none classification
+  through the workbook facade
+- a dedicated validation-only shared-group structural pilot for bounded
+  same-sheet shareable cases
+- deterministic reject and repair-detected handling for classes that stay
+  outside that pilot
+
+The key shared-group closeout references are:
+
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_SCENARIO_MATRIX.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_SCENARIO_MATRIX.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_MAPPING_RULES.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_MAPPING_RULES.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_DECISION_RECORD.md)
+
 ## Next Roadmap Category
 
 The next explicit roadmap category is:
 
 - widening the admitted slice on top of an ownership-complete boundary
 
-The most actionable remaining work is no longer another current-slice
-ownership seam. It is a new bounded widening plan for broader workbook
-classes.
+The most actionable remaining work is now narrower than another broad
+workbook-class push.
 
-The next explicit widening target is:
+The next adjacent concern is:
 
-- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_PLAN.md)
-
-That plan treats shared-group lifecycle and repair on the already-admitted
-mutation set as the next adjacent workbook-class expansion.
+- whether the same-sheet shareable shared-group preserve slice can replace
+  host-observed after-state topology with exact engine-predicted topology
+  and therefore meet the existing live verification standard
 
 ## Current Assessment
 
@@ -829,6 +868,8 @@ The current state should be read as:
 - plus a successful bounded admitted-slice primitive-realization-and-rollback proof
 - plus a successful bounded admitted-slice primitive-execution proof
 - plus a successful admitted-slice ownership-closeout proof
+- plus a successful bounded shared-group widening proof that still closes as
+  validation-only
 - but still not as proof that a full computational storage migration is
   already justified
 
@@ -880,6 +921,7 @@ For the current second-stage boundary and rollout closeout, see:
 - [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_PLAN.md](architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_PLAN.md)
 - [ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_DECISION_RECORD.md](architecture/ADMITTED_SLICE_OWNERSHIP_CLOSEOUT_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_WIDENING_DECISION_RECORD.md)
 - [README.md](architecture/README.md)
 
 For completed plans, closeout records, and historical extraction context, see:

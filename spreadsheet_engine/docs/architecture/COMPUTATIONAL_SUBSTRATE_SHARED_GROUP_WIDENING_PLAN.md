@@ -1,6 +1,6 @@
 # Computational Substrate Shared-Group Widening Plan
 
-Status: implementation-ready plan
+Status: complete closeout record
 
 ## Purpose
 
@@ -21,6 +21,16 @@ This is not a plan for named-range-sensitive structural behavior, sheet
 insert/delete/rename/move, copy/move/clipboard/load-time/undo-like flows, or
 broad `ScDocument` independence. It is the next workbook-class widening step
 on top of the ownership-complete admitted slice.
+
+This plan is now complete.
+
+Its closeout result is:
+
+- do not widen the live rollout
+- keep the bounded same-sheet shareable shared-group slice as
+  validation-only
+- keep shared-group widening out of live admission until the pilot no longer
+  depends on host-observed after-state group topology
 
 ## Why This Plan Exists
 
