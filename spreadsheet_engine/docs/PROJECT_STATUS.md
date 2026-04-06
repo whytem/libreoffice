@@ -622,6 +622,10 @@ result. The most actionable remaining host-owned surface on the admitted
 slice is no longer stage identity or stage ordering. It is the underlying
 raw document mutation shell that still executes the admitted plan.
 
+The implementation-ready plan for that next reassessment is:
+
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_MIGRATION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_MIGRATION_PLAN.md)
+
 ## Current Assessment
 
 The project is in a strong position:

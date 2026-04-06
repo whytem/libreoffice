@@ -391,6 +391,11 @@ Current architecture docs:
   completed closeout decision for live apply-shell migration, admitting
   engine-authored admitted apply plans on the bounded slice and naming raw
   document mutation API migration as the next adjacent concern
+- [COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_MIGRATION_PLAN.md](COMPUTATIONAL_SUBSTRATE_RAW_DOCUMENT_MUTATION_API_MIGRATION_PLAN.md) -
+  implementation-ready plan for the next bounded reassessment after
+  live-apply closeout, focused on making admitted primitive mutation
+  execution more explicitly engine-authored while Calc still owns the
+  primitive realization, rollback, and final verification host shell
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded
