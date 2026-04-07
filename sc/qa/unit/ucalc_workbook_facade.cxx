@@ -427,6 +427,56 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
+    testCalcFacadeSharedGroupThreeGroupAttemptKeepsFarGroupSeparate)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+    using spreadsheetengine::detail::facade::MutationEvent;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+    m_pDoc->SetValue(0, 4, 0, 5.0);
+    m_pDoc->SetValue(0, 5, 0, 6.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*3"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A2*3"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=A3*2"_ustr);
+    m_pDoc->SetString(1, 3, 0, u"=A4*2"_ustr);
+    m_pDoc->SetString(1, 4, 0, u"=A5*3"_ustr);
+    m_pDoc->SetString(1, 5, 0, u"=A6*3"_ustr);
+    m_pDoc->CalcAll();
+
+    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 41);
+    const auto aBeforeGroups = consumers::collectFormulaGroupDescriptors(aBeforeFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(3), aBeforeGroups.size());
+
+    m_pDoc->SetString(1, 2, 0, u"=A3*3"_ustr);
+    m_pDoc->CalcAll();
+
+    CalcWorkbookFacade aAfterFacade(*m_pDoc, 42);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(2), aAfterGroups.size());
+    CPPUNIT_ASSERT((aAfterGroups.front().maAnchor
+                    == spreadsheetengine::api::CellAddress { 0, 1, 0 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aAfterGroups.front().mnLength);
+    CPPUNIT_ASSERT((aAfterGroups.back().maAnchor
+                    == spreadsheetengine::api::CellAddress { 0, 1, 4 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aAfterGroups.back().mnLength);
+
+    const auto aTransition = consumers::classifyFormulaGroupTransition(
+        aBeforeGroups, aAfterGroups, MutationEvent::setFormula({ 0, 1, 2 }, u"=A3*3"));
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaGroupTransitionKind::Split, aTransition.meKind);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aTransition.mnBeforeGroupCount);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aTransition.mnAfterGroupCount);
+    CPPUNIT_ASSERT(!aTransition.mbShareableChanged);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestWorkbookFacade, testNamedRangeMutationTranslatorKeepsDescriptors)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateAddNamedRange;

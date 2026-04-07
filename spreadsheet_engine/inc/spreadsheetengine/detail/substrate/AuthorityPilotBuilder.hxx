@@ -423,6 +423,21 @@ struct SharedGroupReplacementMergeParticipants
     }
 };
 
+struct SharedGroupMultiGroupCollapseParticipants
+{
+    const ShadowFormulaGroupRecord* mpAboveGroup = nullptr;
+    const ShadowFormulaGroupRecord* mpTouchedGroup = nullptr;
+    const ShadowFormulaGroupRecord* mpBelowGroup = nullptr;
+
+    [[nodiscard]] bool isValid() const
+    {
+        return mpAboveGroup && mpTouchedGroup && mpBelowGroup
+               && mpAboveGroup->maId != mpTouchedGroup->maId
+               && mpTouchedGroup->maId != mpBelowGroup->maId
+               && mpAboveGroup->maId != mpBelowGroup->maId;
+    }
+};
+
 struct LoweredSharedFormulaCell
 {
     api::CellAddress maAddress;
@@ -680,6 +695,65 @@ findReplacementMergeParticipantGroups(
     return false;
 }
 
+[[nodiscard]] inline std::optional<SharedGroupMultiGroupCollapseParticipants>
+findMultiGroupCollapseParticipantGroups(
+    const ComputationalWorkbookShadow& rShadow, const api::CellAddress& rAddress)
+{
+    const auto* pTouchedGroup = findShareableSameColumnGroup(rShadow, rAddress);
+    if (!pTouchedGroup)
+        return std::nullopt;
+
+    const api::RowIndex nTouchedStart = pTouchedGroup->maId.maAnchor.mnRow;
+    const api::RowIndex nTouchedEnd = static_cast<api::RowIndex>(
+        pTouchedGroup->maId.maAnchor.mnRow + pTouchedGroup->maId.mnLength - 1);
+    if (nTouchedStart <= 0)
+        return std::nullopt;
+
+    const api::CellAddress aAbove { rAddress.mnSheet, rAddress.mnColumn,
+        static_cast<api::RowIndex>(nTouchedStart - 1) };
+    const api::CellAddress aBelow { rAddress.mnSheet, rAddress.mnColumn,
+        static_cast<api::RowIndex>(nTouchedEnd + 1) };
+    const auto* pAboveGroup = findShareableSameColumnGroup(rShadow, aAbove);
+    const auto* pBelowGroup = findShareableSameColumnGroup(rShadow, aBelow);
+    if (!pAboveGroup || !pBelowGroup)
+        return std::nullopt;
+
+    const api::RowIndex nAboveEnd = static_cast<api::RowIndex>(
+        pAboveGroup->maId.maAnchor.mnRow + pAboveGroup->maId.mnLength - 1);
+    if (nAboveEnd != static_cast<api::RowIndex>(nTouchedStart - 1)
+        || pBelowGroup->maId.maAnchor.mnRow != static_cast<api::RowIndex>(nTouchedEnd + 1))
+    {
+        return std::nullopt;
+    }
+
+    SharedGroupMultiGroupCollapseParticipants aParticipants { pAboveGroup, pTouchedGroup,
+        pBelowGroup };
+    if (!aParticipants.isValid())
+        return std::nullopt;
+
+    return aParticipants;
+}
+
+[[nodiscard]] inline bool matchesMultiGroupCollapseObservedAfterGroup(
+    const ShadowFormulaGroupRecord& rObservedAfterGroup,
+    const SharedGroupMultiGroupCollapseParticipants& rParticipants,
+    const api::CellAddress& rTouchedAddress)
+{
+    if (!rParticipants.isValid())
+        return false;
+
+    const api::RowIndex nExpectedEnd = static_cast<api::RowIndex>(
+        rParticipants.mpBelowGroup->maId.maAnchor.mnRow
+        + rParticipants.mpBelowGroup->maId.mnLength - 1);
+    return rObservedAfterGroup.maId.maAnchor == rParticipants.mpAboveGroup->maId.maAnchor
+           && rObservedAfterGroup.maId.mnLength
+                  == static_cast<sal_Int32>(nExpectedEnd
+                                            - rParticipants.mpAboveGroup->maId.maAnchor.mnRow
+                                            + 1)
+           && rTouchedAddress.mnRow >= rObservedAfterGroup.maId.maAnchor.mnRow
+           && rTouchedAddress.mnRow <= nExpectedEnd;
+}
+
 [[nodiscard]] inline bool isDeferredSharedGroupNonStructuralFormulaInsert(
     const AuthorityPilotInput& rInput)
 {
@@ -842,6 +916,23 @@ determineSharedGroupReplacementMergeWindow(
             break;
     }
 
+    return aWindow;
+}
+
+[[nodiscard]] inline std::optional<SharedGroupRebuildWindow>
+determineSharedGroupMultiGroupCollapseWindow(
+    const ComputationalWorkbookShadow& rBeforeShadow, const api::CellAddress& rTouchedAddress)
+{
+    const auto oParticipants = findMultiGroupCollapseParticipantGroups(
+        rBeforeShadow, rTouchedAddress);
+    if (!oParticipants)
+        return std::nullopt;
+
+    SharedGroupRebuildWindow aWindow;
+    aWindow.mnStartRow = oParticipants->mpAboveGroup->maId.maAnchor.mnRow;
+    aWindow.mnEndRow = static_cast<api::RowIndex>(
+        oParticipants->mpBelowGroup->maId.maAnchor.mnRow
+        + oParticipants->mpBelowGroup->maId.mnLength - 1);
     return aWindow;
 }
 
@@ -1136,6 +1227,20 @@ inline void clearPredictedSharedGroupBindingsInWindow(ComputationalWorkbookShado
                                                    rInput.maComputationalShadow,
                                                    rInput.maMutation.maAddress)
                                              : std::nullopt;
+    const auto oMultiGroupCollapseParticipants = findMultiGroupCollapseParticipantGroups(
+        rInput.maComputationalShadow, rInput.maMutation.maAddress);
+    const bool bAllowMultiGroupCollapseWindow
+        = pBeforeTouchedGroup && pObservedAfterTouchedGroup
+          && pObservedAfterTouchedGroup->maId != pBeforeTouchedGroup->maId
+          && oMultiGroupCollapseParticipants
+          && matchesMultiGroupCollapseObservedAfterGroup(
+              *pObservedAfterTouchedGroup, *oMultiGroupCollapseParticipants,
+              rInput.maMutation.maAddress);
+    const auto oMultiGroupCollapseWindow = bAllowMultiGroupCollapseWindow
+                                               ? determineSharedGroupMultiGroupCollapseWindow(
+                                                     rInput.maComputationalShadow,
+                                                     rInput.maMutation.maAddress)
+                                               : std::nullopt;
     const bool bAllowRegroupExtension
         = rInput.maMutation.meKind == facade::MutationKind::SetFormula && pBeforeTouchedGroup
           && pObservedAfterTouchedGroup && pObservedAfterTouchedGroup->maId != pBeforeTouchedGroup->maId;
@@ -1145,6 +1250,8 @@ inline void clearPredictedSharedGroupBindingsInWindow(ComputationalWorkbookShado
                                    ? *oOneSidedInsertWindow
                              : oReplacementMergeWindow
                                    ? *oReplacementMergeWindow
+                             : oMultiGroupCollapseWindow
+                                   ? *oMultiGroupCollapseWindow
                              : determineSharedGroupRebuildWindow(
                                    rInput.maComputationalShadow, rPredicted, aFacade,
                                    rInput.maMutation.maAddress, bAllowRegroupExtension, rReason);

@@ -722,9 +722,31 @@ Current architecture docs:
   member-exit, same-text preserve, edge-regroup, gap-merge, and
   replacement-merge slice
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_ADMISSION_PLAN.md) -
-  staged next-pass plan for bounded same-sheet three-participant collapse,
-  targeting the smallest exact multi-group merge family before named-range,
-  repair-sensitive, off-sheet, and broader non-edge frontier classes
+  completed closeout record for the exact multi-group-collapse cycle,
+  recording that synthetic three-participant collapse closes in standalone
+  proof but stays deferred live because Calc keeps the far group separate
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_CONTRACT.md) -
+  frozen contract for the multi-group-collapse closeout, fixing the bounded
+  three-participant target family and the retained live defer condition
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_SCENARIO_MATRIX.md) -
+  frozen scenario matrix for the multi-group-collapse closeout, separating
+  exact synthetic full-span collapse from the retained live far-group
+  separation and broader reject buckets
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_MAPPING_RULES.md) -
+  frozen mapping note for the multi-group-collapse closeout, defining the
+  three-participant full-span window and the live defer rule when the host
+  topology does not match it
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_IMPLEMENTATION.md) -
+  completed implementation note for the multi-group-collapse closeout,
+  including synthetic participant discovery and the resulting no-admit
+  live outcome
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_EVIDENCE.md) -
+  frozen evidence note for the multi-group-collapse closeout, recording
+  synthetic exactness plus live far-group-separation proof
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_DECISION_RECORD.md) -
+  completed closeout decision for the multi-group-collapse cycle, leaving
+  the admitted slice unchanged while marking the bounded three-participant
+  family deferred
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

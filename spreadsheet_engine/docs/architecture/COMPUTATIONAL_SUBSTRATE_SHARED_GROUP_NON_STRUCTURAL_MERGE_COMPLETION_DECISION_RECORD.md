@@ -74,13 +74,13 @@ This decision is supported by:
 
 ## Next Adjacent Concern
 
-The next adjacent concern is now:
+The multi-group-collapse concern from this record is now closed by:
 
-- whether bounded same-sheet shareable multi-group collapse can produce the
-  next exact engine-authored promotion family before named-range-combined,
-  repair-sensitive, off-sheet, and broader non-edge regroup and merge
-  classes
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_DECISION_RECORD.md)
 
-That next pass is staged in:
+The remaining adjacent concerns are now:
 
-- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_ADMISSION_PLAN.md)
+- named-range-combined shared-group behavior
+- repair-sensitive host normalization
+- off-sheet shared-group behavior
+- broader non-edge regroup or merge

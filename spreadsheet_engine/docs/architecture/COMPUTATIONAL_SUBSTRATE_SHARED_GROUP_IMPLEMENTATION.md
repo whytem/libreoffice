@@ -1,13 +1,14 @@
 # Computational Substrate Shared-Group Implementation
 
-Status: bounded structural plus non-structural shared-group slice implemented, including exact regroup, gap-merge, replacement-merge, and one-sided insert closeout
+Status: bounded structural plus non-structural shared-group slice implemented, including exact regroup, gap-merge, replacement-merge, one-sided insert closeout, and a deferred multi-group-collapse closeout
 
 ## What Landed
 
 The shared-group widening cycle now has one bounded live structural family,
-one bounded live non-structural member-exit family, and five additional
+one bounded live non-structural member-exit family, five additional
 non-structural frontier admissions on top of the ownership-complete admitted
-slice.
+slice, and one additional bounded multi-group-collapse proof cycle that
+closed as deferred.
 
 The workstream is now closed out by:
 
@@ -31,6 +32,9 @@ The workstream is now closed out by:
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_IMPLEMENTATION.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_DECISION_RECORD.md)
 
 The implementation stays intentionally narrow:
 
@@ -51,9 +55,9 @@ The implementation stays intentionally narrow:
   edge replacement-merge `SetFormula`
 - it now also widens the live admitted slice for exact same-sheet shareable
   one-sided adjacent insertion `SetFormula`
-- it keeps broader merge, named-range-sensitive, off-sheet,
-  repair-sensitive, and non-edge regroup shared-group classes outside live
-  admission
+- it keeps multi-group collapse, broader merge, named-range-sensitive,
+  off-sheet, repair-sensitive, and non-edge regroup shared-group classes
+  outside live admission
 
 ## Main Runtime Surfaces
 
@@ -226,6 +230,10 @@ The frontier closeouts add five more bounded rules:
   can create the inserted formula cell in the predicted shadow and rebuild
   exactly one adjacent prior shared group into a bounded exact
   prior-length-plus-one after-topology
+- bounded three-participant multi-group collapse remains deferred because
+  the exact authored full-span one-group topology closes only in standalone
+  proof; live Calc three-group attempts keep the far participant group
+  separate
 - multi-group collapse, named-range-combined, repair-sensitive, off-sheet,
   and broader non-edge regroup or merge classes remain rejected as deferred
   frontier classes instead of passing through the ordinary formula paths
@@ -256,6 +264,12 @@ The checked-in coverage now includes:
 - standalone proof that exact non-structural shared-group one-sided insert
   candidates close exact computational state without borrowing observed
   topology
+- facade consumer coverage for synthetic non-structural shared-group
+  multi-group-collapse classification
+- standalone proof that exact synthetic non-structural shared-group
+  three-participant collapse candidates close exact computational state
+  without borrowing observed topology
+- standalone retained reject coverage for four-plus-group collapse
 - structural shared-group rejection when the dedicated candidate gate is off
 - structural shared-group preserve, split, and rebuild live-apply coverage
   when the dedicated shared-group gate is on
@@ -271,6 +285,10 @@ The checked-in coverage now includes:
   coverage on the same bounded slice
 - non-structural shared-group one-sided insert lifecycle and mutation-entry
   coverage on the same bounded slice
+- Calc facade proof that live three-group attempts keep the far group
+  separate instead of producing one full-span collapsed group
+- non-structural shared-group lifecycle and mutation-entry proof that live
+  three-group attempts keep the far group separate
 - structural shared-group-plus-named-range defer coverage
 - structural shared-group repair-detected coverage when the group shape is
   perturbed after the structural mutation

@@ -131,6 +131,7 @@ enum class SharedFormulaMutationFamily : std::uint8_t
     OneSidedInsert,
     Merge,
     ReplacementMerge,
+    MultiGroupCollapse,
     StructuralPreserve,
     StructuralSplit,
     StructuralRebuild
@@ -374,6 +375,17 @@ namespace detail
                      && aClassification.mnAfterNeighborhoodGroupCount == 1)
             {
                 aClassification.meFamily = SharedFormulaMutationFamily::Merge;
+            }
+            else if (aClassification.mbTouchedAddressSharedBefore
+                     && aClassification.mbTouchedAddressSharedAfter
+                     && aClassification.maTransition.meKind
+                            == SharedFormulaGroupTransitionKind::Rebuild
+                     && aClassification.mnBeforeNeighborhoodGroupCount == 3
+                     && aClassification.mnAfterNeighborhoodGroupCount == 1
+                     && oTouchedGroupBefore && oTouchedGroupAfter
+                     && *oTouchedGroupBefore != *oTouchedGroupAfter)
+            {
+                aClassification.meFamily = SharedFormulaMutationFamily::MultiGroupCollapse;
             }
             else if (aClassification.mbTouchedAddressSharedBefore
                      && aClassification.mbTouchedAddressSharedAfter
