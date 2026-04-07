@@ -18,6 +18,7 @@
 #include <spreadsheetengine/detail/substrate/ComputationalShadowBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/ExecutionIrBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/DependencyGraphShadowMapping.hxx>
+#include <spreadsheetengine/detail/workbook/FacadeConsumers.hxx>
 #include <spreadsheetengine/detail/workbook/InMemoryWorkbookFacade.hxx>
 
 namespace spreadsheetengine::detail::substrate
@@ -308,6 +309,58 @@ inline void normalizeShadowFormulaGroups(std::vector<ShadowFormulaGroupRecord>& 
             return rLeft.maId.mnIndex < rRight.maId.mnIndex;
         });
     return aNamedRanges;
+}
+
+struct SharedGroupNamedRangeBoundaryEvaluation
+{
+    facade::consumers::SharedFormulaMutationClassification maMutationClassification;
+    facade::consumers::SharedFormulaNamedRangeMutationClassification maNamedRangeClassification;
+};
+
+[[nodiscard]] inline SharedGroupNamedRangeBoundaryEvaluation
+evaluateSharedGroupNamedRangeBoundary(const AuthorityPilotInput& rInput)
+{
+    SharedGroupNamedRangeBoundaryEvaluation aEvaluation;
+    if (!rInput.moObservedAfterComputationalShadow)
+        return aEvaluation;
+
+    const auto aBeforeFacade = materializeFacadeFromComputationalShadow(rInput.maComputationalShadow);
+    const auto aAfterFacade
+        = materializeFacadeFromComputationalShadow(*rInput.moObservedAfterComputationalShadow);
+    aEvaluation.maMutationClassification = facade::consumers::classifySharedFormulaMutation(
+        aBeforeFacade, aAfterFacade, rInput.maMutation);
+    aEvaluation.maNamedRangeClassification
+        = facade::consumers::classifySharedFormulaNamedRangeMutationBoundary(
+            aBeforeFacade, aAfterFacade, rInput.maMutation);
+    return aEvaluation;
+}
+
+[[nodiscard]] inline bool admitsSharedGroupNamedRangeBoundary(
+    const AuthorityPilotInput& rInput, api::String& rReason)
+{
+    const auto aEvaluation = evaluateSharedGroupNamedRangeBoundary(rInput);
+    if (aEvaluation.maNamedRangeClassification.meBoundary
+        == facade::consumers::SharedFormulaNamedRangeMutationBoundary::None)
+    {
+        return true;
+    }
+
+    if (aEvaluation.maNamedRangeClassification.meBoundary
+        != facade::consumers::SharedFormulaNamedRangeMutationBoundary::
+            GlobalSingleAreaSameSheet)
+    {
+        rReason = u"shared_group_named_range_out_of_contract";
+        return false;
+    }
+
+    switch (aEvaluation.maMutationClassification.meFamily)
+    {
+        case facade::consumers::SharedFormulaMutationFamily::SameTextPreserve:
+            return true;
+        default:
+            rReason = u"shared_group_named_range_out_of_contract";
+            return false;
+    }
 }
 
 inline void overlayObservedCellPayloadsPreservingGroupBindings(
@@ -1315,6 +1368,9 @@ inline void clearPredictedSharedGroupBindingsInWindow(ComputationalWorkbookShado
                 return false;
             }
 
+            if (!admitsSharedGroupNamedRangeBoundary(rInput, rReason))
+                return false;
+
             const auto* pObservedAfterCell = findShadowCell(
                 *rInput.moObservedAfterComputationalShadow, rInput.maMutation.maAddress);
             const auto* pObservedAfterGroup = findShareableSameColumnGroup(
@@ -1361,6 +1417,9 @@ inline void clearPredictedSharedGroupBindingsInWindow(ComputationalWorkbookShado
                 rReason = u"shared_group_named_range_out_of_contract";
                 return false;
             }
+
+            if (!admitsSharedGroupNamedRangeBoundary(rInput, rReason))
+                return false;
 
             const auto* pObservedAfterCell = findShadowCell(
                 *rInput.moObservedAfterComputationalShadow, rInput.maMutation.maAddress);
@@ -1418,6 +1477,9 @@ inline void clearPredictedSharedGroupBindingsInWindow(ComputationalWorkbookShado
         rReason = u"shared_group_named_range_out_of_contract";
         return false;
     }
+
+    if (!admitsSharedGroupNamedRangeBoundary(rInput, rReason))
+        return false;
 
     if (!rpTouchedGroup->maDescriptor.mbShareable)
     {

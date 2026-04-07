@@ -11,9 +11,12 @@
 
 #include <algorithm>
 #include <optional>
+#include <set>
 #include <vector>
 
+#include <spreadsheetengine/detail/dependency/DependencySnapshot.hxx>
 #include <spreadsheetengine/detail/workbook/WorkbookFacade.hxx>
+#include <spreadsheetengine/runtime/ReferenceText.hxx>
 
 namespace spreadsheetengine::detail::facade::consumers
 {
@@ -150,8 +153,39 @@ struct SharedFormulaMutationClassification
         = default;
 };
 
+enum class SharedFormulaNamedRangeMutationBoundary : std::uint8_t
+{
+    None,
+    GlobalSingleAreaSameSheet,
+    Deferred
+};
+
+struct SharedFormulaNamedRangeMutationClassification
+{
+    SharedFormulaNamedRangeMutationBoundary meBoundary
+        = SharedFormulaNamedRangeMutationBoundary::None;
+    sal_Int32 mnNamedRangeCount = 0;
+    bool mbDescriptorsStable = false;
+    bool mbAllConsumersStayOnSheet = false;
+
+    [[nodiscard]] constexpr bool operator==(
+        const SharedFormulaNamedRangeMutationClassification& rOther) const = default;
+};
+
 namespace detail
 {
+
+struct AddressLess
+{
+    [[nodiscard]] bool operator()(const api::CellAddress& rLeft, const api::CellAddress& rRight) const
+    {
+        if (rLeft.mnSheet != rRight.mnSheet)
+            return rLeft.mnSheet < rRight.mnSheet;
+        if (rLeft.mnColumn != rRight.mnColumn)
+            return rLeft.mnColumn < rRight.mnColumn;
+        return rLeft.mnRow < rRight.mnRow;
+    }
+};
 
 [[nodiscard]] inline std::optional<FormulaGroupDescriptor> shiftFormulaGroupDescriptor(
     const FormulaGroupDescriptor& rDescriptor, const MutationEvent& rMutation)
@@ -246,6 +280,244 @@ namespace detail
     lCollect(static_cast<api::RowIndex>(rAddress.mnRow - 1));
     lCollect(static_cast<api::RowIndex>(rAddress.mnRow + 1));
     return aGroups;
+}
+
+[[nodiscard]] inline std::optional<api::ColumnIndex> parseNamedRangeColumnName(
+    api::StringView rColumnName)
+{
+    if (rColumnName.empty())
+        return std::nullopt;
+
+    std::int64_t nColumn = 0;
+    for (char16_t cChar : rColumnName)
+    {
+        if (cChar >= u'a' && cChar <= u'z')
+            cChar = static_cast<char16_t>(cChar - u'a' + u'A');
+        if (cChar < u'A' || cChar > u'Z')
+            return std::nullopt;
+        nColumn = (nColumn * 26) + (cChar - u'A' + 1);
+    }
+
+    return static_cast<api::ColumnIndex>(nColumn - 1);
+}
+
+[[nodiscard]] inline bool isAbsoluteAddressToken(api::StringView rToken)
+{
+    if (rToken.empty())
+        return false;
+
+    const std::size_t nDotPos = rToken.rfind(u'.');
+    api::StringView aAddressToken
+        = nDotPos == api::StringView::npos ? rToken : rToken.substr(nDotPos + 1);
+    if (aAddressToken.empty() || aAddressToken.front() != u'$')
+        return false;
+
+    aAddressToken.remove_prefix(1);
+    std::size_t nColumnEnd = 0;
+    while (nColumnEnd < aAddressToken.size())
+    {
+        const char16_t cChar = aAddressToken[nColumnEnd];
+        const bool bAlpha = (cChar >= u'A' && cChar <= u'Z') || (cChar >= u'a' && cChar <= u'z');
+        if (!bAlpha)
+            break;
+        ++nColumnEnd;
+    }
+
+    if (nColumnEnd == 0 || nColumnEnd >= aAddressToken.size() || aAddressToken[nColumnEnd] != u'$')
+        return false;
+
+    api::StringView aRowToken = aAddressToken.substr(nColumnEnd + 1);
+    if (aRowToken.empty())
+        return false;
+
+    return std::all_of(aRowToken.begin(), aRowToken.end(), [](char16_t cChar) {
+        return cChar >= u'0' && cChar <= u'9';
+    });
+}
+
+[[nodiscard]] inline std::optional<api::CellAddress> parseAbsoluteNamedRangeAddressToken(
+    const WorkbookFacade& rFacade, api::StringView rToken, api::SheetId nImplicitSheet)
+{
+    const std::size_t nDotPos = rToken.rfind(u'.');
+    api::SheetId nSheet = nImplicitSheet;
+    api::StringView aAddressToken = rToken;
+    if (nDotPos != api::StringView::npos)
+    {
+        api::StringView aSheetToken = rToken.substr(0, nDotPos);
+        while (!aSheetToken.empty() && aSheetToken.front() == u'$')
+            aSheetToken.remove_prefix(1);
+        if (!aSheetToken.empty())
+        {
+            const auto oSheet = rFacade.findSheetId(
+                runtime::referencetext::unquoteSheetName(aSheetToken));
+            if (!oSheet)
+                return std::nullopt;
+            nSheet = *oSheet;
+        }
+        aAddressToken = rToken.substr(nDotPos + 1);
+    }
+
+    if (!isAbsoluteAddressToken(aAddressToken))
+        return std::nullopt;
+
+    aAddressToken.remove_prefix(1);
+    std::size_t nColumnEnd = 0;
+    while (nColumnEnd < aAddressToken.size())
+    {
+        const char16_t cChar = aAddressToken[nColumnEnd];
+        const bool bAlpha = (cChar >= u'A' && cChar <= u'Z') || (cChar >= u'a' && cChar <= u'z');
+        if (!bAlpha)
+            break;
+        ++nColumnEnd;
+    }
+
+    const auto oColumn = parseNamedRangeColumnName(aAddressToken.substr(0, nColumnEnd));
+    if (!oColumn)
+        return std::nullopt;
+
+    api::StringView aRowToken = aAddressToken.substr(nColumnEnd + 1);
+    std::int64_t nRow = 0;
+    for (const char16_t cChar : aRowToken)
+        nRow = (nRow * 10) + (cChar - u'0');
+
+    if (nRow <= 0)
+        return std::nullopt;
+
+    return api::CellAddress { nSheet, *oColumn, static_cast<api::RowIndex>(nRow - 1) };
+}
+
+[[nodiscard]] inline std::optional<api::CellRange> parseSingleAreaNamedRangeTarget(
+    const WorkbookFacade& rFacade, const NamedRangeDescriptor& rNamedRange)
+{
+    if (rNamedRange.maTargetExpression.find(u'~') != api::StringView::npos
+        || rNamedRange.maTargetExpression.find(u';') != api::StringView::npos
+        || rNamedRange.maTargetExpression.find(u',') != api::StringView::npos)
+    {
+        return std::nullopt;
+    }
+
+    const std::size_t nColonPos = rNamedRange.maTargetExpression.find(u':');
+    if (nColonPos != api::StringView::npos
+        && rNamedRange.maTargetExpression.find(u':', nColonPos + 1) != api::StringView::npos)
+    {
+        return std::nullopt;
+    }
+
+    if (nColonPos == api::StringView::npos)
+    {
+        const auto oSingle = parseAbsoluteNamedRangeAddressToken(
+            rFacade, rNamedRange.maTargetExpression, rNamedRange.maBaseAddress.mnSheet);
+        if (!oSingle)
+            return std::nullopt;
+        return api::CellRange { *oSingle, *oSingle };
+    }
+
+    const auto oStart = parseAbsoluteNamedRangeAddressToken(
+        rFacade, rNamedRange.maTargetExpression.substr(0, nColonPos),
+        rNamedRange.maBaseAddress.mnSheet);
+    if (!oStart)
+        return std::nullopt;
+
+    const auto oEnd = parseAbsoluteNamedRangeAddressToken(
+        rFacade, rNamedRange.maTargetExpression.substr(nColonPos + 1), oStart->mnSheet);
+    if (!oEnd)
+        return std::nullopt;
+
+    api::CellRange aRange { *oStart, *oEnd };
+    if (aRange.maStart.mnSheet != aRange.maEnd.mnSheet)
+        return std::nullopt;
+
+    return dependency::detail::normalizeRange(aRange);
+}
+
+[[nodiscard]] inline std::optional<NamedRangeDescriptor> findNamedRangeDescriptorById(
+    const WorkbookFacade& rFacade, const NamedRangeId& rId)
+{
+    const auto aRanges = rFacade.getNamedRangeDescriptors();
+    const auto it = std::find_if(aRanges.begin(), aRanges.end(),
+        [&rId](const NamedRangeDescriptor& rDescriptor) { return rDescriptor.maId == rId; });
+    if (it == aRanges.end())
+        return std::nullopt;
+    return *it;
+}
+
+[[nodiscard]] inline std::vector<api::CellAddress> collectRelevantSharedFormulaNeighborhoodAddresses(
+    const WorkbookFacade& rFacade, const api::CellAddress& rAddress)
+{
+    std::set<api::CellAddress, AddressLess> aAddresses;
+    auto lCollect = [&](api::RowIndex nRow) {
+        if (nRow < 0)
+            return;
+
+        const api::CellAddress aCandidate { rAddress.mnSheet, rAddress.mnColumn, nRow };
+        if (rFacade.getFormulaCellDescriptor(aCandidate))
+            aAddresses.insert(aCandidate);
+
+        const auto oGroup = rFacade.getFormulaGroupDescriptor(aCandidate);
+        if (!oGroup)
+            return;
+
+        for (sal_Int32 nOffset = 0; nOffset < oGroup->mnLength; ++nOffset)
+        {
+            aAddresses.insert({ oGroup->maAnchor.mnSheet, oGroup->maAnchor.mnColumn,
+                static_cast<api::RowIndex>(oGroup->maAnchor.mnRow + nOffset) });
+        }
+    };
+
+    lCollect(static_cast<api::RowIndex>(rAddress.mnRow - 1));
+    lCollect(rAddress.mnRow);
+    lCollect(static_cast<api::RowIndex>(rAddress.mnRow + 1));
+    return { aAddresses.begin(), aAddresses.end() };
+}
+
+[[nodiscard]] inline std::vector<NamedRangeId> collectNamedRangeDependenciesForFormulaAddresses(
+    const dependency::DependencySnapshot& rSnapshot, const std::vector<api::CellAddress>& rAddresses)
+{
+    std::vector<NamedRangeId> aNamedRangeIds;
+    for (const auto& rAddress : rAddresses)
+    {
+        const auto oFormulaNode = rSnapshot.findFormulaCellNode(rAddress);
+        if (!oFormulaNode)
+            continue;
+
+        for (const auto& rDependency : rSnapshot.getDependencies(*oFormulaNode))
+        {
+            if (rDependency.maSource.meKind != dependency::DependencySourceKind::NamedRange)
+                continue;
+
+            if (std::find(aNamedRangeIds.begin(), aNamedRangeIds.end(),
+                    rDependency.maSource.maNamedRangeId)
+                == aNamedRangeIds.end())
+            {
+                aNamedRangeIds.push_back(rDependency.maSource.maNamedRangeId);
+            }
+        }
+    }
+
+    return aNamedRangeIds;
+}
+
+[[nodiscard]] inline bool namedRangeConsumersStayOnSheet(
+    const dependency::DependencySnapshot& rSnapshot, const NamedRangeId& rId, api::SheetId nSheet)
+{
+    const auto oNamedRangeNode = rSnapshot.findNamedRangeNode(rId);
+    if (!oNamedRangeNode)
+        return false;
+
+    for (const auto aDependentId : rSnapshot.getReverseDependents(*oNamedRangeNode))
+    {
+        const auto* pDependent = rSnapshot.getNode(aDependentId);
+        if (!pDependent || pDependent->meKind != dependency::DependencyNodeKind::FormulaCell
+            || !pDependent->moOutputAddress)
+        {
+            return false;
+        }
+
+        if (pDependent->moOutputAddress->mnSheet != nSheet)
+            return false;
+    }
+
+    return true;
 }
 
 } // namespace detail
@@ -436,6 +708,77 @@ namespace detail
             break;
     }
 
+    return aClassification;
+}
+
+[[nodiscard]] inline SharedFormulaNamedRangeMutationClassification
+classifySharedFormulaNamedRangeMutationBoundary(
+    const WorkbookFacade& rBeforeFacade, const WorkbookFacade& rAfterFacade,
+    const MutationEvent& rMutation)
+{
+    SharedFormulaNamedRangeMutationClassification aClassification;
+
+    const auto aBeforeRelevantAddresses
+        = detail::collectRelevantSharedFormulaNeighborhoodAddresses(rBeforeFacade, rMutation.maAddress);
+    const auto aAfterRelevantAddresses
+        = detail::collectRelevantSharedFormulaNeighborhoodAddresses(rAfterFacade, rMutation.maAddress);
+    const auto aBeforeSnapshot = dependency::buildDependencySnapshot(rBeforeFacade);
+    const auto aAfterSnapshot = dependency::buildDependencySnapshot(rAfterFacade);
+    auto aNamedRangeIds
+        = detail::collectNamedRangeDependenciesForFormulaAddresses(aBeforeSnapshot, aBeforeRelevantAddresses);
+    const auto aAfterNamedRangeIds
+        = detail::collectNamedRangeDependenciesForFormulaAddresses(aAfterSnapshot, aAfterRelevantAddresses);
+    for (const auto& rId : aAfterNamedRangeIds)
+    {
+        if (std::find(aNamedRangeIds.begin(), aNamedRangeIds.end(), rId) == aNamedRangeIds.end())
+            aNamedRangeIds.push_back(rId);
+    }
+
+    if (aNamedRangeIds.empty())
+        return aClassification;
+
+    aClassification.mnNamedRangeCount = static_cast<sal_Int32>(aNamedRangeIds.size());
+    aClassification.mbDescriptorsStable = true;
+    aClassification.mbAllConsumersStayOnSheet = true;
+    for (const auto& rId : aNamedRangeIds)
+    {
+        const auto oBeforeDescriptor = detail::findNamedRangeDescriptorById(rBeforeFacade, rId);
+        const auto oAfterDescriptor = detail::findNamedRangeDescriptorById(rAfterFacade, rId);
+        if (!oBeforeDescriptor || !oAfterDescriptor || *oBeforeDescriptor != *oAfterDescriptor)
+        {
+            aClassification.mbDescriptorsStable = false;
+            aClassification.meBoundary = SharedFormulaNamedRangeMutationBoundary::Deferred;
+            return aClassification;
+        }
+
+        if (oBeforeDescriptor->meScope != NamedRangeScope::Global)
+        {
+            aClassification.meBoundary = SharedFormulaNamedRangeMutationBoundary::Deferred;
+            return aClassification;
+        }
+
+        const auto oTarget
+            = detail::parseSingleAreaNamedRangeTarget(rBeforeFacade, *oBeforeDescriptor);
+        if (!oTarget || oTarget->maStart.mnSheet != rMutation.maAddress.mnSheet
+            || oTarget->maEnd.mnSheet != rMutation.maAddress.mnSheet)
+        {
+            aClassification.meBoundary = SharedFormulaNamedRangeMutationBoundary::Deferred;
+            return aClassification;
+        }
+
+        if (!detail::namedRangeConsumersStayOnSheet(
+                aBeforeSnapshot, rId, rMutation.maAddress.mnSheet)
+            || !detail::namedRangeConsumersStayOnSheet(
+                aAfterSnapshot, rId, rMutation.maAddress.mnSheet))
+        {
+            aClassification.mbAllConsumersStayOnSheet = false;
+            aClassification.meBoundary = SharedFormulaNamedRangeMutationBoundary::Deferred;
+            return aClassification;
+        }
+    }
+
+    aClassification.meBoundary
+        = SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSameSheet;
     return aClassification;
 }
 

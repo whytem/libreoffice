@@ -323,15 +323,19 @@ explicit:
 - the bounded same-sheet three-group collapse cycle is now closed as
   deferred: synthetic exact modeling closes, but live Calc keeps the far
   group separate so the admitted slice does not widen
+- the bounded named-range-combined preserve cycle is now also closed as
+  deferred: facade and standalone exact proof landed, but live lifecycle
+  and mutation-entry carry-through do not admit the bounded preserve family
 - non-exact or broader shared-group classes still fall back to the
   validation-only pilot lane or stay deferred
 - gate-off and named-range-combined shared-group classes reject
-  deterministically
+  deterministically in the live admitted lanes
 - repair-sensitive shared-group divergence remains repair-detected and
   rollback-capable
 - broader shared-group live rollout still stays deferred because
-  multi-group collapse, named-range-combined, repair-sensitive, off-sheet,
-  and broader non-edge regroup or merge classes are not yet engine-authored
+  multi-group collapse, broader named-range-combined, repair-sensitive,
+  off-sheet, and broader non-edge regroup or merge classes are not yet
+  engine-authored
 
 ## Storage And Wiring Outcome
 
@@ -935,18 +939,16 @@ The next explicit roadmap category is:
 The most actionable remaining work is now narrower than another broad
 workbook-class push.
 
-The exact regroup, merge, replacement-merge, merge-completion, and
-multi-group-collapse cycles are now complete.
-
-The next adjacent concern is now staged as:
-
-- bounded named-range-combined shared-group behavior, starting with
-  [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md)
+The exact regroup, merge, replacement-merge, merge-completion,
+multi-group-collapse, and bounded named-range-combined cycles are now
+complete.
 
 The adjacent concerns after that are:
 
 - repair-sensitive host normalization
 - off-sheet shared-group behavior
+- broader named-range-combined member-exit, regroup, merge, and
+  multi-group-collapse classes
 - broader non-edge regroup and merge shared-group classes
 
 The most recent closeout references and next-pass plan are:
@@ -962,6 +964,7 @@ The most recent closeout references and next-pass plan are:
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_ADMISSION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_DECISION_RECORD.md)
 
 ## Current Assessment
 

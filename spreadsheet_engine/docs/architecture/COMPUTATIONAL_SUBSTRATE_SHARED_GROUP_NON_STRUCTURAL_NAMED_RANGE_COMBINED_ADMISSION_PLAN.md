@@ -1,6 +1,18 @@
 # Computational Substrate Shared-Group Non-Structural Named-Range-Combined Admission Plan
 
-Status: staged execution plan for the bounded named-range-combined cycle
+Status: complete closeout record for the bounded named-range-combined cycle
+
+## Closeout Result
+
+This cycle is now complete.
+
+The bounded result is:
+
+- keep same-sheet shareable named-range-combined `SameTextPreserve`
+  deferred despite standalone exactness
+- keep bounded named-range-combined member-exit deferred
+- keep broader named-range-combined, repair-sensitive, and off-sheet classes
+  deferred
 
 ## Purpose
 

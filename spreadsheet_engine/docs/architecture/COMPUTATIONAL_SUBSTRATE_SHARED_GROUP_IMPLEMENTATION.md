@@ -55,7 +55,7 @@ The implementation stays intentionally narrow:
   edge replacement-merge `SetFormula`
 - it now also widens the live admitted slice for exact same-sheet shareable
   one-sided adjacent insertion `SetFormula`
-- it keeps multi-group collapse, broader merge, named-range-sensitive,
+- it keeps multi-group collapse, broader merge, named-range-combined,
   off-sheet, repair-sensitive, and non-edge regroup shared-group classes
   outside live admission
 
@@ -230,13 +230,18 @@ The frontier closeouts add five more bounded rules:
   can create the inserted formula cell in the predicted shadow and rebuild
   exactly one adjacent prior shared group into a bounded exact
   prior-length-plus-one after-topology
+- named-range-combined same-text preserve now has explicit facade
+  classification and preserve-only authority candidate handling, but it
+  remains deferred live because lifecycle and mutation-entry carry-through
+  do not yet close
 - bounded three-participant multi-group collapse remains deferred because
   the exact authored full-span one-group topology closes only in standalone
   proof; live Calc three-group attempts keep the far participant group
   separate
-- multi-group collapse, named-range-combined, repair-sensitive, off-sheet,
-  and broader non-edge regroup or merge classes remain rejected as deferred
-  frontier classes instead of passing through the ordinary formula paths
+- multi-group collapse, broader named-range-combined, repair-sensitive,
+  off-sheet, and broader non-edge regroup or merge classes remain rejected
+  as deferred frontier classes instead of passing through the ordinary
+  formula paths
 
 ## Test Coverage Added
 
@@ -285,10 +290,20 @@ The checked-in coverage now includes:
   coverage on the same bounded slice
 - non-structural shared-group one-sided insert lifecycle and mutation-entry
   coverage on the same bounded slice
+- facade consumer coverage for bounded named-range-combined same-text
+  preserve and off-sheet defer classification
+- standalone proof that exact named-range-combined same-text preserve
+  closes exact computational, graph, and IR state
+- standalone retained reject coverage for bounded named-range-combined
+  member-exit
 - Calc facade proof that live three-group attempts keep the far group
   separate instead of producing one full-span collapsed group
 - non-structural shared-group lifecycle and mutation-entry proof that live
   three-group attempts keep the far group separate
+- live lifecycle and mutation-entry retained defer proof for bounded
+  named-range-combined same-text preserve
+- live authority and mutation-entry retained reject proof for bounded
+  named-range-combined member-exit
 - structural shared-group-plus-named-range defer coverage
 - structural shared-group repair-detected coverage when the group shape is
   perturbed after the structural mutation

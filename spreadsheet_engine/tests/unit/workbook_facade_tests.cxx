@@ -804,6 +804,108 @@ int main()
         }
     }
 
+    // --- Shared-formula named-range-combined preserve classification ---
+    {
+        InMemoryWorkbookFacade aBeforeFacade;
+        aBeforeFacade.setGrammar(aFacade.getGrammar());
+        aBeforeFacade.setGeneration(60);
+        const auto nNamedRangeSheet = aBeforeFacade.addSheet(u"Data");
+        aBeforeFacade.setCell({ nNamedRangeSheet, 0, 0 }, CellValue::number(1.0));
+        aBeforeFacade.setCell({ nNamedRangeSheet, 0, 1 }, CellValue::number(2.0));
+        aBeforeFacade.setCell({ nNamedRangeSheet, 0, 2 }, CellValue::number(3.0));
+        aBeforeFacade.addNamedRange(
+            u"Metrics", std::nullopt, { nNamedRangeSheet, 0, 0 }, u"$Data.$A$1:$A$2");
+        aBeforeFacade.setFormulaCell({ nNamedRangeSheet, 1, 0 }, u"=COUNTA(Metrics)+A1",
+            CellValue::number(3.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.setFormulaCell({ nNamedRangeSheet, 1, 1 }, u"=COUNTA(Metrics)+A2",
+            CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.setFormulaCell({ nNamedRangeSheet, 1, 2 }, u"=COUNTA(Metrics)+A3",
+            CellValue::number(5.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.addFormulaGroup({ nNamedRangeSheet, 1, 0 }, 3, true);
+        aBeforeFacade.setFormulaCell({ nNamedRangeSheet, 2, 0 }, u"=COUNTA(Metrics)",
+            CellValue::number(2.0), FormulaCellKind::Ordinary, true, true);
+
+        InMemoryWorkbookFacade aAfterFacade;
+        aAfterFacade.setGrammar(aBeforeFacade.getGrammar());
+        aAfterFacade.setGeneration(61);
+        aAfterFacade.addSheet(u"Data");
+        aAfterFacade.setCell({ nNamedRangeSheet, 0, 0 }, CellValue::number(1.0));
+        aAfterFacade.setCell({ nNamedRangeSheet, 0, 1 }, CellValue::number(2.0));
+        aAfterFacade.setCell({ nNamedRangeSheet, 0, 2 }, CellValue::number(3.0));
+        aAfterFacade.addNamedRange(
+            u"Metrics", std::nullopt, { nNamedRangeSheet, 0, 0 }, u"$Data.$A$1:$A$2");
+        aAfterFacade.setFormulaCell({ nNamedRangeSheet, 1, 0 }, u"=COUNTA(Metrics)+A1",
+            CellValue::number(3.0), FormulaCellKind::SharedGroupMember, true, true);
+        aAfterFacade.setFormulaCell({ nNamedRangeSheet, 1, 1 }, u"=COUNTA(Metrics)+A2",
+            CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+        aAfterFacade.setFormulaCell({ nNamedRangeSheet, 1, 2 }, u"=COUNTA(Metrics)+A3",
+            CellValue::number(5.0), FormulaCellKind::SharedGroupMember, true, true);
+        aAfterFacade.addFormulaGroup({ nNamedRangeSheet, 1, 0 }, 3, true);
+        aAfterFacade.setFormulaCell({ nNamedRangeSheet, 2, 0 }, u"=COUNTA(Metrics)",
+            CellValue::number(2.0), FormulaCellKind::Ordinary, true, true);
+
+        const auto aClassification = consumers::classifySharedFormulaMutation(
+            aBeforeFacade, aAfterFacade,
+            MutationEvent::setFormula({ nNamedRangeSheet, 1, 1 }, u"=COUNTA(Metrics)+A2"));
+        const auto aNamedRangeBoundary
+            = consumers::classifySharedFormulaNamedRangeMutationBoundary(
+                aBeforeFacade, aAfterFacade,
+                MutationEvent::setFormula(
+                    { nNamedRangeSheet, 1, 1 }, u"=COUNTA(Metrics)+A2"));
+        if (aClassification.meFamily != consumers::SharedFormulaMutationFamily::SameTextPreserve
+            || aNamedRangeBoundary.meBoundary
+                   != consumers::SharedFormulaNamedRangeMutationBoundary::
+                       GlobalSingleAreaSameSheet
+            || aNamedRangeBoundary.mnNamedRangeCount != 1
+            || !aNamedRangeBoundary.mbDescriptorsStable
+            || !aNamedRangeBoundary.mbAllConsumersStayOnSheet)
+        {
+            return fail("facade_consumers",
+                "shared-group named-range preserve classification mismatch");
+        }
+    }
+
+    // --- Shared-formula named-range-combined off-sheet defer classification ---
+    {
+        InMemoryWorkbookFacade aBeforeFacade;
+        aBeforeFacade.setGrammar(aFacade.getGrammar());
+        aBeforeFacade.setGeneration(62);
+        const auto nDataSheet = aBeforeFacade.addSheet(u"Data");
+        const auto nSummarySheet = aBeforeFacade.addSheet(u"Summary");
+        aBeforeFacade.setCell({ nDataSheet, 0, 0 }, CellValue::number(1.0));
+        aBeforeFacade.setCell({ nDataSheet, 0, 1 }, CellValue::number(2.0));
+        aBeforeFacade.setCell({ nDataSheet, 0, 2 }, CellValue::number(3.0));
+        aBeforeFacade.addNamedRange(
+            u"Metrics", std::nullopt, { nDataSheet, 0, 0 }, u"$Data.$A$1:$A$2");
+        aBeforeFacade.setFormulaCell({ nDataSheet, 1, 0 }, u"=COUNTA(Metrics)+A1",
+            CellValue::number(3.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.setFormulaCell({ nDataSheet, 1, 1 }, u"=COUNTA(Metrics)+A2",
+            CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.setFormulaCell({ nDataSheet, 1, 2 }, u"=COUNTA(Metrics)+A3",
+            CellValue::number(5.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.addFormulaGroup({ nDataSheet, 1, 0 }, 3, true);
+        aBeforeFacade.setFormulaCell({ nSummarySheet, 0, 0 }, u"=COUNTA(Metrics)",
+            CellValue::number(2.0), FormulaCellKind::Ordinary, true, true);
+
+        InMemoryWorkbookFacade aAfterFacade = aBeforeFacade;
+        aAfterFacade.setGeneration(63);
+
+        const auto aNamedRangeBoundary
+            = consumers::classifySharedFormulaNamedRangeMutationBoundary(
+                aBeforeFacade, aAfterFacade,
+                MutationEvent::setFormula(
+                    { nDataSheet, 1, 1 }, u"=COUNTA(Metrics)+A2"));
+        if (aNamedRangeBoundary.meBoundary
+                != consumers::SharedFormulaNamedRangeMutationBoundary::Deferred
+            || aNamedRangeBoundary.mnNamedRangeCount != 1
+            || !aNamedRangeBoundary.mbDescriptorsStable
+            || aNamedRangeBoundary.mbAllConsumersStayOnSheet)
+        {
+            return fail("facade_consumers",
+                "shared-group named-range off-sheet boundary mismatch");
+        }
+    }
+
     // --- Named-range inventory consumer ---
     {
         const auto aInventory = consumers::inventoryNamedRanges(rFacade);

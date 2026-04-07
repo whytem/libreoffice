@@ -748,10 +748,31 @@ Current architecture docs:
   the admitted slice unchanged while marking the bounded three-participant
   family deferred
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md) -
-  staged execution plan for the next named-range-combined shared-group
-  cycle, targeting bounded same-sheet shareable same-text preserve on the
-  global single-area named-range surface before repair-sensitive,
-  off-sheet, or broader non-edge regroup and merge classes
+  completed closeout record for the bounded named-range-combined
+  shared-group cycle, keeping the bounded preserve family deferred after
+  standalone exactness plus live lifecycle and mutation-entry reject proof
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_CONTRACT.md) -
+  frozen contract for the named-range-combined closeout, fixing the
+  candidate preserve family plus retained member-exit and broader deferred
+  classes
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_SCENARIO_MATRIX.md) -
+  frozen scenario matrix for the named-range-combined closeout, separating
+  candidate preserve from member-exit, off-sheet, and broader defer buckets
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_MAPPING_RULES.md) -
+  frozen mapping note for the named-range-combined closeout, defining
+  preserve exactness plus the explicit reject rule for broader families
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_IMPLEMENTATION.md) -
+  completed implementation note for the named-range-combined closeout,
+  including boundary classification and preserve-only authority candidate
+  handling without live admission
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_EVIDENCE.md) -
+  frozen evidence note for the named-range-combined closeout, recording
+  standalone exact preserve proof plus live preserve/member-exit defer
+  proof
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_DECISION_RECORD.md) -
+  completed closeout decision for the named-range-combined cycle,
+  leaving the admitted slice unchanged while making the bounded preserve and
+  member-exit limits explicit
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded
