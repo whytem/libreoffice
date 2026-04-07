@@ -1701,26 +1701,41 @@ inline void collectResolvedDependencySources(const dependency::DependencySnapsho
         if (rNode.meKind != dependency::DependencyNodeKind::FormulaCell || !rNode.moOutputAddress)
             continue;
 
-        const auto aListenerAnchor
+        const auto aFormulaCellAnchor
             = graphmapping::makeGraphFormulaCellListenerAnchorId(*rNode.moOutputAddress);
-        std::vector<facade::NamedRangeId> aVisitedNamedRanges;
-        std::vector<dependency::DependencySource> aResolvedSources;
+        const auto oFormulaGroupAnchor = [&rNode]() -> std::optional<ListenerAnchorId> {
+            if (!rNode.moSharedGroupAnchor || rNode.mnSharedGroupLength <= 0)
+                return std::nullopt;
+
+            return graphmapping::makeGraphFormulaGroupListenerAnchorId(
+                { *rNode.moSharedGroupAnchor, rNode.mnSharedGroupLength });
+        }();
+
         for (const auto& rDependency : rSnapshot.getDependencies(rNode.maId))
+        {
+            const ListenerAnchorId aListenerAnchor
+                = (rDependency.maSource.meKind == dependency::DependencySourceKind::NamedRange
+                   && oFormulaGroupAnchor.has_value())
+                      ? *oFormulaGroupAnchor
+                      : aFormulaCellAnchor;
+            std::vector<facade::NamedRangeId> aVisitedNamedRanges;
+            std::vector<dependency::DependencySource> aResolvedSources;
             collectResolvedDependencySources(
                 rSnapshot, rDependency.maSource, aVisitedNamedRanges, aResolvedSources);
 
-        for (const auto& rSource : aResolvedSources)
-        {
-            if (rSource.meKind == dependency::DependencySourceKind::Cell)
+            for (const auto& rSource : aResolvedSources)
             {
-                aCellBroadcasters[rSource.maCellAddress].push_back(aListenerAnchor);
-                continue;
-            }
+                if (rSource.meKind == dependency::DependencySourceKind::Cell)
+                {
+                    aCellBroadcasters[rSource.maCellAddress].push_back(aListenerAnchor);
+                    continue;
+                }
 
-            if (rSource.meKind == dependency::DependencySourceKind::Range)
-            {
-                aAreaBroadcasters[dependency::detail::normalizeRange(rSource.maCellRange)].push_back(
-                    aListenerAnchor);
+                if (rSource.meKind == dependency::DependencySourceKind::Range)
+                {
+                    aAreaBroadcasters[dependency::detail::normalizeRange(rSource.maCellRange)]
+                        .push_back(aListenerAnchor);
+                }
             }
         }
     }
@@ -1813,24 +1828,40 @@ inline void collectResolvedDependencySources(const dependency::DependencySnapsho
         if (rNode.meKind != dependency::DependencyNodeKind::FormulaCell || !rNode.moOutputAddress)
             continue;
 
-        const auto aListenerAnchor
+        const auto aFormulaCellAnchor
             = graphmapping::makeGraphFormulaCellListenerAnchorId(*rNode.moOutputAddress);
-        std::vector<facade::NamedRangeId> aVisitedNamedRanges;
-        std::vector<dependency::DependencySource> aResolvedSources;
+        const auto oFormulaGroupAnchor = [&rNode]() -> std::optional<ListenerAnchorId> {
+            if (!rNode.moSharedGroupAnchor || rNode.mnSharedGroupLength <= 0)
+                return std::nullopt;
+
+            return graphmapping::makeGraphFormulaGroupListenerAnchorId(
+                { *rNode.moSharedGroupAnchor, rNode.mnSharedGroupLength });
+        }();
+
         for (const auto& rDependency : rSnapshot.getDependencies(rNode.maId))
-            collectResolvedDependencySources(rSnapshot, rDependency.maSource, aVisitedNamedRanges, aResolvedSources);
-
-        for (const auto& rSource : aResolvedSources)
         {
-            BroadcasterNodeId aBroadcaster;
-            if (rSource.meKind == dependency::DependencySourceKind::Cell)
-                aBroadcaster = BroadcasterNodeId::forCell(rSource.maCellAddress);
-            else
-                aBroadcaster = BroadcasterNodeId::forArea(
-                    dependency::detail::normalizeRange(rSource.maCellRange));
+            const ListenerAnchorId aListenerAnchor
+                = (rDependency.maSource.meKind == dependency::DependencySourceKind::NamedRange
+                   && oFormulaGroupAnchor.has_value())
+                      ? *oFormulaGroupAnchor
+                      : aFormulaCellAnchor;
+            std::vector<facade::NamedRangeId> aVisitedNamedRanges;
+            std::vector<dependency::DependencySource> aResolvedSources;
+            collectResolvedDependencySources(
+                rSnapshot, rDependency.maSource, aVisitedNamedRanges, aResolvedSources);
 
-            aGraph.maEdges.push_back({ aBroadcaster, aListenerAnchor });
-            ++aBroadcasterCounts[aBroadcaster];
+            for (const auto& rSource : aResolvedSources)
+            {
+                BroadcasterNodeId aBroadcaster;
+                if (rSource.meKind == dependency::DependencySourceKind::Cell)
+                    aBroadcaster = BroadcasterNodeId::forCell(rSource.maCellAddress);
+                else
+                    aBroadcaster = BroadcasterNodeId::forArea(
+                        dependency::detail::normalizeRange(rSource.maCellRange));
+
+                aGraph.maEdges.push_back({ aBroadcaster, aListenerAnchor });
+                ++aBroadcasterCounts[aBroadcaster];
+            }
         }
     }
 

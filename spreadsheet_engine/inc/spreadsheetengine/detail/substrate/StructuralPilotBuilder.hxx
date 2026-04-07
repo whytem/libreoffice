@@ -399,6 +399,70 @@ using spreadsheetengine::detail::substrate::detail::sortNamedRanges;
         });
 }
 
+[[nodiscard]] inline std::optional<api::SheetId> findSingleSheetNamedRangeTargetSheet(
+    const dependency::DependencySnapshot& rSnapshot, dependency::DependencyNodeId aNamedRangeNodeId)
+{
+    std::optional<api::SheetId> oTargetSheet;
+    for (const auto& rDependency : rSnapshot.getDependencies(aNamedRangeNodeId))
+    {
+        std::optional<api::SheetId> oDependencySheet;
+        switch (rDependency.maSource.meKind)
+        {
+            case dependency::DependencySourceKind::Cell:
+                oDependencySheet = rDependency.maSource.maCellAddress.mnSheet;
+                break;
+            case dependency::DependencySourceKind::Range:
+                if (rDependency.maSource.maCellRange.maStart.mnSheet
+                    != rDependency.maSource.maCellRange.maEnd.mnSheet)
+                {
+                    return std::nullopt;
+                }
+                oDependencySheet = rDependency.maSource.maCellRange.maStart.mnSheet;
+                break;
+            case dependency::DependencySourceKind::NamedRange:
+            case dependency::DependencySourceKind::OpaqueWorkbook:
+                return std::nullopt;
+        }
+
+        if (!oTargetSheet)
+            oTargetSheet = oDependencySheet;
+        else if (*oTargetSheet != *oDependencySheet)
+            return std::nullopt;
+    }
+
+    return oTargetSheet;
+}
+
+[[nodiscard]] inline bool hasOffSheetNamedRangeConsumers(
+    const dependency::DependencySnapshot& rSnapshot)
+{
+    for (const auto& rNode : rSnapshot.maNodes)
+    {
+        if (rNode.meKind != dependency::DependencyNodeKind::NamedRange || !rNode.maId.isValid())
+            continue;
+
+        const auto oTargetSheet
+            = findSingleSheetNamedRangeTargetSheet(rSnapshot, rNode.maId);
+        if (!oTargetSheet)
+            continue;
+
+        for (const auto aDependentId : rSnapshot.getReverseDependents(rNode.maId))
+        {
+            const auto* pDependent = rSnapshot.getNode(aDependentId);
+            if (!pDependent || pDependent->meKind != dependency::DependencyNodeKind::FormulaCell
+                || !pDependent->moOutputAddress)
+            {
+                continue;
+            }
+
+            if (pDependent->moOutputAddress->mnSheet != *oTargetSheet)
+                return true;
+        }
+    }
+
+    return false;
+}
+
 [[nodiscard]] inline std::optional<api::CellAddress> shiftAddress(
     const facade::MutationEvent& rMutation, const api::CellAddress& rAddress)
 {
@@ -1196,6 +1260,14 @@ inline void overlayObservedCellPayloads(ComputationalWorkbookShadow& rPredicted,
     {
         aTransition.meVerdict = StructuralPilotVerdict::RejectedOutOfContract;
         aTransition.maReason = u"opaque_dependency_surface";
+        return aTransition;
+    }
+
+    if (bNamedRangeValidationSlice
+        && structuralbuilddetail::hasOffSheetNamedRangeConsumers(aTransition.maDependencySnapshot))
+    {
+        aTransition.meVerdict = StructuralPilotVerdict::RejectedOutOfContract;
+        aTransition.maReason = u"structural_slice_out_of_contract";
         return aTransition;
     }
 

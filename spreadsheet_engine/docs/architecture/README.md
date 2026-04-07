@@ -798,6 +798,32 @@ Current architecture docs:
   completed closeout decision for the FormulaGroup listener-anchor
   live-support cycle, adopting true FormulaGroup replay on the admitted
   slice while keeping named-range admission deferred
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_PLAN.md) -
+  completed blocker-removal and widening closeout for bounded
+  named-range-combined live ownership, now recording admitted bounded
+  preserve carry-through
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_CONTRACT.md) -
+  frozen contract for the bounded named-range-combined live-ownership
+  closeout, fixing the admitted preserve family and retained defer list
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_SCENARIO_MATRIX.md) -
+  frozen scenario matrix for the bounded named-range-combined live-ownership
+  closeout, separating exact admit proof from retained reject buckets
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_MAPPING_RULES.md) -
+  frozen mapping note for the bounded named-range-combined live-ownership
+  closeout, defining target-expression parsing and mixed listener-anchor
+  projection rules
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_IMPLEMENTATION.md) -
+  completed implementation note for the bounded named-range-combined
+  live-ownership closeout, covering zero-opacity snapshot fallback and
+  exact mixed-anchor projection
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_EVIDENCE.md) -
+  frozen evidence note for the bounded named-range-combined live-ownership
+  closeout, proving exact lifecycle and mutation-entry apply on the bounded
+  preserve family
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_DECISION_RECORD.md) -
+  completed closeout decision for the bounded named-range-combined
+  live-ownership cycle, admitting bounded preserve while keeping broader
+  named-range frontier classes deferred
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

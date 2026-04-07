@@ -73,9 +73,12 @@ This decision is supported by:
 
 The next adjacent concern is no longer listener-anchor kind support.
 
-It is now the remaining live ownership gap beyond that support:
+That blocker-removal work is now complete:
 
-- named-range-combined opaque dependency surfaces and exact
-  rollback/final-verification closure
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_DECISION_RECORD.md)
+
+The next adjacent concerns are now:
+
 - repair-sensitive host normalization
 - off-sheet shared-group behavior
+- broader named-range-combined member-exit, regroup, merge, and collapse

@@ -2,6 +2,13 @@
 
 Status: complete closeout decision for the bounded named-range-combined cycle
 
+## Later Update
+
+The bounded preserve family that stayed deferred in this earlier cycle is
+now admitted through the later live-ownership closeout:
+
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_DECISION_RECORD.md)
+
 ## Decision
 
 Do not widen the admitted shared-group non-structural slice in this cycle.

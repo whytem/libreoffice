@@ -262,6 +262,75 @@ inline void addOpaqueDependency(DependencySnapshot& rSnapshot, DependencyNodeId 
         DependencySource::opaqueWorkbook(rDetail));
 }
 
+inline void addDependencyForRange(DependencySnapshot& rSnapshot, DependencyNodeId aNodeId,
+    const api::CellRange& rRange)
+{
+    if (rRange.isSingleCell())
+        addEdge(rSnapshot, aNodeId, DependencyEdgeKind::DirectCell,
+            DependencySource::cell(rRange.maStart));
+    else
+        addEdge(rSnapshot, aNodeId, DependencyEdgeKind::DirectRange,
+            DependencySource::range(rRange));
+}
+
+[[nodiscard]] inline bool collectDependencyFromRawReferenceText(api::StringView rText,
+    const facade::WorkbookFacade& rFacade, DependencySnapshot& rSnapshot, DependencyNodeId aNodeId,
+    const api::CellAddress& rBaseAddress)
+{
+    const FacadeReferenceHost aHost(rFacade);
+    const auto aContext = compiler::makeWorkbookCompileContext(
+        rBaseAddress, rFacade.getGrammar(), false, true);
+
+    if (const auto oReference = compiler::detail::parseSingleReference(
+            rText, aHost, aContext, rBaseAddress.mnSheet))
+    {
+        addDependencyForRange(rSnapshot, aNodeId, toApiRange(*oReference));
+        return true;
+    }
+
+    const std::size_t nSeparator = rText.rfind(u':');
+    if (nSeparator == api::StringView::npos || nSeparator == 0
+        || nSeparator + 1 >= rText.size())
+    {
+        return false;
+    }
+
+    const api::StringView aStartText = rText.substr(0, nSeparator);
+    const api::StringView aEndText = rText.substr(nSeparator + 1);
+    const auto oStart = compiler::detail::parseSingleReference(
+        aStartText, aHost, aContext, rBaseAddress.mnSheet);
+    if (!oStart)
+        return false;
+
+    std::optional<compiler::detail::ExternalReferenceContext> oExternal;
+    if (oStart->mbExternal)
+    {
+        oExternal = compiler::detail::ExternalReferenceContext {
+            oStart->mnFileId, oStart->maExternalTabName };
+    }
+
+    const auto oEnd = compiler::detail::parseSingleReference(
+        aEndText, aHost, aContext, oStart->mnResolvedSheet, oExternal);
+    if (!oEnd)
+        return false;
+
+    api::CellRange aRange;
+    if (oStart->meShape == compiler::detail::ParsedSingleReference::Shape::Cell
+        && oEnd->meShape == compiler::detail::ParsedSingleReference::Shape::Cell)
+    {
+        aRange = detail::normalizeRange(
+            { { oStart->mnResolvedSheet, oStart->mnResolvedColumn, oStart->mnResolvedRow },
+                { oEnd->mnResolvedSheet, oEnd->mnResolvedColumn, oEnd->mnResolvedRow } });
+    }
+    else
+    {
+        aRange = toApiRange(compiler::detail::mergeExpandedRanges(*oStart, *oEnd));
+    }
+
+    addDependencyForRange(rSnapshot, aNodeId, aRange);
+    return true;
+}
+
 [[nodiscard]] inline bool isOpaqueFunctionHead(api::StringView rHead)
 {
     const api::String aFolded = foldAsciiUpper(rHead);
@@ -290,13 +359,7 @@ inline void collectDependenciesFromFormulaNode(const core::formula::Node& rNode,
                 return;
             }
 
-            const api::CellRange aRange = toApiRange(*oReference);
-            if (aRange.isSingleCell())
-                addEdge(rSnapshot, aNodeId, DependencyEdgeKind::DirectCell,
-                    DependencySource::cell(aRange.maStart));
-            else
-                addEdge(rSnapshot, aNodeId, DependencyEdgeKind::DirectRange,
-                    DependencySource::range(aRange));
+            addDependencyForRange(rSnapshot, aNodeId, toApiRange(*oReference));
             return;
         }
         case NodeKind::RangeReference:
@@ -337,12 +400,7 @@ inline void collectDependenciesFromFormulaNode(const core::formula::Node& rNode,
                 aRange = toApiRange(compiler::detail::mergeExpandedRanges(*oStart, *oEnd));
             }
 
-            if (aRange.isSingleCell())
-                addEdge(rSnapshot, aNodeId, DependencyEdgeKind::DirectCell,
-                    DependencySource::cell(aRange.maStart));
-            else
-                addEdge(rSnapshot, aNodeId, DependencyEdgeKind::DirectRange,
-                    DependencySource::range(aRange));
+            addDependencyForRange(rSnapshot, aNodeId, aRange);
             return;
         }
         case NodeKind::NamedReference:
@@ -526,8 +584,12 @@ inline void populateSharedGroupMetadata(const facade::WorkbookFacade& rFacade,
         const auto aParseResult = core::formula::parseFormula(rNamedRange.maTargetExpression);
         if (!aParseResult)
         {
-            detail::addOpaqueDependency(aSnapshot, aNodeId, u"parse_failure");
-            detail::addIssue(aSnapshot, aNodeId, u"parse_failure");
+            if (!detail::collectDependencyFromRawReferenceText(rNamedRange.maTargetExpression,
+                    rFacade, aSnapshot, aNodeId, rNamedRange.maBaseAddress))
+            {
+                detail::addOpaqueDependency(aSnapshot, aNodeId, u"parse_failure");
+                detail::addIssue(aSnapshot, aNodeId, u"parse_failure");
+            }
             continue;
         }
 

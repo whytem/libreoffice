@@ -1084,6 +1084,8 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testNamedRangeInvalidationShadow)
 
     const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 1);
     const auto aSnapshot = buildDependencySnapshot(aBeforeFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(0), aSnapshot.maReport.mnOpaqueNodeCount);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(0), aSnapshot.maReport.mnOpaqueEdgeCount);
     const auto aPlan = planInvalidation(aSnapshot, translateSetScalarValue(ScAddress(0, 1, 0)));
 
     m_pDoc->SetValue(0, 1, 0, 9.0);
@@ -2152,7 +2154,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
-    testComputationalNarrowRolloutSharedGroupNonStructuralLifecycleNamedRangeSameTextPreserveStaysDeferredOpaqueDependencySurface)
+    testComputationalNarrowRolloutSharedGroupNonStructuralLifecycleNamedRangeSameTextPreserveApplies)
 {
     using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
     using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
@@ -2196,9 +2198,11 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     const auto oResult = aLifecycleCapture.apply(
         *m_pDoc, translateSetFormula(ScAddress(1, 1, 0), u"=COUNTA(Metrics)+A2"_ustr));
     CPPUNIT_ASSERT(oResult.has_value());
-    CPPUNIT_ASSERT_EQUAL(ComputationalLifecycleResultKind::RejectedOutOfContract,
-        oResult->meKind);
-    CPPUNIT_ASSERT(oResult->maTransition.maReason == u"opaque_dependency_surface");
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(0),
+        oResult->maTransition.maDependencySnapshot.maReport.mnOpaqueNodeCount);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(0),
+        oResult->maTransition.maDependencySnapshot.maReport.mnOpaqueEdgeCount);
+    assertComputationalLifecycleApplied(oResult, *m_pDoc);
 
     const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
     const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
@@ -2964,7 +2968,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
-    testComputationalMutationEntrySharedGroupNonStructuralNamedRangeSameTextPreserveRemovesListenerAnchorBlockerButStillStaysDeferred)
+    testComputationalMutationEntrySharedGroupNonStructuralNamedRangeSameTextPreserveApplies)
 {
     using spreadsheetengine::detail::substrate::MutationEntryRequest;
     namespace consumers = spreadsheetengine::detail::facade::consumers;
@@ -2996,14 +3000,9 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 
     const auto oResult = aEntryCapture.apply(*m_pDoc,
         MutationEntryRequest::setFormula({ 0, 1, 1 }, u"=COUNTA(Metrics)+A2"));
-    CPPUNIT_ASSERT(oResult.has_value());
-    CPPUNIT_ASSERT_EQUAL(ComputationalMutationEntryResultKind::RejectedOutOfContract,
-        oResult->meKind);
-    CPPUNIT_ASSERT(oResult->moLiveApplyObservation.has_value());
-    CPPUNIT_ASSERT(oResult->moLiveApplyObservation->maReason
-                   == u"rollback_queue_or_state_mismatch");
-    CPPUNIT_ASSERT(
-        oResult->moLiveApplyObservation->maReason != u"listener_anchor_out_of_contract");
+    assertComputationalMutationEntryApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbFullMatch);
 
     const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
     const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(

@@ -1,6 +1,6 @@
 # Computational Substrate Shared-Group Implementation
 
-Status: bounded structural plus non-structural shared-group slice implemented, including exact regroup, gap-merge, replacement-merge, one-sided insert closeout, and a deferred multi-group-collapse closeout
+Status: bounded structural plus non-structural shared-group slice implemented, including exact regroup, gap-merge, replacement-merge, one-sided insert closeout, admitted bounded named-range preserve, and a deferred multi-group-collapse closeout
 
 ## What Landed
 
@@ -35,6 +35,9 @@ The workstream is now closed out by:
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_IMPLEMENTATION.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_DECISION_RECORD.md)
 
 The implementation stays intentionally narrow:
 
@@ -55,7 +58,10 @@ The implementation stays intentionally narrow:
   edge replacement-merge `SetFormula`
 - it now also widens the live admitted slice for exact same-sheet shareable
   one-sided adjacent insertion `SetFormula`
-- it keeps multi-group collapse, broader merge, named-range-combined,
+- it now also widens the live admitted slice for exact same-sheet shareable
+  named-range-combined `SameTextPreserve` `SetFormula` on the bounded
+  `GlobalSingleAreaSameSheet` surface
+- it keeps multi-group collapse, broader named-range-combined classes,
   off-sheet, repair-sensitive, and non-edge regroup shared-group classes
   outside live admission
 
@@ -133,6 +139,8 @@ Within that gate, the admitted family is:
   mutation-entry lanes
 - one-sided adjacent insertion `SetFormula` through the lifecycle and
   mutation-entry lanes
+- bounded named-range-combined same-text preserve `SetFormula` through the
+  lifecycle and mutation-entry lanes
 
 but only when the touched same-sheet shareable shared-group member exits the
 group and surviving members can be repartitioned into exact contiguous runs,
@@ -233,11 +241,10 @@ The frontier closeouts add five more bounded rules:
 - true `FormulaGroup` listener anchors are now live-owned on the already
   admitted shared-group path through resident wiring replay
 - `HostUnknown` listener anchors remain explicitly out of contract
-- named-range-combined same-text preserve now has explicit facade
-  classification and preserve-only authority candidate handling, but it
-  remains deferred live because lifecycle stops at
-  `opaque_dependency_surface` and mutation entry stops at
-  `rollback_queue_or_state_mismatch`
+- named-range-combined same-text preserve is now admitted only when direct
+  target-expression dependencies close without opacity and named-range
+  common dependencies project to exact `FormulaGroup` listener anchors while
+  member-local direct references remain on exact `FormulaCell` anchors
 - bounded three-participant multi-group collapse remains deferred because
   the exact authored full-span one-group topology closes only in standalone
   proof; live Calc three-group attempts keep the far participant group
@@ -298,14 +305,18 @@ The checked-in coverage now includes:
   preserve and off-sheet defer classification
 - standalone proof that exact named-range-combined same-text preserve
   closes exact computational, graph, and IR state
+- Calc dependency-snapshot proof that bounded named-range target
+  expressions no longer create opaque nodes or edges
+- live lifecycle proof that bounded named-range-combined same-text preserve
+  now applies
+- live mutation-entry proof that bounded named-range-combined same-text
+  preserve now applies
 - standalone retained reject coverage for bounded named-range-combined
   member-exit
 - Calc facade proof that live three-group attempts keep the far group
   separate instead of producing one full-span collapsed group
 - non-structural shared-group lifecycle and mutation-entry proof that live
   three-group attempts keep the far group separate
-- live lifecycle and mutation-entry retained defer proof for bounded
-  named-range-combined same-text preserve
 - live authority and mutation-entry retained reject proof for bounded
   named-range-combined member-exit
 - retained reject coverage for `HostUnknown` listener anchors on the live
