@@ -635,6 +635,11 @@ Current architecture docs:
   completed closeout decision for the regroup cycle, admitting only the
   bounded edge-regroup family beyond the earlier member-exit and same-text
   preserve slice
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_ADMISSION_PLAN.md) -
+  active implementation plan for the next exact merge cycle, starting with
+  the bounded gap-closing `SetFormula` merge family while keeping broader
+  merge, named-range-combined, repair-sensitive, and off-sheet classes out
+  of scope unless they also close exactly
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

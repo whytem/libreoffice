@@ -79,3 +79,11 @@ The next adjacent concern is now narrower again:
   shared-group classes can each produce their own exact engine-authored
   promotion family without widening beyond the admitted edge-regroup slice
 
+The next staged cycle is now defined in:
+
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_ADMISSION_PLAN.md)
+
+That cycle starts with the bounded blank-gap `SetFormula` merge family and
+keeps broader replacement-driven merge, named-range-combined,
+repair-sensitive, and off-sheet classes outside scope unless exact merge
+authority closes for them too.
