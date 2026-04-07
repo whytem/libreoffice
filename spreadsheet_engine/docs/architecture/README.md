@@ -611,9 +611,30 @@ Current architecture docs:
   completed closeout decision for the frontier cycle, admitting only the
   bounded same-text preserve family beyond the prior member-exit slice
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_ADMISSION_PLAN.md) -
-  active implementation plan for the next bounded shared-group widening
-  question, isolating exact same-sheet shareable regroup from merge,
-  named-range, repair-sensitive, and off-sheet frontier classes
+  completed closeout record for the exact regroup cycle, admitting the
+  bounded same-sheet shareable edge-regroup family while keeping merge,
+  named-range-combined, repair-sensitive, and off-sheet classes deferred
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_CONTRACT.md) -
+  frozen contract for the regroup closeout, fixing the admitted edge-regroup
+  family, carried-forward admitted families, and the retained deferred
+  classes
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_SCENARIO_MATRIX.md) -
+  frozen scenario matrix for the regroup closeout, separating admitted
+  anchor/tail edge regroup from merge, named-range, off-sheet, and
+  non-edge defer buckets
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_MAPPING_RULES.md) -
+  frozen mapping note for the regroup closeout, defining the bounded
+  edge-regroup window and the exact topology-match requirement
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_IMPLEMENTATION.md) -
+  completed implementation note for the regroup closeout, including the
+  engine-authored regroup window and retained merge defer handling
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_EVIDENCE.md) -
+  frozen evidence note for the regroup closeout, recording facade,
+  standalone, lifecycle, mutation-entry, and retained merge-rejection proof
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_DECISION_RECORD.md) -
+  completed closeout decision for the regroup cycle, admitting only the
+  bounded edge-regroup family beyond the earlier member-exit and same-text
+  preserve slice
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

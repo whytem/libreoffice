@@ -1905,10 +1905,23 @@ int main()
             aLifecycleInput.mbCleanBaseline = true;
 
             const auto aLifecyclePlan = buildLifecyclePilotTransition(aLifecycleInput);
-            if (aLifecyclePlan.meVerdict != LifecyclePilotVerdict::RejectedOutOfContract)
+            if (aLifecyclePlan.meVerdict != LifecyclePilotVerdict::Applicable)
             {
                 return fail("computational_substrate",
-                    "shared-group regroup lifecycle rejection mismatch");
+                    "shared-group regroup lifecycle verdict mismatch");
+            }
+
+            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
+                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aComputationalComparison = compareComputationalShadow(
+                aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
+            if (!aComputationalComparison.mbFullMatch
+                || aLifecyclePlan.maComputationalAfter.maFormulaGroups.size() != 1
+                || !(aLifecyclePlan.maComputationalAfter.maFormulaGroups.front().maId
+                     == ShadowFormulaGroupId { { nSheet, 1, 0 }, 2 }))
+            {
+                return fail("computational_substrate",
+                    "shared-group regroup lifecycle mismatch");
             }
         }
 

@@ -293,7 +293,7 @@ Any expansion into named-range-sensitive structural behavior should therefore
 begin with another bounded reassessment rather than being inferred from the
 current rollout.
 
-The completed shared-group widening workstream now promotes three bounded
+The completed shared-group widening workstream now promotes four bounded
 shared-group families while keeping the rest of the boundary explicit:
 
 - same-sheet shareable shared-group preserve, split, and rebuild outcomes now
@@ -307,15 +307,18 @@ shared-group families while keeping the rest of the boundary explicit:
 - same-sheet shareable non-structural same-text preserve `SetFormula` now
   reaches the admitted lifecycle and mutation-entry lanes behind that same
   dedicated non-structural shared-group gate
+- same-sheet shareable non-structural edge-regroup `SetFormula` now reaches
+  the admitted lifecycle and mutation-entry lanes behind that same
+  dedicated non-structural shared-group gate
 - non-exact or broader shared-group classes still fall back to the
   validation-only pilot lane or stay deferred
 - gate-off and named-range-combined shared-group classes reject
   deterministically
 - repair-sensitive shared-group divergence remains repair-detected and
   rollback-capable
-- broader shared-group live rollout still stays deferred because regroup,
-  merge, named-range-combined, repair-sensitive, and off-sheet classes are
-  not yet engine-authored
+- broader shared-group live rollout still stays deferred because merge,
+  named-range-combined, repair-sensitive, off-sheet, and non-edge regroup
+  classes are not yet engine-authored
 
 ## Storage And Wiring Outcome
 
@@ -825,7 +828,7 @@ The key admitted-slice ownership closeout references are:
 ## Shared-Group Widening Outcome
 
 The shared-group widening workstream is now complete through the broader
-non-structural frontier closeout.
+non-structural regroup closeout.
 
 It justified three bounded live rollout expansions and kept the rest of the
 shared-group boundary explicit:
@@ -838,6 +841,8 @@ shared-group boundary explicit:
   and clear
 - a further admitted non-structural same-text preserve `SetFormula` lane on
   already-shared same-sheet shareable members
+- a further admitted non-structural edge-regroup `SetFormula` lane on
+  already-shared same-sheet shareable edge members
 - deterministic reject and repair-detected handling for classes that stay
   outside that pilot
 
@@ -861,6 +866,13 @@ The key shared-group closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_IMPLEMENTATION.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_ADMISSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_SCENARIO_MATRIX.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_SCENARIO_MATRIX.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_MAPPING_RULES.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_MAPPING_RULES.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_DECISION_RECORD.md)
 
 ## Next Roadmap Category
 
@@ -871,15 +883,18 @@ The next explicit roadmap category is:
 The most actionable remaining work is now narrower than another broad
 workbook-class push.
 
+The exact regroup cycle is now complete.
+
 The next adjacent concern is:
 
-- whether the remaining regroup, merge, named-range-combined,
+- whether the remaining merge, named-range-combined,
   repair-sensitive, or off-sheet shared-group classes can each produce
   their own exact engine-authored promotion family
 
-The next active execution plan starts with exact regroup:
+The regroup closeout references are:
 
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_ADMISSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_DECISION_RECORD.md)
 
 ## Current Assessment
 

@@ -1,6 +1,6 @@
 # Computational Substrate Shared-Group Non-Structural Regroup Admission Plan
 
-Status: active implementation plan
+Status: complete closeout record for the exact regroup cycle
 
 ## Purpose
 
@@ -19,6 +19,22 @@ It also clarified the next blocker:
 This plan therefore isolates exact regroup as the next bounded promotion
 question rather than mixing it with merge, named-range, repair-sensitive, or
 off-sheet classes.
+
+## Closeout Outcome
+
+The cycle is now complete.
+
+It admits one additional exact family:
+
+- same-sheet shareable shared-group edge-regroup `SetFormula`
+
+It keeps the remaining regroup-adjacent frontier deferred:
+
+- merge
+- named-range-combined regroup
+- repair-sensitive normalization
+- off-sheet regroup
+- interior regroup outside the admitted edge window
 
 ## Plan Goal
 
@@ -144,3 +160,9 @@ Record whether exact regroup:
 - is admitted
 - stays validation-only
 - or remains deferred
+
+Closeout result:
+
+- admitted for the bounded edge-regroup `SetFormula` family
+- deferred for merge, named-range-combined, repair-sensitive, off-sheet,
+  and non-edge regroup classes
