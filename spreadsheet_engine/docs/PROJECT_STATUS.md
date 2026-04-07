@@ -860,6 +860,10 @@ The next adjacent concern is:
   shared-group classes can be expressed without falling back to retained
   host-only behavior
 
+That next staged cycle is now captured in:
+
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_ADMISSION_PLAN.md)
+
 ## Current Assessment
 
 The project is in a strong position:

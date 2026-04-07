@@ -582,6 +582,11 @@ Current architecture docs:
   promotion cycle, admitting same-sheet shareable member-exit scalar,
   formula, and clear behavior while keeping broader regrouping classes
   deferred
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_ADMISSION_PLAN.md) -
+  active implementation plan for the broader non-structural shared-group
+  frontier, staging same-text preserve, regroup/merge,
+  named-range-combined, repair-sensitive normalization, and off-sheet
+  families into explicit promotion tracks
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded
