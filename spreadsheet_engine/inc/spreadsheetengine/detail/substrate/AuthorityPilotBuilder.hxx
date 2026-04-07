@@ -213,6 +213,30 @@ inline void normalizeShadowFormulaGroups(std::vector<ShadowFormulaGroupRecord>& 
     return nullptr;
 }
 
+[[nodiscard]] inline ShadowCellRecord* findOrCreateMutableShadowCell(
+    ComputationalWorkbookShadow& rShadow, const api::CellAddress& rAddress)
+{
+    if (auto* pCell = findMutableShadowCell(rShadow, rAddress))
+        return pCell;
+
+    for (auto& rSheet : rShadow.maSheets)
+    {
+        if (rSheet.maSheet.mnId != rAddress.mnSheet)
+            continue;
+
+        ShadowCellRecord aCell;
+        aCell.maId = { rAddress };
+        aCell.maCell.maAddress = rAddress;
+        aCell.maCell.meKind = facade::CellKind::Empty;
+        aCell.maCell.maValue = api::CellValue::number(0.0);
+        aCell.maCell.mbHasFormula = false;
+        rSheet.maCells.push_back(aCell);
+        return &rSheet.maCells.back();
+    }
+
+    return nullptr;
+}
+
 [[nodiscard]] inline const ShadowCellRecord* findShadowCell(
     const ComputationalWorkbookShadow& rShadow, const api::CellAddress& rAddress)
 {
@@ -354,6 +378,17 @@ struct SharedGroupRebuildWindow
     api::RowIndex mnEndRow = 0;
 };
 
+struct SharedGroupGapMergeParticipants
+{
+    const ShadowFormulaGroupRecord* mpAboveGroup = nullptr;
+    const ShadowFormulaGroupRecord* mpBelowGroup = nullptr;
+
+    [[nodiscard]] bool isValid() const
+    {
+        return mpAboveGroup && mpBelowGroup && mpAboveGroup->maId != mpBelowGroup->maId;
+    }
+};
+
 struct LoweredSharedFormulaCell
 {
     api::CellAddress maAddress;
@@ -399,6 +434,53 @@ struct LoweredSharedFormulaCell
     return findShareableSameColumnGroup(rShadow, aBelow);
 }
 
+[[nodiscard]] inline std::optional<SharedGroupGapMergeParticipants>
+findGapMergeParticipantGroups(
+    const ComputationalWorkbookShadow& rShadow, const api::CellAddress& rAddress)
+{
+    if (findShadowCell(rShadow, rAddress) || rAddress.mnRow <= 0)
+        return std::nullopt;
+
+    const api::CellAddress aAbove { rAddress.mnSheet, rAddress.mnColumn,
+        static_cast<api::RowIndex>(rAddress.mnRow - 1) };
+    const api::CellAddress aBelow { rAddress.mnSheet, rAddress.mnColumn,
+        static_cast<api::RowIndex>(rAddress.mnRow + 1) };
+    const auto* pAboveGroup = findShareableSameColumnGroup(rShadow, aAbove);
+    const auto* pBelowGroup = findShareableSameColumnGroup(rShadow, aBelow);
+    if (!pAboveGroup || !pBelowGroup || pAboveGroup->maId == pBelowGroup->maId)
+        return std::nullopt;
+
+    const api::RowIndex nAboveEnd = static_cast<api::RowIndex>(
+        pAboveGroup->maId.maAnchor.mnRow + pAboveGroup->maId.mnLength - 1);
+    const api::RowIndex nBelowStart = pBelowGroup->maId.maAnchor.mnRow;
+    if (nAboveEnd != static_cast<api::RowIndex>(rAddress.mnRow - 1)
+        || nBelowStart != static_cast<api::RowIndex>(rAddress.mnRow + 1))
+    {
+        return std::nullopt;
+    }
+
+    return SharedGroupGapMergeParticipants { pAboveGroup, pBelowGroup };
+}
+
+[[nodiscard]] inline bool matchesGapMergeObservedAfterGroup(
+    const ShadowFormulaGroupRecord& rObservedAfterGroup,
+    const SharedGroupGapMergeParticipants& rParticipants, const api::CellAddress& rTouchedAddress)
+{
+    if (!rParticipants.isValid())
+        return false;
+
+    const api::RowIndex nExpectedEnd = static_cast<api::RowIndex>(
+        rParticipants.mpBelowGroup->maId.maAnchor.mnRow
+        + rParticipants.mpBelowGroup->maId.mnLength - 1);
+    return rObservedAfterGroup.maId.maAnchor == rParticipants.mpAboveGroup->maId.maAnchor
+           && rObservedAfterGroup.maId.mnLength
+                  == static_cast<sal_Int32>(nExpectedEnd
+                                            - rParticipants.mpAboveGroup->maId.maAnchor.mnRow
+                                            + 1)
+           && rTouchedAddress.mnRow >= rObservedAfterGroup.maId.maAnchor.mnRow
+           && rTouchedAddress.mnRow <= nExpectedEnd;
+}
+
 [[nodiscard]] inline bool isDeferredSharedGroupNonStructuralFormulaInsert(
     const AuthorityPilotInput& rInput)
 {
@@ -406,7 +488,10 @@ struct LoweredSharedFormulaCell
            && rInput.maMutation.meKind == facade::MutationKind::SetFormula
            && !findShadowCell(rInput.maComputationalShadow, rInput.maMutation.maAddress)
            && hasAdjacentShareableSameColumnGroup(
-               rInput.maComputationalShadow, rInput.maMutation.maAddress);
+               rInput.maComputationalShadow, rInput.maMutation.maAddress)
+           && !findGapMergeParticipantGroups(
+                   rInput.maComputationalShadow, rInput.maMutation.maAddress)
+                   .has_value();
 }
 
 [[nodiscard]] inline SharedGroupRebuildWindow determineSharedGroupRebuildWindow(
@@ -483,6 +568,21 @@ struct LoweredSharedFormulaCell
         return aWindow;
     }
 
+    return aWindow;
+}
+
+[[nodiscard]] inline std::optional<SharedGroupRebuildWindow> determineSharedGroupGapMergeWindow(
+    const ComputationalWorkbookShadow& rBeforeShadow, const api::CellAddress& rTouchedAddress)
+{
+    const auto oParticipants = findGapMergeParticipantGroups(rBeforeShadow, rTouchedAddress);
+    if (!oParticipants)
+        return std::nullopt;
+
+    SharedGroupRebuildWindow aWindow;
+    aWindow.mnStartRow = oParticipants->mpAboveGroup->maId.maAnchor.mnRow;
+    aWindow.mnEndRow = static_cast<api::RowIndex>(
+        oParticipants->mpBelowGroup->maId.maAnchor.mnRow
+        + oParticipants->mpBelowGroup->maId.mnLength - 1);
     return aWindow;
 }
 
@@ -689,13 +789,16 @@ inline void clearPredictedSharedGroupBindingsInWindow(ComputationalWorkbookShado
         }
         case facade::MutationKind::SetFormula:
         {
-            ShadowCellRecord* pCell = findMutableShadowCell(rPredicted, rInput.maMutation.maAddress);
+            ShadowCellRecord* pCell
+                = findOrCreateMutableShadowCell(rPredicted, rInput.maMutation.maAddress);
             if (!pCell)
             {
                 rReason = u"missing_shared_group_formula_cell";
                 return false;
             }
 
+            pCell->maId = { rInput.maMutation.maAddress };
+            pCell->maCell.maAddress = rInput.maMutation.maAddress;
             pCell->maCell.meKind = facade::CellKind::Formula;
             pCell->maCell.mbHasFormula = true;
             pCell->maCell.maValue
@@ -739,6 +842,8 @@ inline void clearPredictedSharedGroupBindingsInWindow(ComputationalWorkbookShado
     ComputationalWorkbookShadow& rPredicted, const AuthorityPilotInput& rInput, api::String& rReason)
 {
     const auto aFacade = materializeFacadeFromComputationalShadow(rPredicted);
+    const auto oGapMergeWindow = determineSharedGroupGapMergeWindow(
+        rInput.maComputationalShadow, rInput.maMutation.maAddress);
     const auto* pBeforeTouchedGroup
         = findShareableSameColumnGroup(rInput.maComputationalShadow, rInput.maMutation.maAddress);
     const auto* pObservedAfterTouchedGroup
@@ -749,9 +854,11 @@ inline void clearPredictedSharedGroupBindingsInWindow(ComputationalWorkbookShado
     const bool bAllowRegroupExtension
         = rInput.maMutation.meKind == facade::MutationKind::SetFormula && pBeforeTouchedGroup
           && pObservedAfterTouchedGroup && pObservedAfterTouchedGroup->maId != pBeforeTouchedGroup->maId;
-    const auto aWindow = determineSharedGroupRebuildWindow(
-        rInput.maComputationalShadow, rPredicted, aFacade, rInput.maMutation.maAddress,
-        bAllowRegroupExtension, rReason);
+    const auto aWindow = oGapMergeWindow
+                             ? *oGapMergeWindow
+                             : determineSharedGroupRebuildWindow(
+                                   rInput.maComputationalShadow, rPredicted, aFacade,
+                                   rInput.maMutation.maAddress, bAllowRegroupExtension, rReason);
     if (!rReason.empty())
         return false;
 
@@ -783,6 +890,56 @@ inline void clearPredictedSharedGroupBindingsInWindow(ComputationalWorkbookShado
 
     if (!isNonStructuralSharedGroupMutation(rInput.maMutation))
         return false;
+
+    if (rInput.maMutation.meKind == facade::MutationKind::SetFormula)
+    {
+        const auto oMergeParticipants = findGapMergeParticipantGroups(
+            rInput.maComputationalShadow, rInput.maMutation.maAddress);
+        if (oMergeParticipants)
+        {
+            if (!rInput.mbAllowSharedGroupNonStructuralAdmission)
+            {
+                rReason = u"shared_group_non_structural_disabled";
+                return false;
+            }
+
+            if (!rInput.moObservedAfterComputationalShadow)
+            {
+                rReason = u"missing_shared_group_after_shadow";
+                return false;
+            }
+
+            const bool bNamedRangesStable
+                = sortNamedRangesForComparison(rInput.maComputationalShadow.maNamedRanges)
+                  == sortNamedRangesForComparison(
+                      rInput.moObservedAfterComputationalShadow->maNamedRanges);
+            if (!bNamedRangesStable)
+            {
+                rReason = u"shared_group_named_range_out_of_contract";
+                return false;
+            }
+
+            const auto* pObservedAfterCell = findShadowCell(
+                *rInput.moObservedAfterComputationalShadow, rInput.maMutation.maAddress);
+            const auto* pObservedAfterGroup = findShareableSameColumnGroup(
+                *rInput.moObservedAfterComputationalShadow, rInput.maMutation.maAddress);
+            if (!pObservedAfterCell || !pObservedAfterCell->hasFormula())
+            {
+                rReason = u"missing_shared_group_formula_cell";
+                return false;
+            }
+
+            if (!pObservedAfterCell->moFormulaGroup.has_value() || !pObservedAfterGroup
+                || !matchesGapMergeObservedAfterGroup(
+                    *pObservedAfterGroup, *oMergeParticipants, rInput.maMutation.maAddress))
+            {
+                rReason = u"shared_group_non_structural_out_of_contract";
+                return false;
+            }
+
+            return true;
+        }
+    }
 
     rpBeforeCell = findShadowCell(rInput.maComputationalShadow, rInput.maMutation.maAddress);
     if (!rpBeforeCell || !isAdmittedNonMatrixFormulaCell(*rpBeforeCell)
@@ -869,8 +1026,6 @@ inline void clearPredictedSharedGroupBindingsInWindow(ComputationalWorkbookShado
         default:
             return false;
     }
-
-    return true;
 }
 
 [[nodiscard]] inline std::optional<ComputationalWorkbookShadow>

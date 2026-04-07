@@ -630,16 +630,39 @@ Current architecture docs:
   engine-authored regroup window and retained merge defer handling
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_EVIDENCE.md) -
   frozen evidence note for the regroup closeout, recording facade,
-  standalone, lifecycle, mutation-entry, and retained merge-rejection proof
+  standalone, lifecycle, mutation-entry, and retained broader-merge
+  rejection proof
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_DECISION_RECORD.md) -
   completed closeout decision for the regroup cycle, admitting only the
   bounded edge-regroup family beyond the earlier member-exit and same-text
   preserve slice
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_ADMISSION_PLAN.md) -
-  active implementation plan for the next exact merge cycle, starting with
-  the bounded gap-closing `SetFormula` merge family while keeping broader
-  merge, named-range-combined, repair-sensitive, and off-sheet classes out
-  of scope unless they also close exactly
+  completed closeout record for the exact merge cycle, admitting the
+  bounded same-sheet shareable gap-closing merge family while keeping
+  broader merge, named-range-combined, repair-sensitive, and off-sheet
+  classes deferred
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_CONTRACT.md) -
+  frozen contract for the merge closeout, fixing the admitted gap-closing
+  merge family, carried-forward admitted families, and the retained deferred
+  classes
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_SCENARIO_MATRIX.md) -
+  frozen scenario matrix for the merge closeout, separating admitted
+  gap-closing merge from one-sided, replacement-driven, and broader defer
+  buckets
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_MAPPING_RULES.md) -
+  frozen mapping note for the merge closeout, defining the bounded
+  gap-closing merge window and the exact topology-match requirement
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_IMPLEMENTATION.md) -
+  completed implementation note for the merge closeout, including inserted
+  cell prediction and retained broader-merge defer handling
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_EVIDENCE.md) -
+  frozen evidence note for the merge closeout, recording facade,
+  standalone, lifecycle, mutation-entry, and retained one-sided rejection
+  proof
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_DECISION_RECORD.md) -
+  completed closeout decision for the merge cycle, admitting the bounded
+  gap-closing merge family beyond the earlier member-exit, same-text
+  preserve, and edge-regroup slice
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

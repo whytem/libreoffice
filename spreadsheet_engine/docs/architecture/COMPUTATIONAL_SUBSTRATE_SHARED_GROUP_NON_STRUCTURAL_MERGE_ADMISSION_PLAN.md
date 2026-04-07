@@ -1,6 +1,32 @@
 # Computational Substrate Shared-Group Non-Structural Merge Admission Plan
 
-Status: active implementation plan for the exact merge cycle
+Status: complete closeout record for the exact merge cycle
+
+## Closeout Result
+
+This plan is now complete.
+
+The closeout result admits one additional exact family:
+
+- same-sheet shareable shared-group gap-closing merge `SetFormula`
+
+It keeps the remaining merge-adjacent frontier deferred:
+
+- one-sided adjacent insertion next to only one prior shared group
+- replacement-driven merge across a prior shared-group boundary
+- multi-group merge collapse
+- named-range-combined merge
+- repair-sensitive host-only normalization
+- off-sheet merge widening
+
+The closeout references are now:
+
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_SCENARIO_MATRIX.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_SCENARIO_MATRIX.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_MAPPING_RULES.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_MAPPING_RULES.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_DECISION_RECORD.md)
 
 ## Purpose
 
@@ -179,10 +205,10 @@ Record whether exact merge:
 - stays validation-only
 - or remains deferred
 
-Preferred closeout target:
+Closeout result:
 
 - admitted for the bounded same-sheet shareable two-group gap-closing
   `SetFormula` merge family
-- deferred for replacement-driven merge, named-range-combined,
-  repair-sensitive, off-sheet, and multi-group merge classes unless they
-  also achieve exact engine-authored closure in this cycle
+- deferred for one-sided insertion, replacement-driven merge,
+  named-range-combined, repair-sensitive, off-sheet, and multi-group merge
+  classes

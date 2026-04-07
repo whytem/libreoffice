@@ -73,17 +73,14 @@ This decision is supported by:
 
 ## Next Adjacent Concern
 
-The next adjacent concern is now narrower again:
-
-- whether merge, named-range-combined, repair-sensitive, or off-sheet
-  shared-group classes can each produce their own exact engine-authored
-  promotion family without widening beyond the admitted edge-regroup slice
-
-The next staged cycle is now defined in:
+The next staged cycle is now complete and closed out in:
 
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_ADMISSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_DECISION_RECORD.md)
 
-That cycle starts with the bounded blank-gap `SetFormula` merge family and
-keeps broader replacement-driven merge, named-range-combined,
-repair-sensitive, and off-sheet classes outside scope unless exact merge
-authority closes for them too.
+The remaining adjacent concern is now narrower again:
+
+- whether replacement-driven merge, named-range-combined,
+  repair-sensitive, off-sheet, or broader regroup classes can each produce
+  their own exact engine-authored promotion family without widening beyond
+  the admitted edge-regroup plus gap-merge slice

@@ -23,7 +23,7 @@ The checked-in proof surface is:
   [ucalc_dependency_shadow.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_dependency_shadow.cxx)
 - live mutation-entry regroup proof in
   [ucalc_dependency_shadow.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_dependency_shadow.cxx)
-- retained merge rejection coverage in
+- retained broader-merge rejection coverage in
   [computational_substrate_tests.cxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/tests/unit/computational_substrate_tests.cxx)
   and
   [ucalc_dependency_shadow.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_dependency_shadow.cxx)
@@ -48,7 +48,7 @@ The regroup closeout validation set executed in this cycle is:
 - `spreadsheet_engine/build_check/spreadsheetengine_computational_substrate_tests`
 - `make -j1 CPPUNIT_TEST_NAME=testComputationalNarrowRolloutSharedGroupNonStructuralLifecycleRegroup CppunitTest_sc_ucalc_dependency_shadow`
 - `make -j1 CPPUNIT_TEST_NAME=testComputationalMutationEntrySharedGroupNonStructuralRegroupLifecycle CppunitTest_sc_ucalc_dependency_shadow`
-- `make -j1 CPPUNIT_TEST_NAME=testComputationalMutationEntrySharedGroupNonStructuralMergeStaysRejected CppunitTest_sc_ucalc_dependency_shadow`
+- `make -j1 CPPUNIT_TEST_NAME=testComputationalMutationEntrySharedGroupNonStructuralOneSidedExtensionStaysRejected CppunitTest_sc_ucalc_dependency_shadow`
 - `git diff --check`
 
 ## Remaining Deferred Evidence Buckets

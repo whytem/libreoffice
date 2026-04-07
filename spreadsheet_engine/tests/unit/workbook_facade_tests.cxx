@@ -573,6 +573,65 @@ int main()
         }
     }
 
+    // --- Shared-formula merge classification ---
+    {
+        InMemoryWorkbookFacade aBeforeFacade;
+        aBeforeFacade.setGrammar(aFacade.getGrammar());
+        aBeforeFacade.setGeneration(52);
+        const auto nMergeSheet = aBeforeFacade.addSheet(u"Pilot");
+        aBeforeFacade.setCell({ nMergeSheet, 0, 0 }, CellValue::number(1.0));
+        aBeforeFacade.setCell({ nMergeSheet, 0, 1 }, CellValue::number(2.0));
+        aBeforeFacade.setCell({ nMergeSheet, 0, 2 }, CellValue::number(3.0));
+        aBeforeFacade.setCell({ nMergeSheet, 0, 3 }, CellValue::number(4.0));
+        aBeforeFacade.setCell({ nMergeSheet, 0, 4 }, CellValue::number(5.0));
+        aBeforeFacade.setFormulaCell({ nMergeSheet, 1, 0 }, u"=A1*2",
+            CellValue::number(2.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.setFormulaCell({ nMergeSheet, 1, 1 }, u"=A2*2",
+            CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.setFormulaCell({ nMergeSheet, 1, 3 }, u"=A4*2",
+            CellValue::number(8.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.setFormulaCell({ nMergeSheet, 1, 4 }, u"=A5*2",
+            CellValue::number(10.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.addFormulaGroup({ nMergeSheet, 1, 0 }, 2, true);
+        aBeforeFacade.addFormulaGroup({ nMergeSheet, 1, 3 }, 2, true);
+
+        InMemoryWorkbookFacade aAfterFacade;
+        aAfterFacade.setGrammar(aFacade.getGrammar());
+        aAfterFacade.setGeneration(53);
+        aAfterFacade.addSheet(u"Pilot");
+        aAfterFacade.setCell({ nMergeSheet, 0, 0 }, CellValue::number(1.0));
+        aAfterFacade.setCell({ nMergeSheet, 0, 1 }, CellValue::number(2.0));
+        aAfterFacade.setCell({ nMergeSheet, 0, 2 }, CellValue::number(3.0));
+        aAfterFacade.setCell({ nMergeSheet, 0, 3 }, CellValue::number(4.0));
+        aAfterFacade.setCell({ nMergeSheet, 0, 4 }, CellValue::number(5.0));
+        aAfterFacade.setFormulaCell({ nMergeSheet, 1, 0 }, u"=A1*2",
+            CellValue::number(2.0), FormulaCellKind::SharedGroupMember, true, true);
+        aAfterFacade.setFormulaCell({ nMergeSheet, 1, 1 }, u"=A2*2",
+            CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+        aAfterFacade.setFormulaCell({ nMergeSheet, 1, 2 }, u"=A3*2",
+            CellValue::number(6.0), FormulaCellKind::SharedGroupMember, true, true);
+        aAfterFacade.setFormulaCell({ nMergeSheet, 1, 3 }, u"=A4*2",
+            CellValue::number(8.0), FormulaCellKind::SharedGroupMember, true, true);
+        aAfterFacade.setFormulaCell({ nMergeSheet, 1, 4 }, u"=A5*2",
+            CellValue::number(10.0), FormulaCellKind::SharedGroupMember, true, true);
+        aAfterFacade.addFormulaGroup({ nMergeSheet, 1, 0 }, 5, true);
+
+        const auto aClassification = consumers::classifySharedFormulaMutation(
+            aBeforeFacade, aAfterFacade,
+            MutationEvent::setFormula({ nMergeSheet, 1, 2 }, u"=A3*2"));
+        if (aClassification.maTransition.meKind
+                != consumers::SharedFormulaGroupTransitionKind::Rebuild
+            || aClassification.meFamily
+                   != consumers::SharedFormulaMutationFamily::Merge
+            || aClassification.mbTouchedAddressSharedBefore
+            || !aClassification.mbTouchedAddressSharedAfter
+            || aClassification.mnBeforeNeighborhoodGroupCount != 2
+            || aClassification.mnAfterNeighborhoodGroupCount != 1)
+        {
+            return fail("facade_consumers", "shared-group merge classification mismatch");
+        }
+    }
+
     // --- Named-range inventory consumer ---
     {
         const auto aInventory = consumers::inventoryNamedRanges(rFacade);
