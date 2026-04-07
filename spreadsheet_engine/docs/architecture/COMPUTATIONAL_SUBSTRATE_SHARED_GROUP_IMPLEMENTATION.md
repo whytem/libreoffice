@@ -1,11 +1,11 @@
 # Computational Substrate Shared-Group Implementation
 
-Status: bounded structural plus non-structural shared-group slice implemented, including exact regroup and merge closeout
+Status: bounded structural plus non-structural shared-group slice implemented, including exact regroup, gap-merge, and replacement-merge closeout
 
 ## What Landed
 
 The shared-group widening cycle now has one bounded live structural family,
-one bounded live non-structural member-exit family, and three additional
+one bounded live non-structural member-exit family, and four additional
 non-structural frontier admissions on top of the ownership-complete admitted
 slice.
 
@@ -25,6 +25,9 @@ The workstream is now closed out by:
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_IMPLEMENTATION.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_DECISION_RECORD.md)
 
 The implementation stays intentionally narrow:
 
@@ -41,9 +44,11 @@ The implementation stays intentionally narrow:
   edge-regroup `SetFormula`
 - it now also widens the live admitted slice for exact same-sheet shareable
   gap-closing merge `SetFormula`
-- it keeps broader merge, named-range-sensitive, off-sheet,
-  repair-sensitive, and non-edge regroup shared-group classes outside live
-  admission
+- it now also widens the live admitted slice for exact same-sheet shareable
+  edge replacement-merge `SetFormula`
+- it keeps one-sided insert, broader merge, named-range-sensitive,
+  off-sheet, repair-sensitive, and non-edge regroup shared-group classes
+  outside live admission
 
 ## Main Runtime Surfaces
 
@@ -115,6 +120,8 @@ Within that gate, the admitted family is:
 - edge-regroup `SetFormula` through the lifecycle and mutation-entry lanes
 - gap-closing merge `SetFormula` through the lifecycle and mutation-entry
   lanes
+- edge replacement-merge `SetFormula` through the lifecycle and
+  mutation-entry lanes
 
 but only when the touched same-sheet shareable shared-group member exits the
 group and surviving members can be repartitioned into exact contiguous runs,
@@ -122,7 +129,9 @@ or when identical formula-text replacement preserves the same shareable group
 identity exactly, or when a touched edge member regroups through a bounded
 adjacent ordinary-formula run without absorbing another prior shared group,
 or when a blank gap between exactly two adjacent shareable groups can be
-authored as one exact merged after-group.
+authored as one exact merged after-group, or when an already-shared edge
+member can absorb exactly one adjacent prior shared group through a bounded
+engine-authored rebuild window.
 
 ## Engine-Predicted Structural Topology
 
@@ -190,7 +199,7 @@ shape:
 - mutation entry no longer rejects resident non-matrix shared formulas on
   this admitted slice
 
-The frontier closeouts add three more bounded rules:
+The frontier closeouts add four more bounded rules:
 
 - same-text preserve `SetFormula` is admitted only when the touched address
   remains inside the same shareable group identity
@@ -200,9 +209,14 @@ The frontier closeouts add three more bounded rules:
 - gap-closing merge `SetFormula` is admitted only when the engine can create
   the inserted formula cell in the predicted shadow and rebuild the two
   adjacent prior shareable groups into one exact merged after-topology
-- one-sided adjacent formula insertion and replacement-driven merge remain
-  rejected as deferred frontier classes instead of passing through the
-  ordinary formula-insert path
+- edge replacement-merge `SetFormula` is admitted only when the engine can
+  rebuild the touched pre-group plus exactly one adjacent prior shared group
+  into a bounded exact after-topology that still includes the touched
+  address
+- one-sided adjacent formula insertion, multi-group collapse,
+  named-range-combined, repair-sensitive, off-sheet, and broader non-edge
+  regroup or merge classes remain rejected as deferred frontier classes
+  instead of passing through the ordinary formula paths
 
 ## Test Coverage Added
 
@@ -224,6 +238,9 @@ The checked-in coverage now includes:
   close exact computational state without borrowing observed topology
 - standalone proof that exact non-structural shared-group merge candidates
   close exact computational state without borrowing observed topology
+- standalone proof that exact non-structural shared-group replacement-merge
+  candidates close exact computational state without borrowing observed
+  topology
 - structural shared-group rejection when the dedicated candidate gate is off
 - structural shared-group preserve, split, and rebuild live-apply coverage
   when the dedicated shared-group gate is on
@@ -235,6 +252,8 @@ The checked-in coverage now includes:
   on the same bounded slice
 - non-structural shared-group merge lifecycle and mutation-entry coverage on
   the same bounded slice
+- non-structural shared-group replacement-merge lifecycle and mutation-entry
+  coverage on the same bounded slice
 - structural shared-group-plus-named-range defer coverage
 - structural shared-group repair-detected coverage when the group shape is
   perturbed after the structural mutation

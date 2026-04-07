@@ -73,19 +73,14 @@ This decision is supported by:
 
 ## Next Adjacent Concern
 
-The next adjacent concern is narrower again:
+The replacement-driven merge concern from this record is now closed by:
 
-- whether replacement-driven merge, named-range-combined,
-  repair-sensitive, off-sheet, or broader regroup classes can each produce
-  their own exact engine-authored promotion family without widening beyond
-  the admitted edge-regroup plus gap-merge slice
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_DECISION_RECORD.md)
 
-The next staged cycle is now defined in:
+The remaining adjacent concerns are now:
 
-- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_ADMISSION_PLAN.md)
-
-That cycle starts with the bounded same-sheet shareable edge
-replacement-driven `SetFormula` merge family and keeps one-sided insertion,
-named-range-combined, repair-sensitive, off-sheet, and broader merge
-classes outside scope unless exact replacement-merge authority closes for
-them too.
+- one-sided adjacent insertion
+- named-range-combined merge
+- repair-sensitive host normalization
+- off-sheet merge widening
+- broader non-edge regroup or merge

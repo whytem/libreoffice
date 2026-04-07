@@ -129,6 +129,7 @@ enum class SharedFormulaMutationFamily : std::uint8_t
     MemberExit,
     Regroup,
     Merge,
+    ReplacementMerge,
     StructuralPreserve,
     StructuralSplit,
     StructuralRebuild
@@ -363,6 +364,17 @@ namespace detail
                      && aClassification.mnAfterNeighborhoodGroupCount == 1)
             {
                 aClassification.meFamily = SharedFormulaMutationFamily::Merge;
+            }
+            else if (aClassification.mbTouchedAddressSharedBefore
+                     && aClassification.mbTouchedAddressSharedAfter
+                     && aClassification.maTransition.meKind
+                            == SharedFormulaGroupTransitionKind::Rebuild
+                     && aClassification.mnBeforeNeighborhoodGroupCount == 2
+                     && aClassification.mnAfterNeighborhoodGroupCount == 1
+                     && oTouchedGroupBefore && oTouchedGroupAfter
+                     && *oTouchedGroupBefore != *oTouchedGroupAfter)
+            {
+                aClassification.meFamily = SharedFormulaMutationFamily::ReplacementMerge;
             }
             else if (oTouchedGroupBefore && oTouchedGroupAfter
                      && *oTouchedGroupBefore != *oTouchedGroupAfter)

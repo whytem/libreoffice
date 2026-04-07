@@ -314,6 +314,9 @@ explicit:
 - same-sheet shareable non-structural gap-closing merge `SetFormula` now
   reaches the admitted lifecycle and mutation-entry lanes behind that same
   dedicated non-structural shared-group gate
+- same-sheet shareable non-structural edge replacement-merge `SetFormula`
+  now reaches the admitted lifecycle and mutation-entry lanes behind that
+  same dedicated non-structural shared-group gate
 - non-exact or broader shared-group classes still fall back to the
   validation-only pilot lane or stay deferred
 - gate-off and named-range-combined shared-group classes reject
@@ -321,8 +324,9 @@ explicit:
 - repair-sensitive shared-group divergence remains repair-detected and
   rollback-capable
 - broader shared-group live rollout still stays deferred because
-  replacement-driven merge, named-range-combined, repair-sensitive,
-  off-sheet, and non-edge regroup classes are not yet engine-authored
+  one-sided adjacent insertion, named-range-combined, repair-sensitive,
+  off-sheet, and broader non-edge regroup or merge classes are not yet
+  engine-authored
 
 ## Storage And Wiring Outcome
 
@@ -849,6 +853,9 @@ the shared-group boundary explicit:
   already-shared same-sheet shareable edge members
 - a further admitted non-structural gap-closing merge `SetFormula` lane on
   blank-gap insertion between two same-sheet shareable groups
+- a further admitted non-structural edge replacement-merge `SetFormula`
+  lane on already-shared same-sheet shareable edge members that absorb one
+  adjacent prior shared group
 - deterministic reject and repair-detected handling for classes that stay
   outside that pilot
 
@@ -886,6 +893,13 @@ The key shared-group closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_IMPLEMENTATION.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_ADMISSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_CONTRACT.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_CONTRACT.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_SCENARIO_MATRIX.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_SCENARIO_MATRIX.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_MAPPING_RULES.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_MAPPING_RULES.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_DECISION_RECORD.md)
 
 ## Next Roadmap Category
 
@@ -896,13 +910,14 @@ The next explicit roadmap category is:
 The most actionable remaining work is now narrower than another broad
 workbook-class push.
 
-The exact regroup and merge cycles are now complete.
+The exact regroup, merge, and replacement-merge cycles are now complete.
 
 The next adjacent concern is:
 
-- whether replacement-driven merge, named-range-combined,
-  repair-sensitive, off-sheet, or broader regroup shared-group classes can
-  each produce their own exact engine-authored promotion family
+- whether one-sided adjacent insertion, named-range-combined,
+  repair-sensitive, off-sheet, or broader non-edge regroup and merge
+  shared-group classes can each produce their own exact engine-authored
+  promotion family
 
 The most recent closeout references are:
 
@@ -910,14 +925,8 @@ The most recent closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_ADMISSION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_DECISION_RECORD.md)
-
-The next staged execution plan is:
-
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_ADMISSION_PLAN.md)
-
-It starts with the bounded same-sheet shareable edge replacement-driven
-`SetFormula` merge family because that is the smallest remaining true merge
-class on the already-proven authority surface.
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_DECISION_RECORD.md)
 
 ## Current Assessment
 

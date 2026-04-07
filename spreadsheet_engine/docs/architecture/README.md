@@ -664,10 +664,34 @@ Current architecture docs:
   gap-closing merge family beyond the earlier member-exit, same-text
   preserve, and edge-regroup slice
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_ADMISSION_PLAN.md) -
-  active implementation plan for the next exact replacement-driven merge
-  cycle, starting with the bounded same-sheet shareable edge replacement
-  merge family while keeping one-sided, named-range-combined,
-  repair-sensitive, off-sheet, and broader merge classes out of scope
+  completed closeout record for the exact replacement-driven merge cycle,
+  admitting the bounded same-sheet shareable edge replacement-merge family
+  while keeping one-sided, named-range-combined, repair-sensitive,
+  off-sheet, and broader non-edge regroup or merge classes deferred
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_CONTRACT.md) -
+  frozen contract for the replacement-merge closeout, fixing the admitted
+  edge replacement family, carried-forward admitted families, and the
+  retained deferred classes
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_SCENARIO_MATRIX.md) -
+  frozen scenario matrix for the replacement-merge closeout, separating
+  admitted edge replacement merge from one-sided, broader, named-range, and
+  off-sheet defer buckets
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_MAPPING_RULES.md) -
+  frozen mapping note for the replacement-merge closeout, defining the
+  touched-plus-adjacent rebuild window and the exact bounded after-group
+  match requirement
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_IMPLEMENTATION.md) -
+  completed implementation note for the replacement-merge closeout,
+  including bounded participant discovery and exact rebuild-window
+  authority
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_EVIDENCE.md) -
+  frozen evidence note for the replacement-merge closeout, recording
+  facade, standalone, lifecycle, mutation-entry, and retained broader-merge
+  rejection proof
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_DECISION_RECORD.md) -
+  completed closeout decision for the replacement-merge cycle, admitting
+  the bounded edge replacement family beyond the earlier member-exit,
+  same-text preserve, edge-regroup, and gap-merge slice
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded
