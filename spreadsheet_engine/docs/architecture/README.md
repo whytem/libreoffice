@@ -721,6 +721,10 @@ Current architecture docs:
   bounded same-sheet one-sided adjacent insertion beyond the earlier
   member-exit, same-text preserve, edge-regroup, gap-merge, and
   replacement-merge slice
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_ADMISSION_PLAN.md) -
+  staged next-pass plan for bounded same-sheet three-participant collapse,
+  targeting the smallest exact multi-group merge family before named-range,
+  repair-sensitive, off-sheet, and broader non-edge frontier classes
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

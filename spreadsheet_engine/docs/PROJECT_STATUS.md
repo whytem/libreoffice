@@ -927,10 +927,10 @@ now complete.
 
 The next adjacent concern is:
 
-- whether multi-group collapse, named-range-combined,
-  repair-sensitive, off-sheet, or broader non-edge regroup and merge
-  shared-group classes can each produce their own exact engine-authored
-  promotion family
+- whether bounded same-sheet shareable multi-group collapse can become the
+  next exact engine-authored promotion family before named-range-combined,
+  repair-sensitive, off-sheet, and broader non-edge regroup and merge
+  shared-group classes
 
 The most recent closeout references are:
 
@@ -942,6 +942,7 @@ The most recent closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_ADMISSION_PLAN.md)
 
 ## Current Assessment
 

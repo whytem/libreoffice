@@ -76,6 +76,11 @@ This decision is supported by:
 
 The next adjacent concern is now:
 
-- whether multi-group collapse, named-range-combined,
-  repair-sensitive, off-sheet, or broader non-edge regroup and merge
-  classes can each produce their own exact engine-authored promotion family
+- whether bounded same-sheet shareable multi-group collapse can produce the
+  next exact engine-authored promotion family before named-range-combined,
+  repair-sensitive, off-sheet, and broader non-edge regroup and merge
+  classes
+
+That next pass is staged in:
+
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_ADMISSION_PLAN.md)
