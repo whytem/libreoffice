@@ -9,12 +9,16 @@
 
 #pragma once
 
+#include <algorithm>
 #include <vector>
 
+#include <column.hxx>
 #include <document.hxx>
 #include <dociter.hxx>
 #include <formulacell.hxx>
 #include <listenercontext.hxx>
+#include <sharedformula.hxx>
+#include <table.hxx>
 
 #include <spreadsheetengine/api/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/Address.hxx>
@@ -115,6 +119,86 @@ inline void clearAdmittedLiveWiring(ScDocument& rDoc, const std::vector<ScFormul
     return pCell;
 }
 
+struct ResolvedFormulaGroupAnchor
+{
+    spreadsheetengine::detail::substrate::ListenerAnchorId maAnchor;
+    ScFormulaCell* mpTopCell = nullptr;
+    ScFormulaCell** mppSharedTop = nullptr;
+};
+
+[[nodiscard]] inline ResolvedFormulaGroupAnchor resolveFormulaGroupAnchor(
+    ScDocument& rDoc, const spreadsheetengine::detail::substrate::ListenerAnchorId& rAnchor,
+    api::String& rReason)
+{
+    ResolvedFormulaGroupAnchor aResolved;
+    aResolved.maAnchor = rAnchor;
+
+    if (rAnchor.meKind != spreadsheetengine::detail::substrate::ListenerAnchorKind::FormulaGroup)
+    {
+        rReason = u"listener_anchor_out_of_contract";
+        return aResolved;
+    }
+
+    if (rAnchor.mnLength <= 0)
+    {
+        rReason = u"missing_formula_group_anchor";
+        return aResolved;
+    }
+
+    ScFormulaCell* pTopCell = rDoc.GetFormulaCell(toLibreOfficeAddress(rAnchor.maAnchor));
+    if (!pTopCell)
+    {
+        rReason = u"missing_formula_group_anchor";
+        return aResolved;
+    }
+    if (!isAdmittedFormulaCell(*pTopCell))
+    {
+        rReason = u"formula_shape_out_of_contract";
+        return aResolved;
+    }
+    if (!pTopCell->IsSharedTop())
+    {
+        rReason = u"formula_group_anchor_not_shared_top";
+        return aResolved;
+    }
+    if (pTopCell->GetSharedLength() != rAnchor.mnLength)
+    {
+        rReason = u"formula_group_anchor_length_mismatch";
+        return aResolved;
+    }
+
+    ScTable* pTable = rDoc.FetchTable(rAnchor.maAnchor.mnSheet);
+    if (!pTable)
+    {
+        rReason = u"missing_formula_group_anchor_table";
+        return aResolved;
+    }
+
+    ScColumn* pColumn = &pTable->CreateColumnIfNotExists(rAnchor.maAnchor.mnColumn);
+
+    size_t nBlockSize = 0;
+    ScFormulaCell* const* ppTopCell = pColumn->GetFormulaCellBlockAddress(rAnchor.maAnchor.mnRow, nBlockSize);
+    if (!ppTopCell)
+    {
+        rReason = u"missing_formula_group_anchor_block";
+        return aResolved;
+    }
+    if (*ppTopCell != pTopCell)
+    {
+        rReason = u"formula_group_anchor_block_mismatch";
+        return aResolved;
+    }
+    if (nBlockSize < static_cast<size_t>(rAnchor.mnLength))
+    {
+        rReason = u"formula_group_anchor_block_too_short";
+        return aResolved;
+    }
+
+    aResolved.mpTopCell = pTopCell;
+    aResolved.mppSharedTop = const_cast<ScFormulaCell**>(ppTopCell);
+    return aResolved;
+}
+
 [[nodiscard]] inline ScFormulaCell* resolveFormulaCell(
     ScDocument& rDoc, const spreadsheetengine::detail::substrate::ShadowCellId& rNode,
     api::String& rReason)
@@ -152,6 +236,94 @@ inline void applyListenerEdgeTarget(ScDocument& rDoc,
     }
 }
 
+[[nodiscard]] inline bool validateListenerAnchor(
+    ScDocument& rDoc, const spreadsheetengine::detail::substrate::ListenerAnchorId& rAnchor,
+    api::String& rReason)
+{
+    switch (rAnchor.meKind)
+    {
+        case spreadsheetengine::detail::substrate::ListenerAnchorKind::FormulaCell:
+            return resolveFormulaCell(rDoc, rAnchor, rReason) != nullptr;
+        case spreadsheetengine::detail::substrate::ListenerAnchorKind::FormulaGroup:
+            return resolveFormulaGroupAnchor(rDoc, rAnchor, rReason).mpTopCell != nullptr;
+        case spreadsheetengine::detail::substrate::ListenerAnchorKind::HostUnknown:
+            rReason = u"listener_anchor_out_of_contract";
+            return false;
+    }
+
+    rReason = u"listener_anchor_out_of_contract";
+    return false;
+}
+
+[[nodiscard]] inline bool containsAnchor(
+    const std::vector<ResolvedFormulaGroupAnchor>& rAnchors,
+    const spreadsheetengine::detail::substrate::ListenerAnchorId& rAnchor)
+{
+    return std::any_of(rAnchors.begin(), rAnchors.end(),
+        [&rAnchor](const ResolvedFormulaGroupAnchor& rResolved) {
+            return rResolved.maAnchor == rAnchor;
+        });
+}
+
+[[nodiscard]] inline std::vector<ResolvedFormulaGroupAnchor> collectResolvedFormulaGroupAnchors(
+    ScDocument& rDoc,
+    const spreadsheetengine::detail::substrate::AdmittedWiringContainers& rStore,
+    api::String& rReason)
+{
+    std::vector<ResolvedFormulaGroupAnchor> aAnchors;
+    for (const auto& rEdge : rStore.maListenerEdges)
+    {
+        if (rEdge.maListenerAnchor.meKind
+            != spreadsheetengine::detail::substrate::ListenerAnchorKind::FormulaGroup)
+        {
+            continue;
+        }
+
+        if (containsAnchor(aAnchors, rEdge.maListenerAnchor))
+            continue;
+
+        auto aResolved = resolveFormulaGroupAnchor(rDoc, rEdge.maListenerAnchor, rReason);
+        if (!aResolved.mpTopCell)
+            return {};
+
+        aAnchors.push_back(aResolved);
+    }
+
+    return aAnchors;
+}
+
+inline void applyFormulaGroupListenerAnchors(ScDocument& rDoc,
+    const std::vector<ResolvedFormulaGroupAnchor>& rAnchors, api::String& rReason)
+{
+    sc::StartListeningContext aContext(rDoc);
+    for (const auto& rAnchor : rAnchors)
+    {
+        if (!rAnchor.mpTopCell || !rAnchor.mppSharedTop)
+        {
+            rReason = u"missing_formula_group_anchor";
+            return;
+        }
+
+        sc::SharedFormulaUtil::startListeningAsGroup(aContext, rAnchor.mppSharedTop);
+    }
+}
+
+[[nodiscard]] inline bool formulaCellBelongsToFormulaGroupAnchor(
+    const ScFormulaCell& rCell,
+    const std::vector<ResolvedFormulaGroupAnchor>& rAnchors)
+{
+    if (!rCell.GetCellGroup())
+        return false;
+
+    const api::CellAddress aTopAddress
+        = toApiCellAddress(ScAddress(rCell.aPos.Col(), rCell.GetSharedTopRow(), rCell.aPos.Tab()));
+    const auto aAnchor = spreadsheetengine::detail::substrate::ListenerAnchorId {
+        spreadsheetengine::detail::substrate::ListenerAnchorKind::FormulaGroup, aTopAddress,
+        rCell.GetSharedLength()
+    };
+    return containsAnchor(rAnchors, aAnchor);
+}
+
 [[nodiscard]] inline bool validateResidentWiringStore(
     ScDocument& rDoc,
     const spreadsheetengine::detail::substrate::AdmittedWiringContainers& rStore,
@@ -164,7 +336,7 @@ inline void applyListenerEdgeTarget(ScDocument& rDoc,
             rReason = u"wiring_store_missing_broadcaster";
             return false;
         }
-        if (!resolveFormulaCell(rDoc, rEdge.maListenerAnchor, rReason))
+        if (!validateListenerAnchor(rDoc, rEdge.maListenerAnchor, rReason))
             return false;
     }
 
@@ -211,11 +383,39 @@ inline void applyListenerEdgeTarget(ScDocument& rDoc,
     if (!detail::validateResidentWiringStore(rDoc, rStore, aResult.maReason))
         return aResult;
 
+    const auto aResolvedFormulaGroups
+        = detail::collectResolvedFormulaGroupAnchors(rDoc, rStore, aResult.maReason);
+    if (!aResult.maReason.empty())
+        return aResult;
+
     detail::clearAdmittedLiveWiring(rDoc, aCells);
+    detail::applyFormulaGroupListenerAnchors(rDoc, aResolvedFormulaGroups, aResult.maReason);
+    if (!aResult.maReason.empty())
+        return aResult;
 
     aResult.mnBroadcasterNodesRealized = rStore.getBroadcasterNodeCount();
     for (const auto& rEdge : rStore.maListenerEdges)
     {
+        if (rEdge.maListenerAnchor.meKind
+            == spreadsheetengine::detail::substrate::ListenerAnchorKind::FormulaGroup)
+        {
+            ++aResult.mnListenerEdgesApplied;
+            continue;
+        }
+
+        if (!aResolvedFormulaGroups.empty())
+        {
+            ScFormulaCell* pCell
+                = detail::resolveFormulaCell(rDoc, rEdge.maListenerAnchor, aResult.maReason);
+            if (!pCell)
+                return aResult;
+            if (detail::formulaCellBelongsToFormulaGroupAnchor(*pCell, aResolvedFormulaGroups))
+            {
+                ++aResult.mnListenerEdgesApplied;
+                continue;
+            }
+        }
+
         detail::applyListenerEdgeTarget(rDoc, rEdge, aResult.maReason);
         if (!aResult.maReason.empty())
             return aResult;

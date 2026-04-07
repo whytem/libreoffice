@@ -59,8 +59,15 @@ This implementation intentionally still does not admit:
 - off-sheet consumers
 - repair-sensitive normalization
 
-The concrete live blockers proven in this cycle are:
+The concrete live blockers proven originally in this cycle were:
 
 - lifecycle still rejects the bounded preserve family out of contract
 - mutation entry reaches live-apply/final-verification surfaces that still
   report `listener_anchor_out_of_contract`
+
+A later listener-anchor support closeout removed that specific blocker.
+
+The current concrete live blockers are now:
+
+- lifecycle `opaque_dependency_surface`
+- mutation-entry `rollback_queue_or_state_mismatch`

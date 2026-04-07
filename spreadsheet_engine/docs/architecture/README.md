@@ -773,6 +773,31 @@ Current architecture docs:
   completed closeout decision for the named-range-combined cycle,
   leaving the admitted slice unchanged while making the bounded preserve and
   member-exit limits explicit
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_PLAN.md](COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_PLAN.md) -
+  completed blocker-removal plan for true `FormulaGroup` listener-anchor
+  support, now recording the narrower post-closeout blocker boundary
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_CONTRACT.md) -
+  frozen contract for the FormulaGroup listener-anchor live-support
+  closeout, fixing the new live-owned listener kinds and retained deferred
+  classes
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_SCENARIO_MATRIX.md) -
+  frozen scenario matrix for the FormulaGroup listener-anchor live-support
+  closeout, separating exact admitted-slice proof from blocker-removal and
+  retained reject buckets
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_MAPPING_RULES.md) -
+  frozen mapping note for the FormulaGroup listener-anchor live-support
+  closeout, defining live resolution, replay, and retained reject rules
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_IMPLEMENTATION.md) -
+  completed implementation note for the FormulaGroup listener-anchor
+  live-support closeout, covering live replay and the remaining exactness
+  gaps
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_EVIDENCE.md) -
+  frozen evidence note for the FormulaGroup listener-anchor live-support
+  closeout, proving blocker removal without widening the admitted slice
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_DECISION_RECORD.md) -
+  completed closeout decision for the FormulaGroup listener-anchor
+  live-support cycle, adopting true FormulaGroup replay on the admitted
+  slice while keeping named-range admission deferred
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

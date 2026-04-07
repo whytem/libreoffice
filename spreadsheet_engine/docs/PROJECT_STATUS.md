@@ -943,15 +943,21 @@ The exact regroup, merge, replacement-merge, merge-completion,
 multi-group-collapse, and bounded named-range-combined cycles are now
 complete.
 
+The FormulaGroup listener-anchor blocker-removal cycle is now also complete:
+
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_DECISION_RECORD.md)
+
 The adjacent concerns after that are:
 
+- named-range-combined opaque dependency surfaces and exact
+  rollback/final-verification closure
 - repair-sensitive host normalization
 - off-sheet shared-group behavior
 - broader named-range-combined member-exit, regroup, merge, and
   multi-group-collapse classes
 - broader non-edge regroup and merge shared-group classes
 
-The most recent closeout references and next-pass plan are:
+The most recent closeout references are:
 
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_ADMISSION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_DECISION_RECORD.md)
@@ -965,6 +971,8 @@ The most recent closeout references and next-pass plan are:
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_DECISION_RECORD.md)
 
 ## Current Assessment
 

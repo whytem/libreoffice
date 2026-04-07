@@ -34,9 +34,17 @@ The live Calc proof now shows:
 
 - lifecycle keeps bounded named-range-combined `SameTextPreserve` deferred
 - mutation entry keeps bounded named-range-combined `SameTextPreserve`
-  deferred and reports `listener_anchor_out_of_contract`
+  deferred
 - authority rejects bounded named-range-combined member-exit
 - mutation entry rejects bounded named-range-combined member-exit
+
+After the completed FormulaGroup listener-anchor live-support cycle, the
+preserve-family blockers are now narrower:
+
+- lifecycle now reports `opaque_dependency_surface`
+- mutation entry now reports `rollback_queue_or_state_mismatch`
+- the old `listener_anchor_out_of_contract` blocker is removed for that
+  preserve rerun
 
 Coverage:
 
@@ -51,9 +59,9 @@ The closeout validation sweep passed with:
 - `make -j1 CPPUNIT_TEST_NAME=testCalcFacadeSharedGroupNamedRangeBoundarySameTextPreserve CppunitTest_sc_ucalc_workbook_facade`
 - `make -j1 CPPUNIT_TEST_NAME=testCalcFacadeSharedGroupNamedRangeBoundaryOffSheetStaysDeferred CppunitTest_sc_ucalc_workbook_facade`
 - `make -j1 CPPUNIT_TEST_NAME=testComputationalNarrowRolloutSharedGroupNonStructuralAuthorityNamedRangeMemberExitStaysRejected CppunitTest_sc_ucalc_dependency_shadow`
-- `make -j1 CPPUNIT_TEST_NAME=testComputationalNarrowRolloutSharedGroupNonStructuralLifecycleNamedRangeSameTextPreserveStaysDeferred CppunitTest_sc_ucalc_dependency_shadow`
+- `make -j1 CPPUNIT_TEST_NAME=testComputationalNarrowRolloutSharedGroupNonStructuralLifecycleNamedRangeSameTextPreserveStaysDeferredOpaqueDependencySurface CppunitTest_sc_ucalc_dependency_shadow`
 - `make -j1 CPPUNIT_TEST_NAME=testComputationalMutationEntrySharedGroupNonStructuralNamedRangeMemberExitAuthorityStaysRejected CppunitTest_sc_ucalc_dependency_shadow`
-- `make -j1 CPPUNIT_TEST_NAME=testComputationalMutationEntrySharedGroupNonStructuralNamedRangeSameTextPreserveLifecycleStaysDeferred CppunitTest_sc_ucalc_dependency_shadow`
+- `make -j1 CPPUNIT_TEST_NAME=testComputationalMutationEntrySharedGroupNonStructuralNamedRangeSameTextPreserveRemovesListenerAnchorBlockerButStillStaysDeferred CppunitTest_sc_ucalc_dependency_shadow`
 - `make -j1 CppunitTest_sc_ucalc_compile_diff`
 - `spreadsheet_engine/build_check/spreadsheetengine_computational_graph_tests`
 - `spreadsheet_engine/build_check/spreadsheetengine_fods_replay_tests --summary --assert-zero-fallback`
@@ -74,6 +82,6 @@ This evidence supports a no-admit closeout for this cycle.
 It proves:
 
 - standalone exactness exists for the bounded preserve candidate
-- live lifecycle and mutation-entry carry-through do not yet admit that
-  candidate
+- live lifecycle and mutation-entry carry-through still do not admit that
+  candidate even after the listener-anchor blocker is removed
 - bounded member-exit also remains deferred

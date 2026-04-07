@@ -27,9 +27,10 @@ The cycle proved two different facts:
 
 The live failures are now explicit:
 
-- lifecycle keeps the preserve family out of contract
-- mutation entry reaches live-apply and final-verification surfaces that
-  still report `listener_anchor_out_of_contract`
+- lifecycle keeps the preserve family out of contract and now closes as
+  `opaque_dependency_surface`
+- mutation entry reaches live-apply and final-verification surfaces that now
+  close as `rollback_queue_or_state_mismatch`
 - bounded named-range-combined member-exit also stays out of contract
 
 That means the named-range-combined surface is still not engine-owned end to
@@ -73,8 +74,14 @@ groundwork:
 
 ## Next Adjacent Concern
 
-The remaining adjacent concerns are now:
+The FormulaGroup listener-anchor blocker-removal pass is now complete:
 
+- [COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_DECISION_RECORD.md)
+
+The remaining adjacent concerns after that are now:
+
+- named-range-combined opaque dependency surfaces and exact
+  rollback/final-verification closure
 - repair-sensitive host normalization
 - off-sheet shared-group behavior
 - broader named-range-combined member-exit, regroup, merge, and

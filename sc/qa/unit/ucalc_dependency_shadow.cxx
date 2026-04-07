@@ -157,6 +157,25 @@ public:
     }
 };
 
+template <typename BroadcasterSnapshot>
+bool containsListenerKind(
+    const std::vector<BroadcasterSnapshot>& rBroadcasters, ListenerKind eKind)
+{
+    return std::any_of(rBroadcasters.begin(), rBroadcasters.end(),
+        [eKind](const BroadcasterSnapshot& rBroadcaster) {
+            return std::any_of(rBroadcaster.maListeners.begin(), rBroadcaster.maListeners.end(),
+                [eKind](const auto& rListener) { return rListener.meKind == eKind; });
+        });
+}
+
+bool hasLiveFormulaGroupListenerAnchor(const LiveComputationalStateSnapshot& rSnapshot)
+{
+    return containsListenerKind(rSnapshot.maBroadcasters.maCellBroadcasters,
+               ListenerKind::FormulaGroup)
+           || containsListenerKind(rSnapshot.maBroadcasters.maAreaBroadcasters,
+               ListenerKind::FormulaGroup);
+}
+
 struct AddressLess
 {
     [[nodiscard]] bool operator()(const CellAddress& rLeft, const CellAddress& rRight) const
@@ -361,6 +380,14 @@ void assertComputationalLifecycleApplied(
     const std::string aResultMessage
         = "unexpected computational lifecycle result kind="
           + std::to_string(static_cast<int>(oResult->meKind))
+          + " verdict="
+          + std::to_string(static_cast<int>(oResult->maTransition.meVerdict))
+          + " reason="
+          + OUStringToOString(
+                spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                    oResult->maTransition.maReason),
+                RTL_TEXTENCODING_UTF8)
+                .getStr()
           + " queue="
           + (oResult->moQueueComparison
                  ? std::to_string(static_cast<int>(oResult->moQueueComparison->meKind))
@@ -1701,18 +1728,18 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     forceFormulaTreeOrder(*m_pDoc,
         { ScAddress(1, 1, 0), ScAddress(1, 2, 0), ScAddress(2, 0, 0) });
 
-    const auto oResult
-        = aAuthorityCapture.apply(*m_pDoc, translateSetScalarValue(ScAddress(1, 0, 0)));
-    CPPUNIT_ASSERT(oResult.has_value());
-    CPPUNIT_ASSERT_EQUAL(ComputationalPilotResultKind::RejectedOutOfContract, oResult->meKind);
-
-    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+    const CalcWorkbookFacade aMutationFacade(*m_pDoc, 1);
     const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
-        aBeforeFacade, aAfterFacade,
+        aBeforeFacade, aMutationFacade,
         spreadsheetengine::detail::facade::MutationEvent::setScalarValue({ 0, 1, 0 }));
     CPPUNIT_ASSERT_EQUAL(
         consumers::SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSameSheet,
         aBoundary.meBoundary);
+
+    const auto oResult
+        = aAuthorityCapture.apply(*m_pDoc, translateSetScalarValue(ScAddress(1, 0, 0)));
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(ComputationalPilotResultKind::RejectedOutOfContract, oResult->meKind);
 
     m_pDoc->DeleteTab(0);
 }
@@ -2125,7 +2152,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
-    testComputationalNarrowRolloutSharedGroupNonStructuralLifecycleNamedRangeSameTextPreserveStaysDeferred)
+    testComputationalNarrowRolloutSharedGroupNonStructuralLifecycleNamedRangeSameTextPreserveStaysDeferredOpaqueDependencySurface)
 {
     using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
     using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
@@ -2171,6 +2198,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(ComputationalLifecycleResultKind::RejectedOutOfContract,
         oResult->meKind);
+    CPPUNIT_ASSERT(oResult->maTransition.maReason == u"opaque_dependency_surface");
 
     const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
     const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
@@ -2936,7 +2964,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
-    testComputationalMutationEntrySharedGroupNonStructuralNamedRangeSameTextPreserveLifecycleStaysDeferred)
+    testComputationalMutationEntrySharedGroupNonStructuralNamedRangeSameTextPreserveRemovesListenerAnchorBlockerButStillStaysDeferred)
 {
     using spreadsheetengine::detail::substrate::MutationEntryRequest;
     namespace consumers = spreadsheetengine::detail::facade::consumers;
@@ -2972,8 +3000,10 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     CPPUNIT_ASSERT_EQUAL(ComputationalMutationEntryResultKind::RejectedOutOfContract,
         oResult->meKind);
     CPPUNIT_ASSERT(oResult->moLiveApplyObservation.has_value());
+    CPPUNIT_ASSERT(oResult->moLiveApplyObservation->maReason
+                   == u"rollback_queue_or_state_mismatch");
     CPPUNIT_ASSERT(
-        oResult->moLiveApplyObservation->maReason == u"listener_anchor_out_of_contract");
+        oResult->moLiveApplyObservation->maReason != u"listener_anchor_out_of_contract");
 
     const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
     const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
@@ -5917,6 +5947,132 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalObjectRealizationSharedGroupFormulaGroupAnchorsRemoveOutOfContractReject)
+{
+    using spreadsheetengine::compat::libreoffice::bootstrapMutableComputationalSubstrateState;
+    using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
+    using spreadsheetengine::compat::libreoffice::recalcqueue::captureFormulaState;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        AdmittedObjectRealization;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        ObjectRealizationResultKind;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        buildAdmittedObjectRealization;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        classifyObjectRealizationObservation;
+    using spreadsheetengine::compat::libreoffice::substrateobjectrealization::
+        realizeAdmittedObjectRealization;
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
+    using spreadsheetengine::compat::libreoffice::substraterollback::compareRollbackQueueToDocument;
+    using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
+    using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::compareComputationalShadow;
+    using spreadsheetengine::detail::substrate::compareDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::detail::compareBroadcasterCanonicalization;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr)));
+    m_pDoc->SetString(1, 0, 0, u"=COUNTA(Metrics)+A1"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=COUNTA(Metrics)"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aBeforeLiveState = collectLiveComputationalState(*m_pDoc);
+    CPPUNIT_ASSERT(hasLiveFormulaGroupListenerAnchor(aBeforeLiveState));
+
+    const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 0);
+    const auto aBeforeObservation = makeComputationalObservationState(aBeforeLiveState);
+    const auto aBeforeShadow = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+    const auto aBeforeGraph = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+    const auto aBeforeFormulaState = captureFormulaState(*m_pDoc);
+    const auto aMutableState = bootstrapMutableComputationalSubstrateState(aBeforeShadow);
+    const AdmittedObjectRealization aObjectRealization
+        = buildAdmittedObjectRealization(aMutableState);
+
+    m_pDoc->SetEmptyCell(ScAddress(1, 0, 0));
+    m_pDoc->SetEmptyCell(ScAddress(1, 1, 0));
+    m_pDoc->SetEmptyCell(ScAddress(1, 2, 0));
+
+    const auto aRealization = realizeAdmittedObjectRealization(*m_pDoc, aObjectRealization);
+    CPPUNIT_ASSERT_EQUAL(ObjectRealizationResultKind::Applied, aRealization.meKind);
+
+    const auto aLiveState = collectLiveComputationalState(*m_pDoc);
+    CPPUNIT_ASSERT(hasLiveFormulaGroupListenerAnchor(aLiveState));
+
+    const CalcWorkbookFacade aLiveFacade(*m_pDoc, 0);
+    const auto aLiveObservation = makeComputationalObservationState(aLiveState);
+    const auto aQueueComparison = compareRollbackQueueToDocument(aBeforeFormulaState, *m_pDoc);
+    const auto aComputationalComparison
+        = compareComputationalShadow(aMutableState.maShadow, aLiveFacade, aLiveObservation);
+    const auto aLiveShadow = buildComputationalWorkbookShadow(aLiveFacade, aLiveObservation);
+    const auto aGraphComparison
+        = compareDependencyGraphShadow(aBeforeGraph, aLiveShadow, aLiveObservation);
+    const auto aBroadcasterComparison
+        = compareBroadcasterCanonicalization(aMutableState.maShadow, aLiveObservation);
+    const auto aObjectObservation = classifyObjectRealizationObservation(
+        aRealization, aQueueComparison, aComputationalComparison, aGraphComparison,
+        aBroadcasterComparison);
+
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describeObjectRealizationObservation(aObjectObservation),
+        ObjectRealizationObservationKind::QueueOrStateMismatch, aObjectObservation.meKind);
+    CPPUNIT_ASSERT(aObjectObservation.maReason == u"computational_mismatch");
+    CPPUNIT_ASSERT(aObjectObservation.mbFormulaCellLifetimeApplied);
+    CPPUNIT_ASSERT(aObjectObservation.mbCellStorageApplied);
+    CPPUNIT_ASSERT(aObjectObservation.mbWiringApplied);
+    CPPUNIT_ASSERT(aObjectObservation.mbQueueExact);
+    CPPUNIT_ASSERT(!aObjectObservation.mbComputationalFullMatch);
+    CPPUNIT_ASSERT(!aObjectObservation.mbGraphFullMatch);
+    CPPUNIT_ASSERT(!aObjectObservation.mbBroadcasterExact);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(4), aObjectObservation.mnExpectedBroadcasters);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(4), aObjectObservation.mnLiveBroadcasters);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalWiringRejectsHostUnknownListenerAnchor)
+{
+    using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
+    using spreadsheetengine::compat::libreoffice::substratewiring::WiringApplyResultKind;
+    using spreadsheetengine::compat::libreoffice::substratewiring::realizeAdmittedWiringContainers;
+    using spreadsheetengine::detail::substrate::ListenerAnchorKind;
+    using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
+    using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::mutablesubstratedetail::buildAdmittedWiringContainers;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1"_ustr);
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aFacade(*m_pDoc, 0);
+    const auto aObservation = makeComputationalObservationState(
+        collectLiveComputationalState(*m_pDoc));
+    const auto aShadow = buildComputationalWorkbookShadow(aFacade, aObservation);
+    const auto aGraph = buildDependencyGraphShadow(aShadow, aObservation);
+    auto aStore = spreadsheetengine::detail::substrate::buildAdmittedWiringContainers(aGraph);
+    CPPUNIT_ASSERT(!aStore.maListenerEdges.empty());
+
+    aStore.maListenerEdges.front().maListenerAnchor.meKind = ListenerAnchorKind::HostUnknown;
+
+    const auto aResult = realizeAdmittedWiringContainers(*m_pDoc, aStore);
+    CPPUNIT_ASSERT_EQUAL(WiringApplyResultKind::RejectedOutOfContract, aResult.meKind);
+    CPPUNIT_ASSERT(aResult.maReason == u"listener_anchor_out_of_contract");
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     testComputationalRollbackObservationClassifierKinds)
 {
     using spreadsheetengine::compat::libreoffice::recalcshadow::ShadowComparison;
@@ -6136,6 +6292,83 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     CPPUNIT_ASSERT_EQUAL_MESSAGE(describeRollbackObservation(aRollbackObservation),
         RollbackObservationKind::Exact, aRollbackObservation.meKind);
     assertFormulaStateEqual(aBeforeFormulaState, captureFormulaState(*m_pDoc));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalRollbackObservationSharedGroupFormulaGroupAnchorsRemoveOutOfContractReject)
+{
+    using spreadsheetengine::compat::libreoffice::bootstrapMutableComputationalSubstrateState;
+    using spreadsheetengine::compat::libreoffice::makeComputationalObservationState;
+    using spreadsheetengine::compat::libreoffice::recalcqueue::captureFormulaState;
+    using spreadsheetengine::compat::libreoffice::substraterollback::applyAdmittedRollback;
+    using spreadsheetengine::compat::libreoffice::substraterollback::buildAdmittedRollbackRecord;
+    using spreadsheetengine::compat::libreoffice::substraterollback::classifyRollbackObservation;
+    using spreadsheetengine::compat::libreoffice::substraterollback::compareRollbackQueueToDocument;
+    using spreadsheetengine::compat::libreoffice::substrateobs::collectLiveComputationalState;
+    using spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow;
+    using spreadsheetengine::detail::substrate::buildDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::compareComputationalShadow;
+    using spreadsheetengine::detail::substrate::compareDependencyGraphShadow;
+    using spreadsheetengine::detail::substrate::detail::compareBroadcasterCanonicalization;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+    m_pDoc->SetString(1, 0, 0, u"=SUM(A1:A2)"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=SUM(A2:A3)"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=SUM(A3:A4)"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aBeforeLiveState = collectLiveComputationalState(*m_pDoc);
+    CPPUNIT_ASSERT(hasLiveFormulaGroupListenerAnchor(aBeforeLiveState));
+
+    const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 0);
+    const auto aBeforeObservation = makeComputationalObservationState(aBeforeLiveState);
+    const auto aBeforeShadow = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+    const auto aBeforeGraph = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+    const auto aBeforeFormulaState = captureFormulaState(*m_pDoc);
+    const auto aBeforeMutableState = bootstrapMutableComputationalSubstrateState(aBeforeShadow);
+    const auto aBeforeRollback = buildAdmittedRollbackRecord(aBeforeMutableState, aBeforeFormulaState);
+
+    m_pDoc->SetEmptyCell(ScAddress(1, 0, 0));
+    m_pDoc->SetEmptyCell(ScAddress(1, 1, 0));
+    m_pDoc->SetEmptyCell(ScAddress(1, 2, 0));
+
+    const auto aRollbackResult = applyAdmittedRollback(*m_pDoc, aBeforeRollback);
+
+    const auto aRestoredLiveState = collectLiveComputationalState(*m_pDoc);
+    CPPUNIT_ASSERT(hasLiveFormulaGroupListenerAnchor(aRestoredLiveState));
+
+    const CalcWorkbookFacade aRestoredFacade(*m_pDoc, 0);
+    const auto aRestoredObservation = makeComputationalObservationState(aRestoredLiveState);
+    const auto aQueueComparison = compareRollbackQueueToDocument(aBeforeFormulaState, *m_pDoc);
+    const auto aComputationalComparison
+        = compareComputationalShadow(aBeforeMutableState.maShadow, aRestoredFacade, aRestoredObservation);
+    const auto aRestoredShadow = buildComputationalWorkbookShadow(aRestoredFacade, aRestoredObservation);
+    const auto aGraphComparison
+        = compareDependencyGraphShadow(aBeforeGraph, aRestoredShadow, aRestoredObservation);
+    const auto aBroadcasterComparison
+        = compareBroadcasterCanonicalization(aBeforeMutableState.maShadow, aRestoredObservation);
+    const auto aRollbackObservation = classifyRollbackObservation(
+        aRollbackResult, aQueueComparison, aComputationalComparison, aGraphComparison,
+        aBroadcasterComparison);
+
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(describeRollbackObservation(aRollbackObservation),
+        RollbackObservationKind::MissingRestoredObjects, aRollbackObservation.meKind);
+    CPPUNIT_ASSERT(aRollbackObservation.maReason == u"missing_restored_objects");
+    CPPUNIT_ASSERT(aRollbackObservation.mbObjectRealizationApplied);
+    CPPUNIT_ASSERT(aRollbackObservation.mbQueueExact);
+    CPPUNIT_ASSERT(!aRollbackObservation.mbComputationalFullMatch);
+    CPPUNIT_ASSERT(!aRollbackObservation.mbGraphFullMatch);
+    CPPUNIT_ASSERT(!aRollbackObservation.mbBroadcasterExact);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aRollbackObservation.mnExpectedBroadcasters);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aRollbackObservation.mnLiveBroadcasters);
 
     m_pDoc->DeleteTab(0);
 }

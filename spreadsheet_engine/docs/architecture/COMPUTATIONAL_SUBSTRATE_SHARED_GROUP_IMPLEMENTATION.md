@@ -230,10 +230,14 @@ The frontier closeouts add five more bounded rules:
   can create the inserted formula cell in the predicted shadow and rebuild
   exactly one adjacent prior shared group into a bounded exact
   prior-length-plus-one after-topology
+- true `FormulaGroup` listener anchors are now live-owned on the already
+  admitted shared-group path through resident wiring replay
+- `HostUnknown` listener anchors remain explicitly out of contract
 - named-range-combined same-text preserve now has explicit facade
   classification and preserve-only authority candidate handling, but it
-  remains deferred live because lifecycle and mutation-entry carry-through
-  do not yet close
+  remains deferred live because lifecycle stops at
+  `opaque_dependency_surface` and mutation entry stops at
+  `rollback_queue_or_state_mismatch`
 - bounded three-participant multi-group collapse remains deferred because
   the exact authored full-span one-group topology closes only in standalone
   proof; live Calc three-group attempts keep the far participant group
@@ -304,6 +308,14 @@ The checked-in coverage now includes:
   named-range-combined same-text preserve
 - live authority and mutation-entry retained reject proof for bounded
   named-range-combined member-exit
+- retained reject coverage for `HostUnknown` listener anchors on the live
+  wiring path
+- standalone shared-group object-realization proof that `FormulaGroup`
+  listener anchors now apply without out-of-contract reject while still
+  exposing a narrower `computational_mismatch` restore gap
+- standalone shared-group rollback proof that `FormulaGroup` listener
+  anchors now apply without out-of-contract reject while still exposing a
+  narrower `missing_restored_objects` restore gap
 - structural shared-group-plus-named-range defer coverage
 - structural shared-group repair-detected coverage when the group shape is
   perturbed after the structural mutation
