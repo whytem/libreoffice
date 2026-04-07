@@ -128,6 +128,7 @@ enum class SharedFormulaMutationFamily : std::uint8_t
     SameTextPreserve,
     MemberExit,
     Regroup,
+    OneSidedInsert,
     Merge,
     ReplacementMerge,
     StructuralPreserve,
@@ -355,6 +356,15 @@ namespace detail
                      && aClassification.mbTouchedAddressSharedBefore)
             {
                 aClassification.meFamily = SharedFormulaMutationFamily::MemberExit;
+            }
+            else if (!aClassification.mbTouchedAddressSharedBefore
+                     && aClassification.mbTouchedAddressSharedAfter
+                     && aClassification.maTransition.meKind
+                            == SharedFormulaGroupTransitionKind::Rebuild
+                     && aClassification.mnBeforeNeighborhoodGroupCount == 1
+                     && aClassification.mnAfterNeighborhoodGroupCount == 1)
+            {
+                aClassification.meFamily = SharedFormulaMutationFamily::OneSidedInsert;
             }
             else if (!aClassification.mbTouchedAddressSharedBefore
                      && aClassification.mbTouchedAddressSharedAfter

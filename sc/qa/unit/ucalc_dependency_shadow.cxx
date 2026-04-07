@@ -2238,9 +2238,10 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
-    testComputationalNarrowRolloutSharedGroupNonStructuralLifecycleOneSidedExtensionStaysRejected)
+    testComputationalNarrowRolloutSharedGroupNonStructuralLifecycleOneSidedInsert)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
 
     ScopedEnvironmentOverride aRollout(
         "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
@@ -2274,9 +2275,16 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 
     const auto oResult = aLifecycleCapture.apply(
         *m_pDoc, translateSetFormula(ScAddress(1, 2, 0), u"=A3*2"_ustr));
-    CPPUNIT_ASSERT(oResult.has_value());
-    CPPUNIT_ASSERT_EQUAL(ComputationalLifecycleResultKind::RejectedOutOfContract,
-        oResult->meKind);
+    assertComputationalLifecycleApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbGroupMatch);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbFullMatch);
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
+    CPPUNIT_ASSERT((aAfterGroups.front().maAnchor == CellAddress { 0, 1, 0 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aAfterGroups.front().mnLength);
 
     m_pDoc->DeleteTab(0);
 }
@@ -3001,9 +3009,10 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
-    testComputationalMutationEntrySharedGroupNonStructuralOneSidedExtensionStaysRejected)
+    testComputationalMutationEntrySharedGroupNonStructuralOneSidedInsertLifecycle)
 {
     using spreadsheetengine::detail::substrate::MutationEntryRequest;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
 
     ScopedEnvironmentOverride aMutationEntry(
         "SPREADSHEET_ENGINE_COMPUTATIONAL_MUTATION_ENTRY", "1");
@@ -3016,8 +3025,8 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     m_pDoc->SetValue(0, 0, 0, 1.0);
     m_pDoc->SetValue(0, 1, 0, 2.0);
     m_pDoc->SetValue(0, 2, 0, 3.0);
-    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
     m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=A3*2"_ustr);
     m_pDoc->CalcAll();
 
     const auto aEntryCapture
@@ -3026,10 +3035,17 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     CPPUNIT_ASSERT(aEntryCapture.canApplyMutationEntry());
 
     const auto oResult = aEntryCapture.apply(
-        *m_pDoc, MutationEntryRequest::setFormula({ 0, 1, 2 }, u"=A3*2"));
-    CPPUNIT_ASSERT(oResult.has_value());
-    CPPUNIT_ASSERT_EQUAL(ComputationalMutationEntryResultKind::RejectedOutOfContract,
-        oResult->meKind);
+        *m_pDoc, MutationEntryRequest::setFormula({ 0, 1, 0 }, u"=A1*2"));
+    assertComputationalMutationEntryApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbGroupMatch);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbFullMatch);
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
+    CPPUNIT_ASSERT((aAfterGroups.front().maAnchor == CellAddress { 0, 1, 0 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aAfterGroups.front().mnLength);
 
     m_pDoc->DeleteTab(0);
 }

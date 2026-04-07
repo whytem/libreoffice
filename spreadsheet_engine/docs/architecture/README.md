@@ -692,6 +692,35 @@ Current architecture docs:
   completed closeout decision for the replacement-merge cycle, admitting
   the bounded edge replacement family beyond the earlier member-exit,
   same-text preserve, edge-regroup, and gap-merge slice
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_PLAN.md) -
+  completed closeout record for the same-sheet merge completion cycle,
+  admitting bounded one-sided adjacent insertion while keeping broader
+  multi-group collapse, named-range-combined, repair-sensitive, off-sheet,
+  and broader non-edge regroup or merge classes deferred
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_CONTRACT.md) -
+  frozen contract for the merge-completion closeout, fixing the admitted
+  one-sided insert family and retained deferred classes
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_SCENARIO_MATRIX.md) -
+  frozen scenario matrix for the merge-completion closeout, separating
+  admitted one-sided insert from broader multi-group, named-range, repair,
+  and off-sheet defer buckets
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_MAPPING_RULES.md) -
+  frozen mapping note for the merge-completion closeout, defining the
+  inserted-cell-plus-adjacent-group window and exact bounded after-group
+  match requirement
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_IMPLEMENTATION.md) -
+  completed implementation note for the merge-completion closeout,
+  including one-sided insert participant discovery and exact rebuild-window
+  authority
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_EVIDENCE.md) -
+  frozen evidence note for the merge-completion closeout, recording
+  facade, standalone, lifecycle, mutation-entry, and retained broader
+  multi-group rejection proof
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_DECISION_RECORD.md) -
+  completed closeout decision for the merge-completion cycle, admitting
+  bounded same-sheet one-sided adjacent insertion beyond the earlier
+  member-exit, same-text preserve, edge-regroup, gap-merge, and
+  replacement-merge slice
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

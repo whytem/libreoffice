@@ -76,8 +76,14 @@ This decision is supported by:
 
 ## Next Adjacent Concern
 
-The next adjacent concern is narrower again:
+The merge-completion concern from this record is now closed by:
 
-- whether one-sided adjacent insertion, named-range-combined,
-  repair-sensitive, off-sheet, or broader non-edge regroup and merge
-  classes can each produce their own exact engine-authored promotion family
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_DECISION_RECORD.md)
+
+The remaining adjacent concerns are now:
+
+- multi-group collapse beyond the current two-participant merge families
+- named-range-combined merge
+- repair-sensitive host normalization
+- off-sheet merge widening
+- broader non-edge regroup or merge

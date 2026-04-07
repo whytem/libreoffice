@@ -389,6 +389,21 @@ struct SharedGroupGapMergeParticipants
     }
 };
 
+enum class SharedGroupOneSidedInsertDirection : std::uint8_t
+{
+    Upward,
+    Downward
+};
+
+struct SharedGroupOneSidedInsertParticipants
+{
+    const ShadowFormulaGroupRecord* mpAdjacentGroup = nullptr;
+    SharedGroupOneSidedInsertDirection meDirection
+        = SharedGroupOneSidedInsertDirection::Upward;
+
+    [[nodiscard]] bool isValid() const { return mpAdjacentGroup != nullptr; }
+};
+
 enum class SharedGroupReplacementMergeDirection : std::uint8_t
 {
     Upward,
@@ -500,6 +515,80 @@ findGapMergeParticipantGroups(
            && rTouchedAddress.mnRow <= nExpectedEnd;
 }
 
+[[nodiscard]] inline std::optional<SharedGroupOneSidedInsertParticipants>
+findOneSidedInsertParticipantGroup(
+    const ComputationalWorkbookShadow& rShadow, const api::CellAddress& rAddress)
+{
+    if (findShadowCell(rShadow, rAddress))
+        return std::nullopt;
+
+    const ShadowFormulaGroupRecord* pAboveGroup = nullptr;
+    if (rAddress.mnRow > 0)
+    {
+        const api::CellAddress aAbove { rAddress.mnSheet, rAddress.mnColumn,
+            static_cast<api::RowIndex>(rAddress.mnRow - 1) };
+        pAboveGroup = findShareableSameColumnGroup(rShadow, aAbove);
+    }
+    const api::CellAddress aBelow { rAddress.mnSheet, rAddress.mnColumn,
+        static_cast<api::RowIndex>(rAddress.mnRow + 1) };
+    const ShadowFormulaGroupRecord* pBelowGroup = findShareableSameColumnGroup(rShadow, aBelow);
+
+    if (pAboveGroup)
+    {
+        const api::RowIndex nAboveEnd = static_cast<api::RowIndex>(
+            pAboveGroup->maId.maAnchor.mnRow + pAboveGroup->maId.mnLength - 1);
+        if (nAboveEnd != static_cast<api::RowIndex>(rAddress.mnRow - 1))
+            pAboveGroup = nullptr;
+    }
+
+    if (pBelowGroup && pBelowGroup->maId.maAnchor.mnRow != static_cast<api::RowIndex>(rAddress.mnRow + 1))
+        pBelowGroup = nullptr;
+
+    if ((pAboveGroup && pBelowGroup) || (!pAboveGroup && !pBelowGroup))
+        return std::nullopt;
+
+    if (pBelowGroup)
+    {
+        return SharedGroupOneSidedInsertParticipants {
+            pBelowGroup, SharedGroupOneSidedInsertDirection::Upward };
+    }
+
+    return SharedGroupOneSidedInsertParticipants { pAboveGroup,
+        SharedGroupOneSidedInsertDirection::Downward };
+}
+
+[[nodiscard]] inline bool matchesOneSidedInsertObservedAfterGroup(
+    const ShadowFormulaGroupRecord& rObservedAfterGroup,
+    const SharedGroupOneSidedInsertParticipants& rParticipants,
+    const api::CellAddress& rTouchedAddress)
+{
+    if (!rParticipants.isValid())
+        return false;
+
+    const api::RowIndex nObservedEnd = static_cast<api::RowIndex>(
+        rObservedAfterGroup.maId.maAnchor.mnRow + rObservedAfterGroup.maId.mnLength - 1);
+    const api::RowIndex nAdjacentEnd = static_cast<api::RowIndex>(
+        rParticipants.mpAdjacentGroup->maId.maAnchor.mnRow
+        + rParticipants.mpAdjacentGroup->maId.mnLength - 1);
+
+    switch (rParticipants.meDirection)
+    {
+        case SharedGroupOneSidedInsertDirection::Upward:
+            return rObservedAfterGroup.maId.maAnchor.mnRow == rTouchedAddress.mnRow
+                   && nObservedEnd == nAdjacentEnd
+                   && rObservedAfterGroup.maId.mnLength
+                          == rParticipants.mpAdjacentGroup->maId.mnLength + 1;
+        case SharedGroupOneSidedInsertDirection::Downward:
+            return rObservedAfterGroup.maId.maAnchor
+                       == rParticipants.mpAdjacentGroup->maId.maAnchor
+                   && nObservedEnd == rTouchedAddress.mnRow
+                   && rObservedAfterGroup.maId.mnLength
+                          == rParticipants.mpAdjacentGroup->maId.mnLength + 1;
+    }
+
+    return false;
+}
+
 [[nodiscard]] inline std::optional<SharedGroupReplacementMergeParticipants>
 findReplacementMergeParticipantGroups(
     const ComputationalWorkbookShadow& rShadow, const api::CellAddress& rAddress)
@@ -601,6 +690,9 @@ findReplacementMergeParticipantGroups(
                rInput.maComputationalShadow, rInput.maMutation.maAddress)
            && !findGapMergeParticipantGroups(
                    rInput.maComputationalShadow, rInput.maMutation.maAddress)
+                   .has_value()
+           && !findOneSidedInsertParticipantGroup(
+                   rInput.maComputationalShadow, rInput.maMutation.maAddress)
                    .has_value();
 }
 
@@ -693,6 +785,33 @@ findReplacementMergeParticipantGroups(
     aWindow.mnEndRow = static_cast<api::RowIndex>(
         oParticipants->mpBelowGroup->maId.maAnchor.mnRow
         + oParticipants->mpBelowGroup->maId.mnLength - 1);
+    return aWindow;
+}
+
+[[nodiscard]] inline std::optional<SharedGroupRebuildWindow>
+determineSharedGroupOneSidedInsertWindow(
+    const ComputationalWorkbookShadow& rBeforeShadow, const api::CellAddress& rTouchedAddress)
+{
+    const auto oParticipants = findOneSidedInsertParticipantGroup(rBeforeShadow, rTouchedAddress);
+    if (!oParticipants)
+        return std::nullopt;
+
+    SharedGroupRebuildWindow aWindow;
+    const api::RowIndex nAdjacentEnd = static_cast<api::RowIndex>(
+        oParticipants->mpAdjacentGroup->maId.maAnchor.mnRow
+        + oParticipants->mpAdjacentGroup->maId.mnLength - 1);
+    switch (oParticipants->meDirection)
+    {
+        case SharedGroupOneSidedInsertDirection::Upward:
+            aWindow.mnStartRow = rTouchedAddress.mnRow;
+            aWindow.mnEndRow = nAdjacentEnd;
+            break;
+        case SharedGroupOneSidedInsertDirection::Downward:
+            aWindow.mnStartRow = oParticipants->mpAdjacentGroup->maId.maAnchor.mnRow;
+            aWindow.mnEndRow = rTouchedAddress.mnRow;
+            break;
+    }
+
     return aWindow;
 }
 
@@ -984,6 +1103,8 @@ inline void clearPredictedSharedGroupBindingsInWindow(ComputationalWorkbookShado
     const auto aFacade = materializeFacadeFromComputationalShadow(rPredicted);
     const auto oGapMergeWindow = determineSharedGroupGapMergeWindow(
         rInput.maComputationalShadow, rInput.maMutation.maAddress);
+    const auto oOneSidedInsertParticipants = findOneSidedInsertParticipantGroup(
+        rInput.maComputationalShadow, rInput.maMutation.maAddress);
     const auto* pBeforeTouchedGroup
         = findShareableSameColumnGroup(rInput.maComputationalShadow, rInput.maMutation.maAddress);
     const auto* pObservedAfterTouchedGroup
@@ -991,6 +1112,16 @@ inline void clearPredictedSharedGroupBindingsInWindow(ComputationalWorkbookShado
               ? findShareableSameColumnGroup(
                     *rInput.moObservedAfterComputationalShadow, rInput.maMutation.maAddress)
               : nullptr;
+    const bool bAllowOneSidedInsertWindow
+        = !pBeforeTouchedGroup && pObservedAfterTouchedGroup && oOneSidedInsertParticipants
+          && matchesOneSidedInsertObservedAfterGroup(
+              *pObservedAfterTouchedGroup, *oOneSidedInsertParticipants,
+              rInput.maMutation.maAddress);
+    const auto oOneSidedInsertWindow = bAllowOneSidedInsertWindow
+                                           ? determineSharedGroupOneSidedInsertWindow(
+                                                 rInput.maComputationalShadow,
+                                                 rInput.maMutation.maAddress)
+                                           : std::nullopt;
     const auto oReplacementMergeParticipants = findReplacementMergeParticipantGroups(
         rInput.maComputationalShadow, rInput.maMutation.maAddress);
     const bool bAllowReplacementMergeWindow
@@ -1010,6 +1141,8 @@ inline void clearPredictedSharedGroupBindingsInWindow(ComputationalWorkbookShado
           && pObservedAfterTouchedGroup && pObservedAfterTouchedGroup->maId != pBeforeTouchedGroup->maId;
     const auto aWindow = oGapMergeWindow
                              ? *oGapMergeWindow
+                             : oOneSidedInsertWindow
+                                   ? *oOneSidedInsertWindow
                              : oReplacementMergeWindow
                                    ? *oReplacementMergeWindow
                              : determineSharedGroupRebuildWindow(
@@ -1088,6 +1221,54 @@ inline void clearPredictedSharedGroupBindingsInWindow(ComputationalWorkbookShado
             if (!pObservedAfterCell->moFormulaGroup.has_value() || !pObservedAfterGroup
                 || !matchesGapMergeObservedAfterGroup(
                     *pObservedAfterGroup, *oMergeParticipants, rInput.maMutation.maAddress))
+            {
+                rReason = u"shared_group_non_structural_out_of_contract";
+                return false;
+            }
+
+            return true;
+        }
+
+        const auto oOneSidedInsertParticipants = findOneSidedInsertParticipantGroup(
+            rInput.maComputationalShadow, rInput.maMutation.maAddress);
+        if (oOneSidedInsertParticipants)
+        {
+            if (!rInput.mbAllowSharedGroupNonStructuralAdmission)
+            {
+                rReason = u"shared_group_non_structural_disabled";
+                return false;
+            }
+
+            if (!rInput.moObservedAfterComputationalShadow)
+            {
+                rReason = u"missing_shared_group_after_shadow";
+                return false;
+            }
+
+            const bool bNamedRangesStable
+                = sortNamedRangesForComparison(rInput.maComputationalShadow.maNamedRanges)
+                  == sortNamedRangesForComparison(
+                      rInput.moObservedAfterComputationalShadow->maNamedRanges);
+            if (!bNamedRangesStable)
+            {
+                rReason = u"shared_group_named_range_out_of_contract";
+                return false;
+            }
+
+            const auto* pObservedAfterCell = findShadowCell(
+                *rInput.moObservedAfterComputationalShadow, rInput.maMutation.maAddress);
+            const auto* pObservedAfterGroup = findShareableSameColumnGroup(
+                *rInput.moObservedAfterComputationalShadow, rInput.maMutation.maAddress);
+            if (!pObservedAfterCell || !pObservedAfterCell->hasFormula())
+            {
+                rReason = u"missing_shared_group_formula_cell";
+                return false;
+            }
+
+            if (!pObservedAfterCell->moFormulaGroup.has_value() || !pObservedAfterGroup
+                || !matchesOneSidedInsertObservedAfterGroup(
+                    *pObservedAfterGroup, *oOneSidedInsertParticipants,
+                    rInput.maMutation.maAddress))
             {
                 rReason = u"shared_group_non_structural_out_of_contract";
                 return false;

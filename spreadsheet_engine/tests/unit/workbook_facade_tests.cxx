@@ -632,11 +632,58 @@ int main()
         }
     }
 
-    // --- Shared-formula replacement-merge classification ---
+    // --- Shared-formula one-sided-insert classification ---
     {
         InMemoryWorkbookFacade aBeforeFacade;
         aBeforeFacade.setGrammar(aFacade.getGrammar());
         aBeforeFacade.setGeneration(54);
+        const auto nMergeSheet = aBeforeFacade.addSheet(u"Pilot");
+        aBeforeFacade.setCell({ nMergeSheet, 0, 0 }, CellValue::number(1.0));
+        aBeforeFacade.setCell({ nMergeSheet, 0, 1 }, CellValue::number(2.0));
+        aBeforeFacade.setCell({ nMergeSheet, 0, 2 }, CellValue::number(3.0));
+        aBeforeFacade.setFormulaCell({ nMergeSheet, 1, 0 }, u"=A1*2",
+            CellValue::number(2.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.setFormulaCell({ nMergeSheet, 1, 1 }, u"=A2*2",
+            CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.addFormulaGroup({ nMergeSheet, 1, 0 }, 2, true);
+
+        InMemoryWorkbookFacade aAfterFacade;
+        aAfterFacade.setGrammar(aBeforeFacade.getGrammar());
+        aAfterFacade.setGeneration(55);
+        aAfterFacade.addSheet(u"Pilot");
+        aAfterFacade.setCell({ nMergeSheet, 0, 0 }, CellValue::number(1.0));
+        aAfterFacade.setCell({ nMergeSheet, 0, 1 }, CellValue::number(2.0));
+        aAfterFacade.setCell({ nMergeSheet, 0, 2 }, CellValue::number(3.0));
+        aAfterFacade.setFormulaCell({ nMergeSheet, 1, 0 }, u"=A1*2",
+            CellValue::number(2.0), FormulaCellKind::SharedGroupMember, true, true);
+        aAfterFacade.setFormulaCell({ nMergeSheet, 1, 1 }, u"=A2*2",
+            CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+        aAfterFacade.setFormulaCell({ nMergeSheet, 1, 2 }, u"=A3*2",
+            CellValue::number(6.0), FormulaCellKind::SharedGroupMember, true, true);
+        aAfterFacade.addFormulaGroup({ nMergeSheet, 1, 0 }, 3, true);
+
+        const auto aClassification = consumers::classifySharedFormulaMutation(
+            aBeforeFacade, aAfterFacade,
+            MutationEvent::setFormula({ nMergeSheet, 1, 2 }, u"=A3*2"));
+        if (aClassification.maTransition.meKind
+                != consumers::SharedFormulaGroupTransitionKind::Rebuild
+            || aClassification.meFamily
+                   != consumers::SharedFormulaMutationFamily::OneSidedInsert
+            || aClassification.mbTouchedAddressSharedBefore
+            || !aClassification.mbTouchedAddressSharedAfter
+            || aClassification.mnBeforeNeighborhoodGroupCount != 1
+            || aClassification.mnAfterNeighborhoodGroupCount != 1)
+        {
+            return fail("facade_consumers",
+                "shared-group one-sided insert classification mismatch");
+        }
+    }
+
+    // --- Shared-formula replacement-merge classification ---
+    {
+        InMemoryWorkbookFacade aBeforeFacade;
+        aBeforeFacade.setGrammar(aFacade.getGrammar());
+        aBeforeFacade.setGeneration(56);
         const auto nMergeSheet = aBeforeFacade.addSheet(u"Pilot");
         aBeforeFacade.setCell({ nMergeSheet, 0, 0 }, CellValue::number(1.0));
         aBeforeFacade.setCell({ nMergeSheet, 0, 1 }, CellValue::number(2.0));
@@ -655,7 +702,7 @@ int main()
 
         InMemoryWorkbookFacade aAfterFacade;
         aAfterFacade.setGrammar(aBeforeFacade.getGrammar());
-        aAfterFacade.setGeneration(55);
+        aAfterFacade.setGeneration(57);
         aAfterFacade.addSheet(u"Pilot");
         aAfterFacade.setCell({ nMergeSheet, 0, 0 }, CellValue::number(1.0));
         aAfterFacade.setCell({ nMergeSheet, 0, 1 }, CellValue::number(2.0));
