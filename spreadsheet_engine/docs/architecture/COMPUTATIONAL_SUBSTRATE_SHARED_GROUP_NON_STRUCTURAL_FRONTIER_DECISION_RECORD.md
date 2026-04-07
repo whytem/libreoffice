@@ -74,3 +74,7 @@ It is now narrower again:
 - whether regroup, merge, named-range-combined, repair-sensitive, or
   off-sheet classes can each produce their own exact engine-authored proof
   family without borrowing host-observed after-state as authority
+
+That next staged cycle now starts with:
+
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_ADMISSION_PLAN.md)

@@ -877,6 +877,10 @@ The next adjacent concern is:
   repair-sensitive, or off-sheet shared-group classes can each produce
   their own exact engine-authored promotion family
 
+The next active execution plan starts with exact regroup:
+
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_ADMISSION_PLAN.md)
+
 ## Current Assessment
 
 The project is in a strong position:

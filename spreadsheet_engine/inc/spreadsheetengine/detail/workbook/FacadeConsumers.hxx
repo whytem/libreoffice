@@ -127,6 +127,7 @@ enum class SharedFormulaMutationFamily : std::uint8_t
     None,
     SameTextPreserve,
     MemberExit,
+    Regroup,
     StructuralPreserve,
     StructuralSplit,
     StructuralRebuild
@@ -331,6 +332,8 @@ namespace detail
         = rBeforeFacade.getFormulaGroupDescriptor(rMutation.maAddress).has_value();
     aClassification.mbTouchedAddressSharedAfter
         = rAfterFacade.getFormulaGroupDescriptor(rMutation.maAddress).has_value();
+    const auto oTouchedGroupBefore = rBeforeFacade.getFormulaGroupDescriptor(rMutation.maAddress);
+    const auto oTouchedGroupAfter = rAfterFacade.getFormulaGroupDescriptor(rMutation.maAddress);
     aClassification.mnBeforeNeighborhoodGroupCount = static_cast<sal_Int32>(
         detail::collectNeighborhoodGroups(rBeforeFacade, rMutation.maAddress).size());
     aClassification.mnAfterNeighborhoodGroupCount = static_cast<sal_Int32>(
@@ -350,6 +353,11 @@ namespace detail
                      && aClassification.mbTouchedAddressSharedBefore)
             {
                 aClassification.meFamily = SharedFormulaMutationFamily::MemberExit;
+            }
+            else if (oTouchedGroupBefore && oTouchedGroupAfter
+                     && *oTouchedGroupBefore != *oTouchedGroupAfter)
+            {
+                aClassification.meFamily = SharedFormulaMutationFamily::Regroup;
             }
             break;
         }

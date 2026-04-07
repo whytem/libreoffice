@@ -527,6 +527,52 @@ int main()
             return fail("facade_consumers", "shareable group count mismatch");
     }
 
+    // --- Shared-formula regroup classification ---
+    {
+        InMemoryWorkbookFacade aBeforeFacade;
+        aBeforeFacade.setGrammar(aFacade.getGrammar());
+        aBeforeFacade.setGeneration(50);
+        const auto nRegroupSheet = aBeforeFacade.addSheet(u"Pilot");
+        aBeforeFacade.setCell({ nRegroupSheet, 0, 0 }, CellValue::number(1.0));
+        aBeforeFacade.setCell({ nRegroupSheet, 0, 1 }, CellValue::number(2.0));
+        aBeforeFacade.setCell({ nRegroupSheet, 0, 2 }, CellValue::number(3.0));
+        aBeforeFacade.setFormulaCell({ nRegroupSheet, 1, 0 }, u"=A1*3",
+            CellValue::number(3.0), FormulaCellKind::Ordinary, true, true);
+        aBeforeFacade.setFormulaCell({ nRegroupSheet, 1, 1 }, u"=A2*2",
+            CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.setFormulaCell({ nRegroupSheet, 1, 2 }, u"=A3*2",
+            CellValue::number(6.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.addFormulaGroup({ nRegroupSheet, 1, 1 }, 2, true);
+
+        InMemoryWorkbookFacade aAfterFacade;
+        aAfterFacade.setGrammar(aFacade.getGrammar());
+        aAfterFacade.setGeneration(51);
+        aAfterFacade.addSheet(u"Pilot");
+        aAfterFacade.setCell({ nRegroupSheet, 0, 0 }, CellValue::number(1.0));
+        aAfterFacade.setCell({ nRegroupSheet, 0, 1 }, CellValue::number(2.0));
+        aAfterFacade.setCell({ nRegroupSheet, 0, 2 }, CellValue::number(3.0));
+        aAfterFacade.setFormulaCell({ nRegroupSheet, 1, 0 }, u"=A1*3",
+            CellValue::number(3.0), FormulaCellKind::SharedGroupMember, true, true);
+        aAfterFacade.setFormulaCell({ nRegroupSheet, 1, 1 }, u"=A2*3",
+            CellValue::number(6.0), FormulaCellKind::SharedGroupMember, true, true);
+        aAfterFacade.setFormulaCell({ nRegroupSheet, 1, 2 }, u"=A3*2",
+            CellValue::number(6.0), FormulaCellKind::Ordinary, true, true);
+        aAfterFacade.addFormulaGroup({ nRegroupSheet, 1, 0 }, 2, true);
+
+        const auto aClassification = consumers::classifySharedFormulaMutation(
+            aBeforeFacade, aAfterFacade,
+            MutationEvent::setFormula({ nRegroupSheet, 1, 1 }, u"=A2*3"));
+        if (aClassification.maTransition.meKind
+                != consumers::SharedFormulaGroupTransitionKind::Rebuild
+            || aClassification.meFamily
+                   != consumers::SharedFormulaMutationFamily::Regroup
+            || !aClassification.mbTouchedAddressSharedBefore
+            || !aClassification.mbTouchedAddressSharedAfter)
+        {
+            return fail("facade_consumers", "shared-group regroup classification mismatch");
+        }
+    }
+
     // --- Named-range inventory consumer ---
     {
         const auto aInventory = consumers::inventoryNamedRanges(rFacade);
