@@ -663,6 +663,11 @@ Current architecture docs:
   completed closeout decision for the merge cycle, admitting the bounded
   gap-closing merge family beyond the earlier member-exit, same-text
   preserve, and edge-regroup slice
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_ADMISSION_PLAN.md) -
+  active implementation plan for the next exact replacement-driven merge
+  cycle, starting with the bounded same-sheet shareable edge replacement
+  merge family while keeping one-sided, named-range-combined,
+  repair-sensitive, off-sheet, and broader merge classes out of scope
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

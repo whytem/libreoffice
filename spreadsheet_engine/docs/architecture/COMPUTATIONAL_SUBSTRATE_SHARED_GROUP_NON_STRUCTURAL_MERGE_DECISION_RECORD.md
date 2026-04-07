@@ -79,3 +79,13 @@ The next adjacent concern is narrower again:
   repair-sensitive, off-sheet, or broader regroup classes can each produce
   their own exact engine-authored promotion family without widening beyond
   the admitted edge-regroup plus gap-merge slice
+
+The next staged cycle is now defined in:
+
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REPLACEMENT_MERGE_ADMISSION_PLAN.md)
+
+That cycle starts with the bounded same-sheet shareable edge
+replacement-driven `SetFormula` merge family and keeps one-sided insertion,
+named-range-combined, repair-sensitive, off-sheet, and broader merge
+classes outside scope unless exact replacement-merge authority closes for
+them too.
