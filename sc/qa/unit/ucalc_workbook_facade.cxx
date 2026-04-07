@@ -319,6 +319,43 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
 }
 
 CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
+    testCalcFacadeSharedGroupMutationClassificationSameTextPreserve)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+    using spreadsheetengine::detail::facade::MutationEvent;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 100.0);
+    m_pDoc->SetValue(0, 1, 0, 200.0);
+    m_pDoc->SetValue(0, 2, 0, 300.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=A3*2"_ustr);
+    m_pDoc->CalcAll();
+
+    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 40);
+
+    m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
+    m_pDoc->CalcAll();
+
+    CalcWorkbookFacade aAfterFacade(*m_pDoc, 41);
+    const auto aClassification = consumers::classifySharedFormulaMutation(
+        aBeforeFacade, aAfterFacade, MutationEvent::setFormula({ 0, 1, 1 }, u"=A2*2"));
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaGroupTransitionKind::Preserve,
+        aClassification.maTransition.meKind);
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::SameTextPreserve,
+        aClassification.meFamily);
+    CPPUNIT_ASSERT(aClassification.mbTouchedAddressSharedBefore);
+    CPPUNIT_ASSERT(aClassification.mbTouchedAddressSharedAfter);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aClassification.mnBeforeNeighborhoodGroupCount);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aClassification.mnAfterNeighborhoodGroupCount);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     testCalcFacadeSharedGroupTransitionConsumerSplitOnStructuralInsert)
 {
     using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;

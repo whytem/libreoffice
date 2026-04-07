@@ -583,10 +583,33 @@ Current architecture docs:
   formula, and clear behavior while keeping broader regrouping classes
   deferred
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_ADMISSION_PLAN.md) -
-  active implementation plan for the broader non-structural shared-group
-  frontier, staging same-text preserve, regroup/merge,
-  named-range-combined, repair-sensitive normalization, and off-sheet
-  families into explicit promotion tracks
+  completed closeout record for the broader non-structural shared-group
+  frontier cycle, admitting the bounded same-text preserve family while
+  keeping regroup/merge, named-range-combined, repair-sensitive, and
+  off-sheet classes deferred
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_CONTRACT.md) -
+  frozen contract for the frontier closeout, fixing the admitted same-text
+  preserve family, carried-forward member-exit family, and the retained
+  deferred classes
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_SCENARIO_MATRIX.md) -
+  frozen scenario matrix for the frontier closeout, separating the new
+  same-text preserve proof bucket from regroup, merge, named-range, repair,
+  and off-sheet defer buckets
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_MAPPING_RULES.md) -
+  frozen mapping note for the frontier closeout, defining preserve identity,
+  bounded rebuild windows, and the explicit reject rules for deferred
+  frontier shapes
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_IMPLEMENTATION.md) -
+  completed implementation note for the frontier closeout, including
+  same-text preserve admission and adjacent-insert/shared-group defer
+  handling
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_EVIDENCE.md) -
+  frozen evidence note for the frontier closeout, recording exact same-text
+  preserve proof plus explicit regroup/merge/named-range/off-sheet rejection
+  buckets
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_DECISION_RECORD.md) -
+  completed closeout decision for the frontier cycle, admitting only the
+  bounded same-text preserve family beyond the prior member-exit slice
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

@@ -122,6 +122,29 @@ struct SharedFormulaGroupTransition
         = default;
 };
 
+enum class SharedFormulaMutationFamily : std::uint8_t
+{
+    None,
+    SameTextPreserve,
+    MemberExit,
+    StructuralPreserve,
+    StructuralSplit,
+    StructuralRebuild
+};
+
+struct SharedFormulaMutationClassification
+{
+    SharedFormulaGroupTransition maTransition;
+    SharedFormulaMutationFamily meFamily = SharedFormulaMutationFamily::None;
+    bool mbTouchedAddressSharedBefore = false;
+    bool mbTouchedAddressSharedAfter = false;
+    sal_Int32 mnBeforeNeighborhoodGroupCount = 0;
+    sal_Int32 mnAfterNeighborhoodGroupCount = 0;
+
+    [[nodiscard]] constexpr bool operator==(const SharedFormulaMutationClassification& rOther) const
+        = default;
+};
+
 namespace detail
 {
 
@@ -182,6 +205,42 @@ namespace detail
         default:
             return aShifted;
     }
+}
+
+[[nodiscard]] inline std::optional<FormulaGroupDescriptor> findFormulaGroupContainingAddress(
+    const std::vector<FormulaGroupDescriptor>& rGroups, const api::CellAddress& rAddress)
+{
+    const auto it = std::find_if(rGroups.begin(), rGroups.end(),
+        [&rAddress](const FormulaGroupDescriptor& rGroup) {
+            return rGroup.maAnchor.mnSheet == rAddress.mnSheet
+                   && rGroup.maAnchor.mnColumn == rAddress.mnColumn
+                   && rAddress.mnRow >= rGroup.maAnchor.mnRow
+                   && rAddress.mnRow
+                          < static_cast<api::RowIndex>(rGroup.maAnchor.mnRow + rGroup.mnLength);
+        });
+    return it == rGroups.end() ? std::nullopt : std::optional<FormulaGroupDescriptor>(*it);
+}
+
+[[nodiscard]] inline std::vector<FormulaGroupDescriptor> collectNeighborhoodGroups(
+    const WorkbookFacade& rFacade, const api::CellAddress& rAddress)
+{
+    std::vector<FormulaGroupDescriptor> aGroups;
+    auto lCollect = [&](api::RowIndex nRow) {
+        if (nRow < 0)
+            return;
+
+        const api::CellAddress aCandidate { rAddress.mnSheet, rAddress.mnColumn, nRow };
+        const auto oGroup = rFacade.getFormulaGroupDescriptor(aCandidate);
+        if (!oGroup)
+            return;
+        if (std::find(aGroups.begin(), aGroups.end(), *oGroup) == aGroups.end())
+            aGroups.push_back(*oGroup);
+    };
+
+    lCollect(rAddress.mnRow);
+    lCollect(static_cast<api::RowIndex>(rAddress.mnRow - 1));
+    lCollect(static_cast<api::RowIndex>(rAddress.mnRow + 1));
+    return aGroups;
 }
 
 } // namespace detail
@@ -256,6 +315,76 @@ namespace detail
 
     aTransition.meKind = SharedFormulaGroupTransitionKind::Rebuild;
     return aTransition;
+}
+
+[[nodiscard]] inline SharedFormulaMutationClassification classifySharedFormulaMutation(
+    const WorkbookFacade& rBeforeFacade, const WorkbookFacade& rAfterFacade,
+    const MutationEvent& rMutation)
+{
+    SharedFormulaMutationClassification aClassification;
+    const auto aBeforeGroups = collectFormulaGroupDescriptors(rBeforeFacade);
+    const auto aAfterGroups = collectFormulaGroupDescriptors(rAfterFacade);
+    aClassification.maTransition
+        = classifyFormulaGroupTransition(aBeforeGroups, aAfterGroups, rMutation);
+
+    aClassification.mbTouchedAddressSharedBefore
+        = rBeforeFacade.getFormulaGroupDescriptor(rMutation.maAddress).has_value();
+    aClassification.mbTouchedAddressSharedAfter
+        = rAfterFacade.getFormulaGroupDescriptor(rMutation.maAddress).has_value();
+    aClassification.mnBeforeNeighborhoodGroupCount = static_cast<sal_Int32>(
+        detail::collectNeighborhoodGroups(rBeforeFacade, rMutation.maAddress).size());
+    aClassification.mnAfterNeighborhoodGroupCount = static_cast<sal_Int32>(
+        detail::collectNeighborhoodGroups(rAfterFacade, rMutation.maAddress).size());
+
+    switch (rMutation.meKind)
+    {
+        case MutationKind::SetFormula:
+        {
+            const auto oBeforeFormula = rBeforeFacade.getFormulaCellDescriptor(rMutation.maAddress);
+            if (aClassification.maTransition.meKind == SharedFormulaGroupTransitionKind::Preserve
+                && oBeforeFormula && oBeforeFormula->maFormulaSource == rMutation.maText)
+            {
+                aClassification.meFamily = SharedFormulaMutationFamily::SameTextPreserve;
+            }
+            else if (!aClassification.mbTouchedAddressSharedAfter
+                     && aClassification.mbTouchedAddressSharedBefore)
+            {
+                aClassification.meFamily = SharedFormulaMutationFamily::MemberExit;
+            }
+            break;
+        }
+        case MutationKind::SetScalarValue:
+        case MutationKind::ClearCell:
+            if (!aClassification.mbTouchedAddressSharedAfter
+                && aClassification.mbTouchedAddressSharedBefore)
+            {
+                aClassification.meFamily = SharedFormulaMutationFamily::MemberExit;
+            }
+            break;
+        case MutationKind::InsertRows:
+        case MutationKind::DeleteRows:
+        case MutationKind::InsertColumns:
+        case MutationKind::DeleteColumns:
+            switch (aClassification.maTransition.meKind)
+            {
+                case SharedFormulaGroupTransitionKind::Preserve:
+                    aClassification.meFamily = SharedFormulaMutationFamily::StructuralPreserve;
+                    break;
+                case SharedFormulaGroupTransitionKind::Split:
+                    aClassification.meFamily = SharedFormulaMutationFamily::StructuralSplit;
+                    break;
+                case SharedFormulaGroupTransitionKind::Rebuild:
+                    aClassification.meFamily = SharedFormulaMutationFamily::StructuralRebuild;
+                    break;
+                case SharedFormulaGroupTransitionKind::None:
+                    break;
+            }
+            break;
+        default:
+            break;
+    }
+
+    return aClassification;
 }
 
 /// Scan all formula cells and summarize shared-formula groups.

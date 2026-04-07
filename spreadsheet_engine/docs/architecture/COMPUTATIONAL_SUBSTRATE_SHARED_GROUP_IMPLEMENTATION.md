@@ -1,12 +1,13 @@
 # Computational Substrate Shared-Group Implementation
 
-Status: bounded structural plus non-structural shared-group slice implemented
+Status: bounded structural plus non-structural shared-group slice implemented, including same-text preserve closeout
 
 ## What Landed
 
-The shared-group widening cycle now has one bounded live structural family
-plus one bounded live non-structural member-exit family on top of the
-ownership-complete admitted slice.
+The shared-group widening cycle now has one bounded live structural family,
+one bounded live non-structural member-exit family, and one additional
+same-text preserve frontier admission on top of the ownership-complete
+admitted slice.
 
 The workstream is now closed out by:
 
@@ -15,6 +16,9 @@ The workstream is now closed out by:
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_IMPLEMENTATION.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_FRONTIER_DECISION_RECORD.md)
 
 The implementation stays intentionally narrow:
 
@@ -25,6 +29,8 @@ The implementation stays intentionally narrow:
 - it also widens the live admitted slice for exact same-sheet shareable
   non-structural member-exit `SetScalarValue`, `SetFormula`, and
   `ClearCell` cases
+- it now also widens the live admitted slice for exact same-sheet shareable
+  same-text preserve `SetFormula` on an already-shared member
 - it keeps non-exact, named-range-sensitive, off-sheet, regrouping, and
   repair-sensitive shared-group classes outside live admission
 
@@ -91,11 +97,15 @@ The adjacent non-structural shared-group member-exit slice is now guarded by:
 Within that gate, the admitted family is:
 
 - `SetScalarValue` through the authority lane
-- `SetFormula` through the lifecycle lane
+- member-exit `SetFormula` through the lifecycle lane
 - `ClearCell` through the lifecycle lane
+- same-text preserve `SetFormula` through the lifecycle and mutation-entry
+  lanes
 
 but only when the touched same-sheet shareable shared-group member exits the
-group and surviving members can be repartitioned into exact contiguous runs.
+group and surviving members can be repartitioned into exact contiguous runs,
+or when identical formula-text replacement preserves the same shareable group
+identity exactly.
 
 ## Engine-Predicted Structural Topology
 
@@ -162,6 +172,14 @@ shape:
   after-shadow so shared-group bindings stay exact after apply
 - mutation entry no longer rejects resident non-matrix shared formulas on
   this admitted slice
+
+The frontier closeout adds one more bounded rule:
+
+- same-text preserve `SetFormula` is admitted only when the touched address
+  remains inside the same shareable group identity
+- formula insertion adjacent to a shareable group and regroup/merge
+  replacements are rejected as deferred frontier classes instead of passing
+  through the ordinary formula-insert path
 
 ## Test Coverage Added
 

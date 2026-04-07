@@ -58,6 +58,13 @@ makeAuthorityInput(const LifecyclePilotInput& rInput)
 
             if (!pBeforeCell || !pBeforeCell->hasFormula())
             {
+                if (authoritybuilddetail::isDeferredSharedGroupNonStructuralFormulaInsert(
+                        makeAuthorityInput(rInput)))
+                {
+                    rReason = u"shared_group_non_structural_out_of_contract";
+                    return false;
+                }
+
                 rAction.meKind = LifecycleSyncActionKind::InsertFormulaCell;
                 rAction.mbFormulaPresentBefore = false;
                 rAction.mbFormulaPresentAfter = true;
@@ -178,23 +185,33 @@ buildLifecyclePilotTransition(const LifecyclePilotInput& rInput)
         return aTransition;
     }
 
-    auto aFacade
-        = authoritybuilddetail::materializeFacadeFromComputationalShadow(rInput.maComputationalShadow);
-    aFacade.setGeneration(rInput.maComputationalShadow.maSnapshot.mnGeneration + 1);
-
-    AuthorityPilotInput aAuthorityInput;
-    aAuthorityInput.maComputationalShadow = rInput.maComputationalShadow;
-    aAuthorityInput.maGraphShadow = rInput.maGraphShadow;
-    aAuthorityInput.maIrShadow = rInput.maIrShadow;
-    aAuthorityInput.maMutation = rInput.maMutation;
-    aAuthorityInput.moFormulaCachedValueAfter = rInput.moFormulaCachedValueAfter;
-    aAuthorityInput.mbCleanBaseline = rInput.mbCleanBaseline;
-
-    if (!authoritybuilddetail::applyAuthorityMutationToFacade(
-            aFacade, aAuthorityInput, aTransition.maReason))
+    facade::InMemoryWorkbookFacade aFacade;
+    if (oPredictedSharedGroupShadow)
     {
-        aTransition.meVerdict = LifecyclePilotVerdict::RejectedOutOfContract;
-        return aTransition;
+        aFacade = authoritybuilddetail::materializeFacadeFromComputationalShadow(
+            *oPredictedSharedGroupShadow);
+        aFacade.setGeneration(oPredictedSharedGroupShadow->maSnapshot.mnGeneration);
+    }
+    else
+    {
+        aFacade
+            = authoritybuilddetail::materializeFacadeFromComputationalShadow(rInput.maComputationalShadow);
+        aFacade.setGeneration(rInput.maComputationalShadow.maSnapshot.mnGeneration + 1);
+
+        AuthorityPilotInput aAuthorityInput;
+        aAuthorityInput.maComputationalShadow = rInput.maComputationalShadow;
+        aAuthorityInput.maGraphShadow = rInput.maGraphShadow;
+        aAuthorityInput.maIrShadow = rInput.maIrShadow;
+        aAuthorityInput.maMutation = rInput.maMutation;
+        aAuthorityInput.moFormulaCachedValueAfter = rInput.moFormulaCachedValueAfter;
+        aAuthorityInput.mbCleanBaseline = rInput.mbCleanBaseline;
+
+        if (!authoritybuilddetail::applyAuthorityMutationToFacade(
+                aFacade, aAuthorityInput, aTransition.maReason))
+        {
+            aTransition.meVerdict = LifecyclePilotVerdict::RejectedOutOfContract;
+            return aTransition;
+        }
     }
 
     aTransition.maDependencySnapshot = dependency::buildDependencySnapshot(aFacade);
