@@ -747,6 +747,11 @@ Current architecture docs:
   completed closeout decision for the multi-group-collapse cycle, leaving
   the admitted slice unchanged while marking the bounded three-participant
   family deferred
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md) -
+  staged execution plan for the next named-range-combined shared-group
+  cycle, targeting bounded same-sheet shareable same-text preserve on the
+  global single-area named-range surface before repair-sensitive,
+  off-sheet, or broader non-edge regroup and merge classes
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

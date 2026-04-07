@@ -53,9 +53,12 @@ This decision is supported by:
 
 ## Next Adjacent Concern
 
-The next adjacent concerns are now:
+The next staged pass is now:
 
-- named-range-combined shared-group behavior
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md)
+
+The remaining adjacent concerns after that are:
+
 - repair-sensitive host normalization
 - off-sheet shared-group behavior
 - broader non-edge regroup or merge

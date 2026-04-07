@@ -938,13 +938,18 @@ workbook-class push.
 The exact regroup, merge, replacement-merge, merge-completion, and
 multi-group-collapse cycles are now complete.
 
-The next adjacent concern is:
+The next adjacent concern is now staged as:
 
-- whether named-range-combined, repair-sensitive, off-sheet, or broader
-  non-edge regroup and merge shared-group classes can each produce their own
-  exact engine-authored promotion family
+- bounded named-range-combined shared-group behavior, starting with
+  [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md)
 
-The most recent closeout references are:
+The adjacent concerns after that are:
+
+- repair-sensitive host normalization
+- off-sheet shared-group behavior
+- broader non-edge regroup and merge shared-group classes
+
+The most recent closeout references and next-pass plan are:
 
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_ADMISSION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_REGROUP_DECISION_RECORD.md)
@@ -956,6 +961,7 @@ The most recent closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MERGE_COMPLETION_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_ADMISSION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_MULTI_GROUP_COLLAPSE_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NON_STRUCTURAL_NAMED_RANGE_COMBINED_ADMISSION_PLAN.md)
 
 ## Current Assessment
 
