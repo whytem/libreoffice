@@ -217,6 +217,10 @@ For an aggressive multi-blocker execution plan that attacks the full
 remaining frontier as one staged program, see
 [COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md).
 
+For the focused pass that resolves the current repair-sensitive frontier,
+see
+[COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md](COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md).
+
 ### Priority 1: Repair-Sensitive Behavior
 
 After the same-surface frontier, the next meaningful step is

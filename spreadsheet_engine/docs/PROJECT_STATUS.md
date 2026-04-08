@@ -166,6 +166,9 @@ The recommended order is now:
 The staged program plan for attacking those blockers together is
 [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md).
 
+The focused next-pass plan for the current roadmap item is
+[architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md).
+
 The earlier same-surface blocker-phase conclusion has now been superseded by
 the broader same-sheet widening rerun. Corrected frozen-snapshot live facade
 proof showed that bounded named-range-combined `Regroup` and

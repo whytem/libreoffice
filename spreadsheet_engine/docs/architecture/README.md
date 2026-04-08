@@ -15,6 +15,8 @@ This directory holds the active architecture references for
   final closeout and reassessment for that blocker-clearance program
 - [COMPUTATIONAL_SUBSTRATE_BROADER_SAME_SHEET_SHARED_GROUP_WIDENING_PLAN.md](COMPUTATIONAL_SUBSTRATE_BROADER_SAME_SHEET_SHARED_GROUP_WIDENING_PLAN.md):
   completed closeout for the broader same-sheet shared-group widening pass
+- [COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md](COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md):
+  focused execution plan for resolving the repair-sensitive frontier
 - [COMPUTATIONAL_SUBSTRATE_BLOCKER_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CONTRACT.md):
   frozen four-blocker contract
 - [COMPUTATIONAL_SUBSTRATE_BLOCKER_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_SCENARIO_MATRIX.md):
