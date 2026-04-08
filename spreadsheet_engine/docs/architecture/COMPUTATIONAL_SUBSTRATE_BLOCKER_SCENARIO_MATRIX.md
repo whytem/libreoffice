@@ -11,10 +11,10 @@ program must evaluate.
 
 | Scenario | Family | Current state | Target outcome |
 | --- | --- | --- | --- |
-| `sg_nr_regroup_same_sheet` | named-range-combined regroup | deferred | admit if exact |
-| `sg_nr_merge_same_sheet` | named-range-combined merge | deferred | admit if exact |
-| `sg_nr_replacement_merge_same_sheet` | named-range-combined replacement merge | deferred | admit if exact |
-| `sg_nr_one_sided_insert_same_sheet` | named-range-combined one-sided insert | deferred | admit if exact |
+| `sg_nr_regroup_same_sheet` | named-range-combined regroup | live attempt normalized to preserve; deferred as distinct family | admit only if real live family closes exactly |
+| `sg_nr_merge_same_sheet` | named-range-combined merge | live attempt normalized to preserve; deferred as distinct family | admit only if real live family closes exactly |
+| `sg_nr_replacement_merge_same_sheet` | named-range-combined replacement merge | live attempt normalized to preserve; deferred as distinct family | admit only if real live family closes exactly |
+| `sg_nr_one_sided_insert_same_sheet` | named-range-combined one-sided insert | live attempt normalized to preserve; deferred as distinct family | admit only if real live family closes exactly |
 | `sg_nr_multi_group_collapse_same_sheet` | named-range-combined multi-group collapse | deferred | admit only if live Calc actually collapses |
 | `sg_non_edge_regroup_same_sheet` | broader non-edge regroup | deferred | admit if exact |
 | `sg_non_edge_merge_same_sheet` | broader non-edge merge | deferred | admit if exact |

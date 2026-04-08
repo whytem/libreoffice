@@ -3,6 +3,16 @@
 Status: ambitious program plan for clearing the four biggest remaining
 computational-substrate blockers
 
+Phase status:
+
+- Phase 0 complete: boundary, matrix, and mapping rules frozen
+- Phase 1 complete: broader same-sheet named-range-combined attempt families
+  were live-proven not to close as distinct regroup or merge admissions
+- Phase 2 pending
+- Phase 3 pending
+- Phase 4 pending
+- Phase 5 pending
+
 ## Purpose
 
 This plan turns the blocker summary in
@@ -234,6 +244,9 @@ workstreams:
 - move predicted-after graph, queue, and IR generation onto the same
   authored-after surface
 - close the next wave of same-sheet regroup, merge, and collapse families
+
+Phase 1 closeout:
+[COMPUTATIONAL_SUBSTRATE_BLOCKER_PHASE1_SHARED_AUTHORING_CLOSEOUT.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_PHASE1_SHARED_AUTHORING_CLOSEOUT.md)
 
 ### Phase 2: Make Normalization Explicit
 

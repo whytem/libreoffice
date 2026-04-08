@@ -432,6 +432,182 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
 }
 
 CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
+    testCalcFacadeSharedGroupNamedRangeRegroupAttemptActualHostShape)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+    using spreadsheetengine::detail::facade::MutationEvent;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr)));
+    m_pDoc->SetString(1, 0, 0, u"=COUNTA(Metrics)+A1*3"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2*2"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*2"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=COUNTA(Metrics)"_ustr);
+    m_pDoc->CalcAll();
+
+    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 47);
+
+    m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2*3"_ustr);
+    m_pDoc->CalcAll();
+
+    CalcWorkbookFacade aAfterFacade(*m_pDoc, 48);
+    const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
+        aBeforeFacade, aAfterFacade,
+        MutationEvent::setFormula({ 0, 1, 1 }, u"=COUNTA(Metrics)+A2*3"));
+    CPPUNIT_ASSERT_EQUAL(
+        consumers::SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSameSheet,
+        aBoundary.meBoundary);
+    const auto aClassification = consumers::classifySharedFormulaMutation(
+        aBeforeFacade, aAfterFacade,
+        MutationEvent::setFormula({ 0, 1, 1 }, u"=COUNTA(Metrics)+A2*3"));
+    const auto oAfterFormula = aAfterFacade.getFormulaCellDescriptor({ 0, 1, 1 });
+    CPPUNIT_ASSERT(oAfterFormula);
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::SameTextPreserve,
+        aClassification.meFamily);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
+    testCalcFacadeSharedGroupNamedRangeMergeAttemptActualHostShape)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+    using spreadsheetengine::detail::facade::MutationEvent;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+    m_pDoc->SetValue(0, 4, 0, 5.0);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr)));
+    m_pDoc->SetString(1, 0, 0, u"=COUNTA(Metrics)+A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2*2"_ustr);
+    m_pDoc->SetString(1, 3, 0, u"=COUNTA(Metrics)+A4*2"_ustr);
+    m_pDoc->SetString(1, 4, 0, u"=COUNTA(Metrics)+A5*2"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=COUNTA(Metrics)"_ustr);
+    m_pDoc->CalcAll();
+
+    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 49);
+
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*2"_ustr);
+    m_pDoc->CalcAll();
+
+    CalcWorkbookFacade aAfterFacade(*m_pDoc, 50);
+    const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
+        aBeforeFacade, aAfterFacade,
+        MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*2"));
+    CPPUNIT_ASSERT_EQUAL(
+        consumers::SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSameSheet,
+        aBoundary.meBoundary);
+    const auto aClassification = consumers::classifySharedFormulaMutation(
+        aBeforeFacade, aAfterFacade,
+        MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*2"));
+    const auto oAfterFormula = aAfterFacade.getFormulaCellDescriptor({ 0, 1, 2 });
+    CPPUNIT_ASSERT(oAfterFormula);
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::SameTextPreserve,
+        aClassification.meFamily);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
+    testCalcFacadeSharedGroupNamedRangeReplacementMergeAttemptActualHostShape)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+    using spreadsheetengine::detail::facade::MutationEvent;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr)));
+    m_pDoc->SetString(1, 0, 0, u"=COUNTA(Metrics)+A1*3"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2*3"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*2"_ustr);
+    m_pDoc->SetString(1, 3, 0, u"=COUNTA(Metrics)+A4*2"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=COUNTA(Metrics)"_ustr);
+    m_pDoc->CalcAll();
+
+    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 51);
+
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*3"_ustr);
+    m_pDoc->CalcAll();
+
+    CalcWorkbookFacade aAfterFacade(*m_pDoc, 52);
+    const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
+        aBeforeFacade, aAfterFacade,
+        MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*3"));
+    CPPUNIT_ASSERT_EQUAL(
+        consumers::SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSameSheet,
+        aBoundary.meBoundary);
+    const auto aClassification = consumers::classifySharedFormulaMutation(
+        aBeforeFacade, aAfterFacade,
+        MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*3"));
+    const auto oAfterFormula = aAfterFacade.getFormulaCellDescriptor({ 0, 1, 2 });
+    CPPUNIT_ASSERT(oAfterFormula);
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::SameTextPreserve,
+        aClassification.meFamily);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
+    testCalcFacadeSharedGroupNamedRangeOneSidedInsertAttemptActualHostShape)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+    using spreadsheetengine::detail::facade::MutationEvent;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr)));
+    m_pDoc->SetString(1, 0, 0, u"=COUNTA(Metrics)+A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2*2"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=COUNTA(Metrics)"_ustr);
+    m_pDoc->CalcAll();
+
+    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 53);
+
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*2"_ustr);
+    m_pDoc->CalcAll();
+
+    CalcWorkbookFacade aAfterFacade(*m_pDoc, 54);
+    const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
+        aBeforeFacade, aAfterFacade,
+        MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*2"));
+    CPPUNIT_ASSERT_EQUAL(
+        consumers::SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSameSheet,
+        aBoundary.meBoundary);
+    const auto aClassification = consumers::classifySharedFormulaMutation(
+        aBeforeFacade, aAfterFacade,
+        MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*2"));
+    const auto oAfterFormula = aAfterFacade.getFormulaCellDescriptor({ 0, 1, 2 });
+    CPPUNIT_ASSERT(oAfterFormula);
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::SameTextPreserve,
+        aClassification.meFamily);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     testCalcFacadeSharedGroupTransitionConsumerSplitOnStructuralInsert)
 {
     using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;

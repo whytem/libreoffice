@@ -195,6 +195,12 @@ exact-modeling candidates are not real live-admission candidates. For
 example, the bounded three-group collapse cycle closed as deferred because
 live Calc keeps the far group separate.
 
+The blocker-clearance Phase 1 rerun added another concrete example:
+bounded named-range-combined same-sheet regroup and merge attempts did not
+close as distinct live regroup or merge families. On the live facade
+surface they normalized back onto preserve-shaped behavior, so they remain
+deferred as distinct widening targets.
+
 ## Current Roadmap
 
 The roadmap should stay tightly ordered.

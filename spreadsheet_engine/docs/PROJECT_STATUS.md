@@ -164,6 +164,11 @@ The recommended order is:
 The staged program plan for attacking those blockers together is
 [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md).
 
+Phase 1 of that blocker plan is now closed. The result was clarifying but
+not widening: bounded same-sheet named-range-combined regroup and merge
+attempts did not close as distinct live families, so they remain deferred
+and the program moves on to repair-sensitive normalization next.
+
 ## Working Rules Going Forward
 
 - treat the replay baseline as a non-negotiable guardrail
