@@ -3780,6 +3780,559 @@ int main()
             }
         }
 
+        {
+            InMemoryWorkbookFacade aBeforeFacade;
+            aBeforeFacade.setGrammar(aFacade.getGrammar());
+            aBeforeFacade.setGeneration(130);
+            const auto nData = aBeforeFacade.addSheet(u"Data");
+            const auto nSummary = aBeforeFacade.addSheet(u"Summary");
+            aBeforeFacade.setCell({ nData, 0, 0 }, CellValue::number(1.0));
+            aBeforeFacade.setCell({ nData, 0, 1 }, CellValue::number(2.0));
+            aBeforeFacade.setCell({ nData, 0, 2 }, CellValue::number(3.0));
+            aBeforeFacade.addNamedRange(u"Metrics", std::nullopt, { nData, 0, 0 },
+                u"$Data.$A$1:$A$2");
+            aBeforeFacade.setFormulaCell({ nData, 1, 0 }, u"=COUNTA(Metrics)+A1",
+                CellValue::number(3.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 1 }, u"=COUNTA(Metrics)+A2",
+                CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 2 }, u"=COUNTA(Metrics)+A3",
+                CellValue::number(5.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.addFormulaGroup({ nData, 1, 0 }, 3, true);
+            aBeforeFacade.setFormulaCell({ nSummary, 0, 0 }, u"=COUNTA(Metrics)",
+                CellValue::number(2.0), FormulaCellKind::Ordinary, true, true);
+
+            ComputationalObservationState aBeforeObservation;
+            aBeforeObservation.maFormulaTree = { { nData, 1, 0 }, { nData, 1, 1 }, { nData, 1, 2 },
+                { nSummary, 0, 0 } };
+            const auto aBeforeShadow
+                = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+            const auto aBeforeGraph
+                = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+            const auto aBeforeIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aBeforeShadow, aBeforeFacade);
+
+            InMemoryWorkbookFacade aAfterFacade;
+            aAfterFacade.setGrammar(aBeforeFacade.getGrammar());
+            aAfterFacade.setGeneration(131);
+            aAfterFacade.addSheet(u"Data");
+            aAfterFacade.addSheet(u"Summary");
+            aAfterFacade.setCell({ nData, 0, 0 }, CellValue::number(1.0));
+            aAfterFacade.setCell({ nData, 0, 1 }, CellValue::number(2.0));
+            aAfterFacade.setCell({ nData, 0, 2 }, CellValue::number(3.0));
+            aAfterFacade.addNamedRange(u"Metrics", std::nullopt, { nData, 0, 0 },
+                u"$Data.$A$1:$A$2");
+            aAfterFacade.setCell({ nData, 1, 0 }, CellValue::number(9.0));
+            aAfterFacade.setFormulaCell({ nData, 1, 1 }, u"=COUNTA(Metrics)+A2",
+                CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.setFormulaCell({ nData, 1, 2 }, u"=COUNTA(Metrics)+A3",
+                CellValue::number(5.0), FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.addFormulaGroup({ nData, 1, 1 }, 2, true);
+            aAfterFacade.setFormulaCell({ nSummary, 0, 0 }, u"=COUNTA(Metrics)",
+                CellValue::number(2.0), FormulaCellKind::Ordinary, true, true);
+
+            ComputationalObservationState aAfterObservation;
+            aAfterObservation.maFormulaTree = { { nData, 1, 1 }, { nData, 1, 2 }, { nSummary, 0, 0 } };
+            const auto aAfterShadow
+                = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
+
+            AuthorityPilotInput aAuthorityInput;
+            aAuthorityInput.maComputationalShadow = aBeforeShadow;
+            aAuthorityInput.maGraphShadow = aBeforeGraph;
+            aAuthorityInput.maIrShadow = aBeforeIr;
+            aAuthorityInput.maMutation = MutationEvent::setScalarValue({ nData, 1, 0 });
+            aAuthorityInput.moScalarValueAfter = CellValue::number(9.0);
+            aAuthorityInput.moObservedAfterComputationalShadow = aAfterShadow;
+            aAuthorityInput.mbAllowSharedGroupNonStructuralAdmission = true;
+            aAuthorityInput.mbCleanBaseline = true;
+
+            const auto aAuthorityPlan = buildAuthorityPilotTransition(aAuthorityInput);
+            if (aAuthorityPlan.meVerdict != AuthorityPilotVerdict::Applicable)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet named-range member-exit authority verdict mismatch");
+            }
+
+            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
+                aAuthorityPlan.maDependencySnapshot, aAuthorityPlan.maRecalcPlan);
+            const auto aComputationalComparison = compareComputationalShadow(
+                aAuthorityPlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
+            if (!aComputationalComparison.mbFullMatch || !aComputationalComparison.mbGroupMatch
+                || !aComputationalComparison.mbNamedRangeMatch)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet named-range member-exit computational mismatch");
+            }
+
+            const auto aGraphComparison = compareDependencyGraphShadow(
+                aAuthorityPlan.maGraphAfter, aAuthorityPlan.maComputationalAfter,
+                aPredictedObservation);
+            if (aGraphComparison.meKind != graphmapping::GraphComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet named-range member-exit graph mismatch");
+            }
+
+            auto aPredictedFacade = authoritybuilddetail::materializeFacadeFromComputationalShadow(
+                aAuthorityPlan.maComputationalAfter);
+            const auto aExpectedIr = authoritybuilddetail::buildAuthorityExecutionIrShadow(
+                aAuthorityPlan.maComputationalAfter, aPredictedFacade);
+            const auto aIrComparison
+                = compareExecutionIrWorkbookShadow(aAuthorityPlan.maIrAfter, aExpectedIr);
+            if (aIrComparison.meKind != ExecutionIrComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet named-range member-exit IR mismatch");
+            }
+        }
+
+        {
+            InMemoryWorkbookFacade aBeforeFacade;
+            aBeforeFacade.setGrammar(aFacade.getGrammar());
+            aBeforeFacade.setGeneration(132);
+            const auto nData = aBeforeFacade.addSheet(u"Data");
+            const auto nSummary = aBeforeFacade.addSheet(u"Summary");
+            aBeforeFacade.setCell({ nData, 0, 0 }, CellValue::number(1.0));
+            aBeforeFacade.setCell({ nData, 0, 1 }, CellValue::number(2.0));
+            aBeforeFacade.setCell({ nData, 0, 2 }, CellValue::number(3.0));
+            aBeforeFacade.addNamedRange(u"Metrics", std::nullopt, { nData, 0, 0 },
+                u"$Data.$A$1:$A$2");
+            aBeforeFacade.setFormulaCell({ nData, 1, 0 }, u"=COUNTA(Metrics)+A1",
+                CellValue::number(3.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 1 }, u"=COUNTA(Metrics)+A2",
+                CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 2 }, u"=COUNTA(Metrics)+A3",
+                CellValue::number(5.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.addFormulaGroup({ nData, 1, 0 }, 3, true);
+            aBeforeFacade.setFormulaCell({ nSummary, 0, 0 }, u"=COUNTA(Metrics)",
+                CellValue::number(2.0), FormulaCellKind::Ordinary, true, true);
+
+            ComputationalObservationState aBeforeObservation;
+            aBeforeObservation.maFormulaTree = { { nData, 1, 0 }, { nData, 1, 1 }, { nData, 1, 2 },
+                { nSummary, 0, 0 } };
+            const auto aBeforeShadow
+                = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+            const auto aBeforeGraph
+                = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+            const auto aBeforeIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aBeforeShadow, aBeforeFacade);
+
+            InMemoryWorkbookFacade aAfterFacade;
+            aAfterFacade.setGrammar(aBeforeFacade.getGrammar());
+            aAfterFacade.setGeneration(133);
+            aAfterFacade.addSheet(u"Data");
+            aAfterFacade.addSheet(u"Summary");
+            aAfterFacade.setCell({ nData, 0, 0 }, CellValue::number(1.0));
+            aAfterFacade.setCell({ nData, 0, 1 }, CellValue::number(2.0));
+            aAfterFacade.setCell({ nData, 0, 2 }, CellValue::number(3.0));
+            aAfterFacade.addNamedRange(u"Metrics", std::nullopt, { nData, 0, 0 },
+                u"$Data.$A$1:$A$2");
+            aAfterFacade.setFormulaCell({ nData, 1, 1 }, u"=COUNTA(Metrics)+A2",
+                CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.setFormulaCell({ nData, 1, 2 }, u"=COUNTA(Metrics)+A3",
+                CellValue::number(5.0), FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.addFormulaGroup({ nData, 1, 1 }, 2, true);
+            aAfterFacade.setFormulaCell({ nSummary, 0, 0 }, u"=COUNTA(Metrics)",
+                CellValue::number(2.0), FormulaCellKind::Ordinary, true, true);
+
+            ComputationalObservationState aAfterObservation;
+            aAfterObservation.maFormulaTree = { { nData, 1, 1 }, { nData, 1, 2 }, { nSummary, 0, 0 } };
+            const auto aAfterShadow
+                = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
+
+            AuthorityPilotInput aAuthorityInput;
+            aAuthorityInput.maComputationalShadow = aBeforeShadow;
+            aAuthorityInput.maGraphShadow = aBeforeGraph;
+            aAuthorityInput.maIrShadow = aBeforeIr;
+            aAuthorityInput.maMutation = MutationEvent::clearCell({ nData, 1, 0 });
+            aAuthorityInput.moObservedAfterComputationalShadow = aAfterShadow;
+            aAuthorityInput.mbAllowSharedGroupNonStructuralAdmission = true;
+            aAuthorityInput.mbCleanBaseline = true;
+
+            const auto aAuthorityPlan = buildAuthorityPilotTransition(aAuthorityInput);
+            if (aAuthorityPlan.meVerdict != AuthorityPilotVerdict::Applicable)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet named-range clear member-exit authority verdict mismatch");
+            }
+
+            const auto aObservationBuildOptions
+                = authoritybuilddetail::buildAuthorityObservationBuildOptions(
+                    aBeforeShadow, aAfterShadow, MutationEvent::clearCell({ nData, 1, 0 }));
+            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
+                aAuthorityPlan.maDependencySnapshot, aAuthorityPlan.maRecalcPlan,
+                aObservationBuildOptions);
+            const auto aComputationalComparison = compareComputationalShadow(
+                aAuthorityPlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
+            if (!aComputationalComparison.mbFullMatch || !aComputationalComparison.mbGroupMatch
+                || !aComputationalComparison.mbNamedRangeMatch)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet named-range clear member-exit computational mismatch");
+            }
+
+            const auto aGraphComparison = compareDependencyGraphShadow(
+                aAuthorityPlan.maGraphAfter, aAuthorityPlan.maComputationalAfter,
+                aPredictedObservation);
+            if (aGraphComparison.meKind != graphmapping::GraphComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet named-range clear member-exit graph mismatch");
+            }
+
+            auto aPredictedFacade = authoritybuilddetail::materializeFacadeFromComputationalShadow(
+                aAuthorityPlan.maComputationalAfter);
+            const auto aExpectedIr = authoritybuilddetail::buildAuthorityExecutionIrShadow(
+                aAuthorityPlan.maComputationalAfter, aPredictedFacade);
+            const auto aIrComparison
+                = compareExecutionIrWorkbookShadow(aAuthorityPlan.maIrAfter, aExpectedIr);
+            if (aIrComparison.meKind != ExecutionIrComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet named-range clear member-exit IR mismatch");
+            }
+        }
+
+        {
+            InMemoryWorkbookFacade aBeforeFacade;
+            aBeforeFacade.setGrammar(aFacade.getGrammar());
+            aBeforeFacade.setGeneration(134);
+            const auto nData = aBeforeFacade.addSheet(u"Data");
+            const auto nSummary = aBeforeFacade.addSheet(u"Summary");
+            aBeforeFacade.setCell({ nData, 0, 0 }, CellValue::number(1.0));
+            aBeforeFacade.setCell({ nData, 0, 1 }, CellValue::number(2.0));
+            aBeforeFacade.setCell({ nData, 0, 2 }, CellValue::number(3.0));
+            aBeforeFacade.addNamedRange(u"Metrics", std::nullopt, { nData, 0, 0 },
+                u"$Data.$A$1:$A$2");
+            aBeforeFacade.setFormulaCell({ nData, 1, 0 }, u"=COUNTA(Metrics)+A1",
+                CellValue::number(3.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 1 }, u"=COUNTA(Metrics)+A2",
+                CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 2 }, u"=COUNTA(Metrics)+A3",
+                CellValue::number(5.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.addFormulaGroup({ nData, 1, 0 }, 3, true);
+            aBeforeFacade.setFormulaCell({ nSummary, 0, 0 }, u"=COUNTA(Metrics)",
+                CellValue::number(2.0), FormulaCellKind::Ordinary, true, true);
+
+            ComputationalObservationState aBeforeObservation;
+            aBeforeObservation.maFormulaTree = { { nData, 1, 0 }, { nData, 1, 1 }, { nData, 1, 2 },
+                { nSummary, 0, 0 } };
+            const auto aBeforeShadow
+                = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+            const auto aBeforeGraph
+                = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+            const auto aBeforeIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aBeforeShadow, aBeforeFacade);
+
+            InMemoryWorkbookFacade aAfterFacade;
+            aAfterFacade.setGrammar(aBeforeFacade.getGrammar());
+            aAfterFacade.setGeneration(135);
+            aAfterFacade.addSheet(u"Data");
+            aAfterFacade.addSheet(u"Summary");
+            aAfterFacade.setCell({ nData, 0, 0 }, CellValue::number(1.0));
+            aAfterFacade.setCell({ nData, 0, 1 }, CellValue::number(2.0));
+            aAfterFacade.setCell({ nData, 0, 2 }, CellValue::number(3.0));
+            aAfterFacade.addNamedRange(u"Metrics", std::nullopt, { nData, 0, 0 },
+                u"$Data.$A$1:$A$2");
+            aAfterFacade.setFormulaCell({ nData, 1, 0 }, u"=COUNTA(Metrics)+A1*10",
+                CellValue::number(12.0), FormulaCellKind::Ordinary, true, true);
+            aAfterFacade.setFormulaCell({ nData, 1, 1 }, u"=COUNTA(Metrics)+A2",
+                CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.setFormulaCell({ nData, 1, 2 }, u"=COUNTA(Metrics)+A3",
+                CellValue::number(5.0), FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.addFormulaGroup({ nData, 1, 1 }, 2, true);
+            aAfterFacade.setFormulaCell({ nSummary, 0, 0 }, u"=COUNTA(Metrics)",
+                CellValue::number(2.0), FormulaCellKind::Ordinary, true, true);
+
+            ComputationalObservationState aAfterObservation;
+            aAfterObservation.maFormulaTree = { { nData, 1, 0 }, { nData, 1, 1 }, { nData, 1, 2 },
+                { nSummary, 0, 0 } };
+            const auto aAfterShadow
+                = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
+
+            LifecyclePilotInput aLifecycleInput;
+            aLifecycleInput.maComputationalShadow = aBeforeShadow;
+            aLifecycleInput.maGraphShadow = aBeforeGraph;
+            aLifecycleInput.maIrShadow = aBeforeIr;
+            aLifecycleInput.maMutation
+                = MutationEvent::setFormula({ nData, 1, 0 }, u"=COUNTA(Metrics)+A1*10");
+            aLifecycleInput.moFormulaCachedValueAfter = CellValue::number(12.0);
+            aLifecycleInput.moObservedAfterComputationalShadow = aAfterShadow;
+            aLifecycleInput.mbAllowSharedGroupNonStructuralAdmission = true;
+            aLifecycleInput.mbCleanBaseline = true;
+
+            const auto aLifecyclePlan = buildLifecyclePilotTransition(aLifecycleInput);
+            if (aLifecyclePlan.meVerdict != LifecyclePilotVerdict::Applicable)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet named-range setformula member-exit lifecycle verdict mismatch");
+            }
+
+            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
+                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aComputationalComparison = compareComputationalShadow(
+                aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
+            if (!aComputationalComparison.mbFullMatch || !aComputationalComparison.mbGroupMatch
+                || !aComputationalComparison.mbNamedRangeMatch
+                || aLifecyclePlan.maComputationalAfter.maFormulaGroups.size() != 1
+                || !(aLifecyclePlan.maComputationalAfter.maFormulaGroups.front().maId
+                     == ShadowFormulaGroupId { { nData, 1, 1 }, 2 }))
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet named-range setformula member-exit mismatch");
+            }
+
+            const auto aGraphComparison = compareDependencyGraphShadow(
+                aLifecyclePlan.maGraphAfter, aLifecyclePlan.maComputationalAfter,
+                aPredictedObservation);
+            if (aGraphComparison.meKind != graphmapping::GraphComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet named-range setformula member-exit graph mismatch");
+            }
+
+            auto aPredictedFacade = authoritybuilddetail::materializeFacadeFromComputationalShadow(
+                aLifecyclePlan.maComputationalAfter);
+            const auto aExpectedIr = authoritybuilddetail::buildAuthorityExecutionIrShadow(
+                aLifecyclePlan.maComputationalAfter, aPredictedFacade);
+            const auto aIrComparison
+                = compareExecutionIrWorkbookShadow(aLifecyclePlan.maIrAfter, aExpectedIr);
+            if (aIrComparison.meKind != ExecutionIrComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet named-range setformula member-exit IR mismatch");
+            }
+        }
+
+        {
+            InMemoryWorkbookFacade aBeforeFacade;
+            aBeforeFacade.setGrammar(aFacade.getGrammar());
+            aBeforeFacade.setGeneration(136);
+            const auto nData = aBeforeFacade.addSheet(u"Data");
+            const auto nSummary = aBeforeFacade.addSheet(u"Summary");
+            aBeforeFacade.setCell({ nData, 0, 0 }, CellValue::number(1.0));
+            aBeforeFacade.setCell({ nData, 0, 1 }, CellValue::number(2.0));
+            aBeforeFacade.setCell({ nData, 0, 2 }, CellValue::number(3.0));
+            aBeforeFacade.setCell({ nData, 0, 3 }, CellValue::number(4.0));
+            aBeforeFacade.setCell({ nData, 0, 4 }, CellValue::number(5.0));
+            aBeforeFacade.setFormulaCell({ nData, 1, 0 }, u"=A1*2",
+                CellValue::number(2.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 1 }, u"=A2*2",
+                CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 3 }, u"=A4*2",
+                CellValue::number(8.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 4 }, u"=A5*2",
+                CellValue::number(10.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.addFormulaGroup({ nData, 1, 0 }, 2, true);
+            aBeforeFacade.addFormulaGroup({ nData, 1, 3 }, 2, true);
+            aBeforeFacade.setFormulaCell({ nSummary, 2, 0 },
+                u"=Data.B1+Data.B2+Data.B3+Data.B4+Data.B5", CellValue::number(24.0),
+                FormulaCellKind::Ordinary, true, true);
+
+            ComputationalObservationState aBeforeObservation;
+            aBeforeObservation.maFormulaTree = { { nData, 1, 0 }, { nData, 1, 1 },
+                { nData, 1, 3 }, { nData, 1, 4 }, { nSummary, 2, 0 } };
+            const auto aBeforeShadow
+                = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+            const auto aBeforeGraph
+                = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+            const auto aBeforeIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aBeforeShadow, aBeforeFacade);
+
+            InMemoryWorkbookFacade aAfterFacade;
+            aAfterFacade.setGrammar(aBeforeFacade.getGrammar());
+            aAfterFacade.setGeneration(137);
+            aAfterFacade.addSheet(u"Data");
+            aAfterFacade.addSheet(u"Summary");
+            aAfterFacade.setCell({ nData, 0, 0 }, CellValue::number(1.0));
+            aAfterFacade.setCell({ nData, 0, 1 }, CellValue::number(2.0));
+            aAfterFacade.setCell({ nData, 0, 2 }, CellValue::number(3.0));
+            aAfterFacade.setCell({ nData, 0, 3 }, CellValue::number(4.0));
+            aAfterFacade.setCell({ nData, 0, 4 }, CellValue::number(5.0));
+            aAfterFacade.setFormulaCell({ nData, 1, 0 }, u"=A1*2",
+                CellValue::number(2.0), FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.setFormulaCell({ nData, 1, 1 }, u"=A2*2",
+                CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.setFormulaCell({ nData, 1, 2 }, u"=A3*2",
+                CellValue::number(6.0), FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.setFormulaCell({ nData, 1, 3 }, u"=A4*2",
+                CellValue::number(8.0), FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.setFormulaCell({ nData, 1, 4 }, u"=A5*2",
+                CellValue::number(10.0), FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.addFormulaGroup({ nData, 1, 0 }, 5, true);
+            aAfterFacade.setFormulaCell({ nSummary, 2, 0 },
+                u"=Data.B1+Data.B2+Data.B3+Data.B4+Data.B5", CellValue::number(30.0),
+                FormulaCellKind::Ordinary, true, true);
+
+            ComputationalObservationState aAfterObservation;
+            aAfterObservation.maFormulaTree = { { nData, 1, 0 }, { nData, 1, 1 }, { nData, 1, 2 },
+                { nData, 1, 3 }, { nData, 1, 4 }, { nSummary, 2, 0 } };
+            const auto aAfterShadow
+                = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
+
+            LifecyclePilotInput aLifecycleInput;
+            aLifecycleInput.maComputationalShadow = aBeforeShadow;
+            aLifecycleInput.maGraphShadow = aBeforeGraph;
+            aLifecycleInput.maIrShadow = aBeforeIr;
+            aLifecycleInput.maMutation = MutationEvent::setFormula({ nData, 1, 2 }, u"=A3*2");
+            aLifecycleInput.moFormulaCachedValueAfter = CellValue::number(6.0);
+            aLifecycleInput.moObservedAfterComputationalShadow = aAfterShadow;
+            aLifecycleInput.mbAllowSharedGroupNonStructuralAdmission = true;
+            aLifecycleInput.mbCleanBaseline = true;
+
+            const auto aLifecyclePlan = buildLifecyclePilotTransition(aLifecycleInput);
+            if (aLifecyclePlan.meVerdict != LifecyclePilotVerdict::Applicable)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet merge lifecycle verdict mismatch");
+            }
+
+            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
+                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aComputationalComparison = compareComputationalShadow(
+                aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
+            if (!aComputationalComparison.mbFullMatch || !aComputationalComparison.mbGroupMatch
+                || aLifecyclePlan.maComputationalAfter.maFormulaGroups.size() != 1
+                || !(aLifecyclePlan.maComputationalAfter.maFormulaGroups.front().maId
+                     == ShadowFormulaGroupId { { nData, 1, 0 }, 5 }))
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet merge lifecycle mismatch");
+            }
+
+            const auto aGraphComparison = compareDependencyGraphShadow(
+                aLifecyclePlan.maGraphAfter, aLifecyclePlan.maComputationalAfter,
+                aPredictedObservation);
+            if (aGraphComparison.meKind != graphmapping::GraphComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet merge graph mismatch");
+            }
+
+            auto aPredictedFacade = authoritybuilddetail::materializeFacadeFromComputationalShadow(
+                aLifecyclePlan.maComputationalAfter);
+            const auto aExpectedIr = authoritybuilddetail::buildAuthorityExecutionIrShadow(
+                aLifecyclePlan.maComputationalAfter, aPredictedFacade);
+            const auto aIrComparison
+                = compareExecutionIrWorkbookShadow(aLifecyclePlan.maIrAfter, aExpectedIr);
+            if (aIrComparison.meKind != ExecutionIrComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet merge IR mismatch");
+            }
+        }
+
+        {
+            InMemoryWorkbookFacade aBeforeFacade;
+            aBeforeFacade.setGrammar(aFacade.getGrammar());
+            aBeforeFacade.setGeneration(138);
+            const auto nData = aBeforeFacade.addSheet(u"Data");
+            const auto nSummary = aBeforeFacade.addSheet(u"Summary");
+            aBeforeFacade.setCell({ nData, 0, 0 }, CellValue::number(1.0));
+            aBeforeFacade.setCell({ nData, 0, 1 }, CellValue::number(2.0));
+            aBeforeFacade.setCell({ nData, 0, 2 }, CellValue::number(3.0));
+            aBeforeFacade.setCell({ nData, 0, 3 }, CellValue::number(4.0));
+            aBeforeFacade.setFormulaCell({ nData, 1, 0 }, u"=A1*3",
+                CellValue::number(3.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 1 }, u"=A2*3",
+                CellValue::number(6.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 2 }, u"=A3*2",
+                CellValue::number(6.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 3 }, u"=A4*2",
+                CellValue::number(8.0), FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.addFormulaGroup({ nData, 1, 0 }, 2, true);
+            aBeforeFacade.addFormulaGroup({ nData, 1, 2 }, 2, true);
+            aBeforeFacade.setFormulaCell({ nSummary, 2, 0 }, u"=Data.B1+Data.B2+Data.B3+Data.B4",
+                CellValue::number(23.0), FormulaCellKind::Ordinary, true, true);
+
+            ComputationalObservationState aBeforeObservation;
+            aBeforeObservation.maFormulaTree = { { nData, 1, 0 }, { nData, 1, 1 },
+                { nData, 1, 2 }, { nData, 1, 3 }, { nSummary, 2, 0 } };
+            const auto aBeforeShadow
+                = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+            const auto aBeforeGraph
+                = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+            const auto aBeforeIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aBeforeShadow, aBeforeFacade);
+
+            InMemoryWorkbookFacade aAfterFacade;
+            aAfterFacade.setGrammar(aBeforeFacade.getGrammar());
+            aAfterFacade.setGeneration(139);
+            aAfterFacade.addSheet(u"Data");
+            aAfterFacade.addSheet(u"Summary");
+            aAfterFacade.setCell({ nData, 0, 0 }, CellValue::number(1.0));
+            aAfterFacade.setCell({ nData, 0, 1 }, CellValue::number(2.0));
+            aAfterFacade.setCell({ nData, 0, 2 }, CellValue::number(3.0));
+            aAfterFacade.setCell({ nData, 0, 3 }, CellValue::number(4.0));
+            aAfterFacade.setFormulaCell({ nData, 1, 0 }, u"=A1*3",
+                CellValue::number(3.0), FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.setFormulaCell({ nData, 1, 1 }, u"=A2*3",
+                CellValue::number(6.0), FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.setFormulaCell({ nData, 1, 2 }, u"=A3*3",
+                CellValue::number(9.0), FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.setFormulaCell({ nData, 1, 3 }, u"=A4*2",
+                CellValue::number(8.0), FormulaCellKind::Ordinary, true, true);
+            aAfterFacade.addFormulaGroup({ nData, 1, 0 }, 3, true);
+            aAfterFacade.setFormulaCell({ nSummary, 2, 0 }, u"=Data.B1+Data.B2+Data.B3+Data.B4",
+                CellValue::number(26.0), FormulaCellKind::Ordinary, true, true);
+
+            ComputationalObservationState aAfterObservation;
+            aAfterObservation.maFormulaTree = { { nData, 1, 0 }, { nData, 1, 1 }, { nData, 1, 2 },
+                { nData, 1, 3 }, { nSummary, 2, 0 } };
+            const auto aAfterShadow
+                = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
+
+            LifecyclePilotInput aLifecycleInput;
+            aLifecycleInput.maComputationalShadow = aBeforeShadow;
+            aLifecycleInput.maGraphShadow = aBeforeGraph;
+            aLifecycleInput.maIrShadow = aBeforeIr;
+            aLifecycleInput.maMutation = MutationEvent::setFormula({ nData, 1, 2 }, u"=A3*3");
+            aLifecycleInput.moFormulaCachedValueAfter = CellValue::number(9.0);
+            aLifecycleInput.moObservedAfterComputationalShadow = aAfterShadow;
+            aLifecycleInput.mbAllowSharedGroupNonStructuralAdmission = true;
+            aLifecycleInput.mbCleanBaseline = true;
+
+            const auto aLifecyclePlan = buildLifecyclePilotTransition(aLifecycleInput);
+            if (aLifecyclePlan.meVerdict != LifecyclePilotVerdict::Applicable)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet replacement-merge lifecycle verdict mismatch");
+            }
+
+            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
+                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aComputationalComparison = compareComputationalShadow(
+                aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
+            if (!aComputationalComparison.mbFullMatch || !aComputationalComparison.mbGroupMatch
+                || aLifecyclePlan.maComputationalAfter.maFormulaGroups.size() != 1
+                || !(aLifecyclePlan.maComputationalAfter.maFormulaGroups.front().maId
+                     == ShadowFormulaGroupId { { nData, 1, 0 }, 3 }))
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet replacement-merge lifecycle mismatch");
+            }
+
+            const auto aGraphComparison = compareDependencyGraphShadow(
+                aLifecyclePlan.maGraphAfter, aLifecyclePlan.maComputationalAfter,
+                aPredictedObservation);
+            if (aGraphComparison.meKind != graphmapping::GraphComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet replacement-merge graph mismatch");
+            }
+
+            auto aPredictedFacade = authoritybuilddetail::materializeFacadeFromComputationalShadow(
+                aLifecyclePlan.maComputationalAfter);
+            const auto aExpectedIr = authoritybuilddetail::buildAuthorityExecutionIrShadow(
+                aLifecyclePlan.maComputationalAfter, aPredictedFacade);
+            const auto aIrComparison
+                = compareExecutionIrWorkbookShadow(aLifecyclePlan.maIrAfter, aExpectedIr);
+            if (aIrComparison.meKind != ExecutionIrComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet replacement-merge IR mismatch");
+            }
+        }
+
     // --- Safe mutation rebuild path ---
     {
         aFacade.setCell({ nData, 0, 0 }, CellValue::number(11.0));
