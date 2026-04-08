@@ -5100,6 +5100,8 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(
         ComputationalStructuralResultKind::RepairDetected, oResult->meKind);
+    CPPUNIT_ASSERT(
+        oResult->maTransition.maReason == u"structural_named_range_reference_update_mismatch");
     CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(2, 0, 0)));
     CPPUNIT_ASSERT(!m_pDoc->GetFormulaCell(ScAddress(3, 0, 0)));
 
@@ -5499,6 +5501,8 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(
         ComputationalStructuralResultKind::RepairDetected, oResult->meKind);
+    CPPUNIT_ASSERT(
+        oResult->maTransition.maReason == u"structural_shared_group_reference_update_mismatch");
 
     m_pDoc->DeleteTab(0);
 }
@@ -5569,6 +5573,8 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow, testComputationalStructuralRepairDete
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(
         ComputationalStructuralResultKind::RepairDetected, oResult->meKind);
+    CPPUNIT_ASSERT(
+        oResult->maTransition.maReason == u"structural_formula_reference_update_mismatch");
     CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(0, 2, 0)));
     CPPUNIT_ASSERT(!m_pDoc->GetFormulaCell(ScAddress(0, 3, 0)));
     CPPUNIT_ASSERT_EQUAL(20.0, m_pDoc->GetValue(ScAddress(0, 1, 0)));
@@ -5600,6 +5606,8 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(
         ComputationalStructuralResultKind::RepairDetected, oResult->meKind);
+    CPPUNIT_ASSERT(
+        oResult->maTransition.maReason == u"structural_formula_reference_update_mismatch");
     CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(0, 2, 0)));
     CPPUNIT_ASSERT(!m_pDoc->GetFormulaCell(ScAddress(0, 1, 0)));
     CPPUNIT_ASSERT_EQUAL(10.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
@@ -5631,6 +5639,8 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     CPPUNIT_ASSERT(oResult.has_value());
     CPPUNIT_ASSERT_EQUAL(
         ComputationalStructuralResultKind::RepairDetected, oResult->meKind);
+    CPPUNIT_ASSERT(
+        oResult->maTransition.maReason == u"structural_formula_reference_update_mismatch");
     CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(1, 0, 0)));
     CPPUNIT_ASSERT(!m_pDoc->GetFormulaCell(ScAddress(2, 0, 0)));
     CPPUNIT_ASSERT_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));

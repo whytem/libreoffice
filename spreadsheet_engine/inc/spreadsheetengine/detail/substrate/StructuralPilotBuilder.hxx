@@ -1085,6 +1085,24 @@ inline void overlayObservedCellPayloads(ComputationalWorkbookShadow& rPredicted,
     return aPredicted;
 }
 
+[[nodiscard]] inline api::String classifyStructuralRepairReason(
+    const StructuralPilotInput& rInput)
+{
+    if (!rInput.maComputationalShadow.maNamedRanges.empty()
+        || !rInput.maObservedAfterComputationalShadow.maNamedRanges.empty())
+    {
+        return u"structural_named_range_reference_update_mismatch";
+    }
+
+    if (hasSharedGroupIdentity(rInput.maComputationalShadow)
+        || hasSharedGroupIdentity(rInput.maObservedAfterComputationalShadow))
+    {
+        return u"structural_shared_group_reference_update_mismatch";
+    }
+
+    return u"structural_formula_reference_update_mismatch";
+}
+
 } // namespace structuralbuilddetail
 
 [[nodiscard]] inline StructuralPilotTransition buildStructuralPilotTransition(
@@ -1226,7 +1244,7 @@ inline void overlayObservedCellPayloads(ComputationalWorkbookShadow& rPredicted,
     if (aIrComparison.meKind == ExecutionIrComparisonKind::Mismatch)
     {
         aTransition.meVerdict = StructuralPilotVerdict::RepairDetected;
-        aTransition.maReason = u"structural_reference_update_mismatch";
+        aTransition.maReason = structuralbuilddetail::classifyStructuralRepairReason(rInput);
         aTransition.mbRequiresRollback = true;
         return aTransition;
     }
