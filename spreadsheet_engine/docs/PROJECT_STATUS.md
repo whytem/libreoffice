@@ -185,6 +185,12 @@ does move the remaining blocker list onto the three still-open technical
 frontiers: broader same-sheet authoring, repair-sensitive normalization, and
 off-sheet dependency closure.
 
+Phase 5 has now closed the overall blocker-clearance program. The final
+decision is that the program materially clarified and reduced the blocker
+set, but it did not justify a broad-ownership follow-on. The current roadmap
+should return to smaller targeted widening passes against the three
+remaining technical blockers rather than another omnibus blocker program.
+
 ## Working Rules Going Forward
 
 - treat the replay baseline as a non-negotiable guardrail
@@ -200,6 +206,8 @@ off-sheet dependency closure.
   canonical computational-substrate reference
 - [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md):
   ambitious staged blocker-clearance roadmap
+- [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md):
+  final blocker-program closeout and reassessment
 - [architecture/README.md](architecture/README.md): architecture-doc entry
   point
 - [archive/](archive/): archived milestone plans and closeout material

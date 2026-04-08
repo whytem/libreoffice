@@ -203,7 +203,11 @@ deferred as distinct widening targets.
 
 ## Current Roadmap
 
-The roadmap should stay tightly ordered.
+The blocker-clearance program is now closed. Its final reassessment is in
+[COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md).
+
+The roadmap should now stay tightly ordered around the three remaining
+technical frontiers.
 
 For an aggressive multi-blocker execution plan that attacks the full
 remaining frontier as one staged program, see
@@ -249,7 +253,7 @@ The current program has already proven a meaningful bounded authority and
 ownership result. It does not need to force a larger migration to count as a
 success.
 
-## Biggest Blockers
+## Biggest Remaining Blockers
 
 The main blockers are now clear and concrete.
 
@@ -292,25 +296,18 @@ surface remains an explicit defer-or-reject boundary, not a near-miss
 admission. Off-sheet work needs canonical cross-sheet dependency closure
 before any bounded family should be promoted.
 
-### 4. Retained Host Shell Boundaries
+## What Dropped Off The Blocker List
 
-The blocker-clearance Phase 4 pass changed the status of this concern.
+The retained host shell is still real, but the blocker-clearance Phase 4
+pass showed that it is no longer a top opaque blocker on the admitted slice.
 
-The retained host shell is still real, but it is no longer best described
-as a top opaque blocker on the admitted slice. The current runtime already
-treats it as an explicit execution-and-observation shell around
-engine-authored records for realization, rollback, live apply, primitive
-execution, and final verification.
+The runtime already treats it as an explicit execution-and-observation shell
+around engine-authored records for realization, rollback, live apply,
+primitive execution, and final verification.
 
-That means the remaining frontier is better described as:
-
-- broader shared-group after-state authoring
-- repair-sensitive normalization
-- off-sheet dependency closure
-
-The retained host shell still limits any claim of broad host independence,
-but it is no longer the first thing that needs to change for the next
-admitted-slice widening pass.
+That still limits any claim of broad host independence, but it is no longer
+the first thing that needs to change for the next admitted-slice widening
+pass.
 
 ## Working Rules
 

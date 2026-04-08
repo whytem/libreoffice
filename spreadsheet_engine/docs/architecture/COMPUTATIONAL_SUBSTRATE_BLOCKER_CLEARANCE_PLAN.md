@@ -1,7 +1,7 @@
 # Computational Substrate Blocker Clearance Plan
 
-Status: ambitious program plan for clearing the four biggest remaining
-computational-substrate blockers
+Status: completed ambitious program plan for clearing the four biggest
+remaining computational-substrate blockers
 
 Phase status:
 
@@ -14,7 +14,8 @@ Phase status:
   rejected pending exact cross-sheet dependency closure
 - Phase 4 complete: retained host-shell behavior recut into an explicit
   admitted-slice execution contract rather than a top opaque blocker
-- Phase 5 pending
+- Phase 5 complete: final closeout and reassessment recorded the remaining
+  three-frontier blocker set and declined broad-ownership follow-on
 
 ## Purpose
 
@@ -289,6 +290,9 @@ Phase 4 closeout:
   remains unproven
 - decide whether a follow-on broad-ownership program is justified
 
+Phase 5 closeout:
+[COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md)
+
 ## Deliverables
 
 The program should produce:
@@ -302,6 +306,7 @@ The program should produce:
 - per-workstream implementation and evidence notes only where genuinely
   needed
 - one final blocker-clearance decision record
+  [COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md)
 - updates to
   [COMPUTATIONAL_SUBSTRATE_MASTER.md](COMPUTATIONAL_SUBSTRATE_MASTER.md)
   and [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
