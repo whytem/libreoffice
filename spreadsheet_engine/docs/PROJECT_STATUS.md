@@ -169,6 +169,11 @@ not widening: bounded same-sheet named-range-combined regroup and merge
 attempts did not close as distinct live families, so they remain deferred
 and the program moves on to repair-sensitive normalization next.
 
+Phase 2 is now also closed. The repair-sensitive frontier is explicitly
+classified into deterministic `RepairDetected` rollback, explicit
+reject-by-rule, and retained host-only cleanup buckets, but it still does
+not widen the admitted slice.
+
 ## Working Rules Going Forward
 
 - treat the replay baseline as a non-negotiable guardrail

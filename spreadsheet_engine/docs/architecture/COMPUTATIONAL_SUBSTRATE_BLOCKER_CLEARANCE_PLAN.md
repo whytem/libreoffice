@@ -8,7 +8,8 @@ Phase status:
 - Phase 0 complete: boundary, matrix, and mapping rules frozen
 - Phase 1 complete: broader same-sheet named-range-combined attempt families
   were live-proven not to close as distinct regroup or merge admissions
-- Phase 2 pending
+- Phase 2 complete: repair-sensitive families classified into explicit
+  rollback, reject-by-rule, and retained host-only buckets
 - Phase 3 pending
 - Phase 4 pending
 - Phase 5 pending
@@ -255,6 +256,9 @@ Phase 1 closeout:
   outcomes
 - re-run same-sheet frontier families that were previously blocked by repair
   sensitivity
+
+Phase 2 closeout:
+[COMPUTATIONAL_SUBSTRATE_BLOCKER_PHASE2_NORMALIZATION_CLOSEOUT.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_PHASE2_NORMALIZATION_CLOSEOUT.md)
 
 ### Phase 3: Extend To Bounded Off-Sheet Closure
 

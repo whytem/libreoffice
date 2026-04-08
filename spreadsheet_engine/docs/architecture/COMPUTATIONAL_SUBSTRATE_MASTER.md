@@ -268,6 +268,17 @@ as an exact engine-owned rule family.
 
 Until that normalization becomes explicit, those cases should stay deferred.
 
+The blocker-clearance Phase 2 pass made this boundary more precise. The
+current repair-sensitive frontier now breaks into:
+
+- deterministic `RepairDetected` rollback families
+- explicit reject-by-rule families
+- retained host-only cleanup diagnostics
+
+That is progress even without a new admitted family because later widening
+can now fence off each repair bucket deliberately instead of treating them
+all as generic repair drift.
+
 ### 3. Off-Sheet Dependency Closure
 
 Cross-sheet consumers broaden the authority surface significantly.

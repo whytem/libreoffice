@@ -23,10 +23,10 @@ program must evaluate.
 
 | Scenario | Family | Current state | Target outcome |
 | --- | --- | --- | --- |
-| `repair_structural_named_range` | structural repair-sensitive named-range | repair-detected | explicit normalize-or-reject |
-| `repair_shared_group_regroup` | regroup with host cleanup sensitivity | deferred | explicit normalize-or-reject |
-| `repair_shared_group_merge` | merge with host cleanup sensitivity | deferred | explicit normalize-or-reject |
-| `repair_listener_broadcaster` | listener or broadcaster cleanup drift | generic mismatch | explicit normalize-or-reject |
+| `repair_structural_named_range` | structural repair-sensitive named-range | explicit `RepairDetected` rollback | keep explicit rollback unless exact normalization closes |
+| `repair_shared_group_regroup` | regroup with host cleanup sensitivity | explicit reject-by-rule | admit only if exact authored after-state closes |
+| `repair_shared_group_merge` | merge with host cleanup sensitivity | explicit reject-by-rule | admit only if exact authored after-state closes |
+| `repair_listener_broadcaster` | listener or broadcaster cleanup drift | retained host-only cleanup diagnostic | normalize only if canonical engine-owned rule closes |
 
 ## Off-Sheet Dependency Closure
 
