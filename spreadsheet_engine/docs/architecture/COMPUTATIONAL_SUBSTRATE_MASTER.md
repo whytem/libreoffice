@@ -199,6 +199,10 @@ live Calc keeps the far group separate.
 
 The roadmap should stay tightly ordered.
 
+For an aggressive multi-blocker execution plan that attacks the full
+remaining frontier as one staged program, see
+[COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md).
+
 ### Priority 1: Same-Surface Shared-Group Widening
 
 The best next work is still on the same bounded authority surface:
@@ -296,6 +300,7 @@ They are no longer the recommended way to understand the current state.
 For current understanding, use:
 
 - this master document
+- [COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md)
 - [PROJECT_STATUS.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/PROJECT_STATUS.md)
 
 For historical detail, use:

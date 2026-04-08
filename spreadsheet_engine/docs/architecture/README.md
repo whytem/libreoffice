@@ -8,6 +8,9 @@ This directory holds the active architecture references for
 - [COMPUTATIONAL_SUBSTRATE_MASTER.md](COMPUTATIONAL_SUBSTRATE_MASTER.md):
   canonical current-state, admitted-slice, roadmap, and blocker reference
   for the computational-substrate program
+- [COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md):
+  ambitious staged work plan for clearing the four biggest remaining
+  blockers
 - [../PROJECT_STATUS.md](../PROJECT_STATUS.md): concise project-wide status
   snapshot
 
@@ -38,5 +41,6 @@ For day-to-day understanding, use the master document instead.
 The recommended reading order is:
 
 1. [COMPUTATIONAL_SUBSTRATE_MASTER.md](COMPUTATIONAL_SUBSTRATE_MASTER.md)
-2. [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
-3. individual historical `COMPUTATIONAL_SUB*.md` files only as needed
+2. [COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md)
+3. [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
+4. individual historical `COMPUTATIONAL_SUB*.md` files only as needed

@@ -161,6 +161,9 @@ The recommended order is:
 3. repair-sensitive normalization
 4. bounded off-sheet shared-group consumers
 
+The staged program plan for attacking those blockers together is
+[architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md).
+
 ## Working Rules Going Forward
 
 - treat the replay baseline as a non-negotiable guardrail
@@ -174,6 +177,8 @@ The recommended order is:
 
 - [architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md](architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md):
   canonical computational-substrate reference
+- [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md):
+  ambitious staged blocker-clearance roadmap
 - [architecture/README.md](architecture/README.md): architecture-doc entry
   point
 - [archive/](archive/): archived milestone plans and closeout material
