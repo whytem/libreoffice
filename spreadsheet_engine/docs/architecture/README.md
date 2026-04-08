@@ -20,6 +20,8 @@ This directory holds the active architecture references for
   final decision for the same-sheet named-range split-outcome pass
 - [COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_EVIDENCE.md):
   evidence summary for the same-sheet named-range split-outcome pass
+- [COMPUTATIONAL_SUBSTRATE_SAME_SHEET_SPLIT_REPLAY_CARRY_THROUGH_PLAN.md](COMPUTATIONAL_SUBSTRATE_SAME_SHEET_SPLIT_REPLAY_CARRY_THROUGH_PLAN.md):
+  active focused pass for direct same-sheet split-backed replay carry-through
 - [COMPUTATIONAL_SUBSTRATE_BROADER_SAME_SHEET_SHARED_GROUP_WIDENING_PLAN.md](COMPUTATIONAL_SUBSTRATE_BROADER_SAME_SHEET_SHARED_GROUP_WIDENING_PLAN.md):
   completed closeout for the broader same-sheet shared-group widening pass
 - [COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md](COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md):

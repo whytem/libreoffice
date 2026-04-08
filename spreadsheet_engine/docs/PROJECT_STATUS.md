@@ -188,6 +188,9 @@ The now-completed split-outcome pass is
 Its final decision is in
 [architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_DECISION_RECORD.md).
 
+The active follow-on carry-through pass is
+[architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_SPLIT_REPLAY_CARRY_THROUGH_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_SPLIT_REPLAY_CARRY_THROUGH_PLAN.md).
+
 The staged program plan for attacking those blockers together is
 [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md).
 
