@@ -11,6 +11,12 @@ This directory holds the active architecture references for
 - [COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md):
   ambitious staged work plan for clearing the four biggest remaining
   blockers
+- [COMPUTATIONAL_SUBSTRATE_BLOCKER_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CONTRACT.md):
+  frozen four-blocker contract
+- [COMPUTATIONAL_SUBSTRATE_BLOCKER_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_SCENARIO_MATRIX.md):
+  scenario matrix for the blocker-clearance program
+- [COMPUTATIONAL_SUBSTRATE_BLOCKER_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_MAPPING_RULES.md):
+  canonical comparison and ownership rules for the blocker-clearance program
 - [../PROJECT_STATUS.md](../PROJECT_STATUS.md): concise project-wide status
   snapshot
 

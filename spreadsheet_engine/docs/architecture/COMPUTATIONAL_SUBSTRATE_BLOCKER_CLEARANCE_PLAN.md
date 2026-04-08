@@ -268,9 +268,12 @@ workstreams:
 
 The program should produce:
 
-- one blocker contract document
-- one blocker scenario matrix
-- one blocker mapping-rules reference
+- one blocker contract document:
+  [COMPUTATIONAL_SUBSTRATE_BLOCKER_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CONTRACT.md)
+- one blocker scenario matrix:
+  [COMPUTATIONAL_SUBSTRATE_BLOCKER_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_SCENARIO_MATRIX.md)
+- one blocker mapping-rules reference:
+  [COMPUTATIONAL_SUBSTRATE_BLOCKER_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_MAPPING_RULES.md)
 - per-workstream implementation and evidence notes only where genuinely
   needed
 - one final blocker-clearance decision record
