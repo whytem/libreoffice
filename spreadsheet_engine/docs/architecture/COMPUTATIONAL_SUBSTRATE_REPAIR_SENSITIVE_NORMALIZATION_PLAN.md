@@ -1,6 +1,6 @@
 # Computational Substrate Repair-Sensitive Normalization Plan
 
-Status: active execution plan for resolving the repair-sensitive frontier
+Status: completed closeout for the repair-sensitive frontier
 
 ## Purpose
 
@@ -157,3 +157,19 @@ This plan counts as complete only if:
   an active blocker
 - replay and diff hygiene remain clean
 
+## Closeout
+
+The plan is complete.
+
+The exact outcome is:
+
+- no new repair-sensitive family was admitted
+- the currently observed repair-sensitive structural probes are now explicit
+  deterministic rollback buckets with stable reasons
+- the currently exact structural families remain exact and already admitted
+- repair-sensitive normalization is no longer treated as a top-level widening
+  blocker on the roadmap
+
+The repair-sensitive surface remains a real boundary, but it is now a
+settled rollback-or-reject boundary rather than the next active widening
+program. The roadmap should move to bounded off-sheet dependency closure.

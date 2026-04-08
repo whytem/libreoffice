@@ -186,7 +186,8 @@ ownership boundary:
   same-sheet shareable slice
 - named-range-combined multi-group collapse attempts that live Calc keeps
   as far-group-separate or split outcomes
-- repair-sensitive host normalization
+- repair-sensitive structural after-state divergence that is intentionally
+  rollback-only
 - off-sheet shared-group consumers and dependency closure
 - broad storage migration beyond the admitted slice
 - broad token-container ownership transfer
@@ -210,45 +211,34 @@ the already-admitted member-exit path.
 The blocker-clearance program is now closed. Its final reassessment is in
 [COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md).
 
-The roadmap should now stay tightly ordered around the three remaining
-technical frontiers.
+The roadmap should now stay tightly ordered around the remaining widening
+frontiers.
 
 For an aggressive multi-blocker execution plan that attacks the full
 remaining frontier as one staged program, see
 [COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md).
 
-For the focused pass that resolves the current repair-sensitive frontier,
-see
+For the focused pass that closed the repair-sensitive frontier, see
 [COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md](COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md).
+Its final decision is in
+[COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md).
 
-### Priority 1: Repair-Sensitive Behavior
-
-After the same-surface frontier, the next meaningful step is
-repair-sensitive normalization.
-
-That work is harder because it requires either:
-
-- exact engine modeling of Calc cleanup and regroup behavior
-
-or:
-
-- a narrower admitted class that avoids hidden host normalization entirely
-
-### Priority 2: Off-Sheet Shared-Group Behavior
+### Priority 1: Off-Sheet Shared-Group Behavior
 
 Off-sheet consumers and dependencies are a larger boundary jump.
 
-They should come after repair-sensitive work because they broaden authority
-scope materially more than the remaining current frontier.
+They are now the next meaningful widening blocker because the
+repair-sensitive structural frontier has been recut into explicit rollback
+and reject boundaries rather than remaining an open widening question.
 
-### Priority 3: Reassess The Retained Same-Sheet Deferred Boundary
+### Priority 2: Reassess The Retained Same-Sheet Deferred Boundary
 
-Only after repair-sensitive and off-sheet work should the project revisit
+Only after off-sheet work should the project revisit
 the retained same-sheet multi-group collapse boundary. The current live
 proof shows a far-group-separate outcome, so this remains an explicit defer
 rather than a near-term widening target.
 
-### Priority 4: Reassess Broad Ownership Expansion
+### Priority 3: Reassess Broad Ownership Expansion
 
 Only after the above should the project revisit any question of broader
 storage or host-surface transfer.
@@ -261,25 +251,7 @@ success.
 
 The main blockers are now clear and concrete.
 
-### 1. Repair-Sensitive Host Normalization
-
-Some classes still depend on host cleanup behavior that is not yet modeled
-as an exact engine-owned rule family.
-
-Until that normalization becomes explicit, those cases should stay deferred.
-
-The blocker-clearance Phase 2 pass made this boundary more precise. The
-current repair-sensitive frontier now breaks into:
-
-- deterministic `RepairDetected` rollback families
-- explicit reject-by-rule families
-- retained host-only cleanup diagnostics
-
-That is progress even without a new admitted family because later widening
-can now fence off each repair bucket deliberately instead of treating them
-all as generic repair drift.
-
-### 2. Off-Sheet Dependency Closure
+### 1. Off-Sheet Dependency Closure
 
 Cross-sheet consumers broaden the authority surface significantly.
 
@@ -292,7 +264,7 @@ surface remains an explicit defer-or-reject boundary, not a near-miss
 admission. Off-sheet work needs canonical cross-sheet dependency closure
 before any bounded family should be promoted.
 
-### 3. Exact After-State Authoring For The Retained Same-Sheet Collapse Boundary
+### 2. Exact After-State Authoring For The Retained Same-Sheet Collapse Boundary
 
 The broader same-sheet single-cell widening pass materially reduced this
 frontier, but one explicit same-sheet deferred shape remains:
@@ -304,6 +276,21 @@ later the bar stays the same: the engine-authored after-state must match
 the live host exactly rather than collapsing more aggressively than Calc.
 
 ## What Dropped Off The Blocker List
+
+Repair-sensitive normalization is no longer a top blocker on the current
+roadmap.
+
+The repair-sensitive closeout pass showed that the currently observed
+same-sheet structural repair families are better described as:
+
+- exact admitted families when the after-state closes exactly
+- deterministic rollback with explicit structural reasons when the observed
+  after-state diverges
+- explicit rejects outside the exact slice
+
+The closeout did not admit a new family, but it did remove the need for a
+separate open-ended repair-sensitive widening program on the current
+surface.
 
 The retained host shell is still real, but the blocker-clearance Phase 4
 pass showed that it is no longer a top opaque blocker on the admitted slice.

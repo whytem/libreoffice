@@ -145,7 +145,8 @@ The following remain deferred:
 - named-range-sensitive structural rollout
 - named-range-combined multi-group collapse attempts that live Calc keeps
   as far-group-separate or split outcomes
-- repair-sensitive host normalization
+- repair-sensitive structural after-state divergence that is intentionally
+  rollback-only
 - off-sheet shared-group consumers and dependency closure
 - broad storage migration beyond the admitted slice
 - broad token-container and listener ownership transfer
@@ -158,16 +159,17 @@ the current bounded surface.
 
 The recommended order is now:
 
-1. repair-sensitive normalization
-2. bounded off-sheet shared-group consumers
-3. only then reassess the retained same-sheet multi-group collapse boundary
+1. bounded off-sheet shared-group consumers
+2. only then reassess the retained same-sheet multi-group collapse boundary
    if new live evidence suggests a real expansion target
 
 The staged program plan for attacking those blockers together is
 [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md).
 
-The focused next-pass plan for the current roadmap item is
+The now-completed repair-sensitive closeout pass is
 [architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md).
+Its final decision is in
+[architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md).
 
 The earlier same-surface blocker-phase conclusion has now been superseded by
 the broader same-sheet widening rerun. Corrected frozen-snapshot live facade
@@ -176,10 +178,11 @@ proof showed that bounded named-range-combined `Regroup` and
 broader non-edge regroup and merge attempts normalize onto the already-
 admitted member-exit path.
 
-Phase 2 is now also closed. The repair-sensitive frontier is explicitly
-classified into deterministic `RepairDetected` rollback, explicit
-reject-by-rule, and retained host-only cleanup buckets, but it still does
-not widen the admitted slice.
+The repair-sensitive normalization pass is now closed. The current
+repair-sensitive structural probes are explicit deterministic rollback
+buckets with stable reasons, not a hidden widening frontier. The pass did
+not admit a new family, but it did remove repair-sensitive normalization
+from the top-blocker list for the current roadmap.
 
 Phase 3 is now closed as well. Off-sheet shared-group consumers remain an
 explicit deferred or rejected boundary pending exact cross-sheet dependency,
@@ -194,9 +197,9 @@ off-sheet dependency closure.
 
 Phase 5 has now closed the overall blocker-clearance program. The final
 decision is that the program materially clarified and reduced the blocker
-set, but it did not justify a broad-ownership follow-on. The current roadmap
-should return to smaller targeted widening passes against the three
-remaining technical blockers rather than another omnibus blocker program.
+set, but it did not justify a broad-ownership follow-on. After the
+repair-sensitive closeout pass, the current roadmap should move to bounded
+off-sheet widening rather than another omnibus blocker program.
 
 ## Working Rules Going Forward
 
