@@ -852,6 +852,34 @@ Current architecture docs:
   completed closeout decision for the bounded named-range-combined scalar
   member-exit cycle, widening the admitted slice while leaving non-scalar,
   repair-sensitive, and off-sheet frontier classes deferred
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_ADMISSION_PLAN.md) -
+  completed closeout plan for the bounded named-range-combined non-scalar
+  member-exit pass, now recording admitted `SetFormula` member-exit and
+  retained `ClearCell` defer
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_CONTRACT.md) -
+  frozen contract for the bounded named-range-combined non-scalar
+  member-exit closeout, fixing the admitted `SetFormula` lane and the
+  retained `ClearCell` boundary
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_SCENARIO_MATRIX.md) -
+  frozen scenario matrix for the bounded named-range-combined non-scalar
+  member-exit closeout, separating the admitted `SetFormula` lane from the
+  retained `ClearCell` defer bucket
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_MAPPING_RULES.md) -
+  frozen mapping note for the bounded named-range-combined non-scalar
+  member-exit closeout, defining exact `SetFormula` ownership and the
+  planner-side `ClearCell` blocker
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_IMPLEMENTATION.md) -
+  completed implementation note for the bounded named-range-combined
+  non-scalar member-exit closeout, widening the gate only as far as exact
+  `SetFormula` member-exit
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_EVIDENCE.md) -
+  frozen evidence note for the bounded named-range-combined non-scalar
+  member-exit closeout, recording standalone proof, live `SetFormula`
+  apply proof, and retained `ClearCell` reject proof
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_DECISION_RECORD.md) -
+  completed closeout decision for the bounded named-range-combined
+  non-scalar member-exit cycle, admitting `SetFormula` while keeping
+  `ClearCell`, repair-sensitive, and off-sheet frontier classes deferred
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

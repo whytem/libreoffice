@@ -358,7 +358,8 @@ evaluateSharedGroupNamedRangeBoundary(const AuthorityPilotInput& rInput)
         case facade::consumers::SharedFormulaMutationFamily::SameTextPreserve:
             return true;
         case facade::consumers::SharedFormulaMutationFamily::MemberExit:
-            if (rInput.maMutation.meKind == facade::MutationKind::SetScalarValue)
+            if (rInput.maMutation.meKind == facade::MutationKind::SetScalarValue
+                || rInput.maMutation.meKind == facade::MutationKind::SetFormula)
                 return true;
             break;
         default:

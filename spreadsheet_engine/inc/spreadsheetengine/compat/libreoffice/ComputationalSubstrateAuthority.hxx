@@ -13,7 +13,6 @@
 #include <utility>
 
 #include <document.hxx>
-
 #include <spreadsheetengine/compat/libreoffice/ComputationalSubstrateRollout.hxx>
 #include <spreadsheetengine/compat/libreoffice/ComputationalShadowBuilder.hxx>
 #include <spreadsheetengine/compat/libreoffice/DependencyGraphShadowBuilder.hxx>

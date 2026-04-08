@@ -1,6 +1,6 @@
 # Computational Substrate Shared-Group Implementation
 
-Status: bounded structural plus non-structural shared-group slice implemented, including exact regroup, gap-merge, replacement-merge, one-sided insert closeout, admitted bounded named-range preserve and scalar member-exit, and a deferred multi-group-collapse closeout
+Status: bounded structural plus non-structural shared-group slice implemented, including exact regroup, gap-merge, replacement-merge, one-sided insert closeout, admitted bounded named-range preserve plus scalar and formula member-exit, and deferred clear-cell and multi-group-collapse closeouts
 
 ## What Landed
 
@@ -41,6 +41,9 @@ The workstream is now closed out by:
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_IMPLEMENTATION.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_DECISION_RECORD.md)
 
 The implementation stays intentionally narrow:
 
@@ -67,9 +70,13 @@ The implementation stays intentionally narrow:
 - it now also widens the live admitted slice for exact same-sheet
   shareable named-range-combined `SetScalarValue` `MemberExit` on that
   same bounded `GlobalSingleAreaSameSheet` surface
-- it keeps broader named-range-combined non-scalar member-exit,
-  multi-group collapse, off-sheet, repair-sensitive, and non-edge regroup
-  shared-group classes outside live admission
+- it now also widens the live admitted slice for exact same-sheet
+  shareable named-range-combined `SetFormula` `MemberExit` on that same
+  bounded `GlobalSingleAreaSameSheet` surface
+- it keeps bounded named-range-combined `ClearCell` `MemberExit`,
+  broader named-range-combined regroup, merge, and collapse,
+  multi-group collapse, off-sheet, repair-sensitive, and broader non-edge
+  regroup shared-group classes outside live admission
 
 ## Main Runtime Surfaces
 
@@ -319,14 +326,18 @@ The checked-in coverage now includes:
   preserve now applies
 - standalone exactness proof for bounded named-range-combined scalar
   member-exit
+- standalone exactness proof for bounded named-range-combined
+  `SetFormula` member-exit
 - Calc facade proof that live three-group attempts keep the far group
   separate instead of producing one full-span collapsed group
 - non-structural shared-group lifecycle and mutation-entry proof that live
   three-group attempts keep the far group separate
 - live authority and mutation-entry apply proof for bounded
   named-range-combined scalar member-exit
-- live retained reject proof for bounded named-range-combined `SetFormula`
-  and `ClearCell` member-exit
+- live authority, lifecycle, and mutation-entry apply proof for bounded
+  named-range-combined `SetFormula` member-exit
+- live retained reject proof for bounded named-range-combined `ClearCell`
+  member-exit
 - retained reject coverage for `HostUnknown` listener anchors on the live
   wiring path
 - standalone shared-group object-realization proof that `FormulaGroup`
