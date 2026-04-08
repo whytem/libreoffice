@@ -36,8 +36,11 @@ This directory holds the active architecture references for
   final decision for the bounded off-sheet named-range-combined and
   merge-shaped pass
 - [COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_PLAN.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_PLAN.md):
-  active plan for the remaining bounded off-sheet member-exit and direct
-  merge surface
+  completed closeout for the final bounded off-sheet surface pass
+- [COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md):
+  final decision for the final bounded off-sheet surface pass
+- [COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_EVIDENCE.md):
+  evidence summary for the final bounded off-sheet surface pass
 - [COMPUTATIONAL_SUBSTRATE_BLOCKER_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CONTRACT.md):
   frozen four-blocker contract
 - [COMPUTATIONAL_SUBSTRATE_BLOCKER_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_SCENARIO_MATRIX.md):

@@ -1,13 +1,13 @@
 # Computational Substrate Off-Sheet Final Surface Plan
 
-Status: active execution plan for the remaining bounded off-sheet blocker
+Status: completed closeout for the remaining bounded off-sheet blocker
 
 ## Objective
 
 Close the last bounded off-sheet widening blocker on the already-admitted
 one-consumer-sheet surface.
 
-This pass targets the two remaining families called out in the master
+This pass targeted the two remaining families called out in the master
 document:
 
 - off-sheet named-range-combined `MemberExit`
@@ -128,3 +128,22 @@ Success criteria:
   read from the master doc
 - the remaining frontier is no longer the old combined member-exit plus
   direct-merge blocker
+
+## Outcome
+
+This pass closed with a split result:
+
+- bounded off-sheet named-range-combined
+  `GlobalSingleAreaSingleConsumerSheet` `MemberExit` is admitted for
+  `SetScalarValue`, `SetFormula`, and `ClearCell`
+- bounded direct off-sheet replacement-merge does not remain a distinct
+  blocker because live Calc normalizes the bounded attempt onto the already-
+  admitted `Regroup` surface
+- bounded direct off-sheet gap-closing insertion remains explicitly
+  retained because live Calc exposes merged after-topology but does not
+  surface a stable mutation-family classification for the bounded attempt
+
+The completed closeout is recorded in:
+
+- [COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_EVIDENCE.md)

@@ -152,6 +152,9 @@ The current opt-in narrow rollout surface includes:
 - exact same-workbook one-consumer-sheet off-sheet named-range-combined
   `SameTextPreserve`, `Regroup`, and `OneSidedInsert` `SetFormula` on the
   bounded `GlobalSingleAreaSingleConsumerSheet` surface
+- exact same-workbook one-consumer-sheet off-sheet named-range-combined
+  `MemberExit` `SetScalarValue`, `SetFormula`, and `ClearCell` on that same
+  bounded `GlobalSingleAreaSingleConsumerSheet` surface
 
 This slice remains intentionally constrained by:
 
@@ -199,7 +202,7 @@ ownership boundary:
 - off-sheet shared-group behavior outside the bounded one-consumer-sheet
   direct `MemberExit`, `SameTextPreserve`, and `Regroup` slices and the
   bounded named-range-combined `GlobalSingleAreaSingleConsumerSheet`
-  `SameTextPreserve`, `Regroup`, and `OneSidedInsert` slice
+  `SameTextPreserve`, `Regroup`, `OneSidedInsert`, and `MemberExit` slice
 - broad storage migration beyond the admitted slice
 - broad token-container ownership transfer
 - broad listener/broadcaster ownership transfer beyond the admitted slice
@@ -237,16 +240,23 @@ Its final decision is in
 ### Priority 1: Broader Off-Sheet Shared-Group Behavior
 
 The direct one-consumer-sheet off-sheet `MemberExit`,
-`SameTextPreserve`, and `Regroup` lanes are now admitted, and the bounded
+`SameTextPreserve`, and `Regroup` lanes are admitted, and the bounded
 one-consumer-sheet off-sheet named-range-combined
-`GlobalSingleAreaSingleConsumerSheet` `SameTextPreserve`, `Regroup`, and
-`OneSidedInsert` lane is now admitted too.
+`GlobalSingleAreaSingleConsumerSheet` `SameTextPreserve`, `Regroup`,
+`OneSidedInsert`, and `MemberExit` lane is admitted too.
 
-The remaining off-sheet frontier is now the off-sheet named-range-combined
-`MemberExit` and direct gap/replacement-merge surface.
+The completed closeout for the last combined off-sheet blocker is in
+[COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_PLAN.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_PLAN.md),
+with the final decision in
+[COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md).
 
-The active execution plan for that blocker is
-[COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_PLAN.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_PLAN.md).
+The pass also established two important off-sheet host-shape facts:
+
+- bounded direct replacement attempts normalize to the already-admitted
+  direct `Regroup` surface
+- the only retained one-consumer-sheet off-sheet anomaly is the direct
+  gap-closing insertion where live Calc merges after-topology but does not
+  expose a stable mutation-family classification
 
 ### Priority 2: Reassess The Retained Same-Sheet Deferred Boundary
 
@@ -268,22 +278,7 @@ success.
 
 The main blockers are now clear and concrete.
 
-### 1. Off-Sheet Named-Range Member-Exit And Direct Merge Carry-Through
-
-The broader off-sheet formula-retained blocker is now reduced further. This
-pass admitted the bounded off-sheet named-range-combined
-`GlobalSingleAreaSingleConsumerSheet` `SameTextPreserve`, `Regroup`, and
-`OneSidedInsert` families.
-
-What remains is the narrower off-sheet surface where:
-
-- the named-range-combined mutation becomes `MemberExit`, or
-- the direct off-sheet shape expands into gap merge or replacement-merge
-
-Those families still need exact queue, broadcaster, rollback, and
-verification closure.
-
-### 2. Exact After-State Authoring For The Retained Same-Sheet Collapse Boundary
+### 1. Exact After-State Authoring For The Retained Same-Sheet Collapse Boundary
 
 The broader same-sheet single-cell widening pass materially reduced this
 frontier, but one explicit same-sheet deferred shape remains:
@@ -293,6 +288,21 @@ far-group-separate or split outcome.
 This is no longer the best next blocker to attack, but if it is revisited
 later the bar stays the same: the engine-authored after-state must match
 the live host exactly rather than collapsing more aggressively than Calc.
+
+### 2. Narrow Off-Sheet Gap-Closing Insertion Surface
+
+The old combined off-sheet blocker is now mostly closed:
+
+- off-sheet named-range-combined `MemberExit` is admitted
+- direct replacement attempts normalize to admitted direct `Regroup`
+
+The remaining narrow off-sheet question is the bounded direct gap-closing
+insertion surface where live Calc exposes merged after-topology but leaves
+the mutation-family classification at `None`.
+
+That is no longer a broad off-sheet carry-through blocker. It is now a
+host-shape surfacing problem on an otherwise bounded one-consumer-sheet
+surface.
 
 ## What Dropped Off The Blocker List
 

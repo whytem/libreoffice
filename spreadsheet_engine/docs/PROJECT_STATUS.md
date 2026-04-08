@@ -142,6 +142,9 @@ The admitted rollout surface currently includes:
 - exact same-workbook one-consumer-sheet off-sheet named-range-combined
   `SameTextPreserve`, `Regroup`, and `OneSidedInsert` `SetFormula` on the
   bounded `GlobalSingleAreaSingleConsumerSheet` surface
+- exact same-workbook one-consumer-sheet off-sheet named-range-combined
+  `MemberExit` `SetScalarValue`, `SetFormula`, and `ClearCell` on the
+  bounded `GlobalSingleAreaSingleConsumerSheet` surface
 
 This remains an opt-in, exact-verification boundary with rollback on
 divergence, not a broad live-authority flip.
@@ -158,7 +161,7 @@ The following remain deferred:
 - off-sheet shared-group behavior outside the bounded one-consumer-sheet
   direct `MemberExit`, `SameTextPreserve`, and `Regroup` slices and the
   bounded named-range-combined `GlobalSingleAreaSingleConsumerSheet`
-  `SameTextPreserve`, `Regroup`, and `OneSidedInsert` slice
+  `SameTextPreserve`, `Regroup`, `OneSidedInsert`, and `MemberExit` slice
 - broad storage migration beyond the admitted slice
 - broad token-container and listener ownership transfer
 - workbook-wide or sheet-wide authority transfer
@@ -170,16 +173,19 @@ the current bounded surface.
 
 The recommended order is now:
 
-1. off-sheet named-range-combined `MemberExit` plus direct gap/replacement-
-   merge shared-group consumers
-2. only then reassess the retained same-sheet multi-group collapse boundary
-   if new live evidence suggests a real expansion target
+1. reassess the retained same-sheet multi-group collapse boundary if new
+   live evidence suggests a real expansion target
+2. if off-sheet work resumes immediately, isolate the remaining direct
+   gap-closing insertion surface where live Calc merges after-topology but
+   does not expose a stable mutation-family classification
 
 The staged program plan for attacking those blockers together is
 [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md).
 
-The active focused pass for that bounded off-sheet blocker is
+The completed closeout for the final bounded off-sheet surface pass is
 [architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_PLAN.md).
+Its final decision is in
+[architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md).
 
 The now-completed repair-sensitive closeout pass is
 [architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md).
@@ -209,14 +215,17 @@ buckets with stable reasons, not a hidden widening frontier. The pass did
 not admit a new family, but it did remove repair-sensitive normalization
 from the top-blocker list for the current roadmap.
 
-The off-sheet dependency closure, broader formula-retained, and off-sheet
-named-range pass are now closed too. Together they admitted the bounded
-one-consumer-sheet direct off-sheet shared-group `MemberExit`,
+The off-sheet dependency closure, broader formula-retained, named-range,
+and final-surface passes are now closed too. Together they admitted the
+bounded one-consumer-sheet direct off-sheet shared-group `MemberExit`,
 `SameTextPreserve`, and `Regroup` families plus the bounded off-sheet
 named-range-combined `GlobalSingleAreaSingleConsumerSheet`
-`SameTextPreserve`, `Regroup`, and `OneSidedInsert` families. The remaining
-off-sheet blocker is now narrower: named-range-combined `MemberExit` plus
-direct gap/replacement-merge.
+`SameTextPreserve`, `Regroup`, `OneSidedInsert`, and `MemberExit`
+families. The combined off-sheet blocker is now gone; the remaining
+off-sheet question is narrower still: direct gap-closing insertion where
+live Calc merges after-topology but does not expose a stable mutation-
+family classification, while bounded replacement attempts normalize to the
+already-admitted direct `Regroup` lane.
 
 Phase 4 is now closed too. The retained host shell is now recorded as an
 explicit admitted-slice execution and observation contract rather than as a
