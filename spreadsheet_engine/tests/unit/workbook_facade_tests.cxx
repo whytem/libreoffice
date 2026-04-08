@@ -906,6 +906,107 @@ int main()
         }
     }
 
+    // --- Direct off-sheet shared-formula same-text-preserve classification ---
+    {
+        InMemoryWorkbookFacade aBeforeFacade;
+        aBeforeFacade.setGrammar(aFacade.getGrammar());
+        aBeforeFacade.setGeneration(64);
+        const auto nDataSheet = aBeforeFacade.addSheet(u"Data");
+        const auto nSummarySheet = aBeforeFacade.addSheet(u"Summary");
+        aBeforeFacade.setCell({ nDataSheet, 0, 0 }, CellValue::number(1.0));
+        aBeforeFacade.setCell({ nDataSheet, 0, 1 }, CellValue::number(2.0));
+        aBeforeFacade.setCell({ nDataSheet, 0, 2 }, CellValue::number(3.0));
+        aBeforeFacade.setFormulaCell({ nDataSheet, 1, 0 }, u"=A1*2",
+            CellValue::number(2.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.setFormulaCell({ nDataSheet, 1, 1 }, u"=A2*2",
+            CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.setFormulaCell({ nDataSheet, 1, 2 }, u"=A3*2",
+            CellValue::number(6.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.addFormulaGroup({ nDataSheet, 1, 0 }, 3, true);
+        aBeforeFacade.setFormulaCell({ nSummarySheet, 2, 0 }, u"=Data.B1+Data.B2+Data.B3",
+            CellValue::number(12.0), FormulaCellKind::Ordinary, true, true);
+
+        InMemoryWorkbookFacade aAfterFacade = aBeforeFacade;
+        aAfterFacade.setGeneration(65);
+
+        const auto aClassification = consumers::classifySharedFormulaMutation(
+            aBeforeFacade, aAfterFacade,
+            MutationEvent::setFormula({ nDataSheet, 1, 1 }, u"=A2*2"));
+        const auto aNamedRangeBoundary
+            = consumers::classifySharedFormulaNamedRangeMutationBoundary(
+                aBeforeFacade, aAfterFacade,
+                MutationEvent::setFormula({ nDataSheet, 1, 1 }, u"=A2*2"));
+        if (aClassification.meFamily != consumers::SharedFormulaMutationFamily::SameTextPreserve
+            || aNamedRangeBoundary.meBoundary
+                   != consumers::SharedFormulaNamedRangeMutationBoundary::None
+            || aClassification.maTransition.meKind
+                   != consumers::SharedFormulaGroupTransitionKind::Preserve
+            || !aClassification.mbTouchedAddressSharedBefore
+            || !aClassification.mbTouchedAddressSharedAfter)
+        {
+            return fail("facade_consumers",
+                "shared-group off-sheet same-text-preserve classification mismatch");
+        }
+    }
+
+    // --- Direct off-sheet shared-formula regroup classification ---
+    {
+        InMemoryWorkbookFacade aBeforeFacade;
+        aBeforeFacade.setGrammar(aFacade.getGrammar());
+        aBeforeFacade.setGeneration(66);
+        const auto nDataSheet = aBeforeFacade.addSheet(u"Data");
+        const auto nSummarySheet = aBeforeFacade.addSheet(u"Summary");
+        aBeforeFacade.setCell({ nDataSheet, 0, 0 }, CellValue::number(1.0));
+        aBeforeFacade.setCell({ nDataSheet, 0, 1 }, CellValue::number(2.0));
+        aBeforeFacade.setCell({ nDataSheet, 0, 2 }, CellValue::number(3.0));
+        aBeforeFacade.setFormulaCell({ nDataSheet, 1, 0 }, u"=A1*3",
+            CellValue::number(3.0), FormulaCellKind::Ordinary, true, true);
+        aBeforeFacade.setFormulaCell({ nDataSheet, 1, 1 }, u"=A2*2",
+            CellValue::number(4.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.setFormulaCell({ nDataSheet, 1, 2 }, u"=A3*2",
+            CellValue::number(6.0), FormulaCellKind::SharedGroupMember, true, true);
+        aBeforeFacade.addFormulaGroup({ nDataSheet, 1, 1 }, 2, true);
+        aBeforeFacade.setFormulaCell({ nSummarySheet, 2, 0 }, u"=Data.B1+Data.B2+Data.B3",
+            CellValue::number(13.0), FormulaCellKind::Ordinary, true, true);
+
+        InMemoryWorkbookFacade aAfterFacade;
+        aAfterFacade.setGrammar(aBeforeFacade.getGrammar());
+        aAfterFacade.setGeneration(67);
+        aAfterFacade.addSheet(u"Data");
+        aAfterFacade.addSheet(u"Summary");
+        aAfterFacade.setCell({ nDataSheet, 0, 0 }, CellValue::number(1.0));
+        aAfterFacade.setCell({ nDataSheet, 0, 1 }, CellValue::number(2.0));
+        aAfterFacade.setCell({ nDataSheet, 0, 2 }, CellValue::number(3.0));
+        aAfterFacade.setFormulaCell({ nDataSheet, 1, 0 }, u"=A1*3",
+            CellValue::number(3.0), FormulaCellKind::SharedGroupMember, true, true);
+        aAfterFacade.setFormulaCell({ nDataSheet, 1, 1 }, u"=A2*3",
+            CellValue::number(6.0), FormulaCellKind::SharedGroupMember, true, true);
+        aAfterFacade.setFormulaCell({ nDataSheet, 1, 2 }, u"=A3*2",
+            CellValue::number(6.0), FormulaCellKind::Ordinary, true, true);
+        aAfterFacade.addFormulaGroup({ nDataSheet, 1, 0 }, 2, true);
+        aAfterFacade.setFormulaCell({ nSummarySheet, 2, 0 }, u"=Data.B1+Data.B2+Data.B3",
+            CellValue::number(15.0), FormulaCellKind::Ordinary, true, true);
+
+        const auto aClassification = consumers::classifySharedFormulaMutation(
+            aBeforeFacade, aAfterFacade,
+            MutationEvent::setFormula({ nDataSheet, 1, 1 }, u"=A2*3"));
+        const auto aNamedRangeBoundary
+            = consumers::classifySharedFormulaNamedRangeMutationBoundary(
+                aBeforeFacade, aAfterFacade,
+                MutationEvent::setFormula({ nDataSheet, 1, 1 }, u"=A2*3"));
+        if (aClassification.meFamily != consumers::SharedFormulaMutationFamily::Regroup
+            || aNamedRangeBoundary.meBoundary
+                   != consumers::SharedFormulaNamedRangeMutationBoundary::None
+            || aClassification.maTransition.meKind
+                   != consumers::SharedFormulaGroupTransitionKind::Rebuild
+            || !aClassification.mbTouchedAddressSharedBefore
+            || !aClassification.mbTouchedAddressSharedAfter)
+        {
+            return fail("facade_consumers",
+                "shared-group off-sheet regroup classification mismatch");
+        }
+    }
+
     // --- Named-range inventory consumer ---
     {
         const auto aInventory = consumers::inventoryNamedRanges(rFacade);

@@ -3285,6 +3285,196 @@ int main()
             }
         }
 
+        {
+            InMemoryWorkbookFacade aBeforeFacade;
+            aBeforeFacade.setGrammar(aFacade.getGrammar());
+            aBeforeFacade.setGeneration(120);
+            const auto nData = aBeforeFacade.addSheet(u"Data");
+            const auto nSummary = aBeforeFacade.addSheet(u"Summary");
+            aBeforeFacade.setCell({ nData, 0, 0 }, CellValue::number(1.0));
+            aBeforeFacade.setCell({ nData, 0, 1 }, CellValue::number(2.0));
+            aBeforeFacade.setCell({ nData, 0, 2 }, CellValue::number(3.0));
+            aBeforeFacade.setFormulaCell({ nData, 1, 0 }, u"=A1*2", CellValue::number(2.0),
+                FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 1 }, u"=A2*2", CellValue::number(4.0),
+                FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 2 }, u"=A3*2", CellValue::number(6.0),
+                FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.addFormulaGroup({ nData, 1, 0 }, 3, true);
+            aBeforeFacade.setFormulaCell(
+                { nSummary, 2, 0 }, u"=Data.B1+Data.B2+Data.B3", CellValue::number(12.0),
+                FormulaCellKind::Ordinary, true, true);
+
+            ComputationalObservationState aBeforeObservation;
+            aBeforeObservation.maFormulaTree = { { nData, 1, 0 }, { nData, 1, 1 }, { nData, 1, 2 },
+                { nSummary, 2, 0 } };
+            const auto aBeforeShadow
+                = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+            const auto aBeforeGraph
+                = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+            const auto aBeforeIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aBeforeShadow, aBeforeFacade);
+
+            InMemoryWorkbookFacade aAfterFacade = aBeforeFacade;
+            aAfterFacade.setGeneration(121);
+
+            ComputationalObservationState aAfterObservation = aBeforeObservation;
+            const auto aAfterShadow
+                = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
+
+            AuthorityPilotInput aAuthorityInput;
+            aAuthorityInput.maComputationalShadow = aBeforeShadow;
+            aAuthorityInput.maGraphShadow = aBeforeGraph;
+            aAuthorityInput.maIrShadow = aBeforeIr;
+            aAuthorityInput.maMutation = MutationEvent::setFormula({ nData, 1, 1 }, u"=A2*2");
+            aAuthorityInput.moFormulaCachedValueAfter = CellValue::number(4.0);
+            aAuthorityInput.moObservedAfterComputationalShadow = aAfterShadow;
+            aAuthorityInput.mbAllowSharedGroupNonStructuralAdmission = true;
+            aAuthorityInput.mbCleanBaseline = true;
+
+            const auto aAuthorityPlan = buildAuthorityPilotTransition(aAuthorityInput);
+            if (aAuthorityPlan.meVerdict != AuthorityPilotVerdict::Applicable)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet same-text-preserve authority verdict mismatch");
+            }
+
+            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
+                aAuthorityPlan.maDependencySnapshot, aAuthorityPlan.maRecalcPlan);
+            const auto aComputationalComparison = compareComputationalShadow(
+                aAuthorityPlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
+            if (!aComputationalComparison.mbFullMatch || !aComputationalComparison.mbGroupMatch)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet same-text-preserve computational exactness mismatch");
+            }
+
+            const auto aGraphComparison = compareDependencyGraphShadow(
+                aAuthorityPlan.maGraphAfter, aAuthorityPlan.maComputationalAfter,
+                aPredictedObservation);
+            if (aGraphComparison.meKind != graphmapping::GraphComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet same-text-preserve graph exactness mismatch");
+            }
+
+            auto aPredictedFacade = authoritybuilddetail::materializeFacadeFromComputationalShadow(
+                aAuthorityPlan.maComputationalAfter);
+            const auto aExpectedIr = authoritybuilddetail::buildAuthorityExecutionIrShadow(
+                aAuthorityPlan.maComputationalAfter, aPredictedFacade);
+            const auto aIrComparison
+                = compareExecutionIrWorkbookShadow(aAuthorityPlan.maIrAfter, aExpectedIr);
+            if (aIrComparison.meKind != ExecutionIrComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet same-text-preserve IR exactness mismatch");
+            }
+        }
+
+        {
+            InMemoryWorkbookFacade aBeforeFacade;
+            aBeforeFacade.setGrammar(aFacade.getGrammar());
+            aBeforeFacade.setGeneration(122);
+            const auto nData = aBeforeFacade.addSheet(u"Data");
+            const auto nSummary = aBeforeFacade.addSheet(u"Summary");
+            aBeforeFacade.setCell({ nData, 0, 0 }, CellValue::number(1.0));
+            aBeforeFacade.setCell({ nData, 0, 1 }, CellValue::number(2.0));
+            aBeforeFacade.setCell({ nData, 0, 2 }, CellValue::number(3.0));
+            aBeforeFacade.setFormulaCell({ nData, 1, 0 }, u"=A1*3", CellValue::number(3.0),
+                FormulaCellKind::Ordinary, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 1 }, u"=A2*2", CellValue::number(4.0),
+                FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.setFormulaCell({ nData, 1, 2 }, u"=A3*2", CellValue::number(6.0),
+                FormulaCellKind::SharedGroupMember, true, true);
+            aBeforeFacade.addFormulaGroup({ nData, 1, 1 }, 2, true);
+            aBeforeFacade.setFormulaCell(
+                { nSummary, 2, 0 }, u"=Data.B1+Data.B2+Data.B3", CellValue::number(13.0),
+                FormulaCellKind::Ordinary, true, true);
+
+            ComputationalObservationState aBeforeObservation;
+            aBeforeObservation.maFormulaTree = { { nData, 1, 0 }, { nData, 1, 1 }, { nData, 1, 2 },
+                { nSummary, 2, 0 } };
+            const auto aBeforeShadow
+                = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+            const auto aBeforeGraph
+                = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+            const auto aBeforeIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aBeforeShadow, aBeforeFacade);
+
+            InMemoryWorkbookFacade aAfterFacade;
+            aAfterFacade.setGrammar(aBeforeFacade.getGrammar());
+            aAfterFacade.setGeneration(123);
+            aAfterFacade.addSheet(u"Data");
+            aAfterFacade.addSheet(u"Summary");
+            aAfterFacade.setCell({ nData, 0, 0 }, CellValue::number(1.0));
+            aAfterFacade.setCell({ nData, 0, 1 }, CellValue::number(2.0));
+            aAfterFacade.setCell({ nData, 0, 2 }, CellValue::number(3.0));
+            aAfterFacade.setFormulaCell({ nData, 1, 0 }, u"=A1*3", CellValue::number(3.0),
+                FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.setFormulaCell({ nData, 1, 1 }, u"=A2*3", CellValue::number(6.0),
+                FormulaCellKind::SharedGroupMember, true, true);
+            aAfterFacade.setFormulaCell({ nData, 1, 2 }, u"=A3*2", CellValue::number(6.0),
+                FormulaCellKind::Ordinary, true, true);
+            aAfterFacade.addFormulaGroup({ nData, 1, 0 }, 2, true);
+            aAfterFacade.setFormulaCell(
+                { nSummary, 2, 0 }, u"=Data.B1+Data.B2+Data.B3", CellValue::number(15.0),
+                FormulaCellKind::Ordinary, true, true);
+
+            ComputationalObservationState aAfterObservation;
+            aAfterObservation.maFormulaTree = { { nData, 1, 0 }, { nData, 1, 1 }, { nData, 1, 2 },
+                { nSummary, 2, 0 } };
+            const auto aAfterShadow
+                = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
+
+            AuthorityPilotInput aAuthorityInput;
+            aAuthorityInput.maComputationalShadow = aBeforeShadow;
+            aAuthorityInput.maGraphShadow = aBeforeGraph;
+            aAuthorityInput.maIrShadow = aBeforeIr;
+            aAuthorityInput.maMutation = MutationEvent::setFormula({ nData, 1, 1 }, u"=A2*3");
+            aAuthorityInput.moFormulaCachedValueAfter = CellValue::number(6.0);
+            aAuthorityInput.moObservedAfterComputationalShadow = aAfterShadow;
+            aAuthorityInput.mbAllowSharedGroupNonStructuralAdmission = true;
+            aAuthorityInput.mbCleanBaseline = true;
+
+            const auto aAuthorityPlan = buildAuthorityPilotTransition(aAuthorityInput);
+            if (aAuthorityPlan.meVerdict != AuthorityPilotVerdict::Applicable)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet regroup authority verdict mismatch");
+            }
+
+            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
+                aAuthorityPlan.maDependencySnapshot, aAuthorityPlan.maRecalcPlan);
+            const auto aComputationalComparison = compareComputationalShadow(
+                aAuthorityPlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
+            if (!aComputationalComparison.mbFullMatch || !aComputationalComparison.mbGroupMatch)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet regroup computational exactness mismatch");
+            }
+
+            const auto aGraphComparison = compareDependencyGraphShadow(
+                aAuthorityPlan.maGraphAfter, aAuthorityPlan.maComputationalAfter,
+                aPredictedObservation);
+            if (aGraphComparison.meKind != graphmapping::GraphComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet regroup graph exactness mismatch");
+            }
+
+            auto aPredictedFacade = authoritybuilddetail::materializeFacadeFromComputationalShadow(
+                aAuthorityPlan.maComputationalAfter);
+            const auto aExpectedIr = authoritybuilddetail::buildAuthorityExecutionIrShadow(
+                aAuthorityPlan.maComputationalAfter, aPredictedFacade);
+            const auto aIrComparison
+                = compareExecutionIrWorkbookShadow(aAuthorityPlan.maIrAfter, aExpectedIr);
+            if (aIrComparison.meKind != ExecutionIrComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group off-sheet regroup IR exactness mismatch");
+            }
+        }
+
     // --- Safe mutation rebuild path ---
     {
         aFacade.setCell({ nData, 0, 0 }, CellValue::number(11.0));
