@@ -23,6 +23,9 @@ This directory holds the active architecture references for
   completed closeout for the bounded off-sheet dependency closure pass
 - [COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_DECISION_RECORD.md):
   final decision for the bounded off-sheet dependency closure pass
+- [COMPUTATIONAL_SUBSTRATE_BROADER_OFF_SHEET_FORMULA_RETAINED_CARRY_THROUGH_PLAN.md](COMPUTATIONAL_SUBSTRATE_BROADER_OFF_SHEET_FORMULA_RETAINED_CARRY_THROUGH_PLAN.md):
+  active plan for widening direct off-sheet formula-retained shared-group
+  behavior
 - [COMPUTATIONAL_SUBSTRATE_BLOCKER_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CONTRACT.md):
   frozen four-blocker contract
 - [COMPUTATIONAL_SUBSTRATE_BLOCKER_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_SCENARIO_MATRIX.md):

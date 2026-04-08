@@ -235,7 +235,7 @@ The remaining off-sheet frontier is the broader formula-retained and
 named-range-combined surface.
 
 The active execution plan for that blocker is
-[COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_PLAN.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_PLAN.md).
+[COMPUTATIONAL_SUBSTRATE_BROADER_OFF_SHEET_FORMULA_RETAINED_CARRY_THROUGH_PLAN.md](COMPUTATIONAL_SUBSTRATE_BROADER_OFF_SHEET_FORMULA_RETAINED_CARRY_THROUGH_PLAN.md).
 
 ### Priority 2: Reassess The Retained Same-Sheet Deferred Boundary
 
