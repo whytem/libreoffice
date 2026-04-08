@@ -237,10 +237,8 @@ The direct one-consumer-sheet off-sheet `MemberExit`,
 The remaining off-sheet frontier is the off-sheet named-range-combined and
 broader merge-shaped surface.
 
-The just-completed pass for that blocker is
-[COMPUTATIONAL_SUBSTRATE_BROADER_OFF_SHEET_FORMULA_RETAINED_CARRY_THROUGH_PLAN.md](COMPUTATIONAL_SUBSTRATE_BROADER_OFF_SHEET_FORMULA_RETAINED_CARRY_THROUGH_PLAN.md).
-Its final decision is in
-[COMPUTATIONAL_SUBSTRATE_BROADER_OFF_SHEET_FORMULA_RETAINED_CARRY_THROUGH_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_BROADER_OFF_SHEET_FORMULA_RETAINED_CARRY_THROUGH_DECISION_RECORD.md).
+The active execution plan for that blocker is
+[COMPUTATIONAL_SUBSTRATE_OFF_SHEET_NAMED_RANGE_AND_MERGE_CARRY_THROUGH_PLAN.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_NAMED_RANGE_AND_MERGE_CARRY_THROUGH_PLAN.md).
 
 ### Priority 2: Reassess The Retained Same-Sheet Deferred Boundary
 
