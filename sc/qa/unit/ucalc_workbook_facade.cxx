@@ -20,6 +20,7 @@
 #include <spreadsheetengine/compat/libreoffice/MutationTranslator.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/WorkbookFacade.hxx>
+#include <spreadsheetengine/detail/substrate/AuthorityPilotBuilder.hxx>
 #include <spreadsheetengine/detail/workbook/FacadeConsumers.hxx>
 
 namespace
@@ -28,6 +29,16 @@ namespace
 class TestWorkbookFacade : public ScUcalcTestBase
 {
 };
+
+[[nodiscard]] spreadsheetengine::detail::facade::InMemoryWorkbookFacade
+snapshotCalcFacade(const ScDocument& rDoc, sal_Int64 nGeneration)
+{
+    spreadsheetengine::compat::libreoffice::CalcWorkbookFacade aLiveFacade(rDoc, nGeneration);
+    const auto aShadow
+        = spreadsheetengine::compat::libreoffice::buildComputationalWorkbookShadow(aLiveFacade, rDoc);
+    return spreadsheetengine::detail::substrate::authoritybuilddetail::
+        materializeFacadeFromComputationalShadow(aShadow);
+}
 
 } // namespace
 
@@ -153,13 +164,13 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade, testCalcFacadeSharedGroupTransitionCons
     m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 31);
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 31);
     const auto aBeforeGroups = consumers::collectFormulaGroupDescriptors(aBeforeFacade);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aBeforeGroups.size());
 
     m_pDoc->InsertRow(ScRange(0, 0, 0, m_pDoc->MaxCol(), 0, 0));
 
-    CalcWorkbookFacade aAfterFacade(*m_pDoc, 32);
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 32);
     const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
 
@@ -188,14 +199,14 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 33);
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 33);
     const auto aBeforeGroups = consumers::collectFormulaGroupDescriptors(aBeforeFacade);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aBeforeGroups.size());
 
     m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aAfterFacade(*m_pDoc, 34);
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 34);
     const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
 
@@ -223,14 +234,14 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade, testCalcFacadeSharedGroupTransitionCons
     m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 35);
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 35);
     const auto aBeforeGroups = consumers::collectFormulaGroupDescriptors(aBeforeFacade);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aBeforeGroups.size());
 
     m_pDoc->SetEmptyCell(ScAddress(1, 1, 0));
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aAfterFacade(*m_pDoc, 36);
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 36);
     const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
     CPPUNIT_ASSERT(aAfterGroups.empty());
 
@@ -259,14 +270,14 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 36);
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 36);
     const auto aBeforeGroups = consumers::collectFormulaGroupDescriptors(aBeforeFacade);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aBeforeGroups.size());
 
     m_pDoc->SetValue(1, 1, 0, 7.0);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aAfterFacade(*m_pDoc, 37);
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 37);
     const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
     CPPUNIT_ASSERT(aAfterGroups.empty());
 
@@ -297,14 +308,14 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     m_pDoc->SetString(1, 2, 0, u"=A3*2"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 38);
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 38);
     const auto aBeforeGroups = consumers::collectFormulaGroupDescriptors(aBeforeFacade);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aBeforeGroups.size());
 
     m_pDoc->SetString(1, 0, 0, u"=A1*3"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aAfterFacade(*m_pDoc, 39);
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 39);
     const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
 
@@ -335,12 +346,12 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     m_pDoc->SetString(1, 2, 0, u"=A3*2"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 40);
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 40);
 
     m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aAfterFacade(*m_pDoc, 41);
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 41);
     const auto aClassification = consumers::classifySharedFormulaMutation(
         aBeforeFacade, aAfterFacade, MutationEvent::setFormula({ 0, 1, 1 }, u"=A2*2"));
     CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaGroupTransitionKind::Preserve,
@@ -375,12 +386,12 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     m_pDoc->SetString(2, 0, 0, u"=COUNTA(Metrics)"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 43);
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 43);
 
     m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aAfterFacade(*m_pDoc, 44);
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 44);
     const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
         aBeforeFacade, aAfterFacade,
         MutationEvent::setFormula({ 0, 1, 1 }, u"=COUNTA(Metrics)+A2"));
@@ -415,8 +426,8 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     m_pDoc->SetString(0, 0, 1, u"=COUNTA(Metrics)"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 45);
-    CalcWorkbookFacade aAfterFacade(*m_pDoc, 46);
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 45);
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 46);
     const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
         aBeforeFacade, aAfterFacade,
         MutationEvent::setFormula({ 0, 1, 1 }, u"=COUNTA(Metrics)+A2"));
@@ -451,12 +462,12 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     m_pDoc->SetString(2, 0, 0, u"=COUNTA(Metrics)"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 47);
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 47);
 
     m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2*3"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aAfterFacade(*m_pDoc, 48);
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 48);
     const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
         aBeforeFacade, aAfterFacade,
         MutationEvent::setFormula({ 0, 1, 1 }, u"=COUNTA(Metrics)+A2*3"));
@@ -468,8 +479,13 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
         MutationEvent::setFormula({ 0, 1, 1 }, u"=COUNTA(Metrics)+A2*3"));
     const auto oAfterFormula = aAfterFacade.getFormulaCellDescriptor({ 0, 1, 1 });
     CPPUNIT_ASSERT(oAfterFormula);
-    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::SameTextPreserve,
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::Regroup,
         aClassification.meFamily);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
+    CPPUNIT_ASSERT((aAfterGroups.front().maAnchor
+                    == spreadsheetengine::api::CellAddress { 0, 1, 0 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aAfterGroups.front().mnLength);
 
     m_pDoc->DeleteTab(0);
 }
@@ -497,12 +513,12 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     m_pDoc->SetString(2, 0, 0, u"=COUNTA(Metrics)"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 49);
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 49);
 
     m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*2"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aAfterFacade(*m_pDoc, 50);
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 50);
     const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
         aBeforeFacade, aAfterFacade,
         MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*2"));
@@ -514,8 +530,10 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
         MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*2"));
     const auto oAfterFormula = aAfterFacade.getFormulaCellDescriptor({ 0, 1, 2 });
     CPPUNIT_ASSERT(oAfterFormula);
-    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::SameTextPreserve,
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::None,
         aClassification.meFamily);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
 
     m_pDoc->DeleteTab(0);
 }
@@ -542,12 +560,12 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     m_pDoc->SetString(2, 0, 0, u"=COUNTA(Metrics)"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 51);
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 51);
 
     m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*3"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aAfterFacade(*m_pDoc, 52);
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 52);
     const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
         aBeforeFacade, aAfterFacade,
         MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*3"));
@@ -559,8 +577,13 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
         MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*3"));
     const auto oAfterFormula = aAfterFacade.getFormulaCellDescriptor({ 0, 1, 2 });
     CPPUNIT_ASSERT(oAfterFormula);
-    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::SameTextPreserve,
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::Regroup,
         aClassification.meFamily);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
+    CPPUNIT_ASSERT((aAfterGroups.front().maAnchor
+                    == spreadsheetengine::api::CellAddress { 0, 1, 0 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aAfterGroups.front().mnLength);
 
     m_pDoc->DeleteTab(0);
 }
@@ -584,12 +607,12 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     m_pDoc->SetString(2, 0, 0, u"=COUNTA(Metrics)"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 53);
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 53);
 
     m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*2"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aAfterFacade(*m_pDoc, 54);
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 54);
     const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
         aBeforeFacade, aAfterFacade,
         MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*2"));
@@ -601,8 +624,177 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
         MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*2"));
     const auto oAfterFormula = aAfterFacade.getFormulaCellDescriptor({ 0, 1, 2 });
     CPPUNIT_ASSERT(oAfterFormula);
-    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::SameTextPreserve,
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::OneSidedInsert,
         aClassification.meFamily);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
+    CPPUNIT_ASSERT((aAfterGroups.front().maAnchor
+                    == spreadsheetengine::api::CellAddress { 0, 1, 0 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aAfterGroups.front().mnLength);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
+    testCalcFacadeSharedGroupNamedRangeThreeGroupAttemptActualHostShape)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+    using spreadsheetengine::detail::facade::MutationEvent;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+    m_pDoc->SetValue(0, 4, 0, 5.0);
+    m_pDoc->SetValue(0, 5, 0, 6.0);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr)));
+    m_pDoc->SetString(1, 0, 0, u"=COUNTA(Metrics)+A1*3"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2*3"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*2"_ustr);
+    m_pDoc->SetString(1, 3, 0, u"=COUNTA(Metrics)+A4*2"_ustr);
+    m_pDoc->SetString(1, 4, 0, u"=COUNTA(Metrics)+A5*3"_ustr);
+    m_pDoc->SetString(1, 5, 0, u"=COUNTA(Metrics)+A6*3"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=COUNTA(Metrics)"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 55);
+
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*3"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 56);
+    const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
+        aBeforeFacade, aAfterFacade,
+        MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*3"));
+    CPPUNIT_ASSERT_EQUAL(
+        consumers::SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSameSheet,
+        aBoundary.meBoundary);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(2), aAfterGroups.size());
+    CPPUNIT_ASSERT((aAfterGroups.front().maAnchor
+                    == spreadsheetengine::api::CellAddress { 0, 1, 0 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aAfterGroups.front().mnLength);
+    CPPUNIT_ASSERT((aAfterGroups.back().maAnchor
+                    == spreadsheetengine::api::CellAddress { 0, 1, 4 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aAfterGroups.back().mnLength);
+
+    const auto aTransition = consumers::classifyFormulaGroupTransition(
+        consumers::collectFormulaGroupDescriptors(aBeforeFacade), aAfterGroups,
+        MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*3"));
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaGroupTransitionKind::Split, aTransition.meKind);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aTransition.mnBeforeGroupCount);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aTransition.mnAfterGroupCount);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
+    testCalcFacadeSharedGroupNonEdgeRegroupAttemptActualHostShape)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+    using spreadsheetengine::detail::facade::MutationEvent;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+    m_pDoc->SetValue(0, 4, 0, 5.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*3"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=A3*2"_ustr);
+    m_pDoc->SetString(1, 3, 0, u"=A4*2"_ustr);
+    m_pDoc->SetString(1, 4, 0, u"=A5*3"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 57);
+    const auto aBeforeGroups = consumers::collectFormulaGroupDescriptors(aBeforeFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aBeforeGroups.size());
+    CPPUNIT_ASSERT((aBeforeGroups.front().maAnchor
+                    == spreadsheetengine::api::CellAddress { 0, 1, 1 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aBeforeGroups.front().mnLength);
+
+    m_pDoc->SetString(1, 2, 0, u"=A3*3"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 58);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT(aAfterGroups.empty());
+
+    const auto aClassification = consumers::classifySharedFormulaMutation(
+        aBeforeFacade, aAfterFacade, MutationEvent::setFormula({ 0, 1, 2 }, u"=A3*3"));
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaGroupTransitionKind::Split,
+        aClassification.maTransition.meKind);
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::MemberExit,
+        aClassification.meFamily);
+    CPPUNIT_ASSERT(aClassification.mbTouchedAddressSharedBefore);
+    CPPUNIT_ASSERT(!aClassification.mbTouchedAddressSharedAfter);
+    ScFormulaCell* pTouchedFormula = m_pDoc->GetFormulaCell(ScAddress(1, 2, 0));
+    CPPUNIT_ASSERT(pTouchedFormula);
+    CPPUNIT_ASSERT_EQUAL(u"=A3*3"_ustr, pTouchedFormula->GetFormula());
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
+    testCalcFacadeSharedGroupNonEdgeMergeAttemptActualHostShape)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+    using spreadsheetengine::detail::facade::MutationEvent;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+    m_pDoc->SetValue(0, 4, 0, 5.0);
+    m_pDoc->SetValue(0, 5, 0, 6.0);
+    m_pDoc->SetValue(0, 6, 0, 7.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*3"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A2*3"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=A3*2"_ustr);
+    m_pDoc->SetString(1, 3, 0, u"=A4*2"_ustr);
+    m_pDoc->SetString(1, 4, 0, u"=A5*2"_ustr);
+    m_pDoc->SetString(1, 5, 0, u"=A6*3"_ustr);
+    m_pDoc->SetString(1, 6, 0, u"=A7*3"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 59);
+    const auto aBeforeGroups = consumers::collectFormulaGroupDescriptors(aBeforeFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(3), aBeforeGroups.size());
+
+    m_pDoc->SetString(1, 3, 0, u"=A4*3"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 60);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(2), aAfterGroups.size());
+    CPPUNIT_ASSERT((aAfterGroups.front().maAnchor
+                    == spreadsheetengine::api::CellAddress { 0, 1, 0 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aAfterGroups.front().mnLength);
+    CPPUNIT_ASSERT((aAfterGroups.back().maAnchor
+                    == spreadsheetengine::api::CellAddress { 0, 1, 5 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aAfterGroups.back().mnLength);
+
+    const auto aClassification = consumers::classifySharedFormulaMutation(
+        aBeforeFacade, aAfterFacade, MutationEvent::setFormula({ 0, 1, 3 }, u"=A4*3"));
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaGroupTransitionKind::Split,
+        aClassification.maTransition.meKind);
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::MemberExit,
+        aClassification.meFamily);
+    CPPUNIT_ASSERT(aClassification.mbTouchedAddressSharedBefore);
+    CPPUNIT_ASSERT(!aClassification.mbTouchedAddressSharedAfter);
+    ScFormulaCell* pTouchedFormula = m_pDoc->GetFormulaCell(ScAddress(1, 3, 0));
+    CPPUNIT_ASSERT(pTouchedFormula);
+    CPPUNIT_ASSERT_EQUAL(u"=A4*3"_ustr, pTouchedFormula->GetFormula());
 
     m_pDoc->DeleteTab(0);
 }
@@ -622,13 +814,13 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 37);
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 37);
     const auto aBeforeGroups = consumers::collectFormulaGroupDescriptors(aBeforeFacade);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aBeforeGroups.size());
 
     m_pDoc->InsertRow(ScRange(0, 1, 0, m_pDoc->MaxCol(), 1, 0));
 
-    CalcWorkbookFacade aAfterFacade(*m_pDoc, 38);
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 38);
     const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
     CPPUNIT_ASSERT(aAfterGroups.empty());
 
@@ -659,13 +851,13 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     m_pDoc->SetString(1, 2, 0, u"=A3*2"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 39);
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 39);
     const auto aBeforeGroups = consumers::collectFormulaGroupDescriptors(aBeforeFacade);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aBeforeGroups.size());
 
     m_pDoc->InsertRow(ScRange(0, 1, 0, m_pDoc->MaxCol(), 1, 0));
 
-    CalcWorkbookFacade aAfterFacade(*m_pDoc, 40);
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 40);
     const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
 
@@ -702,14 +894,14 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     m_pDoc->SetString(1, 5, 0, u"=A6*3"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aBeforeFacade(*m_pDoc, 41);
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 41);
     const auto aBeforeGroups = consumers::collectFormulaGroupDescriptors(aBeforeFacade);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(3), aBeforeGroups.size());
 
     m_pDoc->SetString(1, 2, 0, u"=A3*3"_ustr);
     m_pDoc->CalcAll();
 
-    CalcWorkbookFacade aAfterFacade(*m_pDoc, 42);
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 42);
     const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(2), aAfterGroups.size());
     CPPUNIT_ASSERT((aAfterGroups.front().maAnchor
