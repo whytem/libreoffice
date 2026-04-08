@@ -324,6 +324,55 @@ inline void applyFormulaGroupListenerAnchors(ScDocument& rDoc,
     return containsAnchor(rAnchors, aAnchor);
 }
 
+[[nodiscard]] inline const ResolvedFormulaGroupAnchor* findFormulaGroupAnchorForCell(
+    const ScFormulaCell& rCell, const std::vector<ResolvedFormulaGroupAnchor>& rAnchors)
+{
+    if (!rCell.GetCellGroup())
+        return nullptr;
+
+    const api::CellAddress aTopAddress
+        = toApiCellAddress(ScAddress(rCell.aPos.Col(), rCell.GetSharedTopRow(), rCell.aPos.Tab()));
+    const auto aAnchor = spreadsheetengine::detail::substrate::ListenerAnchorId {
+        spreadsheetengine::detail::substrate::ListenerAnchorKind::FormulaGroup, aTopAddress,
+        rCell.GetSharedLength()
+    };
+    const auto it = std::find_if(rAnchors.begin(), rAnchors.end(),
+        [&aAnchor](const ResolvedFormulaGroupAnchor& rResolved) {
+            return rResolved.maAnchor == aAnchor;
+        });
+    return it == rAnchors.end() ? nullptr : &*it;
+}
+
+[[nodiscard]] inline bool hasParallelFormulaGroupEdge(
+    const spreadsheetengine::detail::substrate::AdmittedWiringContainers& rStore,
+    const spreadsheetengine::detail::substrate::BroadcasterNodeId& rBroadcaster,
+    const spreadsheetengine::detail::substrate::ListenerAnchorId& rGroupAnchor)
+{
+    return std::any_of(rStore.maListenerEdges.begin(), rStore.maListenerEdges.end(),
+        [&rBroadcaster, &rGroupAnchor](
+            const spreadsheetengine::detail::substrate::GraphEdgeRecord& rEdge) {
+            return rEdge.maBroadcaster == rBroadcaster && rEdge.maListenerAnchor == rGroupAnchor;
+        });
+}
+
+[[nodiscard]] inline bool shouldRetainFormulaCellEdgeAlongsideFormulaGroup(
+    const spreadsheetengine::detail::substrate::AdmittedWiringContainers& rStore,
+    const spreadsheetengine::detail::substrate::GraphEdgeRecord& rEdge,
+    const ScFormulaCell&, const ResolvedFormulaGroupAnchor& rResolvedGroup)
+{
+    if (!rResolvedGroup.mpTopCell)
+        return false;
+
+    const auto aTopCellAnchor = spreadsheetengine::detail::substrate::ListenerAnchorId {
+        spreadsheetengine::detail::substrate::ListenerAnchorKind::FormulaCell,
+        toApiCellAddress(rResolvedGroup.mpTopCell->aPos), 1
+    };
+    if (rEdge.maListenerAnchor != aTopCellAnchor)
+        return false;
+
+    return hasParallelFormulaGroupEdge(rStore, rEdge.maBroadcaster, rResolvedGroup.maAnchor);
+}
+
 [[nodiscard]] inline bool validateResidentWiringStore(
     ScDocument& rDoc,
     const spreadsheetengine::detail::substrate::AdmittedWiringContainers& rStore,
@@ -409,10 +458,15 @@ inline void applyFormulaGroupListenerAnchors(ScDocument& rDoc,
                 = detail::resolveFormulaCell(rDoc, rEdge.maListenerAnchor, aResult.maReason);
             if (!pCell)
                 return aResult;
-            if (detail::formulaCellBelongsToFormulaGroupAnchor(*pCell, aResolvedFormulaGroups))
+            if (const auto* pResolvedGroup
+                = detail::findFormulaGroupAnchorForCell(*pCell, aResolvedFormulaGroups))
             {
-                ++aResult.mnListenerEdgesApplied;
-                continue;
+                if (!detail::shouldRetainFormulaCellEdgeAlongsideFormulaGroup(
+                        rStore, rEdge, *pCell, *pResolvedGroup))
+                {
+                    ++aResult.mnListenerEdgesApplied;
+                    continue;
+                }
             }
         }
 

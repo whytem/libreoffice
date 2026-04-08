@@ -320,6 +320,8 @@ struct SharedGroupNamedRangeBoundaryEvaluation
 struct AuthorityObservationBuildOptions
 {
     std::optional<facade::FormulaGroupDescriptor> moSuppressNamedRangeSharedGroupAreaListener;
+    std::optional<facade::FormulaGroupDescriptor> moDemoteNamedRangeSharedGroupAreaListenerToCells;
+    std::optional<facade::FormulaGroupDescriptor> moAugmentNamedRangeSharedGroupAreaListenerWithTopCell;
 };
 
 [[nodiscard]] inline SharedGroupNamedRangeBoundaryEvaluation
@@ -346,7 +348,7 @@ evaluateSharedGroupNamedRangeBoundary(const AuthorityPilotInput& rInput)
     const facade::MutationEvent& rMutation)
 {
     AuthorityObservationBuildOptions aOptions;
-    if (rMutation.meKind != facade::MutationKind::ClearCell || !roObservedAfterShadow)
+    if (!roObservedAfterShadow)
         return aOptions;
 
     const auto aBeforeFacade = materializeFacadeFromComputationalShadow(rBeforeShadow);
@@ -355,20 +357,36 @@ evaluateSharedGroupNamedRangeBoundary(const AuthorityPilotInput& rInput)
         aBeforeFacade, aAfterFacade, rMutation);
     const auto aNamedRangeBoundary = facade::consumers::classifySharedFormulaNamedRangeMutationBoundary(
         aBeforeFacade, aAfterFacade, rMutation);
-    if (aMutationClassification.meFamily != facade::consumers::SharedFormulaMutationFamily::MemberExit
-        || aNamedRangeBoundary.meBoundary
-               != facade::consumers::SharedFormulaNamedRangeMutationBoundary::
-                   GlobalSingleAreaSameSheet)
+    if (aNamedRangeBoundary.meBoundary
+        != facade::consumers::SharedFormulaNamedRangeMutationBoundary::
+            GlobalSingleAreaSameSheet)
     {
         return aOptions;
     }
 
     const auto aAfterGroups = facade::consumers::detail::collectNeighborhoodGroups(
         aAfterFacade, rMutation.maAddress);
-    if (aAfterGroups.size() != 1)
-        return aOptions;
+    switch (aMutationClassification.meFamily)
+    {
+        case facade::consumers::SharedFormulaMutationFamily::MemberExit:
+            if (rMutation.meKind != facade::MutationKind::ClearCell || aAfterGroups.size() != 1)
+                return aOptions;
+            aOptions.moSuppressNamedRangeSharedGroupAreaListener = aAfterGroups.front();
+            return aOptions;
+        case facade::consumers::SharedFormulaMutationFamily::Regroup:
+            if (rMutation.meKind != facade::MutationKind::SetFormula || aAfterGroups.size() != 1)
+                return aOptions;
+            aOptions.moDemoteNamedRangeSharedGroupAreaListenerToCells = aAfterGroups.front();
+            return aOptions;
+        case facade::consumers::SharedFormulaMutationFamily::OneSidedInsert:
+            if (rMutation.meKind != facade::MutationKind::SetFormula || aAfterGroups.size() != 1)
+                return aOptions;
+            aOptions.moAugmentNamedRangeSharedGroupAreaListenerWithTopCell = aAfterGroups.front();
+            return aOptions;
+        default:
+            return aOptions;
+    }
 
-    aOptions.moSuppressNamedRangeSharedGroupAreaListener = aAfterGroups.front();
     return aOptions;
 }
 
@@ -398,6 +416,11 @@ evaluateSharedGroupNamedRangeBoundary(const AuthorityPilotInput& rInput)
             if (rInput.maMutation.meKind == facade::MutationKind::SetScalarValue
                 || rInput.maMutation.meKind == facade::MutationKind::SetFormula
                 || rInput.maMutation.meKind == facade::MutationKind::ClearCell)
+                return true;
+            break;
+        case facade::consumers::SharedFormulaMutationFamily::Regroup:
+        case facade::consumers::SharedFormulaMutationFamily::OneSidedInsert:
+            if (rInput.maMutation.meKind == facade::MutationKind::SetFormula)
                 return true;
             break;
         default:
@@ -1770,11 +1793,38 @@ inline void collectResolvedDependencySources(const dependency::DependencySnapsho
                 continue;
             }
 
-            const ListenerAnchorId aListenerAnchor
-                = (rDependency.maSource.meKind == dependency::DependencySourceKind::NamedRange
-                   && oFormulaGroupAnchor.has_value())
-                      ? *oFormulaGroupAnchor
-                      : aFormulaCellAnchor;
+            const bool bDemoteNamedRangeSharedGroupAreaListenerToCell
+                = rDependency.maSource.meKind == dependency::DependencySourceKind::NamedRange
+                  && rOptions.moDemoteNamedRangeSharedGroupAreaListenerToCells.has_value()
+                  && rNode.moSharedGroupAnchor
+                  && *rNode.moSharedGroupAnchor
+                         == rOptions.moDemoteNamedRangeSharedGroupAreaListenerToCells->maAnchor
+                  && rNode.mnSharedGroupLength
+                         == rOptions.moDemoteNamedRangeSharedGroupAreaListenerToCells->mnLength;
+            const bool bAugmentNamedRangeSharedGroupAreaListenerWithTopCell
+                = rDependency.maSource.meKind == dependency::DependencySourceKind::NamedRange
+                  && rOptions.moAugmentNamedRangeSharedGroupAreaListenerWithTopCell.has_value()
+                  && rNode.moSharedGroupAnchor
+                  && *rNode.moSharedGroupAnchor
+                         == rOptions.moAugmentNamedRangeSharedGroupAreaListenerWithTopCell->maAnchor
+                  && rNode.mnSharedGroupLength
+                         == rOptions.moAugmentNamedRangeSharedGroupAreaListenerWithTopCell->mnLength
+                  && rNode.moOutputAddress
+                  && *rNode.moOutputAddress
+                         == rOptions.moAugmentNamedRangeSharedGroupAreaListenerWithTopCell->maAnchor;
+            std::vector<ListenerAnchorId> aListenerAnchors;
+            if (rDependency.maSource.meKind == dependency::DependencySourceKind::NamedRange
+                && oFormulaGroupAnchor.has_value()
+                && !bDemoteNamedRangeSharedGroupAreaListenerToCell)
+            {
+                aListenerAnchors.push_back(*oFormulaGroupAnchor);
+                if (bAugmentNamedRangeSharedGroupAreaListenerWithTopCell)
+                    aListenerAnchors.push_back(aFormulaCellAnchor);
+            }
+            else
+            {
+                aListenerAnchors.push_back(aFormulaCellAnchor);
+            }
             std::vector<facade::NamedRangeId> aVisitedNamedRanges;
             std::vector<dependency::DependencySource> aResolvedSources;
             collectResolvedDependencySources(
@@ -1784,14 +1834,17 @@ inline void collectResolvedDependencySources(const dependency::DependencySnapsho
             {
                 if (rSource.meKind == dependency::DependencySourceKind::Cell)
                 {
-                    aCellBroadcasters[rSource.maCellAddress].push_back(aListenerAnchor);
+                    for (const auto& rListenerAnchor : aListenerAnchors)
+                        aCellBroadcasters[rSource.maCellAddress].push_back(rListenerAnchor);
                     continue;
                 }
 
                 if (rSource.meKind == dependency::DependencySourceKind::Range)
                 {
-                    aAreaBroadcasters[dependency::detail::normalizeRange(rSource.maCellRange)]
-                        .push_back(aListenerAnchor);
+                    auto& rListeners
+                        = aAreaBroadcasters[dependency::detail::normalizeRange(rSource.maCellRange)];
+                    for (const auto& rListenerAnchor : aListenerAnchors)
+                        rListeners.push_back(rListenerAnchor);
                 }
             }
         }
