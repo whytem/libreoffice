@@ -1,16 +1,16 @@
 # Computational Substrate Same-Sheet Named-Range Split-Outcome Plan
 
-Status: in progress focused pass for the retained same-sheet named-range
-split-outcome blocker
+Status: completed closeout for the retained same-sheet named-range
+split-outcome pass
 
 Phase status:
 
-- Phase 1 in progress: freeze the exact live host shape and narrow target
-- Phase 2 pending: prove standalone exact carry-through for that host shape
-- Phase 3 pending: prove live authority, lifecycle, and mutation-entry
-  carry-through or patch the runtime until it closes exactly
-- Phase 4 pending: record the widening or retained defer outcome in the
-  master status surface
+- Phase 1 completed: freeze the exact live host shape and narrow target
+- Phase 2 completed: prove standalone exact carry-through for that host shape
+- Phase 3 completed: prove live authority, lifecycle, and mutation-entry
+  carry-through and record the exact live split outcome
+- Phase 4 completed: record the hybrid widening-and-retained-defer outcome
+  in the master status surface
 
 ## Purpose
 
@@ -109,3 +109,28 @@ This pass is complete when one of the following is true:
   standalone and live proof
 - or the pass closes with an explicit retained-defer result backed by exact
   proof of the live mismatch that still prevents admission
+
+## Closeout
+
+The pass is complete.
+
+The old synthetic one-group-collapse model is now closed as historical only.
+The exact live host shape is:
+
+- named-range boundary `GlobalSingleAreaSameSheet`
+- shared-formula mutation family `Regroup`
+- shared-formula transition kind `Split`
+- two after-groups, with the far participant group remaining separate
+
+The final outcome is hybrid:
+
+- standalone exactness for that live split-backed after-topology closes
+- live mutation-entry closes exactly and normalizes onto the already-admitted
+  bounded named-range `Regroup` lane
+- direct authority and lifecycle replay of that split-backed host shape still
+  roll back on exact verification and remain deferred
+
+That means this pass did widen the practical admitted slice on the user-facing
+mutation-entry surface, but it did not admit a new distinct same-sheet
+multi-group-collapse family and it did not clear the direct authority or
+lifecycle split-backed replay boundary.
