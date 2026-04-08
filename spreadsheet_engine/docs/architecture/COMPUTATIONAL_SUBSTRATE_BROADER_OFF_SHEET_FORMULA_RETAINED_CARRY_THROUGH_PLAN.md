@@ -1,6 +1,6 @@
 # Computational Substrate Broader Off-Sheet Formula-Retained Carry-Through Plan
 
-Status: active execution plan for the next off-sheet widening pass
+Status: completed closeout for the bounded broader off-sheet widening pass
 
 ## Objective
 
@@ -125,3 +125,21 @@ Exit criteria:
 - the admitted slice and the retained off-sheet frontier are described in
   one place
 - the next logical blocker is explicit
+
+## Closeout Result
+
+This pass closed as a real admitted-slice widening.
+
+Admitted:
+
+- direct one-consumer-sheet off-sheet `SameTextPreserve`
+- direct one-consumer-sheet off-sheet `Regroup`
+
+Retained deferred:
+
+- off-sheet named-range-combined families
+- off-sheet merge, replacement-merge, and multi-group collapse
+- multi-consumer-sheet and workbook-wide off-sheet authority
+
+The companion decision summary is in
+[COMPUTATIONAL_SUBSTRATE_BROADER_OFF_SHEET_FORMULA_RETAINED_CARRY_THROUGH_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_BROADER_OFF_SHEET_FORMULA_RETAINED_CARRY_THROUGH_DECISION_RECORD.md).

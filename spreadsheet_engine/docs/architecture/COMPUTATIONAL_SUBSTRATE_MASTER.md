@@ -147,6 +147,8 @@ The current opt-in narrow rollout surface includes:
 - exact same-workbook one-consumer-sheet direct off-sheet shared-group
   non-structural `MemberExit` `SetScalarValue`, `SetFormula`, and
   `ClearCell`
+- exact same-workbook one-consumer-sheet direct off-sheet shared-group
+  formula-retained `SameTextPreserve` and `Regroup` `SetFormula`
 
 This slice remains intentionally constrained by:
 
@@ -192,7 +194,7 @@ ownership boundary:
 - repair-sensitive structural after-state divergence that is intentionally
   rollback-only
 - off-sheet shared-group behavior outside the bounded one-consumer-sheet
-  direct `MemberExit` slice
+  direct `MemberExit`, `SameTextPreserve`, and `Regroup` slices
 - broad storage migration beyond the admitted slice
 - broad token-container ownership transfer
 - broad listener/broadcaster ownership transfer beyond the admitted slice
@@ -229,13 +231,16 @@ Its final decision is in
 
 ### Priority 1: Broader Off-Sheet Shared-Group Behavior
 
-The direct one-consumer-sheet off-sheet `MemberExit` lane is now admitted.
+The direct one-consumer-sheet off-sheet `MemberExit`,
+`SameTextPreserve`, and `Regroup` lanes are now admitted.
 
-The remaining off-sheet frontier is the broader formula-retained and
-named-range-combined surface.
+The remaining off-sheet frontier is the off-sheet named-range-combined and
+broader merge-shaped surface.
 
-The active execution plan for that blocker is
+The just-completed pass for that blocker is
 [COMPUTATIONAL_SUBSTRATE_BROADER_OFF_SHEET_FORMULA_RETAINED_CARRY_THROUGH_PLAN.md](COMPUTATIONAL_SUBSTRATE_BROADER_OFF_SHEET_FORMULA_RETAINED_CARRY_THROUGH_PLAN.md).
+Its final decision is in
+[COMPUTATIONAL_SUBSTRATE_BROADER_OFF_SHEET_FORMULA_RETAINED_CARRY_THROUGH_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_BROADER_OFF_SHEET_FORMULA_RETAINED_CARRY_THROUGH_DECISION_RECORD.md).
 
 ### Priority 2: Reassess The Retained Same-Sheet Deferred Boundary
 
@@ -257,16 +262,16 @@ success.
 
 The main blockers are now clear and concrete.
 
-### 1. Broader Off-Sheet Formula-Retained Carry-Through
+### 1. Off-Sheet Named-Range-Combined And Broader Merge Carry-Through
 
-The raw-reference opacity blocker is no longer the first off-sheet problem.
-This pass admitted the bounded direct one-consumer-sheet off-sheet
-`MemberExit` family.
+The direct off-sheet formula-retained blocker is now closed. This pass
+admitted the bounded direct one-consumer-sheet off-sheet
+`SameTextPreserve` and `Regroup` families.
 
-What remains is the broader off-sheet surface where the touched shared-group
-formula stays live or where the off-sheet dependency arrives through the
-named-range-combined lane. Those families still need exact queue,
-broadcaster, rollback, and verification closure.
+What remains is the off-sheet surface where dependency ownership arrives
+through the named-range-combined lane or where the off-sheet shape expands
+beyond the currently proved direct formula-retained families. Those families
+still need exact queue, broadcaster, rollback, and verification closure.
 
 ### 2. Exact After-State Authoring For The Retained Same-Sheet Collapse Boundary
 
