@@ -41,10 +41,10 @@ program must evaluate.
 
 | Scenario | Family | Current state | Target outcome |
 | --- | --- | --- | --- |
-| `host_ir_expected_after` | expected IR rebuilt through host shell | mixed | canonical engine-authored expected IR |
-| `host_live_apply_records` | live-apply records versus host state | mixed | canonical engine-authored record set |
-| `host_final_verification_source` | final verification source of truth | mixed | engine-authored on admitted slice |
-| `host_opaque_dependency_reject` | generic host-surface rejection | generic reject | explicit retained-host rule |
+| `host_ir_expected_after` | expected IR rebuilt through host shell | explicit engine-authored expected IR on admitted slice | keep explicit admitted-slice contract |
+| `host_live_apply_records` | live-apply records versus host state | explicit engine-authored live-apply plan with retained host execution shell | keep explicit admitted-slice contract |
+| `host_final_verification_source` | final verification source of truth | explicit engine-authored final-verification record on admitted slice | keep explicit admitted-slice contract |
+| `host_opaque_dependency_reject` | generic host-surface rejection | replaced on admitted slice by explicit exact, ordering-only, host-only, missing-input, or mismatch classifier buckets | keep generic reject only outside investigated families |
 
 ## Standing Fences
 

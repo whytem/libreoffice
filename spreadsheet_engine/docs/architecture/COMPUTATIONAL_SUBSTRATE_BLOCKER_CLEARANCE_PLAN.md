@@ -12,7 +12,8 @@ Phase status:
   rollback, reject-by-rule, and retained host-only buckets
 - Phase 3 complete: off-sheet families remained explicitly deferred or
   rejected pending exact cross-sheet dependency closure
-- Phase 4 pending
+- Phase 4 complete: retained host-shell behavior recut into an explicit
+  admitted-slice execution contract rather than a top opaque blocker
 - Phase 5 pending
 
 ## Purpose
@@ -277,6 +278,9 @@ Phase 3 closeout:
 - contract the retained host shell to narrow document-service duties
 - re-evaluate whether any currently deferred surface is blocked only by the
   old shell boundary
+
+Phase 4 closeout:
+[COMPUTATIONAL_SUBSTRATE_BLOCKER_PHASE4_HOST_SHELL_CLOSEOUT.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_PHASE4_HOST_SHELL_CLOSEOUT.md)
 
 ### Phase 5: Close Out And Reassess
 

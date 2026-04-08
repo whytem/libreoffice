@@ -294,11 +294,23 @@ before any bounded family should be promoted.
 
 ### 4. Retained Host Shell Boundaries
 
-The engine can now author much more of the admitted slice, but Calc still
-owns the broad document shell and the retained host application surfaces.
+The blocker-clearance Phase 4 pass changed the status of this concern.
 
-That retained boundary limits any claim that broad computational-document
-ownership is already justified.
+The retained host shell is still real, but it is no longer best described
+as a top opaque blocker on the admitted slice. The current runtime already
+treats it as an explicit execution-and-observation shell around
+engine-authored records for realization, rollback, live apply, primitive
+execution, and final verification.
+
+That means the remaining frontier is better described as:
+
+- broader shared-group after-state authoring
+- repair-sensitive normalization
+- off-sheet dependency closure
+
+The retained host shell still limits any claim of broad host independence,
+but it is no longer the first thing that needs to change for the next
+admitted-slice widening pass.
 
 ## Working Rules
 

@@ -178,6 +178,13 @@ Phase 3 is now closed as well. Off-sheet shared-group consumers remain an
 explicit deferred or rejected boundary pending exact cross-sheet dependency,
 queue, broadcaster, rollback, and verification closure.
 
+Phase 4 is now closed too. The retained host shell is now recorded as an
+explicit admitted-slice execution and observation contract rather than as a
+top opaque blocker. That does not widen the admitted slice by itself, but it
+does move the remaining blocker list onto the three still-open technical
+frontiers: broader same-sheet authoring, repair-sensitive normalization, and
+off-sheet dependency closure.
+
 ## Working Rules Going Forward
 
 - treat the replay baseline as a non-negotiable guardrail
