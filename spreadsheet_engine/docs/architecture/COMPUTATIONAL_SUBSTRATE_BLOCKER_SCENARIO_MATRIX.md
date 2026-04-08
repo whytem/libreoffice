@@ -32,10 +32,10 @@ program must evaluate.
 
 | Scenario | Family | Current state | Target outcome |
 | --- | --- | --- | --- |
-| `sg_nr_preserve_off_sheet` | named-range-combined off-sheet preserve | deferred | admit bounded slice if exact |
-| `sg_nr_member_exit_off_sheet` | named-range-combined off-sheet member exit | deferred | admit bounded slice if exact |
-| `sg_off_sheet_direct_consumer` | off-sheet direct shared-group consumer | deferred | admit bounded slice if exact |
-| `sg_off_sheet_multi_sheet_spill` | broader workbook-wide spill | deferred | keep fenced |
+| `sg_nr_preserve_off_sheet` | named-range-combined off-sheet preserve | explicit deferred boundary | admit bounded slice only with exact cross-sheet closure |
+| `sg_nr_member_exit_off_sheet` | named-range-combined off-sheet member exit | explicit deferred boundary | admit bounded slice only with exact cross-sheet closure |
+| `sg_off_sheet_direct_consumer` | off-sheet direct shared-group consumer | authority reject-by-rule | admit bounded slice only with exact cross-sheet closure |
+| `sg_off_sheet_multi_sheet_spill` | broader workbook-wide spill | explicitly fenced | keep fenced |
 
 ## Host-Shell Boundary
 

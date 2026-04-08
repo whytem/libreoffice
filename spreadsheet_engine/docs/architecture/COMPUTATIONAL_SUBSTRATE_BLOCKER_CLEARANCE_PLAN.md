@@ -10,7 +10,8 @@ Phase status:
   were live-proven not to close as distinct regroup or merge admissions
 - Phase 2 complete: repair-sensitive families classified into explicit
   rollback, reject-by-rule, and retained host-only buckets
-- Phase 3 pending
+- Phase 3 complete: off-sheet families remained explicitly deferred or
+  rejected pending exact cross-sheet dependency closure
 - Phase 4 pending
 - Phase 5 pending
 
@@ -265,6 +266,9 @@ Phase 2 closeout:
 - add bounded off-sheet dependency and broadcaster closure
 - admit one bounded off-sheet family
 - retain explicit fences against workbook-wide spillover
+
+Phase 3 closeout:
+[COMPUTATIONAL_SUBSTRATE_BLOCKER_PHASE3_OFF_SHEET_CLOSEOUT.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_PHASE3_OFF_SHEET_CLOSEOUT.md)
 
 ### Phase 4: Recut The Host Shell
 

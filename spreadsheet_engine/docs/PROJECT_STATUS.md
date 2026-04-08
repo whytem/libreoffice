@@ -174,6 +174,10 @@ classified into deterministic `RepairDetected` rollback, explicit
 reject-by-rule, and retained host-only cleanup buckets, but it still does
 not widen the admitted slice.
 
+Phase 3 is now closed as well. Off-sheet shared-group consumers remain an
+explicit deferred or rejected boundary pending exact cross-sheet dependency,
+queue, broadcaster, rollback, and verification closure.
+
 ## Working Rules Going Forward
 
 - treat the replay baseline as a non-negotiable guardrail

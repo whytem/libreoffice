@@ -287,6 +287,11 @@ The blocker is not just formula evaluation. It is exact dependency,
 broadcaster, queue, and rollback closure without accidentally promoting a
 much larger workbook-wide surface.
 
+The blocker-clearance Phase 3 pass confirmed that the current off-sheet
+surface remains an explicit defer-or-reject boundary, not a near-miss
+admission. Off-sheet work needs canonical cross-sheet dependency closure
+before any bounded family should be promoted.
+
 ### 4. Retained Host Shell Boundaries
 
 The engine can now author much more of the admitted slice, but Calc still
