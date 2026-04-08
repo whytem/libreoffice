@@ -128,6 +128,9 @@ The admitted rollout surface currently includes:
   merge, bounded replacement-merge, and bounded one-sided insertion
 - exact same-sheet shareable named-range-combined `SameTextPreserve`
   `SetFormula`
+- exact same-sheet shareable named-range-combined `Regroup` and
+  `OneSidedInsert` `SetFormula` on the bounded
+  `GlobalSingleAreaSameSheet` surface
 - exact same-sheet shareable named-range-combined `MemberExit`
   `SetScalarValue`, `SetFormula`, and `ClearCell` on the bounded
   `GlobalSingleAreaSameSheet` surface
@@ -140,8 +143,8 @@ divergence, not a broad live-authority flip.
 The following remain deferred:
 
 - named-range-sensitive structural rollout
-- broader named-range-combined regroup, merge, and collapse
-- broader non-edge regroup and merge shared-group behavior
+- named-range-combined multi-group collapse attempts that live Calc keeps
+  as far-group-separate or split outcomes
 - repair-sensitive host normalization
 - off-sheet shared-group consumers and dependency closure
 - broad storage migration beyond the admitted slice
@@ -150,24 +153,25 @@ The following remain deferred:
 
 ## Next Roadmap Category
 
-The highest-value next category remains widening the admitted slice on the
-same bounded surface before opening new host surfaces.
+The broader same-sheet single-cell widening pass is now materially closed on
+the current bounded surface.
 
-The recommended order is:
+The recommended order is now:
 
-1. broader same-sheet named-range-combined regroup, merge, and collapse only
-   when the engine can author the exact live after-state
-2. broader same-sheet non-edge regroup and merge families
-3. repair-sensitive normalization
-4. bounded off-sheet shared-group consumers
+1. repair-sensitive normalization
+2. bounded off-sheet shared-group consumers
+3. only then reassess the retained same-sheet multi-group collapse boundary
+   if new live evidence suggests a real expansion target
 
 The staged program plan for attacking those blockers together is
 [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md).
 
-Phase 1 of that blocker plan is now closed. The result was clarifying but
-not widening: bounded same-sheet named-range-combined regroup and merge
-attempts did not close as distinct live families, so they remain deferred
-and the program moves on to repair-sensitive normalization next.
+The earlier same-surface blocker-phase conclusion has now been superseded by
+the broader same-sheet widening rerun. Corrected frozen-snapshot live facade
+proof showed that bounded named-range-combined `Regroup` and
+`OneSidedInsert` are real live families and they are now admitted, while
+broader non-edge regroup and merge attempts normalize onto the already-
+admitted member-exit path.
 
 Phase 2 is now also closed. The repair-sensitive frontier is explicitly
 classified into deterministic `RepairDetected` rollback, explicit

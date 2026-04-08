@@ -138,6 +138,9 @@ The current opt-in narrow rollout surface includes:
   `SetFormula`
 - exact same-sheet shareable named-range-combined `SameTextPreserve`
   `SetFormula` on the bounded `GlobalSingleAreaSameSheet` surface
+- exact same-sheet shareable named-range-combined `Regroup` and
+  `OneSidedInsert` `SetFormula` on that same bounded
+  `GlobalSingleAreaSameSheet` surface
 - exact same-sheet shareable named-range-combined `MemberExit`
   `SetScalarValue`, `SetFormula`, and `ClearCell` on that same bounded
   `GlobalSingleAreaSameSheet` surface
@@ -181,8 +184,8 @@ ownership boundary:
 - named-range-sensitive structural rollout
 - shared-group-sensitive structural behavior outside the bounded exact
   same-sheet shareable slice
-- broader named-range-combined regroup, merge, and collapse
-- broader non-edge regroup and merge shared-group behavior
+- named-range-combined multi-group collapse attempts that live Calc keeps
+  as far-group-separate or split outcomes
 - repair-sensitive host normalization
 - off-sheet shared-group consumers and dependency closure
 - broad storage migration beyond the admitted slice
@@ -195,11 +198,12 @@ exact-modeling candidates are not real live-admission candidates. For
 example, the bounded three-group collapse cycle closed as deferred because
 live Calc keeps the far group separate.
 
-The blocker-clearance Phase 1 rerun added another concrete example:
-bounded named-range-combined same-sheet regroup and merge attempts did not
-close as distinct live regroup or merge families. On the live facade
-surface they normalized back onto preserve-shaped behavior, so they remain
-deferred as distinct widening targets.
+The broader same-sheet widening rerun superseded the older same-surface
+blocker-phase conclusion. With corrected frozen-snapshot live facade proof,
+bounded named-range-combined `Regroup` and bounded named-range-combined
+`OneSidedInsert` closed as real live families and are now admitted, while
+broader non-edge regroup and merge attempts closed as normalization onto
+the already-admitted member-exit path.
 
 ## Current Roadmap
 
@@ -213,18 +217,7 @@ For an aggressive multi-blocker execution plan that attacks the full
 remaining frontier as one staged program, see
 [COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md).
 
-### Priority 1: Same-Surface Shared-Group Widening
-
-The best next work is still on the same bounded authority surface:
-
-- broader same-sheet named-range-combined regroup, merge, and collapse
-  classes, but only when the engine can author the exact live after-state
-- broader same-sheet non-edge shared-group regroup and merge classes
-
-This is the highest-value next category because it expands the admitted slice
-without opening a new host surface.
-
-### Priority 2: Repair-Sensitive Behavior
+### Priority 1: Repair-Sensitive Behavior
 
 After the same-surface frontier, the next meaningful step is
 repair-sensitive normalization.
@@ -237,12 +230,19 @@ or:
 
 - a narrower admitted class that avoids hidden host normalization entirely
 
-### Priority 3: Off-Sheet Shared-Group Behavior
+### Priority 2: Off-Sheet Shared-Group Behavior
 
 Off-sheet consumers and dependencies are a larger boundary jump.
 
-They should come after same-sheet widening and repair-sensitive work because
-they broaden authority scope materially more than the current frontier.
+They should come after repair-sensitive work because they broaden authority
+scope materially more than the remaining current frontier.
+
+### Priority 3: Reassess The Retained Same-Sheet Deferred Boundary
+
+Only after repair-sensitive and off-sheet work should the project revisit
+the retained same-sheet multi-group collapse boundary. The current live
+proof shows a far-group-separate outcome, so this remains an explicit defer
+rather than a near-term widening target.
 
 ### Priority 4: Reassess Broad Ownership Expansion
 
@@ -257,15 +257,7 @@ success.
 
 The main blockers are now clear and concrete.
 
-### 1. Exact After-State Authoring For Broader Shared-Group Families
-
-The engine still needs exact after-state authoring for broader regroup,
-merge, and collapse families.
-
-The bar is not "synthetic modeling looks plausible." The bar is
-"the engine-authored after-state matches live Calc exactly."
-
-### 2. Repair-Sensitive Host Normalization
+### 1. Repair-Sensitive Host Normalization
 
 Some classes still depend on host cleanup behavior that is not yet modeled
 as an exact engine-owned rule family.
@@ -283,7 +275,7 @@ That is progress even without a new admitted family because later widening
 can now fence off each repair bucket deliberately instead of treating them
 all as generic repair drift.
 
-### 3. Off-Sheet Dependency Closure
+### 2. Off-Sheet Dependency Closure
 
 Cross-sheet consumers broaden the authority surface significantly.
 
@@ -295,6 +287,17 @@ The blocker-clearance Phase 3 pass confirmed that the current off-sheet
 surface remains an explicit defer-or-reject boundary, not a near-miss
 admission. Off-sheet work needs canonical cross-sheet dependency closure
 before any bounded family should be promoted.
+
+### 3. Exact After-State Authoring For The Retained Same-Sheet Collapse Boundary
+
+The broader same-sheet single-cell widening pass materially reduced this
+frontier, but one explicit same-sheet deferred shape remains:
+named-range-combined multi-group collapse that live Calc keeps as a
+far-group-separate or split outcome.
+
+This is no longer the best next blocker to attack, but if it is revisited
+later the bar stays the same: the engine-authored after-state must match
+the live host exactly rather than collapsing more aggressively than Calc.
 
 ## What Dropped Off The Blocker List
 

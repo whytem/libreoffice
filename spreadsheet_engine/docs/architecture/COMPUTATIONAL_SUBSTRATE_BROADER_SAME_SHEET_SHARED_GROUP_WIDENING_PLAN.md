@@ -1,7 +1,7 @@
 # Computational Substrate Broader Same-Sheet Shared-Group Widening Plan
 
-Status: execution plan for resolving the remaining broader same-sheet
-shared-group widening frontier
+Status: completed closeout for the broader same-sheet shared-group widening
+frontier
 
 ## Purpose
 
@@ -29,11 +29,18 @@ The admitted same-sheet shared-group slice already covers:
 - bounded named-range-combined same-text preserve
 - bounded named-range-combined member-exit
 
-The unresolved same-sheet frontier is now narrower:
+This pass closed the planned same-sheet frontier as follows:
 
-- named-range-combined three-group-collapse attempts
-- broader non-edge regroup attempts
-- broader non-edge merge attempts
+- named-range-combined three-group-collapse attempts remain explicitly
+  deferred because live Calc keeps the far group separate
+- broader non-edge regroup attempts normalize onto the already-admitted
+  member-exit path
+- broader non-edge merge attempts normalize onto the already-admitted
+  member-exit path
+- corrected live facade proof also exposed bounded named-range-combined
+  `Regroup` and bounded named-range-combined `OneSidedInsert` as real live
+  families, and this pass admitted both on the bounded
+  `GlobalSingleAreaSameSheet` surface
 
 ## Working Rule
 
@@ -154,3 +161,22 @@ This plan counts as complete only if:
 - any real widening is admitted only after exact proof
 - any family that is not a real widening target is documented as such
 - replay and diff hygiene remain clean
+
+## Closeout
+
+The plan is complete.
+
+The exact outcomes are:
+
+- named-range-combined three-group-collapse stays deferred
+- broader non-edge regroup is resolved as normalization to member-exit
+- broader non-edge merge is resolved as normalization to member-exit
+- bounded named-range-combined `Regroup` is admitted
+- bounded named-range-combined `OneSidedInsert` is admitted
+
+That means the broader same-sheet single-cell widening frontier no longer
+contains another immediate admitted-slice expansion target on the current
+surface. The roadmap should now return to repair-sensitive normalization and
+bounded off-sheet dependency closure, with the retained multi-group collapse
+shape kept as an explicit deferred boundary rather than as the next
+assumed widening pass.
