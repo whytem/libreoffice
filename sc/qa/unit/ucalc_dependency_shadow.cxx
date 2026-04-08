@@ -4252,6 +4252,79 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalNarrowRolloutSharedGroupNonStructuralAuthorityNamedRangeSplitOutcomeStaysDeferred)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    using spreadsheetengine::compat::libreoffice::recalcqueue::captureFormulaState;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", nullptr);
+    ScopedEnvironmentOverride aSharedGroupNonStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_SHARED_GROUP_NON_STRUCTURAL", "1");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+    m_pDoc->SetValue(0, 4, 0, 5.0);
+    m_pDoc->SetValue(0, 5, 0, 6.0);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr)));
+    m_pDoc->SetString(1, 0, 0, u"=COUNTA(Metrics)+A1*3"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2*3"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*2"_ustr);
+    m_pDoc->SetString(1, 3, 0, u"=COUNTA(Metrics)+A4*2"_ustr);
+    m_pDoc->SetString(1, 4, 0, u"=COUNTA(Metrics)+A5*3"_ustr);
+    m_pDoc->SetString(1, 5, 0, u"=COUNTA(Metrics)+A6*3"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=COUNTA(Metrics)"_ustr);
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 0);
+    const auto aAuthorityCapture
+        = ScopedComputationalAuthority::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aAuthorityCapture.isCaptured());
+    CPPUNIT_ASSERT(aAuthorityCapture.canApplyAuthority());
+
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*3"_ustr);
+    forceFormulaTreeOrder(*m_pDoc,
+        { ScAddress(1, 0, 0), ScAddress(1, 1, 0), ScAddress(1, 2, 0), ScAddress(1, 3, 0),
+            ScAddress(1, 4, 0), ScAddress(1, 5, 0), ScAddress(2, 0, 0) });
+
+    const CalcWorkbookFacade aMutationFacade(*m_pDoc, 1);
+    const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
+        aBeforeFacade, aMutationFacade,
+        spreadsheetengine::detail::facade::MutationEvent::setFormula(
+            { 0, 1, 2 }, u"=COUNTA(Metrics)+A3*3"));
+    CPPUNIT_ASSERT_EQUAL(
+        consumers::SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSameSheet,
+        aBoundary.meBoundary);
+    const auto aBeforeApply = captureFormulaState(*m_pDoc);
+    const auto oResult = aAuthorityCapture.apply(
+        *m_pDoc, translateSetFormula(ScAddress(1, 2, 0), u"=COUNTA(Metrics)+A3*3"_ustr));
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalPilotResultKind::RolledBackVerificationFailure, oResult->meKind);
+    CPPUNIT_ASSERT(oResult->moQueueComparison.has_value());
+    CPPUNIT_ASSERT_EQUAL(RecalcShadowComparisonKind::Exact, oResult->moQueueComparison->meKind);
+    CPPUNIT_ASSERT(oResult->moGraphComparison.has_value());
+    CPPUNIT_ASSERT_EQUAL(GraphComparisonKind::Mismatch, oResult->moGraphComparison->meKind);
+    assertFormulaStateEqual(aBeforeApply, captureFormulaState(*m_pDoc));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     testComputationalNarrowRolloutSharedGroupNonStructuralLifecycleNamedRangeSameTextPreserveApplies)
 {
     using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
@@ -4383,6 +4456,72 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     ScFormulaCell* pTailFormula = m_pDoc->GetFormulaCell(ScAddress(1, 2, 0));
     CPPUNIT_ASSERT(pTailFormula);
     CPPUNIT_ASSERT_EQUAL(u"=COUNTA(Metrics)+A3*2"_ustr, pTailFormula->GetFormula());
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalNarrowRolloutSharedGroupNonStructuralLifecycleNamedRangeSplitOutcomeStaysDeferred)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    using spreadsheetengine::compat::libreoffice::recalcqueue::captureFormulaState;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", nullptr);
+    ScopedEnvironmentOverride aSharedGroupNonStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_SHARED_GROUP_NON_STRUCTURAL", "1");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+    m_pDoc->SetValue(0, 4, 0, 5.0);
+    m_pDoc->SetValue(0, 5, 0, 6.0);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr)));
+    m_pDoc->SetString(1, 0, 0, u"=COUNTA(Metrics)+A1*3"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2*3"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*2"_ustr);
+    m_pDoc->SetString(1, 3, 0, u"=COUNTA(Metrics)+A4*2"_ustr);
+    m_pDoc->SetString(1, 4, 0, u"=COUNTA(Metrics)+A5*3"_ustr);
+    m_pDoc->SetString(1, 5, 0, u"=COUNTA(Metrics)+A6*3"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=COUNTA(Metrics)"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aLifecycleCapture
+        = ScopedComputationalLifecycle::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aLifecycleCapture.isCaptured());
+    CPPUNIT_ASSERT(aLifecycleCapture.canApplyLifecycle());
+
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*3"_ustr);
+    forceFormulaTreeOrder(*m_pDoc,
+        { ScAddress(1, 0, 0), ScAddress(1, 1, 0), ScAddress(1, 2, 0), ScAddress(1, 3, 0),
+            ScAddress(1, 4, 0), ScAddress(1, 5, 0), ScAddress(2, 0, 0) });
+
+    const auto aBeforeApply = captureFormulaState(*m_pDoc);
+    const auto oResult = aLifecycleCapture.apply(
+        *m_pDoc, translateSetFormula(ScAddress(1, 2, 0), u"=COUNTA(Metrics)+A3*3"_ustr));
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalLifecycleResultKind::RolledBackVerificationFailure, oResult->meKind);
+    CPPUNIT_ASSERT(oResult->moQueueComparison.has_value());
+    CPPUNIT_ASSERT_EQUAL(RecalcShadowComparisonKind::Exact, oResult->moQueueComparison->meKind);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbNamedRangeMatch);
+    CPPUNIT_ASSERT(!oResult->moComputationalComparison->mbFullMatch);
+    CPPUNIT_ASSERT(oResult->moGraphComparison.has_value());
+    CPPUNIT_ASSERT_EQUAL(GraphComparisonKind::Mismatch, oResult->moGraphComparison->meKind);
+    assertFormulaStateEqual(aBeforeApply, captureFormulaState(*m_pDoc));
 
     m_pDoc->DeleteTab(0);
 }
@@ -5634,6 +5773,60 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     ScFormulaCell* pTailFormula = m_pDoc->GetFormulaCell(ScAddress(1, 2, 0));
     CPPUNIT_ASSERT(pTailFormula);
     CPPUNIT_ASSERT_EQUAL(u"=COUNTA(Metrics)+A3*2"_ustr, pTailFormula->GetFormula());
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalMutationEntrySharedGroupNonStructuralNamedRangeSplitOutcomeNormalizesToRegroupApplies)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    using spreadsheetengine::detail::substrate::MutationEntryRequest;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+
+    ScopedEnvironmentOverride aMutationEntry(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_MUTATION_ENTRY", "1");
+    ScopedEnvironmentOverride aSharedGroupNonStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_SHARED_GROUP_NON_STRUCTURAL", "1");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+    m_pDoc->SetValue(0, 4, 0, 5.0);
+    m_pDoc->SetValue(0, 5, 0, 6.0);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr)));
+    m_pDoc->SetString(1, 0, 0, u"=COUNTA(Metrics)+A1*3"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2*3"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*2"_ustr);
+    m_pDoc->SetString(1, 3, 0, u"=COUNTA(Metrics)+A4*2"_ustr);
+    m_pDoc->SetString(1, 4, 0, u"=COUNTA(Metrics)+A5*3"_ustr);
+    m_pDoc->SetString(1, 5, 0, u"=COUNTA(Metrics)+A6*3"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"=COUNTA(Metrics)"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aEntryCapture
+        = ScopedComputationalMutationEntry::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aEntryCapture.isCaptured());
+    CPPUNIT_ASSERT(aEntryCapture.canApplyMutationEntry());
+
+    const auto oResult = aEntryCapture.apply(
+        *m_pDoc, MutationEntryRequest::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*3"));
+    assertComputationalMutationEntryApplied(oResult, *m_pDoc);
+    CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
+    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbFullMatch);
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(2), aAfterGroups.size());
+    CPPUNIT_ASSERT((aAfterGroups.front().maAnchor == CellAddress { 0, 1, 0 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aAfterGroups.front().mnLength);
+    CPPUNIT_ASSERT((aAfterGroups.back().maAnchor == CellAddress { 0, 1, 4 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aAfterGroups.back().mnLength);
 
     m_pDoc->DeleteTab(0);
 }
