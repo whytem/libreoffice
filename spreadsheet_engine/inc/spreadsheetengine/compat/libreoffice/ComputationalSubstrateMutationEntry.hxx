@@ -902,6 +902,7 @@ public:
         const auto aLiveComputationalShadow
             = spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow(
                 aVerifiedFacade, aLiveObservation);
+        const auto aExpectedIrAfter = buildExecutionIrWorkbookShadow(*pComputationalAfter, rDoc);
 
         aResult.moQueueComparison
             = recalcshadow::detail::comparePlanToDocument(*pPlan, aVerifiedFacade, rDoc);
@@ -913,7 +914,7 @@ public:
                 *pGraphAfter, aLiveComputationalShadow, aLiveObservation);
         aResult.moIrComparison
             = spreadsheetengine::detail::substrate::compareExecutionIrWorkbookShadow(
-                *pIrAfter, buildExecutionIrWorkbookShadow(aLiveComputationalShadow, rDoc));
+                aExpectedIrAfter, buildExecutionIrWorkbookShadow(aLiveComputationalShadow, rDoc));
         aResult.moBroadcasterCanonicalization
             = spreadsheetengine::detail::substrate::detail::compareBroadcasterCanonicalization(
                 *pComputationalAfter, aLiveObservation);

@@ -824,6 +824,34 @@ Current architecture docs:
   completed closeout decision for the bounded named-range-combined
   live-ownership cycle, admitting bounded preserve while keeping broader
   named-range frontier classes deferred
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_ADMISSION_PLAN.md) -
+  completed closeout plan for the next bounded named-range-combined
+  topology-change pass, now recording admitted scalar member-exit and the
+  retained non-scalar defer boundary
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_CONTRACT.md) -
+  frozen contract for the bounded named-range-combined scalar member-exit
+  closeout, fixing the admitted scalar lane and retained non-scalar
+  reject surface
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_SCENARIO_MATRIX.md) -
+  frozen scenario matrix for the bounded named-range-combined scalar
+  member-exit closeout, separating admit proof from retained formula and
+  clear reject buckets
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_MAPPING_RULES.md) -
+  frozen mapping note for the bounded named-range-combined scalar
+  member-exit closeout, defining canonical graph-after projection and
+  Calc-hosted predicted IR verification
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_IMPLEMENTATION.md) -
+  completed implementation note for the bounded named-range-combined
+  scalar member-exit closeout, covering the narrow admission gate and the
+  live graph/IR verification fix
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_EVIDENCE.md) -
+  frozen evidence note for the bounded named-range-combined scalar
+  member-exit closeout, proving exact authority and mutation-entry apply
+  while retaining non-scalar reject proof
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_DECISION_RECORD.md) -
+  completed closeout decision for the bounded named-range-combined scalar
+  member-exit cycle, widening the admitted slice while leaving non-scalar,
+  repair-sensitive, and off-sheet frontier classes deferred
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded

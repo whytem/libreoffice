@@ -250,10 +250,12 @@ public:
         const auto aLiveComputationalShadow
             = spreadsheetengine::detail::substrate::buildComputationalWorkbookShadow(
                 aVerifiedFacade, aObservation);
+        const auto aExpectedIrAfter
+            = buildExecutionIrWorkbookShadow(aResult.maTransition.maComputationalAfter, rDoc);
         aResult.moGraphComparison = spreadsheetengine::detail::substrate::compareDependencyGraphShadow(
             aResult.maTransition.maGraphAfter, aLiveComputationalShadow, aObservation);
         aResult.moIrComparison = spreadsheetengine::detail::substrate::compareExecutionIrWorkbookShadow(
-            aResult.maTransition.maIrAfter, buildExecutionIrWorkbookShadow(aLiveComputationalShadow, rDoc));
+            aExpectedIrAfter, buildExecutionIrWorkbookShadow(aLiveComputationalShadow, rDoc));
 
         aResult.meKind = detail::classifyVerifiedPilotResult(aResult);
         if (aResult.meKind == PilotResultKind::RolledBackVerificationFailure)

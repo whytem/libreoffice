@@ -357,10 +357,16 @@ evaluateSharedGroupNamedRangeBoundary(const AuthorityPilotInput& rInput)
     {
         case facade::consumers::SharedFormulaMutationFamily::SameTextPreserve:
             return true;
+        case facade::consumers::SharedFormulaMutationFamily::MemberExit:
+            if (rInput.maMutation.meKind == facade::MutationKind::SetScalarValue)
+                return true;
+            break;
         default:
-            rReason = u"shared_group_named_range_out_of_contract";
-            return false;
+            break;
     }
+
+    rReason = u"shared_group_named_range_out_of_contract";
+    return false;
 }
 
 inline void overlayObservedCellPayloadsPreservingGroupBindings(
@@ -1756,137 +1762,10 @@ inline void collectResolvedDependencySources(const dependency::DependencySnapsho
 }
 
 [[nodiscard]] inline DependencyGraphShadow buildAuthorityGraphShadow(
-    const ComputationalWorkbookShadow& rShadow, const dependency::DependencySnapshot& rSnapshot,
+    const ComputationalWorkbookShadow& rShadow, const dependency::DependencySnapshot&,
     const dependency::RecalcPlan&)
 {
-    DependencyGraphShadow aGraph;
-    aGraph.maSnapshot = rShadow.maSnapshot;
-    aGraph.maGrammar = rShadow.maGrammar;
-
-    for (const auto& rAddress : rShadow.maFormulaTree)
-        aGraph.maFormulaTreeNodes.push_back({ rAddress });
-    for (const auto& rAddress : rShadow.maFormulaTrack)
-        aGraph.maFormulaTrackNodes.push_back({ rAddress });
-
-    auto aIsInFormulaTree = [&aGraph](const api::CellAddress& rAddress) {
-        return std::find(aGraph.maFormulaTreeNodes.begin(), aGraph.maFormulaTreeNodes.end(),
-                   ShadowCellId { rAddress })
-               != aGraph.maFormulaTreeNodes.end();
-    };
-    auto aIsInFormulaTrack = [&aGraph](const api::CellAddress& rAddress) {
-        return std::find(aGraph.maFormulaTrackNodes.begin(), aGraph.maFormulaTrackNodes.end(),
-                   ShadowCellId { rAddress })
-               != aGraph.maFormulaTrackNodes.end();
-    };
-
-    for (const auto& rSheet : rShadow.maSheets)
-    {
-        for (const auto& rCell : rSheet.maCells)
-        {
-            if (!rCell.hasFormula())
-                continue;
-
-            GraphFormulaNodeRecord aNode;
-            aNode.maId = rCell.maId;
-            aNode.moFormulaGroup = rCell.moFormulaGroup;
-            aNode.maListenerAnchor
-                = graphmapping::makeGraphFormulaCellListenerAnchorId(rCell.maId.maAddress);
-            aNode.mbInFormulaTree = aIsInFormulaTree(rCell.maId.maAddress);
-            aNode.mbInFormulaTrack = aIsInFormulaTrack(rCell.maId.maAddress);
-            aGraph.maFormulaNodes.push_back(aNode);
-
-            GraphListenerAnchorRecord aAnchor;
-            aAnchor.maId = aNode.maListenerAnchor;
-            aAnchor.moFormulaCell = aNode.maId;
-            aAnchor.mbInFormulaTree = aNode.mbInFormulaTree;
-            aAnchor.mbInFormulaTrack = aNode.mbInFormulaTrack;
-            aGraph.maListenerAnchors.push_back(aAnchor);
-        }
-    }
-
-    for (const auto& rGroup : rShadow.maFormulaGroups)
-    {
-        GraphFormulaGroupNodeRecord aGroup;
-        aGroup.maId = rGroup.maId;
-        aGroup.maListenerAnchor = graphmapping::makeGraphFormulaGroupListenerAnchorId(rGroup.maId);
-        aGroup.maMembers = rGroup.maMembers;
-        aGraph.maFormulaGroupNodes.push_back(aGroup);
-
-        GraphListenerAnchorRecord aAnchor;
-        aAnchor.maId = aGroup.maListenerAnchor;
-        aAnchor.moFormulaGroup = aGroup.maId;
-        aAnchor.mbInFormulaTree = std::any_of(aGroup.maMembers.begin(), aGroup.maMembers.end(),
-            [&aIsInFormulaTree](const ShadowCellId& rId) { return aIsInFormulaTree(rId.maAddress); });
-        aAnchor.mbInFormulaTrack = std::any_of(aGroup.maMembers.begin(), aGroup.maMembers.end(),
-            [&aIsInFormulaTrack](const ShadowCellId& rId) { return aIsInFormulaTrack(rId.maAddress); });
-        aGraph.maListenerAnchors.push_back(aAnchor);
-    }
-
-    std::map<BroadcasterNodeId, sal_Int32, graphmapping::BroadcasterNodeIdLess> aBroadcasterCounts;
-    for (const auto& rNode : rSnapshot.maNodes)
-    {
-        if (rNode.meKind != dependency::DependencyNodeKind::FormulaCell || !rNode.moOutputAddress)
-            continue;
-
-        const auto aFormulaCellAnchor
-            = graphmapping::makeGraphFormulaCellListenerAnchorId(*rNode.moOutputAddress);
-        const auto oFormulaGroupAnchor = [&rNode]() -> std::optional<ListenerAnchorId> {
-            if (!rNode.moSharedGroupAnchor || rNode.mnSharedGroupLength <= 0)
-                return std::nullopt;
-
-            return graphmapping::makeGraphFormulaGroupListenerAnchorId(
-                { *rNode.moSharedGroupAnchor, rNode.mnSharedGroupLength });
-        }();
-
-        for (const auto& rDependency : rSnapshot.getDependencies(rNode.maId))
-        {
-            const ListenerAnchorId aListenerAnchor
-                = (rDependency.maSource.meKind == dependency::DependencySourceKind::NamedRange
-                   && oFormulaGroupAnchor.has_value())
-                      ? *oFormulaGroupAnchor
-                      : aFormulaCellAnchor;
-            std::vector<facade::NamedRangeId> aVisitedNamedRanges;
-            std::vector<dependency::DependencySource> aResolvedSources;
-            collectResolvedDependencySources(
-                rSnapshot, rDependency.maSource, aVisitedNamedRanges, aResolvedSources);
-
-            for (const auto& rSource : aResolvedSources)
-            {
-                BroadcasterNodeId aBroadcaster;
-                if (rSource.meKind == dependency::DependencySourceKind::Cell)
-                    aBroadcaster = BroadcasterNodeId::forCell(rSource.maCellAddress);
-                else
-                    aBroadcaster = BroadcasterNodeId::forArea(
-                        dependency::detail::normalizeRange(rSource.maCellRange));
-
-                aGraph.maEdges.push_back({ aBroadcaster, aListenerAnchor });
-                ++aBroadcasterCounts[aBroadcaster];
-            }
-        }
-    }
-
-    for (const auto& [rBroadcaster, nCount] : aBroadcasterCounts)
-        aGraph.maBroadcasterNodes.push_back({ rBroadcaster, nCount });
-
-    aGraph.maFormulaTreeNodes
-        = graphmapping::normalizeFormulaSubsetNodes(std::move(aGraph.maFormulaTreeNodes));
-    aGraph.maFormulaTrackNodes
-        = graphmapping::normalizeFormulaSubsetNodes(std::move(aGraph.maFormulaTrackNodes));
-    std::sort(aGraph.maFormulaNodes.begin(), aGraph.maFormulaNodes.end(),
-        [](const GraphFormulaNodeRecord& rLeft, const GraphFormulaNodeRecord& rRight) {
-            return graphmapping::ShadowCellIdLess {}(rLeft.maId, rRight.maId);
-        });
-    std::sort(aGraph.maFormulaGroupNodes.begin(), aGraph.maFormulaGroupNodes.end(),
-        [](const GraphFormulaGroupNodeRecord& rLeft, const GraphFormulaGroupNodeRecord& rRight) {
-            return graphmapping::ShadowFormulaGroupIdLess {}(rLeft.maId, rRight.maId);
-        });
-    aGraph.maListenerAnchors
-        = graphmapping::normalizeListenerAnchors(std::move(aGraph.maListenerAnchors));
-    aGraph.maBroadcasterNodes
-        = graphmapping::normalizeBroadcasterNodes(std::move(aGraph.maBroadcasterNodes));
-    aGraph.maEdges = graphmapping::normalizeGraphEdges(std::move(aGraph.maEdges));
-
-    return aGraph;
+    return buildDependencyGraphShadow(rShadow);
 }
 
 } // namespace authoritybuilddetail

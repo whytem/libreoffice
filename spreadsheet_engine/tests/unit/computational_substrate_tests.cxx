@@ -2021,11 +2021,41 @@ int main()
             aAuthorityInput.mbCleanBaseline = true;
 
             const auto aAuthorityPlan = buildAuthorityPilotTransition(aAuthorityInput);
-            if (aAuthorityPlan.meVerdict != AuthorityPilotVerdict::RejectedOutOfContract
-                || aAuthorityPlan.maReason != u"shared_group_named_range_out_of_contract")
+            if (aAuthorityPlan.meVerdict != AuthorityPilotVerdict::Applicable)
             {
                 return fail("computational_substrate",
-                    "shared-group named-range member-exit rejection mismatch");
+                    "shared-group named-range member-exit authority verdict mismatch");
+            }
+
+            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
+                aAuthorityPlan.maDependencySnapshot, aAuthorityPlan.maRecalcPlan);
+            const auto aComputationalComparison = compareComputationalShadow(
+                aAuthorityPlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
+            if (!aComputationalComparison.mbFullMatch || !aComputationalComparison.mbGroupMatch)
+            {
+                return fail("computational_substrate",
+                    "shared-group named-range member-exit computational exactness mismatch");
+            }
+
+            const auto aGraphComparison = compareDependencyGraphShadow(
+                aAuthorityPlan.maGraphAfter, aAuthorityPlan.maComputationalAfter,
+                aPredictedObservation);
+            if (aGraphComparison.meKind != graphmapping::GraphComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group named-range member-exit graph exactness mismatch");
+            }
+
+            auto aPredictedFacade = authoritybuilddetail::materializeFacadeFromComputationalShadow(
+                aAuthorityPlan.maComputationalAfter);
+            const auto aExpectedIr = authoritybuilddetail::buildAuthorityExecutionIrShadow(
+                aAuthorityPlan.maComputationalAfter, aPredictedFacade);
+            const auto aIrComparison
+                = compareExecutionIrWorkbookShadow(aAuthorityPlan.maIrAfter, aExpectedIr);
+            if (aIrComparison.meKind != ExecutionIrComparisonKind::Exact)
+            {
+                return fail("computational_substrate",
+                    "shared-group named-range member-exit IR exactness mismatch");
             }
         }
 

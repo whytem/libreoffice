@@ -327,10 +327,13 @@ explicit:
   lifecycle and mutation-entry both apply once dependency opacity is
   removed and shared named-range dependencies project onto exact
   `FormulaGroup` anchors
+- the bounded named-range-combined scalar member-exit cycle is now
+  admitted: authority and mutation-entry both apply once live graph and IR
+  verification use the canonical predicted-after surface
 - non-exact or broader shared-group classes still fall back to the
   validation-only pilot lane or stay deferred
-- gate-off and broader named-range-combined shared-group classes reject
-  deterministically in the live admitted lanes
+- gate-off and broader named-range-combined non-scalar shared-group
+  classes reject deterministically in the live admitted lanes
 - repair-sensitive shared-group divergence remains repair-detected and
   rollback-capable
 - broader shared-group live rollout still stays deferred because
@@ -952,12 +955,16 @@ The bounded named-range live-ownership cycle is now also complete:
 
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_DECISION_RECORD.md)
 
+The bounded named-range member-exit admission cycle is now also complete:
+
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_DECISION_RECORD.md)
+
 The adjacent concerns after that are:
 
 - repair-sensitive host normalization
 - off-sheet shared-group behavior
-- broader named-range-combined member-exit, regroup, merge, and
-  multi-group-collapse classes
+- broader named-range-combined non-scalar member-exit, regroup, merge,
+  and multi-group-collapse classes
 - broader non-edge regroup and merge shared-group classes
 
 The most recent closeout references are:
@@ -978,6 +985,8 @@ The most recent closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_FORMULA_GROUP_LISTENER_ANCHOR_LIVE_SUPPORT_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_LIVE_OWNERSHIP_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_ADMISSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_DECISION_RECORD.md)
 
 ## Current Assessment
 
