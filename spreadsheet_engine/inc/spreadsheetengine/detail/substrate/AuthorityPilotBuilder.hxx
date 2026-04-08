@@ -358,8 +358,11 @@ evaluateSharedGroupNamedRangeBoundary(const AuthorityPilotInput& rInput)
     const auto aNamedRangeBoundary = facade::consumers::classifySharedFormulaNamedRangeMutationBoundary(
         aBeforeFacade, aAfterFacade, rMutation);
     if (aNamedRangeBoundary.meBoundary
-        != facade::consumers::SharedFormulaNamedRangeMutationBoundary::
-            GlobalSingleAreaSameSheet)
+            != facade::consumers::SharedFormulaNamedRangeMutationBoundary::
+                GlobalSingleAreaSameSheet
+        && aNamedRangeBoundary.meBoundary
+               != facade::consumers::SharedFormulaNamedRangeMutationBoundary::
+                   GlobalSingleAreaSingleConsumerSheet)
     {
         return aOptions;
     }
@@ -401,8 +404,11 @@ evaluateSharedGroupNamedRangeBoundary(const AuthorityPilotInput& rInput)
     }
 
     if (aEvaluation.maNamedRangeClassification.meBoundary
-        != facade::consumers::SharedFormulaNamedRangeMutationBoundary::
-            GlobalSingleAreaSameSheet)
+            != facade::consumers::SharedFormulaNamedRangeMutationBoundary::
+                GlobalSingleAreaSameSheet
+        && aEvaluation.maNamedRangeClassification.meBoundary
+               != facade::consumers::SharedFormulaNamedRangeMutationBoundary::
+                   GlobalSingleAreaSingleConsumerSheet)
     {
         rReason = u"shared_group_named_range_out_of_contract";
         return false;

@@ -406,7 +406,7 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
 }
 
 CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
-    testCalcFacadeSharedGroupNamedRangeBoundaryOffSheetStaysDeferred)
+    testCalcFacadeSharedGroupNamedRangeBoundaryOffSheetSingleConsumerCandidate)
 {
     using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
     namespace consumers = spreadsheetengine::detail::facade::consumers;
@@ -432,7 +432,7 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
         aBeforeFacade, aAfterFacade,
         MutationEvent::setFormula({ 0, 1, 1 }, u"=COUNTA(Metrics)+A2"));
     CPPUNIT_ASSERT_EQUAL(
-        consumers::SharedFormulaNamedRangeMutationBoundary::Deferred,
+        consumers::SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSingleConsumerSheet,
         aBoundary.meBoundary);
     CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aBoundary.mnNamedRangeCount);
     CPPUNIT_ASSERT(aBoundary.mbDescriptorsStable);
@@ -571,6 +571,149 @@ CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
     CPPUNIT_ASSERT((aAfterGroups.front().maAnchor
                     == spreadsheetengine::api::CellAddress { 0, 1, 0 }));
     CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aAfterGroups.front().mnLength);
+
+    m_pDoc->DeleteTab(1);
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
+    testCalcFacadeSharedGroupNamedRangeOffSheetSameTextPreserveActualHostShape)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+    using spreadsheetengine::detail::facade::MutationEvent;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    m_pDoc->InsertTab(1, u"Summary"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr)));
+    m_pDoc->SetString(1, 0, 0, u"=COUNTA(Metrics)+A1"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3"_ustr);
+    m_pDoc->SetString(0, 0, 1, u"=COUNTA(Metrics)"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 57);
+
+    m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 58);
+    const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
+        aBeforeFacade, aAfterFacade,
+        MutationEvent::setFormula({ 0, 1, 1 }, u"=COUNTA(Metrics)+A2"));
+    CPPUNIT_ASSERT_EQUAL(
+        consumers::SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSingleConsumerSheet,
+        aBoundary.meBoundary);
+    const auto aClassification = consumers::classifySharedFormulaMutation(
+        aBeforeFacade, aAfterFacade,
+        MutationEvent::setFormula({ 0, 1, 1 }, u"=COUNTA(Metrics)+A2"));
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::SameTextPreserve,
+        aClassification.meFamily);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
+    CPPUNIT_ASSERT((aAfterGroups.front().maAnchor
+                    == spreadsheetengine::api::CellAddress { 0, 1, 0 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aAfterGroups.front().mnLength);
+
+    m_pDoc->DeleteTab(1);
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
+    testCalcFacadeSharedGroupNamedRangeOffSheetRegroupAttemptActualHostShape)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+    using spreadsheetengine::detail::facade::MutationEvent;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    m_pDoc->InsertTab(1, u"Summary"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr)));
+    m_pDoc->SetString(1, 0, 0, u"=COUNTA(Metrics)+A1*3"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2*2"_ustr);
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*2"_ustr);
+    m_pDoc->SetString(0, 0, 1, u"=COUNTA(Metrics)"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 59);
+
+    m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2*3"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 60);
+    const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
+        aBeforeFacade, aAfterFacade,
+        MutationEvent::setFormula({ 0, 1, 1 }, u"=COUNTA(Metrics)+A2*3"));
+    CPPUNIT_ASSERT_EQUAL(
+        consumers::SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSingleConsumerSheet,
+        aBoundary.meBoundary);
+    const auto aClassification = consumers::classifySharedFormulaMutation(
+        aBeforeFacade, aAfterFacade,
+        MutationEvent::setFormula({ 0, 1, 1 }, u"=COUNTA(Metrics)+A2*3"));
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::Regroup,
+        aClassification.meFamily);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
+    CPPUNIT_ASSERT((aAfterGroups.front().maAnchor
+                    == spreadsheetengine::api::CellAddress { 0, 1, 0 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aAfterGroups.front().mnLength);
+
+    m_pDoc->DeleteTab(1);
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestWorkbookFacade,
+    testCalcFacadeSharedGroupNamedRangeOffSheetOneSidedInsertAttemptActualHostShape)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+    using spreadsheetengine::detail::facade::MutationEvent;
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    m_pDoc->InsertTab(1, u"Summary"_ustr);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr)));
+    m_pDoc->SetString(1, 0, 0, u"=COUNTA(Metrics)+A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=COUNTA(Metrics)+A2*2"_ustr);
+    m_pDoc->SetString(0, 0, 1, u"=COUNTA(Metrics)"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aBeforeFacade = snapshotCalcFacade(*m_pDoc, 61);
+
+    m_pDoc->SetString(1, 2, 0, u"=COUNTA(Metrics)+A3*2"_ustr);
+    m_pDoc->CalcAll();
+
+    const auto aAfterFacade = snapshotCalcFacade(*m_pDoc, 62);
+    const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
+        aBeforeFacade, aAfterFacade,
+        MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*2"));
+    CPPUNIT_ASSERT_EQUAL(
+        consumers::SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSingleConsumerSheet,
+        aBoundary.meBoundary);
+    const auto aClassification = consumers::classifySharedFormulaMutation(
+        aBeforeFacade, aAfterFacade,
+        MutationEvent::setFormula({ 0, 1, 2 }, u"=COUNTA(Metrics)+A3*2"));
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaMutationFamily::OneSidedInsert,
+        aClassification.meFamily);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
+    CPPUNIT_ASSERT((aAfterGroups.front().maAnchor
+                    == spreadsheetengine::api::CellAddress { 0, 1, 0 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aAfterGroups.front().mnLength);
 
     m_pDoc->DeleteTab(1);
     m_pDoc->DeleteTab(0);

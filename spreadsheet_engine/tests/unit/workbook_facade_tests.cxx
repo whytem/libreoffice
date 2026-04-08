@@ -865,7 +865,7 @@ int main()
         }
     }
 
-    // --- Shared-formula named-range-combined off-sheet defer classification ---
+    // --- Shared-formula named-range-combined off-sheet single-consumer classification ---
     {
         InMemoryWorkbookFacade aBeforeFacade;
         aBeforeFacade.setGrammar(aFacade.getGrammar());
@@ -896,13 +896,14 @@ int main()
                 MutationEvent::setFormula(
                     { nDataSheet, 1, 1 }, u"=COUNTA(Metrics)+A2"));
         if (aNamedRangeBoundary.meBoundary
-                != consumers::SharedFormulaNamedRangeMutationBoundary::Deferred
+                != consumers::SharedFormulaNamedRangeMutationBoundary::
+                       GlobalSingleAreaSingleConsumerSheet
             || aNamedRangeBoundary.mnNamedRangeCount != 1
             || !aNamedRangeBoundary.mbDescriptorsStable
             || aNamedRangeBoundary.mbAllConsumersStayOnSheet)
         {
             return fail("facade_consumers",
-                "shared-group named-range off-sheet boundary mismatch");
+                "shared-group named-range off-sheet single-consumer boundary mismatch");
         }
     }
 

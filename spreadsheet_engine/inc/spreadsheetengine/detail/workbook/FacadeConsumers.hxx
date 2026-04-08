@@ -157,6 +157,7 @@ enum class SharedFormulaNamedRangeMutationBoundary : std::uint8_t
 {
     None,
     GlobalSingleAreaSameSheet,
+    GlobalSingleAreaSingleConsumerSheet,
     Deferred
 };
 
@@ -520,6 +521,34 @@ struct AddressLess
     return true;
 }
 
+[[nodiscard]] inline std::vector<api::SheetId> collectNamedRangeConsumerSheets(
+    const dependency::DependencySnapshot& rSnapshot, const NamedRangeId& rId)
+{
+    std::vector<api::SheetId> aSheets;
+    const auto oNamedRangeNode = rSnapshot.findNamedRangeNode(rId);
+    if (!oNamedRangeNode)
+        return {};
+
+    for (const auto aDependentId : rSnapshot.getReverseDependents(*oNamedRangeNode))
+    {
+        const auto* pDependent = rSnapshot.getNode(aDependentId);
+        if (!pDependent || pDependent->meKind != dependency::DependencyNodeKind::FormulaCell
+            || !pDependent->moOutputAddress)
+        {
+            return {};
+        }
+
+        if (std::find(aSheets.begin(), aSheets.end(), pDependent->moOutputAddress->mnSheet)
+            == aSheets.end())
+        {
+            aSheets.push_back(pDependent->moOutputAddress->mnSheet);
+        }
+    }
+
+    std::sort(aSheets.begin(), aSheets.end());
+    return aSheets;
+}
+
 } // namespace detail
 
 [[nodiscard]] inline SharedFormulaGroupTransition classifyFormulaGroupTransition(
@@ -772,13 +801,41 @@ classifySharedFormulaNamedRangeMutationBoundary(
                 aAfterSnapshot, rId, rMutation.maAddress.mnSheet))
         {
             aClassification.mbAllConsumersStayOnSheet = false;
+            const auto aBeforeConsumerSheets
+                = detail::collectNamedRangeConsumerSheets(aBeforeSnapshot, rId);
+            const auto aAfterConsumerSheets
+                = detail::collectNamedRangeConsumerSheets(aAfterSnapshot, rId);
+            if (aBeforeConsumerSheets.empty() || aAfterConsumerSheets.empty()
+                || aBeforeConsumerSheets != aAfterConsumerSheets)
+            {
+                aClassification.meBoundary = SharedFormulaNamedRangeMutationBoundary::Deferred;
+                return aClassification;
+            }
+
+            sal_Int32 nOffSheetConsumerCount = 0;
+            for (const auto nConsumerSheet : aBeforeConsumerSheets)
+            {
+                if (nConsumerSheet != rMutation.maAddress.mnSheet)
+                    ++nOffSheetConsumerCount;
+            }
+
+            if (nOffSheetConsumerCount == 1)
+            {
+                aClassification.meBoundary
+                    = SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSingleConsumerSheet;
+                continue;
+            }
+
             aClassification.meBoundary = SharedFormulaNamedRangeMutationBoundary::Deferred;
             return aClassification;
         }
     }
 
-    aClassification.meBoundary
-        = SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSameSheet;
+    if (aClassification.meBoundary == SharedFormulaNamedRangeMutationBoundary::None)
+    {
+        aClassification.meBoundary
+            = SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSameSheet;
+    }
     return aClassification;
 }
 
