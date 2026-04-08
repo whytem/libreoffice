@@ -406,6 +406,13 @@ inline void collectDependenciesFromFormulaNode(const core::formula::Node& rNode,
         case NodeKind::NamedReference:
         {
             const auto oNamedRange = resolveNamedRange(rFacade, rNode.maPrimaryText, rBaseAddress);
+            if (!oNamedRange
+                && collectDependencyFromRawReferenceText(
+                    rNode.maPrimaryText, rFacade, rSnapshot, aNodeId, rBaseAddress))
+            {
+                return;
+            }
+
             if (!oNamedRange)
             {
                 addOpaqueDependency(rSnapshot, aNodeId, u"missing_named_reference");
