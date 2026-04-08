@@ -231,6 +231,9 @@ They are now the next meaningful widening blocker because the
 repair-sensitive structural frontier has been recut into explicit rollback
 and reject boundaries rather than remaining an open widening question.
 
+The active execution plan for that blocker is
+[COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_PLAN.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_PLAN.md).
+
 ### Priority 2: Reassess The Retained Same-Sheet Deferred Boundary
 
 Only after off-sheet work should the project revisit

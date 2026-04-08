@@ -171,6 +171,9 @@ The now-completed repair-sensitive closeout pass is
 Its final decision is in
 [architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md).
 
+The active next pass is
+[architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_PLAN.md).
+
 The earlier same-surface blocker-phase conclusion has now been superseded by
 the broader same-sheet widening rerun. Corrected frozen-snapshot live facade
 proof showed that bounded named-range-combined `Regroup` and
