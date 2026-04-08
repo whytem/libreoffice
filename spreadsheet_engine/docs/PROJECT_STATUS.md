@@ -333,17 +333,18 @@ explicit:
 - the bounded named-range-combined `SetFormula` member-exit cycle is now
   admitted: authority, lifecycle, and mutation-entry all apply on the same
   bounded `GlobalSingleAreaSameSheet` surface
+- the bounded named-range-combined `ClearCell` member-exit cycle is now
+  admitted: authority, lifecycle, and mutation-entry all apply once the
+  planner stops projecting the extra post-clear named-range group-area
+  listener
 - non-exact or broader shared-group classes still fall back to the
   validation-only pilot lane or stay deferred
-- bounded named-range-combined `ClearCell` member-exit and broader
-  shared-group frontier classes still reject deterministically in the live
-  admitted lanes
 - repair-sensitive shared-group divergence remains repair-detected and
   rollback-capable
 - broader shared-group live rollout still stays deferred because
-  multi-group collapse, broader named-range-combined, repair-sensitive,
-  off-sheet, and broader non-edge regroup or merge classes are not yet
-  engine-authored
+  multi-group collapse, broader named-range-combined regroup, merge, or
+  collapse, repair-sensitive, off-sheet, and broader non-edge regroup or
+  merge classes are not yet engine-authored
 
 ## Storage And Wiring Outcome
 
@@ -968,9 +969,13 @@ complete:
 
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_DECISION_RECORD.md)
 
+The bounded named-range clear member-exit admission cycle is now also
+complete:
+
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_DECISION_RECORD.md)
+
 The adjacent concerns after that are:
 
-- bounded named-range-combined `ClearCell` member-exit
 - repair-sensitive host normalization
 - off-sheet shared-group behavior
 - broader named-range-combined regroup, merge, and multi-group-collapse
@@ -999,6 +1004,8 @@ The most recent closeout references are:
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_MEMBER_EXIT_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_ADMISSION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_ADMISSION_PLAN.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_ADMISSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_DECISION_RECORD.md)
 
 ## Current Assessment
 

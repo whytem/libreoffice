@@ -227,8 +227,10 @@ buildLifecyclePilotTransition(const LifecyclePilotInput& rInput)
         = dependency::planInvalidation(aTransition.maDependencySnapshot, rInput.maMutation);
     aTransition.maRecalcPlan
         = dependency::buildRecalcPlan(aTransition.maDependencySnapshot, aTransition.maInvalidationPlan);
+    const auto aObservationBuildOptions = authoritybuilddetail::buildAuthorityObservationBuildOptions(
+        rInput.maComputationalShadow, rInput.moObservedAfterComputationalShadow, rInput.maMutation);
     const auto aObservation = authoritybuilddetail::buildAuthorityObservationState(
-        aTransition.maDependencySnapshot, aTransition.maRecalcPlan);
+        aTransition.maDependencySnapshot, aTransition.maRecalcPlan, aObservationBuildOptions);
     if (oPredictedSharedGroupShadow)
     {
         aTransition.maComputationalAfter

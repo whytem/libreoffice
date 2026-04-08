@@ -1,6 +1,6 @@
 # Computational Substrate Shared-Group Implementation
 
-Status: bounded structural plus non-structural shared-group slice implemented, including exact regroup, gap-merge, replacement-merge, one-sided insert closeout, admitted bounded named-range preserve plus scalar and formula member-exit, and deferred clear-cell and multi-group-collapse closeouts
+Status: bounded structural plus non-structural shared-group slice implemented, including exact regroup, gap-merge, replacement-merge, one-sided insert closeout, admitted bounded named-range preserve plus scalar, formula, and clear member-exit, and deferred multi-group-collapse closeout
 
 ## What Landed
 
@@ -44,6 +44,9 @@ The workstream is now closed out by:
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_IMPLEMENTATION.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_NON_SCALAR_MEMBER_EXIT_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_IMPLEMENTATION.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_IMPLEMENTATION.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_EVIDENCE.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_DECISION_RECORD.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/architecture/COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_DECISION_RECORD.md)
 
 The implementation stays intentionally narrow:
 
@@ -73,8 +76,10 @@ The implementation stays intentionally narrow:
 - it now also widens the live admitted slice for exact same-sheet
   shareable named-range-combined `SetFormula` `MemberExit` on that same
   bounded `GlobalSingleAreaSameSheet` surface
-- it keeps bounded named-range-combined `ClearCell` `MemberExit`,
-  broader named-range-combined regroup, merge, and collapse,
+- it now also widens the live admitted slice for exact same-sheet
+  shareable named-range-combined `ClearCell` `MemberExit` on that same
+  bounded `GlobalSingleAreaSameSheet` surface
+- it keeps broader named-range-combined regroup, merge, and collapse,
   multi-group collapse, off-sheet, repair-sensitive, and broader non-edge
   regroup shared-group classes outside live admission
 
@@ -154,6 +159,12 @@ Within that gate, the admitted family is:
   mutation-entry lanes
 - bounded named-range-combined same-text preserve `SetFormula` through the
   lifecycle and mutation-entry lanes
+- bounded named-range-combined `SetScalarValue` `MemberExit` through the
+  authority and mutation-entry lanes
+- bounded named-range-combined `SetFormula` `MemberExit` through the
+  authority, lifecycle, and mutation-entry lanes
+- bounded named-range-combined `ClearCell` `MemberExit` through the
+  authority, lifecycle, and mutation-entry lanes
 
 but only when the touched same-sheet shareable shared-group member exits the
 group and surviving members can be repartitioned into exact contiguous runs,
@@ -328,6 +339,8 @@ The checked-in coverage now includes:
   member-exit
 - standalone exactness proof for bounded named-range-combined
   `SetFormula` member-exit
+- standalone exactness proof for bounded named-range-combined `ClearCell`
+  member-exit
 - Calc facade proof that live three-group attempts keep the far group
   separate instead of producing one full-span collapsed group
 - non-structural shared-group lifecycle and mutation-entry proof that live
@@ -336,8 +349,8 @@ The checked-in coverage now includes:
   named-range-combined scalar member-exit
 - live authority, lifecycle, and mutation-entry apply proof for bounded
   named-range-combined `SetFormula` member-exit
-- live retained reject proof for bounded named-range-combined `ClearCell`
-  member-exit
+- live authority, lifecycle, and mutation-entry apply proof for bounded
+  named-range-combined `ClearCell` member-exit
 - retained reject coverage for `HostUnknown` listener anchors on the live
   wiring path
 - standalone shared-group object-realization proof that `FormulaGroup`

@@ -317,6 +317,11 @@ struct SharedGroupNamedRangeBoundaryEvaluation
     facade::consumers::SharedFormulaNamedRangeMutationClassification maNamedRangeClassification;
 };
 
+struct AuthorityObservationBuildOptions
+{
+    std::optional<facade::FormulaGroupDescriptor> moSuppressNamedRangeSharedGroupAreaListener;
+};
+
 [[nodiscard]] inline SharedGroupNamedRangeBoundaryEvaluation
 evaluateSharedGroupNamedRangeBoundary(const AuthorityPilotInput& rInput)
 {
@@ -333,6 +338,38 @@ evaluateSharedGroupNamedRangeBoundary(const AuthorityPilotInput& rInput)
         = facade::consumers::classifySharedFormulaNamedRangeMutationBoundary(
             aBeforeFacade, aAfterFacade, rInput.maMutation);
     return aEvaluation;
+}
+
+[[nodiscard]] inline AuthorityObservationBuildOptions buildAuthorityObservationBuildOptions(
+    const ComputationalWorkbookShadow& rBeforeShadow,
+    const std::optional<ComputationalWorkbookShadow>& roObservedAfterShadow,
+    const facade::MutationEvent& rMutation)
+{
+    AuthorityObservationBuildOptions aOptions;
+    if (rMutation.meKind != facade::MutationKind::ClearCell || !roObservedAfterShadow)
+        return aOptions;
+
+    const auto aBeforeFacade = materializeFacadeFromComputationalShadow(rBeforeShadow);
+    const auto aAfterFacade = materializeFacadeFromComputationalShadow(*roObservedAfterShadow);
+    const auto aMutationClassification = facade::consumers::classifySharedFormulaMutation(
+        aBeforeFacade, aAfterFacade, rMutation);
+    const auto aNamedRangeBoundary = facade::consumers::classifySharedFormulaNamedRangeMutationBoundary(
+        aBeforeFacade, aAfterFacade, rMutation);
+    if (aMutationClassification.meFamily != facade::consumers::SharedFormulaMutationFamily::MemberExit
+        || aNamedRangeBoundary.meBoundary
+               != facade::consumers::SharedFormulaNamedRangeMutationBoundary::
+                   GlobalSingleAreaSameSheet)
+    {
+        return aOptions;
+    }
+
+    const auto aAfterGroups = facade::consumers::detail::collectNeighborhoodGroups(
+        aAfterFacade, rMutation.maAddress);
+    if (aAfterGroups.size() != 1)
+        return aOptions;
+
+    aOptions.moSuppressNamedRangeSharedGroupAreaListener = aAfterGroups.front();
+    return aOptions;
 }
 
 [[nodiscard]] inline bool admitsSharedGroupNamedRangeBoundary(
@@ -359,7 +396,8 @@ evaluateSharedGroupNamedRangeBoundary(const AuthorityPilotInput& rInput)
             return true;
         case facade::consumers::SharedFormulaMutationFamily::MemberExit:
             if (rInput.maMutation.meKind == facade::MutationKind::SetScalarValue
-                || rInput.maMutation.meKind == facade::MutationKind::SetFormula)
+                || rInput.maMutation.meKind == facade::MutationKind::SetFormula
+                || rInput.maMutation.meKind == facade::MutationKind::ClearCell)
                 return true;
             break;
         default:
@@ -1695,7 +1733,8 @@ inline void collectResolvedDependencySources(const dependency::DependencySnapsho
 }
 
 [[nodiscard]] inline ComputationalObservationState buildAuthorityObservationState(
-    const dependency::DependencySnapshot& rSnapshot, const dependency::RecalcPlan& rPlan)
+    const dependency::DependencySnapshot& rSnapshot, const dependency::RecalcPlan& rPlan,
+    const AuthorityObservationBuildOptions& rOptions = {})
 {
     ComputationalObservationState aObservation;
     aObservation.maFormulaTree = collectQueueAddresses(rPlan);
@@ -1720,6 +1759,17 @@ inline void collectResolvedDependencySources(const dependency::DependencySnapsho
 
         for (const auto& rDependency : rSnapshot.getDependencies(rNode.maId))
         {
+            if (rDependency.maSource.meKind == dependency::DependencySourceKind::NamedRange
+                && rOptions.moSuppressNamedRangeSharedGroupAreaListener.has_value()
+                && rNode.moSharedGroupAnchor
+                && *rNode.moSharedGroupAnchor
+                       == rOptions.moSuppressNamedRangeSharedGroupAreaListener->maAnchor
+                && rNode.mnSharedGroupLength
+                       == rOptions.moSuppressNamedRangeSharedGroupAreaListener->mnLength)
+            {
+                continue;
+            }
+
             const ListenerAnchorId aListenerAnchor
                 = (rDependency.maSource.meKind == dependency::DependencySourceKind::NamedRange
                    && oFormulaGroupAnchor.has_value())
@@ -1844,8 +1894,10 @@ buildAuthorityPilotTransition(const AuthorityPilotInput& rInput)
         = dependency::planInvalidation(aTransition.maDependencySnapshot, rInput.maMutation);
     aTransition.maRecalcPlan
         = dependency::buildRecalcPlan(aTransition.maDependencySnapshot, aTransition.maInvalidationPlan);
+    const auto aObservationBuildOptions = authoritybuilddetail::buildAuthorityObservationBuildOptions(
+        rInput.maComputationalShadow, rInput.moObservedAfterComputationalShadow, rInput.maMutation);
     const auto aObservation = authoritybuilddetail::buildAuthorityObservationState(
-        aTransition.maDependencySnapshot, aTransition.maRecalcPlan);
+        aTransition.maDependencySnapshot, aTransition.maRecalcPlan, aObservationBuildOptions);
     if (oPredictedSharedGroupShadow)
     {
         aTransition.maComputationalAfter

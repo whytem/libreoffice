@@ -880,6 +880,32 @@ Current architecture docs:
   completed closeout decision for the bounded named-range-combined
   non-scalar member-exit cycle, admitting `SetFormula` while keeping
   `ClearCell`, repair-sensitive, and off-sheet frontier classes deferred
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_ADMISSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_ADMISSION_PLAN.md) -
+  completed closeout plan for the bounded named-range-combined
+  `ClearCell` member-exit pass, now recording the admitted clear lane
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_CONTRACT.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_CONTRACT.md) -
+  frozen contract for the bounded named-range-combined `ClearCell`
+  member-exit closeout, fixing the admitted clear lane and retained
+  broader frontier
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_SCENARIO_MATRIX.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_SCENARIO_MATRIX.md) -
+  frozen scenario matrix for the bounded named-range-combined `ClearCell`
+  member-exit closeout, separating the admitted clear lane from retained
+  broader defer buckets
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_MAPPING_RULES.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_MAPPING_RULES.md) -
+  frozen mapping note for the bounded named-range-combined `ClearCell`
+  member-exit closeout, defining the exact post-clear broadcaster rule
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_IMPLEMENTATION.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_IMPLEMENTATION.md) -
+  completed implementation note for the bounded named-range-combined
+  `ClearCell` member-exit closeout, widening the gate and landing the
+  planner-side observation fix
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_EVIDENCE.md) -
+  frozen evidence note for the bounded named-range-combined `ClearCell`
+  member-exit closeout, recording standalone and live apply proof
+- [COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SHARED_GROUP_NAMED_RANGE_CLEAR_MEMBER_EXIT_DECISION_RECORD.md) -
+  completed closeout decision for the bounded named-range-combined
+  `ClearCell` member-exit cycle, widening the admitted slice while
+  keeping broader named-range, repair-sensitive, and off-sheet classes
+  deferred
 - [COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_WIRING_CONTAINER_DECISION_RECORD.md) -
   completed closeout decision for the first wiring-container residency proof
   cycle, admitting engine-resident live wiring containers on the bounded
