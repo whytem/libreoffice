@@ -149,6 +149,9 @@ The current opt-in narrow rollout surface includes:
   `ClearCell`
 - exact same-workbook one-consumer-sheet direct off-sheet shared-group
   formula-retained `SameTextPreserve` and `Regroup` `SetFormula`
+- exact same-workbook one-consumer-sheet off-sheet named-range-combined
+  `SameTextPreserve`, `Regroup`, and `OneSidedInsert` `SetFormula` on the
+  bounded `GlobalSingleAreaSingleConsumerSheet` surface
 
 This slice remains intentionally constrained by:
 
@@ -194,7 +197,9 @@ ownership boundary:
 - repair-sensitive structural after-state divergence that is intentionally
   rollback-only
 - off-sheet shared-group behavior outside the bounded one-consumer-sheet
-  direct `MemberExit`, `SameTextPreserve`, and `Regroup` slices
+  direct `MemberExit`, `SameTextPreserve`, and `Regroup` slices and the
+  bounded named-range-combined `GlobalSingleAreaSingleConsumerSheet`
+  `SameTextPreserve`, `Regroup`, and `OneSidedInsert` slice
 - broad storage migration beyond the admitted slice
 - broad token-container ownership transfer
 - broad listener/broadcaster ownership transfer beyond the admitted slice
@@ -232,13 +237,18 @@ Its final decision is in
 ### Priority 1: Broader Off-Sheet Shared-Group Behavior
 
 The direct one-consumer-sheet off-sheet `MemberExit`,
-`SameTextPreserve`, and `Regroup` lanes are now admitted.
+`SameTextPreserve`, and `Regroup` lanes are now admitted, and the bounded
+one-consumer-sheet off-sheet named-range-combined
+`GlobalSingleAreaSingleConsumerSheet` `SameTextPreserve`, `Regroup`, and
+`OneSidedInsert` lane is now admitted too.
 
-The remaining off-sheet frontier is the off-sheet named-range-combined and
-broader merge-shaped surface.
+The remaining off-sheet frontier is now the off-sheet named-range-combined
+`MemberExit` and direct gap/replacement-merge surface.
 
 The active execution plan for that blocker is
 [COMPUTATIONAL_SUBSTRATE_OFF_SHEET_NAMED_RANGE_AND_MERGE_CARRY_THROUGH_PLAN.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_NAMED_RANGE_AND_MERGE_CARRY_THROUGH_PLAN.md).
+Its final decision is in
+[COMPUTATIONAL_SUBSTRATE_OFF_SHEET_NAMED_RANGE_AND_MERGE_CARRY_THROUGH_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_NAMED_RANGE_AND_MERGE_CARRY_THROUGH_DECISION_RECORD.md).
 
 ### Priority 2: Reassess The Retained Same-Sheet Deferred Boundary
 
@@ -260,16 +270,20 @@ success.
 
 The main blockers are now clear and concrete.
 
-### 1. Off-Sheet Named-Range-Combined And Broader Merge Carry-Through
+### 1. Off-Sheet Named-Range Member-Exit And Direct Merge Carry-Through
 
-The direct off-sheet formula-retained blocker is now closed. This pass
-admitted the bounded direct one-consumer-sheet off-sheet
-`SameTextPreserve` and `Regroup` families.
+The broader off-sheet formula-retained blocker is now reduced further. This
+pass admitted the bounded off-sheet named-range-combined
+`GlobalSingleAreaSingleConsumerSheet` `SameTextPreserve`, `Regroup`, and
+`OneSidedInsert` families.
 
-What remains is the off-sheet surface where dependency ownership arrives
-through the named-range-combined lane or where the off-sheet shape expands
-beyond the currently proved direct formula-retained families. Those families
-still need exact queue, broadcaster, rollback, and verification closure.
+What remains is the narrower off-sheet surface where:
+
+- the named-range-combined mutation becomes `MemberExit`, or
+- the direct off-sheet shape expands into gap merge or replacement-merge
+
+Those families still need exact queue, broadcaster, rollback, and
+verification closure.
 
 ### 2. Exact After-State Authoring For The Retained Same-Sheet Collapse Boundary
 

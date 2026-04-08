@@ -1,6 +1,6 @@
 # Computational Substrate Off-Sheet Named-Range And Merge Carry-Through Plan
 
-Status: active execution plan for the next off-sheet widening pass
+Status: completed closeout for the bounded off-sheet named-range and merge pass
 
 ## Objective
 
@@ -28,9 +28,6 @@ behavior on a global single-area named range with one additional consumer
 sheet:
 
 - `SameTextPreserve` `SetFormula`
-- `MemberExit` `SetScalarValue`
-- `MemberExit` `SetFormula`
-- `MemberExit` `ClearCell`
 - `Regroup` `SetFormula`
 - `OneSidedInsert` `SetFormula`
 
@@ -130,3 +127,24 @@ Success criteria:
 - the admitted slice and retained off-sheet boundary are described in one
   place
 - the next off-sheet blocker is narrower than the current combined blocker
+
+## Closeout Result
+
+This pass closed as a material but bounded admitted-slice widening.
+
+Admitted:
+
+- off-sheet named-range-combined `SameTextPreserve`
+- off-sheet named-range-combined `Regroup`
+- off-sheet named-range-combined `OneSidedInsert`
+
+Retained deferred:
+
+- off-sheet named-range-combined `MemberExit`
+- direct off-sheet gap merge
+- direct off-sheet replacement-merge
+- off-sheet multi-group collapse
+- multi-consumer-sheet and workbook-wide off-sheet authority
+
+The companion closeout is in
+[COMPUTATIONAL_SUBSTRATE_OFF_SHEET_NAMED_RANGE_AND_MERGE_CARRY_THROUGH_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_NAMED_RANGE_AND_MERGE_CARRY_THROUGH_DECISION_RECORD.md).

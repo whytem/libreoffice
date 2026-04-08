@@ -139,6 +139,9 @@ The admitted rollout surface currently includes:
   `ClearCell`
 - exact same-workbook one-consumer-sheet direct off-sheet shared-group
   formula-retained `SameTextPreserve` and `Regroup` `SetFormula`
+- exact same-workbook one-consumer-sheet off-sheet named-range-combined
+  `SameTextPreserve`, `Regroup`, and `OneSidedInsert` `SetFormula` on the
+  bounded `GlobalSingleAreaSingleConsumerSheet` surface
 
 This remains an opt-in, exact-verification boundary with rollback on
 divergence, not a broad live-authority flip.
@@ -153,7 +156,9 @@ The following remain deferred:
 - repair-sensitive structural after-state divergence that is intentionally
   rollback-only
 - off-sheet shared-group behavior outside the bounded one-consumer-sheet
-  direct `MemberExit`, `SameTextPreserve`, and `Regroup` slices
+  direct `MemberExit`, `SameTextPreserve`, and `Regroup` slices and the
+  bounded named-range-combined `GlobalSingleAreaSingleConsumerSheet`
+  `SameTextPreserve`, `Regroup`, and `OneSidedInsert` slice
 - broad storage migration beyond the admitted slice
 - broad token-container and listener ownership transfer
 - workbook-wide or sheet-wide authority transfer
@@ -165,8 +170,8 @@ the current bounded surface.
 
 The recommended order is now:
 
-1. off-sheet named-range-combined and broader merge-shaped shared-group
-   consumers
+1. off-sheet named-range-combined `MemberExit` plus direct gap/replacement-
+   merge shared-group consumers
 2. only then reassess the retained same-sheet multi-group collapse boundary
    if new live evidence suggests a real expansion target
 
@@ -183,8 +188,10 @@ The now-completed off-sheet pass is
 Its final decision is in
 [architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_DECISION_RECORD.md).
 
-The active off-sheet widening pass is
+The now-completed off-sheet named-range and merge pass is
 [architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_NAMED_RANGE_AND_MERGE_CARRY_THROUGH_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_NAMED_RANGE_AND_MERGE_CARRY_THROUGH_PLAN.md).
+Its final decision is in
+[architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_NAMED_RANGE_AND_MERGE_CARRY_THROUGH_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_NAMED_RANGE_AND_MERGE_CARRY_THROUGH_DECISION_RECORD.md).
 
 The earlier same-surface blocker-phase conclusion has now been superseded by
 the broader same-sheet widening rerun. Corrected frozen-snapshot live facade
@@ -199,11 +206,14 @@ buckets with stable reasons, not a hidden widening frontier. The pass did
 not admit a new family, but it did remove repair-sensitive normalization
 from the top-blocker list for the current roadmap.
 
-The off-sheet dependency closure and broader formula-retained passes are now
-closed too. Together they admitted the bounded one-consumer-sheet direct
-off-sheet shared-group `MemberExit`, `SameTextPreserve`, and `Regroup`
-families and narrowed the remaining off-sheet blocker to named-range-
-combined and broader merge-shaped families.
+The off-sheet dependency closure, broader formula-retained, and off-sheet
+named-range pass are now closed too. Together they admitted the bounded
+one-consumer-sheet direct off-sheet shared-group `MemberExit`,
+`SameTextPreserve`, and `Regroup` families plus the bounded off-sheet
+named-range-combined `GlobalSingleAreaSingleConsumerSheet`
+`SameTextPreserve`, `Regroup`, and `OneSidedInsert` families. The remaining
+off-sheet blocker is now narrower: named-range-combined `MemberExit` plus
+direct gap/replacement-merge.
 
 Phase 4 is now closed too. The retained host shell is now recorded as an
 explicit admitted-slice execution and observation contract rather than as a
