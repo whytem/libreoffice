@@ -237,7 +237,17 @@ For the focused pass that closed the repair-sensitive frontier, see
 Its final decision is in
 [COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md).
 
-### Priority 1: Broader Off-Sheet Shared-Group Behavior
+### Priority 1: Reassess The Retained Same-Sheet Deferred Boundary
+
+The next focused pass is
+[COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md](COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md).
+
+It retargets the old synthetic three-group-collapse blocker onto the exact
+live host shape that remains deferred today: a same-sheet named-range-
+combined three-group attempt that resolves as a split-backed regroup while
+keeping the far participant group separate.
+
+### Priority 2: Broader Off-Sheet Shared-Group Behavior
 
 The direct one-consumer-sheet off-sheet `MemberExit`,
 `SameTextPreserve`, and `Regroup` lanes are admitted, and the bounded
@@ -257,13 +267,6 @@ The pass also established two important off-sheet host-shape facts:
 - the only retained one-consumer-sheet off-sheet anomaly is the direct
   gap-closing insertion where live Calc merges after-topology but does not
   expose a stable mutation-family classification
-
-### Priority 2: Reassess The Retained Same-Sheet Deferred Boundary
-
-Only after off-sheet work should the project revisit
-the retained same-sheet multi-group collapse boundary. The current live
-proof shows a far-group-separate outcome, so this remains an explicit defer
-rather than a near-term widening target.
 
 ### Priority 3: Reassess Broad Ownership Expansion
 

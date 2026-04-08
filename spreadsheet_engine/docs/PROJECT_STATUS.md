@@ -173,11 +173,14 @@ the current bounded surface.
 
 The recommended order is now:
 
-1. reassess the retained same-sheet multi-group collapse boundary if new
-   live evidence suggests a real expansion target
-2. if off-sheet work resumes immediately, isolate the remaining direct
+1. execute the focused same-sheet named-range split-outcome pass for the
+   retained three-group blocker
+2. if off-sheet work resumes immediately after that, isolate the remaining direct
    gap-closing insertion surface where live Calc merges after-topology but
    does not expose a stable mutation-family classification
+
+The current focused same-sheet pass is
+[architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md).
 
 The staged program plan for attacking those blockers together is
 [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md).
