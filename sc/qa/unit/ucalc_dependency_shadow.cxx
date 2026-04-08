@@ -4252,7 +4252,7 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
-    testComputationalNarrowRolloutSharedGroupNonStructuralAuthorityNamedRangeSplitOutcomeStaysDeferred)
+    testComputationalNarrowRolloutSharedGroupNonStructuralAuthorityNamedRangeSplitOutcomeApplies)
 {
     using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
     using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
@@ -4309,17 +4309,17 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     CPPUNIT_ASSERT_EQUAL(
         consumers::SharedFormulaNamedRangeMutationBoundary::GlobalSingleAreaSameSheet,
         aBoundary.meBoundary);
-    const auto aBeforeApply = captureFormulaState(*m_pDoc);
     const auto oResult = aAuthorityCapture.apply(
         *m_pDoc, translateSetFormula(ScAddress(1, 2, 0), u"=COUNTA(Metrics)+A3*3"_ustr));
-    CPPUNIT_ASSERT(oResult.has_value());
-    CPPUNIT_ASSERT_EQUAL(
-        ComputationalPilotResultKind::RolledBackVerificationFailure, oResult->meKind);
-    CPPUNIT_ASSERT(oResult->moQueueComparison.has_value());
-    CPPUNIT_ASSERT_EQUAL(RecalcShadowComparisonKind::Exact, oResult->moQueueComparison->meKind);
-    CPPUNIT_ASSERT(oResult->moGraphComparison.has_value());
-    CPPUNIT_ASSERT_EQUAL(GraphComparisonKind::Mismatch, oResult->moGraphComparison->meKind);
-    assertFormulaStateEqual(aBeforeApply, captureFormulaState(*m_pDoc));
+    assertComputationalPilotApplied(oResult, *m_pDoc);
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(2), aAfterGroups.size());
+    CPPUNIT_ASSERT((aAfterGroups.front().maAnchor == CellAddress { 0, 1, 0 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aAfterGroups.front().mnLength);
+    CPPUNIT_ASSERT((aAfterGroups.back().maAnchor == CellAddress { 0, 1, 4 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aAfterGroups.back().mnLength);
 
     m_pDoc->DeleteTab(0);
 }
@@ -4461,11 +4461,12 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
-    testComputationalNarrowRolloutSharedGroupNonStructuralLifecycleNamedRangeSplitOutcomeStaysDeferred)
+    testComputationalNarrowRolloutSharedGroupNonStructuralLifecycleNamedRangeSplitOutcomeApplies)
 {
     using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
     using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
-    using spreadsheetengine::compat::libreoffice::recalcqueue::captureFormulaState;
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
 
     ScopedEnvironmentOverride aRollout(
         "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
@@ -4508,20 +4509,17 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
         { ScAddress(1, 0, 0), ScAddress(1, 1, 0), ScAddress(1, 2, 0), ScAddress(1, 3, 0),
             ScAddress(1, 4, 0), ScAddress(1, 5, 0), ScAddress(2, 0, 0) });
 
-    const auto aBeforeApply = captureFormulaState(*m_pDoc);
     const auto oResult = aLifecycleCapture.apply(
         *m_pDoc, translateSetFormula(ScAddress(1, 2, 0), u"=COUNTA(Metrics)+A3*3"_ustr));
-    CPPUNIT_ASSERT(oResult.has_value());
-    CPPUNIT_ASSERT_EQUAL(
-        ComputationalLifecycleResultKind::RolledBackVerificationFailure, oResult->meKind);
-    CPPUNIT_ASSERT(oResult->moQueueComparison.has_value());
-    CPPUNIT_ASSERT_EQUAL(RecalcShadowComparisonKind::Exact, oResult->moQueueComparison->meKind);
-    CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
-    CPPUNIT_ASSERT(oResult->moComputationalComparison->mbNamedRangeMatch);
-    CPPUNIT_ASSERT(!oResult->moComputationalComparison->mbFullMatch);
-    CPPUNIT_ASSERT(oResult->moGraphComparison.has_value());
-    CPPUNIT_ASSERT_EQUAL(GraphComparisonKind::Mismatch, oResult->moGraphComparison->meKind);
-    assertFormulaStateEqual(aBeforeApply, captureFormulaState(*m_pDoc));
+    assertComputationalLifecycleApplied(oResult, *m_pDoc);
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(2), aAfterGroups.size());
+    CPPUNIT_ASSERT((aAfterGroups.front().maAnchor == CellAddress { 0, 1, 0 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(3), aAfterGroups.front().mnLength);
+    CPPUNIT_ASSERT((aAfterGroups.back().maAnchor == CellAddress { 0, 1, 4 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aAfterGroups.back().mnLength);
 
     m_pDoc->DeleteTab(0);
 }
