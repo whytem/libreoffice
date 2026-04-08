@@ -134,6 +134,9 @@ The admitted rollout surface currently includes:
 - exact same-sheet shareable named-range-combined `MemberExit`
   `SetScalarValue`, `SetFormula`, and `ClearCell` on the bounded
   `GlobalSingleAreaSameSheet` surface
+- exact same-workbook one-consumer-sheet direct off-sheet shared-group
+  non-structural `MemberExit` `SetScalarValue`, `SetFormula`, and
+  `ClearCell`
 
 This remains an opt-in, exact-verification boundary with rollback on
 divergence, not a broad live-authority flip.
@@ -147,7 +150,8 @@ The following remain deferred:
   as far-group-separate or split outcomes
 - repair-sensitive structural after-state divergence that is intentionally
   rollback-only
-- off-sheet shared-group consumers and dependency closure
+- off-sheet shared-group behavior outside the bounded one-consumer-sheet
+  direct `MemberExit` slice
 - broad storage migration beyond the admitted slice
 - broad token-container and listener ownership transfer
 - workbook-wide or sheet-wide authority transfer
@@ -159,7 +163,8 @@ the current bounded surface.
 
 The recommended order is now:
 
-1. bounded off-sheet shared-group consumers
+1. broader off-sheet formula-retained and named-range-combined shared-group
+   consumers
 2. only then reassess the retained same-sheet multi-group collapse boundary
    if new live evidence suggests a real expansion target
 
@@ -171,8 +176,10 @@ The now-completed repair-sensitive closeout pass is
 Its final decision is in
 [architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md).
 
-The active next pass is
+The now-completed off-sheet pass is
 [architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_PLAN.md).
+Its final decision is in
+[architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_DECISION_RECORD.md).
 
 The earlier same-surface blocker-phase conclusion has now been superseded by
 the broader same-sheet widening rerun. Corrected frozen-snapshot live facade
@@ -187,9 +194,10 @@ buckets with stable reasons, not a hidden widening frontier. The pass did
 not admit a new family, but it did remove repair-sensitive normalization
 from the top-blocker list for the current roadmap.
 
-Phase 3 is now closed as well. Off-sheet shared-group consumers remain an
-explicit deferred or rejected boundary pending exact cross-sheet dependency,
-queue, broadcaster, rollback, and verification closure.
+The off-sheet dependency closure pass is now closed too. It admitted the
+bounded one-consumer-sheet direct off-sheet shared-group `MemberExit`
+family and narrowed the remaining off-sheet blocker to broader
+formula-retained and named-range-combined families.
 
 Phase 4 is now closed too. The retained host shell is now recorded as an
 explicit admitted-slice execution and observation contract rather than as a

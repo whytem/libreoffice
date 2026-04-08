@@ -1,6 +1,28 @@
 # Computational Substrate Off-Sheet Dependency Closure Plan
 
-Status: active execution plan for the next widening pass
+Status: completed closeout for the bounded off-sheet widening pass
+
+## Outcome
+
+The pass closed with a real admitted-slice expansion, but on a narrower
+family than the initial candidate list suggested.
+
+Admitted:
+
+- same-workbook one-consumer-sheet direct off-sheet shared-group
+  non-structural `MemberExit`
+- `SetScalarValue`, `SetFormula`, and `ClearCell`
+
+Deferred:
+
+- off-sheet named-range-combined families as a distinct live boundary
+- structural off-sheet named-range rollout
+- broader off-sheet regroup, merge, and multi-consumer-sheet behavior
+
+The closeout decision is recorded in
+[COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_DECISION_RECORD.md).
+Supporting proof is in
+[COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_EVIDENCE.md).
 
 ## Goal
 

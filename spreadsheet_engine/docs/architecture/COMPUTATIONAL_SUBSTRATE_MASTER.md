@@ -144,6 +144,9 @@ The current opt-in narrow rollout surface includes:
 - exact same-sheet shareable named-range-combined `MemberExit`
   `SetScalarValue`, `SetFormula`, and `ClearCell` on that same bounded
   `GlobalSingleAreaSameSheet` surface
+- exact same-workbook one-consumer-sheet direct off-sheet shared-group
+  non-structural `MemberExit` `SetScalarValue`, `SetFormula`, and
+  `ClearCell`
 
 This slice remains intentionally constrained by:
 
@@ -188,7 +191,8 @@ ownership boundary:
   as far-group-separate or split outcomes
 - repair-sensitive structural after-state divergence that is intentionally
   rollback-only
-- off-sheet shared-group consumers and dependency closure
+- off-sheet shared-group behavior outside the bounded one-consumer-sheet
+  direct `MemberExit` slice
 - broad storage migration beyond the admitted slice
 - broad token-container ownership transfer
 - broad listener/broadcaster ownership transfer beyond the admitted slice
@@ -223,13 +227,12 @@ For the focused pass that closed the repair-sensitive frontier, see
 Its final decision is in
 [COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md).
 
-### Priority 1: Off-Sheet Shared-Group Behavior
+### Priority 1: Broader Off-Sheet Shared-Group Behavior
 
-Off-sheet consumers and dependencies are a larger boundary jump.
+The direct one-consumer-sheet off-sheet `MemberExit` lane is now admitted.
 
-They are now the next meaningful widening blocker because the
-repair-sensitive structural frontier has been recut into explicit rollback
-and reject boundaries rather than remaining an open widening question.
+The remaining off-sheet frontier is the broader formula-retained and
+named-range-combined surface.
 
 The active execution plan for that blocker is
 [COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_PLAN.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_DEPENDENCY_CLOSURE_PLAN.md).
@@ -254,18 +257,16 @@ success.
 
 The main blockers are now clear and concrete.
 
-### 1. Off-Sheet Dependency Closure
+### 1. Broader Off-Sheet Formula-Retained Carry-Through
 
-Cross-sheet consumers broaden the authority surface significantly.
+The raw-reference opacity blocker is no longer the first off-sheet problem.
+This pass admitted the bounded direct one-consumer-sheet off-sheet
+`MemberExit` family.
 
-The blocker is not just formula evaluation. It is exact dependency,
-broadcaster, queue, and rollback closure without accidentally promoting a
-much larger workbook-wide surface.
-
-The blocker-clearance Phase 3 pass confirmed that the current off-sheet
-surface remains an explicit defer-or-reject boundary, not a near-miss
-admission. Off-sheet work needs canonical cross-sheet dependency closure
-before any bounded family should be promoted.
+What remains is the broader off-sheet surface where the touched shared-group
+formula stays live or where the off-sheet dependency arrives through the
+named-range-combined lane. Those families still need exact queue,
+broadcaster, rollback, and verification closure.
 
 ### 2. Exact After-State Authoring For The Retained Same-Sheet Collapse Boundary
 
