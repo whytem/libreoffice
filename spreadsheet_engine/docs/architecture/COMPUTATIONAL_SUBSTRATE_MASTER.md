@@ -262,6 +262,10 @@ The completed closeout for the last combined off-sheet blocker is in
 with the final decision in
 [COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md).
 
+The focused follow-on pass for the retained direct off-sheet gap-closing
+insertion surface is now
+[COMPUTATIONAL_SUBSTRATE_OFF_SHEET_GAP_INSERTION_SURFACE_PLAN.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_GAP_INSERTION_SURFACE_PLAN.md).
+
 The pass also established two important off-sheet host-shape facts:
 
 - bounded direct replacement attempts normalize to the already-admitted

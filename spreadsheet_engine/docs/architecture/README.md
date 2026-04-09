@@ -26,6 +26,9 @@ This directory holds the active architecture references for
   final decision for the same-sheet split replay carry-through pass
 - [COMPUTATIONAL_SUBSTRATE_SAME_SHEET_SPLIT_REPLAY_CARRY_THROUGH_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_SAME_SHEET_SPLIT_REPLAY_CARRY_THROUGH_EVIDENCE.md):
   evidence summary for the same-sheet split replay carry-through pass
+- [COMPUTATIONAL_SUBSTRATE_OFF_SHEET_GAP_INSERTION_SURFACE_PLAN.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_GAP_INSERTION_SURFACE_PLAN.md):
+  active focused pass for the retained direct off-sheet gap-closing insertion
+  surface
 - [COMPUTATIONAL_SUBSTRATE_BROADER_SAME_SHEET_SHARED_GROUP_WIDENING_PLAN.md](COMPUTATIONAL_SUBSTRATE_BROADER_SAME_SHEET_SHARED_GROUP_WIDENING_PLAN.md):
   completed closeout for the broader same-sheet shared-group widening pass
 - [COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md](COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md):

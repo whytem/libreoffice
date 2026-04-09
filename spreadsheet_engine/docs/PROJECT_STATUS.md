@@ -199,6 +199,10 @@ The completed closeout for the final bounded off-sheet surface pass is
 Its final decision is in
 [architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md).
 
+The active focused follow-on pass for the retained direct off-sheet
+gap-closing insertion surface is
+[architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_GAP_INSERTION_SURFACE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_GAP_INSERTION_SURFACE_PLAN.md).
+
 The now-completed repair-sensitive closeout pass is
 [architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md).
 Its final decision is in
