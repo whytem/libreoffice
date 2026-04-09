@@ -10,6 +10,9 @@ The active replacements are:
 - [../../PROJECT_STATUS.md](../../PROJECT_STATUS.md)
 - [../../architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md](../../architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md)
 
+The broader pre-pivot substrate archive now lives alongside this one in:
+
+- [../pre_pivot_substrate/](../pre_pivot_substrate/)
+
 Use the archived pass docs only for implementation archaeology or original
 decision context.
-

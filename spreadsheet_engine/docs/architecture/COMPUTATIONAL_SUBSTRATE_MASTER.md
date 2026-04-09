@@ -176,3 +176,4 @@ Use these documents in order:
 2. [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md)
 3. [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
 4. [../archive/interpret_tail/](../archive/interpret_tail/)
+5. [../archive/pre_pivot_substrate/](../archive/pre_pivot_substrate/)

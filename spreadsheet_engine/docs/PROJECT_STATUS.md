@@ -128,3 +128,4 @@ The next pass should prioritize ambient live-routing conversion:
 - [architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md)
 - [archive/interpret_tail/](archive/interpret_tail/)
+- [archive/pre_pivot_substrate/](archive/pre_pivot_substrate/)

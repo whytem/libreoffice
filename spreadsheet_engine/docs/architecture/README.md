@@ -29,6 +29,7 @@ The active roadmap is now simple:
 Older pass-by-pass migration documents now live in:
 
 - [../archive/interpret_tail/](../archive/interpret_tail/)
+- [../archive/pre_pivot_substrate/](../archive/pre_pivot_substrate/)
 - [../archive/](../archive/)
 - [../extraction-history/](../extraction-history/)
 
