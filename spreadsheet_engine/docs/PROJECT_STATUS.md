@@ -49,6 +49,9 @@ Today:
   of that authority result
 - production Calc still does not delegate general cell evaluation authority
   from `ScFormulaCell::InterpretTail` to the engine evaluator
+- but a first real live evaluator family now delegates through
+  `InterpretTail` under env-gated `observe`, `shadow`, and `authority`
+  modes
 
 What has not been proven is equally important:
 
@@ -115,10 +118,45 @@ Calc still intentionally owns:
 - broad `ScDocument` storage and mutation outside the admitted slice
 - broad object lifetime outside the admitted slice
 - broad listener and broadcaster residency outside the admitted slice
+- broad real formula evaluation outside the bounded delegated evaluator
+  family
 - token-container construction and Calc-local token plumbing
 - UI, UNO, rendering, persistence, and document-service integration
 - the retained host shell that executes engine-authored records on the
   admitted live slice
+
+## Current Live Evaluator Delegation Slice
+
+The first real `ScFormulaCell::InterpretTail -> engine` migration pass is
+now landed.
+
+The live delegated evaluator family is:
+
+- literal-only `VALUE`
+- literal-only `DATEVALUE`
+- literal-only `TIMEVALUE`
+- literal-only `NUMBERVALUE`
+
+The live seam is controlled by
+`SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR` with:
+
+- `observe`
+- `shadow` or `shadowcompare`
+- `authority`
+
+At the current boundary:
+
+- `observe` records supported and fallback classification on the real
+  AutoCalc seam
+- `shadow` records mismatch reasons while Calc still owns the final result
+- `authority` lets supported formulas bypass `ScInterpreter`
+- unsupported or out-of-contract formulas fall back explicitly to Calc
+
+The completed closeout is:
+
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md)
 
 ## Current Opt-In Narrow Rollout Surface
 
@@ -188,12 +226,15 @@ The roadmap now has two distinct tracks:
 - shared-engine extraction, which is materially successful
 - live authority transfer inside Calc, which is still active
 
-The recommended next migration program is no longer “another bounded substrate
-admitted-slice widening pass.” It is:
+The recommended next migration program is no longer “start the switchover.”
+That first pass is now complete.
 
-1. implement the
-   [InterpretTail -> engine evaluator switchover plan](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md)
-2. use the substrate as migration underwriter, comparator, and fallback
+The recommended next move is:
+
+1. expand the live `InterpretTail` delegation family by capability cluster,
+   starting with workbook-local reference arguments for the same text-parsing
+   function family
+2. keep using the substrate as migration underwriter, comparator, and fallback
    guardrail during that move
 3. only after that, decide how much remaining bounded substrate widening is
    still worth pursuing
@@ -307,7 +348,11 @@ passes have all landed. The current roadmap is therefore:
   strategy reset for moving from verifier-style widening to real authority
   transfer
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md):
-  concrete migration plan for the first live evaluator switchover
+  completed closeout for the first live evaluator switchover pass
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md):
+  final decision for the first live evaluator switchover pass
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md):
+  evidence summary for the first live evaluator switchover pass
 - [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md):
   ambitious staged blocker-clearance roadmap
 - [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md):

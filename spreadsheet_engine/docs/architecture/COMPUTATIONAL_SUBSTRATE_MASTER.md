@@ -37,6 +37,9 @@ Today:
   of that authority result
 - production Calc still does not delegate general cell evaluation authority
   from `ScFormulaCell::InterpretTail` to the engine evaluator
+- but a first real live evaluator family now delegates through
+  `InterpretTail` under env-gated `observe`, `shadow`, and `authority`
+  modes
 
 What the program did not prove is equally important:
 
@@ -114,8 +117,8 @@ Calc still intentionally owns:
 
 - broad `ScDocument` storage and mutation outside the admitted slice
 - broad formula-cell object lifetime outside the admitted slice
-- real formula evaluation through `ScFormulaCell::InterpretTail` and
-  `ScInterpreter`
+- broad real formula evaluation through `ScFormulaCell::InterpretTail` and
+  `ScInterpreter`, outside the bounded delegated evaluator family
 - broad listener/broadcaster residency outside the admitted slice
 - token-container construction and Calc-local token plumbing
 - UI, UNO, import/export, rendering, persistence, and shell integration
@@ -150,6 +153,40 @@ That strategy reset is documented in
 [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md),
 and the first concrete execution plan is
 [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md).
+
+## Current Live Evaluator Delegation Slice
+
+The first real `InterpretTail -> engine` migration pass is now complete.
+
+That live delegated evaluator slice is:
+
+- literal-only `VALUE`
+- literal-only `DATEVALUE`
+- literal-only `TIMEVALUE`
+- literal-only `NUMBERVALUE`
+
+The live seam is controlled by
+`SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR` with:
+
+- `observe`
+- `shadow` or `shadowcompare`
+- `authority`
+
+The landed boundary is:
+
+- `observe` records supported and fallback classification on the real
+  AutoCalc `InterpretTail` path
+- `shadow` records mismatch reasons while Calc still owns the result
+- `authority` lets supported formulas bypass `ScInterpreter` and project the
+  engine result directly into `ScFormulaCell`
+- unsupported or out-of-contract formulas fall back explicitly and record a
+  fallback reason
+
+The closeout for that first switchover pass is:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md)
 
 ## Current Admitted Authority And Rollout Slice
 
@@ -298,20 +335,22 @@ The named-range structural rollout clearance pass is now complete:
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_EVIDENCE.md)
 
-### Priority 1: InterpretTail -> Engine Evaluator Switchover
+### Priority 1: Expand InterpretTail Evaluator Delegation By Capability Cluster
 
-The highest-value next move is no longer another admitted-slice conjunction.
+The first live switchover phase is now complete.
 
-It is the first real live authority-transfer program:
+The highest-value next move is the next evaluator capability wave:
 
-- move a bounded production evaluation family from `ScInterpreter` to the
-  engine evaluator
-- allow `Observe` and `ShadowCompare` in real AutoCalc sessions
-- use fallback-first delegation rather than exact-or-rollback as the
-  migration bar
+- keep the live `InterpretTail` routing seam
+- expand the delegated family from literal-only text parsing to the next
+  host-backed capability cluster
+- keep fallback-first delegation and shadow comparison as the migration bar
 
-The active plan for that move is
-[COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md).
+The completed first-pass closeout is:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md)
 
 ### Priority 2: Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
 
@@ -323,15 +362,19 @@ live authority-transfer program.
 
 The main blockers are now clear and concrete.
 
-### 1. InterpretTail Still Owns Production Evaluation
+### 1. InterpretTail Delegation Is Still Too Narrow
 
-The biggest live-authority blocker is still the production evaluation seam.
+The biggest live-authority blocker is no longer the total absence of
+delegation. It is the narrowness of the currently delegated family.
 
-- `ScFormulaCell::InterpretTail` still constructs and drives `ScInterpreter`
-- the engine evaluator is still primarily standalone and replay-oriented
-- the current substrate path does not replace that control flow
+- `ScFormulaCell::InterpretTail` now contains a real engine-routing seam
+- but the authoritative family is still limited to literal-only text-parsing
+  formulas
+- workbook-local reference and named-range inputs still mostly fall back to
+  Calc
 
-If the program wants substantive authority relocation, this seam must move.
+If the program wants substantive authority relocation, the next work must
+expand this seam by capability cluster.
 
 ### 2. Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
 
@@ -342,7 +385,7 @@ same-sheet shareable structural surface remains outside the admitted slice
 until the engine can author the exact live after-topology for those classes
 too.
 
-### 2. Named-Range-Sensitive Structural Rollout Beyond The Admitted Shift Slice
+### 3. Named-Range-Sensitive Structural Rollout Beyond The Admitted Shift Slice
 
 The broad named-range structural blocker is now narrower than it was before,
 not gone entirely.

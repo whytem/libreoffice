@@ -1,7 +1,6 @@
 # Computational Substrate InterpretTail -> Engine Evaluator Switchover Plan
 
-Status: active migration plan for the first real live authority-transfer
-program
+Status: completed closeout for the first live evaluator switchover pass
 
 ## Purpose
 
@@ -15,6 +14,33 @@ This plan defines the first concrete live authority transfer target:
 The goal is not to prove another bounded substrate slice. The goal is to move
 real production evaluation authority into `spreadsheet_engine/`, with the
 substrate acting as comparison and fallback support during the migration.
+
+## Closeout Result
+
+This pass landed the first real `ScFormulaCell::InterpretTail` delegation
+slice.
+
+The live delegated family is intentionally narrow but real:
+
+- literal-only `VALUE`
+- literal-only `DATEVALUE`
+- literal-only `TIMEVALUE`
+- literal-only `NUMBERVALUE`
+
+The live routing seam now runs in real AutoCalc sessions behind the
+`SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR` env var with the
+following rollout modes:
+
+- `observe`
+- `shadow` or `shadowcompare`
+- `authority`
+
+In `authority` mode, supported formulas bypass `ScInterpreter` and project
+their result directly into `ScFormulaCell`. Unsupported or out-of-contract
+formulas fall back explicitly to Calc and record a fallback reason.
+
+This is the first completed migration phase, not the end-state evaluator
+transplant.
 
 ## Why This Target
 
@@ -57,6 +83,15 @@ The first delegated production family should be narrow but real:
 This first family should be large enough to matter in normal interactive
 documents, not just in synthetic tests.
 
+The landed first family is smaller than the long-range goal, but it satisfies
+the first migration bar:
+
+- it runs inside the real `InterpretTail` production seam
+- it supports `Observe`, `ShadowCompare`, and `AuthoritativeWithFallback`
+  behavior under AutoCalc
+- it records supported, fallback, and mismatch outcomes
+- it bypasses `ScInterpreter` for a real live function family
+
 ## Non-Goals
 
 This plan does not attempt to solve all remaining authority questions at once.
@@ -88,6 +123,16 @@ The switchover therefore needs an adapter-first phase:
 This is the first mandatory engineering step. Without it, the migration
 remains workbook-snapshot-only.
 
+The completed first pass used an adapter-first companion instead of a full
+host-backed transplant of `FormulaEvaluator.hxx`.
+
+That landed seam is:
+
+- [InterpretTailEngineEvaluator.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx)
+
+It reuses engine parser and text-parsing execution helpers directly against
+live `ScDocument` and `ScInterpreterContext` for the first delegated family.
+
 ## Rollout Modes
 
 Replace the current blanket AutoCalc veto with evaluator-specific rollout
@@ -108,6 +153,8 @@ Rules:
 
 The switchover plan is not complete until at least `Observe` and
 `ShadowCompare` are allowed in real AutoCalc sessions.
+
+That bar is now met for the landed first family.
 
 ## Workstreams
 
@@ -205,6 +252,11 @@ Required result:
 
 - measurable reduction of Calc-owned evaluation authority
 
+For the completed first pass, that reduction is:
+
+- bounded `InterpretTail` bypass for supported literal-only text-parsing
+  formulas in `authority` mode
+
 ## Metrics
 
 This plan is governed by production-facing metrics, not only replay metrics.
@@ -250,3 +302,15 @@ This plan is complete only when all of the following are true:
 If the project cannot satisfy those criteria, then the program should stop
 describing itself as authority relocation and should formally revert to a
 verifier-only goal.
+
+## Next Expansion Target
+
+The next evaluator-migration step should expand by capability cluster rather
+than by substrate conjunction. The closest next family is:
+
+- single-cell workbook-local reference arguments for the same text-parsing
+  function cluster
+
+That would widen the first live `InterpretTail` delegation slice without
+opening external references, add-ins, matrix policy, or workbook-wide
+authority.
