@@ -1,68 +1,31 @@
 # Computational Substrate Master
 
-Status: canonical current-state, roadmap, and blocker reference for the
-computational-substrate program
-
-## Purpose
-
-This document is the primary way to understand the computational-substrate
-effort.
-
-It supersedes the large collection of individual `COMPUTATIONAL_SUB*.md`
-phase, plan, contract, schema, evidence, implementation, and decision
-documents as the recommended entry point for current understanding.
-
-Use this document for:
-
-- the settled current boundary
-- the admitted rollout and ownership slice
-- the remaining deferred frontier
-- the roadmap and biggest blockers
-
-Use the older detailed documents only for historical archaeology.
+Status: canonical current-state, scope, and roadmap reference
 
 ## Executive Summary
 
-The first-stage extraction objective is effectively achieved.
-The live authority-transfer objective is not.
+The first-stage extraction objective is materially achieved.
+The live authority-transfer objective is still in progress.
 
 Today:
 
-- `spreadsheet_engine/` is already a real shared computation layer used by
-  both standalone evaluation and Calc-backed execution paths
-- the promoted FODS replay baseline is stable at zero cached fallback
-- the computational-substrate program proved a bounded, exact, opt-in
-  authority slice
-- the program also proved a bounded ownership-complete admitted slice on top
-  of that authority result
-- production Calc still does not delegate general cell evaluation authority
-  from `ScFormulaCell::InterpretTail` to the engine evaluator
-- but a real bounded live evaluator capability cluster now delegates through
-  `InterpretTail` under env-gated `observe`, `shadow`, and `authority`
-  modes
+- `spreadsheet_engine/` is a real shared computation layer used by both
+  standalone evaluation and Calc-backed execution paths
+- the promoted FODS replay baseline remains exact at zero cached fallback
+- the old computational-substrate widening program proved a bounded admitted
+  slice
+- the live migration program now runs through a real `InterpretTail` seam in
+  production Calc code
+- debug and CI-style builds default that seam to `observe`
+- one tiny family is now engine-first even with rollout explicitly `off`
 
-What the program did not prove is equally important:
+The active program is no longer “prove more substrate slices.”
+The active program is “use the substrate to underwrite live evaluator
+delegation.”
 
-- it did not justify a broad host-core transplant
-- it did not justify broad default-on rollout
-- it did not justify broad storage, token-container, or workbook-wide
-  authority transfer
+## Live Migration Dashboard
 
-The active strategy response to that gap is now:
-
-- [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md)
-
-The correct mental model is:
-
-- successful shared-engine extraction
-- plus successful narrow authority proof
-- plus successful bounded ownership proof
-- but still not broad computational-document replacement
-
-## Verified Baseline
-
-The standing promoted replay baseline is:
+### Replay Guardrail
 
 - `500` workbooks
 - `50,661` formula cells
@@ -70,582 +33,146 @@ The standing promoted replay baseline is:
 - `0` cached-fallback cells
 - `0` cached-fallback rate
 
-Promoted replay families include:
+### Full Replay Corpus: Ambient Live Observe
 
-- `addin`
-- `array`
-- `database`
-- `date_time`
-- `financial`
-- `information`
-- `logical`
-- `mathematical`
-- `spreadsheet`
-- `statistical`
-- `text`
+- `interpret_tail_live_formula_cells=50661`
+- `interpret_tail_live_supported_total=0`
+- `interpret_tail_live_fallback_total=303`
+- `interpret_tail_live_seen_total=303`
+- `interpret_tail_live_unseen_formula_cells=50358`
+- `interpret_tail_live_supported_rate=0.00`
+- `interpret_tail_live_seen_rate=0.60`
 
-This baseline remains a hard guardrail for any future widening work.
+Dominant ambient fallback reasons:
+
+- `unsupported_formula_shape=253`
+- `parse_failure=48`
+- `unsupported_function=2`
+
+### Promoted-Family Probe
+
+- `interpret_tail_probe_formula_cells=1488`
+- `interpret_tail_authoritative_total=1379`
+- `interpret_tail_authoritative_fallback_total=109`
+- promoted-family authoritative rate: `92.67%`
+
+Dominant promoted-family fallback reasons:
+
+- `unsupported_formula_shape=26`
+- `shadow_mismatch=64`
+- `unsupported_host_surface=19`
+
+### Hard-Quarantined Calc Paths
+
+- `1` env-independent engine-first family:
+  - literal-only `NUMBERVALUE`
+
+## Strategic Position
+
+The program now has three settled layers:
+
+1. shared-engine extraction
+2. bounded substrate proof
+3. live `InterpretTail -> engine` migration
+
+Only the third layer is the active authority-transfer roadmap.
+
+That means:
+
+- shared-engine extraction remains a success
+- substrate widening is now secondary and conditional
+- live evaluator delegation is the primary measure of progress
+
+The strategy reset is recorded in
+[COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md).
+The active current-state ledger is
+[COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md).
 
 ## Engine-Owned Today
 
-The engine already owns the following broad surfaces:
+The engine broadly owns:
 
 - compiler and token infrastructure
-- standalone workbook model, FODS loading, and formula evaluation
+- standalone workbook loading and evaluation
 - dependency snapshots, invalidation planning, and recalc planning
-- a substantial shared runtime used by Calc in production execution paths
+- substantial shared runtime already consumed by Calc
 
-On top of that first-stage extraction boundary, the bounded
-computational-substrate program now also owns admitted-slice records for:
+On the live migration track, the engine now also owns bounded delegated
+evaluation for:
 
-- mutable computational sidecar state
-- resident admitted-slice cell storage
-- resident admitted-slice wiring containers
-- admitted-slice formula-cell lifetime decisions
-- admitted-slice object-realization records
-- admitted-slice rollback records
-- admitted-slice raw-mutation and raw-document-mutation records
-- admitted-slice live-apply plans
-- admitted-slice primitive realization, rollback, and execution records
-
-This ownership is real, but it is still admitted-slice ownership, not broad
-document-core ownership.
+- `VALUE`
+- `DATEVALUE`
+- `TIMEVALUE`
+- `NUMBERVALUE`
+- `MATCH`
+- `XMATCH`
+- `LOOKUP`
+- `VLOOKUP`
+- `HLOOKUP`
+- `XLOOKUP`
+- `INDEX`
+- bounded `IFERROR(...)` / `IFNA(...)` wrappers around promoted roots
 
 ## Calc-Retained Today
 
 Calc still intentionally owns:
 
-- broad `ScDocument` storage and mutation outside the admitted slice
-- broad formula-cell object lifetime outside the admitted slice
-- broad real formula evaluation through `ScFormulaCell::InterpretTail` and
-  `ScInterpreter`, outside the bounded delegated evaluator family
-- broad listener/broadcaster residency outside the admitted slice
+- broad document storage and mutation
+- broad listener and broadcaster residency
+- broad formula evaluation outside the promoted delegated family
 - token-container construction and Calc-local token plumbing
 - UI, UNO, import/export, rendering, persistence, and shell integration
-- external-reference, environment, printer, path, and document-service
-  integrations
-- the retained host shell that executes engine-authored records on the
-  admitted live slice
+- external-reference and environment-sensitive host behavior
 
-That retained host boundary is not a bug. It is the current settled design.
+That retained shell is expected. The migration goal is targeted delegation,
+not immediate whole-document replacement.
 
-## Strategic Rebaseline
+## Scope Policy
 
-The program now needs an explicit split between:
+The active roadmap is evaluator migration.
 
-- shared-engine extraction, which is materially successful
-- live authority transfer inside Calc, which remains unfinished
+New computational-substrate widening is out of scope unless it directly:
 
-The computational substrate should therefore be treated primarily as:
+- removes a live `InterpretTail` fallback reason
+- removes a live `InterpretTail` mismatch class
+- unlocks host access needed by a promoted evaluator family
 
-- a migration underwriter
-- a comparator during shadow runs
-- a fallback guardrail during real delegation
-
-It should no longer be treated as the main product if the goal remains
-substantive relocation of authority into the standalone engine.
-
-The recommended north-star transfer target is:
-
-- `ScFormulaCell::InterpretTail` -> engine evaluator
-
-That strategy reset is documented in
-[COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md),
-and the first concrete execution plan is
-[COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md).
-
-## Current Live Evaluator Delegation Slice
-
-The first two live `InterpretTail -> engine` migration waves are now
-complete.
-
-The current live delegated evaluator slice includes:
-
-- widened text parsing with bounded host-backed scalar inputs for:
-  - `VALUE`
-  - `DATEVALUE`
-  - `TIMEVALUE`
-  - `NUMBERVALUE`
-- bounded workbook-local lookup and index routing for:
-  - `MATCH`
-  - `XMATCH`
-  - `LOOKUP`
-  - `VLOOKUP`
-  - `HLOOKUP`
-  - `INDEX`
-
-The live seam is controlled by
-`SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR` with:
-
-- `observe`
-- `shadow` or `shadowcompare`
-- `authority`
-
-The landed boundary is:
-
-- `observe` records supported and fallback classification on the real
-  AutoCalc `InterpretTail` path
-- `shadow` records mismatch reasons while Calc still owns the result
-- `authority` lets supported formulas bypass `ScInterpreter` and project the
-  engine result directly into `ScFormulaCell`
-- unsupported or out-of-contract formulas fall back explicitly and record a
-  fallback reason
-
-The currently admitted evaluator input and result boundary is:
-
-- literal inputs
-- single-cell references
-- single-cell workbook-global names
-- single-cell sheet-local names
-- simple scalar expression trees built from bounded concatenation and scalar
-  unary/binary operators
-- bounded single-area workbook-local lookup/index reads whose result surface
-  stays scalar or single-cell
-
-The completed closeouts for the current evaluator migration waves are:
-
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_EVIDENCE.md)
-
-The first replay-corpus authoritative-usage pass is now also complete.
-
-The completed Calc-backed corpus probe now freezes:
-
-- `interpret_tail_probe_formula_cells=1391`
-- `interpret_tail_authoritative_total=996`
-- `interpret_tail_authoritative_fallback_total=395`
-- `interpret_tail_fallback_parse_failure=0`
-
-The most important caveat on that new baseline is:
-
-- it is a Calc-backed supported-family probe over live formula source
-- it is not yet a claim that natural ambient AutoCalc traffic already
-  produces the same authoritative totals by default
-
-The focused corpus coverage and mismatch-reduction follow-on pass is now
-also complete.
-
-The updated Calc-backed corpus probe now freezes:
-
-- `interpret_tail_probe_formula_cells=1391`
-- `interpret_tail_authoritative_total=1045`
-- `interpret_tail_authoritative_fallback_total=346`
-- `interpret_tail_fallback_unsupported_formula_shape=240`
-- `interpret_tail_fallback_shadow_mismatch=90`
-- `interpret_tail_fallback_unsupported_host_surface=16`
-
-The important interpretation is:
-
-- the live evaluator cluster now matters more on the existing corpus surface
-- the probe-covered top-level promoted-family surface did not grow beyond
-  `1391`
-- the main remaining evaluator hotspots are no longer generic; they are now
-  concentrated on `DATEVALUE` mismatch and residual lookup-family
-  unsupported-shape or mismatch fallout
-
-The completed closeout set now also includes:
-
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md)
-
-The next evaluator authority-transfer wave is now also complete.
-
-The completed authoritative-usage expansion rerun freezes:
-
-- `interpret_tail_probe_formula_cells=1488`
-- `interpret_tail_authoritative_total=1126`
-- `interpret_tail_authoritative_fallback_total=362`
-- `interpret_tail_fallback_unsupported_formula_shape=243`
-- `interpret_tail_fallback_shadow_mismatch=97`
-- `interpret_tail_fallback_unsupported_host_surface=22`
-
-The accepted interpretation is:
-
-- the live evaluator seam is materially wider than before
-- bounded `XLOOKUP` is now real on the Calc-backed corpus surface
-- wrapper-aware delegation is now live and unit-proven
-- the pass widened authority, but it did not convert the dominant retained
-  hotspots as aggressively as planned
-
-The completed closeout set is now:
-
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_EVIDENCE.md)
-
-The focused hotspot-conversion follow-on pass is now also complete.
-
-The completed hotspot-conversion rerun freezes:
-
-- `interpret_tail_probe_formula_cells=1488`
-- `interpret_tail_authoritative_total=1156`
-- `interpret_tail_authoritative_fallback_total=332`
-- `interpret_tail_fallback_unsupported_formula_shape=241`
-- `interpret_tail_fallback_shadow_mismatch=72`
-- `interpret_tail_fallback_unsupported_host_surface=19`
-
-The important interpretation is:
-
-- the measured probe surface stayed flat
-- the same live seam now converts more of that surface authoritatively
-- `DATEVALUE` is no longer a dominant hotspot
-- the main remaining evaluator hotspot is now residual `LOOKUP`
-  unsupported-shape and scalar-projection mismatch fallout
-
-The completed closeout set now also includes:
-
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md)
-
-That lookup-residual conversion pass is now also complete.
-
-The completed lookup-residual rerun freezes:
-
-- `interpret_tail_probe_formula_cells=1488`
-- `interpret_tail_authoritative_total=1379`
-- `interpret_tail_authoritative_fallback_total=109`
-- `interpret_tail_fallback_unsupported_formula_shape=26`
-- `interpret_tail_fallback_shadow_mismatch=64`
-- `interpret_tail_fallback_unsupported_host_surface=19`
-
-The important interpretation is:
-
-- the measured probe surface stayed flat
-- the same seam now converts much more of that surface authoritatively
-- the old `LOOKUP` unsupported-shape blocker is effectively cleared
-- the remaining evaluator frontier is now much narrower and more specific:
-  - residual `LOOKUP` scalar-projection mismatch rows
-  - residual `VLOOKUP` / `XLOOKUP` host-surface rows
-  - residual bounded `INDEX` host-surface rows
-
-The completed closeout set now also includes:
-
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_EVIDENCE.md)
-
-The recommended next evaluator move is now a narrower residual
-lookup-projection and host-surface cleanup wave on the already-promoted
-lookup/index lane, not another broad capability expansion.
-
-## Current Admitted Authority And Rollout Slice
-
-The current opt-in narrow rollout surface includes:
-
-- admitted scalar lifecycle authority
-- admitted scalar mutation entry
-- single-sheet `InsertRows`
-- single-sheet `DeleteRows`
-- single-sheet `InsertColumns`
-- single-sheet `DeleteColumns`
-- exact same-sheet shareable shared-group structural `Preserve`, `Split`,
-  and `Rebuild`
-- exact same-sheet shareable shared-group non-structural member-exit
-  `SetScalarValue`, `SetFormula`, and `ClearCell`
-- exact same-sheet shareable shared-group same-text preserve `SetFormula`
-- exact same-sheet shareable bounded edge-regroup `SetFormula`
-- exact same-sheet shareable bounded gap-closing merge `SetFormula`
-- exact same-sheet shareable bounded replacement-merge `SetFormula`
-- exact same-sheet shareable bounded one-sided adjacent insertion
-  `SetFormula`
-- exact same-sheet shareable named-range-combined `SameTextPreserve`
-  `SetFormula` on the bounded `GlobalSingleAreaSameSheet` surface
-- exact same-sheet shareable named-range-combined `Regroup` and
-  `OneSidedInsert` `SetFormula` on that same bounded
-  `GlobalSingleAreaSameSheet` surface
-- exact same-sheet shareable named-range-combined `MemberExit`
-  `SetScalarValue`, `SetFormula`, and `ClearCell` on that same bounded
-  `GlobalSingleAreaSameSheet` surface
-- exact same-sheet global single-area shift-only structural named-range
-  `InsertRows`, `DeleteRows`, `InsertColumns`, and `DeleteColumns` for
-  ordinary scalar formulas
-- exact same-sheet shareable named-range-combined split-backed three-group
-  `SetFormula` replay on that same bounded `GlobalSingleAreaSameSheet`
-  named-range `Regroup` surface
-- exact same-workbook one-consumer-sheet direct off-sheet shared-group
-  non-structural `MemberExit` `SetScalarValue`, `SetFormula`, and
-  `ClearCell`
-- exact same-workbook one-consumer-sheet direct off-sheet shared-group
-  formula-retained `SameTextPreserve` and `Regroup` `SetFormula`
-- exact same-workbook one-consumer-sheet direct off-sheet host-uncategorized
-  gap-closing insertion `SetFormula`
-- exact same-workbook one-consumer-sheet off-sheet named-range-combined
-  `SameTextPreserve`, `Regroup`, and `OneSidedInsert` `SetFormula` on the
-  bounded `GlobalSingleAreaSingleConsumerSheet` surface
-- exact same-workbook one-consumer-sheet off-sheet named-range-combined
-  `MemberExit` `SetScalarValue`, `SetFormula`, and `ClearCell` on that same
-  bounded `GlobalSingleAreaSingleConsumerSheet` surface
-
-This slice remains intentionally constrained by:
-
-- opt-in rollout and feature gates
-- clean-baseline requirements
-- exact queue, computational, graph, and IR verification
-- explicit rollback on divergence
-
-It should be treated as a bounded authority slice, not as proof that broad
-default-on authority is ready.
-
-## Current Ownership-Complete Admitted Slice
-
-Within that admitted authority surface, the strongest settled conclusion is
-that the engine can own the admitted-slice decision records end-to-end while
-Calc executes the retained host shell around them.
-
-At the current boundary, the engine can own:
-
-- after-state planning
-- dependency and recalc planning
-- resident cell and wiring state on the admitted slice
-- admitted formula-cell lifetime decisions
-- object realization, rollback, raw mutation, and live-apply records
-- primitive realization, rollback, and execution records
-
-Calc still applies those records and remains the host of the underlying
-document shell.
-
-This is why the current boundary is best described as
-ownership-complete-on-the-admitted-slice rather than broad host independence.
-
-## Explicitly Deferred Frontier
-
-The following remain outside the admitted rollout and outside the settled
-ownership boundary:
-
-- named-range-sensitive structural rollout beyond the admitted same-sheet
-  global single-area shift-only surface
-- shared-group-sensitive structural behavior outside the bounded exact
-  same-sheet shareable slice
-- repair-sensitive structural after-state divergence that is intentionally
-  rollback-only
-- off-sheet shared-group behavior outside the bounded one-consumer-sheet
-  direct `MemberExit`, `SameTextPreserve`, `Regroup`, and host-uncategorized
-  gap-closing insertion slices and the bounded named-range-combined
-  `GlobalSingleAreaSingleConsumerSheet` `SameTextPreserve`, `Regroup`,
-  `OneSidedInsert`, and `MemberExit` slice
-- broad storage migration beyond the admitted slice
-- broad token-container ownership transfer
-- broad listener/broadcaster ownership transfer beyond the admitted slice
-- workbook-wide or sheet-wide authority transfer
-
-One important lesson from the completed attempts is that some synthetic
-exact-modeling candidates are not real live-admission candidates. For
-example, the bounded three-group collapse cycle closed as deferred because
-live Calc keeps the far group separate.
-
-The broader same-sheet widening rerun superseded the older same-surface
-blocker-phase conclusion. With corrected frozen-snapshot live facade proof,
-bounded named-range-combined `Regroup` and bounded named-range-combined
-`OneSidedInsert` closed as real live families and are now admitted, while
-broader non-edge regroup and merge attempts closed as normalization onto
-the already-admitted member-exit path.
-
-The follow-on split-outcome pass then froze the exact remaining same-sheet
-three-group host shape. That pass proved the live outcome is a split-backed
-`Regroup`, not a true one-group collapse. It also proved that mutation-entry
-already carries that host-shaped regroup outcome exactly.
-
-The direct split replay carry-through pass is now complete too. It closed
-the old replay blocker by matching the exact named-range area-broadcaster
-shape that live Calc uses for the bounded split-backed outcome, and direct
-authority and lifecycle replay are now admitted on that same
-`GlobalSingleAreaSameSheet` surface.
-
-## Current Roadmap
-
-The blocker-clearance program is now closed. Its final reassessment is in
-[COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md).
-
-The roadmap should now stay tightly ordered around real authority-transfer
-programs first, and bounded substrate widening only when it materially enables
-them.
-
-For an aggressive multi-blocker execution plan that attacks the full
-remaining frontier as one staged program, see
-[COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md).
-
-For the focused pass that closed the repair-sensitive frontier, see
-[COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md](COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md).
-Its final decision is in
-[COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md).
-
-The named-range structural rollout clearance pass is now complete:
-
-- [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_EVIDENCE.md)
-
-### Priority 1: Broaden InterpretTail Delegation Beyond The First Capability Cluster
-
-The first evaluator capability-cluster expansion is now complete.
-
-The highest-value next move is no longer "prove that the seam can widen."
-That bar is met. The next move is to broaden the live delegated surface
-beyond the current bounded scalar-input and bounded lookup/index cluster:
-
-- keep the live `InterpretTail` routing seam
-- first use the new corpus baseline to reduce the largest retained hotspots
-  on the already-landed function families:
-  - unsupported formula shape
-  - shadow mismatch
-  - unsupported host surface
-- then widen workbook-local evaluator coverage beyond scalar and single-cell
-  result surfaces once those hotspots are lower
-- keep fallback-first delegation and shadow comparison as the migration bar
-
-The completed evaluator closeouts are:
-
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_EVIDENCE.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_PLAN.md)
-
-### Priority 2: Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
-
-Further bounded substrate widening remains useful only when it directly
-enables the evaluator migration or removes a concrete fallback reason from the
-live authority-transfer program.
+Historical substrate frontier items that do not meet one of those bars
+remain archived reference material only.
 
 ## Biggest Remaining Blockers
 
-The main blockers are now clear and concrete.
+The highest-value remaining blockers are now:
 
-### 1. InterpretTail Delegation Is Still Bounded To The First Capability Cluster
+1. ambient live-routing reach:
+   the full replay corpus still shows only `303` seen formulas out of
+   `50,661`
+2. ambient unsupported-shape fallout:
+   the biggest full-corpus fallback class is still
+   `unsupported_formula_shape=253`
+3. promoted-family residual parity:
+   `shadow_mismatch=64`
+4. promoted-family residual host access:
+   `unsupported_host_surface=19`
+5. first real Calc-path retirement:
+   one family is hard-routed, but no `ScInterpreter` subroutine has been
+   deleted yet
 
-The biggest live-authority blocker is no longer the absence of delegation or
-the literal-only restriction. It is the remaining boundedness of the promoted
-cluster.
+## Recommended Next Pass
 
-- `ScFormulaCell::InterpretTail` now carries engine-first routing for bounded
-  host-backed text parsing and bounded workbook-local lookup/index reads
-- the new Calc-backed replay runner no longer dies at pure parse failure;
-  it now records real authoritative usage on the promoted families
-- that means the immediate live blocker has shifted from source bridging to
-  semantic completion on the current cluster:
-  - residual `LOOKUP` unsupported promoted-family shapes
-  - residual `LOOKUP` / `VLOOKUP` shadow mismatches
-  - residual lookup/index host-surface exclusions
-- but broader workbook-local evaluator surfaces still fall back to Calc
-- the current seam still excludes matrix/spill-returning lookup/index
-  shapes, multi-cell slice results, and broader external or
-  environment-sensitive families
+The next pass should:
 
-If the program wants substantive authority relocation, the next work must
-first finish converting the remaining high-volume lookup-family hotspots on
-the existing cluster, then extend evaluator breadth beyond it.
+1. increase the full-corpus `interpret_tail_live_seen_total`
+2. convert current ambient `unsupported_formula_shape` fallout
+3. reduce retained lookup/index `shadow_mismatch` and
+   `unsupported_host_surface`
+4. only then expand to the next evaluator capability class
 
-### 2. Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
+## Navigation
 
-The structural slice is still intentionally narrow even without named ranges.
+Use these documents in order:
 
-Broader shared-group-sensitive structural behavior outside the bounded exact
-same-sheet shareable structural surface remains outside the admitted slice
-until the engine can author the exact live after-topology for those classes
-too.
-
-### 3. Named-Range-Sensitive Structural Rollout Beyond The Admitted Shift Slice
-
-The broad named-range structural blocker is now narrower than it was before,
-not gone entirely.
-
-The admitted structural named-range surface now includes the bounded
-same-sheet global single-area shift-only lane. The retained named-range
-structural frontier is:
-
-- target-resize structural edits
-- off-sheet named-range structural consumers
-- sheet-local names
-- multi-area names
-- scope-ambiguous name sets
-
-Those classes still need exact live host proof before they can widen.
-
-## What Dropped Off The Blocker List
-
-Repair-sensitive normalization is no longer a top blocker on the current
-roadmap.
-
-The bounded direct off-sheet gap-closing insertion surface is no longer a
-top blocker either.
-
-The closeout pass proved that the host-uncategorized direct off-sheet lane
-was already exact on the existing bounded machinery:
-
-- live workbook-facade host shape still labels the family as `None`
-- direct authority now has the missing exact queue/graph/IR proof
-- lifecycle and mutation-entry already close as exact live apply
-
-That removes the last retained one-consumer-sheet direct off-sheet anomaly
-from the blocker list.
-
-The repair-sensitive closeout pass showed that the currently observed
-same-sheet structural repair families are better described as:
-
-- exact admitted families when the after-state closes exactly
-- deterministic rollback with explicit structural reasons when the observed
-  after-state diverges
-- explicit rejects outside the exact slice
-
-The closeout did not admit a new family, but it did remove the need for a
-separate open-ended repair-sensitive widening program on the current
-surface.
-
-The retained host shell is still real, but the blocker-clearance Phase 4
-pass showed that it is no longer a top opaque blocker on the admitted slice.
-
-The runtime already treats it as an explicit execution-and-observation shell
-around engine-authored records for realization, rollback, live apply,
-primitive execution, and final verification.
-
-That still limits any claim of broad host independence, but it is no longer
-the first thing that needs to change for the next admitted-slice widening
-pass.
-
-## Working Rules
-
-Any future widening should continue under the same rules:
-
-- do not sacrifice the zero-fallback replay baseline
-- prefer exact verification and explicit rollback over optimistic promotion
-- do not accept hidden dual authority where Calc remains the real source of
-  truth
-- treat performance and memory regressions as architecture issues
-- only widen one bounded family at a time
-- update this master document when the boundary changes
-
-## Historical Detail
-
-The detailed `COMPUTATIONAL_SUB*.md` documents remain in the repository as
-historical closeout records, experiments, and phase-by-phase archaeology.
-
-They are no longer the recommended way to understand the current state.
-
-For current understanding, use:
-
-- this master document
-- [COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md)
-- [PROJECT_STATUS.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/PROJECT_STATUS.md)
-
-For historical detail, use:
-
-- [../archive/](../archive/)
-- [../extraction-history/](../extraction-history/)
+1. [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md)
+2. [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md)
+3. [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
+4. [../archive/interpret_tail/](../archive/interpret_tail/)

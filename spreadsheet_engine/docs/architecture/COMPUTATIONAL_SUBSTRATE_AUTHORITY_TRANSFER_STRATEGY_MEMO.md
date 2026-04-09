@@ -210,8 +210,8 @@ The rest should live in archive material or commit history.
 The next active program should be:
 
 1. adopt this strategy rebaseline in the top-level docs
-2. create a concrete
-   [InterpretTail-to-engine-evaluator switchover plan](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md)
+2. create and maintain a concrete rolling
+   [InterpretTail migration ledger](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md)
 3. introduce production `Observe` and `ShadowCompare` modes for evaluator
    switchover
 4. route a narrow real formula family through the engine with fallback
