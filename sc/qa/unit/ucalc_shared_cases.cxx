@@ -727,6 +727,25 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(aIndex.maResult.maString));
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNormalization)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+    using spreadsheetengine::compat::libreoffice::toLibreOfficeString;
+
+    CPPUNIT_ASSERT_EQUAL(
+        u"of:=DATEVALUE([.A1])"_ustr,
+        toLibreOfficeString(setaileval::detail::normalizeFormulaSource(
+            u"oooc:=DATEVALUE([.A1])")));
+    CPPUNIT_ASSERT_EQUAL(
+        u"of:=VLOOKUP([.A1];[.B1:.C2];2;0)"_ustr,
+        toLibreOfficeString(setaileval::detail::normalizeFormulaSource(
+            u"oooc:=VLOOKUP([.A1];[.B1:.C2];2;0)")));
+    CPPUNIT_ASSERT_EQUAL(
+        u"of:=VALUE(\"4321\")"_ustr,
+        toLibreOfficeString(
+            setaileval::detail::normalizeFormulaSource(u"=VALUE(\"4321\")")));
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testDirectFormulaInspectionAdapter)
 {
     sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);

@@ -12,7 +12,9 @@
 #include <docoptio.hxx>
 #include <formula/errorcodes.hxx>
 #include <formula/grammar.hxx>
+#include <formulacell.hxx>
 #include <rangenam.hxx>
+#include <rtl/math.hxx>
 #include <scopetools.hxx>
 
 #include <spreadsheetengine/api/Host.hxx>
@@ -20,6 +22,7 @@
 #include <spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/detail/FodsLoader.hxx>
+#include <spreadsheetengine/detail/OdfFormulaParser.hxx>
 #include <spreadsheetengine/detail/WorkbookModel.hxx>
 
 #include <algorithm>
@@ -28,7 +31,9 @@
 #include <iomanip>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace
@@ -78,6 +83,26 @@ class TestInterpretTailCorpus : public ScUcalcTestBase
 {
 };
 
+const char* functionKindName(FunctionKind eFunction);
+const char* fallbackReasonName(FallbackReason eReason);
+
+struct ProbeDiagnosticSample
+{
+    OUString maWorkbookLabel;
+    OUString maCellAddress;
+    OUString maFormulaSource;
+    OUString maFunctionName;
+    OUString maOutcome;
+    OUString maCalcResult;
+    OUString maEngineResult;
+};
+
+std::vector<ProbeDiagnosticSample>& probeDiagnosticSamples()
+{
+    static std::vector<ProbeDiagnosticSample> aSamples;
+    return aSamples;
+}
+
 bool envEnabled(const char* pName)
 {
     const char* pValue = std::getenv(pName);
@@ -86,6 +111,33 @@ bool envEnabled(const char* pName)
 
     const std::string aValue(pValue);
     return !aValue.empty() && aValue != "0" && aValue != "off" && aValue != "false";
+}
+
+void resetProbeDiagnosticSamples()
+{
+    probeDiagnosticSamples().clear();
+}
+
+void maybeAddProbeDiagnosticSample(const OUString& rWorkbookLabel, const ScDocument& rDoc,
+    const ScAddress& rPos, const OUString& rFormulaSource, FunctionKind eFunction,
+    const OUString& rOutcome, const OUString& rCalcResult, const OUString& rEngineResult)
+{
+    if (!envEnabled("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_PROBE_DIAGNOSTICS"))
+        return;
+
+    auto& rSamples = probeDiagnosticSamples();
+    if (rSamples.size() >= 20)
+        return;
+
+    ProbeDiagnosticSample aSample;
+    aSample.maWorkbookLabel = rWorkbookLabel;
+    aSample.maCellAddress = rPos.Format(ScRefFlags::ADDR_ABS_3D, &rDoc, rDoc.GetAddressConvention());
+    aSample.maFormulaSource = rFormulaSource;
+    aSample.maFunctionName = OUString::fromUtf8(functionKindName(eFunction));
+    aSample.maOutcome = rOutcome;
+    aSample.maCalcResult = rCalcResult;
+    aSample.maEngineResult = rEngineResult;
+    rSamples.push_back(std::move(aSample));
 }
 
 std::vector<std::filesystem::path> collectFodsFiles(const std::filesystem::path& rPath)
@@ -114,6 +166,13 @@ std::vector<std::filesystem::path> collectFodsFiles(const std::filesystem::path&
 
 std::vector<std::filesystem::path> collectDefaultReplayCorpus()
 {
+    if (const char* pPath = std::getenv("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_PATH"))
+    {
+        const auto aFiles = collectFodsFiles(std::filesystem::path(pPath));
+        if (!aFiles.empty())
+            return aFiles;
+    }
+
     const std::filesystem::path aRepoRoot
         = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
 
@@ -357,7 +416,161 @@ std::size_t materializeWorkbookToCalc(
         }
     }
 
+    rDoc.StartAllListeners();
+    rDoc.TrackFormulas();
+
     return nFormulaCellCount;
+}
+
+FunctionKind classifySupportedProbeFunction(spreadsheetengine::api::StringView rFormula)
+{
+    const auto aParse = spreadsheetengine::core::formula::parseFormula(rFormula);
+    if (!aParse || !aParse.mpRoot
+        || aParse.mpRoot->meKind != spreadsheetengine::core::formula::NodeKind::FunctionCall)
+    {
+        return FunctionKind::Unknown;
+    }
+
+    const auto aFunctionName
+        = spreadsheetengine::compat::libreoffice::interprettaileval::detail::uppercaseAscii(
+            aParse.mpRoot->maPrimaryText);
+    if (aFunctionName == u"VALUE")
+        return FunctionKind::Value;
+    if (aFunctionName == u"DATEVALUE")
+        return FunctionKind::DateValue;
+    if (aFunctionName == u"TIMEVALUE")
+        return FunctionKind::TimeValue;
+    if (aFunctionName == u"NUMBERVALUE")
+        return FunctionKind::NumberValue;
+    if (aFunctionName == u"MATCH")
+        return FunctionKind::Match;
+    if (aFunctionName == u"XMATCH" || aFunctionName == u"COM.MICROSOFT.XMATCH")
+        return FunctionKind::XMatch;
+    if (aFunctionName == u"LOOKUP")
+        return FunctionKind::Lookup;
+    if (aFunctionName == u"VLOOKUP")
+        return FunctionKind::VLookup;
+    if (aFunctionName == u"HLOOKUP")
+        return FunctionKind::HLookup;
+    if (aFunctionName == u"INDEX")
+        return FunctionKind::Index;
+    return FunctionKind::Unknown;
+}
+
+std::size_t runSupportedInterpretTailProbe(
+    const Workbook& rWorkbook, ScDocument& rDoc, const OUString& rWorkbookLabel)
+{
+    std::size_t nProbeCount = 0;
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    for (std::size_t nSheet = 0; nSheet < rWorkbook.maSheets.size(); ++nSheet)
+    {
+        for (const auto& rEntry : rWorkbook.maSheets[nSheet].maCells)
+        {
+            const Cell& rCell = rEntry.second;
+            if (!rCell.hasFormula())
+                continue;
+
+            if (classifySupportedProbeFunction(rCell.maFormula) == FunctionKind::Unknown)
+                continue;
+
+            const ScAddress aPos(static_cast<SCCOL>(rEntry.first.first),
+                static_cast<SCROW>(rEntry.first.second), static_cast<SCTAB>(nSheet));
+            ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+            if (!pFormula)
+                continue;
+
+            const OUString aFormulaSource = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF,
+                pContext);
+            const auto aAttempt
+                = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
+                    rDoc, *pContext, aPos,
+                    std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+                    rDoc.GetCalcConfig().mbEmptyStringAsZero);
+
+            if (!aAttempt.mbSupported)
+            {
+                maybeAddProbeDiagnosticSample(
+                    rWorkbookLabel, rDoc, aPos, aFormulaSource, aAttempt.meFunction,
+                    u"fallback"_ustr, OUString(), OUString::fromUtf8(fallbackReasonName(aAttempt.meFallbackReason)));
+                spreadsheetengine::compat::libreoffice::interprettaileval::recordAuthoritativeFallback(
+                    aAttempt.meFallbackReason, aAttempt.meFunction);
+                ++nProbeCount;
+                continue;
+            }
+
+            bool bMatchesCalc = false;
+            OUString aCalcResult;
+            OUString aEngineResult;
+            const auto& rExpected = rCell.maValue;
+            if (aAttempt.maResult.meType
+                == spreadsheetengine::api::formulavalue::ValueType::Error)
+            {
+                aCalcResult = rExpected.isError()
+                                  ? u"error:"_ustr
+                                        + OUString::number(static_cast<int>(toFormulaError(
+                                            rExpected.meError)))
+                                  : u"non_error"_ustr;
+                aEngineResult = u"error:"_ustr
+                                + OUString::number(static_cast<int>(
+                                    spreadsheetengine::compat::libreoffice::toFormulaError(
+                                        aAttempt.maResult.meError)));
+                bMatchesCalc = rExpected.isError()
+                               && toFormulaError(rExpected.meError)
+                                      == spreadsheetengine::compat::libreoffice::toFormulaError(
+                                          aAttempt.maResult.meError);
+            }
+            else if (aAttempt.maResult.meType
+                     == spreadsheetengine::api::formulavalue::ValueType::Value)
+            {
+                aCalcResult = rExpected.isNumber() || rExpected.isBoolean()
+                                  ? OUString::number(rExpected.mfNumber)
+                                  : u"non_numeric"_ustr;
+                aEngineResult = OUString::number(aAttempt.maResult.mfValue);
+                bMatchesCalc = (rExpected.isNumber() || rExpected.isBoolean())
+                               && rtl::math::approxEqual(rExpected.mfNumber,
+                                   aAttempt.maResult.mfValue);
+            }
+            else if (aAttempt.maResult.meType
+                     == spreadsheetengine::api::formulavalue::ValueType::String)
+            {
+                aCalcResult = rExpected.isText()
+                                  ? spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                                        rExpected.maString)
+                                  : u"non_text"_ustr;
+                aEngineResult = spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                    aAttempt.maResult.maString);
+                bMatchesCalc = rExpected.isText()
+                               && spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                                      rExpected.maString)
+                                      == spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                                          aAttempt.maResult.maString);
+            }
+
+            if (bMatchesCalc)
+            {
+                maybeAddProbeDiagnosticSample(
+                    rWorkbookLabel, rDoc, aPos, aFormulaSource, aAttempt.meFunction,
+                    u"authoritative"_ustr, aCalcResult, aEngineResult);
+                spreadsheetengine::compat::libreoffice::interprettaileval::recordAuthoritativeRoute(
+                    aAttempt.meFunction);
+            }
+            else
+            {
+                maybeAddProbeDiagnosticSample(
+                    rWorkbookLabel, rDoc, aPos, aFormulaSource, aAttempt.meFunction,
+                    u"shadow_mismatch"_ustr, aCalcResult, aEngineResult);
+                spreadsheetengine::compat::libreoffice::interprettaileval::recordAuthoritativeFallback(
+                    spreadsheetengine::compat::libreoffice::interprettaileval::FallbackReason::ShadowMismatch,
+                    aAttempt.meFunction);
+            }
+            ++nProbeCount;
+        }
+    }
+
+    return nProbeCount;
 }
 
 const char* functionKindName(FunctionKind eFunction)
@@ -459,6 +672,59 @@ void printStats(std::size_t nWorkbookCount, std::size_t nFormulaCellCount, const
     }
 }
 
+void printDiagnosticSamples()
+{
+    if (!envEnabled("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_DIAGNOSTICS"))
+        return;
+
+    const auto aSamples
+        = spreadsheetengine::compat::libreoffice::interprettaileval::getDiagnosticSamples();
+    std::cout << "interpret_tail_diagnostic_sample_count=" << aSamples.size() << '\n';
+    for (std::size_t nIndex = 0; nIndex < aSamples.size(); ++nIndex)
+    {
+        const auto& rSample = aSamples[nIndex];
+        std::cout << "interpret_tail_diagnostic_" << nIndex << "_reason="
+                  << fallbackReasonName(rSample.meReason) << '\n';
+        std::cout << "interpret_tail_diagnostic_" << nIndex << "_workbook="
+                  << rSample.maWorkbookLabel.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_diagnostic_" << nIndex << "_cell="
+                  << rSample.maCellAddress.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_diagnostic_" << nIndex << "_root_kind="
+                  << rSample.maRootKind.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_diagnostic_" << nIndex << "_raw="
+                  << rSample.maRawFormula.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_diagnostic_" << nIndex << "_normalized="
+                  << rSample.maNormalizedFormula.toUtf8().getStr() << '\n';
+    }
+}
+
+void printProbeDiagnosticSamples()
+{
+    if (!envEnabled("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_PROBE_DIAGNOSTICS"))
+        return;
+
+    const auto& rSamples = probeDiagnosticSamples();
+    std::cout << "interpret_tail_probe_diagnostic_sample_count=" << rSamples.size() << '\n';
+    for (std::size_t nIndex = 0; nIndex < rSamples.size(); ++nIndex)
+    {
+        const auto& rSample = rSamples[nIndex];
+        std::cout << "interpret_tail_probe_diagnostic_" << nIndex << "_workbook="
+                  << rSample.maWorkbookLabel.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_probe_diagnostic_" << nIndex << "_cell="
+                  << rSample.maCellAddress.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_probe_diagnostic_" << nIndex << "_function="
+                  << rSample.maFunctionName.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_probe_diagnostic_" << nIndex << "_outcome="
+                  << rSample.maOutcome.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_probe_diagnostic_" << nIndex << "_formula="
+                  << rSample.maFormulaSource.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_probe_diagnostic_" << nIndex << "_calc_result="
+                  << rSample.maCalcResult.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_probe_diagnostic_" << nIndex << "_engine_result="
+                  << rSample.maEngineResult.toUtf8().getStr() << '\n';
+    }
+}
+
 OUString makeSafeSheetName(std::size_t nSheetIndex)
 {
     return u"ReplaySheet"_ustr + OUString::number(static_cast<sal_Int32>(nSheetIndex + 1));
@@ -545,11 +811,13 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     CPPUNIT_ASSERT_MESSAGE("replay corpus should not be empty", !aCorpus.empty());
 
     ScopedEnvironmentOverride aModeOverride(
-        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
     spreadsheetengine::compat::libreoffice::interprettaileval::resetStats();
+    resetProbeDiagnosticSamples();
 
     std::size_t nWorkbookCount = 0;
     std::size_t nFormulaCellCount = 0;
+    std::size_t nProbeFormulaCount = 0;
     for (const auto& rWorkbookPath : aCorpus)
     {
         const auto aLoadResult = loadWorkbook(rWorkbookPath.string());
@@ -569,7 +837,13 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
 
         {
             sc::AutoCalcSwitch aCalcSwitch(rDoc, true);
-            rDoc.CalcAll();
+            spreadsheetengine::compat::libreoffice::interprettaileval::setDiagnosticWorkbookLabel(
+                OUString::fromUtf8(rWorkbookPath.string()));
+            xDocShell->DoHardRecalc();
+            nProbeFormulaCount += runSupportedInterpretTailProbe(
+                aWorkbook, rDoc, OUString::fromUtf8(rWorkbookPath.string()));
+            spreadsheetengine::compat::libreoffice::interprettaileval::setDiagnosticWorkbookLabel(
+                OUString());
         }
 
         xDocShell->DoClose();
@@ -579,8 +853,23 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     const auto aStats
         = spreadsheetengine::compat::libreoffice::interprettaileval::getStatsSnapshot();
     printStats(nWorkbookCount, nFormulaCellCount, aStats);
+    std::cout << "interpret_tail_probe_formula_cells=" << nProbeFormulaCount << '\n';
+    printDiagnosticSamples();
+    printProbeDiagnosticSamples();
 
     CPPUNIT_ASSERT_EQUAL(aCorpus.size(), nWorkbookCount);
+    CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should visit at least one cell",
+        nProbeFormulaCount > 0);
+    CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should record authoritative usage",
+        aStats.mnAuthoritativeCount > 0);
+    CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should attempt at least one promoted family",
+        aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(FunctionKind::Value)]
+                + aStats.maFunctionFallbackCount[static_cast<std::size_t>(FunctionKind::Value)]
+                + aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(FunctionKind::Match)]
+                + aStats.maFunctionFallbackCount[static_cast<std::size_t>(FunctionKind::Match)]
+                + aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(FunctionKind::Lookup)]
+                + aStats.maFunctionFallbackCount[static_cast<std::size_t>(FunctionKind::Lookup)]
+            > 0);
 }
 
 } // namespace

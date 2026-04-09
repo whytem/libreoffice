@@ -15,8 +15,11 @@
 #include <cmath>
 #include <cstdlib>
 #include <limits>
+#include <mutex>
 #include <optional>
+#include <string>
 #include <string_view>
+#include <vector>
 
 #include <document.hxx>
 #include <formula/grammar.hxx>
@@ -111,6 +114,16 @@ struct StatsSnapshot
         maFunctionFallbackCount {};
 };
 
+struct DiagnosticSample
+{
+    FallbackReason meReason = FallbackReason::UnsupportedFormulaShape;
+    OUString maWorkbookLabel;
+    OUString maCellAddress;
+    OUString maRawFormula;
+    OUString maNormalizedFormula;
+    OUString maRootKind;
+};
+
 namespace detail
 {
 
@@ -143,9 +156,22 @@ struct StatsStore
         maFunctionFallbackCount {};
 };
 
+struct DiagnosticStore
+{
+    std::mutex maMutex;
+    std::vector<DiagnosticSample> maSamples;
+    OUString maWorkbookLabel;
+};
+
 [[nodiscard]] inline StatsStore& statsStore()
 {
     static StatsStore aStore;
+    return aStore;
+}
+
+[[nodiscard]] inline DiagnosticStore& diagnosticStore()
+{
+    static DiagnosticStore aStore;
     return aStore;
 }
 
@@ -169,6 +195,31 @@ struct StatsStore
     return !rValue.empty() && rValue != "0" && rValue != "off" && rValue != "false";
 }
 
+[[nodiscard]] inline bool diagnosticsEnabled()
+{
+    if (const char* pValue = std::getenv("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_DIAGNOSTICS"))
+        return envEnabled(pValue);
+    return false;
+}
+
+[[nodiscard]] inline std::size_t diagnosticSampleLimit()
+{
+    if (const char* pValue = std::getenv("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_DIAGNOSTIC_LIMIT"))
+    {
+        try
+        {
+            const int nLimit = std::stoi(pValue);
+            if (nLimit > 0)
+                return static_cast<std::size_t>(nLimit);
+        }
+        catch (...)
+        {
+        }
+    }
+
+    return 24;
+}
+
 [[nodiscard]] inline api::String uppercaseAscii(api::StringView rValue)
 {
     api::String aNormalized(rValue);
@@ -178,6 +229,35 @@ struct StatsStore
             rChar = static_cast<char16_t>(rChar - u'a' + u'A');
     }
     return aNormalized;
+}
+
+[[nodiscard]] inline bool isAsciiNamespaceChar(char16_t c)
+{
+    return (c >= u'a' && c <= u'z') || (c >= u'A' && c <= u'Z')
+           || (c >= u'0' && c <= u'9') || c == u'.' || c == u'_' || c == u'-';
+}
+
+[[nodiscard]] inline std::size_t leadingNamespacePrefixLength(std::u16string_view rSource)
+{
+    if (rSource.empty())
+        return 0;
+
+    if (!((rSource.front() >= u'a' && rSource.front() <= u'z')
+          || (rSource.front() >= u'A' && rSource.front() <= u'Z')))
+    {
+        return 0;
+    }
+
+    for (std::size_t i = 1; i < rSource.size(); ++i)
+    {
+        const char16_t c = rSource[i];
+        if (c == u':')
+            return i + 1;
+        if (!isAsciiNamespaceChar(c))
+            return 0;
+    }
+
+    return 0;
 }
 
 [[nodiscard]] inline OUString normalizeReferenceToken(api::StringView rValue)
@@ -210,8 +290,21 @@ struct StatsStore
 {
     if (rSource.rfind(u"of:=", 0) == 0)
         return api::String(rSource);
+    if (rSource.rfind(u"of:", 0) == 0)
+        return api::String(rSource);
 
     const std::u16string_view aTrimmed = trimFormulaEquals(rSource);
+    if (aTrimmed.rfind(u"of:=", 0) == 0 || aTrimmed.rfind(u"of:", 0) == 0)
+        return api::String(aTrimmed);
+
+    if (const std::size_t nPrefixLen = leadingNamespacePrefixLength(aTrimmed))
+    {
+        api::String aCanonical(u"of:");
+        aCanonical.append(aTrimmed.begin() + static_cast<std::ptrdiff_t>(nPrefixLen),
+            aTrimmed.end());
+        return aCanonical;
+    }
+
     api::String aNormalized(u"of:=");
     aNormalized.append(aTrimmed.begin(), aTrimmed.end());
     return aNormalized;
@@ -240,6 +333,66 @@ struct StatsStore
     if (rFunctionName == u"INDEX")
         return FunctionKind::Index;
     return FunctionKind::Unknown;
+}
+
+[[nodiscard]] inline OUString rootKindName(core::formula::NodeKind eKind)
+{
+    switch (eKind)
+    {
+        case core::formula::NodeKind::FunctionCall:
+            return u"FunctionCall"_ustr;
+        case core::formula::NodeKind::NumberLiteral:
+            return u"NumberLiteral"_ustr;
+        case core::formula::NodeKind::StringLiteral:
+            return u"StringLiteral"_ustr;
+        case core::formula::NodeKind::BooleanLiteral:
+            return u"BooleanLiteral"_ustr;
+        case core::formula::NodeKind::ErrorLiteral:
+            return u"ErrorLiteral"_ustr;
+        case core::formula::NodeKind::CellReference:
+            return u"CellReference"_ustr;
+        case core::formula::NodeKind::RangeReference:
+            return u"RangeReference"_ustr;
+        case core::formula::NodeKind::NamedReference:
+            return u"NamedReference"_ustr;
+        case core::formula::NodeKind::RangeConstructor:
+            return u"RangeConstructor"_ustr;
+        case core::formula::NodeKind::ReferenceList:
+            return u"ReferenceList"_ustr;
+        case core::formula::NodeKind::ArrayConstant:
+            return u"ArrayConstant"_ustr;
+        case core::formula::NodeKind::UnaryOperation:
+            return u"UnaryOperation"_ustr;
+        case core::formula::NodeKind::BinaryOperation:
+            return u"BinaryOperation"_ustr;
+        case core::formula::NodeKind::EmptyArgument:
+            return u"EmptyArgument"_ustr;
+    }
+
+    return u"Unknown"_ustr;
+}
+
+inline void recordDiagnosticSample(FallbackReason eReason, const ScDocument& rDoc,
+    const ScAddress& rFormulaPos, std::u16string_view rRawFormula,
+    std::u16string_view rNormalizedFormula, std::optional<core::formula::NodeKind> oRootKind)
+{
+    if (!diagnosticsEnabled())
+        return;
+
+    auto& rStore = diagnosticStore();
+    std::scoped_lock aGuard(rStore.maMutex);
+    if (rStore.maSamples.size() >= diagnosticSampleLimit())
+        return;
+
+    DiagnosticSample aSample;
+    aSample.meReason = eReason;
+    aSample.maWorkbookLabel = rStore.maWorkbookLabel;
+    aSample.maCellAddress = rFormulaPos.Format(ScRefFlags::ADDR_ABS_3D, &rDoc, rDoc.GetAddressConvention());
+    aSample.maRawFormula = toLibreOfficeString(api::String(rRawFormula));
+    aSample.maNormalizedFormula = toLibreOfficeString(api::String(rNormalizedFormula));
+    if (oRootKind)
+        aSample.maRootKind = rootKindName(*oRootKind);
+    rStore.maSamples.push_back(std::move(aSample));
 }
 
 template <typename T>
@@ -1119,11 +1272,17 @@ template <typename T>
     const api::String aNormalized = detail::normalizeFormulaSource(rFormulaSource);
     const auto aParse = core::formula::parseFormula(aNormalized);
     if (!aParse || !aParse.mpRoot)
+    {
+        detail::recordDiagnosticSample(FallbackReason::ParseFailure, rDoc, rFormulaPos,
+            rFormulaSource, aNormalized, std::nullopt);
         return detail::makeUnsupported(FunctionKind::Unknown, FallbackReason::ParseFailure);
+    }
 
     const auto& rRoot = *aParse.mpRoot;
     if (rRoot.meKind != core::formula::NodeKind::FunctionCall)
     {
+        detail::recordDiagnosticSample(FallbackReason::UnsupportedFormulaShape, rDoc, rFormulaPos,
+            rFormulaSource, aNormalized, rRoot.meKind);
         return detail::makeUnsupported(
             FunctionKind::Unknown, FallbackReason::UnsupportedFormulaShape);
     }
@@ -1152,6 +1311,10 @@ inline void resetStats()
         rValue.store(0);
     for (auto& rValue : rStore.maFunctionFallbackCount)
         rValue.store(0);
+
+    auto& rDiagnostics = detail::diagnosticStore();
+    std::scoped_lock aGuard(rDiagnostics.maMutex);
+    rDiagnostics.maSamples.clear();
 }
 
 [[nodiscard]] inline StatsSnapshot getStatsSnapshot()
@@ -1223,6 +1386,20 @@ inline void recordShadowMatch()
 inline void recordMismatch(MismatchReason eReason)
 {
     detail::statsStore().maMismatchReasons[detail::toIndex(eReason)].fetch_add(1);
+}
+
+inline void setDiagnosticWorkbookLabel(const OUString& rWorkbookLabel)
+{
+    auto& rStore = detail::diagnosticStore();
+    std::scoped_lock aGuard(rStore.maMutex);
+    rStore.maWorkbookLabel = rWorkbookLabel;
+}
+
+inline std::vector<DiagnosticSample> getDiagnosticSamples()
+{
+    auto& rStore = detail::diagnosticStore();
+    std::scoped_lock aGuard(rStore.maMutex);
+    return rStore.maSamples;
 }
 
 } // namespace spreadsheetengine::compat::libreoffice::interprettaileval

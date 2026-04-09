@@ -1990,7 +1990,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
             }
             else
             {
-                const OUString aFormulaSource = GetFormula(FormulaGrammar::GRAM_PODF, &rContext);
+                const OUString aFormulaSource = GetFormula(FormulaGrammar::GRAM_ODFF, &rContext);
                 oEngineAttempt = setaileval::tryEvaluateFormula(
                     rDocument, rContext, aPos,
                     std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
