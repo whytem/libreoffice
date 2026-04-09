@@ -160,6 +160,10 @@ clean authoritative routing by:
 3. increasing the share of natural live seam traffic that reaches the same
    promoted-family path without needing the focused probe
 
+That immediate follow-on pass is now:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md)
+
 ## Validation Summary
 
 The validating proof for this pass is summarized in:

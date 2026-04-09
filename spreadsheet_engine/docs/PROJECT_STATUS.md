@@ -201,6 +201,9 @@ board." The next job is to reduce unsupported-shape, mismatch, and
 host-surface fallout on the already-promoted families before another broad
 function-wave expansion.
 
+That immediate follow-on pass is now
+[architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md).
+
 ## Current Opt-In Narrow Rollout Surface
 
 The admitted rollout surface currently includes:
