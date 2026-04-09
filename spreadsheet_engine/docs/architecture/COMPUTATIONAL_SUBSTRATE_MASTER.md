@@ -210,22 +210,24 @@ The completed closeouts for the current evaluator migration waves are:
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md)
-
-The immediate next evaluator pass is now:
-
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_EVIDENCE.md)
 
-That pass is intentionally narrower than another capability-wave expansion.
-The new Calc-backed replay runner proved the seam is being reached, but the
-current corpus still closes at:
+The first replay-corpus authoritative-usage pass is now also complete.
 
-- `0` authoritative routes
-- `303` authoritative fallbacks
-- `303` `parse_failure`
+The completed Calc-backed corpus probe now freezes:
 
-So the next job is to make the live formula-source bridge parseable enough to
-produce the first non-zero authoritative replay-corpus routes on the already
-implemented function families.
+- `interpret_tail_probe_formula_cells=1391`
+- `interpret_tail_authoritative_total=996`
+- `interpret_tail_authoritative_fallback_total=395`
+- `interpret_tail_fallback_parse_failure=0`
+
+The most important caveat on that new baseline is:
+
+- it is a Calc-backed supported-family probe over live formula source
+- it is not yet a claim that natural ambient AutoCalc traffic already
+  produces the same authoritative totals by default
 
 ## Current Admitted Authority And Rollout Slice
 
@@ -383,16 +385,14 @@ That bar is met. The next move is to broaden the live delegated surface
 beyond the current bounded scalar-input and bounded lookup/index cluster:
 
 - keep the live `InterpretTail` routing seam
-- first convert the replay corpus from `0` authoritative / `303`
-  `parse_failure` into real authoritative usage on the already-landed
-  function families
+- first use the new corpus baseline to reduce the largest retained hotspots
+  on the already-landed function families:
+  - unsupported formula shape
+  - shadow mismatch
+  - unsupported host surface
 - then widen workbook-local evaluator coverage beyond scalar and single-cell
-  result surfaces
+  result surfaces once those hotspots are lower
 - keep fallback-first delegation and shadow comparison as the migration bar
-
-The immediate focused pass for that blocker is:
-
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md)
 
 The completed evaluator closeouts are:
 
@@ -402,6 +402,9 @@ The completed evaluator closeouts are:
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_EVIDENCE.md)
 
 ### Priority 2: Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
 
@@ -421,20 +424,21 @@ cluster.
 
 - `ScFormulaCell::InterpretTail` now carries engine-first routing for bounded
   host-backed text parsing and bounded workbook-local lookup/index reads
-- the new Calc-backed replay runner shows that the current corpus reaches the
-  seam but still records `0` authoritative routes and `303`
-  `parse_failure`
-- that means the immediate live blocker is formula-source bridging and
-  pre-authority function classification on the existing cluster, not only
-  breadth of supported semantics
+- the new Calc-backed replay runner no longer dies at pure parse failure;
+  it now records real authoritative usage on the promoted families
+- that means the immediate live blocker has shifted from source bridging to
+  semantic completion on the current cluster:
+  - unsupported promoted-family shapes
+  - retained shadow mismatches
+  - retained host-surface exclusions
 - but broader workbook-local evaluator surfaces still fall back to Calc
 - the current seam still excludes `XLOOKUP`, matrix/spill-returning
   lookup/index shapes, multi-cell slice results, and broader external or
   environment-sensitive families
 
 If the program wants substantive authority relocation, the next work must
-first turn the existing cluster into real authoritative corpus usage, then
-extend evaluator breadth beyond it.
+first improve support and mismatch rates on the existing cluster, then extend
+evaluator breadth beyond it.
 
 ### 2. Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
 

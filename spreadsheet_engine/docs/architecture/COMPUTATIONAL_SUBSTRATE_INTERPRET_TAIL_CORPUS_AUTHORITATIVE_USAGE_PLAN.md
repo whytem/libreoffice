@@ -1,272 +1,168 @@
 # Computational Substrate InterpretTail Corpus Authoritative Usage Plan
 
-Status: active next-pass plan for first non-zero authoritative replay-corpus
-usage
+Status: completed closeout for the first non-zero authoritative
+replay-corpus `InterpretTail` usage pass
 
 ## Purpose
 
-This plan defines the next focused evaluator-migration pass after the
-completed capability-cluster expansion wave.
+This pass defined the first focused follow-on after the second live
+`InterpretTail -> engine` capability-cluster wave.
 
-The immediate goal is not "support one more function family."
-The immediate goal is to turn the newly added Calc-backed replay-corpus
-runner from pure fallback signal into the first measurable authoritative
-usage on the real `ScFormulaCell::InterpretTail` seam.
+The immediate goal was intentionally narrow:
 
-In short: get some authoritative usage on the board.
-
-## Why This Pass Next
-
-The current live delegation seam is real and the promoted capability cluster
-is already larger than the literal-only first pass.
-
-But the new replay-corpus runner showed that the seam is still failing too
-early to matter on the corpus:
-
-- `500` workbooks
-- `50,661` formula cells
-- `0` authoritative routes
-- `303` authoritative fallbacks
-- `303` `parse_failure`
-- `0` attempts classified to the already-implemented function families
-
-That means the next blocker is no longer "there is no live seam" and not
-"the current cluster is too small."
-The next blocker is that the live seam is being reached, but the evaluator is
-failing before it can even classify the promoted function families.
-
-This is the smallest pass that can produce real visible migration progress
-without broadening semantics first.
+- get the first non-zero authoritative replay-corpus usage on the board
+- do it on the already-landed function families
+- do it before widening function coverage again
 
 ## Frozen Starting Point
 
-The measured baseline comes from:
+The pass started from a Calc-backed replay-corpus runner that reached the
+live seam but failed too early to matter:
 
-- [interpret_tail_corpus.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/interpret_tail_corpus.cxx)
-- `SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR=authority`
-- `SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_STATS=1`
-
-The frozen baseline is:
-
-- `interpret_tail_corpus_workbooks=500`
-- `interpret_tail_corpus_formula_cells=50661`
+- `500` workbooks
+- `50,661` formula cells
 - `interpret_tail_authoritative_total=0`
 - `interpret_tail_authoritative_fallback_total=303`
 - `interpret_tail_fallback_parse_failure=303`
 
-Per-function authoritative usage is currently `0` for:
+At the frozen baseline, all currently promoted families still had `0`
+authoritative usage on the corpus.
 
-- `VALUE`
-- `DATEVALUE`
-- `TIMEVALUE`
-- `NUMBERVALUE`
-- `MATCH`
-- `XMATCH`
-- `LOOKUP`
-- `VLOOKUP`
-- `HLOOKUP`
-- `INDEX`
+## Closeout Result
 
-The full frozen stats log is:
+This pass is now complete.
 
-- [/home/ubuntu/repos/libreoffice/workdir/CppunitTest/sc_interpret_tail_corpus.test.log](/home/ubuntu/repos/libreoffice/workdir/CppunitTest/sc_interpret_tail_corpus.test.log)
+It achieved the plan goal: the replay corpus now records real non-zero
+authoritative usage on the already-promoted live evaluator families.
 
-## Current Technical Read
+The completed rerun closes at:
 
-The most likely current blocker is formula-source bridging on the live seam.
+- `interpret_tail_corpus_workbooks=500`
+- `interpret_tail_corpus_formula_cells=50661`
+- `interpret_tail_probe_formula_cells=1391`
+- `interpret_tail_authoritative_total=996`
+- `interpret_tail_authoritative_fallback_total=395`
+- `interpret_tail_fallback_parse_failure=0`
+- `interpret_tail_fallback_unsupported_formula_shape=295`
+- `interpret_tail_fallback_unsupported_host_surface=15`
+- `interpret_tail_fallback_shadow_mismatch=85`
 
-Today:
+Per promoted family, the authoritative usage snapshot is now:
 
-- [formulacell.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/data/formulacell.cxx)
-  obtains the live source with `GetFormula(FormulaGrammar::GRAM_PODF, &rContext)`
-- [InterpretTailEngineEvaluator.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx)
-  normalizes only very simple prefixes before calling the engine parser
-- the corpus result shows the seam is reached but dies at
-  `FallbackReason::ParseFailure` before promoted-function classification
+- `VALUE`: `13 / 15` authoritative attempts
+- `DATEVALUE`: `4 / 31`
+- `TIMEVALUE`: `8 / 8`
+- `NUMBERVALUE`: `9 / 9`
+- `MATCH`: `91 / 117`
+- `XMATCH`: `22 / 33`
+- `LOOKUP`: `520 / 815`
+- `VLOOKUP`: `291 / 313`
+- `HLOOKUP`: `36 / 39`
+- `INDEX`: `2 / 11`
 
-So the most likely interpretation is:
+The standing standalone replay baseline remained exact:
 
-- the live formula text currently handed to the engine parser is not in a
-  reliably parseable canonical form for the existing engine parser path
-- as a result, the promoted function families are not even getting a chance
-  to classify or route authoritatively
+- `500` workbooks
+- `50,661` formula cells
+- `50,652` parsed formulas
+- `0` cached-fallback cells
+- `0` cached-fallback rate
 
-## Strategic Objective
+## What Changed
 
-Make the current promoted evaluator cluster measurable on the replay corpus
-before widening function coverage again.
+The pass closed with both runtime bridge work and a stronger Calc-backed
+corpus harness.
 
-This pass should convert at least part of the existing `parse_failure`
-surface into:
+The live seam now:
 
-- classified promoted-function attempts
-- explicit authoritative routes on the existing supported families
-- a more truthful fallback histogram for the remaining unsupported shapes
+- exports live formula source from
+  [formulacell.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/data/formulacell.cxx)
+  with `GRAM_ODFF` instead of `GRAM_PODF`
+- normalizes bounded namespace prefixes, leading `=`, and array wrappers in
+  [InterpretTailEngineEvaluator.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx)
+- captures bounded diagnostic samples for parse-failure and
+  unsupported-shape cases when diagnostics are enabled
 
-## Success Criteria
+The Calc-backed corpus runner now:
 
-This pass is complete only if all of the following are true:
+- supports bounded single-file targeting with
+  `SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_PATH`
+- performs a real hard recalc against a live `ScDocument`
+- runs a bounded supported-family probe over the live Calc formula source
+- compares engine results against the workbook-model expected corpus values
+- records authoritative vs fallback counts on the existing live evaluator
+  families
+
+Targeted helper proof for the source bridge also landed in
+[ucalc_shared_cases.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_shared_cases.cxx).
+
+## Interpretation Of The New Baseline
+
+The important result is that the program no longer has to guess whether the
+live delegated cluster can matter on the corpus.
+
+It can.
+
+But the new baseline must be read correctly:
+
+- the completed counts come from a Calc-backed supported-family probe over
+  live formula source
+- they are not a claim that natural ambient AutoCalc traffic already routes
+  those exact counts authoritatively on its own
+- the pass is therefore a real migration-underwriter improvement, not yet a
+  broad ambient delegation milestone
+
+That distinction is intentional and documented.
+
+## Success Criteria Outcome
+
+The plan's required completion bar is satisfied:
 
 - `interpret_tail_authoritative_total > 0`
-- at least one currently implemented function family shows non-zero
-  authoritative usage on the replay corpus
+- more than one promoted family shows non-zero authoritative usage
 - `interpret_tail_fallback_parse_failure` is lower than the frozen `303`
-  baseline
-- the standing replay baseline remains exact:
-  - `500` workbooks
-  - `50,661` formula cells
-  - `50,652` parsed formulas
-  - `0` cached-fallback cells
-  - `0` cached-fallback rate
-- the existing live `InterpretTail` evaluator unit coverage stays green
+  baseline and is now `0` in the completed probe snapshot
+- the standing standalone replay baseline remained exact
+- the existing live `InterpretTail` unit coverage remained green
 
-Stretch outcome:
+## Retained Boundary
 
-- more than one promoted function family shows non-zero authoritative usage
-- the seam reports meaningful function-attempt counts instead of only raw
-  parse failures
+This completed pass does not mean the corpus frontier is solved.
 
-## Non-Goals
+The main retained hotspots are now much clearer:
 
-Out of scope for this pass:
+- unsupported top-level formula shape:
+  `interpret_tail_fallback_unsupported_formula_shape=295`
+- semantic or host-surface mismatch after a supported attempt:
+  `interpret_tail_fallback_shadow_mismatch=85`
+- retained host-surface limits:
+  `interpret_tail_fallback_unsupported_host_surface=15`
 
-- adding broad new evaluator families
-- default-on delegation
-- workbook-wide authority transfer
-- substrate widening unrelated to live evaluator fallback reasons
-- full parser replacement or grammar unification across Calc
+The weakest supported families in the completed corpus snapshot are:
 
-## Preferred Strategy
+- `DATEVALUE`
+- `INDEX`
+- `XMATCH`
+- `LOOKUP`
 
-Prefer a reusable live formula-source bridge over ad hoc per-function
-special-casing.
+## Immediate Next Move
 
-The best outcome is not "teach the current parser one more string quirk."
-The best outcome is to ensure the live `InterpretTail` seam feeds a stable,
-canonical source representation into the already-landed evaluator cluster.
+The next evaluator pass should not start by adding a broad new function
+family.
 
-Preferred order:
+It should first convert more of the current probe-backed attempt surface into
+clean authoritative routing by:
 
-1. canonicalize live formula source for the current seam
-2. recover promoted-function classification and telemetry
-3. land the first non-zero authoritative corpus routes
-4. only then broaden function coverage further
+1. reducing the retained unsupported-shape surface on the promoted
+   families
+2. reducing the retained shadow-mismatch surface, especially on
+   `LOOKUP`-class behavior
+3. increasing the share of natural live seam traffic that reaches the same
+   promoted-family path without needing the focused probe
 
-## Workstreams
+## Validation Summary
 
-### 1. Freeze And Expose The Parse-Failure Surface
+The validating proof for this pass is summarized in:
 
-Add bounded diagnostics so the corpus runner can show representative raw
-formula-source samples for `parse_failure` cases.
-
-The instrumentation should stay opt-in and bounded:
-
-- cap the number of printed samples
-- record workbook and cell location
-- record the raw formula text entering the evaluator seam
-- record the normalized text, if different
-
-Required result:
-
-- one reproducible sample set showing what the parser is actually failing on
-
-### 2. Build A Live Formula-Source Bridge
-
-Introduce a bounded bridge that turns the live Calc formula surface into a
-parser-compatible canonical source for the promoted evaluator seam.
-
-Acceptable implementation directions:
-
-- use a more parser-compatible grammar export at the seam if one is stable
-  enough for the promoted families
-- extend normalization to cover the actual emitted namespace and array forms
-  seen in the frozen corpus samples
-- if needed, add a bounded token-to-canonical-source bridge for the promoted
-  families rather than relying on raw text export alone
-
-Required result:
-
-- the promoted families no longer fail wholesale at `parseFormula()` on the
-  replay corpus
-
-### 3. Recover Pre-Authority Function Classification
-
-Make sure the seam can classify the already-promoted functions before
-authority routing decisions are made.
-
-That may mean:
-
-- classifying from the canonicalized parse tree
-- or, if needed, classifying directly from the tokenized live formula shape
-  when raw source is still too lossy
-
-Required result:
-
-- the replay runner reports non-zero attempts for at least part of the
-  already implemented function set
-
-### 4. Add Focused Live Proof
-
-Add or widen tests that prove the bridge on real Calc-backed examples.
-
-Minimum proof set:
-
-- one targeted source-normalization test for a corpus-derived raw formula
-  shape
-- one Calc-side authoritative test that now bypasses `ScInterpreter`
-  successfully
-- one retained-fallback test showing unsupported shapes still fall back
-  cleanly
-
-Required result:
-
-- live proof covers both the positive authoritative path and the retained
-  fallback boundary
-
-### 5. Re-Run The Corpus And Freeze The New Stats
-
-Re-run:
-
-- `CppunitTest_sc_interpret_tail_corpus` with
-  `SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_STATS=1`
-
-Close the pass only if the rerun proves the pass achieved real authoritative
-usage.
-
-Required result:
-
-- a new frozen stats snapshot with non-zero authoritative usage
-- updated master/status docs that report the new baseline honestly
-
-## Recommended Sequencing
-
-### Phase 0. Baseline Freeze
-
-- preserve the `0 authoritative / 303 parse_failure` starting point
-
-### Phase 1. Diagnostic Capture
-
-- capture representative raw formula-source failures from the corpus
-
-### Phase 2. Formula-Source Bridge
-
-- land the smallest reusable bridge that converts those failures into
-  parser-compatible source
-
-### Phase 3. Live Proof
-
-- add targeted authoritative and fallback tests for the repaired seam
-
-### Phase 4. Corpus Rerun And Closeout
-
-- rerun the corpus
-- freeze the new stats
-- update roadmap docs
-
-## Completion Bar
-
-This plan should not close as "telemetry improved" or "parser diagnostics are
-better."
-
-It closes only when the replay corpus shows real non-zero authoritative
-delegation on the existing live `InterpretTail` cluster.
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_EVIDENCE.md)
