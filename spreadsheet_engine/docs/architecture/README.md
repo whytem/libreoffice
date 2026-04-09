@@ -13,6 +13,9 @@ This directory holds the active architecture references for
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md):
   rolling live evaluator migration ledger with the active family, current
   metrics, and current next target
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md):
+  active next-slice plan for improving the full replay corpus live-routing
+  denominator
 - [../PROJECT_STATUS.md](../PROJECT_STATUS.md):
   concise project-wide status snapshot
 

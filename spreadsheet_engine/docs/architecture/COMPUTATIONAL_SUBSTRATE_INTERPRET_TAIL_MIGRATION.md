@@ -13,6 +13,7 @@ Use it for:
 - the current live metrics
 - the current hard-routed or quarantined paths
 - the current next target
+- the active next-slice plan
 
 The older per-pass plan, decision, and evidence documents are retained in
 [../archive/interpret_tail/](../archive/interpret_tail/) for history only.
@@ -175,6 +176,10 @@ historical reference material, not active roadmap work.
 The next high-value pass should focus on ambient live-routing conversion, not
 another broad promoted-family wave.
 
+The active plan for that slice is:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md)
+
 Priority order:
 
 1. increase the full-corpus `interpret_tail_live_seen_total`
@@ -189,4 +194,3 @@ Priority order:
 The retired pass-by-pass ledger lives in:
 
 - [../archive/interpret_tail/](../archive/interpret_tail/)
-

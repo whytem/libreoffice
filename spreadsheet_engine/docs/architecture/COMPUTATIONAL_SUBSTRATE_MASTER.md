@@ -87,6 +87,8 @@ The strategy reset is recorded in
 [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md).
 The active current-state ledger is
 [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md).
+The active next-slice plan is
+[COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md).
 
 ## Engine-Owned Today
 
@@ -168,12 +170,17 @@ The next pass should:
    `unsupported_host_surface`
 4. only then expand to the next evaluator capability class
 
+The active execution plan for that slice is:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md)
+
 ## Navigation
 
 Use these documents in order:
 
 1. [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md)
 2. [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md)
-3. [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
-4. [../archive/interpret_tail/](../archive/interpret_tail/)
-5. [../archive/pre_pivot_substrate/](../archive/pre_pivot_substrate/)
+3. [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md)
+4. [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
+5. [../archive/interpret_tail/](../archive/interpret_tail/)
+6. [../archive/pre_pivot_substrate/](../archive/pre_pivot_substrate/)
