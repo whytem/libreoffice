@@ -144,9 +144,9 @@ The current opt-in narrow rollout surface includes:
 - exact same-sheet shareable named-range-combined `MemberExit`
   `SetScalarValue`, `SetFormula`, and `ClearCell` on that same bounded
   `GlobalSingleAreaSameSheet` surface
-- exact same-sheet shareable named-range-combined three-group split-backed
-  `SetFormula` attempts on mutation-entry, as normalization onto that same
-  bounded named-range `Regroup` surface
+- exact same-sheet shareable named-range-combined split-backed three-group
+  `SetFormula` replay on that same bounded `GlobalSingleAreaSameSheet`
+  named-range `Regroup` surface
 - exact same-workbook one-consumer-sheet direct off-sheet shared-group
   non-structural `MemberExit` `SetScalarValue`, `SetFormula`, and
   `ClearCell`
@@ -198,8 +198,6 @@ ownership boundary:
 - named-range-sensitive structural rollout
 - shared-group-sensitive structural behavior outside the bounded exact
   same-sheet shareable slice
-- direct authority and lifecycle replay of the bounded same-sheet
-  named-range split-backed three-group host shape
 - repair-sensitive structural after-state divergence that is intentionally
   rollback-only
 - off-sheet shared-group behavior outside the bounded one-consumer-sheet
@@ -226,9 +224,13 @@ the already-admitted member-exit path.
 The follow-on split-outcome pass then froze the exact remaining same-sheet
 three-group host shape. That pass proved the live outcome is a split-backed
 `Regroup`, not a true one-group collapse. It also proved that mutation-entry
-already carries that host-shaped regroup outcome exactly, while direct
-authority and lifecycle replay of the split-backed host shape remain
-deferred.
+already carries that host-shaped regroup outcome exactly.
+
+The direct split replay carry-through pass is now complete too. It closed
+the old replay blocker by matching the exact named-range area-broadcaster
+shape that live Calc uses for the bounded split-backed outcome, and direct
+authority and lifecycle replay are now admitted on that same
+`GlobalSingleAreaSameSheet` surface.
 
 ## Current Roadmap
 
@@ -247,25 +249,7 @@ For the focused pass that closed the repair-sensitive frontier, see
 Its final decision is in
 [COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md).
 
-### Priority 1: Direct Same-Sheet Split-Outcome Carry-Through
-
-The focused same-sheet split-outcome pass is now complete:
-
-- [COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md](COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_SAME_SHEET_SPLIT_REPLAY_CARRY_THROUGH_PLAN.md](COMPUTATIONAL_SUBSTRATE_SAME_SHEET_SPLIT_REPLAY_CARRY_THROUGH_PLAN.md)
-
-It closed the user-facing mutation-entry lane as admitted normalization onto
-the bounded named-range `Regroup` surface, but it did not clear the direct
-authority or lifecycle replay boundary for the exact split-backed host
-shape.
-
-If same-sheet widening continues next, the remaining narrow blocker is:
-
-- exact direct authority replay of that split-backed host shape
-- exact direct lifecycle replay of that split-backed host shape
-
-### Priority 2: Broader Off-Sheet Shared-Group Behavior
+### Priority 1: Narrow Off-Sheet Gap-Closing Insertion Surface
 
 The direct one-consumer-sheet off-sheet `MemberExit`,
 `SameTextPreserve`, and `Regroup` lanes are admitted, and the bounded
@@ -286,7 +270,7 @@ The pass also established two important off-sheet host-shape facts:
   gap-closing insertion where live Calc merges after-topology but does not
   expose a stable mutation-family classification
 
-### Priority 3: Reassess Broad Ownership Expansion
+### Priority 2: Reassess Broad Ownership Expansion
 
 Only after the above should the project revisit any question of broader
 storage or host-surface transfer.
@@ -299,21 +283,7 @@ success.
 
 The main blockers are now clear and concrete.
 
-### 1. Direct Replay Of The Same-Sheet Split-Backed Host Shape
-
-The same-sheet split-outcome pass proved that the remaining bounded
-three-group host shape is not a true one-group collapse.
-
-The retained blocker is now narrower:
-
-- direct authority replay of the exact split-backed named-range host shape
-- direct lifecycle replay of the exact split-backed named-range host shape
-
-The user-facing mutation-entry lane already closes exactly, so the remaining
-work is not "discover the family." It is "carry that exact live family
-through the direct replay surfaces without verification rollback."
-
-### 2. Narrow Off-Sheet Gap-Closing Insertion Surface
+### 1. Narrow Off-Sheet Gap-Closing Insertion Surface
 
 The old combined off-sheet blocker is now mostly closed:
 
@@ -327,6 +297,21 @@ the mutation-family classification at `None`.
 That is no longer a broad off-sheet carry-through blocker. It is now a
 host-shape surfacing problem on an otherwise bounded one-consumer-sheet
 surface.
+
+### 2. Named-Range-Sensitive Structural Rollout
+
+The structural slice is admitted only on the bounded exact same-sheet
+shareable shared-group surface without named-range-sensitive widening.
+
+The remaining structural blocker is not hidden normalization anymore, but it
+is still retained:
+
+- named-range-sensitive structural rollout is still outside the admitted
+  slice
+
+If that frontier is revisited, it will need the same standard as the
+non-structural passes: exact live host proof first, then authority
+promotion.
 
 ## What Dropped Off The Blocker List
 

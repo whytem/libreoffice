@@ -134,9 +134,9 @@ The admitted rollout surface currently includes:
 - exact same-sheet shareable named-range-combined `MemberExit`
   `SetScalarValue`, `SetFormula`, and `ClearCell` on the bounded
   `GlobalSingleAreaSameSheet` surface
-- exact same-sheet shareable named-range-combined three-group split-backed
-  `SetFormula` attempts on mutation-entry, as normalization onto the
-  bounded named-range `Regroup` surface
+- exact same-sheet shareable named-range-combined split-backed three-group
+  `SetFormula` replay on the bounded `GlobalSingleAreaSameSheet`
+  named-range `Regroup` surface
 - exact same-workbook one-consumer-sheet direct off-sheet shared-group
   non-structural `MemberExit` `SetScalarValue`, `SetFormula`, and
   `ClearCell`
@@ -157,8 +157,6 @@ divergence, not a broad live-authority flip.
 The following remain deferred:
 
 - named-range-sensitive structural rollout
-- direct authority and lifecycle replay of the bounded same-sheet
-  named-range split-backed three-group host shape
 - repair-sensitive structural after-state divergence that is intentionally
   rollback-only
 - off-sheet shared-group behavior outside the bounded one-consumer-sheet
@@ -177,19 +175,21 @@ too.
 
 The recommended order is now:
 
-1. if same-sheet parity work continues next, isolate direct authority and
-   lifecycle replay for the bounded named-range split-backed host shape
-2. if off-sheet work resumes instead, isolate the remaining direct
+1. isolate the remaining direct off-sheet
    gap-closing insertion surface where live Calc merges after-topology but
    does not expose a stable mutation-family classification
+2. only after that, revisit named-range-sensitive structural rollout if the
+   roadmap still wants another admitted-slice expansion
 
 The now-completed split-outcome pass is
 [architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md).
 Its final decision is in
 [architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_DECISION_RECORD.md).
 
-The active follow-on carry-through pass is
+The now-completed split replay carry-through pass is
 [architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_SPLIT_REPLAY_CARRY_THROUGH_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_SPLIT_REPLAY_CARRY_THROUGH_PLAN.md).
+Its final decision is in
+[architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_SPLIT_REPLAY_CARRY_THROUGH_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_SPLIT_REPLAY_CARRY_THROUGH_DECISION_RECORD.md).
 
 The staged program plan for attacking those blockers together is
 [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md).
@@ -225,8 +225,12 @@ The split-outcome follow-on pass then froze the retained same-sheet
 three-group host shape more precisely. Live Calc does not expose a real
 one-group collapse there. It exposes a split-backed `Regroup` with the far
 participant group still separate. Mutation-entry now carries that host-shaped
-regroup lane exactly, but direct authority and lifecycle replay of that
-split-backed shape remain deferred.
+regroup lane exactly.
+
+The direct split replay carry-through pass is now closed too. The old
+same-sheet replay blocker is gone: direct authority and lifecycle replay now
+carry that exact split-backed named-range host shape on the bounded
+`GlobalSingleAreaSameSheet` surface.
 
 The repair-sensitive normalization pass is now closed. The current
 repair-sensitive structural probes are explicit deterministic rollback
@@ -246,18 +250,16 @@ live Calc merges after-topology but does not expose a stable mutation-
 family classification, while bounded replacement attempts normalize to the
 already-admitted direct `Regroup` lane.
 
-Phase 4 is now closed too. The retained host shell is now recorded as an
-explicit admitted-slice execution and observation contract rather than as a
-top opaque blocker. That does not widen the admitted slice by itself, but it
-does move the remaining blocker list onto the three still-open technical
-frontiers: broader same-sheet authoring, repair-sensitive normalization, and
-off-sheet dependency closure.
+The retained host shell and the old blocker-clearance program are both now
+historical closeouts rather than active top blockers. The same-sheet split
+replay pass, repair-sensitive closeout, and bounded off-sheet widening
+passes have all landed. The current roadmap is therefore narrower and more
+concrete:
 
-Phase 5 has now closed the overall blocker-clearance program. The final
-decision is that the program materially clarified and reduced the blocker
-set, but it did not justify a broad-ownership follow-on. After the
-repair-sensitive closeout pass, the current roadmap should move to bounded
-off-sheet widening rather than another omnibus blocker program.
+- direct off-sheet gap-closing insertion where live Calc merges
+  after-topology but still leaves mutation-family classification at `None`
+- named-range-sensitive structural rollout if another admitted-slice
+  expansion is still desired after the off-sheet gap surface is resolved
 
 ## Working Rules Going Forward
 

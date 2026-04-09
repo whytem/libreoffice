@@ -1,15 +1,15 @@
 # Computational Substrate Same-Sheet Split Replay Carry-Through Plan
 
-Status: in progress focused pass for direct same-sheet split-backed
-named-range replay
+Status: completed closeout for direct same-sheet split-backed named-range
+replay
 
 Phase status:
 
-- Phase 1 in progress: freeze the direct replay target and proof ladder
-- Phase 2 pending: identify the exact direct authority and lifecycle replay
+- Phase 1 completed: freeze the direct replay target and proof ladder
+- Phase 2 completed: identify the exact direct authority and lifecycle replay
   mismatch
-- Phase 3 pending: patch the smallest exact replay seam and rerun proof
-- Phase 4 pending: close the pass as admission or retained defer
+- Phase 3 completed: patch the smallest exact replay seam and rerun proof
+- Phase 4 completed: close the pass as admission
 
 ## Purpose
 
@@ -107,3 +107,28 @@ This pass is complete when one of the following is true:
   the bounded same-sheet split-backed named-range host shape
 - or the pass closes with an explicit retained-defer result that identifies
   the remaining exact mismatch after the targeted replay-shaping change
+
+## Closeout
+
+The pass is complete.
+
+The direct replay blocker is cleared.
+
+The exact bounded same-sheet named-range split-backed host shape now closes
+on:
+
+- authority replay
+- lifecycle replay
+- mutation-entry
+- standalone exactness
+
+The runtime fix was a bounded named-range replay-shaping update on the
+split-backed same-sheet `Regroup` surface:
+
+- the touched surviving after-group now replays as top-cell plus
+  touched-cell area listeners
+- the far surviving after-group now replays as the existing group listener
+  plus top-cell augmentation
+
+That means the same-sheet split-backed host shape is now a real admitted
+slice on the bounded `GlobalSingleAreaSameSheet` named-range surface.
