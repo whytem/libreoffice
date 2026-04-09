@@ -134,6 +134,8 @@ The admitted rollout surface currently includes:
 - exact same-sheet shareable named-range-combined `MemberExit`
   `SetScalarValue`, `SetFormula`, and `ClearCell` on the bounded
   `GlobalSingleAreaSameSheet` surface
+- exact same-sheet global single-area shift-only structural named-range
+  `InsertRows`, `DeleteRows`, `InsertColumns`, and `DeleteColumns`
 - exact same-sheet shareable named-range-combined split-backed three-group
   `SetFormula` replay on the bounded `GlobalSingleAreaSameSheet`
   named-range `Regroup` surface
@@ -158,7 +160,8 @@ divergence, not a broad live-authority flip.
 
 The following remain deferred:
 
-- named-range-sensitive structural rollout
+- named-range-sensitive structural rollout beyond the admitted same-sheet
+  global single-area shift-only surface
 - repair-sensitive structural after-state divergence that is intentionally
   rollback-only
 - off-sheet shared-group behavior outside the bounded one-consumer-sheet
@@ -178,9 +181,12 @@ too.
 
 The recommended order is now:
 
-1. revisit named-range-sensitive structural rollout if the roadmap still
-   wants another admitted-slice expansion
-2. only after that, decide whether broader ownership expansion is worth the
+1. revisit broader shared-group-sensitive structural behavior outside the
+   bounded exact same-sheet shareable slice if the roadmap still wants
+   another admitted-slice expansion
+2. then decide whether the narrower retained named-range structural
+   resize/off-sheet/local/multi-area frontier is worth another focused pass
+3. only after that, decide whether broader ownership expansion is worth the
    complexity on the now-materially-closed bounded non-structural surface
 
 The now-completed split-outcome pass is
@@ -240,6 +246,15 @@ same-sheet replay blocker is gone: direct authority and lifecycle replay now
 carry that exact split-backed named-range host shape on the bounded
 `GlobalSingleAreaSameSheet` surface.
 
+The named-range structural rollout clearance pass is now closed too. The
+bounded same-sheet global single-area shift-only structural named-range
+surface is now admitted on live apply. That includes representative
+`InsertRows`, `DeleteRows`, `InsertColumns`, and `DeleteColumns` cases when
+the named-range target shifts without resizing. The retained named-range
+structural boundary is now narrower: target-resize edits, off-sheet
+consumers, local names, multi-area names, and ambiguous scope sets stay
+deferred.
+
 The repair-sensitive normalization pass is now closed. The current
 repair-sensitive structural probes are explicit deterministic rollback
 buckets with stable reasons, not a hidden widening frontier. The pass did
@@ -261,8 +276,10 @@ replay pass, repair-sensitive closeout, and bounded off-sheet widening
 passes have all landed. The current roadmap is therefore narrower and more
 concrete:
 
-- named-range-sensitive structural rollout if another admitted-slice
-  expansion is still desired
+- broader shared-group-sensitive structural behavior outside the bounded
+  same-sheet slice if another admitted-slice expansion is still desired
+- then the narrower retained named-range structural resize/off-sheet/local/
+  multi-area frontier if that still looks worth the complexity
 - only after that, reassess whether broader ownership expansion is worth
   pursuing at all
 

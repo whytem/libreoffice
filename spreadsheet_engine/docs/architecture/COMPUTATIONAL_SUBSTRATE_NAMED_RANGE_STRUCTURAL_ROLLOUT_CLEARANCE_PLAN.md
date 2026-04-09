@@ -1,6 +1,6 @@
 # Computational Substrate Named-Range Structural Rollout Clearance Plan
 
-Status: active execution plan for clearing the retained named-range-sensitive
+Status: completed closeout plan for clearing the retained named-range-sensitive
 structural rollout blocker
 
 ## Purpose
@@ -18,6 +18,30 @@ that already has:
 - a dedicated live candidate gate
 - clean deterministic reject behavior for off-sheet, local, multi-area, and
   ambiguous cases
+
+## Final Outcome
+
+This pass closed as a real admitted-slice widening, but only on the bounded
+same-sheet global single-area shift-only structural lane.
+
+What is now admitted:
+
+- same-sheet global single-area `InsertRows`
+- same-sheet global single-area `DeleteRows` when the named-range target
+  shifts without shrinking
+- same-sheet global single-area `InsertColumns`
+- same-sheet global single-area `DeleteColumns`
+- ordinary scalar formulas
+- clean baseline only
+
+What remains deferred:
+
+- target-resize named-range structural edits
+- off-sheet consumers
+- local names
+- multi-area names
+- ambiguous scope sets
+- shared-group-sensitive structural behavior
 
 ## Promotion Target
 

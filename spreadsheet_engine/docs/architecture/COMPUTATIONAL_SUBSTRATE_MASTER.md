@@ -144,6 +144,9 @@ The current opt-in narrow rollout surface includes:
 - exact same-sheet shareable named-range-combined `MemberExit`
   `SetScalarValue`, `SetFormula`, and `ClearCell` on that same bounded
   `GlobalSingleAreaSameSheet` surface
+- exact same-sheet global single-area shift-only structural named-range
+  `InsertRows`, `DeleteRows`, `InsertColumns`, and `DeleteColumns` for
+  ordinary scalar formulas
 - exact same-sheet shareable named-range-combined split-backed three-group
   `SetFormula` replay on that same bounded `GlobalSingleAreaSameSheet`
   named-range `Regroup` surface
@@ -197,7 +200,8 @@ ownership-complete-on-the-admitted-slice rather than broad host independence.
 The following remain outside the admitted rollout and outside the settled
 ownership boundary:
 
-- named-range-sensitive structural rollout
+- named-range-sensitive structural rollout beyond the admitted same-sheet
+  global single-area shift-only surface
 - shared-group-sensitive structural behavior outside the bounded exact
   same-sheet shareable slice
 - repair-sensitive structural after-state divergence that is intentionally
@@ -252,23 +256,25 @@ For the focused pass that closed the repair-sensitive frontier, see
 Its final decision is in
 [COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md).
 
-The current focused pass for the retained named-range-sensitive structural
-blocker is
-[COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_PLAN.md).
+The named-range structural rollout clearance pass is now complete:
 
-### Priority 1: Named-Range-Sensitive Structural Rollout
+- [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_EVIDENCE.md)
 
-The non-structural same-sheet and off-sheet widening frontier is now
-materially closed on the current bounded surfaces.
+### Priority 1: Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
 
-The remaining material widening frontier is structural:
+The named-range-sensitive structural blocker is no longer broad. The admitted
+same-sheet structural lane now includes the bounded global single-area
+shift-only surface.
 
-- named-range-sensitive structural rollout is still outside the admitted
-  slice
+The remaining highest-value structural widening frontier is now:
 
-That frontier should only be revisited with the same standard as the
-non-structural passes: exact live host proof first, then authority
-promotion.
+- shared-group-sensitive structural behavior outside the bounded exact
+  same-sheet shareable slice
+
+That frontier should still only be widened with the same standard as the
+non-structural passes: exact live host proof first, then authority promotion.
 
 ### Priority 2: Reassess Broad Ownership Expansion
 
@@ -283,22 +289,7 @@ success.
 
 The main blockers are now clear and concrete.
 
-### 1. Named-Range-Sensitive Structural Rollout
-
-The structural slice is admitted only on the bounded exact same-sheet
-shareable shared-group surface without named-range-sensitive widening.
-
-The remaining structural blocker is not hidden normalization anymore, but it
-is still retained:
-
-- named-range-sensitive structural rollout is still outside the admitted
-  slice
-
-If that frontier is revisited, it will need the same standard as the
-non-structural passes: exact live host proof first, then authority
-promotion.
-
-### 2. Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
+### 1. Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
 
 The structural slice is still intentionally narrow even without named ranges.
 
@@ -306,6 +297,23 @@ Broader shared-group-sensitive structural behavior outside the bounded exact
 same-sheet shareable structural surface remains outside the admitted slice
 until the engine can author the exact live after-topology for those classes
 too.
+
+### 2. Named-Range-Sensitive Structural Rollout Beyond The Admitted Shift Slice
+
+The broad named-range structural blocker is now narrower than it was before,
+not gone entirely.
+
+The admitted structural named-range surface now includes the bounded
+same-sheet global single-area shift-only lane. The retained named-range
+structural frontier is:
+
+- target-resize structural edits
+- off-sheet named-range structural consumers
+- sheet-local names
+- multi-area names
+- scope-ambiguous name sets
+
+Those classes still need exact live host proof before they can widen.
 
 ## What Dropped Off The Blocker List
 
