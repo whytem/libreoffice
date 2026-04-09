@@ -256,18 +256,37 @@ The completed closeout set now also includes:
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md)
 
-The next evaluator authority-transfer wave is now:
+The next evaluator authority-transfer wave is now also complete.
+
+The completed authoritative-usage expansion rerun freezes:
+
+- `interpret_tail_probe_formula_cells=1488`
+- `interpret_tail_authoritative_total=1126`
+- `interpret_tail_authoritative_fallback_total=362`
+- `interpret_tail_fallback_unsupported_formula_shape=243`
+- `interpret_tail_fallback_shadow_mismatch=97`
+- `interpret_tail_fallback_unsupported_host_surface=22`
+
+The accepted interpretation is:
+
+- the live evaluator seam is materially wider than before
+- bounded `XLOOKUP` is now real on the Calc-backed corpus surface
+- wrapper-aware delegation is now live and unit-proven
+- the pass widened authority, but it did not convert the dominant retained
+  hotspots as aggressively as planned
+
+The completed closeout set is now:
 
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_EVIDENCE.md)
 
-That pass is intentionally broader than another cleanup-only cycle. Its
-target is a combined step-change wave:
+The next evaluator pass should now be narrower than that completed
+capability wave. Its main targets should be:
 
-- bounded `DATEVALUE` mismatch repair
-- residual lookup-family and `INDEX` cleanup
-- bounded live `XLOOKUP` promotion
-- wrapper-aware delegation for compound formulas such as bounded
-  `IFERROR` / `IFNA` around promoted roots
+- retained `DATEVALUE` live-corpus mismatch reduction
+- residual `LOOKUP` unsupported-shape reduction
+- residual `LOOKUP` / `VLOOKUP` mismatch and host-surface cleanup
 
 ## Current Admitted Authority And Rollout Slice
 

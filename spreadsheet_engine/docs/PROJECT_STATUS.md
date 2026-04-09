@@ -224,17 +224,35 @@ The completed closeout set now also includes:
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md)
 
-The next evaluator pass is intentionally more ambitious:
+That next evaluator pass is now also complete.
+
+The completed authoritative-usage expansion rerun freezes:
+
+- `interpret_tail_probe_formula_cells=1488`
+- `interpret_tail_authoritative_total=1126`
+- `interpret_tail_authoritative_fallback_total=362`
+- `interpret_tail_fallback_unsupported_formula_shape=243`
+- `interpret_tail_fallback_shadow_mismatch=97`
+- `interpret_tail_fallback_unsupported_host_surface=22`
+
+The important outcome is mixed but real:
+
+- the live seam is now wider
+- bounded `XLOOKUP` now shows non-zero authoritative corpus usage
+- wrapper-aware delegation is now live and unit-proven
+- the pass did not hit its ambitious fallback-reduction targets
+
+The completed closeout set is:
 
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_PLAN.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_DECISION_RECORD.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_EVIDENCE.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_EVIDENCE.md)
 
-Its target is a real step-change in authoritative usage by combining:
+The next evaluator move should now be a hotspot-conversion pass focused on:
 
-- `DATEVALUE` parity repair
-- residual lookup and `INDEX` hotspot cleanup
-- bounded live `XLOOKUP` promotion
-- wrapper-aware delegation for compound formulas around already-promoted
-  roots
+- retained `DATEVALUE` mismatch rows
+- residual `LOOKUP` unsupported-shape fallout
+- residual `LOOKUP` / `VLOOKUP` mismatch and host-surface cleanup
 
 ## Current Opt-In Narrow Rollout Surface
 

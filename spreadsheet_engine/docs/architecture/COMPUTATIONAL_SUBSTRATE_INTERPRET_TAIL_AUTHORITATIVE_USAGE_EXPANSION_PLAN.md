@@ -1,7 +1,7 @@
 # Computational Substrate InterpretTail Authoritative Usage Expansion Plan
 
-Status: active next-pass plan for materially expanding live
-`InterpretTail -> engine` authoritative usage
+Status: completed closeout for the ambitious live
+`InterpretTail -> engine` authoritative-usage expansion pass
 
 ## Purpose
 
@@ -94,6 +94,36 @@ This baseline is frozen in:
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md)
+
+## Closeout Result
+
+This pass is now complete.
+
+It widened the live seam materially, but it closed as a mixed-result pass
+rather than a full success against the original ambitious targets.
+
+The completed rerun freezes:
+
+- `interpret_tail_probe_formula_cells=1488`
+- `interpret_tail_authoritative_total=1126`
+- `interpret_tail_authoritative_fallback_total=362`
+- `interpret_tail_fallback_unsupported_formula_shape=243`
+- `interpret_tail_fallback_shadow_mismatch=97`
+- `interpret_tail_fallback_unsupported_host_surface=22`
+
+The main accepted wins are:
+
+- bounded live `XLOOKUP` is now authoritative on the corpus
+- bounded wrapper-aware delegation is now live and unit-proven
+- the live probe-covered promoted-family surface grew beyond the old `1391`
+  ceiling
+- authoritative usage rose materially from `1045` to `1126`
+
+The main retained misses are:
+
+- total fallback did not fall to the planned target
+- `LOOKUP` unsupported-shape fallout remains the dominant residual hotspot
+- `DATEVALUE` mismatch remains the dominant residual mismatch hotspot
 
 ## Strategic Objective
 
@@ -190,6 +220,32 @@ Stretch outcome:
 - both `XLOOKUP` and wrapper-aware delegation show non-zero authoritative
   corpus usage
 
+## Success Criteria Outcome
+
+The pass did not satisfy the full original completion bar.
+
+What did close:
+
+- `interpret_tail_probe_formula_cells` rose from `1391` to `1488`
+- `interpret_tail_authoritative_total` rose from `1045` to `1126`
+- `XLOOKUP` now shows non-zero authoritative corpus usage:
+  authoritative `78`, fallback `19`, attempts `97`
+- wrapper-aware delegation is now live and unit-proven on the widened seam
+- the standing standalone replay guardrail remained exact
+
+What did not close:
+
+- `interpret_tail_probe_formula_cells >= 1800`
+- `interpret_tail_authoritative_total >= 1400`
+- `interpret_tail_authoritative_fallback_total <= 250`
+- `interpret_tail_fallback_unsupported_formula_shape <= 125`
+- `interpret_tail_fallback_shadow_mismatch <= 55`
+- `interpret_tail_fallback_unsupported_host_surface <= 10`
+- `DATEVALUE` mismatch `<= 10`
+- `LOOKUP` unsupported-shape `<= 120`
+
+So the correct read is: real widening success, incomplete hotspot cleanup.
+
 ## Non-Goals
 
 Still out of scope for this wave:
@@ -200,6 +256,13 @@ Still out of scope for this wave:
 - matrix, spill, slice-valued, or broad multi-cell result projection
 - broad workbook-wide evaluator replacement
 - unrelated computational-substrate widening
+
+## Final Closeout
+
+The final closeout set for this pass is now:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_EVIDENCE.md)
 
 ## Primary Engineering Surfaces
 

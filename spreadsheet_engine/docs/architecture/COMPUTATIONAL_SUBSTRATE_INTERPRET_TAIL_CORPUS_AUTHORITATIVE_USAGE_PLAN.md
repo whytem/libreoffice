@@ -147,30 +147,26 @@ The weakest supported families in the completed corpus snapshot are:
 
 ## Immediate Next Move
 
-The follow-on evaluator pass is now also complete.
+The broader follow-on evaluator wave is now also complete.
 
-It did not uncover additional top-level probe-covered promoted-family roots,
-but it did improve the quality of the current seam materially:
+It widened the live seam materially by promoting bounded `XLOOKUP` and
+wrapper-aware delegation, and it raised the completed Calc-backed rerun to:
 
-- `interpret_tail_authoritative_total` rose from `996` to `1045`
-- `interpret_tail_authoritative_fallback_total` fell from `395` to `346`
-- `interpret_tail_fallback_unsupported_formula_shape` fell from `295` to
-  `240`
+- `interpret_tail_probe_formula_cells=1488`
+- `interpret_tail_authoritative_total=1126`
+- `interpret_tail_authoritative_fallback_total=362`
 
-The retained next-step hotspot is now narrower than the broad generic
-"coverage and mismatch reduction" framing that started the follow-on pass.
+The completed closeout set is now:
 
-The next evaluator move should target:
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_EVIDENCE.md)
 
-1. bounded `DATEVALUE` mismatch repair
-2. residual lookup-family unsupported-shape cleanup
-3. residual lookup-family and `VLOOKUP` mismatch or host-surface cleanup
+The next evaluator move should now be narrower and hotspot-driven:
 
-The completed follow-on closeout is now:
-
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md)
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md)
+1. retained `DATEVALUE` mismatch rows
+2. residual `LOOKUP` unsupported-shape cleanup
+3. residual `LOOKUP` / `VLOOKUP` mismatch and host-surface cleanup
 
 ## Validation Summary
 
