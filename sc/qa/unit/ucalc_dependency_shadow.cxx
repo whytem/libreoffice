@@ -2181,6 +2181,85 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 }
 
 CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalNarrowRolloutSharedGroupNonStructuralAuthorityOffSheetConsumerGapInsertApplies)
+{
+    using spreadsheetengine::compat::libreoffice::CalcWorkbookFacade;
+    using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
+    namespace consumers = spreadsheetengine::detail::facade::consumers;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", nullptr);
+    ScopedEnvironmentOverride aSharedGroupNonStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_SHARED_GROUP_NON_STRUCTURAL", "1");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    m_pDoc->InsertTab(1, u"Summary"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+    m_pDoc->SetValue(0, 4, 0, 5.0);
+    m_pDoc->SetString(1, 0, 0, u"=A1*2"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"=A2*2"_ustr);
+    m_pDoc->SetString(1, 3, 0, u"=A4*2"_ustr);
+    m_pDoc->SetString(1, 4, 0, u"=A5*2"_ustr);
+    m_pDoc->SetString(2, 0, 1, u"=Data.B1+Data.B2+Data.B3+Data.B4+Data.B5"_ustr);
+    m_pDoc->CalcAll();
+
+    const CalcWorkbookFacade aBeforeFacade(*m_pDoc, 0);
+    const auto aAuthorityCapture
+        = ScopedComputationalAuthority::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aAuthorityCapture.isCaptured());
+    CPPUNIT_ASSERT(aAuthorityCapture.canApplyAuthority());
+
+    m_pDoc->SetString(1, 2, 0, u"=A3*2"_ustr);
+    forceFormulaTreeOrder(*m_pDoc,
+        { ScAddress(1, 0, 0), ScAddress(1, 1, 0), ScAddress(1, 2, 0),
+            ScAddress(1, 3, 0), ScAddress(1, 4, 0), ScAddress(2, 0, 1) });
+
+    const CalcWorkbookFacade aMutationFacade(*m_pDoc, 1);
+    const auto aBoundary = consumers::classifySharedFormulaNamedRangeMutationBoundary(
+        aBeforeFacade, aMutationFacade,
+        spreadsheetengine::detail::facade::MutationEvent::setFormula({ 0, 1, 2 }, u"=A3*2"));
+    CPPUNIT_ASSERT_EQUAL(consumers::SharedFormulaNamedRangeMutationBoundary::None,
+        aBoundary.meBoundary);
+
+    const auto oResult
+        = aAuthorityCapture.apply(*m_pDoc, translateSetFormula(ScAddress(1, 2, 0), u"=A3*2"_ustr));
+    assertComputationalPilotApplied(oResult, *m_pDoc);
+    const auto aPredictedQueue
+        = spreadsheetengine::compat::libreoffice::recalcshadow::detail::collectPredictedQueueAddresses(
+            oResult->maTransition.maRecalcPlan);
+    CPPUNIT_ASSERT(std::find(aPredictedQueue.begin(), aPredictedQueue.end(),
+                       CellAddress { 0, 1, 2 })
+                   != aPredictedQueue.end());
+    CPPUNIT_ASSERT(std::find(aPredictedQueue.begin(), aPredictedQueue.end(),
+                       CellAddress { 1, 2, 0 })
+                   != aPredictedQueue.end());
+
+    const CalcWorkbookFacade aAfterFacade(*m_pDoc, 1);
+    const auto aAfterGroups = consumers::collectFormulaGroupDescriptors(aAfterFacade);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(1), aAfterGroups.size());
+    CPPUNIT_ASSERT((aAfterGroups.front().maAnchor == CellAddress { 0, 1, 0 }));
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(5), aAfterGroups.front().mnLength);
+    ScFormulaCell* pSummaryFormula = m_pDoc->GetFormulaCell(ScAddress(2, 0, 1));
+    CPPUNIT_ASSERT(pSummaryFormula);
+    CPPUNIT_ASSERT_EQUAL(u"=Data.B1+Data.B2+Data.B3+Data.B4+Data.B5"_ustr,
+        pSummaryFormula->GetFormula());
+
+    m_pDoc->DeleteTab(1);
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
     testComputationalNarrowRolloutSharedGroupNonStructuralLifecycleOffSheetConsumerMemberExitSetFormulaApplies)
 {
     using spreadsheetengine::compat::libreoffice::mutation::translateSetFormula;
