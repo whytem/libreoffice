@@ -8,6 +8,11 @@ This directory holds the active architecture references for
 - [COMPUTATIONAL_SUBSTRATE_MASTER.md](COMPUTATIONAL_SUBSTRATE_MASTER.md):
   canonical current-state, admitted-slice, roadmap, and blocker reference
   for the computational-substrate program
+- [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md):
+  strategy reset for turning the substrate from the main product into a
+  migration underwriter for real authority transfer
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md):
+  concrete plan for the first real evaluator authority transfer inside Calc
 - [COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md):
   ambitious staged work plan for clearing the four biggest remaining
   blockers
@@ -105,6 +110,7 @@ For day-to-day understanding, use the master document instead.
 The recommended reading order is:
 
 1. [COMPUTATIONAL_SUBSTRATE_MASTER.md](COMPUTATIONAL_SUBSTRATE_MASTER.md)
-2. [COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md)
-3. [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
-4. individual historical `COMPUTATIONAL_SUB*.md` files only as needed
+2. [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md)
+3. [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md)
+4. [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
+5. individual historical `COMPUTATIONAL_SUB*.md` files only as needed

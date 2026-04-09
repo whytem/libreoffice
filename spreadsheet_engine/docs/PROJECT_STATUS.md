@@ -30,7 +30,8 @@ Calc is intended to remain responsible for:
 
 ## Current Status At A Glance
 
-The original extraction objective is effectively achieved.
+The first-stage shared-engine extraction objective is effectively achieved.
+The live authority-transfer objective is not.
 
 Today:
 
@@ -46,6 +47,8 @@ Today:
   authority slice
 - the program also proved a bounded ownership-complete admitted slice on top
   of that authority result
+- production Calc still does not delegate general cell evaluation authority
+  from `ScFormulaCell::InterpretTail` to the engine evaluator
 
 What has not been proven is equally important:
 
@@ -53,6 +56,11 @@ What has not been proven is equally important:
 - broad document-core replacement is not justified
 - broad storage, listener, token-container, or workbook-wide ownership
   transfer is not justified
+
+The active strategy response to that gap is now recorded in:
+
+- [architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md)
 
 ## Verified Baseline
 
@@ -175,19 +183,20 @@ The following remain deferred:
 
 ## Next Roadmap Category
 
-The broader same-sheet single-cell widening pass is now materially closed on
-the current bounded surface, and the follow-on split-outcome pass is closed
-too.
+The roadmap now has two distinct tracks:
 
-The recommended order is now:
+- shared-engine extraction, which is materially successful
+- live authority transfer inside Calc, which is still active
 
-1. revisit broader shared-group-sensitive structural behavior outside the
-   bounded exact same-sheet shareable slice if the roadmap still wants
-   another admitted-slice expansion
-2. then decide whether the narrower retained named-range structural
-   resize/off-sheet/local/multi-area frontier is worth another focused pass
-3. only after that, decide whether broader ownership expansion is worth the
-   complexity on the now-materially-closed bounded non-structural surface
+The recommended next migration program is no longer “another bounded substrate
+admitted-slice widening pass.” It is:
+
+1. implement the
+   [InterpretTail -> engine evaluator switchover plan](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md)
+2. use the substrate as migration underwriter, comparator, and fallback
+   guardrail during that move
+3. only after that, decide how much remaining bounded substrate widening is
+   still worth pursuing
 
 The now-completed split-outcome pass is
 [architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md).
@@ -273,15 +282,13 @@ blocker is now fully gone on the bounded one-consumer-sheet surface.
 The retained host shell and the old blocker-clearance program are both now
 historical closeouts rather than active top blockers. The same-sheet split
 replay pass, repair-sensitive closeout, and bounded off-sheet widening
-passes have all landed. The current roadmap is therefore narrower and more
-concrete:
+passes have all landed. The current roadmap is therefore:
 
-- broader shared-group-sensitive structural behavior outside the bounded
-  same-sheet slice if another admitted-slice expansion is still desired
-- then the narrower retained named-range structural resize/off-sheet/local/
-  multi-area frontier if that still looks worth the complexity
-- only after that, reassess whether broader ownership expansion is worth
-  pursuing at all
+- migrate a real production authority seam first:
+  `ScFormulaCell::InterpretTail` -> engine evaluator
+- use substrate comparison and fallback to underwrite that migration
+- revisit additional bounded substrate widening only when it directly enables
+  the migration program
 
 ## Working Rules Going Forward
 
@@ -296,6 +303,11 @@ concrete:
 
 - [architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md](architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md):
   canonical computational-substrate reference
+- [architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md):
+  strategy reset for moving from verifier-style widening to real authority
+  transfer
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md):
+  concrete migration plan for the first live evaluator switchover
 - [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md):
   ambitious staged blocker-clearance roadmap
 - [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md):

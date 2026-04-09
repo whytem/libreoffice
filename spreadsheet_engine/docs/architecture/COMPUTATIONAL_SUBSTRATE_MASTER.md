@@ -24,6 +24,7 @@ Use the older detailed documents only for historical archaeology.
 ## Executive Summary
 
 The first-stage extraction objective is effectively achieved.
+The live authority-transfer objective is not.
 
 Today:
 
@@ -34,6 +35,8 @@ Today:
   authority slice
 - the program also proved a bounded ownership-complete admitted slice on top
   of that authority result
+- production Calc still does not delegate general cell evaluation authority
+  from `ScFormulaCell::InterpretTail` to the engine evaluator
 
 What the program did not prove is equally important:
 
@@ -41,6 +44,11 @@ What the program did not prove is equally important:
 - it did not justify broad default-on rollout
 - it did not justify broad storage, token-container, or workbook-wide
   authority transfer
+
+The active strategy response to that gap is now:
+
+- [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md)
 
 The correct mental model is:
 
@@ -106,6 +114,8 @@ Calc still intentionally owns:
 
 - broad `ScDocument` storage and mutation outside the admitted slice
 - broad formula-cell object lifetime outside the admitted slice
+- real formula evaluation through `ScFormulaCell::InterpretTail` and
+  `ScInterpreter`
 - broad listener/broadcaster residency outside the admitted slice
 - token-container construction and Calc-local token plumbing
 - UI, UNO, import/export, rendering, persistence, and shell integration
@@ -115,6 +125,31 @@ Calc still intentionally owns:
   admitted live slice
 
 That retained host boundary is not a bug. It is the current settled design.
+
+## Strategic Rebaseline
+
+The program now needs an explicit split between:
+
+- shared-engine extraction, which is materially successful
+- live authority transfer inside Calc, which remains unfinished
+
+The computational substrate should therefore be treated primarily as:
+
+- a migration underwriter
+- a comparator during shadow runs
+- a fallback guardrail during real delegation
+
+It should no longer be treated as the main product if the goal remains
+substantive relocation of authority into the standalone engine.
+
+The recommended north-star transfer target is:
+
+- `ScFormulaCell::InterpretTail` -> engine evaluator
+
+That strategy reset is documented in
+[COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md),
+and the first concrete execution plan is
+[COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md).
 
 ## Current Admitted Authority And Rollout Slice
 
@@ -244,8 +279,9 @@ authority and lifecycle replay are now admitted on that same
 The blocker-clearance program is now closed. Its final reassessment is in
 [COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md).
 
-The roadmap should now stay tightly ordered around the remaining widening
-frontiers.
+The roadmap should now stay tightly ordered around real authority-transfer
+programs first, and bounded substrate widening only when it materially enables
+them.
 
 For an aggressive multi-blocker execution plan that attacks the full
 remaining frontier as one staged program, see
@@ -262,34 +298,42 @@ The named-range structural rollout clearance pass is now complete:
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_EVIDENCE.md)
 
-### Priority 1: Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
+### Priority 1: InterpretTail -> Engine Evaluator Switchover
 
-The named-range-sensitive structural blocker is no longer broad. The admitted
-same-sheet structural lane now includes the bounded global single-area
-shift-only surface.
+The highest-value next move is no longer another admitted-slice conjunction.
 
-The remaining highest-value structural widening frontier is now:
+It is the first real live authority-transfer program:
 
-- shared-group-sensitive structural behavior outside the bounded exact
-  same-sheet shareable slice
+- move a bounded production evaluation family from `ScInterpreter` to the
+  engine evaluator
+- allow `Observe` and `ShadowCompare` in real AutoCalc sessions
+- use fallback-first delegation rather than exact-or-rollback as the
+  migration bar
 
-That frontier should still only be widened with the same standard as the
-non-structural passes: exact live host proof first, then authority promotion.
+The active plan for that move is
+[COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md).
 
-### Priority 2: Reassess Broad Ownership Expansion
+### Priority 2: Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
 
-Only after the above should the project revisit any question of broader
-storage or host-surface transfer.
-
-The current program has already proven a meaningful bounded authority and
-ownership result. It does not need to force a larger migration to count as a
-success.
+Further bounded substrate widening remains useful only when it directly
+enables the evaluator migration or removes a concrete fallback reason from the
+live authority-transfer program.
 
 ## Biggest Remaining Blockers
 
 The main blockers are now clear and concrete.
 
-### 1. Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
+### 1. InterpretTail Still Owns Production Evaluation
+
+The biggest live-authority blocker is still the production evaluation seam.
+
+- `ScFormulaCell::InterpretTail` still constructs and drives `ScInterpreter`
+- the engine evaluator is still primarily standalone and replay-oriented
+- the current substrate path does not replace that control flow
+
+If the program wants substantive authority relocation, this seam must move.
+
+### 2. Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
 
 The structural slice is still intentionally narrow even without named ranges.
 
