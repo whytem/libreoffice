@@ -142,6 +142,10 @@ The key point is that the next hotspot is no longer `DATEVALUE`.
 It is now the residual lookup-family matrix-shape and scalar-projection
 surface.
 
+The scoped execution plan for that follow-on is now:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_PLAN.md)
+
 ## Validation Summary
 
 The supporting proof is summarized in

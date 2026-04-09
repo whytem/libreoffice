@@ -274,6 +274,18 @@ The completed closeout set now also includes:
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md)
 
+The recommended next evaluator move is now the lookup-residual conversion
+pass focused on:
+
+- bounded `LOOKUP` `2D` data-only unsupported-shape conversion
+- bounded `LOOKUP` scalar-projection parity on the retained mismatch rows
+- residual `VLOOKUP` / `XLOOKUP` host-surface cleanup
+- optional bounded `INDEX` scalar cleanup on the same projection seam
+
+That scoped next pass is now:
+
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_PLAN.md)
+
 ## Current Opt-In Narrow Rollout Surface
 
 The admitted rollout surface currently includes:
