@@ -540,6 +540,9 @@ template <typename T>
 [[nodiscard]] inline FunctionKind classifyDelegatedFunctionNode(
     const core::formula::Node& rNode);
 
+[[nodiscard]] inline bool isHardRoutedLiteralOnlyTextParsingNode(
+    const core::formula::Node& rNode);
+
 [[nodiscard]] inline EvaluationAttempt evaluateDelegatedNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos, bool bEmptyStringAsZero, std::size_t nDepth = 0);
@@ -1553,6 +1556,43 @@ inline void putScalarIntoMatrix(
     return classifyFunction(aFunctionName);
 }
 
+[[nodiscard]] inline bool isLiteralOnlyNode(const core::formula::Node& rNode)
+{
+    switch (rNode.meKind)
+    {
+        case core::formula::NodeKind::NumberLiteral:
+        case core::formula::NodeKind::StringLiteral:
+        case core::formula::NodeKind::BooleanLiteral:
+        case core::formula::NodeKind::EmptyArgument:
+            return true;
+        case core::formula::NodeKind::UnaryOperation:
+            return rNode.maChildren.size() == 1 && isLiteralOnlyNode(*rNode.maChildren[0]);
+        default:
+            return false;
+    }
+}
+
+[[nodiscard]] inline bool isHardRoutedLiteralOnlyTextParsingNode(
+    const core::formula::Node& rNode)
+{
+    if (rNode.meKind != core::formula::NodeKind::FunctionCall)
+        return false;
+
+    if (classifyFunction(uppercaseAscii(rNode.maPrimaryText)) != FunctionKind::NumberValue)
+        return false;
+
+    if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
+        return false;
+
+    for (const auto& rxChild : rNode.maChildren)
+    {
+        if (!rxChild || !isLiteralOnlyNode(*rxChild))
+            return false;
+    }
+
+    return true;
+}
+
 [[nodiscard]] inline EvaluationAttempt evaluateTextParsingFunction(
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero)
@@ -2219,7 +2259,13 @@ inline void putScalarIntoMatrix(
 {
     const char* pValue = std::getenv("SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR");
     if (!pValue || !*pValue)
+    {
+#ifdef DBG_UTIL
+        return RolloutMode::Observe;
+#else
         return RolloutMode::Off;
+#endif
+    }
 
     const std::string_view aValue(pValue);
     if (aValue == "observe")
@@ -2259,6 +2305,14 @@ inline void putScalarIntoMatrix(
 
     return detail::evaluateDelegatedNode(
         rRoot, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
+}
+
+[[nodiscard]] inline bool isHardRoutedFormula(std::u16string_view rFormulaSource)
+{
+    const api::String aNormalized = detail::normalizeFormulaSource(rFormulaSource);
+    const auto aParse = core::formula::parseFormula(aNormalized);
+    return aParse && aParse.mpRoot
+           && detail::isHardRoutedLiteralOnlyTextParsingNode(*aParse.mpRoot);
 }
 
 inline void resetStats()

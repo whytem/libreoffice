@@ -1965,15 +1965,28 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
 
         const auto eEngineRolloutMode = setaileval::resolveRolloutMode();
         std::optional<setaileval::EvaluationAttempt> oEngineAttempt;
-        const bool bEngineEligible = eEngineRolloutMode != setaileval::RolloutMode::Off
-                                     && eTailParam == SCITP_NORMAL && !bIsIterCell
-                                     && cMatrixFlag == ScMatrixMode::NONE && !pCode->IsHyperLink()
-                                     && !rContext.pInterpreter
-                                     && !rDocument.IsThreadedGroupCalcInProgress();
+        OUString aEngineFormulaSource;
+        bool bEngineFormulaSourceLoaded = false;
+        const auto getEngineFormulaSource = [&]() -> const OUString& {
+            if (!bEngineFormulaSourceLoaded)
+            {
+                aEngineFormulaSource = GetFormula(FormulaGrammar::GRAM_ODFF, &rContext);
+                bEngineFormulaSourceLoaded = true;
+            }
+            return aEngineFormulaSource;
+        };
+        const bool bTailEligible = eTailParam == SCITP_NORMAL && !bIsIterCell
+                                   && cMatrixFlag == ScMatrixMode::NONE && !pCode->IsHyperLink()
+                                   && !rContext.pInterpreter
+                                   && !rDocument.IsThreadedGroupCalcInProgress();
+        const bool bHardRoutedEngineFamily
+            = bTailEligible
+              && setaileval::isHardRoutedFormula(std::u16string_view(
+                  getEngineFormulaSource().getStr(), getEngineFormulaSource().getLength()));
 
-        if (eEngineRolloutMode != setaileval::RolloutMode::Off)
+        if (eEngineRolloutMode != setaileval::RolloutMode::Off || bHardRoutedEngineFamily)
         {
-            if (!bEngineEligible)
+            if (!bTailEligible)
             {
                 if (eEngineRolloutMode == setaileval::RolloutMode::AuthoritativeWithFallback)
                 {
@@ -1990,14 +2003,19 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
             }
             else
             {
-                const OUString aFormulaSource = GetFormula(FormulaGrammar::GRAM_ODFF, &rContext);
+                const OUString& aFormulaSource = getEngineFormulaSource();
                 oEngineAttempt = setaileval::tryEvaluateFormula(
                     rDocument, rContext, aPos,
                     std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
                     rDocument.GetCalcConfig().mbEmptyStringAsZero);
                 if (!oEngineAttempt->mbSupported)
                 {
-                    if (eEngineRolloutMode == setaileval::RolloutMode::AuthoritativeWithFallback)
+                    if (bHardRoutedEngineFamily)
+                    {
+                        setaileval::recordAuthoritativeFallback(
+                            oEngineAttempt->meFallbackReason, oEngineAttempt->meFunction);
+                    }
+                    else if (eEngineRolloutMode == setaileval::RolloutMode::AuthoritativeWithFallback)
                     {
                         setaileval::recordAuthoritativeFallback(
                             oEngineAttempt->meFallbackReason, oEngineAttempt->meFunction);
@@ -2150,6 +2168,19 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
             pCode->ClearRecalcModeMustAfterImport();
             return true;
         };
+
+        if (bHardRoutedEngineFamily && oEngineAttempt && oEngineAttempt->mbSupported)
+        {
+            if (applyEngineAuthoritativeResult(*oEngineAttempt))
+            {
+                setaileval::recordAuthoritativeRoute(oEngineAttempt->meFunction);
+                return;
+            }
+
+            setaileval::recordAuthoritativeFallback(
+                setaileval::FallbackReason::ProjectionFailure,
+                oEngineAttempt->meFunction);
+        }
 
         if (oEngineAttempt && oEngineAttempt->mbSupported)
         {

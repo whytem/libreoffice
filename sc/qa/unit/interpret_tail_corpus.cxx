@@ -629,6 +629,97 @@ const char* fallbackReasonName(FallbackReason eReason)
     return "count";
 }
 
+void accumulateStats(StatsSnapshot& rTarget, const StatsSnapshot& rSource)
+{
+    rTarget.mnObserveCount += rSource.mnObserveCount;
+    rTarget.mnShadowCompareCount += rSource.mnShadowCompareCount;
+    rTarget.mnAuthoritativeCount += rSource.mnAuthoritativeCount;
+    rTarget.mnAuthoritativeFallbackCount += rSource.mnAuthoritativeFallbackCount;
+    rTarget.mnShadowMatchCount += rSource.mnShadowMatchCount;
+
+    for (std::size_t nIndex = 0; nIndex < static_cast<std::size_t>(FallbackReason::Count);
+         ++nIndex)
+    {
+        rTarget.maFallbackReasons[nIndex] += rSource.maFallbackReasons[nIndex];
+    }
+
+    for (std::size_t nIndex = 0; nIndex < static_cast<std::size_t>(FunctionKind::Count); ++nIndex)
+    {
+        rTarget.maFunctionObserveCount[nIndex] += rSource.maFunctionObserveCount[nIndex];
+        rTarget.maFunctionShadowCompareCount[nIndex]
+            += rSource.maFunctionShadowCompareCount[nIndex];
+        rTarget.maFunctionAuthoritativeCount[nIndex]
+            += rSource.maFunctionAuthoritativeCount[nIndex];
+        rTarget.maFunctionFallbackCount[nIndex] += rSource.maFunctionFallbackCount[nIndex];
+
+        for (std::size_t nReason = 0; nReason < static_cast<std::size_t>(FallbackReason::Count);
+             ++nReason)
+        {
+            rTarget.maFunctionFallbackReasons[nIndex][nReason]
+                += rSource.maFunctionFallbackReasons[nIndex][nReason];
+        }
+    }
+}
+
+sal_uInt64 totalFallbackCount(const StatsSnapshot& rStats)
+{
+    sal_uInt64 nTotal = 0;
+    for (std::size_t nIndex = 0; nIndex < static_cast<std::size_t>(FallbackReason::Count); ++nIndex)
+        nTotal += rStats.maFallbackReasons[nIndex];
+    return nTotal;
+}
+
+void printLiveRoutingStats(std::size_t nFormulaCellCount, const StatsSnapshot& rStats)
+{
+    const sal_uInt64 nSupportedTotal
+        = rStats.mnObserveCount + rStats.mnShadowCompareCount + rStats.mnAuthoritativeCount;
+    const sal_uInt64 nFallbackTotal = totalFallbackCount(rStats);
+    const sal_uInt64 nSeenTotal = nSupportedTotal + nFallbackTotal;
+    const sal_uInt64 nUnseenTotal
+        = nFormulaCellCount > nSeenTotal ? nFormulaCellCount - nSeenTotal : 0;
+    const double fSupportedRate = nFormulaCellCount
+                                      ? (static_cast<double>(nSupportedTotal) * 100.0
+                                         / static_cast<double>(nFormulaCellCount))
+                                      : 0.0;
+    const double fSeenRate = nFormulaCellCount
+                                 ? (static_cast<double>(nSeenTotal) * 100.0
+                                    / static_cast<double>(nFormulaCellCount))
+                                 : 0.0;
+
+    std::cout << "interpret_tail_live_formula_cells=" << nFormulaCellCount << '\n';
+    std::cout << "interpret_tail_live_supported_total=" << nSupportedTotal << '\n';
+    std::cout << "interpret_tail_live_fallback_total=" << nFallbackTotal << '\n';
+    std::cout << "interpret_tail_live_seen_total=" << nSeenTotal << '\n';
+    std::cout << "interpret_tail_live_unseen_formula_cells=" << nUnseenTotal << '\n';
+
+    const auto aOldFlags = std::cout.flags();
+    const auto nOldPrecision = std::cout.precision();
+    std::cout << std::fixed << std::setprecision(2);
+    std::cout << "interpret_tail_live_supported_rate=" << fSupportedRate << '\n';
+    std::cout << "interpret_tail_live_seen_rate=" << fSeenRate << '\n';
+    std::cout.flags(aOldFlags);
+    std::cout.precision(nOldPrecision);
+
+    for (std::size_t nIndex = 1; nIndex < static_cast<std::size_t>(FunctionKind::Count); ++nIndex)
+    {
+        const auto eFunction = static_cast<FunctionKind>(nIndex);
+        const sal_uInt64 nSupported = rStats.maFunctionObserveCount[nIndex]
+                                      + rStats.maFunctionShadowCompareCount[nIndex]
+                                      + rStats.maFunctionAuthoritativeCount[nIndex];
+        std::cout << "interpret_tail_live_function_" << functionKindName(eFunction)
+                  << "_supported=" << nSupported << '\n';
+        std::cout << "interpret_tail_live_function_" << functionKindName(eFunction)
+                  << "_fallback=" << rStats.maFunctionFallbackCount[nIndex] << '\n';
+    }
+
+    for (std::size_t nIndex = 0; nIndex < static_cast<std::size_t>(FallbackReason::Count); ++nIndex)
+    {
+        const auto eReason = static_cast<FallbackReason>(nIndex);
+        std::cout << "interpret_tail_live_fallback_reason_" << fallbackReasonName(eReason)
+                  << "=" << rStats.maFallbackReasons[nIndex] << '\n';
+    }
+}
+
 void printStats(std::size_t nWorkbookCount, std::size_t nFormulaCellCount, const StatsSnapshot& rStats)
 {
     std::cout << "interpret_tail_corpus_workbooks=" << nWorkbookCount << '\n';
@@ -816,9 +907,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     const auto aCorpus = collectDefaultReplayCorpus();
     CPPUNIT_ASSERT_MESSAGE("replay corpus should not be empty", !aCorpus.empty());
 
-    ScopedEnvironmentOverride aModeOverride(
-        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
-    spreadsheetengine::compat::libreoffice::interprettaileval::resetStats();
+    StatsSnapshot aLiveStats;
+    StatsSnapshot aProbeStats;
     resetProbeDiagnosticSamples();
 
     std::size_t nWorkbookCount = 0;
@@ -843,38 +933,54 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
 
         {
             sc::AutoCalcSwitch aCalcSwitch(rDoc, true);
-            spreadsheetengine::compat::libreoffice::interprettaileval::setDiagnosticWorkbookLabel(
-                OUString::fromUtf8(rWorkbookPath.string()));
-            xDocShell->DoHardRecalc();
-            nProbeFormulaCount += runSupportedInterpretTailProbe(
-                aWorkbook, rDoc, OUString::fromUtf8(rWorkbookPath.string()));
-            spreadsheetengine::compat::libreoffice::interprettaileval::setDiagnosticWorkbookLabel(
-                OUString());
+            {
+                ScopedEnvironmentOverride aObserveMode(
+                    "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "observe");
+                spreadsheetengine::compat::libreoffice::interprettaileval::resetStats();
+                xDocShell->DoHardRecalc();
+                accumulateStats(aLiveStats,
+                    spreadsheetengine::compat::libreoffice::interprettaileval::getStatsSnapshot());
+            }
+
+            {
+                ScopedEnvironmentOverride aProbeMode(
+                    "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+                spreadsheetengine::compat::libreoffice::interprettaileval::resetStats();
+                spreadsheetengine::compat::libreoffice::interprettaileval::setDiagnosticWorkbookLabel(
+                    OUString::fromUtf8(rWorkbookPath.string()));
+                nProbeFormulaCount += runSupportedInterpretTailProbe(
+                    aWorkbook, rDoc, OUString::fromUtf8(rWorkbookPath.string()));
+                spreadsheetengine::compat::libreoffice::interprettaileval::setDiagnosticWorkbookLabel(
+                    OUString());
+                accumulateStats(aProbeStats,
+                    spreadsheetengine::compat::libreoffice::interprettaileval::getStatsSnapshot());
+            }
         }
 
         xDocShell->DoClose();
         ++nWorkbookCount;
     }
 
-    const auto aStats
-        = spreadsheetengine::compat::libreoffice::interprettaileval::getStatsSnapshot();
-    printStats(nWorkbookCount, nFormulaCellCount, aStats);
+    printLiveRoutingStats(nFormulaCellCount, aLiveStats);
+    printStats(nWorkbookCount, nFormulaCellCount, aProbeStats);
     std::cout << "interpret_tail_probe_formula_cells=" << nProbeFormulaCount << '\n';
     printDiagnosticSamples();
     printProbeDiagnosticSamples();
 
     CPPUNIT_ASSERT_EQUAL(aCorpus.size(), nWorkbookCount);
+    CPPUNIT_ASSERT_MESSAGE("all-formula InterpretTail live observe should see at least one formula",
+        aLiveStats.mnObserveCount + totalFallbackCount(aLiveStats) > 0);
     CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should visit at least one cell",
         nProbeFormulaCount > 0);
     CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should record authoritative usage",
-        aStats.mnAuthoritativeCount > 0);
+        aProbeStats.mnAuthoritativeCount > 0);
     CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should attempt at least one promoted family",
-        aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(FunctionKind::Value)]
-                + aStats.maFunctionFallbackCount[static_cast<std::size_t>(FunctionKind::Value)]
-                + aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(FunctionKind::Match)]
-                + aStats.maFunctionFallbackCount[static_cast<std::size_t>(FunctionKind::Match)]
-                + aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(FunctionKind::Lookup)]
-                + aStats.maFunctionFallbackCount[static_cast<std::size_t>(FunctionKind::Lookup)]
+        aProbeStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(FunctionKind::Value)]
+                + aProbeStats.maFunctionFallbackCount[static_cast<std::size_t>(FunctionKind::Value)]
+                + aProbeStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(FunctionKind::Match)]
+                + aProbeStats.maFunctionFallbackCount[static_cast<std::size_t>(FunctionKind::Match)]
+                + aProbeStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(FunctionKind::Lookup)]
+                + aProbeStats.maFunctionFallbackCount[static_cast<std::size_t>(FunctionKind::Lookup)]
             > 0);
 }
 
