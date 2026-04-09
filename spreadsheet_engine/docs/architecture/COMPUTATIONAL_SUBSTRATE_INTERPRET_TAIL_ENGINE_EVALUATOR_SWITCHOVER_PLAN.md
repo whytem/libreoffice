@@ -311,6 +311,11 @@ than by substrate conjunction. The closest next family is:
 - single-cell workbook-local reference arguments for the same text-parsing
   function cluster
 
-That would widen the first live `InterpretTail` delegation slice without
-opening external references, add-ins, matrix policy, or workbook-wide
-authority.
+The active ambitious next-wave plan for that expansion is:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md)
+
+That follow-on wave is intentionally broader than one extra formula shape.
+It targets host-backed scalar materialization, workbook-local names, and the
+first bounded lookup-read delegation cluster without opening external
+references, matrix policy, or workbook-wide authority.

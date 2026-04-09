@@ -158,6 +158,10 @@ The completed closeout is:
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md)
 
+The active next-wave plan is:
+
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md)
+
 ## Current Opt-In Narrow Rollout Surface
 
 The admitted rollout surface currently includes:
@@ -232,8 +236,8 @@ That first pass is now complete.
 The recommended next move is:
 
 1. expand the live `InterpretTail` delegation family by capability cluster,
-   starting with workbook-local reference arguments for the same text-parsing
-   function family
+   using the ambitious next-wave plan in
+   [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md)
 2. keep using the substrate as migration underwriter, comparator, and fallback
    guardrail during that move
 3. only after that, decide how much remaining bounded substrate widening is
