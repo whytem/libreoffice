@@ -201,8 +201,28 @@ board." The next job is to reduce unsupported-shape, mismatch, and
 host-surface fallout on the already-promoted families before another broad
 function-wave expansion.
 
-That immediate follow-on pass is now
-[architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md).
+That follow-on pass is now also complete.
+
+The updated Calc-backed probe now freezes:
+
+- `interpret_tail_probe_formula_cells=1391`
+- `interpret_tail_authoritative_total=1045`
+- `interpret_tail_authoritative_fallback_total=346`
+- `interpret_tail_fallback_unsupported_formula_shape=240`
+- `interpret_tail_fallback_shadow_mismatch=90`
+- `interpret_tail_fallback_unsupported_host_surface=16`
+
+That means the current delegated evaluator cluster now converts more of the
+same measured corpus surface into authoritative routes, but the next hotspot
+is no longer generic “get more usage on the board.” The next hotspot is the
+retained `DATEVALUE` mismatch surface plus residual lookup-family
+unsupported-shape, mismatch, and host-surface fallout.
+
+The completed closeout set now also includes:
+
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md)
 
 ## Current Opt-In Narrow Rollout Surface
 

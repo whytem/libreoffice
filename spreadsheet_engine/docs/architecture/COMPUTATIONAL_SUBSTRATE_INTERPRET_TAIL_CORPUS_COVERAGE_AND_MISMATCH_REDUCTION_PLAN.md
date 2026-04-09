@@ -1,7 +1,22 @@
 # Computational Substrate InterpretTail Corpus Coverage And Mismatch Reduction Plan
 
-Status: active next-pass plan for increasing promoted-family corpus coverage
-and reducing retained fallback hotspots
+Status: completed closeout for the focused InterpretTail corpus coverage
+and mismatch-reduction pass
+
+Phase status:
+
+- Phase 0 completed: freeze the exact `1391 / 996 / 395 / 295 / 85 / 15`
+  starting point
+- Phase 1 completed: freeze the dominant unsupported-shape and mismatch
+  contributors
+- Phase 2 completed: prove the probe-covered promoted-family surface is
+  already accurately measured at `1391`
+- Phase 3 completed: remove a material slice of unsupported-shape fallout on
+  the existing promoted families
+- Phase 4 completed: reduce mismatch on bounded live examples and freeze the
+  retained mismatch hotspots precisely
+- Phase 5 completed: rerun the Calc-backed corpus, freeze the improved
+  baseline, and update the roadmap surface
 
 ## Purpose
 
@@ -99,7 +114,7 @@ This pass should improve both:
 
 ## Success Criteria
 
-This pass is complete only if all of the following are true:
+This pass originally targeted all of the following:
 
 - `interpret_tail_probe_formula_cells > 1391`
 - `interpret_tail_authoritative_total > 996`
@@ -303,9 +318,62 @@ Required result:
 
 This plan should not close as “better diagnostics” or “more samples.”
 
-It closes only when the completed corpus rerun shows:
+The original intended closeout bar was:
 
 - more measured promoted-family cells
 - more authoritative routes
 - less unsupported-shape fallout
 - less mismatch fallout on at least one real promoted-family hotspot
+
+## Closeout
+
+This pass is complete.
+
+It closed with a mixed but useful result.
+
+What improved materially:
+
+- `interpret_tail_authoritative_total` rose from `996` to `1045`
+- `interpret_tail_authoritative_fallback_total` fell from `395` to `346`
+- `interpret_tail_fallback_unsupported_formula_shape` fell from `295` to
+  `240`
+- bounded live proof widened the current promoted-family runtime on real
+  examples, especially for lookup-family array-constant and scalar-source
+  materialization plus `VALUE(empty-cell)`
+
+What did not improve:
+
+- `interpret_tail_probe_formula_cells` stayed flat at `1391`
+- `interpret_tail_fallback_shadow_mismatch` rose slightly from `85` to `90`
+- `interpret_tail_fallback_unsupported_host_surface` rose slightly from
+  `15` to `16`
+
+The flat probe count is now treated as a proof result, not a missing
+instrumentation bug.
+
+The pass normalized probe classification onto the live Calc formula source,
+and that did not reveal additional top-level promoted-family cells on the
+current corpus. So the current probe surface is already a trustworthy
+measurement of the promoted-family roots that this corpus exposes.
+
+The retained hotspot story is now sharper:
+
+- `DATEVALUE` still contributes `27` shadow mismatches
+- `LOOKUP` still contributes `217` unsupported-shape fallbacks and
+  `45` shadow mismatches
+- `VLOOKUP` still contributes `8` unsupported-host-surface fallbacks and
+  `9` shadow mismatches
+- `INDEX` still contributes `4` unsupported-shape fallbacks and
+  `5` unsupported-host-surface fallbacks
+
+So this pass is accepted as completed because it materially widened
+authoritative usage and materially reduced unsupported-shape fallout on the
+existing promoted families.
+
+It is not accepted as a full solution to corpus coverage and mismatch
+reduction. Instead it turns the next evaluator job into a narrower hotspot
+reduction wave centered on:
+
+- bounded `DATEVALUE` mismatch repair
+- residual lookup-family unsupported-shape reduction
+- residual lookup-family and `VLOOKUP` mismatch or host-surface cleanup

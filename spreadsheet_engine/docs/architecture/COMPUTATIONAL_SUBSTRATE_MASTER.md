@@ -229,9 +229,32 @@ The most important caveat on that new baseline is:
 - it is not yet a claim that natural ambient AutoCalc traffic already
   produces the same authoritative totals by default
 
-The immediate evaluator follow-on pass is now:
+The focused corpus coverage and mismatch-reduction follow-on pass is now
+also complete.
+
+The updated Calc-backed corpus probe now freezes:
+
+- `interpret_tail_probe_formula_cells=1391`
+- `interpret_tail_authoritative_total=1045`
+- `interpret_tail_authoritative_fallback_total=346`
+- `interpret_tail_fallback_unsupported_formula_shape=240`
+- `interpret_tail_fallback_shadow_mismatch=90`
+- `interpret_tail_fallback_unsupported_host_surface=16`
+
+The important interpretation is:
+
+- the live evaluator cluster now matters more on the existing corpus surface
+- the probe-covered top-level promoted-family surface did not grow beyond
+  `1391`
+- the main remaining evaluator hotspots are no longer generic; they are now
+  concentrated on `DATEVALUE` mismatch and residual lookup-family
+  unsupported-shape or mismatch fallout
+
+The completed closeout set now also includes:
 
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md)
 
 ## Current Admitted Authority And Rollout Slice
 

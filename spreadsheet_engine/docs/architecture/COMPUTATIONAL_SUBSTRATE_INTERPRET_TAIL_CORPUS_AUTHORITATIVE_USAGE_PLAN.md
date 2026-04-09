@@ -147,22 +147,30 @@ The weakest supported families in the completed corpus snapshot are:
 
 ## Immediate Next Move
 
-The next evaluator pass should not start by adding a broad new function
-family.
+The follow-on evaluator pass is now also complete.
 
-It should first convert more of the current probe-backed attempt surface into
-clean authoritative routing by:
+It did not uncover additional top-level probe-covered promoted-family roots,
+but it did improve the quality of the current seam materially:
 
-1. reducing the retained unsupported-shape surface on the promoted
-   families
-2. reducing the retained shadow-mismatch surface, especially on
-   `LOOKUP`-class behavior
-3. increasing the share of natural live seam traffic that reaches the same
-   promoted-family path without needing the focused probe
+- `interpret_tail_authoritative_total` rose from `996` to `1045`
+- `interpret_tail_authoritative_fallback_total` fell from `395` to `346`
+- `interpret_tail_fallback_unsupported_formula_shape` fell from `295` to
+  `240`
 
-That immediate follow-on pass is now:
+The retained next-step hotspot is now narrower than the broad generic
+"coverage and mismatch reduction" framing that started the follow-on pass.
+
+The next evaluator move should target:
+
+1. bounded `DATEVALUE` mismatch repair
+2. residual lookup-family unsupported-shape cleanup
+3. residual lookup-family and `VLOOKUP` mismatch or host-surface cleanup
+
+The completed follow-on closeout is now:
 
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md)
 
 ## Validation Summary
 
