@@ -18,6 +18,7 @@
 #include <scmatrix.hxx>
 #include <docoptio.hxx>
 #include <externalrefmgr.hxx>
+#include <rangenam.hxx>
 #include <undomanager.hxx>
 #include <broadcast.hxx>
 #include <kahan.hxx>
@@ -762,14 +763,22 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorObserveAndSha
 
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
     CPPUNIT_ASSERT_MESSAGE("failed to insert sheet", m_pDoc->InsertTab(0, u"EngineObserve"_ustr));
+    m_pDoc->SetTextCell(ScAddress(0, 0, 0), u"1954-07-20"_ustr);
+    m_pDoc->SetValue(0, 4, 0, 20.0);
+    m_pDoc->SetValue(1, 4, 0, 10.0);
+    m_pDoc->SetTextCell(ScAddress(2, 4, 0), u"ten"_ustr);
+    m_pDoc->SetValue(1, 5, 0, 20.0);
+    m_pDoc->SetTextCell(ScAddress(2, 5, 0), u"twenty"_ustr);
+    m_pDoc->SetValue(1, 6, 0, 30.0);
+    m_pDoc->SetTextCell(ScAddress(2, 6, 0), u"thirty"_ustr);
 
     {
         ScopedEnvironmentOverride aMode(
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "observe");
         setaileval::resetStats();
 
-        m_pDoc->SetString(0, 0, 0, u"=DATEVALUE(\"1954-07-20\")"_ustr);
-        ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(0, 0, 0));
+        m_pDoc->SetString(3, 0, 0, u"=DATEVALUE(A1)"_ustr);
+        ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(3, 0, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
         CPPUNIT_ASSERT(aStats.mnObserveCount >= 1);
@@ -777,6 +786,10 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorObserveAndSha
             static_cast<sal_uInt64>(0), aStats.mnShadowCompareCount);
         CPPUNIT_ASSERT_EQUAL(
             static_cast<sal_uInt64>(0), aStats.mnAuthoritativeCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionObserveCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::DateValue)]
+            >= 1);
     }
 
     {
@@ -784,8 +797,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorObserveAndSha
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "shadow");
         setaileval::resetStats();
 
-        m_pDoc->SetString(0, 1, 0, u"=NUMBERVALUE(\"1,234.5\";\".\";\",\")"_ustr);
-        ASSERT_DOUBLES_EQUAL(1234.5, m_pDoc->GetValue(0, 1, 0));
+        m_pDoc->SetString(3, 4, 0, u"=VLOOKUP(A5;B5:C7;2;0)"_ustr);
+        CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(3, 4, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
         CPPUNIT_ASSERT(aStats.mnShadowCompareCount >= 1);
@@ -801,6 +814,18 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorObserveAndSha
             static_cast<sal_uInt64>(0),
             aStats.maMismatchReasons[static_cast<std::size_t>(
                 setaileval::MismatchReason::FormatType)]);
+        CPPUNIT_ASSERT_EQUAL(
+            static_cast<sal_uInt64>(0),
+            aStats.maMismatchReasons[static_cast<std::size_t>(
+                setaileval::MismatchReason::ResultType)]);
+        CPPUNIT_ASSERT_EQUAL(
+            static_cast<sal_uInt64>(0),
+            aStats.maMismatchReasons[static_cast<std::size_t>(
+                setaileval::MismatchReason::StringValue)]);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionShadowCompareCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::VLookup)]
+            >= 1);
     }
 
     m_pDoc->DeleteTab(0);
@@ -812,25 +837,55 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
 
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
     CPPUNIT_ASSERT_MESSAGE("failed to insert sheet", m_pDoc->InsertTab(0, u"EngineAuthority"_ustr));
+    m_pDoc->SetTextCell(ScAddress(0, 0, 0), u"1954-07-20"_ustr);
+    m_pDoc->SetTextCell(ScAddress(0, 1, 0), u"07-20"_ustr);
+    m_pDoc->SetTextCell(ScAddress(1, 0, 0), u"16:30:01"_ustr);
+    m_pDoc->SetValue(0, 4, 0, 20.0);
+    m_pDoc->SetValue(1, 4, 0, 10.0);
+    m_pDoc->SetTextCell(ScAddress(2, 4, 0), u"ten"_ustr);
+    m_pDoc->SetValue(1, 5, 0, 20.0);
+    m_pDoc->SetTextCell(ScAddress(2, 5, 0), u"twenty"_ustr);
+    m_pDoc->SetValue(1, 6, 0, 30.0);
+    m_pDoc->SetTextCell(ScAddress(2, 6, 0), u"thirty"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"MyTimeName"_ustr, u"$EngineAuthority.$B$1"_ustr)));
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName(0)->insert(
+        new ScRangeData(*m_pDoc, u"LocalTimeName"_ustr, u"$B$1"_ustr)));
 
     {
         ScopedEnvironmentOverride aMode(
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
         setaileval::resetStats();
 
-        m_pDoc->SetString(0, 0, 0, u"=DATEVALUE(\"1954-07-20\")"_ustr);
-        ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(0, 0, 0));
+        m_pDoc->SetString(3, 0, 0, u"=DATEVALUE(A1)"_ustr);
+        m_pDoc->SetString(3, 1, 0, u"=DATEVALUE(\"1954-\"&A2)"_ustr);
+        m_pDoc->SetString(3, 2, 0, u"=TIMEVALUE(MyTimeName)"_ustr);
+        m_pDoc->SetString(3, 3, 0, u"=TIMEVALUE(LocalTimeName)"_ustr);
+        ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(3, 0, 0));
+        ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(3, 1, 0));
+        ASSERT_DOUBLES_EQUAL((16.0 * 3600.0 + 30.0 * 60.0 + 1.0) / 86400.0,
+                             m_pDoc->GetValue(3, 2, 0));
+        ASSERT_DOUBLES_EQUAL((16.0 * 3600.0 + 30.0 * 60.0 + 1.0) / 86400.0,
+                             m_pDoc->GetValue(3, 3, 0));
 
         ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
-        const sal_uInt32 nFormat = m_pDoc->GetNumberFormat(rContext, ScAddress(0, 0, 0));
+        const sal_uInt32 nFormat = m_pDoc->GetNumberFormat(rContext, ScAddress(3, 0, 0));
         const SvNumFormatType eType
             = rContext.GetFormatTable()->GetType(nFormat) & ~SvNumFormatType::DEFINED;
         CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, eType);
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 2);
         CPPUNIT_ASSERT_EQUAL(
             static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::DateValue)]
+            >= 2);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::TimeValue)]
+            >= 2);
     }
 
     {
@@ -838,14 +893,32 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
         setaileval::resetStats();
 
-        m_pDoc->SetString(0, 2, 0, u"=DATEVALUE(\"1954-\"&\"07-20\")"_ustr);
-        ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(0, 2, 0));
+        m_pDoc->SetString(3, 4, 0, u"=VLOOKUP(A5;B5:C7;2;0)"_ustr);
+        CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(3, 4, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT_EQUAL(
+            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::VLookup)]
+            >= 1);
+    }
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(3, 2, 0, u"=LEFT(\"abc\";1)"_ustr);
+        CPPUNIT_ASSERT_EQUAL(u"a"_ustr, m_pDoc->GetString(3, 2, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
         CPPUNIT_ASSERT(aStats.mnAuthoritativeFallbackCount >= 1);
         CPPUNIT_ASSERT(
             aStats.maFallbackReasons[static_cast<std::size_t>(
-                setaileval::FallbackReason::UnsupportedFormulaShape)]
+                setaileval::FallbackReason::UnsupportedFunction)]
             >= 1);
     }
 

@@ -68,6 +68,7 @@
 #include <spreadsheetengine/detail/FormulaCellReferenceUpdate.hxx>
 #include <spreadsheetengine/detail/FormulaCellState.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx>
+#include <spreadsheetengine/compat/libreoffice/FormulaResult.hxx>
 #include <spreadsheetengine/compat/libreoffice/SharedFormula.hxx>
 #include <com/sun/star/sheet/FormulaLanguage.hpp>
 
@@ -1977,29 +1978,34 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                 if (eEngineRolloutMode == setaileval::RolloutMode::AuthoritativeWithFallback)
                 {
                     setaileval::recordAuthoritativeFallback(
-                        setaileval::FallbackReason::UnsupportedTailContext);
+                        setaileval::FallbackReason::UnsupportedTailContext,
+                        setaileval::FunctionKind::Unknown);
                 }
                 else
                 {
-                    setaileval::recordFallback(setaileval::FallbackReason::UnsupportedTailContext);
+                    setaileval::recordFallback(
+                        setaileval::FallbackReason::UnsupportedTailContext,
+                        setaileval::FunctionKind::Unknown);
                 }
             }
             else
             {
                 const OUString aFormulaSource = GetFormula(FormulaGrammar::GRAM_PODF, &rContext);
                 oEngineAttempt = setaileval::tryEvaluateFormula(
-                    rDocument, rContext,
+                    rDocument, rContext, aPos,
                     std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
                     rDocument.GetCalcConfig().mbEmptyStringAsZero);
                 if (!oEngineAttempt->mbSupported)
                 {
                     if (eEngineRolloutMode == setaileval::RolloutMode::AuthoritativeWithFallback)
                     {
-                        setaileval::recordAuthoritativeFallback(oEngineAttempt->meFallbackReason);
+                        setaileval::recordAuthoritativeFallback(
+                            oEngineAttempt->meFallbackReason, oEngineAttempt->meFunction);
                     }
                     else
                     {
-                        setaileval::recordFallback(oEngineAttempt->meFallbackReason);
+                        setaileval::recordFallback(
+                            oEngineAttempt->meFallbackReason, oEngineAttempt->meFunction);
                     }
                 }
             }
@@ -2023,6 +2029,15 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                      == spreadsheetengine::api::formulavalue::ValueType::Value)
             {
                 aNewResult.SetDouble(rAttempt.maResult.mfValue);
+            }
+            else if (rAttempt.maResult.meType
+                     == spreadsheetengine::api::formulavalue::ValueType::String)
+            {
+                const svl::SharedString aSharedString
+                    = rDocument.GetSharedStringPool().intern(
+                        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                            rAttempt.maResult.maString));
+                aNewResult.SetToken(new formula::FormulaStringToken(aSharedString));
             }
             else
             {
@@ -2141,19 +2156,20 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
             switch (eEngineRolloutMode)
             {
                 case setaileval::RolloutMode::Observe:
-                    setaileval::recordObserveSupport();
+                    setaileval::recordObserveSupport(oEngineAttempt->meFunction);
                     break;
                 case setaileval::RolloutMode::AuthoritativeWithFallback:
                     if (applyEngineAuthoritativeResult(*oEngineAttempt))
                     {
-                        setaileval::recordAuthoritativeRoute();
+                        setaileval::recordAuthoritativeRoute(oEngineAttempt->meFunction);
                         return;
                     }
                     setaileval::recordAuthoritativeFallback(
-                        setaileval::FallbackReason::ProjectionFailure);
+                        setaileval::FallbackReason::ProjectionFailure,
+                        oEngineAttempt->meFunction);
                     break;
                 case setaileval::RolloutMode::ShadowCompare:
-                    setaileval::recordShadowCompareSupport();
+                    setaileval::recordShadowCompareSupport(oEngineAttempt->meFunction);
                     break;
                 case setaileval::RolloutMode::Off:
                     break;
@@ -2197,28 +2213,39 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
         if (oEngineAttempt && oEngineAttempt->mbSupported
             && eEngineRolloutMode == setaileval::RolloutMode::ShadowCompare)
         {
-            const FormulaError nInterpreterError = pInterpreter->GetError();
-            if (oEngineAttempt->maResult.meType == spreadsheetengine::api::formulavalue::ValueType::Error)
+            const ScFormulaResult aInterpreterResult(pInterpreter->GetResultToken().get());
+            const sc::FormulaResultValue aInterpreterValue = aInterpreterResult.GetResult();
+            const sc::FormulaResultValue aEngineValue
+                = spreadsheetengine::compat::libreoffice::toLibreOfficeFormulaResultValue(
+                    oEngineAttempt->maResult);
+
+            if (aInterpreterValue.meType != aEngineValue.meType)
             {
-                const auto eEngineError = spreadsheetengine::compat::libreoffice::toFormulaError(
-                    oEngineAttempt->maResult.meError);
-                if (nInterpreterError != eEngineError)
+                setaileval::recordMismatch(setaileval::MismatchReason::ResultType);
+            }
+            else if (aEngineValue.meType == sc::FormulaResultValue::Error)
+            {
+                if (aInterpreterValue.mnError != aEngineValue.mnError)
                     setaileval::recordMismatch(setaileval::MismatchReason::Error);
                 else
                     setaileval::recordShadowMatch();
             }
-            else if (nInterpreterError != FormulaError::NONE)
-            {
-                setaileval::recordMismatch(setaileval::MismatchReason::Error);
-            }
-            else if (!rtl::math::approxEqual(
-                         pInterpreter->GetNumResult(), oEngineAttempt->maResult.mfValue))
+            else if (aEngineValue.meType == sc::FormulaResultValue::Value
+                     && !rtl::math::approxEqual(
+                         aInterpreterValue.mfValue, aEngineValue.mfValue))
             {
                 setaileval::recordMismatch(setaileval::MismatchReason::NumericValue);
             }
-            else if ((oEngineAttempt->meFormatType == SvNumFormatType::DATE
-                      || oEngineAttempt->meFormatType == SvNumFormatType::TIME
-                      || oEngineAttempt->meFormatType == SvNumFormatType::DATETIME)
+            else if (aEngineValue.meType == sc::FormulaResultValue::String
+                     && (aInterpreterValue.maString != aEngineValue.maString
+                         || aInterpreterValue.mbMultiLine != aEngineValue.mbMultiLine))
+            {
+                setaileval::recordMismatch(setaileval::MismatchReason::StringValue);
+            }
+            else if (aEngineValue.meType == sc::FormulaResultValue::Value
+                     && (oEngineAttempt->meFormatType == SvNumFormatType::DATE
+                         || oEngineAttempt->meFormatType == SvNumFormatType::TIME
+                         || oEngineAttempt->meFormatType == SvNumFormatType::DATETIME)
                      && pInterpreter->GetRetFormatType() != oEngineAttempt->meFormatType)
             {
                 setaileval::recordMismatch(setaileval::MismatchReason::FormatType);

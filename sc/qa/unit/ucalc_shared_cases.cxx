@@ -13,6 +13,7 @@
 
 #include <formula/errorcodes.hxx>
 #include <interpretercontext.hxx>
+#include <rangenam.hxx>
 #include <spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/Host.hxx>
@@ -645,27 +646,85 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
     m_pDoc->InsertTab(0, u"InterpretTailHelper"_ustr);
     ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(3, 0, 0);
+
+    m_pDoc->SetTextCell(ScAddress(0, 0, 0), u"1954-07-20"_ustr);
+    m_pDoc->SetTextCell(ScAddress(0, 1, 0), u"07-20"_ustr);
+    m_pDoc->SetValue(0, 2, 0, 42.0);
+    m_pDoc->SetTextCell(ScAddress(1, 0, 0), u"16:30:01"_ustr);
+    m_pDoc->SetValue(0, 4, 0, 20.0);
+    m_pDoc->SetValue(1, 4, 0, 10.0);
+    m_pDoc->SetTextCell(ScAddress(2, 4, 0), u"ten"_ustr);
+    m_pDoc->SetValue(1, 5, 0, 20.0);
+    m_pDoc->SetTextCell(ScAddress(2, 5, 0), u"twenty"_ustr);
+    m_pDoc->SetValue(1, 6, 0, 30.0);
+    m_pDoc->SetTextCell(ScAddress(2, 6, 0), u"thirty"_ustr);
+    m_pDoc->SetTextCell(ScAddress(0, 7, 0), u"1,234.5"_ustr);
+    m_pDoc->SetTextCell(ScAddress(1, 7, 0), u"."_ustr);
+    m_pDoc->SetTextCell(ScAddress(2, 7, 0), u","_ustr);
+
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"MyTimeName"_ustr, u"$InterpretTailHelper.$B$1"_ustr)));
 
     const auto aDate = setaileval::tryEvaluateFormula(
-        *m_pDoc, rContext, u"=DATEVALUE(\"1954-07-20\")", false);
+        *m_pDoc, rContext, aFormulaPos, u"=DATEVALUE(A1)", false);
     CPPUNIT_ASSERT(aDate.mbSupported);
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value, aDate.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(19925.0, aDate.maResult.mfValue, 1e-12);
     CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, aDate.meFormatType);
 
+    const auto aConcatDate = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=DATEVALUE(\"1954-\"&A2)", false);
+    CPPUNIT_ASSERT(aConcatDate.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aConcatDate.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(19925.0, aConcatDate.maResult.mfValue, 1e-12);
+
+    const auto aTimeFromName = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=TIMEVALUE(MyTimeName)", false);
+    CPPUNIT_ASSERT(aTimeFromName.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aTimeFromName.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL((16.0 * 3600.0 + 30.0 * 60.0 + 1.0) / 86400.0,
+        aTimeFromName.maResult.mfValue, 1e-12);
+
+    const auto aSignedValue = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=VALUE(-A3)", false);
+    CPPUNIT_ASSERT(aSignedValue.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aSignedValue.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-42.0, aSignedValue.maResult.mfValue, 1e-12);
+
     const auto aNumber = setaileval::tryEvaluateFormula(
-        *m_pDoc, rContext, u"=NUMBERVALUE(\"1,234.5\";\".\";\",\")", false);
+        *m_pDoc, rContext, aFormulaPos, u"=NUMBERVALUE(A8;B8;C8)", false);
     CPPUNIT_ASSERT(aNumber.mbSupported);
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value, aNumber.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1234.5, aNumber.maResult.mfValue, 1e-12);
 
-    const auto aUnsupported
-        = setaileval::tryEvaluateFormula(*m_pDoc, rContext, u"=DATEVALUE(A1)", false);
-    CPPUNIT_ASSERT(!aUnsupported.mbSupported);
+    const auto aMatch = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 4, 0), u"=MATCH(A5;B5:B7;0)", false);
+    CPPUNIT_ASSERT(aMatch.mbSupported);
     CPPUNIT_ASSERT_EQUAL(
-        setaileval::FallbackReason::UnsupportedFormulaShape, aUnsupported.meFallbackReason);
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMatch.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aMatch.maResult.mfValue, 1e-12);
+
+    const auto aVLookup = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 4, 0), u"=VLOOKUP(A5;B5:C7;2;0)", false);
+    CPPUNIT_ASSERT(aVLookup.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aVLookup.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aVLookup.maResult.maString));
+
+    const auto aIndex = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 4, 0), u"=INDEX(B5:C7;2;2)", false);
+    CPPUNIT_ASSERT(aIndex.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aIndex.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aIndex.maResult.maString));
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testDirectFormulaInspectionAdapter)

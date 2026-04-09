@@ -9,18 +9,27 @@
 
 #pragma once
 
+#include <address.hxx>
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <optional>
 #include <string_view>
 
 #include <document.hxx>
+#include <formula/grammar.hxx>
 #include <interpretercontext.hxx>
+#include <rangeutl.hxx>
 #include <svl/numformat.hxx>
 
 #include <spreadsheetengine/api/FormulaResult.hxx>
+#include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
+#include <spreadsheetengine/compat/libreoffice/Host.hxx>
+#include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
 #include <spreadsheetengine/detail/OdfFormulaParser.hxx>
@@ -40,6 +49,7 @@ enum class FallbackReason : sal_uInt8
 {
     UnsupportedTailContext,
     UnsupportedFormulaShape,
+    UnsupportedHostSurface,
     UnsupportedFunction,
     ParseFailure,
     ProjectionFailure,
@@ -52,6 +62,24 @@ enum class MismatchReason : sal_uInt8
     Error,
     NumericValue,
     FormatType,
+    ResultType,
+    StringValue,
+    Count
+};
+
+enum class FunctionKind : sal_uInt8
+{
+    Unknown,
+    Value,
+    DateValue,
+    TimeValue,
+    NumberValue,
+    Match,
+    XMatch,
+    Lookup,
+    VLookup,
+    HLookup,
+    Index,
     Count
 };
 
@@ -62,6 +90,7 @@ struct EvaluationAttempt
         = api::formulavalue::makeInvalidResult();
     SvNumFormatType meFormatType = SvNumFormatType::ALL;
     FallbackReason meFallbackReason = FallbackReason::UnsupportedFormulaShape;
+    FunctionKind meFunction = FunctionKind::Unknown;
 };
 
 struct StatsSnapshot
@@ -73,10 +102,25 @@ struct StatsSnapshot
     sal_uInt64 mnShadowMatchCount = 0;
     std::array<sal_uInt64, static_cast<std::size_t>(FallbackReason::Count)> maFallbackReasons {};
     std::array<sal_uInt64, static_cast<std::size_t>(MismatchReason::Count)> maMismatchReasons {};
+    std::array<sal_uInt64, static_cast<std::size_t>(FunctionKind::Count)> maFunctionObserveCount {};
+    std::array<sal_uInt64, static_cast<std::size_t>(FunctionKind::Count)>
+        maFunctionShadowCompareCount {};
+    std::array<sal_uInt64, static_cast<std::size_t>(FunctionKind::Count)>
+        maFunctionAuthoritativeCount {};
+    std::array<sal_uInt64, static_cast<std::size_t>(FunctionKind::Count)>
+        maFunctionFallbackCount {};
 };
 
 namespace detail
 {
+
+template <typename T> struct Materialization
+{
+    bool mbSupported = false;
+    std::optional<T> moValue;
+    api::Error meError = api::Error::None;
+    FallbackReason meFallbackReason = FallbackReason::UnsupportedFormulaShape;
+};
 
 struct StatsStore
 {
@@ -89,6 +133,14 @@ struct StatsStore
         maFallbackReasons {};
     std::array<std::atomic<sal_uInt64>, static_cast<std::size_t>(MismatchReason::Count)>
         maMismatchReasons {};
+    std::array<std::atomic<sal_uInt64>, static_cast<std::size_t>(FunctionKind::Count)>
+        maFunctionObserveCount {};
+    std::array<std::atomic<sal_uInt64>, static_cast<std::size_t>(FunctionKind::Count)>
+        maFunctionShadowCompareCount {};
+    std::array<std::atomic<sal_uInt64>, static_cast<std::size_t>(FunctionKind::Count)>
+        maFunctionAuthoritativeCount {};
+    std::array<std::atomic<sal_uInt64>, static_cast<std::size_t>(FunctionKind::Count)>
+        maFunctionFallbackCount {};
 };
 
 [[nodiscard]] inline StatsStore& statsStore()
@@ -107,6 +159,11 @@ struct StatsStore
     return static_cast<std::size_t>(eReason);
 }
 
+[[nodiscard]] constexpr std::size_t toIndex(FunctionKind eFunction)
+{
+    return static_cast<std::size_t>(eFunction);
+}
+
 [[nodiscard]] inline bool envEnabled(std::string_view rValue)
 {
     return !rValue.empty() && rValue != "0" && rValue != "off" && rValue != "false";
@@ -121,6 +178,14 @@ struct StatsStore
             rChar = static_cast<char16_t>(rChar - u'a' + u'A');
     }
     return aNormalized;
+}
+
+[[nodiscard]] inline OUString normalizeReferenceToken(api::StringView rValue)
+{
+    OUString aText = toLibreOfficeString(api::String(rValue));
+    if (!aText.isEmpty() && aText[0] == '.')
+        aText = aText.copy(1);
+    return aText;
 }
 
 [[nodiscard]] inline std::u16string_view trimFormulaEquals(std::u16string_view rSource)
@@ -152,14 +217,100 @@ struct StatsStore
     return aNormalized;
 }
 
-[[nodiscard]] inline bool isSignedNumericLiteral(const core::formula::Node& rNode)
+[[nodiscard]] inline FunctionKind classifyFunction(api::StringView rFunctionName)
 {
-    if (rNode.meKind != core::formula::NodeKind::UnaryOperation || rNode.maChildren.size() != 1)
-        return false;
-    if (rNode.maPrimaryText != u"+" && rNode.maPrimaryText != u"-")
-        return false;
-    return rNode.maChildren[0]
-           && rNode.maChildren[0]->meKind == core::formula::NodeKind::NumberLiteral;
+    if (rFunctionName == u"VALUE")
+        return FunctionKind::Value;
+    if (rFunctionName == u"DATEVALUE")
+        return FunctionKind::DateValue;
+    if (rFunctionName == u"TIMEVALUE")
+        return FunctionKind::TimeValue;
+    if (rFunctionName == u"NUMBERVALUE")
+        return FunctionKind::NumberValue;
+    if (rFunctionName == u"MATCH")
+        return FunctionKind::Match;
+    if (rFunctionName == u"XMATCH" || rFunctionName == u"COM.MICROSOFT.XMATCH")
+        return FunctionKind::XMatch;
+    if (rFunctionName == u"LOOKUP")
+        return FunctionKind::Lookup;
+    if (rFunctionName == u"VLOOKUP")
+        return FunctionKind::VLookup;
+    if (rFunctionName == u"HLOOKUP")
+        return FunctionKind::HLookup;
+    if (rFunctionName == u"INDEX")
+        return FunctionKind::Index;
+    return FunctionKind::Unknown;
+}
+
+template <typename T>
+[[nodiscard]] inline Materialization<T> makeUnsupportedMaterialization(FallbackReason eReason)
+{
+    Materialization<T> aResult;
+    aResult.meFallbackReason = eReason;
+    return aResult;
+}
+
+template <typename T>
+[[nodiscard]] inline Materialization<T> makeMaterializedValue(T aValue)
+{
+    Materialization<T> aResult;
+    aResult.mbSupported = true;
+    aResult.moValue = std::move(aValue);
+    return aResult;
+}
+
+template <typename T>
+[[nodiscard]] inline Materialization<T> makeMaterializedError(api::Error eError)
+{
+    Materialization<T> aResult;
+    aResult.mbSupported = true;
+    aResult.meError = eError;
+    return aResult;
+}
+
+[[nodiscard]] inline api::formulavalue::FormulaResultValue makeErrorResultFromApi(api::Error eError)
+{
+    return api::formulavalue::makeErrorResult(eError);
+}
+
+[[nodiscard]] inline EvaluationAttempt makeUnsupported(
+    FunctionKind eFunction, FallbackReason eReason)
+{
+    EvaluationAttempt aAttempt;
+    aAttempt.meFunction = eFunction;
+    aAttempt.meFallbackReason = eReason;
+    return aAttempt;
+}
+
+[[nodiscard]] inline EvaluationAttempt makeNumericResult(
+    FunctionKind eFunction, double fValue, SvNumFormatType eFormatType)
+{
+    EvaluationAttempt aAttempt;
+    aAttempt.mbSupported = true;
+    aAttempt.meFunction = eFunction;
+    aAttempt.maResult = api::formulavalue::makeValueResult(fValue);
+    aAttempt.meFormatType = eFormatType;
+    return aAttempt;
+}
+
+[[nodiscard]] inline EvaluationAttempt makeStringResult(
+    FunctionKind eFunction, const OUString& rValue, bool bMultiLine = false)
+{
+    EvaluationAttempt aAttempt;
+    aAttempt.mbSupported = true;
+    aAttempt.meFunction = eFunction;
+    aAttempt.maResult
+        = api::formulavalue::makeStringResult(toApiString(rValue), bMultiLine);
+    return aAttempt;
+}
+
+[[nodiscard]] inline EvaluationAttempt makeErrorResult(FunctionKind eFunction, api::Error eError)
+{
+    EvaluationAttempt aAttempt;
+    aAttempt.mbSupported = true;
+    aAttempt.meFunction = eFunction;
+    aAttempt.maResult = makeErrorResultFromApi(eError);
+    return aAttempt;
 }
 
 [[nodiscard]] inline std::optional<double> extractNumericLiteral(
@@ -168,139 +319,775 @@ struct StatsStore
     if (rNode.meKind == core::formula::NodeKind::NumberLiteral)
         return rNode.mfNumber;
 
-    if (!isSignedNumericLiteral(rNode))
+    if (rNode.meKind != core::formula::NodeKind::UnaryOperation || rNode.maChildren.size() != 1
+        || rNode.maChildren[0]->meKind != core::formula::NodeKind::NumberLiteral)
+    {
         return std::nullopt;
+    }
 
     const double fValue = rNode.maChildren[0]->mfNumber;
-    return rNode.maPrimaryText == u"-" ? -fValue : fValue;
+    return rNode.meUnaryOperator == core::formula::UnaryOperator::Minus ? -fValue : fValue;
 }
 
-[[nodiscard]] inline std::optional<OUString> extractStringLiteral(
-    const core::formula::Node& rNode)
+[[nodiscard]] inline OUString formatScalarNumber(
+    const ScDocument& rDoc, ScInterpreterContext& rContext, double fValue)
 {
-    if (rNode.meKind == core::formula::NodeKind::StringLiteral)
-        return toLibreOfficeString(api::String(rNode.maPrimaryText));
-
-    if (rNode.meKind == core::formula::NodeKind::EmptyArgument)
-        return OUString();
-
-    return std::nullopt;
+    DocumentEvaluationHost aHost(rDoc, rContext);
+    const auto aFormatted = aHost.formatNumber(fValue);
+    return aFormatted ? toLibreOfficeString(aFormatted.maValue) : OUString::number(fValue);
 }
 
-[[nodiscard]] inline api::formulavalue::FormulaResultValue makeErrorResultFromApi(
-    api::Error eError)
+[[nodiscard]] inline api::ValueResult<OUString> coerceScalarToText(
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const api::CellValue& rValue)
 {
-    return api::formulavalue::makeErrorResult(eError);
+    if (rValue.isError())
+        return api::ValueResult<OUString>::failure(rValue.meError);
+
+    if (rValue.isEmpty())
+        return api::ValueResult<OUString>::success(OUString());
+
+    if (rValue.isText())
+    {
+        return api::ValueResult<OUString>::success(
+            toLibreOfficeString(rValue.maString));
+    }
+
+    if (rValue.isBoolean())
+    {
+        return api::ValueResult<OUString>::success(
+            rValue.mfNumber != 0.0 ? u"TRUE"_ustr : u"FALSE"_ustr);
+    }
+
+    return api::ValueResult<OUString>::success(formatScalarNumber(rDoc, rContext, rValue.mfNumber));
 }
 
-[[nodiscard]] inline EvaluationAttempt makeUnsupported(FallbackReason eReason)
+[[nodiscard]] inline api::ValueResult<double> coerceScalarToNumber(
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const api::CellValue& rValue)
 {
-    EvaluationAttempt aAttempt;
-    aAttempt.meFallbackReason = eReason;
-    return aAttempt;
+    if (rValue.isError())
+        return api::ValueResult<double>::failure(rValue.meError);
+
+    if (rValue.isEmpty())
+        return api::ValueResult<double>::success(0.0);
+
+    if (rValue.isNumber() || rValue.isBoolean())
+        return api::ValueResult<double>::success(rValue.mfNumber);
+
+    if (!rValue.isText())
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+    DocumentEvaluationHost aHost(rDoc, rContext);
+    const auto aParsed = aHost.parseNumber(rValue.maString);
+    if (!aParsed)
+        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+    return api::ValueResult<double>::success(aParsed.maValue.mfValue);
 }
 
-[[nodiscard]] inline EvaluationAttempt makeNumericResult(double fValue, SvNumFormatType eFormatType)
+[[nodiscard]] inline api::ValueResult<bool> coerceScalarToBool(
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const api::CellValue& rValue)
 {
-    EvaluationAttempt aAttempt;
-    aAttempt.mbSupported = true;
-    aAttempt.maResult = api::formulavalue::makeValueResult(fValue);
-    aAttempt.meFormatType = eFormatType;
-    return aAttempt;
+    if (rValue.isError())
+        return api::ValueResult<bool>::failure(rValue.meError);
+
+    if (rValue.isEmpty())
+        return api::ValueResult<bool>::success(false);
+
+    if (rValue.isBoolean() || rValue.isNumber())
+        return api::ValueResult<bool>::success(rValue.mfNumber != 0.0);
+
+    if (!rValue.isText())
+        return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
+
+    DocumentEvaluationHost aHost(rDoc, rContext);
+    const auto aParsed = aHost.parseNumber(rValue.maString);
+    if (!aParsed)
+        return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
+    return api::ValueResult<bool>::success(aParsed.maValue.mfValue != 0.0);
 }
 
-[[nodiscard]] inline EvaluationAttempt makeErrorResult(api::Error eError)
+[[nodiscard]] inline std::optional<sal_Int32> coerceWholeNumber(double fValue)
 {
-    EvaluationAttempt aAttempt;
-    aAttempt.mbSupported = true;
-    aAttempt.maResult = makeErrorResultFromApi(eError);
-    return aAttempt;
+    if (!std::isfinite(fValue) || std::trunc(fValue) != fValue
+        || fValue < static_cast<double>(std::numeric_limits<sal_Int32>::min())
+        || fValue > static_cast<double>(std::numeric_limits<sal_Int32>::max()))
+    {
+        return std::nullopt;
+    }
+    return static_cast<sal_Int32>(fValue);
+}
+
+[[nodiscard]] inline Materialization<ScRange> resolveReferenceRangeNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, const ScAddress& rFormulaPos)
+{
+    switch (rNode.meKind)
+    {
+        case core::formula::NodeKind::CellReference:
+        {
+            ScRefAddress aReference;
+            ScAddress::ExternalInfo aExternalInfo;
+            const OUString aText = normalizeReferenceToken(rNode.maPrimaryText);
+            const ScAddress::Details aDetails(formula::FormulaGrammar::CONV_OOO, rFormulaPos);
+            if (!ConvertSingleRef(rDoc, aText, rFormulaPos.Tab(), aReference, aDetails,
+                    &aExternalInfo)
+                || aExternalInfo.mbExternal)
+            {
+                return makeUnsupportedMaterialization<ScRange>(
+                    FallbackReason::UnsupportedHostSurface);
+            }
+
+            const ScAddress aAddress = aReference.GetAddress();
+            return makeMaterializedValue(ScRange(aAddress, aAddress));
+        }
+        case core::formula::NodeKind::RangeReference:
+        {
+            ScRefAddress aStart;
+            ScRefAddress aEnd;
+            ScAddress::ExternalInfo aExternalInfo;
+            OUString aText = normalizeReferenceToken(rNode.maPrimaryText);
+            aText += u":"_ustr;
+            aText += normalizeReferenceToken(rNode.maSecondaryText);
+            const ScAddress::Details aDetails(formula::FormulaGrammar::CONV_OOO, rFormulaPos);
+            if (!ConvertDoubleRef(rDoc, aText, rFormulaPos.Tab(), aStart, aEnd, aDetails,
+                    &aExternalInfo)
+                || aExternalInfo.mbExternal)
+            {
+                return makeUnsupportedMaterialization<ScRange>(
+                    FallbackReason::UnsupportedHostSurface);
+            }
+
+            return makeMaterializedValue(ScRange(aStart.GetAddress(), aEnd.GetAddress()));
+        }
+        case core::formula::NodeKind::NamedReference:
+        {
+            ScRangeData* pRangeData = ScRangeStringConverter::GetRangeDataFromString(
+                toLibreOfficeString(rNode.maPrimaryText), rFormulaPos.Tab(), rDoc,
+                formula::FormulaGrammar::CONV_OOO);
+            if (!pRangeData)
+            {
+                return makeUnsupportedMaterialization<ScRange>(
+                    FallbackReason::UnsupportedHostSurface);
+            }
+
+            ScRange aRange;
+            if (!pRangeData->IsReference(aRange, rFormulaPos))
+            {
+                return makeUnsupportedMaterialization<ScRange>(
+                    FallbackReason::UnsupportedHostSurface);
+            }
+            return makeMaterializedValue(aRange);
+        }
+        default:
+            return makeUnsupportedMaterialization<ScRange>(
+                FallbackReason::UnsupportedFormulaShape);
+    }
+}
+
+[[nodiscard]] inline Materialization<api::CellValue> materializeScalarNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    switch (rNode.meKind)
+    {
+        case core::formula::NodeKind::NumberLiteral:
+            return makeMaterializedValue(api::CellValue::number(rNode.mfNumber));
+        case core::formula::NodeKind::StringLiteral:
+            return makeMaterializedValue(api::CellValue::text(rNode.maPrimaryText));
+        case core::formula::NodeKind::BooleanLiteral:
+            return makeMaterializedValue(api::CellValue::boolean(rNode.mbBoolean));
+        case core::formula::NodeKind::ErrorLiteral:
+            return makeMaterializedValue(api::CellValue::error(api::Error::IllegalArgument));
+        case core::formula::NodeKind::EmptyArgument:
+            return makeMaterializedValue(api::CellValue::empty());
+        case core::formula::NodeKind::CellReference:
+        case core::formula::NodeKind::NamedReference:
+        {
+            const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+            if (!aRange.mbSupported)
+                return makeUnsupportedMaterialization<api::CellValue>(aRange.meFallbackReason);
+            if (!aRange.moValue)
+                return makeMaterializedError<api::CellValue>(aRange.meError);
+            if (aRange.moValue->aStart != aRange.moValue->aEnd
+                || aRange.moValue->aStart == rFormulaPos)
+            {
+                return makeUnsupportedMaterialization<api::CellValue>(
+                    FallbackReason::UnsupportedHostSurface);
+            }
+            return makeMaterializedValue(
+                readHostDocumentCellValue(rDoc, aRange.moValue->aStart).maValue);
+        }
+        case core::formula::NodeKind::UnaryOperation:
+        {
+            if (rNode.maChildren.size() != 1)
+                return makeUnsupportedMaterialization<api::CellValue>(
+                    FallbackReason::UnsupportedFormulaShape);
+
+            const auto aChild
+                = materializeScalarNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+            if (!aChild.mbSupported)
+                return makeUnsupportedMaterialization<api::CellValue>(aChild.meFallbackReason);
+            if (!aChild.moValue)
+                return makeMaterializedError<api::CellValue>(aChild.meError);
+
+            const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aChild.moValue);
+            if (!aNumber)
+                return makeMaterializedError<api::CellValue>(aNumber.meError);
+
+            return makeMaterializedValue(api::CellValue::number(
+                rNode.meUnaryOperator == core::formula::UnaryOperator::Minus
+                    ? -aNumber.maValue
+                    : aNumber.maValue));
+        }
+        case core::formula::NodeKind::BinaryOperation:
+        {
+            if (rNode.maChildren.size() != 2)
+                return makeUnsupportedMaterialization<api::CellValue>(
+                    FallbackReason::UnsupportedFormulaShape);
+
+            const auto aLeft
+                = materializeScalarNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+            if (!aLeft.mbSupported)
+                return makeUnsupportedMaterialization<api::CellValue>(aLeft.meFallbackReason);
+            if (!aLeft.moValue)
+                return makeMaterializedError<api::CellValue>(aLeft.meError);
+
+            const auto aRight
+                = materializeScalarNode(*rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+            if (!aRight.mbSupported)
+                return makeUnsupportedMaterialization<api::CellValue>(aRight.meFallbackReason);
+            if (!aRight.moValue)
+                return makeMaterializedError<api::CellValue>(aRight.meError);
+
+            switch (rNode.meBinaryOperator)
+            {
+                case core::formula::BinaryOperator::Concat:
+                {
+                    const auto aLeftText = coerceScalarToText(rDoc, rContext, *aLeft.moValue);
+                    if (!aLeftText)
+                        return makeMaterializedError<api::CellValue>(aLeftText.meError);
+                    const auto aRightText = coerceScalarToText(rDoc, rContext, *aRight.moValue);
+                    if (!aRightText)
+                        return makeMaterializedError<api::CellValue>(aRightText.meError);
+                    return makeMaterializedValue(
+                        api::CellValue::text(toApiString(aLeftText.maValue + aRightText.maValue)));
+                }
+                case core::formula::BinaryOperator::Add:
+                case core::formula::BinaryOperator::Subtract:
+                case core::formula::BinaryOperator::Multiply:
+                case core::formula::BinaryOperator::Divide:
+                case core::formula::BinaryOperator::Power:
+                {
+                    const auto aLeftNumber = coerceScalarToNumber(rDoc, rContext, *aLeft.moValue);
+                    if (!aLeftNumber)
+                        return makeMaterializedError<api::CellValue>(aLeftNumber.meError);
+                    const auto aRightNumber = coerceScalarToNumber(rDoc, rContext, *aRight.moValue);
+                    if (!aRightNumber)
+                        return makeMaterializedError<api::CellValue>(aRightNumber.meError);
+
+                    double fResult = 0.0;
+                    switch (rNode.meBinaryOperator)
+                    {
+                        case core::formula::BinaryOperator::Add:
+                            fResult = aLeftNumber.maValue + aRightNumber.maValue;
+                            break;
+                        case core::formula::BinaryOperator::Subtract:
+                            fResult = aLeftNumber.maValue - aRightNumber.maValue;
+                            break;
+                        case core::formula::BinaryOperator::Multiply:
+                            fResult = aLeftNumber.maValue * aRightNumber.maValue;
+                            break;
+                        case core::formula::BinaryOperator::Divide:
+                            if (aRightNumber.maValue == 0.0)
+                                return makeMaterializedError<api::CellValue>(
+                                    api::Error::DivisionByZero);
+                            fResult = aLeftNumber.maValue / aRightNumber.maValue;
+                            break;
+                        case core::formula::BinaryOperator::Power:
+                            fResult = std::pow(aLeftNumber.maValue, aRightNumber.maValue);
+                            if (!std::isfinite(fResult))
+                                return makeMaterializedError<api::CellValue>(api::Error::Domain);
+                            break;
+                        default:
+                            break;
+                    }
+                    return makeMaterializedValue(api::CellValue::number(fResult));
+                }
+                default:
+                    return makeUnsupportedMaterialization<api::CellValue>(
+                        FallbackReason::UnsupportedFormulaShape);
+            }
+        }
+        default:
+            return makeUnsupportedMaterialization<api::CellValue>(
+                FallbackReason::UnsupportedFormulaShape);
+    }
+}
+
+[[nodiscard]] inline EvaluationAttempt materializeLookupResult(
+    FunctionKind eFunction, const ScDocument& rDoc, const lookupexecution::LookupExecutionResult& rResult)
+{
+    const auto makeScalarAttempt = [&](const api::CellValue& rValue) {
+        if (rValue.isError())
+            return makeErrorResult(eFunction, rValue.meError);
+        if (rValue.isText())
+            return makeStringResult(eFunction, toLibreOfficeString(rValue.maString));
+        if (rValue.isNumber() || rValue.isBoolean())
+            return makeNumericResult(eFunction, rValue.mfNumber, SvNumFormatType::NUMBER);
+        return makeUnsupported(eFunction, FallbackReason::UnsupportedHostSurface);
+    };
+
+    if (rResult.meKind == lookupexecution::LookupExecutionResult::Kind::Scalar)
+        return makeScalarAttempt(rResult.maScalar);
+
+    if (rResult.isSingleCellReference())
+        return makeScalarAttempt(readHostDocumentCellValue(rDoc, rResult.maRange.aStart).maValue);
+
+    return makeUnsupported(eFunction, FallbackReason::UnsupportedHostSurface);
 }
 
 [[nodiscard]] inline EvaluationAttempt evaluateTextParsingFunction(
-    const core::formula::Node& rNode, api::StringView rFunctionName, const ScDocument& rDoc,
-    ScInterpreterContext& rContext, bool bEmptyStringAsZero)
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero)
 {
-    if (rFunctionName == u"VALUE")
+    auto materializeArgument = [&](const core::formula::Node& rArgument)
+        -> Materialization<api::CellValue> {
+        return materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+    };
+
+    if (eFunction == FunctionKind::Value || eFunction == FunctionKind::DateValue
+        || eFunction == FunctionKind::TimeValue)
     {
         if (rNode.maChildren.size() != 1)
-            return makeErrorResult(api::Error::IllegalArgument);
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-        if (const auto oNumeric = extractNumericLiteral(*rNode.maChildren[0]))
-            return makeNumericResult(*oNumeric, SvNumFormatType::NUMBER);
+        const auto aArgument = materializeArgument(*rNode.maChildren[0]);
+        if (!aArgument.mbSupported)
+            return makeUnsupported(eFunction, aArgument.meFallbackReason);
+        if (!aArgument.moValue)
+            return makeErrorResult(eFunction, aArgument.meError);
 
-        const auto oText = extractStringLiteral(*rNode.maChildren[0]);
-        if (!oText)
-            return makeUnsupported(FallbackReason::UnsupportedFormulaShape);
+        if (eFunction == FunctionKind::Value
+            && (aArgument.moValue->isNumber() || aArgument.moValue->isBoolean()))
+        {
+            return makeNumericResult(eFunction, aArgument.moValue->mfNumber,
+                SvNumFormatType::NUMBER);
+        }
 
-        const auto aResult = textparsingexecution::evaluateValue(rDoc, rContext, *oText);
+        const auto aText = coerceScalarToText(rDoc, rContext, *aArgument.moValue);
+        if (!aText)
+            return makeErrorResult(eFunction, aText.meError);
+
+        if (eFunction == FunctionKind::Value)
+        {
+            const auto aResult = textparsingexecution::evaluateValue(rDoc, rContext, aText.maValue);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::NUMBER);
+        }
+
+        if (eFunction == FunctionKind::DateValue)
+        {
+            const auto aResult
+                = textparsingexecution::evaluateDateValue(rDoc, rContext, aText.maValue);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::DATE);
+        }
+
+        const auto aResult = textparsingexecution::evaluateTimeValue(rDoc, rContext, aText.maValue);
         if (!aResult)
-            return makeErrorResult(aResult.meError);
-        return makeNumericResult(aResult.maValue, SvNumFormatType::NUMBER);
+            return makeErrorResult(eFunction, aResult.meError);
+        return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::TIME);
     }
 
-    if (rFunctionName == u"DATEVALUE")
-    {
-        if (rNode.maChildren.size() != 1)
-            return makeErrorResult(api::Error::IllegalArgument);
-
-        const auto oText = extractStringLiteral(*rNode.maChildren[0]);
-        if (!oText)
-            return makeUnsupported(FallbackReason::UnsupportedFormulaShape);
-
-        const auto aResult = textparsingexecution::evaluateDateValue(rDoc, rContext, *oText);
-        if (!aResult)
-            return makeErrorResult(aResult.meError);
-        return makeNumericResult(aResult.maValue, SvNumFormatType::DATE);
-    }
-
-    if (rFunctionName == u"TIMEVALUE")
-    {
-        if (rNode.maChildren.size() != 1)
-            return makeErrorResult(api::Error::IllegalArgument);
-
-        const auto oText = extractStringLiteral(*rNode.maChildren[0]);
-        if (!oText)
-            return makeUnsupported(FallbackReason::UnsupportedFormulaShape);
-
-        const auto aResult = textparsingexecution::evaluateTimeValue(rDoc, rContext, *oText);
-        if (!aResult)
-            return makeErrorResult(aResult.meError);
-        return makeNumericResult(aResult.maValue, SvNumFormatType::TIME);
-    }
-
-    if (rFunctionName == u"NUMBERVALUE")
+    if (eFunction == FunctionKind::NumberValue)
     {
         if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
-            return makeErrorResult(api::Error::IllegalArgument);
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-        const auto oText = extractStringLiteral(*rNode.maChildren[0]);
-        if (!oText)
-            return makeUnsupported(FallbackReason::UnsupportedFormulaShape);
+        const auto aTextArg = materializeArgument(*rNode.maChildren[0]);
+        if (!aTextArg.mbSupported)
+            return makeUnsupported(eFunction, aTextArg.meFallbackReason);
+        if (!aTextArg.moValue)
+            return makeErrorResult(eFunction, aTextArg.meError);
+        const auto aText = coerceScalarToText(rDoc, rContext, *aTextArg.moValue);
+        if (!aText)
+            return makeErrorResult(eFunction, aText.meError);
 
         std::optional<OUString> oDecimalSeparator;
         std::optional<OUString> oGroupSeparator;
         if (rNode.maChildren.size() >= 2)
         {
-            oDecimalSeparator = extractStringLiteral(*rNode.maChildren[1]);
-            if (!oDecimalSeparator)
-                return makeUnsupported(FallbackReason::UnsupportedFormulaShape);
+            const auto aDecimalArg = materializeArgument(*rNode.maChildren[1]);
+            if (!aDecimalArg.mbSupported)
+                return makeUnsupported(eFunction, aDecimalArg.meFallbackReason);
+            if (!aDecimalArg.moValue)
+                return makeErrorResult(eFunction, aDecimalArg.meError);
+            const auto aDecimal = coerceScalarToText(rDoc, rContext, *aDecimalArg.moValue);
+            if (!aDecimal)
+                return makeErrorResult(eFunction, aDecimal.meError);
+            oDecimalSeparator = aDecimal.maValue;
         }
         if (rNode.maChildren.size() == 3)
         {
-            oGroupSeparator = extractStringLiteral(*rNode.maChildren[2]);
-            if (!oGroupSeparator)
-                return makeUnsupported(FallbackReason::UnsupportedFormulaShape);
+            const auto aGroupArg = materializeArgument(*rNode.maChildren[2]);
+            if (!aGroupArg.mbSupported)
+                return makeUnsupported(eFunction, aGroupArg.meFallbackReason);
+            if (!aGroupArg.moValue)
+                return makeErrorResult(eFunction, aGroupArg.meError);
+            const auto aGroup = coerceScalarToText(rDoc, rContext, *aGroupArg.moValue);
+            if (!aGroup)
+                return makeErrorResult(eFunction, aGroup.meError);
+            oGroupSeparator = aGroup.maValue;
         }
 
         const auto aResult = textparsingexecution::evaluateNumberValue(
-            rDoc, rContext, *oText, oDecimalSeparator, oGroupSeparator, bEmptyStringAsZero);
+            rDoc, rContext, aText.maValue, oDecimalSeparator, oGroupSeparator,
+            bEmptyStringAsZero);
         if (!aResult)
-            return makeErrorResult(aResult.meError);
-        return makeNumericResult(aResult.maValue, SvNumFormatType::NUMBER);
+            return makeErrorResult(eFunction, aResult.meError);
+        return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::NUMBER);
     }
 
-    return makeUnsupported(FallbackReason::UnsupportedFunction);
+    return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+}
+
+[[nodiscard]] inline EvaluationAttempt evaluateLookupFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
+{
+    auto materializeArgument = [&](const core::formula::Node& rArgument)
+        -> Materialization<api::CellValue> {
+        return materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+    };
+    auto materializeSource = [&](const core::formula::Node& rArgument)
+        -> Materialization<lookupexecution::LookupInputSource> {
+        const auto aRange = resolveReferenceRangeNode(rArgument, rDoc, rFormulaPos);
+        if (!aRange.mbSupported)
+        {
+            return makeUnsupportedMaterialization<lookupexecution::LookupInputSource>(
+                aRange.meFallbackReason);
+        }
+        if (!aRange.moValue)
+            return makeMaterializedError<lookupexecution::LookupInputSource>(aRange.meError);
+
+        if (aRange.moValue->aStart.Tab() != aRange.moValue->aEnd.Tab())
+        {
+            return makeUnsupportedMaterialization<lookupexecution::LookupInputSource>(
+                FallbackReason::UnsupportedHostSurface);
+        }
+
+        lookupexecution::LookupInputSource aSource;
+        aSource.moRange = *aRange.moValue;
+        return makeMaterializedValue(aSource);
+    };
+    auto normalizeWholeArgument = [&](const core::formula::Node& rArgument)
+        -> Materialization<sal_Int32> {
+        const auto aArgument = materializeArgument(rArgument);
+        if (!aArgument.mbSupported)
+            return makeUnsupportedMaterialization<sal_Int32>(aArgument.meFallbackReason);
+        if (!aArgument.moValue)
+            return makeMaterializedError<sal_Int32>(aArgument.meError);
+        if (aArgument.moValue->isEmpty())
+            return makeMaterializedError<sal_Int32>(api::Error::IllegalArgument);
+        const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aArgument.moValue);
+        if (!aNumber)
+            return makeMaterializedError<sal_Int32>(aNumber.meError);
+        const auto oWhole = coerceWholeNumber(aNumber.maValue);
+        if (!oWhole)
+            return makeMaterializedError<sal_Int32>(api::Error::IllegalArgument);
+        return makeMaterializedValue(*oWhole);
+    };
+
+    if (eFunction == FunctionKind::Match)
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aLookup = materializeArgument(*rNode.maChildren[0]);
+        if (!aLookup.mbSupported)
+            return makeUnsupported(eFunction, aLookup.meFallbackReason);
+        if (!aLookup.moValue)
+            return makeErrorResult(eFunction, aLookup.meError);
+        if (aLookup.moValue->isError())
+            return makeErrorResult(eFunction, aLookup.moValue->meError);
+
+        const auto aSearch = materializeSource(*rNode.maChildren[1]);
+        if (!aSearch.mbSupported)
+            return makeUnsupported(eFunction, aSearch.meFallbackReason);
+        if (!aSearch.moValue)
+            return makeErrorResult(eFunction, aSearch.meError);
+
+        api::lookup::MatchSearchMode aModes;
+        if (rNode.maChildren.size() == 3)
+        {
+            const auto aMode = normalizeWholeArgument(*rNode.maChildren[2]);
+            if (!aMode.mbSupported)
+                return makeUnsupported(eFunction, aMode.meFallbackReason);
+            if (!aMode.moValue)
+                return makeErrorResult(eFunction, aMode.meError);
+            const auto aNormalized = api::lookup::normalizeMatchType(*aMode.moValue);
+            if (!aNormalized)
+                return makeErrorResult(eFunction, aNormalized.meError);
+            aModes = aNormalized.maValue;
+        }
+        else
+        {
+            aModes.meMatchMode = api::lookup::MatchMode::ExactOrNextSmaller;
+            aModes.meSearchMode = api::lookup::SearchMode::BinaryAscending;
+        }
+
+        lookupexecution::MatchExecutionRequest aRequest;
+        aRequest.maLookupValue = *aLookup.moValue;
+        aRequest.maSearchSource = *aSearch.moValue;
+        aRequest.maLegacyModes = aModes;
+        const auto aResolved = lookupexecution::resolveMatchIndex(rDoc, rContext, aRequest);
+        if (!aResolved)
+            return makeErrorResult(eFunction, aResolved.meError);
+        return makeNumericResult(eFunction, static_cast<double>(aResolved.maValue + 1),
+            SvNumFormatType::NUMBER);
+    }
+
+    if (eFunction == FunctionKind::XMatch)
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aLookup = materializeArgument(*rNode.maChildren[0]);
+        if (!aLookup.mbSupported)
+            return makeUnsupported(eFunction, aLookup.meFallbackReason);
+        if (!aLookup.moValue)
+            return makeErrorResult(eFunction, aLookup.meError);
+        if (aLookup.moValue->isError())
+            return makeErrorResult(eFunction, aLookup.moValue->meError);
+
+        const auto aSearch = materializeSource(*rNode.maChildren[1]);
+        if (!aSearch.mbSupported)
+            return makeUnsupported(eFunction, aSearch.meFallbackReason);
+        if (!aSearch.moValue)
+            return makeErrorResult(eFunction, aSearch.meError);
+
+        lookupexecution::MatchExecutionRequest aRequest;
+        aRequest.mbExtended = true;
+        aRequest.mbAllowPatternMatch = true;
+        aRequest.maLookupValue = *aLookup.moValue;
+        aRequest.maSearchSource = *aSearch.moValue;
+
+        if (rNode.maChildren.size() >= 3
+            && rNode.maChildren[2]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aMode = normalizeWholeArgument(*rNode.maChildren[2]);
+            if (!aMode.mbSupported)
+                return makeUnsupported(eFunction, aMode.meFallbackReason);
+            if (!aMode.moValue)
+                return makeErrorResult(eFunction, aMode.meError);
+            const auto aNormalized = api::lookup::normalizeExtendedMatchMode(
+                static_cast<std::int16_t>(*aMode.moValue));
+            if (!aNormalized)
+                return makeErrorResult(eFunction, aNormalized.meError);
+            aRequest.meMatchMode = aNormalized.maValue;
+        }
+
+        if (rNode.maChildren.size() >= 4
+            && rNode.maChildren[3]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aMode = normalizeWholeArgument(*rNode.maChildren[3]);
+            if (!aMode.mbSupported)
+                return makeUnsupported(eFunction, aMode.meFallbackReason);
+            if (!aMode.moValue)
+                return makeErrorResult(eFunction, aMode.meError);
+            const auto aNormalized = api::lookup::normalizeSearchMode(
+                static_cast<std::int16_t>(*aMode.moValue));
+            if (!aNormalized)
+                return makeErrorResult(eFunction, aNormalized.meError);
+            aRequest.meSearchMode = aNormalized.maValue;
+        }
+
+        const auto aResolved = lookupexecution::resolveMatchIndex(rDoc, rContext, aRequest);
+        if (!aResolved)
+            return makeErrorResult(eFunction, aResolved.meError);
+        return makeNumericResult(eFunction, static_cast<double>(aResolved.maValue + 1),
+            SvNumFormatType::NUMBER);
+    }
+
+    if (eFunction == FunctionKind::Lookup)
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aLookup = materializeArgument(*rNode.maChildren[0]);
+        if (!aLookup.mbSupported)
+            return makeUnsupported(eFunction, aLookup.meFallbackReason);
+        if (!aLookup.moValue)
+            return makeErrorResult(eFunction, aLookup.meError);
+        if (aLookup.moValue->isError())
+            return makeErrorResult(eFunction, aLookup.moValue->meError);
+
+        const auto aData = materializeSource(*rNode.maChildren[1]);
+        if (!aData.mbSupported)
+            return makeUnsupported(eFunction, aData.meFallbackReason);
+        if (!aData.moValue)
+            return makeErrorResult(eFunction, aData.meError);
+
+        lookupexecution::LegacyLookupRequest aRequest;
+        aRequest.maLookupValue = *aLookup.moValue;
+        const auto aDataInput = lookupexecution::detail::buildLookupInput(*aData.moValue);
+        if (!aDataInput)
+            return makeErrorResult(eFunction, aDataInput.meError);
+        aRequest.maDataInput = aDataInput.maValue;
+
+        if (rNode.maChildren.size() == 3)
+        {
+            const auto aResult = materializeSource(*rNode.maChildren[2]);
+            if (!aResult.mbSupported)
+                return makeUnsupported(eFunction, aResult.meFallbackReason);
+            if (!aResult.moValue)
+                return makeErrorResult(eFunction, aResult.meError);
+            const auto aResultInput = lookupexecution::detail::buildLookupInput(*aResult.moValue);
+            if (!aResultInput)
+                return makeErrorResult(eFunction, aResultInput.meError);
+            aRequest.moResultInput = aResultInput.maValue;
+        }
+
+        const auto aResolved = lookupexecution::resolveLookupResult(rDoc, rContext, aRequest);
+        if (!aResolved)
+            return makeErrorResult(eFunction, aResolved.meError);
+        return materializeLookupResult(eFunction, rDoc, aResolved.maValue);
+    }
+
+    if (eFunction == FunctionKind::VLookup || eFunction == FunctionKind::HLookup)
+    {
+        if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 4)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aLookup = materializeArgument(*rNode.maChildren[0]);
+        if (!aLookup.mbSupported)
+            return makeUnsupported(eFunction, aLookup.meFallbackReason);
+        if (!aLookup.moValue)
+            return makeErrorResult(eFunction, aLookup.meError);
+        if (aLookup.moValue->isError())
+            return makeErrorResult(eFunction, aLookup.moValue->meError);
+
+        const auto aTable = materializeSource(*rNode.maChildren[1]);
+        if (!aTable.mbSupported)
+            return makeUnsupported(eFunction, aTable.meFallbackReason);
+        if (!aTable.moValue)
+            return makeErrorResult(eFunction, aTable.meError);
+        const auto aTableInput = lookupexecution::detail::buildLookupInput(*aTable.moValue);
+        if (!aTableInput)
+            return makeErrorResult(eFunction, aTableInput.meError);
+
+        const auto aIndex = normalizeWholeArgument(*rNode.maChildren[2]);
+        if (!aIndex.mbSupported)
+            return makeUnsupported(eFunction, aIndex.meFallbackReason);
+        if (!aIndex.moValue || *aIndex.moValue < 1)
+            return makeErrorResult(eFunction, aIndex.moValue ? api::Error::IllegalArgument
+                                                             : aIndex.meError);
+
+        bool bApproximate = true;
+        if (rNode.maChildren.size() == 4)
+        {
+            const auto aApprox = materializeArgument(*rNode.maChildren[3]);
+            if (!aApprox.mbSupported)
+                return makeUnsupported(eFunction, aApprox.meFallbackReason);
+            if (!aApprox.moValue)
+                return makeErrorResult(eFunction, aApprox.meError);
+            const auto aApproxBool = coerceScalarToBool(rDoc, rContext, *aApprox.moValue);
+            if (!aApproxBool)
+                return makeErrorResult(eFunction, aApproxBool.meError);
+            bApproximate = aApproxBool.maValue;
+        }
+
+        lookupexecution::TabularLookupRequest aRequest;
+        aRequest.maLookupValue = *aLookup.moValue;
+        aRequest.maTableInput = aTableInput.maValue;
+        aRequest.meSearchOrientation
+            = eFunction == FunctionKind::HLookup ? api::lookup::VectorOrientation::Row
+                                                 : api::lookup::VectorOrientation::Column;
+        aRequest.mnResultIndex = *aIndex.moValue - 1;
+        aRequest.mbApproximate = bApproximate;
+
+        const auto aResolved
+            = lookupexecution::resolveTabularLookupResult(rDoc, rContext, aRequest);
+        if (!aResolved)
+            return makeErrorResult(eFunction, aResolved.meError);
+        return materializeLookupResult(eFunction, rDoc, aResolved.maValue);
+    }
+
+    if (eFunction == FunctionKind::Index)
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aSource = resolveReferenceRangeNode(*rNode.maChildren[0], rDoc, rFormulaPos);
+        if (!aSource.mbSupported)
+            return makeUnsupported(eFunction, aSource.meFallbackReason);
+        if (!aSource.moValue)
+            return makeErrorResult(eFunction, aSource.meError);
+
+        const auto aRow = normalizeWholeArgument(*rNode.maChildren[1]);
+        if (!aRow.mbSupported)
+            return makeUnsupported(eFunction, aRow.meFallbackReason);
+        if (!aRow.moValue || *aRow.moValue < 0)
+            return makeErrorResult(eFunction, aRow.moValue ? api::Error::IllegalArgument
+                                                           : aRow.meError);
+
+        sal_Int32 nColumn = 0;
+        if (rNode.maChildren.size() == 3)
+        {
+            const auto aColumn = normalizeWholeArgument(*rNode.maChildren[2]);
+            if (!aColumn.mbSupported)
+                return makeUnsupported(eFunction, aColumn.meFallbackReason);
+            if (!aColumn.moValue || *aColumn.moValue < 0)
+            {
+                return makeErrorResult(eFunction, aColumn.moValue ? api::Error::IllegalArgument
+                                                                  : aColumn.meError);
+            }
+            nColumn = *aColumn.moValue;
+        }
+
+        const auto aSelection = referenceexecution::planIndexReferenceSelection(
+            *aSource.moValue, *aRow.moValue, nColumn, static_cast<std::uint8_t>(rNode.maChildren.size()));
+        if (!aSelection)
+            return makeErrorResult(eFunction, aSelection.meError);
+        if (!aSelection.maValue.maRange.isSingleCell())
+            return makeUnsupported(eFunction, FallbackReason::UnsupportedHostSurface);
+
+        lookupexecution::LookupExecutionResult aResult;
+        aResult.meKind = lookupexecution::LookupExecutionResult::Kind::Reference;
+        aResult.maRange = toLibreOfficeRange(aSelection.maValue.maRange);
+        return materializeLookupResult(eFunction, rDoc, aResult);
+    }
+
+    return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+}
+
+[[nodiscard]] inline EvaluationAttempt evaluateFunctionNode(
+    const core::formula::Node& rRoot, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos, bool bEmptyStringAsZero)
+{
+    const api::String aFunctionName = uppercaseAscii(rRoot.maPrimaryText);
+    const FunctionKind eFunction = classifyFunction(aFunctionName);
+    switch (eFunction)
+    {
+        case FunctionKind::Value:
+        case FunctionKind::DateValue:
+        case FunctionKind::TimeValue:
+        case FunctionKind::NumberValue:
+            return evaluateTextParsingFunction(
+                rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
+        case FunctionKind::Match:
+        case FunctionKind::XMatch:
+        case FunctionKind::Lookup:
+        case FunctionKind::VLookup:
+        case FunctionKind::HLookup:
+        case FunctionKind::Index:
+            return evaluateLookupFunction(rRoot, eFunction, rDoc, rContext, rFormulaPos);
+        case FunctionKind::Unknown:
+        case FunctionKind::Count:
+            return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+    }
+
+    return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
 }
 
 } // namespace detail
@@ -326,21 +1113,23 @@ struct StatsStore
 }
 
 [[nodiscard]] inline EvaluationAttempt tryEvaluateFormula(
-    const ScDocument& rDoc, ScInterpreterContext& rContext, std::u16string_view rFormulaSource,
-    bool bEmptyStringAsZero)
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const ScAddress& rFormulaPos,
+    std::u16string_view rFormulaSource, bool bEmptyStringAsZero)
 {
     const api::String aNormalized = detail::normalizeFormulaSource(rFormulaSource);
     const auto aParse = core::formula::parseFormula(aNormalized);
     if (!aParse || !aParse.mpRoot)
-        return detail::makeUnsupported(FallbackReason::ParseFailure);
+        return detail::makeUnsupported(FunctionKind::Unknown, FallbackReason::ParseFailure);
 
     const auto& rRoot = *aParse.mpRoot;
     if (rRoot.meKind != core::formula::NodeKind::FunctionCall)
-        return detail::makeUnsupported(FallbackReason::UnsupportedFormulaShape);
+    {
+        return detail::makeUnsupported(
+            FunctionKind::Unknown, FallbackReason::UnsupportedFormulaShape);
+    }
 
-    const api::String aFunctionName = detail::uppercaseAscii(rRoot.maPrimaryText);
-    return detail::evaluateTextParsingFunction(
-        rRoot, aFunctionName, rDoc, rContext, bEmptyStringAsZero);
+    return detail::evaluateFunctionNode(
+        rRoot, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
 }
 
 inline void resetStats()
@@ -354,6 +1143,14 @@ inline void resetStats()
     for (auto& rValue : rStore.maFallbackReasons)
         rValue.store(0);
     for (auto& rValue : rStore.maMismatchReasons)
+        rValue.store(0);
+    for (auto& rValue : rStore.maFunctionObserveCount)
+        rValue.store(0);
+    for (auto& rValue : rStore.maFunctionShadowCompareCount)
+        rValue.store(0);
+    for (auto& rValue : rStore.maFunctionAuthoritativeCount)
+        rValue.store(0);
+    for (auto& rValue : rStore.maFunctionFallbackCount)
         rValue.store(0);
 }
 
@@ -370,34 +1167,52 @@ inline void resetStats()
         aSnapshot.maFallbackReasons[i] = rStore.maFallbackReasons[i].load();
     for (std::size_t i = 0; i < aSnapshot.maMismatchReasons.size(); ++i)
         aSnapshot.maMismatchReasons[i] = rStore.maMismatchReasons[i].load();
+    for (std::size_t i = 0; i < aSnapshot.maFunctionObserveCount.size(); ++i)
+        aSnapshot.maFunctionObserveCount[i] = rStore.maFunctionObserveCount[i].load();
+    for (std::size_t i = 0; i < aSnapshot.maFunctionShadowCompareCount.size(); ++i)
+        aSnapshot.maFunctionShadowCompareCount[i] = rStore.maFunctionShadowCompareCount[i].load();
+    for (std::size_t i = 0; i < aSnapshot.maFunctionAuthoritativeCount.size(); ++i)
+        aSnapshot.maFunctionAuthoritativeCount[i]
+            = rStore.maFunctionAuthoritativeCount[i].load();
+    for (std::size_t i = 0; i < aSnapshot.maFunctionFallbackCount.size(); ++i)
+        aSnapshot.maFunctionFallbackCount[i] = rStore.maFunctionFallbackCount[i].load();
     return aSnapshot;
 }
 
-inline void recordObserveSupport()
+inline void recordObserveSupport(FunctionKind eFunction)
 {
-    detail::statsStore().mnObserveCount.fetch_add(1);
+    auto& rStore = detail::statsStore();
+    rStore.mnObserveCount.fetch_add(1);
+    rStore.maFunctionObserveCount[detail::toIndex(eFunction)].fetch_add(1);
 }
 
-inline void recordShadowCompareSupport()
+inline void recordShadowCompareSupport(FunctionKind eFunction)
 {
-    detail::statsStore().mnShadowCompareCount.fetch_add(1);
+    auto& rStore = detail::statsStore();
+    rStore.mnShadowCompareCount.fetch_add(1);
+    rStore.maFunctionShadowCompareCount[detail::toIndex(eFunction)].fetch_add(1);
 }
 
-inline void recordAuthoritativeRoute()
+inline void recordAuthoritativeRoute(FunctionKind eFunction)
 {
-    detail::statsStore().mnAuthoritativeCount.fetch_add(1);
+    auto& rStore = detail::statsStore();
+    rStore.mnAuthoritativeCount.fetch_add(1);
+    rStore.maFunctionAuthoritativeCount[detail::toIndex(eFunction)].fetch_add(1);
 }
 
-inline void recordAuthoritativeFallback(FallbackReason eReason)
+inline void recordAuthoritativeFallback(FallbackReason eReason, FunctionKind eFunction)
 {
     auto& rStore = detail::statsStore();
     rStore.mnAuthoritativeFallbackCount.fetch_add(1);
     rStore.maFallbackReasons[detail::toIndex(eReason)].fetch_add(1);
+    rStore.maFunctionFallbackCount[detail::toIndex(eFunction)].fetch_add(1);
 }
 
-inline void recordFallback(FallbackReason eReason)
+inline void recordFallback(FallbackReason eReason, FunctionKind eFunction)
 {
-    detail::statsStore().maFallbackReasons[detail::toIndex(eReason)].fetch_add(1);
+    auto& rStore = detail::statsStore();
+    rStore.maFallbackReasons[detail::toIndex(eReason)].fetch_add(1);
+    rStore.maFunctionFallbackCount[detail::toIndex(eFunction)].fetch_add(1);
 }
 
 inline void recordShadowMatch()
