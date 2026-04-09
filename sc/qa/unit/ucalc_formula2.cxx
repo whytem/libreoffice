@@ -988,6 +988,25 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
         setaileval::resetStats();
 
+        m_pDoc->SetFormula(ScAddress(3, 18, 0), u"of:#N/A"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+        m_pDoc->SetFormula(
+            ScAddress(3, 19, 0), u"[.OF:.ERR]:502"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+        CPPUNIT_ASSERT_EQUAL(FormulaError::NotAvailable, m_pDoc->GetErrCode(ScAddress(3, 18, 0)));
+        CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(3, 19, 0)));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 2);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Unknown)]
+            >= 2);
+    }
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
         m_pDoc->SetString(3, 4, 0, u"=VLOOKUP(A5;B5:C7;2;0)"_ustr);
         CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(3, 4, 0));
 

@@ -13,6 +13,8 @@
 #include <formula/errorcodes.hxx>
 #include <formula/grammar.hxx>
 #include <formulacell.hxx>
+#include <refupdatecontext.hxx>
+#include <rangelst.hxx>
 #include <rangenam.hxx>
 #include <rtl/math.hxx>
 #include <scopetools.hxx>
@@ -42,6 +44,7 @@ namespace
 using spreadsheetengine::compat::libreoffice::toFormulaError;
 using spreadsheetengine::compat::libreoffice::toApiString;
 using spreadsheetengine::compat::libreoffice::toLibreOfficeString;
+using spreadsheetengine::compat::libreoffice::interprettaileval::DiagnosticSample;
 using spreadsheetengine::compat::libreoffice::interprettaileval::FallbackReason;
 using spreadsheetengine::compat::libreoffice::interprettaileval::FunctionKind;
 using spreadsheetengine::compat::libreoffice::interprettaileval::StatsSnapshot;
@@ -769,17 +772,21 @@ void printStats(std::size_t nWorkbookCount, std::size_t nFormulaCellCount, const
     }
 }
 
-void printDiagnosticSamples()
+void appendDiagnosticSamples(
+    std::vector<DiagnosticSample>& rTarget, const std::vector<DiagnosticSample>& rSource)
+{
+    rTarget.insert(rTarget.end(), rSource.begin(), rSource.end());
+}
+
+void printDiagnosticSamples(const std::vector<DiagnosticSample>& rSamples)
 {
     if (!envEnabled("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_DIAGNOSTICS"))
         return;
 
-    const auto aSamples
-        = spreadsheetengine::compat::libreoffice::interprettaileval::getDiagnosticSamples();
-    std::cout << "interpret_tail_diagnostic_sample_count=" << aSamples.size() << '\n';
-    for (std::size_t nIndex = 0; nIndex < aSamples.size(); ++nIndex)
+    std::cout << "interpret_tail_diagnostic_sample_count=" << rSamples.size() << '\n';
+    for (std::size_t nIndex = 0; nIndex < rSamples.size(); ++nIndex)
     {
-        const auto& rSample = aSamples[nIndex];
+        const auto& rSample = rSamples[nIndex];
         std::cout << "interpret_tail_diagnostic_" << nIndex << "_reason="
                   << fallbackReasonName(rSample.meReason) << '\n';
         std::cout << "interpret_tail_diagnostic_" << nIndex << "_workbook="
@@ -793,6 +800,35 @@ void printDiagnosticSamples()
         std::cout << "interpret_tail_diagnostic_" << nIndex << "_normalized="
                   << rSample.maNormalizedFormula.toUtf8().getStr() << '\n';
     }
+}
+
+ScRangeList collectWorkbookUsedRanges(const Workbook& rWorkbook)
+{
+    ScRangeList aRanges;
+    for (std::size_t nSheet = 0; nSheet < rWorkbook.maSheets.size(); ++nSheet)
+    {
+        if (rWorkbook.maSheets[nSheet].maCells.empty())
+            continue;
+
+        SCCOL nStartCol = std::numeric_limits<SCCOL>::max();
+        SCROW nStartRow = std::numeric_limits<SCROW>::max();
+        SCCOL nEndCol = 0;
+        SCROW nEndRow = 0;
+        for (const auto& rEntry : rWorkbook.maSheets[nSheet].maCells)
+        {
+            const SCCOL nCol = static_cast<SCCOL>(rEntry.first.first);
+            const SCROW nRow = static_cast<SCROW>(rEntry.first.second);
+            nStartCol = std::min(nStartCol, nCol);
+            nStartRow = std::min(nStartRow, nRow);
+            nEndCol = std::max(nEndCol, nCol);
+            nEndRow = std::max(nEndRow, nRow);
+        }
+
+        aRanges.Join(ScRange(nStartCol, nStartRow, static_cast<SCTAB>(nSheet), nEndCol, nEndRow,
+            static_cast<SCTAB>(nSheet)));
+    }
+
+    return aRanges;
 }
 
 void printProbeDiagnosticSamples()
@@ -909,6 +945,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
 
     StatsSnapshot aLiveStats;
     StatsSnapshot aProbeStats;
+    std::vector<DiagnosticSample> aLiveDiagnosticSamples;
     resetProbeDiagnosticSamples();
 
     std::size_t nWorkbookCount = 0;
@@ -921,6 +958,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
             static_cast<bool>(aLoadResult));
         Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
         normalizeWorkbookSheetNamesForCalc(aWorkbook);
+        const ScRangeList aWorkbookRanges = collectWorkbookUsedRanges(aWorkbook);
 
         ScDocShellRef xDocShell
             = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
@@ -937,7 +975,16 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                 ScopedEnvironmentOverride aObserveMode(
                     "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "observe");
                 spreadsheetengine::compat::libreoffice::interprettaileval::resetStats();
+                spreadsheetengine::compat::libreoffice::interprettaileval::setDiagnosticWorkbookLabel(
+                    OUString::fromUtf8(rWorkbookPath.string()));
+                sc::SetFormulaDirtyContext aDirtyCxt;
+                rDoc.SetAllFormulasDirty(aDirtyCxt);
+                rDoc.InterpretCellsIfNeeded(aWorkbookRanges);
                 xDocShell->DoHardRecalc();
+                appendDiagnosticSamples(aLiveDiagnosticSamples,
+                    spreadsheetengine::compat::libreoffice::interprettaileval::getDiagnosticSamples());
+                spreadsheetengine::compat::libreoffice::interprettaileval::setDiagnosticWorkbookLabel(
+                    OUString());
                 accumulateStats(aLiveStats,
                     spreadsheetengine::compat::libreoffice::interprettaileval::getStatsSnapshot());
             }
@@ -964,7 +1011,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     printLiveRoutingStats(nFormulaCellCount, aLiveStats);
     printStats(nWorkbookCount, nFormulaCellCount, aProbeStats);
     std::cout << "interpret_tail_probe_formula_cells=" << nProbeFormulaCount << '\n';
-    printDiagnosticSamples();
+    printDiagnosticSamples(aLiveDiagnosticSamples);
     printProbeDiagnosticSamples();
 
     CPPUNIT_ASSERT_EQUAL(aCorpus.size(), nWorkbookCount);

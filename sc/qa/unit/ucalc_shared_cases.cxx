@@ -821,6 +821,22 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::api::formulavalue::ValueType::Value, aNumber.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1234.5, aNumber.maResult.mfValue, 1e-12);
 
+    const auto aErrorLiteral = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=of:#N/A", false);
+    CPPUNIT_ASSERT(aErrorLiteral.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error, aErrorLiteral.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::NotAvailable, aErrorLiteral.maResult.meError);
+
+    const auto aBracketedErrorLiteral = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=[.OF:.ERR]:502", false);
+    CPPUNIT_ASSERT(aBracketedErrorLiteral.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::Error,
+        aBracketedErrorLiteral.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::Error::IllegalArgument,
+        aBracketedErrorLiteral.maResult.meError);
+
     const auto aMatch = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 4, 0), u"=MATCH(A5;B5:B7;0)", false);
     CPPUNIT_ASSERT(aMatch.mbSupported);

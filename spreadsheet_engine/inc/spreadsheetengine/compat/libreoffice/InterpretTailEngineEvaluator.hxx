@@ -344,6 +344,18 @@ private:
     if (aTrimmed.rfind(u"of:=", 0) == 0 || aTrimmed.rfind(u"of:", 0) == 0)
         return api::String(aTrimmed);
 
+    constexpr std::u16string_view aBracketedErrorPrefix = u"[.OF:.ERR]:";
+    if (aTrimmed.rfind(aBracketedErrorPrefix, 0) == 0
+        && aTrimmed.size() > aBracketedErrorPrefix.size())
+    {
+        api::String aCanonical(u"of:#ERR");
+        aCanonical.append(aTrimmed.begin()
+                              + static_cast<std::ptrdiff_t>(aBracketedErrorPrefix.size()),
+            aTrimmed.end());
+        aCanonical.push_back(u'!');
+        return aCanonical;
+    }
+
     if (const std::size_t nPrefixLen = leadingNamespacePrefixLength(aTrimmed))
     {
         api::String aCanonical(u"of:");
@@ -392,6 +404,71 @@ private:
     if (rOptions.IsFormulaWildcardsEnabled())
         return api::query::SearchType::Wildcard;
     return api::query::SearchType::Normal;
+}
+
+[[nodiscard]] inline api::Error mapNumericErrorCode(api::StringView rCode)
+{
+    if (rCode == u"503" || rCode == u"523")
+        return api::Error::NoConvergence;
+    if (rCode == u"513")
+        return api::Error::StringOverflow;
+    if (rCode == u"519")
+        return api::Error::NoValue;
+    if (rCode == u"532")
+        return api::Error::DivisionByZero;
+    return api::Error::IllegalArgument;
+}
+
+[[nodiscard]] inline api::Error mapErrorLiteral(api::StringView rText)
+{
+    if (rText == u"#N/A")
+        return api::Error::NotAvailable;
+    if (rText == u"#DIV/0!")
+        return api::Error::DivisionByZero;
+    if (rText == u"#VALUE!")
+        return api::Error::NoValue;
+    if (rText == u"#NUM!")
+        return api::Error::NoConvergence;
+    if (rText == u"#NAME?" || rText == u"#REF!" || rText == u"#NULL!")
+        return api::Error::IllegalArgument;
+
+    constexpr api::StringView aErrPrefix = u"#ERR";
+    if (rText.starts_with(aErrPrefix) && rText.size() > aErrPrefix.size() + 1
+        && rText.back() == u'!')
+    {
+        const api::StringView aCode
+            = rText.substr(aErrPrefix.size(), rText.size() - aErrPrefix.size() - 1);
+        bool bDigitsOnly = !aCode.empty();
+        for (const char16_t cChar : aCode)
+        {
+            if (cChar < u'0' || cChar > u'9')
+            {
+                bDigitsOnly = false;
+                break;
+            }
+        }
+        if (bDigitsOnly)
+            return mapNumericErrorCode(aCode);
+    }
+
+    const std::size_t nColon = rText.rfind(u':');
+    if (nColon != api::StringView::npos && nColon + 1 < rText.size())
+    {
+        const api::StringView aCode = rText.substr(nColon + 1);
+        bool bDigitsOnly = true;
+        for (const char16_t cChar : aCode)
+        {
+            if (cChar < u'0' || cChar > u'9')
+            {
+                bDigitsOnly = false;
+                break;
+            }
+        }
+        if (bDigitsOnly)
+            return mapNumericErrorCode(aCode);
+    }
+
+    return api::Error::NoValue;
 }
 
 [[nodiscard]] inline OUString rootKindName(core::formula::NodeKind eKind)
@@ -2295,6 +2372,9 @@ inline void putScalarIntoMatrix(
     }
 
     const auto& rRoot = *aParse.mpRoot;
+    if (rRoot.meKind == core::formula::NodeKind::ErrorLiteral)
+        return detail::makeErrorResult(FunctionKind::Unknown, detail::mapErrorLiteral(rRoot.maPrimaryText));
+
     if (rRoot.meKind != core::formula::NodeKind::FunctionCall)
     {
         detail::recordDiagnosticSample(FallbackReason::UnsupportedFormulaShape, rDoc, rFormulaPos,
