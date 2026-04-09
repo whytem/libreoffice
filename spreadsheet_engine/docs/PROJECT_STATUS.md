@@ -180,6 +180,18 @@ The completed closeouts are:
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md)
 
+The immediate next evaluator pass is now
+[architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md).
+
+The new Calc-backed replay runner froze the current live-corpus baseline at:
+
+- `interpret_tail_authoritative_total=0`
+- `interpret_tail_authoritative_fallback_total=303`
+- `interpret_tail_fallback_parse_failure=303`
+
+So the next job is to turn the existing delegated cluster into real
+authoritative replay-corpus usage before widening function breadth again.
+
 ## Current Opt-In Narrow Rollout Surface
 
 The admitted rollout surface currently includes:
@@ -253,12 +265,18 @@ That first pass is now complete.
 
 The recommended next move is:
 
-1. broaden the live `InterpretTail` delegation family beyond the first
+1. convert the replay corpus from `0` authoritative / `303 parse_failure`
+   into the first non-zero authoritative usage on the already-promoted
+   `InterpretTail` function families
+2. then broaden the live `InterpretTail` delegation family beyond the first
    bounded scalar-input and lookup/index capability cluster
-2. keep using the substrate as migration underwriter, comparator, and fallback
+3. keep using the substrate as migration underwriter, comparator, and fallback
    guardrail during that move
-3. treat remaining bounded substrate widening as secondary unless it directly
+4. treat remaining bounded substrate widening as secondary unless it directly
    removes a live evaluator fallback reason
+
+That focused next pass is
+[architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md).
 
 The now-completed split-outcome pass is
 [architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md).

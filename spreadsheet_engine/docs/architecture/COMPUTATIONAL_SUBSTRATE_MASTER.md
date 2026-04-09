@@ -211,6 +211,22 @@ The completed closeouts for the current evaluator migration waves are:
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md)
 
+The immediate next evaluator pass is now:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md)
+
+That pass is intentionally narrower than another capability-wave expansion.
+The new Calc-backed replay runner proved the seam is being reached, but the
+current corpus still closes at:
+
+- `0` authoritative routes
+- `303` authoritative fallbacks
+- `303` `parse_failure`
+
+So the next job is to make the live formula-source bridge parseable enough to
+produce the first non-zero authoritative replay-corpus routes on the already
+implemented function families.
+
 ## Current Admitted Authority And Rollout Slice
 
 The current opt-in narrow rollout surface includes:
@@ -367,9 +383,16 @@ That bar is met. The next move is to broaden the live delegated surface
 beyond the current bounded scalar-input and bounded lookup/index cluster:
 
 - keep the live `InterpretTail` routing seam
-- widen workbook-local evaluator coverage beyond scalar and single-cell
+- first convert the replay corpus from `0` authoritative / `303`
+  `parse_failure` into real authoritative usage on the already-landed
+  function families
+- then widen workbook-local evaluator coverage beyond scalar and single-cell
   result surfaces
 - keep fallback-first delegation and shadow comparison as the migration bar
+
+The immediate focused pass for that blocker is:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md)
 
 The completed evaluator closeouts are:
 
@@ -398,13 +421,20 @@ cluster.
 
 - `ScFormulaCell::InterpretTail` now carries engine-first routing for bounded
   host-backed text parsing and bounded workbook-local lookup/index reads
+- the new Calc-backed replay runner shows that the current corpus reaches the
+  seam but still records `0` authoritative routes and `303`
+  `parse_failure`
+- that means the immediate live blocker is formula-source bridging and
+  pre-authority function classification on the existing cluster, not only
+  breadth of supported semantics
 - but broader workbook-local evaluator surfaces still fall back to Calc
 - the current seam still excludes `XLOOKUP`, matrix/spill-returning
   lookup/index shapes, multi-cell slice results, and broader external or
   environment-sensitive families
 
 If the program wants substantive authority relocation, the next work must
-extend evaluator breadth beyond this first capability cluster.
+first turn the existing cluster into real authoritative corpus usage, then
+extend evaluator breadth beyond it.
 
 ### 2. Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
 

@@ -60,6 +60,16 @@ The retained deferred boundary for this wave is:
   surfaces
 - workbook-wide default-on delegation
 
+The immediate follow-on pass for this completed wave is:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_PLAN.md)
+
+That follow-on is not another capability-wave expansion yet.
+The Calc-backed replay runner showed that the current corpus still records
+`0` authoritative routes and `303` `parse_failure`, so the next job is to
+make the existing promoted cluster produce measurable authoritative corpus
+usage first.
+
 ## Why This Wave Next
 
 The first switchover pass already proved the hard foundational facts:
