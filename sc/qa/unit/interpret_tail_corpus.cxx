@@ -441,35 +441,12 @@ FunctionKind classifySupportedProbeFunction(std::u16string_view rFormula)
 
     const auto aNormalized = setaileval::detail::normalizeFormulaSource(rFormula);
     const auto aParse = spreadsheetengine::core::formula::parseFormula(aNormalized);
-    if (!aParse || !aParse.mpRoot
-        || aParse.mpRoot->meKind != spreadsheetengine::core::formula::NodeKind::FunctionCall)
+    if (!aParse || !aParse.mpRoot)
     {
         return FunctionKind::Unknown;
     }
 
-    const auto aFunctionName
-        = setaileval::detail::uppercaseAscii(aParse.mpRoot->maPrimaryText);
-    if (aFunctionName == u"VALUE")
-        return FunctionKind::Value;
-    if (aFunctionName == u"DATEVALUE")
-        return FunctionKind::DateValue;
-    if (aFunctionName == u"TIMEVALUE")
-        return FunctionKind::TimeValue;
-    if (aFunctionName == u"NUMBERVALUE")
-        return FunctionKind::NumberValue;
-    if (aFunctionName == u"MATCH")
-        return FunctionKind::Match;
-    if (aFunctionName == u"XMATCH" || aFunctionName == u"COM.MICROSOFT.XMATCH")
-        return FunctionKind::XMatch;
-    if (aFunctionName == u"LOOKUP")
-        return FunctionKind::Lookup;
-    if (aFunctionName == u"VLOOKUP")
-        return FunctionKind::VLookup;
-    if (aFunctionName == u"HLOOKUP")
-        return FunctionKind::HLookup;
-    if (aFunctionName == u"INDEX")
-        return FunctionKind::Index;
-    return FunctionKind::Unknown;
+    return setaileval::detail::classifyDelegatedFunctionNode(*aParse.mpRoot);
 }
 
 std::size_t runSupportedInterpretTailProbe(
@@ -616,6 +593,8 @@ const char* functionKindName(FunctionKind eFunction)
             return "vlookup";
         case FunctionKind::HLookup:
             return "hlookup";
+        case FunctionKind::XLookup:
+            return "xlookup";
         case FunctionKind::Index:
             return "index";
         case FunctionKind::Count:

@@ -66,6 +66,19 @@ public:
     }
 };
 
+void setCellNumberFormat(ScDocument* pDoc, const ScAddress& rPos, const OUString& rFormat)
+{
+    SvNumberFormatter* pFormatter = pDoc->GetFormatTable();
+    CPPUNIT_ASSERT(pFormatter);
+
+    sal_Int32 nCheckPos = 0;
+    SvNumFormatType eType = SvNumFormatType::ALL;
+    sal_uInt32 nFormat = 0;
+    OUString aFormat = rFormat;
+    pFormatter->PutEntry(aFormat, nCheckPos, eType, nFormat);
+    pDoc->SetNumberFormat(rPos, nFormat);
+}
+
 ScRange getCachedRange(const ScExternalRefCache::TableTypeRef& pCacheTab)
 {
     ScRange aRange;
@@ -840,6 +853,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
     m_pDoc->SetTextCell(ScAddress(0, 0, 0), u"1954-07-20"_ustr);
     m_pDoc->SetTextCell(ScAddress(0, 1, 0), u"07-20"_ustr);
     m_pDoc->SetTextCell(ScAddress(1, 0, 0), u"16:30:01"_ustr);
+    m_pDoc->SetTextCell(ScAddress(0, 3, 0), u"1899-12-27 12:00:00"_ustr);
     m_pDoc->SetValue(0, 4, 0, 20.0);
     m_pDoc->SetValue(1, 4, 0, 10.0);
     m_pDoc->SetTextCell(ScAddress(2, 4, 0), u"ten"_ustr);
@@ -847,6 +861,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
     m_pDoc->SetTextCell(ScAddress(2, 5, 0), u"twenty"_ustr);
     m_pDoc->SetValue(1, 6, 0, 30.0);
     m_pDoc->SetTextCell(ScAddress(2, 6, 0), u"thirty"_ustr);
+    m_pDoc->SetValue(0, 9, 0, -3.5);
+    setCellNumberFormat(m_pDoc, ScAddress(0, 9, 0), u"YYYY-MM-DD HH:MM:SS"_ustr);
     CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
         new ScRangeData(*m_pDoc, u"MyTimeName"_ustr, u"$EngineAuthority.$B$1"_ustr)));
     CPPUNIT_ASSERT(m_pDoc->GetRangeName(0)->insert(
@@ -861,12 +877,16 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetString(3, 1, 0, u"=DATEVALUE(\"1954-\"&A2)"_ustr);
         m_pDoc->SetString(3, 2, 0, u"=TIMEVALUE(MyTimeName)"_ustr);
         m_pDoc->SetString(3, 3, 0, u"=TIMEVALUE(LocalTimeName)"_ustr);
+        m_pDoc->SetString(3, 4, 0, u"=DATEVALUE(A4)"_ustr);
+        m_pDoc->SetString(3, 9, 0, u"=DATEVALUE(A10)"_ustr);
         ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(3, 0, 0));
         ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(3, 1, 0));
         ASSERT_DOUBLES_EQUAL((16.0 * 3600.0 + 30.0 * 60.0 + 1.0) / 86400.0,
                              m_pDoc->GetValue(3, 2, 0));
         ASSERT_DOUBLES_EQUAL((16.0 * 3600.0 + 30.0 * 60.0 + 1.0) / 86400.0,
                              m_pDoc->GetValue(3, 3, 0));
+        ASSERT_DOUBLES_EQUAL(-3.0, m_pDoc->GetValue(3, 4, 0));
+        ASSERT_DOUBLES_EQUAL(-3.0, m_pDoc->GetValue(3, 9, 0));
 
         ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
         const sal_uInt32 nFormat = m_pDoc->GetNumberFormat(rContext, ScAddress(3, 0, 0));
@@ -881,7 +901,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::DateValue)]
-            >= 2);
+            >= 4);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::TimeValue)]
@@ -915,14 +935,20 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetString(3, 8, 0, u"=MATCH(2;{1;2;3};0)"_ustr);
         m_pDoc->SetString(3, 9, 0, u"=INDEX({1;2|3;4};2;2)"_ustr);
         m_pDoc->SetString(3, 10, 0, u"=VALUE(A11)"_ustr);
+        m_pDoc->SetString(3, 11, 0, u"=XLOOKUP(A5;B5:B7;C5:C7)"_ustr);
+        m_pDoc->SetString(3, 12, 0, u"=IFERROR(VLOOKUP(25;B5:C7;2;0);\"missing\")"_ustr);
+        m_pDoc->SetString(3, 13, 0, u"=IFNA(XLOOKUP(25;B5:B7;C5:C7);\"missing\")"_ustr);
 
         CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(3, 7, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(3, 8, 0));
         ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(3, 9, 0));
         ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(3, 10, 0));
+        CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(3, 11, 0));
+        CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(3, 12, 0));
+        CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(3, 13, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 4);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 7);
         CPPUNIT_ASSERT_EQUAL(
             static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
@@ -941,6 +967,14 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Value)]
             >= 1);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::VLookup)]
+            >= 1);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::XLookup)]
+            >= 2);
     }
 
     {

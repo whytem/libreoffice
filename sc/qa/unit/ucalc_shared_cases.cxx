@@ -21,6 +21,7 @@
 #include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
 #include <spreadsheetengine/api/Host.hxx>
 #include <spreadsheetengine/api/Parsing.hxx>
+#include <spreadsheetengine/detail/OdfFormulaParser.hxx>
 #include <spreadsheetengine/detail/HostValueAccess.hxx>
 
 #include <cmath>
@@ -288,6 +289,19 @@ void setTextCell(ScDocument* pDoc, SCCOL nCol, const OUString& rValue)
 void setValueCell(ScDocument* pDoc, SCCOL nCol, double fValue)
 {
     pDoc->SetValue(ScAddress(nCol, 0, 0), fValue);
+}
+
+void setCellNumberFormat(ScDocument* pDoc, const ScAddress& rPos, const OUString& rFormat)
+{
+    SvNumberFormatter* pFormatter = pDoc->GetFormatTable();
+    CPPUNIT_ASSERT(pFormatter);
+
+    sal_Int32 nCheckPos = 0;
+    SvNumFormatType eType = SvNumFormatType::ALL;
+    sal_uInt32 nFormat = 0;
+    OUString aFormat = rFormat;
+    pFormatter->PutEntry(aFormat, nCheckPos, eType, nFormat);
+    pDoc->SetNumberFormat(rPos, nFormat);
 }
 
 OUString evaluateFormulaString(ScDocument* pDoc, const OUString& rFormula)
@@ -652,6 +666,7 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     m_pDoc->SetTextCell(ScAddress(0, 1, 0), u"07-20"_ustr);
     m_pDoc->SetValue(0, 2, 0, 42.0);
     m_pDoc->SetTextCell(ScAddress(1, 0, 0), u"16:30:01"_ustr);
+    m_pDoc->SetTextCell(ScAddress(0, 3, 0), u"1899-12-27 12:00:00"_ustr);
     m_pDoc->SetValue(0, 4, 0, 20.0);
     m_pDoc->SetValue(1, 4, 0, 10.0);
     m_pDoc->SetTextCell(ScAddress(2, 4, 0), u"ten"_ustr);
@@ -662,6 +677,8 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     m_pDoc->SetTextCell(ScAddress(0, 7, 0), u"1,234.5"_ustr);
     m_pDoc->SetTextCell(ScAddress(1, 7, 0), u"."_ustr);
     m_pDoc->SetTextCell(ScAddress(2, 7, 0), u","_ustr);
+    m_pDoc->SetValue(0, 9, 0, -3.5);
+    setCellNumberFormat(m_pDoc, ScAddress(0, 9, 0), u"YYYY-MM-DD HH:MM:SS"_ustr);
 
     CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
         new ScRangeData(*m_pDoc, u"MyTimeName"_ustr, u"$InterpretTailHelper.$B$1"_ustr)));
@@ -680,6 +697,24 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value, aConcatDate.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(19925.0, aConcatDate.maResult.mfValue, 1e-12);
+
+    const auto aDateFromDateTimeRef = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 9, 0), u"=DATEVALUE(A10)", false);
+    CPPUNIT_ASSERT(aDateFromDateTimeRef.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aDateFromDateTimeRef.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-3.0, aDateFromDateTimeRef.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, aDateFromDateTimeRef.meFormatType);
+
+    const auto aDateFromIsoDateTimeText = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 3, 0), u"=DATEVALUE(A4)", false);
+    CPPUNIT_ASSERT(aDateFromIsoDateTimeText.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aDateFromIsoDateTimeText.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-3.0, aDateFromIsoDateTimeText.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, aDateFromIsoDateTimeText.meFormatType);
 
     const auto aTimeFromName = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=TIMEVALUE(MyTimeName)", false);
@@ -783,6 +818,61 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value, aIndexArray.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, aIndexArray.maResult.mfValue, 1e-12);
+
+    const auto aXLookup = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 4, 0), u"=XLOOKUP(A5;B5:B7;C5:C7)", false);
+    CPPUNIT_ASSERT(aXLookup.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::XLookup, aXLookup.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aXLookup.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aXLookup.maResult.maString));
+
+    const auto aXLookupFallback = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 4, 0),
+        u"=XLOOKUP(25;B5:B7;C5:C7;\"missing\")", false);
+    CPPUNIT_ASSERT(aXLookupFallback.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::XLookup, aXLookupFallback.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aXLookupFallback.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"missing"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aXLookupFallback.maResult.maString));
+
+    const auto aXLookupArray = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0),
+        u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"})", false);
+    CPPUNIT_ASSERT(aXLookupArray.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::XLookup, aXLookupArray.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aXLookupArray.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"two"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aXLookupArray.maResult.maString));
+
+    const auto aIfErrorWrappedLookup = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 4, 0),
+        u"=IFERROR(VLOOKUP(25;B5:C7;2;0);\"missing\")", false);
+    CPPUNIT_ASSERT(aIfErrorWrappedLookup.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::VLookup, aIfErrorWrappedLookup.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aIfErrorWrappedLookup.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"missing"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aIfErrorWrappedLookup.maResult.maString));
+
+    const auto aIfNaWrappedXLookup = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 4, 0),
+        u"=IFNA(XLOOKUP(25;B5:B7;C5:C7);\"missing\")", false);
+    CPPUNIT_ASSERT(aIfNaWrappedXLookup.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::XLookup, aIfNaWrappedXLookup.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aIfNaWrappedXLookup.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"missing"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aIfNaWrappedXLookup.maResult.maString));
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNormalization)
@@ -799,9 +889,21 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNorm
         toLibreOfficeString(setaileval::detail::normalizeFormulaSource(
             u"oooc:=VLOOKUP([.A1];[.B1:.C2];2;0)")));
     CPPUNIT_ASSERT_EQUAL(
+        u"of:=COM.MICROSOFT.XLOOKUP([.A1];[.B1:.B3];[.C1:.C3])"_ustr,
+        toLibreOfficeString(setaileval::detail::normalizeFormulaSource(
+            u"oooc:=COM.MICROSOFT.XLOOKUP([.A1];[.B1:.B3];[.C1:.C3])")));
+    CPPUNIT_ASSERT_EQUAL(
         u"of:=VALUE(\"4321\")"_ustr,
         toLibreOfficeString(
             setaileval::detail::normalizeFormulaSource(u"=VALUE(\"4321\")")));
+
+    const auto aParse = spreadsheetengine::core::formula::parseFormula(
+        setaileval::detail::normalizeFormulaSource(
+            u"=IFERROR(VLOOKUP(A1;B1:C3;2;0);\"missing\")"));
+    CPPUNIT_ASSERT(aParse && aParse.mpRoot);
+    CPPUNIT_ASSERT_EQUAL(
+        setaileval::FunctionKind::VLookup,
+        setaileval::detail::classifyDelegatedFunctionNode(*aParse.mpRoot));
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testDirectFormulaInspectionAdapter)
