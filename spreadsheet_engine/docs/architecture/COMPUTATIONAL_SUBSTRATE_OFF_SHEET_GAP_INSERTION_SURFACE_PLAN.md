@@ -1,14 +1,14 @@
 # Computational Substrate Off-Sheet Gap Insertion Surface Plan
 
-Status: in progress focused pass for the retained direct off-sheet
-gap-closing insertion surface
+Status: completed closeout for the bounded direct off-sheet gap-closing
+insertion surface
 
 Phase status:
 
-- Phase 1 in progress: freeze the bounded host-shape target and proof ladder
-- Phase 2 pending: probe the missing live authority surface
-- Phase 3 pending: land the smallest exact runtime or proof change
-- Phase 4 pending: close the pass as admission or retained defer
+- Phase 1 completed: freeze the bounded host-shape target and proof ladder
+- Phase 2 completed: probe the missing live authority surface
+- Phase 3 completed: land the smallest exact runtime or proof change
+- Phase 4 completed: close the pass as admission
 
 ## Purpose
 
@@ -82,3 +82,23 @@ This pass is successful if one of the following becomes true:
   mutation-family classifier remains `None`
 - or the pass closes with a precise retained-defer reason backed by live
   authority proof rather than roadmap inference
+
+## Closeout
+
+The pass is complete.
+
+The retained direct off-sheet gap-closing insertion blocker is gone.
+
+The bounded same-workbook one-consumer-sheet direct off-sheet gap-closing
+insertion `SetFormula` surface now closes on:
+
+- live workbook-facade host-shape proof
+- direct authority queue, graph, and IR carry-through proof
+- lifecycle apply proof
+- mutation-entry apply proof
+- standalone exactness
+
+No production runtime patch survived the pass. The deciding result was
+proof-based: the existing bounded off-sheet machinery already carried this
+host-shaped lane exactly once the missing authority bucket was added and the
+authority contract was stated correctly.

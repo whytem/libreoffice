@@ -152,6 +152,8 @@ The current opt-in narrow rollout surface includes:
   `ClearCell`
 - exact same-workbook one-consumer-sheet direct off-sheet shared-group
   formula-retained `SameTextPreserve` and `Regroup` `SetFormula`
+- exact same-workbook one-consumer-sheet direct off-sheet host-uncategorized
+  gap-closing insertion `SetFormula`
 - exact same-workbook one-consumer-sheet off-sheet named-range-combined
   `SameTextPreserve`, `Regroup`, and `OneSidedInsert` `SetFormula` on the
   bounded `GlobalSingleAreaSingleConsumerSheet` surface
@@ -201,9 +203,10 @@ ownership boundary:
 - repair-sensitive structural after-state divergence that is intentionally
   rollback-only
 - off-sheet shared-group behavior outside the bounded one-consumer-sheet
-  direct `MemberExit`, `SameTextPreserve`, and `Regroup` slices and the
-  bounded named-range-combined `GlobalSingleAreaSingleConsumerSheet`
-  `SameTextPreserve`, `Regroup`, `OneSidedInsert`, and `MemberExit` slice
+  direct `MemberExit`, `SameTextPreserve`, `Regroup`, and host-uncategorized
+  gap-closing insertion slices and the bounded named-range-combined
+  `GlobalSingleAreaSingleConsumerSheet` `SameTextPreserve`, `Regroup`,
+  `OneSidedInsert`, and `MemberExit` slice
 - broad storage migration beyond the admitted slice
 - broad token-container ownership transfer
 - broad listener/broadcaster ownership transfer beyond the admitted slice
@@ -249,30 +252,19 @@ For the focused pass that closed the repair-sensitive frontier, see
 Its final decision is in
 [COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_DECISION_RECORD.md).
 
-### Priority 1: Narrow Off-Sheet Gap-Closing Insertion Surface
+### Priority 1: Named-Range-Sensitive Structural Rollout
 
-The direct one-consumer-sheet off-sheet `MemberExit`,
-`SameTextPreserve`, and `Regroup` lanes are admitted, and the bounded
-one-consumer-sheet off-sheet named-range-combined
-`GlobalSingleAreaSingleConsumerSheet` `SameTextPreserve`, `Regroup`,
-`OneSidedInsert`, and `MemberExit` lane is admitted too.
+The non-structural same-sheet and off-sheet widening frontier is now
+materially closed on the current bounded surfaces.
 
-The completed closeout for the last combined off-sheet blocker is in
-[COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_PLAN.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_PLAN.md),
-with the final decision in
-[COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md).
+The remaining material widening frontier is structural:
 
-The focused follow-on pass for the retained direct off-sheet gap-closing
-insertion surface is now
-[COMPUTATIONAL_SUBSTRATE_OFF_SHEET_GAP_INSERTION_SURFACE_PLAN.md](COMPUTATIONAL_SUBSTRATE_OFF_SHEET_GAP_INSERTION_SURFACE_PLAN.md).
+- named-range-sensitive structural rollout is still outside the admitted
+  slice
 
-The pass also established two important off-sheet host-shape facts:
-
-- bounded direct replacement attempts normalize to the already-admitted
-  direct `Regroup` surface
-- the only retained one-consumer-sheet off-sheet anomaly is the direct
-  gap-closing insertion where live Calc merges after-topology but does not
-  expose a stable mutation-family classification
+That frontier should only be revisited with the same standard as the
+non-structural passes: exact live host proof first, then authority
+promotion.
 
 ### Priority 2: Reassess Broad Ownership Expansion
 
@@ -287,22 +279,7 @@ success.
 
 The main blockers are now clear and concrete.
 
-### 1. Narrow Off-Sheet Gap-Closing Insertion Surface
-
-The old combined off-sheet blocker is now mostly closed:
-
-- off-sheet named-range-combined `MemberExit` is admitted
-- direct replacement attempts normalize to admitted direct `Regroup`
-
-The remaining narrow off-sheet question is the bounded direct gap-closing
-insertion surface where live Calc exposes merged after-topology but leaves
-the mutation-family classification at `None`.
-
-That is no longer a broad off-sheet carry-through blocker. It is now a
-host-shape surfacing problem on an otherwise bounded one-consumer-sheet
-surface.
-
-### 2. Named-Range-Sensitive Structural Rollout
+### 1. Named-Range-Sensitive Structural Rollout
 
 The structural slice is admitted only on the bounded exact same-sheet
 shareable shared-group surface without named-range-sensitive widening.
@@ -317,10 +294,32 @@ If that frontier is revisited, it will need the same standard as the
 non-structural passes: exact live host proof first, then authority
 promotion.
 
+### 2. Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
+
+The structural slice is still intentionally narrow even without named ranges.
+
+Broader shared-group-sensitive structural behavior outside the bounded exact
+same-sheet shareable structural surface remains outside the admitted slice
+until the engine can author the exact live after-topology for those classes
+too.
+
 ## What Dropped Off The Blocker List
 
 Repair-sensitive normalization is no longer a top blocker on the current
 roadmap.
+
+The bounded direct off-sheet gap-closing insertion surface is no longer a
+top blocker either.
+
+The closeout pass proved that the host-uncategorized direct off-sheet lane
+was already exact on the existing bounded machinery:
+
+- live workbook-facade host shape still labels the family as `None`
+- direct authority now has the missing exact queue/graph/IR proof
+- lifecycle and mutation-entry already close as exact live apply
+
+That removes the last retained one-consumer-sheet direct off-sheet anomaly
+from the blocker list.
 
 The repair-sensitive closeout pass showed that the currently observed
 same-sheet structural repair families are better described as:

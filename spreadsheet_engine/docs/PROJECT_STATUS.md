@@ -142,6 +142,8 @@ The admitted rollout surface currently includes:
   `ClearCell`
 - exact same-workbook one-consumer-sheet direct off-sheet shared-group
   formula-retained `SameTextPreserve` and `Regroup` `SetFormula`
+- exact same-workbook one-consumer-sheet direct off-sheet host-uncategorized
+  gap-closing insertion `SetFormula`
 - exact same-workbook one-consumer-sheet off-sheet named-range-combined
   `SameTextPreserve`, `Regroup`, and `OneSidedInsert` `SetFormula` on the
   bounded `GlobalSingleAreaSingleConsumerSheet` surface
@@ -160,9 +162,10 @@ The following remain deferred:
 - repair-sensitive structural after-state divergence that is intentionally
   rollback-only
 - off-sheet shared-group behavior outside the bounded one-consumer-sheet
-  direct `MemberExit`, `SameTextPreserve`, and `Regroup` slices and the
-  bounded named-range-combined `GlobalSingleAreaSingleConsumerSheet`
-  `SameTextPreserve`, `Regroup`, `OneSidedInsert`, and `MemberExit` slice
+  direct `MemberExit`, `SameTextPreserve`, `Regroup`, and host-uncategorized
+  gap-closing insertion slices and the bounded named-range-combined
+  `GlobalSingleAreaSingleConsumerSheet` `SameTextPreserve`, `Regroup`,
+  `OneSidedInsert`, and `MemberExit` slice
 - broad storage migration beyond the admitted slice
 - broad token-container and listener ownership transfer
 - workbook-wide or sheet-wide authority transfer
@@ -175,11 +178,10 @@ too.
 
 The recommended order is now:
 
-1. isolate the remaining direct off-sheet
-   gap-closing insertion surface where live Calc merges after-topology but
-   does not expose a stable mutation-family classification
-2. only after that, revisit named-range-sensitive structural rollout if the
-   roadmap still wants another admitted-slice expansion
+1. revisit named-range-sensitive structural rollout if the roadmap still
+   wants another admitted-slice expansion
+2. only after that, decide whether broader ownership expansion is worth the
+   complexity on the now-materially-closed bounded non-structural surface
 
 The now-completed split-outcome pass is
 [architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md).
@@ -199,9 +201,11 @@ The completed closeout for the final bounded off-sheet surface pass is
 Its final decision is in
 [architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_FINAL_SURFACE_DECISION_RECORD.md).
 
-The active focused follow-on pass for the retained direct off-sheet
+The now-completed focused pass for the bounded direct off-sheet
 gap-closing insertion surface is
 [architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_GAP_INSERTION_SURFACE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_GAP_INSERTION_SURFACE_PLAN.md).
+Its final decision is in
+[architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_GAP_INSERTION_SURFACE_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_OFF_SHEET_GAP_INSERTION_SURFACE_DECISION_RECORD.md).
 
 The now-completed repair-sensitive closeout pass is
 [architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_REPAIR_SENSITIVE_NORMALIZATION_PLAN.md).
@@ -243,16 +247,13 @@ not admit a new family, but it did remove repair-sensitive normalization
 from the top-blocker list for the current roadmap.
 
 The off-sheet dependency closure, broader formula-retained, named-range,
-and final-surface passes are now closed too. Together they admitted the
-bounded one-consumer-sheet direct off-sheet shared-group `MemberExit`,
-`SameTextPreserve`, and `Regroup` families plus the bounded off-sheet
-named-range-combined `GlobalSingleAreaSingleConsumerSheet`
-`SameTextPreserve`, `Regroup`, `OneSidedInsert`, and `MemberExit`
-families. The combined off-sheet blocker is now gone; the remaining
-off-sheet question is narrower still: direct gap-closing insertion where
-live Calc merges after-topology but does not expose a stable mutation-
-family classification, while bounded replacement attempts normalize to the
-already-admitted direct `Regroup` lane.
+final-surface, and gap-insertion passes are now closed too. Together they
+admitted the bounded one-consumer-sheet direct off-sheet shared-group
+`MemberExit`, `SameTextPreserve`, `Regroup`, and host-uncategorized
+gap-closing insertion lanes plus the bounded off-sheet named-range-combined
+`GlobalSingleAreaSingleConsumerSheet` `SameTextPreserve`, `Regroup`,
+`OneSidedInsert`, and `MemberExit` families. The old combined off-sheet
+blocker is now fully gone on the bounded one-consumer-sheet surface.
 
 The retained host shell and the old blocker-clearance program are both now
 historical closeouts rather than active top blockers. The same-sheet split
@@ -260,10 +261,10 @@ replay pass, repair-sensitive closeout, and bounded off-sheet widening
 passes have all landed. The current roadmap is therefore narrower and more
 concrete:
 
-- direct off-sheet gap-closing insertion where live Calc merges
-  after-topology but still leaves mutation-family classification at `None`
 - named-range-sensitive structural rollout if another admitted-slice
-  expansion is still desired after the off-sheet gap surface is resolved
+  expansion is still desired
+- only after that, reassess whether broader ownership expansion is worth
+  pursuing at all
 
 ## Working Rules Going Forward
 
