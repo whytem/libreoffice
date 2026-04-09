@@ -36,7 +36,9 @@ What is still not true:
 
 - no broad default-on production rollout exists
 - no `ScInterpreter` subroutine has been deleted yet
-- the full replay corpus still shows very little ambient live-seam traffic
+- the full replay corpus now shows material ambient live-seam traffic
+- most of that new ambient supported traffic is still error-literal traffic,
+  not yet promoted-family function traffic
 
 ## Routing Modes
 
@@ -95,28 +97,31 @@ Two different denominators matter, and both are now reported.
 ### Full Replay Corpus: Ambient Live Observe
 
 This is the honest all-formula live-routing surface from the standing replay
-corpus:
+corpus after the completed ambient live-conversion slice:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=0`
-- `interpret_tail_live_fallback_total=303`
-- `interpret_tail_live_seen_total=303`
-- `interpret_tail_live_unseen_formula_cells=50358`
-- `interpret_tail_live_supported_rate=0.00`
-- `interpret_tail_live_seen_rate=0.60`
+- `interpret_tail_live_supported_total=598`
+- `interpret_tail_live_fallback_total=8`
+- `interpret_tail_live_seen_total=606`
+- `interpret_tail_live_unseen_formula_cells=50055`
+- `interpret_tail_live_supported_rate=1.18`
+- `interpret_tail_live_seen_rate=1.20`
 
 Current ambient fallback reasons:
 
-- `unsupported_formula_shape=253`
-- `parse_failure=48`
-- `unsupported_function=2`
+- `unsupported_formula_shape=4`
+- `unsupported_function=4`
+- `parse_failure=0`
 
 Interpretation:
 
 - the seam now measures the full replay corpus
 - the ambient live-routing denominator is real, not curated
-- the current routed families still reach only a tiny fraction of natural
-  replay-corpus traffic
+- the full replay corpus now reaches the seam materially more often
+- almost all newly supported ambient traffic is still error-literal traffic
+  classified as `FunctionKind::Unknown`
+- the next value is in converting the tiny retained blocker surface into
+  promoted-family or normalized ambient traffic
 
 ### Promoted-Family Probe
 
@@ -173,21 +178,18 @@ historical reference material, not active roadmap work.
 
 ## Current Next Target
 
-The next high-value pass should focus on ambient live-routing conversion, not
-another broad promoted-family wave.
-
-The active plan for that slice is:
+The completed ambient live-conversion slice is recorded in:
 
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md)
 
-Priority order:
+The next high-value pass should now focus on the retained ambient blockers:
 
-1. increase the full-corpus `interpret_tail_live_seen_total`
-2. convert current `unsupported_formula_shape` fallout on natural replay
-   traffic
-3. reduce retained `shadow_mismatch` and `unsupported_host_surface` on the
-   promoted lookup and index family
-4. only then widen to the next capability class
+1. normalize the localized named-error roots that still fall back as
+   `NamedReference`
+2. identify and convert the four retained ambient unsupported-function cells
+3. then raise ambient promoted-family function traffic, not just
+   `FunctionKind::Unknown` error-literal support
+4. only after that return to broader capability-family expansion
 
 ## Historical Archive
 

@@ -32,18 +32,18 @@ That splits into two tracks:
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=0`
-- `interpret_tail_live_fallback_total=303`
-- `interpret_tail_live_seen_total=303`
-- `interpret_tail_live_unseen_formula_cells=50358`
-- `interpret_tail_live_supported_rate=0.00`
-- `interpret_tail_live_seen_rate=0.60`
+- `interpret_tail_live_supported_total=598`
+- `interpret_tail_live_fallback_total=8`
+- `interpret_tail_live_seen_total=606`
+- `interpret_tail_live_unseen_formula_cells=50055`
+- `interpret_tail_live_supported_rate=1.18`
+- `interpret_tail_live_seen_rate=1.20`
 
 Ambient live fallback reasons:
 
-- `unsupported_formula_shape=253`
-- `parse_failure=48`
-- `unsupported_function=2`
+- `unsupported_formula_shape=4`
+- `unsupported_function=4`
+- `parse_failure=0`
 
 ### Promoted-Family Probe
 
@@ -80,7 +80,9 @@ Still not true:
 
 - no broad default-on rollout exists
 - no `ScInterpreter` subroutine has been deleted yet
-- natural replay-corpus traffic still hits the live seam only rarely
+- full replay-corpus live traffic is now material, but most supported ambient
+  traffic is still error-literal traffic rather than promoted-family function
+  traffic
 
 ## Active Delegated Family
 
@@ -116,13 +118,14 @@ historical reference material, not active roadmap.
 
 The next pass should prioritize ambient live-routing conversion:
 
-1. raise `interpret_tail_live_seen_total` on the full replay corpus
-2. convert current ambient `unsupported_formula_shape` fallout
-3. reduce retained lookup/index `shadow_mismatch` and
-   `unsupported_host_surface`
+1. normalize the retained localized named-error roots that still fall back as
+   `NamedReference`
+2. identify and convert the four retained ambient unsupported-function cells
+3. then increase ambient promoted-family function routing on the full replay
+   corpus
 4. only then widen to the next evaluator capability class
 
-The active plan for that slice is:
+The completed ambient live-conversion closeout is:
 
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md)
 

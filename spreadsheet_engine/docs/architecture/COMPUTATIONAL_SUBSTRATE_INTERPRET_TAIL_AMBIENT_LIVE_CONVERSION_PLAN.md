@@ -1,19 +1,54 @@
 # InterpretTail Ambient Live Conversion Plan
 
-Status: active next-slice plan for full-corpus live-routing conversion
+Status: completed slice closeout for full-corpus live-routing conversion
 
 ## Purpose
 
-This plan defines the next evaluator-migration slice after the initial
-`InterpretTail` capability and hotspot passes.
+This document records the ambient live-conversion slice that followed the
+initial `InterpretTail` capability and hotspot passes.
 
-The goal is not another promoted-family probe win.
-The goal is to improve the full replay corpus denominator so the live seam
+The goal of the slice was not another promoted-family probe win.
+The goal was to improve the full replay corpus denominator so the live seam
 starts converting natural traffic, not just curated promoted-family cells.
+
+## Closeout Result
+
+The slice closed successfully.
+
+Final full replay-corpus live metrics:
+
+- `interpret_tail_live_formula_cells=50661`
+- `interpret_tail_live_supported_total=598`
+- `interpret_tail_live_fallback_total=8`
+- `interpret_tail_live_seen_total=606`
+- `interpret_tail_live_unseen_formula_cells=50055`
+- `interpret_tail_live_supported_rate=1.18`
+- `interpret_tail_live_seen_rate=1.20`
+
+Final dominant ambient fallback reasons:
+
+- `unsupported_formula_shape=4`
+- `unsupported_function=4`
+- `parse_failure=0`
+
+Promoted-family probe guardrails held:
+
+- `interpret_tail_probe_formula_cells=1488`
+- `interpret_tail_authoritative_total=1379`
+- `interpret_tail_authoritative_fallback_total=109`
+
+Important interpretation:
+
+- the slice materially widened the full replay-corpus live denominator
+- almost all newly supported ambient traffic is error-literal traffic routed
+  as `FunctionKind::Unknown`, not yet promoted-family function traffic
+- the retained ambient blocker set is now small and explicit:
+  localized named-error roots such as `of:chyba:511` / `of:chyba:504`, plus
+  four unsupported ambient function cells
 
 ## Starting Baseline
 
-Current full replay-corpus live metrics:
+Starting full replay-corpus live metrics:
 
 - `interpret_tail_live_formula_cells=50661`
 - `interpret_tail_live_supported_total=0`
@@ -23,13 +58,13 @@ Current full replay-corpus live metrics:
 - `interpret_tail_live_supported_rate=0.00`
 - `interpret_tail_live_seen_rate=0.60`
 
-Current dominant ambient fallback reasons:
+Starting dominant ambient fallback reasons:
 
 - `unsupported_formula_shape=253`
 - `parse_failure=48`
 - `unsupported_function=2`
 
-Current promoted-family probe metrics, retained as non-regression guardrails:
+Starting promoted-family probe metrics, retained as non-regression guardrails:
 
 - `interpret_tail_probe_formula_cells=1488`
 - `interpret_tail_authoritative_total=1379`
@@ -38,7 +73,7 @@ Current promoted-family probe metrics, retained as non-regression guardrails:
 
 ## Core Thesis
 
-The highest-value next slice is ambient live conversion:
+The slice thesis was ambient live conversion:
 
 - make more naturally occurring replay-corpus formulas reach the seam
 - make at least some of those formulas classify as supported on the full
@@ -84,7 +119,7 @@ Required output:
 
 ### 2. Remove Ambient Parse-Failure Waste
 
-The current `parse_failure=48` bucket is pure waste on the live seam.
+The starting `parse_failure=48` bucket was pure waste on the live seam.
 
 Target:
 
@@ -93,7 +128,7 @@ Target:
 
 ### 3. Convert Ambient Shape Waste
 
-The largest ambient blocker is `unsupported_formula_shape=253`.
+The largest starting ambient blocker was `unsupported_formula_shape=253`.
 
 Target only the highest-volume contributor shapes that:
 
@@ -140,6 +175,10 @@ Recommended numeric targets:
 - `parse_failure <= 10`
 - `unsupported_formula_shape <= 175`
 
+Closeout status:
+
+- all recommended numeric targets were met or exceeded
+
 ## Validation
 
 Minimum validation for closeout:
@@ -156,9 +195,14 @@ Minimum validation for closeout:
 
 ## Exit Interpretation
 
-If this pass lands cleanly, the next slice should be chosen from the retained
-ambient blockers, not from a generic wishlist of new functions.
+The next slice should be chosen from the retained ambient blockers, not from
+a generic wishlist of new functions.
 
-If this pass fails to produce non-zero ambient supported total, the migration
-should reassess whether the seam needs a broader eligibility or source-bridge
-change before further capability expansion.
+Recommended next target:
+
+1. normalize the retained localized named-error roots that still surface as
+   `NamedReference`
+2. identify and convert the four retained ambient unsupported-function cells
+3. then increase ambient promoted-family penetration, because the current
+   full-corpus supported traffic is still mostly non-function error-literal
+   traffic

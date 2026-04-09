@@ -36,18 +36,18 @@ delegation.”
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=0`
-- `interpret_tail_live_fallback_total=303`
-- `interpret_tail_live_seen_total=303`
-- `interpret_tail_live_unseen_formula_cells=50358`
-- `interpret_tail_live_supported_rate=0.00`
-- `interpret_tail_live_seen_rate=0.60`
+- `interpret_tail_live_supported_total=598`
+- `interpret_tail_live_fallback_total=8`
+- `interpret_tail_live_seen_total=606`
+- `interpret_tail_live_unseen_formula_cells=50055`
+- `interpret_tail_live_supported_rate=1.18`
+- `interpret_tail_live_seen_rate=1.20`
 
 Dominant ambient fallback reasons:
 
-- `unsupported_formula_shape=253`
-- `parse_failure=48`
-- `unsupported_function=2`
+- `unsupported_formula_shape=4`
+- `unsupported_function=4`
+- `parse_failure=0`
 
 ### Promoted-Family Probe
 
@@ -87,7 +87,7 @@ The strategy reset is recorded in
 [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md).
 The active current-state ledger is
 [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md).
-The active next-slice plan is
+The completed ambient live-conversion slice is recorded in
 [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md).
 
 ## Engine-Owned Today
@@ -147,11 +147,11 @@ remain archived reference material only.
 The highest-value remaining blockers are now:
 
 1. ambient live-routing reach:
-   the full replay corpus still shows only `303` seen formulas out of
-   `50,661`
+   the full replay corpus now shows `606` seen formulas out of `50,661`, but
+   most newly supported traffic is still error-literal traffic
 2. ambient unsupported-shape fallout:
-   the biggest full-corpus fallback class is still
-   `unsupported_formula_shape=253`
+   the retained fallback surface is now tiny but specific:
+   `unsupported_formula_shape=4`
 3. promoted-family residual parity:
    `shadow_mismatch=64`
 4. promoted-family residual host access:
@@ -164,13 +164,14 @@ The highest-value remaining blockers are now:
 
 The next pass should:
 
-1. increase the full-corpus `interpret_tail_live_seen_total`
-2. convert current ambient `unsupported_formula_shape` fallout
-3. reduce retained lookup/index `shadow_mismatch` and
-   `unsupported_host_surface`
+1. normalize the retained localized named-error roots that still fall back as
+   `NamedReference`
+2. identify and convert the four retained ambient unsupported-function cells
+3. then increase ambient promoted-family function routing on the full replay
+   corpus
 4. only then expand to the next evaluator capability class
 
-The active execution plan for that slice is:
+The latest completed closeout for this line is:
 
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md)
 
