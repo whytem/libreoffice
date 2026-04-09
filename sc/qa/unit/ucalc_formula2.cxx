@@ -12,6 +12,7 @@
 #include <scopetools.hxx>
 #include <formulacell.hxx>
 #include <docfunc.hxx>
+#include <interpretercontext.hxx>
 #include <tokenstringcontext.hxx>
 #include <dbdata.hxx>
 #include <scmatrix.hxx>
@@ -20,6 +21,7 @@
 #include <undomanager.hxx>
 #include <broadcast.hxx>
 #include <kahan.hxx>
+#include <spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx>
 
 #include <svl/broadcast.hxx>
 #include <sfx2/docfile.hxx>
@@ -28,12 +30,41 @@
 #include <functional>
 #include <set>
 #include <algorithm>
+#include <cstdlib>
+#include <optional>
 #include <vector>
 
 using namespace formula;
 
 namespace
 {
+class ScopedEnvironmentOverride
+{
+    std::string maName;
+    std::optional<std::string> moOriginalValue;
+
+public:
+    ScopedEnvironmentOverride(const char* pName, const char* pValue)
+        : maName(pName)
+    {
+        if (const char* pOriginal = std::getenv(pName))
+            moOriginalValue = pOriginal;
+
+        if (pValue)
+            setenv(maName.c_str(), pValue, 1);
+        else
+            unsetenv(maName.c_str());
+    }
+
+    ~ScopedEnvironmentOverride()
+    {
+        if (moOriginalValue)
+            setenv(maName.c_str(), moOriginalValue->c_str(), 1);
+        else
+            unsetenv(maName.c_str());
+    }
+};
+
 ScRange getCachedRange(const ScExternalRefCache::TableTypeRef& pCacheTab)
 {
     ScRange aRange;
@@ -720,6 +751,102 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncNUMBERVALUE)
         OUString aResult = m_pDoc->GetString(0, nRow, 0);
         CPPUNIT_ASSERT_EQUAL_MESSAGE(aChecks[i].pFormula,
                                      OUString::createFromAscii(aChecks[i].pResult), aResult);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorObserveAndShadowCompare)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet", m_pDoc->InsertTab(0, u"EngineObserve"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "observe");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 0, 0, u"=DATEVALUE(\"1954-07-20\")"_ustr);
+        ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(0, 0, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnObserveCount >= 1);
+        CPPUNIT_ASSERT_EQUAL(
+            static_cast<sal_uInt64>(0), aStats.mnShadowCompareCount);
+        CPPUNIT_ASSERT_EQUAL(
+            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeCount);
+    }
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "shadow");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 1, 0, u"=NUMBERVALUE(\"1,234.5\";\".\";\",\")"_ustr);
+        ASSERT_DOUBLES_EQUAL(1234.5, m_pDoc->GetValue(0, 1, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnShadowCompareCount >= 1);
+        CPPUNIT_ASSERT_EQUAL(
+            static_cast<sal_uInt64>(0),
+            aStats.maMismatchReasons[static_cast<std::size_t>(
+                setaileval::MismatchReason::Error)]);
+        CPPUNIT_ASSERT_EQUAL(
+            static_cast<sal_uInt64>(0),
+            aStats.maMismatchReasons[static_cast<std::size_t>(
+                setaileval::MismatchReason::NumericValue)]);
+        CPPUNIT_ASSERT_EQUAL(
+            static_cast<sal_uInt64>(0),
+            aStats.maMismatchReasons[static_cast<std::size_t>(
+                setaileval::MismatchReason::FormatType)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritativeWithFallback)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet", m_pDoc->InsertTab(0, u"EngineAuthority"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 0, 0, u"=DATEVALUE(\"1954-07-20\")"_ustr);
+        ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(0, 0, 0));
+
+        ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+        const sal_uInt32 nFormat = m_pDoc->GetNumberFormat(rContext, ScAddress(0, 0, 0));
+        const SvNumFormatType eType
+            = rContext.GetFormatTable()->GetType(nFormat) & ~SvNumFormatType::DEFINED;
+        CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, eType);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT_EQUAL(
+            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+    }
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 2, 0, u"=DATEVALUE(\"1954-\"&\"07-20\")"_ustr);
+        ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(0, 2, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeFallbackCount >= 1);
+        CPPUNIT_ASSERT(
+            aStats.maFallbackReasons[static_cast<std::size_t>(
+                setaileval::FallbackReason::UnsupportedFormulaShape)]
+            >= 1);
     }
 
     m_pDoc->DeleteTab(0);

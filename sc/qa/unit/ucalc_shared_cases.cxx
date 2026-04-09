@@ -16,6 +16,7 @@
 #include <spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/Host.hxx>
+#include <spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
 #include <spreadsheetengine/api/Host.hxx>
 #include <spreadsheetengine/api/Parsing.hxx>
@@ -635,6 +636,36 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testDirectTextParsingAdapter)
     const auto aInvalidDate = aAdapter.evaluateDateValue(u"not a date"_ustr);
     CPPUNIT_ASSERT(!aInvalidDate);
     CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::Error::IllegalArgument, aInvalidDate.meError);
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+
+    const auto aDate = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, u"=DATEVALUE(\"1954-07-20\")", false);
+    CPPUNIT_ASSERT(aDate.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aDate.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(19925.0, aDate.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, aDate.meFormatType);
+
+    const auto aNumber = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, u"=NUMBERVALUE(\"1,234.5\";\".\";\",\")", false);
+    CPPUNIT_ASSERT(aNumber.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aNumber.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1234.5, aNumber.maResult.mfValue, 1e-12);
+
+    const auto aUnsupported
+        = setaileval::tryEvaluateFormula(*m_pDoc, rContext, u"=DATEVALUE(A1)", false);
+    CPPUNIT_ASSERT(!aUnsupported.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        setaileval::FallbackReason::UnsupportedFormulaShape, aUnsupported.meFallbackReason);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testDirectFormulaInspectionAdapter)
