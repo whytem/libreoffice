@@ -110,6 +110,10 @@ It should be a targeted hotspot-conversion pass focused on:
 
 That is the highest-leverage next move after this widening wave.
 
+The scoped execution plan for that follow-on is now:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md)
+
 ## Validation Summary
 
 The supporting proof is summarized in

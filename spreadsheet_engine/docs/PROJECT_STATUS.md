@@ -254,6 +254,10 @@ The next evaluator move should now be a hotspot-conversion pass focused on:
 - residual `LOOKUP` unsupported-shape fallout
 - residual `LOOKUP` / `VLOOKUP` mismatch and host-surface cleanup
 
+That scoped next pass is now:
+
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md)
+
 ## Current Opt-In Narrow Rollout Surface
 
 The admitted rollout surface currently includes:

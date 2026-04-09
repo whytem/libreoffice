@@ -288,6 +288,10 @@ capability wave. Its main targets should be:
 - residual `LOOKUP` unsupported-shape reduction
 - residual `LOOKUP` / `VLOOKUP` mismatch and host-surface cleanup
 
+That scoped next pass is now:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md)
+
 ## Current Admitted Authority And Rollout Slice
 
 The current opt-in narrow rollout surface includes:
