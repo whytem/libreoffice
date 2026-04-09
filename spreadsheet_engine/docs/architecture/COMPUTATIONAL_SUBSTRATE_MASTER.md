@@ -37,7 +37,7 @@ Today:
   of that authority result
 - production Calc still does not delegate general cell evaluation authority
   from `ScFormulaCell::InterpretTail` to the engine evaluator
-- but a first real live evaluator family now delegates through
+- but a real bounded live evaluator capability cluster now delegates through
   `InterpretTail` under env-gated `observe`, `shadow`, and `authority`
   modes
 
@@ -156,14 +156,23 @@ and the first concrete execution plan is
 
 ## Current Live Evaluator Delegation Slice
 
-The first real `InterpretTail -> engine` migration pass is now complete.
+The first two live `InterpretTail -> engine` migration waves are now
+complete.
 
-That live delegated evaluator slice is:
+The current live delegated evaluator slice includes:
 
-- literal-only `VALUE`
-- literal-only `DATEVALUE`
-- literal-only `TIMEVALUE`
-- literal-only `NUMBERVALUE`
+- widened text parsing with bounded host-backed scalar inputs for:
+  - `VALUE`
+  - `DATEVALUE`
+  - `TIMEVALUE`
+  - `NUMBERVALUE`
+- bounded workbook-local lookup and index routing for:
+  - `MATCH`
+  - `XMATCH`
+  - `LOOKUP`
+  - `VLOOKUP`
+  - `HLOOKUP`
+  - `INDEX`
 
 The live seam is controlled by
 `SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR` with:
@@ -182,15 +191,25 @@ The landed boundary is:
 - unsupported or out-of-contract formulas fall back explicitly and record a
   fallback reason
 
-The closeout for that first switchover pass is:
+The currently admitted evaluator input and result boundary is:
+
+- literal inputs
+- single-cell references
+- single-cell workbook-global names
+- single-cell sheet-local names
+- simple scalar expression trees built from bounded concatenation and scalar
+  unary/binary operators
+- bounded single-area workbook-local lookup/index reads whose result surface
+  stays scalar or single-cell
+
+The completed closeouts for the current evaluator migration waves are:
 
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md)
-
-The active next-wave expansion plan is:
-
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md)
 
 ## Current Admitted Authority And Rollout Slice
 
@@ -339,26 +358,27 @@ The named-range structural rollout clearance pass is now complete:
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_NAMED_RANGE_STRUCTURAL_ROLLOUT_CLEARANCE_EVIDENCE.md)
 
-### Priority 1: Expand InterpretTail Evaluator Delegation By Capability Cluster
+### Priority 1: Broaden InterpretTail Delegation Beyond The First Capability Cluster
 
-The first live switchover phase is now complete.
+The first evaluator capability-cluster expansion is now complete.
 
-The highest-value next move is the next evaluator capability wave:
+The highest-value next move is no longer "prove that the seam can widen."
+That bar is met. The next move is to broaden the live delegated surface
+beyond the current bounded scalar-input and bounded lookup/index cluster:
 
 - keep the live `InterpretTail` routing seam
-- expand the delegated family from literal-only text parsing to the next
-  host-backed capability cluster
+- widen workbook-local evaluator coverage beyond scalar and single-cell
+  result surfaces
 - keep fallback-first delegation and shadow comparison as the migration bar
 
-The completed first-pass closeout is:
+The completed evaluator closeouts are:
 
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md)
-
-The active plan for that next migration wave is:
-
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md)
 
 ### Priority 2: Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
 
@@ -370,19 +390,21 @@ live authority-transfer program.
 
 The main blockers are now clear and concrete.
 
-### 1. InterpretTail Delegation Is Still Too Narrow
+### 1. InterpretTail Delegation Is Still Bounded To The First Capability Cluster
 
-The biggest live-authority blocker is no longer the total absence of
-delegation. It is the narrowness of the currently delegated family.
+The biggest live-authority blocker is no longer the absence of delegation or
+the literal-only restriction. It is the remaining boundedness of the promoted
+cluster.
 
-- `ScFormulaCell::InterpretTail` now contains a real engine-routing seam
-- but the authoritative family is still limited to literal-only text-parsing
-  formulas
-- workbook-local reference and named-range inputs still mostly fall back to
-  Calc
+- `ScFormulaCell::InterpretTail` now carries engine-first routing for bounded
+  host-backed text parsing and bounded workbook-local lookup/index reads
+- but broader workbook-local evaluator surfaces still fall back to Calc
+- the current seam still excludes `XLOOKUP`, matrix/spill-returning
+  lookup/index shapes, multi-cell slice results, and broader external or
+  environment-sensitive families
 
 If the program wants substantive authority relocation, the next work must
-expand this seam by capability cluster.
+extend evaluator breadth beyond this first capability cluster.
 
 ### 2. Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
 

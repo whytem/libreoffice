@@ -303,19 +303,18 @@ If the project cannot satisfy those criteria, then the program should stop
 describing itself as authority relocation and should formally revert to a
 verifier-only goal.
 
-## Next Expansion Target
+## Follow-On Wave
 
-The next evaluator-migration step should expand by capability cluster rather
-than by substrate conjunction. The closest next family is:
+The next evaluator-migration step described by this first-pass closeout has
+now also been executed.
 
-- single-cell workbook-local reference arguments for the same text-parsing
-  function cluster
-
-The active ambitious next-wave plan for that expansion is:
+The completed follow-on wave is:
 
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md)
 
-That follow-on wave is intentionally broader than one extra formula shape.
-It targets host-backed scalar materialization, workbook-local names, and the
-first bounded lookup-read delegation cluster without opening external
-references, matrix policy, or workbook-wide authority.
+That second wave widened the live seam from literal-only text parsing to
+bounded host-backed scalar inputs plus the first bounded lookup/index
+delegation cluster without opening external references, matrix policy, or
+workbook-wide authority.

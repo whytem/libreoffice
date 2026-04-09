@@ -49,7 +49,7 @@ Today:
   of that authority result
 - production Calc still does not delegate general cell evaluation authority
   from `ScFormulaCell::InterpretTail` to the engine evaluator
-- but a first real live evaluator family now delegates through
+- but a real bounded live evaluator capability cluster now delegates through
   `InterpretTail` under env-gated `observe`, `shadow`, and `authority`
   modes
 
@@ -127,15 +127,23 @@ Calc still intentionally owns:
 
 ## Current Live Evaluator Delegation Slice
 
-The first real `ScFormulaCell::InterpretTail -> engine` migration pass is
+The first two `ScFormulaCell::InterpretTail -> engine` migration waves are
 now landed.
 
-The live delegated evaluator family is:
+The live delegated evaluator family now includes:
 
-- literal-only `VALUE`
-- literal-only `DATEVALUE`
-- literal-only `TIMEVALUE`
-- literal-only `NUMBERVALUE`
+- widened host-backed text parsing for:
+  - `VALUE`
+  - `DATEVALUE`
+  - `TIMEVALUE`
+  - `NUMBERVALUE`
+- bounded workbook-local lookup and index routing for:
+  - `MATCH`
+  - `XMATCH`
+  - `LOOKUP`
+  - `VLOOKUP`
+  - `HLOOKUP`
+  - `INDEX`
 
 The live seam is controlled by
 `SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR` with:
@@ -152,15 +160,25 @@ At the current boundary:
 - `authority` lets supported formulas bypass `ScInterpreter`
 - unsupported or out-of-contract formulas fall back explicitly to Calc
 
-The completed closeout is:
+At the current boundary, the live delegated seam accepts:
+
+- literals
+- single-cell references
+- single-cell workbook-global names
+- single-cell sheet-local names
+- simple scalar expression trees built from bounded concatenation and scalar
+  unary/binary operators
+- bounded single-area workbook-local lookup/index reads whose result remains
+  scalar or single-cell
+
+The completed closeouts are:
 
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_PLAN.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_DECISION_RECORD.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md)
-
-The active next-wave plan is:
-
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md)
 
 ## Current Opt-In Narrow Rollout Surface
 
@@ -235,13 +253,12 @@ That first pass is now complete.
 
 The recommended next move is:
 
-1. expand the live `InterpretTail` delegation family by capability cluster,
-   using the ambitious next-wave plan in
-   [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md)
+1. broaden the live `InterpretTail` delegation family beyond the first
+   bounded scalar-input and lookup/index capability cluster
 2. keep using the substrate as migration underwriter, comparator, and fallback
    guardrail during that move
-3. only after that, decide how much remaining bounded substrate widening is
-   still worth pursuing
+3. treat remaining bounded substrate widening as secondary unless it directly
+   removes a live evaluator fallback reason
 
 The now-completed split-outcome pass is
 [architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_SAME_SHEET_NAMED_RANGE_SPLIT_OUTCOME_PLAN.md).
@@ -357,6 +374,12 @@ passes have all landed. The current roadmap is therefore:
   final decision for the first live evaluator switchover pass
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_ENGINE_EVALUATOR_SWITCHOVER_EVIDENCE.md):
   evidence summary for the first live evaluator switchover pass
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_PLAN.md):
+  completed closeout for the second live evaluator capability-cluster wave
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_DECISION_RECORD.md):
+  final decision for the second live evaluator capability-cluster wave
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CAPABILITY_CLUSTER_EXPANSION_EVIDENCE.md):
+  evidence summary for the second live evaluator capability-cluster wave
 - [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_PLAN.md):
   ambitious staged blocker-clearance roadmap
 - [architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_BLOCKER_CLEARANCE_DECISION_RECORD.md):

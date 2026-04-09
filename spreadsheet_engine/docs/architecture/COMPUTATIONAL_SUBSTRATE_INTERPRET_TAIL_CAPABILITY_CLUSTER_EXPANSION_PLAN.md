@@ -1,6 +1,6 @@
 # Computational Substrate InterpretTail Capability-Cluster Expansion Plan
 
-Status: active migration plan for the second live evaluator switchover wave
+Status: completed closeout for the second live evaluator switchover wave
 
 ## Purpose
 
@@ -13,6 +13,52 @@ than function-by-function or substrate-conjunction-by-conjunction.
 
 This is the next real authority-transfer step, not another verification-only
 closeout cycle.
+
+## Closeout Result
+
+This pass is now complete.
+
+The second live evaluator wave widened the real `InterpretTail` delegation
+surface from literal-only text parsing to a bounded host-backed capability
+cluster:
+
+- `VALUE`, `DATEVALUE`, `TIMEVALUE`, and `NUMBERVALUE` now accept bounded
+  host-backed scalar inputs:
+  - literals
+  - single-cell references
+  - single-cell global and sheet-local names
+  - simple scalar expression trees built from concatenation and bounded
+    unary/binary scalar operators
+- the first bounded lookup/index authority cluster now routes through the
+  same live seam for:
+  - `MATCH`
+  - `XMATCH`
+  - `LOOKUP`
+  - `VLOOKUP`
+  - `HLOOKUP`
+  - `INDEX`
+- authoritative projection now carries string results in addition to numeric
+  and error outputs
+- per-function observe, shadow, authoritative, and fallback counters now
+  exist on the live seam
+- fallback reasons now distinguish unsupported host-surface restrictions from
+  unsupported formula shape and unsupported function
+
+The real Calc-path retirement bar for this pass is met in the bounded sense
+defined by the plan:
+
+- in `authority` mode, the promoted text-parsing and bounded lookup/index
+  clusters are now engine-first and explicit-Calc-fallback inside
+  [ScFormulaCell::InterpretTail](/home/ubuntu/repos/libreoffice/sc/source/core/data/formulacell.cxx)
+
+The retained deferred boundary for this wave is:
+
+- `XLOOKUP`
+- matrix or spill-returning lookup/index shapes
+- multi-cell or slice-valued lookup results
+- external references, add-ins, macros, DDE, and volatile environment
+  surfaces
+- workbook-wide default-on delegation
 
 ## Why This Wave Next
 
