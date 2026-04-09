@@ -126,7 +126,20 @@ void maybeAddProbeDiagnosticSample(const OUString& rWorkbookLabel, const ScDocum
         return;
 
     auto& rSamples = probeDiagnosticSamples();
-    if (rSamples.size() >= 20)
+    std::size_t nLimit = 20;
+    if (const char* pValue = std::getenv("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_PROBE_DIAGNOSTIC_LIMIT"))
+    {
+        try
+        {
+            const int nConfiguredLimit = std::stoi(pValue);
+            if (nConfiguredLimit > 0)
+                nLimit = static_cast<std::size_t>(nConfiguredLimit);
+        }
+        catch (...)
+        {
+        }
+    }
+    if (rSamples.size() >= nLimit)
         return;
 
     ProbeDiagnosticSample aSample;
@@ -422,9 +435,12 @@ std::size_t materializeWorkbookToCalc(
     return nFormulaCellCount;
 }
 
-FunctionKind classifySupportedProbeFunction(spreadsheetengine::api::StringView rFormula)
+FunctionKind classifySupportedProbeFunction(std::u16string_view rFormula)
 {
-    const auto aParse = spreadsheetengine::core::formula::parseFormula(rFormula);
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    const auto aNormalized = setaileval::detail::normalizeFormulaSource(rFormula);
+    const auto aParse = spreadsheetengine::core::formula::parseFormula(aNormalized);
     if (!aParse || !aParse.mpRoot
         || aParse.mpRoot->meKind != spreadsheetengine::core::formula::NodeKind::FunctionCall)
     {
@@ -432,8 +448,7 @@ FunctionKind classifySupportedProbeFunction(spreadsheetengine::api::StringView r
     }
 
     const auto aFunctionName
-        = spreadsheetengine::compat::libreoffice::interprettaileval::detail::uppercaseAscii(
-            aParse.mpRoot->maPrimaryText);
+        = setaileval::detail::uppercaseAscii(aParse.mpRoot->maPrimaryText);
     if (aFunctionName == u"VALUE")
         return FunctionKind::Value;
     if (aFunctionName == u"DATEVALUE")
@@ -473,9 +488,6 @@ std::size_t runSupportedInterpretTailProbe(
             if (!rCell.hasFormula())
                 continue;
 
-            if (classifySupportedProbeFunction(rCell.maFormula) == FunctionKind::Unknown)
-                continue;
-
             const ScAddress aPos(static_cast<SCCOL>(rEntry.first.first),
                 static_cast<SCROW>(rEntry.first.second), static_cast<SCTAB>(nSheet));
             ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
@@ -484,6 +496,11 @@ std::size_t runSupportedInterpretTailProbe(
 
             const OUString aFormulaSource = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF,
                 pContext);
+            const FunctionKind eProbeFunction = classifySupportedProbeFunction(
+                std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()));
+            if (eProbeFunction == FunctionKind::Unknown)
+                continue;
+
             const auto aAttempt
                 = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
                     rDoc, *pContext, aPos,
@@ -493,10 +510,12 @@ std::size_t runSupportedInterpretTailProbe(
             if (!aAttempt.mbSupported)
             {
                 maybeAddProbeDiagnosticSample(
-                    rWorkbookLabel, rDoc, aPos, aFormulaSource, aAttempt.meFunction,
+                    rWorkbookLabel, rDoc, aPos, aFormulaSource,
+                    aAttempt.meFunction != FunctionKind::Unknown ? aAttempt.meFunction : eProbeFunction,
                     u"fallback"_ustr, OUString(), OUString::fromUtf8(fallbackReasonName(aAttempt.meFallbackReason)));
                 spreadsheetengine::compat::libreoffice::interprettaileval::recordAuthoritativeFallback(
-                    aAttempt.meFallbackReason, aAttempt.meFunction);
+                    aAttempt.meFallbackReason,
+                    aAttempt.meFunction != FunctionKind::Unknown ? aAttempt.meFunction : eProbeFunction);
                 ++nProbeCount;
                 continue;
             }
@@ -660,6 +679,14 @@ void printStats(std::size_t nWorkbookCount, std::size_t nFormulaCellCount, const
         std::cout << "interpret_tail_function_" << pName << "_attempts=" << nAttempts << '\n';
         std::cout << "interpret_tail_function_" << pName << "_support_rate=" << fSupportRate
                   << '\n';
+        for (std::size_t nReason = 0; nReason < static_cast<std::size_t>(FallbackReason::Count);
+             ++nReason)
+        {
+            const auto eReason = static_cast<FallbackReason>(nReason);
+            std::cout << "interpret_tail_function_" << pName << "_fallback_reason_"
+                      << fallbackReasonName(eReason) << "="
+                      << rStats.maFunctionFallbackReasons[nIndex][nReason] << '\n';
+        }
     }
     std::cout.flags(aOldFlags);
     std::cout.precision(nOldPrecision);

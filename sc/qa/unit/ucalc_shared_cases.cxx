@@ -696,6 +696,13 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::api::formulavalue::ValueType::Value, aSignedValue.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(-42.0, aSignedValue.maResult.mfValue, 1e-12);
 
+    const auto aEmptyValue = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0), u"=VALUE(A9)", false);
+    CPPUNIT_ASSERT(aEmptyValue.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aEmptyValue.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, aEmptyValue.maResult.mfValue, 1e-12);
+
     const auto aNumber = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=NUMBERVALUE(A8;B8;C8)", false);
     CPPUNIT_ASSERT(aNumber.mbSupported);
@@ -718,6 +725,50 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr,
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(aVLookup.maResult.maString));
 
+    const auto aLookupArray = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0),
+        u"=LOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"})", false);
+    CPPUNIT_ASSERT(aLookupArray.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aLookupArray.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"two"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aLookupArray.maResult.maString));
+
+    const auto aMatchArray = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0), u"=MATCH(2;{1;2;3};0)", false);
+    CPPUNIT_ASSERT(aMatchArray.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMatchArray.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aMatchArray.maResult.mfValue, 1e-12);
+
+    const auto aXMatchArray = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0), u"=XMATCH(2;{1;2;3})", false);
+    CPPUNIT_ASSERT(aXMatchArray.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aXMatchArray.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aXMatchArray.maResult.mfValue, 1e-12);
+
+    const auto aVLookupArray = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0),
+        u"=VLOOKUP(2;{1;\"one\"|2;\"two\"|3;\"three\"};2;0)", false);
+    CPPUNIT_ASSERT(aVLookupArray.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aVLookupArray.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"two"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aVLookupArray.maResult.maString));
+
+    const auto aHLookupArray = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0),
+        u"=HLOOKUP(2;{1;2;3|\"one\";\"two\";\"three\"};2;0)", false);
+    CPPUNIT_ASSERT(aHLookupArray.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aHLookupArray.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"two"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aHLookupArray.maResult.maString));
+
     const auto aIndex = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 4, 0), u"=INDEX(B5:C7;2;2)", false);
     CPPUNIT_ASSERT(aIndex.mbSupported);
@@ -725,6 +776,13 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::api::formulavalue::ValueType::String, aIndex.maResult.meType);
     CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr,
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(aIndex.maResult.maString));
+
+    const auto aIndexArray = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0), u"=INDEX({1;2|3;4};2;2)", false);
+    CPPUNIT_ASSERT(aIndexArray.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aIndexArray.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, aIndexArray.maResult.mfValue, 1e-12);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNormalization)

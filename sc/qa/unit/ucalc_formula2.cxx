@@ -911,6 +911,43 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
         setaileval::resetStats();
 
+        m_pDoc->SetString(3, 7, 0, u"=LOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"})"_ustr);
+        m_pDoc->SetString(3, 8, 0, u"=MATCH(2;{1;2;3};0)"_ustr);
+        m_pDoc->SetString(3, 9, 0, u"=INDEX({1;2|3;4};2;2)"_ustr);
+        m_pDoc->SetString(3, 10, 0, u"=VALUE(A11)"_ustr);
+
+        CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(3, 7, 0));
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(3, 8, 0));
+        ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(3, 9, 0));
+        ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(3, 10, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 4);
+        CPPUNIT_ASSERT_EQUAL(
+            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Lookup)]
+            >= 1);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Match)]
+            >= 1);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Index)]
+            >= 1);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Value)]
+            >= 1);
+    }
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
         m_pDoc->SetString(3, 2, 0, u"=LEFT(\"abc\";1)"_ustr);
         CPPUNIT_ASSERT_EQUAL(u"a"_ustr, m_pDoc->GetString(3, 2, 0));
 

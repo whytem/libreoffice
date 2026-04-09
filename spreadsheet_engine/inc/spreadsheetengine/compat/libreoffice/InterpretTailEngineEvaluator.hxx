@@ -112,6 +112,9 @@ struct StatsSnapshot
         maFunctionAuthoritativeCount {};
     std::array<sal_uInt64, static_cast<std::size_t>(FunctionKind::Count)>
         maFunctionFallbackCount {};
+    std::array<std::array<sal_uInt64, static_cast<std::size_t>(FallbackReason::Count)>,
+        static_cast<std::size_t>(FunctionKind::Count)>
+        maFunctionFallbackReasons {};
 };
 
 struct DiagnosticSample
@@ -154,6 +157,9 @@ struct StatsStore
         maFunctionAuthoritativeCount {};
     std::array<std::atomic<sal_uInt64>, static_cast<std::size_t>(FunctionKind::Count)>
         maFunctionFallbackCount {};
+    std::array<std::array<std::atomic<sal_uInt64>, static_cast<std::size_t>(FallbackReason::Count)>,
+        static_cast<std::size_t>(FunctionKind::Count)>
+        maFunctionFallbackReasons {};
 };
 
 struct DiagnosticStore
@@ -635,6 +641,21 @@ template <typename T>
     }
 }
 
+inline void putScalarIntoMatrix(
+    const api::CellValue& rValue, const ScMatrixRef& pMatrix, SCSIZE nColumn, SCSIZE nRow)
+{
+    if (rValue.isError())
+        pMatrix->PutError(toFormulaError(rValue.meError), nColumn, nRow);
+    else if (rValue.isText())
+        pMatrix->PutString(svl::SharedString(toLibreOfficeString(rValue.maString)), nColumn, nRow);
+    else if (rValue.isBoolean())
+        pMatrix->PutBoolean(rValue.mfNumber != 0.0, nColumn, nRow);
+    else if (rValue.isNumber())
+        pMatrix->PutDouble(rValue.mfNumber, nColumn, nRow);
+    else
+        pMatrix->PutEmpty(nColumn, nRow);
+}
+
 [[nodiscard]] inline Materialization<api::CellValue> materializeScalarNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
@@ -775,6 +796,94 @@ template <typename T>
     }
 }
 
+[[nodiscard]] inline Materialization<ScMatrixRef> materializeMatrixNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    if (rNode.meKind == core::formula::NodeKind::ArrayConstant)
+    {
+        if (rNode.mnArrayColumns < 1 || rNode.mnArrayRows < 1
+            || static_cast<sal_Int32>(rNode.maChildren.size())
+                   != rNode.mnArrayColumns * rNode.mnArrayRows)
+        {
+            return makeMaterializedError<ScMatrixRef>(api::Error::IllegalArgument);
+        }
+
+        ScMatrixRef xMatrix(
+            new ScMatrix(static_cast<SCSIZE>(rNode.mnArrayColumns), static_cast<SCSIZE>(rNode.mnArrayRows)));
+        std::size_t nIndex = 0;
+        for (sal_Int32 nRow = 0; nRow < rNode.mnArrayRows; ++nRow)
+        {
+            for (sal_Int32 nColumn = 0; nColumn < rNode.mnArrayColumns; ++nColumn)
+            {
+                const auto aElement
+                    = materializeScalarNode(*rNode.maChildren[nIndex++], rDoc, rContext, rFormulaPos);
+                if (!aElement.mbSupported)
+                    return makeUnsupportedMaterialization<ScMatrixRef>(aElement.meFallbackReason);
+                if (!aElement.moValue)
+                    return makeMaterializedError<ScMatrixRef>(aElement.meError);
+
+                putScalarIntoMatrix(*aElement.moValue, xMatrix, static_cast<SCSIZE>(nColumn),
+                    static_cast<SCSIZE>(nRow));
+            }
+        }
+
+        return makeMaterializedValue(xMatrix);
+    }
+
+    const auto aScalar = materializeScalarNode(rNode, rDoc, rContext, rFormulaPos);
+    if (!aScalar.mbSupported)
+        return makeUnsupportedMaterialization<ScMatrixRef>(aScalar.meFallbackReason);
+    if (!aScalar.moValue)
+        return makeMaterializedError<ScMatrixRef>(aScalar.meError);
+
+    ScMatrixRef xMatrix(new ScMatrix(1, 1));
+    putScalarIntoMatrix(*aScalar.moValue, xMatrix, 0, 0);
+    return makeMaterializedValue(xMatrix);
+}
+
+[[nodiscard]] inline Materialization<lookupexecution::LookupInputSource> materializeLookupInputSourceNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    if (rNode.meKind == core::formula::NodeKind::CellReference
+        || rNode.meKind == core::formula::NodeKind::RangeReference
+        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    {
+        const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+        if (!aRange.mbSupported)
+        {
+            return makeUnsupportedMaterialization<lookupexecution::LookupInputSource>(
+                aRange.meFallbackReason);
+        }
+        if (!aRange.moValue)
+            return makeMaterializedError<lookupexecution::LookupInputSource>(aRange.meError);
+
+        if (aRange.moValue->aStart.Tab() != aRange.moValue->aEnd.Tab())
+        {
+            return makeUnsupportedMaterialization<lookupexecution::LookupInputSource>(
+                FallbackReason::UnsupportedHostSurface);
+        }
+
+        lookupexecution::LookupInputSource aSource;
+        aSource.moRange = *aRange.moValue;
+        return makeMaterializedValue(aSource);
+    }
+
+    const auto aMatrix = materializeMatrixNode(rNode, rDoc, rContext, rFormulaPos);
+    if (!aMatrix.mbSupported)
+    {
+        return makeUnsupportedMaterialization<lookupexecution::LookupInputSource>(
+            aMatrix.meFallbackReason);
+    }
+    if (!aMatrix.moValue)
+        return makeMaterializedError<lookupexecution::LookupInputSource>(aMatrix.meError);
+
+    lookupexecution::LookupInputSource aSource;
+    aSource.mpMatrix = *aMatrix.moValue;
+    return makeMaterializedValue(aSource);
+}
+
 [[nodiscard]] inline EvaluationAttempt materializeLookupResult(
     FunctionKind eFunction, const ScDocument& rDoc, const lookupexecution::LookupExecutionResult& rResult)
 {
@@ -793,6 +902,15 @@ template <typename T>
 
     if (rResult.isSingleCellReference())
         return makeScalarAttempt(readHostDocumentCellValue(rDoc, rResult.maRange.aStart).maValue);
+
+    if (rResult.meKind == lookupexecution::LookupExecutionResult::Kind::Matrix && rResult.mpMatrix)
+    {
+        SCSIZE nColumns = 0;
+        SCSIZE nRows = 0;
+        rResult.mpMatrix->GetDimensions(nColumns, nRows);
+        if (nColumns == 1 && nRows == 1)
+            return makeScalarAttempt(lookupexecution::detail::toApiCellValue(rResult.mpMatrix->Get(0, 0)));
+    }
 
     return makeUnsupported(eFunction, FallbackReason::UnsupportedHostSurface);
 }
@@ -824,6 +942,8 @@ template <typename T>
             return makeNumericResult(eFunction, aArgument.moValue->mfNumber,
                 SvNumFormatType::NUMBER);
         }
+        if (eFunction == FunctionKind::Value && aArgument.moValue->isEmpty())
+            return makeNumericResult(eFunction, 0.0, SvNumFormatType::NUMBER);
 
         const auto aText = coerceScalarToText(rDoc, rContext, *aArgument.moValue);
         if (!aText)
@@ -914,24 +1034,7 @@ template <typename T>
     };
     auto materializeSource = [&](const core::formula::Node& rArgument)
         -> Materialization<lookupexecution::LookupInputSource> {
-        const auto aRange = resolveReferenceRangeNode(rArgument, rDoc, rFormulaPos);
-        if (!aRange.mbSupported)
-        {
-            return makeUnsupportedMaterialization<lookupexecution::LookupInputSource>(
-                aRange.meFallbackReason);
-        }
-        if (!aRange.moValue)
-            return makeMaterializedError<lookupexecution::LookupInputSource>(aRange.meError);
-
-        if (aRange.moValue->aStart.Tab() != aRange.moValue->aEnd.Tab())
-        {
-            return makeUnsupportedMaterialization<lookupexecution::LookupInputSource>(
-                FallbackReason::UnsupportedHostSurface);
-        }
-
-        lookupexecution::LookupInputSource aSource;
-        aSource.moRange = *aRange.moValue;
-        return makeMaterializedValue(aSource);
+        return materializeLookupInputSourceNode(rArgument, rDoc, rContext, rFormulaPos);
     };
     auto normalizeWholeArgument = [&](const core::formula::Node& rArgument)
         -> Materialization<sal_Int32> {
@@ -1171,12 +1274,6 @@ template <typename T>
         if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
             return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-        const auto aSource = resolveReferenceRangeNode(*rNode.maChildren[0], rDoc, rFormulaPos);
-        if (!aSource.mbSupported)
-            return makeUnsupported(eFunction, aSource.meFallbackReason);
-        if (!aSource.moValue)
-            return makeErrorResult(eFunction, aSource.meError);
-
         const auto aRow = normalizeWholeArgument(*rNode.maChildren[1]);
         if (!aRow.mbSupported)
             return makeUnsupported(eFunction, aRow.meFallbackReason);
@@ -1198,17 +1295,65 @@ template <typename T>
             nColumn = *aColumn.moValue;
         }
 
-        const auto aSelection = referenceexecution::planIndexReferenceSelection(
-            *aSource.moValue, *aRow.moValue, nColumn, static_cast<std::uint8_t>(rNode.maChildren.size()));
-        if (!aSelection)
-            return makeErrorResult(eFunction, aSelection.meError);
-        if (!aSelection.maValue.maRange.isSingleCell())
-            return makeUnsupported(eFunction, FallbackReason::UnsupportedHostSurface);
+        const auto aReferenceSource = resolveReferenceRangeNode(*rNode.maChildren[0], rDoc, rFormulaPos);
+        if (aReferenceSource.mbSupported && aReferenceSource.moValue)
+        {
+            const auto aSelection = referenceexecution::planIndexReferenceSelection(
+                *aReferenceSource.moValue, *aRow.moValue, nColumn,
+                static_cast<std::uint8_t>(rNode.maChildren.size()));
+            if (!aSelection)
+                return makeErrorResult(eFunction, aSelection.meError);
+            if (!aSelection.maValue.maRange.isSingleCell())
+                return makeUnsupported(eFunction, FallbackReason::UnsupportedHostSurface);
 
-        lookupexecution::LookupExecutionResult aResult;
-        aResult.meKind = lookupexecution::LookupExecutionResult::Kind::Reference;
-        aResult.maRange = toLibreOfficeRange(aSelection.maValue.maRange);
-        return materializeLookupResult(eFunction, rDoc, aResult);
+            lookupexecution::LookupExecutionResult aResult;
+            aResult.meKind = lookupexecution::LookupExecutionResult::Kind::Reference;
+            aResult.maRange = toLibreOfficeRange(aSelection.maValue.maRange);
+            return materializeLookupResult(eFunction, rDoc, aResult);
+        }
+        if (!aReferenceSource.mbSupported
+            && aReferenceSource.meFallbackReason != FallbackReason::UnsupportedFormulaShape)
+        {
+            return makeUnsupported(eFunction, aReferenceSource.meFallbackReason);
+        }
+        if (!aReferenceSource.mbSupported
+            && aReferenceSource.meFallbackReason == FallbackReason::UnsupportedFormulaShape)
+        {
+            const auto aMatrixSource
+                = materializeMatrixNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+            if (!aMatrixSource.mbSupported)
+                return makeUnsupported(eFunction, aMatrixSource.meFallbackReason);
+            if (!aMatrixSource.moValue)
+                return makeErrorResult(eFunction, aMatrixSource.meError);
+
+            SCSIZE nColumns = 0;
+            SCSIZE nRows = 0;
+            (*aMatrixSource.moValue)->GetDimensions(nColumns, nRows);
+            const auto aSelection = api::reference::planIndexMatrixSelection(
+                { static_cast<api::MatrixSize>(nColumns), static_cast<api::MatrixSize>(nRows) },
+                *aRow.moValue, nColumn, rNode.maChildren.size() < 3,
+                static_cast<std::uint8_t>(rNode.maChildren.size()));
+            if (!aSelection)
+                return makeErrorResult(eFunction, aSelection.meError);
+            if (aSelection.maValue.maDimensions.mnColumns != 1
+                || aSelection.maValue.maDimensions.mnRows != 1)
+            {
+                return makeUnsupported(eFunction, FallbackReason::UnsupportedHostSurface);
+            }
+
+            const api::CellValue aScalar = lookupexecution::detail::toApiCellValue(
+                (*aMatrixSource.moValue)->Get(static_cast<SCSIZE>(aSelection.maValue.maStart.mnColumn),
+                    static_cast<SCSIZE>(aSelection.maValue.maStart.mnRow)));
+            if (aScalar.isError())
+                return makeErrorResult(eFunction, aScalar.meError);
+            if (aScalar.isText())
+                return makeStringResult(eFunction, toLibreOfficeString(aScalar.maString));
+            if (aScalar.isNumber() || aScalar.isBoolean())
+                return makeNumericResult(eFunction, aScalar.mfNumber, SvNumFormatType::NUMBER);
+            return makeUnsupported(eFunction, FallbackReason::UnsupportedHostSurface);
+        }
+
+        return makeErrorResult(eFunction, aReferenceSource.meError);
     }
 
     return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
@@ -1311,6 +1456,11 @@ inline void resetStats()
         rValue.store(0);
     for (auto& rValue : rStore.maFunctionFallbackCount)
         rValue.store(0);
+    for (auto& rFunctionReasons : rStore.maFunctionFallbackReasons)
+    {
+        for (auto& rValue : rFunctionReasons)
+            rValue.store(0);
+    }
 
     auto& rDiagnostics = detail::diagnosticStore();
     std::scoped_lock aGuard(rDiagnostics.maMutex);
@@ -1339,6 +1489,14 @@ inline void resetStats()
             = rStore.maFunctionAuthoritativeCount[i].load();
     for (std::size_t i = 0; i < aSnapshot.maFunctionFallbackCount.size(); ++i)
         aSnapshot.maFunctionFallbackCount[i] = rStore.maFunctionFallbackCount[i].load();
+    for (std::size_t i = 0; i < aSnapshot.maFunctionFallbackReasons.size(); ++i)
+    {
+        for (std::size_t j = 0; j < aSnapshot.maFunctionFallbackReasons[i].size(); ++j)
+        {
+            aSnapshot.maFunctionFallbackReasons[i][j]
+                = rStore.maFunctionFallbackReasons[i][j].load();
+        }
+    }
     return aSnapshot;
 }
 
@@ -1369,6 +1527,7 @@ inline void recordAuthoritativeFallback(FallbackReason eReason, FunctionKind eFu
     rStore.mnAuthoritativeFallbackCount.fetch_add(1);
     rStore.maFallbackReasons[detail::toIndex(eReason)].fetch_add(1);
     rStore.maFunctionFallbackCount[detail::toIndex(eFunction)].fetch_add(1);
+    rStore.maFunctionFallbackReasons[detail::toIndex(eFunction)][detail::toIndex(eReason)].fetch_add(1);
 }
 
 inline void recordFallback(FallbackReason eReason, FunctionKind eFunction)
@@ -1376,6 +1535,7 @@ inline void recordFallback(FallbackReason eReason, FunctionKind eFunction)
     auto& rStore = detail::statsStore();
     rStore.maFallbackReasons[detail::toIndex(eReason)].fetch_add(1);
     rStore.maFunctionFallbackCount[detail::toIndex(eFunction)].fetch_add(1);
+    rStore.maFunctionFallbackReasons[detail::toIndex(eFunction)][detail::toIndex(eReason)].fetch_add(1);
 }
 
 inline void recordShadowMatch()
