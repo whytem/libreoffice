@@ -1,6 +1,6 @@
 # Computational Substrate InterpretTail Lookup Residual Conversion Plan
 
-Status: active next-pass plan for the focused post-hotspot-conversion
+Status: completed closeout for the focused post-hotspot-conversion
 `InterpretTail -> engine` lookup-residual wave
 
 ## Purpose
@@ -100,6 +100,38 @@ This baseline is frozen in:
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md)
+
+## Closeout Result
+
+This pass is now complete.
+
+It closed as a strong mixed-result runtime pass:
+
+- the main authoritative-usage target was exceeded
+- total fallback and unsupported-shape fallout fell sharply
+- the large retained `LOOKUP` unsupported-shape bucket was effectively
+  converted
+- the remaining residuals are now much narrower:
+  - retained `LOOKUP` shadow mismatch rows
+  - retained `VLOOKUP` / `XLOOKUP` host-surface rows
+  - retained bounded `INDEX` host-surface rows
+
+The completed rerun freezes:
+
+- `interpret_tail_probe_formula_cells=1488`
+- `interpret_tail_authoritative_total=1379`
+- `interpret_tail_authoritative_fallback_total=109`
+- `interpret_tail_fallback_unsupported_formula_shape=26`
+- `interpret_tail_fallback_shadow_mismatch=64`
+- `interpret_tail_fallback_unsupported_host_surface=19`
+
+The most important per-family completed results are:
+
+- `LOOKUP`: `777 / 815`, with unsupported-shape reduced from `215` to `0`
+  and shadow mismatch reduced from `45` to `38`
+- `VLOOKUP`: `296 / 313`, with retained unsupported-host-surface `8`
+- `XLOOKUP`: `78 / 97`, with retained unsupported-host-surface `6`
+- `INDEX`: `2 / 11`, with retained unsupported-host-surface `5`
 
 ## Recommended Scope
 
@@ -209,6 +241,32 @@ Stretch outcome:
 - `LOOKUP` unsupported-shape fallout falls to `125` or below
 - `LOOKUP` mismatch stops being the dominant live evaluator hotspot
 
+## Success Criteria Outcome
+
+The pass did not satisfy every original bar, but it closed well enough to
+count as a real runtime conversion wave rather than another measurement-only
+pass.
+
+What closed:
+
+- `interpret_tail_authoritative_total >= 1215`
+- `interpret_tail_authoritative_fallback_total <= 275`
+- `interpret_tail_fallback_unsupported_formula_shape <= 180`
+- `LOOKUP` unsupported-shape fallout `<= 150`
+- the standalone replay guardrail remained exact
+- the stretch `interpret_tail_authoritative_total >= 1250`
+- the stretch `interpret_tail_authoritative_fallback_total <= 250`
+- the stretch `LOOKUP` unsupported-shape `<= 125`
+
+What did not close:
+
+- `interpret_tail_fallback_shadow_mismatch <= 58`
+- `interpret_tail_fallback_unsupported_host_surface <= 12`
+- `LOOKUP` shadow mismatch `<= 30`
+- combined `VLOOKUP + XLOOKUP` unsupported-host-surface `<= 6`
+- the stretch goal that `LOOKUP` mismatch stop being the dominant live
+  evaluator hotspot
+
 ## Non-Goals
 
 Still out of scope for this wave:
@@ -305,6 +363,19 @@ The desired shape is:
 
 - one runtime commit
 - one docs closeout commit
+
+## Final Closeout
+
+The completed closeout documents are:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_EVIDENCE.md)
+
+The next evaluator move should now be narrower than this pass:
+
+- residual `LOOKUP` scalar-projection mismatch cleanup
+- residual `VLOOKUP` / `XLOOKUP` scalar host-surface cleanup
+- residual bounded `INDEX` host-surface cleanup on the same projection seam
 
 ## Recommended Reading Order For The Pass
 

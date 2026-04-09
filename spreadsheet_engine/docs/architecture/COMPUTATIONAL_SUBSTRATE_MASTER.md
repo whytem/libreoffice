@@ -306,17 +306,36 @@ The completed closeout set now also includes:
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md)
 
-The recommended next evaluator move is now the lookup-residual conversion
-pass focused on:
+That lookup-residual conversion pass is now also complete.
 
-- bounded `LOOKUP` `2D` data-only unsupported-shape conversion
-- bounded `LOOKUP` scalar-projection parity on the retained mismatch rows
-- residual `VLOOKUP` / `XLOOKUP` host-surface cleanup
-- optional bounded `INDEX` scalar cleanup on the same projection seam
+The completed lookup-residual rerun freezes:
 
-That scoped next pass is now:
+- `interpret_tail_probe_formula_cells=1488`
+- `interpret_tail_authoritative_total=1379`
+- `interpret_tail_authoritative_fallback_total=109`
+- `interpret_tail_fallback_unsupported_formula_shape=26`
+- `interpret_tail_fallback_shadow_mismatch=64`
+- `interpret_tail_fallback_unsupported_host_surface=19`
+
+The important interpretation is:
+
+- the measured probe surface stayed flat
+- the same seam now converts much more of that surface authoritatively
+- the old `LOOKUP` unsupported-shape blocker is effectively cleared
+- the remaining evaluator frontier is now much narrower and more specific:
+  - residual `LOOKUP` scalar-projection mismatch rows
+  - residual `VLOOKUP` / `XLOOKUP` host-surface rows
+  - residual bounded `INDEX` host-surface rows
+
+The completed closeout set now also includes:
 
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_LOOKUP_RESIDUAL_CONVERSION_EVIDENCE.md)
+
+The recommended next evaluator move is now a narrower residual
+lookup-projection and host-surface cleanup wave on the already-promoted
+lookup/index lane, not another broad capability expansion.
 
 ## Current Admitted Authority And Rollout Slice
 
