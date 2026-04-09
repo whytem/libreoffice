@@ -869,10 +869,60 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
     m_pDoc->SetValue(1, 12, 0, 3.0);
     m_pDoc->SetValue(2, 12, 0, 6.0);
     m_pDoc->SetValue(3, 12, 0, 9.0);
+    m_pDoc->SetValue(5, 14, 0, 1.0);
+    m_pDoc->SetTextCell(ScAddress(6, 14, 0), u"apple"_ustr);
+    m_pDoc->SetValue(5, 15, 0, 2.0);
+    m_pDoc->SetTextCell(ScAddress(6, 15, 0), u"banana"_ustr);
+    m_pDoc->SetValue(5, 16, 0, 3.0);
+    m_pDoc->SetTextCell(ScAddress(6, 16, 0), u"cherry"_ustr);
+    m_pDoc->SetValue(5, 17, 0, 4.0);
+    m_pDoc->SetTextCell(ScAddress(6, 17, 0), u"date"_ustr);
+    m_pDoc->SetValue(7, 14, 0, 3.0);
+    m_pDoc->SetValue(7, 15, 0, 2.0);
+    m_pDoc->SetValue(7, 16, 0, 4.0);
+    m_pDoc->SetValue(7, 17, 0, 1.0);
+    m_pDoc->SetValue(8, 14, 0, 1.0);
+    m_pDoc->SetValue(8, 15, 0, 2.0);
+    m_pDoc->SetValue(8, 16, 0, 3.0);
+    m_pDoc->SetValue(8, 17, 0, 4.0);
+    m_pDoc->SetValue(9, 14, 0, 1.0);
+    m_pDoc->SetValue(9, 15, 0, 2.0);
+    m_pDoc->SetValue(9, 16, 0, 3.0);
+    m_pDoc->SetValue(9, 17, 0, 4.0);
+    m_pDoc->SetValue(10, 0, 0, 1.0);
+    m_pDoc->SetValue(10, 1, 0, 2.0);
+    m_pDoc->SetValue(10, 2, 0, 3.0);
+    m_pDoc->SetValue(10, 3, 0, 5.0);
+    m_pDoc->SetValue(11, 0, 0, 10.0);
+    m_pDoc->SetValue(11, 1, 0, 20.0);
+    m_pDoc->SetValue(11, 2, 0, 30.0);
+    m_pDoc->SetValue(11, 3, 0, 50.0);
+    m_pDoc->SetString(12, 0, 0, u"=L1*10"_ustr);
+    m_pDoc->SetString(12, 1, 0, u"=L2*10"_ustr);
+    m_pDoc->SetString(12, 2, 0, u"=L3*10"_ustr);
+    m_pDoc->SetString(12, 3, 0, u"=L4*10"_ustr);
+    m_pDoc->SetValue(20, 0, 0, 0.0);
+    m_pDoc->SetValue(20, 1, 0, 1.0);
+    m_pDoc->SetValue(20, 2, 0, 2.0);
+    m_pDoc->SetValue(20, 3, 0, 3.0);
+    m_pDoc->SetValue(21, 0, 0, 0.0);
+    m_pDoc->SetValue(21, 1, 0, 11.0);
+    m_pDoc->SetValue(21, 2, 0, 22.0);
+    m_pDoc->SetValue(21, 3, 0, 33.0);
+    m_pDoc->SetString(22, 0, 0, u"=V1&\" 2\""_ustr);
+    m_pDoc->SetString(22, 1, 0, u"=V2&\" 2\""_ustr);
+    m_pDoc->SetString(22, 2, 0, u"=V3&\" 2\""_ustr);
+    m_pDoc->SetString(22, 3, 0, u"=V4&\" 2\""_ustr);
     CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
         new ScRangeData(*m_pDoc, u"MyTimeName"_ustr, u"$EngineAuthority.$B$1"_ustr)));
     CPPUNIT_ASSERT(m_pDoc->GetRangeName(0)->insert(
         new ScRangeData(*m_pDoc, u"LocalTimeName"_ustr, u"$B$1"_ustr)));
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"column1"_ustr, u"$EngineAuthority.$H$15:$H$18"_ustr)));
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"table"_ustr, u"$EngineAuthority.$F$15:$G$18"_ustr)));
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"range"_ustr, u"$EngineAuthority.$I$15:$I$18"_ustr)));
 
     {
         ScopedEnvironmentOverride aMode(
@@ -983,6 +1033,53 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::XLookup)]
             >= 2);
+    }
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(13, 14, 0, u"=VLOOKUP(column1;table;2;0)"_ustr);
+        m_pDoc->SetString(13, 15, 0, u"=VLOOKUP(column1;table;2;0)"_ustr);
+        m_pDoc->SetString(13, 16, 0, u"=VLOOKUP(column1;table;2;0)"_ustr);
+        m_pDoc->SetString(13, 17, 0, u"=VLOOKUP(column1;table;2;0)"_ustr);
+        m_pDoc->SetString(13, 18, 0, u"=INDEX(range;2;1)"_ustr);
+        m_pDoc->SetString(13, 0, 0, u"=LOOKUP(4;MMULT(K1:K4;1);L1:L4)"_ustr);
+        m_pDoc->SetString(13, 1, 0, u"=LOOKUP(4;MMULT(K1:K4;1))"_ustr);
+        m_pDoc->SetString(13, 2, 0, u"=LOOKUP(4;MMULT(K1:L4;1))"_ustr);
+        m_pDoc->SetString(13, 3, 0, u"=LOOKUP(4;MMULT(K1:K4;1);M1:M4)"_ustr);
+        m_pDoc->SetString(13, 4, 0, u"=LOOKUP(1;U1:W4)"_ustr);
+
+        CPPUNIT_ASSERT_EQUAL(u"cherry"_ustr, m_pDoc->GetString(13, 14, 0));
+        CPPUNIT_ASSERT_EQUAL(u"banana"_ustr, m_pDoc->GetString(13, 15, 0));
+        CPPUNIT_ASSERT_EQUAL(u"date"_ustr, m_pDoc->GetString(13, 16, 0));
+        CPPUNIT_ASSERT_EQUAL(u"apple"_ustr, m_pDoc->GetString(13, 17, 0));
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(13, 18, 0));
+        ASSERT_DOUBLES_EQUAL(30.0, m_pDoc->GetValue(13, 0, 0));
+        ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(13, 1, 0));
+        CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(13, 2, 0)));
+        ASSERT_DOUBLES_EQUAL(300.0, m_pDoc->GetValue(13, 3, 0));
+        CPPUNIT_ASSERT_EQUAL(u"11 2"_ustr, m_pDoc->GetString(13, 4, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 10);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeFallbackCount <= 2);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Lookup)]
+            >= 5);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Lookup)]);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::VLookup)]
+            >= 4);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Index)]
+            >= 1);
     }
 
     {

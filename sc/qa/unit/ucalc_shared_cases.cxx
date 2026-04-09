@@ -687,9 +687,59 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     m_pDoc->SetValue(1, 12, 0, 3.0);
     m_pDoc->SetValue(2, 12, 0, 6.0);
     m_pDoc->SetValue(3, 12, 0, 9.0);
+    m_pDoc->SetValue(5, 14, 0, 1.0);
+    m_pDoc->SetTextCell(ScAddress(6, 14, 0), u"apple"_ustr);
+    m_pDoc->SetValue(5, 15, 0, 2.0);
+    m_pDoc->SetTextCell(ScAddress(6, 15, 0), u"banana"_ustr);
+    m_pDoc->SetValue(5, 16, 0, 3.0);
+    m_pDoc->SetTextCell(ScAddress(6, 16, 0), u"cherry"_ustr);
+    m_pDoc->SetValue(5, 17, 0, 4.0);
+    m_pDoc->SetTextCell(ScAddress(6, 17, 0), u"date"_ustr);
+    m_pDoc->SetValue(7, 14, 0, 3.0);
+    m_pDoc->SetValue(7, 15, 0, 2.0);
+    m_pDoc->SetValue(7, 16, 0, 4.0);
+    m_pDoc->SetValue(7, 17, 0, 1.0);
+    m_pDoc->SetValue(8, 14, 0, 1.0);
+    m_pDoc->SetValue(8, 15, 0, 2.0);
+    m_pDoc->SetValue(8, 16, 0, 3.0);
+    m_pDoc->SetValue(8, 17, 0, 4.0);
+    m_pDoc->SetValue(9, 14, 0, 1.0);
+    m_pDoc->SetValue(9, 15, 0, 2.0);
+    m_pDoc->SetValue(9, 16, 0, 3.0);
+    m_pDoc->SetValue(9, 17, 0, 4.0);
+    m_pDoc->SetValue(10, 0, 0, 1.0);
+    m_pDoc->SetValue(10, 1, 0, 2.0);
+    m_pDoc->SetValue(10, 2, 0, 3.0);
+    m_pDoc->SetValue(10, 3, 0, 5.0);
+    m_pDoc->SetValue(11, 0, 0, 10.0);
+    m_pDoc->SetValue(11, 1, 0, 20.0);
+    m_pDoc->SetValue(11, 2, 0, 30.0);
+    m_pDoc->SetValue(11, 3, 0, 50.0);
+    m_pDoc->SetString(12, 0, 0, u"=L1*10"_ustr);
+    m_pDoc->SetString(12, 1, 0, u"=L2*10"_ustr);
+    m_pDoc->SetString(12, 2, 0, u"=L3*10"_ustr);
+    m_pDoc->SetString(12, 3, 0, u"=L4*10"_ustr);
+    m_pDoc->SetValue(20, 0, 0, 0.0);
+    m_pDoc->SetValue(20, 1, 0, 1.0);
+    m_pDoc->SetValue(20, 2, 0, 2.0);
+    m_pDoc->SetValue(20, 3, 0, 3.0);
+    m_pDoc->SetValue(21, 0, 0, 0.0);
+    m_pDoc->SetValue(21, 1, 0, 11.0);
+    m_pDoc->SetValue(21, 2, 0, 22.0);
+    m_pDoc->SetValue(21, 3, 0, 33.0);
+    m_pDoc->SetString(22, 0, 0, u"=V1&\" 2\""_ustr);
+    m_pDoc->SetString(22, 1, 0, u"=V2&\" 2\""_ustr);
+    m_pDoc->SetString(22, 2, 0, u"=V3&\" 2\""_ustr);
+    m_pDoc->SetString(22, 3, 0, u"=V4&\" 2\""_ustr);
 
     CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
         new ScRangeData(*m_pDoc, u"MyTimeName"_ustr, u"$InterpretTailHelper.$B$1"_ustr)));
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"column1"_ustr, u"$InterpretTailHelper.$H$15:$H$18"_ustr)));
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"table"_ustr, u"$InterpretTailHelper.$F$15:$G$18"_ustr)));
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"range"_ustr, u"$InterpretTailHelper.$I$15:$I$18"_ustr)));
 
     const auto aDate = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=DATEVALUE(A1)", false);
@@ -803,6 +853,66 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::api::formulavalue::ValueType::Value,
         aLookupMatrixArithmetic.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aLookupMatrixArithmetic.maResult.mfValue, 1e-12);
+
+    const auto aNamedVLookup = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(9, 14, 0), u"=VLOOKUP(column1;table;2;0)", false);
+    CPPUNIT_ASSERT(aNamedVLookup.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aNamedVLookup.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"cherry"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aNamedVLookup.maResult.maString));
+
+    const auto aIndexNamedColumn = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(13, 14, 0), u"=INDEX(range;2;1)", false);
+    CPPUNIT_ASSERT(aIndexNamedColumn.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aIndexNamedColumn.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aIndexNamedColumn.maResult.mfValue, 1e-12);
+
+    const auto aMmultLookup = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(12, 0, 0), u"=LOOKUP(4;MMULT(K1:K4;1);L1:L4)", false);
+    CPPUNIT_ASSERT(aMmultLookup.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aMmultLookup.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(30.0, aMmultLookup.maResult.mfValue, 1e-12);
+
+    const auto aMmultFormulaResultLookup = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(13, 0, 0), u"=LOOKUP(4;MMULT(K1:K4;1);M1:M4)", false);
+    CPPUNIT_ASSERT(aMmultFormulaResultLookup.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aMmultFormulaResultLookup.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(300.0, aMmultFormulaResultLookup.maResult.mfValue, 1e-12);
+
+    const auto aMmultArrayLookup = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(12, 1, 0), u"=LOOKUP(4;MMULT(K1:K4;1))", false);
+    CPPUNIT_ASSERT(aMmultArrayLookup.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aMmultArrayLookup.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, aMmultArrayLookup.maResult.mfValue, 1e-12);
+
+    const auto aInvalidMmultLookup = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(12, 2, 0), u"=LOOKUP(4;MMULT(K1:L4;1))", false);
+    CPPUNIT_ASSERT(aInvalidMmultLookup.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error,
+        aInvalidMmultLookup.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::IllegalArgument, aInvalidMmultLookup.maResult.meError);
+
+    const auto aLookupFormulaBacked2D = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(23, 1, 0), u"=LOOKUP(1;U1:W4)", false);
+    CPPUNIT_ASSERT(aLookupFormulaBacked2D.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aLookupFormulaBacked2D.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"11 2"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aLookupFormulaBacked2D.maResult.maString));
 
     const auto aMatchArray = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 8, 0), u"=MATCH(2;{1;2;3};0)", false);

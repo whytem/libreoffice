@@ -161,6 +161,13 @@ using spreadsheetengine::core::lookup::LookupMaterializer;
         return spreadsheetengine::api::ValueResult<LookupInput>::failure(
             spreadsheetengine::api::Error::IllegalArgument);
 
+    if (nColumns == 1 && nRows == 1)
+    {
+        LookupInput aScalar;
+        aScalar.maScalar = toApiCellValue(rSource.mpMatrix->Get(0, 0));
+        return spreadsheetengine::api::ValueResult<LookupInput>::success(aScalar);
+    }
+
     aInput.mnColumns = static_cast<spreadsheetengine::api::MatrixSize>(nColumns);
     aInput.mnRows = static_cast<spreadsheetengine::api::MatrixSize>(nRows);
     aInput.maValues.reserve(nColumns * nRows);
@@ -393,6 +400,11 @@ resolveLookupResult(const ScDocument& rDoc, ScInterpreterContext& rContext,
         return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
             spreadsheetengine::api::Error::NotAvailable);
     }
+    if (rRequest.maDataInput.mbScalar && rRequest.maDataInput.maScalar.isError())
+    {
+        return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
+            rRequest.maDataInput.maScalar.meError);
+    }
 
     const auto aDataLayout
         = spreadsheetengine::core::lookup::detectLookupLayout(rRequest.maDataInput, true);
@@ -406,6 +418,11 @@ resolveLookupResult(const ScDocument& rDoc, ScInterpreterContext& rContext,
     std::optional<spreadsheetengine::api::lookup::VectorLayout> oResultLayout;
     if (rRequest.moResultInput)
     {
+        if (rRequest.moResultInput->mbScalar && rRequest.moResultInput->maScalar.isError())
+        {
+            return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
+                rRequest.moResultInput->maScalar.meError);
+        }
         const auto aResultLayout
             = spreadsheetengine::core::lookup::detectLookupLayout(*rRequest.moResultInput, false);
         if (!aResultLayout)
@@ -495,6 +512,11 @@ resolveTabularLookupResult(const ScDocument& rDoc, ScInterpreterContext& rContex
         return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
             rRequest.maLookupValue.meError);
     }
+    if (rRequest.maTableInput.mbScalar && rRequest.maTableInput.maScalar.isError())
+    {
+        return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
+            rRequest.maTableInput.maScalar.meError);
+    }
 
     const spreadsheetengine::api::MatrixDimensions aDimensions {
         rRequest.maTableInput.mnColumns, rRequest.maTableInput.mnRows
@@ -565,6 +587,16 @@ resolveXLookupResult(const ScDocument& rDoc, ScInterpreterContext& rContext,
     {
         return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
             spreadsheetengine::api::Error::NotAvailable);
+    }
+    if (rRequest.maSearchInput.mbScalar && rRequest.maSearchInput.maScalar.isError())
+    {
+        return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
+            rRequest.maSearchInput.maScalar.meError);
+    }
+    if (rRequest.maResultInput.mbScalar && rRequest.maResultInput.maScalar.isError())
+    {
+        return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
+            rRequest.maResultInput.maScalar.meError);
     }
 
     const auto aSearchLayout
