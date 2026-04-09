@@ -10,9 +10,11 @@
 #pragma once
 
 #include <address.hxx>
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <limits>
 #include <mutex>
@@ -33,12 +35,15 @@
 #include <spreadsheetengine/api/Calendar.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
+#include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/Host.hxx>
 #include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
 #include <spreadsheetengine/detail/OdfFormulaParser.hxx>
+#include <spreadsheetengine/runtime/DateTimeParse.hxx>
+#include <spreadsheetengine/runtime/DateTimeParts.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::interprettaileval
 {
@@ -512,6 +517,14 @@ template <typename T>
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
     std::size_t nDepth = 0);
 
+[[nodiscard]] inline Materialization<api::CellValue> materializeScalarNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos);
+
+[[nodiscard]] inline Materialization<ScMatrixRef> materializeMatrixNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos);
+
 [[nodiscard]] inline std::optional<double> extractNumericLiteral(
     const core::formula::Node& rNode)
 {
@@ -558,6 +571,33 @@ template <typename T>
     }
 
     return api::ValueResult<OUString>::success(formatScalarNumber(rDoc, rContext, rValue.mfNumber));
+}
+
+[[nodiscard]] inline OUString formatBasisDateTime(double fSerialValue)
+{
+    const api::DateParts aNullDate = spreadsheetengine::core::datetime::defaultNullDate();
+    const api::DateSerial nDateSerial = static_cast<api::DateSerial>(std::floor(fSerialValue));
+    const double fTimeValue = spreadsheetengine::core::datetime::normalizeTimeFraction(fSerialValue);
+
+    const std::int16_t nYear = static_cast<std::int16_t>(
+        spreadsheetengine::core::datetime::extractYear(aNullDate, nDateSerial));
+    const std::int16_t nMonth = static_cast<std::int16_t>(
+        spreadsheetengine::core::datetime::extractMonth(aNullDate, nDateSerial));
+    const std::int16_t nDay = static_cast<std::int16_t>(
+        spreadsheetengine::core::datetime::extractDay(aNullDate, nDateSerial).value_or(0.0));
+    const std::int16_t nHour
+        = static_cast<std::int16_t>(spreadsheetengine::core::datetime::extractHour(fTimeValue));
+    const std::int16_t nMinute = static_cast<std::int16_t>(
+        spreadsheetengine::core::datetime::extractMinute(fTimeValue));
+    const std::int16_t nSecond = static_cast<std::int16_t>(
+        spreadsheetengine::core::datetime::extractSecond(fTimeValue));
+
+    char aBuffer[32];
+    const int nLength = std::snprintf(aBuffer, sizeof(aBuffer), "%04d-%02d-%02d %02d:%02d:%02d",
+        static_cast<int>(nYear), static_cast<int>(nMonth), static_cast<int>(nDay),
+        static_cast<int>(nHour), static_cast<int>(nMinute), static_cast<int>(nSecond));
+    return OUString::fromUtf8(
+        std::string_view(aBuffer, static_cast<std::size_t>(std::max(nLength, 0))));
 }
 
 [[nodiscard]] inline bool isAsciiDigit(char16_t c)
@@ -616,6 +656,43 @@ template <typename T>
         return std::nullopt;
 
     return std::trunc(aSerial.maValue);
+}
+
+[[nodiscard]] inline std::optional<double> tryStandaloneParsedDateValue(const OUString& rInput)
+{
+    const auto oParsed
+        = spreadsheetengine::core::datetime::parseStandaloneNumberText(toApiString(rInput));
+    if (!oParsed)
+        return std::nullopt;
+    if (oParsed->meKind != api::NumberParseResult::Kind::Date
+        && oParsed->meKind != api::NumberParseResult::Kind::DateTime)
+    {
+        return std::nullopt;
+    }
+    return std::trunc(oParsed->mfValue);
+}
+
+[[nodiscard]] inline std::optional<double> tryStandaloneParsedTimeValue(const OUString& rInput)
+{
+    const auto oParsed
+        = spreadsheetengine::core::datetime::parseStandaloneNumberText(toApiString(rInput));
+    if (!oParsed)
+        return std::nullopt;
+    if (oParsed->meKind != api::NumberParseResult::Kind::Time
+        && oParsed->meKind != api::NumberParseResult::Kind::DateTime)
+    {
+        return std::nullopt;
+    }
+    return spreadsheetengine::core::datetime::normalizeTimeFraction(oParsed->mfValue);
+}
+
+[[nodiscard]] inline std::optional<double> tryStandaloneParsedScalarValue(const OUString& rInput)
+{
+    const auto oParsed
+        = spreadsheetengine::core::datetime::parseStandaloneNumberText(toApiString(rInput));
+    if (!oParsed)
+        return std::nullopt;
+    return oParsed->mfValue;
 }
 
 [[nodiscard]] inline api::ValueResult<double> coerceScalarToNumber(
@@ -773,6 +850,61 @@ template <typename T>
     return aCell.getRawValue();
 }
 
+[[nodiscard]] inline std::optional<api::CellValue> tryMaterializeBoundedReferencedFormulaCellValue(
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const ScAddress& rAddress)
+{
+    const auto aFormulaText = formulainspection::formulaTextForCell(rDoc, rContext, rAddress);
+    if (!aFormulaText)
+        return std::nullopt;
+
+    const auto aNormalized
+        = normalizeFormulaSource(std::u16string_view(aFormulaText.maValue.getStr(), aFormulaText.maValue.getLength()));
+    const auto aParse = core::formula::parseFormula(aNormalized);
+    if (!aParse || !aParse.mpRoot || aParse.mpRoot->meKind != core::formula::NodeKind::FunctionCall)
+        return std::nullopt;
+
+    const auto& rRoot = *aParse.mpRoot;
+    if (uppercaseAscii(rRoot.maPrimaryText) != u"BASISODATETIME" || rRoot.maChildren.size() != 1)
+        return std::nullopt;
+
+    const auto aArgument = materializeScalarNode(*rRoot.maChildren[0], rDoc, rContext, rAddress);
+    if (!aArgument.mbSupported || !aArgument.moValue)
+        return std::nullopt;
+    if (aArgument.moValue->isError() || aArgument.moValue->isEmpty())
+        return api::CellValue::error(api::Error::IllegalArgument);
+
+    double fSerialValue = 0.0;
+    if (aArgument.moValue->isText())
+    {
+        const auto oParsed = spreadsheetengine::core::datetime::parseStandaloneNumberText(
+            aArgument.moValue->maString);
+        if (!oParsed)
+            return api::CellValue::error(api::Error::IllegalArgument);
+        fSerialValue = oParsed->mfValue;
+    }
+    else
+    {
+        fSerialValue = aArgument.moValue->mfNumber;
+    }
+
+    return api::CellValue::text(toApiString(formatBasisDateTime(fSerialValue)));
+}
+
+[[nodiscard]] inline api::CellValue readMaterializedHostCellValue(
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const ScAddress& rAddress)
+{
+    auto aValue = readHostDocumentCellValue(rDoc, rAddress).maValue;
+    if ((aValue.isEmpty() || aValue.isError()))
+    {
+        if (const auto oFormulaValue
+            = tryMaterializeBoundedReferencedFormulaCellValue(rDoc, rContext, rAddress))
+        {
+            return *oFormulaValue;
+        }
+    }
+    return aValue;
+}
+
 inline void putScalarIntoMatrix(
     const api::CellValue& rValue, const ScMatrixRef& pMatrix, SCSIZE nColumn, SCSIZE nRow)
 {
@@ -819,7 +951,7 @@ inline void putScalarIntoMatrix(
                     FallbackReason::UnsupportedHostSurface);
             }
             return makeMaterializedValue(
-                readHostDocumentCellValue(rDoc, aRange.moValue->aStart).maValue);
+                readMaterializedHostCellValue(rDoc, rContext, aRange.moValue->aStart));
         }
         case core::formula::NodeKind::UnaryOperation:
         {
@@ -928,10 +1060,160 @@ inline void putScalarIntoMatrix(
     }
 }
 
+[[nodiscard]] inline Materialization<ScMatrixRef> materializeReferencedMatrix(
+    const ScRange& rRange, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    if (rRange.aStart.Tab() != rRange.aEnd.Tab())
+        return makeUnsupportedMaterialization<ScMatrixRef>(FallbackReason::UnsupportedHostSurface);
+
+    if (rRange.aStart == rFormulaPos && rRange.aEnd == rFormulaPos)
+        return makeUnsupportedMaterialization<ScMatrixRef>(FallbackReason::UnsupportedHostSurface);
+
+    const SCSIZE nColumns = static_cast<SCSIZE>(rRange.aEnd.Col() - rRange.aStart.Col() + 1);
+    const SCSIZE nRows = static_cast<SCSIZE>(rRange.aEnd.Row() - rRange.aStart.Row() + 1);
+    ScMatrixRef xMatrix(new ScMatrix(nColumns, nRows));
+    for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+    {
+        for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+        {
+            const ScAddress aAddress(rRange.aStart.Col() + static_cast<SCCOL>(nColumn),
+                rRange.aStart.Row() + static_cast<SCROW>(nRow), rRange.aStart.Tab());
+            putScalarIntoMatrix(readMaterializedHostCellValue(rDoc, rContext, aAddress), xMatrix,
+                nColumn, nRow);
+        }
+    }
+
+    return makeMaterializedValue(xMatrix);
+}
+
+[[nodiscard]] inline Materialization<ScMatrixRef> materializeMatrixBinaryOperation(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    if (rNode.maChildren.size() != 2)
+        return makeUnsupportedMaterialization<ScMatrixRef>(FallbackReason::UnsupportedFormulaShape);
+
+    const auto aLeft = materializeMatrixNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+    if (!aLeft.mbSupported)
+        return makeUnsupportedMaterialization<ScMatrixRef>(aLeft.meFallbackReason);
+    if (!aLeft.moValue)
+        return makeMaterializedError<ScMatrixRef>(aLeft.meError);
+
+    const auto aRight = materializeMatrixNode(*rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+    if (!aRight.mbSupported)
+        return makeUnsupportedMaterialization<ScMatrixRef>(aRight.meFallbackReason);
+    if (!aRight.moValue)
+        return makeMaterializedError<ScMatrixRef>(aRight.meError);
+
+    SCSIZE nLeftColumns = 0;
+    SCSIZE nLeftRows = 0;
+    SCSIZE nRightColumns = 0;
+    SCSIZE nRightRows = 0;
+    (*aLeft.moValue)->GetDimensions(nLeftColumns, nLeftRows);
+    (*aRight.moValue)->GetDimensions(nRightColumns, nRightRows);
+
+    const SCSIZE nResultColumns = std::max(nLeftColumns, nRightColumns);
+    const SCSIZE nResultRows = std::max(nLeftRows, nRightRows);
+    ScMatrixRef xMatrix(new ScMatrix(nResultColumns, nResultRows));
+    for (SCSIZE nRow = 0; nRow < nResultRows; ++nRow)
+    {
+        for (SCSIZE nColumn = 0; nColumn < nResultColumns; ++nColumn)
+        {
+            SCSIZE nLeftColumn = nColumn;
+            SCSIZE nLeftRow = nRow;
+            SCSIZE nRightColumn = nColumn;
+            SCSIZE nRightRow = nRow;
+            if (!(*aLeft.moValue)->ValidColRowOrReplicated(nLeftColumn, nLeftRow)
+                || !(*aRight.moValue)->ValidColRowOrReplicated(nRightColumn, nRightRow))
+            {
+                return makeUnsupportedMaterialization<ScMatrixRef>(
+                    FallbackReason::UnsupportedFormulaShape);
+            }
+
+            const auto aLeftValue = lookupexecution::detail::toApiCellValue(
+                (*aLeft.moValue)->Get(nLeftColumn, nLeftRow));
+            const auto aRightValue = lookupexecution::detail::toApiCellValue(
+                (*aRight.moValue)->Get(nRightColumn, nRightRow));
+            if (aLeftValue.isError())
+            {
+                putScalarIntoMatrix(aLeftValue, xMatrix, nColumn, nRow);
+                continue;
+            }
+            if (aRightValue.isError())
+            {
+                putScalarIntoMatrix(aRightValue, xMatrix, nColumn, nRow);
+                continue;
+            }
+
+            const auto aLeftNumber = coerceScalarToNumber(rDoc, rContext, aLeftValue);
+            if (!aLeftNumber)
+            {
+                putScalarIntoMatrix(api::CellValue::error(aLeftNumber.meError), xMatrix, nColumn,
+                    nRow);
+                continue;
+            }
+            const auto aRightNumber = coerceScalarToNumber(rDoc, rContext, aRightValue);
+            if (!aRightNumber)
+            {
+                putScalarIntoMatrix(api::CellValue::error(aRightNumber.meError), xMatrix, nColumn,
+                    nRow);
+                continue;
+            }
+
+            std::optional<api::CellValue> oResult;
+            switch (rNode.meBinaryOperator)
+            {
+                case core::formula::BinaryOperator::Add:
+                    oResult = api::CellValue::number(aLeftNumber.maValue + aRightNumber.maValue);
+                    break;
+                case core::formula::BinaryOperator::Subtract:
+                    oResult = api::CellValue::number(aLeftNumber.maValue - aRightNumber.maValue);
+                    break;
+                case core::formula::BinaryOperator::Multiply:
+                    oResult = api::CellValue::number(aLeftNumber.maValue * aRightNumber.maValue);
+                    break;
+                case core::formula::BinaryOperator::Divide:
+                    if (aRightNumber.maValue == 0.0)
+                        oResult = api::CellValue::error(api::Error::DivisionByZero);
+                    else
+                        oResult = api::CellValue::number(aLeftNumber.maValue / aRightNumber.maValue);
+                    break;
+                case core::formula::BinaryOperator::Power:
+                {
+                    const double fValue = std::pow(aLeftNumber.maValue, aRightNumber.maValue);
+                    oResult = std::isfinite(fValue) ? api::CellValue::number(fValue)
+                                                    : api::CellValue::error(api::Error::Domain);
+                    break;
+                }
+                default:
+                    return makeUnsupportedMaterialization<ScMatrixRef>(
+                        FallbackReason::UnsupportedFormulaShape);
+            }
+
+            putScalarIntoMatrix(*oResult, xMatrix, nColumn, nRow);
+        }
+    }
+
+    return makeMaterializedValue(xMatrix);
+}
+
 [[nodiscard]] inline Materialization<ScMatrixRef> materializeMatrixNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
 {
+    if (rNode.meKind == core::formula::NodeKind::CellReference
+        || rNode.meKind == core::formula::NodeKind::RangeReference
+        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    {
+        const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+        if (!aRange.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aRange.meFallbackReason);
+        if (!aRange.moValue)
+            return makeMaterializedError<ScMatrixRef>(aRange.meError);
+        return materializeReferencedMatrix(*aRange.moValue, rDoc, rContext, rFormulaPos);
+    }
+
     if (rNode.meKind == core::formula::NodeKind::ArrayConstant)
     {
         if (rNode.mnArrayColumns < 1 || rNode.mnArrayRows < 1
@@ -962,6 +1244,9 @@ inline void putScalarIntoMatrix(
 
         return makeMaterializedValue(xMatrix);
     }
+
+    if (rNode.meKind == core::formula::NodeKind::BinaryOperation)
+        return materializeMatrixBinaryOperation(rNode, rDoc, rContext, rFormulaPos);
 
     const auto aScalar = materializeScalarNode(rNode, rDoc, rContext, rFormulaPos);
     if (!aScalar.mbSupported)
@@ -1020,8 +1305,6 @@ inline void putScalarIntoMatrix(
     FunctionKind eFunction, const ScDocument& rDoc, const lookupexecution::LookupExecutionResult& rResult)
 {
     const auto makeLookupScalarAttempt = [&](const api::CellValue& rValue) {
-        if (rValue.isEmpty())
-            return makeUnsupported(eFunction, FallbackReason::UnsupportedHostSurface);
         return makeScalarAttempt(eFunction, rValue);
     };
 
@@ -1108,7 +1391,11 @@ inline void putScalarIntoMatrix(
         {
             const auto aResult = textparsingexecution::evaluateValue(rDoc, rContext, aText.maValue);
             if (!aResult)
+            {
+                if (const auto oStandalone = tryStandaloneParsedScalarValue(aText.maValue))
+                    return makeNumericResult(eFunction, *oStandalone, SvNumFormatType::NUMBER);
                 return makeErrorResult(eFunction, aResult.meError);
+            }
             return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::NUMBER);
         }
 
@@ -1118,6 +1405,8 @@ inline void putScalarIntoMatrix(
                 = textparsingexecution::evaluateDateValue(rDoc, rContext, aText.maValue);
             if (!aResult)
             {
+                if (const auto oStandalone = tryStandaloneParsedDateValue(aText.maValue))
+                    return makeNumericResult(eFunction, *oStandalone, SvNumFormatType::DATE);
                 if (const auto oIsoFallback = tryIsoDateValueFallback(rDoc, aText.maValue))
                     return makeNumericResult(eFunction, *oIsoFallback, SvNumFormatType::DATE);
                 return makeErrorResult(eFunction, aResult.meError);
@@ -1127,7 +1416,11 @@ inline void putScalarIntoMatrix(
 
         const auto aResult = textparsingexecution::evaluateTimeValue(rDoc, rContext, aText.maValue);
         if (!aResult)
+        {
+            if (const auto oStandalone = tryStandaloneParsedTimeValue(aText.maValue))
+                return makeNumericResult(eFunction, *oStandalone, SvNumFormatType::TIME);
             return makeErrorResult(eFunction, aResult.meError);
+        }
         return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::TIME);
     }
 

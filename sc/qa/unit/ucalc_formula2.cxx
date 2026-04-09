@@ -863,6 +863,12 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
     m_pDoc->SetTextCell(ScAddress(2, 6, 0), u"thirty"_ustr);
     m_pDoc->SetValue(0, 9, 0, -3.5);
     setCellNumberFormat(m_pDoc, ScAddress(0, 9, 0), u"YYYY-MM-DD HH:MM:SS"_ustr);
+    m_pDoc->SetValue(1, 11, 0, 1.0);
+    m_pDoc->SetValue(2, 11, 0, 2.0);
+    m_pDoc->SetValue(3, 11, 0, 3.0);
+    m_pDoc->SetValue(1, 12, 0, 3.0);
+    m_pDoc->SetValue(2, 12, 0, 6.0);
+    m_pDoc->SetValue(3, 12, 0, 9.0);
     CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
         new ScRangeData(*m_pDoc, u"MyTimeName"_ustr, u"$EngineAuthority.$B$1"_ustr)));
     CPPUNIT_ASSERT(m_pDoc->GetRangeName(0)->insert(
@@ -938,6 +944,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetString(3, 11, 0, u"=XLOOKUP(A5;B5:B7;C5:C7)"_ustr);
         m_pDoc->SetString(3, 12, 0, u"=IFERROR(VLOOKUP(25;B5:C7;2;0);\"missing\")"_ustr);
         m_pDoc->SetString(3, 13, 0, u"=IFNA(XLOOKUP(25;B5:B7;C5:C7);\"missing\")"_ustr);
+        m_pDoc->SetString(4, 11, 0, u"=LOOKUP(4;B12:D12*2;B13:D13/3)"_ustr);
 
         CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(3, 7, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(3, 8, 0));
@@ -946,9 +953,10 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(3, 11, 0));
         CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(3, 12, 0));
         CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(3, 13, 0));
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(4, 11, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 7);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 8);
         CPPUNIT_ASSERT_EQUAL(
             static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(

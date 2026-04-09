@@ -679,6 +679,14 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     m_pDoc->SetTextCell(ScAddress(2, 7, 0), u","_ustr);
     m_pDoc->SetValue(0, 9, 0, -3.5);
     setCellNumberFormat(m_pDoc, ScAddress(0, 9, 0), u"YYYY-MM-DD HH:MM:SS"_ustr);
+    m_pDoc->SetValue(6, 10, 0, -3.5);
+    m_pDoc->SetString(0, 10, 0, u"=BASISODATETIME(G11)"_ustr);
+    m_pDoc->SetValue(1, 11, 0, 1.0);
+    m_pDoc->SetValue(2, 11, 0, 2.0);
+    m_pDoc->SetValue(3, 11, 0, 3.0);
+    m_pDoc->SetValue(1, 12, 0, 3.0);
+    m_pDoc->SetValue(2, 12, 0, 6.0);
+    m_pDoc->SetValue(3, 12, 0, 9.0);
 
     CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
         new ScRangeData(*m_pDoc, u"MyTimeName"_ustr, u"$InterpretTailHelper.$B$1"_ustr)));
@@ -715,6 +723,24 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         aDateFromIsoDateTimeText.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(-3.0, aDateFromIsoDateTimeText.maResult.mfValue, 1e-12);
     CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, aDateFromIsoDateTimeText.meFormatType);
+
+    const auto aDateFromMonthNameText = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 14, 0), u"=DATEVALUE(\"Jan1, 2015\")", false);
+    CPPUNIT_ASSERT(aDateFromMonthNameText.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aDateFromMonthNameText.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(42005.0, aDateFromMonthNameText.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, aDateFromMonthNameText.meFormatType);
+
+    const auto aDateFromBasisFormulaRef = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 10, 0), u"=DATEVALUE(A11)", false);
+    CPPUNIT_ASSERT(aDateFromBasisFormulaRef.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aDateFromBasisFormulaRef.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-4.0, aDateFromBasisFormulaRef.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, aDateFromBasisFormulaRef.meFormatType);
 
     const auto aTimeFromName = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=TIMEVALUE(MyTimeName)", false);
@@ -769,6 +795,14 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     CPPUNIT_ASSERT_EQUAL(u"two"_ustr,
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(
             aLookupArray.maResult.maString));
+
+    const auto aLookupMatrixArithmetic = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(4, 11, 0), u"=LOOKUP(4;B12:D12*2;B13:D13/3)", false);
+    CPPUNIT_ASSERT(aLookupMatrixArithmetic.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aLookupMatrixArithmetic.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aLookupMatrixArithmetic.maResult.mfValue, 1e-12);
 
     const auto aMatchArray = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 8, 0), u"=MATCH(2;{1;2;3};0)", false);
