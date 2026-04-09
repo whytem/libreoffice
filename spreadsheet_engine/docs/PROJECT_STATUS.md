@@ -224,6 +224,18 @@ The completed closeout set now also includes:
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md)
 
+The next evaluator pass is intentionally more ambitious:
+
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_PLAN.md)
+
+Its target is a real step-change in authoritative usage by combining:
+
+- `DATEVALUE` parity repair
+- residual lookup and `INDEX` hotspot cleanup
+- bounded live `XLOOKUP` promotion
+- wrapper-aware delegation for compound formulas around already-promoted
+  roots
+
 ## Current Opt-In Narrow Rollout Surface
 
 The admitted rollout surface currently includes:

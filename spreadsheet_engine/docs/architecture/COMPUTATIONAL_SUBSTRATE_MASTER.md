@@ -256,6 +256,19 @@ The completed closeout set now also includes:
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_EVIDENCE.md)
 
+The next evaluator authority-transfer wave is now:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_PLAN.md)
+
+That pass is intentionally broader than another cleanup-only cycle. Its
+target is a combined step-change wave:
+
+- bounded `DATEVALUE` mismatch repair
+- residual lookup-family and `INDEX` cleanup
+- bounded live `XLOOKUP` promotion
+- wrapper-aware delegation for compound formulas such as bounded
+  `IFERROR` / `IFNA` around promoted roots
+
 ## Current Admitted Authority And Rollout Slice
 
 The current opt-in narrow rollout surface includes:
