@@ -461,7 +461,53 @@ void assertComputationalStructuralApplied(
                   spreadsheetengine::compat::libreoffice::toLibreOfficeString(
                       oResult->maTransition.maReason),
                   RTL_TEXTENCODING_UTF8)
-                  .getStr(),
+                  .getStr()
+            + " queue="
+            + (oResult->moQueueComparison
+                   ? std::to_string(static_cast<int>(oResult->moQueueComparison->meKind))
+                   : std::string("none"))
+            + " comp_full="
+            + (oResult->moComputationalComparison
+                   ? (oResult->moComputationalComparison->mbFullMatch ? "1" : "0")
+                   : "none")
+            + " comp_cells="
+            + (oResult->moComputationalComparison
+                   ? (oResult->moComputationalComparison->mbCellPopulationMatch ? "1" : "0")
+                   : "none")
+            + " comp_tree="
+            + (oResult->moComputationalComparison
+                   ? (oResult->moComputationalComparison->mbFormulaTreeMatch ? "1" : "0")
+                   : "none")
+            + " comp_track="
+            + (oResult->moComputationalComparison
+                   ? (oResult->moComputationalComparison->mbFormulaTrackMatch ? "1" : "0")
+                   : "none")
+            + " comp_broadcasters="
+            + (oResult->moComputationalComparison
+                   ? (oResult->moComputationalComparison->mbBroadcasterMatch ? "1" : "0")
+                   : "none")
+            + " comp_groups="
+            + (oResult->moComputationalComparison
+                   ? (oResult->moComputationalComparison->mbGroupMatch ? "1" : "0")
+                   : "none")
+            + " comp_names="
+            + (oResult->moComputationalComparison
+                   ? (oResult->moComputationalComparison->mbNamedRangeMatch ? "1" : "0")
+                   : "none")
+            + " graph="
+            + (oResult->moGraphComparison
+                   ? std::to_string(static_cast<int>(oResult->moGraphComparison->meKind))
+                         + "/"
+                         + (oResult->moGraphComparison->mbFullMatch ? std::string("1")
+                                                                    : std::string("0"))
+                   : std::string("none"))
+            + " ir="
+            + (oResult->moIrComparison
+                   ? std::to_string(static_cast<int>(oResult->moIrComparison->meKind))
+                         + "/"
+                         + (oResult->moIrComparison->mbFullMatch ? std::string("1")
+                                                                 : std::string("0"))
+                   : std::string("none")),
         oResult->meKind == ComputationalStructuralResultKind::Applied
             || oResult->meKind == ComputationalStructuralResultKind::AppliedNormalizedEquivalent);
     CPPUNIT_ASSERT(oResult->moQueueComparison.has_value());
@@ -484,6 +530,16 @@ void assertComputationalStructuralAppliedExactly(
 {
     assertComputationalStructuralApplied(oResult, rDoc);
     CPPUNIT_ASSERT_EQUAL(ComputationalStructuralResultKind::Applied, oResult->meKind);
+}
+
+void assertComputationalStructuralAppliedFullyExact(
+    const std::optional<
+        spreadsheetengine::compat::libreoffice::substratestructural::StructuralResult>& oResult,
+    const ScDocument& rDoc)
+{
+    assertComputationalStructuralAppliedExactly(oResult, rDoc);
+    CPPUNIT_ASSERT(oResult->moIrComparison.has_value());
+    CPPUNIT_ASSERT_EQUAL(ExecutionIrComparisonKind::Exact, oResult->moIrComparison->meKind);
 }
 
 [[nodiscard]] std::string describeObjectRealizationObservation(
@@ -6881,16 +6937,189 @@ CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
 
     const auto oResult = aStructuralCapture.apply(*m_pDoc, translateInsertColumns(0, 0, 1));
 
-    CPPUNIT_ASSERT(oResult.has_value());
+    assertComputationalStructuralAppliedFullyExact(oResult, *m_pDoc);
     CPPUNIT_ASSERT_EQUAL(spreadsheetengine::detail::substrate::StructuralMutationClass::Admitted,
         oResult->maTransition.maContract.meMutationClass);
-    CPPUNIT_ASSERT(oResult->meKind
-        != ComputationalStructuralResultKind::RejectedOutOfContract);
-    CPPUNIT_ASSERT(oResult->meKind
-        != ComputationalStructuralResultKind::RejectedDirtyBaseline);
-    CPPUNIT_ASSERT(oResult->moQueueComparison.has_value());
-    CPPUNIT_ASSERT(oResult->moComputationalComparison.has_value());
-    CPPUNIT_ASSERT(oResult->moGraphComparison.has_value());
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalNarrowRolloutGlobalNamedRangeInsertRowExplicitSheetPrefixApplies)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateInsertRows;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", nullptr);
+    ScopedEnvironmentOverride aGlobalNamedRange(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_GLOBAL_NAMED_RANGE", "1");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetString(2, 0, 0, u"=SUM(Metrics)"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$Data.$A$1:$A$2"_ustr)));
+    m_pDoc->CalcAll();
+
+    const auto aStructuralCapture
+        = ScopedComputationalStructural::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aStructuralCapture.isCaptured());
+    CPPUNIT_ASSERT(aStructuralCapture.canApplyStructural());
+
+    m_pDoc->InsertRow(ScRange(0, 0, 0, m_pDoc->MaxCol(), 0, 0));
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(2, 1, 0) });
+
+    const auto oResult = aStructuralCapture.apply(*m_pDoc, translateInsertRows(0, 0, 1));
+
+    assertComputationalStructuralAppliedFullyExact(oResult, *m_pDoc);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::detail::substrate::StructuralMutationClass::Admitted,
+        oResult->maTransition.maContract.meMutationClass);
+    CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(2, 1, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalNarrowRolloutGlobalNamedRangeDeleteRowApplies)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateDeleteRows;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", nullptr);
+    ScopedEnvironmentOverride aGlobalNamedRange(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_GLOBAL_NAMED_RANGE", "1");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 5.0);
+    m_pDoc->SetValue(0, 1, 0, 10.0);
+    m_pDoc->SetValue(0, 2, 0, 20.0);
+    m_pDoc->SetString(2, 3, 0, u"=SUM(Metrics)"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$A$2:$A$3"_ustr)));
+    m_pDoc->CalcAll();
+
+    const auto aStructuralCapture
+        = ScopedComputationalStructural::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aStructuralCapture.isCaptured());
+    CPPUNIT_ASSERT(aStructuralCapture.canApplyStructural());
+
+    m_pDoc->DeleteRow(ScRange(0, 0, 0, m_pDoc->MaxCol(), 0, 0));
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(2, 2, 0) });
+
+    const auto oResult = aStructuralCapture.apply(*m_pDoc, translateDeleteRows(0, 0, 1));
+
+    assertComputationalStructuralAppliedFullyExact(oResult, *m_pDoc);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::detail::substrate::StructuralMutationClass::Admitted,
+        oResult->maTransition.maContract.meMutationClass);
+    CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(2, 2, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalNarrowRolloutGlobalNamedRangeDeleteRowResizeStaysDeferred)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateDeleteRows;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", nullptr);
+    ScopedEnvironmentOverride aGlobalNamedRange(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_GLOBAL_NAMED_RANGE", "1");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(0, 0, 0, 10.0);
+    m_pDoc->SetValue(0, 1, 0, 20.0);
+    m_pDoc->SetString(2, 2, 0, u"=SUM(Metrics)"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$A$1:$A$2"_ustr)));
+    m_pDoc->CalcAll();
+
+    const auto aStructuralCapture
+        = ScopedComputationalStructural::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aStructuralCapture.isCaptured());
+    CPPUNIT_ASSERT(aStructuralCapture.canApplyStructural());
+
+    m_pDoc->DeleteRow(ScRange(0, 0, 0, m_pDoc->MaxCol(), 0, 0));
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(2, 1, 0) });
+
+    const auto oResult = aStructuralCapture.apply(*m_pDoc, translateDeleteRows(0, 0, 1));
+
+    CPPUNIT_ASSERT(oResult.has_value());
+    CPPUNIT_ASSERT_EQUAL(
+        ComputationalStructuralResultKind::RejectedOutOfContract, oResult->meKind);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::detail::substrate::StructuralPilotVerdict::RejectedOutOfContract,
+        oResult->maTransition.meVerdict);
+    CPPUNIT_ASSERT(oResult->maTransition.maReason == u"structural_population_mismatch");
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestDependencyShadow,
+    testComputationalNarrowRolloutGlobalNamedRangeDeleteColumnApplies)
+{
+    using spreadsheetengine::compat::libreoffice::mutation::translateDeleteColumns;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_NARROW_ROLLOUT", "1");
+    ScopedEnvironmentOverride aAuthority(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_AUTHORITY", nullptr);
+    ScopedEnvironmentOverride aLifecycle(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_LIFECYCLE", nullptr);
+    ScopedEnvironmentOverride aStructural(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_STRUCTURAL", nullptr);
+    ScopedEnvironmentOverride aGlobalNamedRange(
+        "SPREADSHEET_ENGINE_COMPUTATIONAL_GLOBAL_NAMED_RANGE", "1");
+
+    m_pDoc->InsertTab(0, u"Data"_ustr);
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    m_pDoc->SetValue(1, 0, 0, 1.0);
+    m_pDoc->SetValue(1, 1, 0, 2.0);
+    m_pDoc->SetString(3, 0, 0, u"=SUM(Metrics)"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"Metrics"_ustr, u"$B$1:$B$2"_ustr)));
+    m_pDoc->CalcAll();
+
+    const auto aStructuralCapture
+        = ScopedComputationalStructural::captureIfRuntimeEnabled(*m_pDoc);
+    CPPUNIT_ASSERT(aStructuralCapture.isCaptured());
+    CPPUNIT_ASSERT(aStructuralCapture.canApplyStructural());
+
+    m_pDoc->DeleteCol(ScRange(0, 0, 0, 0, m_pDoc->MaxRow(), 0));
+    forceFormulaTreeOrder(*m_pDoc, { ScAddress(2, 0, 0) });
+
+    const auto oResult = aStructuralCapture.apply(*m_pDoc, translateDeleteColumns(0, 0, 1));
+
+    assertComputationalStructuralAppliedFullyExact(oResult, *m_pDoc);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::detail::substrate::StructuralMutationClass::Admitted,
+        oResult->maTransition.maContract.meMutationClass);
+    CPPUNIT_ASSERT(m_pDoc->GetFormulaCell(ScAddress(2, 0, 0)));
 
     m_pDoc->DeleteTab(0);
 }

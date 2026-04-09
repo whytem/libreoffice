@@ -1083,6 +1083,78 @@ int main()
         {
             InMemoryWorkbookFacade aBeforeFacade;
             aBeforeFacade.setGrammar(aFacade.getGrammar());
+            aBeforeFacade.setGeneration(75);
+            const auto nSheet = aBeforeFacade.addSheet(u"Pilot");
+            aBeforeFacade.setCell({ nSheet, 0, 0 }, CellValue::number(1.0));
+            aBeforeFacade.setCell({ nSheet, 0, 1 }, CellValue::number(2.0));
+            aBeforeFacade.setFormulaCell(
+                { nSheet, 2, 0 }, u"=SUM(Metrics)", CellValue::number(3.0));
+            aBeforeFacade.addNamedRange(
+                u"Metrics", std::nullopt, { nSheet, 0, 0 }, u"$Pilot.$A$1:$A$2");
+
+            ComputationalObservationState aBeforeObservation;
+            aBeforeObservation.maFormulaTree = { { nSheet, 2, 0 } };
+            aBeforeObservation.maAreaBroadcasters.push_back({
+                { { nSheet, 0, 0 }, { nSheet, 0, 1 } },
+                { { ListenerAnchorKind::FormulaCell, { nSheet, 2, 0 }, 1 } } });
+            const auto aBeforeShadow = buildComputationalWorkbookShadow(aBeforeFacade, aBeforeObservation);
+            const auto aBeforeGraph = buildDependencyGraphShadow(aBeforeShadow, aBeforeObservation);
+            const auto aBeforeIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aBeforeShadow, aBeforeFacade);
+
+            InMemoryWorkbookFacade aAfterFacade;
+            aAfterFacade.setGrammar(aBeforeFacade.getGrammar());
+            aAfterFacade.setGeneration(76);
+            aAfterFacade.addSheet(u"Pilot");
+            aAfterFacade.setCell({ nSheet, 0, 1 }, CellValue::number(1.0));
+            aAfterFacade.setCell({ nSheet, 0, 2 }, CellValue::number(2.0));
+            aAfterFacade.setFormulaCell(
+                { nSheet, 2, 1 }, u"=SUM(Metrics)", CellValue::number(3.0));
+            aAfterFacade.addNamedRange(
+                u"Metrics", std::nullopt, { nSheet, 0, 0 }, u"$Pilot.$A$2:$A$3");
+
+            ComputationalObservationState aAfterObservation;
+            aAfterObservation.maFormulaTree = { { nSheet, 2, 1 } };
+            aAfterObservation.maAreaBroadcasters.push_back({
+                { { nSheet, 0, 1 }, { nSheet, 0, 2 } },
+                { { ListenerAnchorKind::FormulaCell, { nSheet, 2, 1 }, 1 } } });
+            const auto aAfterShadow = buildComputationalWorkbookShadow(aAfterFacade, aAfterObservation);
+            const auto aAfterIr
+                = authoritybuilddetail::buildAuthorityExecutionIrShadow(aAfterShadow, aAfterFacade);
+
+            const auto aPredicted = structuralbuilddetail::buildPredictedStructuralComputationalShadow(
+                aBeforeShadow, MutationEvent::insertRows(nSheet, 0, 1), aAfterShadow);
+            if (aPredicted.maNamedRanges != aAfterShadow.maNamedRanges)
+            {
+                return fail("computational_substrate",
+                    "named-range insert-row explicit-sheet-prefix prediction mismatch");
+            }
+
+            StructuralPilotInput aStructuralInput;
+            aStructuralInput.maComputationalShadow = aBeforeShadow;
+            aStructuralInput.maGraphShadow = aBeforeGraph;
+            aStructuralInput.maIrShadow = aBeforeIr;
+            aStructuralInput.maObservedAfterComputationalShadow = aAfterShadow;
+            aStructuralInput.maObservedAfterIrShadow = aAfterIr;
+            aStructuralInput.maMutation = MutationEvent::insertRows(nSheet, 0, 1);
+            aStructuralInput.mbCleanBaseline = true;
+
+            const auto aAuthorityCandidate = buildStructuralPilotTransition(aStructuralInput,
+                aAfterFacade, aAfterObservation, StructuralPilotBuildMode::AuthorityOnly, true);
+            if (aAuthorityCandidate.meVerdict != StructuralPilotVerdict::Applicable
+                || aAuthorityCandidate.maContract.meMutationClass
+                       != StructuralMutationClass::Admitted
+                || aAuthorityCandidate.maSyncActions.size() != 1
+                || aAuthorityCandidate.maGraphAfter.getEdgeCount() < 1)
+            {
+                return fail("computational_substrate",
+                    "named-range insert-row authority candidate mismatch");
+            }
+        }
+
+        {
+            InMemoryWorkbookFacade aBeforeFacade;
+            aBeforeFacade.setGrammar(aFacade.getGrammar());
             aBeforeFacade.setGeneration(81);
             const auto nSheet = aBeforeFacade.addSheet(u"Pilot");
             aBeforeFacade.setCell({ nSheet, 0, 0 }, CellValue::number(1.0));

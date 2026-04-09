@@ -1296,19 +1296,28 @@ inline void overlayObservedCellPayloads(ComputationalWorkbookShadow& rPredicted,
 
     const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
         aTransition.maDependencySnapshot, aTransition.maRecalcPlan);
-    if (bSharedGroupStructuralCandidate)
+    ComputationalObservationState aStructuralObservation = aPredictedObservation;
+    if (bNamedRangeValidationSlice)
+    {
+        aStructuralObservation.maCellBroadcasters
+            = rInput.maObservedAfterComputationalShadow.maCellBroadcasters;
+        aStructuralObservation.maAreaBroadcasters
+            = rInput.maObservedAfterComputationalShadow.maAreaBroadcasters;
+    }
+
+    if (bSharedGroupStructuralCandidate || bNamedRangeValidationSlice)
     {
         aTransition.maComputationalAfter
             = structuralbuilddetail::applyObservationStateToStructuralShadow(
-                aPredictedComputational, aPredictedObservation);
+                aPredictedComputational, aStructuralObservation);
     }
     else
     {
         aTransition.maComputationalAfter
-            = buildComputationalWorkbookShadow(rAfterFacade, aPredictedObservation);
+            = buildComputationalWorkbookShadow(rAfterFacade, aStructuralObservation);
     }
     aTransition.maGraphAfter
-        = buildDependencyGraphShadow(aTransition.maComputationalAfter, aPredictedObservation);
+        = buildDependencyGraphShadow(aTransition.maComputationalAfter, aStructuralObservation);
     aTransition.meVerdict = StructuralPilotVerdict::Applicable;
     aTransition.maReason = u"ready";
     return aTransition;
