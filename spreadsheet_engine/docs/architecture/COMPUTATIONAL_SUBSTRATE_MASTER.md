@@ -281,16 +281,30 @@ The completed closeout set is now:
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_EVIDENCE.md)
 
-The next evaluator pass should now be narrower than that completed
-capability wave. Its main targets should be:
+The focused hotspot-conversion follow-on pass is now also complete.
 
-- retained `DATEVALUE` live-corpus mismatch reduction
-- residual `LOOKUP` unsupported-shape reduction
-- residual `LOOKUP` / `VLOOKUP` mismatch and host-surface cleanup
+The completed hotspot-conversion rerun freezes:
 
-That scoped next pass is now:
+- `interpret_tail_probe_formula_cells=1488`
+- `interpret_tail_authoritative_total=1156`
+- `interpret_tail_authoritative_fallback_total=332`
+- `interpret_tail_fallback_unsupported_formula_shape=241`
+- `interpret_tail_fallback_shadow_mismatch=72`
+- `interpret_tail_fallback_unsupported_host_surface=19`
+
+The important interpretation is:
+
+- the measured probe surface stayed flat
+- the same live seam now converts more of that surface authoritatively
+- `DATEVALUE` is no longer a dominant hotspot
+- the main remaining evaluator hotspot is now residual `LOOKUP`
+  unsupported-shape and scalar-projection mismatch fallout
+
+The completed closeout set now also includes:
 
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md)
 
 ## Current Admitted Authority And Rollout Slice
 
@@ -469,6 +483,9 @@ The completed evaluator closeouts are:
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_DECISION_RECORD.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_AUTHORITATIVE_USAGE_EVIDENCE.md)
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_CORPUS_COVERAGE_AND_MISMATCH_REDUCTION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md)
 
 ### Priority 2: Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
 
@@ -492,17 +509,17 @@ cluster.
   it now records real authoritative usage on the promoted families
 - that means the immediate live blocker has shifted from source bridging to
   semantic completion on the current cluster:
-  - unsupported promoted-family shapes
-  - retained shadow mismatches
-  - retained host-surface exclusions
+  - residual `LOOKUP` unsupported promoted-family shapes
+  - residual `LOOKUP` / `VLOOKUP` shadow mismatches
+  - residual lookup/index host-surface exclusions
 - but broader workbook-local evaluator surfaces still fall back to Calc
-- the current seam still excludes `XLOOKUP`, matrix/spill-returning
-  lookup/index shapes, multi-cell slice results, and broader external or
+- the current seam still excludes matrix/spill-returning lookup/index
+  shapes, multi-cell slice results, and broader external or
   environment-sensitive families
 
 If the program wants substantive authority relocation, the next work must
-first improve support and mismatch rates on the existing cluster, then extend
-evaluator breadth beyond it.
+first finish converting the remaining high-volume lookup-family hotspots on
+the existing cluster, then extend evaluator breadth beyond it.
 
 ### 2. Shared-Group-Sensitive Structural Behavior Outside The Bounded Slice
 

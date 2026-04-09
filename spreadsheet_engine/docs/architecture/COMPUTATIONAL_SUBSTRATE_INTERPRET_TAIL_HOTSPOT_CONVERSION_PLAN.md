@@ -1,6 +1,6 @@
 # Computational Substrate InterpretTail Hotspot Conversion Plan
 
-Status: active next-pass plan for the focused post-expansion
+Status: completed closeout for the focused post-expansion
 `InterpretTail -> engine` hotspot-conversion wave
 
 ## Purpose
@@ -276,6 +276,35 @@ Validation must include:
 - `spreadsheetengine_fods_evaluator_tests`
 - `spreadsheetengine_fods_replay_tests --summary --assert-zero-fallback`
 - `git diff --check`
+
+## Completed Outcome
+
+This pass completed with a mixed-result runtime closeout.
+
+The finished Calc-backed corpus rerun now freezes:
+
+- `interpret_tail_probe_formula_cells=1488`
+- `interpret_tail_authoritative_total=1156`
+- `interpret_tail_authoritative_fallback_total=332`
+- `interpret_tail_fallback_unsupported_formula_shape=241`
+- `interpret_tail_fallback_shadow_mismatch=72`
+- `interpret_tail_fallback_unsupported_host_surface=19`
+
+The important completed interpretation is:
+
+- the probe-covered surface did not grow beyond `1488`
+- authoritative routes rose materially from `1126` to `1156`
+- total fallback dropped from `362` to `332`
+- `DATEVALUE` mismatch stopped being a dominant hotspot, falling from `27`
+  shadow mismatches to `2`
+- total shadow mismatch dropped below the planned `75` bar
+- the biggest retained hotspot is now the same `LOOKUP` family, especially
+  the bounded `2D` data-only unsupported-shape and mismatch residue
+
+The closeout artifacts for this completed pass are:
+
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md)
 
 ## Deliverables
 

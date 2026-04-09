@@ -248,15 +248,31 @@ The completed closeout set is:
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_DECISION_RECORD.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_EVIDENCE.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AUTHORITATIVE_USAGE_EXPANSION_EVIDENCE.md)
 
-The next evaluator move should now be a hotspot-conversion pass focused on:
+That hotspot-conversion pass is now also complete.
 
-- retained `DATEVALUE` mismatch rows
-- residual `LOOKUP` unsupported-shape fallout
-- residual `LOOKUP` / `VLOOKUP` mismatch and host-surface cleanup
+The completed hotspot-conversion rerun freezes:
 
-That scoped next pass is now:
+- `interpret_tail_probe_formula_cells=1488`
+- `interpret_tail_authoritative_total=1156`
+- `interpret_tail_authoritative_fallback_total=332`
+- `interpret_tail_fallback_unsupported_formula_shape=241`
+- `interpret_tail_fallback_shadow_mismatch=72`
+- `interpret_tail_fallback_unsupported_host_surface=19`
+
+The important outcome is mixed but clearly better:
+
+- the measured probe surface stayed flat
+- authoritative usage rose again
+- total fallback and total shadow mismatch both moved down materially
+- `DATEVALUE` stopped being a dominant hotspot
+- the biggest retained hotspot is now residual `LOOKUP`
+  unsupported-shape and scalar-projection mismatch fallout
+
+The completed closeout set now also includes:
 
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_PLAN.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_DECISION_RECORD.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_HOTSPOT_CONVERSION_EVIDENCE.md)
 
 ## Current Opt-In Narrow Rollout Surface
 
