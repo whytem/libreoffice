@@ -572,6 +572,33 @@ std::size_t runSupportedInterpretTailProbe(
     return nProbeCount;
 }
 
+std::size_t runForcedInterpretObserveSurface(const Workbook& rWorkbook, ScDocument& rDoc)
+{
+    std::size_t nInterpretCount = 0;
+    for (std::size_t nSheet = 0; nSheet < rWorkbook.maSheets.size(); ++nSheet)
+    {
+        for (const auto& rEntry : rWorkbook.maSheets[nSheet].maCells)
+        {
+            const Cell& rCell = rEntry.second;
+            if (!rCell.hasFormula())
+                continue;
+
+            const ScAddress aPos(static_cast<SCCOL>(rEntry.first.first),
+                static_cast<SCROW>(rEntry.first.second), static_cast<SCTAB>(nSheet));
+            ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+            if (!pFormula)
+                continue;
+
+            pFormula->SetDirty();
+            (void)pFormula->Interpret();
+
+            ++nInterpretCount;
+        }
+    }
+
+    return nInterpretCount;
+}
+
 const char* functionKindName(FunctionKind eFunction)
 {
     switch (eFunction)
@@ -674,7 +701,8 @@ sal_uInt64 totalFallbackCount(const StatsSnapshot& rStats)
     return nTotal;
 }
 
-void printLiveRoutingStats(std::size_t nFormulaCellCount, const StatsSnapshot& rStats)
+void printRoutingStats(
+    std::string_view aPrefix, std::size_t nFormulaCellCount, const StatsSnapshot& rStats)
 {
     const sal_uInt64 nSupportedTotal
         = rStats.mnObserveCount + rStats.mnShadowCompareCount + rStats.mnAuthoritativeCount;
@@ -691,17 +719,28 @@ void printLiveRoutingStats(std::size_t nFormulaCellCount, const StatsSnapshot& r
                                     / static_cast<double>(nFormulaCellCount))
                                  : 0.0;
 
-    std::cout << "interpret_tail_live_formula_cells=" << nFormulaCellCount << '\n';
-    std::cout << "interpret_tail_live_supported_total=" << nSupportedTotal << '\n';
-    std::cout << "interpret_tail_live_fallback_total=" << nFallbackTotal << '\n';
-    std::cout << "interpret_tail_live_seen_total=" << nSeenTotal << '\n';
-    std::cout << "interpret_tail_live_unseen_formula_cells=" << nUnseenTotal << '\n';
+    std::cout << aPrefix << "_formula_cells=" << nFormulaCellCount << '\n';
+    std::cout << aPrefix << "_supported_total=" << nSupportedTotal << '\n';
+    std::cout << aPrefix << "_fallback_total=" << nFallbackTotal << '\n';
+    std::cout << aPrefix << "_seen_total=" << nSeenTotal << '\n';
+    std::cout << aPrefix << "_unseen_formula_cells=" << nUnseenTotal << '\n';
+
+    sal_uInt64 nPromotedFunctionSupported = 0;
+    for (std::size_t nIndex = static_cast<std::size_t>(FunctionKind::Value);
+         nIndex < static_cast<std::size_t>(FunctionKind::Count); ++nIndex)
+    {
+        nPromotedFunctionSupported += rStats.maFunctionObserveCount[nIndex]
+                                     + rStats.maFunctionShadowCompareCount[nIndex]
+                                     + rStats.maFunctionAuthoritativeCount[nIndex];
+    }
+    std::cout << aPrefix << "_promoted_function_supported_total="
+              << nPromotedFunctionSupported << '\n';
 
     const auto aOldFlags = std::cout.flags();
     const auto nOldPrecision = std::cout.precision();
     std::cout << std::fixed << std::setprecision(2);
-    std::cout << "interpret_tail_live_supported_rate=" << fSupportedRate << '\n';
-    std::cout << "interpret_tail_live_seen_rate=" << fSeenRate << '\n';
+    std::cout << aPrefix << "_supported_rate=" << fSupportedRate << '\n';
+    std::cout << aPrefix << "_seen_rate=" << fSeenRate << '\n';
     std::cout.flags(aOldFlags);
     std::cout.precision(nOldPrecision);
 
@@ -711,16 +750,16 @@ void printLiveRoutingStats(std::size_t nFormulaCellCount, const StatsSnapshot& r
         const sal_uInt64 nSupported = rStats.maFunctionObserveCount[nIndex]
                                       + rStats.maFunctionShadowCompareCount[nIndex]
                                       + rStats.maFunctionAuthoritativeCount[nIndex];
-        std::cout << "interpret_tail_live_function_" << functionKindName(eFunction)
+        std::cout << aPrefix << "_function_" << functionKindName(eFunction)
                   << "_supported=" << nSupported << '\n';
-        std::cout << "interpret_tail_live_function_" << functionKindName(eFunction)
+        std::cout << aPrefix << "_function_" << functionKindName(eFunction)
                   << "_fallback=" << rStats.maFunctionFallbackCount[nIndex] << '\n';
     }
 
     for (std::size_t nIndex = 0; nIndex < static_cast<std::size_t>(FallbackReason::Count); ++nIndex)
     {
         const auto eReason = static_cast<FallbackReason>(nIndex);
-        std::cout << "interpret_tail_live_fallback_reason_" << fallbackReasonName(eReason)
+        std::cout << aPrefix << "_fallback_reason_" << fallbackReasonName(eReason)
                   << "=" << rStats.maFallbackReasons[nIndex] << '\n';
     }
 }
@@ -946,12 +985,14 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     CPPUNIT_ASSERT_MESSAGE("replay corpus should not be empty", !aCorpus.empty());
 
     StatsSnapshot aLiveStats;
+    StatsSnapshot aForcedInterpretStats;
     StatsSnapshot aProbeStats;
     std::vector<DiagnosticSample> aLiveDiagnosticSamples;
     resetProbeDiagnosticSamples();
 
     std::size_t nWorkbookCount = 0;
     std::size_t nFormulaCellCount = 0;
+    std::size_t nForcedInterpretFormulaCount = 0;
     std::size_t nProbeFormulaCount = 0;
     for (const auto& rWorkbookPath : aCorpus)
     {
@@ -992,6 +1033,23 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
             }
 
             {
+                ScopedEnvironmentOverride aObserveMode(
+                    "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "observe");
+                spreadsheetengine::compat::libreoffice::interprettaileval::resetStats();
+                spreadsheetengine::compat::libreoffice::interprettaileval::setDiagnosticWorkbookLabel(
+                    OUString::fromUtf8(rWorkbookPath.string()));
+                sc::SetFormulaDirtyContext aDirtyCxt;
+                rDoc.SetAllFormulasDirty(aDirtyCxt);
+                nForcedInterpretFormulaCount += runForcedInterpretObserveSurface(aWorkbook, rDoc);
+                appendDiagnosticSamples(aLiveDiagnosticSamples,
+                    spreadsheetengine::compat::libreoffice::interprettaileval::getDiagnosticSamples());
+                spreadsheetengine::compat::libreoffice::interprettaileval::setDiagnosticWorkbookLabel(
+                    OUString());
+                accumulateStats(aForcedInterpretStats,
+                    spreadsheetengine::compat::libreoffice::interprettaileval::getStatsSnapshot());
+            }
+
+            {
                 ScopedEnvironmentOverride aProbeMode(
                     "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
                 spreadsheetengine::compat::libreoffice::interprettaileval::resetStats();
@@ -1010,7 +1068,9 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         ++nWorkbookCount;
     }
 
-    printLiveRoutingStats(nFormulaCellCount, aLiveStats);
+    printRoutingStats("interpret_tail_live", nFormulaCellCount, aLiveStats);
+    printRoutingStats("interpret_tail_forced_interpret", nForcedInterpretFormulaCount,
+        aForcedInterpretStats);
     printStats(nWorkbookCount, nFormulaCellCount, aProbeStats);
     std::cout << "interpret_tail_probe_formula_cells=" << nProbeFormulaCount << '\n';
     printDiagnosticSamples(aLiveDiagnosticSamples);
@@ -1019,6 +1079,9 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     CPPUNIT_ASSERT_EQUAL(aCorpus.size(), nWorkbookCount);
     CPPUNIT_ASSERT_MESSAGE("all-formula InterpretTail live observe should see at least one formula",
         aLiveStats.mnObserveCount + totalFallbackCount(aLiveStats) > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "full replay forced-interpret observe should touch every formula cell in the corpus",
+        nForcedInterpretFormulaCount == nFormulaCellCount);
     CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should visit at least one cell",
         nProbeFormulaCount > 0);
     CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should record authoritative usage",

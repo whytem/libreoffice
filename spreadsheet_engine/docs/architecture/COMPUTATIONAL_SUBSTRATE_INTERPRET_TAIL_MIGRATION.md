@@ -39,6 +39,9 @@ What is still not true:
 - the full replay corpus now shows material ambient live-seam traffic
 - most of that new ambient supported traffic is still root-error or bounded
   logical-literal traffic, not yet promoted-family function traffic
+- even the new full replay forced-interpret denominator still does not surface
+  promoted families live, which means the blocker is earlier than access
+  pattern alone
 
 ## Routing Modes
 
@@ -107,6 +110,7 @@ corpus after the completed ambient residual-blocker conversion slice:
 - `interpret_tail_live_fallback_total=0`
 - `interpret_tail_live_seen_total=606`
 - `interpret_tail_live_unseen_formula_cells=50055`
+- `interpret_tail_live_promoted_function_supported_total=0`
 - `interpret_tail_live_supported_rate=1.20`
 - `interpret_tail_live_seen_rate=1.20`
 
@@ -124,8 +128,30 @@ Interpretation:
   retained ambient fallback
 - the newly supported ambient traffic is still mostly root-error traffic plus
   bounded logical-literal traffic
-- the next value is increasing ambient promoted-family function routing, not
-  more cleanup of the old blocker tail
+- the ambient replay surface still does not include promoted-family function
+  traffic
+
+### Full Replay Corpus: Forced Interpret Observe
+
+This is the new full-corpus measurement after explicitly dirtying and forcing
+every replay formula cell through Calc's live `Interpret()` path:
+
+- `interpret_tail_forced_interpret_formula_cells=50661`
+- `interpret_tail_forced_interpret_supported_total=303`
+- `interpret_tail_forced_interpret_fallback_total=0`
+- `interpret_tail_forced_interpret_seen_total=303`
+- `interpret_tail_forced_interpret_unseen_formula_cells=50358`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=0`
+- `interpret_tail_forced_interpret_supported_rate=0.60`
+- `interpret_tail_forced_interpret_seen_rate=0.60`
+
+Interpretation:
+
+- the replay barrier is not just incidental getter access
+- even direct live interpretation on the replay corpus still fails to surface
+  promoted families
+- the next value is identifying the pre-tail live eligibility barrier, not
+  widening the evaluator family again
 
 ### Promoted-Family Probe
 
@@ -182,20 +208,17 @@ historical reference material, not active roadmap work.
 
 ## Current Next Target
 
-The completed ambient residual-blocker slice is recorded in:
+The latest replay reach closeout is recorded in:
 
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md)
 
-The next high-value pass should now focus on ambient promoted-family
-conversion:
+The next high-value pass should now focus on replay-corpus live eligibility:
 
-1. inventory the largest ambient replay-corpus formulas that still remain
-   unseen by the live seam
-2. move at least one real promoted-family function lane onto that ambient
-   surface
-3. raise ambient promoted-family routing without regressing current probe
-   quality bars
-4. only after that return to broader capability-family expansion
+1. inventory which promoted-family replay cells never become live seen
+2. compare probe addresses against ambient and forced-interpret seen addresses
+3. identify the dominant pre-tail barrier: dirty-state, shared-group entry, or
+   another live routing condition
+4. only after that return to ambient promoted-family conversion work
 
 ## Historical Archive
 

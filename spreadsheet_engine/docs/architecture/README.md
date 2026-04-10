@@ -13,9 +13,9 @@ This directory holds the active architecture references for
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md):
   rolling live evaluator migration ledger with the active family, current
   metrics, and current next target
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md):
-  completed residual-blocker slice that clears the ambient live fallback tail
-  on the full replay corpus
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md):
+  completed replay-reach diagnostic slice that proves the next blocker is
+  pre-tail live eligibility, not just access pattern
 - [../PROJECT_STATUS.md](../PROJECT_STATUS.md):
   concise project-wide status snapshot
 

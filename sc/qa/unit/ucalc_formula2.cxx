@@ -841,6 +841,63 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorObserveAndSha
             >= 1);
     }
 
+    {
+        ScCalcConfig aConfig = m_pDoc->GetCalcConfig();
+        aConfig.mnOpenCLMinimumFormulaGroupSize = 1;
+        m_pDoc->SetCalcConfig(aConfig);
+
+        for (SCROW nRow = 20; nRow < 60; ++nRow)
+            m_pDoc->SetValue(0, nRow, 0, static_cast<double>((nRow - 20) % 3 + 1));
+        m_pDoc->SetValue(1, 20, 0, 1.0);
+        m_pDoc->SetValue(1, 21, 0, 2.0);
+        m_pDoc->SetValue(1, 22, 0, 3.0);
+        m_pDoc->SetValue(2, 20, 0, 10.0);
+        m_pDoc->SetValue(2, 21, 0, 20.0);
+        m_pDoc->SetValue(2, 22, 0, 30.0);
+        for (SCROW nRow = 20; nRow < 60; ++nRow)
+            m_pDoc->SetString(3, nRow, 0, u"=LOOKUP(A21;$B$21:$B$23;$C$21:$C$23)"_ustr.replaceFirst(u"21"_ustr, OUString::number(nRow + 1)));
+        m_pDoc->CalcAll();
+
+        ScFormulaCell* pTop = m_pDoc->GetFormulaCell(ScAddress(3, 20, 0));
+        CPPUNIT_ASSERT(pTop);
+        CPPUNIT_ASSERT(pTop->IsSharedTop());
+        CPPUNIT_ASSERT(pTop->GetSharedLength() >= 20);
+
+        {
+            ScopedEnvironmentOverride aMode(
+                "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "observe");
+            setaileval::resetStats();
+
+            m_pDoc->SetValue(2, 20, 0, 15.0);
+            m_pDoc->CalcAll();
+
+            const auto aStats = setaileval::getStatsSnapshot();
+            CPPUNIT_ASSERT(
+                aStats.maFunctionObserveCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::Lookup)]
+                >= 20);
+        }
+
+        {
+            ScopedEnvironmentOverride aMode(
+                "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "shadow");
+            setaileval::resetStats();
+
+            m_pDoc->SetValue(2, 21, 0, 25.0);
+            m_pDoc->CalcAll();
+
+            const auto aStats = setaileval::getStatsSnapshot();
+            CPPUNIT_ASSERT(
+                aStats.maFunctionShadowCompareCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::Lookup)]
+                >= 20);
+            CPPUNIT_ASSERT_EQUAL(
+                static_cast<sal_uInt64>(0),
+                aStats.maMismatchReasons[static_cast<std::size_t>(
+                    setaileval::MismatchReason::Error)]);
+        }
+    }
+
     m_pDoc->DeleteTab(0);
 }
 

@@ -36,6 +36,7 @@ That splits into two tracks:
 - `interpret_tail_live_fallback_total=0`
 - `interpret_tail_live_seen_total=606`
 - `interpret_tail_live_unseen_formula_cells=50055`
+- `interpret_tail_live_promoted_function_supported_total=0`
 - `interpret_tail_live_supported_rate=1.20`
 - `interpret_tail_live_seen_rate=1.20`
 
@@ -44,6 +45,17 @@ Ambient live fallback reasons:
 - `unsupported_formula_shape=0`
 - `unsupported_function=0`
 - `parse_failure=0`
+
+### Full Replay Corpus: Forced Interpret Observe
+
+- `interpret_tail_forced_interpret_formula_cells=50661`
+- `interpret_tail_forced_interpret_supported_total=303`
+- `interpret_tail_forced_interpret_fallback_total=0`
+- `interpret_tail_forced_interpret_seen_total=303`
+- `interpret_tail_forced_interpret_unseen_formula_cells=50358`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=0`
+- `interpret_tail_forced_interpret_supported_rate=0.60`
+- `interpret_tail_forced_interpret_seen_rate=0.60`
 
 ### Promoted-Family Probe
 
@@ -83,6 +95,9 @@ Still not true:
 - full replay-corpus live traffic is now material, but most supported ambient
   traffic is still root-error or logical-literal traffic rather than promoted
   family function traffic
+- even the new full forced-interpret replay denominator still surfaces zero
+  promoted-family live traffic, which means the blocker is earlier than access
+  pattern alone
 
 ## Active Delegated Family
 
@@ -118,25 +133,23 @@ historical reference material, not active roadmap.
 
 ## Recommended Next Pass
 
-The next pass should prioritize ambient promoted-family conversion:
+The next pass should prioritize replay-corpus live eligibility:
 
-1. inventory the largest ambient replay-corpus formulas that still remain
-   unseen by the live seam
-2. move at least one real promoted-family function lane onto that ambient live
-   surface
-3. raise ambient promoted-family routing without regressing the current probe
-   quality bars
-4. only then widen to the next evaluator capability class
+1. inventory which promoted-family replay cells never become live seen
+2. compare probe addresses against ambient and forced-interpret seen addresses
+3. identify the dominant pre-tail barrier: dirty-state, shared-group entry, or
+   another live routing condition
+4. only then return to ambient promoted-family conversion work
 
-The completed residual-blocker closeout is:
+The latest replay reach closeout is:
 
-- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md)
 
 ## References
 
 - [architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md](architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md)
-- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md)
 - [archive/interpret_tail/](archive/interpret_tail/)
 - [archive/pre_pivot_substrate/](archive/pre_pivot_substrate/)

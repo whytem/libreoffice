@@ -78,6 +78,7 @@
 
 #include <memory>
 #include <map>
+#include <optional>
 
 using namespace formula;
 
@@ -1932,6 +1933,16 @@ bool ScFormulaCell::Interpret(SCROW nStartOffset, SCROW nEndOffset)
     return bGroupInterpreted;
 }
 
+namespace
+{
+namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+void recordInterpretTailShadowOutcome(const setaileval::EvaluationAttempt& rAttempt,
+    const sc::FormulaResultValue& rCalcValue,
+    std::optional<SvNumFormatType> oCalcFormatType = std::nullopt);
+
+} // namespace
+
 void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTailParameter eTailParam )
 {
     RecursionCounter aRecursionCounter( rDocument.GetRecursionHelper(), this);
@@ -2245,46 +2256,8 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
             && eEngineRolloutMode == setaileval::RolloutMode::ShadowCompare)
         {
             const ScFormulaResult aInterpreterResult(pInterpreter->GetResultToken().get());
-            const sc::FormulaResultValue aInterpreterValue = aInterpreterResult.GetResult();
-            const sc::FormulaResultValue aEngineValue
-                = spreadsheetengine::compat::libreoffice::toLibreOfficeFormulaResultValue(
-                    oEngineAttempt->maResult);
-
-            if (aInterpreterValue.meType != aEngineValue.meType)
-            {
-                setaileval::recordMismatch(setaileval::MismatchReason::ResultType);
-            }
-            else if (aEngineValue.meType == sc::FormulaResultValue::Error)
-            {
-                if (aInterpreterValue.mnError != aEngineValue.mnError)
-                    setaileval::recordMismatch(setaileval::MismatchReason::Error);
-                else
-                    setaileval::recordShadowMatch();
-            }
-            else if (aEngineValue.meType == sc::FormulaResultValue::Value
-                     && !rtl::math::approxEqual(
-                         aInterpreterValue.mfValue, aEngineValue.mfValue))
-            {
-                setaileval::recordMismatch(setaileval::MismatchReason::NumericValue);
-            }
-            else if (aEngineValue.meType == sc::FormulaResultValue::String
-                     && (aInterpreterValue.maString != aEngineValue.maString
-                         || aInterpreterValue.mbMultiLine != aEngineValue.mbMultiLine))
-            {
-                setaileval::recordMismatch(setaileval::MismatchReason::StringValue);
-            }
-            else if (aEngineValue.meType == sc::FormulaResultValue::Value
-                     && (oEngineAttempt->meFormatType == SvNumFormatType::DATE
-                         || oEngineAttempt->meFormatType == SvNumFormatType::TIME
-                         || oEngineAttempt->meFormatType == SvNumFormatType::DATETIME)
-                     && pInterpreter->GetRetFormatType() != oEngineAttempt->meFormatType)
-            {
-                setaileval::recordMismatch(setaileval::MismatchReason::FormatType);
-            }
-            else
-            {
-                setaileval::recordShadowMatch();
-            }
+            recordInterpretTailShadowOutcome(
+                *oEngineAttempt, aInterpreterResult.GetResult(), pInterpreter->GetRetFormatType());
         }
 
         if (rDocument.GetRecursionHelper().IsInReturn() && eTailParam != SCITP_CLOSE_ITERATION_CIRCLE)
@@ -4954,6 +4927,131 @@ struct ScDependantsCalculator
 
 } // anonymous namespace
 
+namespace
+{
+namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+setaileval::FunctionKind classifyDelegatedInterpretTailFunction(std::u16string_view rFormula)
+{
+    const auto aNormalized = setaileval::detail::normalizeFormulaSource(rFormula);
+    const auto aParse = spreadsheetengine::core::formula::parseFormula(aNormalized);
+    if (!aParse || !aParse.mpRoot)
+        return setaileval::FunctionKind::Unknown;
+
+    return setaileval::detail::classifyDelegatedFunctionNode(*aParse.mpRoot);
+}
+
+void recordInterpretTailShadowOutcome(const setaileval::EvaluationAttempt& rAttempt,
+    const sc::FormulaResultValue& rCalcValue, std::optional<SvNumFormatType> oCalcFormatType)
+{
+    const sc::FormulaResultValue aEngineValue
+        = spreadsheetengine::compat::libreoffice::toLibreOfficeFormulaResultValue(
+            rAttempt.maResult);
+
+    if (rCalcValue.meType != aEngineValue.meType)
+    {
+        setaileval::recordMismatch(setaileval::MismatchReason::ResultType);
+    }
+    else if (aEngineValue.meType == sc::FormulaResultValue::Error)
+    {
+        if (rCalcValue.mnError != aEngineValue.mnError)
+            setaileval::recordMismatch(setaileval::MismatchReason::Error);
+        else
+            setaileval::recordShadowMatch();
+    }
+    else if (aEngineValue.meType == sc::FormulaResultValue::Value
+             && !rtl::math::approxEqual(rCalcValue.mfValue, aEngineValue.mfValue))
+    {
+        setaileval::recordMismatch(setaileval::MismatchReason::NumericValue);
+    }
+    else if (aEngineValue.meType == sc::FormulaResultValue::String
+             && (rCalcValue.maString != aEngineValue.maString
+                 || rCalcValue.mbMultiLine != aEngineValue.mbMultiLine))
+    {
+        setaileval::recordMismatch(setaileval::MismatchReason::StringValue);
+    }
+    else if (aEngineValue.meType == sc::FormulaResultValue::Value
+             && (rAttempt.meFormatType == SvNumFormatType::DATE
+                 || rAttempt.meFormatType == SvNumFormatType::TIME
+                 || rAttempt.meFormatType == SvNumFormatType::DATETIME)
+             && oCalcFormatType && *oCalcFormatType != rAttempt.meFormatType)
+    {
+        setaileval::recordMismatch(setaileval::MismatchReason::FormatType);
+    }
+    else
+    {
+        setaileval::recordShadowMatch();
+    }
+}
+
+void maybeRecordFormulaGroupInterpretTailRouting(
+    ScDocument& rDocument, ScFormulaCell& rTopCell, SCROW nStartOffset, SCROW nEndOffset)
+{
+    const auto eRolloutMode = setaileval::resolveRolloutMode();
+    if (eRolloutMode != setaileval::RolloutMode::Observe
+        && eRolloutMode != setaileval::RolloutMode::ShadowCompare)
+    {
+        return;
+    }
+
+    if (!rTopCell.IsSharedTop())
+        return;
+
+    const SCROW nSharedLength = rTopCell.GetSharedLength();
+    if (nSharedLength <= 0)
+        return;
+
+    const SCROW nFirstOffset = std::max<SCROW>(0, nStartOffset);
+    const SCROW nLastOffset = std::min<SCROW>(nSharedLength - 1, nEndOffset);
+    if (nFirstOffset > nLastOffset)
+        return;
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDocument, rDocument.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    if (!pContext)
+        return;
+
+    ScAddress aCellPos(rTopCell.aPos);
+    for (SCROW nOffset = nFirstOffset; nOffset <= nLastOffset; ++nOffset)
+    {
+        aCellPos.SetRow(rTopCell.aPos.Row() + nOffset);
+        ScFormulaCell* pCell = rDocument.GetFormulaCell(aCellPos);
+        if (!pCell)
+            continue;
+
+        const OUString aFormulaSource
+            = pCell->GetFormula(FormulaGrammar::GRAM_ODFF, pContext);
+        const auto eDelegatedFunction = classifyDelegatedInterpretTailFunction(
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()));
+        if (eDelegatedFunction == setaileval::FunctionKind::Unknown)
+            continue;
+
+        auto aAttempt = setaileval::tryEvaluateFormula(
+            rDocument, *pContext, aCellPos,
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+            rDocument.GetCalcConfig().mbEmptyStringAsZero);
+        const auto eAttemptFunction
+            = aAttempt.meFunction != setaileval::FunctionKind::Unknown ? aAttempt.meFunction
+                                                                       : eDelegatedFunction;
+        if (!aAttempt.mbSupported)
+        {
+            setaileval::recordFallback(aAttempt.meFallbackReason, eAttemptFunction);
+            continue;
+        }
+
+        if (eRolloutMode == setaileval::RolloutMode::Observe)
+        {
+            setaileval::recordObserveSupport(aAttempt.meFunction);
+            continue;
+        }
+
+        setaileval::recordShadowCompareSupport(aAttempt.meFunction);
+        recordInterpretTailShadowOutcome(aAttempt, static_cast<const ScFormulaCell&>(*pCell).GetResult());
+    }
+}
+
+} // namespace
+
 bool ScFormulaCell::InterpretFormulaGroup(SCROW nStartOffset, SCROW nEndOffset)
 {
     if (!mxGroup || !pCode)
@@ -5377,6 +5475,21 @@ bool ScFormulaCell::InterpretFormulaGroupThreading(sc::FormulaLogger::GroupScope
             static_cast<SCROW>(aCompletionPlan.mnSpanLength), mxGroup->mpTopCell->aPos.Tab(),
             aInterpreters[0].get());
 
+        maybeRecordFormulaGroupInterpretTailRouting(rDocument, *mxGroup->mpTopCell, nStartOffset,
+            nEndOffset);
+        for (SCCOL nCurrCol = nColStart; nCurrCol <= nColEnd; ++nCurrCol)
+        {
+            if (nCurrCol == aPos.Col())
+                continue;
+
+            const auto it = aFGMap.find(nCurrCol);
+            if (it == aFGMap.end() || !it->second)
+                continue;
+
+            maybeRecordFormulaGroupInterpretTailRouting(
+                rDocument, *it->second, nStartOffset, nEndOffset);
+        }
+
         return true;
     }
 
@@ -5601,6 +5714,9 @@ bool ScFormulaCell::InterpretFormulaGroupOpenCL(sc::FormulaLogger::GroupScope& a
         mxGroup->mpTopCell->aPos = aOrigPos;
     if (aFinalizationPlan.mbSetGroupCalcEnabled)
         mxGroup->meCalcState = sc::GroupCalcEnabled;
+
+    maybeRecordFormulaGroupInterpretTailRouting(
+        rDocument, *mxGroup->mpTopCell, 0, mxGroup->mnLength - 1);
     return true;
 }
 

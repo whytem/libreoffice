@@ -40,6 +40,7 @@ delegation.”
 - `interpret_tail_live_fallback_total=0`
 - `interpret_tail_live_seen_total=606`
 - `interpret_tail_live_unseen_formula_cells=50055`
+- `interpret_tail_live_promoted_function_supported_total=0`
 - `interpret_tail_live_supported_rate=1.20`
 - `interpret_tail_live_seen_rate=1.20`
 
@@ -48,6 +49,17 @@ Dominant ambient fallback reasons:
 - `unsupported_formula_shape=0`
 - `unsupported_function=0`
 - `parse_failure=0`
+
+### Full Replay Corpus: Forced Interpret Observe
+
+- `interpret_tail_forced_interpret_formula_cells=50661`
+- `interpret_tail_forced_interpret_supported_total=303`
+- `interpret_tail_forced_interpret_fallback_total=0`
+- `interpret_tail_forced_interpret_seen_total=303`
+- `interpret_tail_forced_interpret_unseen_formula_cells=50358`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=0`
+- `interpret_tail_forced_interpret_supported_rate=0.60`
+- `interpret_tail_forced_interpret_seen_rate=0.60`
 
 ### Promoted-Family Probe
 
@@ -87,8 +99,8 @@ The strategy reset is recorded in
 [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md).
 The active current-state ledger is
 [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md).
-The completed ambient residual-blocker slice is recorded in
-[COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md).
+The latest replay reach closeout is recorded in
+[COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md).
 
 ## Engine-Owned Today
 
@@ -150,12 +162,16 @@ The highest-value remaining blockers are now:
 
 1. ambient live-routing reach:
    the full replay corpus now shows `606` seen formulas out of `50,661`, but
-   most newly supported traffic is still root-error or logical-literal traffic
-2. promoted-family residual parity:
+   promoted-family live traffic is still `0`
+2. replay-corpus pre-tail eligibility:
+   even the new full forced-interpret denominator still surfaces
+   `0` promoted-family live traffic, which points to a dirty-state, import, or
+   shared-group entry barrier before the evaluator seam
+3. promoted-family residual parity:
    `shadow_mismatch=69`
-3. promoted-family residual host access:
+4. promoted-family residual host access:
    `unsupported_host_surface=19`
-4. first real Calc-path retirement:
+5. first real Calc-path retirement:
    one family is hard-routed, but no `ScInterpreter` subroutine has been
    deleted yet
 
@@ -163,17 +179,15 @@ The highest-value remaining blockers are now:
 
 The next pass should:
 
-1. inventory the largest ambient replay-corpus formulas that still remain
-   unseen by the live seam
-2. move at least one real promoted-family function lane onto that ambient
-   surface
-3. raise ambient promoted-family routing without regressing current probe
-   quality
-4. only then expand to the next evaluator capability class
+1. inventory which promoted-family replay cells never become live seen
+2. compare probe addresses against ambient and forced-interpret seen addresses
+3. identify the dominant pre-tail barrier: dirty-state, shared-group entry, or
+   another live routing condition
+4. only then return to ambient promoted-family conversion work
 
 The latest completed closeout for this line is:
 
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md)
 
 ## Navigation
 
@@ -181,7 +195,7 @@ Use these documents in order:
 
 1. [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md)
 2. [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md)
-3. [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md)
+3. [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md)
 4. [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
 5. [../archive/interpret_tail/](../archive/interpret_tail/)
 6. [../archive/pre_pivot_substrate/](../archive/pre_pivot_substrate/)
