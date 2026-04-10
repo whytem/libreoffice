@@ -1122,6 +1122,11 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             u"=XLOOKUP(2;{1|2|3};INDEX({10;100|20;200|30;300};0;2))"_ustr);
         m_pDoc->SetString(23, 16, 0,
             u"=MATCH(200;INDEX({10;100|20;200|30;300};0;2);0)"_ustr);
+        m_pDoc->SetString(23, 17, 0, u"=LOOKUP(5;{1;2;3|4;5;6|7;8;9})"_ustr);
+        m_pDoc->SetString(23, 18, 0,
+            u"=LOOKUP(\"D\";{\"B\";\"C\";\"D\"};{\"X\"|\"Y\"|\"Z\"})"_ustr);
+        m_pDoc->SetString(23, 19, 0,
+            u"=LOOKUP(\"D\";{\"B\";\"C\";\"D\"};{\"X\";\"Y\"})"_ustr);
         m_pDoc->SetString(0, 23, 0, u"=INDEX(B24:C25;1)"_ustr);
         m_pDoc->SetString(0, 25, 0, u"=INDEX({1;2|3;4};0;2)"_ustr);
         m_pDoc->SetString(0, 26, 0, u"=XLOOKUP(2;B27:D27;B28:D29)"_ustr);
@@ -1151,18 +1156,21 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         ASSERT_DOUBLES_EQUAL(50.0, m_pDoc->GetValue(23, 14, 0));
         ASSERT_DOUBLES_EQUAL(200.0, m_pDoc->GetValue(23, 15, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(23, 16, 0));
+        ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(23, 17, 0));
+        CPPUNIT_ASSERT_EQUAL(u"Z"_ustr, m_pDoc->GetString(23, 18, 0));
+        CPPUNIT_ASSERT_EQUAL(FormulaError::NotAvailable, m_pDoc->GetErrCode(ScAddress(23, 19, 0)));
         ASSERT_DOUBLES_EQUAL(11.0, m_pDoc->GetValue(0, 23, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(0, 25, 0));
         CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(0, 26, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 14);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 17);
         CPPUNIT_ASSERT_EQUAL(
             static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Lookup)]
-            >= 1);
+            >= 5);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Match)]

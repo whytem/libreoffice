@@ -184,6 +184,10 @@ void maybeAddProbeDiagnosticSample(const OUString& rWorkbookLabel, const ScDocum
     if (!envEnabled("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_PROBE_DIAGNOSTICS"))
         return;
 
+    // Keep the limited probe diagnostic buffer focused on actionable rows.
+    if (rOutcome == u"authoritative")
+        return;
+
     auto& rSamples = probeDiagnosticSamples();
     std::size_t nLimit = 20;
     if (const char* pValue = std::getenv("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_PROBE_DIAGNOSTIC_LIMIT"))

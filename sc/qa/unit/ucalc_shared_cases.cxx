@@ -862,6 +862,35 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(
             aLookupArray.maResult.maString));
 
+    const auto aLookupArrayFormSquare = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0), u"=LOOKUP(5;{1;2;3|4;5;6|7;8;9})", false);
+    CPPUNIT_ASSERT(aLookupArrayFormSquare.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aLookupArrayFormSquare.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(6.0, aLookupArrayFormSquare.maResult.mfValue, 1e-12);
+
+    const auto aLookupDifferentDirectionVectors = setaileval::tryEvaluateFormula(*m_pDoc,
+        rContext, ScAddress(3, 8, 0), u"=LOOKUP(\"D\";{\"B\";\"C\";\"D\"};{\"X\"|\"Y\"|\"Z\"})",
+        false);
+    CPPUNIT_ASSERT(aLookupDifferentDirectionVectors.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aLookupDifferentDirectionVectors.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"Z"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aLookupDifferentDirectionVectors.maResult.maString));
+
+    const auto aLookupShortResultVector = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0),
+        u"=LOOKUP(\"D\";{\"B\";\"C\";\"D\"};{\"X\";\"Y\"})", false);
+    CPPUNIT_ASSERT(aLookupShortResultVector.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error,
+        aLookupShortResultVector.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::Error::NotAvailable,
+        aLookupShortResultVector.maResult.meError);
+
     const auto aLookupMatrixArithmetic = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(4, 11, 0), u"=LOOKUP(4;B12:D12*2;B13:D13/3)", false);
     CPPUNIT_ASSERT(aLookupMatrixArithmetic.mbSupported);

@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <optional>
 
 #include <address.hxx>
@@ -187,6 +188,69 @@ using spreadsheetengine::core::lookup::LookupMaterializer;
     return aInput;
 }
 
+[[nodiscard]] inline LookupInput buildLookupSliceInput(const LookupInput& rInput,
+    spreadsheetengine::api::MatrixCoordinate aStart,
+    const spreadsheetengine::api::MatrixDimensions& rDimensions)
+{
+    if (rInput.mbScalar)
+        return buildLookupScalarInput(rInput.maScalar);
+
+    LookupInput aInput;
+    aInput.mbScalar = false;
+    aInput.mnColumns = rDimensions.mnColumns;
+    aInput.mnRows = rDimensions.mnRows;
+
+    if (rInput.maValues.empty())
+    {
+        aInput.maReference.maRange = {
+            { rInput.maReference.maRange.maStart.mnColumn + aStart.mnColumn,
+              rInput.maReference.maRange.maStart.mnRow + aStart.mnRow,
+              rInput.maReference.maRange.maStart.mnSheet },
+            { rInput.maReference.maRange.maStart.mnColumn + aStart.mnColumn
+                  + rDimensions.mnColumns - 1,
+              rInput.maReference.maRange.maStart.mnRow + aStart.mnRow + rDimensions.mnRows - 1,
+              rInput.maReference.maRange.maStart.mnSheet }
+        };
+        return aInput;
+    }
+
+    aInput.maValues.reserve(static_cast<std::size_t>(rDimensions.mnColumns) * rDimensions.mnRows);
+    for (spreadsheetengine::api::MatrixSize nRow = 0; nRow < rDimensions.mnRows; ++nRow)
+    {
+        for (spreadsheetengine::api::MatrixSize nColumn = 0; nColumn < rDimensions.mnColumns;
+             ++nColumn)
+        {
+            const std::int64_t nLinearIndex
+                = static_cast<std::int64_t>(aStart.mnRow + nRow) * rInput.mnColumns
+                  + (aStart.mnColumn + nColumn);
+            aInput.maValues.push_back(
+                rInput.maValues[static_cast<std::size_t>(nLinearIndex)]);
+        }
+    }
+
+    return aInput;
+}
+
+[[nodiscard]] inline LookupInput buildLookupArrayFormVectorInput(const LookupInput& rInput,
+    spreadsheetengine::api::lookup::VectorOrientation eOrientation, bool bResultVector)
+{
+    if (rInput.mbScalar)
+        return buildLookupScalarInput(rInput.maScalar);
+
+    const spreadsheetengine::api::MatrixDimensions aDimensions { rInput.mnColumns, rInput.mnRows };
+    if (spreadsheetengine::api::lookup::detectVectorLayout(aDimensions))
+        return rInput;
+
+    if (eOrientation == spreadsheetengine::api::lookup::VectorOrientation::Column)
+    {
+        return buildLookupSliceInput(rInput,
+            { bResultVector ? aDimensions.mnColumns - 1 : 0, 0 }, { 1, aDimensions.mnRows });
+    }
+
+    return buildLookupSliceInput(rInput,
+        { 0, bResultVector ? aDimensions.mnRows - 1 : 0 }, { aDimensions.mnColumns, 1 });
+}
+
 class CalcLookupMaterializer final : public LookupMaterializer
 {
     DocumentEvaluationHost maHost;
@@ -287,6 +351,30 @@ makeCoordinateResult(const CalcLookupMaterializer& rMaterializer, const LookupIn
         rInput.maReference.maRange.maStart.mnRow + aCoordinate.mnRow,
         rInput.maReference.maRange.maStart.mnSheet);
     return spreadsheetengine::api::ValueResult<LookupExecutionResult>::success(aResult);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<LookupExecutionResult>
+makeVectorElementResult(const CalcLookupMaterializer& rMaterializer, const LookupInput& rInput,
+    const spreadsheetengine::api::lookup::VectorLayout& rLayout,
+    spreadsheetengine::api::MatrixSize nIndex)
+{
+    if (nIndex < 0 || nIndex >= rLayout.mnLength)
+    {
+        return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
+            spreadsheetengine::api::Error::NotAvailable);
+    }
+
+    const auto aCoordinate = spreadsheetengine::api::lookup::planVectorElement(
+        rLayout.meOrientation, nIndex, { rInput.mnColumns, rInput.mnRows });
+    if (!aCoordinate)
+    {
+        return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
+            aCoordinate.meError == spreadsheetengine::api::Error::IllegalArgument
+                ? spreadsheetengine::api::Error::NotAvailable
+                : aCoordinate.meError);
+    }
+
+    return makeCoordinateResult(rMaterializer, rInput, aCoordinate.maValue);
 }
 
 inline void putApiCellValue(
@@ -414,6 +502,31 @@ resolveLookupResult(const ScDocument& rDoc, ScInterpreterContext& rContext,
             aDataLayout.meError);
     }
 
+    LookupInput aSearchInput = rRequest.maDataInput;
+    LookupInput aDefaultResultInput = rRequest.maDataInput;
+    auto aSearchLayout = aDataLayout.maValue;
+    bool bArrayFormVectorized = false;
+    const spreadsheetengine::api::MatrixDimensions aDataDimensions {
+        rRequest.maDataInput.mnColumns, rRequest.maDataInput.mnRows
+    };
+    if (!rRequest.maDataInput.mbScalar && !rRequest.maDataInput.maValues.empty()
+        && !spreadsheetengine::api::lookup::detectVectorLayout(aDataDimensions))
+    {
+        bArrayFormVectorized = true;
+        aSearchInput = detail::buildLookupArrayFormVectorInput(
+            rRequest.maDataInput, aDataLayout.maValue.meOrientation, false);
+        aDefaultResultInput = detail::buildLookupArrayFormVectorInput(
+            rRequest.maDataInput, aDataLayout.maValue.meOrientation, true);
+        const auto aSearchVectorLayout = spreadsheetengine::api::lookup::detectVectorLayout(
+            { aSearchInput.mnColumns, aSearchInput.mnRows });
+        if (!aSearchVectorLayout)
+        {
+            return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
+                aSearchVectorLayout.meError);
+        }
+        aSearchLayout = aSearchVectorLayout.maValue;
+    }
+
     const detail::CalcLookupMaterializer aMaterializer(rDoc, rContext);
     std::optional<spreadsheetengine::api::lookup::VectorLayout> oResultLayout;
     if (rRequest.moResultInput)
@@ -434,13 +547,12 @@ resolveLookupResult(const ScDocument& rDoc, ScInterpreterContext& rContext,
     }
 
     const auto aResolvedIndex = spreadsheetengine::core::lookup::resolveLookupIndex(
-        aMaterializer, rRequest.maLookupValue, rRequest.maDataInput, rRequest.meSearchType);
+        aMaterializer, rRequest.maLookupValue, aSearchInput, rRequest.meSearchType);
     if (!aResolvedIndex)
         return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(aResolvedIndex.meError);
 
     const auto aMatchedSearchValue = spreadsheetengine::core::lookup::materializeLookupInputValue(
-        aMaterializer, rRequest.maDataInput, aDataLayout.maValue.meOrientation,
-        aResolvedIndex.maValue);
+        aMaterializer, aSearchInput, aSearchLayout.meOrientation, aResolvedIndex.maValue);
     if (!aMatchedSearchValue)
     {
         return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
@@ -466,17 +578,28 @@ resolveLookupResult(const ScDocument& rDoc, ScInterpreterContext& rContext,
             return spreadsheetengine::api::ValueResult<LookupExecutionResult>::success(
                 detail::makeScalarResult(rRequest.moResultInput->maScalar));
         }
+        return detail::makeVectorElementResult(
+            aMaterializer, *rRequest.moResultInput, *oResultLayout, aResolvedIndex.maValue);
+    }
 
-        const auto aCoordinate = spreadsheetengine::api::lookup::planVectorElement(
-            oResultLayout->meOrientation, aResolvedIndex.maValue,
-            { rRequest.moResultInput->mnColumns, rRequest.moResultInput->mnRows });
-        if (!aCoordinate)
+    if (bArrayFormVectorized)
+    {
+        if (aDefaultResultInput.mbScalar)
+        {
+            return spreadsheetengine::api::ValueResult<LookupExecutionResult>::success(
+                detail::makeScalarResult(aDefaultResultInput.maScalar));
+        }
+
+        const auto aDefaultResultLayout = spreadsheetengine::api::lookup::detectVectorLayout(
+            { aDefaultResultInput.mnColumns, aDefaultResultInput.mnRows });
+        if (!aDefaultResultLayout)
         {
             return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
-                aCoordinate.meError);
+                aDefaultResultLayout.meError);
         }
-        return detail::makeCoordinateResult(aMaterializer, *rRequest.moResultInput,
-            aCoordinate.maValue);
+
+        return detail::makeVectorElementResult(aMaterializer, aDefaultResultInput,
+            aDefaultResultLayout.maValue, aResolvedIndex.maValue);
     }
 
     if (rRequest.maDataInput.mbScalar)
@@ -485,21 +608,26 @@ resolveLookupResult(const ScDocument& rDoc, ScInterpreterContext& rContext,
             detail::makeScalarResult(rRequest.maDataInput.maScalar));
     }
 
-    const spreadsheetengine::api::MatrixDimensions aDimensions {
-        rRequest.maDataInput.mnColumns, rRequest.maDataInput.mnRows
-    };
+    if (const auto aVectorLayout
+        = spreadsheetengine::api::lookup::detectVectorLayout(aDataDimensions))
+    {
+        return detail::makeVectorElementResult(
+            aMaterializer, rRequest.maDataInput, aVectorLayout.maValue, aResolvedIndex.maValue);
+    }
+
     const spreadsheetengine::api::MatrixSize nResultIndex
         = aDataLayout.maValue.meOrientation
               == spreadsheetengine::api::lookup::VectorOrientation::Column
-              ? aDimensions.mnColumns - 1
-              : aDimensions.mnRows - 1;
+              ? aDataDimensions.mnColumns - 1
+              : aDataDimensions.mnRows - 1;
     const auto aCoordinate = spreadsheetengine::api::lookup::planTabularLookupResult(
-        aDataLayout.maValue.meOrientation, aResolvedIndex.maValue, nResultIndex, aDimensions);
+        aDataLayout.maValue.meOrientation, aResolvedIndex.maValue, nResultIndex, aDataDimensions);
     if (!aCoordinate)
     {
         return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
             aCoordinate.meError);
     }
+
     return detail::makeCoordinateResult(aMaterializer, rRequest.maDataInput, aCoordinate.maValue);
 }
 
