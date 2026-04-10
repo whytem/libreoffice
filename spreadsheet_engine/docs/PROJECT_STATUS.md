@@ -32,30 +32,30 @@ That splits into two tracks:
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=606`
-- `interpret_tail_live_fallback_total=0`
-- `interpret_tail_live_seen_total=606`
-- `interpret_tail_live_unseen_formula_cells=50055`
-- `interpret_tail_live_promoted_function_supported_total=0`
-- `interpret_tail_live_supported_rate=1.20`
-- `interpret_tail_live_seen_rate=1.20`
+- `interpret_tail_live_supported_total=4136`
+- `interpret_tail_live_fallback_total=90`
+- `interpret_tail_live_seen_total=4226`
+- `interpret_tail_live_unseen_formula_cells=46435`
+- `interpret_tail_live_promoted_function_supported_total=2886`
+- `interpret_tail_live_supported_rate=8.16`
+- `interpret_tail_live_seen_rate=8.34`
 
 Ambient live fallback reasons:
 
-- `unsupported_formula_shape=0`
-- `unsupported_function=0`
+- `unsupported_formula_shape=52`
+- `unsupported_host_surface=38`
 - `parse_failure=0`
 
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=303`
-- `interpret_tail_forced_interpret_fallback_total=0`
-- `interpret_tail_forced_interpret_seen_total=303`
-- `interpret_tail_forced_interpret_unseen_formula_cells=50358`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=0`
-- `interpret_tail_forced_interpret_supported_rate=0.60`
-- `interpret_tail_forced_interpret_seen_rate=0.60`
+- `interpret_tail_forced_interpret_supported_total=2068`
+- `interpret_tail_forced_interpret_fallback_total=45`
+- `interpret_tail_forced_interpret_seen_total=2113`
+- `interpret_tail_forced_interpret_unseen_formula_cells=48548`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=1443`
+- `interpret_tail_forced_interpret_supported_rate=4.08`
+- `interpret_tail_forced_interpret_seen_rate=4.17`
 
 ### Promoted-Family Probe
 
@@ -73,12 +73,14 @@ Promoted-family fallback reasons:
 ### Promoted Replay Eligibility Inventory
 
 - `interpret_tail_replay_promoted_formula_cells=1812`
-- `interpret_tail_replay_promoted_direct_seen=2`
-- `interpret_tail_replay_promoted_direct_unseen=1810`
+- `interpret_tail_replay_promoted_direct_seen=1812`
+- `interpret_tail_replay_promoted_direct_supported=1767`
+- `interpret_tail_replay_promoted_direct_fallback=45`
+- `interpret_tail_replay_promoted_direct_unseen=0`
 - `interpret_tail_replay_promoted_shared_formula_cells=395`
 - `interpret_tail_replay_promoted_non_shared_formula_cells=1417`
-- `interpret_tail_replay_promoted_unseen_shared_member=312`
-- `interpret_tail_replay_promoted_unseen_non_shared=1415`
+- `interpret_tail_replay_promoted_unseen_shared_member=0`
+- `interpret_tail_replay_promoted_unseen_non_shared=0`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
 - `interpret_tail_replay_promoted_needs_interpret_after_dirty=1812`
 - `interpret_tail_replay_promoted_dirty_after_interpret=0`
@@ -106,12 +108,10 @@ Still not true:
 - no broad default-on rollout exists
 - no `ScInterpreter` subroutine has been deleted yet
 - full replay-corpus live traffic is now material, but most supported ambient
-  traffic is still root-error or logical-literal traffic rather than promoted
-  family function traffic
-- even the new full forced-interpret replay denominator still surfaces zero
-  promoted-family live traffic, and the replay eligibility inventory now shows
-  that the blocker is dominated by a non-shared pre-tail replay path rather
-  than shared entry or dirty-state
+  traffic still covers only a bounded minority of formulas
+- the replay-promoted reach blocker is cleared, but replay-imported promoted
+  formulas still retain `unsupported_formula_shape` and
+  `unsupported_host_surface` fallback
 
 ## Active Delegated Family
 
@@ -147,16 +147,13 @@ historical reference material, not active roadmap.
 
 ## Recommended Next Pass
 
-The next pass should target the non-shared replay barrier directly:
+The next pass should target replay-imported promoted fallback conversion:
 
-1. instrument the replay path between `Interpret()` entry and
-   `InterpretTail` reach for promoted non-shared formulas
-2. compare replay-imported promoted formulas with curated probe formulas at the
-   token or code-path level
-3. convert the dominant non-shared replay families first:
-   `LOOKUP`, `VLOOKUP`, and promoted logical constants
-4. revisit shared-group replay work only if the non-shared barrier stops
-   dominating
+1. reduce replay-live `unsupported_formula_shape`
+2. reduce replay-live `unsupported_host_surface`
+3. prioritize retained replay-imported families by ambient impact:
+   `VLOOKUP`, `XLOOKUP`, `MATCH`, `XMATCH`, `INDEX`, and bounded `VALUE`
+4. only return to broader reach work if the promoted replay surface regresses
 
 ## References
 

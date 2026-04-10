@@ -31,18 +31,20 @@ Today:
   Calc path
 - one tiny family is now engine-first even with rollout set to `off`:
   literal-only `NUMBERVALUE`
+- replay-imported promoted formulas now reach the live seam on both the
+  ambient and forced-interpret replay surfaces through a bounded pre-RPN
+  observe bridge
 
 What is still not true:
 
 - no broad default-on production rollout exists
 - no `ScInterpreter` subroutine has been deleted yet
 - the full replay corpus now shows material ambient live-seam traffic
-- most of that new ambient supported traffic is still root-error or bounded
-  logical-literal traffic, not yet promoted-family function traffic
-- even the new full replay forced-interpret denominator still does not surface
-  promoted families live, and the new replay eligibility inventory shows the
-  dominant blocker is a non-shared pre-tail replay path rather than
-  shared-group entry
+- the full replay corpus still reaches only a bounded minority of formulas
+- residual replay-live fallback is now concentrated in promoted-family
+  `unsupported_formula_shape` and `unsupported_host_surface`
+- no promoted family has moved from observe-only replay reach into a broader
+  replay authority lane yet
 
 ## Routing Modes
 
@@ -107,30 +109,30 @@ This is the honest all-formula live-routing surface from the standing replay
 corpus after the completed ambient residual-blocker conversion slice:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=606`
-- `interpret_tail_live_fallback_total=0`
-- `interpret_tail_live_seen_total=606`
-- `interpret_tail_live_unseen_formula_cells=50055`
-- `interpret_tail_live_promoted_function_supported_total=0`
-- `interpret_tail_live_supported_rate=1.20`
-- `interpret_tail_live_seen_rate=1.20`
+- `interpret_tail_live_supported_total=4136`
+- `interpret_tail_live_fallback_total=90`
+- `interpret_tail_live_seen_total=4226`
+- `interpret_tail_live_unseen_formula_cells=46435`
+- `interpret_tail_live_promoted_function_supported_total=2886`
+- `interpret_tail_live_supported_rate=8.16`
+- `interpret_tail_live_seen_rate=8.34`
 
 Current ambient fallback reasons:
 
-- `unsupported_formula_shape=0`
-- `unsupported_function=0`
+- `unsupported_formula_shape=52`
+- `unsupported_host_surface=38`
 - `parse_failure=0`
 
 Interpretation:
 
 - the seam now measures the full replay corpus
 - the ambient live-routing denominator is real, not curated
-- the full replay corpus now reaches the seam materially and clears with zero
-  retained ambient fallback
-- the newly supported ambient traffic is still mostly root-error traffic plus
-  bounded logical-literal traffic
-- the ambient replay surface still does not include promoted-family function
+- the ambient replay surface now includes material promoted-family function
   traffic
+- the pre-RPN observe bridge converted the replay-promoted reach problem into a
+  residual family-fallback problem
+- the main remaining ambient replay work is no longer “find the seam”; it is
+  cleanup inside already-promoted families
 
 ### Full Replay Corpus: Forced Interpret Observe
 
@@ -138,21 +140,22 @@ This is the new full-corpus measurement after explicitly dirtying and forcing
 every replay formula cell through Calc's live `Interpret()` path:
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=303`
-- `interpret_tail_forced_interpret_fallback_total=0`
-- `interpret_tail_forced_interpret_seen_total=303`
-- `interpret_tail_forced_interpret_unseen_formula_cells=50358`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=0`
-- `interpret_tail_forced_interpret_supported_rate=0.60`
-- `interpret_tail_forced_interpret_seen_rate=0.60`
+- `interpret_tail_forced_interpret_supported_total=2068`
+- `interpret_tail_forced_interpret_fallback_total=45`
+- `interpret_tail_forced_interpret_seen_total=2113`
+- `interpret_tail_forced_interpret_unseen_formula_cells=48548`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=1443`
+- `interpret_tail_forced_interpret_supported_rate=4.08`
+- `interpret_tail_forced_interpret_seen_rate=4.17`
 
 Interpretation:
 
-- the replay barrier is not just incidental getter access
-- even direct live interpretation on the replay corpus still fails to surface
-  promoted families
-- the next value is identifying the pre-tail live eligibility barrier, not
-  widening the evaluator family again
+- the replay barrier is no longer “promoted families never reach live
+  interpretation”
+- forced interpret now shows real promoted-family reach on replay-imported
+  formulas
+- the remaining replay blocker is now residual fallback cleanup on that
+  imported surface, not pre-tail eligibility
 
 ### Promoted-Family Probe
 
@@ -184,27 +187,31 @@ surface after forcing each promoted replay formula through direct live
 `Interpret()`:
 
 - `interpret_tail_replay_promoted_formula_cells=1812`
-- `interpret_tail_replay_promoted_direct_seen=2`
-- `interpret_tail_replay_promoted_direct_unseen=1810`
+- `interpret_tail_replay_promoted_direct_seen=1812`
+- `interpret_tail_replay_promoted_direct_supported=1767`
+- `interpret_tail_replay_promoted_direct_fallback=45`
+- `interpret_tail_replay_promoted_direct_unseen=0`
 - `interpret_tail_replay_promoted_shared_formula_cells=395`
 - `interpret_tail_replay_promoted_shared_top_formula_cells=83`
 - `interpret_tail_replay_promoted_shared_member_formula_cells=312`
 - `interpret_tail_replay_promoted_non_shared_formula_cells=1417`
-- `interpret_tail_replay_promoted_unseen_shared_top=83`
-- `interpret_tail_replay_promoted_unseen_shared_member=312`
-- `interpret_tail_replay_promoted_unseen_non_shared=1415`
+- `interpret_tail_replay_promoted_unseen_shared_top=0`
+- `interpret_tail_replay_promoted_unseen_shared_member=0`
+- `interpret_tail_replay_promoted_unseen_non_shared=0`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
 - `interpret_tail_replay_promoted_needs_interpret_after_dirty=1812`
 - `interpret_tail_replay_promoted_dirty_after_interpret=0`
 
 Interpretation:
 
-- the blocker is not “cell never becomes dirty enough to interpret”
-- the blocker is not primarily shared-group top entry
-- the dominant missed surface is non-shared promoted replay formulas
-- the next migration value is now instrumenting or converting the replay path
-  between `Interpret()` entry and `InterpretTail` reach for non-shared imported
-  formulas
+- the pre-tail replay eligibility blocker is cleared for the promoted replay
+  surface
+- both shared and non-shared promoted replay formulas now reach the live seam
+- the residual replay work is now the `45` direct fallback cells on this
+  imported promoted-family surface
+- the dominant next targets are the replay-imported promoted families with
+  retained live fallback: `VLOOKUP`, `XLOOKUP`, `MATCH`, `XMATCH`, `INDEX`,
+  and bounded `VALUE`
 
 ## Hard-Routed Family
 
@@ -240,16 +247,14 @@ historical reference material, not active roadmap work.
 
 The latest replay closeout is now folded into this migration ledger.
 
-The next high-value pass should now focus on the non-shared replay barrier:
+The next high-value pass should now focus on replay-imported promoted fallback
+conversion:
 
-1. instrument the pre-tail replay path for promoted non-shared formulas between
-   `Interpret()` entry and `InterpretTail` reach
-2. compare replay-imported promoted formulas against curated probe formulas at
-   the token or code-path level
-3. target the dominant non-shared replay families first:
-   `LOOKUP`, `VLOOKUP`, and promoted logical constants
-4. only return to shared-group replay work if the non-shared barrier stops
-   dominating
+1. reduce replay-live `unsupported_formula_shape` on promoted families
+2. reduce replay-live `unsupported_host_surface` on promoted families
+3. prioritize the retained replay-imported families by ambient impact:
+   `VLOOKUP`, `XLOOKUP`, `MATCH`, `XMATCH`, `INDEX`, and bounded `VALUE`
+4. only return to broader reach work if the promoted replay surface regresses
 
 ## Historical Archive
 

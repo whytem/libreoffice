@@ -36,30 +36,30 @@ delegation.”
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=606`
-- `interpret_tail_live_fallback_total=0`
-- `interpret_tail_live_seen_total=606`
-- `interpret_tail_live_unseen_formula_cells=50055`
-- `interpret_tail_live_promoted_function_supported_total=0`
-- `interpret_tail_live_supported_rate=1.20`
-- `interpret_tail_live_seen_rate=1.20`
+- `interpret_tail_live_supported_total=4136`
+- `interpret_tail_live_fallback_total=90`
+- `interpret_tail_live_seen_total=4226`
+- `interpret_tail_live_unseen_formula_cells=46435`
+- `interpret_tail_live_promoted_function_supported_total=2886`
+- `interpret_tail_live_supported_rate=8.16`
+- `interpret_tail_live_seen_rate=8.34`
 
 Dominant ambient fallback reasons:
 
-- `unsupported_formula_shape=0`
-- `unsupported_function=0`
+- `unsupported_formula_shape=52`
+- `unsupported_host_surface=38`
 - `parse_failure=0`
 
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=303`
-- `interpret_tail_forced_interpret_fallback_total=0`
-- `interpret_tail_forced_interpret_seen_total=303`
-- `interpret_tail_forced_interpret_unseen_formula_cells=50358`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=0`
-- `interpret_tail_forced_interpret_supported_rate=0.60`
-- `interpret_tail_forced_interpret_seen_rate=0.60`
+- `interpret_tail_forced_interpret_supported_total=2068`
+- `interpret_tail_forced_interpret_fallback_total=45`
+- `interpret_tail_forced_interpret_seen_total=2113`
+- `interpret_tail_forced_interpret_unseen_formula_cells=48548`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=1443`
+- `interpret_tail_forced_interpret_supported_rate=4.08`
+- `interpret_tail_forced_interpret_seen_rate=4.17`
 
 ### Promoted-Family Probe
 
@@ -160,17 +160,16 @@ remain archived reference material only.
 The highest-value remaining blockers are now:
 
 1. ambient live-routing reach:
-   the full replay corpus now shows `606` seen formulas out of `50,661`, but
-   promoted-family live traffic is still `0`
+   the full replay corpus now shows `4,226` seen formulas out of `50,661`, with
+   `2,886` promoted-family live supported routes
 2. replay-corpus pre-tail eligibility:
-   even the new full forced-interpret denominator still surfaces
-   `0` promoted-family live traffic, and the new replay inventory shows that
-   `1,415` of the `1,810` direct-unseen promoted replay cells are non-shared
-   while shared-member top replay still surfaces `0` extra seen cells
+   the reach blocker is cleared for promoted replay formulas, but the replay
+   imported surface still retains `45` direct promoted fallback cells and
+   ambient replay still covers only a bounded minority of formulas
 3. promoted-family residual parity:
    `shadow_mismatch=69`
 4. promoted-family residual host access:
-   `unsupported_host_surface=19`
+   replay-live `unsupported_host_surface=38`
 5. first real Calc-path retirement:
    one family is hard-routed, but no `ScInterpreter` subroutine has been
    deleted yet
@@ -179,14 +178,12 @@ The highest-value remaining blockers are now:
 
 The next pass should:
 
-1. instrument the replay path between `Interpret()` entry and
-   `InterpretTail` reach for promoted non-shared formulas
-2. compare replay-imported promoted formulas against curated probe formulas at
-   the token or code-path level
-3. target the dominant non-shared replay families first:
-   `LOOKUP`, `VLOOKUP`, and promoted logical constants
-4. only revisit shared-group replay work if the non-shared barrier stops
-   dominating
+1. reduce replay-live `unsupported_formula_shape`
+2. reduce replay-live `unsupported_host_surface`
+3. prioritize retained replay-imported families by ambient impact:
+   `VLOOKUP`, `XLOOKUP`, `MATCH`, `XMATCH`, `INDEX`, and bounded `VALUE`
+4. move the first replay-imported promoted family from observe-only reach
+   toward a broader authority candidate once fallback shrinks materially
 
 ## Navigation
 

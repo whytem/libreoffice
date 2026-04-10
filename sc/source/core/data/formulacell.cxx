@@ -1941,6 +1941,8 @@ void recordInterpretTailShadowOutcome(const setaileval::EvaluationAttempt& rAtte
     const sc::FormulaResultValue& rCalcValue,
     std::optional<SvNumFormatType> oCalcFormatType = std::nullopt);
 
+setaileval::FunctionKind classifyDelegatedInterpretTailFunction(std::u16string_view rFormula);
+
 } // namespace
 
 void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTailParameter eTailParam )
@@ -1949,6 +1951,54 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
     // TODO If this cell is not an iteration cell, add it to the list of iteration cells?
     if(bIsIterCell)
         nSeenInIteration = rDocument.GetRecursionHelper().GetIteration();
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    const auto eEngineRolloutMode = setaileval::resolveRolloutMode();
+    OUString aEngineFormulaSource;
+    bool bEngineFormulaSourceLoaded = false;
+    const auto getEngineFormulaSource = [&]() -> const OUString& {
+        if (!bEngineFormulaSourceLoaded)
+        {
+            aEngineFormulaSource = GetFormula(FormulaGrammar::GRAM_ODFF, &rContext);
+            bEngineFormulaSourceLoaded = true;
+        }
+        return aEngineFormulaSource;
+    };
+    const bool bTailEligible = eTailParam == SCITP_NORMAL && !bIsIterCell
+                               && cMatrixFlag == ScMatrixMode::NONE && !pCode->IsHyperLink()
+                               && !rContext.pInterpreter
+                               && !rDocument.IsThreadedGroupCalcInProgress();
+    const bool bHardRoutedEngineFamily
+        = bTailEligible
+          && setaileval::isHardRoutedFormula(std::u16string_view(
+              getEngineFormulaSource().getStr(), getEngineFormulaSource().getLength()));
+    const auto maybeRecordPreRpnObserve = [&]() {
+        if (eEngineRolloutMode != setaileval::RolloutMode::Observe || !bTailEligible)
+            return;
+
+        const OUString& aFormulaSource = getEngineFormulaSource();
+        const auto eDelegatedFunction = classifyDelegatedInterpretTailFunction(
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()));
+        if (eDelegatedFunction == setaileval::FunctionKind::Unknown)
+            return;
+
+        auto aAttempt = setaileval::tryEvaluateFormula(
+            rDocument, rContext, aPos,
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+            rDocument.GetCalcConfig().mbEmptyStringAsZero);
+        if (aAttempt.mbSupported)
+        {
+            setaileval::recordObserveSupport(aAttempt.meFunction);
+            return;
+        }
+
+        const auto eAttemptFunction
+            = aAttempt.meFunction != setaileval::FunctionKind::Unknown
+                  ? aAttempt.meFunction
+                  : eDelegatedFunction;
+        setaileval::recordFallback(aAttempt.meFallbackReason, eAttemptFunction);
+    };
+
     if( !pCode->GetCodeLen() && pCode->GetCodeError() == FormulaError::NONE )
     {
         // #i11719# no RPN and no error and no token code but result string present
@@ -1962,6 +2012,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
         // condition further down.
         if ( !pCode->GetLen() && !aResult.GetHybridFormula().isEmpty() )
         {
+            maybeRecordPreRpnObserve();
             pCode->SetCodeError( FormulaError::NoCode );
             // This is worth an assertion; if encountered in daily work
             // documents we might need another solution. Or just confirm correctness.
@@ -1972,28 +2023,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
 
     if( pCode->GetCodeLen() )
     {
-        namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
-
-        const auto eEngineRolloutMode = setaileval::resolveRolloutMode();
         std::optional<setaileval::EvaluationAttempt> oEngineAttempt;
-        OUString aEngineFormulaSource;
-        bool bEngineFormulaSourceLoaded = false;
-        const auto getEngineFormulaSource = [&]() -> const OUString& {
-            if (!bEngineFormulaSourceLoaded)
-            {
-                aEngineFormulaSource = GetFormula(FormulaGrammar::GRAM_ODFF, &rContext);
-                bEngineFormulaSourceLoaded = true;
-            }
-            return aEngineFormulaSource;
-        };
-        const bool bTailEligible = eTailParam == SCITP_NORMAL && !bIsIterCell
-                                   && cMatrixFlag == ScMatrixMode::NONE && !pCode->IsHyperLink()
-                                   && !rContext.pInterpreter
-                                   && !rDocument.IsThreadedGroupCalcInProgress();
-        const bool bHardRoutedEngineFamily
-            = bTailEligible
-              && setaileval::isHardRoutedFormula(std::u16string_view(
-                  getEngineFormulaSource().getStr(), getEngineFormulaSource().getLength()));
 
         if (eEngineRolloutMode != setaileval::RolloutMode::Off || bHardRoutedEngineFamily)
         {
@@ -2642,6 +2672,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
     }
     else
     {
+        maybeRecordPreRpnObserve();
         // Cells with compiler errors should not be marked dirty forever
         OSL_ENSURE( pCode->GetCodeError() != FormulaError::NONE, "no RPN code and no errors ?!?!" );
         ResetDirty();

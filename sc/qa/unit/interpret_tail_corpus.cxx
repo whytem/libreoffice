@@ -1064,6 +1064,19 @@ sal_uInt64 totalFallbackCount(const StatsSnapshot& rStats)
     return nTotal;
 }
 
+sal_uInt64 promotedFunctionSupportedCount(const StatsSnapshot& rStats)
+{
+    sal_uInt64 nPromotedFunctionSupported = 0;
+    for (std::size_t nIndex = static_cast<std::size_t>(FunctionKind::Value);
+         nIndex < static_cast<std::size_t>(FunctionKind::Count); ++nIndex)
+    {
+        nPromotedFunctionSupported += rStats.maFunctionObserveCount[nIndex]
+                                     + rStats.maFunctionShadowCompareCount[nIndex]
+                                     + rStats.maFunctionAuthoritativeCount[nIndex];
+    }
+    return nPromotedFunctionSupported;
+}
+
 void printRoutingStats(
     std::string_view aPrefix, std::size_t nFormulaCellCount, const StatsSnapshot& rStats)
 {
@@ -1088,14 +1101,7 @@ void printRoutingStats(
     std::cout << aPrefix << "_seen_total=" << nSeenTotal << '\n';
     std::cout << aPrefix << "_unseen_formula_cells=" << nUnseenTotal << '\n';
 
-    sal_uInt64 nPromotedFunctionSupported = 0;
-    for (std::size_t nIndex = static_cast<std::size_t>(FunctionKind::Value);
-         nIndex < static_cast<std::size_t>(FunctionKind::Count); ++nIndex)
-    {
-        nPromotedFunctionSupported += rStats.maFunctionObserveCount[nIndex]
-                                     + rStats.maFunctionShadowCompareCount[nIndex]
-                                     + rStats.maFunctionAuthoritativeCount[nIndex];
-    }
+    const sal_uInt64 nPromotedFunctionSupported = promotedFunctionSupportedCount(rStats);
     std::cout << aPrefix << "_promoted_function_supported_total="
               << nPromotedFunctionSupported << '\n';
 
@@ -1513,8 +1519,14 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     CPPUNIT_ASSERT_MESSAGE("all-formula InterpretTail live observe should see at least one formula",
         aLiveStats.mnObserveCount + totalFallbackCount(aLiveStats) > 0);
     CPPUNIT_ASSERT_MESSAGE(
+        "all-formula InterpretTail live observe should now surface promoted-family support",
+        promotedFunctionSupportedCount(aLiveStats) > 0);
+    CPPUNIT_ASSERT_MESSAGE(
         "full replay forced-interpret observe should touch every formula cell in the corpus",
         nForcedInterpretFormulaCount == nFormulaCellCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "full replay forced-interpret observe should now surface promoted-family support",
+        promotedFunctionSupportedCount(aForcedInterpretStats) > 0);
     CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should visit at least one cell",
         nProbeFormulaCount > 0);
     CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should record authoritative usage",
@@ -1528,8 +1540,9 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                 + aProbeStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(FunctionKind::Lookup)]
                 + aProbeStats.maFunctionFallbackCount[static_cast<std::size_t>(FunctionKind::Lookup)]
             > 0);
-    CPPUNIT_ASSERT_MESSAGE("replay eligibility inventory should identify at least one direct unseen promoted cell",
-        aReplayEligibilityInventory.mnDirectUnseen > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "replay eligibility inventory should record direct live reach for promoted replay cells",
+        aReplayEligibilityInventory.mnDirectSeen > 0);
 }
 
 } // namespace
