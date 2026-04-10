@@ -991,14 +991,40 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetFormula(ScAddress(3, 18, 0), u"of:#N/A"_ustr, formula::FormulaGrammar::GRAM_ODFF);
         m_pDoc->SetFormula(
             ScAddress(3, 19, 0), u"[.OF:.ERR]:502"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+        m_pDoc->SetFormula(
+            ScAddress(4, 18, 0), u"of:chyba:511"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+        m_pDoc->SetFormula(
+            ScAddress(4, 19, 0), u"of:Err:504"_ustr, formula::FormulaGrammar::GRAM_ODFF);
         CPPUNIT_ASSERT_EQUAL(FormulaError::NotAvailable, m_pDoc->GetErrCode(ScAddress(3, 18, 0)));
         CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(3, 19, 0)));
+        CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(4, 18, 0)));
+        CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(4, 19, 0)));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 2);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 4);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Unknown)]
+            >= 4);
+    }
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(5, 18, 0, u"=TRUE()"_ustr);
+        m_pDoc->SetString(5, 19, 0, u"=FALSE()"_ustr);
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(5, 18, 0));
+        CPPUNIT_ASSERT_EQUAL(u"FALSE"_ustr, m_pDoc->GetString(5, 19, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 2);
+        CPPUNIT_ASSERT_EQUAL(
+            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::LogicalConstant)]
             >= 2);
     }
 

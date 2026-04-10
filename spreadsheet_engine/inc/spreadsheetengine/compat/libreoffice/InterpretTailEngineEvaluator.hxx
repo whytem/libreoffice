@@ -82,6 +82,7 @@ enum class MismatchReason : sal_uInt8
 enum class FunctionKind : sal_uInt8
 {
     Unknown,
+    LogicalConstant,
     Value,
     DateValue,
     TimeValue,
@@ -335,14 +336,68 @@ private:
 
 [[nodiscard]] inline api::String normalizeFormulaSource(std::u16string_view rSource)
 {
-    if (rSource.rfind(u"of:=", 0) == 0)
+    const auto tryCanonicalizeRootErrorLiteral = [](std::u16string_view rCandidate)
+        -> std::optional<api::String> {
+        const std::u16string_view aErrorPrefix = u"of:#ERR";
+        if (rCandidate.rfind(aErrorPrefix, 0) == 0 && !rCandidate.empty()
+            && rCandidate.back() == u'!')
+        {
+            return api::String(rCandidate);
+        }
+
+        std::u16string_view aBody = rCandidate;
+        if (aBody.rfind(u"of:=", 0) == 0)
+            aBody.remove_prefix(4);
+        else if (aBody.rfind(u"of:", 0) == 0)
+            aBody.remove_prefix(3);
+        else
+            return std::nullopt;
+
+        const std::size_t nColon = aBody.find(u':');
+        if (nColon == std::u16string_view::npos || nColon == 0 || nColon + 1 >= aBody.size())
+            return std::nullopt;
+
+        const std::u16string_view aToken = aBody.substr(0, nColon);
+        const std::u16string_view aDigits = aBody.substr(nColon + 1);
+        api::String aUpperToken;
+        aUpperToken.reserve(aToken.size());
+        for (const char16_t cChar : aToken)
+        {
+            if ((cChar < u'a' || cChar > u'z') && (cChar < u'A' || cChar > u'Z'))
+                return std::nullopt;
+            if (cChar >= u'a' && cChar <= u'z')
+                aUpperToken.push_back(static_cast<char16_t>(cChar - u'a' + u'A'));
+            else
+                aUpperToken.push_back(cChar);
+        }
+        if (aUpperToken != u"ERR" && aUpperToken != u"ERROR" && aUpperToken != u"CHYBA")
+            return std::nullopt;
+        for (const char16_t cChar : aDigits)
+        {
+            if (cChar < u'0' || cChar > u'9')
+                return std::nullopt;
+        }
+
+        api::String aCanonical(u"of:#ERR");
+        aCanonical.append(aDigits.begin(), aDigits.end());
+        aCanonical.push_back(u'!');
+        return aCanonical;
+    };
+
+    if (rSource.rfind(u"of:=", 0) == 0 || rSource.rfind(u"of:", 0) == 0)
+    {
+        if (const auto oCanonical = tryCanonicalizeRootErrorLiteral(rSource))
+            return *oCanonical;
         return api::String(rSource);
-    if (rSource.rfind(u"of:", 0) == 0)
-        return api::String(rSource);
+    }
 
     const std::u16string_view aTrimmed = trimFormulaEquals(rSource);
     if (aTrimmed.rfind(u"of:=", 0) == 0 || aTrimmed.rfind(u"of:", 0) == 0)
+    {
+        if (const auto oCanonical = tryCanonicalizeRootErrorLiteral(aTrimmed))
+            return *oCanonical;
         return api::String(aTrimmed);
+    }
 
     constexpr std::u16string_view aBracketedErrorPrefix = u"[.OF:.ERR]:";
     if (aTrimmed.rfind(aBracketedErrorPrefix, 0) == 0
@@ -371,6 +426,8 @@ private:
 
 [[nodiscard]] inline FunctionKind classifyFunction(api::StringView rFunctionName)
 {
+    if (rFunctionName == u"TRUE" || rFunctionName == u"FALSE")
+        return FunctionKind::LogicalConstant;
     if (rFunctionName == u"VALUE")
         return FunctionKind::Value;
     if (rFunctionName == u"DATEVALUE")
@@ -609,7 +666,9 @@ template <typename T>
         return makeErrorResult(eFunction, rValue.meError);
     if (rValue.isText())
         return makeStringResult(eFunction, toLibreOfficeString(rValue.maString));
-    if (rValue.isNumber() || rValue.isBoolean())
+    if (rValue.isBoolean())
+        return makeNumericResult(eFunction, rValue.mfNumber, SvNumFormatType::LOGICAL);
+    if (rValue.isNumber())
         return makeNumericResult(eFunction, rValue.mfNumber, SvNumFormatType::NUMBER);
     return makeNumericResult(eFunction, 0.0, SvNumFormatType::NUMBER);
 }
@@ -2236,6 +2295,11 @@ inline void putScalarIntoMatrix(
     const FunctionKind eFunction = classifyFunction(aFunctionName);
     switch (eFunction)
     {
+        case FunctionKind::LogicalConstant:
+            if (!rRoot.maChildren.empty())
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            return makeNumericResult(eFunction, aFunctionName == u"TRUE" ? 1.0 : 0.0,
+                SvNumFormatType::LOGICAL);
         case FunctionKind::Value:
         case FunctionKind::DateValue:
         case FunctionKind::TimeValue:
@@ -2383,8 +2447,14 @@ inline void putScalarIntoMatrix(
             FunctionKind::Unknown, FallbackReason::UnsupportedFormulaShape);
     }
 
-    return detail::evaluateDelegatedNode(
+    auto aAttempt = detail::evaluateDelegatedNode(
         rRoot, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
+    if (!aAttempt.mbSupported && aAttempt.meFallbackReason == FallbackReason::UnsupportedFunction)
+    {
+        detail::recordDiagnosticSample(FallbackReason::UnsupportedFunction, rDoc, rFormulaPos,
+            rFormulaSource, aNormalized, rRoot.meKind);
+    }
+    return aAttempt;
 }
 
 [[nodiscard]] inline bool isHardRoutedFormula(std::u16string_view rFormulaSource)

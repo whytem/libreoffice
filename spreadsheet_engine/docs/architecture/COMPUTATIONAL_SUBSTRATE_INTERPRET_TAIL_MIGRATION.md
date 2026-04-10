@@ -37,8 +37,8 @@ What is still not true:
 - no broad default-on production rollout exists
 - no `ScInterpreter` subroutine has been deleted yet
 - the full replay corpus now shows material ambient live-seam traffic
-- most of that new ambient supported traffic is still error-literal traffic,
-  not yet promoted-family function traffic
+- most of that new ambient supported traffic is still root-error or bounded
+  logical-literal traffic, not yet promoted-family function traffic
 
 ## Routing Modes
 
@@ -63,6 +63,9 @@ default without changing shipping behavior.
 
 The currently promoted live evaluator family includes:
 
+- logical literals:
+  - `TRUE`
+  - `FALSE`
 - text parsing:
   - `VALUE`
   - `DATEVALUE`
@@ -97,45 +100,46 @@ Two different denominators matter, and both are now reported.
 ### Full Replay Corpus: Ambient Live Observe
 
 This is the honest all-formula live-routing surface from the standing replay
-corpus after the completed ambient live-conversion slice:
+corpus after the completed ambient residual-blocker conversion slice:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=598`
-- `interpret_tail_live_fallback_total=8`
+- `interpret_tail_live_supported_total=606`
+- `interpret_tail_live_fallback_total=0`
 - `interpret_tail_live_seen_total=606`
 - `interpret_tail_live_unseen_formula_cells=50055`
-- `interpret_tail_live_supported_rate=1.18`
+- `interpret_tail_live_supported_rate=1.20`
 - `interpret_tail_live_seen_rate=1.20`
 
 Current ambient fallback reasons:
 
-- `unsupported_formula_shape=4`
-- `unsupported_function=4`
+- `unsupported_formula_shape=0`
+- `unsupported_function=0`
 - `parse_failure=0`
 
 Interpretation:
 
 - the seam now measures the full replay corpus
 - the ambient live-routing denominator is real, not curated
-- the full replay corpus now reaches the seam materially more often
-- almost all newly supported ambient traffic is still error-literal traffic
-  classified as `FunctionKind::Unknown`
-- the next value is in converting the tiny retained blocker surface into
-  promoted-family or normalized ambient traffic
+- the full replay corpus now reaches the seam materially and clears with zero
+  retained ambient fallback
+- the newly supported ambient traffic is still mostly root-error traffic plus
+  bounded logical-literal traffic
+- the next value is increasing ambient promoted-family function routing, not
+  more cleanup of the old blocker tail
 
 ### Promoted-Family Probe
 
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
-- `interpret_tail_probe_formula_cells=1488`
-- `interpret_tail_authoritative_total=1379`
-- `interpret_tail_authoritative_fallback_total=109`
-- promoted-family authoritative rate: `92.67%`
+- `interpret_tail_probe_formula_cells=1812`
+- `interpret_tail_authoritative_total=1698`
+- `interpret_tail_authoritative_fallback_total=114`
+- promoted-family authoritative rate: `93.71%`
 
 Current promoted-family fallback reasons:
 
 - `unsupported_formula_shape=26`
-- `shadow_mismatch=64`
+- `shadow_mismatch=69`
 - `unsupported_host_surface=19`
 
 Interpretation:
@@ -178,17 +182,19 @@ historical reference material, not active roadmap work.
 
 ## Current Next Target
 
-The completed ambient live-conversion slice is recorded in:
+The completed ambient residual-blocker slice is recorded in:
 
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_LIVE_CONVERSION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_AMBIENT_RESIDUAL_BLOCKER_CONVERSION_PLAN.md)
 
-The next high-value pass should now focus on the retained ambient blockers:
+The next high-value pass should now focus on ambient promoted-family
+conversion:
 
-1. normalize the localized named-error roots that still fall back as
-   `NamedReference`
-2. identify and convert the four retained ambient unsupported-function cells
-3. then raise ambient promoted-family function traffic, not just
-   `FunctionKind::Unknown` error-literal support
+1. inventory the largest ambient replay-corpus formulas that still remain
+   unseen by the live seam
+2. move at least one real promoted-family function lane onto that ambient
+   surface
+3. raise ambient promoted-family routing without regressing current probe
+   quality bars
 4. only after that return to broader capability-family expansion
 
 ## Historical Archive

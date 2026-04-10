@@ -1033,6 +1033,33 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     CPPUNIT_ASSERT_EQUAL(u"missing"_ustr,
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(
             aIfNaWrappedXLookup.maResult.maString));
+
+    const auto aTrue = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(4, 4, 0), u"=TRUE()", false);
+    CPPUNIT_ASSERT(aTrue.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::LogicalConstant, aTrue.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aTrue.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aTrue.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::LOGICAL, aTrue.meFormatType);
+
+    const auto aFalse = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(5, 4, 0), u"=FALSE()", false);
+    CPPUNIT_ASSERT(aFalse.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::LogicalConstant, aFalse.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aFalse.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, aFalse.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::LOGICAL, aFalse.meFormatType);
+
+    const auto aLocalizedError = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(6, 4, 0), u"=of:chyba:511", false);
+    CPPUNIT_ASSERT(aLocalizedError.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Unknown, aLocalizedError.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error, aLocalizedError.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::Error::IllegalArgument,
+        aLocalizedError.maResult.meError);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNormalization)
@@ -1056,6 +1083,14 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNorm
         u"of:=VALUE(\"4321\")"_ustr,
         toLibreOfficeString(
             setaileval::detail::normalizeFormulaSource(u"=VALUE(\"4321\")")));
+    CPPUNIT_ASSERT_EQUAL(
+        u"of:#ERR511!"_ustr,
+        toLibreOfficeString(
+            setaileval::detail::normalizeFormulaSource(u"=of:chyba:511")));
+    CPPUNIT_ASSERT_EQUAL(
+        u"of:#ERR504!"_ustr,
+        toLibreOfficeString(
+            setaileval::detail::normalizeFormulaSource(u"of:Err:504")));
 
     const auto aParse = spreadsheetengine::core::formula::parseFormula(
         setaileval::detail::normalizeFormulaSource(
