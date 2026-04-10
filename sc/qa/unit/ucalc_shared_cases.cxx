@@ -852,6 +852,16 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr,
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(aVLookup.maResult.maString));
 
+    const auto aVLookupExplicitFalse = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(4, 4, 0), u"=VLOOKUP(A5;B5:C7;2;FALSE())", false);
+    CPPUNIT_ASSERT(aVLookupExplicitFalse.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aVLookupExplicitFalse.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aVLookupExplicitFalse.maResult.maString));
+
     const auto aLookupArray = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 8, 0),
         u"=LOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"})", false);

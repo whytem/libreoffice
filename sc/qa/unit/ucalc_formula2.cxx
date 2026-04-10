@@ -1089,16 +1089,18 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         setaileval::resetStats();
 
         m_pDoc->SetString(3, 4, 0, u"=VLOOKUP(A5;B5:C7;2;0)"_ustr);
+        m_pDoc->SetString(4, 4, 0, u"=VLOOKUP(A5;B5:C7;2;FALSE())"_ustr);
         CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(3, 4, 0));
+        CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(4, 4, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 2);
         CPPUNIT_ASSERT_EQUAL(
             static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::VLookup)]
-            >= 1);
+            >= 2);
     }
 
     {

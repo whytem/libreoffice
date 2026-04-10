@@ -1242,6 +1242,17 @@ inline void putScalarIntoMatrix(
             return makeMaterializedValue(api::CellValue::text(rNode.maPrimaryText));
         case core::formula::NodeKind::BooleanLiteral:
             return makeMaterializedValue(api::CellValue::boolean(rNode.mbBoolean));
+        case core::formula::NodeKind::FunctionCall:
+        {
+            const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+            if (classifyFunction(aFunctionName) == FunctionKind::LogicalConstant
+                && rNode.maChildren.empty())
+            {
+                return makeMaterializedValue(api::CellValue::boolean(aFunctionName == u"TRUE"));
+            }
+            return makeUnsupportedMaterialization<api::CellValue>(
+                FallbackReason::UnsupportedFormulaShape);
+        }
         case core::formula::NodeKind::ErrorLiteral:
             return makeMaterializedValue(api::CellValue::error(api::Error::IllegalArgument));
         case core::formula::NodeKind::EmptyArgument:
