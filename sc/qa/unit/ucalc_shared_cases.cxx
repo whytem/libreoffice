@@ -1010,6 +1010,34 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(
             aXLookupArray.maResult.maString));
 
+    const auto aNestedXLookupRowSlice = setaileval::tryEvaluateFormula(*m_pDoc, rContext,
+        ScAddress(3, 8, 0),
+        u"=XLOOKUP(\"Sales\";{\"Product\";\"Sales\";\"Profit\"};XLOOKUP(\"B\";{\"A\"|\"B\"};{10;20;30|40;50;60}))",
+        false);
+    CPPUNIT_ASSERT(aNestedXLookupRowSlice.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::XLookup, aNestedXLookupRowSlice.meFunction);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::Value,
+        aNestedXLookupRowSlice.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(50.0, aNestedXLookupRowSlice.maResult.mfValue, 1e-12);
+
+    const auto aXLookupIndexColumnSlice = setaileval::tryEvaluateFormula(*m_pDoc, rContext,
+        ScAddress(3, 8, 0),
+        u"=XLOOKUP(2;{1|2|3};INDEX({10;100|20;200|30;300};0;2))", false);
+    CPPUNIT_ASSERT(aXLookupIndexColumnSlice.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::XLookup, aXLookupIndexColumnSlice.meFunction);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::Value,
+        aXLookupIndexColumnSlice.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(200.0, aXLookupIndexColumnSlice.maResult.mfValue, 1e-12);
+
+    const auto aMatchIndexColumnSlice = setaileval::tryEvaluateFormula(*m_pDoc, rContext,
+        ScAddress(3, 8, 0),
+        u"=MATCH(200;INDEX({10;100|20;200|30;300};0;2);0)", false);
+    CPPUNIT_ASSERT(aMatchIndexColumnSlice.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Match, aMatchIndexColumnSlice.meFunction);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::Value,
+        aMatchIndexColumnSlice.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aMatchIndexColumnSlice.maResult.mfValue, 1e-12);
+
     const auto aIfErrorWrappedLookup = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 4, 0),
         u"=IFERROR(VLOOKUP(25;B5:C7;2;0);\"missing\")", false);

@@ -1116,6 +1116,12 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetString(3, 12, 0, u"=IFERROR(VLOOKUP(25;B5:C7;2;0);\"missing\")"_ustr);
         m_pDoc->SetString(3, 13, 0, u"=IFNA(XLOOKUP(25;B5:B7;C5:C7);\"missing\")"_ustr);
         m_pDoc->SetString(4, 11, 0, u"=LOOKUP(4;B12:D12*2;B13:D13/3)"_ustr);
+        m_pDoc->SetString(23, 14, 0,
+            u"=XLOOKUP(\"Sales\";{\"Product\";\"Sales\";\"Profit\"};XLOOKUP(\"B\";{\"A\"|\"B\"};{10;20;30|40;50;60}))"_ustr);
+        m_pDoc->SetString(23, 15, 0,
+            u"=XLOOKUP(2;{1|2|3};INDEX({10;100|20;200|30;300};0;2))"_ustr);
+        m_pDoc->SetString(23, 16, 0,
+            u"=MATCH(200;INDEX({10;100|20;200|30;300};0;2);0)"_ustr);
 
         CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(3, 7, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(3, 8, 0));
@@ -1125,9 +1131,12 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(3, 12, 0));
         CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(3, 13, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(4, 11, 0));
+        ASSERT_DOUBLES_EQUAL(50.0, m_pDoc->GetValue(23, 14, 0));
+        ASSERT_DOUBLES_EQUAL(200.0, m_pDoc->GetValue(23, 15, 0));
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(23, 16, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 8);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 11);
         CPPUNIT_ASSERT_EQUAL(
             static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
@@ -1153,7 +1162,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::XLookup)]
-            >= 2);
+            >= 4);
     }
 
     {

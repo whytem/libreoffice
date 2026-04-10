@@ -23,8 +23,8 @@ The active roadmap is now simple:
 1. keep the replay guardrail exact
 2. expand real `InterpretTail -> engine` delegation
 3. use substrate work only when it removes a live evaluator blocker
-4. prioritize replay-imported promoted fallback conversion before any new
-   reach-expansion slice
+4. prioritize replay-imported promoted host-surface and shape cleanup before
+   any new reach-expansion slice
 
 ## Historical Material
 

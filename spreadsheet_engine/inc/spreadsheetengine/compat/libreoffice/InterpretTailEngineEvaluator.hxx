@@ -696,6 +696,10 @@ template <typename T>
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos);
 
+[[nodiscard]] inline Materialization<lookupexecution::LookupInputSource> materializeLookupInputSourceNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos);
+
 [[nodiscard]] inline std::optional<double> extractNumericLiteral(
     const core::formula::Node& rNode)
 {
@@ -1446,15 +1450,239 @@ inline void putScalarIntoMatrix(
     return xMatrix;
 }
 
+[[nodiscard]] inline Materialization<ScMatrixRef> materializeLookupExecutionResultMatrix(
+    const lookupexecution::LookupExecutionResult& rResult, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
+{
+    if (rResult.meKind == lookupexecution::LookupExecutionResult::Kind::Scalar)
+        return makeMaterializedValue(makeSingleValueMatrix(rResult.maScalar));
+
+    if (rResult.meKind == lookupexecution::LookupExecutionResult::Kind::Reference)
+        return materializeReferencedMatrix(rResult.maRange, rDoc, rContext, rFormulaPos);
+
+    if (rResult.meKind == lookupexecution::LookupExecutionResult::Kind::Matrix && rResult.mpMatrix)
+        return makeMaterializedValue(rResult.mpMatrix);
+
+    return makeUnsupportedMaterialization<ScMatrixRef>(FallbackReason::UnsupportedHostSurface);
+}
+
+[[nodiscard]] inline Materialization<ScMatrixRef> materializeMatrixSlice(
+    const ScMatrixRef& pSource, const api::reference::IndexMatrixSelection& rSelection)
+{
+    if (!pSource)
+        return makeUnsupportedMaterialization<ScMatrixRef>(FallbackReason::UnsupportedHostSurface);
+
+    if (rSelection.meKind == api::reference::IndexSelectionKind::KeepSource)
+        return makeMaterializedValue(pSource);
+
+    ScMatrixRef xMatrix(new ScMatrix(static_cast<SCSIZE>(rSelection.maDimensions.mnColumns),
+        static_cast<SCSIZE>(rSelection.maDimensions.mnRows)));
+    for (api::MatrixSize nRow = 0; nRow < rSelection.maDimensions.mnRows; ++nRow)
+    {
+        for (api::MatrixSize nColumn = 0; nColumn < rSelection.maDimensions.mnColumns; ++nColumn)
+        {
+            const SCSIZE nSourceColumn
+                = static_cast<SCSIZE>(rSelection.maStart.mnColumn + nColumn);
+            const SCSIZE nSourceRow = static_cast<SCSIZE>(rSelection.maStart.mnRow + nRow);
+            putScalarIntoMatrix(
+                lookupexecution::detail::toApiCellValue(pSource->Get(nSourceColumn, nSourceRow)),
+                xMatrix, static_cast<SCSIZE>(nColumn), static_cast<SCSIZE>(nRow));
+        }
+    }
+
+    return makeMaterializedValue(xMatrix);
+}
+
+[[nodiscard]] inline Materialization<sal_Int32> normalizeWholeMaterializedArgument(
+    const core::formula::Node& rArgument, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    const auto aArgument = materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+    if (!aArgument.mbSupported)
+        return makeUnsupportedMaterialization<sal_Int32>(aArgument.meFallbackReason);
+    if (!aArgument.moValue)
+        return makeMaterializedError<sal_Int32>(aArgument.meError);
+    if (aArgument.moValue->isEmpty())
+        return makeMaterializedError<sal_Int32>(api::Error::IllegalArgument);
+    const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aArgument.moValue);
+    if (!aNumber)
+        return makeMaterializedError<sal_Int32>(aNumber.meError);
+    const auto oWhole = coerceWholeNumber(aNumber.maValue);
+    if (!oWhole)
+        return makeMaterializedError<sal_Int32>(api::Error::IllegalArgument);
+    return makeMaterializedValue(*oWhole);
+}
+
+[[nodiscard]] inline Materialization<ScMatrixRef> materializeXLookupMatrixFunctionCall(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 6)
+        return makeMaterializedValue(makeSingleValueMatrix(api::CellValue::error(
+            api::Error::IllegalArgument)));
+
+    const auto aLookup = materializeScalarNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+    if (!aLookup.mbSupported)
+        return makeUnsupportedMaterialization<ScMatrixRef>(aLookup.meFallbackReason);
+    if (!aLookup.moValue)
+        return makeMaterializedError<ScMatrixRef>(aLookup.meError);
+    if (aLookup.moValue->isError())
+        return makeMaterializedValue(makeSingleValueMatrix(*aLookup.moValue));
+
+    const auto aSearch = materializeLookupInputSourceNode(
+        *rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+    if (!aSearch.mbSupported)
+        return makeUnsupportedMaterialization<ScMatrixRef>(aSearch.meFallbackReason);
+    if (!aSearch.moValue)
+        return makeMaterializedError<ScMatrixRef>(aSearch.meError);
+    const auto aSearchInput = lookupexecution::detail::buildLookupInput(*aSearch.moValue);
+    if (!aSearchInput)
+        return makeMaterializedError<ScMatrixRef>(aSearchInput.meError);
+
+    const auto aResult = materializeLookupInputSourceNode(
+        *rNode.maChildren[2], rDoc, rContext, rFormulaPos);
+    if (!aResult.mbSupported)
+        return makeUnsupportedMaterialization<ScMatrixRef>(aResult.meFallbackReason);
+    if (!aResult.moValue)
+        return makeMaterializedError<ScMatrixRef>(aResult.meError);
+    const auto aResultInput = lookupexecution::detail::buildLookupInput(*aResult.moValue);
+    if (!aResultInput)
+        return makeMaterializedError<ScMatrixRef>(aResultInput.meError);
+
+    lookupexecution::XLookupExecutionRequest aRequest;
+    aRequest.maLookupValue = *aLookup.moValue;
+    aRequest.maSearchInput = aSearchInput.maValue;
+    aRequest.maResultInput = aResultInput.maValue;
+    aRequest.meSearchType = searchTypeFromDocument(rDoc);
+    aRequest.mbAllowPatternMatch = true;
+
+    if (rNode.maChildren.size() >= 5
+        && rNode.maChildren[4]->meKind != core::formula::NodeKind::EmptyArgument)
+    {
+        const auto aMode
+            = normalizeWholeMaterializedArgument(*rNode.maChildren[4], rDoc, rContext, rFormulaPos);
+        if (!aMode.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aMode.meFallbackReason);
+        if (!aMode.moValue)
+            return makeMaterializedError<ScMatrixRef>(aMode.meError);
+        const auto aNormalized = api::lookup::normalizeExtendedMatchMode(
+            static_cast<std::int16_t>(*aMode.moValue));
+        if (!aNormalized)
+            return makeMaterializedError<ScMatrixRef>(aNormalized.meError);
+        aRequest.meMatchMode = aNormalized.maValue;
+    }
+
+    if (rNode.maChildren.size() >= 6
+        && rNode.maChildren[5]->meKind != core::formula::NodeKind::EmptyArgument)
+    {
+        const auto aMode
+            = normalizeWholeMaterializedArgument(*rNode.maChildren[5], rDoc, rContext, rFormulaPos);
+        if (!aMode.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aMode.meFallbackReason);
+        if (!aMode.moValue)
+            return makeMaterializedError<ScMatrixRef>(aMode.meError);
+        const auto aNormalized = api::lookup::normalizeSearchMode(
+            static_cast<std::int16_t>(*aMode.moValue));
+        if (!aNormalized)
+            return makeMaterializedError<ScMatrixRef>(aNormalized.meError);
+        aRequest.meSearchMode = aNormalized.maValue;
+    }
+
+    const auto aResolved = lookupexecution::resolveXLookupResult(rDoc, rContext, aRequest);
+    if (!aResolved)
+    {
+        if (aResolved.meError == api::Error::NotAvailable && rNode.maChildren.size() >= 4
+            && rNode.maChildren[3]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            return materializeMatrixNode(*rNode.maChildren[3], rDoc, rContext, rFormulaPos);
+        }
+        return makeMaterializedValue(makeSingleValueMatrix(api::CellValue::error(aResolved.meError)));
+    }
+
+    return materializeLookupExecutionResultMatrix(aResolved.maValue, rDoc, rContext, rFormulaPos);
+}
+
+[[nodiscard]] inline Materialization<ScMatrixRef> materializeIndexMatrixFunctionCall(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
+        return makeMaterializedValue(makeSingleValueMatrix(api::CellValue::error(
+            api::Error::IllegalArgument)));
+
+    const auto aRow
+        = normalizeWholeMaterializedArgument(*rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+    if (!aRow.mbSupported)
+        return makeUnsupportedMaterialization<ScMatrixRef>(aRow.meFallbackReason);
+    if (!aRow.moValue || *aRow.moValue < 0)
+    {
+        return makeMaterializedValue(makeSingleValueMatrix(
+            api::CellValue::error(aRow.moValue ? api::Error::IllegalArgument : aRow.meError)));
+    }
+
+    sal_Int32 nColumn = 0;
+    if (rNode.maChildren.size() == 3)
+    {
+        const auto aColumn = normalizeWholeMaterializedArgument(
+            *rNode.maChildren[2], rDoc, rContext, rFormulaPos);
+        if (!aColumn.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aColumn.meFallbackReason);
+        if (!aColumn.moValue || *aColumn.moValue < 0)
+        {
+            return makeMaterializedValue(makeSingleValueMatrix(api::CellValue::error(
+                aColumn.moValue ? api::Error::IllegalArgument : aColumn.meError)));
+        }
+        nColumn = *aColumn.moValue;
+    }
+
+    const auto aReferenceSource = resolveReferenceRangeNode(*rNode.maChildren[0], rDoc, rFormulaPos);
+    if (aReferenceSource.mbSupported && aReferenceSource.moValue)
+    {
+        const auto aSelection = referenceexecution::planIndexReferenceSelection(
+            *aReferenceSource.moValue, *aRow.moValue, nColumn,
+            static_cast<std::uint8_t>(rNode.maChildren.size()));
+        if (!aSelection)
+            return makeMaterializedError<ScMatrixRef>(aSelection.meError);
+        return materializeReferencedMatrix(
+            toLibreOfficeRange(aSelection.maValue.maRange), rDoc, rContext, rFormulaPos);
+    }
+    if (!aReferenceSource.mbSupported
+        && aReferenceSource.meFallbackReason != FallbackReason::UnsupportedFormulaShape)
+    {
+        return makeUnsupportedMaterialization<ScMatrixRef>(aReferenceSource.meFallbackReason);
+    }
+
+    const auto aMatrixSource = materializeMatrixNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+    if (!aMatrixSource.mbSupported)
+        return makeUnsupportedMaterialization<ScMatrixRef>(aMatrixSource.meFallbackReason);
+    if (!aMatrixSource.moValue)
+        return makeMaterializedError<ScMatrixRef>(aMatrixSource.meError);
+
+    SCSIZE nColumns = 0;
+    SCSIZE nRows = 0;
+    (*aMatrixSource.moValue)->GetDimensions(nColumns, nRows);
+    const auto aSelection = api::reference::planIndexMatrixSelection(
+        { static_cast<api::MatrixSize>(nColumns), static_cast<api::MatrixSize>(nRows) },
+        *aRow.moValue, nColumn, rNode.maChildren.size() < 3,
+        static_cast<std::uint8_t>(rNode.maChildren.size()));
+    if (!aSelection)
+        return makeMaterializedError<ScMatrixRef>(aSelection.meError);
+    return materializeMatrixSlice(*aMatrixSource.moValue, aSelection.maValue);
+}
+
 [[nodiscard]] inline Materialization<ScMatrixRef> materializeMatrixFunctionCall(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
 {
-    if (uppercaseAscii(rNode.maPrimaryText) != u"MMULT")
-    {
-        return makeUnsupportedMaterialization<ScMatrixRef>(
-            FallbackReason::UnsupportedFormulaShape);
-    }
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    const FunctionKind eFunction = classifyFunction(aFunctionName);
+    if (eFunction == FunctionKind::XLookup)
+        return materializeXLookupMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
+    if (eFunction == FunctionKind::Index)
+        return materializeIndexMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
+
+    if (aFunctionName != u"MMULT")
+        return makeUnsupportedMaterialization<ScMatrixRef>(FallbackReason::UnsupportedFormulaShape);
 
     if (rNode.maChildren.size() != 2)
     {
