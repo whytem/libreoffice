@@ -13,9 +13,6 @@ This directory holds the active architecture references for
 - [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md):
   rolling live evaluator migration ledger with the active family, current
   metrics, and current next target
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md):
-  completed replay-reach diagnostic slice that proves the next blocker is
-  pre-tail live eligibility, not just access pattern
 - [../PROJECT_STATUS.md](../PROJECT_STATUS.md):
   concise project-wide status snapshot
 
@@ -26,6 +23,7 @@ The active roadmap is now simple:
 1. keep the replay guardrail exact
 2. expand real `InterpretTail -> engine` delegation
 3. use substrate work only when it removes a live evaluator blocker
+4. prioritize the non-shared replay barrier before any new shared-group slice
 
 ## Historical Material
 

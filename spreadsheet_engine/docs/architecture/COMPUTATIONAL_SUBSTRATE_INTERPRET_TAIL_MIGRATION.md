@@ -40,8 +40,9 @@ What is still not true:
 - most of that new ambient supported traffic is still root-error or bounded
   logical-literal traffic, not yet promoted-family function traffic
 - even the new full replay forced-interpret denominator still does not surface
-  promoted families live, which means the blocker is earlier than access
-  pattern alone
+  promoted families live, and the new replay eligibility inventory shows the
+  dominant blocker is a non-shared pre-tail replay path rather than
+  shared-group entry
 
 ## Routing Modes
 
@@ -176,6 +177,35 @@ Interpretation:
 - the current hotspots are residual mismatch and host-surface cleanup on the
   already-promoted families
 
+### Replay Eligibility Inventory
+
+This is the new per-cell replay inventory over the promoted-family replay
+surface after forcing each promoted replay formula through direct live
+`Interpret()`:
+
+- `interpret_tail_replay_promoted_formula_cells=1812`
+- `interpret_tail_replay_promoted_direct_seen=2`
+- `interpret_tail_replay_promoted_direct_unseen=1810`
+- `interpret_tail_replay_promoted_shared_formula_cells=395`
+- `interpret_tail_replay_promoted_shared_top_formula_cells=83`
+- `interpret_tail_replay_promoted_shared_member_formula_cells=312`
+- `interpret_tail_replay_promoted_non_shared_formula_cells=1417`
+- `interpret_tail_replay_promoted_unseen_shared_top=83`
+- `interpret_tail_replay_promoted_unseen_shared_member=312`
+- `interpret_tail_replay_promoted_unseen_non_shared=1415`
+- `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=1812`
+- `interpret_tail_replay_promoted_dirty_after_interpret=0`
+
+Interpretation:
+
+- the blocker is not “cell never becomes dirty enough to interpret”
+- the blocker is not primarily shared-group top entry
+- the dominant missed surface is non-shared promoted replay formulas
+- the next migration value is now instrumenting or converting the replay path
+  between `Interpret()` entry and `InterpretTail` reach for non-shared imported
+  formulas
+
 ## Hard-Routed Family
 
 The first env-independent engine-first family is now live:
@@ -208,17 +238,18 @@ historical reference material, not active roadmap work.
 
 ## Current Next Target
 
-The latest replay reach closeout is recorded in:
+The latest replay closeout is now folded into this migration ledger.
 
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md)
+The next high-value pass should now focus on the non-shared replay barrier:
 
-The next high-value pass should now focus on replay-corpus live eligibility:
-
-1. inventory which promoted-family replay cells never become live seen
-2. compare probe addresses against ambient and forced-interpret seen addresses
-3. identify the dominant pre-tail barrier: dirty-state, shared-group entry, or
-   another live routing condition
-4. only after that return to ambient promoted-family conversion work
+1. instrument the pre-tail replay path for promoted non-shared formulas between
+   `Interpret()` entry and `InterpretTail` reach
+2. compare replay-imported promoted formulas against curated probe formulas at
+   the token or code-path level
+3. target the dominant non-shared replay families first:
+   `LOOKUP`, `VLOOKUP`, and promoted logical constants
+4. only return to shared-group replay work if the non-shared barrier stops
+   dominating
 
 ## Historical Archive
 

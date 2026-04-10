@@ -88,6 +88,7 @@ class TestInterpretTailCorpus : public ScUcalcTestBase
 
 const char* functionKindName(FunctionKind eFunction);
 const char* fallbackReasonName(FallbackReason eReason);
+sal_uInt64 totalFallbackCount(const StatsSnapshot& rStats);
 
 struct ProbeDiagnosticSample
 {
@@ -100,9 +101,59 @@ struct ProbeDiagnosticSample
     OUString maEngineResult;
 };
 
+struct ReplayEligibilityDiagnosticSample
+{
+    OUString maWorkbookLabel;
+    OUString maCellAddress;
+    OUString maFunctionName;
+    OUString maSharedState;
+    OUString maOutcome;
+    bool mbNeedsInterpretBeforeDirty = false;
+    bool mbNeedsInterpretAfterDirty = false;
+    bool mbDirtyAfterInterpret = false;
+    bool mbSeenViaSharedTop = false;
+};
+
+struct ReplayEligibilityInventory
+{
+    std::size_t mnPromotedFormulaCells = 0;
+    std::size_t mnSharedFormulaCells = 0;
+    std::size_t mnSharedTopFormulaCells = 0;
+    std::size_t mnSharedMemberFormulaCells = 0;
+    std::size_t mnNonSharedFormulaCells = 0;
+    std::size_t mnNeedsInterpretBeforeDirty = 0;
+    std::size_t mnNeedsInterpretAfterDirty = 0;
+    std::size_t mnDirectSeen = 0;
+    std::size_t mnDirectSupported = 0;
+    std::size_t mnDirectFallback = 0;
+    std::size_t mnDirectUnseen = 0;
+    std::size_t mnInterpretReturnedFalse = 0;
+    std::size_t mnDirtyAfterInterpret = 0;
+    std::size_t mnNeedsInterpretAfterInterpret = 0;
+    std::size_t mnSharedMemberSeenViaTop = 0;
+    std::size_t mnSharedMemberFallbackViaTop = 0;
+    std::size_t mnSharedMemberStillUnseenViaTop = 0;
+    std::size_t mnUnseenSharedTop = 0;
+    std::size_t mnUnseenSharedMember = 0;
+    std::size_t mnUnseenNonShared = 0;
+    std::size_t mnMatrixFormulaCells = 0;
+    std::size_t mnHyperLinkFormulaCells = 0;
+    std::size_t mnMissingCodeFormulaCells = 0;
+    std::size_t mnRawErrorFormulaCells = 0;
+    std::array<std::size_t, static_cast<std::size_t>(FunctionKind::Count)> maFunctionFormulaCells {};
+    std::array<std::size_t, static_cast<std::size_t>(FunctionKind::Count)> maFunctionDirectSeen {};
+    std::array<std::size_t, static_cast<std::size_t>(FunctionKind::Count)> maFunctionDirectUnseen {};
+};
+
 std::vector<ProbeDiagnosticSample>& probeDiagnosticSamples()
 {
     static std::vector<ProbeDiagnosticSample> aSamples;
+    return aSamples;
+}
+
+std::vector<ReplayEligibilityDiagnosticSample>& replayEligibilityDiagnosticSamples()
+{
+    static std::vector<ReplayEligibilityDiagnosticSample> aSamples;
     return aSamples;
 }
 
@@ -119,6 +170,11 @@ bool envEnabled(const char* pName)
 void resetProbeDiagnosticSamples()
 {
     probeDiagnosticSamples().clear();
+}
+
+void resetReplayEligibilityDiagnosticSamples()
+{
+    replayEligibilityDiagnosticSamples().clear();
 }
 
 void maybeAddProbeDiagnosticSample(const OUString& rWorkbookLabel, const ScDocument& rDoc,
@@ -153,6 +209,45 @@ void maybeAddProbeDiagnosticSample(const OUString& rWorkbookLabel, const ScDocum
     aSample.maOutcome = rOutcome;
     aSample.maCalcResult = rCalcResult;
     aSample.maEngineResult = rEngineResult;
+    rSamples.push_back(std::move(aSample));
+}
+
+void maybeAddReplayEligibilityDiagnosticSample(const OUString& rWorkbookLabel,
+    const ScDocument& rDoc, const ScAddress& rPos, FunctionKind eFunction, std::u16string_view rSharedState,
+    std::u16string_view rOutcome, bool bNeedsInterpretBeforeDirty, bool bNeedsInterpretAfterDirty,
+    bool bDirtyAfterInterpret, bool bSeenViaSharedTop)
+{
+    if (!envEnabled("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_ELIGIBILITY_DIAGNOSTICS"))
+        return;
+
+    auto& rSamples = replayEligibilityDiagnosticSamples();
+    std::size_t nLimit = 24;
+    if (const char* pValue
+        = std::getenv("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_ELIGIBILITY_DIAGNOSTIC_LIMIT"))
+    {
+        try
+        {
+            const int nConfiguredLimit = std::stoi(pValue);
+            if (nConfiguredLimit > 0)
+                nLimit = static_cast<std::size_t>(nConfiguredLimit);
+        }
+        catch (...)
+        {
+        }
+    }
+    if (rSamples.size() >= nLimit)
+        return;
+
+    ReplayEligibilityDiagnosticSample aSample;
+    aSample.maWorkbookLabel = rWorkbookLabel;
+    aSample.maCellAddress = rPos.Format(ScRefFlags::ADDR_ABS_3D, &rDoc, rDoc.GetAddressConvention());
+    aSample.maFunctionName = OUString::fromUtf8(functionKindName(eFunction));
+    aSample.maSharedState = OUString(rSharedState.data(), rSharedState.size());
+    aSample.maOutcome = OUString(rOutcome.data(), rOutcome.size());
+    aSample.mbNeedsInterpretBeforeDirty = bNeedsInterpretBeforeDirty;
+    aSample.mbNeedsInterpretAfterDirty = bNeedsInterpretAfterDirty;
+    aSample.mbDirtyAfterInterpret = bDirtyAfterInterpret;
+    aSample.mbSeenViaSharedTop = bSeenViaSharedTop;
     rSamples.push_back(std::move(aSample));
 }
 
@@ -599,6 +694,175 @@ std::size_t runForcedInterpretObserveSurface(const Workbook& rWorkbook, ScDocume
     return nInterpretCount;
 }
 
+sal_uInt64 statsSeenCount(const StatsSnapshot& rStats)
+{
+    sal_uInt64 nFallbackCount = 0;
+    for (std::size_t nIndex = 0; nIndex < static_cast<std::size_t>(FallbackReason::Count); ++nIndex)
+        nFallbackCount += rStats.maFallbackReasons[nIndex];
+    return rStats.mnObserveCount + rStats.mnShadowCompareCount + rStats.mnAuthoritativeCount
+           + nFallbackCount;
+}
+
+std::u16string_view sharedStateLabel(const ScFormulaCell& rFormula)
+{
+    if (!rFormula.IsShared())
+        return u"non_shared";
+    if (rFormula.IsSharedTop())
+        return u"shared_top";
+    return u"shared_member";
+}
+
+ReplayEligibilityInventory runPromotedReplayEligibilityInventory(
+    const Workbook& rWorkbook, ScDocument& rDoc, const OUString& rWorkbookLabel)
+{
+    ReplayEligibilityInventory aInventory;
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    for (std::size_t nSheet = 0; nSheet < rWorkbook.maSheets.size(); ++nSheet)
+    {
+        for (const auto& rEntry : rWorkbook.maSheets[nSheet].maCells)
+        {
+            const Cell& rCell = rEntry.second;
+            if (!rCell.hasFormula())
+                continue;
+
+            const ScAddress aPos(static_cast<SCCOL>(rEntry.first.first),
+                static_cast<SCROW>(rEntry.first.second), static_cast<SCTAB>(nSheet));
+            ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+            if (!pFormula)
+                continue;
+
+            const OUString aFormulaSource = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF,
+                pContext);
+            const FunctionKind eProbeFunction = classifySupportedProbeFunction(
+                std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()));
+            if (eProbeFunction == FunctionKind::Unknown)
+                continue;
+
+            ++aInventory.mnPromotedFormulaCells;
+            ++aInventory.maFunctionFormulaCells[static_cast<std::size_t>(eProbeFunction)];
+
+            if (pFormula->IsShared())
+            {
+                ++aInventory.mnSharedFormulaCells;
+                if (pFormula->IsSharedTop())
+                    ++aInventory.mnSharedTopFormulaCells;
+                else
+                    ++aInventory.mnSharedMemberFormulaCells;
+            }
+            else
+            {
+                ++aInventory.mnNonSharedFormulaCells;
+            }
+
+            if (pFormula->NeedsInterpret())
+                ++aInventory.mnNeedsInterpretBeforeDirty;
+            if (pFormula->GetMatrixFlag() != ScMatrixMode::NONE)
+                ++aInventory.mnMatrixFormulaCells;
+            if (pFormula->IsHyperLinkCell())
+                ++aInventory.mnHyperLinkFormulaCells;
+            if (!pFormula->GetCode())
+                ++aInventory.mnMissingCodeFormulaCells;
+            if (pFormula->GetRawError() != FormulaError::NONE)
+                ++aInventory.mnRawErrorFormulaCells;
+
+            const bool bNeedsInterpretBeforeDirty = pFormula->NeedsInterpret();
+            spreadsheetengine::compat::libreoffice::interprettaileval::resetStats();
+            pFormula->SetDirty();
+            const bool bNeedsInterpretAfterDirty = pFormula->NeedsInterpret();
+            if (bNeedsInterpretAfterDirty)
+                ++aInventory.mnNeedsInterpretAfterDirty;
+
+            const bool bInterpretReturned = pFormula->Interpret();
+            if (!bInterpretReturned)
+                ++aInventory.mnInterpretReturnedFalse;
+
+            const StatsSnapshot aDirectStats
+                = spreadsheetengine::compat::libreoffice::interprettaileval::getStatsSnapshot();
+            const bool bDirectSeen = statsSeenCount(aDirectStats) > 0;
+            const bool bDirectSupported = aDirectStats.mnObserveCount
+                                              + aDirectStats.mnShadowCompareCount
+                                              + aDirectStats.mnAuthoritativeCount
+                                          > 0;
+            const bool bDirectFallback = totalFallbackCount(aDirectStats) > 0;
+            const bool bDirtyAfterInterpret = pFormula->GetDirty();
+            const bool bNeedsInterpretAfterInterpret = pFormula->NeedsInterpret();
+            if (bDirtyAfterInterpret)
+                ++aInventory.mnDirtyAfterInterpret;
+            if (bNeedsInterpretAfterInterpret)
+                ++aInventory.mnNeedsInterpretAfterInterpret;
+
+            bool bSeenViaSharedTop = false;
+            if (bDirectSeen)
+            {
+                ++aInventory.mnDirectSeen;
+                ++aInventory.maFunctionDirectSeen[static_cast<std::size_t>(eProbeFunction)];
+            }
+            else
+            {
+                ++aInventory.mnDirectUnseen;
+                ++aInventory.maFunctionDirectUnseen[static_cast<std::size_t>(eProbeFunction)];
+
+                if (pFormula->IsShared())
+                {
+                    if (pFormula->IsSharedTop())
+                    {
+                        ++aInventory.mnUnseenSharedTop;
+                    }
+                    else
+                    {
+                        ++aInventory.mnUnseenSharedMember;
+
+                        ScAddress aTopPos = aPos;
+                        aTopPos.SetRow(pFormula->GetSharedTopRow());
+                        if (ScFormulaCell* pTopFormula = rDoc.GetFormulaCell(aTopPos))
+                        {
+                            spreadsheetengine::compat::libreoffice::interprettaileval::resetStats();
+                            pTopFormula->SetDirty();
+                            (void)pTopFormula->Interpret();
+                            const StatsSnapshot aTopStats
+                                = spreadsheetengine::compat::libreoffice::interprettaileval::getStatsSnapshot();
+                            const bool bTopSupported = aTopStats.mnObserveCount
+                                                           + aTopStats.mnShadowCompareCount
+                                                           + aTopStats.mnAuthoritativeCount
+                                                       > 0;
+                            const bool bTopFallback = totalFallbackCount(aTopStats) > 0;
+                            bSeenViaSharedTop = bTopSupported || bTopFallback;
+                            if (bTopSupported)
+                                ++aInventory.mnSharedMemberSeenViaTop;
+                            else if (bTopFallback)
+                                ++aInventory.mnSharedMemberFallbackViaTop;
+                            else
+                                ++aInventory.mnSharedMemberStillUnseenViaTop;
+                        }
+                    }
+                }
+                else
+                {
+                    ++aInventory.mnUnseenNonShared;
+                }
+            }
+
+            if (bDirectSupported)
+                ++aInventory.mnDirectSupported;
+            if (bDirectFallback)
+                ++aInventory.mnDirectFallback;
+
+            if (!bDirectSeen)
+            {
+                maybeAddReplayEligibilityDiagnosticSample(rWorkbookLabel, rDoc, aPos,
+                    eProbeFunction, sharedStateLabel(*pFormula), u"direct_unseen",
+                    bNeedsInterpretBeforeDirty, bNeedsInterpretAfterDirty, bDirtyAfterInterpret,
+                    bSeenViaSharedTop);
+            }
+        }
+    }
+
+    return aInventory;
+}
+
 const char* functionKindName(FunctionKind eFunction)
 {
     switch (eFunction)
@@ -634,6 +898,105 @@ const char* functionKindName(FunctionKind eFunction)
     }
 
     return "count";
+}
+
+void printReplayEligibilityInventory(const ReplayEligibilityInventory& rInventory)
+{
+    std::cout << "interpret_tail_replay_promoted_formula_cells="
+              << rInventory.mnPromotedFormulaCells << '\n';
+    std::cout << "interpret_tail_replay_promoted_shared_formula_cells="
+              << rInventory.mnSharedFormulaCells << '\n';
+    std::cout << "interpret_tail_replay_promoted_shared_top_formula_cells="
+              << rInventory.mnSharedTopFormulaCells << '\n';
+    std::cout << "interpret_tail_replay_promoted_shared_member_formula_cells="
+              << rInventory.mnSharedMemberFormulaCells << '\n';
+    std::cout << "interpret_tail_replay_promoted_non_shared_formula_cells="
+              << rInventory.mnNonSharedFormulaCells << '\n';
+    std::cout << "interpret_tail_replay_promoted_needs_interpret_before_dirty="
+              << rInventory.mnNeedsInterpretBeforeDirty << '\n';
+    std::cout << "interpret_tail_replay_promoted_needs_interpret_after_dirty="
+              << rInventory.mnNeedsInterpretAfterDirty << '\n';
+    std::cout << "interpret_tail_replay_promoted_direct_seen="
+              << rInventory.mnDirectSeen << '\n';
+    std::cout << "interpret_tail_replay_promoted_direct_supported="
+              << rInventory.mnDirectSupported << '\n';
+    std::cout << "interpret_tail_replay_promoted_direct_fallback="
+              << rInventory.mnDirectFallback << '\n';
+    std::cout << "interpret_tail_replay_promoted_direct_unseen="
+              << rInventory.mnDirectUnseen << '\n';
+    std::cout << "interpret_tail_replay_promoted_interpret_returned_false="
+              << rInventory.mnInterpretReturnedFalse << '\n';
+    std::cout << "interpret_tail_replay_promoted_dirty_after_interpret="
+              << rInventory.mnDirtyAfterInterpret << '\n';
+    std::cout << "interpret_tail_replay_promoted_needs_interpret_after_interpret="
+              << rInventory.mnNeedsInterpretAfterInterpret << '\n';
+    std::cout << "interpret_tail_replay_promoted_unseen_shared_top="
+              << rInventory.mnUnseenSharedTop << '\n';
+    std::cout << "interpret_tail_replay_promoted_unseen_shared_member="
+              << rInventory.mnUnseenSharedMember << '\n';
+    std::cout << "interpret_tail_replay_promoted_unseen_non_shared="
+              << rInventory.mnUnseenNonShared << '\n';
+    std::cout << "interpret_tail_replay_promoted_shared_member_seen_via_top="
+              << rInventory.mnSharedMemberSeenViaTop << '\n';
+    std::cout << "interpret_tail_replay_promoted_shared_member_fallback_via_top="
+              << rInventory.mnSharedMemberFallbackViaTop << '\n';
+    std::cout << "interpret_tail_replay_promoted_shared_member_still_unseen_via_top="
+              << rInventory.mnSharedMemberStillUnseenViaTop << '\n';
+    std::cout << "interpret_tail_replay_promoted_matrix_formula_cells="
+              << rInventory.mnMatrixFormulaCells << '\n';
+    std::cout << "interpret_tail_replay_promoted_hyperlink_formula_cells="
+              << rInventory.mnHyperLinkFormulaCells << '\n';
+    std::cout << "interpret_tail_replay_promoted_missing_code_formula_cells="
+              << rInventory.mnMissingCodeFormulaCells << '\n';
+    std::cout << "interpret_tail_replay_promoted_raw_error_formula_cells="
+              << rInventory.mnRawErrorFormulaCells << '\n';
+
+    for (std::size_t nIndex = 1; nIndex < static_cast<std::size_t>(FunctionKind::Count); ++nIndex)
+    {
+        const auto eFunction = static_cast<FunctionKind>(nIndex);
+        const char* pName = functionKindName(eFunction);
+        std::cout << "interpret_tail_replay_promoted_function_" << pName
+                  << "_formula_cells=" << rInventory.maFunctionFormulaCells[nIndex] << '\n';
+        std::cout << "interpret_tail_replay_promoted_function_" << pName
+                  << "_direct_seen=" << rInventory.maFunctionDirectSeen[nIndex] << '\n';
+        std::cout << "interpret_tail_replay_promoted_function_" << pName
+                  << "_direct_unseen=" << rInventory.maFunctionDirectUnseen[nIndex] << '\n';
+    }
+}
+
+void printReplayEligibilityDiagnosticSamples()
+{
+    if (!envEnabled("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_ELIGIBILITY_DIAGNOSTICS"))
+        return;
+
+    const auto& rSamples = replayEligibilityDiagnosticSamples();
+    std::cout << "interpret_tail_replay_eligibility_diagnostic_sample_count=" << rSamples.size()
+              << '\n';
+    for (std::size_t nIndex = 0; nIndex < rSamples.size(); ++nIndex)
+    {
+        const auto& rSample = rSamples[nIndex];
+        std::cout << "interpret_tail_replay_eligibility_diagnostic_" << nIndex << "_workbook="
+                  << rSample.maWorkbookLabel.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_replay_eligibility_diagnostic_" << nIndex << "_cell="
+                  << rSample.maCellAddress.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_replay_eligibility_diagnostic_" << nIndex << "_function="
+                  << rSample.maFunctionName.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_replay_eligibility_diagnostic_" << nIndex << "_shared_state="
+                  << rSample.maSharedState.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_replay_eligibility_diagnostic_" << nIndex << "_outcome="
+                  << rSample.maOutcome.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_replay_eligibility_diagnostic_" << nIndex
+                  << "_needs_interpret_before_dirty="
+                  << (rSample.mbNeedsInterpretBeforeDirty ? 1 : 0) << '\n';
+        std::cout << "interpret_tail_replay_eligibility_diagnostic_" << nIndex
+                  << "_needs_interpret_after_dirty="
+                  << (rSample.mbNeedsInterpretAfterDirty ? 1 : 0) << '\n';
+        std::cout << "interpret_tail_replay_eligibility_diagnostic_" << nIndex
+                  << "_dirty_after_interpret=" << (rSample.mbDirtyAfterInterpret ? 1 : 0)
+                  << '\n';
+        std::cout << "interpret_tail_replay_eligibility_diagnostic_" << nIndex
+                  << "_seen_via_shared_top=" << (rSample.mbSeenViaSharedTop ? 1 : 0) << '\n';
+    }
 }
 
 const char* fallbackReasonName(FallbackReason eReason)
@@ -987,8 +1350,10 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     StatsSnapshot aLiveStats;
     StatsSnapshot aForcedInterpretStats;
     StatsSnapshot aProbeStats;
+    ReplayEligibilityInventory aReplayEligibilityInventory;
     std::vector<DiagnosticSample> aLiveDiagnosticSamples;
     resetProbeDiagnosticSamples();
+    resetReplayEligibilityDiagnosticSamples();
 
     std::size_t nWorkbookCount = 0;
     std::size_t nFormulaCellCount = 0;
@@ -1062,6 +1427,72 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                 accumulateStats(aProbeStats,
                     spreadsheetengine::compat::libreoffice::interprettaileval::getStatsSnapshot());
             }
+
+            {
+                ScopedEnvironmentOverride aObserveMode(
+                    "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "observe");
+                spreadsheetengine::compat::libreoffice::interprettaileval::resetStats();
+                auto aWorkbookInventory = runPromotedReplayEligibilityInventory(
+                    aWorkbook, rDoc, OUString::fromUtf8(rWorkbookPath.string()));
+
+                aReplayEligibilityInventory.mnPromotedFormulaCells
+                    += aWorkbookInventory.mnPromotedFormulaCells;
+                aReplayEligibilityInventory.mnSharedFormulaCells
+                    += aWorkbookInventory.mnSharedFormulaCells;
+                aReplayEligibilityInventory.mnSharedTopFormulaCells
+                    += aWorkbookInventory.mnSharedTopFormulaCells;
+                aReplayEligibilityInventory.mnSharedMemberFormulaCells
+                    += aWorkbookInventory.mnSharedMemberFormulaCells;
+                aReplayEligibilityInventory.mnNonSharedFormulaCells
+                    += aWorkbookInventory.mnNonSharedFormulaCells;
+                aReplayEligibilityInventory.mnNeedsInterpretBeforeDirty
+                    += aWorkbookInventory.mnNeedsInterpretBeforeDirty;
+                aReplayEligibilityInventory.mnNeedsInterpretAfterDirty
+                    += aWorkbookInventory.mnNeedsInterpretAfterDirty;
+                aReplayEligibilityInventory.mnDirectSeen += aWorkbookInventory.mnDirectSeen;
+                aReplayEligibilityInventory.mnDirectSupported
+                    += aWorkbookInventory.mnDirectSupported;
+                aReplayEligibilityInventory.mnDirectFallback
+                    += aWorkbookInventory.mnDirectFallback;
+                aReplayEligibilityInventory.mnDirectUnseen += aWorkbookInventory.mnDirectUnseen;
+                aReplayEligibilityInventory.mnInterpretReturnedFalse
+                    += aWorkbookInventory.mnInterpretReturnedFalse;
+                aReplayEligibilityInventory.mnDirtyAfterInterpret
+                    += aWorkbookInventory.mnDirtyAfterInterpret;
+                aReplayEligibilityInventory.mnNeedsInterpretAfterInterpret
+                    += aWorkbookInventory.mnNeedsInterpretAfterInterpret;
+                aReplayEligibilityInventory.mnSharedMemberSeenViaTop
+                    += aWorkbookInventory.mnSharedMemberSeenViaTop;
+                aReplayEligibilityInventory.mnSharedMemberFallbackViaTop
+                    += aWorkbookInventory.mnSharedMemberFallbackViaTop;
+                aReplayEligibilityInventory.mnSharedMemberStillUnseenViaTop
+                    += aWorkbookInventory.mnSharedMemberStillUnseenViaTop;
+                aReplayEligibilityInventory.mnUnseenSharedTop
+                    += aWorkbookInventory.mnUnseenSharedTop;
+                aReplayEligibilityInventory.mnUnseenSharedMember
+                    += aWorkbookInventory.mnUnseenSharedMember;
+                aReplayEligibilityInventory.mnUnseenNonShared
+                    += aWorkbookInventory.mnUnseenNonShared;
+                aReplayEligibilityInventory.mnMatrixFormulaCells
+                    += aWorkbookInventory.mnMatrixFormulaCells;
+                aReplayEligibilityInventory.mnHyperLinkFormulaCells
+                    += aWorkbookInventory.mnHyperLinkFormulaCells;
+                aReplayEligibilityInventory.mnMissingCodeFormulaCells
+                    += aWorkbookInventory.mnMissingCodeFormulaCells;
+                aReplayEligibilityInventory.mnRawErrorFormulaCells
+                    += aWorkbookInventory.mnRawErrorFormulaCells;
+
+                for (std::size_t nIndex = 0;
+                     nIndex < static_cast<std::size_t>(FunctionKind::Count); ++nIndex)
+                {
+                    aReplayEligibilityInventory.maFunctionFormulaCells[nIndex]
+                        += aWorkbookInventory.maFunctionFormulaCells[nIndex];
+                    aReplayEligibilityInventory.maFunctionDirectSeen[nIndex]
+                        += aWorkbookInventory.maFunctionDirectSeen[nIndex];
+                    aReplayEligibilityInventory.maFunctionDirectUnseen[nIndex]
+                        += aWorkbookInventory.maFunctionDirectUnseen[nIndex];
+                }
+            }
         }
 
         xDocShell->DoClose();
@@ -1073,8 +1504,10 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         aForcedInterpretStats);
     printStats(nWorkbookCount, nFormulaCellCount, aProbeStats);
     std::cout << "interpret_tail_probe_formula_cells=" << nProbeFormulaCount << '\n';
+    printReplayEligibilityInventory(aReplayEligibilityInventory);
     printDiagnosticSamples(aLiveDiagnosticSamples);
     printProbeDiagnosticSamples();
+    printReplayEligibilityDiagnosticSamples();
 
     CPPUNIT_ASSERT_EQUAL(aCorpus.size(), nWorkbookCount);
     CPPUNIT_ASSERT_MESSAGE("all-formula InterpretTail live observe should see at least one formula",
@@ -1086,6 +1519,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         nProbeFormulaCount > 0);
     CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should record authoritative usage",
         aProbeStats.mnAuthoritativeCount > 0);
+    CPPUNIT_ASSERT_EQUAL(nProbeFormulaCount, aReplayEligibilityInventory.mnPromotedFormulaCells);
     CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should attempt at least one promoted family",
         aProbeStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(FunctionKind::Value)]
                 + aProbeStats.maFunctionFallbackCount[static_cast<std::size_t>(FunctionKind::Value)]
@@ -1094,6 +1528,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                 + aProbeStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(FunctionKind::Lookup)]
                 + aProbeStats.maFunctionFallbackCount[static_cast<std::size_t>(FunctionKind::Lookup)]
             > 0);
+    CPPUNIT_ASSERT_MESSAGE("replay eligibility inventory should identify at least one direct unseen promoted cell",
+        aReplayEligibilityInventory.mnDirectUnseen > 0);
 }
 
 } // namespace

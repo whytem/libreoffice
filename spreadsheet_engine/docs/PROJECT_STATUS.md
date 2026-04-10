@@ -70,6 +70,19 @@ Promoted-family fallback reasons:
 - `shadow_mismatch=69`
 - `unsupported_host_surface=19`
 
+### Promoted Replay Eligibility Inventory
+
+- `interpret_tail_replay_promoted_formula_cells=1812`
+- `interpret_tail_replay_promoted_direct_seen=2`
+- `interpret_tail_replay_promoted_direct_unseen=1810`
+- `interpret_tail_replay_promoted_shared_formula_cells=395`
+- `interpret_tail_replay_promoted_non_shared_formula_cells=1417`
+- `interpret_tail_replay_promoted_unseen_shared_member=312`
+- `interpret_tail_replay_promoted_unseen_non_shared=1415`
+- `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=1812`
+- `interpret_tail_replay_promoted_dirty_after_interpret=0`
+
 ### Current Hard-Routed Family Count
 
 - `1` env-independent engine-first family:
@@ -96,8 +109,9 @@ Still not true:
   traffic is still root-error or logical-literal traffic rather than promoted
   family function traffic
 - even the new full forced-interpret replay denominator still surfaces zero
-  promoted-family live traffic, which means the blocker is earlier than access
-  pattern alone
+  promoted-family live traffic, and the replay eligibility inventory now shows
+  that the blocker is dominated by a non-shared pre-tail replay path rather
+  than shared entry or dirty-state
 
 ## Active Delegated Family
 
@@ -133,17 +147,16 @@ historical reference material, not active roadmap.
 
 ## Recommended Next Pass
 
-The next pass should prioritize replay-corpus live eligibility:
+The next pass should target the non-shared replay barrier directly:
 
-1. inventory which promoted-family replay cells never become live seen
-2. compare probe addresses against ambient and forced-interpret seen addresses
-3. identify the dominant pre-tail barrier: dirty-state, shared-group entry, or
-   another live routing condition
-4. only then return to ambient promoted-family conversion work
-
-The latest replay reach closeout is:
-
-- [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md)
+1. instrument the replay path between `Interpret()` entry and
+   `InterpretTail` reach for promoted non-shared formulas
+2. compare replay-imported promoted formulas with curated probe formulas at the
+   token or code-path level
+3. convert the dominant non-shared replay families first:
+   `LOOKUP`, `VLOOKUP`, and promoted logical constants
+4. revisit shared-group replay work only if the non-shared barrier stops
+   dominating
 
 ## References
 

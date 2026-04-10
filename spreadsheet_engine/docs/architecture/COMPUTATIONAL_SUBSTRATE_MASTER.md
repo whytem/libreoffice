@@ -99,8 +99,7 @@ The strategy reset is recorded in
 [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md).
 The active current-state ledger is
 [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md).
-The latest replay reach closeout is recorded in
-[COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md).
+The latest replay eligibility closeout is now folded into that migration ledger.
 
 ## Engine-Owned Today
 
@@ -165,8 +164,9 @@ The highest-value remaining blockers are now:
    promoted-family live traffic is still `0`
 2. replay-corpus pre-tail eligibility:
    even the new full forced-interpret denominator still surfaces
-   `0` promoted-family live traffic, which points to a dirty-state, import, or
-   shared-group entry barrier before the evaluator seam
+   `0` promoted-family live traffic, and the new replay inventory shows that
+   `1,415` of the `1,810` direct-unseen promoted replay cells are non-shared
+   while shared-member top replay still surfaces `0` extra seen cells
 3. promoted-family residual parity:
    `shadow_mismatch=69`
 4. promoted-family residual host access:
@@ -179,15 +179,14 @@ The highest-value remaining blockers are now:
 
 The next pass should:
 
-1. inventory which promoted-family replay cells never become live seen
-2. compare probe addresses against ambient and forced-interpret seen addresses
-3. identify the dominant pre-tail barrier: dirty-state, shared-group entry, or
-   another live routing condition
-4. only then return to ambient promoted-family conversion work
-
-The latest completed closeout for this line is:
-
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md)
+1. instrument the replay path between `Interpret()` entry and
+   `InterpretTail` reach for promoted non-shared formulas
+2. compare replay-imported promoted formulas against curated probe formulas at
+   the token or code-path level
+3. target the dominant non-shared replay families first:
+   `LOOKUP`, `VLOOKUP`, and promoted logical constants
+4. only revisit shared-group replay work if the non-shared barrier stops
+   dominating
 
 ## Navigation
 
@@ -195,7 +194,6 @@ Use these documents in order:
 
 1. [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md)
 2. [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md)
-3. [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md)
-4. [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
-5. [../archive/interpret_tail/](../archive/interpret_tail/)
-6. [../archive/pre_pivot_substrate/](../archive/pre_pivot_substrate/)
+3. [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
+4. [../archive/interpret_tail/](../archive/interpret_tail/)
+5. [../archive/pre_pivot_substrate/](../archive/pre_pivot_substrate/)
