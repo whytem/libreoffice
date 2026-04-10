@@ -1086,7 +1086,31 @@ template <typename T>
     const auto& rRoot = *aParse.mpRoot;
     if (rRoot.meKind == core::formula::NodeKind::FunctionCall)
     {
-        if (uppercaseAscii(rRoot.maPrimaryText) == u"BASISODATETIME" && rRoot.maChildren.size() == 1)
+        const api::String aFunctionName = uppercaseAscii(rRoot.maPrimaryText);
+        if ((aFunctionName == u"CONCATENATE" || aFunctionName == u"CONCAT")
+            && !rRoot.maChildren.empty())
+        {
+            OUString aResult;
+            for (const auto& rxChild : rRoot.maChildren)
+            {
+                if (!rxChild)
+                    return api::CellValue::error(api::Error::IllegalArgument);
+
+                const auto aArgument
+                    = materializeScalarNode(*rxChild, rDoc, rContext, rAddress);
+                if (!aArgument.mbSupported || !aArgument.moValue)
+                    return std::nullopt;
+
+                const auto aText = coerceScalarToText(rDoc, rContext, *aArgument.moValue);
+                if (!aText)
+                    return api::CellValue::error(aText.meError);
+                aResult += aText.maValue;
+            }
+
+            return api::CellValue::text(toApiString(aResult));
+        }
+
+        if (aFunctionName == u"BASISODATETIME" && rRoot.maChildren.size() == 1)
         {
             const auto aArgument = materializeScalarNode(*rRoot.maChildren[0], rDoc, rContext, rAddress);
             if (!aArgument.mbSupported || !aArgument.moValue)

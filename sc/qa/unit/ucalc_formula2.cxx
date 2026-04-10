@@ -1179,12 +1179,20 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_EQUAL(u"Andy"_ustr, m_pDoc->GetString(23, 20, 0));
         CPPUNIT_ASSERT_EQUAL(u"OUT OF BOUND"_ustr, m_pDoc->GetString(23, 21, 0));
         CPPUNIT_ASSERT_EQUAL(u"Res2"_ustr, m_pDoc->GetString(23, 22, 0));
+        for (SCROW nRow = 40; nRow <= 42; ++nRow)
+        {
+            ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(21, nRow, 0));
+            CPPUNIT_ASSERT(pFormula);
+            pFormula->SetDirty();
+        }
+        m_pDoc->SetString(23, 23, 0, u"=LOOKUP(2;U41:V43)"_ustr);
+        CPPUNIT_ASSERT_EQUAL(u"Res2"_ustr, m_pDoc->GetString(23, 23, 0));
         ASSERT_DOUBLES_EQUAL(11.0, m_pDoc->GetValue(0, 23, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(0, 25, 0));
         CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(0, 26, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 20);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 21);
         CPPUNIT_ASSERT(aStats.mnAuthoritativeFallbackCount <= 2);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
