@@ -39,6 +39,9 @@ Today:
 - top-level replay-imported `INDEX` and `XLOOKUP` slice results now scalarize
   through the engine seam instead of falling out as generic host-surface
   fallout
+- the latest bounded `LOOKUP` parity slice tightened scalar-text best-fit,
+  range-backed short-result handling, and host-backed formula-result reads
+  without yet moving the replay counters
 
 What is still not true:
 
@@ -186,6 +189,8 @@ Interpretation:
 - the just-closed slice reduced host-surface fallback materially
 - the current hotspots are now `LOOKUP` / `XLOOKUP` / `VLOOKUP` parity
   mismatch, with smaller residual `VLOOKUP` / `INDEX` host-surface cleanup
+- the latest `LOOKUP` semantics pass improved mismatch fidelity on several
+  range-backed rows, but the dominant replay mismatch counts stayed flat
 
 ### Replay Eligibility Inventory
 
@@ -256,14 +261,17 @@ historical reference material, not active roadmap work.
 
 The latest replay closeout is now folded into this migration ledger.
 
-The next high-value pass should now focus on promoted-family parity cleanup
-after the replay-imported host-surface conversion slice:
+The next high-value pass should now stay on promoted-family parity cleanup,
+starting with the still-dominant `LOOKUP` replay rows:
 
-1. reduce promoted-family `shadow_mismatch`, led by `LOOKUP`
-2. then convert residual `XLOOKUP` and `VLOOKUP` mismatch rows
-3. clean up the remaining replay-imported `VLOOKUP` / `INDEX`
+1. convert the formula-backed `2D` `LOOKUP` replay rows that still surface
+   `error:0` instead of the live text result
+2. convert the remaining range-backed short-result `LOOKUP` rows that still
+   mismatch on `OUT OF BOUND`-style semantics
+3. then convert residual `XLOOKUP` and `VLOOKUP` mismatch rows
+4. clean up the remaining replay-imported `VLOOKUP` / `INDEX`
    `unsupported_host_surface` and `unsupported_formula_shape` fallout
-4. only return to broader reach work if the promoted replay surface regresses
+5. only return to broader reach work if the promoted replay surface regresses
 
 ## Historical Archive
 

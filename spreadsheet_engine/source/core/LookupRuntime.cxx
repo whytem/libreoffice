@@ -399,7 +399,18 @@ api::ValueResult<api::MatrixSize> resolveLookupIndex(const LookupMaterializer& r
             return api::ValueResult<api::MatrixSize>::success(0);
 
         if (rLookup.isText())
+        {
+            if (!rSearchInput.maScalar.isText() && !rSearchInput.maScalar.isEmpty())
+                return api::ValueResult<api::MatrixSize>::failure(api::Error::NotAvailable);
+
+            const api::StringView aCandidateText
+                = rSearchInput.maScalar.isText() ? api::StringView(rSearchInput.maScalar.maString)
+                                                 : api::StringView();
+            if (sequery::compareFoldedText(aCandidateText, rLookup.maString) <= 0)
+                return api::ValueResult<api::MatrixSize>::success(0);
+
             return api::ValueResult<api::MatrixSize>::failure(api::Error::NotAvailable);
+        }
 
         const auto aLookupNumber = coerceToNumber(rLookup);
         const auto aDataNumber = coerceToNumber(rSearchInput.maScalar);

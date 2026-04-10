@@ -104,6 +104,8 @@ Today:
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
+- the latest `LOOKUP` semantics pass tightened scalar-text and range-backed
+  behavior, but did not move the replay counters yet
 
 Still not true:
 
@@ -115,6 +117,9 @@ Still not true:
   replay-imported promoted fallback further
 - the dominant retained promoted-family blocker is now `shadow_mismatch`,
   with residual `VLOOKUP` / `INDEX` host-surface fallout secondary
+- the next highest-value replay blocker is still the bounded `LOOKUP` parity
+  band, especially formula-backed `2D` result rows and remaining
+  `OUT OF BOUND` range-backed rows
 
 ## Active Delegated Family
 
@@ -150,13 +155,16 @@ historical reference material, not active roadmap.
 
 ## Recommended Next Pass
 
-The next pass should target promoted-family parity cleanup:
+The next pass should stay on promoted-family parity cleanup:
 
-1. reduce promoted-family `shadow_mismatch`, led by `LOOKUP`
-2. then convert residual `XLOOKUP` and `VLOOKUP` mismatch rows
-3. clean up the remaining replay-imported `VLOOKUP` / `INDEX`
+1. convert the formula-backed `2D` `LOOKUP` replay rows that still return
+   `error:0` instead of the live text result
+2. convert the remaining range-backed short-result `LOOKUP` rows that still
+   miss Calc's `OUT OF BOUND`-style behavior
+3. then convert residual `XLOOKUP` and `VLOOKUP` mismatch rows
+4. clean up the remaining replay-imported `VLOOKUP` / `INDEX`
    `unsupported_host_surface` and `unsupported_formula_shape` fallout
-4. only return to broader reach work if the promoted replay surface regresses
+5. only return to broader reach work if the promoted replay surface regresses
 
 ## References
 

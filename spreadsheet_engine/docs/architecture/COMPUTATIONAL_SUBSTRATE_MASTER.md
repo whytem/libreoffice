@@ -174,15 +174,22 @@ The highest-value remaining blockers are now:
    one family is hard-routed, but no `ScInterpreter` subroutine has been
    deleted yet
 
+The latest bounded `LOOKUP` semantics slice improved parity fidelity on
+several replay rows, but it did not move the replay counters. That means the
+top parity blocker is now narrower and clearer than before, not broader.
+
 ## Recommended Next Pass
 
 The next pass should:
 
-1. reduce promoted-family `shadow_mismatch`, led by `LOOKUP`
-2. then convert residual `XLOOKUP` and `VLOOKUP` mismatch rows
-3. clean up the remaining replay-imported `VLOOKUP` / `INDEX`
+1. convert the formula-backed `2D` `LOOKUP` replay rows that still surface
+   `error:0`
+2. convert the remaining range-backed short-result `LOOKUP` rows that still
+   miss Calc's `OUT OF BOUND`-style behavior
+3. then convert residual `XLOOKUP` and `VLOOKUP` mismatch rows
+4. clean up the remaining replay-imported `VLOOKUP` / `INDEX`
    `unsupported_host_surface` and `unsupported_formula_shape` fallout
-4. move the first replay-imported promoted family from observe-only reach
+5. move the first replay-imported promoted family from observe-only reach
    toward a broader authority candidate once host-surface and shape fallback
    shrink materially
 

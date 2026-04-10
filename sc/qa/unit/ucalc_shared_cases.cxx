@@ -862,6 +862,17 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(
             aLookupArray.maResult.maString));
 
+    const auto aLookupScalarSearchVector = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0),
+        u"=LOOKUP(\"B\";{\"A\"};{\"Andy\";\"Bruce\";\"Charlie\"})", false);
+    CPPUNIT_ASSERT(aLookupScalarSearchVector.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aLookupScalarSearchVector.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"Andy"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aLookupScalarSearchVector.maResult.maString));
+
     const auto aLookupArrayFormSquare = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 8, 0), u"=LOOKUP(5;{1;2;3|4;5;6|7;8;9})", false);
     CPPUNIT_ASSERT(aLookupArrayFormSquare.mbSupported);
@@ -890,6 +901,42 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         aLookupShortResultVector.maResult.meType);
     CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::Error::NotAvailable,
         aLookupShortResultVector.maResult.meError);
+
+    m_pDoc->SetString(18, 30, 0, u"A"_ustr);
+    m_pDoc->SetString(18, 31, 0, u"B"_ustr);
+    m_pDoc->SetString(18, 32, 0, u"C"_ustr);
+    m_pDoc->SetString(18, 33, 0, u"D"_ustr);
+    m_pDoc->SetString(18, 34, 0, u"E"_ustr);
+    m_pDoc->SetString(19, 30, 0, u"=CONCATENATE(\"Res\";S31)"_ustr);
+    m_pDoc->SetString(19, 31, 0, u"=CONCATENATE(\"Res\";S32)"_ustr);
+    m_pDoc->SetString(19, 32, 0, u"=CONCATENATE(\"Res\";S33)"_ustr);
+
+    const auto aLookupShortResultRange = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(20, 30, 0), u"=LOOKUP(\"E\";S31:S35;T31:T33)", false);
+    CPPUNIT_ASSERT(aLookupShortResultRange.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aLookupShortResultRange.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"ResC"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aLookupShortResultRange.maResult.maString));
+
+    m_pDoc->SetValue(20, 40, 0, 1.0);
+    m_pDoc->SetValue(20, 41, 0, 2.0);
+    m_pDoc->SetValue(20, 42, 0, 3.0);
+    m_pDoc->SetString(21, 40, 0, u"=CONCATENATE(\"Res\";U41)"_ustr);
+    m_pDoc->SetString(21, 41, 0, u"=CONCATENATE(\"Res\";U42)"_ustr);
+    m_pDoc->SetString(21, 42, 0, u"=CONCATENATE(\"Res\";U43)"_ustr);
+
+    const auto aLookupFormulaBackedRange = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(22, 40, 0), u"=LOOKUP(2;U41:V43)", false);
+    CPPUNIT_ASSERT(aLookupFormulaBackedRange.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aLookupFormulaBackedRange.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"Res2"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aLookupFormulaBackedRange.maResult.maString));
 
     const auto aLookupMatrixArithmetic = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(4, 11, 0), u"=LOOKUP(4;B12:D12*2;B13:D13/3)", false);

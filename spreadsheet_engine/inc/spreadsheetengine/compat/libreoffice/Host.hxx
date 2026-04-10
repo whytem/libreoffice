@@ -48,6 +48,24 @@ enum class HostCellStringKind : std::uint8_t
     if (rCell.isEmpty())
         return spreadsheetengine::api::CellValue::empty();
 
+    if (rCell.getType() == CELLTYPE_FORMULA)
+    {
+        ScFormulaCell* pFormula = rCell.getFormula();
+        if (!pFormula)
+            return spreadsheetengine::api::CellValue::empty();
+
+        if (const FormulaError eError = pFormula->GetErrCode(); eError != FormulaError::NONE)
+            return spreadsheetengine::api::CellValue::error(toApiError(eError));
+
+        if (pFormula->IsValue())
+            return spreadsheetengine::api::CellValue::number(pFormula->GetRawValue());
+
+        const OUString aString = eStringKind == HostCellStringKind::Display
+                                     ? pFormula->GetString().getString()
+                                     : pFormula->GetRawString().getString();
+        return spreadsheetengine::api::CellValue::text(toApiString(aString));
+    }
+
     if (rCell.hasError())
         return spreadsheetengine::api::CellValue::error(toApiError(rDoc.GetErrCode(rAddress)));
 

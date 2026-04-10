@@ -578,8 +578,19 @@ resolveLookupResult(const ScDocument& rDoc, ScInterpreterContext& rContext,
             return spreadsheetengine::api::ValueResult<LookupExecutionResult>::success(
                 detail::makeScalarResult(rRequest.moResultInput->maScalar));
         }
+        spreadsheetengine::api::MatrixSize nResultIndex = aResolvedIndex.maValue;
+        if (nResultIndex >= oResultLayout->mnLength)
+        {
+            if (rRequest.moResultInput->maValues.empty() && oResultLayout->mnLength > 0)
+                nResultIndex = oResultLayout->mnLength - 1;
+            else
+            {
+                return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
+                    spreadsheetengine::api::Error::NotAvailable);
+            }
+        }
         return detail::makeVectorElementResult(
-            aMaterializer, *rRequest.moResultInput, *oResultLayout, aResolvedIndex.maValue);
+            aMaterializer, *rRequest.moResultInput, *oResultLayout, nResultIndex);
     }
 
     if (bArrayFormVectorized)

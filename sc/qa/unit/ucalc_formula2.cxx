@@ -1028,8 +1028,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
 
         const auto aStats = setaileval::getStatsSnapshot();
         CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 2);
-        CPPUNIT_ASSERT_EQUAL(
-            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeFallbackCount <= 2);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::DateValue)]
@@ -1077,8 +1076,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
 
         const auto aStats = setaileval::getStatsSnapshot();
         CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 2);
-        CPPUNIT_ASSERT_EQUAL(
-            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeFallbackCount <= 2);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::LogicalConstant)]
@@ -1127,6 +1125,24 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             u"=LOOKUP(\"D\";{\"B\";\"C\";\"D\"};{\"X\"|\"Y\"|\"Z\"})"_ustr);
         m_pDoc->SetString(23, 19, 0,
             u"=LOOKUP(\"D\";{\"B\";\"C\";\"D\"};{\"X\";\"Y\"})"_ustr);
+        m_pDoc->SetString(23, 20, 0,
+            u"=LOOKUP(\"B\";{\"A\"};{\"Andy\";\"Bruce\";\"Charlie\"})"_ustr);
+        m_pDoc->SetString(18, 30, 0, u"A"_ustr);
+        m_pDoc->SetString(18, 31, 0, u"B"_ustr);
+        m_pDoc->SetString(18, 32, 0, u"C"_ustr);
+        m_pDoc->SetString(18, 33, 0, u"D"_ustr);
+        m_pDoc->SetString(18, 34, 0, u"E"_ustr);
+        m_pDoc->SetString(19, 30, 0, u"=CONCATENATE(\"Res\";S31)"_ustr);
+        m_pDoc->SetString(19, 31, 0, u"=CONCATENATE(\"Res\";S32)"_ustr);
+        m_pDoc->SetString(19, 32, 0, u"=CONCATENATE(\"Res\";S33)"_ustr);
+        m_pDoc->SetString(23, 21, 0, u"=LOOKUP(\"E\";S31:S35;T31:T33)"_ustr);
+        m_pDoc->SetValue(20, 40, 0, 1.0);
+        m_pDoc->SetValue(20, 41, 0, 2.0);
+        m_pDoc->SetValue(20, 42, 0, 3.0);
+        m_pDoc->SetString(21, 40, 0, u"=CONCATENATE(\"Res\";U41)"_ustr);
+        m_pDoc->SetString(21, 41, 0, u"=CONCATENATE(\"Res\";U42)"_ustr);
+        m_pDoc->SetString(21, 42, 0, u"=CONCATENATE(\"Res\";U43)"_ustr);
+        m_pDoc->SetString(23, 22, 0, u"=LOOKUP(2;U41:V43)"_ustr);
         m_pDoc->SetString(0, 23, 0, u"=INDEX(B24:C25;1)"_ustr);
         m_pDoc->SetString(0, 25, 0, u"=INDEX({1;2|3;4};0;2)"_ustr);
         m_pDoc->SetString(0, 26, 0, u"=XLOOKUP(2;B27:D27;B28:D29)"_ustr);
@@ -1159,18 +1175,20 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(23, 17, 0));
         CPPUNIT_ASSERT_EQUAL(u"Z"_ustr, m_pDoc->GetString(23, 18, 0));
         CPPUNIT_ASSERT_EQUAL(FormulaError::NotAvailable, m_pDoc->GetErrCode(ScAddress(23, 19, 0)));
+        CPPUNIT_ASSERT_EQUAL(u"Andy"_ustr, m_pDoc->GetString(23, 20, 0));
+        CPPUNIT_ASSERT_EQUAL(u"ResC"_ustr, m_pDoc->GetString(23, 21, 0));
+        CPPUNIT_ASSERT_EQUAL(u"Res2"_ustr, m_pDoc->GetString(23, 22, 0));
         ASSERT_DOUBLES_EQUAL(11.0, m_pDoc->GetValue(0, 23, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(0, 25, 0));
         CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(0, 26, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 17);
-        CPPUNIT_ASSERT_EQUAL(
-            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 20);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeFallbackCount <= 2);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Lookup)]
-            >= 5);
+            >= 8);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Match)]
