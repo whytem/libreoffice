@@ -1024,6 +1024,23 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(
             aLookupFormulaBacked2D.maResult.maString));
 
+    for (SCROW nRow = 0; nRow <= 3; ++nRow)
+    {
+        ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(22, nRow, 0));
+        CPPUNIT_ASSERT(pFormula);
+        pFormula->SetDirty();
+    }
+
+    const auto aLookupDirtyFormulaBacked2D = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(23, 2, 0), u"=LOOKUP(1;U1:W4)", false);
+    CPPUNIT_ASSERT(aLookupDirtyFormulaBacked2D.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aLookupDirtyFormulaBacked2D.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"11 2"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aLookupDirtyFormulaBacked2D.maResult.maString));
+
     const auto aMatchArray = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 8, 0), u"=MATCH(2;{1;2;3};0)", false);
     CPPUNIT_ASSERT(aMatchArray.mbSupported);

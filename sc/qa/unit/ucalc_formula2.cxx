@@ -1190,9 +1190,17 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         ASSERT_DOUBLES_EQUAL(11.0, m_pDoc->GetValue(0, 23, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(0, 25, 0));
         CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(0, 26, 0));
+        for (SCROW nRow = 0; nRow <= 3; ++nRow)
+        {
+            ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(22, nRow, 0));
+            CPPUNIT_ASSERT(pFormula);
+            pFormula->SetDirty();
+        }
+        m_pDoc->SetString(13, 5, 0, u"=LOOKUP(1;U1:W4)"_ustr);
+        CPPUNIT_ASSERT_EQUAL(u"11 2"_ustr, m_pDoc->GetString(13, 5, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 21);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 22);
         CPPUNIT_ASSERT(aStats.mnAuthoritativeFallbackCount <= 2);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(

@@ -1152,6 +1152,28 @@ template <typename T>
                 return std::nullopt;
         }
     }
+    else if (rRoot.meKind == core::formula::NodeKind::BinaryOperation
+             && rRoot.meBinaryOperator == core::formula::BinaryOperator::Concat
+             && rRoot.maChildren.size() == 2)
+    {
+        OUString aResult;
+        for (const auto& rxChild : rRoot.maChildren)
+        {
+            if (!rxChild)
+                return api::CellValue::error(api::Error::IllegalArgument);
+
+            const auto aArgument = materializeScalarNode(*rxChild, rDoc, rContext, rAddress);
+            if (!aArgument.mbSupported || !aArgument.moValue)
+                return std::nullopt;
+
+            const auto aText = coerceScalarToText(rDoc, rContext, *aArgument.moValue);
+            if (!aText)
+                return api::CellValue::error(aText.meError);
+            aResult += aText.maValue;
+        }
+
+        return api::CellValue::text(toApiString(aResult));
+    }
 
     const auto aScalar = materializeScalarNode(rRoot, rDoc, rContext, rAddress);
     if (!aScalar.mbSupported || !aScalar.moValue)
