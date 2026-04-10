@@ -979,6 +979,25 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::api::formulavalue::ValueType::Value, aIndexArray.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, aIndexArray.maResult.mfValue, 1e-12);
 
+    m_pDoc->SetValue(1, 23, 0, 11.0);
+    m_pDoc->SetValue(2, 23, 0, 12.0);
+    m_pDoc->SetValue(1, 24, 0, 21.0);
+    m_pDoc->SetValue(2, 24, 0, 22.0);
+
+    const auto aIndexReferenceRowSlice = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(0, 23, 0), u"=INDEX(B24:C25;1)", false);
+    CPPUNIT_ASSERT(aIndexReferenceRowSlice.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::Value,
+        aIndexReferenceRowSlice.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(11.0, aIndexReferenceRowSlice.maResult.mfValue, 1e-12);
+
+    const auto aIndexArrayColumnSlice = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(0, 25, 0), u"=INDEX({1;2|3;4};0;2)", false);
+    CPPUNIT_ASSERT(aIndexArrayColumnSlice.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::Value,
+        aIndexArrayColumnSlice.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aIndexArrayColumnSlice.maResult.mfValue, 1e-12);
+
     const auto aXLookup = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 4, 0), u"=XLOOKUP(A5;B5:B7;C5:C7)", false);
     CPPUNIT_ASSERT(aXLookup.mbSupported);
@@ -1009,6 +1028,26 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     CPPUNIT_ASSERT_EQUAL(u"two"_ustr,
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(
             aXLookupArray.maResult.maString));
+
+    m_pDoc->SetValue(1, 26, 0, 1.0);
+    m_pDoc->SetValue(2, 26, 0, 2.0);
+    m_pDoc->SetValue(3, 26, 0, 3.0);
+    m_pDoc->SetString(1, 27, 0, u"one"_ustr);
+    m_pDoc->SetString(2, 27, 0, u"two"_ustr);
+    m_pDoc->SetString(3, 27, 0, u"three"_ustr);
+    m_pDoc->SetString(1, 28, 0, u"ONE"_ustr);
+    m_pDoc->SetString(2, 28, 0, u"TWO"_ustr);
+    m_pDoc->SetString(3, 28, 0, u"THREE"_ustr);
+
+    const auto aXLookupReferenceColumnSlice = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(0, 26, 0), u"=XLOOKUP(2;B27:D27;B28:D29)", false);
+    CPPUNIT_ASSERT(aXLookupReferenceColumnSlice.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::XLookup, aXLookupReferenceColumnSlice.meFunction);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::String,
+        aXLookupReferenceColumnSlice.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"two"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aXLookupReferenceColumnSlice.maResult.maString));
 
     const auto aNestedXLookupRowSlice = setaileval::tryEvaluateFormula(*m_pDoc, rContext,
         ScAddress(3, 8, 0),

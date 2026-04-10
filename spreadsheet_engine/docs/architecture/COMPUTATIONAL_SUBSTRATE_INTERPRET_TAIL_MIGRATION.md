@@ -36,6 +36,9 @@ Today:
   observe bridge
 - nested delegated `XLOOKUP` and `INDEX` matrix-return sources now stay inside
   the engine seam on the replay-imported promoted surface
+- top-level replay-imported `INDEX` and `XLOOKUP` slice results now scalarize
+  through the engine seam instead of falling out as generic host-surface
+  fallout
 
 What is still not true:
 
@@ -44,7 +47,7 @@ What is still not true:
 - the full replay corpus now shows material ambient live-seam traffic
 - the full replay corpus still reaches only a bounded minority of formulas
 - residual replay-live fallback is now concentrated in promoted-family
-  `unsupported_formula_shape` and `unsupported_host_surface`
+  `shadow_mismatch`, with narrowed `unsupported_host_surface` secondary
 - no promoted family has moved from observe-only replay reach into a broader
   replay authority lane yet
 
@@ -108,21 +111,21 @@ Two different denominators matter, and both are now reported.
 ### Full Replay Corpus: Ambient Live Observe
 
 This is the honest all-formula live-routing surface from the standing replay
-corpus after the completed ambient residual-blocker conversion slice:
+corpus after the completed replay-imported host-surface cleanup slice:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=4142`
-- `interpret_tail_live_fallback_total=84`
+- `interpret_tail_live_supported_total=4158`
+- `interpret_tail_live_fallback_total=68`
 - `interpret_tail_live_seen_total=4226`
 - `interpret_tail_live_unseen_formula_cells=46435`
-- `interpret_tail_live_promoted_function_supported_total=2892`
-- `interpret_tail_live_supported_rate=8.18`
+- `interpret_tail_live_promoted_function_supported_total=2908`
+- `interpret_tail_live_supported_rate=8.21`
 - `interpret_tail_live_seen_rate=8.34`
 
 Current ambient fallback reasons:
 
 - `unsupported_formula_shape=46`
-- `unsupported_host_surface=38`
+- `unsupported_host_surface=22`
 - `parse_failure=0`
 
 Interpretation:
@@ -133,8 +136,9 @@ Interpretation:
   traffic
 - the pre-RPN observe bridge converted the replay-promoted reach problem into a
   residual family-fallback problem
-- the main remaining ambient replay work is no longer “find the seam”; it is
-  cleanup inside already-promoted families
+- the just-closed slice materially reduced replay-live host-surface fallout
+- the main remaining ambient replay work is now parity cleanup inside
+  already-promoted families
 
 ### Full Replay Corpus: Forced Interpret Observe
 
@@ -142,12 +146,12 @@ This is the new full-corpus measurement after explicitly dirtying and forcing
 every replay formula cell through Calc's live `Interpret()` path:
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=2071`
-- `interpret_tail_forced_interpret_fallback_total=42`
+- `interpret_tail_forced_interpret_supported_total=2079`
+- `interpret_tail_forced_interpret_fallback_total=34`
 - `interpret_tail_forced_interpret_seen_total=2113`
 - `interpret_tail_forced_interpret_unseen_formula_cells=48548`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=1446`
-- `interpret_tail_forced_interpret_supported_rate=4.09`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=1454`
+- `interpret_tail_forced_interpret_supported_rate=4.10`
 - `interpret_tail_forced_interpret_seen_rate=4.17`
 
 Interpretation:
@@ -164,23 +168,24 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1701`
-- `interpret_tail_authoritative_fallback_total=111`
-- promoted-family authoritative rate: `93.87%`
+- `interpret_tail_authoritative_total=1708`
+- `interpret_tail_authoritative_fallback_total=104`
+- promoted-family authoritative rate: `94.26%`
 
 Current promoted-family fallback reasons:
 
 - `unsupported_formula_shape=23`
-- `shadow_mismatch=69`
-- `unsupported_host_surface=19`
+- `shadow_mismatch=70`
+- `unsupported_host_surface=11`
 
 Interpretation:
 
 - once the probe hits promoted-family cells, authority conversion is now
   strong
 - the main remaining conversion work is no longer generic breadth
-- the current hotspots are residual mismatch and host-surface cleanup on the
-  already-promoted families
+- the just-closed slice reduced host-surface fallback materially
+- the current hotspots are now `LOOKUP` / `XLOOKUP` / `VLOOKUP` parity
+  mismatch, with smaller residual `VLOOKUP` / `INDEX` host-surface cleanup
 
 ### Replay Eligibility Inventory
 
@@ -190,8 +195,8 @@ surface after forcing each promoted replay formula through direct live
 
 - `interpret_tail_replay_promoted_formula_cells=1812`
 - `interpret_tail_replay_promoted_direct_seen=1812`
-- `interpret_tail_replay_promoted_direct_supported=1770`
-- `interpret_tail_replay_promoted_direct_fallback=42`
+- `interpret_tail_replay_promoted_direct_supported=1778`
+- `interpret_tail_replay_promoted_direct_fallback=34`
 - `interpret_tail_replay_promoted_direct_unseen=0`
 - `interpret_tail_replay_promoted_shared_formula_cells=395`
 - `interpret_tail_replay_promoted_shared_top_formula_cells=83`
@@ -209,13 +214,13 @@ Interpretation:
 - the pre-tail replay eligibility blocker is cleared for the promoted replay
   surface
 - both shared and non-shared promoted replay formulas now reach the live seam
-- the residual replay work is now the `42` direct fallback cells on this
+- the residual replay work is now the `34` direct fallback cells on this
   imported promoted-family surface
-- the just-closed slice converted delegated matrix-return `XLOOKUP` and
-  `INDEX` sources on the replay-imported surface
-- the dominant next targets are now the retained replay-imported host-surface
-  and parity fallbacks on `VLOOKUP`, `XLOOKUP`, `MATCH`, `XMATCH`, `INDEX`,
-  and bounded `VALUE`
+- the just-closed slice converted bounded top-level `INDEX` / `XLOOKUP` slice
+  results on the replay-imported surface
+- the dominant next targets are now parity fallbacks on `LOOKUP`, `XLOOKUP`,
+  and `VLOOKUP`, plus the residual replay-imported `VLOOKUP` / `INDEX`
+  host-surface and shape cases
 
 ## Hard-Routed Family
 
@@ -251,14 +256,13 @@ historical reference material, not active roadmap work.
 
 The latest replay closeout is now folded into this migration ledger.
 
-The next high-value pass should now focus on replay-imported promoted fallback
-cleanup after the nested matrix-return conversion slice:
+The next high-value pass should now focus on promoted-family parity cleanup
+after the replay-imported host-surface conversion slice:
 
-1. reduce replay-live `unsupported_host_surface` on promoted families
-2. prioritize scalar projection and result-surface cleanup for `VLOOKUP`,
-   `XLOOKUP`, and `INDEX`
-3. then continue residual `unsupported_formula_shape` cleanup on `MATCH`,
-   `XMATCH`, and bounded `VALUE`
+1. reduce promoted-family `shadow_mismatch`, led by `LOOKUP`
+2. then convert residual `XLOOKUP` and `VLOOKUP` mismatch rows
+3. clean up the remaining replay-imported `VLOOKUP` / `INDEX`
+   `unsupported_host_surface` and `unsupported_formula_shape` fallout
 4. only return to broader reach work if the promoted replay surface regresses
 
 ## Historical Archive

@@ -1877,7 +1877,7 @@ inline void putScalarIntoMatrix(
 }
 
 [[nodiscard]] inline EvaluationAttempt materializeLookupResult(FunctionKind eFunction,
-    const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const ScAddress& rFormulaPos,
     const lookupexecution::LookupExecutionResult& rResult)
 {
     const auto makeLookupScalarAttempt = [&](const api::CellValue& rValue) {
@@ -1887,16 +1887,28 @@ inline void putScalarIntoMatrix(
     if (rResult.meKind == lookupexecution::LookupExecutionResult::Kind::Scalar)
         return makeLookupScalarAttempt(rResult.maScalar);
 
-    if (rResult.isSingleCellReference())
-        return makeLookupScalarAttempt(
-            readMaterializedHostCellValue(rDoc, rContext, rResult.maRange.aStart));
+    if (rResult.meKind == lookupexecution::LookupExecutionResult::Kind::Reference)
+    {
+        ScAddress aScalarAddress = rResult.maRange.aStart;
+        if (!rResult.isSingleCellReference())
+        {
+            if (const auto oImplicit = tryImplicitIntersectionAddress(rResult.maRange, rFormulaPos);
+                oImplicit && *oImplicit != rFormulaPos)
+            {
+                aScalarAddress = *oImplicit;
+            }
+        }
+        if (aScalarAddress == rFormulaPos)
+            return makeUnsupported(eFunction, FallbackReason::UnsupportedHostSurface);
+        return makeLookupScalarAttempt(readMaterializedHostCellValue(rDoc, rContext, aScalarAddress));
+    }
 
     if (rResult.meKind == lookupexecution::LookupExecutionResult::Kind::Matrix && rResult.mpMatrix)
     {
         SCSIZE nColumns = 0;
         SCSIZE nRows = 0;
         rResult.mpMatrix->GetDimensions(nColumns, nRows);
-        if (nColumns == 1 && nRows == 1)
+        if (nColumns >= 1 && nRows >= 1)
             return makeLookupScalarAttempt(lookupexecution::detail::toApiCellValue(rResult.mpMatrix->Get(0, 0)));
     }
 
@@ -2277,7 +2289,7 @@ inline void putScalarIntoMatrix(
         const auto aResolved = lookupexecution::resolveLookupResult(rDoc, rContext, aRequest);
         if (!aResolved)
             return makeErrorResult(eFunction, aResolved.meError);
-        return materializeLookupResult(eFunction, rDoc, rContext, aResolved.maValue);
+        return materializeLookupResult(eFunction, rDoc, rContext, rFormulaPos, aResolved.maValue);
     }
 
     if (eFunction == FunctionKind::VLookup || eFunction == FunctionKind::HLookup)
@@ -2337,7 +2349,7 @@ inline void putScalarIntoMatrix(
             = lookupexecution::resolveTabularLookupResult(rDoc, rContext, aRequest);
         if (!aResolved)
             return makeErrorResult(eFunction, aResolved.meError);
-        return materializeLookupResult(eFunction, rDoc, rContext, aResolved.maValue);
+        return materializeLookupResult(eFunction, rDoc, rContext, rFormulaPos, aResolved.maValue);
     }
 
     if (eFunction == FunctionKind::XLookup)
@@ -2422,7 +2434,7 @@ inline void putScalarIntoMatrix(
             }
             return makeErrorResult(eFunction, aResolved.meError);
         }
-        return materializeLookupResult(eFunction, rDoc, rContext, aResolved.maValue);
+        return materializeLookupResult(eFunction, rDoc, rContext, rFormulaPos, aResolved.maValue);
     }
 
     if (eFunction == FunctionKind::Index)
@@ -2459,13 +2471,11 @@ inline void putScalarIntoMatrix(
                 static_cast<std::uint8_t>(rNode.maChildren.size()));
             if (!aSelection)
                 return makeErrorResult(eFunction, aSelection.meError);
-            if (!aSelection.maValue.maRange.isSingleCell())
-                return makeUnsupported(eFunction, FallbackReason::UnsupportedHostSurface);
 
             lookupexecution::LookupExecutionResult aResult;
             aResult.meKind = lookupexecution::LookupExecutionResult::Kind::Reference;
             aResult.maRange = toLibreOfficeRange(aSelection.maValue.maRange);
-            return materializeLookupResult(eFunction, rDoc, rContext, aResult);
+            return materializeLookupResult(eFunction, rDoc, rContext, rFormulaPos, aResult);
         }
         if (!aReferenceSource.mbSupported
             && aReferenceSource.meFallbackReason != FallbackReason::UnsupportedFormulaShape)
@@ -2491,12 +2501,6 @@ inline void putScalarIntoMatrix(
                 static_cast<std::uint8_t>(rNode.maChildren.size()));
             if (!aSelection)
                 return makeErrorResult(eFunction, aSelection.meError);
-            if (aSelection.maValue.maDimensions.mnColumns != 1
-                || aSelection.maValue.maDimensions.mnRows != 1)
-            {
-                return makeUnsupported(eFunction, FallbackReason::UnsupportedHostSurface);
-            }
-
             const api::CellValue aScalar = lookupexecution::detail::toApiCellValue(
                 (*aMatrixSource.moValue)->Get(static_cast<SCSIZE>(aSelection.maValue.maStart.mnColumn),
                     static_cast<SCSIZE>(aSelection.maValue.maStart.mnRow)));
@@ -2677,10 +2681,10 @@ inline void putScalarIntoMatrix(
 
     auto aAttempt = detail::evaluateDelegatedNode(
         rRoot, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
-    if (!aAttempt.mbSupported && aAttempt.meFallbackReason == FallbackReason::UnsupportedFunction)
+    if (!aAttempt.mbSupported)
     {
-        detail::recordDiagnosticSample(FallbackReason::UnsupportedFunction, rDoc, rFormulaPos,
-            rFormulaSource, aNormalized, rRoot.meKind);
+        detail::recordDiagnosticSample(aAttempt.meFallbackReason, rDoc, rFormulaPos, rFormulaSource,
+            aNormalized, rRoot.meKind);
     }
     return aAttempt;
 }
