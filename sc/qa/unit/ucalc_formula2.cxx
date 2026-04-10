@@ -1135,6 +1135,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetString(19, 30, 0, u"=CONCATENATE(\"Res\";S31)"_ustr);
         m_pDoc->SetString(19, 31, 0, u"=CONCATENATE(\"Res\";S32)"_ustr);
         m_pDoc->SetString(19, 32, 0, u"=CONCATENATE(\"Res\";S33)"_ustr);
+        m_pDoc->SetString(19, 34, 0, u"OUT OF BOUND"_ustr);
         m_pDoc->SetString(23, 21, 0, u"=LOOKUP(\"E\";S31:S35;T31:T33)"_ustr);
         m_pDoc->SetValue(20, 40, 0, 1.0);
         m_pDoc->SetValue(20, 41, 0, 2.0);
@@ -1176,7 +1177,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_EQUAL(u"Z"_ustr, m_pDoc->GetString(23, 18, 0));
         CPPUNIT_ASSERT_EQUAL(FormulaError::NotAvailable, m_pDoc->GetErrCode(ScAddress(23, 19, 0)));
         CPPUNIT_ASSERT_EQUAL(u"Andy"_ustr, m_pDoc->GetString(23, 20, 0));
-        CPPUNIT_ASSERT_EQUAL(u"ResC"_ustr, m_pDoc->GetString(23, 21, 0));
+        CPPUNIT_ASSERT_EQUAL(u"OUT OF BOUND"_ustr, m_pDoc->GetString(23, 21, 0));
         CPPUNIT_ASSERT_EQUAL(u"Res2"_ustr, m_pDoc->GetString(23, 22, 0));
         ASSERT_DOUBLES_EQUAL(11.0, m_pDoc->GetValue(0, 23, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(0, 25, 0));

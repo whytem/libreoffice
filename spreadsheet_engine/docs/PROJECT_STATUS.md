@@ -60,14 +60,14 @@ Ambient live fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1708`
-- `interpret_tail_authoritative_fallback_total=104`
-- promoted-family authoritative rate: `94.26%`
+- `interpret_tail_authoritative_total=1713`
+- `interpret_tail_authoritative_fallback_total=99`
+- promoted-family authoritative rate: `94.54%`
 
 Promoted-family fallback reasons:
 
 - `unsupported_formula_shape=23`
-- `shadow_mismatch=70`
+- `shadow_mismatch=65`
 - `unsupported_host_surface=11`
 
 ### Promoted Replay Eligibility Inventory
@@ -104,8 +104,9 @@ Today:
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
-- the latest `LOOKUP` semantics pass tightened scalar-text and range-backed
-  behavior, but did not move the replay counters yet
+- the latest `LOOKUP` parity pass converted bounded short-result and
+  formula-result rows on the promoted replay surface, improving probe
+  authority without changing the broader ambient replay denominator
 
 Still not true:
 
@@ -117,9 +118,9 @@ Still not true:
   replay-imported promoted fallback further
 - the dominant retained promoted-family blocker is now `shadow_mismatch`,
   with residual `VLOOKUP` / `INDEX` host-surface fallout secondary
-- the next highest-value replay blocker is still the bounded `LOOKUP` parity
-  band, especially formula-backed `2D` result rows and remaining
-  `OUT OF BOUND` range-backed rows
+- the next highest-value replay blocker is now the residual parity band led
+  by `LOOKUP` mismatch rows, then `XLOOKUP` / `VLOOKUP` mismatch and smaller
+  `VLOOKUP` / `INDEX` host-surface cleanup
 
 ## Active Delegated Family
 
@@ -157,14 +158,12 @@ historical reference material, not active roadmap.
 
 The next pass should stay on promoted-family parity cleanup:
 
-1. convert the formula-backed `2D` `LOOKUP` replay rows that still return
-   `error:0` instead of the live text result
-2. convert the remaining range-backed short-result `LOOKUP` rows that still
-   miss Calc's `OUT OF BOUND`-style behavior
-3. then convert residual `XLOOKUP` and `VLOOKUP` mismatch rows
-4. clean up the remaining replay-imported `VLOOKUP` / `INDEX`
+1. convert the remaining `LOOKUP` shadow-mismatch rows on the
+   replay-promoted surface
+2. then convert residual `XLOOKUP` and `VLOOKUP` mismatch rows
+3. clean up the remaining replay-imported `VLOOKUP` / `INDEX`
    `unsupported_host_surface` and `unsupported_formula_shape` fallout
-5. only return to broader reach work if the promoted replay surface regresses
+4. only return to broader reach work if the promoted replay surface regresses
 
 ## References
 

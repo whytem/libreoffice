@@ -377,6 +377,43 @@ makeVectorElementResult(const CalcLookupMaterializer& rMaterializer, const Looku
     return makeCoordinateResult(rMaterializer, rInput, aCoordinate.maValue);
 }
 
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<LookupExecutionResult>
+makeReferenceOffsetVectorElementResult(const ScDocument& rDoc, const LookupInput& rInput,
+    const spreadsheetengine::api::lookup::VectorLayout& rLayout,
+    spreadsheetengine::api::MatrixSize nIndex)
+{
+    if (rInput.mbScalar || !rInput.maValues.empty())
+    {
+        return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
+            spreadsheetengine::api::Error::IllegalArgument);
+    }
+
+    if (nIndex < 0)
+    {
+        return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
+            spreadsheetengine::api::Error::NotAvailable);
+    }
+
+    SCCOL nColumn = rInput.maReference.maRange.maStart.mnColumn;
+    SCROW nRow = rInput.maReference.maRange.maStart.mnRow;
+    if (rLayout.meOrientation == spreadsheetengine::api::lookup::VectorOrientation::Column)
+        nRow += nIndex;
+    else
+        nColumn += nIndex;
+
+    const ScAddress aAddress(nColumn, nRow, rInput.maReference.maRange.maStart.mnSheet);
+    if (!rDoc.ValidAddress(aAddress) || !rDoc.HasTable(aAddress.Tab()))
+    {
+        return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(
+            spreadsheetengine::api::Error::NotAvailable);
+    }
+
+    LookupExecutionResult aResult;
+    aResult.meKind = LookupExecutionResult::Kind::Reference;
+    aResult.maRange = ScRange(aAddress, aAddress);
+    return spreadsheetengine::api::ValueResult<LookupExecutionResult>::success(aResult);
+}
+
 inline void putApiCellValue(
     const spreadsheetengine::api::CellValue& rValue, const ScMatrixRef& pMatrix, SCSIZE nColumn,
     SCSIZE nRow)
@@ -582,7 +619,10 @@ resolveLookupResult(const ScDocument& rDoc, ScInterpreterContext& rContext,
         if (nResultIndex >= oResultLayout->mnLength)
         {
             if (rRequest.moResultInput->maValues.empty() && oResultLayout->mnLength > 0)
-                nResultIndex = oResultLayout->mnLength - 1;
+            {
+                return detail::makeReferenceOffsetVectorElementResult(
+                    rDoc, *rRequest.moResultInput, *oResultLayout, nResultIndex);
+            }
             else
             {
                 return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(

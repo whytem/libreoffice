@@ -64,14 +64,14 @@ Dominant ambient fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1708`
-- `interpret_tail_authoritative_fallback_total=104`
-- promoted-family authoritative rate: `94.26%`
+- `interpret_tail_authoritative_total=1713`
+- `interpret_tail_authoritative_fallback_total=99`
+- promoted-family authoritative rate: `94.54%`
 
 Dominant promoted-family fallback reasons:
 
 - `unsupported_formula_shape=23`
-- `shadow_mismatch=70`
+- `shadow_mismatch=65`
 - `unsupported_host_surface=11`
 
 ### Hard-Quarantined Calc Paths
@@ -167,29 +167,28 @@ The highest-value remaining blockers are now:
    imported surface still retains `34` direct promoted fallback cells and
    ambient replay still covers only a bounded minority of formulas
 3. promoted-family residual parity:
-   `shadow_mismatch=70`
+   `shadow_mismatch=65`
 4. promoted-family residual host access:
    replay-live `unsupported_host_surface=22`
 5. first real Calc-path retirement:
    one family is hard-routed, but no `ScInterpreter` subroutine has been
    deleted yet
 
-The latest bounded `LOOKUP` semantics slice improved parity fidelity on
-several replay rows, but it did not move the replay counters. That means the
-top parity blocker is now narrower and clearer than before, not broader.
+The latest bounded `LOOKUP` parity slice improved the promoted replay surface,
+raising probe authority and cutting mismatch there without changing the
+broader ambient replay denominator. That means the top parity blocker is now
+narrower and clearer than before, not broader.
 
 ## Recommended Next Pass
 
 The next pass should:
 
-1. convert the formula-backed `2D` `LOOKUP` replay rows that still surface
-   `error:0`
-2. convert the remaining range-backed short-result `LOOKUP` rows that still
-   miss Calc's `OUT OF BOUND`-style behavior
-3. then convert residual `XLOOKUP` and `VLOOKUP` mismatch rows
-4. clean up the remaining replay-imported `VLOOKUP` / `INDEX`
+1. convert the remaining `LOOKUP` shadow-mismatch rows on the
+   replay-promoted surface
+2. then convert residual `XLOOKUP` and `VLOOKUP` mismatch rows
+3. clean up the remaining replay-imported `VLOOKUP` / `INDEX`
    `unsupported_host_surface` and `unsupported_formula_shape` fallout
-5. move the first replay-imported promoted family from observe-only reach
+4. move the first replay-imported promoted family from observe-only reach
    toward a broader authority candidate once host-surface and shape fallback
    shrink materially
 

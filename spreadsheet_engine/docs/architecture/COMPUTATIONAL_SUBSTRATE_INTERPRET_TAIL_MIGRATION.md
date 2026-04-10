@@ -40,8 +40,9 @@ Today:
   through the engine seam instead of falling out as generic host-surface
   fallout
 - the latest bounded `LOOKUP` parity slice tightened scalar-text best-fit,
-  range-backed short-result handling, and host-backed formula-result reads
-  without yet moving the replay counters
+  converted short explicit result-range handling onto Calc's
+  `OUT OF BOUND`-style offset behavior, and improved host-backed
+  formula-result reads on the promoted replay surface
 
 What is still not true:
 
@@ -171,14 +172,14 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1708`
-- `interpret_tail_authoritative_fallback_total=104`
-- promoted-family authoritative rate: `94.26%`
+- `interpret_tail_authoritative_total=1713`
+- `interpret_tail_authoritative_fallback_total=99`
+- promoted-family authoritative rate: `94.54%`
 
 Current promoted-family fallback reasons:
 
 - `unsupported_formula_shape=23`
-- `shadow_mismatch=70`
+- `shadow_mismatch=65`
 - `unsupported_host_surface=11`
 
 Interpretation:
@@ -186,11 +187,11 @@ Interpretation:
 - once the probe hits promoted-family cells, authority conversion is now
   strong
 - the main remaining conversion work is no longer generic breadth
-- the just-closed slice reduced host-surface fallback materially
-- the current hotspots are now `LOOKUP` / `XLOOKUP` / `VLOOKUP` parity
-  mismatch, with smaller residual `VLOOKUP` / `INDEX` host-surface cleanup
-- the latest `LOOKUP` semantics pass improved mismatch fidelity on several
-  range-backed rows, but the dominant replay mismatch counts stayed flat
+- the just-closed slice reduced promoted-family fallback from `104` to `99`
+  and cut `shadow_mismatch` from `70` to `65`
+- the current hotspots are now `LOOKUP` parity mismatch first, then residual
+  `XLOOKUP` / `VLOOKUP` mismatch and smaller `VLOOKUP` / `INDEX`
+  host-surface cleanup
 
 ### Replay Eligibility Inventory
 
@@ -218,6 +219,8 @@ Interpretation:
 
 - the pre-tail replay eligibility blocker is cleared for the promoted replay
   surface
+- the latest slice improved parity inside that surface rather than widening
+  its denominator
 - both shared and non-shared promoted replay formulas now reach the live seam
 - the residual replay work is now the `34` direct fallback cells on this
   imported promoted-family surface

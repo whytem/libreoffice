@@ -1139,6 +1139,25 @@ template <typename T>
     const ScDocument& rDoc, ScInterpreterContext& rContext, const ScAddress& rAddress)
 {
     auto aValue = readHostDocumentCellValue(rDoc, rAddress).maValue;
+    if (ScFormulaCell* pFormula = const_cast<ScDocument&>(rDoc).GetFormulaCell(rAddress))
+    {
+        if (aValue.isEmpty())
+        {
+            const auto aDisplayValue
+                = readHostDocumentCellValue(rDoc, rAddress, HostCellStringKind::Display).maValue;
+            if (!aDisplayValue.isEmpty())
+                return aDisplayValue;
+        }
+
+        if (aValue.isError() && pFormula->GetErrCode() == FormulaError::NONE)
+        {
+            const auto aDisplayValue
+                = readHostDocumentCellValue(rDoc, rAddress, HostCellStringKind::Display).maValue;
+            if (!aDisplayValue.isEmpty())
+                return aDisplayValue;
+        }
+    }
+
     if ((aValue.isEmpty() || aValue.isError()))
     {
         if (const auto oFormulaValue

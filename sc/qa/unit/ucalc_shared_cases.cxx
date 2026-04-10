@@ -910,6 +910,7 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     m_pDoc->SetString(19, 30, 0, u"=CONCATENATE(\"Res\";S31)"_ustr);
     m_pDoc->SetString(19, 31, 0, u"=CONCATENATE(\"Res\";S32)"_ustr);
     m_pDoc->SetString(19, 32, 0, u"=CONCATENATE(\"Res\";S33)"_ustr);
+    m_pDoc->SetTextCell(ScAddress(19, 34, 0), u"OUT OF BOUND"_ustr);
 
     const auto aLookupShortResultRange = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(20, 30, 0), u"=LOOKUP(\"E\";S31:S35;T31:T33)", false);
@@ -917,7 +918,7 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::String,
         aLookupShortResultRange.maResult.meType);
-    CPPUNIT_ASSERT_EQUAL(u"ResC"_ustr,
+    CPPUNIT_ASSERT_EQUAL(u"OUT OF BOUND"_ustr,
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(
             aLookupShortResultRange.maResult.maString));
 
