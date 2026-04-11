@@ -64,14 +64,14 @@ Dominant ambient fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1785`
-- `interpret_tail_authoritative_fallback_total=27`
-- promoted-family authoritative rate: `98.51%`
+- `interpret_tail_authoritative_total=1786`
+- `interpret_tail_authoritative_fallback_total=26`
+- promoted-family authoritative rate: `98.57%`
 
 Dominant promoted-family fallback reasons:
 
 - `unsupported_formula_shape=6`
-- `shadow_mismatch=21`
+- `shadow_mismatch=20`
 - `unsupported_host_surface=0`
 
 ### Hard-Quarantined Calc Paths
@@ -167,17 +167,17 @@ The highest-value remaining blockers are now:
    imported surface still retains `6` direct promoted fallback cells and
    ambient replay still covers only a bounded minority of formulas
 3. promoted-family residual parity:
-   `shadow_mismatch=21`
+   `shadow_mismatch=20`
 4. promoted-family residual formula shape:
    replay-live `unsupported_formula_shape=12`
 5. first real Calc-path retirement:
    one family is hard-routed, but no `ScInterpreter` subroutine has been
    deleted yet
 
-The latest bounded approximate-text `VLOOKUP` parity slice improved
-promoted-family authority from `1781 / 31` to `1785 / 27`, held replay
-direct fallback at `6`, and moved `MATCH` ahead of `VLOOKUP` as the top
-residual promoted-family parity band.
+The latest bounded full-width `MATCH` search-source trim slice improved
+promoted-family authority from `1785 / 27` to `1786 / 26`, held replay
+direct fallback at `6`, and narrowed the top residual `MATCH` band to
+lookup-value and array-constant parity.
 
 ## Recommended Next Pass
 

@@ -60,14 +60,14 @@ Ambient live fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1785`
-- `interpret_tail_authoritative_fallback_total=27`
-- promoted-family authoritative rate: `98.51%`
+- `interpret_tail_authoritative_total=1786`
+- `interpret_tail_authoritative_fallback_total=26`
+- promoted-family authoritative rate: `98.57%`
 
 Promoted-family fallback reasons:
 
 - `unsupported_formula_shape=6`
-- `shadow_mismatch=21`
+- `shadow_mismatch=20`
 - `unsupported_host_surface=0`
 
 ### Promoted Replay Eligibility Inventory
@@ -104,9 +104,9 @@ Today:
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
-- the latest bounded approximate-text `VLOOKUP` parity slice tightened the
-  promoted replay band again, improving authority from `1781 / 31` to
-  `1785 / 27`
+- the latest bounded full-width `MATCH` search-source trim slice tightened the
+  promoted replay band again, improving authority from `1785 / 27` to
+  `1786 / 26`
 
 Still not true:
 
@@ -118,9 +118,10 @@ Still not true:
   replay-imported promoted fallback further
 - the dominant retained promoted-family blocker is still `shadow_mismatch`,
   with smaller `unsupported_formula_shape` cleanup secondary
-- the next highest-value replay blocker is now `MATCH` parity first, then
-  logical-constant display parity, with smaller `VLOOKUP` / `XLOOKUP`
-  mismatch rows and `INDEX` shape fallout behind them
+- the next highest-value replay blocker is now `MATCH` lookup-value and
+  array-constant parity first, then logical-constant display parity, with
+  smaller `VLOOKUP` / `XLOOKUP` mismatch rows and `INDEX` shape fallout
+  behind them
 
 ## Active Delegated Family
 
@@ -158,10 +159,12 @@ historical reference material, not active roadmap.
 
 The next pass should stay on promoted-family parity cleanup:
 
-1. convert the residual `MATCH` parity rows on the replay-promoted surface
-2. clean up logical-constant display parity on the promoted replay surface
-3. then convert the smaller `VLOOKUP` / `XLOOKUP` mismatch rows and the
-   remaining replay-imported `INDEX` `unsupported_formula_shape` fallout
+1. convert the residual `MATCH` lookup-value range rows on the
+   replay-promoted surface
+2. then convert the residual `MATCH` array-constant rows on the same surface
+3. then clean up logical-constant display parity and the smaller
+   `VLOOKUP` / `XLOOKUP` mismatch rows, plus the remaining replay-imported
+   `INDEX` `unsupported_formula_shape` fallout
 4. only return to broader reach work if the promoted replay surface regresses
 
 ## References
