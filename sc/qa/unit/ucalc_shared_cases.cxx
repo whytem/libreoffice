@@ -1173,6 +1173,43 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(
             aVLookupArrayLookupValue.maResult.maString));
 
+    m_pDoc->SetString(26, 30, 0, u"ABC"_ustr);
+    m_pDoc->SetString(27, 30, 0, u"ABC"_ustr);
+    m_pDoc->SetString(26, 31, 0, u"abcd"_ustr);
+    m_pDoc->SetString(27, 31, 0, u"AB"_ustr);
+    m_pDoc->SetString(26, 32, 0, u"cot\u00E9"_ustr);
+    m_pDoc->SetString(27, 32, 0, u"ABCD"_ustr);
+    m_pDoc->SetString(26, 33, 0, u"c\u00F4te"_ustr);
+    m_pDoc->SetString(27, 33, 0, u"cot\u00E9"_ustr);
+    m_pDoc->SetString(26, 34, 0, u"c\u00F4t\u00E9"_ustr);
+    m_pDoc->SetString(27, 34, 0, u"c\u00F4te"_ustr);
+    m_pDoc->SetString(26, 35, 0, u"cote "_ustr);
+    m_pDoc->SetString(27, 35, 0, u"c\u00F4t\u00E9"_ustr);
+    m_pDoc->SetString(26, 36, 0, u"D\u00FCrst"_ustr);
+    m_pDoc->SetString(27, 36, 0, u"cote "_ustr);
+    m_pDoc->SetString(26, 37, 0, u"DUERST"_ustr);
+    m_pDoc->SetString(27, 37, 0, u"D\u00FCrst"_ustr);
+
+    const auto aVLookupApproxAccent = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(38, 38, 0), u"=VLOOKUP(\"c\u00F4ted\";AA31:AB38;1;1)", false);
+    CPPUNIT_ASSERT(aVLookupApproxAccent.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aVLookupApproxAccent.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"cote "_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aVLookupApproxAccent.maResult.maString));
+
+    const auto aVLookupApproxDuerst = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(39, 38, 0), u"=VLOOKUP(\"D\u00FCrs\";AA31:AB38;1;1)", false);
+    CPPUNIT_ASSERT(aVLookupApproxDuerst.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aVLookupApproxDuerst.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"cote "_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aVLookupApproxDuerst.maResult.maString));
+
     const auto aHLookupArray = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 8, 0),
         u"=HLOOKUP(2;{1;2;3|\"one\";\"two\";\"three\"};2;0)", false);

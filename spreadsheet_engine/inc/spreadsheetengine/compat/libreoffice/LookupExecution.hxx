@@ -14,8 +14,10 @@
 
 #include <address.hxx>
 #include <document.hxx>
+#include <global.hxx>
 #include <interpretercontext.hxx>
 #include <scmatrix.hxx>
+#include <unotools/collatorwrapper.hxx>
 
 #include <spreadsheetengine/api/Host.hxx>
 #include <spreadsheetengine/api/Lookup.hxx>
@@ -485,6 +487,69 @@ inline void putApiCellValue(
     return spreadsheetengine::api::ValueResult<LookupExecutionResult>::success(aResult);
 }
 
+[[nodiscard]] inline spreadsheetengine::api::ValueResult<spreadsheetengine::api::MatrixSize>
+resolveCalcApproximateTextTabularLookupIndex(const CalcLookupMaterializer& rMaterializer,
+    const spreadsheetengine::api::CellValue& rLookupValue, const LookupInput& rTableInput,
+    spreadsheetengine::api::lookup::VectorOrientation eSearchOrientation)
+{
+    if (!rLookupValue.isText())
+    {
+        return spreadsheetengine::api::ValueResult<
+            spreadsheetengine::api::MatrixSize>::failure(
+            spreadsheetengine::api::Error::NotAvailable);
+    }
+
+    const OUString aLookupText
+        = spreadsheetengine::compat::libreoffice::toLibreOfficeString(rLookupValue.maString);
+    const spreadsheetengine::api::MatrixSize nSearchLength
+        = eSearchOrientation == spreadsheetengine::api::lookup::VectorOrientation::Column
+              ? rTableInput.mnRows
+              : rTableInput.mnColumns;
+    std::optional<spreadsheetengine::api::MatrixSize> oResolvedIndex;
+    for (spreadsheetengine::api::MatrixSize nSearchIndex = 0; nSearchIndex < nSearchLength;
+         ++nSearchIndex)
+    {
+        const spreadsheetengine::api::MatrixCoordinate aCoordinate
+            = eSearchOrientation == spreadsheetengine::api::lookup::VectorOrientation::Column
+                  ? spreadsheetengine::api::MatrixCoordinate { 0, nSearchIndex }
+                  : spreadsheetengine::api::MatrixCoordinate { nSearchIndex, 0 };
+        const auto aCandidate = rMaterializer.materialize(rTableInput, aCoordinate);
+        if (!aCandidate)
+            continue;
+
+        const spreadsheetengine::api::CellValue& rCandidate = aCandidate.maValue;
+        if (!(rCandidate.isText() || rCandidate.isEmpty()))
+        {
+            oResolvedIndex = nSearchIndex;
+            continue;
+        }
+
+        const OUString aCandidateText = rCandidate.isText()
+                                            ? spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                                                  rCandidate.maString)
+                                            : OUString();
+        const sal_Int32 nCompare = ScGlobal::GetCollator().compareString(aCandidateText, aLookupText);
+        if (nCompare <= 0)
+        {
+            oResolvedIndex = nSearchIndex;
+        }
+        else if (nSearchIndex > 0)
+        {
+            break;
+        }
+    }
+
+    if (!oResolvedIndex)
+    {
+        return spreadsheetengine::api::ValueResult<
+            spreadsheetengine::api::MatrixSize>::failure(
+            spreadsheetengine::api::Error::NotAvailable);
+    }
+
+    return spreadsheetengine::api::ValueResult<
+        spreadsheetengine::api::MatrixSize>::success(*oResolvedIndex);
+}
+
 } // namespace detail
 
 [[nodiscard]] inline spreadsheetengine::api::ValueResult<spreadsheetengine::api::MatrixSize>
@@ -721,9 +786,17 @@ resolveTabularLookupResult(const ScDocument& rDoc, ScInterpreterContext& rContex
     }
 
     const detail::CalcLookupMaterializer aMaterializer(rDoc, rContext);
-    const auto aResolvedIndex = spreadsheetengine::core::lookup::resolveTabularLookupIndex(
+    auto aResolvedIndex = spreadsheetengine::core::lookup::resolveTabularLookupIndex(
         aMaterializer, rRequest.maLookupValue, rRequest.maTableInput, rRequest.meSearchOrientation,
         rRequest.mbApproximate, rRequest.meSearchType);
+    if (rRequest.mbApproximate && rRequest.maLookupValue.isText())
+    {
+        const auto aCompatApproxIndex = detail::resolveCalcApproximateTextTabularLookupIndex(
+            aMaterializer, rRequest.maLookupValue, rRequest.maTableInput,
+            rRequest.meSearchOrientation);
+        if (aCompatApproxIndex)
+            aResolvedIndex = aCompatApproxIndex;
+    }
     if (!aResolvedIndex)
         return spreadsheetengine::api::ValueResult<LookupExecutionResult>::failure(aResolvedIndex.meError);
 

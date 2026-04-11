@@ -1094,20 +1094,40 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             u"=VLOOKUP(2;{1;\"one\"|2;\"first\"|2;\"second\"};2;0)"_ustr);
         m_pDoc->SetString(6, 4, 0, u"=VLOOKUP(B5:B7;B5:C7;2;0)"_ustr);
         m_pDoc->SetString(6, 5, 0, u"=VLOOKUP(B5:B7;B5:C7;2;0)"_ustr);
+        m_pDoc->SetString(26, 30, 0, u"ABC"_ustr);
+        m_pDoc->SetString(27, 30, 0, u"ABC"_ustr);
+        m_pDoc->SetString(26, 31, 0, u"abcd"_ustr);
+        m_pDoc->SetString(27, 31, 0, u"AB"_ustr);
+        m_pDoc->SetString(26, 32, 0, u"cot\u00E9"_ustr);
+        m_pDoc->SetString(27, 32, 0, u"ABCD"_ustr);
+        m_pDoc->SetString(26, 33, 0, u"c\u00F4te"_ustr);
+        m_pDoc->SetString(27, 33, 0, u"cot\u00E9"_ustr);
+        m_pDoc->SetString(26, 34, 0, u"c\u00F4t\u00E9"_ustr);
+        m_pDoc->SetString(27, 34, 0, u"c\u00F4te"_ustr);
+        m_pDoc->SetString(26, 35, 0, u"cote "_ustr);
+        m_pDoc->SetString(27, 35, 0, u"c\u00F4t\u00E9"_ustr);
+        m_pDoc->SetString(26, 36, 0, u"D\u00FCrst"_ustr);
+        m_pDoc->SetString(27, 36, 0, u"cote "_ustr);
+        m_pDoc->SetString(26, 37, 0, u"DUERST"_ustr);
+        m_pDoc->SetString(27, 37, 0, u"D\u00FCrst"_ustr);
+        m_pDoc->SetString(38, 38, 0, u"=VLOOKUP(\"c\u00F4ted\";AA31:AB38;1;1)"_ustr);
+        m_pDoc->SetString(39, 38, 0, u"=VLOOKUP(\"D\u00FCrs\";AA31:AB38;1;1)"_ustr);
         CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(3, 4, 0));
         CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(4, 4, 0));
         CPPUNIT_ASSERT_EQUAL(u"second"_ustr, m_pDoc->GetString(5, 4, 0));
         CPPUNIT_ASSERT_EQUAL(u"ten"_ustr, m_pDoc->GetString(6, 4, 0));
         CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(6, 5, 0));
+        CPPUNIT_ASSERT_EQUAL(u"cote "_ustr, m_pDoc->GetString(38, 38, 0));
+        CPPUNIT_ASSERT_EQUAL(u"cote "_ustr, m_pDoc->GetString(39, 38, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 5);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 7);
         CPPUNIT_ASSERT_EQUAL(
             static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::VLookup)]
-            >= 5);
+            >= 7);
     }
 
     {
