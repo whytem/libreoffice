@@ -731,7 +731,6 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     m_pDoc->SetString(22, 1, 0, u"=V2&\" 2\""_ustr);
     m_pDoc->SetString(22, 2, 0, u"=V3&\" 2\""_ustr);
     m_pDoc->SetString(22, 3, 0, u"=V4&\" 2\""_ustr);
-
     CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
         new ScRangeData(*m_pDoc, u"MyTimeName"_ustr, u"$InterpretTailHelper.$B$1"_ustr)));
     CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(

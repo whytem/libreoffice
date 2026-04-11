@@ -23,8 +23,8 @@ The active roadmap is now simple:
 1. keep the replay guardrail exact
 2. expand real `InterpretTail -> engine` delegation
 3. use substrate work only when it removes a live evaluator blocker
-4. prioritize promoted-family parity cleanup, with residual replay-imported
-   host-surface cleanup secondary, before any new reach-expansion slice
+4. prioritize promoted-family parity cleanup, with smaller replay-imported
+   formula-shape cleanup secondary, before any new reach-expansion slice
 
 ## Historical Material
 

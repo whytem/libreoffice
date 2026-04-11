@@ -25,6 +25,7 @@
 
 #include <document.hxx>
 #include <docoptio.hxx>
+#include <compiler.hxx>
 #include <formula/grammar.hxx>
 #include <global.hxx>
 #include <interpretercontext.hxx>
@@ -925,6 +926,69 @@ template <typename T>
     return static_cast<sal_Int32>(fValue);
 }
 
+[[nodiscard]] inline ScRangeData* findNamedRangeData(
+    const OUString& rName, const ScDocument& rDoc, const ScAddress& rFormulaPos)
+{
+    ScRangeData* pRangeData = ScRangeStringConverter::GetRangeDataFromString(
+        rName, rFormulaPos.Tab(), rDoc, formula::FormulaGrammar::CONV_OOO);
+    if (pRangeData)
+        return pRangeData;
+
+    const OUString aUpperName = ScGlobal::getCharClass().uppercase(rName);
+    if (ScRangeName* pLocalNames = rDoc.GetRangeName(rFormulaPos.Tab()))
+        pRangeData = pLocalNames->findByUpperName(aUpperName);
+    if (pRangeData)
+        return pRangeData;
+
+    if (ScRangeName* pGlobalNames = rDoc.GetRangeName())
+        return pGlobalNames->findByUpperName(aUpperName);
+    return nullptr;
+}
+
+[[nodiscard]] inline bool tryResolveNamedRangeReference(
+    ScRange& rRange, const ScRangeData& rRangeData, const ScDocument& rDoc,
+    const ScAddress&)
+{
+    const ScAddress& rNamePos = rRangeData.GetPos();
+
+    if (rRangeData.IsReference(rRange, rNamePos))
+        return true;
+    if (const ScTokenArray* pCode = rRangeData.GetCode(); pCode && pCode->IsReference(rRange, rNamePos))
+        return true;
+
+    auto tryParseSymbol = [&](formula::FormulaGrammar::Grammar eGrammar) {
+        const OUString aSymbol = rRangeData.GetSymbol(rNamePos, eGrammar);
+        if (aSymbol.isEmpty())
+            return false;
+
+        sal_Int32 nOffset = 0;
+        return ScRangeStringConverter::GetRangeFromString(
+                   rRange, aSymbol, rDoc, formula::FormulaGrammar::CONV_OOO, nOffset)
+               && nOffset >= 0;
+    };
+
+    auto tryCompileSymbol = [&](formula::FormulaGrammar::Grammar eGrammar) {
+        const OUString aSymbol = rRangeData.GetSymbol(rNamePos, eGrammar);
+        if (aSymbol.isEmpty())
+            return false;
+
+        ScCompiler aCompiler(const_cast<ScDocument&>(rDoc), rNamePos, eGrammar);
+        std::unique_ptr<ScTokenArray> pCode = aCompiler.CompileString(aSymbol);
+        if (!pCode || pCode->GetCodeError() != FormulaError::NONE)
+            return false;
+
+        ScCompiler aRpnCompiler(const_cast<ScDocument&>(rDoc), rNamePos, *pCode, eGrammar);
+        aRpnCompiler.CompileTokenArray();
+        pCode->DelRPN();
+        return pCode->IsReference(rRange, rNamePos);
+    };
+
+    return tryParseSymbol(formula::FormulaGrammar::GRAM_ODFF)
+           || tryCompileSymbol(formula::FormulaGrammar::GRAM_ODFF)
+           || tryParseSymbol(formula::FormulaGrammar::GRAM_NATIVE)
+           || tryCompileSymbol(formula::FormulaGrammar::GRAM_NATIVE);
+}
+
 [[nodiscard]] inline Materialization<ScRange> resolveReferenceRangeNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, const ScAddress& rFormulaPos)
 {
@@ -969,19 +1033,7 @@ template <typename T>
         case core::formula::NodeKind::NamedReference:
         {
             const OUString aName = toLibreOfficeString(rNode.maPrimaryText);
-            ScRangeData* pRangeData = ScRangeStringConverter::GetRangeDataFromString(
-                aName, rFormulaPos.Tab(), rDoc, formula::FormulaGrammar::CONV_OOO);
-            if (!pRangeData)
-            {
-                const OUString aUpperName = ScGlobal::getCharClass().uppercase(aName);
-                if (ScRangeName* pLocalNames = rDoc.GetRangeName(rFormulaPos.Tab()))
-                    pRangeData = pLocalNames->findByUpperName(aUpperName);
-                if (!pRangeData)
-                {
-                    if (ScRangeName* pGlobalNames = rDoc.GetRangeName())
-                        pRangeData = pGlobalNames->findByUpperName(aUpperName);
-                }
-            }
+            ScRangeData* pRangeData = findNamedRangeData(aName, rDoc, rFormulaPos);
             if (!pRangeData)
             {
                 return makeUnsupportedMaterialization<ScRange>(
@@ -989,7 +1041,7 @@ template <typename T>
             }
 
             ScRange aRange;
-            if (!pRangeData->IsReference(aRange, rFormulaPos))
+            if (!tryResolveNamedRangeReference(aRange, *pRangeData, rDoc, rFormulaPos))
             {
                 return makeUnsupportedMaterialization<ScRange>(
                     FallbackReason::UnsupportedHostSurface);

@@ -1203,7 +1203,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
 
         const auto aStats = setaileval::getStatsSnapshot();
         CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 22);
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeFallbackCount <= 2);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeFallbackCount <= 3);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Lookup)]

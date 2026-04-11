@@ -32,50 +32,50 @@ That splits into two tracks:
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=4158`
-- `interpret_tail_live_fallback_total=68`
+- `interpret_tail_live_supported_total=4182`
+- `interpret_tail_live_fallback_total=44`
 - `interpret_tail_live_seen_total=4226`
 - `interpret_tail_live_unseen_formula_cells=46435`
-- `interpret_tail_live_promoted_function_supported_total=2908`
-- `interpret_tail_live_supported_rate=8.21`
+- `interpret_tail_live_promoted_function_supported_total=2932`
+- `interpret_tail_live_supported_rate=8.25`
 - `interpret_tail_live_seen_rate=8.34`
 
 Ambient live fallback reasons:
 
-- `unsupported_formula_shape=46`
-- `unsupported_host_surface=22`
+- `unsupported_formula_shape=44`
+- `unsupported_host_surface=0`
 - `parse_failure=0`
 
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=2079`
-- `interpret_tail_forced_interpret_fallback_total=34`
+- `interpret_tail_forced_interpret_supported_total=2091`
+- `interpret_tail_forced_interpret_fallback_total=22`
 - `interpret_tail_forced_interpret_seen_total=2113`
 - `interpret_tail_forced_interpret_unseen_formula_cells=48548`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=1454`
-- `interpret_tail_forced_interpret_supported_rate=4.10`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=1466`
+- `interpret_tail_forced_interpret_supported_rate=4.13`
 - `interpret_tail_forced_interpret_seen_rate=4.17`
 
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1713`
-- `interpret_tail_authoritative_fallback_total=99`
-- promoted-family authoritative rate: `94.54%`
+- `interpret_tail_authoritative_total=1756`
+- `interpret_tail_authoritative_fallback_total=56`
+- promoted-family authoritative rate: `96.91%`
 
 Promoted-family fallback reasons:
 
-- `unsupported_formula_shape=23`
-- `shadow_mismatch=65`
-- `unsupported_host_surface=11`
+- `unsupported_formula_shape=22`
+- `shadow_mismatch=34`
+- `unsupported_host_surface=0`
 
 ### Promoted Replay Eligibility Inventory
 
 - `interpret_tail_replay_promoted_formula_cells=1812`
 - `interpret_tail_replay_promoted_direct_seen=1812`
-- `interpret_tail_replay_promoted_direct_supported=1778`
-- `interpret_tail_replay_promoted_direct_fallback=34`
+- `interpret_tail_replay_promoted_direct_supported=1790`
+- `interpret_tail_replay_promoted_direct_fallback=22`
 - `interpret_tail_replay_promoted_direct_unseen=0`
 - `interpret_tail_replay_promoted_shared_formula_cells=395`
 - `interpret_tail_replay_promoted_non_shared_formula_cells=1417`
@@ -104,9 +104,9 @@ Today:
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
-- the latest `LOOKUP` parity pass converted bounded short-result and
-  formula-result rows on the promoted replay surface, improving probe
-  authority without changing the broader ambient replay denominator
+- the latest replay-imported named-range slice cleared the residual
+  `VLOOKUP` / `INDEX` host-surface band, improving both the ambient replay
+  surface and promoted-family authority
 
 Still not true:
 
@@ -117,10 +117,10 @@ Still not true:
 - the replay-promoted reach blocker is cleared, and the latest slice reduced
   replay-imported promoted fallback further
 - the dominant retained promoted-family blocker is now `shadow_mismatch`,
-  with residual `VLOOKUP` / `INDEX` host-surface fallout secondary
+  with smaller `unsupported_formula_shape` cleanup secondary
 - the next highest-value replay blocker is now the residual parity band led
-  by `LOOKUP` mismatch rows, then `XLOOKUP` / `VLOOKUP` mismatch and smaller
-  `VLOOKUP` / `INDEX` host-surface cleanup
+  by `XLOOKUP` / `VLOOKUP` mismatch rows, then `LOOKUP` mismatch and smaller
+  `MATCH` / `INDEX` shape cleanup
 
 ## Active Delegated Family
 
@@ -158,11 +158,11 @@ historical reference material, not active roadmap.
 
 The next pass should stay on promoted-family parity cleanup:
 
-1. convert the remaining `LOOKUP` shadow-mismatch rows on the
+1. convert the remaining `XLOOKUP` and `VLOOKUP` mismatch rows on the
    replay-promoted surface
-2. then convert residual `XLOOKUP` and `VLOOKUP` mismatch rows
-3. clean up the remaining replay-imported `VLOOKUP` / `INDEX`
-   `unsupported_host_surface` and `unsupported_formula_shape` fallout
+2. then convert the residual `LOOKUP` mismatch rows
+3. clean up the remaining replay-imported `MATCH` / `INDEX`
+   `unsupported_formula_shape` fallout
 4. only return to broader reach work if the promoted replay surface regresses
 
 ## References
