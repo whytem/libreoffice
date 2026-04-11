@@ -339,6 +339,7 @@ api::ValueResult<api::MatrixSize> resolveTabularLookupIndex(
     }
     else
     {
+        bool bSeenExactMatch = false;
         for (api::MatrixSize nSearchIndex = 0; nSearchIndex < nSearchLength; ++nSearchIndex)
         {
             const auto aCandidate = loadTabularSearchCandidate(
@@ -348,8 +349,10 @@ api::ValueResult<api::MatrixSize> resolveTabularLookupIndex(
             if (isExactLookupMatch(rLookup, aCandidate.maValue, eSearchType))
             {
                 oResolvedIndex = nSearchIndex;
-                break;
+                bSeenExactMatch = true;
             }
+            else if (bSeenExactMatch)
+                break;
         }
     }
 
@@ -532,6 +535,7 @@ api::ValueResult<api::MatrixSize> resolveMatchIndex(const LookupMaterializer& rM
     std::optional<api::MatrixSize> oResolvedIndex;
     if (rModes.meMatchMode == api::lookup::MatchMode::ExactOrNotAvailable)
     {
+        bool bSeenExactMatch = false;
         for (api::MatrixSize nSearchIndex = 0; nSearchIndex < nSearchLength; ++nSearchIndex)
         {
             const auto aCandidate = materializeLookupInputValue(
@@ -541,8 +545,10 @@ api::ValueResult<api::MatrixSize> resolveMatchIndex(const LookupMaterializer& rM
             if (isExactMatch(aCandidate.maValue))
             {
                 oResolvedIndex = nSearchIndex;
-                break;
+                bSeenExactMatch = true;
             }
+            else if (bSeenExactMatch)
+                break;
         }
     }
     else if (rModes.meMatchMode == api::lookup::MatchMode::ExactOrNextSmaller)

@@ -1090,17 +1090,20 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
 
         m_pDoc->SetString(3, 4, 0, u"=VLOOKUP(A5;B5:C7;2;0)"_ustr);
         m_pDoc->SetString(4, 4, 0, u"=VLOOKUP(A5;B5:C7;2;FALSE())"_ustr);
+        m_pDoc->SetString(5, 4, 0,
+            u"=VLOOKUP(2;{1;\"one\"|2;\"first\"|2;\"second\"};2;0)"_ustr);
         CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(3, 4, 0));
         CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(4, 4, 0));
+        CPPUNIT_ASSERT_EQUAL(u"second"_ustr, m_pDoc->GetString(5, 4, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 2);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 3);
         CPPUNIT_ASSERT_EQUAL(
             static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::VLookup)]
-            >= 2);
+            >= 3);
     }
 
     {
@@ -1110,6 +1113,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
 
         m_pDoc->SetString(3, 7, 0, u"=LOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"})"_ustr);
         m_pDoc->SetString(3, 8, 0, u"=MATCH(2;{1;2;3};0)"_ustr);
+        m_pDoc->SetString(4, 8, 0, u"=MATCH(0;{0;0;1};0)"_ustr);
         m_pDoc->SetString(3, 9, 0, u"=INDEX({1;2|3;4};2;2)"_ustr);
         m_pDoc->SetString(3, 10, 0, u"=VALUE(A11)"_ustr);
         m_pDoc->SetString(3, 11, 0, u"=XLOOKUP(A5;B5:B7;C5:C7)"_ustr);
@@ -1177,6 +1181,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
 
         CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(3, 7, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(3, 8, 0));
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(4, 8, 0));
         ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(3, 9, 0));
         ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(3, 10, 0));
         CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(3, 11, 0));
@@ -1231,7 +1236,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Match)]
-            >= 1);
+            >= 2);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Index)]
