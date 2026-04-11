@@ -2004,6 +2004,60 @@ inline void putScalarIntoMatrix(
     return makeMaterializedValue(aSource);
 }
 
+[[nodiscard]] inline Materialization<api::CellValue> materializeLookupValueNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    if (rNode.meKind == core::formula::NodeKind::CellReference
+        || rNode.meKind == core::formula::NodeKind::RangeReference
+        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    {
+        const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+        if (!aRange.mbSupported)
+            return makeUnsupportedMaterialization<api::CellValue>(aRange.meFallbackReason);
+        if (!aRange.moValue)
+            return makeMaterializedError<api::CellValue>(aRange.meError);
+
+        std::optional<ScAddress> oScalarAddress
+            = tryImplicitIntersectionAddress(*aRange.moValue, rFormulaPos);
+        if ((!oScalarAddress || *oScalarAddress == rFormulaPos)
+            && aRange.moValue->aStart != rFormulaPos)
+        {
+            oScalarAddress = aRange.moValue->aStart;
+        }
+
+        if (!oScalarAddress || *oScalarAddress == rFormulaPos)
+        {
+            return makeUnsupportedMaterialization<api::CellValue>(
+                FallbackReason::UnsupportedHostSurface);
+        }
+
+        return makeMaterializedValue(
+            readMaterializedHostCellValue(rDoc, rContext, *oScalarAddress));
+    }
+
+    const auto aScalar = materializeScalarNode(rNode, rDoc, rContext, rFormulaPos);
+    if (aScalar.mbSupported || aScalar.meFallbackReason != FallbackReason::UnsupportedFormulaShape)
+        return aScalar;
+    if (!aScalar.moValue && aScalar.meError != api::Error::None)
+        return makeMaterializedError<api::CellValue>(aScalar.meError);
+
+    const auto aMatrix = materializeMatrixNode(rNode, rDoc, rContext, rFormulaPos);
+    if (!aMatrix.mbSupported)
+        return makeUnsupportedMaterialization<api::CellValue>(aMatrix.meFallbackReason);
+    if (!aMatrix.moValue)
+        return makeMaterializedError<api::CellValue>(aMatrix.meError);
+
+    SCSIZE nColumns = 0;
+    SCSIZE nRows = 0;
+    (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+    if (nColumns < 1 || nRows < 1)
+        return makeMaterializedError<api::CellValue>(api::Error::IllegalArgument);
+
+    return makeMaterializedValue(
+        lookupexecution::detail::toApiCellValue((*aMatrix.moValue)->Get(0, 0)));
+}
+
 [[nodiscard]] inline EvaluationAttempt materializeLookupResult(FunctionKind eFunction,
     const ScDocument& rDoc, ScInterpreterContext& rContext, const ScAddress& rFormulaPos,
     const lookupexecution::LookupExecutionResult& rResult)
@@ -2266,7 +2320,8 @@ inline void putScalarIntoMatrix(
         if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
             return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-        const auto aLookup = materializeArgument(*rNode.maChildren[0]);
+        const auto aLookup = materializeLookupValueNode(
+            *rNode.maChildren[0], rDoc, rContext, rFormulaPos);
         if (!aLookup.mbSupported)
             return makeUnsupported(eFunction, aLookup.meFallbackReason);
         if (!aLookup.moValue)
@@ -2316,7 +2371,8 @@ inline void putScalarIntoMatrix(
         if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)
             return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-        const auto aLookup = materializeArgument(*rNode.maChildren[0]);
+        const auto aLookup = materializeLookupValueNode(
+            *rNode.maChildren[0], rDoc, rContext, rFormulaPos);
         if (!aLookup.mbSupported)
             return makeUnsupported(eFunction, aLookup.meFallbackReason);
         if (!aLookup.moValue)
@@ -2379,7 +2435,8 @@ inline void putScalarIntoMatrix(
         if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
             return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-        const auto aLookup = materializeArgument(*rNode.maChildren[0]);
+        const auto aLookup = materializeLookupValueNode(
+            *rNode.maChildren[0], rDoc, rContext, rFormulaPos);
         if (!aLookup.mbSupported)
             return makeUnsupported(eFunction, aLookup.meFallbackReason);
         if (!aLookup.moValue)
@@ -2425,7 +2482,8 @@ inline void putScalarIntoMatrix(
         if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 4)
             return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-        const auto aLookup = materializeArgument(*rNode.maChildren[0]);
+        const auto aLookup = materializeLookupValueNode(
+            *rNode.maChildren[0], rDoc, rContext, rFormulaPos);
         if (!aLookup.mbSupported)
             return makeUnsupported(eFunction, aLookup.meFallbackReason);
         if (!aLookup.moValue)
@@ -2485,7 +2543,8 @@ inline void putScalarIntoMatrix(
         if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 6)
             return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-        const auto aLookup = materializeArgument(*rNode.maChildren[0]);
+        const auto aLookup = materializeLookupValueNode(
+            *rNode.maChildren[0], rDoc, rContext, rFormulaPos);
         if (!aLookup.mbSupported)
             return makeUnsupported(eFunction, aLookup.meFallbackReason);
         if (!aLookup.moValue)
