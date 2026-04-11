@@ -117,7 +117,7 @@ Two different denominators matter, and both are now reported.
 ### Full Replay Corpus: Ambient Live Observe
 
 This is the honest all-formula live-routing surface from the standing replay
-corpus after the completed `XMATCH` predicate-source materialization slice:
+corpus after the completed residual `XMATCH` empty-aware parity slice:
 
 - `interpret_tail_live_formula_cells=50661`
 - `interpret_tail_live_supported_total=4214`
@@ -142,8 +142,8 @@ Interpretation:
   traffic
 - the pre-RPN observe bridge converted the replay-promoted reach problem into a
   residual family-fallback problem
-- the latest slice held the ambient denominator steady while converting the
-  replay `XMATCH` predicate-source band inside it
+- the latest slice held the ambient denominator steady while closing the last
+  residual replay `XMATCH` mismatch rows inside it
 - the main remaining ambient replay work is now parity cleanup inside
   already-promoted families
 
@@ -176,14 +176,14 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1780`
-- `interpret_tail_authoritative_fallback_total=32`
-- promoted-family authoritative rate: `98.23%`
+- `interpret_tail_authoritative_total=1781`
+- `interpret_tail_authoritative_fallback_total=31`
+- promoted-family authoritative rate: `98.29%`
 
 Current promoted-family fallback reasons:
 
 - `unsupported_formula_shape=6`
-- `shadow_mismatch=26`
+- `shadow_mismatch=25`
 - `unsupported_host_surface=0`
 
 Interpretation:
@@ -191,12 +191,12 @@ Interpretation:
 - once the probe hits promoted-family cells, authority conversion is now
   strong
 - the main remaining conversion work is no longer generic breadth
-- the latest slice reduced promoted-family fallback from `38` to `32`
-  while cutting `unsupported_formula_shape` from `12` to `6`
-- the replay `XMATCH(1;ISNUMBER(...);0;-1)` shape cluster is now closed
+- the latest slice reduced promoted-family fallback from `32` to `31`
+  while clearing the last residual `XMATCH` mismatch rows
+- the replay `XMATCH` parity band is now closed on the promoted probe
 - the current hotspots are now `VLOOKUP` mismatch first, then `MATCH`
-  parity, with only two residual `XMATCH` mismatch rows and smaller
-  `INDEX` shape fallout behind them
+  parity, with smaller `INDEX` shape fallout and residual `LOOKUP` /
+  `XLOOKUP` mismatches behind them
 
 ### Replay Eligibility Inventory
 
@@ -230,9 +230,8 @@ Interpretation:
 - the residual replay work is now the `6` direct fallback cells on this
   imported promoted-family surface
 - the dominant next targets are now `VLOOKUP` parity first, then `MATCH`
-  parity, with two residual `XMATCH` mismatch rows, smaller `INDEX`
-  shape fallout, and residual `LOOKUP` / `XLOOKUP` mismatch rows behind
-  them
+  parity, with smaller `INDEX` shape fallout and residual `LOOKUP` /
+  `XLOOKUP` mismatch rows behind them
 
 ## Hard-Routed Family
 
@@ -269,16 +268,13 @@ historical reference material, not active roadmap work.
 The latest replay closeout is now folded into this migration ledger.
 
 The next high-value pass should now stay on promoted-family parity cleanup,
-starting with the still-dominant `LOOKUP` replay rows:
+starting with the still-dominant `VLOOKUP` replay rows:
 
-1. convert the formula-backed `2D` `LOOKUP` replay rows that still surface
-   `error:0` instead of the live text result
-2. convert the remaining range-backed short-result `LOOKUP` rows that still
-   mismatch on `OUT OF BOUND`-style semantics
-3. then convert residual `XLOOKUP` and `VLOOKUP` mismatch rows
-4. clean up the remaining replay-imported `VLOOKUP` / `INDEX`
-   `unsupported_host_surface` and `unsupported_formula_shape` fallout
-5. only return to broader reach work if the promoted replay surface regresses
+1. convert the remaining replay-promoted `VLOOKUP` mismatch rows
+2. then clean up the residual replay-imported `MATCH` parity rows
+3. convert smaller `INDEX` `unsupported_formula_shape` fallout and residual
+   `LOOKUP` / `XLOOKUP` mismatch rows
+4. only return to broader reach work if the promoted replay surface regresses
 
 ## Historical Archive
 

@@ -107,6 +107,15 @@ using spreadsheetengine::core::util::coerceToNumber;
     return nLength;
 }
 
+[[nodiscard]] bool preserveTrailingEmptiesForExtendedMatch(
+    const api::CellValue& rLookup, api::lookup::MatchMode eMatchMode)
+{
+    if (rLookup.isEmpty())
+        return true;
+
+    return rLookup.isText() && eMatchMode == api::lookup::MatchMode::ExactOrNextLarger;
+}
+
 [[nodiscard]] bool isExactLookupMatch(const api::CellValue& rLookup,
     const api::CellValue& rCandidate, api::query::SearchType eSearchType)
 {
@@ -524,9 +533,7 @@ api::ValueResult<api::MatrixSize> resolveMatchIndex(const LookupMaterializer& rM
     if (!aSearchLayout)
         return api::ValueResult<api::MatrixSize>::failure(aSearchLayout.meError);
 
-    api::MatrixSize nSearchLength = trimTrailingEmptyLookupLength(
-        rMaterializer, rSearchInput, aSearchLayout.maValue.meOrientation,
-        aSearchLayout.maValue.mnLength);
+    const api::MatrixSize nSearchLength = aSearchLayout.maValue.mnLength;
 
     auto isExactMatch = [&](const api::CellValue& rCandidate) {
         return isExactLookupMatch(rLookup, rCandidate, eSearchType);
@@ -746,9 +753,13 @@ api::ValueResult<api::MatrixSize> resolveExtendedMatchIndex(
             eSearchType = api::query::SearchType::Regex;
     }
 
-    api::MatrixSize nSearchLength = trimTrailingEmptyLookupLength(
-        rMaterializer, rSearchInput, aSearchLayout.maValue.meOrientation,
-        aSearchLayout.maValue.mnLength);
+    api::MatrixSize nSearchLength = aSearchLayout.maValue.mnLength;
+    if (!preserveTrailingEmptiesForExtendedMatch(rLookup, eMatchMode))
+    {
+        nSearchLength = trimTrailingEmptyLookupLength(
+            rMaterializer, rSearchInput, aSearchLayout.maValue.meOrientation,
+            aSearchLayout.maValue.mnLength);
+    }
 
     std::optional<api::MatrixSize> oResolvedIndex;
     if (eMatchMode == api::lookup::MatchMode::ExactOrNotAvailable
@@ -776,6 +787,7 @@ api::ValueResult<api::MatrixSize> resolveExtendedMatchIndex(
             {
                 api::String aBestText;
                 bool bHaveBestText = false;
+                std::optional<api::MatrixSize> oEmptyFallbackIndex;
                 for (api::MatrixSize nOffset = 0; nOffset < nSearchLength; ++nOffset)
                 {
                     const api::MatrixSize nSearchIndex
@@ -929,6 +941,7 @@ api::ValueResult<api::MatrixSize> resolveExtendedMatchIndex(
             {
                 api::String aBestText;
                 bool bHaveBestText = false;
+                std::optional<api::MatrixSize> oEmptyFallbackIndex;
                 for (api::MatrixSize nOffset = 0; nOffset < nSearchLength; ++nOffset)
                 {
                     const api::MatrixSize nSearchIndex
@@ -943,9 +956,14 @@ api::ValueResult<api::MatrixSize> resolveExtendedMatchIndex(
                     if (!(rCandidate.isText() || rCandidate.isEmpty()))
                         continue;
 
-                    const api::StringView aCandidateText
-                        = rCandidate.isText() ? api::StringView(rCandidate.maString)
-                                              : api::StringView();
+                    if (rCandidate.isEmpty())
+                    {
+                        if (!oEmptyFallbackIndex)
+                            oEmptyFallbackIndex = nSearchIndex;
+                        continue;
+                    }
+
+                    const api::StringView aCandidateText(rCandidate.maString);
                     if (sequery::compareFoldedText(aCandidateText, rLookup.maString) <= 0)
                         continue;
 
@@ -957,6 +975,9 @@ api::ValueResult<api::MatrixSize> resolveExtendedMatchIndex(
                         oResolvedIndex = nSearchIndex;
                     }
                 }
+
+                if (!oResolvedIndex && oEmptyFallbackIndex)
+                    oResolvedIndex = *oEmptyFallbackIndex;
             }
             else
             {

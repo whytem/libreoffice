@@ -1164,10 +1164,17 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetValue(20, 40, 0, 1.0);
         m_pDoc->SetValue(20, 41, 0, 2.0);
         m_pDoc->SetValue(20, 42, 0, 3.0);
+        m_pDoc->SetTextCell(ScAddress(24, 20, 0), u"Amy"_ustr);
+        m_pDoc->SetTextCell(ScAddress(24, 21, 0), u"Beth"_ustr);
+        m_pDoc->SetTextCell(ScAddress(24, 22, 0), u"Clara"_ustr);
+        m_pDoc->SetTextCell(ScAddress(24, 23, 0), u"Diana"_ustr);
+        m_pDoc->SetString(24, 24, 0, u""_ustr);
         m_pDoc->SetString(21, 40, 0, u"=CONCATENATE(\"Res\";U41)"_ustr);
         m_pDoc->SetString(21, 41, 0, u"=CONCATENATE(\"Res\";U42)"_ustr);
         m_pDoc->SetString(21, 42, 0, u"=CONCATENATE(\"Res\";U43)"_ustr);
         m_pDoc->SetString(23, 22, 0, u"=LOOKUP(2;U41:V43)"_ustr);
+        m_pDoc->SetString(23, 30, 0, u"=XMATCH(;Y21:Y25)"_ustr);
+        m_pDoc->SetString(23, 31, 0, u"=XMATCH(\"Susan\";Y21:Y25;1)"_ustr);
         m_pDoc->SetString(0, 23, 0, u"=INDEX(B24:C25;1)"_ustr);
         m_pDoc->SetString(0, 25, 0, u"=INDEX({1;2|3;4};0;2)"_ustr);
         m_pDoc->SetString(0, 26, 0, u"=XLOOKUP(2;B27:D27;B28:D29)"_ustr);
@@ -1213,6 +1220,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_EQUAL(u"BR"_ustr, m_pDoc->GetString(23, 26, 0));
         CPPUNIT_ASSERT_EQUAL(u"cC"_ustr, m_pDoc->GetString(23, 27, 0));
         CPPUNIT_ASSERT_EQUAL(u"eE"_ustr, m_pDoc->GetString(23, 28, 0));
+        ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(23, 30, 0));
+        ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(23, 31, 0));
         CPPUNIT_ASSERT_EQUAL(u"Res2"_ustr, m_pDoc->GetString(23, 22, 0));
         for (SCROW nRow = 40; nRow <= 42; ++nRow)
         {
@@ -1252,7 +1261,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::XMatch)]
-            >= 2);
+            >= 4);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Index)]

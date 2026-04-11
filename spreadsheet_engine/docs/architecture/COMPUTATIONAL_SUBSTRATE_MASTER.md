@@ -64,14 +64,14 @@ Dominant ambient fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1780`
-- `interpret_tail_authoritative_fallback_total=32`
-- promoted-family authoritative rate: `98.23%`
+- `interpret_tail_authoritative_total=1781`
+- `interpret_tail_authoritative_fallback_total=31`
+- promoted-family authoritative rate: `98.29%`
 
 Dominant promoted-family fallback reasons:
 
 - `unsupported_formula_shape=6`
-- `shadow_mismatch=26`
+- `shadow_mismatch=25`
 - `unsupported_host_surface=0`
 
 ### Hard-Quarantined Calc Paths
@@ -167,17 +167,16 @@ The highest-value remaining blockers are now:
    imported surface still retains `6` direct promoted fallback cells and
    ambient replay still covers only a bounded minority of formulas
 3. promoted-family residual parity:
-   `shadow_mismatch=26`
+   `shadow_mismatch=25`
 4. promoted-family residual formula shape:
    replay-live `unsupported_formula_shape=12`
 5. first real Calc-path retirement:
    one family is hard-routed, but no `ScInterpreter` subroutine has been
    deleted yet
 
-The latest `XMATCH` predicate-source slice improved promoted-family
-authority from `1774 / 38` to `1780 / 32`, cut promoted replay direct
-fallback from `12` to `6`, and narrowed the top blocker to `VLOOKUP`
-parity plus `MATCH` parity.
+The latest residual `XMATCH` parity slice improved promoted-family
+authority from `1780 / 32` to `1781 / 31`, held replay direct fallback at
+`6`, and removed `XMATCH` from the top residual blocker list.
 
 ## Recommended Next Pass
 
@@ -185,8 +184,7 @@ The next pass should:
 
 1. convert the remaining `XLOOKUP` and `VLOOKUP` mismatch rows on the
    replay-promoted surface
-2. then clean up the remaining replay-imported `MATCH` parity rows and
-   the two residual `XMATCH` mismatch rows
+2. then clean up the remaining replay-imported `MATCH` parity rows
 3. convert smaller `INDEX` shape fallout and residual `LOOKUP` / `XLOOKUP`
    mismatch rows
 4. move the first replay-imported promoted family from observe-only reach

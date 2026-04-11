@@ -997,6 +997,28 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         aXMatchIsNumber.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, aXMatchIsNumber.maResult.mfValue, 1e-12);
 
+    m_pDoc->SetTextCell(ScAddress(24, 20, 0), u"Amy"_ustr);
+    m_pDoc->SetTextCell(ScAddress(24, 21, 0), u"Beth"_ustr);
+    m_pDoc->SetTextCell(ScAddress(24, 22, 0), u"Clara"_ustr);
+    m_pDoc->SetTextCell(ScAddress(24, 23, 0), u"Diana"_ustr);
+    m_pDoc->SetString(24, 24, 0, u""_ustr);
+
+    const auto aXMatchEmptyLookup = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(25, 20, 0), u"=XMATCH(;Y21:Y25)", false);
+    CPPUNIT_ASSERT(aXMatchEmptyLookup.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aXMatchEmptyLookup.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, aXMatchEmptyLookup.maResult.mfValue, 1e-12);
+
+    const auto aXMatchTextNextLargerEmpty = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(25, 21, 0), u"=XMATCH(\"Susan\";Y21:Y25;1)", false);
+    CPPUNIT_ASSERT(aXMatchTextNextLargerEmpty.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aXMatchTextNextLargerEmpty.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, aXMatchTextNextLargerEmpty.maResult.mfValue, 1e-12);
+
     const auto aNamedVLookup = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(9, 14, 0), u"=VLOOKUP(column1;table;2;0)", false);
     CPPUNIT_ASSERT(aNamedVLookup.mbSupported);
