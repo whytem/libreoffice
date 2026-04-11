@@ -981,6 +981,11 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
     CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
         new ScRangeData(*m_pDoc, u"range"_ustr, u"$EngineAuthority.$I$15:$I$18"_ustr)));
 
+    m_pDoc->SetString(40, 40, 0, u"=MATCH(0;{0;0;1};0)"_ustr);
+    m_pDoc->SetString(40, 41, 0, u"=MATCH(\"C\";{\"A\";\"A\";\"B\";\"B\";\"C\";\"C\"};0)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(40, 40, 0));
+    ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(40, 41, 0));
+
     {
         ScopedEnvironmentOverride aMode(
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
@@ -1138,6 +1143,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetString(3, 7, 0, u"=LOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"})"_ustr);
         m_pDoc->SetString(3, 8, 0, u"=MATCH(2;{1;2;3};0)"_ustr);
         m_pDoc->SetString(4, 8, 0, u"=MATCH(0;{0;0;1};0)"_ustr);
+        m_pDoc->SetString(5, 8, 0, u"=MATCH(\"C\";{\"A\";\"A\";\"B\";\"B\";\"C\";\"C\"};0)"_ustr);
         m_pDoc->SetString(6, 4, 0, u"=MATCH(B5:B7;B5:B7;0)"_ustr);
         m_pDoc->SetString(6, 5, 0, u"=XMATCH(B5:B7;B5:B7)"_ustr);
         m_pDoc->SetString(3, 9, 0, u"=INDEX({1;2|3;4};2;2)"_ustr);
@@ -1222,7 +1228,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
 
         CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(3, 7, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(3, 8, 0));
-        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(4, 8, 0));
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(4, 8, 0));
+        ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(5, 8, 0));
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(6, 4, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(6, 5, 0));
         ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(3, 9, 0));
@@ -1283,7 +1290,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Match)]
-            >= 4);
+            >= 5);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::XMatch)]

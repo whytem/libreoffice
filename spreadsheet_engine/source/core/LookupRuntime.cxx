@@ -542,7 +542,6 @@ api::ValueResult<api::MatrixSize> resolveMatchIndex(const LookupMaterializer& rM
     std::optional<api::MatrixSize> oResolvedIndex;
     if (rModes.meMatchMode == api::lookup::MatchMode::ExactOrNotAvailable)
     {
-        bool bSeenExactMatch = false;
         for (api::MatrixSize nSearchIndex = 0; nSearchIndex < nSearchLength; ++nSearchIndex)
         {
             const auto aCandidate = materializeLookupInputValue(
@@ -552,10 +551,8 @@ api::ValueResult<api::MatrixSize> resolveMatchIndex(const LookupMaterializer& rM
             if (isExactMatch(aCandidate.maValue))
             {
                 oResolvedIndex = nSearchIndex;
-                bSeenExactMatch = true;
-            }
-            else if (bSeenExactMatch)
                 break;
+            }
         }
     }
     else if (rModes.meMatchMode == api::lookup::MatchMode::ExactOrNextSmaller)

@@ -1125,7 +1125,16 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value,
         aMatchDuplicateExact.maResult.meType);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aMatchDuplicateExact.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aMatchDuplicateExact.maResult.mfValue, 1e-12);
+
+    const auto aMatchDuplicateExactText = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(40, 40, 0), u"=MATCH(\"C\";{\"A\";\"A\";\"B\";\"B\";\"C\";\"C\"};0)",
+        false);
+    CPPUNIT_ASSERT(aMatchDuplicateExactText.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aMatchDuplicateExactText.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, aMatchDuplicateExactText.maResult.mfValue, 1e-12);
 
     m_pDoc->SetString(30, 39, 0, u"A"_ustr);
     m_pDoc->SetString(31, 39, 0, u"B"_ustr);
