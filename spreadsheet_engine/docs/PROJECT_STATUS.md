@@ -60,14 +60,14 @@ Ambient live fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1756`
-- `interpret_tail_authoritative_fallback_total=56`
-- promoted-family authoritative rate: `96.91%`
+- `interpret_tail_authoritative_total=1765`
+- `interpret_tail_authoritative_fallback_total=47`
+- promoted-family authoritative rate: `97.41%`
 
 Promoted-family fallback reasons:
 
 - `unsupported_formula_shape=22`
-- `shadow_mismatch=34`
+- `shadow_mismatch=25`
 - `unsupported_host_surface=0`
 
 ### Promoted Replay Eligibility Inventory
@@ -104,9 +104,8 @@ Today:
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
-- the latest replay-imported named-range slice cleared the residual
-  `VLOOKUP` / `INDEX` host-surface band, improving both the ambient replay
-  surface and promoted-family authority
+- the latest descending-binary `XLOOKUP` parity slice tightened the promoted
+  replay band again, improving authority from `1756 / 56` to `1765 / 47`
 
 Still not true:
 
@@ -118,9 +117,9 @@ Still not true:
   replay-imported promoted fallback further
 - the dominant retained promoted-family blocker is now `shadow_mismatch`,
   with smaller `unsupported_formula_shape` cleanup secondary
-- the next highest-value replay blocker is now the residual parity band led
-  by `XLOOKUP` / `VLOOKUP` mismatch rows, then `LOOKUP` mismatch and smaller
-  `MATCH` / `INDEX` shape cleanup
+- the next highest-value replay blocker is now `VLOOKUP` parity first, then
+  `MATCH` / `XMATCH` shape cleanup, with only two residual non-binary
+  `XLOOKUP` mismatch rows remaining
 
 ## Active Delegated Family
 

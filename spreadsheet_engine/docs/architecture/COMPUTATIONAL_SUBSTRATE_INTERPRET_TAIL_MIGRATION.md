@@ -117,7 +117,7 @@ Two different denominators matter, and both are now reported.
 ### Full Replay Corpus: Ambient Live Observe
 
 This is the honest all-formula live-routing surface from the standing replay
-corpus after the completed replay-imported host-surface cleanup slice:
+corpus after the completed bounded descending-`XLOOKUP` parity slice:
 
 - `interpret_tail_live_formula_cells=50661`
 - `interpret_tail_live_supported_total=4182`
@@ -142,8 +142,8 @@ Interpretation:
   traffic
 - the pre-RPN observe bridge converted the replay-promoted reach problem into a
   residual family-fallback problem
-- the just-closed slice closed the replay-imported named-range
-  host-surface band on the ambient live surface
+- the latest slice held the ambient denominator steady while improving
+  promoted-family parity inside it
 - the main remaining ambient replay work is now parity cleanup inside
   already-promoted families
 
@@ -175,14 +175,14 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1756`
-- `interpret_tail_authoritative_fallback_total=56`
-- promoted-family authoritative rate: `96.91%`
+- `interpret_tail_authoritative_total=1765`
+- `interpret_tail_authoritative_fallback_total=47`
+- promoted-family authoritative rate: `97.41%`
 
 Current promoted-family fallback reasons:
 
 - `unsupported_formula_shape=22`
-- `shadow_mismatch=34`
+- `shadow_mismatch=25`
 - `unsupported_host_surface=0`
 
 Interpretation:
@@ -190,11 +190,13 @@ Interpretation:
 - once the probe hits promoted-family cells, authority conversion is now
   strong
 - the main remaining conversion work is no longer generic breadth
-- the just-closed slice reduced promoted-family fallback from `99` to `56`,
-  cleared promoted `unsupported_host_surface`, and nearly halved
-  `shadow_mismatch`
-- the current hotspots are now `XLOOKUP` / `VLOOKUP` mismatch first, then
-  `LOOKUP` mismatch and smaller `MATCH` / `INDEX` shape cleanup
+- the latest slice reduced promoted-family fallback from `56` to `47`
+  while cutting `shadow_mismatch` from `34` to `25`
+- the large descending `XLOOKUP ... ; ... ; ... ; ; <matchmode> ; -2`
+  replay cluster is now closed
+- the current hotspots are now `VLOOKUP` mismatch first, then
+  `MATCH` / `XMATCH` shape cleanup, with only two residual non-binary
+  `XLOOKUP` mismatch rows still visible
 
 ### Replay Eligibility Inventory
 
@@ -227,11 +229,11 @@ Interpretation:
 - both shared and non-shared promoted replay formulas now reach the live seam
 - the residual replay work is now the `22` direct fallback cells on this
   imported promoted-family surface
-- the just-closed slice cleared the replay-imported named-range
-  `VLOOKUP` / `INDEX` host-surface band on that surface
-- the dominant next targets are now parity fallbacks on `XLOOKUP`,
-  `VLOOKUP`, and `LOOKUP`, plus smaller `MATCH` / `INDEX`
-  `unsupported_formula_shape` rows
+- the descending-binary `XLOOKUP` replay band is no longer one of those
+  dominant blockers
+- the dominant next targets are now `VLOOKUP` parity first, then
+  `MATCH` / `XMATCH` `unsupported_formula_shape`, with residual `LOOKUP`
+  mismatch and two smaller `XLOOKUP` rows behind them
 
 ## Hard-Routed Family
 

@@ -1149,6 +1149,70 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(
             aXLookupArray.maResult.maString));
 
+    const auto aXLookupDescNextSmaller = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0),
+        u"=XLOOKUP(4;{6;5;3;2;1};{\"a6\";\"b5\";\"c3\";\"d2\";\"e1\"};;-1;-2)", false);
+    CPPUNIT_ASSERT(aXLookupDescNextSmaller.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::XLookup,
+        aXLookupDescNextSmaller.meFunction);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::String,
+        aXLookupDescNextSmaller.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"c3"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aXLookupDescNextSmaller.maResult.maString));
+
+    const auto aXLookupDescNextLarger = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0),
+        u"=XLOOKUP(4;{6;5;3;2;1};{\"a6\";\"b5\";\"c3\";\"d2\";\"e1\"};;1;-2)", false);
+    CPPUNIT_ASSERT(aXLookupDescNextLarger.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::XLookup,
+        aXLookupDescNextLarger.meFunction);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::String,
+        aXLookupDescNextLarger.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"b5"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aXLookupDescNextLarger.maResult.maString));
+
+    const auto aXLookupDescDuplicateLarger = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0),
+        u"=XLOOKUP(5;{10;9;8;7;6;6;4;3;2;1;0};"
+        u"{\"CN\";\"IN\";\"US\";\"NG2\";\"ID\";\"BR\";\"PK\";\"NG\";\"BD\";\"RU\";\"MX\"};0;1;-2)",
+        false);
+    CPPUNIT_ASSERT(aXLookupDescDuplicateLarger.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::XLookup,
+        aXLookupDescDuplicateLarger.meFunction);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::String,
+        aXLookupDescDuplicateLarger.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"BR"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aXLookupDescDuplicateLarger.maResult.maString));
+
+    const auto aXLookupDescTextNextSmaller = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0),
+        u"=XLOOKUP(\"D\";{\"F\";\"E\";\"C\";\"B\";\"A\"};{\"fF\";\"eE\";\"cC\";\"bB\";\"aA\"};;-1;-2)",
+        false);
+    CPPUNIT_ASSERT(aXLookupDescTextNextSmaller.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::XLookup,
+        aXLookupDescTextNextSmaller.meFunction);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::String,
+        aXLookupDescTextNextSmaller.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"cC"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aXLookupDescTextNextSmaller.maResult.maString));
+
+    const auto aXLookupDescTextNextLarger = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0),
+        u"=XLOOKUP(\"D\";{\"F\";\"E\";\"C\";\"B\";\"A\"};{\"fF\";\"eE\";\"cC\";\"bB\";\"aA\"};;1;-2)",
+        false);
+    CPPUNIT_ASSERT(aXLookupDescTextNextLarger.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::XLookup,
+        aXLookupDescTextNextLarger.meFunction);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::String,
+        aXLookupDescTextNextLarger.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"eE"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aXLookupDescTextNextLarger.maResult.maString));
+
     m_pDoc->SetValue(1, 26, 0, 1.0);
     m_pDoc->SetValue(2, 26, 0, 2.0);
     m_pDoc->SetValue(3, 26, 0, 3.0);

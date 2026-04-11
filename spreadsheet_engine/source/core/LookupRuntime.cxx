@@ -837,6 +837,7 @@ api::ValueResult<api::MatrixSize> resolveExtendedMatchIndex(
         }
         else if (rLookup.isText())
         {
+            const bool bDescending = eSearchMode == api::lookup::SearchMode::BinaryDescending;
             for (api::MatrixSize nSearchIndex = 0; nSearchIndex < nSearchLength; ++nSearchIndex)
             {
                 const auto aCandidate = materializeLookupInputValue(
@@ -853,10 +854,18 @@ api::ValueResult<api::MatrixSize> resolveExtendedMatchIndex(
                                               : api::StringView();
                     const std::int32_t nCompare
                         = sequery::compareFoldedText(aCandidateText, rLookup.maString);
-                    if (nCompare < 0)
+                    if (!bDescending)
+                    {
+                        if (nCompare < 0)
+                            oResolvedIndex = nSearchIndex;
+                        else if (nSearchIndex > 0)
+                            break;
+                    }
+                    else if (nCompare <= 0)
+                    {
                         oResolvedIndex = nSearchIndex;
-                    else if (nSearchIndex > 0)
                         break;
+                    }
                 }
             }
         }
@@ -866,6 +875,7 @@ api::ValueResult<api::MatrixSize> resolveExtendedMatchIndex(
             if (!aLookupNumber)
                 return api::ValueResult<api::MatrixSize>::failure(aLookupNumber.meError);
 
+            const bool bDescending = eSearchMode == api::lookup::SearchMode::BinaryDescending;
             for (api::MatrixSize nSearchIndex = 0; nSearchIndex < nSearchLength; ++nSearchIndex)
             {
                 const auto aCandidate = materializeLookupInputValue(
@@ -882,11 +892,14 @@ api::ValueResult<api::MatrixSize> resolveExtendedMatchIndex(
                 if (!aCandidateNumber)
                     continue;
 
-                if (aCandidateNumber.maValue < aLookupNumber.maValue)
+                if ((!bDescending && aCandidateNumber.maValue < aLookupNumber.maValue)
+                    || (bDescending && aCandidateNumber.maValue <= aLookupNumber.maValue))
                 {
                     oResolvedIndex = nSearchIndex;
+                    if (bDescending)
+                        break;
                 }
-                else
+                else if (!bDescending)
                 {
                     break;
                 }
@@ -995,7 +1008,7 @@ api::ValueResult<api::MatrixSize> resolveExtendedMatchIndex(
                                           : api::StringView();
                 const std::int32_t nCompare
                     = sequery::compareFoldedText(aCandidateText, rLookup.maString);
-                if ((!bDescending && nCompare > 0) || (bDescending && nCompare < 0))
+                if ((!bDescending && nCompare > 0) || (bDescending && nCompare >= 0))
                 {
                     oResolvedIndex = nSearchIndex;
                     if (!bDescending)
@@ -1031,7 +1044,7 @@ api::ValueResult<api::MatrixSize> resolveExtendedMatchIndex(
                     continue;
 
                 if ((!bDescending && aCandidateNumber.maValue > aLookupNumber.maValue)
-                    || (bDescending && aCandidateNumber.maValue < aLookupNumber.maValue))
+                    || (bDescending && aCandidateNumber.maValue >= aLookupNumber.maValue))
                 {
                     oResolvedIndex = nSearchIndex;
                     if (!bDescending)

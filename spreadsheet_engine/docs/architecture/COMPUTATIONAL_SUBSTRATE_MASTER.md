@@ -64,14 +64,14 @@ Dominant ambient fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1756`
-- `interpret_tail_authoritative_fallback_total=56`
-- promoted-family authoritative rate: `96.91%`
+- `interpret_tail_authoritative_total=1765`
+- `interpret_tail_authoritative_fallback_total=47`
+- promoted-family authoritative rate: `97.41%`
 
 Dominant promoted-family fallback reasons:
 
 - `unsupported_formula_shape=22`
-- `shadow_mismatch=34`
+- `shadow_mismatch=25`
 - `unsupported_host_surface=0`
 
 ### Hard-Quarantined Calc Paths
@@ -167,17 +167,17 @@ The highest-value remaining blockers are now:
    imported surface still retains `22` direct promoted fallback cells and
    ambient replay still covers only a bounded minority of formulas
 3. promoted-family residual parity:
-   `shadow_mismatch=34`
+   `shadow_mismatch=25`
 4. promoted-family residual formula shape:
    replay-live `unsupported_formula_shape=44`
 5. first real Calc-path retirement:
    one family is hard-routed, but no `ScInterpreter` subroutine has been
    deleted yet
 
-The latest replay-imported named-range slice cleared the remaining
-`VLOOKUP` / `INDEX` host-surface band, improved both ambient replay support
-and promoted-family authority, and narrowed the top blocker to parity and
-shape cleanup rather than host access.
+The latest descending-binary `XLOOKUP` parity slice improved promoted-family
+authority from `1756 / 56` to `1765 / 47`, cut `shadow_mismatch` from `34`
+to `25`, and narrowed the top blocker to `VLOOKUP` parity and
+`MATCH` / `XMATCH` shape cleanup.
 
 ## Recommended Next Pass
 
@@ -185,9 +185,9 @@ The next pass should:
 
 1. convert the remaining `XLOOKUP` and `VLOOKUP` mismatch rows on the
    replay-promoted surface
-2. then convert residual `LOOKUP` mismatch rows
-3. clean up the remaining replay-imported `MATCH` / `INDEX`
+2. then clean up the remaining replay-imported `MATCH` / `XMATCH`
    `unsupported_formula_shape` fallout
+3. convert residual `LOOKUP` mismatch rows and smaller `INDEX` shape fallout
 4. move the first replay-imported promoted family from observe-only reach
    toward a broader authority candidate once mismatch and shape fallback
    shrink materially

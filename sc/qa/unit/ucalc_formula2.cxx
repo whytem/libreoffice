@@ -1139,6 +1139,17 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetString(19, 32, 0, u"=CONCATENATE(\"Res\";S33)"_ustr);
         m_pDoc->SetString(19, 34, 0, u"OUT OF BOUND"_ustr);
         m_pDoc->SetString(23, 21, 0, u"=LOOKUP(\"E\";S31:S35;T31:T33)"_ustr);
+        m_pDoc->SetString(23, 24, 0,
+            u"=XLOOKUP(4;{6;5;3;2;1};{\"a6\";\"b5\";\"c3\";\"d2\";\"e1\"};;-1;-2)"_ustr);
+        m_pDoc->SetString(23, 25, 0,
+            u"=XLOOKUP(4;{6;5;3;2;1};{\"a6\";\"b5\";\"c3\";\"d2\";\"e1\"};;1;-2)"_ustr);
+        m_pDoc->SetString(23, 26, 0,
+            u"=XLOOKUP(5;{10;9;8;7;6;6;4;3;2;1;0};"
+            u"{\"CN\";\"IN\";\"US\";\"NG2\";\"ID\";\"BR\";\"PK\";\"NG\";\"BD\";\"RU\";\"MX\"};0;1;-2)"_ustr);
+        m_pDoc->SetString(23, 27, 0,
+            u"=XLOOKUP(\"D\";{\"F\";\"E\";\"C\";\"B\";\"A\"};{\"fF\";\"eE\";\"cC\";\"bB\";\"aA\"};;-1;-2)"_ustr);
+        m_pDoc->SetString(23, 28, 0,
+            u"=XLOOKUP(\"D\";{\"F\";\"E\";\"C\";\"B\";\"A\"};{\"fF\";\"eE\";\"cC\";\"bB\";\"aA\"};;1;-2)"_ustr);
         m_pDoc->SetValue(20, 40, 0, 1.0);
         m_pDoc->SetValue(20, 41, 0, 2.0);
         m_pDoc->SetValue(20, 42, 0, 3.0);
@@ -1180,6 +1191,11 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_EQUAL(FormulaError::NotAvailable, m_pDoc->GetErrCode(ScAddress(23, 19, 0)));
         CPPUNIT_ASSERT_EQUAL(u"Andy"_ustr, m_pDoc->GetString(23, 20, 0));
         CPPUNIT_ASSERT_EQUAL(u"OUT OF BOUND"_ustr, m_pDoc->GetString(23, 21, 0));
+        CPPUNIT_ASSERT_EQUAL(u"c3"_ustr, m_pDoc->GetString(23, 24, 0));
+        CPPUNIT_ASSERT_EQUAL(u"b5"_ustr, m_pDoc->GetString(23, 25, 0));
+        CPPUNIT_ASSERT_EQUAL(u"BR"_ustr, m_pDoc->GetString(23, 26, 0));
+        CPPUNIT_ASSERT_EQUAL(u"cC"_ustr, m_pDoc->GetString(23, 27, 0));
+        CPPUNIT_ASSERT_EQUAL(u"eE"_ustr, m_pDoc->GetString(23, 28, 0));
         CPPUNIT_ASSERT_EQUAL(u"Res2"_ustr, m_pDoc->GetString(23, 22, 0));
         for (SCROW nRow = 40; nRow <= 42; ++nRow)
         {
@@ -1202,11 +1218,15 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_EQUAL(u"11 2"_ustr, m_pDoc->GetString(13, 5, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 22);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 27);
         CPPUNIT_ASSERT(aStats.mnAuthoritativeFallbackCount <= 3);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Lookup)]
+            >= 8);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::XLookup)]
             >= 8);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
