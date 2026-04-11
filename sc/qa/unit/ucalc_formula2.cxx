@@ -1198,6 +1198,11 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetString(0, 23, 0, u"=INDEX(B24:C25;1)"_ustr);
         m_pDoc->SetString(0, 25, 0, u"=INDEX({1;2|3;4};0;2)"_ustr);
         m_pDoc->SetString(0, 26, 0, u"=XLOOKUP(2;B27:D27;B28:D29)"_ustr);
+        m_pDoc->SetString(30, 39, 0, u"A"_ustr);
+        m_pDoc->SetString(31, 39, 0, u"B"_ustr);
+        m_pDoc->SetString(32, 39, 0, u"C"_ustr);
+        m_pDoc->SetString(33, 39, 0, u"D"_ustr);
+        m_pDoc->SetString(0, 40, 0, u"=MATCH(AH40;A40:XFD40;1)"_ustr);
 
         m_pDoc->SetValue(1, 23, 0, 11.0);
         m_pDoc->SetValue(2, 23, 0, 12.0);
@@ -1242,6 +1247,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_EQUAL(u"eE"_ustr, m_pDoc->GetString(23, 28, 0));
         ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(23, 30, 0));
         ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(23, 31, 0));
+        ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(0, 40, 0));
         CPPUNIT_ASSERT_EQUAL(u"Res2"_ustr, m_pDoc->GetString(23, 22, 0));
         for (SCROW nRow = 40; nRow <= 42; ++nRow)
         {
@@ -1277,7 +1283,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Match)]
-            >= 3);
+            >= 4);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::XMatch)]

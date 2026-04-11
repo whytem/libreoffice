@@ -2039,6 +2039,57 @@ inline void putScalarIntoMatrix(
     return makeMaterializedValue(aSource);
 }
 
+[[nodiscard]] inline ScRange trimWholeMatchSearchRangeToUsedData(
+    const ScDocument& rDoc, const ScRange& rRange)
+{
+    if (rRange.aStart.Tab() != rRange.aEnd.Tab())
+        return rRange;
+
+    const bool bWholeRow
+        = rRange.aStart.Col() == 0 && rRange.aEnd.Col() == rDoc.MaxCol();
+    const bool bWholeColumn
+        = rRange.aStart.Row() == 0 && rRange.aEnd.Row() == rDoc.MaxRow();
+    if (!bWholeRow && !bWholeColumn)
+        return rRange;
+
+    ScRange aTrimmed(rRange);
+    if (rDoc.GetDataAreaSubrange(aTrimmed))
+        return aTrimmed;
+
+    return rRange;
+}
+
+[[nodiscard]] inline Materialization<lookupexecution::LookupInputSource>
+materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
+{
+    if (rNode.meKind == core::formula::NodeKind::CellReference
+        || rNode.meKind == core::formula::NodeKind::RangeReference
+        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    {
+        const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+        if (!aRange.mbSupported)
+        {
+            return makeUnsupportedMaterialization<lookupexecution::LookupInputSource>(
+                aRange.meFallbackReason);
+        }
+        if (!aRange.moValue)
+            return makeMaterializedError<lookupexecution::LookupInputSource>(aRange.meError);
+
+        if (aRange.moValue->aStart.Tab() != aRange.moValue->aEnd.Tab())
+        {
+            return makeUnsupportedMaterialization<lookupexecution::LookupInputSource>(
+                FallbackReason::UnsupportedHostSurface);
+        }
+
+        lookupexecution::LookupInputSource aSource;
+        aSource.moRange = trimWholeMatchSearchRangeToUsedData(rDoc, *aRange.moValue);
+        return makeMaterializedValue(aSource);
+    }
+
+    return materializeLookupInputSourceNode(rNode, rDoc, rContext, rFormulaPos);
+}
+
 [[nodiscard]] inline Materialization<api::CellValue> materializeLookupValueNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
@@ -2364,7 +2415,8 @@ inline void putScalarIntoMatrix(
         if (aLookup.moValue->isError())
             return makeErrorResult(eFunction, aLookup.moValue->meError);
 
-        const auto aSearch = materializeSource(*rNode.maChildren[1]);
+        const auto aSearch = materializeMatchLookupInputSourceNode(
+            *rNode.maChildren[1], rDoc, rContext, rFormulaPos);
         if (!aSearch.mbSupported)
             return makeUnsupported(eFunction, aSearch.meFallbackReason);
         if (!aSearch.moValue)

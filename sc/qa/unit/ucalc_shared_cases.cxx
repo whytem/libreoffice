@@ -1127,6 +1127,18 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         aMatchDuplicateExact.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aMatchDuplicateExact.maResult.mfValue, 1e-12);
 
+    m_pDoc->SetString(30, 39, 0, u"A"_ustr);
+    m_pDoc->SetString(31, 39, 0, u"B"_ustr);
+    m_pDoc->SetString(32, 39, 0, u"C"_ustr);
+    m_pDoc->SetString(33, 39, 0, u"D"_ustr);
+    const auto aMatchWholeRowApprox = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(0, 40, 0), u"=MATCH(AH40;A40:XFD40;1)", false);
+    CPPUNIT_ASSERT(aMatchWholeRowApprox.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aMatchWholeRowApprox.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, aMatchWholeRowApprox.maResult.mfValue, 1e-12);
+
     const auto aXMatchArray = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 8, 0), u"=XMATCH(2;{1;2;3})", false);
     CPPUNIT_ASSERT(aXMatchArray.mbSupported);
