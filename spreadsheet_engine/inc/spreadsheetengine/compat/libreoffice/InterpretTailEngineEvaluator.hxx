@@ -1798,6 +1798,39 @@ inline void putScalarIntoMatrix(
     return materializeMatrixSlice(*aMatrixSource.moValue, aSelection.maValue);
 }
 
+[[nodiscard]] inline Materialization<ScMatrixRef> materializeIsNumberMatrixFunctionCall(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    if (rNode.maChildren.size() != 1)
+    {
+        return makeMaterializedValue(
+            makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+    }
+
+    const auto aSource = materializeMatrixNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+    if (!aSource.mbSupported)
+        return makeUnsupportedMaterialization<ScMatrixRef>(aSource.meFallbackReason);
+    if (!aSource.moValue)
+        return makeMaterializedError<ScMatrixRef>(aSource.meError);
+
+    SCSIZE nColumns = 0;
+    SCSIZE nRows = 0;
+    (*aSource.moValue)->GetDimensions(nColumns, nRows);
+    ScMatrixRef xMatrix(new ScMatrix(nColumns, nRows));
+    for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+    {
+        for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+        {
+            const auto aValue
+                = lookupexecution::detail::toApiCellValue((*aSource.moValue)->Get(nColumn, nRow));
+            putScalarIntoMatrix(api::CellValue::boolean(aValue.isNumber()), xMatrix, nColumn, nRow);
+        }
+    }
+
+    return makeMaterializedValue(xMatrix);
+}
+
 [[nodiscard]] inline Materialization<ScMatrixRef> materializeMatrixFunctionCall(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
@@ -1808,6 +1841,8 @@ inline void putScalarIntoMatrix(
         return materializeXLookupMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
     if (eFunction == FunctionKind::Index)
         return materializeIndexMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
+    if (aFunctionName == u"ISNUMBER")
+        return materializeIsNumberMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
 
     if (aFunctionName != u"MMULT")
         return makeUnsupportedMaterialization<ScMatrixRef>(FallbackReason::UnsupportedFormulaShape);

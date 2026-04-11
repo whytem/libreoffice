@@ -1139,6 +1139,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             u"=LOOKUP(\"D\";{\"B\";\"C\";\"D\"};{\"X\";\"Y\"})"_ustr);
         m_pDoc->SetString(23, 20, 0,
             u"=LOOKUP(\"B\";{\"A\"};{\"Andy\";\"Bruce\";\"Charlie\"})"_ustr);
+        m_pDoc->SetString(23, 29, 0, u"=XMATCH(1;ISNUMBER(B24:E24);0;-1)"_ustr);
         m_pDoc->SetString(18, 30, 0, u"A"_ustr);
         m_pDoc->SetString(18, 31, 0, u"B"_ustr);
         m_pDoc->SetString(18, 32, 0, u"C"_ustr);
@@ -1175,6 +1176,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetValue(2, 23, 0, 12.0);
         m_pDoc->SetValue(1, 24, 0, 21.0);
         m_pDoc->SetValue(2, 24, 0, 22.0);
+        m_pDoc->SetTextCell(ScAddress(3, 23, 0), u"text"_ustr);
+        m_pDoc->SetValue(4, 23, 0, 24.0);
         m_pDoc->SetValue(1, 26, 0, 1.0);
         m_pDoc->SetValue(2, 26, 0, 2.0);
         m_pDoc->SetValue(3, 26, 0, 3.0);
@@ -1203,6 +1206,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_EQUAL(u"Z"_ustr, m_pDoc->GetString(23, 18, 0));
         CPPUNIT_ASSERT_EQUAL(FormulaError::NotAvailable, m_pDoc->GetErrCode(ScAddress(23, 19, 0)));
         CPPUNIT_ASSERT_EQUAL(u"Andy"_ustr, m_pDoc->GetString(23, 20, 0));
+        ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(23, 29, 0));
         CPPUNIT_ASSERT_EQUAL(u"OUT OF BOUND"_ustr, m_pDoc->GetString(23, 21, 0));
         CPPUNIT_ASSERT_EQUAL(u"c3"_ustr, m_pDoc->GetString(23, 24, 0));
         CPPUNIT_ASSERT_EQUAL(u"b5"_ustr, m_pDoc->GetString(23, 25, 0));
@@ -1248,7 +1252,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::XMatch)]
-            >= 1);
+            >= 2);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Index)]

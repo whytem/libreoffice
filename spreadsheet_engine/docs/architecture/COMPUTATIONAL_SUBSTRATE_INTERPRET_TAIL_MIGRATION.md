@@ -117,20 +117,20 @@ Two different denominators matter, and both are now reported.
 ### Full Replay Corpus: Ambient Live Observe
 
 This is the honest all-formula live-routing surface from the standing replay
-corpus after the completed lookup-value scalarization slice:
+corpus after the completed `XMATCH` predicate-source materialization slice:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=4202`
-- `interpret_tail_live_fallback_total=24`
+- `interpret_tail_live_supported_total=4214`
+- `interpret_tail_live_fallback_total=12`
 - `interpret_tail_live_seen_total=4226`
 - `interpret_tail_live_unseen_formula_cells=46435`
-- `interpret_tail_live_promoted_function_supported_total=2952`
-- `interpret_tail_live_supported_rate=8.29`
+- `interpret_tail_live_promoted_function_supported_total=2964`
+- `interpret_tail_live_supported_rate=8.32`
 - `interpret_tail_live_seen_rate=8.34`
 
 Current ambient fallback reasons:
 
-- `unsupported_formula_shape=24`
+- `unsupported_formula_shape=12`
 - `unsupported_host_surface=0`
 - `parse_failure=0`
 
@@ -142,8 +142,8 @@ Interpretation:
   traffic
 - the pre-RPN observe bridge converted the replay-promoted reach problem into a
   residual family-fallback problem
-- the latest slice held the ambient denominator steady while converting more
-  replay lookup-family traffic inside it
+- the latest slice held the ambient denominator steady while converting the
+  replay `XMATCH` predicate-source band inside it
 - the main remaining ambient replay work is now parity cleanup inside
   already-promoted families
 
@@ -153,12 +153,12 @@ This is the new full-corpus measurement after explicitly dirtying and forcing
 every replay formula cell through Calc's live `Interpret()` path:
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=2101`
-- `interpret_tail_forced_interpret_fallback_total=12`
+- `interpret_tail_forced_interpret_supported_total=2107`
+- `interpret_tail_forced_interpret_fallback_total=6`
 - `interpret_tail_forced_interpret_seen_total=2113`
 - `interpret_tail_forced_interpret_unseen_formula_cells=48548`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=1476`
-- `interpret_tail_forced_interpret_supported_rate=4.15`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=1482`
+- `interpret_tail_forced_interpret_supported_rate=4.16`
 - `interpret_tail_forced_interpret_seen_rate=4.17`
 
 Interpretation:
@@ -176,13 +176,13 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1774`
-- `interpret_tail_authoritative_fallback_total=38`
-- promoted-family authoritative rate: `97.90%`
+- `interpret_tail_authoritative_total=1780`
+- `interpret_tail_authoritative_fallback_total=32`
+- promoted-family authoritative rate: `98.23%`
 
 Current promoted-family fallback reasons:
 
-- `unsupported_formula_shape=12`
+- `unsupported_formula_shape=6`
 - `shadow_mismatch=26`
 - `unsupported_host_surface=0`
 
@@ -191,11 +191,12 @@ Interpretation:
 - once the probe hits promoted-family cells, authority conversion is now
   strong
 - the main remaining conversion work is no longer generic breadth
-- the latest slice reduced promoted-family fallback from `47` to `38`
-  while cutting `unsupported_formula_shape` from `22` to `12`
-- the current hotspots are now `VLOOKUP` mismatch plus
-  `MATCH` / `XMATCH` parity and shape cleanup, with smaller `INDEX`
-  shape fallout behind them
+- the latest slice reduced promoted-family fallback from `38` to `32`
+  while cutting `unsupported_formula_shape` from `12` to `6`
+- the replay `XMATCH(1;ISNUMBER(...);0;-1)` shape cluster is now closed
+- the current hotspots are now `VLOOKUP` mismatch first, then `MATCH`
+  parity, with only two residual `XMATCH` mismatch rows and smaller
+  `INDEX` shape fallout behind them
 
 ### Replay Eligibility Inventory
 
@@ -205,8 +206,8 @@ surface after forcing each promoted replay formula through direct live
 
 - `interpret_tail_replay_promoted_formula_cells=1812`
 - `interpret_tail_replay_promoted_direct_seen=1812`
-- `interpret_tail_replay_promoted_direct_supported=1800`
-- `interpret_tail_replay_promoted_direct_fallback=12`
+- `interpret_tail_replay_promoted_direct_supported=1806`
+- `interpret_tail_replay_promoted_direct_fallback=6`
 - `interpret_tail_replay_promoted_direct_unseen=0`
 - `interpret_tail_replay_promoted_shared_formula_cells=395`
 - `interpret_tail_replay_promoted_shared_top_formula_cells=83`
@@ -226,12 +227,12 @@ Interpretation:
 - the latest slice improved parity and shape coverage inside that surface
   rather than widening its denominator
 - both shared and non-shared promoted replay formulas now reach the live seam
-- the residual replay work is now the `12` direct fallback cells on this
+- the residual replay work is now the `6` direct fallback cells on this
   imported promoted-family surface
-- the dominant next targets are now `VLOOKUP` parity first, then
-  `MATCH` / `XMATCH` parity and `unsupported_formula_shape`, with
-  smaller `INDEX` shape fallout and residual `LOOKUP` / `XLOOKUP`
-  mismatch rows behind them
+- the dominant next targets are now `VLOOKUP` parity first, then `MATCH`
+  parity, with two residual `XMATCH` mismatch rows, smaller `INDEX`
+  shape fallout, and residual `LOOKUP` / `XLOOKUP` mismatch rows behind
+  them
 
 ## Hard-Routed Family
 

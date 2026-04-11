@@ -984,6 +984,19 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         aLookupMatrixArithmetic.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aLookupMatrixArithmetic.maResult.mfValue, 1e-12);
 
+    m_pDoc->SetValue(14, 20, 0, 7.0);
+    m_pDoc->SetTextCell(ScAddress(15, 20, 0), u"text"_ustr);
+    m_pDoc->SetValue(16, 20, 0, 9.0);
+    m_pDoc->SetTextCell(ScAddress(17, 20, 0), u"tail"_ustr);
+
+    const auto aXMatchIsNumber = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(18, 20, 0), u"=XMATCH(1;ISNUMBER(O21:R21);0;-1)", false);
+    CPPUNIT_ASSERT(aXMatchIsNumber.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aXMatchIsNumber.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, aXMatchIsNumber.maResult.mfValue, 1e-12);
+
     const auto aNamedVLookup = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(9, 14, 0), u"=VLOOKUP(column1;table;2;0)", false);
     CPPUNIT_ASSERT(aNamedVLookup.mbSupported);
