@@ -60,14 +60,14 @@ Ambient live fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1781`
-- `interpret_tail_authoritative_fallback_total=31`
-- promoted-family authoritative rate: `98.29%`
+- `interpret_tail_authoritative_total=1785`
+- `interpret_tail_authoritative_fallback_total=27`
+- promoted-family authoritative rate: `98.51%`
 
 Promoted-family fallback reasons:
 
 - `unsupported_formula_shape=6`
-- `shadow_mismatch=25`
+- `shadow_mismatch=21`
 - `unsupported_host_surface=0`
 
 ### Promoted Replay Eligibility Inventory
@@ -104,8 +104,9 @@ Today:
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
-- the latest residual `XMATCH` parity slice tightened the promoted replay
-  band again, improving authority from `1780 / 32` to `1781 / 31`
+- the latest bounded approximate-text `VLOOKUP` parity slice tightened the
+  promoted replay band again, improving authority from `1781 / 31` to
+  `1785 / 27`
 
 Still not true:
 
@@ -115,11 +116,11 @@ Still not true:
   traffic still covers only a bounded minority of formulas
 - the replay-promoted reach blocker is cleared, and the latest slice reduced
   replay-imported promoted fallback further
-- the dominant retained promoted-family blocker is now `shadow_mismatch`,
+- the dominant retained promoted-family blocker is still `shadow_mismatch`,
   with smaller `unsupported_formula_shape` cleanup secondary
-- the next highest-value replay blocker is now `VLOOKUP` parity first, then
-  `MATCH` parity, with smaller `INDEX` shape fallout and residual
-  `LOOKUP` / `XLOOKUP` mismatch rows behind them
+- the next highest-value replay blocker is now `MATCH` parity first, then
+  logical-constant display parity, with smaller `VLOOKUP` / `XLOOKUP`
+  mismatch rows and `INDEX` shape fallout behind them
 
 ## Active Delegated Family
 
@@ -157,11 +158,10 @@ historical reference material, not active roadmap.
 
 The next pass should stay on promoted-family parity cleanup:
 
-1. convert the remaining `XLOOKUP` and `VLOOKUP` mismatch rows on the
-   replay-promoted surface
-2. then convert the residual `LOOKUP` mismatch rows
-3. clean up the remaining replay-imported `MATCH` / `INDEX`
-   `unsupported_formula_shape` fallout
+1. convert the residual `MATCH` parity rows on the replay-promoted surface
+2. clean up logical-constant display parity on the promoted replay surface
+3. then convert the smaller `VLOOKUP` / `XLOOKUP` mismatch rows and the
+   remaining replay-imported `INDEX` `unsupported_formula_shape` fallout
 4. only return to broader reach work if the promoted replay surface regresses
 
 ## References

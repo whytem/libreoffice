@@ -117,7 +117,7 @@ Two different denominators matter, and both are now reported.
 ### Full Replay Corpus: Ambient Live Observe
 
 This is the honest all-formula live-routing surface from the standing replay
-corpus after the completed residual `XMATCH` empty-aware parity slice:
+corpus after the completed bounded approximate-text `VLOOKUP` parity slice:
 
 - `interpret_tail_live_formula_cells=50661`
 - `interpret_tail_live_supported_total=4214`
@@ -142,8 +142,8 @@ Interpretation:
   traffic
 - the pre-RPN observe bridge converted the replay-promoted reach problem into a
   residual family-fallback problem
-- the latest slice held the ambient denominator steady while closing the last
-  residual replay `XMATCH` mismatch rows inside it
+- the latest slice held the ambient denominator steady while reducing promoted
+  replay mismatch inside already-seen `VLOOKUP` rows
 - the main remaining ambient replay work is now parity cleanup inside
   already-promoted families
 
@@ -176,14 +176,14 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1781`
-- `interpret_tail_authoritative_fallback_total=31`
-- promoted-family authoritative rate: `98.29%`
+- `interpret_tail_authoritative_total=1785`
+- `interpret_tail_authoritative_fallback_total=27`
+- promoted-family authoritative rate: `98.51%`
 
 Current promoted-family fallback reasons:
 
 - `unsupported_formula_shape=6`
-- `shadow_mismatch=25`
+- `shadow_mismatch=21`
 - `unsupported_host_surface=0`
 
 Interpretation:
@@ -191,12 +191,12 @@ Interpretation:
 - once the probe hits promoted-family cells, authority conversion is now
   strong
 - the main remaining conversion work is no longer generic breadth
-- the latest slice reduced promoted-family fallback from `32` to `31`
-  while clearing the last residual `XMATCH` mismatch rows
-- the replay `XMATCH` parity band is now closed on the promoted probe
-- the current hotspots are now `VLOOKUP` mismatch first, then `MATCH`
-  parity, with smaller `INDEX` shape fallout and residual `LOOKUP` /
-  `XLOOKUP` mismatches behind them
+- the latest slice reduced promoted-family fallback from `31` to `27`
+  while keeping the replay denominator steady
+- the residual approximate-text `VLOOKUP` band is now smaller, not dominant
+- the current hotspots are now `MATCH` parity first, then logical-constant
+  display parity, with smaller `VLOOKUP` / `XLOOKUP` mismatches and `INDEX`
+  shape fallout behind them
 
 ### Replay Eligibility Inventory
 
@@ -229,9 +229,9 @@ Interpretation:
 - both shared and non-shared promoted replay formulas now reach the live seam
 - the residual replay work is now the `6` direct fallback cells on this
   imported promoted-family surface
-- the dominant next targets are now `VLOOKUP` parity first, then `MATCH`
-  parity, with smaller `INDEX` shape fallout and residual `LOOKUP` /
-  `XLOOKUP` mismatch rows behind them
+- the dominant next targets are now `MATCH` parity first, then
+  logical-constant display parity, with smaller `VLOOKUP` / `XLOOKUP`
+  mismatch rows and `INDEX` shape fallout behind them
 
 ## Hard-Routed Family
 
