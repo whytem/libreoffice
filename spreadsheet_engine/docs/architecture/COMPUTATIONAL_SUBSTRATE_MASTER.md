@@ -193,13 +193,18 @@ A bounded live-host-truth pass now also shows the replay-imported exact
 cached non-error workbook values are likewise no longer treated as runtime
 conversion targets.
 
+A bounded live-host-truth pass now also shows the replay-imported
+collation-sensitive exact `VLOOKUP([.M22]; [.$L$11:.$M$32]; 1; 0)` row
+evaluates to `FormulaError::VariableExpected` in Calc with the seam forced
+off, so the residual replay `VLOOKUP` band is no longer treated as a real
+runtime conversion target either.
+
 ## Recommended Next Pass
 
 The next pass should:
 
 1. convert the residual
-   real `VLOOKUP` / `XLOOKUP` mismatch rows, starting with the
-   collation-sensitive `VLOOKUP` band
+   real `XLOOKUP` mismatch rows
 2. then convert smaller `INDEX` shape fallout and any remaining `LOOKUP`
    parity rows
 3. move the first replay-imported promoted family from observe-only reach

@@ -211,9 +211,13 @@ Interpretation:
   `FormulaError::VariableExpected` in Calc with the seam forced off, so those
   cached non-error workbook values are not treated as runtime conversion
   targets
+- a bounded live-host-truth pass now also shows the replay-imported
+  collation-sensitive exact `VLOOKUP([.M22]; [.L$11:.M$32]; 1; 0)` row
+  evaluates to `FormulaError::VariableExpected` in Calc with the seam forced
+  off, so the residual replay `VLOOKUP` band is no longer treated as a real
+  runtime conversion target
 - the next reducible promoted-family runtime hotspot is therefore the smaller
-  collation-sensitive `VLOOKUP` / `XLOOKUP` mismatch band, with `INDEX` shape
-  fallout behind it
+  `XLOOKUP` mismatch band, with `INDEX` shape fallout behind it
 
 ### Replay Eligibility Inventory
 
@@ -288,8 +292,8 @@ The next high-value pass should now stay on promoted-family parity cleanup,
 starting with the residual `VLOOKUP` / `XLOOKUP` mismatch band and then the
 smaller shape fallout behind it:
 
-1. convert the remaining real replay-promoted `VLOOKUP` / `XLOOKUP`
-   mismatch rows, starting with the collation-sensitive `VLOOKUP` band
+1. convert the remaining real replay-promoted `XLOOKUP`
+   mismatch rows
 2. then convert smaller `INDEX` `unsupported_formula_shape` fallout
 3. clean up any residual `LOOKUP` mismatch rows still visible after that
 4. only return to broader reach work if the promoted replay surface regresses
