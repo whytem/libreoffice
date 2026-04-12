@@ -118,11 +118,15 @@ Still not true:
   replay-imported promoted fallback further
 - the dominant retained promoted-family blocker is still `shadow_mismatch`,
   with smaller `unsupported_formula_shape` cleanup secondary
-- the next highest-value replay blocker is now the replay-imported whole-row
-  `MATCH([.$B$150];[.$150:.$150];-1)` row plus the localized array-constant
-  `MATCH(2; {1.2}; 1)` pair, then logical-constant display parity, with
-  smaller `VLOOKUP` / `XLOOKUP` mismatch rows and `INDEX` shape fallout
-  behind them
+- a focused live-host check now shows the replay-imported whole-row
+  `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to
+  `FormulaError::VariableExpected`
+  in Calc itself, so it is no longer treated as a confirmed live parity
+  blocker
+- the next highest-value replay blocker is therefore the localized
+  array-constant `MATCH(2; {1.2}; 1)` pair, then logical-constant display
+  parity, with smaller `VLOOKUP` / `XLOOKUP` mismatch rows and `INDEX`
+  shape fallout behind them
 
 ## Active Delegated Family
 
@@ -160,13 +164,12 @@ historical reference material, not active roadmap.
 
 The next pass should stay on promoted-family parity cleanup:
 
-1. convert the residual `MATCH` lookup-value range rows on the
+1. convert the residual `MATCH` array-constant rows on the
    replay-promoted surface
-2. then convert the residual `MATCH` array-constant rows on the same surface
-3. then clean up logical-constant display parity and the smaller
+2. then clean up logical-constant display parity and the smaller
    `VLOOKUP` / `XLOOKUP` mismatch rows, plus the remaining replay-imported
    `INDEX` `unsupported_formula_shape` fallout
-4. only return to broader reach work if the promoted replay surface regresses
+3. only return to broader reach work if the promoted replay surface regresses
 
 ## References
 

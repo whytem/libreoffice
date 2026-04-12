@@ -195,8 +195,12 @@ Interpretation:
   while keeping the replay denominator steady
 - the latest closed replay row was the imported range-lookup-value
   `MATCH(F29:F37;F29:F37;0)` parity case
-- the current hotspots are now the replay-imported whole-row
-  `MATCH([.$B$150];[.$150:.$150];-1)` row plus the localized array-constant
+- a focused host-truth test now shows the replay-imported whole-row
+  `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to
+  `FormulaError::VariableExpected`
+  in live Calc with the seam forced off, so it is not a proven live parity
+  blocker even though the replay workbook stores a non-error expected value
+- the current confirmed hotspots are therefore the localized array-constant
   `MATCH(2; {1.2}; 1)` pair, then logical-constant display parity, with
   smaller `VLOOKUP` / `XLOOKUP` mismatches and `INDEX` shape fallout behind
   them

@@ -179,12 +179,17 @@ promoted-family authority from `1788 / 24` to `1789 / 23`, held replay
 direct fallback at `6`, and cleared the
 `MATCH(F29:F37;F29:F37;0)` replay row from diagnostics.
 
+A focused live-host check now shows the replay-imported whole-row
+`MATCH([.$B$150]; [.$150:.$150]; -1)` row evaluates to
+`FormulaError::VariableExpected` in Calc with the seam forced off, so that
+row is no longer treated as a confirmed live parity blocker even though the
+replay workbook stores a non-error expected value.
+
 ## Recommended Next Pass
 
 The next pass should:
 
-1. convert the remaining replay-imported whole-row `MATCH([.$B$150];
-   [.$150:.$150];-1)` row and the localized array-constant parity pair
+1. convert the localized array-constant `MATCH(2; {1.2}; 1)` parity pair
 2. then clean up logical-constant display parity plus the residual
    `VLOOKUP` / `XLOOKUP` mismatch rows
 3. convert smaller `INDEX` shape fallout and any remaining `LOOKUP`
