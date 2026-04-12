@@ -2083,7 +2083,16 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         }
 
         lookupexecution::LookupInputSource aSource;
-        aSource.moRange = trimWholeMatchSearchRangeToUsedData(rDoc, *aRange.moValue);
+        const ScRange aTrimmedRange = trimWholeMatchSearchRangeToUsedData(rDoc, *aRange.moValue);
+        const auto aMatrix = materializeReferencedMatrix(aTrimmedRange, rDoc, rContext, rFormulaPos);
+        if (!aMatrix.mbSupported)
+        {
+            return makeUnsupportedMaterialization<lookupexecution::LookupInputSource>(
+                aMatrix.meFallbackReason);
+        }
+        if (!aMatrix.moValue)
+            return makeMaterializedError<lookupexecution::LookupInputSource>(aMatrix.meError);
+        aSource.mpMatrix = *aMatrix.moValue;
         return makeMaterializedValue(aSource);
     }
 
