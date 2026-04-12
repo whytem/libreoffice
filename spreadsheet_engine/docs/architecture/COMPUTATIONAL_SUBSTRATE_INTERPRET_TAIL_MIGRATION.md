@@ -117,22 +117,23 @@ Two different denominators matter, and both are now reported.
 ### Full Replay Corpus: Ambient Live Observe
 
 This is the honest all-formula live-routing surface from the standing replay
-corpus after the completed bounded full-width `MATCH` search-source trim slice:
+corpus after the completed token-backed canonical-source localized-array slice:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=4214`
-- `interpret_tail_live_fallback_total=12`
-- `interpret_tail_live_seen_total=4226`
-- `interpret_tail_live_unseen_formula_cells=46435`
-- `interpret_tail_live_promoted_function_supported_total=2964`
-- `interpret_tail_live_supported_rate=8.32`
-- `interpret_tail_live_seen_rate=8.34`
+- `interpret_tail_live_supported_total=4324`
+- `interpret_tail_live_fallback_total=624`
+- `interpret_tail_live_seen_total=4948`
+- `interpret_tail_live_unseen_formula_cells=45713`
+- `interpret_tail_live_promoted_function_supported_total=3074`
+- `interpret_tail_live_supported_rate=8.54`
+- `interpret_tail_live_seen_rate=9.77`
 
 Current ambient fallback reasons:
 
-- `unsupported_formula_shape=12`
+- `unsupported_formula_shape=32`
 - `unsupported_host_surface=0`
-- `parse_failure=0`
+- `parse_failure=4`
+- `unsupported_function=588`
 
 Interpretation:
 
@@ -153,13 +154,13 @@ This is the new full-corpus measurement after explicitly dirtying and forcing
 every replay formula cell through Calc's live `Interpret()` path:
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=2107`
-- `interpret_tail_forced_interpret_fallback_total=6`
-- `interpret_tail_forced_interpret_seen_total=2113`
-- `interpret_tail_forced_interpret_unseen_formula_cells=48548`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=1482`
-- `interpret_tail_forced_interpret_supported_rate=4.16`
-- `interpret_tail_forced_interpret_seen_rate=4.17`
+- `interpret_tail_forced_interpret_supported_total=2162`
+- `interpret_tail_forced_interpret_fallback_total=312`
+- `interpret_tail_forced_interpret_seen_total=2474`
+- `interpret_tail_forced_interpret_unseen_formula_cells=48187`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=1537`
+- `interpret_tail_forced_interpret_supported_rate=4.27`
+- `interpret_tail_forced_interpret_seen_rate=4.88`
 
 Interpretation:
 
@@ -176,14 +177,14 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1789`
-- `interpret_tail_authoritative_fallback_total=23`
-- promoted-family authoritative rate: `98.73%`
+- `interpret_tail_authoritative_total=1793`
+- `interpret_tail_authoritative_fallback_total=19`
+- promoted-family authoritative rate: `98.95%`
 
 Current promoted-family fallback reasons:
 
 - `unsupported_formula_shape=6`
-- `shadow_mismatch=17`
+- `shadow_mismatch=13`
 - `unsupported_host_surface=0`
 
 Interpretation:
@@ -191,19 +192,19 @@ Interpretation:
 - once the probe hits promoted-family cells, authority conversion is now
   strong
 - the main remaining conversion work is no longer generic breadth
-- the latest slice reduced promoted-family fallback from `24` to `23`
-  while keeping the replay denominator steady
-- the latest closed replay row was the imported range-lookup-value
-  `MATCH(F29:F37;F29:F37;0)` parity case
+- the latest slice closed the imported localized array-constant replay pair
+  through a token-backed canonical-source sidecar instead of relying on the
+  ambiguous display-string rewrite
+- the promoted-family probe improved from `1789 / 23` to `1793 / 19` while the
+  replay-promoted direct surface held at `1806 / 6`
 - a focused host-truth test now shows the replay-imported whole-row
   `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to
   `FormulaError::VariableExpected`
   in live Calc with the seam forced off, so it is not a proven live parity
   blocker even though the replay workbook stores a non-error expected value
-- the current confirmed hotspots are therefore the localized array-constant
-  `MATCH(2; {1.2}; 1)` pair, then logical-constant display parity, with
-  smaller `VLOOKUP` / `XLOOKUP` mismatches and `INDEX` shape fallout behind
-  them
+- the current confirmed hotspots are therefore the residual logical-constant
+  display parity rows, then smaller `VLOOKUP` / `XLOOKUP` mismatches and
+  `INDEX` shape fallout behind them
 
 ### Replay Eligibility Inventory
 
@@ -275,12 +276,14 @@ historical reference material, not active roadmap work.
 The latest replay closeout is now folded into this migration ledger.
 
 The next high-value pass should now stay on promoted-family parity cleanup,
-starting with the still-dominant `VLOOKUP` replay rows:
+starting with the remaining logical-constant display band and then the
+small lookup mismatches behind it:
 
-1. convert the remaining replay-promoted `VLOOKUP` mismatch rows
-2. then clean up the residual replay-imported `MATCH` parity rows
+1. convert the residual replay-imported logical-constant display parity rows
+2. then clean up the remaining replay-promoted `VLOOKUP` / `XLOOKUP`
+   mismatch rows
 3. convert smaller `INDEX` `unsupported_formula_shape` fallout and residual
-   `LOOKUP` / `XLOOKUP` mismatch rows
+   `LOOKUP` mismatch rows
 4. only return to broader reach work if the promoted replay surface regresses
 
 ## Historical Archive

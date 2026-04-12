@@ -27,10 +27,12 @@
 #include <docoptio.hxx>
 #include <compiler.hxx>
 #include <formula/grammar.hxx>
+#include <formula/token.hxx>
 #include <global.hxx>
 #include <interpretercontext.hxx>
 #include <rangeutl.hxx>
 #include <svl/numformat.hxx>
+#include <tokenarray.hxx>
 
 #include <spreadsheetengine/api/FormulaResult.hxx>
 #include <spreadsheetengine/api/Lookup.hxx>
@@ -423,6 +425,182 @@ private:
     api::String aNormalized(u"of:=");
     aNormalized.append(aTrimmed.begin(), aTrimmed.end());
     return aNormalized;
+}
+
+struct ArrayConstantSpan
+{
+    std::size_t mnBegin = 0;
+    std::size_t mnEnd = 0;
+};
+
+[[nodiscard]] inline std::vector<ArrayConstantSpan> collectArrayConstantSpans(
+    std::u16string_view rSource)
+{
+    std::vector<ArrayConstantSpan> aSpans;
+    bool bInString = false;
+    std::size_t nDepth = 0;
+    std::size_t nStart = 0;
+    for (std::size_t i = 0; i < rSource.size(); ++i)
+    {
+        const char16_t cChar = rSource[i];
+        if (bInString)
+        {
+            if (cChar == u'"')
+            {
+                if (i + 1 < rSource.size() && rSource[i + 1] == u'"')
+                    ++i;
+                else
+                    bInString = false;
+            }
+            continue;
+        }
+
+        if (cChar == u'"')
+        {
+            bInString = true;
+            continue;
+        }
+
+        if (cChar == u'{')
+        {
+            if (nDepth == 0)
+                nStart = i;
+            ++nDepth;
+            continue;
+        }
+
+        if (cChar == u'}' && nDepth > 0)
+        {
+            --nDepth;
+            if (nDepth == 0)
+                aSpans.push_back({ nStart, i + 1 });
+        }
+    }
+    return aSpans;
+}
+
+[[nodiscard]] inline bool needsTokenBackedArrayRewrite(
+    std::u16string_view rArrayText, const ScMatrix& rMatrix)
+{
+    SCSIZE nColumns = 0;
+    SCSIZE nRows = 0;
+    rMatrix.GetDimensions(nColumns, nRows);
+    if (nColumns * nRows <= 1)
+        return false;
+
+    if (rArrayText.find(u';') != std::u16string_view::npos
+        || rArrayText.find(u'|') != std::u16string_view::npos)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+[[nodiscard]] inline std::optional<OUString> tryFormatCanonicalArrayScalar(
+    const ScMatrix& rMatrix, SCSIZE nColumn, SCSIZE nRow)
+{
+    if (rMatrix.IsValue(nColumn, nRow))
+    {
+        const FormulaError eError = rMatrix.GetError(nColumn, nRow);
+        if (eError != FormulaError::NONE)
+            return std::nullopt;
+        return OUString::number(rMatrix.GetDouble(nColumn, nRow));
+    }
+
+    if (rMatrix.IsStringOrEmpty(nColumn, nRow))
+    {
+        OUString aString = rMatrix.GetString(nColumn, nRow).getString();
+        aString = aString.replaceAll(u"\""_ustr, u"\"\""_ustr);
+        return u"\""_ustr + aString + u"\""_ustr;
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] inline std::optional<OUString> tryBuildCanonicalArrayConstant(
+    const ScMatrix& rMatrix)
+{
+    SCSIZE nColumns = 0;
+    SCSIZE nRows = 0;
+    rMatrix.GetDimensions(nColumns, nRows);
+    if (!nColumns || !nRows)
+        return std::nullopt;
+
+    OUStringBuffer aBuffer;
+    aBuffer.append(u'{');
+    for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+    {
+        if (nRow)
+            aBuffer.append(u'|');
+        for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+        {
+            if (nColumn)
+                aBuffer.append(u';');
+            const auto oScalar = tryFormatCanonicalArrayScalar(rMatrix, nColumn, nRow);
+            if (!oScalar)
+                return std::nullopt;
+            aBuffer.append(*oScalar);
+        }
+    }
+    aBuffer.append(u'}');
+    return aBuffer.makeStringAndClear();
+}
+
+[[nodiscard]] inline api::String maybeCanonicalizeArrayConstantsFromTokens(
+    api::StringView rNormalizedSource, const ScTokenArray* pTokenArray)
+{
+    if (!pTokenArray)
+        return api::String(rNormalizedSource);
+
+    std::vector<const ScMatrix*> aMatrices;
+    for (formula::FormulaToken* pToken : pTokenArray->Tokens())
+    {
+        if (!pToken || pToken->GetType() != formula::svMatrix)
+            continue;
+
+        const ScMatrix* pMatrix = pToken->GetMatrix();
+        if (!pMatrix)
+            return api::String(rNormalizedSource);
+        aMatrices.push_back(pMatrix);
+    }
+
+    if (aMatrices.empty())
+        return api::String(rNormalizedSource);
+
+    const auto aSpans = collectArrayConstantSpans(rNormalizedSource);
+    if (aSpans.empty() || aSpans.size() != aMatrices.size())
+        return api::String(rNormalizedSource);
+
+    OUStringBuffer aBuffer;
+    std::size_t nCursor = 0;
+    bool bRewrote = false;
+    for (std::size_t i = 0; i < aSpans.size(); ++i)
+    {
+        const auto& rSpan = aSpans[i];
+        aBuffer.append(OUString(rNormalizedSource.substr(nCursor, rSpan.mnBegin - nCursor)));
+
+        const std::u16string_view aArrayText
+            = rNormalizedSource.substr(rSpan.mnBegin, rSpan.mnEnd - rSpan.mnBegin);
+        if (!needsTokenBackedArrayRewrite(aArrayText, *aMatrices[i]))
+        {
+            aBuffer.append(OUString(aArrayText));
+        }
+        else if (const auto oCanonical = tryBuildCanonicalArrayConstant(*aMatrices[i]))
+        {
+            aBuffer.append(*oCanonical);
+            bRewrote = true;
+        }
+        else
+        {
+            aBuffer.append(OUString(aArrayText));
+        }
+
+        nCursor = rSpan.mnEnd;
+    }
+    aBuffer.append(OUString(rNormalizedSource.substr(nCursor)));
+
+    return bRewrote ? toApiString(aBuffer.makeStringAndClear()) : api::String(rNormalizedSource);
 }
 
 [[nodiscard]] inline FunctionKind classifyFunction(api::StringView rFunctionName)
@@ -2967,14 +3145,20 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
 [[nodiscard]] inline EvaluationAttempt tryEvaluateFormula(
     const ScDocument& rDoc, ScInterpreterContext& rContext, const ScAddress& rFormulaPos,
-    std::u16string_view rFormulaSource, bool bEmptyStringAsZero)
+    std::u16string_view rFormulaSource, bool bEmptyStringAsZero,
+    const ScTokenArray* pTokenArray = nullptr,
+    std::u16string_view rCanonicalFormulaSource = {})
 {
     const api::String aNormalized = detail::normalizeFormulaSource(rFormulaSource);
-    const auto aParse = core::formula::parseFormula(aNormalized);
+    const api::String aCanonical
+        = rCanonicalFormulaSource.empty()
+              ? detail::maybeCanonicalizeArrayConstantsFromTokens(aNormalized, pTokenArray)
+              : detail::normalizeFormulaSource(rCanonicalFormulaSource);
+    const auto aParse = core::formula::parseFormula(aCanonical);
     if (!aParse || !aParse.mpRoot)
     {
         detail::recordDiagnosticSample(FallbackReason::ParseFailure, rDoc, rFormulaPos,
-            rFormulaSource, aNormalized, std::nullopt);
+            rFormulaSource, aCanonical, std::nullopt);
         return detail::makeUnsupported(FunctionKind::Unknown, FallbackReason::ParseFailure);
     }
 
@@ -2985,7 +3169,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     if (rRoot.meKind != core::formula::NodeKind::FunctionCall)
     {
         detail::recordDiagnosticSample(FallbackReason::UnsupportedFormulaShape, rDoc, rFormulaPos,
-            rFormulaSource, aNormalized, rRoot.meKind);
+            rFormulaSource, aCanonical, rRoot.meKind);
         return detail::makeUnsupported(
             FunctionKind::Unknown, FallbackReason::UnsupportedFormulaShape);
     }
@@ -2994,8 +3178,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         rRoot, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
     if (!aAttempt.mbSupported)
     {
-        detail::recordDiagnosticSample(aAttempt.meFallbackReason, rDoc, rFormulaPos, rFormulaSource,
-            aNormalized, rRoot.meKind);
+        detail::recordDiagnosticSample(aAttempt.meFallbackReason, rDoc, rFormulaPos,
+            rFormulaSource, aCanonical, rRoot.meKind);
     }
     return aAttempt;
 }

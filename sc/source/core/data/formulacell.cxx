@@ -1977,6 +1977,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
             return;
 
         const OUString& aFormulaSource = getEngineFormulaSource();
+        const OUString aCanonicalFormulaSource = GetHybridFormula();
         const auto eDelegatedFunction = classifyDelegatedInterpretTailFunction(
             std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()));
         if (eDelegatedFunction == setaileval::FunctionKind::Unknown)
@@ -1985,7 +1986,9 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
         auto aAttempt = setaileval::tryEvaluateFormula(
             rDocument, rContext, aPos,
             std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
-            rDocument.GetCalcConfig().mbEmptyStringAsZero);
+            rDocument.GetCalcConfig().mbEmptyStringAsZero, pCode,
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()));
         if (aAttempt.mbSupported)
         {
             setaileval::recordObserveSupport(aAttempt.meFunction);
@@ -1998,6 +2001,203 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                   : eDelegatedFunction;
         setaileval::recordFallback(aAttempt.meFallbackReason, eAttemptFunction);
     };
+
+    const auto applyEngineAuthoritativeResult =
+        [&](const setaileval::EvaluationAttempt& rAttempt) -> bool {
+        if (!rAttempt.mbSupported)
+            return false;
+
+        FormulaError nOldErrCode = aResult.GetResultError();
+        ScFormulaResult aNewResult;
+        if (rAttempt.maResult.meType
+            == spreadsheetengine::api::formulavalue::ValueType::Error)
+        {
+            aNewResult.SetResultError(
+                spreadsheetengine::compat::libreoffice::toFormulaError(
+                    rAttempt.maResult.meError));
+        }
+        else if (rAttempt.maResult.meType
+                 == spreadsheetengine::api::formulavalue::ValueType::Value)
+        {
+            aNewResult.SetDouble(rAttempt.maResult.mfValue);
+        }
+        else if (rAttempt.maResult.meType
+                 == spreadsheetengine::api::formulavalue::ValueType::String)
+        {
+            const svl::SharedString aSharedString
+                = rDocument.GetSharedStringPool().intern(
+                    spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                        rAttempt.maResult.maString));
+            aNewResult.SetToken(new formula::FormulaStringToken(aSharedString));
+        }
+        else
+        {
+            return false;
+        }
+
+        bool bContentChanged = false;
+        const bool bFormatChange
+            = rAttempt.maResult.meType
+                  == spreadsheetengine::api::formulavalue::ValueType::Value
+              && rAttempt.meFormatType != SvNumFormatType::ALL
+              && rAttempt.meFormatType != SvNumFormatType::NUMBER;
+
+        bool bSetNumberFormat = false;
+        sal_uInt32 nNewFormatIndex = NUMBERFORMAT_ENTRY_NOT_FOUND;
+        if (bFormatChange)
+        {
+            sal_uInt32 nOldFormatIndex = rDocument.GetNumberFormat(rContext, aPos);
+            nNewFormatIndex
+                = ScGlobal::GetStandardFormat(rContext, nOldFormatIndex, rAttempt.meFormatType);
+            bSetNumberFormat = nNewFormatIndex != nOldFormatIndex && !rDocument.IsInLayoutStrings();
+            nFormatType = rAttempt.meFormatType;
+        }
+
+        StackVar eOld = aResult.GetCellResultType();
+        StackVar eNew = aNewResult.GetCellResultType();
+        bChanged = bSetNumberFormat || aNewResult.GetResultError() != nOldErrCode
+                   || aResult.GetResultError() != aNewResult.GetResultError()
+                   || (eOld != eNew)
+                   || (eNew == svDouble
+                       && !rtl::math::approxEqual(
+                           aResult.GetDouble(), aNewResult.GetDouble()))
+                   || (eNew == svString && aResult.GetString() != aNewResult.GetString());
+
+        if (bChanged && rDocument.IsStreamValid(aPos.Tab()))
+        {
+            if (!((eOld == svUnknown
+                   && (eNew == svError || (eNew == svDouble && aNewResult.GetDouble() == 0.0)))
+                  || (eOld == svDouble && eNew == svDouble
+                      && rtl::math::approxEqual(
+                          aResult.GetDouble(), aNewResult.GetDouble()))))
+            {
+                bContentChanged = true;
+            }
+        }
+
+        aResult.Assign(aNewResult);
+
+        if (bSetNumberFormat)
+        {
+            rDocument.SetNumberFormat(aPos, nNewFormatIndex);
+            bChanged = true;
+        }
+
+        if (aResult.IsValue() && aResult.GetResultError() == FormulaError::NONE
+            && rDocument.GetDocOptions().IsCalcAsShown()
+            && nFormatType != SvNumFormatType::DATE && nFormatType != SvNumFormatType::TIME
+            && nFormatType != SvNumFormatType::DATETIME)
+        {
+            sal_uInt32 nFormat = rDocument.GetNumberFormat(rContext, aPos);
+            aResult.SetDouble(rDocument.RoundValueAsShown(aResult.GetDouble(), nFormat, &rContext));
+        }
+
+        ResetDirty();
+
+        if (aResult.IsValue() && !std::isfinite(aResult.GetDouble()))
+        {
+            const FormulaError nErr = GetDoubleErrorValue(aResult.GetDouble());
+            aResult.SetResultError(nErr);
+            bChanged = bContentChanged = true;
+        }
+
+        if (bContentChanged && rDocument.IsStreamValid(aPos.Tab()))
+            rDocument.SetStreamValid(aPos.Tab(), false, true);
+
+        if (!rDocument.IsThreadedGroupCalcInProgress())
+        {
+            ScProgress* pProgress = ScProgress::GetInterpretProgress();
+            if (pProgress && pProgress->Enabled())
+            {
+                pProgress->SetStateCountDownOnPercent(
+                    rDocument.GetFormulaCodeInTree() / MIN_NO_CODES_PER_PROGRESS_UPDATE);
+            }
+
+            if (pCode->IsRecalcModeAlways())
+            {
+                EndListeningTo(rDocument);
+                pCode->SetExclusiveRecalcModeNormal();
+            }
+            else
+            {
+                rDocument.EndListeningArea(BCA_LISTEN_ALWAYS, false, this);
+            }
+            rDocument.RemoveFromFormulaTree(this);
+        }
+
+        if (pCode->IsRecalcModeForced())
+        {
+            sal_uInt32 nValidation
+                = rDocument.GetAttr(aPos.Col(), aPos.Row(), aPos.Tab(), ATTR_VALIDDATA).GetValue();
+            if (nValidation)
+            {
+                const ScValidationData* pData = rDocument.GetValidationEntry(nValidation);
+                ScRefCellValue aTmpCell(this);
+                if (pData && !pData->IsDataValid(aTmpCell, aPos))
+                    pData->DoCalcError(this);
+            }
+        }
+
+        pCode->ClearRecalcModeMustAfterImport();
+        return true;
+    };
+
+    if (!pCode->GetCodeLen() && !GetHybridFormula().isEmpty()
+        && (eEngineRolloutMode != setaileval::RolloutMode::Off || bHardRoutedEngineFamily))
+    {
+        const OUString& aFormulaSource = getEngineFormulaSource();
+        const OUString aCanonicalFormulaSource = GetHybridFormula();
+        auto aAttempt = setaileval::tryEvaluateFormula(
+            rDocument, rContext, aPos,
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+            rDocument.GetCalcConfig().mbEmptyStringAsZero, pCode,
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()));
+
+        if (aAttempt.mbSupported)
+        {
+            if (bHardRoutedEngineFamily
+                || eEngineRolloutMode == setaileval::RolloutMode::AuthoritativeWithFallback)
+            {
+                if (applyEngineAuthoritativeResult(aAttempt))
+                {
+                    if (pCode->GetCodeError() != FormulaError::NONE)
+                        pCode->SetCodeError(FormulaError::NONE);
+                    setaileval::recordAuthoritativeRoute(aAttempt.meFunction);
+                    return;
+                }
+
+                setaileval::recordAuthoritativeFallback(
+                    setaileval::FallbackReason::ProjectionFailure, aAttempt.meFunction);
+            }
+            else if (eEngineRolloutMode == setaileval::RolloutMode::Observe)
+            {
+                setaileval::recordObserveSupport(aAttempt.meFunction);
+            }
+            else if (eEngineRolloutMode == setaileval::RolloutMode::ShadowCompare)
+            {
+                setaileval::recordShadowCompareSupport(aAttempt.meFunction);
+            }
+        }
+        else
+        {
+            if (bHardRoutedEngineFamily
+                || eEngineRolloutMode == setaileval::RolloutMode::AuthoritativeWithFallback)
+            {
+                setaileval::recordAuthoritativeFallback(
+                    aAttempt.meFallbackReason, aAttempt.meFunction);
+            }
+            else
+            {
+                const auto eAttemptFunction
+                    = aAttempt.meFunction != setaileval::FunctionKind::Unknown
+                          ? aAttempt.meFunction
+                          : classifyDelegatedInterpretTailFunction(std::u16string_view(
+                                aFormulaSource.getStr(), aFormulaSource.getLength()));
+                setaileval::recordFallback(aAttempt.meFallbackReason, eAttemptFunction);
+            }
+        }
+    }
 
     if( !pCode->GetCodeLen() && pCode->GetCodeError() == FormulaError::NONE )
     {
@@ -2045,10 +2245,13 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
             else
             {
                 const OUString& aFormulaSource = getEngineFormulaSource();
+                const OUString aCanonicalFormulaSource = GetHybridFormula();
                 oEngineAttempt = setaileval::tryEvaluateFormula(
                     rDocument, rContext, aPos,
                     std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
-                    rDocument.GetCalcConfig().mbEmptyStringAsZero);
+                    rDocument.GetCalcConfig().mbEmptyStringAsZero, pCode,
+                    std::u16string_view(aCanonicalFormulaSource.getStr(),
+                        aCanonicalFormulaSource.getLength()));
                 if (!oEngineAttempt->mbSupported)
                 {
                     if (bHardRoutedEngineFamily)
@@ -2069,146 +2272,6 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                 }
             }
         }
-
-        const auto applyEngineAuthoritativeResult =
-            [&](const setaileval::EvaluationAttempt& rAttempt) -> bool {
-            if (!rAttempt.mbSupported)
-                return false;
-
-            FormulaError nOldErrCode = aResult.GetResultError();
-            ScFormulaResult aNewResult;
-            if (rAttempt.maResult.meType
-                == spreadsheetengine::api::formulavalue::ValueType::Error)
-            {
-                aNewResult.SetResultError(
-                    spreadsheetengine::compat::libreoffice::toFormulaError(
-                        rAttempt.maResult.meError));
-            }
-            else if (rAttempt.maResult.meType
-                     == spreadsheetengine::api::formulavalue::ValueType::Value)
-            {
-                aNewResult.SetDouble(rAttempt.maResult.mfValue);
-            }
-            else if (rAttempt.maResult.meType
-                     == spreadsheetengine::api::formulavalue::ValueType::String)
-            {
-                const svl::SharedString aSharedString
-                    = rDocument.GetSharedStringPool().intern(
-                        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
-                            rAttempt.maResult.maString));
-                aNewResult.SetToken(new formula::FormulaStringToken(aSharedString));
-            }
-            else
-            {
-                return false;
-            }
-
-            bool bContentChanged = false;
-            const bool bFormatChange
-                = rAttempt.maResult.meType
-                      == spreadsheetengine::api::formulavalue::ValueType::Value
-                  && rAttempt.meFormatType != SvNumFormatType::ALL
-                  && rAttempt.meFormatType != SvNumFormatType::NUMBER;
-
-            bool bSetNumberFormat = false;
-            sal_uInt32 nNewFormatIndex = NUMBERFORMAT_ENTRY_NOT_FOUND;
-            if (bFormatChange)
-            {
-                sal_uInt32 nOldFormatIndex = rDocument.GetNumberFormat(rContext, aPos);
-                nNewFormatIndex
-                    = ScGlobal::GetStandardFormat(rContext, nOldFormatIndex, rAttempt.meFormatType);
-                bSetNumberFormat = nNewFormatIndex != nOldFormatIndex && !rDocument.IsInLayoutStrings();
-                nFormatType = rAttempt.meFormatType;
-            }
-
-            StackVar eOld = aResult.GetCellResultType();
-            StackVar eNew = aNewResult.GetCellResultType();
-            bChanged = bSetNumberFormat || aNewResult.GetResultError() != nOldErrCode
-                       || aResult.GetResultError() != aNewResult.GetResultError()
-                       || (eOld != eNew)
-                       || (eNew == svDouble
-                           && !rtl::math::approxEqual(
-                               aResult.GetDouble(), aNewResult.GetDouble()))
-                       || (eNew == svString && aResult.GetString() != aNewResult.GetString());
-
-            if (bChanged && rDocument.IsStreamValid(aPos.Tab()))
-            {
-                if (!((eOld == svUnknown
-                       && (eNew == svError || (eNew == svDouble && aNewResult.GetDouble() == 0.0)))
-                      || (eOld == svDouble && eNew == svDouble
-                          && rtl::math::approxEqual(
-                              aResult.GetDouble(), aNewResult.GetDouble()))))
-                {
-                    bContentChanged = true;
-                }
-            }
-
-            aResult.Assign(aNewResult);
-
-            if (bSetNumberFormat)
-            {
-                rDocument.SetNumberFormat(aPos, nNewFormatIndex);
-                bChanged = true;
-            }
-
-            if (aResult.IsValue() && aResult.GetResultError() == FormulaError::NONE
-                && rDocument.GetDocOptions().IsCalcAsShown()
-                && nFormatType != SvNumFormatType::DATE && nFormatType != SvNumFormatType::TIME
-                && nFormatType != SvNumFormatType::DATETIME)
-            {
-                sal_uInt32 nFormat = rDocument.GetNumberFormat(rContext, aPos);
-                aResult.SetDouble(rDocument.RoundValueAsShown(aResult.GetDouble(), nFormat, &rContext));
-            }
-
-            ResetDirty();
-
-            if (aResult.IsValue() && !std::isfinite(aResult.GetDouble()))
-            {
-                const FormulaError nErr = GetDoubleErrorValue(aResult.GetDouble());
-                aResult.SetResultError(nErr);
-                bChanged = bContentChanged = true;
-            }
-
-            if (bContentChanged && rDocument.IsStreamValid(aPos.Tab()))
-                rDocument.SetStreamValid(aPos.Tab(), false, true);
-
-            if (!rDocument.IsThreadedGroupCalcInProgress())
-            {
-                ScProgress* pProgress = ScProgress::GetInterpretProgress();
-                if (pProgress && pProgress->Enabled())
-                {
-                    pProgress->SetStateCountDownOnPercent(
-                        rDocument.GetFormulaCodeInTree() / MIN_NO_CODES_PER_PROGRESS_UPDATE);
-                }
-
-                if (pCode->IsRecalcModeAlways())
-                {
-                    EndListeningTo(rDocument);
-                    pCode->SetExclusiveRecalcModeNormal();
-                }
-                else
-                {
-                    rDocument.EndListeningArea(BCA_LISTEN_ALWAYS, false, this);
-                }
-                rDocument.RemoveFromFormulaTree(this);
-            }
-
-            if (pCode->IsRecalcModeForced())
-            {
-                sal_uInt32 nValidation
-                    = rDocument.GetAttr(aPos.Col(), aPos.Row(), aPos.Tab(), ATTR_VALIDDATA).GetValue();
-                if (nValidation)
-                {
-                    const ScValidationData* pData = rDocument.GetValidationEntry(nValidation);
-                    ScRefCellValue aTmpCell(this);
-                    if (pData && !pData->IsDataValid(aTmpCell, aPos))
-                        pData->DoCalcError(this);
-                }
-            }
-
-            pCode->ClearRecalcModeMustAfterImport();
-            return true;
-        };
 
         if (bHardRoutedEngineFamily && oEngineAttempt && oEngineAttempt->mbSupported)
         {
@@ -5052,6 +5115,7 @@ void maybeRecordFormulaGroupInterpretTailRouting(
 
         const OUString aFormulaSource
             = pCell->GetFormula(FormulaGrammar::GRAM_ODFF, pContext);
+        const OUString aCanonicalFormulaSource = pCell->GetHybridFormula();
         const auto eDelegatedFunction = classifyDelegatedInterpretTailFunction(
             std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()));
         if (eDelegatedFunction == setaileval::FunctionKind::Unknown)
@@ -5060,7 +5124,9 @@ void maybeRecordFormulaGroupInterpretTailRouting(
         auto aAttempt = setaileval::tryEvaluateFormula(
             rDocument, *pContext, aCellPos,
             std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
-            rDocument.GetCalcConfig().mbEmptyStringAsZero);
+            rDocument.GetCalcConfig().mbEmptyStringAsZero, pCell->GetCode(),
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()));
         const auto eAttemptFunction
             = aAttempt.meFunction != setaileval::FunctionKind::Unknown ? aAttempt.meFunction
                                                                        : eDelegatedFunction;

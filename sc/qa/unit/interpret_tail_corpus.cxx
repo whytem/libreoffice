@@ -487,6 +487,31 @@ void materializeScalarCell(ScDocument& rDoc, const ScAddress& rPos, const Cell& 
         rDoc.SetError(rPos.Col(), rPos.Row(), rPos.Tab(), toFormulaError(rValue.meError));
 }
 
+[[nodiscard]] bool hasArrayConstant(spreadsheetengine::api::StringView rFormula)
+{
+    bool bInString = false;
+    for (char16_t cChar : rFormula)
+    {
+        if (bInString)
+        {
+            if (cChar == u'"')
+                bInString = false;
+            continue;
+        }
+
+        if (cChar == u'"')
+        {
+            bInString = true;
+            continue;
+        }
+
+        if (cChar == u'{')
+            return true;
+    }
+
+    return false;
+}
+
 void materializeSheetCells(const Sheet& rSheet, SCTAB nTab, ScDocument& rDoc)
 {
     for (const auto& rEntry : rSheet.maCells)
@@ -507,6 +532,15 @@ void materializeSheetCells(const Sheet& rSheet, SCTAB nTab, ScDocument& rDoc)
         {
             rDoc.SetFormula(aPos, toLibreOfficeString(rCell.maFormula),
                 formula::FormulaGrammar::GRAM_ODFF);
+            if (hasArrayConstant(rCell.maFormula))
+            {
+                ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+                CPPUNIT_ASSERT(pFormula);
+                // Preserve the imported raw ODF formula as a token-backed canonical source
+                // sidecar so InterpretTail can bypass the ambiguous display rewrite.
+                pFormula->SetHybridFormula(
+                    toLibreOfficeString(rCell.maFormula), formula::FormulaGrammar::GRAM_ODFF);
+            }
         }
     }
 }
@@ -575,6 +609,7 @@ std::size_t runSupportedInterpretTailProbe(
 
             const OUString aFormulaSource = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF,
                 pContext);
+            const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
             const FunctionKind eProbeFunction = classifySupportedProbeFunction(
                 std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()));
             if (eProbeFunction == FunctionKind::Unknown)
@@ -584,7 +619,9 @@ std::size_t runSupportedInterpretTailProbe(
                 = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
                     rDoc, *pContext, aPos,
                     std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
-                    rDoc.GetCalcConfig().mbEmptyStringAsZero);
+                    rDoc.GetCalcConfig().mbEmptyStringAsZero, pFormula->GetCode(),
+                    std::u16string_view(aCanonicalFormulaSource.getStr(),
+                        aCanonicalFormulaSource.getLength()));
 
             if (!aAttempt.mbSupported)
             {
@@ -1377,13 +1414,16 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedMatchExactRangeParity)
 
     const OUString aFormulaSource
         = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+    const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
     CPPUNIT_ASSERT_EQUAL(u"=of:=MATCH(0;[.G77:.G79];0)"_ustr, aFormulaSource);
 
     const auto aAttempt
         = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
             rDoc, *pContext, aPos,
             std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
-            rDoc.GetCalcConfig().mbEmptyStringAsZero);
+            rDoc.GetCalcConfig().mbEmptyStringAsZero, pFormula->GetCode(),
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()));
     CPPUNIT_ASSERT(aAttempt.mbSupported);
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value,
@@ -1419,18 +1459,108 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedMatchRangeLookupValueP
 
     const OUString aFormulaSource
         = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+    const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
     CPPUNIT_ASSERT_EQUAL(u"=of:=MATCH([.F29:.F37];[.F29:.F37];0)"_ustr, aFormulaSource);
 
     const auto aAttempt
         = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
             rDoc, *pContext, aPos,
             std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
-            rDoc.GetCalcConfig().mbEmptyStringAsZero);
+            rDoc.GetCalcConfig().mbEmptyStringAsZero, pFormula->GetCode(),
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()));
     CPPUNIT_ASSERT(aAttempt.mbSupported);
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value,
         aAttempt.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aAttempt.maResult.mfValue, 1e-12);
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedMatchLocalizedArrayConstantParity)
+{
+    const OUString aWorkbookPath
+        = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/spreadsheet/fods/match.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for match.fods", static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    for (const auto& [nRow, fExpected] :
+         { std::pair(SCROW(157), 1.0), std::pair(SCROW(158), 2.0), std::pair(SCROW(159), 2.0) })
+    {
+        const ScAddress aPos(0, nRow, 1);
+        ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+        CPPUNIT_ASSERT(pFormula);
+
+        const OUString aFormulaSource
+            = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+        const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
+        CPPUNIT_ASSERT_EQUAL(u"=of:=MATCH(2; {1.2}; 1)"_ustr, aFormulaSource);
+
+        const auto aAttempt
+            = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
+                rDoc, *pContext, aPos,
+                std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+                rDoc.GetCalcConfig().mbEmptyStringAsZero, pFormula->GetCode(),
+                std::u16string_view(aCanonicalFormulaSource.getStr(),
+                    aCanonicalFormulaSource.getLength()));
+        CPPUNIT_ASSERT(aAttempt.mbSupported);
+        CPPUNIT_ASSERT_EQUAL(
+            spreadsheetengine::api::formulavalue::ValueType::Value,
+            aAttempt.maResult.meType);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(fExpected, aAttempt.maResult.mfValue, 1e-12);
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedMatchLocalizedArrayConstantAuthorityParity)
+{
+    const OUString aWorkbookPath
+        = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/spreadsheet/fods/match.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for match.fods", static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    {
+        ScopedEnvironmentOverride aAuthorityMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        sc::SetFormulaDirtyContext aDirtyCxt;
+        rDoc.SetAllFormulasDirty(aDirtyCxt);
+
+        for (const auto& [nRow, fExpected] :
+             { std::pair(SCROW(158), 2.0), std::pair(SCROW(159), 2.0) })
+        {
+            const ScAddress aPos(0, nRow, 1);
+            ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+            CPPUNIT_ASSERT(pFormula);
+            pFormula->SetDirty();
+            pFormula->Interpret();
+            CPPUNIT_ASSERT_EQUAL(FormulaError::NONE, rDoc.GetErrCode(aPos));
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(fExpected, rDoc.GetValue(aPos), 1e-12);
+        }
+    }
 }
 
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedMatchWholeRowLiveHostTruth)

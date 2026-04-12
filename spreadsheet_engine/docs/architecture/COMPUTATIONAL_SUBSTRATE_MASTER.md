@@ -36,37 +36,38 @@ delegation.”
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=4214`
-- `interpret_tail_live_fallback_total=12`
-- `interpret_tail_live_seen_total=4226`
-- `interpret_tail_live_unseen_formula_cells=46435`
-- `interpret_tail_live_promoted_function_supported_total=2964`
-- `interpret_tail_live_supported_rate=8.32`
-- `interpret_tail_live_seen_rate=8.34`
+- `interpret_tail_live_supported_total=4324`
+- `interpret_tail_live_fallback_total=624`
+- `interpret_tail_live_seen_total=4948`
+- `interpret_tail_live_unseen_formula_cells=45713`
+- `interpret_tail_live_promoted_function_supported_total=3074`
+- `interpret_tail_live_supported_rate=8.54`
+- `interpret_tail_live_seen_rate=9.77`
 
 Dominant ambient fallback reasons:
 
-- `unsupported_formula_shape=12`
+- `unsupported_formula_shape=32`
 - `unsupported_host_surface=0`
-- `parse_failure=0`
+- `parse_failure=4`
+- `unsupported_function=588`
 
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=2107`
-- `interpret_tail_forced_interpret_fallback_total=6`
-- `interpret_tail_forced_interpret_seen_total=2113`
-- `interpret_tail_forced_interpret_unseen_formula_cells=48548`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=1482`
-- `interpret_tail_forced_interpret_supported_rate=4.16`
-- `interpret_tail_forced_interpret_seen_rate=4.17`
+- `interpret_tail_forced_interpret_supported_total=2162`
+- `interpret_tail_forced_interpret_fallback_total=312`
+- `interpret_tail_forced_interpret_seen_total=2474`
+- `interpret_tail_forced_interpret_unseen_formula_cells=48187`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=1537`
+- `interpret_tail_forced_interpret_supported_rate=4.27`
+- `interpret_tail_forced_interpret_seen_rate=4.88`
 
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1786`
-- `interpret_tail_authoritative_fallback_total=26`
-- promoted-family authoritative rate: `98.57%`
+- `interpret_tail_authoritative_total=1793`
+- `interpret_tail_authoritative_fallback_total=19`
+- promoted-family authoritative rate: `98.95%`
 
 Dominant promoted-family fallback reasons:
 
@@ -167,17 +168,17 @@ The highest-value remaining blockers are now:
    imported surface still retains `6` direct promoted fallback cells and
    ambient replay still covers only a bounded minority of formulas
 3. promoted-family residual parity:
-   `shadow_mismatch=17`
+   `shadow_mismatch=13`
 4. promoted-family residual formula shape:
    replay-live `unsupported_formula_shape=6`
 5. first real Calc-path retirement:
    one family is hard-routed, but no `ScInterpreter` subroutine has been
    deleted yet
 
-The latest imported range-lookup-value `MATCH` scalarization slice improved
-promoted-family authority from `1788 / 24` to `1789 / 23`, held replay
-direct fallback at `6`, and cleared the
-`MATCH(F29:F37;F29:F37;0)` replay row from diagnostics.
+The latest token-backed canonical-source slice improved promoted-family
+authority from `1789 / 23` to `1793 / 19`, held replay direct fallback at
+`6`, and closed the replay-imported localized array-constant `MATCH`
+pair without relying on the ambiguous display-string rewrite.
 
 A focused live-host check now shows the replay-imported whole-row
 `MATCH([.$B$150]; [.$150:.$150]; -1)` row evaluates to
@@ -189,8 +190,8 @@ replay workbook stores a non-error expected value.
 
 The next pass should:
 
-1. convert the localized array-constant `MATCH(2; {1.2}; 1)` parity pair
-2. then clean up logical-constant display parity plus the residual
+1. convert the residual logical-constant display parity rows
+2. then clean up the residual
    `VLOOKUP` / `XLOOKUP` mismatch rows
 3. convert smaller `INDEX` shape fallout and any remaining `LOOKUP`
    parity rows
