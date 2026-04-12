@@ -186,12 +186,20 @@ A focused live-host check now shows the replay-imported whole-row
 row is no longer treated as a confirmed live parity blocker even though the
 replay workbook stores a non-error expected value.
 
+A bounded live-host-truth pass now also shows the replay-imported exact
+`VLOOKUP([.P6]; [.$L$2:.$M$8]; 2; 0)` and
+`VLOOKUP(21; [.$AM$2:.$AN$4]; 2; 0)` rows both evaluate to
+`FormulaError::VariableExpected` in Calc with the seam forced off, so those
+cached non-error workbook values are likewise no longer treated as runtime
+conversion targets.
+
 ## Recommended Next Pass
 
 The next pass should:
 
 1. convert the residual
-   `VLOOKUP` / `XLOOKUP` mismatch rows
+   real `VLOOKUP` / `XLOOKUP` mismatch rows, starting with the
+   collation-sensitive `VLOOKUP` band
 2. then convert smaller `INDEX` shape fallout and any remaining `LOOKUP`
    parity rows
 3. move the first replay-imported promoted family from observe-only reach

@@ -128,8 +128,13 @@ Still not true:
 - a bounded live-host-truth pass now shows the residual replay-imported
   logical-constant band is genuine live Calc error behavior, not a stale
   cached-value artifact
+- a bounded live-host-truth pass now also shows the replay-imported exact
+  `VLOOKUP([.P6];[.$L$2:.$M$8];2;0)` and
+  `VLOOKUP(21;[.$AM$2:.$AN$4];2;0)` rows are genuine live Calc
+  `FormulaError::VariableExpected` rows, not real non-error parity blockers
 - the next highest-value reducible replay blocker is therefore the smaller
-  `VLOOKUP` / `XLOOKUP` mismatch band, with `INDEX` shape fallout behind it
+  collation-sensitive `VLOOKUP` / `XLOOKUP` mismatch band, with `INDEX` shape
+  fallout behind it
 
 ## Active Delegated Family
 
@@ -167,8 +172,9 @@ historical reference material, not active roadmap.
 
 The next pass should stay on promoted-family parity cleanup:
 
-1. convert the smaller
-   `VLOOKUP` / `XLOOKUP` mismatch rows on the replay-promoted surface
+1. convert the smaller real
+   `VLOOKUP` / `XLOOKUP` mismatch rows on the replay-promoted surface,
+   starting with the collation-sensitive `VLOOKUP` band
 2. then clean up the remaining replay-imported
    `INDEX` `unsupported_formula_shape` fallout
 3. only return to broader reach work if the promoted replay surface regresses
