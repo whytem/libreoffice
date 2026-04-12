@@ -1605,6 +1605,67 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedMatchWholeRowLiveHostT
     CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(aPos));
 }
 
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalConstantLiveHostTruth)
+{
+    const struct WorkbookLogicalRow
+    {
+        OUString maWorkbookPath;
+        std::vector<std::pair<SCROW, FormulaError>> maRows;
+    } aCases[] = {
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/logical/fods/ifs.fods"),
+            { { SCROW(15), FormulaError::NoName } } }, // Sheet2.B16
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/logical/fods/switch.fods"),
+            { { SCROW(10), FormulaError::NoName } } }, // Sheet2.B11
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/text/fods/exact.fods"),
+            { { SCROW(76), FormulaError::VariableExpected },
+              { SCROW(77), FormulaError::VariableExpected },
+              { SCROW(79), FormulaError::VariableExpected } } }, // Sheet2.B77/B78/B80
+    };
+
+    for (const auto& rCase : aCases)
+    {
+        const std::string aWorkbookPathUtf8(rCase.maWorkbookPath.toUtf8().getStr());
+        const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+        CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for logical-constant host truth case",
+            static_cast<bool>(aLoadResult));
+
+        Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+        normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+        ScDocShellRef xDocShell
+            = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT
+                             | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                             | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+        xDocShell->DoInitUnitTest();
+        ScDocument& rDoc = xDocShell->GetDocument();
+        (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+        ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+        ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+        CPPUNIT_ASSERT(pContext);
+
+        for (const auto& [nRow, eExpectedError] : rCase.maRows)
+        {
+            const ScAddress aPos(1, nRow, 1);
+            ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+            CPPUNIT_ASSERT(pFormula);
+
+            const OUString aFormulaSource
+                = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+            CPPUNIT_ASSERT(aFormulaSource.indexOf(u"TRUE()") >= 0);
+
+            {
+                ScopedEnvironmentOverride aOffMode(
+                    "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+                pFormula->SetDirty();
+                pFormula->Interpret();
+            }
+
+            CPPUNIT_ASSERT_EQUAL(eExpectedError, rDoc.GetErrCode(aPos));
+        }
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
 {
     if (!envEnabled("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_STATS"))

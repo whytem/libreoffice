@@ -125,9 +125,11 @@ Still not true:
   `FormulaError::VariableExpected`
   in Calc itself, so it is no longer treated as a confirmed live parity
   blocker
-- the next highest-value replay blocker is therefore the residual
-  logical-constant display parity band, with smaller `VLOOKUP` /
-  `XLOOKUP` mismatch rows and `INDEX` shape fallout behind it
+- a bounded live-host-truth pass now shows the residual replay-imported
+  logical-constant band is genuine live Calc error behavior, not a stale
+  cached-value artifact
+- the next highest-value reducible replay blocker is therefore the smaller
+  `VLOOKUP` / `XLOOKUP` mismatch band, with `INDEX` shape fallout behind it
 
 ## Active Delegated Family
 
@@ -165,10 +167,9 @@ historical reference material, not active roadmap.
 
 The next pass should stay on promoted-family parity cleanup:
 
-1. convert the residual logical-constant display parity rows on the
-   replay-promoted surface
-2. then clean up the smaller
-   `VLOOKUP` / `XLOOKUP` mismatch rows, plus the remaining replay-imported
+1. convert the smaller
+   `VLOOKUP` / `XLOOKUP` mismatch rows on the replay-promoted surface
+2. then clean up the remaining replay-imported
    `INDEX` `unsupported_formula_shape` fallout
 3. only return to broader reach work if the promoted replay surface regresses
 

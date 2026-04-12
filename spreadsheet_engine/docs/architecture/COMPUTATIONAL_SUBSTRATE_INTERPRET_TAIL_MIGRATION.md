@@ -202,9 +202,11 @@ Interpretation:
   `FormulaError::VariableExpected`
   in live Calc with the seam forced off, so it is not a proven live parity
   blocker even though the replay workbook stores a non-error expected value
-- the current confirmed hotspots are therefore the residual logical-constant
-  display parity rows, then smaller `VLOOKUP` / `XLOOKUP` mismatches and
-  `INDEX` shape fallout behind them
+- a bounded live-host-truth pass now shows the residual replay-imported
+  logical-constant rows are genuine live Calc error rows, not stale cached
+  workbook artifacts
+- the next reducible promoted-family runtime hotspot is therefore the smaller
+  `VLOOKUP` / `XLOOKUP` mismatch band, with `INDEX` shape fallout behind it
 
 ### Replay Eligibility Inventory
 
@@ -237,9 +239,9 @@ Interpretation:
 - both shared and non-shared promoted replay formulas now reach the live seam
 - the residual replay work is now the `6` direct fallback cells on this
   imported promoted-family surface
-- the dominant next targets are now `MATCH` lookup-value and array-constant
-  parity first, then logical-constant display parity, with smaller
-  `VLOOKUP` / `XLOOKUP` mismatch rows and `INDEX` shape fallout behind them
+- the dominant next targets are now the residual `VLOOKUP` / `XLOOKUP`
+  mismatch band first, then smaller `INDEX` shape fallout and any trailing
+  `LOOKUP` mismatches behind it
 
 ## Hard-Routed Family
 
@@ -276,14 +278,13 @@ historical reference material, not active roadmap work.
 The latest replay closeout is now folded into this migration ledger.
 
 The next high-value pass should now stay on promoted-family parity cleanup,
-starting with the remaining logical-constant display band and then the
-small lookup mismatches behind it:
+starting with the residual `VLOOKUP` / `XLOOKUP` mismatch band and then the
+smaller shape fallout behind it:
 
-1. convert the residual replay-imported logical-constant display parity rows
-2. then clean up the remaining replay-promoted `VLOOKUP` / `XLOOKUP`
+1. convert the remaining replay-promoted `VLOOKUP` / `XLOOKUP`
    mismatch rows
-3. convert smaller `INDEX` `unsupported_formula_shape` fallout and residual
-   `LOOKUP` mismatch rows
+2. then convert smaller `INDEX` `unsupported_formula_shape` fallout
+3. clean up any residual `LOOKUP` mismatch rows still visible after that
 4. only return to broader reach work if the promoted replay surface regresses
 
 ## Historical Archive

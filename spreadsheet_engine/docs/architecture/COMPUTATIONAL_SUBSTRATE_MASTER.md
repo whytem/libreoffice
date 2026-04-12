@@ -190,12 +190,11 @@ replay workbook stores a non-error expected value.
 
 The next pass should:
 
-1. convert the residual logical-constant display parity rows
-2. then clean up the residual
+1. convert the residual
    `VLOOKUP` / `XLOOKUP` mismatch rows
-3. convert smaller `INDEX` shape fallout and any remaining `LOOKUP`
+2. then convert smaller `INDEX` shape fallout and any remaining `LOOKUP`
    parity rows
-4. move the first replay-imported promoted family from observe-only reach
+3. move the first replay-imported promoted family from observe-only reach
    toward a broader authority candidate once mismatch and shape fallback
    shrink materially
 
