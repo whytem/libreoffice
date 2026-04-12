@@ -60,9 +60,9 @@ Ambient live fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1786`
-- `interpret_tail_authoritative_fallback_total=26`
-- promoted-family authoritative rate: `98.57%`
+- `interpret_tail_authoritative_total=1788`
+- `interpret_tail_authoritative_fallback_total=24`
+- promoted-family authoritative rate: `98.68%`
 
 Promoted-family fallback reasons:
 
@@ -104,9 +104,9 @@ Today:
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
-- the latest bounded full-width `MATCH` search-source trim slice tightened the
-  promoted replay band again, improving authority from `1785 / 27` to
-  `1786 / 26`
+- the latest imported exact-range `MATCH` search-source materialization slice
+  tightened the promoted replay band again, improving authority from
+  `1786 / 26` to `1788 / 24`
 
 Still not true:
 

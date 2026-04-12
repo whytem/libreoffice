@@ -167,27 +167,28 @@ The highest-value remaining blockers are now:
    imported surface still retains `6` direct promoted fallback cells and
    ambient replay still covers only a bounded minority of formulas
 3. promoted-family residual parity:
-   `shadow_mismatch=20`
+   `shadow_mismatch=18`
 4. promoted-family residual formula shape:
-   replay-live `unsupported_formula_shape=12`
+   replay-live `unsupported_formula_shape=6`
 5. first real Calc-path retirement:
    one family is hard-routed, but no `ScInterpreter` subroutine has been
    deleted yet
 
-The latest bounded full-width `MATCH` search-source trim slice improved
-promoted-family authority from `1785 / 27` to `1786 / 26`, held replay
-direct fallback at `6`, and narrowed the top residual `MATCH` band to
-lookup-value and array-constant parity.
+The latest imported exact-range `MATCH` search-source materialization slice
+improved promoted-family authority from `1786 / 26` to `1788 / 24`, held
+replay direct fallback at `6`, and cleared the
+`MATCH(0;G77:G79;0)` replay row from diagnostics.
 
 ## Recommended Next Pass
 
 The next pass should:
 
-1. convert the remaining `XLOOKUP` and `VLOOKUP` mismatch rows on the
-   replay-promoted surface
-2. then clean up the remaining replay-imported `MATCH` parity rows
-3. convert smaller `INDEX` shape fallout and residual `LOOKUP` / `XLOOKUP`
-   mismatch rows
+1. convert the remaining replay-imported `MATCH` lookup-value and
+   array-constant parity rows
+2. then clean up logical-constant display parity plus the residual
+   `VLOOKUP` / `XLOOKUP` mismatch rows
+3. convert smaller `INDEX` shape fallout and any remaining `LOOKUP`
+   parity rows
 4. move the first replay-imported promoted family from observe-only reach
    toward a broader authority candidate once mismatch and shape fallback
    shrink materially

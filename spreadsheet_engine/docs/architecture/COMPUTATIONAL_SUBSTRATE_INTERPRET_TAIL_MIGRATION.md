@@ -176,9 +176,9 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1786`
-- `interpret_tail_authoritative_fallback_total=26`
-- promoted-family authoritative rate: `98.57%`
+- `interpret_tail_authoritative_total=1788`
+- `interpret_tail_authoritative_fallback_total=24`
+- promoted-family authoritative rate: `98.68%`
 
 Current promoted-family fallback reasons:
 
@@ -191,10 +191,10 @@ Interpretation:
 - once the probe hits promoted-family cells, authority conversion is now
   strong
 - the main remaining conversion work is no longer generic breadth
-- the latest slice reduced promoted-family fallback from `27` to `26`
+- the latest slice reduced promoted-family fallback from `26` to `24`
   while keeping the replay denominator steady
-- the latest closed replay row was a full-width imported `MATCH` search-source
-  parity case
+- the latest closed replay row was the imported exact-range
+  `MATCH(0;G77:G79;0)` parity case
 - the current hotspots are now `MATCH` lookup-value and array-constant parity
   first, then logical-constant display parity, with smaller `VLOOKUP` /
   `XLOOKUP` mismatches and `INDEX` shape fallout behind them
