@@ -176,14 +176,14 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1788`
-- `interpret_tail_authoritative_fallback_total=24`
-- promoted-family authoritative rate: `98.68%`
+- `interpret_tail_authoritative_total=1789`
+- `interpret_tail_authoritative_fallback_total=23`
+- promoted-family authoritative rate: `98.73%`
 
 Current promoted-family fallback reasons:
 
 - `unsupported_formula_shape=6`
-- `shadow_mismatch=20`
+- `shadow_mismatch=17`
 - `unsupported_host_surface=0`
 
 Interpretation:
@@ -191,13 +191,15 @@ Interpretation:
 - once the probe hits promoted-family cells, authority conversion is now
   strong
 - the main remaining conversion work is no longer generic breadth
-- the latest slice reduced promoted-family fallback from `26` to `24`
+- the latest slice reduced promoted-family fallback from `24` to `23`
   while keeping the replay denominator steady
-- the latest closed replay row was the imported exact-range
-  `MATCH(0;G77:G79;0)` parity case
-- the current hotspots are now `MATCH` lookup-value and array-constant parity
-  first, then logical-constant display parity, with smaller `VLOOKUP` /
-  `XLOOKUP` mismatches and `INDEX` shape fallout behind them
+- the latest closed replay row was the imported range-lookup-value
+  `MATCH(F29:F37;F29:F37;0)` parity case
+- the current hotspots are now the replay-imported whole-row
+  `MATCH([.$B$150];[.$150:.$150];-1)` row plus the localized array-constant
+  `MATCH(2; {1.2}; 1)` pair, then logical-constant display parity, with
+  smaller `VLOOKUP` / `XLOOKUP` mismatches and `INDEX` shape fallout behind
+  them
 
 ### Replay Eligibility Inventory
 

@@ -2153,6 +2153,34 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         lookupexecution::detail::toApiCellValue((*aMatrix.moValue)->Get(0, 0)));
 }
 
+[[nodiscard]] inline Materialization<api::CellValue> materializeMatchLookupValueNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    if (rNode.meKind == core::formula::NodeKind::CellReference
+        || rNode.meKind == core::formula::NodeKind::RangeReference
+        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    {
+        const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+        if (!aRange.mbSupported)
+            return makeUnsupportedMaterialization<api::CellValue>(aRange.meFallbackReason);
+        if (!aRange.moValue)
+            return makeMaterializedError<api::CellValue>(aRange.meError);
+
+        const ScAddress aScalarAddress = aRange.moValue->aStart;
+        if (aScalarAddress == rFormulaPos)
+        {
+            return makeUnsupportedMaterialization<api::CellValue>(
+                FallbackReason::UnsupportedHostSurface);
+        }
+
+        return makeMaterializedValue(
+            readMaterializedHostCellValue(rDoc, rContext, aScalarAddress));
+    }
+
+    return materializeLookupValueNode(rNode, rDoc, rContext, rFormulaPos);
+}
+
 [[nodiscard]] inline EvaluationAttempt materializeLookupResult(FunctionKind eFunction,
     const ScDocument& rDoc, ScInterpreterContext& rContext, const ScAddress& rFormulaPos,
     const lookupexecution::LookupExecutionResult& rResult)
@@ -2415,7 +2443,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
             return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-        const auto aLookup = materializeLookupValueNode(
+        const auto aLookup = materializeMatchLookupValueNode(
             *rNode.maChildren[0], rDoc, rContext, rFormulaPos);
         if (!aLookup.mbSupported)
             return makeUnsupported(eFunction, aLookup.meFallbackReason);

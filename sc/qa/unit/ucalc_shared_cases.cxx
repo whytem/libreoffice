@@ -1111,6 +1111,14 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         aMatchRangeLookupValue.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aMatchRangeLookupValue.maResult.mfValue, 1e-12);
 
+    const auto aMatchRangeLookupValueOffRow = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(6, 5, 0), u"=MATCH(B5:B7;B5:B7;0)", false);
+    CPPUNIT_ASSERT(aMatchRangeLookupValueOffRow.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aMatchRangeLookupValueOffRow.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aMatchRangeLookupValueOffRow.maResult.mfValue, 1e-12);
+
     const auto aMatchArrayLookupValue = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(6, 4, 0), u"=MATCH({1;2;3};{1;2;3};0)", false);
     CPPUNIT_ASSERT(aMatchArrayLookupValue.mbSupported);
@@ -1499,7 +1507,6 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNorm
         u"of:#ERR504!"_ustr,
         toLibreOfficeString(
             setaileval::detail::normalizeFormulaSource(u"of:Err:504")));
-
     const auto aParse = spreadsheetengine::core::formula::parseFormula(
         setaileval::detail::normalizeFormulaSource(
             u"=IFERROR(VLOOKUP(A1;B1:C3;2;0);\"missing\")"));

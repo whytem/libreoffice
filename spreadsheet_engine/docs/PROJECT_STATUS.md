@@ -60,14 +60,14 @@ Ambient live fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1788`
-- `interpret_tail_authoritative_fallback_total=24`
-- promoted-family authoritative rate: `98.68%`
+- `interpret_tail_authoritative_total=1789`
+- `interpret_tail_authoritative_fallback_total=23`
+- promoted-family authoritative rate: `98.73%`
 
 Promoted-family fallback reasons:
 
 - `unsupported_formula_shape=6`
-- `shadow_mismatch=20`
+- `shadow_mismatch=17`
 - `unsupported_host_surface=0`
 
 ### Promoted Replay Eligibility Inventory
@@ -104,9 +104,9 @@ Today:
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
-- the latest imported exact-range `MATCH` search-source materialization slice
+- the latest imported range-lookup-value `MATCH` scalarization slice
   tightened the promoted replay band again, improving authority from
-  `1786 / 26` to `1788 / 24`
+  `1788 / 24` to `1789 / 23`
 
 Still not true:
 
@@ -118,8 +118,9 @@ Still not true:
   replay-imported promoted fallback further
 - the dominant retained promoted-family blocker is still `shadow_mismatch`,
   with smaller `unsupported_formula_shape` cleanup secondary
-- the next highest-value replay blocker is now `MATCH` lookup-value and
-  array-constant parity first, then logical-constant display parity, with
+- the next highest-value replay blocker is now the replay-imported whole-row
+  `MATCH([.$B$150];[.$150:.$150];-1)` row plus the localized array-constant
+  `MATCH(2; {1.2}; 1)` pair, then logical-constant display parity, with
   smaller `VLOOKUP` / `XLOOKUP` mismatch rows and `INDEX` shape fallout
   behind them
 
