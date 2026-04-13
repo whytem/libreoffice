@@ -951,6 +951,14 @@ const char* functionKindName(FunctionKind eFunction)
             return "timevalue";
         case FunctionKind::NumberValue:
             return "numbervalue";
+        case FunctionKind::Round:
+            return "round";
+        case FunctionKind::InformationPredicate:
+            return "information_predicate";
+        case FunctionKind::LogicalFold:
+            return "logical_fold";
+        case FunctionKind::Not:
+            return "not";
         case FunctionKind::Match:
             return "match";
         case FunctionKind::XMatch:

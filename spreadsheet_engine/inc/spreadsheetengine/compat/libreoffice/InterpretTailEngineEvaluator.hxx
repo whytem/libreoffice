@@ -19,6 +19,7 @@
 #include <limits>
 #include <mutex>
 #include <optional>
+#include <rtl/math.hxx>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -48,6 +49,7 @@
 #include <spreadsheetengine/detail/OdfFormulaParser.hxx>
 #include <spreadsheetengine/runtime/DateTimeParse.hxx>
 #include <spreadsheetengine/runtime/DateTimeParts.hxx>
+#include <spreadsheetengine/runtime/MathFunctionRuntime.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::interprettaileval
 {
@@ -90,6 +92,10 @@ enum class FunctionKind : sal_uInt8
     DateValue,
     TimeValue,
     NumberValue,
+    Round,
+    InformationPredicate,
+    LogicalFold,
+    Not,
     Match,
     XMatch,
     Lookup,
@@ -615,6 +621,18 @@ struct ArrayConstantSpan
         return FunctionKind::TimeValue;
     if (rFunctionName == u"NUMBERVALUE")
         return FunctionKind::NumberValue;
+    if (rFunctionName == u"ROUND" || rFunctionName == u"ROUNDUP" || rFunctionName == u"ROUNDDOWN")
+        return FunctionKind::Round;
+    if (rFunctionName == u"ISERROR" || rFunctionName == u"ISERR" || rFunctionName == u"ISNUMBER"
+        || rFunctionName == u"ISNA" || rFunctionName == u"ISTEXT"
+        || rFunctionName == u"ISNONTEXT" || rFunctionName == u"ISBLANK")
+    {
+        return FunctionKind::InformationPredicate;
+    }
+    if (rFunctionName == u"AND" || rFunctionName == u"OR" || rFunctionName == u"XOR")
+        return FunctionKind::LogicalFold;
+    if (rFunctionName == u"NOT")
+        return FunctionKind::Not;
     if (rFunctionName == u"MATCH")
         return FunctionKind::Match;
     if (rFunctionName == u"XMATCH" || rFunctionName == u"COM.MICROSOFT.XMATCH")
@@ -1483,6 +1501,28 @@ inline void putScalarIntoMatrix(
         pMatrix->PutEmpty(nColumn, nRow);
 }
 
+[[nodiscard]] inline bool matchesComparisonResult(
+    short nCompareResult, core::formula::BinaryOperator eOperator)
+{
+    switch (eOperator)
+    {
+        case core::formula::BinaryOperator::Equal:
+            return nCompareResult == 0;
+        case core::formula::BinaryOperator::NotEqual:
+            return nCompareResult != 0;
+        case core::formula::BinaryOperator::Less:
+            return nCompareResult < 0;
+        case core::formula::BinaryOperator::LessEqual:
+            return nCompareResult <= 0;
+        case core::formula::BinaryOperator::Greater:
+            return nCompareResult > 0;
+        case core::formula::BinaryOperator::GreaterEqual:
+            return nCompareResult >= 0;
+        default:
+            return false;
+    }
+}
+
 [[nodiscard]] inline Materialization<api::CellValue> materializeScalarNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
@@ -1622,6 +1662,35 @@ inline void putScalarIntoMatrix(
                             break;
                     }
                     return makeMaterializedValue(api::CellValue::number(fResult));
+                }
+                case core::formula::BinaryOperator::Equal:
+                case core::formula::BinaryOperator::NotEqual:
+                case core::formula::BinaryOperator::Less:
+                case core::formula::BinaryOperator::LessEqual:
+                case core::formula::BinaryOperator::Greater:
+                case core::formula::BinaryOperator::GreaterEqual:
+                {
+                    if (aLeft.moValue->isText() && aRight.moValue->isText())
+                    {
+                        const short nCompare = ScGlobal::GetCollator().compareString(
+                            toLibreOfficeString(aLeft.moValue->maString),
+                            toLibreOfficeString(aRight.moValue->maString));
+                        return makeMaterializedValue(api::CellValue::boolean(
+                            matchesComparisonResult(nCompare, rNode.meBinaryOperator)));
+                    }
+
+                    const auto aLeftNumber = coerceScalarToNumber(rDoc, rContext, *aLeft.moValue);
+                    if (!aLeftNumber)
+                        return makeMaterializedError<api::CellValue>(aLeftNumber.meError);
+                    const auto aRightNumber = coerceScalarToNumber(rDoc, rContext, *aRight.moValue);
+                    if (!aRightNumber)
+                        return makeMaterializedError<api::CellValue>(aRightNumber.meError);
+
+                    short nCompare = 0;
+                    if (!rtl::math::approxEqual(aLeftNumber.maValue, aRightNumber.maValue))
+                        nCompare = aLeftNumber.maValue < aRightNumber.maValue ? -1 : 1;
+                    return makeMaterializedValue(api::CellValue::boolean(
+                        matchesComparisonResult(nCompare, rNode.meBinaryOperator)));
                 }
                 default:
                     return makeUnsupportedMaterialization<api::CellValue>(
@@ -3140,6 +3209,183 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
 }
 
+[[nodiscard]] inline EvaluationAttempt evaluateScalarUtilityFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero)
+{
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    auto materializeArgument = [&](const core::formula::Node& rArgument)
+        -> Materialization<api::CellValue> {
+        const auto aAttempt = evaluateScalarOrDelegatedNode(
+            rArgument, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 1);
+        if (!aAttempt.mbSupported)
+            return makeUnsupportedMaterialization<api::CellValue>(aAttempt.meFallbackReason);
+
+        switch (aAttempt.maResult.meType)
+        {
+            case api::formulavalue::ValueType::Error:
+                return makeMaterializedValue(api::CellValue::error(aAttempt.maResult.meError));
+            case api::formulavalue::ValueType::String:
+                return makeMaterializedValue(api::CellValue::text(aAttempt.maResult.maString));
+            case api::formulavalue::ValueType::Value:
+                if (aAttempt.meFormatType == SvNumFormatType::LOGICAL)
+                    return makeMaterializedValue(
+                        api::CellValue::boolean(aAttempt.maResult.mfValue != 0.0));
+                return makeMaterializedValue(api::CellValue::number(aAttempt.maResult.mfValue));
+            case api::formulavalue::ValueType::Invalid:
+                return makeMaterializedValue(api::CellValue::empty());
+        }
+
+        return makeMaterializedValue(api::CellValue::empty());
+    };
+
+    if (eFunction == FunctionKind::Round)
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aValue = materializeArgument(*rNode.maChildren[0]);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorResult(eFunction, aValue.meError);
+        const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aValue.moValue);
+        if (!aNumber)
+            return makeErrorResult(eFunction, aNumber.meError);
+
+        sal_Int32 nDecimals = 0;
+        if (rNode.maChildren.size() == 2)
+        {
+            const auto aDigits = materializeArgument(*rNode.maChildren[1]);
+            if (!aDigits.mbSupported)
+                return makeUnsupported(eFunction, aDigits.meFallbackReason);
+            if (!aDigits.moValue)
+                return makeErrorResult(eFunction, aDigits.meError);
+            const auto aDigitsNumber = coerceScalarToNumber(rDoc, rContext, *aDigits.moValue);
+            if (!aDigitsNumber)
+                return makeErrorResult(eFunction, aDigitsNumber.meError);
+            const auto oWhole = coerceWholeNumber(aDigitsNumber.maValue);
+            if (!oWhole)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            nDecimals = *oWhole;
+        }
+
+        api::RoundingMode eMode = api::RoundingMode::Corrected;
+        if (aFunctionName == u"ROUNDUP")
+            eMode = api::RoundingMode::Up;
+        else if (aFunctionName == u"ROUNDDOWN")
+            eMode = api::RoundingMode::Down;
+
+        const auto aRounded = spreadsheetengine::core::math::evaluateRoundValue(
+            aNumber.maValue, nDecimals, eMode,
+            aFunctionName == u"ROUNDUP" || aFunctionName == u"ROUNDDOWN");
+        if (!aRounded)
+            return makeErrorResult(eFunction, aRounded.meError);
+        return makeNumericResult(eFunction, aRounded.maValue, SvNumFormatType::NUMBER);
+    }
+
+    if (eFunction == FunctionKind::InformationPredicate)
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aArgument = materializeArgument(*rNode.maChildren[0]);
+        if (!aArgument.mbSupported)
+            return makeUnsupported(eFunction, aArgument.meFallbackReason);
+        if (!aArgument.moValue)
+            return makeErrorResult(eFunction, aArgument.meError);
+
+        bool bResult = false;
+        if (aFunctionName == u"ISERROR")
+        {
+            bResult = aArgument.moValue->isError();
+        }
+        else if (aFunctionName == u"ISERR")
+        {
+            bResult = aArgument.moValue->isError()
+                      && aArgument.moValue->meError != api::Error::NotAvailable;
+        }
+        else if (aFunctionName == u"ISNUMBER")
+        {
+            bResult = aArgument.moValue->isNumber() || aArgument.moValue->isBoolean();
+        }
+        else if (aFunctionName == u"ISNA")
+        {
+            bResult = aArgument.moValue->isError()
+                      && aArgument.moValue->meError == api::Error::NotAvailable;
+        }
+        else if (aFunctionName == u"ISTEXT")
+        {
+            bResult = aArgument.moValue->isText();
+        }
+        else if (aFunctionName == u"ISNONTEXT")
+        {
+            bResult = !aArgument.moValue->isText();
+        }
+        else if (aFunctionName == u"ISBLANK")
+        {
+            bResult = aArgument.moValue->isEmpty();
+        }
+        else
+        {
+            return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+        }
+
+        return makeNumericResult(eFunction, bResult ? 1.0 : 0.0, SvNumFormatType::LOGICAL);
+    }
+
+    if (eFunction == FunctionKind::LogicalFold || eFunction == FunctionKind::Not)
+    {
+        if (eFunction == FunctionKind::Not)
+        {
+            if (rNode.maChildren.size() != 1)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+            const auto aArgument = materializeArgument(*rNode.maChildren[0]);
+            if (!aArgument.mbSupported)
+                return makeUnsupported(eFunction, aArgument.meFallbackReason);
+            if (!aArgument.moValue)
+                return makeErrorResult(eFunction, aArgument.meError);
+            const auto aBool = coerceScalarToBool(rDoc, rContext, *aArgument.moValue);
+            if (!aBool)
+                return makeErrorResult(eFunction, aBool.meError);
+            return makeNumericResult(eFunction, aBool.maValue ? 0.0 : 1.0,
+                SvNumFormatType::LOGICAL);
+        }
+
+        if (rNode.maChildren.empty())
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        bool bResult = aFunctionName == u"AND";
+        bool bSawValue = false;
+        for (const auto& rxChild : rNode.maChildren)
+        {
+            const auto aArgument = materializeArgument(*rxChild);
+            if (!aArgument.mbSupported)
+                return makeUnsupported(eFunction, aArgument.meFallbackReason);
+            if (!aArgument.moValue)
+                return makeErrorResult(eFunction, aArgument.meError);
+            const auto aBool = coerceScalarToBool(rDoc, rContext, *aArgument.moValue);
+            if (!aBool)
+                return makeErrorResult(eFunction, aBool.meError);
+
+            if (aFunctionName == u"AND")
+                bResult = bResult && aBool.maValue;
+            else if (aFunctionName == u"OR")
+                bResult = bResult || aBool.maValue;
+            else
+                bResult = bResult != aBool.maValue;
+            bSawValue = true;
+        }
+
+        if (!bSawValue)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        return makeNumericResult(eFunction, bResult ? 1.0 : 0.0, SvNumFormatType::LOGICAL);
+    }
+
+    return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+}
+
 [[nodiscard]] inline EvaluationAttempt evaluateLookupFunction(
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
@@ -3582,6 +3828,12 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         case FunctionKind::NumberValue:
             return evaluateTextParsingFunction(
                 rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
+        case FunctionKind::Round:
+        case FunctionKind::InformationPredicate:
+        case FunctionKind::LogicalFold:
+        case FunctionKind::Not:
+            return evaluateScalarUtilityFunction(
+                rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
         case FunctionKind::Match:
         case FunctionKind::XMatch:
         case FunctionKind::Lookup:
@@ -3723,10 +3975,16 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
     if (rRoot.meKind != core::formula::NodeKind::FunctionCall)
     {
-        detail::recordDiagnosticSample(FallbackReason::UnsupportedFormulaShape, rDoc, rFormulaPos,
-            rFormulaSource, aCanonical, rRoot.meKind);
-        return detail::makeUnsupported(
-            FunctionKind::Unknown, FallbackReason::UnsupportedFormulaShape);
+        const auto aScalar = detail::materializeScalarNode(rRoot, rDoc, rContext, rFormulaPos);
+        if (!aScalar.mbSupported)
+        {
+            detail::recordDiagnosticSample(aScalar.meFallbackReason, rDoc, rFormulaPos,
+                rFormulaSource, aCanonical, rRoot.meKind);
+            return detail::makeUnsupported(FunctionKind::Unknown, aScalar.meFallbackReason);
+        }
+        if (!aScalar.moValue)
+            return detail::makeErrorResult(FunctionKind::Unknown, aScalar.meError);
+        return detail::makeScalarAttempt(FunctionKind::Unknown, *aScalar.moValue);
     }
 
     auto aAttempt = detail::evaluateDelegatedNode(

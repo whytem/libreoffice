@@ -806,6 +806,81 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::api::formulavalue::ValueType::Value, aSignedValue.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(-42.0, aSignedValue.maResult.mfValue, 1e-12);
 
+    const auto aDirectReference = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=B5", false);
+    CPPUNIT_ASSERT(aDirectReference.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aDirectReference.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, aDirectReference.maResult.mfValue, 1e-12);
+
+    const auto aScalarArithmetic = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=A5+B5", false);
+    CPPUNIT_ASSERT(aScalarArithmetic.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aScalarArithmetic.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(30.0, aScalarArithmetic.maResult.mfValue, 1e-12);
+
+    const auto aScalarComparison = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=A5=B6", false);
+    CPPUNIT_ASSERT(aScalarComparison.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aScalarComparison.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aScalarComparison.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::LOGICAL, aScalarComparison.meFormatType);
+
+    const auto aScalarComparisonLess = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=A5<B7", false);
+    CPPUNIT_ASSERT(aScalarComparisonLess.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aScalarComparisonLess.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aScalarComparisonLess.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::LOGICAL, aScalarComparisonLess.meFormatType);
+
+    const auto aScalarConcat = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=\"A\"&\"B\"", false);
+    CPPUNIT_ASSERT(aScalarConcat.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aScalarConcat.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"AB"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aScalarConcat.maResult.maString));
+
+    const auto aRound = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ROUND(12.345;2)", false);
+    CPPUNIT_ASSERT(aRound.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aRound.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(12.35, aRound.maResult.mfValue, 1e-12);
+
+    const auto aIsError = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ISERROR(1/0)", false);
+    CPPUNIT_ASSERT(aIsError.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aIsError.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aIsError.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::LOGICAL, aIsError.meFormatType);
+
+    const auto aAnd = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=AND(A5=B6;A5<B7)", false);
+    CPPUNIT_ASSERT(aAnd.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aAnd.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aAnd.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::LOGICAL, aAnd.meFormatType);
+
+    const auto aNot = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=NOT(A5=B6)", false);
+    CPPUNIT_ASSERT(aNot.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aNot.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, aNot.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::LOGICAL, aNot.meFormatType);
+
     m_pDoc->SetTextCell(ScAddress(25, 0, 0), u"12 potatoes"_ustr);
     m_pDoc->SetTextCell(ScAddress(25, 1, 0), u"1"_ustr);
     m_pDoc->SetTextCell(ScAddress(25, 2, 0), u"2000-01-01"_ustr);
