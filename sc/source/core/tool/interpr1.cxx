@@ -6313,6 +6313,15 @@ void ScInterpreter::ScLookup()
 
 void ScInterpreter::ScHLookup()
 {
+    const std::optional<OUString> oQuarantinedFormula
+        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
+    if (oQuarantinedFormula)
+    {
+        SAL_WARN("sc.core",
+            "hard-routed HLOOKUP reached ScInterpreter for " << *oQuarantinedFormula);
+        OSL_FAIL("hard-routed HLOOKUP reached ScInterpreter");
+    }
+
     CalculateLookup(true);
 }
 
