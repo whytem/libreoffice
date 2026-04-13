@@ -36,11 +36,11 @@ delegation.”
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=4324`
-- `interpret_tail_live_fallback_total=624`
+- `interpret_tail_live_supported_total=4326`
+- `interpret_tail_live_fallback_total=622`
 - `interpret_tail_live_seen_total=4948`
 - `interpret_tail_live_unseen_formula_cells=45713`
-- `interpret_tail_live_promoted_function_supported_total=3074`
+- `interpret_tail_live_promoted_function_supported_total=3076`
 - `interpret_tail_live_supported_rate=8.54`
 - `interpret_tail_live_seen_rate=9.77`
 
@@ -54,11 +54,11 @@ Dominant ambient fallback reasons:
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=2162`
-- `interpret_tail_forced_interpret_fallback_total=312`
+- `interpret_tail_forced_interpret_supported_total=2163`
+- `interpret_tail_forced_interpret_fallback_total=311`
 - `interpret_tail_forced_interpret_seen_total=2474`
 - `interpret_tail_forced_interpret_unseen_formula_cells=48187`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=1537`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=1538`
 - `interpret_tail_forced_interpret_supported_rate=4.27`
 - `interpret_tail_forced_interpret_seen_rate=4.88`
 
@@ -74,6 +74,13 @@ Dominant promoted-family fallback reasons:
 - `unsupported_formula_shape=5`
 - `shadow_mismatch=13`
 - `unsupported_host_surface=0`
+
+### Live-Target Filtered Promoted Probe
+
+- `interpret_tail_live_target_probe_formula_cells=0`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=1812`
+- `interpret_tail_live_target_authoritative_total=0`
+- `interpret_tail_live_target_authoritative_fallback_total=0`
 
 ### Hard-Quarantined Calc Paths
 
@@ -165,18 +172,17 @@ The highest-value remaining blockers are now:
 1. ambient live-routing reach:
    the full replay corpus now shows `4,226` seen formulas out of `50,661`, with
    `2,964` promoted-family live supported routes
-2. promoted replay residual fallback:
-   the reach blocker is cleared for promoted replay formulas, but the replay
-   imported surface still retains `6` direct promoted fallback cells and
-   ambient replay still covers only a bounded minority of formulas
-3. promoted-family residual parity:
+2. promoted-family residual parity:
    `shadow_mismatch=13`
-4. promoted-family residual formula shape:
+3. promoted-family residual formula shape:
    replay-live `unsupported_formula_shape=6`
-5. first real Calc-path retirement:
+4. first real Calc-path retirement:
    one family is hard-routed and its legacy interpreter entry is now
    quarantined for the narrow literal-only slice, but no whole
    `ScInterpreter` subroutine has been deleted yet
+5. imported replay denominator honesty:
+   the raw promoted replay probe is now confirmed to be a cached imported
+   correctness surface, not a live seam-off retirement denominator
 
 The latest bounded text-parsing slice improved promoted-family authority from
 `1793 / 19` to `1794 / 18`, held replay direct fallback at `6`, and closed
@@ -234,15 +240,21 @@ A bounded live-host-truth pass now also shows the replay-imported
 cached workbook non-error row is likewise not treated as a real runtime
 conversion target.
 
+With the new host-truth filtered probe, all `1,812` promoted replay probe
+rows now classify as imported host-truth artifacts under seam-off direct
+legacy interpretation. So that probe remains useful as a cached imported
+correctness surface, but not as the live retirement denominator.
+
 ## Recommended Next Pass
 
 The next pass should:
 
-1. decide whether imported logical-constant and month-name `DATEVALUE`
-   error parity is in scope for the migration target
-2. if yes, convert that residual genuine shadow-mismatch band
-3. if no, freeze promoted replay cleanup here and return to broader ambient
-   live reach plus future Calc-path retirement work
+1. treat the raw promoted replay probe as a cached imported correctness
+   surface, not as the live retirement denominator
+2. drive the next real runtime win on broader ambient live reach or another
+   narrow hard-route / quarantine slice inside `ScInterpreter`
+3. only return to imported replay parity if we intentionally decide to
+   rehabilitate legacy seam-off imported-formula execution
 
 ## Navigation
 

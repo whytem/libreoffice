@@ -120,11 +120,11 @@ This is the honest all-formula live-routing surface from the standing replay
 corpus after the completed token-backed canonical-source localized-array slice:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=4324`
-- `interpret_tail_live_fallback_total=624`
+- `interpret_tail_live_supported_total=4326`
+- `interpret_tail_live_fallback_total=622`
 - `interpret_tail_live_seen_total=4948`
 - `interpret_tail_live_unseen_formula_cells=45713`
-- `interpret_tail_live_promoted_function_supported_total=3074`
+- `interpret_tail_live_promoted_function_supported_total=3076`
 - `interpret_tail_live_supported_rate=8.54`
 - `interpret_tail_live_seen_rate=9.77`
 
@@ -154,11 +154,11 @@ This is the new full-corpus measurement after explicitly dirtying and forcing
 every replay formula cell through Calc's live `Interpret()` path:
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=2162`
-- `interpret_tail_forced_interpret_fallback_total=312`
+- `interpret_tail_forced_interpret_supported_total=2163`
+- `interpret_tail_forced_interpret_fallback_total=311`
 - `interpret_tail_forced_interpret_seen_total=2474`
 - `interpret_tail_forced_interpret_unseen_formula_cells=48187`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=1537`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=1538`
 - `interpret_tail_forced_interpret_supported_rate=4.27`
 - `interpret_tail_forced_interpret_seen_rate=4.88`
 
@@ -186,6 +186,17 @@ Current promoted-family fallback reasons:
 - `unsupported_formula_shape=5`
 - `shadow_mismatch=13`
 - `unsupported_host_surface=0`
+
+### Live-Target Filtered Promoted Probe
+
+This is the same promoted replay probe after excluding rows where live Calc
+with the seam forced `off` already disagrees with the imported cached workbook
+result:
+
+- `interpret_tail_live_target_probe_formula_cells=0`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=1812`
+- `interpret_tail_live_target_authoritative_total=0`
+- `interpret_tail_live_target_authoritative_fallback_total=0`
 
 Interpretation:
 
@@ -243,9 +254,11 @@ Interpretation:
   `FormulaError::VariableExpected` in Calc with the seam forced off, so that
   cached workbook non-error row is likewise not treated as a real live runtime
   conversion target
-- the residual promoted replay fallback is therefore now dominated by
-  shadow-mismatch rows and cached-workbook shape rows that have already been
-  disproved as live runtime targets by host-truth checks
+- once the probe is filtered by live host truth, there is currently no
+  remaining imported promoted replay surface that behaves like a real seam-off
+  legacy runtime target
+- the raw promoted replay probe is therefore useful as a cached imported
+  correctness surface, but not as the live retirement denominator
 
 ### Replay Eligibility Inventory
 
@@ -319,14 +332,14 @@ historical reference material, not active roadmap work.
 
 The latest replay closeout is now folded into this migration ledger.
 
-The next high-value pass should now stay on the remaining genuine parity
-decision, not on cached-workbook-only shape rows:
+The next high-value pass should now move off imported replay parity cleanup:
 
-1. decide whether imported logical-constant and month-name `DATEVALUE`
-   error parity is in scope for the live migration target
-2. if yes, convert that residual genuine shadow-mismatch band
-3. if no, freeze promoted replay cleanup here and return to broader ambient
-   live reach and future Calc-path retirement work
+1. treat the raw promoted replay probe as a cached imported correctness
+   surface, not as the live retirement denominator
+2. drive the next real runtime win on broader ambient live reach or another
+   narrow hard-route / quarantine slice inside `ScInterpreter`
+3. only return to imported replay parity if we intentionally decide to
+   rehabilitate legacy seam-off imported-formula execution
 
 ## Historical Archive
 

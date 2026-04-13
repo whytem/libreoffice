@@ -32,11 +32,11 @@ That splits into two tracks:
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=4324`
-- `interpret_tail_live_fallback_total=624`
+- `interpret_tail_live_supported_total=4326`
+- `interpret_tail_live_fallback_total=622`
 - `interpret_tail_live_seen_total=4948`
 - `interpret_tail_live_unseen_formula_cells=45713`
-- `interpret_tail_live_promoted_function_supported_total=3074`
+- `interpret_tail_live_promoted_function_supported_total=3076`
 - `interpret_tail_live_supported_rate=8.54`
 - `interpret_tail_live_seen_rate=9.77`
 
@@ -50,11 +50,11 @@ Ambient live fallback reasons:
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=2162`
-- `interpret_tail_forced_interpret_fallback_total=312`
+- `interpret_tail_forced_interpret_supported_total=2163`
+- `interpret_tail_forced_interpret_fallback_total=311`
 - `interpret_tail_forced_interpret_seen_total=2474`
 - `interpret_tail_forced_interpret_unseen_formula_cells=48187`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=1537`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=1538`
 - `interpret_tail_forced_interpret_supported_rate=4.27`
 - `interpret_tail_forced_interpret_seen_rate=4.88`
 
@@ -64,6 +64,13 @@ Ambient live fallback reasons:
 - `interpret_tail_authoritative_total=1794`
 - `interpret_tail_authoritative_fallback_total=18`
 - promoted-family authoritative rate: `99.01%`
+
+### Live-Target Filtered Promoted Probe
+
+- `interpret_tail_live_target_probe_formula_cells=0`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=1812`
+- `interpret_tail_live_target_authoritative_total=0`
+- `interpret_tail_live_target_authoritative_fallback_total=0`
 
 Promoted-family fallback reasons:
 
@@ -159,9 +166,13 @@ Still not true:
 - a bounded live-host-truth pass now also shows the replay-imported
   `MATCH(1; FREQUENCY([.I126]; [.H129:.M129]); 0)` row is also a genuine live
   Calc `FormulaError::VariableExpected` row, not a real runtime parity blocker
-- the remaining promoted replay cleanup question is therefore no longer the
-  old shape band, but whether current live Calc imported logical-constant and
-  month-name `DATEVALUE` error behavior is in scope to reproduce
+- the promoted replay probe is now explicitly split into raw cached-workbook
+  parity and live-target filtered parity, and the filtered surface is empty:
+  all `1812` promoted replay probe rows are imported host-truth artifacts under
+  seam-off direct legacy interpretation
+- the next runtime milestone therefore should not be defined by the imported
+  replay probe anymore; it should move to broader ambient live reach plus
+  additional Calc-path quarantine / retirement slices
 
 ## Active Delegated Family
 
@@ -197,13 +208,14 @@ historical reference material, not active roadmap.
 
 ## Recommended Next Pass
 
-The next pass should stay on the remaining real parity decision:
+The next pass should now move off imported replay parity cleanup:
 
-1. decide whether imported logical-constant and month-name `DATEVALUE`
-   error parity is in scope
-2. if yes, convert that residual genuine shadow-mismatch band
-3. if no, freeze promoted replay cleanup and return to broader ambient
-   live reach work
+1. treat the raw promoted replay probe as a cached imported correctness surface,
+   not as the live retirement denominator
+2. drive the next real runtime win on broader ambient live reach or another
+   narrow hard-route / quarantine slice inside `ScInterpreter`
+3. only return to imported replay parity if we intentionally decide to
+   rehabilitate legacy seam-off imported-formula execution
 
 ## References
 
