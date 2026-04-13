@@ -1525,6 +1525,13 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNorm
     CPPUNIT_ASSERT_EQUAL(
         setaileval::FunctionKind::VLookup,
         setaileval::detail::classifyDelegatedFunctionNode(*aParse.mpRoot));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(u"=VALUE(\"4321\")"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(u"=DATEVALUE(\"1954-07-20\")"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(u"=TIMEVALUE(\"16:30:01\")"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(u"=NUMBERVALUE(\"1,234.5\";\".\";\",\")"));
+    CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=VALUE(A1)"));
+    CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=DATEVALUE(A1)"));
+    CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=TIMEVALUE(MyTimeName)"));
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testDirectFormulaInspectionAdapter)

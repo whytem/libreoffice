@@ -144,7 +144,7 @@ spreadsheetengine::api::query::SearchType toApiSearchType(utl::SearchParam::Sear
     }
 }
 
-[[nodiscard]] std::optional<OUString> lclGetQuarantinedLiteralOnlyNumberValueFormula(
+[[nodiscard]] std::optional<OUString> lclGetQuarantinedLiteralOnlyTextParsingFormula(
     const ScFormulaCell* pCell, const ScDocument& rDoc, ScInterpreterContext& rContext)
 {
     if (!pCell)
@@ -3285,6 +3285,15 @@ void ScInterpreter::ScT()
 
 void ScInterpreter::ScValue()
 {
+    const std::optional<OUString> oQuarantinedFormula
+        = lclGetQuarantinedLiteralOnlyTextParsingFormula(pMyFormulaCell, mrDoc, mrContext);
+    if (oQuarantinedFormula)
+    {
+        SAL_WARN("sc.core",
+            "literal-only hard-routed VALUE reached ScInterpreter for " << *oQuarantinedFormula);
+        OSL_FAIL("literal-only hard-routed VALUE reached ScInterpreter");
+    }
+
     OUString aInputString;
     double fVal;
 
@@ -3365,7 +3374,7 @@ void ScInterpreter::ScValue()
 void ScInterpreter::ScNumberValue()
 {
     const std::optional<OUString> oQuarantinedFormula
-        = lclGetQuarantinedLiteralOnlyNumberValueFormula(pMyFormulaCell, mrDoc, mrContext);
+        = lclGetQuarantinedLiteralOnlyTextParsingFormula(pMyFormulaCell, mrDoc, mrContext);
     if (oQuarantinedFormula)
     {
         SAL_WARN("sc.core",

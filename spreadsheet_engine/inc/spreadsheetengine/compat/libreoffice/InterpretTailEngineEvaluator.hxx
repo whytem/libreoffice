@@ -2472,7 +2472,15 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     if (rNode.meKind != core::formula::NodeKind::FunctionCall)
         return false;
 
-    if (classifyFunction(uppercaseAscii(rNode.maPrimaryText)) != FunctionKind::NumberValue)
+    const auto eFunction = classifyFunction(uppercaseAscii(rNode.maPrimaryText));
+    if (eFunction == FunctionKind::Value || eFunction == FunctionKind::DateValue
+        || eFunction == FunctionKind::TimeValue)
+    {
+        return rNode.maChildren.size() == 1 && rNode.maChildren[0]
+               && rNode.maChildren[0]->meKind == core::formula::NodeKind::StringLiteral;
+    }
+
+    if (eFunction != FunctionKind::NumberValue)
         return false;
 
     if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)

@@ -54,6 +54,7 @@
 #include <spreadsheetengine/runtime/MathScalar.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
+#include <spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx>
 #include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
@@ -68,10 +69,38 @@ namespace sedatetime = spreadsheetengine::core::datetime;
 namespace semath = spreadsheetengine::core::math;
 namespace seconvert = spreadsheetengine::core::convert;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
+namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 namespace setextparseexec = spreadsheetengine::compat::libreoffice::textparsingexecution;
 
 #define SCdEpsilon                1.0E-7
+
+namespace
+{
+
+[[nodiscard]] std::optional<OUString> lclGetQuarantinedLiteralOnlyTextParsingFormula(
+    const ScFormulaCell* pCell, const ScDocument& rDoc, ScInterpreterContext& rContext)
+{
+    if (!pCell)
+        return std::nullopt;
+
+    if (pCell->IsIterCell() || pCell->GetMatrixFlag() != ScMatrixMode::NONE
+        || pCell->IsHyperLinkCell() || rDoc.IsThreadedGroupCalcInProgress())
+    {
+        return std::nullopt;
+    }
+
+    OUString aFormulaSource = pCell->GetFormula(FormulaGrammar::GRAM_ODFF, &rContext);
+    if (!setaileval::isHardRoutedFormula(
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength())))
+    {
+        return std::nullopt;
+    }
+
+    return aFormulaSource;
+}
+
+}
 
 // Date and Time
 
@@ -151,6 +180,16 @@ void ScInterpreter::ScGetHour()
 
 void ScInterpreter::ScGetDateValue()
 {
+    const std::optional<OUString> oQuarantinedFormula
+        = lclGetQuarantinedLiteralOnlyTextParsingFormula(pMyFormulaCell, mrDoc, mrContext);
+    if (oQuarantinedFormula)
+    {
+        SAL_WARN("sc.core",
+            "literal-only hard-routed DATEVALUE reached ScInterpreter for "
+                << *oQuarantinedFormula);
+        OSL_FAIL("literal-only hard-routed DATEVALUE reached ScInterpreter");
+    }
+
     OUString aInputString = GetString().getString();
     const auto aResult = setextparseexec::evaluateDateValue(mrDoc, mrContext, aInputString);
     if (aResult)
@@ -530,6 +569,16 @@ void ScInterpreter::ScGetDateDif()
 
 void ScInterpreter::ScGetTimeValue()
 {
+    const std::optional<OUString> oQuarantinedFormula
+        = lclGetQuarantinedLiteralOnlyTextParsingFormula(pMyFormulaCell, mrDoc, mrContext);
+    if (oQuarantinedFormula)
+    {
+        SAL_WARN("sc.core",
+            "literal-only hard-routed TIMEVALUE reached ScInterpreter for "
+                << *oQuarantinedFormula);
+        OSL_FAIL("literal-only hard-routed TIMEVALUE reached ScInterpreter");
+    }
+
     OUString aInputString = GetString().getString();
     const auto aResult = setextparseexec::evaluateTimeValue(mrDoc, mrContext, aInputString);
     if (aResult)
