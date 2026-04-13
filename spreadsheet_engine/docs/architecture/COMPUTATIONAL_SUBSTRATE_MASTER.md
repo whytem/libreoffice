@@ -206,14 +206,20 @@ A bounded live-host-truth pass now also shows the residual replay-imported
 residual replay `XLOOKUP` band is no longer treated as a real runtime
 conversion target either.
 
+A bounded live-host-truth pass now also shows the replay-imported
+`INDEX([.H13:.J19]; XMATCH([.G10]; [.G13:.G19]); XMATCH([.H10]; [.H12:.J12]))`
+row evaluates to `FormulaError::VariableExpected` in Calc with the seam
+forced off, so that cached numeric workbook value is not treated as a real
+runtime conversion target either.
+
 ## Recommended Next Pass
 
 The next pass should:
 
 1. convert the residual
-   real `INDEX` shape-fallback rows
-2. then convert smaller `INDEX` shape fallout and any remaining `LOOKUP`
-   parity rows
+   real `INDEX` matrix-function shape-fallback rows
+2. then convert smaller `INDEX` matrix-function fallout and any remaining
+   `LOOKUP` parity rows
 3. move the first replay-imported promoted family from observe-only reach
    toward a broader authority candidate once mismatch and shape fallback
    shrink materially

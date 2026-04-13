@@ -222,9 +222,14 @@ Interpretation:
   `FormulaError::VariableExpected` in Calc with the seam forced off, so the
   residual replay `XLOOKUP` band is likewise no longer treated as a real
   runtime conversion target
+- a bounded live-host-truth pass now also shows the replay-imported
+  `INDEX([.H13:.J19]; XMATCH([.G10]; [.G13:.G19]); XMATCH([.H10]; [.H12:.J12]))`
+  row evaluates to `FormulaError::VariableExpected` in Calc with the seam
+  forced off, so that cached numeric workbook value is not treated as a real
+  runtime conversion target either
 - the next reducible promoted-family runtime hotspot is therefore `INDEX`
-  shape fallout, with the smaller `VALUE` and `DATEVALUE` parity cleanup
-  behind it
+  matrix-function fallout, with the smaller `VALUE` and `DATEVALUE` parity
+  cleanup behind it
 
 ### Replay Eligibility Inventory
 
@@ -300,8 +305,8 @@ starting with the residual `VLOOKUP` / `XLOOKUP` mismatch band and then the
 smaller shape fallout behind it:
 
 1. convert the remaining real replay-promoted `INDEX`
-   `unsupported_formula_shape` rows
-2. then convert smaller `INDEX` `unsupported_formula_shape` fallout
+   matrix-function `unsupported_formula_shape` rows
+2. then convert smaller `INDEX` matrix-function fallout
 3. clean up any residual `LOOKUP` mismatch rows still visible after that
 4. only return to broader reach work if the promoted replay surface regresses
 

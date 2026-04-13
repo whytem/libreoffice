@@ -140,8 +140,13 @@ Still not true:
   `XLOOKUP("Ireland"; [.H2:.H11]; [.J2:.J11]; "")` and
   `XLOOKUP([.G14]; [.I14:.R14]; [.I15:.R16])` rows are genuine live Calc
   `FormulaError::VariableExpected` rows, not real runtime parity blockers
-- the next highest-value reducible replay blocker is therefore `INDEX` shape
-  fallout, with smaller `VALUE` and `DATEVALUE` cleanup behind it
+- a bounded live-host-truth pass now also shows the replay-imported
+  `INDEX([.H13:.J19]; XMATCH([.G10]; [.G13:.G19]); XMATCH([.H10]; [.H12:.J12]))`
+  row is also a genuine live Calc `FormulaError::VariableExpected` row, not a
+  real runtime parity blocker
+- the next highest-value reducible replay blocker is therefore `INDEX`
+  matrix-function shape fallout, with smaller `VALUE` and `DATEVALUE` cleanup
+  behind it
 
 ## Active Delegated Family
 
@@ -180,9 +185,10 @@ historical reference material, not active roadmap.
 The next pass should stay on promoted-family parity cleanup:
 
 1. convert the remaining real
-   `INDEX` `unsupported_formula_shape` rows on the replay-promoted surface
+   `INDEX` matrix-function `unsupported_formula_shape` rows on the
+   replay-promoted surface
 2. then clean up the remaining replay-imported
-   `INDEX` `unsupported_formula_shape` fallout
+   `INDEX` matrix-function `unsupported_formula_shape` fallout
 3. only return to broader reach work if the promoted replay surface regresses
 
 ## References
