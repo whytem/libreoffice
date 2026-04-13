@@ -95,13 +95,14 @@ Promoted-family fallback reasons:
 
 ### Current Hard-Routed Family Count
 
-- `6` env-independent engine-first slices:
+- `7` env-independent engine-first slices:
   - `TRUE()`
   - `FALSE()`
   - string-literal `VALUE`
   - string-literal `DATEVALUE`
   - string-literal `TIMEVALUE`
   - literal-only `NUMBERVALUE`
+  - exact `MATCH(<literal>; <1D literal array>; 0)`
 - corresponding legacy entrypoints now carry debug quarantine warnings on
   normal interpreter reach:
   - `ScInterpreter::ScTrue()`
@@ -110,6 +111,7 @@ Promoted-family fallback reasons:
   - `ScInterpreter::ScGetDateValue()`
   - `ScInterpreter::ScGetTimeValue()`
   - `ScInterpreter::ScNumberValue()`
+  - `ScInterpreter::ScMatch()`
 
 ## Current State
 
