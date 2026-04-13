@@ -144,9 +144,15 @@ Still not true:
   `INDEX([.H13:.J19]; XMATCH([.G10]; [.G13:.G19]); XMATCH([.H10]; [.H12:.J12]))`
   row is also a genuine live Calc `FormulaError::VariableExpected` row, not a
   real runtime parity blocker
-- the next highest-value reducible replay blocker is therefore `INDEX`
-  matrix-function shape fallout, with smaller `VALUE` and `DATEVALUE` cleanup
-  behind it
+- a bounded live-host-truth pass now also shows the replay-imported
+  `INDEX(LOGEST([.K11:.O11]; [.K12:.O12]; TRUE(); TRUE()); 2; 1)`,
+  `INDEX(LOGEST([.K11:.O11]; [.K12:.O12]; TRUE(); TRUE()); 2; 2)`, and
+  `INDEX(LOGEST([.K11:.O11]; [.K12:.O12]; TRUE(); TRUE()); 2; 0)` rows are
+  likewise genuine live Calc `FormulaError::VariableExpected` rows, not real
+  runtime parity blockers
+- the next highest-value reducible replay blocker is therefore the smaller
+  `VALUE` and `DATEVALUE` parity cleanup, with any residual `LOOKUP`
+  mismatches behind it
 
 ## Active Delegated Family
 
@@ -184,11 +190,9 @@ historical reference material, not active roadmap.
 
 The next pass should stay on promoted-family parity cleanup:
 
-1. convert the remaining real
-   `INDEX` matrix-function `unsupported_formula_shape` rows on the
+1. convert the remaining real `VALUE` / `DATEVALUE` parity rows on the
    replay-promoted surface
-2. then clean up the remaining replay-imported
-   `INDEX` matrix-function `unsupported_formula_shape` fallout
+2. then clean up any residual `LOOKUP` mismatch rows
 3. only return to broader reach work if the promoted replay surface regresses
 
 ## References

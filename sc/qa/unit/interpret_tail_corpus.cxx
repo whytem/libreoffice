@@ -1851,6 +1851,87 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedIndexNestedXMatchLiveH
     CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(aPos));
 }
 
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedIndexLogestLiveHostTruth)
+{
+    const OUString aWorkbookPath
+        = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/spreadsheet/fods/index.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for index.fods", static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    struct IndexLogestHostTruthCase
+    {
+        OUString maExpectedFormula;
+        FormulaError meExpectedError;
+        bool mbSeen = false;
+    } aCases[] = {
+        { u"=of:=INDEX(LOGEST([.K11:.O11];[.K12:.O12];TRUE();TRUE());2;1)"_ustr,
+            FormulaError::VariableExpected },
+        { u"=of:=INDEX(LOGEST([.K11:.O11];[.K12:.O12];TRUE();TRUE());2;2)"_ustr,
+            FormulaError::VariableExpected },
+        { u"=of:=INDEX(LOGEST([.K11:.O11];[.K12:.O12];TRUE();TRUE());2;0)"_ustr,
+            FormulaError::VariableExpected },
+    };
+
+    for (std::size_t nSheet = 0; nSheet < aWorkbook.maSheets.size(); ++nSheet)
+    {
+        for (const auto& rEntry : aWorkbook.maSheets[nSheet].maCells)
+        {
+            const Cell& rCell = rEntry.second;
+            if (!rCell.hasFormula())
+                continue;
+
+            const ScAddress aPos(static_cast<SCCOL>(rEntry.first.first),
+                static_cast<SCROW>(rEntry.first.second), static_cast<SCTAB>(nSheet));
+            ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+            if (!pFormula)
+                continue;
+
+            const OUString aFormulaSource
+                = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+            for (auto& rCase : aCases)
+            {
+                if (aFormulaSource != rCase.maExpectedFormula)
+                    continue;
+
+                rCase.mbSeen = true;
+                {
+                    ScopedEnvironmentOverride aOffMode(
+                        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+                    pFormula->SetDirty();
+                    pFormula->Interpret();
+                }
+
+                CPPUNIT_ASSERT_EQUAL(rCase.meExpectedError, rDoc.GetErrCode(aPos));
+            }
+        }
+    }
+
+    for (const auto& rCase : aCases)
+    {
+        const OUString aMessage
+            = u"expected imported INDEX(LOGEST) formula not found: "_ustr
+              + rCase.maExpectedFormula;
+        CPPUNIT_ASSERT_MESSAGE(
+            OUStringToOString(aMessage, RTL_TEXTENCODING_UTF8).getStr(),
+            rCase.mbSeen);
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
 {
     if (!envEnabled("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_STATS"))

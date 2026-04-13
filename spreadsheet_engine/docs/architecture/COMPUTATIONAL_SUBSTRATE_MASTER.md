@@ -212,14 +212,20 @@ row evaluates to `FormulaError::VariableExpected` in Calc with the seam
 forced off, so that cached numeric workbook value is not treated as a real
 runtime conversion target either.
 
+A bounded live-host-truth pass now also shows the replay-imported
+`INDEX(LOGEST([.K11:.O11]; [.K12:.O12]; TRUE(); TRUE()); 2; 1)`,
+`INDEX(LOGEST([.K11:.O11]; [.K12:.O12]; TRUE(); TRUE()); 2; 2)`, and
+`INDEX(LOGEST([.K11:.O11]; [.K12:.O12]; TRUE(); TRUE()); 2; 0)` rows all
+evaluate to `FormulaError::VariableExpected` in Calc with the seam forced
+off, so that imported `INDEX` matrix-function band is not treated as a real
+runtime conversion target either.
+
 ## Recommended Next Pass
 
 The next pass should:
 
-1. convert the residual
-   real `INDEX` matrix-function shape-fallback rows
-2. then convert smaller `INDEX` matrix-function fallout and any remaining
-   `LOOKUP` parity rows
+1. convert the residual real `VALUE` / `DATEVALUE` parity rows
+2. then convert any remaining `LOOKUP` parity rows
 3. move the first replay-imported promoted family from observe-only reach
    toward a broader authority candidate once mismatch and shape fallback
    shrink materially

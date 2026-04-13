@@ -227,9 +227,16 @@ Interpretation:
   row evaluates to `FormulaError::VariableExpected` in Calc with the seam
   forced off, so that cached numeric workbook value is not treated as a real
   runtime conversion target either
-- the next reducible promoted-family runtime hotspot is therefore `INDEX`
-  matrix-function fallout, with the smaller `VALUE` and `DATEVALUE` parity
-  cleanup behind it
+- a bounded live-host-truth pass now also shows the replay-imported
+  `INDEX(LOGEST([.K11:.O11]; [.K12:.O12]; TRUE(); TRUE()); 2; 1)`,
+  `INDEX(LOGEST([.K11:.O11]; [.K12:.O12]; TRUE(); TRUE()); 2; 2)`, and
+  `INDEX(LOGEST([.K11:.O11]; [.K12:.O12]; TRUE(); TRUE()); 2; 0)` rows all
+  evaluate to `FormulaError::VariableExpected` in Calc with the seam forced
+  off, so that imported `INDEX` matrix-function band is likewise no longer
+  treated as a real runtime conversion target
+- the next reducible promoted-family runtime hotspot is therefore the smaller
+  `VALUE` and `DATEVALUE` parity cleanup, with any residual `LOOKUP`
+  mismatches behind it
 
 ### Replay Eligibility Inventory
 
@@ -304,11 +311,10 @@ The next high-value pass should now stay on promoted-family parity cleanup,
 starting with the residual `VLOOKUP` / `XLOOKUP` mismatch band and then the
 smaller shape fallout behind it:
 
-1. convert the remaining real replay-promoted `INDEX`
-   matrix-function `unsupported_formula_shape` rows
-2. then convert smaller `INDEX` matrix-function fallout
-3. clean up any residual `LOOKUP` mismatch rows still visible after that
-4. only return to broader reach work if the promoted replay surface regresses
+1. convert the remaining real replay-promoted `VALUE` / `DATEVALUE` parity
+   rows
+2. then clean up any residual `LOOKUP` mismatch rows still visible after that
+3. only return to broader reach work if the promoted replay surface regresses
 
 ## Historical Archive
 
