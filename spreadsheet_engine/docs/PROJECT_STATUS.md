@@ -95,7 +95,7 @@ Promoted-family fallback reasons:
 
 ### Current Hard-Routed Family Count
 
-- `20` env-independent engine-first slices:
+- `30` env-independent engine-first slices:
   - `TRUE()`
   - `FALSE()`
   - string-literal `VALUE`
@@ -106,6 +106,10 @@ Promoted-family fallback reasons:
   - default-exact `XMATCH(<literal>; <1D literal array>)`
   - exact `XMATCH(<literal>; <1D literal array>; 0)`
   - exact-forward `XMATCH(<literal>; <1D literal array>; 0; 1)`
+  - exact-reverse `XMATCH(<literal>; <1D literal array>; 0; -1)`
+  - exact-binary-ascending `XMATCH(<literal>; <ascending numeric 1D literal array>; 0; 2)`
+  - exact-binary-descending `XMATCH(<literal>; <descending numeric 1D literal array>; 0; -2)`
+  - `LOOKUP(<literal>; <1D literal vector>)`
   - `LOOKUP(<literal>; <1D literal vector>; <1D literal result vector>)`
   - `LOOKUP(<literal>; <2D literal matrix>)`
   - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
@@ -114,8 +118,14 @@ Promoted-family fallback reasons:
   - `HLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>)`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0; 1)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0; -1)`
+  - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 0; 2)`
+  - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector> ;; 0; -2)`
+  - `INDEX(<2D literal array>; <positive whole>)`
   - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
   - `INDEX(<2D literal array>; 0; <positive whole>)`
+  - `INDEX(<2D literal array>; <positive whole>; 0)`
 - corresponding legacy entrypoints now carry debug quarantine warnings on
   normal interpreter reach:
   - `ScInterpreter::ScTrue()`
@@ -143,14 +153,14 @@ Today:
 - `DBG_UTIL` builds default to `observe` when the rollout env var is unset
 - `authority` mode authoritatively bypasses `ScInterpreter` for supported
   promoted families
-- the env-`off` hard-route boundary now covers a twenty-slice
+- the env-`off` hard-route boundary now covers a thirty-slice
   logical/text/match/lookup/index cluster instead of just `NUMBERVALUE`
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
-- the latest bounded exact-`XMATCH` / `HLOOKUP` / `INDEX` slice raised the
-  env-independent hard-route cluster from `15` to `20` and added
-  `ScHLookup()` to the quarantined legacy entrypoints
+- the latest bounded exact-search-mode plus literal-array lookup/index slice
+  raised the env-independent hard-route cluster from `20` to `30` without
+  widening beyond explicit-exact or literal-array semantics
 
 Still not true:
 

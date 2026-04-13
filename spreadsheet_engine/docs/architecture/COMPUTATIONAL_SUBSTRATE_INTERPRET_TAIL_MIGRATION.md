@@ -317,6 +317,10 @@ The env-independent engine-first cluster now includes:
 - default-exact `XMATCH(<literal>; <1D literal array>)`
 - exact `XMATCH(<literal>; <1D literal array>; 0)`
 - exact-forward `XMATCH(<literal>; <1D literal array>; 0; 1)`
+- exact-reverse `XMATCH(<literal>; <1D literal array>; 0; -1)`
+- exact-binary-ascending `XMATCH(<literal>; <ascending numeric 1D literal array>; 0; 2)`
+- exact-binary-descending `XMATCH(<literal>; <descending numeric 1D literal array>; 0; -2)`
+- `LOOKUP(<literal>; <1D literal vector>)`
 - `LOOKUP(<literal>; <1D literal vector>; <1D literal result vector>)`
 - `LOOKUP(<literal>; <2D literal matrix>)`
 - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
@@ -325,8 +329,14 @@ The env-independent engine-first cluster now includes:
 - `HLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
 - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>)`
 - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0)`
+- `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0; 1)`
+- `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0; -1)`
+- `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 0; 2)`
+- `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector> ;; 0; -2)`
+- `INDEX(<2D literal array>; <positive whole>)`
 - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
 - `INDEX(<2D literal array>; 0; <positive whole>)`
+- `INDEX(<2D literal array>; <positive whole>; 0)`
 
 Current meaning:
 
@@ -347,7 +357,7 @@ Current meaning:
 
 This latest hard-route milestone extends the explicit-exact match and
 literal lookup/index hard-quarantined Calc path cluster on the migration
-track and brings the env-independent engine-first total to `20` slices.
+track and brings the env-independent engine-first total to `30` slices.
 
 ## Scope Policy
 

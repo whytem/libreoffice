@@ -84,7 +84,7 @@ Dominant promoted-family fallback reasons:
 
 ### Hard-Quarantined Calc Paths
 
-- `20` env-independent engine-first slices:
+- `30` env-independent engine-first slices:
   - `TRUE()`
   - `FALSE()`
   - string-literal `VALUE`
@@ -95,6 +95,10 @@ Dominant promoted-family fallback reasons:
   - default-exact `XMATCH(<literal>; <1D literal array>)`
   - exact `XMATCH(<literal>; <1D literal array>; 0)`
   - exact-forward `XMATCH(<literal>; <1D literal array>; 0; 1)`
+  - exact-reverse `XMATCH(<literal>; <1D literal array>; 0; -1)`
+  - exact-binary-ascending `XMATCH(<literal>; <ascending numeric 1D literal array>; 0; 2)`
+  - exact-binary-descending `XMATCH(<literal>; <descending numeric 1D literal array>; 0; -2)`
+  - `LOOKUP(<literal>; <1D literal vector>)`
   - `LOOKUP(<literal>; <1D literal vector>; <1D literal result vector>)`
   - `LOOKUP(<literal>; <2D literal matrix>)`
   - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
@@ -103,8 +107,14 @@ Dominant promoted-family fallback reasons:
   - `HLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>)`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0; 1)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0; -1)`
+  - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 0; 2)`
+  - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector> ;; 0; -2)`
+  - `INDEX(<2D literal array>; <positive whole>)`
   - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
   - `INDEX(<2D literal array>; 0; <positive whole>)`
+  - `INDEX(<2D literal array>; <positive whole>; 0)`
 - the corresponding legacy interpreter entries now warn on normal reach for
   those narrow slices:
   - `ScInterpreter::ScTrue()`
@@ -216,10 +226,9 @@ The highest-value remaining blockers are now:
    the raw promoted replay probe is now confirmed to be a cached imported
    correctness surface, not a live seam-off retirement denominator
 
-The latest bounded exact-`XMATCH` / `HLOOKUP` / `INDEX` slice raised the
-env-independent hard-route cluster from `15` to `20` and added
-`ScInterpreter::ScHLookup()` to the quarantined legacy entrypoint set while
-keeping the expansion inside literal-array and explicit-exact semantics.
+The latest bounded exact-search-mode plus literal-array lookup/index slice
+raised the env-independent hard-route cluster from `20` to `30` while
+keeping the expansion inside explicit-exact and literal-array semantics.
 
 A focused live-host check now shows the replay-imported whole-row
 `MATCH([.$B$150]; [.$150:.$150]; -1)` row evaluates to
