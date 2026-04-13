@@ -84,7 +84,7 @@ Dominant promoted-family fallback reasons:
 
 ### Hard-Quarantined Calc Paths
 
-- `7` env-independent engine-first slices:
+- `8` env-independent engine-first slices:
   - `TRUE()`
   - `FALSE()`
   - string-literal `VALUE`
@@ -92,6 +92,7 @@ Dominant promoted-family fallback reasons:
   - string-literal `TIMEVALUE`
   - literal-only `NUMBERVALUE`
   - exact `MATCH(<literal>; <1D literal array>; 0)`
+  - default-exact `XMATCH(<literal>; <1D literal array>)`
 - the corresponding legacy interpreter entries now warn on normal reach for
   those narrow slices:
   - `ScInterpreter::ScTrue()`
@@ -101,6 +102,7 @@ Dominant promoted-family fallback reasons:
   - `ScInterpreter::ScGetTimeValue()`
   - `ScInterpreter::ScNumberValue()`
   - `ScInterpreter::ScMatch()`
+  - `ScInterpreter::ScXMatch()`
 
 ## Strategic Position
 

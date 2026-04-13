@@ -29,7 +29,7 @@ Today:
 - release-style builds still default to `off` unless explicitly opted in
 - `observe`, `shadowcompare`, and `authority` are all live on the production
   Calc path
-- seven narrow logical-constant, text-parsing, and exact-literal-match
+- eight narrow logical-constant, text-parsing, and exact-literal-match
   slices are now engine-first even with rollout set to `off`:
   - `TRUE()`
   - `FALSE()`
@@ -38,6 +38,7 @@ Today:
   - string-literal `TIMEVALUE`
   - literal-only `NUMBERVALUE`
   - exact `MATCH(<literal>; <1D literal array>; 0)`
+  - default-exact `XMATCH(<literal>; <1D literal array>)`
 - replay-imported promoted formulas now reach the live seam on both the
   ambient and forced-interpret replay surfaces through a bounded pre-RPN
   observe bridge
@@ -313,6 +314,7 @@ The env-independent engine-first cluster now includes:
 - string-literal `TIMEVALUE`
 - literal-only `NUMBERVALUE`
 - exact `MATCH(<literal>; <1D literal array>; 0)`
+- default-exact `XMATCH(<literal>; <1D literal array>)`
 
 Current meaning:
 
@@ -324,12 +326,12 @@ Current meaning:
 - `ScInterpreter::ScTrue()`, `ScInterpreter::ScFalse()`,
   `ScInterpreter::ScValue()`, `ScInterpreter::ScGetDateValue()`,
   `ScInterpreter::ScGetTimeValue()`, `ScInterpreter::ScNumberValue()`, and
-  `ScInterpreter::ScMatch()` now treat those narrow slices as quarantined
-  legacy paths and emit a debug warning if normal interpreter execution
-  reaches them
+  `ScInterpreter::ScMatch()`, and `ScInterpreter::ScXMatch()` now treat
+  those narrow slices as quarantined legacy paths and emit a debug warning if
+  normal interpreter execution reaches them
 
-This is the third hard-route milestone and the first lookup-family
-hard-quarantined Calc path on the migration track.
+This is the fourth hard-route milestone and extends the lookup-family
+hard-quarantined Calc path cluster on the migration track.
 
 ## Scope Policy
 
