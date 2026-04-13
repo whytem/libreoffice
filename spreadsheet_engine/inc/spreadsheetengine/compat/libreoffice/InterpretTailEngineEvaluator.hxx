@@ -2575,6 +2575,32 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return true;
 }
 
+[[nodiscard]] inline bool isSortedNumericLiteralVectorArrayConstantNode(
+    const core::formula::Node& rNode, bool bAscending)
+{
+    sal_Int32 nLength = 0;
+    if (!isLiteralVectorArrayConstantNode(rNode, &nLength) || nLength < 1)
+        return false;
+
+    std::optional<double> ofPrevious;
+    for (const auto& rxChild : rNode.maChildren)
+    {
+        if (!rxChild)
+            return false;
+        const auto oValue = extractNumericLiteral(*rxChild);
+        if (!oValue)
+            return false;
+        if (ofPrevious)
+        {
+            if (bAscending ? (*oValue < *ofPrevious) : (*oValue > *ofPrevious))
+                return false;
+        }
+        ofPrevious = oValue;
+    }
+
+    return true;
+}
+
 [[nodiscard]] inline bool isZeroOrFalseNode(const core::formula::Node& rNode)
 {
     if (const auto oNumber = extractNumericLiteral(rNode))
@@ -2597,6 +2623,27 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 {
     if (const auto oNumber = extractNumericLiteral(rNode))
         return *oNumber == 1.0;
+    return false;
+}
+
+[[nodiscard]] inline bool isMinusOneNode(const core::formula::Node& rNode)
+{
+    if (const auto oNumber = extractNumericLiteral(rNode))
+        return *oNumber == -1.0;
+    return false;
+}
+
+[[nodiscard]] inline bool isTwoNode(const core::formula::Node& rNode)
+{
+    if (const auto oNumber = extractNumericLiteral(rNode))
+        return *oNumber == 2.0;
+    return false;
+}
+
+[[nodiscard]] inline bool isMinusTwoNode(const core::formula::Node& rNode)
+{
+    if (const auto oNumber = extractNumericLiteral(rNode))
+        return *oNumber == -2.0;
     return false;
 }
 
@@ -2647,9 +2694,18 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (rNode.maChildren.size() == 4 && rNode.maChildren[0] && rNode.maChildren[1]
             && rNode.maChildren[2] && rNode.maChildren[3])
         {
-            return isLiteralOnlyNode(*rNode.maChildren[0])
-                   && isLiteralVectorArrayConstantNode(*rNode.maChildren[1])
-                   && isZeroOrFalseNode(*rNode.maChildren[2]) && isOneNode(*rNode.maChildren[3]);
+            if (!isLiteralOnlyNode(*rNode.maChildren[0])
+                || !isLiteralVectorArrayConstantNode(*rNode.maChildren[1])
+                || !isZeroOrFalseNode(*rNode.maChildren[2]))
+            {
+                return false;
+            }
+
+            return isOneNode(*rNode.maChildren[3]) || isMinusOneNode(*rNode.maChildren[3])
+                   || (isTwoNode(*rNode.maChildren[3])
+                       && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], true))
+                   || (isMinusTwoNode(*rNode.maChildren[3])
+                       && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], false));
         }
     }
 
@@ -2665,7 +2721,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         {
             return isLiteralOnlyNode(*rNode.maChildren[0])
                    && isLiteralArrayConstantNode(*rNode.maChildren[1])
-                   && rNode.maChildren[1]->mnArrayColumns > 1 && rNode.maChildren[1]->mnArrayRows > 1;
+                   && (isLiteralVectorArrayConstantNode(*rNode.maChildren[1])
+                       || (rNode.maChildren[1]->mnArrayColumns > 1
+                           && rNode.maChildren[1]->mnArrayRows > 1));
         }
 
         if (rNode.maChildren.size() == 3 && rNode.maChildren[0] && rNode.maChildren[1]
@@ -2722,11 +2780,40 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                    && isZeroOrFalseNode(*rNode.maChildren[4]);
         }
 
+        if (rNode.maChildren.size() == 6 && rNode.maChildren[0] && rNode.maChildren[1]
+            && rNode.maChildren[2] && rNode.maChildren[3] && rNode.maChildren[4]
+            && rNode.maChildren[5])
+        {
+            sal_Int32 nSearchLength = 0;
+            sal_Int32 nResultLength = 0;
+            if (!isLiteralOnlyNode(*rNode.maChildren[0])
+                || !isLiteralVectorArrayConstantNode(*rNode.maChildren[1], &nSearchLength)
+                || !isLiteralVectorArrayConstantNode(*rNode.maChildren[2], &nResultLength)
+                || nSearchLength != nResultLength
+                || rNode.maChildren[3]->meKind != core::formula::NodeKind::EmptyArgument
+                || !isZeroOrFalseNode(*rNode.maChildren[4]))
+            {
+                return false;
+            }
+
+            return isOneNode(*rNode.maChildren[5]) || isMinusOneNode(*rNode.maChildren[5])
+                   || (isTwoNode(*rNode.maChildren[5])
+                       && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], true))
+                   || (isMinusTwoNode(*rNode.maChildren[5])
+                       && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], false));
+        }
+
         return false;
     }
 
     if (eFunction == FunctionKind::Index)
     {
+        if (rNode.maChildren.size() == 2 && rNode.maChildren[0] && rNode.maChildren[1])
+        {
+            return isLiteralArrayConstantNode(*rNode.maChildren[0])
+                   && isPositiveWholeLiteralNode(*rNode.maChildren[1]);
+        }
+
         if (rNode.maChildren.size() != 3 || !rNode.maChildren[0] || !rNode.maChildren[1]
             || !rNode.maChildren[2])
         {
@@ -2737,7 +2824,10 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         const bool bPositiveRow = isPositiveWholeLiteralNode(*rNode.maChildren[1]);
         const bool bPositiveColumn = isPositiveWholeLiteralNode(*rNode.maChildren[2]);
         const bool bZeroRow = isZeroOrFalseNode(*rNode.maChildren[1]);
-        return bArray && ((bPositiveRow && bPositiveColumn) || (bZeroRow && bPositiveColumn));
+        const bool bZeroColumn = isZeroOrFalseNode(*rNode.maChildren[2]);
+        return bArray
+               && ((bPositiveRow && bPositiveColumn) || (bZeroRow && bPositiveColumn)
+                   || (bPositiveRow && bZeroColumn));
     }
 
     return false;
