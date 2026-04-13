@@ -29,16 +29,9 @@ Today:
 - release-style builds still default to `off` unless explicitly opted in
 - `observe`, `shadowcompare`, and `authority` are all live on the production
   Calc path
-- eight narrow logical-constant, text-parsing, and exact-literal-match
-  slices are now engine-first even with rollout set to `off`:
-  - `TRUE()`
-  - `FALSE()`
-  - string-literal `VALUE`
-  - string-literal `DATEVALUE`
-  - string-literal `TIMEVALUE`
-  - literal-only `NUMBERVALUE`
-  - exact `MATCH(<literal>; <1D literal array>; 0)`
-  - default-exact `XMATCH(<literal>; <1D literal array>)`
+- a fifty-slice env-independent logical/text/match/xmatch/lookup/index
+  cluster is now engine-first even with rollout set to `off`; see
+  [Hard-Routed Family](#hard-routed-family) below
 - replay-imported promoted formulas now reach the live seam on both the
   ambient and forced-interpret replay surfaces through a bounded pre-RPN
   observe bridge
@@ -314,6 +307,8 @@ The env-independent engine-first cluster now includes:
 - string-literal `TIMEVALUE`
 - literal-only `NUMBERVALUE`
 - exact `MATCH(<literal>; <1D literal array>; 0)`
+- approximate-ascending `MATCH(<literal>; <ascending numeric 1D literal array>; 1)`
+- approximate-descending `MATCH(<literal>; <descending numeric 1D literal array>; -1)`
 - default-exact `XMATCH(<literal>; <1D literal array>)`
 - exact `XMATCH(<literal>; <1D literal array>; 0)`
 - exact-forward `XMATCH(<literal>; <1D literal array>; 0; 1)`
@@ -339,10 +334,18 @@ The env-independent engine-first cluster now includes:
 - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; 1)`
 - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0; -1)`
 - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; -1)`
+- `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;;; 1)`
+- `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found> ;; 1)`
+- `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;;; -1)`
+- `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found> ;; -1)`
 - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 0; 2)`
 - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; 2)`
+- `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;;; 2)`
+- `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found> ;; 2)`
 - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector> ;; 0; -2)`
 - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; -2)`
+- `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector> ;;; -2)`
+- `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found> ;; -2)`
 - `INDEX(<2D literal array>; <positive whole>)`
 - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
 - `INDEX(<2D literal array>; 0; <positive whole>)`
@@ -365,9 +368,10 @@ Current meaning:
   legacy paths and emit a debug warning if normal interpreter execution
   reaches them
 
-This latest hard-route milestone extends the explicit-exact match and
-literal lookup/index hard-quarantined Calc path cluster on the migration
-track and brings the env-independent engine-first total to `40` slices.
+This latest hard-route milestone extends the adjacent approximate-`MATCH`
+and omitted-match-mode `XLOOKUP` hard-quarantined Calc path cluster on the
+migration track and brings the env-independent engine-first total to `50`
+slices.
 
 ## Scope Policy
 

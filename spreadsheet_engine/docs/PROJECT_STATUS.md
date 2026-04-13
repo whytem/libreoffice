@@ -95,7 +95,7 @@ Promoted-family fallback reasons:
 
 ### Current Hard-Routed Family Count
 
-- `40` env-independent engine-first slices:
+- `50` env-independent engine-first slices:
   - `TRUE()`
   - `FALSE()`
   - string-literal `VALUE`
@@ -103,6 +103,8 @@ Promoted-family fallback reasons:
   - string-literal `TIMEVALUE`
   - literal-only `NUMBERVALUE`
   - exact `MATCH(<literal>; <1D literal array>; 0)`
+  - approximate-ascending `MATCH(<literal>; <ascending numeric 1D literal array>; 1)`
+  - approximate-descending `MATCH(<literal>; <descending numeric 1D literal array>; -1)`
   - default-exact `XMATCH(<literal>; <1D literal array>)`
   - exact `XMATCH(<literal>; <1D literal array>; 0)`
   - exact-forward `XMATCH(<literal>; <1D literal array>; 0; 1)`
@@ -128,10 +130,18 @@ Promoted-family fallback reasons:
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; 1)`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0; -1)`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; -1)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;;; 1)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found> ;; 1)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;;; -1)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found> ;; -1)`
   - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 0; 2)`
   - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; 2)`
+  - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;;; 2)`
+  - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found> ;; 2)`
   - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector> ;; 0; -2)`
   - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; -2)`
+  - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector> ;;; -2)`
+  - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found> ;; -2)`
   - `INDEX(<2D literal array>; <positive whole>)`
   - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
   - `INDEX(<2D literal array>; 0; <positive whole>)`
@@ -163,14 +173,15 @@ Today:
 - `DBG_UTIL` builds default to `observe` when the rollout env var is unset
 - `authority` mode authoritatively bypasses `ScInterpreter` for supported
   promoted families
-- the env-`off` hard-route boundary now covers a forty-slice
-  logical/text/match/lookup/index cluster instead of just `NUMBERVALUE`
+- the env-`off` hard-route boundary now covers a fifty-slice
+  logical/text/match/xmatch/lookup/index cluster instead of just
+  `NUMBERVALUE`
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
-- the latest bounded exact-search-mode plus literal-fallback/approximate
-  lookup slice raised the env-independent hard-route cluster from `30` to
-  `40` without opening a new delegated family
+- the latest bounded approximate-`MATCH` plus omitted-match-mode `XLOOKUP`
+  slice raised the env-independent hard-route cluster from `40` to `50`
+  without opening a new delegated family
 
 Still not true:
 

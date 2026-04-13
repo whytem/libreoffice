@@ -17,7 +17,8 @@ Today:
 - the live migration program now runs through a real `InterpretTail` seam in
   production Calc code
 - debug and CI-style builds default that seam to `observe`
-- one tiny family is now engine-first even with rollout explicitly `off`
+- a fifty-slice env-independent logical/text/match/xmatch/lookup/index
+  cluster is now engine-first even with rollout explicitly `off`
 
 The active program is no longer “prove more substrate slices.”
 The active program is “use the substrate to underwrite live evaluator
@@ -84,7 +85,7 @@ Dominant promoted-family fallback reasons:
 
 ### Hard-Quarantined Calc Paths
 
-- `40` env-independent engine-first slices:
+- `50` env-independent engine-first slices:
   - `TRUE()`
   - `FALSE()`
   - string-literal `VALUE`
@@ -92,6 +93,8 @@ Dominant promoted-family fallback reasons:
   - string-literal `TIMEVALUE`
   - literal-only `NUMBERVALUE`
   - exact `MATCH(<literal>; <1D literal array>; 0)`
+  - approximate-ascending `MATCH(<literal>; <ascending numeric 1D literal array>; 1)`
+  - approximate-descending `MATCH(<literal>; <descending numeric 1D literal array>; -1)`
   - default-exact `XMATCH(<literal>; <1D literal array>)`
   - exact `XMATCH(<literal>; <1D literal array>; 0)`
   - exact-forward `XMATCH(<literal>; <1D literal array>; 0; 1)`
@@ -117,10 +120,18 @@ Dominant promoted-family fallback reasons:
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; 1)`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0; -1)`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; -1)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;;; 1)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found> ;; 1)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;;; -1)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found> ;; -1)`
   - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 0; 2)`
   - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; 2)`
+  - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;;; 2)`
+  - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found> ;; 2)`
   - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector> ;; 0; -2)`
   - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; -2)`
+  - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector> ;;; -2)`
+  - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found> ;; -2)`
   - `INDEX(<2D literal array>; <positive whole>)`
   - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
   - `INDEX(<2D literal array>; 0; <positive whole>)`
@@ -236,10 +247,9 @@ The highest-value remaining blockers are now:
    the raw promoted replay probe is now confirmed to be a cached imported
    correctness surface, not a live seam-off retirement denominator
 
-The latest bounded exact-search-mode plus literal-fallback/approximate
-lookup slice raised the env-independent hard-route cluster from `30` to
-`40` while keeping the expansion inside explicit-exact and literal-array
-semantics.
+The latest bounded approximate-`MATCH` plus omitted-match-mode `XLOOKUP`
+slice raised the env-independent hard-route cluster from `40` to `50`
+while keeping the expansion inside adjacent literal-array semantics.
 
 A focused live-host check now shows the replay-imported whole-row
 `MATCH([.$B$150]; [.$150:.$150]; -1)` row evaluates to
