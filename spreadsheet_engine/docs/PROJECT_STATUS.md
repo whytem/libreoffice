@@ -95,7 +95,7 @@ Promoted-family fallback reasons:
 
 ### Current Hard-Routed Family Count
 
-- `8` env-independent engine-first slices:
+- `15` env-independent engine-first slices:
   - `TRUE()`
   - `FALSE()`
   - string-literal `VALUE`
@@ -104,6 +104,13 @@ Promoted-family fallback reasons:
   - literal-only `NUMBERVALUE`
   - exact `MATCH(<literal>; <1D literal array>; 0)`
   - default-exact `XMATCH(<literal>; <1D literal array>)`
+  - `LOOKUP(<literal>; <1D literal vector>; <1D literal result vector>)`
+  - `LOOKUP(<literal>; <2D literal matrix>)`
+  - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
+  - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0)`
+  - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
 - corresponding legacy entrypoints now carry debug quarantine warnings on
   normal interpreter reach:
   - `ScInterpreter::ScTrue()`
@@ -114,6 +121,10 @@ Promoted-family fallback reasons:
   - `ScInterpreter::ScNumberValue()`
   - `ScInterpreter::ScMatch()`
   - `ScInterpreter::ScXMatch()`
+  - `ScInterpreter::ScLookup()`
+  - `ScInterpreter::ScVLookup()`
+  - `ScInterpreter::ScXLookup()`
+  - `ScInterpreter::ScIndex()`
 
 ## Current State
 
@@ -126,21 +137,20 @@ Today:
 - `DBG_UTIL` builds default to `observe` when the rollout env var is unset
 - `authority` mode authoritatively bypasses `ScInterpreter` for supported
   promoted families
-- the env-`off` hard-route boundary now covers a six-slice
-  logical-constant plus literal text-parsing cluster instead of just
-  `NUMBERVALUE`
+- the env-`off` hard-route boundary now covers a fifteen-slice
+  logical/text/lookup/index cluster instead of just `NUMBERVALUE`
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
-- the latest bounded text-parsing slice closed the replay-promoted
-  `VALUE([.I1:.I3])` fallback row, improving authority from `1793 / 19` to
-  `1794 / 18`
+- the latest bounded literal lookup/index slice raised the env-independent
+  hard-route cluster from `8` to `15` and quarantined the corresponding
+  `LOOKUP` / `VLOOKUP` / `XLOOKUP` / `INDEX` legacy entrypoints
 
 Still not true:
 
 - no broad default-on rollout exists
 - no `ScInterpreter` subroutine has been deleted yet
-- the second interpreter hard-route milestone has landed, but full legacy
+- multiple interpreter hard-route milestones have landed, but full legacy
   opcode retirement has not
 - full replay-corpus live traffic is now material, but most supported ambient
   traffic still covers only a bounded minority of formulas

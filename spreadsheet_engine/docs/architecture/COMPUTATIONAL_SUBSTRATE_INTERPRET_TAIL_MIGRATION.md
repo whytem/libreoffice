@@ -315,6 +315,13 @@ The env-independent engine-first cluster now includes:
 - literal-only `NUMBERVALUE`
 - exact `MATCH(<literal>; <1D literal array>; 0)`
 - default-exact `XMATCH(<literal>; <1D literal array>)`
+- `LOOKUP(<literal>; <1D literal vector>; <1D literal result vector>)`
+- `LOOKUP(<literal>; <2D literal matrix>)`
+- `VLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
+- `VLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
+- `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>)`
+- `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0)`
+- `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
 
 Current meaning:
 
@@ -326,12 +333,15 @@ Current meaning:
 - `ScInterpreter::ScTrue()`, `ScInterpreter::ScFalse()`,
   `ScInterpreter::ScValue()`, `ScInterpreter::ScGetDateValue()`,
   `ScInterpreter::ScGetTimeValue()`, `ScInterpreter::ScNumberValue()`, and
-  `ScInterpreter::ScMatch()`, and `ScInterpreter::ScXMatch()` now treat
+  `ScInterpreter::ScMatch()`, `ScInterpreter::ScXMatch()`,
+  `ScInterpreter::ScLookup()`, `ScInterpreter::ScVLookup()`,
+  `ScInterpreter::ScXLookup()`, and `ScInterpreter::ScIndex()` now treat
   those narrow slices as quarantined legacy paths and emit a debug warning if
   normal interpreter execution reaches them
 
-This is the fourth hard-route milestone and extends the lookup-family
-hard-quarantined Calc path cluster on the migration track.
+This latest hard-route milestone extends the literal lookup/index
+hard-quarantined Calc path cluster on the migration track and brings the
+env-independent engine-first total to `15` slices.
 
 ## Scope Policy
 

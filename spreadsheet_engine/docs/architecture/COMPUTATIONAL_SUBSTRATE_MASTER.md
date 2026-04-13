@@ -84,7 +84,7 @@ Dominant promoted-family fallback reasons:
 
 ### Hard-Quarantined Calc Paths
 
-- `8` env-independent engine-first slices:
+- `15` env-independent engine-first slices:
   - `TRUE()`
   - `FALSE()`
   - string-literal `VALUE`
@@ -93,6 +93,13 @@ Dominant promoted-family fallback reasons:
   - literal-only `NUMBERVALUE`
   - exact `MATCH(<literal>; <1D literal array>; 0)`
   - default-exact `XMATCH(<literal>; <1D literal array>)`
+  - `LOOKUP(<literal>; <1D literal vector>; <1D literal result vector>)`
+  - `LOOKUP(<literal>; <2D literal matrix>)`
+  - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
+  - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0)`
+  - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
 - the corresponding legacy interpreter entries now warn on normal reach for
   those narrow slices:
   - `ScInterpreter::ScTrue()`
@@ -103,6 +110,10 @@ Dominant promoted-family fallback reasons:
   - `ScInterpreter::ScNumberValue()`
   - `ScInterpreter::ScMatch()`
   - `ScInterpreter::ScXMatch()`
+  - `ScInterpreter::ScLookup()`
+  - `ScInterpreter::ScVLookup()`
+  - `ScInterpreter::ScXLookup()`
+  - `ScInterpreter::ScIndex()`
 
 ## Strategic Position
 
@@ -192,18 +203,18 @@ The highest-value remaining blockers are now:
 3. promoted-family residual formula shape:
    replay-live `unsupported_formula_shape=6`
 4. first real Calc-path retirement:
-   one narrow logical-constant, text-parsing, and exact-literal-match cluster
-   is hard-routed and its legacy interpreter entries are now quarantined for
-   those slices, but no whole
+   one narrow logical/text/lookup/index cluster is now hard-routed and its
+   legacy interpreter entries are quarantined for those slices, but no whole
    `ScInterpreter` subroutine has been deleted yet
 5. imported replay denominator honesty:
    the raw promoted replay probe is now confirmed to be a cached imported
    correctness surface, not a live seam-off retirement denominator
 
-The latest bounded text-parsing slice improved promoted-family authority from
-`1793 / 19` to `1794 / 18`, held replay direct fallback at `6`, and closed
-the residual replay-promoted `VALUE([.I1:.I3])` fallback row without widening
-new delegated families.
+The latest bounded literal lookup/index slice raised the env-independent
+hard-route cluster from `8` to `15` and added `ScInterpreter::ScLookup()`,
+`ScInterpreter::ScVLookup()`, `ScInterpreter::ScXLookup()`, and
+`ScInterpreter::ScIndex()` to the quarantined legacy entrypoint set without
+widening delegated families beyond literal-array shapes.
 
 A focused live-host check now shows the replay-imported whole-row
 `MATCH([.$B$150]; [.$150:.$150]; -1)` row evaluates to
