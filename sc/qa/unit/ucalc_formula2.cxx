@@ -1408,6 +1408,46 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
         setaileval::resetStats();
 
+        m_pDoc->SetValue(0, 29, 0, 1.0);
+        m_pDoc->SetValue(0, 30, 0, 1.0);
+        m_pDoc->SetValue(0, 31, 0, 0.0);
+        m_pDoc->SetValue(1, 29, 0, 1.0);
+        m_pDoc->SetValue(1, 30, 0, 0.0);
+        m_pDoc->SetValue(1, 31, 0, 0.0);
+        m_pDoc->SetString(2, 29, 0, u"=1=1"_ustr);
+        m_pDoc->SetString(2, 30, 0, u"=2=2"_ustr);
+
+        m_pDoc->SetString(19, 20, 0, u"=AND(A30:A32)"_ustr);
+        m_pDoc->SetString(20, 20, 0, u"=OR(A30:A32)"_ustr);
+        m_pDoc->SetString(21, 20, 0, u"=XOR(B30:B32)"_ustr);
+        m_pDoc->SetString(22, 20, 0, u"=ROUNDUP(31415.92654;3.3)"_ustr);
+        m_pDoc->SetString(23, 20, 0, u"=ROUNDDOWN(31415.92654;3.3)"_ustr);
+        m_pDoc->SetString(24, 20, 0, u"=AND(C30:C32)"_ustr);
+        CPPUNIT_ASSERT_EQUAL(u"FALSE"_ustr, m_pDoc->GetString(19, 20, 0));
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(20, 20, 0));
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(21, 20, 0));
+        ASSERT_DOUBLES_EQUAL(31415.927, m_pDoc->GetValue(22, 20, 0));
+        ASSERT_DOUBLES_EQUAL(31415.926, m_pDoc->GetValue(23, 20, 0));
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(24, 20, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 6);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::LogicalFold)]
+            >= 4);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Round)]
+            >= 2);
+    }
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
         m_pDoc->SetString(3, 4, 0, u"=VLOOKUP(A5;B5:C7;2;0)"_ustr);
         m_pDoc->SetString(4, 4, 0, u"=VLOOKUP(A5;B5:C7;2;FALSE())"_ustr);
         m_pDoc->SetString(5, 4, 0,

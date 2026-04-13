@@ -881,6 +881,63 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, aNot.maResult.mfValue, 1e-12);
     CPPUNIT_ASSERT_EQUAL(SvNumFormatType::LOGICAL, aNot.meFormatType);
 
+    m_pDoc->SetValue(0, 29, 0, 1.0);
+    m_pDoc->SetValue(0, 30, 0, 1.0);
+    m_pDoc->SetValue(0, 31, 0, 0.0);
+    m_pDoc->SetValue(1, 29, 0, 1.0);
+    m_pDoc->SetValue(1, 30, 0, 0.0);
+    m_pDoc->SetValue(1, 31, 0, 0.0);
+
+    const auto aAndRange = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=AND(A30:A32)", false);
+    CPPUNIT_ASSERT(aAndRange.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aAndRange.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, aAndRange.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::LOGICAL, aAndRange.meFormatType);
+
+    const auto aOrRange = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=OR(A30:A32)", false);
+    CPPUNIT_ASSERT(aOrRange.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aOrRange.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aOrRange.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::LOGICAL, aOrRange.meFormatType);
+
+    const auto aXorRange = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=XOR(B30:B32)", false);
+    CPPUNIT_ASSERT(aXorRange.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aXorRange.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aXorRange.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::LOGICAL, aXorRange.meFormatType);
+
+    m_pDoc->SetString(2, 29, 0, u"=1=1"_ustr);
+    m_pDoc->SetString(2, 30, 0, u"=2=2"_ustr);
+    const auto aAndBooleanFormulaRange = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=AND(C30:C32)", false);
+    CPPUNIT_ASSERT(aAndBooleanFormulaRange.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::Value,
+        aAndBooleanFormulaRange.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aAndBooleanFormulaRange.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::LOGICAL, aAndBooleanFormulaRange.meFormatType);
+
+    const auto aRoundUpFractionalDigits = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ROUNDUP(31415.92654;3.3)", false);
+    CPPUNIT_ASSERT(aRoundUpFractionalDigits.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aRoundUpFractionalDigits.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(31415.927, aRoundUpFractionalDigits.maResult.mfValue, 1e-12);
+
+    const auto aRoundDownFractionalDigits = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ROUNDDOWN(31415.92654;3.3)", false);
+    CPPUNIT_ASSERT(aRoundDownFractionalDigits.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aRoundDownFractionalDigits.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(31415.926, aRoundDownFractionalDigits.maResult.mfValue, 1e-12);
+
     m_pDoc->SetTextCell(ScAddress(25, 0, 0), u"12 potatoes"_ustr);
     m_pDoc->SetTextCell(ScAddress(25, 1, 0), u"1"_ustr);
     m_pDoc->SetTextCell(ScAddress(25, 2, 0), u"2000-01-01"_ustr);

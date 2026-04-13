@@ -3238,6 +3238,60 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
         return makeMaterializedValue(api::CellValue::empty());
     };
+    auto materializeLogicalReferenceArgument = [&](const core::formula::Node& rArgument)
+        -> Materialization<api::CellValue> {
+        const auto aMatrix = materializeMatrixNode(rArgument, rDoc, rContext, rFormulaPos);
+        if (!aMatrix.mbSupported)
+            return makeUnsupportedMaterialization<api::CellValue>(aMatrix.meFallbackReason);
+        if (!aMatrix.moValue)
+            return makeMaterializedError<api::CellValue>(aMatrix.meError);
+
+        SCSIZE nColumns = 0;
+        SCSIZE nRows = 0;
+        (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+
+        bool bResult = aFunctionName == u"AND";
+        bool bSawValue = false;
+        std::optional<api::Error> oDeferredError;
+        for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+        {
+            for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+            {
+                const auto aValue = lookupexecution::detail::toApiCellValue(
+                    (*aMatrix.moValue)->Get(nColumn, nRow));
+                if (aValue.isError())
+                {
+                    if (!oDeferredError)
+                        oDeferredError = aValue.meError;
+                    continue;
+                }
+                if (aValue.isEmpty() || aValue.isText())
+                    continue;
+
+                const auto aBool = coerceScalarToBool(rDoc, rContext, aValue);
+                if (!aBool)
+                {
+                    if (!oDeferredError)
+                        oDeferredError = aBool.meError;
+                    continue;
+                }
+
+                if (aFunctionName == u"AND")
+                    bResult = bResult && aBool.maValue;
+                else if (aFunctionName == u"OR")
+                    bResult = bResult || aBool.maValue;
+                else
+                    bResult = bResult != aBool.maValue;
+                bSawValue = true;
+            }
+        }
+
+        if (!bSawValue)
+            return makeMaterializedError<api::CellValue>(api::Error::NoValue);
+        if (oDeferredError)
+            return makeMaterializedError<api::CellValue>(*oDeferredError);
+        return makeMaterializedValue(api::CellValue::boolean(bResult));
+    };
 
     if (eFunction == FunctionKind::Round)
     {
@@ -3264,10 +3318,15 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             const auto aDigitsNumber = coerceScalarToNumber(rDoc, rContext, *aDigits.moValue);
             if (!aDigitsNumber)
                 return makeErrorResult(eFunction, aDigitsNumber.meError);
-            const auto oWhole = coerceWholeNumber(aDigitsNumber.maValue);
-            if (!oWhole)
+            if (!std::isfinite(aDigitsNumber.maValue)
+                || std::trunc(aDigitsNumber.maValue)
+                       < static_cast<double>(std::numeric_limits<sal_Int32>::min())
+                || std::trunc(aDigitsNumber.maValue)
+                       > static_cast<double>(std::numeric_limits<sal_Int32>::max()))
+            {
                 return makeErrorResult(eFunction, api::Error::IllegalArgument);
-            nDecimals = *oWhole;
+            }
+            nDecimals = static_cast<sal_Int32>(std::trunc(aDigitsNumber.maValue));
         }
 
         api::RoundingMode eMode = api::RoundingMode::Corrected;
@@ -3360,6 +3419,30 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         bool bSawValue = false;
         for (const auto& rxChild : rNode.maChildren)
         {
+            if (rxChild->meKind == core::formula::NodeKind::CellReference
+                || rxChild->meKind == core::formula::NodeKind::RangeReference
+                || rxChild->meKind == core::formula::NodeKind::NamedReference)
+            {
+                const auto aFolded = materializeLogicalReferenceArgument(*rxChild);
+                if (!aFolded.mbSupported)
+                    return makeUnsupported(eFunction, aFolded.meFallbackReason);
+                if (!aFolded.moValue)
+                    return makeErrorResult(eFunction, aFolded.meError);
+
+                const auto aBool = coerceScalarToBool(rDoc, rContext, *aFolded.moValue);
+                if (!aBool)
+                    return makeErrorResult(eFunction, aBool.meError);
+
+                if (aFunctionName == u"AND")
+                    bResult = bResult && aBool.maValue;
+                else if (aFunctionName == u"OR")
+                    bResult = bResult || aBool.maValue;
+                else
+                    bResult = bResult != aBool.maValue;
+                bSawValue = true;
+                continue;
+            }
+
             const auto aArgument = materializeArgument(*rxChild);
             if (!aArgument.mbSupported)
                 return makeUnsupported(eFunction, aArgument.meFallbackReason);
@@ -3379,7 +3462,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         }
 
         if (!bSawValue)
-            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            return makeErrorResult(eFunction, api::Error::NoValue);
         return makeNumericResult(eFunction, bResult ? 1.0 : 0.0, SvNumFormatType::LOGICAL);
     }
 
