@@ -29,8 +29,12 @@ Today:
 - release-style builds still default to `off` unless explicitly opted in
 - `observe`, `shadowcompare`, and `authority` are all live on the production
   Calc path
-- one tiny family is now engine-first even with rollout set to `off`:
-  literal-only `NUMBERVALUE`
+- four narrow literal text-parsing slices are now engine-first even with
+  rollout set to `off`:
+  - string-literal `VALUE`
+  - string-literal `DATEVALUE`
+  - string-literal `TIMEVALUE`
+  - literal-only `NUMBERVALUE`
 - replay-imported promoted formulas now reach the live seam on both the
   ambient and forced-interpret replay surfaces through a bounded pre-RPN
   observe bridge
@@ -297,8 +301,11 @@ Interpretation:
 
 ## Hard-Routed Family
 
-The first env-independent engine-first family is now live:
+The first env-independent engine-first cluster is now live:
 
+- string-literal `VALUE`
+- string-literal `DATEVALUE`
+- string-literal `TIMEVALUE`
 - literal-only `NUMBERVALUE`
 
 Current meaning:
@@ -308,11 +315,12 @@ Current meaning:
 - supported results bypass the normal rollout gate and are applied
   authoritatively
 - unsupported or projection-failure cases still fall back safely
-- `ScInterpreter::ScNumberValue()` now treats that literal-only slice as a
-  quarantined legacy path and emits a debug warning if normal interpreter
-  execution reaches it
+- `ScInterpreter::ScValue()`, `ScInterpreter::ScGetDateValue()`,
+  `ScInterpreter::ScGetTimeValue()`, and `ScInterpreter::ScNumberValue()`
+  now treat those narrow literal slices as quarantined legacy paths and emit
+  a debug warning if normal interpreter execution reaches them
 
-This is the first hard-quarantined Calc path on the migration track.
+This is the first hard-quarantined Calc path cluster on the migration track.
 
 ## Scope Policy
 
