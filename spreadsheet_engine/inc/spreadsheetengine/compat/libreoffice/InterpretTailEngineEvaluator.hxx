@@ -2722,9 +2722,24 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             return false;
         }
 
-        const auto oExactMode = extractNumericLiteral(*rNode.maChildren[2]);
-        return oExactMode && *oExactMode == 0.0 && isLiteralOnlyNode(*rNode.maChildren[0])
-               && isLiteralVectorArrayConstantNode(*rNode.maChildren[1]);
+        const auto oMode = extractNumericLiteral(*rNode.maChildren[2]);
+        if (!oMode)
+            return false;
+
+        if (*oMode == 0.0)
+        {
+            return isLiteralOnlyNode(*rNode.maChildren[0])
+                   && isLiteralVectorArrayConstantNode(*rNode.maChildren[1]);
+        }
+
+        const auto oLookup = extractNumericLiteral(*rNode.maChildren[0]);
+        if (!oLookup)
+            return false;
+
+        return (*oMode == 1.0
+                && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], true))
+               || (*oMode == -1.0
+                   && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], false));
     }
 
     if (eFunction == FunctionKind::XMatch)
@@ -2876,14 +2891,19 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             if (!isLiteralOnlyNode(*rNode.maChildren[0])
                 || !isLiteralVectorArrayConstantNode(*rNode.maChildren[1], &nSearchLength)
                 || !isLiteralVectorArrayConstantNode(*rNode.maChildren[2], &nResultLength)
-                || nSearchLength != nResultLength
-                || !isZeroOrFalseNode(*rNode.maChildren[4]))
+                || nSearchLength != nResultLength)
             {
                 return false;
             }
 
             if (rNode.maChildren[3]->meKind != core::formula::NodeKind::EmptyArgument
                 && !isLiteralOnlyNode(*rNode.maChildren[3]))
+            {
+                return false;
+            }
+
+            if (rNode.maChildren[4]->meKind != core::formula::NodeKind::EmptyArgument
+                && !isZeroOrFalseNode(*rNode.maChildren[4]))
             {
                 return false;
             }
