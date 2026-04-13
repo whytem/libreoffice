@@ -84,7 +84,7 @@ Dominant promoted-family fallback reasons:
 
 ### Hard-Quarantined Calc Paths
 
-- `15` env-independent engine-first slices:
+- `20` env-independent engine-first slices:
   - `TRUE()`
   - `FALSE()`
   - string-literal `VALUE`
@@ -93,13 +93,18 @@ Dominant promoted-family fallback reasons:
   - literal-only `NUMBERVALUE`
   - exact `MATCH(<literal>; <1D literal array>; 0)`
   - default-exact `XMATCH(<literal>; <1D literal array>)`
+  - exact `XMATCH(<literal>; <1D literal array>; 0)`
+  - exact-forward `XMATCH(<literal>; <1D literal array>; 0; 1)`
   - `LOOKUP(<literal>; <1D literal vector>; <1D literal result vector>)`
   - `LOOKUP(<literal>; <2D literal matrix>)`
   - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
   - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
+  - `HLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
+  - `HLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>)`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0)`
   - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
+  - `INDEX(<2D literal array>; 0; <positive whole>)`
 - the corresponding legacy interpreter entries now warn on normal reach for
   those narrow slices:
   - `ScInterpreter::ScTrue()`
@@ -112,6 +117,7 @@ Dominant promoted-family fallback reasons:
   - `ScInterpreter::ScXMatch()`
   - `ScInterpreter::ScLookup()`
   - `ScInterpreter::ScVLookup()`
+  - `ScInterpreter::ScHLookup()`
   - `ScInterpreter::ScXLookup()`
   - `ScInterpreter::ScIndex()`
 
@@ -210,11 +216,10 @@ The highest-value remaining blockers are now:
    the raw promoted replay probe is now confirmed to be a cached imported
    correctness surface, not a live seam-off retirement denominator
 
-The latest bounded literal lookup/index slice raised the env-independent
-hard-route cluster from `8` to `15` and added `ScInterpreter::ScLookup()`,
-`ScInterpreter::ScVLookup()`, `ScInterpreter::ScXLookup()`, and
-`ScInterpreter::ScIndex()` to the quarantined legacy entrypoint set without
-widening delegated families beyond literal-array shapes.
+The latest bounded exact-`XMATCH` / `HLOOKUP` / `INDEX` slice raised the
+env-independent hard-route cluster from `15` to `20` and added
+`ScInterpreter::ScHLookup()` to the quarantined legacy entrypoint set while
+keeping the expansion inside literal-array and explicit-exact semantics.
 
 A focused live-host check now shows the replay-imported whole-row
 `MATCH([.$B$150]; [.$150:.$150]; -1)` row evaluates to

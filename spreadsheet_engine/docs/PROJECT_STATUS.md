@@ -95,7 +95,7 @@ Promoted-family fallback reasons:
 
 ### Current Hard-Routed Family Count
 
-- `15` env-independent engine-first slices:
+- `20` env-independent engine-first slices:
   - `TRUE()`
   - `FALSE()`
   - string-literal `VALUE`
@@ -104,13 +104,18 @@ Promoted-family fallback reasons:
   - literal-only `NUMBERVALUE`
   - exact `MATCH(<literal>; <1D literal array>; 0)`
   - default-exact `XMATCH(<literal>; <1D literal array>)`
+  - exact `XMATCH(<literal>; <1D literal array>; 0)`
+  - exact-forward `XMATCH(<literal>; <1D literal array>; 0; 1)`
   - `LOOKUP(<literal>; <1D literal vector>; <1D literal result vector>)`
   - `LOOKUP(<literal>; <2D literal matrix>)`
   - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
   - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
+  - `HLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
+  - `HLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>)`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0)`
   - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
+  - `INDEX(<2D literal array>; 0; <positive whole>)`
 - corresponding legacy entrypoints now carry debug quarantine warnings on
   normal interpreter reach:
   - `ScInterpreter::ScTrue()`
@@ -123,6 +128,7 @@ Promoted-family fallback reasons:
   - `ScInterpreter::ScXMatch()`
   - `ScInterpreter::ScLookup()`
   - `ScInterpreter::ScVLookup()`
+  - `ScInterpreter::ScHLookup()`
   - `ScInterpreter::ScXLookup()`
   - `ScInterpreter::ScIndex()`
 
@@ -137,14 +143,14 @@ Today:
 - `DBG_UTIL` builds default to `observe` when the rollout env var is unset
 - `authority` mode authoritatively bypasses `ScInterpreter` for supported
   promoted families
-- the env-`off` hard-route boundary now covers a fifteen-slice
-  logical/text/lookup/index cluster instead of just `NUMBERVALUE`
+- the env-`off` hard-route boundary now covers a twenty-slice
+  logical/text/match/lookup/index cluster instead of just `NUMBERVALUE`
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
-- the latest bounded literal lookup/index slice raised the env-independent
-  hard-route cluster from `8` to `15` and quarantined the corresponding
-  `LOOKUP` / `VLOOKUP` / `XLOOKUP` / `INDEX` legacy entrypoints
+- the latest bounded exact-`XMATCH` / `HLOOKUP` / `INDEX` slice raised the
+  env-independent hard-route cluster from `15` to `20` and added
+  `ScHLookup()` to the quarantined legacy entrypoints
 
 Still not true:
 
