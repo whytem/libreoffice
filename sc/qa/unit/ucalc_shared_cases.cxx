@@ -1531,7 +1531,12 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNorm
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(u"=DATEVALUE(\"1954-07-20\")"));
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(u"=TIMEVALUE(\"16:30:01\")"));
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(u"=NUMBERVALUE(\"1,234.5\";\".\";\",\")"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(u"=MATCH(2;{1;2;3};0)"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
+        u"=MATCH(\"C\";{\"A\";\"A\";\"B\";\"B\";\"C\";\"C\"};0)"));
     CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=TRUE(1)"));
+    CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=MATCH(2;A1:A3;0)"));
+    CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=MATCH(2;{1;2;3})"));
     CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=VALUE(A1)"));
     CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=DATEVALUE(A1)"));
     CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=TIMEVALUE(MyTimeName)"));

@@ -858,6 +858,9 @@ template <typename T>
 [[nodiscard]] inline bool isHardRoutedNode(
     const core::formula::Node& rNode);
 
+[[nodiscard]] inline bool isLiteralVectorArrayConstantNode(
+    const core::formula::Node& rNode);
+
 [[nodiscard]] inline EvaluationAttempt evaluateDelegatedNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos, bool bEmptyStringAsZero, std::size_t nDepth = 0);
@@ -2484,10 +2487,46 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     }
 
     if (eFunction != FunctionKind::NumberValue)
-        return false;
+    {
+        if (eFunction != FunctionKind::Match)
+            return false;
+
+        if (rNode.maChildren.size() != 3 || !rNode.maChildren[0] || !rNode.maChildren[1]
+            || !rNode.maChildren[2])
+        {
+            return false;
+        }
+
+        const auto oExactMode = extractNumericLiteral(*rNode.maChildren[2]);
+        return oExactMode && *oExactMode == 0.0 && isLiteralOnlyNode(*rNode.maChildren[0])
+               && isLiteralVectorArrayConstantNode(*rNode.maChildren[1]);
+    }
 
     if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
         return false;
+
+    for (const auto& rxChild : rNode.maChildren)
+    {
+        if (!rxChild || !isLiteralOnlyNode(*rxChild))
+            return false;
+    }
+
+    return true;
+}
+
+[[nodiscard]] inline bool isLiteralVectorArrayConstantNode(
+    const core::formula::Node& rNode)
+{
+    if (rNode.meKind != core::formula::NodeKind::ArrayConstant)
+        return false;
+
+    if (rNode.mnArrayColumns < 1 || rNode.mnArrayRows < 1
+        || (rNode.mnArrayColumns != 1 && rNode.mnArrayRows != 1)
+        || static_cast<sal_Int32>(rNode.maChildren.size())
+               != rNode.mnArrayColumns * rNode.mnArrayRows)
+    {
+        return false;
+    }
 
     for (const auto& rxChild : rNode.maChildren)
     {
