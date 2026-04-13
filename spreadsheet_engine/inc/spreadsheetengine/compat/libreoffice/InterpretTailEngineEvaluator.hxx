@@ -2601,6 +2601,40 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return true;
 }
 
+[[nodiscard]] inline bool isSortedNumericLiteralTableKeyNode(
+    const core::formula::Node& rNode, api::lookup::VectorOrientation eOrientation)
+{
+    if (!isLiteralArrayConstantNode(rNode))
+        return false;
+
+    const sal_Int32 nKeyLength = eOrientation == api::lookup::VectorOrientation::Column
+                                     ? rNode.mnArrayRows
+                                     : rNode.mnArrayColumns;
+    if (nKeyLength < 1)
+        return false;
+
+    std::optional<double> ofPrevious;
+    for (sal_Int32 nIndex = 0; nIndex < nKeyLength; ++nIndex)
+    {
+        const sal_Int32 nOffset = eOrientation == api::lookup::VectorOrientation::Column
+                                      ? nIndex * rNode.mnArrayColumns
+                                      : nIndex;
+        if (nOffset < 0 || o3tl::make_unsigned(nOffset) >= rNode.maChildren.size())
+            return false;
+        const auto& rxChild = rNode.maChildren[nOffset];
+        if (!rxChild)
+            return false;
+        const auto oValue = extractNumericLiteral(*rxChild);
+        if (!oValue)
+            return false;
+        if (ofPrevious && *oValue < *ofPrevious)
+            return false;
+        ofPrevious = oValue;
+    }
+
+    return true;
+}
+
 [[nodiscard]] inline bool isZeroOrFalseNode(const core::formula::Node& rNode)
 {
     if (const auto oNumber = extractNumericLiteral(rNode))
@@ -2657,6 +2691,24 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     if (pValue)
         *pValue = static_cast<sal_Int32>(*oNumber);
     return true;
+}
+
+[[nodiscard]] inline bool isOneOrTrueNode(const core::formula::Node& rNode)
+{
+    if (const auto oNumber = extractNumericLiteral(rNode))
+        return *oNumber == 1.0;
+
+    if (rNode.meKind == core::formula::NodeKind::BooleanLiteral)
+        return rNode.mbBoolean;
+
+    if (rNode.meKind == core::formula::NodeKind::FunctionCall
+        && classifyFunction(uppercaseAscii(rNode.maPrimaryText)) == FunctionKind::LogicalConstant
+        && rNode.maChildren.empty())
+    {
+        return uppercaseAscii(rNode.maPrimaryText) == u"TRUE";
+    }
+
+    return false;
 }
 
 [[nodiscard]] inline bool isHardRoutedLiteralMatchNode(
@@ -2741,17 +2793,38 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
     if (eFunction == FunctionKind::VLookup || eFunction == FunctionKind::HLookup)
     {
+        if (rNode.maChildren.size() == 3 && rNode.maChildren[0] && rNode.maChildren[1]
+            && rNode.maChildren[2] && isLiteralOnlyNode(*rNode.maChildren[0])
+            && isLiteralArrayConstantNode(*rNode.maChildren[1])
+            && isPositiveWholeLiteralNode(*rNode.maChildren[2]))
+        {
+            const auto eOrientation = eFunction == FunctionKind::HLookup
+                                          ? api::lookup::VectorOrientation::Row
+                                          : api::lookup::VectorOrientation::Column;
+            return isSortedNumericLiteralTableKeyNode(*rNode.maChildren[1], eOrientation);
+        }
+
         if (rNode.maChildren.size() != 4 || !rNode.maChildren[0] || !rNode.maChildren[1]
             || !rNode.maChildren[2] || !rNode.maChildren[3]
             || !isLiteralOnlyNode(*rNode.maChildren[0])
             || !isLiteralArrayConstantNode(*rNode.maChildren[1])
-            || !isPositiveWholeLiteralNode(*rNode.maChildren[2])
-            || !isZeroOrFalseNode(*rNode.maChildren[3]))
+            || !isPositiveWholeLiteralNode(*rNode.maChildren[2]))
         {
             return false;
         }
 
-        return rNode.maChildren[1]->mnArrayColumns >= 1;
+        if (isZeroOrFalseNode(*rNode.maChildren[3]))
+            return rNode.maChildren[1]->mnArrayColumns >= 1;
+
+        if (isOneOrTrueNode(*rNode.maChildren[3]))
+        {
+            const auto eOrientation = eFunction == FunctionKind::HLookup
+                                          ? api::lookup::VectorOrientation::Row
+                                          : api::lookup::VectorOrientation::Column;
+            return isSortedNumericLiteralTableKeyNode(*rNode.maChildren[1], eOrientation);
+        }
+
+        return false;
     }
 
     if (eFunction == FunctionKind::XLookup)
@@ -2767,6 +2840,18 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                    && nSearchLength == nResultLength;
         }
 
+        if (rNode.maChildren.size() == 4 && rNode.maChildren[0] && rNode.maChildren[1]
+            && rNode.maChildren[2] && rNode.maChildren[3])
+        {
+            sal_Int32 nSearchLength = 0;
+            sal_Int32 nResultLength = 0;
+            return isLiteralOnlyNode(*rNode.maChildren[0])
+                   && isLiteralVectorArrayConstantNode(*rNode.maChildren[1], &nSearchLength)
+                   && isLiteralVectorArrayConstantNode(*rNode.maChildren[2], &nResultLength)
+                   && nSearchLength == nResultLength
+                   && isLiteralOnlyNode(*rNode.maChildren[3]);
+        }
+
         if (rNode.maChildren.size() == 5 && rNode.maChildren[0] && rNode.maChildren[1]
             && rNode.maChildren[2] && rNode.maChildren[3] && rNode.maChildren[4])
         {
@@ -2776,8 +2861,10 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                    && isLiteralVectorArrayConstantNode(*rNode.maChildren[1], &nSearchLength)
                    && isLiteralVectorArrayConstantNode(*rNode.maChildren[2], &nResultLength)
                    && nSearchLength == nResultLength
-                   && rNode.maChildren[3]->meKind == core::formula::NodeKind::EmptyArgument
-                   && isZeroOrFalseNode(*rNode.maChildren[4]);
+                   && ((rNode.maChildren[3]->meKind == core::formula::NodeKind::EmptyArgument
+                        && isZeroOrFalseNode(*rNode.maChildren[4]))
+                       || (isLiteralOnlyNode(*rNode.maChildren[3])
+                           && isZeroOrFalseNode(*rNode.maChildren[4])));
         }
 
         if (rNode.maChildren.size() == 6 && rNode.maChildren[0] && rNode.maChildren[1]
@@ -2790,8 +2877,13 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                 || !isLiteralVectorArrayConstantNode(*rNode.maChildren[1], &nSearchLength)
                 || !isLiteralVectorArrayConstantNode(*rNode.maChildren[2], &nResultLength)
                 || nSearchLength != nResultLength
-                || rNode.maChildren[3]->meKind != core::formula::NodeKind::EmptyArgument
                 || !isZeroOrFalseNode(*rNode.maChildren[4]))
+            {
+                return false;
+            }
+
+            if (rNode.maChildren[3]->meKind != core::formula::NodeKind::EmptyArgument
+                && !isLiteralOnlyNode(*rNode.maChildren[3]))
             {
                 return false;
             }

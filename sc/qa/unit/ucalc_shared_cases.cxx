@@ -1227,6 +1227,28 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(
             aVLookupArray.maResult.maString));
 
+    const auto aVLookupApproxDefault = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(4, 8, 0),
+        u"=VLOOKUP(25;{10;\"ten\"|20;\"twenty\"|30;\"thirty\"};2)", false);
+    CPPUNIT_ASSERT(aVLookupApproxDefault.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aVLookupApproxDefault.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aVLookupApproxDefault.maResult.maString));
+
+    const auto aVLookupApproxTrue = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(5, 8, 0),
+        u"=VLOOKUP(25;{10;\"ten\"|20;\"twenty\"|30;\"thirty\"};2;TRUE())", false);
+    CPPUNIT_ASSERT(aVLookupApproxTrue.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aVLookupApproxTrue.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aVLookupApproxTrue.maResult.maString));
+
     const auto aVLookupRangeLookupValue = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(6, 4, 0), u"=VLOOKUP(B5:B7;B5:C7;2;0)", false);
     CPPUNIT_ASSERT(aVLookupRangeLookupValue.mbSupported);
@@ -1305,6 +1327,28 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(
             aHLookupArrayFalse.maResult.maString));
 
+    const auto aHLookupApproxDefault = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(5, 8, 0),
+        u"=HLOOKUP(25;{10;20;30|\"ten\";\"twenty\";\"thirty\"};2)", false);
+    CPPUNIT_ASSERT(aHLookupApproxDefault.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aHLookupApproxDefault.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aHLookupApproxDefault.maResult.maString));
+
+    const auto aHLookupApproxTrue = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(6, 8, 0),
+        u"=HLOOKUP(25;{10;20;30|\"ten\";\"twenty\";\"thirty\"};2;TRUE())", false);
+    CPPUNIT_ASSERT(aHLookupApproxTrue.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aHLookupApproxTrue.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aHLookupApproxTrue.maResult.maString));
+
     const auto aIndexArrayTwoArgs = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(4, 4, 0), u"=INDEX({1;2|3;4};1)", false);
     CPPUNIT_ASSERT(aIndexArrayTwoArgs.mbSupported);
@@ -1362,6 +1406,17 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr,
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(aXLookup.maResult.maString));
 
+    const auto aXLookupLiteralFallback = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(13, 14, 0),
+        u"=XLOOKUP(25;{1;2;3};{\"one\";\"two\";\"three\"};\"missing\")", false);
+    CPPUNIT_ASSERT(aXLookupLiteralFallback.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aXLookupLiteralFallback.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"missing"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aXLookupLiteralFallback.maResult.maString));
+
     const auto aXLookupArrayExactForward = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(14, 14, 0),
         u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"};;0;1)", false);
@@ -1413,6 +1468,61 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::api::formulavalue::ValueType::Value,
         aLookupLiteralVector.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aLookupLiteralVector.maResult.mfValue, 1e-12);
+
+    const auto aXLookupLiteralFallbackExplicitExact = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(19, 14, 0),
+        u"=XLOOKUP(25;{1;2;3};{\"one\";\"two\";\"three\"};\"missing\";0)", false);
+    CPPUNIT_ASSERT(aXLookupLiteralFallbackExplicitExact.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aXLookupLiteralFallbackExplicitExact.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"missing"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aXLookupLiteralFallbackExplicitExact.maResult.maString));
+
+    const auto aXLookupLiteralFallbackForward = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(20, 14, 0),
+        u"=XLOOKUP(25;{1;2;3};{\"one\";\"two\";\"three\"};\"missing\";0;1)", false);
+    CPPUNIT_ASSERT(aXLookupLiteralFallbackForward.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aXLookupLiteralFallbackForward.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"missing"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aXLookupLiteralFallbackForward.maResult.maString));
+
+    const auto aXLookupLiteralFallbackReverse = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(21, 14, 0),
+        u"=XLOOKUP(25;{1;2;3};{\"one\";\"two\";\"three\"};\"missing\";0;-1)", false);
+    CPPUNIT_ASSERT(aXLookupLiteralFallbackReverse.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aXLookupLiteralFallbackReverse.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"missing"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aXLookupLiteralFallbackReverse.maResult.maString));
+
+    const auto aXLookupLiteralFallbackBinaryAscending = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(22, 14, 0),
+        u"=XLOOKUP(4;{1;2;3};{\"one\";\"two\";\"three\"};\"missing\";0;2)", false);
+    CPPUNIT_ASSERT(aXLookupLiteralFallbackBinaryAscending.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aXLookupLiteralFallbackBinaryAscending.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"missing"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aXLookupLiteralFallbackBinaryAscending.maResult.maString));
+
+    const auto aXLookupLiteralFallbackBinaryDescending = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(23, 14, 0),
+        u"=XLOOKUP(4;{3;2;1};{\"three\";\"two\";\"one\"};\"missing\";0;-2)", false);
+    CPPUNIT_ASSERT(aXLookupLiteralFallbackBinaryDescending.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aXLookupLiteralFallbackBinaryDescending.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"missing"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aXLookupLiteralFallbackBinaryDescending.maResult.maString));
 
     const auto aXLookupFallback = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 4, 0),
@@ -1714,21 +1824,41 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNorm
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
         u"=VLOOKUP(2;{1;\"one\"|2;\"first\"|2;\"second\"};2;FALSE())"));
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
+        u"=VLOOKUP(25;{10;\"ten\"|20;\"twenty\"|30;\"thirty\"};2)"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
+        u"=VLOOKUP(25;{10;\"ten\"|20;\"twenty\"|30;\"thirty\"};2;TRUE())"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
         u"=HLOOKUP(2;{1;2;3|\"one\";\"two\";\"three\"};2;0)"));
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
         u"=HLOOKUP(2;{1;2;3|\"one\";\"two\";\"three\"};2;FALSE())"));
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
+        u"=HLOOKUP(25;{10;20;30|\"ten\";\"twenty\";\"thirty\"};2)"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
+        u"=HLOOKUP(25;{10;20;30|\"ten\";\"twenty\";\"thirty\"};2;TRUE())"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
         u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"})"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
+        u"=XLOOKUP(25;{1;2;3};{\"one\";\"two\";\"three\"};\"missing\")"));
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
         u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"};;0)"));
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
+        u"=XLOOKUP(25;{1;2;3};{\"one\";\"two\";\"three\"};\"missing\";0)"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
         u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"};;0;1)"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
+        u"=XLOOKUP(25;{1;2;3};{\"one\";\"two\";\"three\"};\"missing\";0;1)"));
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
         u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"};;0;-1)"));
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
+        u"=XLOOKUP(25;{1;2;3};{\"one\";\"two\";\"three\"};\"missing\";0;-1)"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
         u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"};;0;2)"));
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
+        u"=XLOOKUP(4;{1;2;3};{\"one\";\"two\";\"three\"};\"missing\";0;2)"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
         u"=XLOOKUP(2;{3;2;1};{\"three\";\"two\";\"one\"};;0;-2)"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
+        u"=XLOOKUP(4;{3;2;1};{\"three\";\"two\";\"one\"};\"missing\";0;-2)"));
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(u"=INDEX({1;2|3;4};2;2)"));
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(u"=INDEX({1;2|3;4};1)"));
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(u"=INDEX({1;2|3;4};2;0)"));

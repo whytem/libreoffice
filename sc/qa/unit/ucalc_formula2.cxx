@@ -1080,41 +1080,65 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetString(18, 7, 0,
             u"=VLOOKUP(2;{1;\"one\"|2;\"first\"|2;\"second\"};2;FALSE())"_ustr);
         m_pDoc->SetString(19, 7, 0,
-            u"=HLOOKUP(2;{1;2;3|\"one\";\"two\";\"three\"};2;0)"_ustr);
+            u"=VLOOKUP(25;{10;\"ten\"|20;\"twenty\"|30;\"thirty\"};2)"_ustr);
         m_pDoc->SetString(20, 7, 0,
+            u"=VLOOKUP(25;{10;\"ten\"|20;\"twenty\"|30;\"thirty\"};2;TRUE())"_ustr);
+        m_pDoc->SetString(21, 7, 0,
+            u"=HLOOKUP(2;{1;2;3|\"one\";\"two\";\"three\"};2;0)"_ustr);
+        m_pDoc->SetString(22, 7, 0,
             u"=HLOOKUP(2;{1;2;3|\"one\";\"two\";\"three\"};2;FALSE())"_ustr);
-        m_pDoc->SetString(21, 7, 0, u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"})"_ustr);
-        m_pDoc->SetString(22, 7, 0, u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"};;0)"_ustr);
-        m_pDoc->SetString(23, 7, 0, u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"};;0;1)"_ustr);
-        m_pDoc->SetString(24, 7, 0, u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"};;0;-1)"_ustr);
-        m_pDoc->SetString(25, 7, 0, u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"};;0;2)"_ustr);
-        m_pDoc->SetString(26, 7, 0, u"=XLOOKUP(2;{3;2;1};{\"three\";\"two\";\"one\"};;0;-2)"_ustr);
-        m_pDoc->SetString(27, 7, 0, u"=INDEX({1;2|3;4};1)"_ustr);
-        m_pDoc->SetString(28, 7, 0, u"=INDEX({1;2|3;4};0;2)"_ustr);
-        m_pDoc->SetString(29, 7, 0, u"=INDEX({1;2|3;4};2;0)"_ustr);
-        m_pDoc->SetString(30, 7, 0, u"=INDEX({1;2|3;4};2;2)"_ustr);
-        m_pDoc->SetString(31, 7, 0, u"=INDEX({1;2|3;4};2;2)"_ustr);
+        m_pDoc->SetString(23, 7, 0,
+            u"=HLOOKUP(25;{10;20;30|\"ten\";\"twenty\";\"thirty\"};2)"_ustr);
+        m_pDoc->SetString(24, 7, 0,
+            u"=HLOOKUP(25;{10;20;30|\"ten\";\"twenty\";\"thirty\"};2;TRUE())"_ustr);
+        m_pDoc->SetString(25, 7, 0, u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"})"_ustr);
+        m_pDoc->SetString(26, 7, 0, u"=XLOOKUP(25;{1;2;3};{\"one\";\"two\";\"three\"};\"missing\")"_ustr);
+        m_pDoc->SetString(27, 7, 0, u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"};;0)"_ustr);
+        m_pDoc->SetString(28, 7, 0, u"=XLOOKUP(25;{1;2;3};{\"one\";\"two\";\"three\"};\"missing\";0)"_ustr);
+        m_pDoc->SetString(29, 7, 0, u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"};;0;1)"_ustr);
+        m_pDoc->SetString(30, 7, 0, u"=XLOOKUP(25;{1;2;3};{\"one\";\"two\";\"three\"};\"missing\";0;1)"_ustr);
+        m_pDoc->SetString(31, 7, 0, u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"};;0;-1)"_ustr);
+        m_pDoc->SetString(32, 7, 0, u"=XLOOKUP(25;{1;2;3};{\"one\";\"two\";\"three\"};\"missing\";0;-1)"_ustr);
+        m_pDoc->SetString(33, 7, 0, u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"};;0;2)"_ustr);
+        m_pDoc->SetString(34, 7, 0, u"=XLOOKUP(4;{1;2;3};{\"one\";\"two\";\"three\"};\"missing\";0;2)"_ustr);
+        m_pDoc->SetString(35, 7, 0, u"=XLOOKUP(2;{3;2;1};{\"three\";\"two\";\"one\"};;0;-2)"_ustr);
+        m_pDoc->SetString(36, 7, 0, u"=XLOOKUP(4;{3;2;1};{\"three\";\"two\";\"one\"};\"missing\";0;-2)"_ustr);
+        m_pDoc->SetString(37, 7, 0, u"=INDEX({1;2|3;4};1)"_ustr);
+        m_pDoc->SetString(38, 7, 0, u"=INDEX({1;2|3;4};0;2)"_ustr);
+        m_pDoc->SetString(39, 7, 0, u"=INDEX({1;2|3;4};2;0)"_ustr);
+        m_pDoc->SetString(40, 7, 0, u"=INDEX({1;2|3;4};2;2)"_ustr);
+        m_pDoc->SetString(41, 7, 0, u"=INDEX({1;2|3;4};2;2)"_ustr);
         CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(14, 7, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(15, 7, 0));
         ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(16, 7, 0));
         CPPUNIT_ASSERT_EQUAL(u"second"_ustr, m_pDoc->GetString(17, 7, 0));
         CPPUNIT_ASSERT_EQUAL(u"second"_ustr, m_pDoc->GetString(18, 7, 0));
-        CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(19, 7, 0));
-        CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(20, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(19, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(20, 7, 0));
         CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(21, 7, 0));
         CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(22, 7, 0));
-        CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(23, 7, 0));
-        CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(24, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(23, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(24, 7, 0));
         CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(25, 7, 0));
-        CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(26, 7, 0));
-        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(27, 7, 0));
-        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(28, 7, 0));
-        ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(29, 7, 0));
-        ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(30, 7, 0));
-        ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(31, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(26, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(27, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(28, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(29, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(30, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(31, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(32, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(33, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(34, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(35, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(36, 7, 0));
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(37, 7, 0));
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(38, 7, 0));
+        ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(39, 7, 0));
+        ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(40, 7, 0));
+        ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(41, 7, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 18);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 28);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
@@ -1123,15 +1147,15 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::VLookup)]
-            >= 2);
+            >= 4);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::HLookup)]
-            >= 2);
+            >= 4);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::XLookup)]
-            >= 6);
+            >= 12);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Index)]
