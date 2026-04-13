@@ -17,7 +17,7 @@ Today:
 - the live migration program now runs through a real `InterpretTail` seam in
   production Calc code
 - debug and CI-style builds default that seam to `observe`
-- a fifty-slice env-independent logical/text/match/xmatch/lookup/index
+- an eighty-five-slice env-independent logical/text/match/xmatch/lookup/index
   cluster is now engine-first even with rollout explicitly `off`
 
 The active program is no longer “prove more substrate slices.”
@@ -85,7 +85,7 @@ Dominant promoted-family fallback reasons:
 
 ### Hard-Quarantined Calc Paths
 
-- `50` env-independent engine-first slices:
+- `85` env-independent engine-first slices:
   - `TRUE()`
   - `FALSE()`
   - string-literal `VALUE`
@@ -93,6 +93,7 @@ Dominant promoted-family fallback reasons:
   - string-literal `TIMEVALUE`
   - literal-only `NUMBERVALUE`
   - exact `MATCH(<literal>; <1D literal array>; 0)`
+  - default-approximate `MATCH(<literal>; <ascending numeric 1D literal array>)`
   - approximate-ascending `MATCH(<literal>; <ascending numeric 1D literal array>; 1)`
   - approximate-descending `MATCH(<literal>; <descending numeric 1D literal array>; -1)`
   - default-exact `XMATCH(<literal>; <1D literal array>)`
@@ -101,6 +102,20 @@ Dominant promoted-family fallback reasons:
   - exact-reverse `XMATCH(<literal>; <1D literal array>; 0; -1)`
   - exact-binary-ascending `XMATCH(<literal>; <ascending numeric 1D literal array>; 0; 2)`
   - exact-binary-descending `XMATCH(<literal>; <descending numeric 1D literal array>; 0; -2)`
+  - default-exact-forward `XMATCH(<literal>; <1D literal array> ;; 1)`
+  - default-exact-reverse `XMATCH(<literal>; <1D literal array> ;; -1)`
+  - default-exact-binary-ascending `XMATCH(<literal>; <ascending numeric 1D literal array> ;; 2)`
+  - default-exact-binary-descending `XMATCH(<literal>; <descending numeric 1D literal array> ;; -2)`
+  - next-larger `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; 1)`
+  - next-smaller `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; -1)`
+  - next-larger-forward `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; 1; 1)`
+  - next-smaller-forward `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; -1; 1)`
+  - next-larger-reverse `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; 1; -1)`
+  - next-smaller-reverse `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; -1; -1)`
+  - next-larger-binary-ascending `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; 1; 2)`
+  - next-smaller-binary-ascending `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; -1; 2)`
+  - next-larger-binary-descending `XMATCH(<numeric literal>; <descending numeric 1D literal array>; 1; -2)`
+  - next-smaller-binary-descending `XMATCH(<numeric literal>; <descending numeric 1D literal array>; -1; -2)`
   - `LOOKUP(<literal>; <1D literal vector>)`
   - `LOOKUP(<literal>; <1D literal vector>; <1D literal result vector>)`
   - `LOOKUP(<literal>; <2D literal matrix>)`
@@ -132,6 +147,26 @@ Dominant promoted-family fallback reasons:
   - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; -2)`
   - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector> ;;; -2)`
   - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found> ;; -2)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 1)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 1)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; -1)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; -1)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 1; 1)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 1; 1)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; -1; 1)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; -1; 1)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 1; -1)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 1; -1)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; -1; -1)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; -1; -1)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 1; 2)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 1; 2)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; -1; 2)`
+  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; -1; 2)`
+  - `XLOOKUP(<numeric literal>; <descending numeric 1D literal array>; <1D literal result vector> ;; 1; -2)`
+  - `XLOOKUP(<numeric literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 1; -2)`
+  - `XLOOKUP(<numeric literal>; <descending numeric 1D literal array>; <1D literal result vector> ;; -1; -2)`
+  - `XLOOKUP(<numeric literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; -1; -2)`
   - `INDEX(<2D literal array>; <positive whole>)`
   - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
   - `INDEX(<2D literal array>; 0; <positive whole>)`
@@ -247,9 +282,15 @@ The highest-value remaining blockers are now:
    the raw promoted replay probe is now confirmed to be a cached imported
    correctness surface, not a live seam-off retirement denominator
 
-The latest bounded approximate-`MATCH` plus omitted-match-mode `XLOOKUP`
-slice raised the env-independent hard-route cluster from `40` to `50`
-while keeping the expansion inside adjacent literal-array semantics.
+The latest bounded default/approximate `MATCH` plus omitted/approximate
+extended-match slice raised the env-independent hard-route cluster from
+`50` to `85` while keeping the expansion inside adjacent literal-array
+semantics.
+
+Inside the current families, that effectively exhausts the semantically
+distinct env-independent literal-array hard-route frontier. Remaining
+additions would mainly be alias recounts or moves into pattern/collation-
+sensitive behavior.
 
 A focused live-host check now shows the replay-imported whole-row
 `MATCH([.$B$150]; [.$150:.$150]; -1)` row evaluates to
@@ -313,9 +354,12 @@ The next pass should:
 
 1. treat the raw promoted replay probe as a cached imported correctness
    surface, not as the live retirement denominator
-2. drive the next real runtime win on broader ambient live reach or another
-   narrow hard-route / quarantine slice inside `ScInterpreter`
-3. only return to imported replay parity if we intentionally decide to
+2. treat the current family-local env-independent hard-route surface as
+   effectively exhausted except for alias recounts or pattern/collation-
+   sensitive variants
+3. drive the next real runtime win on broader ambient live reach, a new
+   deliberate function-family expansion, or a legacy-path retirement slice
+4. only return to imported replay parity if we intentionally decide to
    rehabilitate legacy seam-off imported-formula execution
 
 ## Navigation
