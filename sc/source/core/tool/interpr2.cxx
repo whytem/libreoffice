@@ -78,7 +78,7 @@ namespace setextparseexec = spreadsheetengine::compat::libreoffice::textparsinge
 namespace
 {
 
-[[nodiscard]] std::optional<OUString> lclGetQuarantinedLiteralOnlyTextParsingFormula(
+[[nodiscard]] std::optional<OUString> lclGetQuarantinedHardRoutedFormula(
     const ScFormulaCell* pCell, const ScDocument& rDoc, ScInterpreterContext& rContext)
 {
     if (!pCell)
@@ -181,7 +181,7 @@ void ScInterpreter::ScGetHour()
 void ScInterpreter::ScGetDateValue()
 {
     const std::optional<OUString> oQuarantinedFormula
-        = lclGetQuarantinedLiteralOnlyTextParsingFormula(pMyFormulaCell, mrDoc, mrContext);
+        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
     if (oQuarantinedFormula)
     {
         SAL_WARN("sc.core",
@@ -570,7 +570,7 @@ void ScInterpreter::ScGetDateDif()
 void ScInterpreter::ScGetTimeValue()
 {
     const std::optional<OUString> oQuarantinedFormula
-        = lclGetQuarantinedLiteralOnlyTextParsingFormula(pMyFormulaCell, mrDoc, mrContext);
+        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
     if (oQuarantinedFormula)
     {
         SAL_WARN("sc.core",

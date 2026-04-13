@@ -855,7 +855,7 @@ template <typename T>
 [[nodiscard]] inline FunctionKind classifyDelegatedFunctionNode(
     const core::formula::Node& rNode);
 
-[[nodiscard]] inline bool isHardRoutedLiteralOnlyTextParsingNode(
+[[nodiscard]] inline bool isHardRoutedNode(
     const core::formula::Node& rNode);
 
 [[nodiscard]] inline EvaluationAttempt evaluateDelegatedNode(
@@ -2466,13 +2466,16 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     }
 }
 
-[[nodiscard]] inline bool isHardRoutedLiteralOnlyTextParsingNode(
+[[nodiscard]] inline bool isHardRoutedNode(
     const core::formula::Node& rNode)
 {
     if (rNode.meKind != core::formula::NodeKind::FunctionCall)
         return false;
 
     const auto eFunction = classifyFunction(uppercaseAscii(rNode.maPrimaryText));
+    if (eFunction == FunctionKind::LogicalConstant)
+        return rNode.maChildren.empty();
+
     if (eFunction == FunctionKind::Value || eFunction == FunctionKind::DateValue
         || eFunction == FunctionKind::TimeValue)
     {
@@ -3237,7 +3240,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const api::String aNormalized = detail::normalizeFormulaSource(rFormulaSource);
     const auto aParse = core::formula::parseFormula(aNormalized);
     return aParse && aParse.mpRoot
-           && detail::isHardRoutedLiteralOnlyTextParsingNode(*aParse.mpRoot);
+           && detail::isHardRoutedNode(*aParse.mpRoot);
 }
 
 inline void resetStats()

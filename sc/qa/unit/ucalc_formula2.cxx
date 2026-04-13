@@ -991,21 +991,29 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
         setaileval::resetStats();
 
+        m_pDoc->SetString(0, 7, 0, u"=TRUE()"_ustr);
         m_pDoc->SetString(1, 7, 0, u"=VALUE(\"4321\")"_ustr);
         m_pDoc->SetString(2, 7, 0, u"=DATEVALUE(\"1954-07-20\")"_ustr);
         m_pDoc->SetString(3, 7, 0, u"=TIMEVALUE(\"16:30:01\")"_ustr);
         m_pDoc->SetString(4, 7, 0, u"=NUMBERVALUE(\"1,234.5\";\".\";\",\")"_ustr);
+        m_pDoc->SetString(5, 7, 0, u"=FALSE()"_ustr);
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(0, 7, 0));
         ASSERT_DOUBLES_EQUAL(4321.0, m_pDoc->GetValue(1, 7, 0));
         ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(2, 7, 0));
         ASSERT_DOUBLES_EQUAL((16.0 * 3600.0 + 30.0 * 60.0 + 1.0) / 86400.0,
                              m_pDoc->GetValue(3, 7, 0));
         ASSERT_DOUBLES_EQUAL(1234.5, m_pDoc->GetValue(4, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"FALSE"_ustr, m_pDoc->GetString(5, 7, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnObserveCount);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnShadowCompareCount);
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 4);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 6);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::LogicalConstant)]
+            >= 2);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Value)]

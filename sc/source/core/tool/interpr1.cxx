@@ -144,7 +144,7 @@ spreadsheetengine::api::query::SearchType toApiSearchType(utl::SearchParam::Sear
     }
 }
 
-[[nodiscard]] std::optional<OUString> lclGetQuarantinedLiteralOnlyTextParsingFormula(
+[[nodiscard]] std::optional<OUString> lclGetQuarantinedHardRoutedFormula(
     const ScFormulaCell* pCell, const ScDocument& rDoc, ScInterpreterContext& rContext)
 {
     if (!pCell)
@@ -2035,12 +2035,30 @@ void ScInterpreter::ScRandbetween()
 
 void ScInterpreter::ScTrue()
 {
+    const std::optional<OUString> oQuarantinedFormula
+        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
+    if (oQuarantinedFormula)
+    {
+        SAL_WARN("sc.core",
+            "hard-routed TRUE() reached ScInterpreter for " << *oQuarantinedFormula);
+        OSL_FAIL("hard-routed TRUE() reached ScInterpreter");
+    }
+
     nFuncFmtType = SvNumFormatType::LOGICAL;
     PushInt(1);
 }
 
 void ScInterpreter::ScFalse()
 {
+    const std::optional<OUString> oQuarantinedFormula
+        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
+    if (oQuarantinedFormula)
+    {
+        SAL_WARN("sc.core",
+            "hard-routed FALSE() reached ScInterpreter for " << *oQuarantinedFormula);
+        OSL_FAIL("hard-routed FALSE() reached ScInterpreter");
+    }
+
     nFuncFmtType = SvNumFormatType::LOGICAL;
     PushInt(0);
 }
@@ -3286,7 +3304,7 @@ void ScInterpreter::ScT()
 void ScInterpreter::ScValue()
 {
     const std::optional<OUString> oQuarantinedFormula
-        = lclGetQuarantinedLiteralOnlyTextParsingFormula(pMyFormulaCell, mrDoc, mrContext);
+        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
     if (oQuarantinedFormula)
     {
         SAL_WARN("sc.core",
@@ -3374,7 +3392,7 @@ void ScInterpreter::ScValue()
 void ScInterpreter::ScNumberValue()
 {
     const std::optional<OUString> oQuarantinedFormula
-        = lclGetQuarantinedLiteralOnlyTextParsingFormula(pMyFormulaCell, mrDoc, mrContext);
+        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
     if (oQuarantinedFormula)
     {
         SAL_WARN("sc.core",
