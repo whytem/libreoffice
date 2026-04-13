@@ -65,14 +65,14 @@ Dominant ambient fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1793`
-- `interpret_tail_authoritative_fallback_total=19`
-- promoted-family authoritative rate: `98.95%`
+- `interpret_tail_authoritative_total=1794`
+- `interpret_tail_authoritative_fallback_total=18`
+- promoted-family authoritative rate: `99.01%`
 
 Dominant promoted-family fallback reasons:
 
-- `unsupported_formula_shape=6`
-- `shadow_mismatch=20`
+- `unsupported_formula_shape=5`
+- `shadow_mismatch=13`
 - `unsupported_host_surface=0`
 
 ### Hard-Quarantined Calc Paths
@@ -175,10 +175,10 @@ The highest-value remaining blockers are now:
    one family is hard-routed, but no `ScInterpreter` subroutine has been
    deleted yet
 
-The latest token-backed canonical-source slice improved promoted-family
-authority from `1789 / 23` to `1793 / 19`, held replay direct fallback at
-`6`, and closed the replay-imported localized array-constant `MATCH`
-pair without relying on the ambiguous display-string rewrite.
+The latest bounded text-parsing slice improved promoted-family authority from
+`1793 / 19` to `1794 / 18`, held replay direct fallback at `6`, and closed
+the residual replay-promoted `VALUE([.I1:.I3])` fallback row without widening
+new delegated families.
 
 A focused live-host check now shows the replay-imported whole-row
 `MATCH([.$B$150]; [.$150:.$150]; -1)` row evaluates to
@@ -220,12 +220,18 @@ evaluate to `FormulaError::VariableExpected` in Calc with the seam forced
 off, so that imported `INDEX` matrix-function band is not treated as a real
 runtime conversion target either.
 
+A bounded live-host-truth pass now also shows the replay-imported
+`DATEVALUE("Jan1, 2015")` rows evaluate to `FormulaError::VariableExpected`
+in Calc with the seam forced off, so those cached non-numeric workbook rows
+are not treated as real runtime conversion targets either.
+
 ## Recommended Next Pass
 
 The next pass should:
 
-1. convert the residual real `VALUE` / `DATEVALUE` parity rows
-2. then convert any remaining `LOOKUP` parity rows
+1. convert the residual real replay-promoted
+   `MATCH(FREQUENCY(...))` / `INDEX(...)` `unsupported_formula_shape` rows
+2. then convert any remaining genuine `LOOKUP` parity rows
 3. move the first replay-imported promoted family from observe-only reach
    toward a broader authority candidate once mismatch and shape fallback
    shrink materially

@@ -177,13 +177,13 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1793`
-- `interpret_tail_authoritative_fallback_total=19`
-- promoted-family authoritative rate: `98.95%`
+- `interpret_tail_authoritative_total=1794`
+- `interpret_tail_authoritative_fallback_total=18`
+- promoted-family authoritative rate: `99.01%`
 
 Current promoted-family fallback reasons:
 
-- `unsupported_formula_shape=6`
+- `unsupported_formula_shape=5`
 - `shadow_mismatch=13`
 - `unsupported_host_surface=0`
 
@@ -192,10 +192,10 @@ Interpretation:
 - once the probe hits promoted-family cells, authority conversion is now
   strong
 - the main remaining conversion work is no longer generic breadth
-- the latest slice closed the imported localized array-constant replay pair
-  through a token-backed canonical-source sidecar instead of relying on the
-  ambiguous display-string rewrite
-- the promoted-family probe improved from `1789 / 23` to `1793 / 19` while the
+- the latest slice closed the residual replay-promoted
+  `VALUE([.I1:.I3])` fallback row through bounded text-parsing range
+  scalarization instead of widening new delegated families
+- the promoted-family probe improved from `1793 / 19` to `1794 / 18` while the
   replay-promoted direct surface held at `1806 / 6`
 - a focused host-truth test now shows the replay-imported whole-row
   `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to
@@ -234,9 +234,13 @@ Interpretation:
   evaluate to `FormulaError::VariableExpected` in Calc with the seam forced
   off, so that imported `INDEX` matrix-function band is likewise no longer
   treated as a real runtime conversion target
+- a bounded live-host-truth pass now also shows the replay-imported
+  `DATEVALUE("Jan1, 2015")` rows evaluate to `FormulaError::VariableExpected`
+  in Calc with the seam forced off, so those cached non-numeric workbook rows
+  are not treated as real live runtime conversion targets either
 - the next reducible promoted-family runtime hotspot is therefore the smaller
-  `VALUE` and `DATEVALUE` parity cleanup, with any residual `LOOKUP`
-  mismatches behind it
+  replay-promoted `MATCH(FREQUENCY(...))` / `INDEX(...)` shape band, with any
+  genuine remaining `LOOKUP` parity work behind it
 
 ### Replay Eligibility Inventory
 
@@ -307,13 +311,14 @@ historical reference material, not active roadmap work.
 
 The latest replay closeout is now folded into this migration ledger.
 
-The next high-value pass should now stay on promoted-family parity cleanup,
-starting with the residual `VLOOKUP` / `XLOOKUP` mismatch band and then the
-smaller shape fallout behind it:
+The next high-value pass should now stay on the residual real
+replay-promoted shape band before returning to any cached-workbook mismatch
+cleanup:
 
-1. convert the remaining real replay-promoted `VALUE` / `DATEVALUE` parity
-   rows
-2. then clean up any residual `LOOKUP` mismatch rows still visible after that
+1. convert the remaining real replay-promoted
+   `MATCH(FREQUENCY(...))` / `INDEX(...)` `unsupported_formula_shape` rows
+2. then clean up any genuine residual `LOOKUP` mismatch rows still visible
+   after that
 3. only return to broader reach work if the promoted replay surface regresses
 
 ## Historical Archive

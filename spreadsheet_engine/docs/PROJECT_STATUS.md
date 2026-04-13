@@ -61,13 +61,13 @@ Ambient live fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1793`
-- `interpret_tail_authoritative_fallback_total=19`
-- promoted-family authoritative rate: `98.95%`
+- `interpret_tail_authoritative_total=1794`
+- `interpret_tail_authoritative_fallback_total=18`
+- promoted-family authoritative rate: `99.01%`
 
 Promoted-family fallback reasons:
 
-- `unsupported_formula_shape=6`
+- `unsupported_formula_shape=5`
 - `shadow_mismatch=13`
 - `unsupported_host_surface=0`
 
@@ -105,10 +105,9 @@ Today:
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
-- the latest token-backed canonical-source slice closed the replay-imported
-  localized array-constant `MATCH` pair without relying on the ambiguous
-  display-string rewrite, improving authority from `1789 / 23` to
-  `1793 / 19`
+- the latest bounded text-parsing slice closed the replay-promoted
+  `VALUE([.I1:.I3])` fallback row, improving authority from `1793 / 19` to
+  `1794 / 18`
 
 Still not true:
 
@@ -150,9 +149,12 @@ Still not true:
   `INDEX(LOGEST([.K11:.O11]; [.K12:.O12]; TRUE(); TRUE()); 2; 0)` rows are
   likewise genuine live Calc `FormulaError::VariableExpected` rows, not real
   runtime parity blockers
+- a bounded live-host-truth pass now also shows the replay-imported
+  `DATEVALUE("Jan1, 2015")` rows are genuine live Calc
+  `FormulaError::VariableExpected` rows, not real runtime parity blockers
 - the next highest-value reducible replay blocker is therefore the smaller
-  `VALUE` and `DATEVALUE` parity cleanup, with any residual `LOOKUP`
-  mismatches behind it
+  real `MATCH(FREQUENCY(...))` / `INDEX(...)` shape band, with any genuine
+  residual `LOOKUP` mismatches behind it
 
 ## Active Delegated Family
 
@@ -190,9 +192,9 @@ historical reference material, not active roadmap.
 
 The next pass should stay on promoted-family parity cleanup:
 
-1. convert the remaining real `VALUE` / `DATEVALUE` parity rows on the
-   replay-promoted surface
-2. then clean up any residual `LOOKUP` mismatch rows
+1. convert the remaining real replay-promoted
+   `MATCH(FREQUENCY(...))` / `INDEX(...)` `unsupported_formula_shape` rows
+2. then clean up any genuine residual `LOOKUP` mismatch rows
 3. only return to broader reach work if the promoted replay surface regresses
 
 ## References
