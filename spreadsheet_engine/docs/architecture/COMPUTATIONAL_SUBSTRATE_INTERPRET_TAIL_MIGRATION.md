@@ -290,6 +290,9 @@ Current meaning:
 - supported results bypass the normal rollout gate and are applied
   authoritatively
 - unsupported or projection-failure cases still fall back safely
+- `ScInterpreter::ScNumberValue()` now treats that literal-only slice as a
+  quarantined legacy path and emits a debug warning if normal interpreter
+  execution reaches it
 
 This is the first hard-quarantined Calc path on the migration track.
 

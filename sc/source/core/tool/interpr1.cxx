@@ -67,6 +67,7 @@
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/InfoInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/IndirectExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
 #include <spreadsheetengine/compat/libreoffice/JumpExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/JumpMatrixExecution.hxx>
@@ -121,6 +122,7 @@ namespace seletexec = spreadsheetengine::compat::libreoffice::letexecution;
 namespace seformulainspect = spreadsheetengine::compat::libreoffice::formulainspection;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace selookupexec = spreadsheetengine::compat::libreoffice::lookupexecution;
+namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 namespace setextparseexec = spreadsheetengine::compat::libreoffice::textparsingexecution;
 
@@ -140,6 +142,28 @@ spreadsheetengine::api::query::SearchType toApiSearchType(utl::SearchParam::Sear
         default:
             return spreadsheetengine::api::query::SearchType::Normal;
     }
+}
+
+[[nodiscard]] std::optional<OUString> lclGetQuarantinedLiteralOnlyNumberValueFormula(
+    const ScFormulaCell* pCell, const ScDocument& rDoc, ScInterpreterContext& rContext)
+{
+    if (!pCell)
+        return std::nullopt;
+
+    if (pCell->IsIterCell() || pCell->GetMatrixFlag() != ScMatrixMode::NONE
+        || pCell->IsHyperLinkCell() || rDoc.IsThreadedGroupCalcInProgress())
+    {
+        return std::nullopt;
+    }
+
+    OUString aFormulaSource = pCell->GetFormula(FormulaGrammar::GRAM_ODFF, &rContext);
+    if (!setaileval::isHardRoutedFormula(
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength())))
+    {
+        return std::nullopt;
+    }
+
+    return aFormulaSource;
 }
 
 }
@@ -3340,52 +3364,68 @@ void ScInterpreter::ScValue()
 // fdo#57180
 void ScInterpreter::ScNumberValue()
 {
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 1, 3 ) )
-        return;
-
-    std::optional<OUString> oGroupSeparator;
-    std::optional<OUString> oDecimalSeparator;
-    if (nParamCount == 3)
-        oGroupSeparator = GetString().getString();
-    if (nParamCount >= 2)
-        oDecimalSeparator = GetString().getString();
-
-    switch (GetStackType())
+    const std::optional<OUString> oQuarantinedFormula
+        = lclGetQuarantinedLiteralOnlyNumberValueFormula(pMyFormulaCell, mrDoc, mrContext);
+    if (oQuarantinedFormula)
     {
-        case svDouble:
-        return; // leave on stack
-        default:
-        break;
-    }
-    OUString aInputString = GetString().getString();
-    if ( nGlobalError != FormulaError::NONE )
-    {
-        PushError( nGlobalError );
-        return;
+        SAL_WARN("sc.core",
+            "literal-only hard-routed NUMBERVALUE reached ScInterpreter for "
+                << *oQuarantinedFormula);
+        OSL_FAIL("literal-only hard-routed NUMBERVALUE reached ScInterpreter");
     }
 
-    const auto aResult = setextparseexec::evaluateNumberValue(
-        mrDoc, mrContext, aInputString, oDecimalSeparator, oGroupSeparator,
-        maCalcConfig.mbEmptyStringAsZero);
-    if (aResult)
+    const auto executeLegacyNumberValue = [&]()
     {
-        PushDouble(aResult.maValue);
-        return;
-    }
-
-    switch (aResult.meError)
-    {
-        case spreadsheetengine::api::Error::IllegalArgument:
-            PushIllegalArgument();
+        sal_uInt8 nParamCount = GetByte();
+        if ( !MustHaveParamCount( nParamCount, 1, 3 ) )
             return;
-        case spreadsheetengine::api::Error::NoValue:
-            PushNoValue();
+
+        std::optional<OUString> oGroupSeparator;
+        std::optional<OUString> oDecimalSeparator;
+        if (nParamCount == 3)
+            oGroupSeparator = GetString().getString();
+        if (nParamCount >= 2)
+            oDecimalSeparator = GetString().getString();
+
+        switch (GetStackType())
+        {
+            case svDouble:
+            return; // leave on stack
+            default:
+            break;
+        }
+        OUString aInputString = GetString().getString();
+        if ( nGlobalError != FormulaError::NONE )
+        {
+            PushError( nGlobalError );
             return;
-        default:
-            PushIllegalArgument();
+        }
+
+        const auto aResult = setextparseexec::evaluateNumberValue(
+            mrDoc, mrContext, aInputString, oDecimalSeparator, oGroupSeparator,
+            maCalcConfig.mbEmptyStringAsZero);
+        if (aResult)
+        {
+            PushDouble(aResult.maValue);
             return;
-    }
+        }
+
+        switch (aResult.meError)
+        {
+            case spreadsheetengine::api::Error::IllegalArgument:
+                PushIllegalArgument();
+                return;
+            case spreadsheetengine::api::Error::NoValue:
+                PushNoValue();
+                return;
+            default:
+                PushIllegalArgument();
+                return;
+        }
+    };
+
+    // Keep the legacy body as the safety net until the entire opcode can be retired.
+    executeLegacyNumberValue();
 }
 
 

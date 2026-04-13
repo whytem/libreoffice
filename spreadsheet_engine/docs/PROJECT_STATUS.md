@@ -90,6 +90,8 @@ Promoted-family fallback reasons:
 
 - `1` env-independent engine-first family:
   - literal-only `NUMBERVALUE`
+  - its legacy `ScInterpreter::ScNumberValue()` entry now carries a debug
+    quarantine warning on normal interpreter reach
 
 ## Current State
 
@@ -113,6 +115,8 @@ Still not true:
 
 - no broad default-on rollout exists
 - no `ScInterpreter` subroutine has been deleted yet
+- the first interpreter quarantine boundary has landed, but full legacy opcode
+  retirement has not
 - full replay-corpus live traffic is now material, but most supported ambient
   traffic still covers only a bounded minority of formulas
 - the replay-promoted reach blocker is cleared, and the latest slice reduced

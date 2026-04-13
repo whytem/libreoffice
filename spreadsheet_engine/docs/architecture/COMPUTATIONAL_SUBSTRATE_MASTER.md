@@ -79,6 +79,8 @@ Dominant promoted-family fallback reasons:
 
 - `1` env-independent engine-first family:
   - literal-only `NUMBERVALUE`
+  - the legacy `ScInterpreter::ScNumberValue()` entry now warns on normal
+    interpreter reach for that literal-only slice
 
 ## Strategic Position
 
@@ -172,8 +174,9 @@ The highest-value remaining blockers are now:
 4. promoted-family residual formula shape:
    replay-live `unsupported_formula_shape=6`
 5. first real Calc-path retirement:
-   one family is hard-routed, but no `ScInterpreter` subroutine has been
-   deleted yet
+   one family is hard-routed and its legacy interpreter entry is now
+   quarantined for the narrow literal-only slice, but no whole
+   `ScInterpreter` subroutine has been deleted yet
 
 The latest bounded text-parsing slice improved promoted-family authority from
 `1793 / 19` to `1794 / 18`, held replay direct fallback at `6`, and closed
