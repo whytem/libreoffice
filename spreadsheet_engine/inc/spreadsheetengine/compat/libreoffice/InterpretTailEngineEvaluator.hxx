@@ -2716,6 +2716,12 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 {
     if (eFunction == FunctionKind::Match)
     {
+        if (rNode.maChildren.size() == 2 && rNode.maChildren[0] && rNode.maChildren[1])
+        {
+            return extractNumericLiteral(*rNode.maChildren[0]).has_value()
+                   && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], true);
+        }
+
         if (rNode.maChildren.size() != 3 || !rNode.maChildren[0] || !rNode.maChildren[1]
             || !rNode.maChildren[2])
         {
@@ -2753,6 +2759,13 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (rNode.maChildren.size() == 3 && rNode.maChildren[0] && rNode.maChildren[1]
             && rNode.maChildren[2])
         {
+            const auto oMode = extractNumericLiteral(*rNode.maChildren[2]);
+            if (oMode && (*oMode == 1.0 || *oMode == -1.0))
+            {
+                return extractNumericLiteral(*rNode.maChildren[0]).has_value()
+                       && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], true);
+            }
+
             return isLiteralOnlyNode(*rNode.maChildren[0])
                    && isLiteralVectorArrayConstantNode(*rNode.maChildren[1])
                    && isZeroOrFalseNode(*rNode.maChildren[2]);
@@ -2762,13 +2775,30 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             && rNode.maChildren[2] && rNode.maChildren[3])
         {
             if (!isLiteralOnlyNode(*rNode.maChildren[0])
-                || !isLiteralVectorArrayConstantNode(*rNode.maChildren[1])
-                || !isZeroOrFalseNode(*rNode.maChildren[2]))
+                || !isLiteralVectorArrayConstantNode(*rNode.maChildren[1]))
             {
                 return false;
             }
 
-            return isOneNode(*rNode.maChildren[3]) || isMinusOneNode(*rNode.maChildren[3])
+            if (rNode.maChildren[2]->meKind == core::formula::NodeKind::EmptyArgument
+                || isZeroOrFalseNode(*rNode.maChildren[2]))
+            {
+                return isOneNode(*rNode.maChildren[3]) || isMinusOneNode(*rNode.maChildren[3])
+                       || (isTwoNode(*rNode.maChildren[3])
+                           && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], true))
+                       || (isMinusTwoNode(*rNode.maChildren[3])
+                           && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], false));
+            }
+
+            const auto oMode = extractNumericLiteral(*rNode.maChildren[2]);
+            if (!oMode || (*oMode != 1.0 && *oMode != -1.0)
+                || !extractNumericLiteral(*rNode.maChildren[0]).has_value())
+            {
+                return false;
+            }
+
+            return ((isOneNode(*rNode.maChildren[3]) || isMinusOneNode(*rNode.maChildren[3]))
+                    && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], true))
                    || (isTwoNode(*rNode.maChildren[3])
                        && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], true))
                    || (isMinusTwoNode(*rNode.maChildren[3])
@@ -2872,14 +2902,26 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         {
             sal_Int32 nSearchLength = 0;
             sal_Int32 nResultLength = 0;
-            return isLiteralOnlyNode(*rNode.maChildren[0])
-                   && isLiteralVectorArrayConstantNode(*rNode.maChildren[1], &nSearchLength)
-                   && isLiteralVectorArrayConstantNode(*rNode.maChildren[2], &nResultLength)
-                   && nSearchLength == nResultLength
-                   && ((rNode.maChildren[3]->meKind == core::formula::NodeKind::EmptyArgument
-                        && isZeroOrFalseNode(*rNode.maChildren[4]))
-                       || (isLiteralOnlyNode(*rNode.maChildren[3])
-                           && isZeroOrFalseNode(*rNode.maChildren[4])));
+            if (!isLiteralOnlyNode(*rNode.maChildren[0])
+                || !isLiteralVectorArrayConstantNode(*rNode.maChildren[1], &nSearchLength)
+                || !isLiteralVectorArrayConstantNode(*rNode.maChildren[2], &nResultLength)
+                || nSearchLength != nResultLength)
+            {
+                return false;
+            }
+
+            const bool bEmptyIfNotFound
+                = rNode.maChildren[3]->meKind == core::formula::NodeKind::EmptyArgument;
+            if (!bEmptyIfNotFound && !isLiteralOnlyNode(*rNode.maChildren[3]))
+                return false;
+
+            if (isZeroOrFalseNode(*rNode.maChildren[4]))
+                return true;
+
+            const auto oMode = extractNumericLiteral(*rNode.maChildren[4]);
+            return oMode && (*oMode == 1.0 || *oMode == -1.0)
+                   && extractNumericLiteral(*rNode.maChildren[0]).has_value()
+                   && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], true);
         }
 
         if (rNode.maChildren.size() == 6 && rNode.maChildren[0] && rNode.maChildren[1]
@@ -2902,13 +2944,28 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                 return false;
             }
 
-            if (rNode.maChildren[4]->meKind != core::formula::NodeKind::EmptyArgument
-                && !isZeroOrFalseNode(*rNode.maChildren[4]))
+            const bool bExactMode = rNode.maChildren[4]->meKind == core::formula::NodeKind::EmptyArgument
+                                    || isZeroOrFalseNode(*rNode.maChildren[4]);
+            const auto oApproxMode = extractNumericLiteral(*rNode.maChildren[4]);
+            if (!bExactMode && (!oApproxMode || (*oApproxMode != 1.0 && *oApproxMode != -1.0)))
             {
                 return false;
             }
 
-            return isOneNode(*rNode.maChildren[5]) || isMinusOneNode(*rNode.maChildren[5])
+            if (bExactMode)
+            {
+                return isOneNode(*rNode.maChildren[5]) || isMinusOneNode(*rNode.maChildren[5])
+                       || (isTwoNode(*rNode.maChildren[5])
+                           && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], true))
+                       || (isMinusTwoNode(*rNode.maChildren[5])
+                           && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], false));
+            }
+
+            if (!extractNumericLiteral(*rNode.maChildren[0]).has_value())
+                return false;
+
+            return ((isOneNode(*rNode.maChildren[5]) || isMinusOneNode(*rNode.maChildren[5]))
+                    && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], true))
                    || (isTwoNode(*rNode.maChildren[5])
                        && isSortedNumericLiteralVectorArrayConstantNode(*rNode.maChildren[1], true))
                    || (isMinusTwoNode(*rNode.maChildren[5])
