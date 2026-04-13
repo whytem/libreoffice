@@ -19,6 +19,9 @@ Today:
 - debug and CI-style builds default that seam to `observe`
 - an eighty-five-slice env-independent logical/text/match/xmatch/lookup/index
   cluster is now engine-first even with rollout explicitly `off`
+- the latest scalar-root plus delegated utility-family expansion raised the
+  ambient live seen rate from `9.77%` to `26.23%`, clearing the original
+  `15-20%` target band
 
 The active program is no longer “prove more substrate slices.”
 The active program is “use the substrate to underwrite live evaluator
@@ -37,49 +40,50 @@ delegation.”
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=4326`
-- `interpret_tail_live_fallback_total=622`
-- `interpret_tail_live_seen_total=4948`
-- `interpret_tail_live_unseen_formula_cells=45713`
-- `interpret_tail_live_promoted_function_supported_total=3076`
-- `interpret_tail_live_supported_rate=8.54`
-- `interpret_tail_live_seen_rate=9.77`
+- `interpret_tail_live_supported_total=9466`
+- `interpret_tail_live_fallback_total=3822`
+- `interpret_tail_live_seen_total=13288`
+- `interpret_tail_live_unseen_formula_cells=37373`
+- `interpret_tail_live_promoted_function_supported_total=8216`
+- `interpret_tail_live_supported_rate=18.68`
+- `interpret_tail_live_seen_rate=26.23`
 
 Dominant ambient fallback reasons:
 
-- `unsupported_formula_shape=32`
-- `unsupported_host_surface=0`
+- `unsupported_formula_shape=2788`
+- `unsupported_host_surface=12`
 - `parse_failure=4`
-- `unsupported_function=588`
+- `unsupported_function=1018`
 
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=2163`
-- `interpret_tail_forced_interpret_fallback_total=311`
-- `interpret_tail_forced_interpret_seen_total=2474`
-- `interpret_tail_forced_interpret_unseen_formula_cells=48187`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=1538`
-- `interpret_tail_forced_interpret_supported_rate=4.27`
-- `interpret_tail_forced_interpret_seen_rate=4.88`
+- `interpret_tail_forced_interpret_supported_total=4737`
+- `interpret_tail_forced_interpret_fallback_total=41711`
+- `interpret_tail_forced_interpret_seen_total=46448`
+- `interpret_tail_forced_interpret_unseen_formula_cells=4213`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=4110`
+- `interpret_tail_forced_interpret_supported_rate=9.35`
+- `interpret_tail_forced_interpret_seen_rate=91.68`
 
 ### Promoted-Family Probe
 
-- `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1794`
-- `interpret_tail_authoritative_fallback_total=18`
-- promoted-family authoritative rate: `99.01%`
+- `interpret_tail_probe_formula_cells=6006`
+- `interpret_tail_authoritative_total=4160`
+- `interpret_tail_authoritative_fallback_total=1846`
+- promoted-family authoritative rate: `69.26%`
 
 Dominant promoted-family fallback reasons:
 
-- `unsupported_formula_shape=5`
-- `shadow_mismatch=13`
-- `unsupported_host_surface=0`
+- `unsupported_formula_shape=1384`
+- `shadow_mismatch=241`
+- `unsupported_function=215`
+- `unsupported_host_surface=6`
 
 ### Live-Target Filtered Promoted Probe
 
 - `interpret_tail_live_target_probe_formula_cells=0`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=1812`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=6006`
 - `interpret_tail_live_target_authoritative_total=0`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 
@@ -227,6 +231,20 @@ evaluation for:
 - `DATEVALUE`
 - `TIMEVALUE`
 - `NUMBERVALUE`
+- `ROUND`
+- `ROUNDUP`
+- `ROUNDDOWN`
+- `ISERROR`
+- `ISERR`
+- `ISNUMBER`
+- `ISNA`
+- `ISTEXT`
+- `ISNONTEXT`
+- `ISBLANK`
+- `AND`
+- `OR`
+- `XOR`
+- `NOT`
 - `MATCH`
 - `XMATCH`
 - `LOOKUP`
@@ -267,25 +285,27 @@ remain archived reference material only.
 
 The highest-value remaining blockers are now:
 
-1. ambient live-routing reach:
-   the full replay corpus now shows `4,948` seen formulas out of `50,661`, with
-   `3,076` promoted-family live supported routes
-2. promoted-family residual parity:
-   `shadow_mismatch=13`
-3. promoted-family residual formula shape:
-   replay-live `unsupported_formula_shape=6`
-4. first real Calc-path retirement:
+1. quality inside the new ambient live traffic:
+   the full replay corpus now shows `13,288` seen formulas out of `50,661`,
+   but `3,822` of those seen routes still fall back
+2. logical-fold support quality:
+   ambient live `1644 supported / 2736 fallback`
+3. round-family support quality:
+   ambient live `108 supported / 402 fallback`
+4. promoted-family residual parity and shape:
+   `shadow_mismatch=241`, `unsupported_formula_shape=1384`,
+   `unsupported_function=215`
+5. first real Calc-path retirement:
    one narrow logical/text/lookup/index cluster is now hard-routed and its
    legacy interpreter entries are quarantined for those slices, but no whole
    `ScInterpreter` subroutine has been deleted yet
-5. imported replay denominator honesty:
+6. imported replay denominator honesty:
    the raw promoted replay probe is now confirmed to be a cached imported
    correctness surface, not a live seam-off retirement denominator
 
-The latest bounded default/approximate `MATCH` plus omitted/approximate
-extended-match slice raised the env-independent hard-route cluster from
-`50` to `85` while keeping the expansion inside adjacent literal-array
-semantics.
+The latest scalar-root plus delegated utility-family slice raised the ambient
+live seen rate from `9.77%` to `26.23%` and the ambient supported rate from
+`8.54%` to `18.68%` while keeping the replay guardrail exact.
 
 Inside the current families, that effectively exhausts the semantically
 distinct env-independent literal-array hard-route frontier. Remaining
@@ -357,9 +377,11 @@ The next pass should:
 2. treat the current family-local env-independent hard-route surface as
    effectively exhausted except for alias recounts or pattern/collation-
    sensitive variants
-3. drive the next real runtime win on broader ambient live reach, a new
-   deliberate function-family expansion, or a legacy-path retirement slice
-4. only return to imported replay parity if we intentionally decide to
+3. reduce fallback inside the new ambient live traffic, led by logical-fold
+   shape support, round-family function support, and residual parity cleanup
+4. pursue another legacy-path retirement slice once the new ambient traffic
+   is less fallback-heavy
+5. only return to imported replay parity if we intentionally decide to
    rehabilitate legacy seam-off imported-formula execution
 
 ## Navigation

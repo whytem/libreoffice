@@ -32,65 +32,66 @@ That splits into two tracks:
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=4326`
-- `interpret_tail_live_fallback_total=622`
-- `interpret_tail_live_seen_total=4948`
-- `interpret_tail_live_unseen_formula_cells=45713`
-- `interpret_tail_live_promoted_function_supported_total=3076`
-- `interpret_tail_live_supported_rate=8.54`
-- `interpret_tail_live_seen_rate=9.77`
+- `interpret_tail_live_supported_total=9466`
+- `interpret_tail_live_fallback_total=3822`
+- `interpret_tail_live_seen_total=13288`
+- `interpret_tail_live_unseen_formula_cells=37373`
+- `interpret_tail_live_promoted_function_supported_total=8216`
+- `interpret_tail_live_supported_rate=18.68`
+- `interpret_tail_live_seen_rate=26.23`
 
 Ambient live fallback reasons:
 
-- `unsupported_formula_shape=32`
-- `unsupported_host_surface=0`
+- `unsupported_formula_shape=2788`
+- `unsupported_host_surface=12`
 - `parse_failure=4`
-- `unsupported_function=588`
+- `unsupported_function=1018`
 
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=2163`
-- `interpret_tail_forced_interpret_fallback_total=311`
-- `interpret_tail_forced_interpret_seen_total=2474`
-- `interpret_tail_forced_interpret_unseen_formula_cells=48187`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=1538`
-- `interpret_tail_forced_interpret_supported_rate=4.27`
-- `interpret_tail_forced_interpret_seen_rate=4.88`
+- `interpret_tail_forced_interpret_supported_total=4737`
+- `interpret_tail_forced_interpret_fallback_total=41711`
+- `interpret_tail_forced_interpret_seen_total=46448`
+- `interpret_tail_forced_interpret_unseen_formula_cells=4213`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=4110`
+- `interpret_tail_forced_interpret_supported_rate=9.35`
+- `interpret_tail_forced_interpret_seen_rate=91.68`
 
 ### Promoted-Family Probe
 
-- `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1794`
-- `interpret_tail_authoritative_fallback_total=18`
-- promoted-family authoritative rate: `99.01%`
+- `interpret_tail_probe_formula_cells=6006`
+- `interpret_tail_authoritative_total=4160`
+- `interpret_tail_authoritative_fallback_total=1846`
+- promoted-family authoritative rate: `69.26%`
 
 ### Live-Target Filtered Promoted Probe
 
 - `interpret_tail_live_target_probe_formula_cells=0`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=1812`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=6006`
 - `interpret_tail_live_target_authoritative_total=0`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 
 Promoted-family fallback reasons:
 
-- `unsupported_formula_shape=5`
-- `shadow_mismatch=13`
-- `unsupported_host_surface=0`
+- `unsupported_formula_shape=1384`
+- `shadow_mismatch=241`
+- `unsupported_function=215`
+- `unsupported_host_surface=6`
 
 ### Promoted Replay Eligibility Inventory
 
-- `interpret_tail_replay_promoted_formula_cells=1812`
-- `interpret_tail_replay_promoted_direct_seen=1812`
-- `interpret_tail_replay_promoted_direct_supported=1806`
-- `interpret_tail_replay_promoted_direct_fallback=6`
+- `interpret_tail_replay_promoted_formula_cells=6006`
+- `interpret_tail_replay_promoted_direct_seen=6006`
+- `interpret_tail_replay_promoted_direct_supported=4401`
+- `interpret_tail_replay_promoted_direct_fallback=1605`
 - `interpret_tail_replay_promoted_direct_unseen=0`
-- `interpret_tail_replay_promoted_shared_formula_cells=395`
-- `interpret_tail_replay_promoted_non_shared_formula_cells=1417`
+- `interpret_tail_replay_promoted_shared_formula_cells=2892`
+- `interpret_tail_replay_promoted_non_shared_formula_cells=3114`
 - `interpret_tail_replay_promoted_unseen_shared_member=0`
 - `interpret_tail_replay_promoted_unseen_non_shared=0`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=1812`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=6006`
 - `interpret_tail_replay_promoted_dirty_after_interpret=0`
 
 ### Current Hard-Routed Family Count
@@ -228,12 +229,18 @@ Still not true:
 - no `ScInterpreter` subroutine has been deleted yet
 - multiple interpreter hard-route milestones have landed, but full legacy
   opcode retirement has not
-- full replay-corpus live traffic is now material, but most supported ambient
-  traffic still covers only a bounded minority of formulas
-- the replay-promoted reach blocker is cleared, and the latest slice reduced
-  replay-imported promoted fallback further
-- the dominant retained promoted-family blocker is still `shadow_mismatch`,
-  with smaller `unsupported_formula_shape` cleanup secondary
+- the latest scalar-root plus delegated utility-family expansion moved ambient
+  live traffic from `4,948 / 50,661` seen formulas (`9.77%`) to
+  `13,288 / 50,661` (`26.23%`), so the original reach target is exceeded
+- the dominant retained live blocker is now quality inside that newly admitted
+  traffic, especially logical-fold and round fallback, not simple lack of
+  ambient reach
+- the replay-promoted reach blocker is cleared, and the promoted replay
+  denominator is now much broader because `ROUND`, information predicates,
+  logical folds, and `NOT` are part of the delegated family
+- the dominant retained promoted-family blockers are now
+  `unsupported_formula_shape=1384`, `shadow_mismatch=241`, and
+  `unsupported_function=215`
 - a focused live-host check now shows the replay-imported whole-row
   `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to
   `FormulaError::VariableExpected`
@@ -272,12 +279,12 @@ Still not true:
   Calc `FormulaError::VariableExpected` row, not a real runtime parity blocker
 - the promoted replay probe is now explicitly split into raw cached-workbook
   parity and live-target filtered parity, and the filtered surface is empty:
-  all `1812` promoted replay probe rows are imported host-truth artifacts under
+  all `6006` promoted replay probe rows are imported host-truth artifacts under
   seam-off direct legacy interpretation
 - the next runtime milestone therefore should not be defined by the imported
-  replay probe anymore; it should move to broader ambient live reach,
-  additional Calc-path quarantine / retirement slices, or deliberate
-  function-family expansion
+  replay probe anymore; it should move to quality inside the new ambient live
+  traffic, additional Calc-path quarantine / retirement slices, or another
+  deliberate function-family expansion
 
 ## Active Delegated Family
 
@@ -289,6 +296,20 @@ The live delegated evaluator family currently includes:
 - `DATEVALUE`
 - `TIMEVALUE`
 - `NUMBERVALUE`
+- `ROUND`
+- `ROUNDUP`
+- `ROUNDDOWN`
+- `ISERROR`
+- `ISERR`
+- `ISNUMBER`
+- `ISNA`
+- `ISTEXT`
+- `ISNONTEXT`
+- `ISBLANK`
+- `AND`
+- `OR`
+- `XOR`
+- `NOT`
 - `MATCH`
 - `XMATCH`
 - `LOOKUP`
@@ -317,8 +338,9 @@ The next pass should now move off imported replay parity cleanup:
 
 1. treat the raw promoted replay probe as a cached imported correctness surface,
    not as the live retirement denominator
-2. drive the next real runtime win on broader ambient live reach or another
-   narrow hard-route / quarantine slice inside `ScInterpreter`
+2. reduce residual fallback inside the new ambient live traffic, led by
+   logical-fold `unsupported_formula_shape`, round `unsupported_function`, and
+   the remaining promoted-family `shadow_mismatch` band
 3. only return to imported replay parity if we intentionally decide to
    rehabilitate legacy seam-off imported-formula execution
 

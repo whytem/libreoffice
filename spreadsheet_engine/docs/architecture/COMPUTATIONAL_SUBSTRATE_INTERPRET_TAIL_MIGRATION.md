@@ -32,6 +32,10 @@ Today:
 - an eighty-five-slice env-independent logical/text/match/xmatch/lookup/index
   cluster is now engine-first even with rollout set to `off`; see
   [Hard-Routed Family](#hard-routed-family) below
+- direct scalar-root formulas and a bounded scalar utility cluster now also
+  ride the live seam: arithmetic/reference/concat/comparison roots plus
+  `ROUND`, `ROUNDUP`, `ROUNDDOWN`, information predicates, logical folds, and
+  `NOT`
 - replay-imported promoted formulas now reach the live seam on both the
   ambient and forced-interpret replay surfaces through a bounded pre-RPN
   observe bridge
@@ -43,18 +47,18 @@ Today:
 - replay-imported named-range `VLOOKUP` and `INDEX` rows now resolve through
   the engine seam using the stored name-definition base position instead of
   falling out as generic host-surface fallout
-- the latest bounded replay slice therefore moved the remaining imported
-  named-range host-surface band to zero and tightened the residual frontier
-  down to parity and shape cleanup inside already-promoted families
+- the latest deliberate family expansion materially raised the ambient live
+  denominator instead of only refining replay-imported parity inside already-
+  promoted families
 
 What is still not true:
 
 - no broad default-on production rollout exists
 - no `ScInterpreter` subroutine has been deleted yet
-- the full replay corpus now shows material ambient live-seam traffic
-- the full replay corpus still reaches only a bounded minority of formulas
-- residual replay-live fallback is now concentrated in promoted-family
-  `shadow_mismatch`, with residual `unsupported_formula_shape` secondary
+- the full replay corpus now shows strong ambient live-seam traffic, but most
+  retained fallback now lives inside the newly admitted scalar utility traffic
+- the next dominant live blocker is no longer simple reach; it is the quality
+  of logical-fold, round, and related scalar utility support
 - no promoted family has moved from observe-only replay reach into a broader
   replay authority lane yet
 
@@ -89,6 +93,21 @@ The currently promoted live evaluator family includes:
   - `DATEVALUE`
   - `TIMEVALUE`
   - `NUMBERVALUE`
+- scalar utilities:
+  - `ROUND`
+  - `ROUNDUP`
+  - `ROUNDDOWN`
+  - `ISERROR`
+  - `ISERR`
+  - `ISNUMBER`
+  - `ISNA`
+  - `ISTEXT`
+  - `ISNONTEXT`
+  - `ISBLANK`
+  - `AND`
+  - `OR`
+  - `XOR`
+  - `NOT`
 - lookup and index:
   - `MATCH`
   - `XMATCH`
@@ -118,36 +137,34 @@ Two different denominators matter, and both are now reported.
 ### Full Replay Corpus: Ambient Live Observe
 
 This is the honest all-formula live-routing surface from the standing replay
-corpus after the completed token-backed canonical-source localized-array slice:
+corpus after the scalar-root plus bounded scalar-utility family expansion:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=4326`
-- `interpret_tail_live_fallback_total=622`
-- `interpret_tail_live_seen_total=4948`
-- `interpret_tail_live_unseen_formula_cells=45713`
-- `interpret_tail_live_promoted_function_supported_total=3076`
-- `interpret_tail_live_supported_rate=8.54`
-- `interpret_tail_live_seen_rate=9.77`
+- `interpret_tail_live_supported_total=9466`
+- `interpret_tail_live_fallback_total=3822`
+- `interpret_tail_live_seen_total=13288`
+- `interpret_tail_live_unseen_formula_cells=37373`
+- `interpret_tail_live_promoted_function_supported_total=8216`
+- `interpret_tail_live_supported_rate=18.68`
+- `interpret_tail_live_seen_rate=26.23`
 
 Current ambient fallback reasons:
 
-- `unsupported_formula_shape=32`
-- `unsupported_host_surface=0`
+- `unsupported_formula_shape=2788`
+- `unsupported_host_surface=12`
 - `parse_failure=4`
-- `unsupported_function=588`
+- `unsupported_function=1018`
 
 Interpretation:
 
 - the seam now measures the full replay corpus
 - the ambient live-routing denominator is real, not curated
-- the ambient replay surface now includes material promoted-family function
-  traffic
-- the pre-RPN observe bridge converted the replay-promoted reach problem into a
-  residual family-fallback problem
-- the latest slice held the ambient denominator steady while reducing promoted
-  replay mismatch inside already-seen `MATCH` rows
-- the main remaining ambient replay work is now parity cleanup inside
-  already-promoted families
+- the new scalar-root and delegated utility slice raised the seen rate from
+  `9.77%` to `26.23%`, exceeding the original `15-20%` target band
+- the ambient replay surface now includes large real traffic from
+  information predicates, logical folds, and round-family formulas
+- the main remaining ambient work is now quality inside those newly admitted
+  families, not simple denominator reach
 
 ### Full Replay Corpus: Forced Interpret Observe
 
@@ -155,38 +172,37 @@ This is the new full-corpus measurement after explicitly dirtying and forcing
 every replay formula cell through Calc's live `Interpret()` path:
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=2163`
-- `interpret_tail_forced_interpret_fallback_total=311`
-- `interpret_tail_forced_interpret_seen_total=2474`
-- `interpret_tail_forced_interpret_unseen_formula_cells=48187`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=1538`
-- `interpret_tail_forced_interpret_supported_rate=4.27`
-- `interpret_tail_forced_interpret_seen_rate=4.88`
+- `interpret_tail_forced_interpret_supported_total=4737`
+- `interpret_tail_forced_interpret_fallback_total=41711`
+- `interpret_tail_forced_interpret_seen_total=46448`
+- `interpret_tail_forced_interpret_unseen_formula_cells=4213`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=4110`
+- `interpret_tail_forced_interpret_supported_rate=9.35`
+- `interpret_tail_forced_interpret_seen_rate=91.68`
 
 Interpretation:
 
-- the replay barrier is no longer “promoted families never reach live
-  interpretation”
-- forced interpret now shows real promoted-family reach on replay-imported
-  formulas
-- the remaining replay blocker is now narrower parity and residual
-  formula-shape cleanup on that imported surface, not host-surface
-  eligibility
+- forced interpret now confirms that a much larger fraction of the corpus
+  reaches the seam when explicitly dirtied and interpreted
+- the retained forced-interpret fallback is now dominated by formulas outside
+  the promoted family plus unsupported utility-family subshapes, not by simple
+  replay reach failure
 
 ### Promoted-Family Probe
 
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
-- `interpret_tail_probe_formula_cells=1812`
-- `interpret_tail_authoritative_total=1794`
-- `interpret_tail_authoritative_fallback_total=18`
-- promoted-family authoritative rate: `99.01%`
+- `interpret_tail_probe_formula_cells=6006`
+- `interpret_tail_authoritative_total=4160`
+- `interpret_tail_authoritative_fallback_total=1846`
+- promoted-family authoritative rate: `69.26%`
 
 Current promoted-family fallback reasons:
 
-- `unsupported_formula_shape=5`
-- `shadow_mismatch=13`
-- `unsupported_host_surface=0`
+- `unsupported_formula_shape=1384`
+- `shadow_mismatch=241`
+- `unsupported_function=215`
+- `unsupported_host_surface=6`
 
 ### Live-Target Filtered Promoted Probe
 
@@ -195,20 +211,18 @@ with the seam forced `off` already disagrees with the imported cached workbook
 result:
 
 - `interpret_tail_live_target_probe_formula_cells=0`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=1812`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=6006`
 - `interpret_tail_live_target_authoritative_total=0`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 
 Interpretation:
 
-- once the probe hits promoted-family cells, authority conversion is now
-  strong
-- the main remaining conversion work is no longer generic breadth
-- the latest slice closed the residual replay-promoted
-  `VALUE([.I1:.I3])` fallback row through bounded text-parsing range
-  scalarization instead of widening new delegated families
-- the promoted-family probe improved from `1793 / 19` to `1794 / 18` while the
-  replay-promoted direct surface held at `1806 / 6`
+- the promoted-family denominator is now much broader because scalar roots,
+  round-family formulas, information predicates, logical folds, and `NOT`
+  are part of the delegated family
+- the main remaining conversion work is now quality inside that broader
+  denominator, especially logical-fold shape support, round-family unsupported
+  functions, and residual parity mismatches
 - a focused host-truth test now shows the replay-imported whole-row
   `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to
   `FormulaError::VariableExpected`
@@ -267,34 +281,34 @@ This is the new per-cell replay inventory over the promoted-family replay
 surface after forcing each promoted replay formula through direct live
 `Interpret()`:
 
-- `interpret_tail_replay_promoted_formula_cells=1812`
-- `interpret_tail_replay_promoted_direct_seen=1812`
-- `interpret_tail_replay_promoted_direct_supported=1806`
-- `interpret_tail_replay_promoted_direct_fallback=6`
+- `interpret_tail_replay_promoted_formula_cells=6006`
+- `interpret_tail_replay_promoted_direct_seen=6006`
+- `interpret_tail_replay_promoted_direct_supported=4401`
+- `interpret_tail_replay_promoted_direct_fallback=1605`
 - `interpret_tail_replay_promoted_direct_unseen=0`
-- `interpret_tail_replay_promoted_shared_formula_cells=395`
-- `interpret_tail_replay_promoted_shared_top_formula_cells=83`
-- `interpret_tail_replay_promoted_shared_member_formula_cells=312`
-- `interpret_tail_replay_promoted_non_shared_formula_cells=1417`
+- `interpret_tail_replay_promoted_shared_formula_cells=2892`
+- `interpret_tail_replay_promoted_shared_top_formula_cells=670`
+- `interpret_tail_replay_promoted_shared_member_formula_cells=2222`
+- `interpret_tail_replay_promoted_non_shared_formula_cells=3114`
 - `interpret_tail_replay_promoted_unseen_shared_top=0`
 - `interpret_tail_replay_promoted_unseen_shared_member=0`
 - `interpret_tail_replay_promoted_unseen_non_shared=0`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=1812`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=6006`
 - `interpret_tail_replay_promoted_dirty_after_interpret=0`
 
 Interpretation:
 
 - the pre-tail replay eligibility blocker is cleared for the promoted replay
   surface
-- the latest slice improved parity and shape coverage inside that surface
-  rather than widening its denominator
+- the latest slice widened the replay-promoted denominator materially by
+  promoting scalar-root and scalar-utility traffic
 - both shared and non-shared promoted replay formulas now reach the live seam
-- the residual replay work is now the `6` direct fallback cells on this
-  imported promoted-family surface
-- the dominant next targets are now the residual `VLOOKUP` / `XLOOKUP`
-  mismatch band first, then smaller `INDEX` shape fallout and any trailing
-  `LOOKUP` mismatches behind it
+- the residual replay work is now the `1605` direct fallback cells on this
+  broader imported promoted-family surface
+- the dominant next targets are logical-fold `unsupported_formula_shape`,
+  round-family `unsupported_function`, and remaining promoted-family
+  `shadow_mismatch`
 
 ## Hard-Routed Family
 
@@ -433,9 +447,11 @@ The next high-value pass should now move off imported replay parity cleanup:
 2. treat the current family-local env-independent hard-route surface as
    effectively exhausted except for alias recounts or pattern/collation-
    sensitive variants
-3. drive the next real runtime win on broader ambient live reach, a new
-   deliberate function-family expansion, or a legacy-path retirement slice
-4. only return to imported replay parity if we intentionally decide to
+3. reduce fallback inside the new ambient live traffic, led by logical-fold
+   shape support, round-family function support, and residual parity cleanup
+4. pursue another legacy-path retirement slice once that broader ambient
+   traffic is less fallback-heavy
+5. only return to imported replay parity if we intentionally decide to
    rehabilitate legacy seam-off imported-formula execution
 
 ## Historical Archive
