@@ -84,13 +84,17 @@ Dominant promoted-family fallback reasons:
 
 ### Hard-Quarantined Calc Paths
 
-- `4` env-independent engine-first literal text-parsing slices:
+- `6` env-independent engine-first slices:
+  - `TRUE()`
+  - `FALSE()`
   - string-literal `VALUE`
   - string-literal `DATEVALUE`
   - string-literal `TIMEVALUE`
   - literal-only `NUMBERVALUE`
 - the corresponding legacy interpreter entries now warn on normal reach for
   those narrow slices:
+  - `ScInterpreter::ScTrue()`
+  - `ScInterpreter::ScFalse()`
   - `ScInterpreter::ScValue()`
   - `ScInterpreter::ScGetDateValue()`
   - `ScInterpreter::ScGetTimeValue()`
@@ -184,8 +188,8 @@ The highest-value remaining blockers are now:
 3. promoted-family residual formula shape:
    replay-live `unsupported_formula_shape=6`
 4. first real Calc-path retirement:
-   one narrow text-parsing cluster is hard-routed and its legacy interpreter
-   entries are now quarantined for those literal slices, but no whole
+   one narrow logical-constant plus text-parsing cluster is hard-routed and
+   its legacy interpreter entries are now quarantined for those slices, but no whole
    `ScInterpreter` subroutine has been deleted yet
 5. imported replay denominator honesty:
    the raw promoted replay probe is now confirmed to be a cached imported

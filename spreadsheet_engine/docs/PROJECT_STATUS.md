@@ -95,13 +95,17 @@ Promoted-family fallback reasons:
 
 ### Current Hard-Routed Family Count
 
-- `4` env-independent engine-first literal text-parsing slices:
+- `6` env-independent engine-first slices:
+  - `TRUE()`
+  - `FALSE()`
   - string-literal `VALUE`
   - string-literal `DATEVALUE`
   - string-literal `TIMEVALUE`
   - literal-only `NUMBERVALUE`
 - corresponding legacy entrypoints now carry debug quarantine warnings on
   normal interpreter reach:
+  - `ScInterpreter::ScTrue()`
+  - `ScInterpreter::ScFalse()`
   - `ScInterpreter::ScValue()`
   - `ScInterpreter::ScGetDateValue()`
   - `ScInterpreter::ScGetTimeValue()`
@@ -118,8 +122,9 @@ Today:
 - `DBG_UTIL` builds default to `observe` when the rollout env var is unset
 - `authority` mode authoritatively bypasses `ScInterpreter` for supported
   promoted families
-- the env-`off` hard-route boundary now covers four narrow literal
-  text-parsing slices instead of just `NUMBERVALUE`
+- the env-`off` hard-route boundary now covers a six-slice
+  logical-constant plus literal text-parsing cluster instead of just
+  `NUMBERVALUE`
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
@@ -131,8 +136,8 @@ Still not true:
 
 - no broad default-on rollout exists
 - no `ScInterpreter` subroutine has been deleted yet
-- the first interpreter quarantine cluster has landed, but full legacy opcode
-  retirement has not
+- the second interpreter hard-route milestone has landed, but full legacy
+  opcode retirement has not
 - full replay-corpus live traffic is now material, but most supported ambient
   traffic still covers only a bounded minority of formulas
 - the replay-promoted reach blocker is cleared, and the latest slice reduced
