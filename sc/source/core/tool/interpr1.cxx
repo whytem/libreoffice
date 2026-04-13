@@ -4667,6 +4667,15 @@ void ScInterpreter::ScMatch()
 
 void ScInterpreter::ScXMatch()
 {
+    const std::optional<OUString> oQuarantinedFormula
+        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
+    if (oQuarantinedFormula)
+    {
+        SAL_WARN("sc.core",
+            "hard-routed XMATCH reached ScInterpreter for " << *oQuarantinedFormula);
+        OSL_FAIL("hard-routed XMATCH reached ScInterpreter");
+    }
+
     ScMatchOp(true);
 }
 

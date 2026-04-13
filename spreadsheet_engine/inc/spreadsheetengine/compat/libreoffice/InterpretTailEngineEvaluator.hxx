@@ -861,6 +861,9 @@ template <typename T>
 [[nodiscard]] inline bool isLiteralVectorArrayConstantNode(
     const core::formula::Node& rNode);
 
+[[nodiscard]] inline bool isHardRoutedLiteralMatchNode(
+    FunctionKind eFunction, const core::formula::Node& rNode);
+
 [[nodiscard]] inline EvaluationAttempt evaluateDelegatedNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos, bool bEmptyStringAsZero, std::size_t nDepth = 0);
@@ -2488,18 +2491,10 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
     if (eFunction != FunctionKind::NumberValue)
     {
-        if (eFunction != FunctionKind::Match)
+        if (eFunction != FunctionKind::Match && eFunction != FunctionKind::XMatch)
             return false;
 
-        if (rNode.maChildren.size() != 3 || !rNode.maChildren[0] || !rNode.maChildren[1]
-            || !rNode.maChildren[2])
-        {
-            return false;
-        }
-
-        const auto oExactMode = extractNumericLiteral(*rNode.maChildren[2]);
-        return oExactMode && *oExactMode == 0.0 && isLiteralOnlyNode(*rNode.maChildren[0])
-               && isLiteralVectorArrayConstantNode(*rNode.maChildren[1]);
+        return isHardRoutedLiteralMatchNode(eFunction, rNode);
     }
 
     if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
@@ -2535,6 +2530,32 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     }
 
     return true;
+}
+
+[[nodiscard]] inline bool isHardRoutedLiteralMatchNode(
+    FunctionKind eFunction, const core::formula::Node& rNode)
+{
+    if (eFunction == FunctionKind::Match)
+    {
+        if (rNode.maChildren.size() != 3 || !rNode.maChildren[0] || !rNode.maChildren[1]
+            || !rNode.maChildren[2])
+        {
+            return false;
+        }
+
+        const auto oExactMode = extractNumericLiteral(*rNode.maChildren[2]);
+        return oExactMode && *oExactMode == 0.0 && isLiteralOnlyNode(*rNode.maChildren[0])
+               && isLiteralVectorArrayConstantNode(*rNode.maChildren[1]);
+    }
+
+    if (eFunction == FunctionKind::XMatch)
+    {
+        return rNode.maChildren.size() == 2 && rNode.maChildren[0] && rNode.maChildren[1]
+               && isLiteralOnlyNode(*rNode.maChildren[0])
+               && isLiteralVectorArrayConstantNode(*rNode.maChildren[1]);
+    }
+
+    return false;
 }
 
 [[nodiscard]] inline EvaluationAttempt evaluateTextParsingFunction(

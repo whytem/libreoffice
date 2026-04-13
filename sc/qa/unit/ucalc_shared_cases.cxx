@@ -1437,6 +1437,14 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         aMatchIndexColumnSlice.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aMatchIndexColumnSlice.maResult.mfValue, 1e-12);
 
+    const auto aLiteralXMatch = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0), u"=XMATCH(2;{1;2;3})", false);
+    CPPUNIT_ASSERT(aLiteralXMatch.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::XMatch, aLiteralXMatch.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aLiteralXMatch.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aLiteralXMatch.maResult.mfValue, 1e-12);
+
     const auto aIfErrorWrappedLookup = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 4, 0),
         u"=IFERROR(VLOOKUP(25;B5:C7;2;0);\"missing\")", false);
@@ -1534,9 +1542,11 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNorm
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(u"=MATCH(2;{1;2;3};0)"));
     CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(
         u"=MATCH(\"C\";{\"A\";\"A\";\"B\";\"B\";\"C\";\"C\"};0)"));
+    CPPUNIT_ASSERT(setaileval::isHardRoutedFormula(u"=XMATCH(2;{1;2;3})"));
     CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=TRUE(1)"));
     CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=MATCH(2;A1:A3;0)"));
     CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=MATCH(2;{1;2;3})"));
+    CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=XMATCH(2;A1:A3)"));
     CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=VALUE(A1)"));
     CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=DATEVALUE(A1)"));
     CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=TIMEVALUE(MyTimeName)"));
