@@ -228,16 +228,21 @@ A bounded live-host-truth pass now also shows the replay-imported
 in Calc with the seam forced off, so those cached non-numeric workbook rows
 are not treated as real runtime conversion targets either.
 
+A bounded live-host-truth pass now also shows the replay-imported
+`MATCH(1; FREQUENCY([.I126]; [.H129:.M129]); 0)` row evaluates to
+`FormulaError::VariableExpected` in Calc with the seam forced off, so that
+cached workbook non-error row is likewise not treated as a real runtime
+conversion target.
+
 ## Recommended Next Pass
 
 The next pass should:
 
-1. convert the residual real replay-promoted
-   `MATCH(FREQUENCY(...))` / `INDEX(...)` `unsupported_formula_shape` rows
-2. then convert any remaining genuine `LOOKUP` parity rows
-3. move the first replay-imported promoted family from observe-only reach
-   toward a broader authority candidate once mismatch and shape fallback
-   shrink materially
+1. decide whether imported logical-constant and month-name `DATEVALUE`
+   error parity is in scope for the migration target
+2. if yes, convert that residual genuine shadow-mismatch band
+3. if no, freeze promoted replay cleanup here and return to broader ambient
+   live reach plus future Calc-path retirement work
 
 ## Navigation
 

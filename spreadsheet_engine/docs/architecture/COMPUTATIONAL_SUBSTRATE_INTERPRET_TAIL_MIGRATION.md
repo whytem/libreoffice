@@ -238,9 +238,14 @@ Interpretation:
   `DATEVALUE("Jan1, 2015")` rows evaluate to `FormulaError::VariableExpected`
   in Calc with the seam forced off, so those cached non-numeric workbook rows
   are not treated as real live runtime conversion targets either
-- the next reducible promoted-family runtime hotspot is therefore the smaller
-  replay-promoted `MATCH(FREQUENCY(...))` / `INDEX(...)` shape band, with any
-  genuine remaining `LOOKUP` parity work behind it
+- a bounded live-host-truth pass now also shows the replay-imported
+  `MATCH(1; FREQUENCY([.I126]; [.H129:.M129]); 0)` row evaluates to
+  `FormulaError::VariableExpected` in Calc with the seam forced off, so that
+  cached workbook non-error row is likewise not treated as a real live runtime
+  conversion target
+- the residual promoted replay fallback is therefore now dominated by
+  shadow-mismatch rows and cached-workbook shape rows that have already been
+  disproved as live runtime targets by host-truth checks
 
 ### Replay Eligibility Inventory
 
@@ -314,15 +319,14 @@ historical reference material, not active roadmap work.
 
 The latest replay closeout is now folded into this migration ledger.
 
-The next high-value pass should now stay on the residual real
-replay-promoted shape band before returning to any cached-workbook mismatch
-cleanup:
+The next high-value pass should now stay on the remaining genuine parity
+decision, not on cached-workbook-only shape rows:
 
-1. convert the remaining real replay-promoted
-   `MATCH(FREQUENCY(...))` / `INDEX(...)` `unsupported_formula_shape` rows
-2. then clean up any genuine residual `LOOKUP` mismatch rows still visible
-   after that
-3. only return to broader reach work if the promoted replay surface regresses
+1. decide whether imported logical-constant and month-name `DATEVALUE`
+   error parity is in scope for the live migration target
+2. if yes, convert that residual genuine shadow-mismatch band
+3. if no, freeze promoted replay cleanup here and return to broader ambient
+   live reach and future Calc-path retirement work
 
 ## Historical Archive
 

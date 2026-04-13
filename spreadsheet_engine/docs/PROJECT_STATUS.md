@@ -156,9 +156,12 @@ Still not true:
 - a bounded live-host-truth pass now also shows the replay-imported
   `DATEVALUE("Jan1, 2015")` rows are genuine live Calc
   `FormulaError::VariableExpected` rows, not real runtime parity blockers
-- the next highest-value reducible replay blocker is therefore the smaller
-  real `MATCH(FREQUENCY(...))` / `INDEX(...)` shape band, with any genuine
-  residual `LOOKUP` mismatches behind it
+- a bounded live-host-truth pass now also shows the replay-imported
+  `MATCH(1; FREQUENCY([.I126]; [.H129:.M129]); 0)` row is also a genuine live
+  Calc `FormulaError::VariableExpected` row, not a real runtime parity blocker
+- the remaining promoted replay cleanup question is therefore no longer the
+  old shape band, but whether current live Calc imported logical-constant and
+  month-name `DATEVALUE` error behavior is in scope to reproduce
 
 ## Active Delegated Family
 
@@ -194,12 +197,13 @@ historical reference material, not active roadmap.
 
 ## Recommended Next Pass
 
-The next pass should stay on promoted-family parity cleanup:
+The next pass should stay on the remaining real parity decision:
 
-1. convert the remaining real replay-promoted
-   `MATCH(FREQUENCY(...))` / `INDEX(...)` `unsupported_formula_shape` rows
-2. then clean up any genuine residual `LOOKUP` mismatch rows
-3. only return to broader reach work if the promoted replay surface regresses
+1. decide whether imported logical-constant and month-name `DATEVALUE`
+   error parity is in scope
+2. if yes, convert that residual genuine shadow-mismatch band
+3. if no, freeze promoted replay cleanup and return to broader ambient
+   live reach work
 
 ## References
 
