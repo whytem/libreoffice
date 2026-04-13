@@ -806,6 +806,17 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::api::formulavalue::ValueType::Value, aSignedValue.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(-42.0, aSignedValue.maResult.mfValue, 1e-12);
 
+    m_pDoc->SetTextCell(ScAddress(25, 0, 0), u"12 potatoes"_ustr);
+    m_pDoc->SetTextCell(ScAddress(25, 1, 0), u"1"_ustr);
+    m_pDoc->SetTextCell(ScAddress(25, 2, 0), u"2000-01-01"_ustr);
+    const auto aRangeValue = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(26, 5, 0), u"=VALUE(Z1:Z3)", false);
+    CPPUNIT_ASSERT(aRangeValue.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error, aRangeValue.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::IllegalArgument, aRangeValue.maResult.meError);
+
     const auto aEmptyValue = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 8, 0), u"=VALUE(A9)", false);
     CPPUNIT_ASSERT(aEmptyValue.mbSupported);

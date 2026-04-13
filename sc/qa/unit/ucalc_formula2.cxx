@@ -1149,6 +1149,10 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetString(6, 5, 0, u"=XMATCH(B5:B7;B5:B7)"_ustr);
         m_pDoc->SetString(3, 9, 0, u"=INDEX({1;2|3;4};2;2)"_ustr);
         m_pDoc->SetString(3, 10, 0, u"=VALUE(A11)"_ustr);
+        m_pDoc->SetTextCell(ScAddress(25, 0, 0), u"12 potatoes"_ustr);
+        m_pDoc->SetTextCell(ScAddress(25, 1, 0), u"1"_ustr);
+        m_pDoc->SetTextCell(ScAddress(25, 2, 0), u"2000-01-01"_ustr);
+        m_pDoc->SetString(26, 5, 0, u"=VALUE(Z1:Z3)"_ustr);
         m_pDoc->SetString(3, 11, 0, u"=XLOOKUP(A5;B5:B7;C5:C7)"_ustr);
         m_pDoc->SetString(3, 12, 0, u"=IFERROR(VLOOKUP(25;B5:C7;2;0);\"missing\")"_ustr);
         m_pDoc->SetString(3, 13, 0, u"=IFNA(XLOOKUP(25;B5:B7;C5:C7);\"missing\")"_ustr);
@@ -1236,6 +1240,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(6, 5, 0));
         ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(3, 9, 0));
         ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(3, 10, 0));
+        CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(26, 5, 0)));
         CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(3, 11, 0));
         CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(3, 12, 0));
         CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(3, 13, 0));
@@ -1304,7 +1309,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Value)]
-            >= 1);
+            >= 2);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::VLookup)]

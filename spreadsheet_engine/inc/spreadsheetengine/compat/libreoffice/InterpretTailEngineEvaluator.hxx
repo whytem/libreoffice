@@ -2331,6 +2331,41 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         lookupexecution::detail::toApiCellValue((*aMatrix.moValue)->Get(0, 0)));
 }
 
+[[nodiscard]] inline Materialization<api::CellValue> materializeTextParsingValueNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    if (rNode.meKind == core::formula::NodeKind::CellReference
+        || rNode.meKind == core::formula::NodeKind::RangeReference
+        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    {
+        const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+        if (!aRange.mbSupported)
+            return makeUnsupportedMaterialization<api::CellValue>(aRange.meFallbackReason);
+        if (!aRange.moValue)
+            return makeMaterializedError<api::CellValue>(aRange.meError);
+
+        std::optional<ScAddress> oScalarAddress
+            = tryImplicitIntersectionAddress(*aRange.moValue, rFormulaPos);
+        if ((!oScalarAddress || *oScalarAddress == rFormulaPos)
+            && aRange.moValue->aStart != rFormulaPos)
+        {
+            oScalarAddress = aRange.moValue->aStart;
+        }
+
+        if (!oScalarAddress || *oScalarAddress == rFormulaPos)
+        {
+            return makeUnsupportedMaterialization<api::CellValue>(
+                FallbackReason::UnsupportedHostSurface);
+        }
+
+        return makeMaterializedValue(
+            readMaterializedHostCellValue(rDoc, rContext, *oScalarAddress));
+    }
+
+    return materializeScalarNode(rNode, rDoc, rContext, rFormulaPos);
+}
+
 [[nodiscard]] inline Materialization<api::CellValue> materializeMatchLookupValueNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
@@ -2456,9 +2491,14 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero)
 {
-    auto materializeArgument = [&](const core::formula::Node& rArgument)
+    auto materializeScalarArgument = [&](const core::formula::Node& rArgument)
         -> Materialization<api::CellValue> {
         return materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+    };
+
+    auto materializeTextArgument = [&](const core::formula::Node& rArgument)
+        -> Materialization<api::CellValue> {
+        return materializeTextParsingValueNode(rArgument, rDoc, rContext, rFormulaPos);
     };
 
     if (eFunction == FunctionKind::Value || eFunction == FunctionKind::DateValue
@@ -2467,7 +2507,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (rNode.maChildren.size() != 1)
             return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-        const auto aArgument = materializeArgument(*rNode.maChildren[0]);
+        const auto aArgument = materializeTextArgument(*rNode.maChildren[0]);
         if (!aArgument.mbSupported)
             return makeUnsupported(eFunction, aArgument.meFallbackReason);
         if (!aArgument.moValue)
@@ -2538,7 +2578,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
             return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-        const auto aTextArg = materializeArgument(*rNode.maChildren[0]);
+        const auto aTextArg = materializeTextArgument(*rNode.maChildren[0]);
         if (!aTextArg.mbSupported)
             return makeUnsupported(eFunction, aTextArg.meFallbackReason);
         if (!aTextArg.moValue)
@@ -2551,7 +2591,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         std::optional<OUString> oGroupSeparator;
         if (rNode.maChildren.size() >= 2)
         {
-            const auto aDecimalArg = materializeArgument(*rNode.maChildren[1]);
+            const auto aDecimalArg = materializeScalarArgument(*rNode.maChildren[1]);
             if (!aDecimalArg.mbSupported)
                 return makeUnsupported(eFunction, aDecimalArg.meFallbackReason);
             if (!aDecimalArg.moValue)
@@ -2563,7 +2603,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         }
         if (rNode.maChildren.size() == 3)
         {
-            const auto aGroupArg = materializeArgument(*rNode.maChildren[2]);
+            const auto aGroupArg = materializeScalarArgument(*rNode.maChildren[2]);
             if (!aGroupArg.mbSupported)
                 return makeUnsupported(eFunction, aGroupArg.meFallbackReason);
             if (!aGroupArg.moValue)
