@@ -216,8 +216,15 @@ Interpretation:
   evaluates to `FormulaError::VariableExpected` in Calc with the seam forced
   off, so the residual replay `VLOOKUP` band is no longer treated as a real
   runtime conversion target
-- the next reducible promoted-family runtime hotspot is therefore the smaller
-  `XLOOKUP` mismatch band, with `INDEX` shape fallout behind it
+- a bounded live-host-truth pass now also shows the residual replay-imported
+  `XLOOKUP("Ireland"; [.H2:.H11]; [.J2:.J11]; "")` and
+  `XLOOKUP([.G14]; [.I14:.R14]; [.I15:.R16])` rows both evaluate to
+  `FormulaError::VariableExpected` in Calc with the seam forced off, so the
+  residual replay `XLOOKUP` band is likewise no longer treated as a real
+  runtime conversion target
+- the next reducible promoted-family runtime hotspot is therefore `INDEX`
+  shape fallout, with the smaller `VALUE` and `DATEVALUE` parity cleanup
+  behind it
 
 ### Replay Eligibility Inventory
 
@@ -292,8 +299,8 @@ The next high-value pass should now stay on promoted-family parity cleanup,
 starting with the residual `VLOOKUP` / `XLOOKUP` mismatch band and then the
 smaller shape fallout behind it:
 
-1. convert the remaining real replay-promoted `XLOOKUP`
-   mismatch rows
+1. convert the remaining real replay-promoted `INDEX`
+   `unsupported_formula_shape` rows
 2. then convert smaller `INDEX` `unsupported_formula_shape` fallout
 3. clean up any residual `LOOKUP` mismatch rows still visible after that
 4. only return to broader reach work if the promoted replay surface regresses

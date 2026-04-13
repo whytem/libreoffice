@@ -199,12 +199,19 @@ evaluates to `FormulaError::VariableExpected` in Calc with the seam forced
 off, so the residual replay `VLOOKUP` band is no longer treated as a real
 runtime conversion target either.
 
+A bounded live-host-truth pass now also shows the residual replay-imported
+`XLOOKUP("Ireland"; [.$H$2:.$H$11]; [.$J$2:.$J$11]; "")` and
+`XLOOKUP([.$G$14]; [.$I$14:.$R$14]; [.$I$15:.$R$16])` rows evaluate to
+`FormulaError::VariableExpected` in Calc with the seam forced off, so the
+residual replay `XLOOKUP` band is no longer treated as a real runtime
+conversion target either.
+
 ## Recommended Next Pass
 
 The next pass should:
 
 1. convert the residual
-   real `XLOOKUP` mismatch rows
+   real `INDEX` shape-fallback rows
 2. then convert smaller `INDEX` shape fallout and any remaining `LOOKUP`
    parity rows
 3. move the first replay-imported promoted family from observe-only reach

@@ -1758,6 +1758,57 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedVLookupCollationLiveHo
     CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(aPos));
 }
 
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedXLookupLiveHostTruth)
+{
+    const OUString aWorkbookPath
+        = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/spreadsheet/fods/xlookup.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for xlookup.fods", static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    const struct XLookupHostTruthCase
+    {
+        SCROW mnRow;
+        OUString maExpectedFormula;
+    } aCases[] = {
+        { SCROW(5), u"=of:=COM.MICROSOFT.XLOOKUP(\"Ireland\";[.H2:.H11];[.J2:.J11];\"\")"_ustr }, // Sheet2.A6
+        { SCROW(15), u"=of:=COM.MICROSOFT.XLOOKUP([.G14];[.I14:.R14];[.I15:.R16])"_ustr }, // Sheet2.A16
+    };
+
+    for (const auto& rCase : aCases)
+    {
+        const ScAddress aPos(0, rCase.mnRow, 1);
+        ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+        CPPUNIT_ASSERT(pFormula);
+
+        const OUString aFormulaSource
+            = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+        CPPUNIT_ASSERT_EQUAL(rCase.maExpectedFormula, aFormulaSource);
+
+        {
+            ScopedEnvironmentOverride aOffMode(
+                "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+            pFormula->SetDirty();
+            pFormula->Interpret();
+        }
+        CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(aPos));
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
 {
     if (!envEnabled("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_STATS"))
