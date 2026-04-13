@@ -6251,6 +6251,15 @@ void ScInterpreter::ScMaxIfs_MS()
 
 void ScInterpreter::ScLookup()
 {
+    const std::optional<OUString> oQuarantinedFormula
+        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
+    if (oQuarantinedFormula)
+    {
+        SAL_WARN("sc.core",
+            "hard-routed LOOKUP reached ScInterpreter for " << *oQuarantinedFormula);
+        OSL_FAIL("hard-routed LOOKUP reached ScInterpreter");
+    }
+
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 2, 3 ) )
         return;
@@ -6438,11 +6447,29 @@ bool ScInterpreter::FillEntry(ScQueryEntry& rEntry)
 
 void ScInterpreter::ScVLookup()
 {
+    const std::optional<OUString> oQuarantinedFormula
+        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
+    if (oQuarantinedFormula)
+    {
+        SAL_WARN("sc.core",
+            "hard-routed VLOOKUP reached ScInterpreter for " << *oQuarantinedFormula);
+        OSL_FAIL("hard-routed VLOOKUP reached ScInterpreter");
+    }
+
     CalculateLookup(false);
 }
 
 void ScInterpreter::ScXLookup()
 {
+    const std::optional<OUString> oQuarantinedFormula
+        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
+    if (oQuarantinedFormula)
+    {
+        SAL_WARN("sc.core",
+            "hard-routed XLOOKUP reached ScInterpreter for " << *oQuarantinedFormula);
+        OSL_FAIL("hard-routed XLOOKUP reached ScInterpreter");
+    }
+
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 3, 6 ) )
         return;
@@ -9296,6 +9323,15 @@ void ScInterpreter::ScOffset()
 
 void ScInterpreter::ScIndex()
 {
+    const std::optional<OUString> oQuarantinedFormula
+        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
+    if (oQuarantinedFormula)
+    {
+        SAL_WARN("sc.core",
+            "hard-routed INDEX reached ScInterpreter for " << *oQuarantinedFormula);
+        OSL_FAIL("hard-routed INDEX reached ScInterpreter");
+    }
+
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 1, 4 ) )
         return;

@@ -864,6 +864,23 @@ template <typename T>
 [[nodiscard]] inline bool isHardRoutedLiteralMatchNode(
     FunctionKind eFunction, const core::formula::Node& rNode);
 
+[[nodiscard]] inline bool isLiteralArrayConstantNode(
+    const core::formula::Node& rNode);
+
+[[nodiscard]] inline bool isLiteralVectorArrayConstantNode(
+    const core::formula::Node& rNode);
+
+[[nodiscard]] inline bool isLiteralVectorArrayConstantNode(
+    const core::formula::Node& rNode, sal_Int32* pLength);
+
+[[nodiscard]] inline bool isZeroOrFalseNode(const core::formula::Node& rNode);
+
+[[nodiscard]] inline bool isPositiveWholeLiteralNode(
+    const core::formula::Node& rNode, sal_Int32* pValue = nullptr);
+
+[[nodiscard]] inline bool isHardRoutedLiteralLookupNode(
+    FunctionKind eFunction, const core::formula::Node& rNode);
+
 [[nodiscard]] inline EvaluationAttempt evaluateDelegatedNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos, bool bEmptyStringAsZero, std::size_t nDepth = 0);
@@ -2491,10 +2508,17 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
     if (eFunction != FunctionKind::NumberValue)
     {
-        if (eFunction != FunctionKind::Match && eFunction != FunctionKind::XMatch)
-            return false;
+        if (eFunction == FunctionKind::Match || eFunction == FunctionKind::XMatch)
+            return isHardRoutedLiteralMatchNode(eFunction, rNode);
 
-        return isHardRoutedLiteralMatchNode(eFunction, rNode);
+        if (eFunction == FunctionKind::Lookup || eFunction == FunctionKind::VLookup
+            || eFunction == FunctionKind::XLookup
+            || eFunction == FunctionKind::Index)
+        {
+            return isHardRoutedLiteralLookupNode(eFunction, rNode);
+        }
+
+        return false;
     }
 
     if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
@@ -2509,14 +2533,13 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return true;
 }
 
-[[nodiscard]] inline bool isLiteralVectorArrayConstantNode(
+[[nodiscard]] inline bool isLiteralArrayConstantNode(
     const core::formula::Node& rNode)
 {
     if (rNode.meKind != core::formula::NodeKind::ArrayConstant)
         return false;
 
     if (rNode.mnArrayColumns < 1 || rNode.mnArrayRows < 1
-        || (rNode.mnArrayColumns != 1 && rNode.mnArrayRows != 1)
         || static_cast<sal_Int32>(rNode.maChildren.size())
                != rNode.mnArrayColumns * rNode.mnArrayRows)
     {
@@ -2529,6 +2552,56 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             return false;
     }
 
+    return true;
+}
+
+[[nodiscard]] inline bool isLiteralVectorArrayConstantNode(
+    const core::formula::Node& rNode)
+{
+    return isLiteralVectorArrayConstantNode(rNode, nullptr);
+}
+
+[[nodiscard]] inline bool isLiteralVectorArrayConstantNode(
+    const core::formula::Node& rNode, sal_Int32* pLength)
+{
+    if (!isLiteralArrayConstantNode(rNode)
+        || (rNode.mnArrayColumns != 1 && rNode.mnArrayRows != 1))
+    {
+        return false;
+    }
+
+    if (pLength)
+        *pLength = std::max(rNode.mnArrayColumns, rNode.mnArrayRows);
+    return true;
+}
+
+[[nodiscard]] inline bool isZeroOrFalseNode(const core::formula::Node& rNode)
+{
+    if (const auto oNumber = extractNumericLiteral(rNode))
+        return *oNumber == 0.0;
+
+    if (rNode.meKind == core::formula::NodeKind::BooleanLiteral)
+        return !rNode.mbBoolean;
+
+    if (rNode.meKind == core::formula::NodeKind::FunctionCall
+        && classifyFunction(uppercaseAscii(rNode.maPrimaryText)) == FunctionKind::LogicalConstant
+        && rNode.maChildren.empty())
+    {
+        return uppercaseAscii(rNode.maPrimaryText) == u"FALSE";
+    }
+
+    return false;
+}
+
+[[nodiscard]] inline bool isPositiveWholeLiteralNode(
+    const core::formula::Node& rNode, sal_Int32* pValue)
+{
+    const auto oNumber = extractNumericLiteral(rNode);
+    if (!oNumber || *oNumber < 1.0 || std::floor(*oNumber) != *oNumber)
+        return false;
+
+    if (pValue)
+        *pValue = static_cast<sal_Int32>(*oNumber);
     return true;
 }
 
@@ -2553,6 +2626,91 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         return rNode.maChildren.size() == 2 && rNode.maChildren[0] && rNode.maChildren[1]
                && isLiteralOnlyNode(*rNode.maChildren[0])
                && isLiteralVectorArrayConstantNode(*rNode.maChildren[1]);
+    }
+
+    return false;
+}
+
+[[nodiscard]] inline bool isHardRoutedLiteralLookupNode(
+    FunctionKind eFunction, const core::formula::Node& rNode)
+{
+    if (eFunction == FunctionKind::Lookup)
+    {
+        if (rNode.maChildren.size() == 2 && rNode.maChildren[0] && rNode.maChildren[1])
+        {
+            return isLiteralOnlyNode(*rNode.maChildren[0])
+                   && isLiteralArrayConstantNode(*rNode.maChildren[1])
+                   && rNode.maChildren[1]->mnArrayColumns > 1 && rNode.maChildren[1]->mnArrayRows > 1;
+        }
+
+        if (rNode.maChildren.size() == 3 && rNode.maChildren[0] && rNode.maChildren[1]
+            && rNode.maChildren[2])
+        {
+            sal_Int32 nSearchLength = 0;
+            sal_Int32 nResultLength = 0;
+            return isLiteralOnlyNode(*rNode.maChildren[0])
+                   && isLiteralVectorArrayConstantNode(*rNode.maChildren[1], &nSearchLength)
+                   && isLiteralVectorArrayConstantNode(*rNode.maChildren[2], &nResultLength)
+                   && nSearchLength == nResultLength;
+        }
+        return false;
+    }
+
+    if (eFunction == FunctionKind::VLookup)
+    {
+        if (rNode.maChildren.size() != 4 || !rNode.maChildren[0] || !rNode.maChildren[1]
+            || !rNode.maChildren[2] || !rNode.maChildren[3]
+            || !isLiteralOnlyNode(*rNode.maChildren[0])
+            || !isLiteralArrayConstantNode(*rNode.maChildren[1])
+            || !isPositiveWholeLiteralNode(*rNode.maChildren[2])
+            || !isZeroOrFalseNode(*rNode.maChildren[3]))
+        {
+            return false;
+        }
+
+        return rNode.maChildren[1]->mnArrayColumns >= 1;
+    }
+
+    if (eFunction == FunctionKind::XLookup)
+    {
+        if (rNode.maChildren.size() == 3 && rNode.maChildren[0] && rNode.maChildren[1]
+            && rNode.maChildren[2])
+        {
+            sal_Int32 nSearchLength = 0;
+            sal_Int32 nResultLength = 0;
+            return isLiteralOnlyNode(*rNode.maChildren[0])
+                   && isLiteralVectorArrayConstantNode(*rNode.maChildren[1], &nSearchLength)
+                   && isLiteralVectorArrayConstantNode(*rNode.maChildren[2], &nResultLength)
+                   && nSearchLength == nResultLength;
+        }
+
+        if (rNode.maChildren.size() == 5 && rNode.maChildren[0] && rNode.maChildren[1]
+            && rNode.maChildren[2] && rNode.maChildren[3] && rNode.maChildren[4])
+        {
+            sal_Int32 nSearchLength = 0;
+            sal_Int32 nResultLength = 0;
+            return isLiteralOnlyNode(*rNode.maChildren[0])
+                   && isLiteralVectorArrayConstantNode(*rNode.maChildren[1], &nSearchLength)
+                   && isLiteralVectorArrayConstantNode(*rNode.maChildren[2], &nResultLength)
+                   && nSearchLength == nResultLength
+                   && rNode.maChildren[3]->meKind == core::formula::NodeKind::EmptyArgument
+                   && isZeroOrFalseNode(*rNode.maChildren[4]);
+        }
+
+        return false;
+    }
+
+    if (eFunction == FunctionKind::Index)
+    {
+        if (rNode.maChildren.size() != 3 || !rNode.maChildren[0] || !rNode.maChildren[1]
+            || !rNode.maChildren[2])
+        {
+            return false;
+        }
+
+        return isLiteralArrayConstantNode(*rNode.maChildren[0])
+               && isPositiveWholeLiteralNode(*rNode.maChildren[1])
+               && isPositiveWholeLiteralNode(*rNode.maChildren[2]);
     }
 
     return false;
