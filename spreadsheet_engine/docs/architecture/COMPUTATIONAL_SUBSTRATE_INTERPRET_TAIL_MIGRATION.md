@@ -325,14 +325,24 @@ The env-independent engine-first cluster now includes:
 - `LOOKUP(<literal>; <2D literal matrix>)`
 - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
 - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
+- `VLOOKUP(<literal>; <ascending numeric 2D literal array>; <positive whole>)`
+- `VLOOKUP(<literal>; <ascending numeric 2D literal array>; <positive whole>; TRUE())`
 - `HLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
 - `HLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
+- `HLOOKUP(<literal>; <ascending numeric 2D literal array>; <positive whole>)`
+- `HLOOKUP(<literal>; <ascending numeric 2D literal array>; <positive whole>; TRUE())`
 - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>)`
+- `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>)`
 - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0)`
+- `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>; 0)`
 - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0; 1)`
+- `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; 1)`
 - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0; -1)`
+- `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; -1)`
 - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 0; 2)`
+- `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; 2)`
 - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector> ;; 0; -2)`
+- `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; -2)`
 - `INDEX(<2D literal array>; <positive whole>)`
 - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
 - `INDEX(<2D literal array>; 0; <positive whole>)`
@@ -357,7 +367,7 @@ Current meaning:
 
 This latest hard-route milestone extends the explicit-exact match and
 literal lookup/index hard-quarantined Calc path cluster on the migration
-track and brings the env-independent engine-first total to `30` slices.
+track and brings the env-independent engine-first total to `40` slices.
 
 ## Scope Policy
 

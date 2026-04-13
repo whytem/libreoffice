@@ -84,7 +84,7 @@ Dominant promoted-family fallback reasons:
 
 ### Hard-Quarantined Calc Paths
 
-- `30` env-independent engine-first slices:
+- `40` env-independent engine-first slices:
   - `TRUE()`
   - `FALSE()`
   - string-literal `VALUE`
@@ -103,14 +103,24 @@ Dominant promoted-family fallback reasons:
   - `LOOKUP(<literal>; <2D literal matrix>)`
   - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
   - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
+  - `VLOOKUP(<literal>; <ascending numeric 2D literal array>; <positive whole>)`
+  - `VLOOKUP(<literal>; <ascending numeric 2D literal array>; <positive whole>; TRUE())`
   - `HLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
   - `HLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
+  - `HLOOKUP(<literal>; <ascending numeric 2D literal array>; <positive whole>)`
+  - `HLOOKUP(<literal>; <ascending numeric 2D literal array>; <positive whole>; TRUE())`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>)`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>; 0)`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0; 1)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; 1)`
   - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0; -1)`
+  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; -1)`
   - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 0; 2)`
+  - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; 2)`
   - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector> ;; 0; -2)`
+  - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; -2)`
   - `INDEX(<2D literal array>; <positive whole>)`
   - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
   - `INDEX(<2D literal array>; 0; <positive whole>)`
@@ -226,9 +236,10 @@ The highest-value remaining blockers are now:
    the raw promoted replay probe is now confirmed to be a cached imported
    correctness surface, not a live seam-off retirement denominator
 
-The latest bounded exact-search-mode plus literal-array lookup/index slice
-raised the env-independent hard-route cluster from `20` to `30` while
-keeping the expansion inside explicit-exact and literal-array semantics.
+The latest bounded exact-search-mode plus literal-fallback/approximate
+lookup slice raised the env-independent hard-route cluster from `30` to
+`40` while keeping the expansion inside explicit-exact and literal-array
+semantics.
 
 A focused live-host check now shows the replay-imported whole-row
 `MATCH([.$B$150]; [.$150:.$150]; -1)` row evaluates to
