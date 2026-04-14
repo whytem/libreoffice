@@ -143,10 +143,10 @@ This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=7063`
-- `interpret_tail_live_authoritative_match_total=4385`
-- `interpret_tail_live_authoritative_fallback_total=2678`
-- live authoritative-match rate over the corpus: `8.6556%`
-- live authoritative-match rate over the current promoted probe: `62.0841%`
+- `interpret_tail_live_authoritative_match_total=4389`
+- `interpret_tail_live_authoritative_fallback_total=2674`
+- live authoritative-match rate over the corpus: `8.6635%`
+- live authoritative-match rate over the current promoted probe: `62.1407%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -156,12 +156,12 @@ This is the honest all-formula live-routing surface from the standing replay
 corpus:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=19190`
-- `interpret_tail_live_fallback_total=612`
+- `interpret_tail_live_supported_total=19198`
+- `interpret_tail_live_fallback_total=604`
 - `interpret_tail_live_seen_total=19802`
 - `interpret_tail_live_unseen_formula_cells=30859`
-- `interpret_tail_live_promoted_function_supported_total=17940`
-- `interpret_tail_live_supported_rate=37.88`
+- `interpret_tail_live_promoted_function_supported_total=17948`
+- `interpret_tail_live_supported_rate=37.90`
 - `interpret_tail_live_seen_rate=39.09`
 
 Current ambient fallback reasons:
@@ -180,6 +180,8 @@ Interpretation:
   helpers, and bounded financial feeders
 - the imported direct information-predicate host-truth residue is now closed
   on the live surface
+- the imported direct logical-fold residue and the imported nested-`XMATCH`
+  `INDEX` residue are now also closed on the live surface
 - the main remaining ambient work is now parity quality inside those newly
   admitted families, not simple denominator reach
 - the live authoritative-match north-star has now moved decisively above the
@@ -192,11 +194,11 @@ This is the new full-corpus measurement after explicitly dirtying and forcing
 every replay formula cell through Calc's live `Interpret()` path:
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=47189`
-- `interpret_tail_forced_interpret_fallback_total=306`
+- `interpret_tail_forced_interpret_supported_total=47193`
+- `interpret_tail_forced_interpret_fallback_total=302`
 - `interpret_tail_forced_interpret_seen_total=47495`
 - `interpret_tail_forced_interpret_unseen_formula_cells=3160`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=46562`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=46566`
 - `interpret_tail_forced_interpret_supported_rate=93.15`
 - `interpret_tail_forced_interpret_seen_rate=93.75`
 

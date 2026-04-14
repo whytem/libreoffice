@@ -4631,7 +4631,16 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
             const auto aArgument = materializeArgument(*rxChild);
             if (!aArgument.mbSupported)
+            {
+                if ((bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
+                    && !containsReferenceLikeDescendant(rNode)
+                    && (aArgument.meFallbackReason == FallbackReason::UnsupportedFunction
+                        || aArgument.meFallbackReason == FallbackReason::UnsupportedFormulaShape))
+                {
+                    return makeErrorResult(eFunction, api::Error::VariableExpected);
+                }
                 return makeUnsupported(eFunction, aArgument.meFallbackReason);
+            }
             if (!aArgument.moValue)
                 return makeErrorResult(eFunction, aArgument.meError);
             const auto aBool = coerceScalarToBool(rDoc, rContext, *aArgument.moValue);
@@ -5018,7 +5027,15 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
         const auto aRow = normalizeWholeArgument(*rNode.maChildren[1]);
         if (!aRow.mbSupported)
+        {
+            if ((bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
+                && (aRow.meFallbackReason == FallbackReason::UnsupportedFormulaShape
+                    || aRow.meFallbackReason == FallbackReason::UnsupportedFunction))
+            {
+                return makeErrorResult(eFunction, api::Error::VariableExpected);
+            }
             return makeUnsupported(eFunction, aRow.meFallbackReason);
+        }
         if (!aRow.moValue || *aRow.moValue < 0)
             return makeErrorResult(eFunction, aRow.moValue ? api::Error::IllegalArgument
                                                            : aRow.meError);
@@ -5028,11 +5045,19 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         {
             const auto aColumn = normalizeWholeArgument(*rNode.maChildren[2]);
             if (!aColumn.mbSupported)
+            {
+                if ((bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
+                    && (aColumn.meFallbackReason == FallbackReason::UnsupportedFormulaShape
+                        || aColumn.meFallbackReason == FallbackReason::UnsupportedFunction))
+                {
+                    return makeErrorResult(eFunction, api::Error::VariableExpected);
+                }
                 return makeUnsupported(eFunction, aColumn.meFallbackReason);
+            }
             if (!aColumn.moValue || *aColumn.moValue < 0)
             {
                 return makeErrorResult(eFunction, aColumn.moValue ? api::Error::IllegalArgument
-                                                                  : aColumn.meError);
+                                                                 : aColumn.meError);
             }
             nColumn = *aColumn.moValue;
         }

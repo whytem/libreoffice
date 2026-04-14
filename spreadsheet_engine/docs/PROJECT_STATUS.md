@@ -35,22 +35,22 @@ This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=7063`
-- `interpret_tail_live_authoritative_match_total=4385`
-- `interpret_tail_live_authoritative_fallback_total=2678`
-- live authoritative-match rate over the corpus: `8.6556%`
-- live authoritative-match rate over the current promoted probe: `62.0841%`
+- `interpret_tail_live_authoritative_match_total=4389`
+- `interpret_tail_live_authoritative_fallback_total=2674`
+- live authoritative-match rate over the corpus: `8.6635%`
+- live authoritative-match rate over the current promoted probe: `62.1407%`
 
 Everything below is diagnostic context for improving that number.
 
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=19190`
-- `interpret_tail_live_fallback_total=612`
+- `interpret_tail_live_supported_total=19198`
+- `interpret_tail_live_fallback_total=604`
 - `interpret_tail_live_seen_total=19802`
 - `interpret_tail_live_unseen_formula_cells=30859`
-- `interpret_tail_live_promoted_function_supported_total=17940`
-- `interpret_tail_live_supported_rate=37.88`
+- `interpret_tail_live_promoted_function_supported_total=17948`
+- `interpret_tail_live_supported_rate=37.90`
 - `interpret_tail_live_seen_rate=39.09`
 
 Ambient live fallback reasons:
@@ -63,11 +63,11 @@ Ambient live fallback reasons:
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=47189`
-- `interpret_tail_forced_interpret_fallback_total=306`
+- `interpret_tail_forced_interpret_supported_total=47193`
+- `interpret_tail_forced_interpret_fallback_total=302`
 - `interpret_tail_forced_interpret_seen_total=47495`
 - `interpret_tail_forced_interpret_unseen_formula_cells=3166`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=46562`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=46566`
 - `interpret_tail_forced_interpret_supported_rate=93.15`
 - `interpret_tail_forced_interpret_seen_rate=93.75`
 
@@ -252,11 +252,10 @@ Still not true:
   traffic, especially logical-fold shadow mismatches and math-scalar shadow
   mismatches, not simple lack of ambient reach
 - the live authoritative-match north-star has now moved to
-  `4385 / 50,661` (`8.6556%`) on the replay corpus
+  `4389 / 50,661` (`8.6635%`) on the replay corpus
 - that gain now includes imported direct information-predicate host-truth
-  parity on unsupported expression roots, on top of the earlier
-  reference-driven information-predicate cleanup plus small structural residue
-  cleanup in `NOT`, `MATCH`, and `INDEX`
+  parity on unsupported expression roots, plus the follow-on imported
+  direct logical-fold and nested-`XMATCH` `INDEX` host-truth cleanup
 - the raw promoted replay probe is now unambiguously a diagnostic surface, not
   the retirement denominator: it intentionally sits at `2628 / 4435`
   because live-host parity now takes precedence over cached-workbook parity on
@@ -301,9 +300,8 @@ Still not true:
   parity and live-target filtered parity, and the filtered surface is empty:
   all `7063` promoted replay probe rows are imported host-truth artifacts under
   seam-off direct legacy interpretation
-- the dominant retained live buckets are now `logical_fold=6`, `INDEX=2`, and
-  the still-large ambient `unsupported_function=586`; the raw promoted
-  buckets remain diagnostic debt,
+- the dominant retained live buckets are now the still-large ambient
+  `unsupported_function=586`; the raw promoted buckets remain diagnostic debt,
   not the deletion-gating story
 - the next runtime milestone therefore should not be defined by the imported
   replay probe anymore; it should move to quality inside the new ambient live

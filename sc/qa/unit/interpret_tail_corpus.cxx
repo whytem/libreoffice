@@ -1956,6 +1956,126 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalFoldLiveHostTru
     CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(aPos));
 }
 
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalFoldDirectParity)
+{
+    const struct ImportedLogicalFoldCase
+    {
+        OUString maWorkbookPath;
+        ScAddress maPos;
+        OUString maExpectedFormula;
+    } aCases[] = {
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/logical/fods/iferror.fods"),
+            ScAddress(0, 22, 1), u"=of:=AND(NA();IFERROR(NA();1))"_ustr }, // Sheet2.A23
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/logical/fods/or.fods"),
+            ScAddress(0, 11, 1), u"=of:=OR(FALSE();NA())"_ustr }, // Sheet2.A12
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/logical/fods/xor.fods"),
+            ScAddress(0, 11, 1), u"=of:=XOR(FALSE();NA())"_ustr }, // Sheet2.A12
+    };
+
+    for (const auto& rCase : aCases)
+    {
+        const std::string aWorkbookPathUtf8(rCase.maWorkbookPath.toUtf8().getStr());
+        const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+        CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for direct logical-fold parity case",
+            static_cast<bool>(aLoadResult));
+
+        Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+        normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+        ScDocShellRef xDocShell
+            = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT
+                             | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                             | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+        xDocShell->DoInitUnitTest();
+        ScDocument& rDoc = xDocShell->GetDocument();
+        (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+        ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+        ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+        CPPUNIT_ASSERT(pContext);
+
+        ScFormulaCell* pFormula = rDoc.GetFormulaCell(rCase.maPos);
+        CPPUNIT_ASSERT(pFormula);
+
+        const OUString aFormulaSource
+            = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+        const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
+        CPPUNIT_ASSERT_EQUAL(rCase.maExpectedFormula, aFormulaSource);
+
+        const auto aAttempt
+            = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
+                rDoc, *pContext, rCase.maPos,
+                std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+                rDoc.GetCalcConfig().mbEmptyStringAsZero, pFormula->GetCode(),
+                std::u16string_view(aCanonicalFormulaSource.getStr(),
+                    aCanonicalFormulaSource.getLength()));
+        CPPUNIT_ASSERT(aAttempt.mbSupported);
+        CPPUNIT_ASSERT_EQUAL(
+            spreadsheetengine::api::formulavalue::ValueType::Error,
+            aAttempt.maResult.meType);
+        CPPUNIT_ASSERT_EQUAL(
+            spreadsheetengine::api::Error::VariableExpected, aAttempt.maResult.meError);
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalFoldDirectLiveHostTruth)
+{
+    const struct ImportedLogicalFoldCase
+    {
+        OUString maWorkbookPath;
+        ScAddress maPos;
+        OUString maExpectedFormula;
+    } aCases[] = {
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/logical/fods/iferror.fods"),
+            ScAddress(0, 22, 1), u"=of:=AND(NA();IFERROR(NA();1))"_ustr }, // Sheet2.A23
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/logical/fods/or.fods"),
+            ScAddress(0, 11, 1), u"=of:=OR(FALSE();NA())"_ustr }, // Sheet2.A12
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/logical/fods/xor.fods"),
+            ScAddress(0, 11, 1), u"=of:=XOR(FALSE();NA())"_ustr }, // Sheet2.A12
+    };
+
+    for (const auto& rCase : aCases)
+    {
+        const std::string aWorkbookPathUtf8(rCase.maWorkbookPath.toUtf8().getStr());
+        const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+        CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for direct logical-fold host truth case",
+            static_cast<bool>(aLoadResult));
+
+        Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+        normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+        ScDocShellRef xDocShell
+            = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT
+                             | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                             | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+        xDocShell->DoInitUnitTest();
+        ScDocument& rDoc = xDocShell->GetDocument();
+        (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+        ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+        ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+        CPPUNIT_ASSERT(pContext);
+
+        ScFormulaCell* pFormula = rDoc.GetFormulaCell(rCase.maPos);
+        CPPUNIT_ASSERT(pFormula);
+
+        const OUString aFormulaSource
+            = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+        CPPUNIT_ASSERT_EQUAL(rCase.maExpectedFormula, aFormulaSource);
+
+        {
+            ScopedEnvironmentOverride aOffMode(
+                "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+            pFormula->SetDirty();
+            pFormula->Interpret();
+        }
+
+        const OString aCaseLabel = OUStringToOString(rCase.maExpectedFormula, RTL_TEXTENCODING_UTF8);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            aCaseLabel.getStr(), FormulaError::VariableExpected, rDoc.GetErrCode(rCase.maPos));
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedMathScalarLiveHostTruth)
 {
     const OUString aWorkbookPath
@@ -2745,6 +2865,53 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedIndexNestedXMatchLiveH
     }
 
     CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(aPos));
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedIndexNestedXMatchParity)
+{
+    const OUString aWorkbookPath
+        = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/spreadsheet/fods/xmatch.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for xmatch.fods", static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    const ScAddress aPos(0, 7, 1); // Sheet2.A8
+    ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+    CPPUNIT_ASSERT(pFormula);
+
+    const OUString aFormulaSource
+        = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+    const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
+    CPPUNIT_ASSERT_EQUAL(
+        u"=of:=INDEX([.H13:.J19];COM.MICROSOFT.XMATCH([.G10];[.G13:.G19]);COM.MICROSOFT.XMATCH([.H10];[.H12:.J12]))"_ustr,
+        aFormulaSource);
+
+    const auto aAttempt
+        = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
+            rDoc, *pContext, aPos,
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+            rDoc.GetCalcConfig().mbEmptyStringAsZero, pFormula->GetCode(),
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()));
+    CPPUNIT_ASSERT(aAttempt.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error, aAttempt.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::VariableExpected, aAttempt.maResult.meError);
 }
 
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedIndexLogestLiveHostTruth)

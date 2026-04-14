@@ -27,7 +27,7 @@ Today:
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to
-  `4385 / 50,661` (`8.6556%`) on the standing replay corpus
+  `4389 / 50,661` (`8.6635%`) on the standing replay corpus
 
 The active program is no longer “prove more substrate slices.”
 The active program is “use the substrate to underwrite live evaluator
@@ -49,22 +49,22 @@ This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=7063`
-- `interpret_tail_live_authoritative_match_total=4385`
-- `interpret_tail_live_authoritative_fallback_total=2678`
-- live authoritative-match rate over the corpus: `8.6556%`
-- live authoritative-match rate over the current promoted probe: `62.0841%`
+- `interpret_tail_live_authoritative_match_total=4389`
+- `interpret_tail_live_authoritative_fallback_total=2674`
+- live authoritative-match rate over the corpus: `8.6635%`
+- live authoritative-match rate over the current promoted probe: `62.1407%`
 
 Everything below is diagnostic context for improving that number.
 
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=19190`
-- `interpret_tail_live_fallback_total=612`
+- `interpret_tail_live_supported_total=19198`
+- `interpret_tail_live_fallback_total=604`
 - `interpret_tail_live_seen_total=19802`
 - `interpret_tail_live_unseen_formula_cells=30859`
-- `interpret_tail_live_promoted_function_supported_total=17940`
-- `interpret_tail_live_supported_rate=37.88`
+- `interpret_tail_live_promoted_function_supported_total=17948`
+- `interpret_tail_live_supported_rate=37.90`
 - `interpret_tail_live_seen_rate=39.09`
 
 Dominant ambient fallback reasons:
@@ -77,11 +77,11 @@ Dominant ambient fallback reasons:
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=47189`
-- `interpret_tail_forced_interpret_fallback_total=306`
+- `interpret_tail_forced_interpret_supported_total=47193`
+- `interpret_tail_forced_interpret_fallback_total=302`
 - `interpret_tail_forced_interpret_seen_total=47495`
 - `interpret_tail_forced_interpret_unseen_formula_cells=3166`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=46562`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=46566`
 - `interpret_tail_forced_interpret_supported_rate=93.15`
 - `interpret_tail_forced_interpret_seen_rate=93.75`
 
@@ -313,13 +313,13 @@ The highest-value remaining blockers are now:
 
 1. quality inside the new ambient live traffic:
    the full replay corpus now shows `19,802` seen formulas out of `50,661`,
-   but `612` of those seen routes still fall back
+   but `604` of those seen routes still fall back
 2. live-authority headroom:
-   the north-star is now `4385 / 50,661` (`8.6556%`), which is a real jump
+   the north-star is now `4389 / 50,661` (`8.6635%`), which is a real jump
    but still well short of deletion-comfortable territory
 3. imported live-host-truth residuals:
-   the next likely north-star movers are now residual `logical_fold`
-   and the small remaining `INDEX` residue
+   the next likely north-star movers are now the broader ambient
+   `unsupported_function` wall rather than the tiny imported residue buckets
 4. raw promoted diagnostic debt:
    `logical_fold=2157` fallback and `math_scalar=626` fallback now reflect
    cached-workbook disagreement after the live-host parity pivot
@@ -336,15 +336,16 @@ The highest-value remaining blockers are now:
    correctness surface, not a live seam-off retirement denominator
 
 The live authoritative-match north-star on the standing replay corpus has now
-improved to `4385 / 50,661` (`8.6556%`), while ambient live reach has widened
+improved to `4389 / 50,661` (`8.6635%`), while ambient live reach has widened
 to `19,802 / 50,661` seen formulas (`39.09%`) and
-`19,190 / 50,661` supported (`37.88%`). That remains the only number that
+`19,198 / 50,661` supported (`37.90%`). That remains the only number that
 should gate deletion claims.
 
 That gain came first from aligning imported live host truth on
 reference-driven `logical_fold` / `math_scalar` roots, and now from extending
 that same policy into imported direct `information_predicate` residue plus the
-small `NOT` / `MATCH` / `INDEX` structural residue. It intentionally trades away a
+follow-on imported direct `logical_fold` and nested-`XMATCH` `INDEX`
+residue. It intentionally trades away a
 large amount of cached-workbook promoted-probe agreement, so the raw promoted
 probe must now be read strictly as diagnostics rather than as progress
 gating.
