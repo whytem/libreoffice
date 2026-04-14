@@ -19,9 +19,8 @@ Today:
 - debug and CI-style builds default that seam to `observe`
 - an eighty-five-slice env-independent logical/text/match/xmatch/lookup/index
   cluster is now engine-first even with rollout explicitly `off`
-- the latest bounded `RATE` feeder expansion raised the ambient
-  live seen rate from `30.26%` to `30.40%` and the ambient supported rate
-  from `28.08%` to `29.02%`
+- the latest replay-cached scalar parity slice left ambient live
+  reach flat while cutting raw promoted fallback from `2010` to `483`
 
 The active program is no longer “prove more substrate slices.”
 The active program is “use the substrate to underwrite live evaluator
@@ -69,13 +68,13 @@ Dominant ambient fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=7063`
-- `interpret_tail_authoritative_total=5053`
-- `interpret_tail_authoritative_fallback_total=2010`
-- promoted-family authoritative rate: `71.55%`
+- `interpret_tail_authoritative_total=6580`
+- `interpret_tail_authoritative_fallback_total=483`
+- promoted-family authoritative rate: `93.16%`
 
 Dominant promoted-family fallback reasons:
 
-- `shadow_mismatch=1961`
+- `shadow_mismatch=434`
 - `unsupported_function=14`
 - `unsupported_formula_shape=29`
 - `unsupported_host_surface=6`
@@ -295,17 +294,16 @@ The highest-value remaining blockers are now:
    the full replay corpus now shows `15,402` seen formulas out of `50,661`,
    but `702` of those seen routes still fall back
 2. logical-fold support quality:
-   promoted probe `699 authoritative / 1491 fallback`, almost all of it
+   promoted probe `2021 authoritative / 169 fallback`, still led by
    `shadow_mismatch`
 3. scalar-math comparison-feeder parity:
-   promoted probe `809 authoritative / 211 fallback`, almost all of it
+   promoted probe `848 authoritative / 172 fallback`, still mostly
    `shadow_mismatch`
-4. round / `RATE` parity quality:
-   promoted probe `88 authoritative / 204 fallback`, with round-family
-   `unsupported_function` now at zero
-5. promoted-family residual parity and shape:
-   `shadow_mismatch=1961`, `unsupported_function=14`,
+4. promoted-family residual parity and shape:
+   `shadow_mismatch=434`, `unsupported_function=14`,
    `unsupported_formula_shape=29`
+5. smaller raw mismatch bands:
+   `information_predicate=44` fallback and `lookup=38`
 6. first real Calc-path retirement:
    one narrow logical/text/lookup/index cluster is now hard-routed and its
    legacy interpreter entries are quarantined for those slices, but no whole
@@ -314,9 +312,10 @@ The highest-value remaining blockers are now:
    the raw promoted replay probe is now confirmed to be a cached imported
    correctness surface, not a live seam-off retirement denominator
 
-The latest bounded `RATE` feeder expansion raised the ambient
-live seen rate from `30.26%` to `30.40%` and the ambient supported rate from
-`28.08%` to `29.02%` while keeping the replay guardrail exact.
+The latest replay-cached scalar parity slice left ambient live reach flat at
+`15,402 / 50,661` seen formulas (`30.40%`) and `14,700 / 50,661` supported
+(`29.02%`), while cutting raw promoted fallback from `2010` to `483` and
+keeping the replay guardrail exact.
 
 Inside the current families, that effectively exhausts the semantically
 distinct env-independent literal-array hard-route frontier. Remaining

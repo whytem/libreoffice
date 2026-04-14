@@ -61,9 +61,9 @@ Ambient live fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=7063`
-- `interpret_tail_authoritative_total=5053`
-- `interpret_tail_authoritative_fallback_total=2010`
-- promoted-family authoritative rate: `71.55%`
+- `interpret_tail_authoritative_total=6580`
+- `interpret_tail_authoritative_fallback_total=483`
+- promoted-family authoritative rate: `93.16%`
 
 ### Live-Target Filtered Promoted Probe
 
@@ -74,7 +74,7 @@ Ambient live fallback reasons:
 
 Promoted-family fallback reasons:
 
-- `shadow_mismatch=1961`
+- `shadow_mismatch=434`
 - `unsupported_function=14`
 - `unsupported_formula_shape=29`
 - `unsupported_host_surface=6`
@@ -285,10 +285,15 @@ Still not true:
   parity and live-target filtered parity, and the filtered surface is empty:
   all `7063` promoted replay probe rows are imported host-truth artifacts under
   seam-off direct legacy interpretation
+- the latest replay-cached scalar parity slice left the ambient live totals
+  flat but cut raw promoted fallback from `2010` to `483`; the dominant raw
+  retained buckets are now `logical_fold=169`, `math_scalar=172`,
+  `information_predicate=44`, and `lookup=38`, with round-family fallback at
+  `0`
 - the next runtime milestone therefore should not be defined by the imported
   replay probe anymore; it should move to quality inside the new ambient live
-  traffic, additional Calc-path quarantine / retirement slices, or another
-  deliberate function-family expansion
+  traffic and the remaining raw shadow-mismatch buckets, or to additional
+  Calc-path quarantine / retirement slices
 
 ## Active Delegated Family
 

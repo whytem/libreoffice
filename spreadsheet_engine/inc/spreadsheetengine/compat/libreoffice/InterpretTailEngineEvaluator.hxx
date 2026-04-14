@@ -1867,7 +1867,7 @@ template <typename T>
     DocumentEvaluationHost aHost(rDoc, rContext);
     const auto aParsed = aHost.parseNumber(rValue.maString);
     if (!aParsed)
-        return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+        return api::ValueResult<double>::failure(api::Error::NoValue);
     return api::ValueResult<double>::success(aParsed.maValue.mfValue);
 }
 
@@ -1889,7 +1889,7 @@ template <typename T>
     DocumentEvaluationHost aHost(rDoc, rContext);
     const auto aParsed = aHost.parseNumber(rValue.maString);
     if (!aParsed)
-        return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
+        return api::ValueResult<bool>::failure(api::Error::NoValue);
     return api::ValueResult<bool>::success(aParsed.maValue.mfValue != 0.0);
 }
 
@@ -2211,9 +2211,134 @@ template <typename T>
     return *aScalar.moValue;
 }
 
+[[nodiscard]] inline std::optional<api::Error> tryParseImportedHybridFormulaErrorText(
+    const ScDocument& rDoc, const ScAddress& rAddress, std::u16string_view rText)
+{
+    if (rText.empty())
+        return std::nullopt;
+
+    const OUString aRawString(rText);
+
+    const auto tryParseDetailedError = [&]() -> std::optional<api::Error> {
+        std::u16string_view aCandidate = rText;
+        const std::size_t nColon = aCandidate.find(u':');
+        if (nColon == std::u16string_view::npos || nColon == 0 || nColon + 1 >= aCandidate.size())
+            return std::nullopt;
+
+        api::String aUpperToken;
+        aUpperToken.reserve(nColon);
+        for (std::size_t nIndex = 0; nIndex < nColon; ++nIndex)
+        {
+            const char16_t cChar = aCandidate[nIndex];
+            if ((cChar < u'a' || cChar > u'z') && (cChar < u'A' || cChar > u'Z'))
+                return std::nullopt;
+            if (cChar >= u'a' && cChar <= u'z')
+                aUpperToken.push_back(static_cast<char16_t>(cChar - u'a' + u'A'));
+            else
+                aUpperToken.push_back(cChar);
+        }
+
+        if (aUpperToken != u"ERR" && aUpperToken != u"ERROR" && aUpperToken != u"CHYBA")
+            return std::nullopt;
+
+        sal_uInt16 nErrorValue = 0;
+        for (std::size_t nIndex = nColon + 1; nIndex < aCandidate.size(); ++nIndex)
+        {
+            const char16_t cChar = aCandidate[nIndex];
+            if (cChar < u'0' || cChar > u'9')
+                return std::nullopt;
+            nErrorValue = static_cast<sal_uInt16>(nErrorValue * 10 + (cChar - u'0'));
+        }
+
+        const FormulaError eError = static_cast<FormulaError>(nErrorValue);
+        if (!isPublishedFormulaError(eError) && eError != FormulaError::NotAvailable)
+            return std::nullopt;
+
+        return toApiError(eError);
+    };
+
+    if (const auto oDetailedError = tryParseDetailedError())
+        return *oDetailedError;
+
+    ScCompiler aCompiler(
+        const_cast<ScDocument&>(rDoc), rAddress, formula::FormulaGrammar::GRAM_ODFF);
+    const FormulaError nError = aCompiler.GetErrorConstant(aRawString);
+    if (nError == FormulaError::NONE)
+    {
+        for (FormulaError eCandidate : { FormulaError::NoCode, FormulaError::DivisionByZero,
+                 FormulaError::NoValue, FormulaError::NoRef, FormulaError::NoName,
+                 FormulaError::IllegalFPOperation, FormulaError::NotAvailable })
+        {
+            if (aRawString == ScGlobal::GetErrorString(eCandidate))
+                return toApiError(eCandidate);
+        }
+
+        return std::nullopt;
+    }
+
+    return toApiError(nError);
+}
+
+[[nodiscard]] inline std::optional<api::CellValue> tryReadCachedFormulaCellValue(
+    const ScDocument& rDoc, const ScAddress& rAddress, const ScFormulaCell& rFormula)
+{
+    if (rFormula.NeedsInterpret())
+        return std::nullopt;
+
+    if (rFormula.HasHybridStringResult())
+    {
+        const OUString aCachedString = rFormula.GetResultString().getString();
+        if (const auto oError = tryParseImportedHybridFormulaErrorText(
+                rDoc, rAddress,
+                std::u16string_view(aCachedString.getStr(), aCachedString.getLength())))
+        {
+            return api::CellValue::error(*oError);
+        }
+
+        if (const auto oParsed
+            = spreadsheetengine::core::datetime::parseStandaloneNumberText(
+                toApiString(aCachedString)))
+        {
+            return api::CellValue::number(oParsed->mfValue);
+        }
+
+        const OUString aUpperString = aCachedString.toAsciiUpperCase();
+        if (aUpperString == "TRUE")
+            return api::CellValue::boolean(true);
+        if (aUpperString == "FALSE")
+            return api::CellValue::boolean(false);
+
+        return api::CellValue::text(toApiString(aCachedString));
+    }
+
+    const sc::FormulaResultValue aResult = rFormula.GetResult();
+    switch (aResult.meType)
+    {
+        case sc::FormulaResultValue::Value:
+            return api::CellValue::number(aResult.mfValue);
+        case sc::FormulaResultValue::Error:
+            return api::CellValue::error(toApiError(aResult.mnError));
+        case sc::FormulaResultValue::String:
+            return api::CellValue::text(toApiString(aResult.maString.getString()));
+        case sc::FormulaResultValue::Invalid:
+            break;
+    }
+
+    return std::nullopt;
+}
+
 [[nodiscard]] inline api::CellValue readMaterializedHostCellValue(
     const ScDocument& rDoc, ScInterpreterContext& rContext, const ScAddress& rAddress)
 {
+    if (ScFormulaCell* pFormula = const_cast<ScDocument&>(rDoc).GetFormulaCell(rAddress))
+    {
+        if (const auto oImportedCachedValue
+            = tryReadCachedFormulaCellValue(rDoc, rAddress, *pFormula))
+        {
+            return *oImportedCachedValue;
+        }
+    }
+
     auto aValue = readHostDocumentCellValue(rDoc, rAddress).maValue;
     if (ScFormulaCell* pFormula = const_cast<ScDocument&>(rDoc).GetFormulaCell(rAddress))
     {

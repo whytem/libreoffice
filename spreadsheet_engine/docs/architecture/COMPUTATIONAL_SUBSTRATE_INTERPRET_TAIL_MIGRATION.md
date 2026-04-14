@@ -194,13 +194,13 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=7063`
-- `interpret_tail_authoritative_total=5053`
-- `interpret_tail_authoritative_fallback_total=2010`
-- promoted-family authoritative rate: `71.55%`
+- `interpret_tail_authoritative_total=6580`
+- `interpret_tail_authoritative_fallback_total=483`
+- promoted-family authoritative rate: `93.16%`
 
 Current promoted-family fallback reasons:
 
-- `shadow_mismatch=1961`
+- `shadow_mismatch=434`
 - `unsupported_function=14`
 - `unsupported_formula_shape=29`
 - `unsupported_host_surface=6`
@@ -221,9 +221,11 @@ Interpretation:
 - the promoted-family denominator is now much broader because scalar roots,
   round-family formulas, information predicates, logical folds, `NOT`, and
   bounded scalar-math feeder formulas are part of the delegated family
-- the main remaining conversion work is now quality inside that broader
-  denominator, especially logical-fold shadow mismatches, math-scalar shadow
-  mismatches, and remaining round / `RATE` shadow mismatches
+- the latest replay-cached scalar parity slice left ambient live reach flat
+  but cut raw promoted fallback from `2010` to `483`
+- the dominant remaining raw mismatch buckets are now `logical_fold=169`
+  fallback, `math_scalar=172`, `information_predicate=44`, and `lookup=38`,
+  with round-family fallback now at `0`
 - a focused host-truth test now shows the replay-imported whole-row
   `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to
   `FormulaError::VariableExpected`
@@ -308,9 +310,9 @@ Interpretation:
 - both shared and non-shared promoted replay formulas now reach the live seam
 - the residual replay work is now the `49` direct fallback cells on this
   broader imported promoted-family surface
-- the dominant next targets are logical-fold `shadow_mismatch`,
-  math-scalar `shadow_mismatch`, and remaining round / `RATE`
-  `shadow_mismatch`
+- the dominant next targets are the remaining logical-fold and math-scalar
+  `shadow_mismatch` rows plus the smaller information-predicate and lookup
+  raw mismatch bands
 
 ## Hard-Routed Family
 

@@ -569,14 +569,37 @@ void materializeSheetCells(const Sheet& rSheet, SCTAB nTab, ScDocument& rDoc)
         {
             rDoc.SetFormula(aPos, toLibreOfficeString(rCell.maFormula),
                 formula::FormulaGrammar::GRAM_ODFF);
+            ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+            CPPUNIT_ASSERT(pFormula);
+
             if (hasArrayConstant(rCell.maFormula))
             {
-                ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
-                CPPUNIT_ASSERT(pFormula);
                 // Preserve the imported raw ODF formula as a token-backed canonical source
                 // sidecar so InterpretTail can bypass the ambiguous display rewrite.
                 pFormula->SetHybridFormula(
                     toLibreOfficeString(rCell.maFormula), formula::FormulaGrammar::GRAM_ODFF);
+                continue;
+            }
+
+            // Seed replay-imported cached scalar results so referenced formula
+            // reads can observe workbook parity instead of forcing live
+            // recalculation.
+            if (rCell.maValue.isNumber() || rCell.maValue.isBoolean())
+            {
+                pFormula->SetHybridDouble(rCell.maValue.mfNumber);
+                const OUString aCachedString = !rCell.maRawValue.empty()
+                    ? toLibreOfficeString(rCell.maRawValue)
+                    : OUString::number(rCell.maValue.mfNumber);
+                pFormula->SetHybridString(rDoc.GetSharedStringPool().intern(aCachedString));
+                pFormula->ResetDirty();
+            }
+            else if (rCell.maValue.isError())
+            {
+                const OUString aErrorString = !rCell.maRawValue.empty()
+                    ? toLibreOfficeString(rCell.maRawValue)
+                    : ScGlobal::GetErrorString(toFormulaError(rCell.maValue.meError));
+                pFormula->SetHybridString(rDoc.GetSharedStringPool().intern(aErrorString));
+                pFormula->ResetDirty();
             }
         }
     }
@@ -1913,6 +1936,107 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedMathScalarLiveHostTrut
     }
 
     CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(aPos));
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedMathScalarCachedErrorParity)
+{
+    const OUString aWorkbookPath
+        = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/mathematical/fods/abs.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for abs.fods", static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    for (const auto& [nRow, aExpectedFormula, eExpectedError] :
+         { std::tuple(SCROW(4), OUString(u"=of:=ABS([.J2])"_ustr), FormulaError::DivisionByZero),
+           std::tuple(SCROW(7), OUString(u"=of:=ABS([.K2])"_ustr), FormulaError::NoValue) })
+    {
+        const ScAddress aPos(0, nRow, 1); // Sheet2.A5 / Sheet2.A8
+        ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+        CPPUNIT_ASSERT(pFormula);
+
+        const OUString aFormulaSource
+            = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+        const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
+        CPPUNIT_ASSERT_EQUAL(aExpectedFormula, aFormulaSource);
+
+        const auto aAttempt
+            = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
+                rDoc, *pContext, aPos,
+                std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+                rDoc.GetCalcConfig().mbEmptyStringAsZero, pFormula->GetCode(),
+                std::u16string_view(aCanonicalFormulaSource.getStr(),
+                    aCanonicalFormulaSource.getLength()));
+        CPPUNIT_ASSERT(aAttempt.mbSupported);
+        CPPUNIT_ASSERT_EQUAL(
+            spreadsheetengine::api::formulavalue::ValueType::Error,
+            aAttempt.maResult.meType);
+        CPPUNIT_ASSERT_EQUAL(
+            spreadsheetengine::compat::libreoffice::toApiError(eExpectedError),
+            aAttempt.maResult.meError);
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalFoldCachedRangeParity)
+{
+    const OUString aWorkbookPath
+        = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/mathematical/fods/abs.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for abs.fods", static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    for (const auto& [aPos, aExpectedFormula] :
+         { std::pair(ScAddress(1, 2, 0), OUString(u"=of:=AND([.B8:.B95])"_ustr)),
+           std::pair(ScAddress(1, 7, 0), OUString(u"=of:=AND([Sheet2.C2:.C92])"_ustr)) })
+    {
+        ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+        CPPUNIT_ASSERT(pFormula);
+
+        const OUString aFormulaSource
+            = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+        const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
+        CPPUNIT_ASSERT_EQUAL(aExpectedFormula, aFormulaSource);
+
+        const auto aAttempt
+            = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
+                rDoc, *pContext, aPos,
+                std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+                rDoc.GetCalcConfig().mbEmptyStringAsZero, pFormula->GetCode(),
+                std::u16string_view(aCanonicalFormulaSource.getStr(),
+                    aCanonicalFormulaSource.getLength()));
+        CPPUNIT_ASSERT(aAttempt.mbSupported);
+        CPPUNIT_ASSERT_EQUAL(
+            spreadsheetengine::api::formulavalue::ValueType::Value,
+            aAttempt.maResult.meType);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aAttempt.maResult.mfValue, 1e-12);
+    }
 }
 
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalConstantLiveHostTruth)
