@@ -53,8 +53,9 @@ Today:
 
 What is still not true:
 
-- no broad default-on production rollout exists
-- no `ScInterpreter` subroutine has been deleted yet
+- no broad default-on production rollout exists beyond logical constants
+- only the narrow `ScInterpreter::ScTrue()` / `ScFalse()` pair has been
+  deleted so far; broader legacy retirement has not started
 - the full replay corpus now shows strong ambient live-seam traffic, but most
   retained fallback now lives inside the newly admitted scalar utility traffic
 - the next dominant live blocker is no longer simple reach; it is the quality
@@ -425,8 +426,9 @@ Current meaning:
 - supported results bypass the normal rollout gate and are applied
   authoritatively
 - unsupported or projection-failure cases still fall back safely
-- `ScInterpreter::ScTrue()`, `ScInterpreter::ScFalse()`,
-  `ScInterpreter::ScValue()`, `ScInterpreter::ScGetDateValue()`,
+- `TRUE()` / `FALSE()` now also have an explicit family-local default-on
+  rollout path, and their dedicated `ScInterpreter` subroutines are deleted
+- `ScInterpreter::ScValue()`, `ScInterpreter::ScGetDateValue()`,
   `ScInterpreter::ScGetTimeValue()`, `ScInterpreter::ScNumberValue()`, and
   `ScInterpreter::ScMatch()`, `ScInterpreter::ScXMatch()`,
   `ScInterpreter::ScLookup()`, `ScInterpreter::ScVLookup()`,
@@ -468,9 +470,9 @@ The next high-value pass is now constrained by the scope gate:
    or live mismatch bucket
 4. reduce fallback inside the admitted ambient live traffic, led by
    `math_scalar` and `logical_fold` shadow mismatch
-5. add a family-local default-on path for `TRUE()` / `FALSE()` and use it to
-   delete `ScInterpreter::ScTrue()` / `ScFalse()` as the first real legacy
-   retirement milestone
+5. use the logical-constant deletion milestone as the template for the next
+   narrow retirement only after `math_scalar` / `logical_fold` mismatch
+   reduction pays down more live fallback
 6. only return to imported replay parity if we intentionally decide to
    rehabilitate legacy seam-off imported-formula execution
 

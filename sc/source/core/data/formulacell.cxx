@@ -1964,22 +1964,39 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
         }
         return aEngineFormulaSource;
     };
+    std::optional<setaileval::FunctionKind> oEngineDelegatedFunction;
+    const auto getEngineDelegatedFunction = [&]() -> setaileval::FunctionKind {
+        if (!oEngineDelegatedFunction)
+        {
+            const OUString& rFormulaSource = getEngineFormulaSource();
+            oEngineDelegatedFunction = classifyDelegatedInterpretTailFunction(
+                std::u16string_view(rFormulaSource.getStr(), rFormulaSource.getLength()));
+        }
+        return *oEngineDelegatedFunction;
+    };
     const bool bTailEligible = eTailParam == SCITP_NORMAL && !bIsIterCell
                                && cMatrixFlag == ScMatrixMode::NONE && !pCode->IsHyperLink()
                                && !rContext.pInterpreter
                                && !rDocument.IsThreadedGroupCalcInProgress();
-    const bool bHardRoutedEngineFamily
+    // Logical constants are the first explicit family-local default-on
+    // rollout. Keep that policy separate from the broader frozen hard-route
+    // frontier so future retirement work has a narrower template.
+    const bool bDefaultAuthoritativeEngineFamily
         = bTailEligible
+          && getEngineDelegatedFunction() == setaileval::FunctionKind::LogicalConstant;
+    const bool bHardRoutedEngineFamily
+        = bTailEligible && !bDefaultAuthoritativeEngineFamily
           && setaileval::isHardRoutedFormula(std::u16string_view(
               getEngineFormulaSource().getStr(), getEngineFormulaSource().getLength()));
+    const bool bEngineAuthoritativeWhileOff
+        = bDefaultAuthoritativeEngineFamily || bHardRoutedEngineFamily;
     const auto maybeRecordPreRpnObserve = [&]() {
         if (eEngineRolloutMode != setaileval::RolloutMode::Observe || !bTailEligible)
             return;
 
         const OUString& aFormulaSource = getEngineFormulaSource();
         const OUString aCanonicalFormulaSource = GetHybridFormula();
-        const auto eDelegatedFunction = classifyDelegatedInterpretTailFunction(
-            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()));
+        const auto eDelegatedFunction = getEngineDelegatedFunction();
         if (eDelegatedFunction == setaileval::FunctionKind::Unknown)
             return;
 
@@ -2143,7 +2160,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
     };
 
     if (!pCode->GetCodeLen() && !GetHybridFormula().isEmpty()
-        && (eEngineRolloutMode != setaileval::RolloutMode::Off || bHardRoutedEngineFamily))
+        && (eEngineRolloutMode != setaileval::RolloutMode::Off || bEngineAuthoritativeWhileOff))
     {
         const OUString& aFormulaSource = getEngineFormulaSource();
         const OUString aCanonicalFormulaSource = GetHybridFormula();
@@ -2156,7 +2173,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
 
         if (aAttempt.mbSupported)
         {
-            if (bHardRoutedEngineFamily
+            if (bEngineAuthoritativeWhileOff
                 || eEngineRolloutMode == setaileval::RolloutMode::AuthoritativeWithFallback)
             {
                 if (applyEngineAuthoritativeResult(aAttempt))
@@ -2181,7 +2198,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
         }
         else
         {
-            if (bHardRoutedEngineFamily
+            if (bEngineAuthoritativeWhileOff
                 || eEngineRolloutMode == setaileval::RolloutMode::AuthoritativeWithFallback)
             {
                 setaileval::recordAuthoritativeFallback(
@@ -2192,8 +2209,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                 const auto eAttemptFunction
                     = aAttempt.meFunction != setaileval::FunctionKind::Unknown
                           ? aAttempt.meFunction
-                          : classifyDelegatedInterpretTailFunction(std::u16string_view(
-                                aFormulaSource.getStr(), aFormulaSource.getLength()));
+                          : getEngineDelegatedFunction();
                 setaileval::recordFallback(aAttempt.meFallbackReason, eAttemptFunction);
             }
         }
@@ -2225,7 +2241,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
     {
         std::optional<setaileval::EvaluationAttempt> oEngineAttempt;
 
-        if (eEngineRolloutMode != setaileval::RolloutMode::Off || bHardRoutedEngineFamily)
+        if (eEngineRolloutMode != setaileval::RolloutMode::Off || bEngineAuthoritativeWhileOff)
         {
             if (!bTailEligible)
             {
@@ -2254,7 +2270,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                         aCanonicalFormulaSource.getLength()));
                 if (!oEngineAttempt->mbSupported)
                 {
-                    if (bHardRoutedEngineFamily)
+                    if (bEngineAuthoritativeWhileOff)
                     {
                         setaileval::recordAuthoritativeFallback(
                             oEngineAttempt->meFallbackReason, oEngineAttempt->meFunction);
@@ -2273,7 +2289,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
             }
         }
 
-        if (bHardRoutedEngineFamily && oEngineAttempt && oEngineAttempt->mbSupported)
+        if (bEngineAuthoritativeWhileOff && oEngineAttempt && oEngineAttempt->mbSupported)
         {
             if (applyEngineAuthoritativeResult(*oEngineAttempt))
             {

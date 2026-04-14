@@ -19,6 +19,9 @@ Today:
 - debug and CI-style builds default that seam to `observe`
 - an eighty-five-slice env-independent logical/text/match/xmatch/lookup/index
   cluster is now engine-first even with rollout explicitly `off`
+- the first real legacy deletion milestone has landed:
+  `ScInterpreter::ScTrue()` / `ScFalse()` are retired behind an explicit
+  family-local default-on logical-constant path
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star is currently only
@@ -190,10 +193,10 @@ Dominant promoted-family fallback reasons:
   - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
   - `INDEX(<2D literal array>; 0; <positive whole>)`
   - `INDEX(<2D literal array>; <positive whole>; 0)`
+- `TRUE()` / `FALSE()` now also have an explicit family-local default-on
+  rollout path, and their dedicated `ScInterpreter` subroutines are deleted
 - the corresponding legacy interpreter entries now warn on normal reach for
   those narrow slices:
-  - `ScInterpreter::ScTrue()`
-  - `ScInterpreter::ScFalse()`
   - `ScInterpreter::ScValue()`
   - `ScInterpreter::ScGetDateValue()`
   - `ScInterpreter::ScGetTimeValue()`
@@ -320,9 +323,9 @@ The highest-value remaining blockers are now:
 5. smaller raw mismatch bands:
    `information_predicate=37` fallback and `lookup=0`
 6. first real Calc-path retirement:
-   one narrow logical/text/lookup/index cluster is now hard-routed and its
-   legacy interpreter entries are quarantined for those slices, but no whole
-   `ScInterpreter` subroutine has been deleted yet
+   the logical-constant pair now has explicit family-local default-on routing
+   and its dedicated `ScInterpreter` subroutines are deleted, but broader
+   interpreter retirement is still ahead
 7. imported replay denominator honesty:
    the raw promoted replay probe is now confirmed to be a cached imported
    correctness surface, not a live seam-off retirement denominator
@@ -405,9 +408,9 @@ The next pass should:
    surface, not as the live retirement denominator
 4. reduce residual fallback inside the admitted ambient traffic, led by
    `math_scalar` and `logical_fold` shadow mismatch
-5. land a family-local default-on path for `TRUE()` / `FALSE()` and use it to
-   delete `ScInterpreter::ScTrue()` / `ScFalse()` as the first real legacy
-   retirement milestone
+5. use the logical-constant deletion milestone as the template for the next
+   narrow retirement only after `math_scalar` / `logical_fold` mismatch
+   reduction pays down more live fallback
 6. only return to imported replay parity if we intentionally decide to
    rehabilitate legacy seam-off imported-formula execution
 

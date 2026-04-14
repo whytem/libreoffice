@@ -1037,6 +1037,10 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
         setaileval::resetStats();
 
+        m_pDoc->SetString(4, 69, 0, u"=TRUE()"_ustr);
+        m_pDoc->SetString(5, 69, 0, u"=FALSE()"_ustr);
+        m_pDoc->SetString(6, 69, 0, u"=NORM.S.DIST(1;TRUE())"_ustr);
+        m_pDoc->SetString(7, 69, 0, u"=NORM.S.DIST(1;FALSE())"_ustr);
         m_pDoc->SetString(4, 70, 0, u"=ABS(-7.25)"_ustr);
         m_pDoc->SetString(5, 70, 0, u"=DEGREES(ACOS(-0.5))"_ustr);
         m_pDoc->SetString(6, 70, 0, u"=ATANH(0)/PI()"_ustr);
@@ -1069,6 +1073,10 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         }
         m_pDoc->SetString(3, 70, 0, u"=AND(C71:C73)"_ustr);
 
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(4, 69, 0));
+        CPPUNIT_ASSERT_EQUAL(u"FALSE"_ustr, m_pDoc->GetString(5, 69, 0));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.841344746068543, m_pDoc->GetValue(6, 69, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.241970724519143, m_pDoc->GetValue(7, 69, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(7.25, m_pDoc->GetValue(4, 70, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(120.0, m_pDoc->GetValue(5, 70, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(6, 70, 0), 1e-12);
@@ -1079,6 +1087,14 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(12, 70, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(210.0, m_pDoc->GetValue(13, 70, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(3, 70, 0), 1e-12);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 2);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::LogicalConstant)]
+            >= 2);
     }
 
     {

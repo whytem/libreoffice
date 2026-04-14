@@ -2033,36 +2033,6 @@ void ScInterpreter::ScRandbetween()
     ScRandomImpl( RandomFunc, fMin, fMax);
 }
 
-void ScInterpreter::ScTrue()
-{
-    const std::optional<OUString> oQuarantinedFormula
-        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
-    if (oQuarantinedFormula)
-    {
-        SAL_WARN("sc.core",
-            "hard-routed TRUE() reached ScInterpreter for " << *oQuarantinedFormula);
-        OSL_FAIL("hard-routed TRUE() reached ScInterpreter");
-    }
-
-    nFuncFmtType = SvNumFormatType::LOGICAL;
-    PushInt(1);
-}
-
-void ScInterpreter::ScFalse()
-{
-    const std::optional<OUString> oQuarantinedFormula
-        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
-    if (oQuarantinedFormula)
-    {
-        SAL_WARN("sc.core",
-            "hard-routed FALSE() reached ScInterpreter for " << *oQuarantinedFormula);
-        OSL_FAIL("hard-routed FALSE() reached ScInterpreter");
-    }
-
-    nFuncFmtType = SvNumFormatType::LOGICAL;
-    PushInt(0);
-}
-
 void ScInterpreter::ScDeg()
 {
     PushDouble(semath::computeDegrees(GetDouble()));

@@ -70,6 +70,7 @@
 #include <tokenarray.hxx>
 #include <compiler.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx>
 #include <spreadsheetengine/compat/libreoffice/MatrixFrameExecution.hxx>
 
 #include <map>
@@ -3987,6 +3988,30 @@ StackVar ScInterpreter::Interpret()
                     }
                 }
 
+                namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+                const auto pushLegacyLogicalConstant = [&](bool bValue) {
+                    if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
+                        && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
+                        && !pMyFormulaCell->IsHyperLinkCell()
+                        && !mrDoc.IsThreadedGroupCalcInProgress())
+                    {
+                        const OUString aFormulaSource
+                            = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
+                        if (setaileval::isHardRoutedFormula(std::u16string_view(
+                                aFormulaSource.getStr(), aFormulaSource.getLength())))
+                        {
+                            SAL_WARN("sc.core",
+                                "family-local default-on "
+                                    << (bValue ? "TRUE()" : "FALSE()")
+                                    << " reached ScInterpreter for " << aFormulaSource);
+                            OSL_FAIL("family-local default-on logical constant reached ScInterpreter");
+                        }
+                    }
+
+                    nFuncFmtType = SvNumFormatType::LOGICAL;
+                    PushInt(bValue ? 1 : 0);
+                };
+
                 switch( eOp )
                 {
                     case ocSep:
@@ -4045,8 +4070,8 @@ StackVar ScInterpreter::Interpret()
                     case ocLet              : ScLet();                      break;
                     case ocWrapCols         : ScWrapCols();                 break;
                     case ocWrapRows         : ScWrapRows();                 break;
-                    case ocTrue             : ScTrue();                     break;
-                    case ocFalse            : ScFalse();                    break;
+                    case ocTrue             : pushLegacyLogicalConstant(true);  break;
+                    case ocFalse            : pushLegacyLogicalConstant(false); break;
                     case ocGetActDate       : ScGetActDate();               break;
                     case ocGetActTime       : ScGetActTime();               break;
                     case ocNotAvail         : PushError( FormulaError::NotAvailable); break;

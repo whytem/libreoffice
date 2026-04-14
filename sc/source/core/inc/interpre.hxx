@@ -578,8 +578,6 @@ private:
     void ScRandArray();
     void ScRandomImpl( const std::function<double( double fFirst, double fLast )>& RandomFunc,
             double fFirst, double fLast );
-    void ScTrue();
-    void ScFalse();
     void ScDeg();
     void ScRad();
     void ScSin();

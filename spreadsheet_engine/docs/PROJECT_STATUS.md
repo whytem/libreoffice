@@ -195,10 +195,10 @@ Promoted-family fallback reasons:
   - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
   - `INDEX(<2D literal array>; 0; <positive whole>)`
   - `INDEX(<2D literal array>; <positive whole>; 0)`
+- `TRUE()` / `FALSE()` now also have an explicit family-local default-on
+  rollout path, and their dedicated `ScInterpreter` subroutines are deleted
 - corresponding legacy entrypoints now carry debug quarantine warnings on
   normal interpreter reach:
-  - `ScInterpreter::ScTrue()`
-  - `ScInterpreter::ScFalse()`
   - `ScInterpreter::ScValue()`
   - `ScInterpreter::ScGetDateValue()`
   - `ScInterpreter::ScGetTimeValue()`
@@ -240,8 +240,9 @@ Today:
 
 Still not true:
 
-- no broad default-on rollout exists
-- no `ScInterpreter` subroutine has been deleted yet
+- no broad default-on rollout exists beyond logical constants
+- only the narrow `ScInterpreter::ScTrue()` / `ScFalse()` pair has been
+  deleted so far; broader legacy retirement has not started
 - multiple interpreter hard-route milestones have landed, but full legacy
   opcode retirement has not
 - the dominant retained live blocker is now quality inside that newly admitted
@@ -365,9 +366,9 @@ The next pass is now constrained by the scope gate:
 4. reduce residual fallback inside the new ambient live traffic, led by
    logical-fold `shadow_mismatch`, math-scalar `shadow_mismatch`, and the
    remaining round / `RATE` parity mismatches
-5. add a family-local default-on path for `TRUE()` / `FALSE()` and use it to
-   delete `ScInterpreter::ScTrue()` / `ScFalse()` as the first real legacy
-   retirement milestone
+5. use the logical-constant deletion milestone as the template for the next
+   narrow retirement only after `math_scalar` / `logical_fold` mismatch
+   reduction pays down more live fallback
 6. only return to imported replay parity if we intentionally decide to
    rehabilitate legacy seam-off imported-formula execution
 
