@@ -1002,6 +1002,8 @@ const char* functionKindName(FunctionKind eFunction)
             return "rate";
         case FunctionKind::Round:
             return "round";
+        case FunctionKind::NumericAggregate:
+            return "numeric_aggregate";
         case FunctionKind::MathScalar:
             return "math_scalar";
         case FunctionKind::InformationPredicate:

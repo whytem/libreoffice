@@ -101,6 +101,7 @@ enum class FunctionKind : sal_uInt8
     NumberValue,
     Rate,
     Round,
+    NumericAggregate,
     MathScalar,
     InformationPredicate,
     LogicalFold,
@@ -672,6 +673,13 @@ canonicalMathScalarFunctionName(api::StringView rFunctionName)
         return FunctionKind::Rate;
     if (rFunctionName == u"ROUND" || rFunctionName == u"ROUNDUP" || rFunctionName == u"ROUNDDOWN")
         return FunctionKind::Round;
+    if (rFunctionName == u"SUM" || rFunctionName == u"PRODUCT" || rFunctionName == u"SUMSQ"
+        || rFunctionName == u"AVERAGE" || rFunctionName == u"DEVSQ"
+        || rFunctionName == u"MULTINOMIAL" || rFunctionName == u"SUMX2MY2"
+        || rFunctionName == u"SUMX2PY2" || rFunctionName == u"SUMXMY2")
+    {
+        return FunctionKind::NumericAggregate;
+    }
     if (canonicalMathScalarFunctionName(rFunctionName))
         return FunctionKind::MathScalar;
     if (rFunctionName == u"ISERROR" || rFunctionName == u"ISERR" || rFunctionName == u"ISNUMBER"
@@ -2465,7 +2473,8 @@ inline void putScalarIntoMatrix(
             {
                 return makeMaterializedValue(api::CellValue::boolean(aFunctionName == u"TRUE"));
             }
-            if (eFunction == FunctionKind::MathScalar)
+            if (eFunction == FunctionKind::MathScalar
+                || eFunction == FunctionKind::NumericAggregate)
             {
                 auto aAttempt = evaluateFunctionNode(
                     rNode, rDoc, rContext, rFormulaPos, rDoc.GetCalcConfig().mbEmptyStringAsZero);
@@ -4315,6 +4324,253 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
 }
 
+[[nodiscard]] inline EvaluationAttempt evaluateNumericAggregateFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos,
+    bool bImportedCanonicalSource)
+{
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    if ((bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
+        && containsReferenceLikeDescendant(rNode))
+    {
+        return makeErrorResult(eFunction, api::Error::VariableExpected);
+    }
+
+    const auto makeNumericAttempt = [&](double fValue) {
+        return makeNumericResult(eFunction, fValue, SvNumFormatType::NUMBER);
+    };
+    const auto makeErrorAttempt = [&](api::Error eError) {
+        return makeErrorResult(eFunction, eError);
+    };
+    const auto collectNumericAggregateValues = [&]() -> Materialization<std::vector<double>> {
+        if (rNode.maChildren.empty())
+            return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+
+        std::vector<double> aValues;
+        for (const auto& rxChild : rNode.maChildren)
+        {
+            if (!rxChild)
+                return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+
+            const bool bMatrixLike = rxChild->meKind == core::formula::NodeKind::CellReference
+                                     || rxChild->meKind == core::formula::NodeKind::RangeReference
+                                     || rxChild->meKind == core::formula::NodeKind::NamedReference
+                                     || rxChild->meKind == core::formula::NodeKind::ArrayConstant
+                                     || rxChild->meKind == core::formula::NodeKind::BinaryOperation
+                                     || rxChild->meKind == core::formula::NodeKind::FunctionCall;
+            if (bMatrixLike)
+            {
+                const auto aMatrix = materializeMatrixNode(*rxChild, rDoc, rContext, rFormulaPos);
+                if (!aMatrix.mbSupported)
+                {
+                    return makeUnsupportedMaterialization<std::vector<double>>(
+                        aMatrix.meFallbackReason);
+                }
+                if (!aMatrix.moValue)
+                    return makeMaterializedError<std::vector<double>>(aMatrix.meError);
+
+                SCSIZE nColumns = 0;
+                SCSIZE nRows = 0;
+                (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+                for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+                {
+                    for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                    {
+                        const auto aValue = lookupexecution::detail::toApiCellValue(
+                            (*aMatrix.moValue)->Get(nColumn, nRow));
+                        if (aValue.isEmpty() || aValue.isText())
+                            continue;
+
+                        const auto aNumber = coerceScalarToNumber(rDoc, rContext, aValue);
+                        if (!aNumber)
+                        {
+                            return makeMaterializedError<std::vector<double>>(
+                                aNumber.meError);
+                        }
+                        aValues.push_back(aNumber.maValue);
+                    }
+                }
+                continue;
+            }
+
+            const auto aScalar = materializeScalarNode(*rxChild, rDoc, rContext, rFormulaPos);
+            if (!aScalar.mbSupported)
+                return makeUnsupportedMaterialization<std::vector<double>>(aScalar.meFallbackReason);
+            if (!aScalar.moValue)
+                return makeMaterializedError<std::vector<double>>(aScalar.meError);
+            if (aScalar.moValue->isEmpty())
+                continue;
+            if (aScalar.moValue->isText())
+                return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+
+            const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aScalar.moValue);
+            if (!aNumber)
+                return makeMaterializedError<std::vector<double>>(aNumber.meError);
+            aValues.push_back(aNumber.maValue);
+        }
+
+        return makeMaterializedValue(std::move(aValues));
+    };
+
+    const auto collectPairedNumericAggregateValues
+        = [&]() -> Materialization<std::pair<std::vector<double>, std::vector<double>>> {
+        if (rNode.maChildren.size() != 2)
+        {
+            return makeMaterializedError<std::pair<std::vector<double>, std::vector<double>>>(
+                api::Error::IllegalArgument);
+        }
+
+        std::pair<std::vector<double>, std::vector<double>> aPair;
+        for (std::size_t nIndex = 0; nIndex < 2; ++nIndex)
+        {
+            const auto aMatrix = materializeMatrixNode(
+                *rNode.maChildren[nIndex], rDoc, rContext, rFormulaPos);
+            if (!aMatrix.mbSupported)
+            {
+                return makeUnsupportedMaterialization<
+                    std::pair<std::vector<double>, std::vector<double>>>(aMatrix.meFallbackReason);
+            }
+            if (!aMatrix.moValue)
+            {
+                return makeMaterializedError<std::pair<std::vector<double>, std::vector<double>>>(
+                    aMatrix.meError);
+            }
+
+            auto& rValues = nIndex == 0 ? aPair.first : aPair.second;
+            SCSIZE nColumns = 0;
+            SCSIZE nRows = 0;
+            (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+            for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+            {
+                for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                {
+                    const auto aValue = lookupexecution::detail::toApiCellValue(
+                        (*aMatrix.moValue)->Get(nColumn, nRow));
+                    if (aValue.isEmpty() || aValue.isText())
+                        continue;
+
+                    const auto aNumber = coerceScalarToNumber(rDoc, rContext, aValue);
+                    if (!aNumber)
+                    {
+                        return makeMaterializedError<
+                            std::pair<std::vector<double>, std::vector<double>>>(
+                            aNumber.meError);
+                    }
+                    rValues.push_back(aNumber.maValue);
+                }
+            }
+        }
+
+        if (aPair.first.size() != aPair.second.size())
+        {
+            return makeMaterializedError<std::pair<std::vector<double>, std::vector<double>>>(
+                api::Error::IllegalArgument);
+        }
+        return makeMaterializedValue(std::move(aPair));
+    };
+
+    if (aFunctionName == u"SUM" || aFunctionName == u"PRODUCT" || aFunctionName == u"SUMSQ"
+        || aFunctionName == u"AVERAGE" || aFunctionName == u"DEVSQ"
+        || aFunctionName == u"MULTINOMIAL")
+    {
+        const auto aValues = collectNumericAggregateValues();
+        if (!aValues.mbSupported)
+            return makeUnsupported(eFunction, aValues.meFallbackReason);
+        if (!aValues.moValue)
+            return makeErrorAttempt(aValues.meError);
+
+        const auto& rValues = *aValues.moValue;
+        if (aFunctionName == u"SUM")
+            return makeNumericAttempt(std::accumulate(rValues.begin(), rValues.end(), 0.0));
+
+        if (aFunctionName == u"PRODUCT")
+        {
+            double fProduct = 1.0;
+            for (double fValue : rValues)
+                fProduct *= fValue;
+            return makeNumericAttempt(rValues.empty() ? 0.0 : fProduct);
+        }
+
+        if (aFunctionName == u"SUMSQ")
+        {
+            double fTotal = 0.0;
+            for (double fValue : rValues)
+                fTotal += fValue * fValue;
+            return makeNumericAttempt(fTotal);
+        }
+
+        if (aFunctionName == u"AVERAGE")
+        {
+            if (rValues.empty())
+                return makeErrorAttempt(api::Error::DivisionByZero);
+            const double fTotal = std::accumulate(rValues.begin(), rValues.end(), 0.0);
+            return makeNumericAttempt(fTotal / static_cast<double>(rValues.size()));
+        }
+
+        if (aFunctionName == u"DEVSQ")
+        {
+            if (rValues.empty())
+                return makeNumericAttempt(0.0);
+            const double fMean = std::accumulate(rValues.begin(), rValues.end(), 0.0)
+                                 / static_cast<double>(rValues.size());
+            double fDeviation = 0.0;
+            for (double fValue : rValues)
+            {
+                const double fDelta = fValue - fMean;
+                fDeviation += fDelta * fDelta;
+            }
+            return makeNumericAttempt(fDeviation);
+        }
+
+        if (rValues.empty())
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        long double fLogGamma = 0.0L;
+        sal_Int64 nTotal = 0;
+        for (double fValue : rValues)
+        {
+            const auto oWhole = coerceWholeNumber(fValue);
+            if (!oWhole || *oWhole < 0)
+                return makeErrorAttempt(api::Error::IllegalArgument);
+            nTotal += *oWhole;
+            fLogGamma += std::lgammal(static_cast<long double>(*oWhole) + 1.0L);
+        }
+
+        const long double fResult
+            = std::exp(std::lgammal(static_cast<long double>(nTotal) + 1.0L) - fLogGamma);
+        if (!std::isfinite(static_cast<double>(fResult)))
+            return makeErrorAttempt(api::Error::Domain);
+        return makeNumericAttempt(static_cast<double>(std::round(fResult)));
+    }
+
+    if (aFunctionName == u"SUMX2MY2" || aFunctionName == u"SUMX2PY2" || aFunctionName == u"SUMXMY2")
+    {
+        const auto aPair = collectPairedNumericAggregateValues();
+        if (!aPair.mbSupported)
+            return makeUnsupported(eFunction, aPair.meFallbackReason);
+        if (!aPair.moValue)
+            return makeErrorAttempt(aPair.meError);
+
+        const auto& [rLeft, rRight] = *aPair.moValue;
+        double fTotal = 0.0;
+        for (std::size_t nIndex = 0; nIndex < rLeft.size(); ++nIndex)
+        {
+            if (aFunctionName == u"SUMX2MY2")
+                fTotal += rLeft[nIndex] * rLeft[nIndex] - rRight[nIndex] * rRight[nIndex];
+            else if (aFunctionName == u"SUMX2PY2")
+                fTotal += rLeft[nIndex] * rLeft[nIndex] + rRight[nIndex] * rRight[nIndex];
+            else
+            {
+                const double fDelta = rLeft[nIndex] - rRight[nIndex];
+                fTotal += fDelta * fDelta;
+            }
+        }
+        return makeNumericAttempt(fTotal);
+    }
+
+    return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+}
+
 [[nodiscard]] inline EvaluationAttempt evaluateScalarUtilityFunction(
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
@@ -5141,11 +5397,16 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         case FunctionKind::Rate:
             return evaluateFinancialScalarFunction(rRoot, eFunction, rDoc, rContext, rFormulaPos);
         case FunctionKind::Round:
+        case FunctionKind::NumericAggregate:
         case FunctionKind::MathScalar:
             return eFunction == FunctionKind::MathScalar
                        ? evaluateMathScalarFunction(
                              rRoot, eFunction, rDoc, rContext, rFormulaPos,
                              bImportedCanonicalSource)
+                       : eFunction == FunctionKind::NumericAggregate
+                             ? evaluateNumericAggregateFunction(
+                                   rRoot, eFunction, rDoc, rContext, rFormulaPos,
+                                   bImportedCanonicalSource)
                        : evaluateScalarUtilityFunction(
                              rRoot, eFunction, rDoc, rContext, rFormulaPos,
                              bEmptyStringAsZero, bImportedCanonicalSource);

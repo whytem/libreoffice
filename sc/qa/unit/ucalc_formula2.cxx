@@ -997,6 +997,13 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetString(3, 7, 0, u"=TIMEVALUE(\"16:30:01\")"_ustr);
         m_pDoc->SetString(4, 7, 0, u"=NUMBERVALUE(\"1,234.5\";\".\";\",\")"_ustr);
         m_pDoc->SetString(5, 7, 0, u"=FALSE()"_ustr);
+        m_pDoc->SetString(6, 7, 0, u"=SUM({1;2;3})"_ustr);
+        m_pDoc->SetString(7, 7, 0, u"=PRODUCT(F15:F18)"_ustr);
+        m_pDoc->SetString(8, 7, 0, u"=AVERAGE(L1:L4)"_ustr);
+        m_pDoc->SetString(9, 7, 0, u"=SUMSQ({\"a\";-4;-5})"_ustr);
+        m_pDoc->SetString(10, 7, 0, u"=DEVSQ({1;2;3;4;5})"_ustr);
+        m_pDoc->SetString(11, 7, 0, u"=MULTINOMIAL({2;3;4})"_ustr);
+        m_pDoc->SetString(12, 7, 0, u"=SUMX2MY2({3;4};{1;2})"_ustr);
         CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(0, 7, 0));
         ASSERT_DOUBLES_EQUAL(4321.0, m_pDoc->GetValue(1, 7, 0));
         ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(2, 7, 0));
@@ -1004,11 +1011,18 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
                              m_pDoc->GetValue(3, 7, 0));
         ASSERT_DOUBLES_EQUAL(1234.5, m_pDoc->GetValue(4, 7, 0));
         CPPUNIT_ASSERT_EQUAL(u"FALSE"_ustr, m_pDoc->GetString(5, 7, 0));
+        ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(6, 7, 0));
+        ASSERT_DOUBLES_EQUAL(24.0, m_pDoc->GetValue(7, 7, 0));
+        ASSERT_DOUBLES_EQUAL(2.75, m_pDoc->GetValue(8, 7, 0));
+        ASSERT_DOUBLES_EQUAL(41.0, m_pDoc->GetValue(9, 7, 0));
+        ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(10, 7, 0));
+        ASSERT_DOUBLES_EQUAL(1260.0, m_pDoc->GetValue(11, 7, 0));
+        ASSERT_DOUBLES_EQUAL(20.0, m_pDoc->GetValue(12, 7, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnObserveCount);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnShadowCompareCount);
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 6);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 13);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
@@ -1030,6 +1044,10 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::NumberValue)]
             >= 1);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::NumericAggregate)]
+            >= 7);
     }
 
     {
@@ -1851,6 +1869,60 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             aStats.maFallbackReasons[static_cast<std::size_t>(
                 setaileval::FallbackReason::UnsupportedFunction)]
             >= 1);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorNumericAggregateAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineAggregateAuthority"_ustr));
+    m_pDoc->SetValue(0, 4, 0, 20.0);
+    m_pDoc->SetValue(1, 4, 0, 10.0);
+    m_pDoc->SetValue(5, 14, 0, 1.0);
+    m_pDoc->SetValue(5, 15, 0, 2.0);
+    m_pDoc->SetValue(5, 16, 0, 3.0);
+    m_pDoc->SetValue(5, 17, 0, 4.0);
+    m_pDoc->SetValue(10, 0, 0, 1.0);
+    m_pDoc->SetValue(10, 1, 0, 2.0);
+    m_pDoc->SetValue(10, 2, 0, 3.0);
+    m_pDoc->SetValue(10, 3, 0, 5.0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"=SUM({1;2;3})"_ustr);
+        m_pDoc->SetString(1, 7, 0, u"=PRODUCT(A5:B5)"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=AVERAGE(K1:K4)"_ustr);
+        m_pDoc->SetString(3, 7, 0, u"=SUMSQ({\"a\";-4;-5})"_ustr);
+        m_pDoc->SetString(4, 7, 0, u"=DEVSQ({1;2;3;4;5})"_ustr);
+        m_pDoc->SetString(5, 7, 0, u"=MULTINOMIAL({2;3;4})"_ustr);
+        m_pDoc->SetString(6, 7, 0, u"=SUMX2MY2({3;4};{1;2})"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(0, 7, 0));
+        ASSERT_DOUBLES_EQUAL(200.0, m_pDoc->GetValue(1, 7, 0));
+        ASSERT_DOUBLES_EQUAL(2.75, m_pDoc->GetValue(2, 7, 0));
+        ASSERT_DOUBLES_EQUAL(41.0, m_pDoc->GetValue(3, 7, 0));
+        ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(4, 7, 0));
+        ASSERT_DOUBLES_EQUAL(1260.0, m_pDoc->GetValue(5, 7, 0));
+        ASSERT_DOUBLES_EQUAL(20.0, m_pDoc->GetValue(6, 7, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 7);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::NumericAggregate)]
+            >= 7);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::NumericAggregate)]);
     }
 
     m_pDoc->DeleteTab(0);

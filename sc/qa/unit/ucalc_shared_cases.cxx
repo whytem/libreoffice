@@ -818,6 +818,62 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::api::formulavalue::ValueType::Value, aSignedValue.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(-42.0, aSignedValue.maResult.mfValue, 1e-12);
 
+    const auto aSum = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=SUM({1;2;3})", false);
+    CPPUNIT_ASSERT(aSum.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::NumericAggregate, aSum.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aSum.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(6.0, aSum.maResult.mfValue, 1e-12);
+
+    const auto aProduct = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=PRODUCT(A5:B5)", false);
+    CPPUNIT_ASSERT(aProduct.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::NumericAggregate, aProduct.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aProduct.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(200.0, aProduct.maResult.mfValue, 1e-12);
+
+    const auto aAverage = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=AVERAGE(L1:L4)", false);
+    CPPUNIT_ASSERT(aAverage.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::NumericAggregate, aAverage.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aAverage.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.75, aAverage.maResult.mfValue, 1e-12);
+
+    const auto aSumSq = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=SUMSQ({\"a\";-4;-5})", false);
+    CPPUNIT_ASSERT(aSumSq.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::NumericAggregate, aSumSq.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aSumSq.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(41.0, aSumSq.maResult.mfValue, 1e-12);
+
+    const auto aDevSq = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=DEVSQ({1;2;3;4;5})", false);
+    CPPUNIT_ASSERT(aDevSq.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::NumericAggregate, aDevSq.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aDevSq.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, aDevSq.maResult.mfValue, 1e-12);
+
+    const auto aMultinomial = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=MULTINOMIAL({2;3;4})", false);
+    CPPUNIT_ASSERT(aMultinomial.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::NumericAggregate, aMultinomial.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMultinomial.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1260.0, aMultinomial.maResult.mfValue, 1e-12);
+
+    const auto aSumX2My2 = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=SUMX2MY2({3;4};{1;2})", false);
+    CPPUNIT_ASSERT(aSumX2My2.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::NumericAggregate, aSumX2My2.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aSumX2My2.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(20.0, aSumX2My2.maResult.mfValue, 1e-12);
+
     const auto aDirectReference = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=B5", false);
     CPPUNIT_ASSERT(aDirectReference.mbSupported);
@@ -2585,6 +2641,83 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::api::formulavalue::ValueType::Error, aLocalizedError.maResult.meType);
     CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::Error::IllegalArgument,
         aLocalizedError.maResult.meError);
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorNumericAggregateHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailAggregateHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(3, 0, 0);
+
+    m_pDoc->SetValue(0, 4, 0, 20.0);
+    m_pDoc->SetValue(1, 4, 0, 10.0);
+    m_pDoc->SetValue(5, 14, 0, 1.0);
+    m_pDoc->SetValue(5, 15, 0, 2.0);
+    m_pDoc->SetValue(5, 16, 0, 3.0);
+    m_pDoc->SetValue(5, 17, 0, 4.0);
+    m_pDoc->SetValue(10, 0, 0, 1.0);
+    m_pDoc->SetValue(10, 1, 0, 2.0);
+    m_pDoc->SetValue(10, 2, 0, 3.0);
+    m_pDoc->SetValue(10, 3, 0, 5.0);
+
+    const auto aSum = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=SUM({1;2;3})", false);
+    CPPUNIT_ASSERT(aSum.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::NumericAggregate, aSum.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aSum.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(6.0, aSum.maResult.mfValue, 1e-12);
+
+    const auto aProduct = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=PRODUCT(A5:B5)", false);
+    CPPUNIT_ASSERT(aProduct.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::NumericAggregate, aProduct.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aProduct.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(200.0, aProduct.maResult.mfValue, 1e-12);
+
+    const auto aAverage = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=AVERAGE(K1:K4)", false);
+    CPPUNIT_ASSERT(aAverage.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::NumericAggregate, aAverage.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aAverage.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.75, aAverage.maResult.mfValue, 1e-12);
+
+    const auto aSumSq = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=SUMSQ({\"a\";-4;-5})", false);
+    CPPUNIT_ASSERT(aSumSq.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::NumericAggregate, aSumSq.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aSumSq.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(41.0, aSumSq.maResult.mfValue, 1e-12);
+
+    const auto aDevSq = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=DEVSQ({1;2;3;4;5})", false);
+    CPPUNIT_ASSERT(aDevSq.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::NumericAggregate, aDevSq.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aDevSq.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, aDevSq.maResult.mfValue, 1e-12);
+
+    const auto aMultinomial = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=MULTINOMIAL({2;3;4})", false);
+    CPPUNIT_ASSERT(aMultinomial.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::NumericAggregate, aMultinomial.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMultinomial.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1260.0, aMultinomial.maResult.mfValue, 1e-12);
+
+    const auto aSumX2My2 = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=SUMX2MY2({3;4};{1;2})", false);
+    CPPUNIT_ASSERT(aSumX2My2.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::NumericAggregate, aSumX2My2.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aSumX2My2.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(20.0, aSumX2My2.maResult.mfValue, 1e-12);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNormalization)
