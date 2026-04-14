@@ -143,10 +143,10 @@ This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=7063`
-- `interpret_tail_live_authoritative_match_total=2769`
-- `interpret_tail_live_authoritative_fallback_total=4294`
-- live authoritative-match rate over the corpus: `5.4657%`
-- live authoritative-match rate over the current promoted probe: `39.2043%`
+- `interpret_tail_live_authoritative_match_total=4364`
+- `interpret_tail_live_authoritative_fallback_total=2699`
+- live authoritative-match rate over the corpus: `8.6141%`
+- live authoritative-match rate over the current promoted probe: `61.7868%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -156,13 +156,13 @@ This is the honest all-formula live-routing surface from the standing replay
 corpus:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=14738`
-- `interpret_tail_live_fallback_total=664`
-- `interpret_tail_live_seen_total=15402`
-- `interpret_tail_live_unseen_formula_cells=35259`
-- `interpret_tail_live_promoted_function_supported_total=13488`
-- `interpret_tail_live_supported_rate=29.09`
-- `interpret_tail_live_seen_rate=30.40`
+- `interpret_tail_live_supported_total=19148`
+- `interpret_tail_live_fallback_total=654`
+- `interpret_tail_live_seen_total=19802`
+- `interpret_tail_live_unseen_formula_cells=30859`
+- `interpret_tail_live_promoted_function_supported_total=17898`
+- `interpret_tail_live_supported_rate=37.80`
+- `interpret_tail_live_seen_rate=39.09`
 
 Current ambient fallback reasons:
 
@@ -211,9 +211,9 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=7063`
-- `interpret_tail_authoritative_total=4218`
-- `interpret_tail_authoritative_fallback_total=2845`
-- promoted-family authoritative rate: `59.72%`
+- `interpret_tail_authoritative_total=2628`
+- `interpret_tail_authoritative_fallback_total=4435`
+- promoted-family authoritative rate: `37.21%`
 
 Current promoted-family fallback reasons:
 
@@ -306,8 +306,8 @@ surface after forcing each promoted replay formula through direct live
 
 - `interpret_tail_replay_promoted_formula_cells=7063`
 - `interpret_tail_replay_promoted_direct_seen=7063`
-- `interpret_tail_replay_promoted_direct_supported=7014`
-- `interpret_tail_replay_promoted_direct_fallback=49`
+- `interpret_tail_replay_promoted_direct_supported=7033`
+- `interpret_tail_replay_promoted_direct_fallback=30`
 - `interpret_tail_replay_promoted_direct_unseen=0`
 - `interpret_tail_replay_promoted_shared_formula_cells=3331`
 - `interpret_tail_replay_promoted_shared_top_formula_cells=739`
@@ -328,7 +328,7 @@ Interpretation:
   promoting bounded scalar-math feeder traffic beneath comparison helpers and
   adding bounded scalar `RATE`
 - both shared and non-shared promoted replay formulas now reach the live seam
-- the residual replay work is now the `49` direct fallback cells on this
+- the residual replay work is now the `30` direct fallback cells on this
   broader imported promoted-family surface
 - the dominant next targets are the remaining logical-fold and math-scalar
   `shadow_mismatch` rows plus the smaller information-predicate and lookup
