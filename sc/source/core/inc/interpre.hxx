@@ -837,8 +837,6 @@ public:
     void ScRound();
     void ScRoundUp();
     void ScRoundDown();
-    void ScGetDateValue();
-    void ScGetTimeValue();
     void ScArcTan2();
     void ScLog();
     void ScGetDate();

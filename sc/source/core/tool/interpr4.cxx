@@ -72,6 +72,7 @@
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx>
 #include <spreadsheetengine/compat/libreoffice/MatrixFrameExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
 
 #include <map>
 #include <algorithm>
@@ -84,6 +85,7 @@ using namespace formula;
 namespace seexternalexec = spreadsheetengine::compat::libreoffice::externalreferenceexecution;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
+namespace setextparseexec = spreadsheetengine::compat::libreoffice::textparsingexecution;
 
 #define ADDIN_MAXSTRLEN 256
 
@@ -4011,6 +4013,37 @@ StackVar ScInterpreter::Interpret()
                     nFuncFmtType = SvNumFormatType::LOGICAL;
                     PushInt(bValue ? 1 : 0);
                 };
+                const auto pushLegacyDateOrTimeValue =
+                    [&](const char* pFunctionName, SvNumFormatType eFormatType,
+                        auto aEvaluator) {
+                        if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
+                            && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
+                            && !pMyFormulaCell->IsHyperLinkCell()
+                            && !mrDoc.IsThreadedGroupCalcInProgress())
+                        {
+                            const OUString aFormulaSource
+                                = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
+                            if (setaileval::isHardRoutedFormula(std::u16string_view(
+                                    aFormulaSource.getStr(), aFormulaSource.getLength())))
+                            {
+                                SAL_WARN("sc.core",
+                                    "literal-only hard-routed " << pFunctionName
+                                        << " reached ScInterpreter for " << aFormulaSource);
+                                OSL_FAIL("literal-only hard-routed text parsing slice reached "
+                                         "ScInterpreter");
+                            }
+                        }
+
+                        const OUString aInputString = GetString().getString();
+                        const auto aResult = aEvaluator(aInputString);
+                        if (aResult)
+                        {
+                            nFuncFmtType = eFormatType;
+                            PushDouble(aResult.maValue);
+                        }
+                        else
+                            PushIllegalArgument();
+                    };
 
                 switch( eOp )
                 {
@@ -4143,8 +4176,22 @@ StackVar ScInterpreter::Interpret()
                     case ocIsEven           : ScIsEven();                   break;
                     case ocIsOdd            : ScIsOdd();                    break;
                     case ocN                : ScN();                        break;
-                    case ocGetDateValue     : ScGetDateValue();             break;
-                    case ocGetTimeValue     : ScGetTimeValue();             break;
+                    case ocGetDateValue     :
+                        pushLegacyDateOrTimeValue(
+                            "DATEVALUE", SvNumFormatType::DATE,
+                            [&](const OUString& rInputString) {
+                                return setextparseexec::evaluateDateValue(
+                                    mrDoc, mrContext, rInputString);
+                            });
+                        break;
+                    case ocGetTimeValue     :
+                        pushLegacyDateOrTimeValue(
+                            "TIMEVALUE", SvNumFormatType::TIME,
+                            [&](const OUString& rInputString) {
+                                return setextparseexec::evaluateTimeValue(
+                                    mrDoc, mrContext, rInputString);
+                            });
+                        break;
                     case ocCode             : ScCode();                     break;
                     case ocTrim             : ScTrim();                     break;
                     case ocUpper            : ScUpper();                    break;

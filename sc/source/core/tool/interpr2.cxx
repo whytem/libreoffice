@@ -69,36 +69,12 @@ namespace sedatetime = spreadsheetengine::core::datetime;
 namespace semath = spreadsheetengine::core::math;
 namespace seconvert = spreadsheetengine::core::convert;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
-namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
-namespace setextparseexec = spreadsheetengine::compat::libreoffice::textparsingexecution;
 
 #define SCdEpsilon                1.0E-7
 
 namespace
 {
-
-[[nodiscard]] std::optional<OUString> lclGetQuarantinedHardRoutedFormula(
-    const ScFormulaCell* pCell, const ScDocument& rDoc, ScInterpreterContext& rContext)
-{
-    if (!pCell)
-        return std::nullopt;
-
-    if (pCell->IsIterCell() || pCell->GetMatrixFlag() != ScMatrixMode::NONE
-        || pCell->IsHyperLinkCell() || rDoc.IsThreadedGroupCalcInProgress())
-    {
-        return std::nullopt;
-    }
-
-    OUString aFormulaSource = pCell->GetFormula(FormulaGrammar::GRAM_ODFF, &rContext);
-    if (!setaileval::isHardRoutedFormula(
-            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength())))
-    {
-        return std::nullopt;
-    }
-
-    return aFormulaSource;
-}
 
 }
 
@@ -176,29 +152,6 @@ void ScInterpreter::ScGetSec()
 void ScInterpreter::ScGetHour()
 {
     PushDouble(sedatetime::extractHour(GetDouble()));
-}
-
-void ScInterpreter::ScGetDateValue()
-{
-    const std::optional<OUString> oQuarantinedFormula
-        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
-    if (oQuarantinedFormula)
-    {
-        SAL_WARN("sc.core",
-            "literal-only hard-routed DATEVALUE reached ScInterpreter for "
-                << *oQuarantinedFormula);
-        OSL_FAIL("literal-only hard-routed DATEVALUE reached ScInterpreter");
-    }
-
-    OUString aInputString = GetString().getString();
-    const auto aResult = setextparseexec::evaluateDateValue(mrDoc, mrContext, aInputString);
-    if (aResult)
-    {
-        nFuncFmtType = SvNumFormatType::DATE;
-        PushDouble(aResult.maValue);
-    }
-    else
-        PushIllegalArgument();
 }
 
 void ScInterpreter::ScGetDayOfWeek()
@@ -565,29 +518,6 @@ void ScInterpreter::ScGetDateDif()
         PushDouble(*fResult);
     else
         PushIllegalArgument();               // unsupported format
-}
-
-void ScInterpreter::ScGetTimeValue()
-{
-    const std::optional<OUString> oQuarantinedFormula
-        = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
-    if (oQuarantinedFormula)
-    {
-        SAL_WARN("sc.core",
-            "literal-only hard-routed TIMEVALUE reached ScInterpreter for "
-                << *oQuarantinedFormula);
-        OSL_FAIL("literal-only hard-routed TIMEVALUE reached ScInterpreter");
-    }
-
-    OUString aInputString = GetString().getString();
-    const auto aResult = setextparseexec::evaluateTimeValue(mrDoc, mrContext, aInputString);
-    if (aResult)
-    {
-        nFuncFmtType = SvNumFormatType::TIME;
-        PushDouble(aResult.maValue);
-    }
-    else
-        PushIllegalArgument();
 }
 
 void ScInterpreter::ScPlusMinus()

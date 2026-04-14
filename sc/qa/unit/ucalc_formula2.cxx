@@ -1041,6 +1041,10 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetString(5, 69, 0, u"=FALSE()"_ustr);
         m_pDoc->SetString(6, 69, 0, u"=NORM.S.DIST(1;TRUE())"_ustr);
         m_pDoc->SetString(7, 69, 0, u"=NORM.S.DIST(1;FALSE())"_ustr);
+        m_pDoc->SetString(8, 69, 0, u"=DATEVALUE(\"1954-07-20\")"_ustr);
+        m_pDoc->SetString(9, 69, 0, u"=TIMEVALUE(\"16:30:01\")"_ustr);
+        m_pDoc->SetString(10, 69, 0, u"=DATEVALUE(\"1954-07-20\")+1"_ustr);
+        m_pDoc->SetString(11, 69, 0, u"=TIMEVALUE(\"16:30:01\")*86400"_ustr);
         m_pDoc->SetString(4, 70, 0, u"=ABS(-7.25)"_ustr);
         m_pDoc->SetString(5, 70, 0, u"=DEGREES(ACOS(-0.5))"_ustr);
         m_pDoc->SetString(6, 70, 0, u"=ATANH(0)/PI()"_ustr);
@@ -1077,6 +1081,12 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_EQUAL(u"FALSE"_ustr, m_pDoc->GetString(5, 69, 0));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(0.841344746068543, m_pDoc->GetValue(6, 69, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(0.241970724519143, m_pDoc->GetValue(7, 69, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(8, 69, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL((16.0 * 3600.0 + 30.0 * 60.0 + 1.0) / 86400.0,
+                                     m_pDoc->GetValue(9, 69, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(19926.0, m_pDoc->GetValue(10, 69, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(16.0 * 3600.0 + 30.0 * 60.0 + 1.0,
+                                     m_pDoc->GetValue(11, 69, 0), 1e-9);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(7.25, m_pDoc->GetValue(4, 70, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(120.0, m_pDoc->GetValue(5, 70, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(6, 70, 0), 1e-12);
@@ -1089,12 +1099,20 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(3, 70, 0), 1e-12);
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 2);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 4);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::LogicalConstant)]
             >= 2);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::DateValue)]
+            >= 1);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::TimeValue)]
+            >= 1);
     }
 
     {
