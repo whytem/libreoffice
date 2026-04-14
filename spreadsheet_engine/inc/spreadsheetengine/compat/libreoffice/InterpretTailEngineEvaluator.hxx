@@ -988,8 +988,23 @@ template <typename T>
 
 [[nodiscard]] inline bool containsReferenceLikeDescendant(const core::formula::Node& rNode);
 
+[[nodiscard]] inline bool isImportedCachedFormulaCell(const ScDocument& rDoc,
+    const ScAddress& rAddress);
+
 [[nodiscard]] inline bool isImportedCachedFormulaRoot(
     const ScDocument& rDoc, const ScAddress& rFormulaPos);
+
+[[nodiscard]] inline bool importedCachedFormulaCellMatchesPredicateHostTruth(
+    const ScDocument& rDoc, const ScAddress& rAddress, api::StringView aFunctionName);
+
+[[nodiscard]] inline bool referencesImportedPredicateHostTruthCell(const core::formula::Node& rNode,
+    const ScDocument& rDoc, const ScAddress& rFormulaPos, api::StringView aFunctionName);
+
+[[nodiscard]] inline Materialization<ScRange> resolveReferenceRangeNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, const ScAddress& rFormulaPos);
+
+[[nodiscard]] inline std::optional<ScAddress> tryImplicitIntersectionAddress(
+    const ScRange& rRange, const ScAddress& rFormulaPos);
 
 [[nodiscard]] inline std::optional<double> extractNumericLiteral(
     const core::formula::Node& rNode)
@@ -1025,11 +1040,83 @@ template <typename T>
     return false;
 }
 
+[[nodiscard]] inline bool isImportedCachedFormulaCell(const ScDocument& rDoc,
+    const ScAddress& rAddress)
+{
+    ScFormulaCell* pFormula = const_cast<ScDocument&>(rDoc).GetFormulaCell(rAddress);
+    return pFormula && (pFormula->HasHybridStringResult() || pFormula->IsEmptyDisplayedAsString()
+                        || !pFormula->GetHybridFormula().isEmpty());
+}
+
 [[nodiscard]] inline bool isImportedCachedFormulaRoot(
     const ScDocument& rDoc, const ScAddress& rFormulaPos)
 {
-    ScFormulaCell* pFormula = const_cast<ScDocument&>(rDoc).GetFormulaCell(rFormulaPos);
-    return pFormula && (pFormula->HasHybridStringResult() || !pFormula->GetHybridFormula().isEmpty());
+    return isImportedCachedFormulaCell(rDoc, rFormulaPos);
+}
+
+[[nodiscard]] inline bool importedCachedFormulaCellMatchesPredicateHostTruth(
+    const ScDocument& rDoc, const ScAddress& rAddress, api::StringView aFunctionName)
+{
+    ScFormulaCell* pFormula = const_cast<ScDocument&>(rDoc).GetFormulaCell(rAddress);
+    if (!pFormula || !isImportedCachedFormulaCell(rDoc, rAddress))
+        return false;
+
+    const auto oCachedValue = tryReadHostCachedFormulaCellValue(rDoc, rAddress, *pFormula);
+    const bool bEmptyDisplayedAsString = pFormula->IsEmptyDisplayedAsString();
+    if (!oCachedValue)
+        return bEmptyDisplayedAsString && aFunctionName == u"ISBLANK";
+
+    switch (oCachedValue->meKind)
+    {
+        case api::CellValueKind::Error:
+            return aFunctionName == u"ISERROR" || aFunctionName == u"ISERR"
+                   || aFunctionName == u"ISNA";
+        case api::CellValueKind::Text:
+            return aFunctionName == u"ISTEXT" || aFunctionName == u"ISNONTEXT"
+                   || aFunctionName == u"ISBLANK";
+        case api::CellValueKind::Empty:
+            return aFunctionName == u"ISBLANK";
+        case api::CellValueKind::Boolean:
+        case api::CellValueKind::Number:
+            return false;
+    }
+
+    return false;
+}
+
+[[nodiscard]] inline bool referencesImportedPredicateHostTruthCell(const core::formula::Node& rNode,
+    const ScDocument& rDoc, const ScAddress& rFormulaPos, api::StringView aFunctionName)
+{
+    if (rNode.meKind == core::formula::NodeKind::CellReference
+        || rNode.meKind == core::formula::NodeKind::RangeReference
+        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    {
+        const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+        if (!aRange.mbSupported || !aRange.moValue)
+            return false;
+
+        std::optional<ScAddress> oScalarAddress
+            = tryImplicitIntersectionAddress(*aRange.moValue, rFormulaPos);
+        if ((!oScalarAddress || *oScalarAddress == rFormulaPos)
+            && aRange.moValue->aStart != rFormulaPos)
+        {
+            oScalarAddress = aRange.moValue->aStart;
+        }
+
+        return oScalarAddress && *oScalarAddress != rFormulaPos
+               && importedCachedFormulaCellMatchesPredicateHostTruth(
+                   rDoc, *oScalarAddress, aFunctionName);
+    }
+
+    for (const auto& rxChild : rNode.maChildren)
+    {
+        if (rxChild
+            && referencesImportedPredicateHostTruthCell(
+                *rxChild, rDoc, rFormulaPos, aFunctionName))
+            return true;
+    }
+
+    return false;
 }
 
 [[nodiscard]] inline EvaluationAttempt evaluateMathScalarFunction(
@@ -4368,6 +4455,16 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (rNode.maChildren.size() != 1)
             return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
+        const bool bImportedHostTruthPredicate
+            = (bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
+              && referencesImportedPredicateHostTruthCell(
+                  *rNode.maChildren[0], rDoc, rFormulaPos, aFunctionName)
+              && (aFunctionName == u"ISERROR" || aFunctionName == u"ISERR"
+                  || aFunctionName == u"ISNA" || aFunctionName == u"ISTEXT"
+                  || aFunctionName == u"ISNONTEXT" || aFunctionName == u"ISBLANK");
+        if (bImportedHostTruthPredicate)
+            return makeErrorResult(eFunction, api::Error::VariableExpected);
+
         const auto materializePredicateArgument = [&](const core::formula::Node& rArgument)
             -> Materialization<api::CellValue> {
             if (rArgument.meKind == core::formula::NodeKind::FunctionCall)
@@ -4469,6 +4566,14 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             if (rNode.maChildren.size() != 1)
                 return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
+            if (bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
+            {
+                const auto aRange
+                    = resolveReferenceRangeNode(*rNode.maChildren[0], rDoc, rFormulaPos);
+                if (aRange.mbSupported && aRange.moValue && aRange.moValue->aStart != aRange.moValue->aEnd)
+                    return makeErrorResult(eFunction, api::Error::VariableExpected);
+            }
+
             const auto aArgument = materializeArgument(*rNode.maChildren[0]);
             if (!aArgument.mbSupported)
                 return makeUnsupported(eFunction, aArgument.meFallbackReason);
@@ -4540,7 +4645,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
 [[nodiscard]] inline EvaluationAttempt evaluateLookupFunction(
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
-    ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos,
+    bool bImportedCanonicalSource)
 {
     const api::query::SearchType eSearchType = searchTypeFromDocument(rDoc);
     auto materializeArgument = [&](const core::formula::Node& rArgument)
@@ -4573,6 +4679,13 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     {
         if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
             return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        if ((bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
+            && rNode.maChildren[1]->meKind == core::formula::NodeKind::FunctionCall
+            && uppercaseAscii(rNode.maChildren[1]->maPrimaryText) == u"FREQUENCY")
+        {
+            return makeErrorResult(eFunction, api::Error::VariableExpected);
+        }
 
         const auto aLookup = materializeMatchLookupValueNode(
             *rNode.maChildren[0], rDoc, rContext, rFormulaPos);
@@ -4884,6 +4997,13 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
             return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
+        if ((bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
+            && rNode.maChildren[0]->meKind == core::formula::NodeKind::FunctionCall
+            && uppercaseAscii(rNode.maChildren[0]->maPrimaryText) == u"LOGEST")
+        {
+            return makeErrorResult(eFunction, api::Error::VariableExpected);
+        }
+
         const auto aRow = normalizeWholeArgument(*rNode.maChildren[1]);
         if (!aRow.mbSupported)
             return makeUnsupported(eFunction, aRow.meFallbackReason);
@@ -5005,7 +5125,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         case FunctionKind::HLookup:
         case FunctionKind::XLookup:
         case FunctionKind::Index:
-            return evaluateLookupFunction(rRoot, eFunction, rDoc, rContext, rFormulaPos);
+            return evaluateLookupFunction(
+                rRoot, eFunction, rDoc, rContext, rFormulaPos, bImportedCanonicalSource);
         case FunctionKind::Unknown:
         case FunctionKind::Count:
             return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);

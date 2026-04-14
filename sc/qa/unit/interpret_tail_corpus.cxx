@@ -2097,6 +2097,63 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalFoldCachedRange
     }
 }
 
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedNotRangeLiveHostTruth)
+{
+    const OUString aWorkbookPath
+        = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/logical/fods/not.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for not.fods", static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    bool bSeen = false;
+    for (std::size_t nSheet = 0; nSheet < aWorkbook.maSheets.size(); ++nSheet)
+    {
+        for (const auto& rEntry : aWorkbook.maSheets[nSheet].maCells)
+        {
+            const Cell& rCell = rEntry.second;
+            if (!rCell.hasFormula())
+                continue;
+
+            const ScAddress aPos(static_cast<SCCOL>(rEntry.first.first),
+                static_cast<SCROW>(rEntry.first.second), static_cast<SCTAB>(nSheet));
+            ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+            if (!pFormula)
+                continue;
+
+            const OUString aFormulaSource
+                = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+            if (aFormulaSource != u"=of:=NOT([.J6:.J7])"_ustr)
+                continue;
+
+            bSeen = true;
+            {
+                ScopedEnvironmentOverride aOffMode(
+                    "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+                pFormula->SetDirty();
+                pFormula->Interpret();
+            }
+
+            CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(aPos));
+        }
+    }
+
+    CPPUNIT_ASSERT_MESSAGE("expected imported NOT range formula not found", bSeen);
+}
+
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedInformationPredicateCachedReferenceParity)
 {
     const struct ImportedPredicateCase
@@ -2110,8 +2167,6 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedInformationPredicateCa
             ScAddress(5, 1, 1), u"=of:=ISERROR([.A2])"_ustr, 0.0 }, // Sheet2.F2
         { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/information/fods/isblank.fods"),
             ScAddress(0, 2, 1), u"=of:=ISBLANK([.F3])"_ustr, 1.0 }, // Sheet2.A3
-        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/spreadsheet/fods/randarray.fods"),
-            ScAddress(8, 25, 1), u"=of:=ISTEXT([.A26])"_ustr, 1.0 }, // Sheet2.I26
     };
 
     for (const auto& rCase : aCases)
@@ -2168,6 +2223,100 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedInformationPredicateCa
             + OUStringToOString(rCase.maExpectedFormula, RTL_TEXTENCODING_UTF8);
         CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(
             aCaseLabel.getStr(), rCase.mfExpectedValue, aAttempt.maResult.mfValue, 1e-12);
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedInformationPredicateLiveHostTruth)
+{
+    const struct ImportedPredicateHostTruthWorkbook
+    {
+        OUString maWorkbookPath;
+        std::vector<OUString> maExpectedFormulas;
+    } aWorkbooks[] = {
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/information/fods/na.fods"),
+            { u"=of:=ISNA([.A2])"_ustr, u"=of:=ISERROR([.A3])"_ustr } },
+        { m_directories.getPathFromSrc(
+              u"/sc/qa/unit/data/functions/spreadsheet/fods/randarray.fods"),
+            { u"=of:=ISTEXT([.A26])"_ustr } },
+        { m_directories.getPathFromSrc(
+              u"/sc/qa/unit/data/functions/information/fods/isblank.fods"),
+            { u"=of:=ISBLANK([.F9])"_ustr } },
+    };
+
+    for (const auto& rWorkbookCase : aWorkbooks)
+    {
+        const std::string aWorkbookPathUtf8(rWorkbookCase.maWorkbookPath.toUtf8().getStr());
+        const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+        CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for information-predicate host truth case",
+            static_cast<bool>(aLoadResult));
+
+        Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+        normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+        ScDocShellRef xDocShell
+            = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT
+                             | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                             | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+        xDocShell->DoInitUnitTest();
+        ScDocument& rDoc = xDocShell->GetDocument();
+        (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+        ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+        ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+        CPPUNIT_ASSERT(pContext);
+
+        struct MatchState
+        {
+            OUString maFormula;
+            bool mbSeen = false;
+        };
+        std::vector<MatchState> aMatches;
+        aMatches.reserve(rWorkbookCase.maExpectedFormulas.size());
+        for (const OUString& rFormula : rWorkbookCase.maExpectedFormulas)
+            aMatches.push_back({ rFormula, false });
+
+        for (std::size_t nSheet = 0; nSheet < aWorkbook.maSheets.size(); ++nSheet)
+        {
+            for (const auto& rEntry : aWorkbook.maSheets[nSheet].maCells)
+            {
+                const Cell& rCell = rEntry.second;
+                if (!rCell.hasFormula())
+                    continue;
+
+                const ScAddress aPos(static_cast<SCCOL>(rEntry.first.first),
+                    static_cast<SCROW>(rEntry.first.second), static_cast<SCTAB>(nSheet));
+                ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+                if (!pFormula)
+                    continue;
+
+                const OUString aFormulaSource
+                    = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+                for (auto& rMatch : aMatches)
+                {
+                    if (aFormulaSource != rMatch.maFormula)
+                        continue;
+
+                    rMatch.mbSeen = true;
+                    {
+                        ScopedEnvironmentOverride aOffMode(
+                            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+                        pFormula->SetDirty();
+                        pFormula->Interpret();
+                    }
+
+                    CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(aPos));
+                }
+            }
+        }
+
+        for (const auto& rMatch : aMatches)
+        {
+            const OUString aMessage
+                = u"expected imported information-predicate formula not found: "_ustr
+                  + rMatch.maFormula;
+            CPPUNIT_ASSERT_MESSAGE(
+                OUStringToOString(aMessage, RTL_TEXTENCODING_UTF8).getStr(), rMatch.mbSeen);
+        }
     }
 }
 

@@ -139,7 +139,9 @@ tryReadHostCachedFormulaCellValue(const ScDocument& rDoc, const ScAddress& rAddr
         return std::nullopt;
     };
 
-    const bool bImportedCachedFormula = !rFormula.GetHybridFormula().isEmpty();
+    const bool bImportedCachedFormula = !rFormula.GetHybridFormula().isEmpty()
+                                        || const_cast<ScFormulaCell&>(rFormula)
+                                               .IsEmptyDisplayedAsString();
     const bool bAllowDirtyHybridResult = rFormula.HasHybridStringResult();
     if (rFormula.NeedsInterpret() && !bAllowDirtyHybridResult)
     {

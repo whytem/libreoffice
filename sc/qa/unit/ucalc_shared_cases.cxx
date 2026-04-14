@@ -12,6 +12,7 @@
 #include <scopetools.hxx>
 
 #include <formula/errorcodes.hxx>
+#include <global.hxx>
 #include <interpretercontext.hxx>
 #include <rangenam.hxx>
 #include <spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx>
@@ -1067,6 +1068,98 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::Error::VariableExpected,
         aImportedAbsReference.maResult.meError);
+
+    m_pDoc->SetString(35, 29, 0, u"=1/0"_ustr);
+    ScFormulaCell* pImportedError = m_pDoc->GetFormulaCell(ScAddress(35, 29, 0));
+    CPPUNIT_ASSERT(pImportedError);
+    pImportedError->SetHybridString(
+        m_pDoc->GetSharedStringPool().intern(ScGlobal::GetErrorString(FormulaError::DivisionByZero)));
+    pImportedError->ResetDirty();
+
+    m_pDoc->SetString(36, 29, 0, u"=NA()"_ustr);
+    ScFormulaCell* pImportedNa = m_pDoc->GetFormulaCell(ScAddress(36, 29, 0));
+    CPPUNIT_ASSERT(pImportedNa);
+    pImportedNa->SetHybridString(
+        m_pDoc->GetSharedStringPool().intern(ScGlobal::GetErrorString(FormulaError::NotAvailable)));
+    pImportedNa->ResetDirty();
+
+    m_pDoc->SetString(37, 29, 0, u"=\"hello\""_ustr);
+    ScFormulaCell* pImportedText = m_pDoc->GetFormulaCell(ScAddress(37, 29, 0));
+    CPPUNIT_ASSERT(pImportedText);
+    pImportedText->SetHybridString(m_pDoc->GetSharedStringPool().intern(u"hello"_ustr));
+    pImportedText->ResetDirty();
+
+    m_pDoc->SetString(38, 29, 0, u"=\"\""_ustr);
+    ScFormulaCell* pImportedBlank = m_pDoc->GetFormulaCell(ScAddress(38, 29, 0));
+    CPPUNIT_ASSERT(pImportedBlank);
+    pImportedBlank->SetHybridEmptyDisplayedAsString();
+    pImportedBlank->ResetDirty();
+
+    const auto aImportedIsErrorRef = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ISERROR(AJ30)", false, nullptr,
+        u"of:=ISERROR([.AJ30])");
+    CPPUNIT_ASSERT(aImportedIsErrorRef.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error,
+        aImportedIsErrorRef.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::VariableExpected,
+        aImportedIsErrorRef.maResult.meError);
+
+    const auto aImportedIsErrRef = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ISERR(AJ30)", false, nullptr,
+        u"of:=ISERR([.AJ30])");
+    CPPUNIT_ASSERT(aImportedIsErrRef.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error,
+        aImportedIsErrRef.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::VariableExpected,
+        aImportedIsErrRef.maResult.meError);
+
+    const auto aImportedIsNaRef = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ISNA(AK30)", false, nullptr,
+        u"of:=ISNA([.AK30])");
+    CPPUNIT_ASSERT(aImportedIsNaRef.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error,
+        aImportedIsNaRef.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::VariableExpected,
+        aImportedIsNaRef.maResult.meError);
+
+    const auto aImportedIsTextRef = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ISTEXT(AL30)", false, nullptr,
+        u"of:=ISTEXT([.AL30])");
+    CPPUNIT_ASSERT(aImportedIsTextRef.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error,
+        aImportedIsTextRef.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::VariableExpected,
+        aImportedIsTextRef.maResult.meError);
+
+    const auto aImportedIsNonTextRef = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ISNONTEXT(AL30)", false, nullptr,
+        u"of:=ISNONTEXT([.AL30])");
+    CPPUNIT_ASSERT(aImportedIsNonTextRef.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error,
+        aImportedIsNonTextRef.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::VariableExpected,
+        aImportedIsNonTextRef.maResult.meError);
+
+    const auto aImportedIsBlankRef = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ISBLANK(AM30)", false, nullptr,
+        u"of:=ISBLANK([.AM30])");
+    CPPUNIT_ASSERT(aImportedIsBlankRef.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error,
+        aImportedIsBlankRef.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::VariableExpected,
+        aImportedIsBlankRef.maResult.meError);
 
     const auto aRoundUpFractionalDigits = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=ROUNDUP(31415.92654;3.3)", false);
