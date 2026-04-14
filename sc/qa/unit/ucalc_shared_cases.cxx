@@ -1047,6 +1047,27 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aAndBooleanFormulaRange.maResult.mfValue, 1e-12);
     CPPUNIT_ASSERT_EQUAL(SvNumFormatType::LOGICAL, aAndBooleanFormulaRange.meFormatType);
 
+    const auto aImportedAndRange = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=AND(A30:A32)", false, nullptr,
+        u"of:=AND([.A30:.A32])");
+    CPPUNIT_ASSERT(aImportedAndRange.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error,
+        aImportedAndRange.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::VariableExpected,
+        aImportedAndRange.maResult.meError);
+
+    const auto aImportedAbsReference = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ABS(A30)", false, nullptr, u"of:=ABS([.A30])");
+    CPPUNIT_ASSERT(aImportedAbsReference.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error,
+        aImportedAbsReference.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::VariableExpected,
+        aImportedAbsReference.maResult.meError);
+
     const auto aRoundUpFractionalDigits = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=ROUNDUP(31415.92654;3.3)", false);
     CPPUNIT_ASSERT(aRoundUpFractionalDigits.mbSupported);

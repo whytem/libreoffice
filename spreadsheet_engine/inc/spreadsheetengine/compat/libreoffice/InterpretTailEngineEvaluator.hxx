@@ -982,6 +982,15 @@ template <typename T>
 
 [[nodiscard]] inline std::optional<sal_Int32> coerceWholeNumber(double fValue);
 
+[[nodiscard]] inline Materialization<api::CellValue> materializeScalarizedReferenceValueNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos);
+
+[[nodiscard]] inline bool containsReferenceLikeDescendant(const core::formula::Node& rNode);
+
+[[nodiscard]] inline bool isImportedCachedFormulaRoot(
+    const ScDocument& rDoc, const ScAddress& rFormulaPos);
+
 [[nodiscard]] inline std::optional<double> extractNumericLiteral(
     const core::formula::Node& rNode)
 {
@@ -998,15 +1007,45 @@ template <typename T>
     return rNode.meUnaryOperator == core::formula::UnaryOperator::Minus ? -fValue : fValue;
 }
 
+[[nodiscard]] inline bool containsReferenceLikeDescendant(const core::formula::Node& rNode)
+{
+    if (rNode.meKind == core::formula::NodeKind::CellReference
+        || rNode.meKind == core::formula::NodeKind::RangeReference
+        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    {
+        return true;
+    }
+
+    for (const auto& rxChild : rNode.maChildren)
+    {
+        if (rxChild && containsReferenceLikeDescendant(*rxChild))
+            return true;
+    }
+
+    return false;
+}
+
+[[nodiscard]] inline bool isImportedCachedFormulaRoot(
+    const ScDocument& rDoc, const ScAddress& rFormulaPos)
+{
+    ScFormulaCell* pFormula = const_cast<ScDocument&>(rDoc).GetFormulaCell(rFormulaPos);
+    return pFormula && (pFormula->HasHybridStringResult() || !pFormula->GetHybridFormula().isEmpty());
+}
+
 [[nodiscard]] inline EvaluationAttempt evaluateMathScalarFunction(
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
-    ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos,
+    bool bImportedCanonicalSource)
 {
     const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
     const auto oCanonical = canonicalMathScalarFunctionName(aFunctionName);
     if (!oCanonical)
         return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
     const api::StringView aCanonicalName = *oCanonical;
+
+    if ((bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
+        && containsReferenceLikeDescendant(rNode))
+        return makeErrorResult(eFunction, api::Error::VariableExpected);
 
     const auto materializeNumericArgument = [&](const core::formula::Node& rArgument,
                                                 std::optional<double> oEmptyDefault = std::nullopt)
@@ -1018,7 +1057,8 @@ template <typename T>
             return makeMaterializedValue(*oEmptyDefault);
         }
 
-        const auto aArgument = materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+        const auto aArgument = materializeScalarizedReferenceValueNode(
+            rArgument, rDoc, rContext, rFormulaPos);
         if (!aArgument.mbSupported)
             return makeUnsupportedMaterialization<double>(aArgument.meFallbackReason);
         if (!aArgument.moValue)
@@ -2257,6 +2297,30 @@ template <typename T>
     return aValue;
 }
 
+[[nodiscard]] inline api::CellValue readTextParsingHostCellValue(
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const ScAddress& rAddress)
+{
+    if (ScFormulaCell* pFormula = const_cast<ScDocument&>(rDoc).GetFormulaCell(rAddress))
+    {
+        const bool bImportedCachedFormula = !pFormula->GetHybridFormula().isEmpty();
+        if (pFormula->HasHybridStringResult())
+        {
+            return api::CellValue::text(toApiString(pFormula->GetResultString().getString()));
+        }
+
+        if (bImportedCachedFormula && pFormula->NeedsInterpret())
+        {
+            const sc::FormulaResultValue aStoredResult = pFormula->GetResult();
+            if (aStoredResult.meType == sc::FormulaResultValue::String)
+            {
+                return api::CellValue::text(toApiString(aStoredResult.maString.getString()));
+            }
+        }
+    }
+
+    return readMaterializedHostCellValue(rDoc, rContext, rAddress);
+}
+
 inline void putScalarIntoMatrix(
     const api::CellValue& rValue, const ScMatrixRef& pMatrix, SCSIZE nColumn, SCSIZE nRow)
 {
@@ -3248,6 +3312,41 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         }
 
         return makeMaterializedValue(
+            readTextParsingHostCellValue(rDoc, rContext, *oScalarAddress));
+    }
+
+    return materializeScalarNode(rNode, rDoc, rContext, rFormulaPos);
+}
+
+[[nodiscard]] inline Materialization<api::CellValue> materializeScalarizedReferenceValueNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    if (rNode.meKind == core::formula::NodeKind::CellReference
+        || rNode.meKind == core::formula::NodeKind::RangeReference
+        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    {
+        const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+        if (!aRange.mbSupported)
+            return makeUnsupportedMaterialization<api::CellValue>(aRange.meFallbackReason);
+        if (!aRange.moValue)
+            return makeMaterializedError<api::CellValue>(aRange.meError);
+
+        std::optional<ScAddress> oScalarAddress
+            = tryImplicitIntersectionAddress(*aRange.moValue, rFormulaPos);
+        if ((!oScalarAddress || *oScalarAddress == rFormulaPos)
+            && aRange.moValue->aStart != rFormulaPos)
+        {
+            oScalarAddress = aRange.moValue->aStart;
+        }
+
+        if (!oScalarAddress || *oScalarAddress == rFormulaPos)
+        {
+            return makeUnsupportedMaterialization<api::CellValue>(
+                FallbackReason::UnsupportedHostSurface);
+        }
+
+        return makeMaterializedValue(
             readMaterializedHostCellValue(rDoc, rContext, *oScalarAddress));
     }
 
@@ -4131,7 +4230,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
 [[nodiscard]] inline EvaluationAttempt evaluateScalarUtilityFunction(
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
-    ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero)
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
+    bool bImportedCanonicalSource)
 {
     const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
     auto materializeArgument = [&](const core::formula::Node& rArgument)
@@ -4297,7 +4397,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                 }
             }
 
-            const auto aScalar = materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+            const auto aScalar = materializeScalarizedReferenceValueNode(
+                rArgument, rDoc, rContext, rFormulaPos);
             if (!aScalar.mbSupported)
                 return makeUnsupportedMaterialization<api::CellValue>(aScalar.meFallbackReason);
             if (!aScalar.moValue)
@@ -4356,6 +4457,13 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
     if (eFunction == FunctionKind::LogicalFold || eFunction == FunctionKind::Not)
     {
+        if ((bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
+            && eFunction == FunctionKind::LogicalFold
+            && containsReferenceLikeDescendant(rNode))
+        {
+            return makeErrorResult(eFunction, api::Error::VariableExpected);
+        }
+
         if (eFunction == FunctionKind::Not)
         {
             if (rNode.maChildren.size() != 1)
@@ -4878,14 +4986,18 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         case FunctionKind::Round:
         case FunctionKind::MathScalar:
             return eFunction == FunctionKind::MathScalar
-                       ? evaluateMathScalarFunction(rRoot, eFunction, rDoc, rContext, rFormulaPos)
+                       ? evaluateMathScalarFunction(
+                             rRoot, eFunction, rDoc, rContext, rFormulaPos,
+                             bImportedCanonicalSource)
                        : evaluateScalarUtilityFunction(
-                             rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
+                             rRoot, eFunction, rDoc, rContext, rFormulaPos,
+                             bEmptyStringAsZero, bImportedCanonicalSource);
         case FunctionKind::InformationPredicate:
         case FunctionKind::LogicalFold:
         case FunctionKind::Not:
             return evaluateScalarUtilityFunction(
-                rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
+                rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero,
+                bImportedCanonicalSource);
         case FunctionKind::Match:
         case FunctionKind::XMatch:
         case FunctionKind::Lookup:

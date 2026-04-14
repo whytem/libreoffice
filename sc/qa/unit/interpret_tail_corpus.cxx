@@ -2610,6 +2610,88 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedDateValueMonthNameLive
     }
 }
 
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedDateValueReferencedFormulaParity)
+{
+    const OUString aWorkbookPath
+        = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/date_time/fods/hour.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for hour.fods", static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    struct ImportedDateValueReferenceCase
+    {
+        OUString maExpectedFormula;
+        double mfExpectedValue;
+        bool mbSeen = false;
+    } aCases[] = {
+        { u"=of:=DATEVALUE([.A2])"_ustr, -4.0 },
+        { u"=of:=DATEVALUE([.A24])"_ustr, 2.0 },
+    };
+
+    for (std::size_t nSheet = 0; nSheet < aWorkbook.maSheets.size(); ++nSheet)
+    {
+        for (const auto& rEntry : aWorkbook.maSheets[nSheet].maCells)
+        {
+            const Cell& rCell = rEntry.second;
+            if (!rCell.hasFormula())
+                continue;
+
+            const ScAddress aPos(static_cast<SCCOL>(rEntry.first.first),
+                static_cast<SCROW>(rEntry.first.second), static_cast<SCTAB>(nSheet));
+            ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+            if (!pFormula)
+                continue;
+
+            const OUString aFormulaSource
+                = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+            const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
+            for (auto& rCase : aCases)
+            {
+                if (aFormulaSource != rCase.maExpectedFormula)
+                    continue;
+
+                rCase.mbSeen = true;
+                const auto aAttempt
+                    = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
+                        rDoc, *pContext, aPos,
+                        std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+                        rDoc.GetCalcConfig().mbEmptyStringAsZero, pFormula->GetCode(),
+                        std::u16string_view(aCanonicalFormulaSource.getStr(),
+                            aCanonicalFormulaSource.getLength()));
+                CPPUNIT_ASSERT(aAttempt.mbSupported);
+                CPPUNIT_ASSERT_EQUAL(
+                    spreadsheetengine::api::formulavalue::ValueType::Value,
+                    aAttempt.maResult.meType);
+                CPPUNIT_ASSERT_DOUBLES_EQUAL(
+                    rCase.mfExpectedValue, aAttempt.maResult.mfValue, 1e-12);
+            }
+        }
+    }
+
+    for (const auto& rCase : aCases)
+    {
+        const OUString aMessage
+            = u"expected imported DATEVALUE reference formula not found: "_ustr
+              + rCase.maExpectedFormula;
+        CPPUNIT_ASSERT_MESSAGE(
+            OUStringToOString(aMessage, RTL_TEXTENCODING_UTF8).getStr(), rCase.mbSeen);
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
 {
     if (!envEnabled("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_STATS"))

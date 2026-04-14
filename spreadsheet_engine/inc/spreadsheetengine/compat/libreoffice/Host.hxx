@@ -98,52 +98,69 @@ tryParseHostImportedHybridFormulaErrorText(const ScDocument& rDoc, const ScAddre
 tryReadHostCachedFormulaCellValue(const ScDocument& rDoc, const ScAddress& rAddress,
     const ScFormulaCell& rFormula)
 {
-    const bool bAllowDirtyHybridResult = rFormula.HasHybridStringResult();
-    if (rFormula.NeedsInterpret() && !bAllowDirtyHybridResult)
-        return std::nullopt;
-
-    if (rFormula.HasHybridStringResult())
-    {
-        const OUString aCachedString = rFormula.GetResultString().getString();
+    const auto convertStoredStringValue = [&](const OUString& rString)
+        -> spreadsheetengine::api::CellValue {
         if (const auto oError = tryParseHostImportedHybridFormulaErrorText(
                 rDoc, rAddress,
-                std::u16string_view(aCachedString.getStr(), aCachedString.getLength())))
+                std::u16string_view(rString.getStr(), rString.getLength())))
         {
             return spreadsheetengine::api::CellValue::error(*oError);
         }
 
         if (const auto oParsed = spreadsheetengine::core::datetime::parseStandaloneNumberText(
-                toApiString(aCachedString)))
+                toApiString(rString)))
         {
             return spreadsheetengine::api::CellValue::number(oParsed->mfValue);
         }
 
-        const OUString aUpperString = aCachedString.toAsciiUpperCase();
+        const OUString aUpperString = rString.toAsciiUpperCase();
         if (aUpperString == "TRUE")
             return spreadsheetengine::api::CellValue::boolean(true);
         if (aUpperString == "FALSE")
             return spreadsheetengine::api::CellValue::boolean(false);
 
-        return spreadsheetengine::api::CellValue::text(toApiString(aCachedString));
+        return spreadsheetengine::api::CellValue::text(toApiString(rString));
+    };
+
+    const auto convertStoredResultValue = [&](const sc::FormulaResultValue& rResult)
+        -> std::optional<spreadsheetengine::api::CellValue> {
+        switch (rResult.meType)
+        {
+            case sc::FormulaResultValue::Value:
+                return spreadsheetengine::api::CellValue::number(rResult.mfValue);
+            case sc::FormulaResultValue::Error:
+                return spreadsheetengine::api::CellValue::error(toApiError(rResult.mnError));
+            case sc::FormulaResultValue::String:
+                return convertStoredStringValue(rResult.maString.getString());
+            case sc::FormulaResultValue::Invalid:
+                break;
+        }
+
+        return std::nullopt;
+    };
+
+    const bool bImportedCachedFormula = !rFormula.GetHybridFormula().isEmpty();
+    const bool bAllowDirtyHybridResult = rFormula.HasHybridStringResult();
+    if (rFormula.NeedsInterpret() && !bAllowDirtyHybridResult)
+    {
+        if (bImportedCachedFormula)
+        {
+            if (const auto oStoredResult = convertStoredResultValue(rFormula.GetResult()))
+                return *oStoredResult;
+        }
+        return std::nullopt;
+    }
+
+    if (rFormula.HasHybridStringResult())
+    {
+        return convertStoredStringValue(rFormula.GetResultString().getString());
     }
 
     if (rFormula.NeedsInterpret())
         return std::nullopt;
 
     const sc::FormulaResultValue aResult = rFormula.GetResult();
-    switch (aResult.meType)
-    {
-        case sc::FormulaResultValue::Value:
-            return spreadsheetengine::api::CellValue::number(aResult.mfValue);
-        case sc::FormulaResultValue::Error:
-            return spreadsheetengine::api::CellValue::error(toApiError(aResult.mnError));
-        case sc::FormulaResultValue::String:
-            return spreadsheetengine::api::CellValue::text(toApiString(aResult.maString.getString()));
-        case sc::FormulaResultValue::Invalid:
-            break;
-    }
-
-    return std::nullopt;
+    return convertStoredResultValue(aResult);
 }
 
 [[nodiscard]] inline spreadsheetengine::api::CellValue readHostDocumentCellValue(
