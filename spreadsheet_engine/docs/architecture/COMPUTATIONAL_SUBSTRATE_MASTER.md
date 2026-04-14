@@ -19,9 +19,11 @@ Today:
 - debug and CI-style builds default that seam to `observe`
 - an eighty-five-slice env-independent logical/text/match/xmatch/lookup/index
   cluster is now engine-first even with rollout explicitly `off`
-- the first real legacy deletion milestone has landed:
+- two real narrow legacy deletion milestones have landed:
   `ScInterpreter::ScTrue()` / `ScFalse()` are retired behind an explicit
-  family-local default-on logical-constant path
+  family-local default-on logical-constant path, and the dedicated
+  `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair is retired while
+  preserving inline nested legacy execution
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star is currently only
@@ -195,11 +197,12 @@ Dominant promoted-family fallback reasons:
   - `INDEX(<2D literal array>; <positive whole>; 0)`
 - `TRUE()` / `FALSE()` now also have an explicit family-local default-on
   rollout path, and their dedicated `ScInterpreter` subroutines are deleted
+- the dedicated `ScInterpreter` wrapper pair for string-literal `DATEVALUE` /
+  `TIMEVALUE` is also deleted; nested legacy evaluation remains inline at
+  dispatch while the existing env-`off` engine-first root slice stays intact
 - the corresponding legacy interpreter entries now warn on normal reach for
   those narrow slices:
   - `ScInterpreter::ScValue()`
-  - `ScInterpreter::ScGetDateValue()`
-  - `ScInterpreter::ScGetTimeValue()`
   - `ScInterpreter::ScNumberValue()`
   - `ScInterpreter::ScMatch()`
   - `ScInterpreter::ScXMatch()`
@@ -408,9 +411,9 @@ The next pass should:
    surface, not as the live retirement denominator
 4. reduce residual fallback inside the admitted ambient traffic, led by
    `math_scalar` and `logical_fold` shadow mismatch
-5. use the logical-constant deletion milestone as the template for the next
-   narrow retirement only after `math_scalar` / `logical_fold` mismatch
-   reduction pays down more live fallback
+5. use the logical-constant and date/time wrapper deletion milestones as the
+   template for the next narrow retirement only after `math_scalar` /
+   `logical_fold` mismatch reduction pays down more live fallback
 6. only return to imported replay parity if we intentionally decide to
    rehabilitate legacy seam-off imported-formula execution
 

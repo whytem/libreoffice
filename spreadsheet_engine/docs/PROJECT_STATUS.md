@@ -197,11 +197,12 @@ Promoted-family fallback reasons:
   - `INDEX(<2D literal array>; <positive whole>; 0)`
 - `TRUE()` / `FALSE()` now also have an explicit family-local default-on
   rollout path, and their dedicated `ScInterpreter` subroutines are deleted
+- the dedicated `ScInterpreter` wrapper pair for string-literal `DATEVALUE` /
+  `TIMEVALUE` is also deleted; nested legacy evaluation stays inline at
+  dispatch while the existing env-`off` engine-first root slice remains intact
 - corresponding legacy entrypoints now carry debug quarantine warnings on
   normal interpreter reach:
   - `ScInterpreter::ScValue()`
-  - `ScInterpreter::ScGetDateValue()`
-  - `ScInterpreter::ScGetTimeValue()`
   - `ScInterpreter::ScNumberValue()`
   - `ScInterpreter::ScMatch()`
   - `ScInterpreter::ScXMatch()`
@@ -241,8 +242,10 @@ Today:
 Still not true:
 
 - no broad default-on rollout exists beyond logical constants
-- only the narrow `ScInterpreter::ScTrue()` / `ScFalse()` pair has been
-  deleted so far; broader legacy retirement has not started
+- two narrow legacy deletion milestones have landed:
+  `ScInterpreter::ScTrue()` / `ScFalse()` and the dedicated
+  `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair; broader legacy
+  retirement has not started
 - multiple interpreter hard-route milestones have landed, but full legacy
   opcode retirement has not
 - the dominant retained live blocker is now quality inside that newly admitted
@@ -366,9 +369,9 @@ The next pass is now constrained by the scope gate:
 4. reduce residual fallback inside the new ambient live traffic, led by
    logical-fold `shadow_mismatch`, math-scalar `shadow_mismatch`, and the
    remaining round / `RATE` parity mismatches
-5. use the logical-constant deletion milestone as the template for the next
-   narrow retirement only after `math_scalar` / `logical_fold` mismatch
-   reduction pays down more live fallback
+5. use the logical-constant and date/time wrapper deletion milestones as the
+   template for the next narrow retirement only after `math_scalar` /
+   `logical_fold` mismatch reduction pays down more live fallback
 6. only return to imported replay parity if we intentionally decide to
    rehabilitate legacy seam-off imported-formula execution
 

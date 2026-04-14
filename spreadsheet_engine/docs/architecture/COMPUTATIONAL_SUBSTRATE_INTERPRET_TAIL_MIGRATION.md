@@ -54,8 +54,10 @@ Today:
 What is still not true:
 
 - no broad default-on production rollout exists beyond logical constants
-- only the narrow `ScInterpreter::ScTrue()` / `ScFalse()` pair has been
-  deleted so far; broader legacy retirement has not started
+- two narrow legacy deletion milestones have landed:
+  `ScInterpreter::ScTrue()` / `ScFalse()` and the dedicated
+  `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair; broader legacy
+  retirement has not started
 - the full replay corpus now shows strong ambient live-seam traffic, but most
   retained fallback now lives inside the newly admitted scalar utility traffic
 - the next dominant live blocker is no longer simple reach; it is the quality
@@ -428,8 +430,10 @@ Current meaning:
 - unsupported or projection-failure cases still fall back safely
 - `TRUE()` / `FALSE()` now also have an explicit family-local default-on
   rollout path, and their dedicated `ScInterpreter` subroutines are deleted
-- `ScInterpreter::ScValue()`, `ScInterpreter::ScGetDateValue()`,
-  `ScInterpreter::ScGetTimeValue()`, `ScInterpreter::ScNumberValue()`, and
+- the dedicated `ScInterpreter` wrapper pair for string-literal `DATEVALUE` /
+  `TIMEVALUE` is also deleted; nested legacy evaluation stays inline at
+  dispatch while the existing env-`off` engine-first root slice remains intact
+- `ScInterpreter::ScValue()`, `ScInterpreter::ScNumberValue()`, and
   `ScInterpreter::ScMatch()`, `ScInterpreter::ScXMatch()`,
   `ScInterpreter::ScLookup()`, `ScInterpreter::ScVLookup()`,
   `ScInterpreter::ScHLookup()`, `ScInterpreter::ScXLookup()`, and
@@ -470,9 +474,9 @@ The next high-value pass is now constrained by the scope gate:
    or live mismatch bucket
 4. reduce fallback inside the admitted ambient live traffic, led by
    `math_scalar` and `logical_fold` shadow mismatch
-5. use the logical-constant deletion milestone as the template for the next
-   narrow retirement only after `math_scalar` / `logical_fold` mismatch
-   reduction pays down more live fallback
+5. use the logical-constant and date/time wrapper deletion milestones as the
+   template for the next narrow retirement only after `math_scalar` /
+   `logical_fold` mismatch reduction pays down more live fallback
 6. only return to imported replay parity if we intentionally decide to
    rehabilitate legacy seam-off imported-formula execution
 
