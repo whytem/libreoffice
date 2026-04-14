@@ -2720,6 +2720,58 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorNumericAgg
     CPPUNIT_ASSERT_DOUBLES_EQUAL(20.0, aSumX2My2.maResult.mfValue, 1e-12);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorRankedAggregateHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailRankedAggregateHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(3, 0, 0);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+    m_pDoc->SetValue(1, 0, 0, 7.0);
+    m_pDoc->SetValue(1, 1, 0, 8.0);
+    m_pDoc->SetValue(1, 2, 0, 9.0);
+    m_pDoc->SetValue(1, 3, 0, 10.0);
+
+    const auto aQuartile = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=QUARTILE(B1:B4;3)", false);
+    CPPUNIT_ASSERT(aQuartile.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::RankedAggregate, aQuartile.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aQuartile.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(9.25, aQuartile.maResult.mfValue, 1e-12);
+
+    const auto aQuartileExc = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.QUARTILE.EXC(B1:B4;3)", false);
+    CPPUNIT_ASSERT(aQuartileExc.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::RankedAggregate, aQuartileExc.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aQuartileExc.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(9.75, aQuartileExc.maResult.mfValue, 1e-12);
+
+    const auto aPercentRank = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=PERCENTRANK(A1:A4;3.5;2)", false);
+    CPPUNIT_ASSERT(aPercentRank.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::RankedAggregate, aPercentRank.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aPercentRank.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.83, aPercentRank.maResult.mfValue, 1e-12);
+
+    const auto aPercentRankExc = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.PERCENTRANK.EXC(A1:A4;3.5;2)", false);
+    CPPUNIT_ASSERT(aPercentRankExc.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::RankedAggregate, aPercentRankExc.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aPercentRankExc.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.7, aPercentRankExc.maResult.mfValue, 1e-12);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNormalization)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

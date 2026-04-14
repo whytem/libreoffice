@@ -1928,6 +1928,52 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorNumericAggreg
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRankedAggregateAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineRankedAggregateAuthority"_ustr));
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+    m_pDoc->SetValue(1, 0, 0, 7.0);
+    m_pDoc->SetValue(1, 1, 0, 8.0);
+    m_pDoc->SetValue(1, 2, 0, 9.0);
+    m_pDoc->SetValue(1, 3, 0, 10.0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"=QUARTILE(B1:B4;3)"_ustr);
+        m_pDoc->SetString(1, 7, 0, u"=COM.MICROSOFT.QUARTILE.EXC(B1:B4;3)"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=PERCENTRANK(A1:A4;3.5;2)"_ustr);
+        m_pDoc->SetString(3, 7, 0, u"=COM.MICROSOFT.PERCENTRANK.EXC(A1:A4;3.5;2)"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(9.25, m_pDoc->GetValue(0, 7, 0));
+        ASSERT_DOUBLES_EQUAL(9.75, m_pDoc->GetValue(1, 7, 0));
+        ASSERT_DOUBLES_EQUAL(0.83, m_pDoc->GetValue(2, 7, 0));
+        ASSERT_DOUBLES_EQUAL(0.7, m_pDoc->GetValue(3, 7, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 4);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::RankedAggregate)]
+            >= 4);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::RankedAggregate)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncLEN)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true); // turn auto calc on.

@@ -52,6 +52,7 @@
 #include <spreadsheetengine/runtime/DateTimeParse.hxx>
 #include <spreadsheetengine/runtime/DateTimeParts.hxx>
 #include <spreadsheetengine/runtime/FinancialRuntime.hxx>
+#include <spreadsheetengine/runtime/MathAggregate.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathFunctionRuntime.hxx>
 #include <spreadsheetengine/runtime/MathRounding.hxx>
@@ -102,6 +103,7 @@ enum class FunctionKind : sal_uInt8
     Rate,
     Round,
     NumericAggregate,
+    RankedAggregate,
     MathScalar,
     InformationPredicate,
     LogicalFold,
@@ -679,6 +681,17 @@ canonicalMathScalarFunctionName(api::StringView rFunctionName)
         || rFunctionName == u"SUMX2PY2" || rFunctionName == u"SUMXMY2")
     {
         return FunctionKind::NumericAggregate;
+    }
+    if (rFunctionName == u"QUARTILE" || rFunctionName == u"QUARTILE.INC"
+        || rFunctionName == u"COM.MICROSOFT.QUARTILE.INC"
+        || rFunctionName == u"QUARTILE.EXC"
+        || rFunctionName == u"COM.MICROSOFT.QUARTILE.EXC"
+        || rFunctionName == u"PERCENTRANK" || rFunctionName == u"PERCENTRANK.INC"
+        || rFunctionName == u"COM.MICROSOFT.PERCENTRANK.INC"
+        || rFunctionName == u"PERCENTRANK.EXC"
+        || rFunctionName == u"COM.MICROSOFT.PERCENTRANK.EXC")
+    {
+        return FunctionKind::RankedAggregate;
     }
     if (canonicalMathScalarFunctionName(rFunctionName))
         return FunctionKind::MathScalar;
@@ -2474,7 +2487,8 @@ inline void putScalarIntoMatrix(
                 return makeMaterializedValue(api::CellValue::boolean(aFunctionName == u"TRUE"));
             }
             if (eFunction == FunctionKind::MathScalar
-                || eFunction == FunctionKind::NumericAggregate)
+                || eFunction == FunctionKind::NumericAggregate
+                || eFunction == FunctionKind::RankedAggregate)
             {
                 auto aAttempt = evaluateFunctionNode(
                     rNode, rDoc, rContext, rFormulaPos, rDoc.GetCalcConfig().mbEmptyStringAsZero);
@@ -4571,6 +4585,187 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
 }
 
+[[nodiscard]] inline EvaluationAttempt evaluateRankedAggregateFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos,
+    bool bImportedCanonicalSource)
+{
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    if ((bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
+        && containsReferenceLikeDescendant(rNode))
+    {
+        return makeErrorResult(eFunction, api::Error::VariableExpected);
+    }
+
+    const auto makeNumericAttempt = [&](double fValue) {
+        return makeNumericResult(eFunction, fValue, SvNumFormatType::NUMBER);
+    };
+    const auto makeErrorAttempt = [&](api::Error eError) {
+        return makeErrorResult(eFunction, eError);
+    };
+    const auto materializeNumericScalar = [&](const core::formula::Node& rArgument)
+        -> Materialization<double> {
+        const auto aScalar = materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+        if (!aScalar.mbSupported)
+            return makeUnsupportedMaterialization<double>(aScalar.meFallbackReason);
+        if (!aScalar.moValue)
+            return makeMaterializedError<double>(aScalar.meError);
+
+        const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aScalar.moValue);
+        if (!aNumber)
+            return makeMaterializedError<double>(aNumber.meError);
+        return makeMaterializedValue(aNumber.maValue);
+    };
+    const auto collectRankedAggregateScan
+        = [&](const core::formula::Node& rArgument)
+        -> Materialization<spreadsheetengine::core::math::AggregateScan> {
+        spreadsheetengine::core::math::AggregateScan aScan;
+        const bool bMatrixLike = rArgument.meKind == core::formula::NodeKind::CellReference
+                                 || rArgument.meKind == core::formula::NodeKind::RangeReference
+                                 || rArgument.meKind == core::formula::NodeKind::NamedReference
+                                 || rArgument.meKind == core::formula::NodeKind::ArrayConstant
+                                 || rArgument.meKind == core::formula::NodeKind::BinaryOperation
+                                 || rArgument.meKind == core::formula::NodeKind::FunctionCall;
+        if (bMatrixLike)
+        {
+            const auto aMatrix = materializeMatrixNode(rArgument, rDoc, rContext, rFormulaPos);
+            if (!aMatrix.mbSupported)
+            {
+                return makeUnsupportedMaterialization<
+                    spreadsheetengine::core::math::AggregateScan>(aMatrix.meFallbackReason);
+            }
+            if (!aMatrix.moValue)
+            {
+                return makeMaterializedError<spreadsheetengine::core::math::AggregateScan>(
+                    aMatrix.meError);
+            }
+
+            SCSIZE nColumns = 0;
+            SCSIZE nRows = 0;
+            (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+            for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+            {
+                for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                {
+                    const auto aValue = lookupexecution::detail::toApiCellValue(
+                        (*aMatrix.moValue)->Get(nColumn, nRow));
+                    if (aValue.isError())
+                    {
+                        return makeMaterializedError<
+                            spreadsheetengine::core::math::AggregateScan>(aValue.meError);
+                    }
+                    if (aValue.isNumber())
+                        aScan.maNumbers.push_back(aValue.mfNumber);
+                }
+            }
+            return makeMaterializedValue(std::move(aScan));
+        }
+
+        const auto aScalar = materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+        if (!aScalar.mbSupported)
+        {
+            return makeUnsupportedMaterialization<spreadsheetengine::core::math::AggregateScan>(
+                aScalar.meFallbackReason);
+        }
+        if (!aScalar.moValue)
+        {
+            return makeMaterializedError<spreadsheetengine::core::math::AggregateScan>(
+                aScalar.meError);
+        }
+        if (aScalar.moValue->isNumber())
+            aScan.maNumbers.push_back(aScalar.moValue->mfNumber);
+        return makeMaterializedValue(std::move(aScan));
+    };
+
+    if (aFunctionName == u"QUARTILE" || aFunctionName == u"QUARTILE.INC"
+        || aFunctionName == u"COM.MICROSOFT.QUARTILE.INC"
+        || aFunctionName == u"QUARTILE.EXC"
+        || aFunctionName == u"COM.MICROSOFT.QUARTILE.EXC")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aScan = collectRankedAggregateScan(*rNode.maChildren[0]);
+        if (!aScan.mbSupported)
+            return makeUnsupported(eFunction, aScan.meFallbackReason);
+        if (!aScan.moValue)
+            return makeErrorAttempt(aScan.meError);
+        if (aScan.moValue->maNumbers.empty())
+            return makeErrorAttempt(api::Error::NoValue);
+
+        const auto aRank = materializeNumericScalar(*rNode.maChildren[1]);
+        if (!aRank.mbSupported)
+            return makeUnsupported(eFunction, aRank.meFallbackReason);
+        if (!aRank.moValue)
+            return makeErrorAttempt(aRank.meError);
+
+        const double fRank = ::rtl::math::approxFloor(*aRank.moValue);
+        const std::int32_t nFunction
+            = (aFunctionName == u"QUARTILE.EXC"
+               || aFunctionName == u"COM.MICROSOFT.QUARTILE.EXC")
+                  ? 19
+                  : 17;
+        const auto aAggregate = spreadsheetengine::core::math::evaluateAggregateRankedNumbers(
+            nFunction, *aScan.moValue, fRank);
+        if (!aAggregate)
+            return makeErrorAttempt(aAggregate.meError);
+        return makeNumericAttempt(aAggregate.maValue);
+    }
+
+    if (aFunctionName == u"PERCENTRANK" || aFunctionName == u"PERCENTRANK.INC"
+        || aFunctionName == u"COM.MICROSOFT.PERCENTRANK.INC"
+        || aFunctionName == u"PERCENTRANK.EXC"
+        || aFunctionName == u"COM.MICROSOFT.PERCENTRANK.EXC")
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aScan = collectRankedAggregateScan(*rNode.maChildren[0]);
+        if (!aScan.mbSupported)
+            return makeUnsupported(eFunction, aScan.meFallbackReason);
+        if (!aScan.moValue)
+            return makeErrorAttempt(aScan.meError);
+        if (aScan.moValue->maNumbers.empty())
+            return makeErrorAttempt(api::Error::NoValue);
+
+        const auto aValue = materializeNumericScalar(*rNode.maChildren[1]);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+
+        std::int32_t nSignificance = 3;
+        if (rNode.maChildren.size() == 3
+            && rNode.maChildren[2]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aSignificance = materializeNumericScalar(*rNode.maChildren[2]);
+            if (!aSignificance.mbSupported)
+                return makeUnsupported(eFunction, aSignificance.meFallbackReason);
+            if (!aSignificance.moValue)
+                return makeErrorAttempt(aSignificance.meError);
+
+            nSignificance
+                = static_cast<std::int32_t>(::rtl::math::approxFloor(*aSignificance.moValue));
+            if (nSignificance < 1)
+                return makeErrorAttempt(api::Error::IllegalArgument);
+        }
+
+        const bool bInclusive = aFunctionName != u"PERCENTRANK.EXC"
+                                && aFunctionName != u"COM.MICROSOFT.PERCENTRANK.EXC";
+        const auto aRank = spreadsheetengine::core::math::evaluatePercentrank(
+            aScan.moValue->maNumbers, *aValue.moValue, bInclusive, nSignificance);
+        if (!aRank)
+        {
+            return makeErrorAttempt(aRank.meError == api::Error::NotAvailable
+                                        ? api::Error::NoValue
+                                        : aRank.meError);
+        }
+        return makeNumericAttempt(aRank.maValue);
+    }
+
+    return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+}
+
 [[nodiscard]] inline EvaluationAttempt evaluateScalarUtilityFunction(
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
@@ -5398,6 +5593,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             return evaluateFinancialScalarFunction(rRoot, eFunction, rDoc, rContext, rFormulaPos);
         case FunctionKind::Round:
         case FunctionKind::NumericAggregate:
+        case FunctionKind::RankedAggregate:
         case FunctionKind::MathScalar:
             return eFunction == FunctionKind::MathScalar
                        ? evaluateMathScalarFunction(
@@ -5407,9 +5603,13 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                              ? evaluateNumericAggregateFunction(
                                    rRoot, eFunction, rDoc, rContext, rFormulaPos,
                                    bImportedCanonicalSource)
-                       : evaluateScalarUtilityFunction(
-                             rRoot, eFunction, rDoc, rContext, rFormulaPos,
-                             bEmptyStringAsZero, bImportedCanonicalSource);
+                             : eFunction == FunctionKind::RankedAggregate
+                                   ? evaluateRankedAggregateFunction(
+                                         rRoot, eFunction, rDoc, rContext, rFormulaPos,
+                                         bImportedCanonicalSource)
+                             : evaluateScalarUtilityFunction(
+                                   rRoot, eFunction, rDoc, rContext, rFormulaPos,
+                                   bEmptyStringAsZero, bImportedCanonicalSource);
         case FunctionKind::InformationPredicate:
         case FunctionKind::LogicalFold:
         case FunctionKind::Not:
