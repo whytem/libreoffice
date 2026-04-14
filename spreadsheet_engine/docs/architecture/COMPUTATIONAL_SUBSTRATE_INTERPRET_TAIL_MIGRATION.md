@@ -142,11 +142,11 @@ Two different denominators matter, and both are now reported.
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=7063`
-- `interpret_tail_live_authoritative_match_total=4389`
-- `interpret_tail_live_authoritative_fallback_total=2674`
-- live authoritative-match rate over the corpus: `8.6635%`
-- live authoritative-match rate over the current promoted probe: `62.1407%`
+- `interpret_tail_live_authoritative_probe_formula_cells=7199`
+- `interpret_tail_live_authoritative_match_total=4480`
+- `interpret_tail_live_authoritative_fallback_total=2719`
+- live authoritative-match rate over the corpus: `8.8431%`
+- live authoritative-match rate over the current promoted probe: `62.2309%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -156,20 +156,20 @@ This is the honest all-formula live-routing surface from the standing replay
 corpus:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=19198`
-- `interpret_tail_live_fallback_total=604`
-- `interpret_tail_live_seen_total=19802`
-- `interpret_tail_live_unseen_formula_cells=30859`
-- `interpret_tail_live_promoted_function_supported_total=17948`
-- `interpret_tail_live_supported_rate=37.90`
-- `interpret_tail_live_seen_rate=39.09`
+- `interpret_tail_live_supported_total=19540`
+- `interpret_tail_live_fallback_total=534`
+- `interpret_tail_live_seen_total=20074`
+- `interpret_tail_live_unseen_formula_cells=30587`
+- `interpret_tail_live_promoted_function_supported_total=18290`
+- `interpret_tail_live_supported_rate=38.57`
+- `interpret_tail_live_seen_rate=39.62`
 
 Current ambient fallback reasons:
 
-- `unsupported_formula_shape=22`
+- `unsupported_formula_shape=24`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=586`
+- `unsupported_function=506`
 
 Interpretation:
 
@@ -177,7 +177,7 @@ Interpretation:
 - the ambient live-routing denominator is real, not curated
 - the ambient replay surface now includes large real traffic from
   information predicates, logical folds, round-family formulas, scalar-math
-  helpers, and bounded financial feeders
+  helpers, bounded financial feeders, and bounded numeric aggregates
 - the imported direct information-predicate host-truth residue is now closed
   on the live surface
 - the imported direct logical-fold residue and the imported nested-`XMATCH`

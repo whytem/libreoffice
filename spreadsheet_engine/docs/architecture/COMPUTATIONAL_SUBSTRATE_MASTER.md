@@ -48,61 +48,61 @@ delegation.”
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=7063`
-- `interpret_tail_live_authoritative_match_total=4389`
-- `interpret_tail_live_authoritative_fallback_total=2674`
-- live authoritative-match rate over the corpus: `8.6635%`
-- live authoritative-match rate over the current promoted probe: `62.1407%`
+- `interpret_tail_live_authoritative_probe_formula_cells=7199`
+- `interpret_tail_live_authoritative_match_total=4480`
+- `interpret_tail_live_authoritative_fallback_total=2719`
+- live authoritative-match rate over the corpus: `8.8431%`
+- live authoritative-match rate over the current promoted probe: `62.2309%`
 
 Everything below is diagnostic context for improving that number.
 
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=19198`
-- `interpret_tail_live_fallback_total=604`
-- `interpret_tail_live_seen_total=19802`
-- `interpret_tail_live_unseen_formula_cells=30859`
-- `interpret_tail_live_promoted_function_supported_total=17948`
-- `interpret_tail_live_supported_rate=37.90`
-- `interpret_tail_live_seen_rate=39.09`
+- `interpret_tail_live_supported_total=19540`
+- `interpret_tail_live_fallback_total=534`
+- `interpret_tail_live_seen_total=20074`
+- `interpret_tail_live_unseen_formula_cells=30587`
+- `interpret_tail_live_promoted_function_supported_total=18290`
+- `interpret_tail_live_supported_rate=38.57`
+- `interpret_tail_live_seen_rate=39.62`
 
 Dominant ambient fallback reasons:
 
-- `unsupported_formula_shape=22`
+- `unsupported_formula_shape=24`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=586`
+- `unsupported_function=506`
 
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=47193`
-- `interpret_tail_forced_interpret_fallback_total=302`
-- `interpret_tail_forced_interpret_seen_total=47495`
-- `interpret_tail_forced_interpret_unseen_formula_cells=3166`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=46566`
-- `interpret_tail_forced_interpret_supported_rate=93.15`
-- `interpret_tail_forced_interpret_seen_rate=93.75`
+- `interpret_tail_forced_interpret_supported_total=47364`
+- `interpret_tail_forced_interpret_fallback_total=267`
+- `interpret_tail_forced_interpret_seen_total=47631`
+- `interpret_tail_forced_interpret_unseen_formula_cells=3030`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=46737`
+- `interpret_tail_forced_interpret_supported_rate=93.49`
+- `interpret_tail_forced_interpret_seen_rate=94.02`
 
 ### Promoted-Family Probe
 
-- `interpret_tail_probe_formula_cells=7063`
-- `interpret_tail_authoritative_total=2628`
-- `interpret_tail_authoritative_fallback_total=4435`
-- promoted-family authoritative rate: `37.21%`
+- `interpret_tail_probe_formula_cells=7199`
+- `interpret_tail_authoritative_total=2665`
+- `interpret_tail_authoritative_fallback_total=4534`
+- promoted-family authoritative rate: `37.02%`
 
 Dominant promoted-family fallback reasons:
 
-- `shadow_mismatch=2815`
-- `unsupported_function=14`
-- `unsupported_formula_shape=10`
-- `unsupported_host_surface=6`
+- `shadow_mismatch=4532`
+- `unsupported_function=0`
+- `unsupported_formula_shape=2`
+- `unsupported_host_surface=0`
 
 ### Live-Target Filtered Promoted Probe
 
 - `interpret_tail_live_target_probe_formula_cells=0`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=7063`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=7199`
 - `interpret_tail_live_target_authoritative_total=0`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 
