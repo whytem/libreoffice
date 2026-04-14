@@ -19,9 +19,9 @@ Today:
 - debug and CI-style builds default that seam to `observe`
 - an eighty-five-slice env-independent logical/text/match/xmatch/lookup/index
   cluster is now engine-first even with rollout explicitly `off`
-- the latest scalar-root plus delegated utility-family expansion raised the
-  ambient live seen rate from `9.77%` to `26.23%`, clearing the original
-  `15-20%` target band
+- the latest deliberate underlying math-feeder expansion raised the ambient
+  live seen rate from `26.23%` to `30.26%` and the ambient supported rate
+  from `18.68%` to `28.08%`
 
 The active program is no longer “prove more substrate slices.”
 The active program is “use the substrate to underwrite live evaluator
@@ -40,50 +40,50 @@ delegation.”
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=9466`
-- `interpret_tail_live_fallback_total=3822`
-- `interpret_tail_live_seen_total=13288`
-- `interpret_tail_live_unseen_formula_cells=37373`
-- `interpret_tail_live_promoted_function_supported_total=8216`
-- `interpret_tail_live_supported_rate=18.68`
-- `interpret_tail_live_seen_rate=26.23`
+- `interpret_tail_live_supported_total=14226`
+- `interpret_tail_live_fallback_total=1102`
+- `interpret_tail_live_seen_total=15328`
+- `interpret_tail_live_unseen_formula_cells=35333`
+- `interpret_tail_live_promoted_function_supported_total=12976`
+- `interpret_tail_live_supported_rate=28.08`
+- `interpret_tail_live_seen_rate=30.26`
 
 Dominant ambient fallback reasons:
 
-- `unsupported_formula_shape=2788`
+- `unsupported_formula_shape=78`
 - `unsupported_host_surface=12`
 - `parse_failure=4`
-- `unsupported_function=1018`
+- `unsupported_function=1008`
 
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=4737`
-- `interpret_tail_forced_interpret_fallback_total=41711`
-- `interpret_tail_forced_interpret_seen_total=46448`
-- `interpret_tail_forced_interpret_unseen_formula_cells=4213`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=4110`
-- `interpret_tail_forced_interpret_supported_rate=9.35`
-- `interpret_tail_forced_interpret_seen_rate=91.68`
+- `interpret_tail_forced_interpret_supported_total=12603`
+- `interpret_tail_forced_interpret_fallback_total=40539`
+- `interpret_tail_forced_interpret_seen_total=53142`
+- `interpret_tail_forced_interpret_unseen_formula_cells=0`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=11687`
+- `interpret_tail_forced_interpret_supported_rate=24.88`
+- `interpret_tail_forced_interpret_seen_rate=104.90`
 
 ### Promoted-Family Probe
 
-- `interpret_tail_probe_formula_cells=6006`
-- `interpret_tail_authoritative_total=4160`
-- `interpret_tail_authoritative_fallback_total=1846`
-- promoted-family authoritative rate: `69.26%`
+- `interpret_tail_probe_formula_cells=7026`
+- `interpret_tail_authoritative_total=5020`
+- `interpret_tail_authoritative_fallback_total=2006`
+- promoted-family authoritative rate: `71.45%`
 
 Dominant promoted-family fallback reasons:
 
-- `unsupported_formula_shape=1384`
-- `shadow_mismatch=241`
-- `unsupported_function=215`
+- `shadow_mismatch=1757`
+- `unsupported_function=214`
+- `unsupported_formula_shape=29`
 - `unsupported_host_surface=6`
 
 ### Live-Target Filtered Promoted Probe
 
 - `interpret_tail_live_target_probe_formula_cells=0`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=6006`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=7026`
 - `interpret_tail_live_target_authoritative_total=0`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 
@@ -252,6 +252,10 @@ evaluation for:
 - `HLOOKUP`
 - `XLOOKUP`
 - `INDEX`
+- bounded scalar-math helpers under comparison ranges:
+  `ABS`, `PI`, trig / inverse-trig / hyperbolic variants, scalar rounding
+  variants, bitwise helpers, `POWER`, `LOG`, `EXP`, `MOD`, `TRUNC`,
+  `GCD`, `LCM`, and related aliases
 - bounded `IFERROR(...)` / `IFNA(...)` wrappers around promoted roots
 
 ## Calc-Retained Today
@@ -286,26 +290,30 @@ remain archived reference material only.
 The highest-value remaining blockers are now:
 
 1. quality inside the new ambient live traffic:
-   the full replay corpus now shows `13,288` seen formulas out of `50,661`,
-   but `3,822` of those seen routes still fall back
+   the full replay corpus now shows `15,328` seen formulas out of `50,661`,
+   but `1,102` of those seen routes still fall back
 2. logical-fold support quality:
-   ambient live `1644 supported / 2736 fallback`
-3. round-family support quality:
-   ambient live `108 supported / 402 fallback`
-4. promoted-family residual parity and shape:
-   `shadow_mismatch=241`, `unsupported_formula_shape=1384`,
-   `unsupported_function=215`
-5. first real Calc-path retirement:
+   promoted probe `699 authoritative / 1491 fallback`, almost all of it
+   `shadow_mismatch`
+3. scalar-math comparison-feeder parity:
+   promoted probe `809 authoritative / 211 fallback`, almost all of it
+   `shadow_mismatch`
+4. round-family support quality:
+   promoted probe `55 authoritative / 200 fallback`
+5. promoted-family residual parity and shape:
+   `shadow_mismatch=1757`, `unsupported_function=214`,
+   `unsupported_formula_shape=29`
+6. first real Calc-path retirement:
    one narrow logical/text/lookup/index cluster is now hard-routed and its
    legacy interpreter entries are quarantined for those slices, but no whole
    `ScInterpreter` subroutine has been deleted yet
-6. imported replay denominator honesty:
+7. imported replay denominator honesty:
    the raw promoted replay probe is now confirmed to be a cached imported
    correctness surface, not a live seam-off retirement denominator
 
-The latest scalar-root plus delegated utility-family slice raised the ambient
-live seen rate from `9.77%` to `26.23%` and the ambient supported rate from
-`8.54%` to `18.68%` while keeping the replay guardrail exact.
+The latest deliberate underlying math-feeder expansion raised the ambient
+live seen rate from `26.23%` to `30.26%` and the ambient supported rate from
+`18.68%` to `28.08%` while keeping the replay guardrail exact.
 
 Inside the current families, that effectively exhausts the semantically
 distinct env-independent literal-array hard-route frontier. Remaining
