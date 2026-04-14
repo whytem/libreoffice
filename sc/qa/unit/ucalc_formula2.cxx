@@ -988,7 +988,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
 
     {
         ScopedEnvironmentOverride aMode(
-            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
         setaileval::resetStats();
 
         m_pDoc->SetString(0, 7, 0, u"=TRUE()"_ustr);
@@ -1030,6 +1030,55 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::NumberValue)]
             >= 1);
+    }
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(4, 70, 0, u"=ABS(-7.25)"_ustr);
+        m_pDoc->SetString(5, 70, 0, u"=DEGREES(ACOS(-0.5))"_ustr);
+        m_pDoc->SetString(6, 70, 0, u"=ATANH(0)/PI()"_ustr);
+        m_pDoc->SetString(7, 70, 0, u"=CEILING.MATH(-5.5;2;-1)"_ustr);
+        m_pDoc->SetString(8, 70, 0, u"=BITLSHIFT(6;1)"_ustr);
+        m_pDoc->SetString(9, 70, 0, u"=MOD(22;3)"_ustr);
+        m_pDoc->SetString(10, 70, 0, u"=TRUNC(1.234;2)"_ustr);
+        m_pDoc->SetValue(11, 70, 0, 6.0);
+        m_pDoc->SetValue(11, 71, 0, 10.0);
+        m_pDoc->SetValue(11, 72, 0, 14.0);
+        m_pDoc->SetString(12, 70, 0, u"=GCD(L71:L73)"_ustr);
+        m_pDoc->SetString(13, 70, 0, u"=LCM(L71:L73)"_ustr);
+        m_pDoc->SetString(0, 70, 0, u"=ABS(-1)"_ustr);
+        m_pDoc->SetString(0, 71, 0, u"=MOD(22;3)"_ustr);
+        m_pDoc->SetString(0, 72, 0, u"=BITLSHIFT(3;1)"_ustr);
+        m_pDoc->SetValue(1, 70, 0, 1.0);
+        m_pDoc->SetValue(1, 71, 0, 1.0);
+        m_pDoc->SetValue(1, 72, 0, 6.0);
+        m_pDoc->SetString(2, 70, 0, u"=A71=B71"_ustr);
+        m_pDoc->SetString(2, 71, 0, u"=A72=B72"_ustr);
+        m_pDoc->SetString(2, 72, 0, u"=A73=B73"_ustr);
+        for (SCROW nRow = 70; nRow <= 72; ++nRow)
+        {
+            ScFormulaCell* pMath = m_pDoc->GetFormulaCell(ScAddress(0, nRow, 0));
+            CPPUNIT_ASSERT(pMath);
+            pMath->SetDirty();
+            ScFormulaCell* pCompare = m_pDoc->GetFormulaCell(ScAddress(2, nRow, 0));
+            CPPUNIT_ASSERT(pCompare);
+            pCompare->SetDirty();
+        }
+        m_pDoc->SetString(3, 70, 0, u"=AND(C71:C73)"_ustr);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(7.25, m_pDoc->GetValue(4, 70, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(120.0, m_pDoc->GetValue(5, 70, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(6, 70, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(-6.0, m_pDoc->GetValue(7, 70, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(12.0, m_pDoc->GetValue(8, 70, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(9, 70, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.23, m_pDoc->GetValue(10, 70, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(12, 70, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(210.0, m_pDoc->GetValue(13, 70, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(3, 70, 0), 1e-12);
     }
 
     {

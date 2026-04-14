@@ -953,6 +953,8 @@ const char* functionKindName(FunctionKind eFunction)
             return "numbervalue";
         case FunctionKind::Round:
             return "round";
+        case FunctionKind::MathScalar:
+            return "math_scalar";
         case FunctionKind::InformationPredicate:
             return "information_predicate";
         case FunctionKind::LogicalFold:

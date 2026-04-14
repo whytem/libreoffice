@@ -857,6 +857,104 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::api::formulavalue::ValueType::Value, aRound.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(12.35, aRound.maResult.mfValue, 1e-12);
 
+    const auto aAbs = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ABS(-7.25)", false);
+    CPPUNIT_ASSERT(aAbs.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aAbs.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(7.25, aAbs.maResult.mfValue, 1e-12);
+
+    const auto aDegreesArcCos = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=DEGREES(ACOS(-0.5))", false);
+    CPPUNIT_ASSERT(aDegreesArcCos.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aDegreesArcCos.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(120.0, aDegreesArcCos.maResult.mfValue, 1e-12);
+
+    const auto aAtanhOverPi = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ATANH(0)/PI()", false);
+    CPPUNIT_ASSERT(aAtanhOverPi.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aAtanhOverPi.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, aAtanhOverPi.maResult.mfValue, 1e-12);
+
+    const auto aCeilingMath = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=CEILING.MATH(-5.5;2;-1)", false);
+    CPPUNIT_ASSERT(aCeilingMath.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aCeilingMath.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-6.0, aCeilingMath.maResult.mfValue, 1e-12);
+
+    const auto aBitShift = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=BITLSHIFT(6;1)", false);
+    CPPUNIT_ASSERT(aBitShift.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aBitShift.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(12.0, aBitShift.maResult.mfValue, 1e-12);
+
+    const auto aMod = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=MOD(22;3)", false);
+    CPPUNIT_ASSERT(aMod.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMod.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aMod.maResult.mfValue, 1e-12);
+
+    const auto aTrunc = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=TRUNC(1.234;2)", false);
+    CPPUNIT_ASSERT(aTrunc.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aTrunc.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.23, aTrunc.maResult.mfValue, 1e-12);
+
+    m_pDoc->SetValue(30, 29, 0, 6.0);
+    m_pDoc->SetValue(30, 30, 0, 10.0);
+    m_pDoc->SetValue(30, 31, 0, 14.0);
+    const auto aGcdRange = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=GCD(AE30:AE32)", false);
+    CPPUNIT_ASSERT(aGcdRange.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aGcdRange.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aGcdRange.maResult.mfValue, 1e-12);
+
+    const auto aLcmRange = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=LCM(AE30:AE32)", false);
+    CPPUNIT_ASSERT(aLcmRange.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aLcmRange.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(210.0, aLcmRange.maResult.mfValue, 1e-12);
+
+    m_pDoc->SetString(31, 29, 0, u"=ABS(-1)"_ustr);
+    m_pDoc->SetString(31, 30, 0, u"=MOD(22;3)"_ustr);
+    m_pDoc->SetString(31, 31, 0, u"=BITLSHIFT(3;1)"_ustr);
+    m_pDoc->SetValue(32, 29, 0, 1.0);
+    m_pDoc->SetValue(32, 30, 0, 1.0);
+    m_pDoc->SetValue(32, 31, 0, 6.0);
+    m_pDoc->SetString(33, 29, 0, u"=AF30=AG30"_ustr);
+    m_pDoc->SetString(33, 30, 0, u"=AF31=AG31"_ustr);
+    m_pDoc->SetString(33, 31, 0, u"=AF32=AG32"_ustr);
+    for (SCROW nRow = 29; nRow <= 31; ++nRow)
+    {
+        ScFormulaCell* pMath = m_pDoc->GetFormulaCell(ScAddress(31, nRow, 0));
+        CPPUNIT_ASSERT(pMath);
+        pMath->SetDirty();
+        ScFormulaCell* pCompare = m_pDoc->GetFormulaCell(ScAddress(33, nRow, 0));
+        CPPUNIT_ASSERT(pCompare);
+        pCompare->SetDirty();
+    }
+
+    const auto aMathBackedAndRange = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(34, 29, 0), u"=AND(AH30:AH32)", false);
+    CPPUNIT_ASSERT(aMathBackedAndRange.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aMathBackedAndRange.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aMathBackedAndRange.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::LOGICAL, aMathBackedAndRange.meFormatType);
+
     const auto aIsError = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=ISERROR(1/0)", false);
     CPPUNIT_ASSERT(aIsError.mbSupported);

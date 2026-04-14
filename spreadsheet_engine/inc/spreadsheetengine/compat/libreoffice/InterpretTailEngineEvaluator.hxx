@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <limits>
 #include <mutex>
+#include <numeric>
 #include <optional>
 #include <rtl/math.hxx>
 #include <string>
@@ -36,6 +37,7 @@
 #include <tokenarray.hxx>
 
 #include <spreadsheetengine/api/FormulaResult.hxx>
+#include <spreadsheetengine/api/Math.hxx>
 #include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Calendar.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
@@ -49,7 +51,11 @@
 #include <spreadsheetengine/detail/OdfFormulaParser.hxx>
 #include <spreadsheetengine/runtime/DateTimeParse.hxx>
 #include <spreadsheetengine/runtime/DateTimeParts.hxx>
+#include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathFunctionRuntime.hxx>
+#include <spreadsheetengine/runtime/MathRounding.hxx>
+#include <spreadsheetengine/runtime/MathScalar.hxx>
+#include <spreadsheetengine/runtime/MathTranscendental.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::interprettaileval
 {
@@ -93,6 +99,7 @@ enum class FunctionKind : sal_uInt8
     TimeValue,
     NumberValue,
     Round,
+    MathScalar,
     InformationPredicate,
     LogicalFold,
     Not,
@@ -609,6 +616,44 @@ struct ArrayConstantSpan
     return bRewrote ? toApiString(aBuffer.makeStringAndClear()) : api::String(rNormalizedSource);
 }
 
+[[nodiscard]] inline std::optional<api::StringView>
+canonicalMathScalarFunctionName(api::StringView rFunctionName)
+{
+    static constexpr api::StringView aScalarNames[] = {
+        u"ABS", u"PI", u"DEGREES", u"RADIANS", u"SIN", u"COS", u"TAN", u"COT", u"ASIN",
+        u"ACOS", u"ATAN", u"ACOT", u"ATAN2", u"SINH", u"COSH", u"TANH", u"COTH", u"ASINH",
+        u"ACOSH", u"ATANH", u"ACOTH", u"EVEN", u"ODD", u"COLOR", u"SIGN", u"INT", u"GCD",
+        u"LCM", u"CEILING", u"FLOOR", u"CEILING.XCL", u"FLOOR.XCL", u"CEILING.MATH",
+        u"FLOOR.MATH", u"CEILING.PRECISE", u"FLOOR.PRECISE", u"ISO.CEILING", u"ROUNDSIG",
+        u"BITAND", u"BITOR", u"BITXOR", u"BITLSHIFT", u"BITRSHIFT", u"POWER", u"LOG",
+        u"LOG10", u"LN", u"MROUND", u"COMBIN", u"COMBINA", u"CSC", u"CSCH", u"SEC", u"SECH",
+        u"EXP", u"TRUNC", u"MOD", u"RAWSUBTRACT"
+    };
+
+    for (const auto aName : aScalarNames)
+    {
+        if (rFunctionName == aName)
+            return aName;
+    }
+
+    if (rFunctionName == u"COM.MICROSOFT.CEILING")
+        return api::StringView(u"CEILING.XCL");
+    if (rFunctionName == u"COM.MICROSOFT.FLOOR")
+        return api::StringView(u"FLOOR.XCL");
+    if (rFunctionName == u"COM.MICROSOFT.CEILING.PRECISE")
+        return api::StringView(u"CEILING.PRECISE");
+    if (rFunctionName == u"COM.MICROSOFT.FLOOR.PRECISE")
+        return api::StringView(u"FLOOR.PRECISE");
+    if (rFunctionName == u"COM.MICROSOFT.ISO.CEILING")
+        return api::StringView(u"ISO.CEILING");
+    if (rFunctionName == u"ORG.LIBREOFFICE.ROUNDSIG")
+        return api::StringView(u"ROUNDSIG");
+    if (rFunctionName == u"ORG.LIBREOFFICE.RAWSUBTRACT")
+        return api::StringView(u"RAWSUBTRACT");
+
+    return std::nullopt;
+}
+
 [[nodiscard]] inline FunctionKind classifyFunction(api::StringView rFunctionName)
 {
     if (rFunctionName == u"TRUE" || rFunctionName == u"FALSE")
@@ -623,6 +668,8 @@ struct ArrayConstantSpan
         return FunctionKind::NumberValue;
     if (rFunctionName == u"ROUND" || rFunctionName == u"ROUNDUP" || rFunctionName == u"ROUNDDOWN")
         return FunctionKind::Round;
+    if (canonicalMathScalarFunctionName(rFunctionName))
+        return FunctionKind::MathScalar;
     if (rFunctionName == u"ISERROR" || rFunctionName == u"ISERR" || rFunctionName == u"ISNUMBER"
         || rFunctionName == u"ISNA" || rFunctionName == u"ISTEXT"
         || rFunctionName == u"ISNONTEXT" || rFunctionName == u"ISBLANK")
@@ -908,6 +955,10 @@ template <typename T>
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
     std::size_t nDepth = 0);
 
+[[nodiscard]] inline EvaluationAttempt evaluateFunctionNode(
+    const core::formula::Node& rRoot, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos, bool bEmptyStringAsZero);
+
 [[nodiscard]] inline Materialization<api::CellValue> materializeScalarNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos);
@@ -919,6 +970,11 @@ template <typename T>
 [[nodiscard]] inline Materialization<lookupexecution::LookupInputSource> materializeLookupInputSourceNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos);
+
+[[nodiscard]] inline api::ValueResult<double> coerceScalarToNumber(
+    const ScDocument& rDoc, ScInterpreterContext& rContext, const api::CellValue& rValue);
+
+[[nodiscard]] inline std::optional<sal_Int32> coerceWholeNumber(double fValue);
 
 [[nodiscard]] inline std::optional<double> extractNumericLiteral(
     const core::formula::Node& rNode)
@@ -934,6 +990,705 @@ template <typename T>
 
     const double fValue = rNode.maChildren[0]->mfNumber;
     return rNode.meUnaryOperator == core::formula::UnaryOperator::Minus ? -fValue : fValue;
+}
+
+[[nodiscard]] inline EvaluationAttempt evaluateMathScalarFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
+{
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    const auto oCanonical = canonicalMathScalarFunctionName(aFunctionName);
+    if (!oCanonical)
+        return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+    const api::StringView aCanonicalName = *oCanonical;
+
+    const auto materializeNumericArgument = [&](const core::formula::Node& rArgument,
+                                                std::optional<double> oEmptyDefault = std::nullopt)
+        -> Materialization<double> {
+        if (rArgument.meKind == core::formula::NodeKind::EmptyArgument)
+        {
+            if (!oEmptyDefault)
+                return makeMaterializedError<double>(api::Error::IllegalArgument);
+            return makeMaterializedValue(*oEmptyDefault);
+        }
+
+        const auto aArgument = materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+        if (!aArgument.mbSupported)
+            return makeUnsupportedMaterialization<double>(aArgument.meFallbackReason);
+        if (!aArgument.moValue)
+            return makeMaterializedError<double>(aArgument.meError);
+
+        const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aArgument.moValue);
+        if (!aNumber)
+            return makeMaterializedError<double>(aNumber.meError);
+        return makeMaterializedValue(aNumber.maValue);
+    };
+
+    const auto materializeWholeArgument = [&](const core::formula::Node& rArgument,
+                                              std::optional<sal_Int32> oEmptyDefault = std::nullopt)
+        -> Materialization<sal_Int32> {
+        if (rArgument.meKind == core::formula::NodeKind::EmptyArgument)
+        {
+            if (!oEmptyDefault)
+                return makeMaterializedError<sal_Int32>(api::Error::IllegalArgument);
+            return makeMaterializedValue(*oEmptyDefault);
+        }
+
+        const auto aNumber = materializeNumericArgument(rArgument, std::nullopt);
+        if (!aNumber.mbSupported)
+            return makeUnsupportedMaterialization<sal_Int32>(aNumber.meFallbackReason);
+        if (!aNumber.moValue)
+            return makeMaterializedError<sal_Int32>(aNumber.meError);
+
+        const auto oWhole = coerceWholeNumber(*aNumber.moValue);
+        if (!oWhole)
+            return makeMaterializedError<sal_Int32>(api::Error::IllegalArgument);
+        return makeMaterializedValue(*oWhole);
+    };
+
+    const auto collectNumericArguments = [&]() -> Materialization<std::vector<double>> {
+        if (rNode.maChildren.empty())
+            return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+
+        std::vector<double> aValues;
+        for (const auto& rxChild : rNode.maChildren)
+        {
+            if (!rxChild)
+                return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+
+            const auto aMatrix = materializeMatrixNode(*rxChild, rDoc, rContext, rFormulaPos);
+            if (!aMatrix.mbSupported)
+            {
+                return makeUnsupportedMaterialization<std::vector<double>>(
+                    aMatrix.meFallbackReason);
+            }
+            if (!aMatrix.moValue)
+                return makeMaterializedError<std::vector<double>>(aMatrix.meError);
+
+            SCSIZE nColumns = 0;
+            SCSIZE nRows = 0;
+            (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+            for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+            {
+                for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                {
+                    const auto aValue = lookupexecution::detail::toApiCellValue(
+                        (*aMatrix.moValue)->Get(nColumn, nRow));
+                    if (aValue.isEmpty())
+                        continue;
+
+                    const auto aNumber = coerceScalarToNumber(rDoc, rContext, aValue);
+                    if (!aNumber)
+                    {
+                        return makeMaterializedError<std::vector<double>>(
+                            aNumber.meError);
+                    }
+                    aValues.push_back(aNumber.maValue);
+                }
+            }
+        }
+
+        return makeMaterializedValue(std::move(aValues));
+    };
+
+    const auto makeNumericAttempt = [&](double fValue) {
+        return makeNumericResult(eFunction, fValue, SvNumFormatType::NUMBER);
+    };
+    const auto makeErrorAttempt = [&](api::Error eError) {
+        return makeErrorResult(eFunction, eError);
+    };
+    const auto finishNumericValue = [&](const api::ValueResult<double>& rResult) {
+        if (!rResult)
+            return makeErrorAttempt(rResult.meError);
+        return makeNumericAttempt(rResult.maValue);
+    };
+    const auto finishOptionalValue = [&](const std::optional<double>& oValue,
+                                         api::Error eError = api::Error::IllegalArgument) {
+        if (!oValue)
+            return makeErrorAttempt(eError);
+        if (!std::isfinite(*oValue))
+            return makeErrorAttempt(api::Error::Domain);
+        return makeNumericAttempt(*oValue);
+    };
+    const auto evaluateUnaryFinite = [&](auto aCompute,
+                                         api::Error eError = api::Error::Domain) {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+
+        const double fResult = aCompute(*aValue.moValue);
+        if (!std::isfinite(fResult))
+            return makeErrorAttempt(eError);
+        return makeNumericAttempt(fResult);
+    };
+    const auto evaluateUnaryOptional = [&](auto aCompute,
+                                           api::Error eError = api::Error::IllegalArgument) {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+
+        return finishOptionalValue(aCompute(*aValue.moValue), eError);
+    };
+
+    if (aCanonicalName == u"ABS")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+        return makeNumericAttempt(spreadsheetengine::core::math::computeAbs(*aValue.moValue));
+    }
+
+    if (aCanonicalName == u"PI")
+    {
+        if (!rNode.maChildren.empty())
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        return makeNumericAttempt(spreadsheetengine::core::math::computePi());
+    }
+
+    if (aCanonicalName == u"DEGREES")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeDegrees);
+    if (aCanonicalName == u"RADIANS")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeRadians);
+    if (aCanonicalName == u"SIN")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeSin);
+    if (aCanonicalName == u"COS")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeCos);
+    if (aCanonicalName == u"TAN")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeTan);
+    if (aCanonicalName == u"COT")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeCot);
+    if (aCanonicalName == u"ASIN")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeArcSin, api::Error::Domain);
+    if (aCanonicalName == u"ACOS")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeArcCos, api::Error::Domain);
+    if (aCanonicalName == u"ATAN")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeArcTan);
+    if (aCanonicalName == u"ACOT")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeArcCot);
+    if (aCanonicalName == u"SINH")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeSinHyp);
+    if (aCanonicalName == u"COSH")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeCosHyp);
+    if (aCanonicalName == u"TANH")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeTanHyp);
+    if (aCanonicalName == u"COTH")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeCotHyp);
+    if (aCanonicalName == u"ASINH")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeArcSinHyp);
+    if (aCanonicalName == u"ACOSH")
+        return evaluateUnaryOptional(spreadsheetengine::core::math::computeArcCosHyp,
+            api::Error::Domain);
+    if (aCanonicalName == u"ACOTH")
+        return evaluateUnaryOptional(spreadsheetengine::core::math::computeArcCotHyp,
+            api::Error::Domain);
+    if (aCanonicalName == u"SEC")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeSecant);
+    if (aCanonicalName == u"SECH")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeSecantHyp);
+    if (aCanonicalName == u"EXP")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeExp);
+    if (aCanonicalName == u"LOG10")
+        return evaluateUnaryOptional(spreadsheetengine::core::math::computeLog10);
+    if (aCanonicalName == u"LN")
+        return evaluateUnaryOptional(spreadsheetengine::core::math::computeLn);
+
+    if (aCanonicalName == u"ATAN2")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aY = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aY.mbSupported)
+            return makeUnsupported(eFunction, aY.meFallbackReason);
+        if (!aY.moValue)
+            return makeErrorAttempt(aY.meError);
+        const auto aX = materializeNumericArgument(*rNode.maChildren[1], std::nullopt);
+        if (!aX.mbSupported)
+            return makeUnsupported(eFunction, aX.meFallbackReason);
+        if (!aX.moValue)
+            return makeErrorAttempt(aX.meError);
+        const double fResult
+            = spreadsheetengine::core::math::computeArcTan2(*aY.moValue, *aX.moValue);
+        if (!std::isfinite(fResult))
+            return makeErrorAttempt(api::Error::Domain);
+        return makeNumericAttempt(fResult);
+    }
+
+    if (aCanonicalName == u"ATANH")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+        return finishNumericValue(
+            spreadsheetengine::api::math::inverseHyperbolicTangent(*aValue.moValue));
+    }
+
+    if (aCanonicalName == u"CSC")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+        return finishNumericValue(
+            spreadsheetengine::core::math::evaluateCscValue(*aValue.moValue));
+    }
+
+    if (aCanonicalName == u"CSCH")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+        return finishNumericValue(
+            spreadsheetengine::core::math::evaluateCschValue(*aValue.moValue));
+    }
+
+    if (aCanonicalName == u"COLOR")
+    {
+        if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 4)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        std::array<double, 4> aChannels { 0.0, 0.0, 0.0, 0.0 };
+        for (std::size_t nIndex = 0; nIndex < rNode.maChildren.size(); ++nIndex)
+        {
+            const auto aChannel = materializeNumericArgument(*rNode.maChildren[nIndex], std::nullopt);
+            if (!aChannel.mbSupported)
+                return makeUnsupported(eFunction, aChannel.meFallbackReason);
+            if (!aChannel.moValue)
+                return makeErrorAttempt(aChannel.meError);
+
+            const double fFloor = rtl::math::approxFloor(*aChannel.moValue);
+            if (fFloor < 0.0 || fFloor > 255.0)
+                return makeErrorAttempt(api::Error::IllegalArgument);
+            if (nIndex < 3)
+                aChannels[nIndex + 1] = fFloor;
+            else
+                aChannels[0] = fFloor;
+        }
+
+        const double fResult = 256.0 * 256.0 * 256.0 * aChannels[0]
+                               + 256.0 * 256.0 * aChannels[1] + 256.0 * aChannels[2]
+                               + aChannels[3];
+        return makeNumericAttempt(fResult);
+    }
+
+    if (aCanonicalName == u"SIGN")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+        return makeNumericAttempt(static_cast<double>(
+            spreadsheetengine::core::math::computePlusMinus(*aValue.moValue)));
+    }
+
+    if (aCanonicalName == u"INT")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeInt);
+    if (aCanonicalName == u"EVEN")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeEven);
+    if (aCanonicalName == u"ODD")
+        return evaluateUnaryFinite(spreadsheetengine::core::math::computeOdd);
+
+    if (aCanonicalName == u"GCD" || aCanonicalName == u"LCM")
+    {
+        const auto aNumbers = collectNumericArguments();
+        if (!aNumbers.mbSupported)
+            return makeUnsupported(eFunction, aNumbers.meFallbackReason);
+        if (!aNumbers.moValue)
+            return makeErrorAttempt(aNumbers.meError);
+        if (aNumbers.moValue->empty())
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        std::int64_t nResult = 0;
+        bool bSawValue = false;
+        for (double fValue : *aNumbers.moValue)
+        {
+            if (!std::isfinite(fValue) || fValue < 0.0)
+                return makeErrorAttempt(api::Error::IllegalArgument);
+            const double fTruncated = std::trunc(fValue);
+            if (fTruncated < static_cast<double>(std::numeric_limits<std::int64_t>::min())
+                || fTruncated > static_cast<double>(std::numeric_limits<std::int64_t>::max()))
+            {
+                return makeErrorAttempt(api::Error::IllegalArgument);
+            }
+
+            const std::int64_t nValue = static_cast<std::int64_t>(fTruncated);
+            if (!bSawValue)
+            {
+                nResult = std::abs(nValue);
+                bSawValue = true;
+            }
+            else if (aCanonicalName == u"GCD")
+                nResult = std::gcd(nResult, std::abs(nValue));
+            else
+                nResult = std::lcm(nResult, std::abs(nValue));
+        }
+
+        return makeNumericAttempt(static_cast<double>(nResult));
+    }
+
+    if (aCanonicalName == u"CEILING" || aCanonicalName == u"FLOOR"
+        || aCanonicalName == u"CEILING.XCL" || aCanonicalName == u"FLOOR.XCL")
+    {
+        const bool bMicrosoftCompat
+            = aCanonicalName == u"CEILING.XCL" || aCanonicalName == u"FLOOR.XCL";
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 3
+            || (bMicrosoftCompat && rNode.maChildren.size() != 2))
+        {
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        }
+
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], 0.0);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+
+        double fSignificance = 1.0;
+        const bool bMissingSignificance = rNode.maChildren.size() < 2
+                                          || rNode.maChildren[1]->meKind
+                                                 == core::formula::NodeKind::EmptyArgument;
+        if (rNode.maChildren.size() >= 2 && !bMissingSignificance)
+        {
+            const auto aSignificance = materializeNumericArgument(*rNode.maChildren[1], std::nullopt);
+            if (!aSignificance.mbSupported)
+                return makeUnsupported(eFunction, aSignificance.meFallbackReason);
+            if (!aSignificance.moValue)
+                return makeErrorAttempt(aSignificance.meError);
+            fSignificance = *aSignificance.moValue;
+        }
+
+        bool bAbs = false;
+        if (!bMicrosoftCompat && rNode.maChildren.size() == 3
+            && rNode.maChildren[2]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aMode = materializeNumericArgument(*rNode.maChildren[2], std::nullopt);
+            if (!aMode.mbSupported)
+                return makeUnsupported(eFunction, aMode.meFallbackReason);
+            if (!aMode.moValue)
+                return makeErrorAttempt(aMode.meError);
+            bAbs = !rtl::math::approxEqual(*aMode.moValue, 0.0);
+        }
+
+        if (!bMicrosoftCompat && bMissingSignificance && *aValue.moValue < 0.0)
+            fSignificance = -1.0;
+
+        return finishNumericValue(
+            spreadsheetengine::core::math::evaluateCeilingFloorValue(*aValue.moValue,
+                fSignificance, bAbs,
+                aCanonicalName == u"CEILING" || aCanonicalName == u"CEILING.XCL",
+                bMicrosoftCompat));
+    }
+
+    if (aCanonicalName == u"CEILING.MATH" || aCanonicalName == u"FLOOR.MATH")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+
+        double fSignificance = 1.0;
+        if (rNode.maChildren.size() >= 2)
+        {
+            const auto aSignificance = materializeNumericArgument(*rNode.maChildren[1], 0.0);
+            if (!aSignificance.mbSupported)
+                return makeUnsupported(eFunction, aSignificance.meFallbackReason);
+            if (!aSignificance.moValue)
+                return makeErrorAttempt(aSignificance.meError);
+            fSignificance = *aSignificance.moValue;
+        }
+
+        double fMode = 0.0;
+        if (rNode.maChildren.size() == 3)
+        {
+            const auto aMode = materializeNumericArgument(*rNode.maChildren[2], 0.0);
+            if (!aMode.mbSupported)
+                return makeUnsupported(eFunction, aMode.meFallbackReason);
+            if (!aMode.moValue)
+                return makeErrorAttempt(aMode.meError);
+            fMode = *aMode.moValue;
+        }
+
+        if (fSignificance == 0.0 || *aValue.moValue == 0.0)
+            return makeNumericAttempt(0.0);
+
+        return finishNumericValue(
+            spreadsheetengine::core::math::evaluateCeilingFloorMathValue(
+                *aValue.moValue, fSignificance, fMode, aCanonicalName == u"CEILING.MATH"));
+    }
+
+    if (aCanonicalName == u"CEILING.PRECISE" || aCanonicalName == u"FLOOR.PRECISE"
+        || aCanonicalName == u"ISO.CEILING")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+
+        double fSignificance = 1.0;
+        if (rNode.maChildren.size() == 2)
+        {
+            const auto aSignificance = materializeNumericArgument(*rNode.maChildren[1], std::nullopt);
+            if (!aSignificance.mbSupported)
+                return makeUnsupported(eFunction, aSignificance.meFallbackReason);
+            if (!aSignificance.moValue)
+                return makeErrorAttempt(aSignificance.meError);
+            fSignificance = *aSignificance.moValue;
+        }
+
+        return finishNumericValue(
+            spreadsheetengine::core::math::evaluateCeilingFloorPreciseValue(
+                *aValue.moValue, fSignificance, aCanonicalName == u"FLOOR.PRECISE"));
+    }
+
+    if (aCanonicalName == u"ROUNDSIG")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+        const auto aDigits = materializeNumericArgument(*rNode.maChildren[1], std::nullopt);
+        if (!aDigits.mbSupported)
+            return makeUnsupported(eFunction, aDigits.meFallbackReason);
+        if (!aDigits.moValue)
+            return makeErrorAttempt(aDigits.meError);
+        return finishNumericValue(
+            spreadsheetengine::core::math::evaluateRoundSigValue(*aValue.moValue, *aDigits.moValue));
+    }
+
+    if (aCanonicalName == u"BITAND" || aCanonicalName == u"BITOR" || aCanonicalName == u"BITXOR")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aLeft = materializeNumericArgument(*rNode.maChildren[0], 0.0);
+        if (!aLeft.mbSupported)
+            return makeUnsupported(eFunction, aLeft.meFallbackReason);
+        if (!aLeft.moValue)
+            return makeErrorAttempt(aLeft.meError);
+        const auto aRight = materializeNumericArgument(*rNode.maChildren[1], 0.0);
+        if (!aRight.mbSupported)
+            return makeUnsupported(eFunction, aRight.meFallbackReason);
+        if (!aRight.moValue)
+            return makeErrorAttempt(aRight.meError);
+
+        std::optional<double> oResult;
+        if (aCanonicalName == u"BITAND")
+            oResult = spreadsheetengine::core::math::computeBitAnd(*aLeft.moValue, *aRight.moValue);
+        else if (aCanonicalName == u"BITOR")
+            oResult = spreadsheetengine::core::math::computeBitOr(*aLeft.moValue, *aRight.moValue);
+        else
+            oResult = spreadsheetengine::core::math::computeBitXor(*aLeft.moValue, *aRight.moValue);
+        return finishOptionalValue(oResult);
+    }
+
+    if (aCanonicalName == u"BITLSHIFT" || aCanonicalName == u"BITRSHIFT")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+        const auto aShift = materializeNumericArgument(*rNode.maChildren[1], 0.0);
+        if (!aShift.mbSupported)
+            return makeUnsupported(eFunction, aShift.meFallbackReason);
+        if (!aShift.moValue)
+            return makeErrorAttempt(aShift.meError);
+
+        const auto oResult = aCanonicalName == u"BITLSHIFT"
+                                 ? spreadsheetengine::core::math::computeBitLeftShift(
+                                       *aValue.moValue, *aShift.moValue)
+                                 : spreadsheetengine::core::math::computeBitRightShift(
+                                       *aValue.moValue, *aShift.moValue);
+        return finishOptionalValue(oResult);
+    }
+
+    if (aCanonicalName == u"POWER")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aBase = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aBase.mbSupported)
+            return makeUnsupported(eFunction, aBase.meFallbackReason);
+        if (!aBase.moValue)
+            return makeErrorAttempt(aBase.meError);
+        const auto aExponent = materializeNumericArgument(*rNode.maChildren[1], std::nullopt);
+        if (!aExponent.mbSupported)
+            return makeUnsupported(eFunction, aExponent.meFallbackReason);
+        if (!aExponent.moValue)
+            return makeErrorAttempt(aExponent.meError);
+        const double fResult = std::pow(*aBase.moValue, *aExponent.moValue);
+        if (!std::isfinite(fResult))
+            return makeErrorAttempt(api::Error::Domain);
+        return makeNumericAttempt(fResult);
+    }
+
+    if (aCanonicalName == u"LOG")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+        double fBase = 10.0;
+        if (rNode.maChildren.size() == 2
+            && rNode.maChildren[1]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aBase = materializeNumericArgument(*rNode.maChildren[1], std::nullopt);
+            if (!aBase.mbSupported)
+                return makeUnsupported(eFunction, aBase.meFallbackReason);
+            if (!aBase.moValue)
+                return makeErrorAttempt(aBase.meError);
+            fBase = *aBase.moValue;
+        }
+        return finishNumericValue(
+            spreadsheetengine::core::math::evaluateLogValue(*aValue.moValue, fBase));
+    }
+
+    if (aCanonicalName == u"MROUND")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+        const auto aMultiple = materializeNumericArgument(*rNode.maChildren[1], std::nullopt);
+        if (!aMultiple.mbSupported)
+            return makeUnsupported(eFunction, aMultiple.meFallbackReason);
+        if (!aMultiple.moValue)
+            return makeErrorAttempt(aMultiple.meError);
+        return finishNumericValue(
+            spreadsheetengine::core::math::evaluateMroundValue(*aValue.moValue, *aMultiple.moValue));
+    }
+
+    if (aCanonicalName == u"COMBIN" || aCanonicalName == u"COMBINA")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aN = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aN.mbSupported)
+            return makeUnsupported(eFunction, aN.meFallbackReason);
+        if (!aN.moValue)
+            return makeErrorAttempt(aN.meError);
+        const auto aK = materializeNumericArgument(*rNode.maChildren[1], std::nullopt);
+        if (!aK.mbSupported)
+            return makeUnsupported(eFunction, aK.meFallbackReason);
+        if (!aK.moValue)
+            return makeErrorAttempt(aK.meError);
+        return finishNumericValue(spreadsheetengine::core::math::evaluateCombinValue(
+            *aN.moValue, *aK.moValue, aCanonicalName == u"COMBINA"));
+    }
+
+    if (aCanonicalName == u"TRUNC")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+
+        sal_Int32 nDigits = 0;
+        if (rNode.maChildren.size() == 2
+            && rNode.maChildren[1]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aDigits = materializeWholeArgument(*rNode.maChildren[1], std::nullopt);
+            if (!aDigits.mbSupported)
+                return makeUnsupported(eFunction, aDigits.meFallbackReason);
+            if (!aDigits.moValue)
+                return makeErrorAttempt(aDigits.meError);
+            nDigits = *aDigits.moValue;
+        }
+        return finishNumericValue(
+            spreadsheetengine::core::math::evaluateTruncValue(*aValue.moValue, nDigits));
+    }
+
+    if (aCanonicalName == u"MOD")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aNumerator = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aNumerator.mbSupported)
+            return makeUnsupported(eFunction, aNumerator.meFallbackReason);
+        if (!aNumerator.moValue)
+            return makeErrorAttempt(aNumerator.meError);
+        const auto aDenominator = materializeNumericArgument(*rNode.maChildren[1], std::nullopt);
+        if (!aDenominator.mbSupported)
+            return makeUnsupported(eFunction, aDenominator.meFallbackReason);
+        if (!aDenominator.moValue)
+            return makeErrorAttempt(aDenominator.meError);
+        return finishNumericValue(
+            spreadsheetengine::core::math::evaluateModValue(*aNumerator.moValue,
+                *aDenominator.moValue));
+    }
+
+    if (aCanonicalName == u"RAWSUBTRACT")
+    {
+        if (rNode.maChildren.size() < 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aFirst = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aFirst.mbSupported)
+            return makeUnsupported(eFunction, aFirst.meFallbackReason);
+        if (!aFirst.moValue)
+            return makeErrorAttempt(aFirst.meError);
+
+        double fResult = *aFirst.moValue;
+        for (std::size_t nIndex = 1; nIndex < rNode.maChildren.size(); ++nIndex)
+        {
+            const auto aNext = materializeNumericArgument(*rNode.maChildren[nIndex], std::nullopt);
+            if (!aNext.mbSupported)
+                return makeUnsupported(eFunction, aNext.meFallbackReason);
+            if (!aNext.moValue)
+                return makeErrorAttempt(aNext.meError);
+            fResult -= *aNext.moValue;
+        }
+        return makeNumericAttempt(fResult);
+    }
+
+    return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
 }
 
 [[nodiscard]] inline OUString formatScalarNumber(
@@ -1538,10 +2293,35 @@ inline void putScalarIntoMatrix(
         case core::formula::NodeKind::FunctionCall:
         {
             const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
-            if (classifyFunction(aFunctionName) == FunctionKind::LogicalConstant
-                && rNode.maChildren.empty())
+            const FunctionKind eFunction = classifyFunction(aFunctionName);
+            if (eFunction == FunctionKind::LogicalConstant && rNode.maChildren.empty())
             {
                 return makeMaterializedValue(api::CellValue::boolean(aFunctionName == u"TRUE"));
+            }
+            if (eFunction == FunctionKind::MathScalar)
+            {
+                auto aAttempt = evaluateFunctionNode(
+                    rNode, rDoc, rContext, rFormulaPos, rDoc.GetCalcConfig().mbEmptyStringAsZero);
+                if (!aAttempt.mbSupported)
+                {
+                    return makeUnsupportedMaterialization<api::CellValue>(
+                        aAttempt.meFallbackReason);
+                }
+
+                switch (aAttempt.maResult.meType)
+                {
+                    case api::formulavalue::ValueType::Value:
+                        return makeMaterializedValue(
+                            api::CellValue::number(aAttempt.maResult.mfValue));
+                    case api::formulavalue::ValueType::String:
+                        return makeMaterializedValue(
+                            api::CellValue::text(aAttempt.maResult.maString));
+                    case api::formulavalue::ValueType::Error:
+                        return makeMaterializedValue(
+                            api::CellValue::error(aAttempt.maResult.meError));
+                    default:
+                        break;
+                }
             }
             return makeUnsupportedMaterialization<api::CellValue>(
                 FallbackReason::UnsupportedFormulaShape);
@@ -3912,6 +4692,11 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             return evaluateTextParsingFunction(
                 rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
         case FunctionKind::Round:
+        case FunctionKind::MathScalar:
+            return eFunction == FunctionKind::MathScalar
+                       ? evaluateMathScalarFunction(rRoot, eFunction, rDoc, rContext, rFormulaPos)
+                       : evaluateScalarUtilityFunction(
+                             rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
         case FunctionKind::InformationPredicate:
         case FunctionKind::LogicalFold:
         case FunctionKind::Not:
