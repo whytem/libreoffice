@@ -782,6 +782,17 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
     CPPUNIT_ASSERT_DOUBLES_EQUAL(42005.0, aDateFromMonthNameText.maResult.mfValue, 1e-12);
     CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, aDateFromMonthNameText.meFormatType);
 
+    const auto aImportedDateFromMonthNameText = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 14, 0), u"=DATEVALUE(\"Jan1, 2015\")", false, nullptr,
+        u"of:=DATEVALUE(\"Jan1, 2015\")");
+    CPPUNIT_ASSERT(aImportedDateFromMonthNameText.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error,
+        aImportedDateFromMonthNameText.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::VariableExpected,
+        aImportedDateFromMonthNameText.maResult.meError);
+
     const auto aDateFromBasisFormulaRef = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 10, 0), u"=DATEVALUE(A11)", false);
     CPPUNIT_ASSERT(aDateFromBasisFormulaRef.mbSupported);

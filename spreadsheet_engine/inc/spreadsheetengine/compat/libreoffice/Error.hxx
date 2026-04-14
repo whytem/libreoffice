@@ -22,6 +22,8 @@ inline spreadsheetengine::api::Error toApiError(FormulaError eError)
     {
         case FormulaError::IllegalArgument:
             return spreadsheetengine::api::Error::IllegalArgument;
+        case FormulaError::VariableExpected:
+            return spreadsheetengine::api::Error::VariableExpected;
         case FormulaError::DivisionByZero:
             return spreadsheetengine::api::Error::DivisionByZero;
         case FormulaError::IllegalFPOperation:
@@ -46,6 +48,8 @@ inline FormulaError toFormulaError(spreadsheetengine::api::Error eError)
     {
         case spreadsheetengine::api::Error::IllegalArgument:
             return FormulaError::IllegalArgument;
+        case spreadsheetengine::api::Error::VariableExpected:
+            return FormulaError::VariableExpected;
         case spreadsheetengine::api::Error::DivisionByZero:
             return FormulaError::DivisionByZero;
         case spreadsheetengine::api::Error::Domain:

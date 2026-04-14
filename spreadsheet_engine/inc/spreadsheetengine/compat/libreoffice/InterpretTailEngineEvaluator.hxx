@@ -952,16 +952,18 @@ template <typename T>
 
 [[nodiscard]] inline EvaluationAttempt evaluateDelegatedNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
-    const ScAddress& rFormulaPos, bool bEmptyStringAsZero, std::size_t nDepth = 0);
+    const ScAddress& rFormulaPos, bool bEmptyStringAsZero, std::size_t nDepth = 0,
+    bool bImportedCanonicalSource = false);
 
 [[nodiscard]] inline EvaluationAttempt evaluateScalarOrDelegatedNode(
     const core::formula::Node& rNode, FunctionKind ePreferredFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
-    std::size_t nDepth = 0);
+    std::size_t nDepth = 0, bool bImportedCanonicalSource = false);
 
 [[nodiscard]] inline EvaluationAttempt evaluateFunctionNode(
     const core::formula::Node& rRoot, const ScDocument& rDoc, ScInterpreterContext& rContext,
-    const ScAddress& rFormulaPos, bool bEmptyStringAsZero);
+    const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
+    bool bImportedCanonicalSource = false);
 
 [[nodiscard]] inline Materialization<api::CellValue> materializeScalarNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
@@ -3870,7 +3872,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
 [[nodiscard]] inline EvaluationAttempt evaluateTextParsingFunction(
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
-    ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero)
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
+    bool bImportedCanonicalSource)
 {
     auto materializeScalarArgument = [&](const core::formula::Node& rArgument)
         -> Materialization<api::CellValue> {
@@ -3931,6 +3934,21 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
         if (eFunction == FunctionKind::DateValue)
         {
+            const bool bImportedMonthNameLiteral
+                = bImportedCanonicalSource
+                  && rNode.maChildren[0]->meKind == core::formula::NodeKind::StringLiteral
+                  && [&]() {
+                         const std::u16string_view aTextView(
+                             aText.maValue.getStr(), aText.maValue.getLength());
+                         return std::any_of(
+                             aTextView.begin(), aTextView.end(), [](sal_Unicode cChar) {
+                                 return (cChar >= u'A' && cChar <= u'Z')
+                                        || (cChar >= u'a' && cChar <= u'z');
+                             });
+                     }();
+            if (bImportedMonthNameLiteral)
+                return makeErrorResult(eFunction, api::Error::VariableExpected);
+
             const auto aResult
                 = textparsingexecution::evaluateDateValue(rDoc, rContext, aText.maValue);
             if (!aResult)
@@ -4837,7 +4855,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
 [[nodiscard]] inline EvaluationAttempt evaluateFunctionNode(
     const core::formula::Node& rRoot, const ScDocument& rDoc, ScInterpreterContext& rContext,
-    const ScAddress& rFormulaPos, bool bEmptyStringAsZero)
+    const ScAddress& rFormulaPos, bool bEmptyStringAsZero, bool bImportedCanonicalSource)
 {
     const api::String aFunctionName = uppercaseAscii(rRoot.maPrimaryText);
     const FunctionKind eFunction = classifyFunction(aFunctionName);
@@ -4853,7 +4871,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         case FunctionKind::TimeValue:
         case FunctionKind::NumberValue:
             return evaluateTextParsingFunction(
-                rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
+                rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero,
+                bImportedCanonicalSource);
         case FunctionKind::Rate:
             return evaluateFinancialScalarFunction(rRoot, eFunction, rDoc, rContext, rFormulaPos);
         case FunctionKind::Round:
@@ -4886,12 +4905,14 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 [[nodiscard]] inline EvaluationAttempt evaluateScalarOrDelegatedNode(
     const core::formula::Node& rNode, FunctionKind ePreferredFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
-    std::size_t nDepth)
+    std::size_t nDepth, bool bImportedCanonicalSource)
 {
     if (rNode.meKind == core::formula::NodeKind::FunctionCall)
     {
         auto aAttempt
-            = evaluateDelegatedNode(rNode, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, nDepth);
+            = evaluateDelegatedNode(
+                rNode, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, nDepth,
+                bImportedCanonicalSource);
         if (aAttempt.meFunction == FunctionKind::Unknown)
             aAttempt.meFunction = ePreferredFunction;
         return aAttempt;
@@ -4907,7 +4928,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
 [[nodiscard]] inline EvaluationAttempt evaluateDelegatedNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
-    const ScAddress& rFormulaPos, bool bEmptyStringAsZero, std::size_t nDepth)
+    const ScAddress& rFormulaPos, bool bEmptyStringAsZero, std::size_t nDepth,
+    bool bImportedCanonicalSource)
 {
     if (nDepth > 8)
         return makeUnsupported(classifyDelegatedFunctionNode(rNode),
@@ -4925,7 +4947,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
         const FunctionKind ePrimaryFunction = classifyDelegatedFunctionNode(*rNode.maChildren[0]);
         auto aPrimary = evaluateDelegatedNode(
-            *rNode.maChildren[0], rDoc, rContext, rFormulaPos, bEmptyStringAsZero, nDepth + 1);
+            *rNode.maChildren[0], rDoc, rContext, rFormulaPos, bEmptyStringAsZero, nDepth + 1,
+            bImportedCanonicalSource);
         if (!aPrimary.mbSupported)
         {
             if (aPrimary.meFunction == FunctionKind::Unknown)
@@ -4946,13 +4969,15 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
         auto aFallback = evaluateScalarOrDelegatedNode(*rNode.maChildren[1],
             ePrimaryFunction != FunctionKind::Unknown ? ePrimaryFunction : FunctionKind::Unknown,
-            rDoc, rContext, rFormulaPos, bEmptyStringAsZero, nDepth + 1);
+            rDoc, rContext, rFormulaPos, bEmptyStringAsZero, nDepth + 1,
+            bImportedCanonicalSource);
         if (aFallback.meFunction == FunctionKind::Unknown)
             aFallback.meFunction = ePrimaryFunction;
         return aFallback;
     }
 
-    return evaluateFunctionNode(rNode, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
+    return evaluateFunctionNode(
+        rNode, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, bImportedCanonicalSource);
 }
 
 } // namespace detail
@@ -4994,6 +5019,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         = rCanonicalFormulaSource.empty()
               ? detail::maybeCanonicalizeArrayConstantsFromTokens(aNormalized, pTokenArray)
               : detail::normalizeFormulaSource(rCanonicalFormulaSource);
+    const bool bImportedCanonicalSource = !rCanonicalFormulaSource.empty();
     const auto aParse = core::formula::parseFormula(aCanonical);
     if (!aParse || !aParse.mpRoot)
     {
@@ -5021,7 +5047,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     }
 
     auto aAttempt = detail::evaluateDelegatedNode(
-        rRoot, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
+        rRoot, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 0, bImportedCanonicalSource);
     if (!aAttempt.mbSupported)
     {
         detail::recordDiagnosticSample(aAttempt.meFallbackReason, rDoc, rFormulaPos,

@@ -18,6 +18,7 @@ enum class Error
 {
     None,
     IllegalArgument,
+    VariableExpected,
     DivisionByZero,
     Domain,
     StringOverflow,
