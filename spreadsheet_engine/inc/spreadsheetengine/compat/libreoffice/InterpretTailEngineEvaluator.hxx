@@ -4509,7 +4509,19 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
         const auto aArgument = materializePredicateArgument(*rNode.maChildren[0]);
         if (!aArgument.mbSupported)
+        {
+            if ((bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
+                && (aArgument.meFallbackReason == FallbackReason::UnsupportedHostSurface
+                    || aArgument.meFallbackReason == FallbackReason::UnsupportedFunction
+                    || aArgument.meFallbackReason == FallbackReason::UnsupportedFormulaShape)
+                && (aFunctionName == u"ISERROR" || aFunctionName == u"ISERR"
+                    || aFunctionName == u"ISNA" || aFunctionName == u"ISTEXT"
+                    || aFunctionName == u"ISNONTEXT" || aFunctionName == u"ISBLANK"))
+            {
+                return makeErrorResult(eFunction, api::Error::VariableExpected);
+            }
             return makeUnsupported(eFunction, aArgument.meFallbackReason);
+        }
         if (!aArgument.moValue)
             return makeErrorResult(eFunction, aArgument.meError);
 

@@ -143,10 +143,10 @@ This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=7063`
-- `interpret_tail_live_authoritative_match_total=4364`
-- `interpret_tail_live_authoritative_fallback_total=2699`
-- live authoritative-match rate over the corpus: `8.6141%`
-- live authoritative-match rate over the current promoted probe: `61.7868%`
+- `interpret_tail_live_authoritative_match_total=4385`
+- `interpret_tail_live_authoritative_fallback_total=2678`
+- live authoritative-match rate over the corpus: `8.6556%`
+- live authoritative-match rate over the current promoted probe: `62.0841%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -156,20 +156,20 @@ This is the honest all-formula live-routing surface from the standing replay
 corpus:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=19148`
-- `interpret_tail_live_fallback_total=654`
+- `interpret_tail_live_supported_total=19190`
+- `interpret_tail_live_fallback_total=612`
 - `interpret_tail_live_seen_total=19802`
 - `interpret_tail_live_unseen_formula_cells=30859`
-- `interpret_tail_live_promoted_function_supported_total=17898`
-- `interpret_tail_live_supported_rate=37.80`
+- `interpret_tail_live_promoted_function_supported_total=17940`
+- `interpret_tail_live_supported_rate=37.88`
 - `interpret_tail_live_seen_rate=39.09`
 
 Current ambient fallback reasons:
 
-- `unsupported_formula_shape=40`
-- `unsupported_host_surface=12`
+- `unsupported_formula_shape=22`
+- `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=608`
+- `unsupported_function=586`
 
 Interpretation:
 
@@ -178,6 +178,8 @@ Interpretation:
 - the ambient replay surface now includes large real traffic from
   information predicates, logical folds, round-family formulas, scalar-math
   helpers, and bounded financial feeders
+- the imported direct information-predicate host-truth residue is now closed
+  on the live surface
 - the main remaining ambient work is now parity quality inside those newly
   admitted families, not simple denominator reach
 - the live authoritative-match north-star has now moved decisively above the
@@ -190,13 +192,13 @@ This is the new full-corpus measurement after explicitly dirtying and forcing
 every replay formula cell through Calc's live `Interpret()` path:
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=47169`
-- `interpret_tail_forced_interpret_fallback_total=332`
-- `interpret_tail_forced_interpret_seen_total=47501`
+- `interpret_tail_forced_interpret_supported_total=47189`
+- `interpret_tail_forced_interpret_fallback_total=306`
+- `interpret_tail_forced_interpret_seen_total=47495`
 - `interpret_tail_forced_interpret_unseen_formula_cells=3160`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=46544`
-- `interpret_tail_forced_interpret_supported_rate=93.11`
-- `interpret_tail_forced_interpret_seen_rate=93.76`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=46562`
+- `interpret_tail_forced_interpret_supported_rate=93.15`
+- `interpret_tail_forced_interpret_seen_rate=93.75`
 
 Interpretation:
 
