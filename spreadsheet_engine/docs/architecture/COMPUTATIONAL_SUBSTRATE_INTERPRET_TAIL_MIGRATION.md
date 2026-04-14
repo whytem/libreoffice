@@ -173,13 +173,13 @@ This is the new full-corpus measurement after explicitly dirtying and forcing
 every replay formula cell through Calc's live `Interpret()` path:
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=52645`
-- `interpret_tail_forced_interpret_fallback_total=539`
-- `interpret_tail_forced_interpret_seen_total=53184`
-- `interpret_tail_forced_interpret_unseen_formula_cells=0`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=51729`
-- `interpret_tail_forced_interpret_supported_rate=103.92`
-- `interpret_tail_forced_interpret_seen_rate=104.98`
+- `interpret_tail_forced_interpret_supported_total=47150`
+- `interpret_tail_forced_interpret_fallback_total=351`
+- `interpret_tail_forced_interpret_seen_total=47501`
+- `interpret_tail_forced_interpret_unseen_formula_cells=3160`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=46525`
+- `interpret_tail_forced_interpret_supported_rate=93.07`
+- `interpret_tail_forced_interpret_seen_rate=93.76`
 
 Interpretation:
 
@@ -194,13 +194,13 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=7063`
-- `interpret_tail_authoritative_total=6580`
-- `interpret_tail_authoritative_fallback_total=483`
-- promoted-family authoritative rate: `93.16%`
+- `interpret_tail_authoritative_total=6742`
+- `interpret_tail_authoritative_fallback_total=321`
+- promoted-family authoritative rate: `95.45%`
 
 Current promoted-family fallback reasons:
 
-- `shadow_mismatch=434`
+- `shadow_mismatch=272`
 - `unsupported_function=14`
 - `unsupported_formula_shape=29`
 - `unsupported_host_surface=6`
@@ -222,10 +222,10 @@ Interpretation:
   round-family formulas, information predicates, logical folds, `NOT`, and
   bounded scalar-math feeder formulas are part of the delegated family
 - the latest replay-cached scalar parity slice left ambient live reach flat
-  but cut raw promoted fallback from `2010` to `483`
-- the dominant remaining raw mismatch buckets are now `logical_fold=169`
-  fallback, `math_scalar=172`, `information_predicate=44`, and `lookup=38`,
-  with round-family fallback now at `0`
+  but cut raw promoted fallback from `483` to `321`
+- the dominant remaining raw mismatch buckets are now `math_scalar=172`,
+  `logical_fold=53`, `information_predicate=37`, and `lookup=0`, with
+  round-family fallback still at `0`
 - a focused host-truth test now shows the replay-imported whole-row
   `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to
   `FormulaError::VariableExpected`
@@ -289,10 +289,10 @@ surface after forcing each promoted replay formula through direct live
 - `interpret_tail_replay_promoted_direct_supported=7014`
 - `interpret_tail_replay_promoted_direct_fallback=49`
 - `interpret_tail_replay_promoted_direct_unseen=0`
-- `interpret_tail_replay_promoted_shared_formula_cells=3329`
-- `interpret_tail_replay_promoted_shared_top_formula_cells=738`
-- `interpret_tail_replay_promoted_shared_member_formula_cells=2591`
-- `interpret_tail_replay_promoted_non_shared_formula_cells=3697`
+- `interpret_tail_replay_promoted_shared_formula_cells=3331`
+- `interpret_tail_replay_promoted_shared_top_formula_cells=739`
+- `interpret_tail_replay_promoted_shared_member_formula_cells=2592`
+- `interpret_tail_replay_promoted_non_shared_formula_cells=3732`
 - `interpret_tail_replay_promoted_unseen_shared_top=0`
 - `interpret_tail_replay_promoted_unseen_shared_member=0`
 - `interpret_tail_replay_promoted_unseen_non_shared=0`

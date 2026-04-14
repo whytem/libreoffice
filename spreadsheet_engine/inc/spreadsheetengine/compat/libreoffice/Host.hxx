@@ -10,8 +10,10 @@
 #pragma once
 
 #include <cellvalue.hxx>
+#include <compiler.hxx>
 #include <document.hxx>
 #include <formulacell.hxx>
+#include <global.hxx>
 #include <interpretercontext.hxx>
 
 #include <spreadsheetengine/api/Host.hxx>
@@ -19,6 +21,7 @@
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
+#include <spreadsheetengine/runtime/DateTimeParse.hxx>
 
 namespace spreadsheetengine::compat::libreoffice
 {
@@ -41,6 +44,108 @@ enum class HostCellStringKind : std::uint8_t
     Display
 };
 
+[[nodiscard]] inline std::optional<spreadsheetengine::api::Error>
+tryParseHostImportedHybridFormulaErrorText(const ScDocument& rDoc, const ScAddress& rAddress,
+    std::u16string_view aRawString)
+{
+    if (aRawString.empty())
+        return std::nullopt;
+
+    const auto tryParseDetailedError = [&]() -> std::optional<spreadsheetengine::api::Error> {
+        sal_uInt16 nErrorValue = 0;
+        bool bSawDigit = false;
+        for (sal_Unicode cChar : aRawString)
+        {
+            if (cChar < u'0' || cChar > u'9')
+                continue;
+            bSawDigit = true;
+            nErrorValue = static_cast<sal_uInt16>(nErrorValue * 10 + (cChar - u'0'));
+        }
+
+        if (!bSawDigit)
+            return std::nullopt;
+
+        const FormulaError eError = static_cast<FormulaError>(nErrorValue);
+        if (!isPublishedFormulaError(eError) && eError != FormulaError::NotAvailable)
+            return std::nullopt;
+
+        return toApiError(eError);
+    };
+
+    if (const auto oDetailedError = tryParseDetailedError())
+        return *oDetailedError;
+
+    const OUString aErrorText(aRawString.data(), aRawString.size());
+    ScCompiler aCompiler(
+        const_cast<ScDocument&>(rDoc), rAddress, formula::FormulaGrammar::GRAM_ODFF);
+    const FormulaError eError = aCompiler.GetErrorConstant(aErrorText);
+    if (eError == FormulaError::NONE)
+    {
+        for (FormulaError eCandidate : { FormulaError::NoCode, FormulaError::DivisionByZero,
+                 FormulaError::NoValue, FormulaError::NoRef, FormulaError::NoName,
+                 FormulaError::IllegalFPOperation, FormulaError::NotAvailable })
+        {
+            if (aErrorText == ScGlobal::GetErrorString(eCandidate))
+                return toApiError(eCandidate);
+        }
+        return std::nullopt;
+    }
+
+    return toApiError(eError);
+}
+
+[[nodiscard]] inline std::optional<spreadsheetengine::api::CellValue>
+tryReadHostCachedFormulaCellValue(const ScDocument& rDoc, const ScAddress& rAddress,
+    const ScFormulaCell& rFormula)
+{
+    const bool bAllowDirtyHybridResult = rFormula.HasHybridStringResult();
+    if (rFormula.NeedsInterpret() && !bAllowDirtyHybridResult)
+        return std::nullopt;
+
+    if (rFormula.HasHybridStringResult())
+    {
+        const OUString aCachedString = rFormula.GetResultString().getString();
+        if (const auto oError = tryParseHostImportedHybridFormulaErrorText(
+                rDoc, rAddress,
+                std::u16string_view(aCachedString.getStr(), aCachedString.getLength())))
+        {
+            return spreadsheetengine::api::CellValue::error(*oError);
+        }
+
+        if (const auto oParsed = spreadsheetengine::core::datetime::parseStandaloneNumberText(
+                toApiString(aCachedString)))
+        {
+            return spreadsheetengine::api::CellValue::number(oParsed->mfValue);
+        }
+
+        const OUString aUpperString = aCachedString.toAsciiUpperCase();
+        if (aUpperString == "TRUE")
+            return spreadsheetengine::api::CellValue::boolean(true);
+        if (aUpperString == "FALSE")
+            return spreadsheetengine::api::CellValue::boolean(false);
+
+        return spreadsheetengine::api::CellValue::text(toApiString(aCachedString));
+    }
+
+    if (rFormula.NeedsInterpret())
+        return std::nullopt;
+
+    const sc::FormulaResultValue aResult = rFormula.GetResult();
+    switch (aResult.meType)
+    {
+        case sc::FormulaResultValue::Value:
+            return spreadsheetengine::api::CellValue::number(aResult.mfValue);
+        case sc::FormulaResultValue::Error:
+            return spreadsheetengine::api::CellValue::error(toApiError(aResult.mnError));
+        case sc::FormulaResultValue::String:
+            return spreadsheetengine::api::CellValue::text(toApiString(aResult.maString.getString()));
+        case sc::FormulaResultValue::Invalid:
+            break;
+    }
+
+    return std::nullopt;
+}
+
 [[nodiscard]] inline spreadsheetengine::api::CellValue readHostDocumentCellValue(
     const ScDocument& rDoc, const ScAddress& rAddress, const ScRefCellValue& rCell,
     HostCellStringKind eStringKind = HostCellStringKind::Raw)
@@ -53,6 +158,9 @@ enum class HostCellStringKind : std::uint8_t
         ScFormulaCell* pFormula = rCell.getFormula();
         if (!pFormula)
             return spreadsheetengine::api::CellValue::empty();
+
+        if (const auto oCachedValue = tryReadHostCachedFormulaCellValue(rDoc, rAddress, *pFormula))
+            return *oCachedValue;
 
         if (const FormulaError eError = pFormula->GetErrCode(); eError != FormulaError::NONE)
             return spreadsheetengine::api::CellValue::error(toApiError(eError));

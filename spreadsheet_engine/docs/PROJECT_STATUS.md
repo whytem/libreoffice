@@ -50,20 +50,20 @@ Ambient live fallback reasons:
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=52645`
-- `interpret_tail_forced_interpret_fallback_total=539`
-- `interpret_tail_forced_interpret_seen_total=53184`
-- `interpret_tail_forced_interpret_unseen_formula_cells=0`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=51729`
-- `interpret_tail_forced_interpret_supported_rate=103.92`
-- `interpret_tail_forced_interpret_seen_rate=104.98`
+- `interpret_tail_forced_interpret_supported_total=47150`
+- `interpret_tail_forced_interpret_fallback_total=351`
+- `interpret_tail_forced_interpret_seen_total=47501`
+- `interpret_tail_forced_interpret_unseen_formula_cells=3160`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=46525`
+- `interpret_tail_forced_interpret_supported_rate=93.07`
+- `interpret_tail_forced_interpret_seen_rate=93.76`
 
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=7063`
-- `interpret_tail_authoritative_total=6580`
-- `interpret_tail_authoritative_fallback_total=483`
-- promoted-family authoritative rate: `93.16%`
+- `interpret_tail_authoritative_total=6742`
+- `interpret_tail_authoritative_fallback_total=321`
+- promoted-family authoritative rate: `95.45%`
 
 ### Live-Target Filtered Promoted Probe
 
@@ -74,7 +74,7 @@ Ambient live fallback reasons:
 
 Promoted-family fallback reasons:
 
-- `shadow_mismatch=434`
+- `shadow_mismatch=272`
 - `unsupported_function=14`
 - `unsupported_formula_shape=29`
 - `unsupported_host_surface=6`
@@ -86,8 +86,8 @@ Promoted-family fallback reasons:
 - `interpret_tail_replay_promoted_direct_supported=7014`
 - `interpret_tail_replay_promoted_direct_fallback=49`
 - `interpret_tail_replay_promoted_direct_unseen=0`
-- `interpret_tail_replay_promoted_shared_formula_cells=3329`
-- `interpret_tail_replay_promoted_non_shared_formula_cells=3697`
+- `interpret_tail_replay_promoted_shared_formula_cells=3331`
+- `interpret_tail_replay_promoted_non_shared_formula_cells=3732`
 - `interpret_tail_replay_promoted_unseen_shared_member=0`
 - `interpret_tail_replay_promoted_unseen_non_shared=0`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
@@ -286,10 +286,10 @@ Still not true:
   all `7063` promoted replay probe rows are imported host-truth artifacts under
   seam-off direct legacy interpretation
 - the latest replay-cached scalar parity slice left the ambient live totals
-  flat but cut raw promoted fallback from `2010` to `483`; the dominant raw
-  retained buckets are now `logical_fold=169`, `math_scalar=172`,
-  `information_predicate=44`, and `lookup=38`, with round-family fallback at
-  `0`
+  flat but cut raw promoted fallback from `483` to `321`; the dominant raw
+  retained buckets are now `math_scalar=172`, `logical_fold=53`,
+  `information_predicate=37`, and `lookup=0`, with round-family fallback still
+  at `0`
 - the next runtime milestone therefore should not be defined by the imported
   replay probe anymore; it should move to quality inside the new ambient live
   traffic and the remaining raw shadow-mismatch buckets, or to additional

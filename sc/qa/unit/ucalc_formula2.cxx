@@ -1219,6 +1219,13 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetString(67, 7, 0, u"=XLOOKUP(35;{30;20;10};{\"thirty\";\"twenty\";\"ten\"};\"missing\";1;-2)"_ustr);
         m_pDoc->SetString(68, 7, 0, u"=XLOOKUP(25;{30;20;10};{\"thirty\";\"twenty\";\"ten\"};;-1;-2)"_ustr);
         m_pDoc->SetString(69, 7, 0, u"=XLOOKUP(5;{30;20;10};{\"thirty\";\"twenty\";\"ten\"};\"missing\";-1;-2)"_ustr);
+        m_pDoc->SetValue(1, 30, 0, 1.0);
+        m_pDoc->SetString(2, 30, 0, u"one"_ustr);
+        m_pDoc->SetValue(1, 31, 0, 2.0);
+        m_pDoc->SetString(2, 31, 0, u"two"_ustr);
+        m_pDoc->SetValue(1, 32, 0, 3.0);
+        m_pDoc->SetString(2, 32, 0, u"three"_ustr);
+        m_pDoc->SetString(70, 7, 0, u"=LOOKUP(2;B31:C33)"_ustr);
         CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(14, 7, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(15, 7, 0));
         ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(16, 7, 0));
@@ -1275,6 +1282,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(67, 7, 0));
         CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(68, 7, 0));
         CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(69, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(70, 7, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
         CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 56);

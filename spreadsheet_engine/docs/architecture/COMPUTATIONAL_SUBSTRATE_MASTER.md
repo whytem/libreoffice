@@ -20,7 +20,7 @@ Today:
 - an eighty-five-slice env-independent logical/text/match/xmatch/lookup/index
   cluster is now engine-first even with rollout explicitly `off`
 - the latest replay-cached scalar parity slice left ambient live
-  reach flat while cutting raw promoted fallback from `2010` to `483`
+  reach flat while cutting raw promoted fallback from `483` to `321`
 
 The active program is no longer “prove more substrate slices.”
 The active program is “use the substrate to underwrite live evaluator
@@ -57,24 +57,24 @@ Dominant ambient fallback reasons:
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=52645`
-- `interpret_tail_forced_interpret_fallback_total=539`
-- `interpret_tail_forced_interpret_seen_total=53184`
-- `interpret_tail_forced_interpret_unseen_formula_cells=0`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=51729`
-- `interpret_tail_forced_interpret_supported_rate=103.92`
-- `interpret_tail_forced_interpret_seen_rate=104.98`
+- `interpret_tail_forced_interpret_supported_total=47150`
+- `interpret_tail_forced_interpret_fallback_total=351`
+- `interpret_tail_forced_interpret_seen_total=47501`
+- `interpret_tail_forced_interpret_unseen_formula_cells=3160`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=46525`
+- `interpret_tail_forced_interpret_supported_rate=93.07`
+- `interpret_tail_forced_interpret_seen_rate=93.76`
 
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=7063`
-- `interpret_tail_authoritative_total=6580`
-- `interpret_tail_authoritative_fallback_total=483`
-- promoted-family authoritative rate: `93.16%`
+- `interpret_tail_authoritative_total=6742`
+- `interpret_tail_authoritative_fallback_total=321`
+- promoted-family authoritative rate: `95.45%`
 
 Dominant promoted-family fallback reasons:
 
-- `shadow_mismatch=434`
+- `shadow_mismatch=272`
 - `unsupported_function=14`
 - `unsupported_formula_shape=29`
 - `unsupported_host_surface=6`
@@ -300,10 +300,10 @@ The highest-value remaining blockers are now:
    promoted probe `848 authoritative / 172 fallback`, still mostly
    `shadow_mismatch`
 4. promoted-family residual parity and shape:
-   `shadow_mismatch=434`, `unsupported_function=14`,
+   `shadow_mismatch=272`, `unsupported_function=14`,
    `unsupported_formula_shape=29`
 5. smaller raw mismatch bands:
-   `information_predicate=44` fallback and `lookup=38`
+   `information_predicate=37` fallback and `lookup=0`
 6. first real Calc-path retirement:
    one narrow logical/text/lookup/index cluster is now hard-routed and its
    legacy interpreter entries are quarantined for those slices, but no whole
@@ -314,7 +314,7 @@ The highest-value remaining blockers are now:
 
 The latest replay-cached scalar parity slice left ambient live reach flat at
 `15,402 / 50,661` seen formulas (`30.40%`) and `14,700 / 50,661` supported
-(`29.02%`), while cutting raw promoted fallback from `2010` to `483` and
+(`29.02%`), while cutting raw promoted fallback from `483` to `321` and
 keeping the replay guardrail exact.
 
 Inside the current families, that effectively exhausts the semantically

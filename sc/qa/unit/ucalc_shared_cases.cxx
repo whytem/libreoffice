@@ -2357,6 +2357,24 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(
             aLiteralLookup.maResult.maString));
 
+    m_pDoc->SetValue(1, 30, 0, 1.0);
+    m_pDoc->SetString(2, 30, 0, u"one"_ustr);
+    m_pDoc->SetValue(1, 31, 0, 2.0);
+    m_pDoc->SetString(2, 31, 0, u"two"_ustr);
+    m_pDoc->SetValue(1, 32, 0, 3.0);
+    m_pDoc->SetString(2, 32, 0, u"three"_ustr);
+
+    const auto aRangeLookupArrayForm = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(3, 8, 0), u"=LOOKUP(2;B31:C33)", false);
+    CPPUNIT_ASSERT(aRangeLookupArrayForm.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Lookup, aRangeLookupArrayForm.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aRangeLookupArrayForm.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"two"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aRangeLookupArrayForm.maResult.maString));
+
     const auto aLiteralVLookup = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, ScAddress(3, 8, 0),
         u"=VLOOKUP(2;{1;\"one\"|2;\"first\"|2;\"second\"};2;0)", false);
