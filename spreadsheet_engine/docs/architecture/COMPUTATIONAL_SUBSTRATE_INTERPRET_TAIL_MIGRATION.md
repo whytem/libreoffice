@@ -143,10 +143,10 @@ This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=7063`
-- `interpret_tail_live_authoritative_match_total=2`
-- `interpret_tail_live_authoritative_fallback_total=7061`
-- live authoritative-match rate over the corpus: `0.0039%`
-- live authoritative-match rate over the current promoted probe: `0.0283%`
+- `interpret_tail_live_authoritative_match_total=47`
+- `interpret_tail_live_authoritative_fallback_total=7016`
+- live authoritative-match rate over the corpus: `0.0928%`
+- live authoritative-match rate over the current promoted probe: `0.6654%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -180,9 +180,9 @@ Interpretation:
   helpers, and bounded financial feeders
 - the main remaining ambient work is now parity quality inside those newly
   admitted families, not simple denominator reach
-- the live authoritative-match north-star is still effectively zero, so these
-  ambient reach numbers are supporting diagnostics rather than the retirement
-  claim
+- the live authoritative-match north-star has now measurably improved, but
+  these ambient reach numbers are still supporting diagnostics rather than a
+  retirement claim
 
 ### Full Replay Corpus: Forced Interpret Observe
 

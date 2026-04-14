@@ -35,10 +35,10 @@ This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=7063`
-- `interpret_tail_live_authoritative_match_total=2`
-- `interpret_tail_live_authoritative_fallback_total=7061`
-- live authoritative-match rate over the corpus: `0.0039%`
-- live authoritative-match rate over the current promoted probe: `0.0283%`
+- `interpret_tail_live_authoritative_match_total=47`
+- `interpret_tail_live_authoritative_fallback_total=7016`
+- live authoritative-match rate over the corpus: `0.0928%`
+- live authoritative-match rate over the current promoted probe: `0.6654%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -251,8 +251,9 @@ Still not true:
 - the dominant retained live blocker is now quality inside that newly admitted
   traffic, especially logical-fold shadow mismatches and math-scalar shadow
   mismatches, not simple lack of ambient reach
-- the live authoritative-match north-star is still effectively zero on the
-  replay corpus at `2 / 50,661` (`0.0039%`)
+- the live authoritative-match north-star has now moved off the floor on the
+  replay corpus to `47 / 50,661` (`0.0928%`), but it is still far below a
+  deletion-comfortable level
 - the raw promoted replay probe is now a diagnostic surface, not the
   retirement denominator, even though it improved to `6742 / 321`
 - a focused live-host check now shows the replay-imported whole-row

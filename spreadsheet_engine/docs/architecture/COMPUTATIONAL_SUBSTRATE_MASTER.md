@@ -26,8 +26,8 @@ Today:
   preserving inline nested legacy execution
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
-- the deletion-gating live authoritative-match north-star is currently only
-  `2 / 50,661` (`0.0039%`) on the standing replay corpus
+- the deletion-gating live authoritative-match north-star has now moved to
+  `47 / 50,661` (`0.0928%`) on the standing replay corpus
 
 The active program is no longer “prove more substrate slices.”
 The active program is “use the substrate to underwrite live evaluator
@@ -49,10 +49,10 @@ This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=7063`
-- `interpret_tail_live_authoritative_match_total=2`
-- `interpret_tail_live_authoritative_fallback_total=7061`
-- live authoritative-match rate over the corpus: `0.0039%`
-- live authoritative-match rate over the current promoted probe: `0.0283%`
+- `interpret_tail_live_authoritative_match_total=47`
+- `interpret_tail_live_authoritative_fallback_total=7016`
+- live authoritative-match rate over the corpus: `0.0928%`
+- live authoritative-match rate over the current promoted probe: `0.6654%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -333,10 +333,10 @@ The highest-value remaining blockers are now:
    the raw promoted replay probe is now confirmed to be a cached imported
    correctness surface, not a live seam-off retirement denominator
 
-The live authoritative-match north-star on the standing replay corpus is now
-explicitly measured at only `2 / 50,661` (`0.0039%`), even though ambient
-live reach is `15,402 / 50,661` seen formulas (`30.40%`) and
-`14,700 / 50,661` supported (`29.02%`). That is now the only number that
+The live authoritative-match north-star on the standing replay corpus has now
+improved to `47 / 50,661` (`0.0928%`), even though ambient live reach is
+still `15,402 / 50,661` seen formulas (`30.40%`) and
+`14,700 / 50,661` supported (`29.02%`). That remains the only number that
 should gate deletion claims.
 
 Inside the current families, the semantically distinct env-independent
