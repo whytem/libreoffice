@@ -2168,7 +2168,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedMathScalarCachedErrorP
     }
 }
 
-CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalFoldCachedRangeParity)
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalFoldCachedRangeLiveHostTruth)
 {
     const OUString aWorkbookPath
         = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/mathematical/fods/abs.fods");
@@ -2211,9 +2211,11 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalFoldCachedRange
                     aCanonicalFormulaSource.getLength()));
         CPPUNIT_ASSERT(aAttempt.mbSupported);
         CPPUNIT_ASSERT_EQUAL(
-            spreadsheetengine::api::formulavalue::ValueType::Value,
+            spreadsheetengine::api::formulavalue::ValueType::Error,
             aAttempt.maResult.meType);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aAttempt.maResult.mfValue, 1e-12);
+        CPPUNIT_ASSERT_EQUAL(
+            spreadsheetengine::compat::libreoffice::toApiError(FormulaError::VariableExpected),
+            aAttempt.maResult.meError);
     }
 }
 
