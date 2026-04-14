@@ -140,30 +140,30 @@ This is the honest all-formula live-routing surface from the standing replay
 corpus after the deliberate bounded scalar-math feeder family expansion:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=14226`
-- `interpret_tail_live_fallback_total=1102`
-- `interpret_tail_live_seen_total=15328`
-- `interpret_tail_live_unseen_formula_cells=35333`
-- `interpret_tail_live_promoted_function_supported_total=12976`
-- `interpret_tail_live_supported_rate=28.08`
-- `interpret_tail_live_seen_rate=30.26`
+- `interpret_tail_live_supported_total=14700`
+- `interpret_tail_live_fallback_total=702`
+- `interpret_tail_live_seen_total=15402`
+- `interpret_tail_live_unseen_formula_cells=35259`
+- `interpret_tail_live_promoted_function_supported_total=13450`
+- `interpret_tail_live_supported_rate=29.02`
+- `interpret_tail_live_seen_rate=30.40`
 
 Current ambient fallback reasons:
 
 - `unsupported_formula_shape=78`
 - `unsupported_host_surface=12`
 - `parse_failure=4`
-- `unsupported_function=1008`
+- `unsupported_function=608`
 
 Interpretation:
 
 - the seam now measures the full replay corpus
 - the ambient live-routing denominator is real, not curated
-- the new math-feeder expansion raised the seen rate from `26.23%` to
-  `30.26%` and the supported rate from `18.68%` to `28.08%`
+- the new bounded `RATE` feeder slice raised the seen rate from `30.26%` to
+  `30.40%` and the supported rate from `28.08%` to `29.02%`
 - the ambient replay surface now includes large real traffic from
   information predicates, logical folds, round-family formulas, and
-  bounded scalar-math feeder formulas
+  bounded scalar-math feeder formulas, now including `RATE`
 - the main remaining ambient work is now quality inside those newly admitted
   families, not simple denominator reach
 
@@ -173,13 +173,13 @@ This is the new full-corpus measurement after explicitly dirtying and forcing
 every replay formula cell through Calc's live `Interpret()` path:
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=12603`
-- `interpret_tail_forced_interpret_fallback_total=40539`
-- `interpret_tail_forced_interpret_seen_total=53142`
+- `interpret_tail_forced_interpret_supported_total=52645`
+- `interpret_tail_forced_interpret_fallback_total=539`
+- `interpret_tail_forced_interpret_seen_total=53184`
 - `interpret_tail_forced_interpret_unseen_formula_cells=0`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=11687`
-- `interpret_tail_forced_interpret_supported_rate=24.88`
-- `interpret_tail_forced_interpret_seen_rate=104.90`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=51729`
+- `interpret_tail_forced_interpret_supported_rate=103.92`
+- `interpret_tail_forced_interpret_seen_rate=104.98`
 
 Interpretation:
 
@@ -193,15 +193,15 @@ Interpretation:
 
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
-- `interpret_tail_probe_formula_cells=7026`
-- `interpret_tail_authoritative_total=5020`
-- `interpret_tail_authoritative_fallback_total=2006`
-- promoted-family authoritative rate: `71.45%`
+- `interpret_tail_probe_formula_cells=7063`
+- `interpret_tail_authoritative_total=5053`
+- `interpret_tail_authoritative_fallback_total=2010`
+- promoted-family authoritative rate: `71.55%`
 
 Current promoted-family fallback reasons:
 
-- `shadow_mismatch=1757`
-- `unsupported_function=214`
+- `shadow_mismatch=1961`
+- `unsupported_function=14`
 - `unsupported_formula_shape=29`
 - `unsupported_host_surface=6`
 
@@ -212,7 +212,7 @@ with the seam forced `off` already disagrees with the imported cached workbook
 result:
 
 - `interpret_tail_live_target_probe_formula_cells=0`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=7026`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=7063`
 - `interpret_tail_live_target_authoritative_total=0`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 
@@ -223,7 +223,7 @@ Interpretation:
   bounded scalar-math feeder formulas are part of the delegated family
 - the main remaining conversion work is now quality inside that broader
   denominator, especially logical-fold shadow mismatches, math-scalar shadow
-  mismatches, and the remaining round-family unsupported-function band
+  mismatches, and remaining round / `RATE` shadow mismatches
 - a focused host-truth test now shows the replay-imported whole-row
   `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to
   `FormulaError::VariableExpected`
@@ -282,10 +282,10 @@ This is the new per-cell replay inventory over the promoted-family replay
 surface after forcing each promoted replay formula through direct live
 `Interpret()`:
 
-- `interpret_tail_replay_promoted_formula_cells=7026`
-- `interpret_tail_replay_promoted_direct_seen=7026`
-- `interpret_tail_replay_promoted_direct_supported=6777`
-- `interpret_tail_replay_promoted_direct_fallback=249`
+- `interpret_tail_replay_promoted_formula_cells=7063`
+- `interpret_tail_replay_promoted_direct_seen=7063`
+- `interpret_tail_replay_promoted_direct_supported=7014`
+- `interpret_tail_replay_promoted_direct_fallback=49`
 - `interpret_tail_replay_promoted_direct_unseen=0`
 - `interpret_tail_replay_promoted_shared_formula_cells=3329`
 - `interpret_tail_replay_promoted_shared_top_formula_cells=738`
@@ -295,7 +295,7 @@ surface after forcing each promoted replay formula through direct live
 - `interpret_tail_replay_promoted_unseen_shared_member=0`
 - `interpret_tail_replay_promoted_unseen_non_shared=0`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=7026`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=7063`
 - `interpret_tail_replay_promoted_dirty_after_interpret=0`
 
 Interpretation:
@@ -303,13 +303,14 @@ Interpretation:
 - the pre-tail replay eligibility blocker is cleared for the promoted replay
   surface
 - the latest slice widened the replay-promoted denominator materially by
-  promoting bounded scalar-math feeder traffic beneath comparison helpers
+  promoting bounded scalar-math feeder traffic beneath comparison helpers and
+  adding bounded scalar `RATE`
 - both shared and non-shared promoted replay formulas now reach the live seam
-- the residual replay work is now the `249` direct fallback cells on this
+- the residual replay work is now the `49` direct fallback cells on this
   broader imported promoted-family surface
 - the dominant next targets are logical-fold `shadow_mismatch`,
-  math-scalar `shadow_mismatch`, and remaining round-family
-  `unsupported_function`
+  math-scalar `shadow_mismatch`, and remaining round / `RATE`
+  `shadow_mismatch`
 
 ## Hard-Routed Family
 

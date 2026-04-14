@@ -19,9 +19,9 @@ Today:
 - debug and CI-style builds default that seam to `observe`
 - an eighty-five-slice env-independent logical/text/match/xmatch/lookup/index
   cluster is now engine-first even with rollout explicitly `off`
-- the latest deliberate underlying math-feeder expansion raised the ambient
-  live seen rate from `26.23%` to `30.26%` and the ambient supported rate
-  from `18.68%` to `28.08%`
+- the latest bounded `RATE` feeder expansion raised the ambient
+  live seen rate from `30.26%` to `30.40%` and the ambient supported rate
+  from `28.08%` to `29.02%`
 
 The active program is no longer “prove more substrate slices.”
 The active program is “use the substrate to underwrite live evaluator
@@ -40,50 +40,50 @@ delegation.”
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=14226`
-- `interpret_tail_live_fallback_total=1102`
-- `interpret_tail_live_seen_total=15328`
-- `interpret_tail_live_unseen_formula_cells=35333`
-- `interpret_tail_live_promoted_function_supported_total=12976`
-- `interpret_tail_live_supported_rate=28.08`
-- `interpret_tail_live_seen_rate=30.26`
+- `interpret_tail_live_supported_total=14700`
+- `interpret_tail_live_fallback_total=702`
+- `interpret_tail_live_seen_total=15402`
+- `interpret_tail_live_unseen_formula_cells=35259`
+- `interpret_tail_live_promoted_function_supported_total=13450`
+- `interpret_tail_live_supported_rate=29.02`
+- `interpret_tail_live_seen_rate=30.40`
 
 Dominant ambient fallback reasons:
 
 - `unsupported_formula_shape=78`
 - `unsupported_host_surface=12`
 - `parse_failure=4`
-- `unsupported_function=1008`
+- `unsupported_function=608`
 
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=12603`
-- `interpret_tail_forced_interpret_fallback_total=40539`
-- `interpret_tail_forced_interpret_seen_total=53142`
+- `interpret_tail_forced_interpret_supported_total=52645`
+- `interpret_tail_forced_interpret_fallback_total=539`
+- `interpret_tail_forced_interpret_seen_total=53184`
 - `interpret_tail_forced_interpret_unseen_formula_cells=0`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=11687`
-- `interpret_tail_forced_interpret_supported_rate=24.88`
-- `interpret_tail_forced_interpret_seen_rate=104.90`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=51729`
+- `interpret_tail_forced_interpret_supported_rate=103.92`
+- `interpret_tail_forced_interpret_seen_rate=104.98`
 
 ### Promoted-Family Probe
 
-- `interpret_tail_probe_formula_cells=7026`
-- `interpret_tail_authoritative_total=5020`
-- `interpret_tail_authoritative_fallback_total=2006`
-- promoted-family authoritative rate: `71.45%`
+- `interpret_tail_probe_formula_cells=7063`
+- `interpret_tail_authoritative_total=5053`
+- `interpret_tail_authoritative_fallback_total=2010`
+- promoted-family authoritative rate: `71.55%`
 
 Dominant promoted-family fallback reasons:
 
-- `shadow_mismatch=1757`
-- `unsupported_function=214`
+- `shadow_mismatch=1961`
+- `unsupported_function=14`
 - `unsupported_formula_shape=29`
 - `unsupported_host_surface=6`
 
 ### Live-Target Filtered Promoted Probe
 
 - `interpret_tail_live_target_probe_formula_cells=0`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=7026`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=7063`
 - `interpret_tail_live_target_authoritative_total=0`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 
@@ -93,10 +93,11 @@ Dominant promoted-family fallback reasons:
   - `TRUE()`
   - `FALSE()`
   - string-literal `VALUE`
-  - string-literal `DATEVALUE`
-  - string-literal `TIMEVALUE`
-  - literal-only `NUMBERVALUE`
-  - exact `MATCH(<literal>; <1D literal array>; 0)`
+- string-literal `DATEVALUE`
+- string-literal `TIMEVALUE`
+- literal-only `NUMBERVALUE`
+- bounded scalar `RATE`
+- exact `MATCH(<literal>; <1D literal array>; 0)`
   - default-approximate `MATCH(<literal>; <ascending numeric 1D literal array>)`
   - approximate-ascending `MATCH(<literal>; <ascending numeric 1D literal array>; 1)`
   - approximate-descending `MATCH(<literal>; <descending numeric 1D literal array>; -1)`
@@ -231,6 +232,7 @@ evaluation for:
 - `DATEVALUE`
 - `TIMEVALUE`
 - `NUMBERVALUE`
+- `RATE`
 - `ROUND`
 - `ROUNDUP`
 - `ROUNDDOWN`
@@ -290,18 +292,19 @@ remain archived reference material only.
 The highest-value remaining blockers are now:
 
 1. quality inside the new ambient live traffic:
-   the full replay corpus now shows `15,328` seen formulas out of `50,661`,
-   but `1,102` of those seen routes still fall back
+   the full replay corpus now shows `15,402` seen formulas out of `50,661`,
+   but `702` of those seen routes still fall back
 2. logical-fold support quality:
    promoted probe `699 authoritative / 1491 fallback`, almost all of it
    `shadow_mismatch`
 3. scalar-math comparison-feeder parity:
    promoted probe `809 authoritative / 211 fallback`, almost all of it
    `shadow_mismatch`
-4. round-family support quality:
-   promoted probe `55 authoritative / 200 fallback`
+4. round / `RATE` parity quality:
+   promoted probe `88 authoritative / 204 fallback`, with round-family
+   `unsupported_function` now at zero
 5. promoted-family residual parity and shape:
-   `shadow_mismatch=1757`, `unsupported_function=214`,
+   `shadow_mismatch=1961`, `unsupported_function=14`,
    `unsupported_formula_shape=29`
 6. first real Calc-path retirement:
    one narrow logical/text/lookup/index cluster is now hard-routed and its
@@ -311,9 +314,9 @@ The highest-value remaining blockers are now:
    the raw promoted replay probe is now confirmed to be a cached imported
    correctness surface, not a live seam-off retirement denominator
 
-The latest deliberate underlying math-feeder expansion raised the ambient
-live seen rate from `26.23%` to `30.26%` and the ambient supported rate from
-`18.68%` to `28.08%` while keeping the replay guardrail exact.
+The latest bounded `RATE` feeder expansion raised the ambient
+live seen rate from `30.26%` to `30.40%` and the ambient supported rate from
+`28.08%` to `29.02%` while keeping the replay guardrail exact.
 
 Inside the current families, that effectively exhausts the semantically
 distinct env-independent literal-array hard-route frontier. Remaining
