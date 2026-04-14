@@ -34,54 +34,54 @@ That splits into two tracks:
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=7199`
-- `interpret_tail_live_authoritative_match_total=4480`
-- `interpret_tail_live_authoritative_fallback_total=2719`
-- live authoritative-match rate over the corpus: `8.8431%`
-- live authoritative-match rate over the current promoted probe: `62.2309%`
+- `interpret_tail_live_authoritative_probe_formula_cells=7365`
+- `interpret_tail_live_authoritative_match_total=4596`
+- `interpret_tail_live_authoritative_fallback_total=2769`
+- live authoritative-match rate over the corpus: `9.0721%`
+- live authoritative-match rate over the current promoted probe: `62.4033%`
 
 Everything below is diagnostic context for improving that number.
 
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=19540`
-- `interpret_tail_live_fallback_total=534`
-- `interpret_tail_live_seen_total=20074`
-- `interpret_tail_live_unseen_formula_cells=30587`
-- `interpret_tail_live_promoted_function_supported_total=18290`
-- `interpret_tail_live_supported_rate=38.57`
-- `interpret_tail_live_seen_rate=39.62`
+- `interpret_tail_live_supported_total=19972`
+- `interpret_tail_live_fallback_total=434`
+- `interpret_tail_live_seen_total=20406`
+- `interpret_tail_live_unseen_formula_cells=30255`
+- `interpret_tail_live_promoted_function_supported_total=18722`
+- `interpret_tail_live_supported_rate=39.42`
+- `interpret_tail_live_seen_rate=40.28`
 
 Ambient live fallback reasons:
 
 - `unsupported_formula_shape=24`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=506`
+- `unsupported_function=406`
 
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=47364`
-- `interpret_tail_forced_interpret_fallback_total=267`
-- `interpret_tail_forced_interpret_seen_total=47631`
-- `interpret_tail_forced_interpret_unseen_formula_cells=3030`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=46737`
-- `interpret_tail_forced_interpret_supported_rate=93.49`
-- `interpret_tail_forced_interpret_seen_rate=94.02`
+- `interpret_tail_forced_interpret_supported_total=47580`
+- `interpret_tail_forced_interpret_fallback_total=217`
+- `interpret_tail_forced_interpret_seen_total=47797`
+- `interpret_tail_forced_interpret_unseen_formula_cells=2864`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=46953`
+- `interpret_tail_forced_interpret_supported_rate=93.92`
+- `interpret_tail_forced_interpret_seen_rate=94.35`
 
 ### Promoted-Family Probe
 
-- `interpret_tail_probe_formula_cells=7199`
-- `interpret_tail_authoritative_total=2665`
-- `interpret_tail_authoritative_fallback_total=4534`
-- promoted-family authoritative rate: `37.02%`
+- `interpret_tail_probe_formula_cells=7365`
+- `interpret_tail_authoritative_total=2715`
+- `interpret_tail_authoritative_fallback_total=4650`
+- promoted-family authoritative rate: `36.86%`
 
 ### Live-Target Filtered Promoted Probe
 
 - `interpret_tail_live_target_probe_formula_cells=0`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=7199`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=7365`
 - `interpret_tail_live_target_authoritative_total=0`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 
@@ -94,17 +94,17 @@ Promoted-family fallback reasons:
 
 ### Promoted Replay Eligibility Inventory
 
-- `interpret_tail_replay_promoted_formula_cells=7199`
-- `interpret_tail_replay_promoted_direct_seen=7199`
-- `interpret_tail_replay_promoted_direct_supported=7165`
-- `interpret_tail_replay_promoted_direct_fallback=34`
-- `interpret_tail_replay_promoted_direct_unseen=0`
-- `interpret_tail_replay_promoted_shared_formula_cells=3343`
-- `interpret_tail_replay_promoted_non_shared_formula_cells=3856`
-- `interpret_tail_replay_promoted_unseen_shared_member=0`
-- `interpret_tail_replay_promoted_unseen_non_shared=0`
+- `interpret_tail_replay_promoted_formula_cells=7365`
+- `interpret_tail_replay_promoted_direct_seen=7354`
+- `interpret_tail_replay_promoted_direct_supported=7352`
+- `interpret_tail_replay_promoted_direct_fallback=2`
+- `interpret_tail_replay_promoted_direct_unseen=11`
+- `interpret_tail_replay_promoted_shared_formula_cells=3350`
+- `interpret_tail_replay_promoted_non_shared_formula_cells=4015`
+- `interpret_tail_replay_promoted_unseen_shared_member=2`
+- `interpret_tail_replay_promoted_unseen_non_shared=8`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=7063`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=7365`
 - `interpret_tail_replay_promoted_dirty_after_interpret=0`
 
 ### Current Hard-Routed Family Count
@@ -248,16 +248,17 @@ Still not true:
   retirement has not started
 - multiple interpreter hard-route milestones have landed, but full legacy
   opcode retirement has not
-- the dominant retained live blocker is now quality inside that newly admitted
-  traffic, especially logical-fold shadow mismatches and math-scalar shadow
-  mismatches, not simple lack of ambient reach
+- the dominant retained live blocker is now the broader ambient
+  `unsupported_function=406` wall rather than residual quality inside the
+  already-admitted families
 - the live authoritative-match north-star has now moved to
-  `4389 / 50,661` (`8.6635%`) on the replay corpus
+  `4596 / 50,661` (`9.0721%`) on the replay corpus
 - that gain now includes imported direct information-predicate host-truth
   parity on unsupported expression roots, plus the follow-on imported
-  direct logical-fold and nested-`XMATCH` `INDEX` host-truth cleanup
+  direct logical-fold and nested-`XMATCH` `INDEX` host-truth cleanup, and the
+  new bounded ranked-statistical cluster
 - the raw promoted replay probe is now unambiguously a diagnostic surface, not
-  the retirement denominator: it intentionally sits at `2628 / 4435`
+  the retirement denominator: it intentionally sits at `2715 / 4650`
   because live-host parity now takes precedence over cached-workbook parity on
   those imported rows
 - a focused live-host check now shows the replay-imported whole-row
@@ -298,10 +299,10 @@ Still not true:
   Calc `FormulaError::VariableExpected` row, not a real runtime parity blocker
 - the promoted replay probe is now explicitly split into raw cached-workbook
   parity and live-target filtered parity, and the filtered surface is empty:
-  all `7063` promoted replay probe rows are imported host-truth artifacts under
+  all `7365` promoted replay probe rows are imported host-truth artifacts under
   seam-off direct legacy interpretation
-- the dominant retained live buckets are now the still-large ambient
-  `unsupported_function=586`; the raw promoted buckets remain diagnostic debt,
+- the dominant retained live bucket is now the still-large ambient
+  `unsupported_function=406`; the raw promoted buckets remain diagnostic debt,
   not the deletion-gating story
 - the next runtime milestone therefore should not be defined by the imported
   replay probe anymore; it should move to quality inside the new ambient live
@@ -340,6 +341,12 @@ The live delegated evaluator family currently includes:
 - `HLOOKUP`
 - `XLOOKUP`
 - `INDEX`
+- bounded numeric aggregates:
+  `SUM`, `PRODUCT`, `SUMSQ`, `AVERAGE`, `DEVSQ`, `MULTINOMIAL`,
+  `SUMX2MY2`, `SUMX2PY2`, `SUMXMY2`
+- bounded ranked statistical helpers:
+  `QUARTILE`, `QUARTILE.INC`, `QUARTILE.EXC`,
+  `PERCENTRANK`, `PERCENTRANK.INC`, `PERCENTRANK.EXC`
 - bounded scalar-math helpers under comparison ranges:
   `ABS`, `PI`, trig / inverse-trig / hyperbolic variants, scalar rounding
   variants, bitwise helpers, `POWER`, `LOG`, `EXP`, `MOD`, `TRUNC`,
@@ -370,13 +377,14 @@ The next pass is now constrained by the scope gate:
 3. treat the raw promoted replay probe as a cached imported correctness
    surface, not as the live retirement denominator
 4. keep targeting slices that increase live authoritative-match directly,
-   starting with the remaining imported live-host-truth buckets that still
-   sit inside `information_predicate`, residual `logical_constant`, and
-   smaller lookup / structural residue
-5. use the logical-constant and date/time wrapper deletion milestones as the
-   template for the next narrow retirement only after `math_scalar` /
-   `logical_fold` mismatch reduction pays down more live fallback
-6. only return to imported replay parity if we intentionally decide to
+   starting with the remaining ambient `unsupported_function` wall rather
+   than reopening replay-probe cleanup
+5. take the bounded business-day cluster next:
+   `NETWORKDAYS`, `WORKDAY`, `NETWORKDAYS.INTL`, and `WORKDAY.INTL`
+6. use the logical-constant and date/time wrapper deletion milestones as the
+   template for the next narrow retirement only after that ambient wall pays
+   down further
+7. only return to imported replay parity if we intentionally decide to
    rehabilitate legacy seam-off imported-formula execution
 
 ## References
