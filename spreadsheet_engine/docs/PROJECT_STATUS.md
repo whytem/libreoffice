@@ -29,6 +29,19 @@ That splits into two tracks:
 - `0` cached-fallback cells
 - `0` cached-fallback rate
 
+### North-Star Live Authoritative Match
+
+This is the deletion-gating number for the standing replay corpus:
+
+- `interpret_tail_live_authoritative_corpus_formula_cells=50661`
+- `interpret_tail_live_authoritative_probe_formula_cells=7063`
+- `interpret_tail_live_authoritative_match_total=2`
+- `interpret_tail_live_authoritative_fallback_total=7061`
+- live authoritative-match rate over the corpus: `0.0039%`
+- live authoritative-match rate over the current promoted probe: `0.0283%`
+
+Everything below is diagnostic context for improving that number.
+
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
@@ -221,9 +234,9 @@ Today:
   extended-match slice raised the env-independent hard-route cluster from
   `50` to `85` without opening a new delegated family
 - within the current families, the semantically distinct env-independent
-  literal-array hard-route surface is now effectively exhausted; further
-  widening would mainly mean alias recounts or pattern/collation-sensitive
-  modes
+  literal-array hard-route surface is now effectively exhausted
+- new hard-route widening is now frozen unless it removes a live fallback
+  reason or a live mismatch bucket
 
 Still not true:
 
@@ -231,20 +244,13 @@ Still not true:
 - no `ScInterpreter` subroutine has been deleted yet
 - multiple interpreter hard-route milestones have landed, but full legacy
   opcode retirement has not
-- the latest bounded `RATE` feeder expansion moved ambient live
-  traffic from `15,328 / 50,661` seen formulas (`30.26%`) to
-  `15,402 / 50,661` (`30.40%`) and ambient supported traffic from
-  `14,226 / 50,661` (`28.08%`) to `14,700 / 50,661` (`29.02%`)
 - the dominant retained live blocker is now quality inside that newly admitted
   traffic, especially logical-fold shadow mismatches and math-scalar shadow
   mismatches, not simple lack of ambient reach
-- the replay-promoted reach blocker is cleared, and the promoted replay
-  denominator is now much broader because `ROUND`, information predicates,
-  logical folds, `NOT`, and the new bounded scalar-math feeder family are
-  part of the delegated family
-- the dominant retained promoted-family blockers are now
-  `shadow_mismatch=1961`, `unsupported_formula_shape=29`, and
-  `unsupported_function=14`
+- the live authoritative-match north-star is still effectively zero on the
+  replay corpus at `2 / 50,661` (`0.0039%`)
+- the raw promoted replay probe is now a diagnostic surface, not the
+  retirement denominator, even though it improved to `6742 / 321`
 - a focused live-host check now shows the replay-imported whole-row
   `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to
   `FormulaError::VariableExpected`
@@ -348,14 +354,21 @@ historical reference material, not active roadmap.
 
 ## Recommended Next Pass
 
-The next pass should now move off imported replay parity cleanup:
+The next pass is now constrained by the scope gate:
 
-1. treat the raw promoted replay probe as a cached imported correctness surface,
-   not as the live retirement denominator
-2. reduce residual fallback inside the new ambient live traffic, led by
+1. do not add new hard-route slices unless they remove a live fallback reason
+   or a live mismatch bucket
+2. treat live authoritative-match as the single north-star metric for
+   retirement progress
+3. treat the raw promoted replay probe as a cached imported correctness
+   surface, not as the live retirement denominator
+4. reduce residual fallback inside the new ambient live traffic, led by
    logical-fold `shadow_mismatch`, math-scalar `shadow_mismatch`, and the
    remaining round / `RATE` parity mismatches
-3. only return to imported replay parity if we intentionally decide to
+5. add a family-local default-on path for `TRUE()` / `FALSE()` and use it to
+   delete `ScInterpreter::ScTrue()` / `ScFalse()` as the first real legacy
+   retirement milestone
+6. only return to imported replay parity if we intentionally decide to
    rehabilitate legacy seam-off imported-formula execution
 
 ## References

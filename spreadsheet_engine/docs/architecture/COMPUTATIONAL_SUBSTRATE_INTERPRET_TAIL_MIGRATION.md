@@ -134,10 +134,23 @@ The admitted live input surface includes:
 
 Two different denominators matter, and both are now reported.
 
+### North-Star Live Authoritative Match
+
+This is the deletion-gating number for the standing replay corpus:
+
+- `interpret_tail_live_authoritative_corpus_formula_cells=50661`
+- `interpret_tail_live_authoritative_probe_formula_cells=7063`
+- `interpret_tail_live_authoritative_match_total=2`
+- `interpret_tail_live_authoritative_fallback_total=7061`
+- live authoritative-match rate over the corpus: `0.0039%`
+- live authoritative-match rate over the current promoted probe: `0.0283%`
+
+Everything below is diagnostic context for improving that number.
+
 ### Full Replay Corpus: Ambient Live Observe
 
 This is the honest all-formula live-routing surface from the standing replay
-corpus after the deliberate bounded scalar-math feeder family expansion:
+corpus:
 
 - `interpret_tail_live_formula_cells=50661`
 - `interpret_tail_live_supported_total=14700`
@@ -159,13 +172,14 @@ Interpretation:
 
 - the seam now measures the full replay corpus
 - the ambient live-routing denominator is real, not curated
-- the new bounded `RATE` feeder slice raised the seen rate from `30.26%` to
-  `30.40%` and the supported rate from `28.08%` to `29.02%`
 - the ambient replay surface now includes large real traffic from
-  information predicates, logical folds, round-family formulas, and
-  bounded scalar-math feeder formulas, now including `RATE`
-- the main remaining ambient work is now quality inside those newly admitted
-  families, not simple denominator reach
+  information predicates, logical folds, round-family formulas, scalar-math
+  helpers, and bounded financial feeders
+- the main remaining ambient work is now parity quality inside those newly
+  admitted families, not simple denominator reach
+- the live authoritative-match north-star is still effectively zero, so these
+  ambient reach numbers are supporting diagnostics rather than the retirement
+  claim
 
 ### Full Replay Corpus: Forced Interpret Observe
 
@@ -221,8 +235,8 @@ Interpretation:
 - the promoted-family denominator is now much broader because scalar roots,
   round-family formulas, information predicates, logical folds, `NOT`, and
   bounded scalar-math feeder formulas are part of the delegated family
-- the latest replay-cached scalar parity slice left ambient live reach flat
-  but cut raw promoted fallback from `483` to `321`
+- the raw promoted replay probe is now diagnostic, not the deletion
+  denominator
 - the dominant remaining raw mismatch buckets are now `math_scalar=172`,
   `logical_fold=53`, `information_predicate=37`, and `lookup=0`, with
   round-family fallback still at `0`
@@ -444,18 +458,20 @@ historical reference material, not active roadmap work.
 
 The latest replay closeout is now folded into this migration ledger.
 
-The next high-value pass should now move off imported replay parity cleanup:
+The next high-value pass is now constrained by the scope gate:
 
-1. treat the raw promoted replay probe as a cached imported correctness
+1. treat live authoritative-match as the single north-star metric for
+   deletion progress
+2. treat the raw promoted replay probe as a cached imported correctness
    surface, not as the live retirement denominator
-2. treat the current family-local env-independent hard-route surface as
-   effectively exhausted except for alias recounts or pattern/collation-
-   sensitive variants
-3. reduce fallback inside the new ambient live traffic, led by logical-fold
-   shape support, round-family function support, and residual parity cleanup
-4. pursue another legacy-path retirement slice once that broader ambient
-   traffic is less fallback-heavy
-5. only return to imported replay parity if we intentionally decide to
+3. do not add new hard-route slices unless they remove a live fallback reason
+   or live mismatch bucket
+4. reduce fallback inside the admitted ambient live traffic, led by
+   `math_scalar` and `logical_fold` shadow mismatch
+5. add a family-local default-on path for `TRUE()` / `FALSE()` and use it to
+   delete `ScInterpreter::ScTrue()` / `ScFalse()` as the first real legacy
+   retirement milestone
+6. only return to imported replay parity if we intentionally decide to
    rehabilitate legacy seam-off imported-formula execution
 
 ## Historical Archive

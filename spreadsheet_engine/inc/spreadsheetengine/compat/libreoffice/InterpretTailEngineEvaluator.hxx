@@ -3355,6 +3355,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 [[nodiscard]] inline bool isHardRoutedNode(
     const core::formula::Node& rNode)
 {
+    // Keep this frontier intentionally frozen unless a new slice burns down a
+    // live fallback reason or live mismatch class. Enumeration-only widening
+    // is now out of scope.
     if (rNode.meKind != core::formula::NodeKind::FunctionCall)
         return false;
 

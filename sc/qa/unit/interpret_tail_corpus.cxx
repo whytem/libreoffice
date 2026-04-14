@@ -120,9 +120,11 @@ struct ProbeValue
 struct SupportedProbeRun
 {
     std::size_t mnRawFormulaCount = 0;
+    std::size_t mnLiveAuthoritativeFormulaCount = 0;
     std::size_t mnLiveTargetFormulaCount = 0;
     std::size_t mnHostTruthArtifactFormulaCount = 0;
     StatsSnapshot maRawStats;
+    StatsSnapshot maLiveAuthoritativeStats;
     StatsSnapshot maLiveTargetStats;
     std::array<std::size_t, static_cast<std::size_t>(FunctionKind::Count)>
         maHostTruthArtifactFunctionCount {};
@@ -684,6 +686,7 @@ SupportedProbeRun runSupportedInterpretTailProbe(
                 continue;
 
             ++aRun.mnRawFormulaCount;
+            ++aRun.mnLiveAuthoritativeFormulaCount;
 
             const auto aAttempt
                 = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
@@ -714,6 +717,11 @@ SupportedProbeRun runSupportedInterpretTailProbe(
                         aAttempt.meFunction != FunctionKind::Unknown ? aAttempt.meFunction : eProbeFunction);
                 }
 
+                recordProbeAuthoritativeFallback(
+                    aRun.maLiveAuthoritativeStats, aAttempt.meFallbackReason,
+                    aAttempt.meFunction != FunctionKind::Unknown ? aAttempt.meFunction
+                                                                 : eProbeFunction);
+
                 maybeAddProbeDiagnosticSample(
                     rWorkbookLabel, rDoc, aPos, aFormulaSource,
                     aAttempt.meFunction != FunctionKind::Unknown ? aAttempt.meFunction : eProbeFunction,
@@ -731,6 +739,7 @@ SupportedProbeRun runSupportedInterpretTailProbe(
             const ProbeValue aLiveHostValue = probeValueFromLiveHostCell(rDoc, aPos);
 
             const bool bMatchesWorkbook = probeValuesMatch(aEngineValue, aWorkbookValue);
+            const bool bMatchesLiveHost = probeValuesMatch(aEngineValue, aLiveHostValue);
             const bool bHostTruthArtifact = !probeValuesMatch(aWorkbookValue, aLiveHostValue);
 
             if (bHostTruthArtifact)
@@ -747,6 +756,13 @@ SupportedProbeRun runSupportedInterpretTailProbe(
                     recordProbeAuthoritativeFallback(
                         aRun.maLiveTargetStats, FallbackReason::ShadowMismatch, aAttempt.meFunction);
             }
+
+            if (bMatchesLiveHost)
+                recordProbeAuthoritativeRoute(aRun.maLiveAuthoritativeStats, aAttempt.meFunction);
+            else
+                recordProbeAuthoritativeFallback(
+                    aRun.maLiveAuthoritativeStats, FallbackReason::ShadowMismatch,
+                    aAttempt.meFunction);
 
             if (bMatchesWorkbook)
             {
@@ -1442,6 +1458,40 @@ void printLiveTargetProbeSummary(const SupportedProbeRun& rRun)
         std::cout << "interpret_tail_probe_host_truth_artifact_function_" << pName << "="
                   << rRun.maHostTruthArtifactFunctionCount[nIndex] << '\n';
     }
+}
+
+void printLiveAuthoritativeSummary(
+    std::size_t nCorpusFormulaCount, const SupportedProbeRun& rRun)
+{
+    const sal_uInt64 nAuthoritative = rRun.maLiveAuthoritativeStats.mnAuthoritativeCount;
+    const sal_uInt64 nFallback = rRun.maLiveAuthoritativeStats.mnAuthoritativeFallbackCount;
+    const double fCorpusMatchRate = nCorpusFormulaCount
+                                        ? (static_cast<double>(nAuthoritative) * 100.0
+                                           / static_cast<double>(nCorpusFormulaCount))
+                                        : 0.0;
+    const double fProbeMatchRate = rRun.mnLiveAuthoritativeFormulaCount
+                                       ? (static_cast<double>(nAuthoritative) * 100.0
+                                          / static_cast<double>(rRun.mnLiveAuthoritativeFormulaCount))
+                                       : 0.0;
+
+    std::cout << "interpret_tail_live_authoritative_corpus_formula_cells="
+              << nCorpusFormulaCount << '\n';
+    std::cout << "interpret_tail_live_authoritative_probe_formula_cells="
+              << rRun.mnLiveAuthoritativeFormulaCount << '\n';
+    std::cout << "interpret_tail_live_authoritative_match_total="
+              << nAuthoritative << '\n';
+    std::cout << "interpret_tail_live_authoritative_fallback_total="
+              << nFallback << '\n';
+
+    const auto aOldFlags = std::cout.flags();
+    const auto nOldPrecision = std::cout.precision();
+    std::cout << std::fixed << std::setprecision(4);
+    std::cout << "interpret_tail_live_authoritative_match_rate="
+              << fCorpusMatchRate << '\n';
+    std::cout << "interpret_tail_live_authoritative_probe_match_rate="
+              << fProbeMatchRate << '\n';
+    std::cout.flags(aOldFlags);
+    std::cout.precision(nOldPrecision);
 }
 
 void appendDiagnosticSamples(
@@ -2571,6 +2621,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     StatsSnapshot aLiveStats;
     StatsSnapshot aForcedInterpretStats;
     StatsSnapshot aProbeStats;
+    StatsSnapshot aLiveAuthoritativeProbeStats;
     StatsSnapshot aLiveTargetProbeStats;
     ReplayEligibilityInventory aReplayEligibilityInventory;
     std::vector<DiagnosticSample> aLiveDiagnosticSamples;
@@ -2581,6 +2632,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     std::size_t nFormulaCellCount = 0;
     std::size_t nForcedInterpretFormulaCount = 0;
     std::size_t nProbeFormulaCount = 0;
+    std::size_t nLiveAuthoritativeProbeFormulaCount = 0;
     std::size_t nLiveTargetProbeFormulaCount = 0;
     std::size_t nProbeHostTruthArtifactFormulaCount = 0;
     std::array<std::size_t, static_cast<std::size_t>(FunctionKind::Count)>
@@ -2646,9 +2698,11 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                 const auto aProbeRun = runSupportedInterpretTailProbe(
                     aWorkbook, rDoc, OUString::fromUtf8(rWorkbookPath.string()));
                 nProbeFormulaCount += aProbeRun.mnRawFormulaCount;
+                nLiveAuthoritativeProbeFormulaCount += aProbeRun.mnLiveAuthoritativeFormulaCount;
                 nLiveTargetProbeFormulaCount += aProbeRun.mnLiveTargetFormulaCount;
                 nProbeHostTruthArtifactFormulaCount += aProbeRun.mnHostTruthArtifactFormulaCount;
                 accumulateStats(aProbeStats, aProbeRun.maRawStats);
+                accumulateStats(aLiveAuthoritativeProbeStats, aProbeRun.maLiveAuthoritativeStats);
                 accumulateStats(aLiveTargetProbeStats, aProbeRun.maLiveTargetStats);
                 for (std::size_t nIndex = 0;
                      nIndex < static_cast<std::size_t>(FunctionKind::Count); ++nIndex)
@@ -2736,10 +2790,13 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     std::cout << "interpret_tail_probe_formula_cells=" << nProbeFormulaCount << '\n';
     {
         SupportedProbeRun aPrintedProbeRun;
+        aPrintedProbeRun.mnLiveAuthoritativeFormulaCount = nLiveAuthoritativeProbeFormulaCount;
+        aPrintedProbeRun.maLiveAuthoritativeStats = aLiveAuthoritativeProbeStats;
         aPrintedProbeRun.mnLiveTargetFormulaCount = nLiveTargetProbeFormulaCount;
         aPrintedProbeRun.mnHostTruthArtifactFormulaCount = nProbeHostTruthArtifactFormulaCount;
         aPrintedProbeRun.maLiveTargetStats = aLiveTargetProbeStats;
         aPrintedProbeRun.maHostTruthArtifactFunctionCount = aProbeHostTruthArtifactFunctionCount;
+        printLiveAuthoritativeSummary(nFormulaCellCount, aPrintedProbeRun);
         printLiveTargetProbeSummary(aPrintedProbeRun);
     }
     printReplayEligibilityInventory(aReplayEligibilityInventory);
@@ -2761,8 +2818,12 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         promotedFunctionSupportedCount(aForcedInterpretStats) > 0);
     CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should visit at least one cell",
         nProbeFormulaCount > 0);
+    CPPUNIT_ASSERT_EQUAL(nProbeFormulaCount, nLiveAuthoritativeProbeFormulaCount);
     CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should record authoritative usage",
         aProbeStats.mnAuthoritativeCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "live authoritative-match probe should record at least one authoritative match",
+        aLiveAuthoritativeProbeStats.mnAuthoritativeCount > 0);
     CPPUNIT_ASSERT_MESSAGE(
         "live-target filtered probe plus imported host-truth artifact count should partition the probe surface",
         nLiveTargetProbeFormulaCount + nProbeHostTruthArtifactFormulaCount == nProbeFormulaCount);

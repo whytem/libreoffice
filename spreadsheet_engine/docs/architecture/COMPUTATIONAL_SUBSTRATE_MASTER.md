@@ -19,8 +19,10 @@ Today:
 - debug and CI-style builds default that seam to `observe`
 - an eighty-five-slice env-independent logical/text/match/xmatch/lookup/index
   cluster is now engine-first even with rollout explicitly `off`
-- the latest replay-cached scalar parity slice left ambient live
-  reach flat while cutting raw promoted fallback from `483` to `321`
+- hard-route widening is now frozen unless it removes a live fallback reason
+  or live mismatch bucket
+- the deletion-gating live authoritative-match north-star is currently only
+  `2 / 50,661` (`0.0039%`) on the standing replay corpus
 
 The active program is no longer “prove more substrate slices.”
 The active program is “use the substrate to underwrite live evaluator
@@ -35,6 +37,19 @@ delegation.”
 - `50,652` parsed formulas
 - `0` cached-fallback cells
 - `0` cached-fallback rate
+
+### North-Star Live Authoritative Match
+
+This is the deletion-gating number for the standing replay corpus:
+
+- `interpret_tail_live_authoritative_corpus_formula_cells=50661`
+- `interpret_tail_live_authoritative_probe_formula_cells=7063`
+- `interpret_tail_live_authoritative_match_total=2`
+- `interpret_tail_live_authoritative_fallback_total=7061`
+- live authoritative-match rate over the corpus: `0.0039%`
+- live authoritative-match rate over the current promoted probe: `0.0283%`
+
+Everything below is diagnostic context for improving that number.
 
 ### Full Replay Corpus: Ambient Live Observe
 
@@ -312,15 +327,15 @@ The highest-value remaining blockers are now:
    the raw promoted replay probe is now confirmed to be a cached imported
    correctness surface, not a live seam-off retirement denominator
 
-The latest replay-cached scalar parity slice left ambient live reach flat at
-`15,402 / 50,661` seen formulas (`30.40%`) and `14,700 / 50,661` supported
-(`29.02%`), while cutting raw promoted fallback from `483` to `321` and
-keeping the replay guardrail exact.
+The live authoritative-match north-star on the standing replay corpus is now
+explicitly measured at only `2 / 50,661` (`0.0039%`), even though ambient
+live reach is `15,402 / 50,661` seen formulas (`30.40%`) and
+`14,700 / 50,661` supported (`29.02%`). That is now the only number that
+should gate deletion claims.
 
-Inside the current families, that effectively exhausts the semantically
-distinct env-independent literal-array hard-route frontier. Remaining
-additions would mainly be alias recounts or moves into pattern/collation-
-sensitive behavior.
+Inside the current families, the semantically distinct env-independent
+literal-array hard-route frontier is now frozen. New widening is out of scope
+unless it removes a live fallback reason or live mismatch bucket.
 
 A focused live-host check now shows the replay-imported whole-row
 `MATCH([.$B$150]; [.$150:.$150]; -1)` row evaluates to
@@ -382,16 +397,18 @@ correctness surface, but not as the live retirement denominator.
 
 The next pass should:
 
-1. treat the raw promoted replay probe as a cached imported correctness
+1. do not add new hard-route slices unless they remove a live fallback reason
+   or live mismatch bucket
+2. treat live authoritative-match as the single north-star metric for
+   retirement progress
+3. treat the raw promoted replay probe as a cached imported correctness
    surface, not as the live retirement denominator
-2. treat the current family-local env-independent hard-route surface as
-   effectively exhausted except for alias recounts or pattern/collation-
-   sensitive variants
-3. reduce fallback inside the new ambient live traffic, led by logical-fold
-   shape support, round-family function support, and residual parity cleanup
-4. pursue another legacy-path retirement slice once the new ambient traffic
-   is less fallback-heavy
-5. only return to imported replay parity if we intentionally decide to
+4. reduce residual fallback inside the admitted ambient traffic, led by
+   `math_scalar` and `logical_fold` shadow mismatch
+5. land a family-local default-on path for `TRUE()` / `FALSE()` and use it to
+   delete `ScInterpreter::ScTrue()` / `ScFalse()` as the first real legacy
+   retirement milestone
+6. only return to imported replay parity if we intentionally decide to
    rehabilitate legacy seam-off imported-formula execution
 
 ## Navigation
