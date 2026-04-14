@@ -35,27 +35,27 @@ This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=7063`
-- `interpret_tail_live_authoritative_match_total=47`
-- `interpret_tail_live_authoritative_fallback_total=7016`
-- live authoritative-match rate over the corpus: `0.0928%`
-- live authoritative-match rate over the current promoted probe: `0.6654%`
+- `interpret_tail_live_authoritative_match_total=2769`
+- `interpret_tail_live_authoritative_fallback_total=4294`
+- live authoritative-match rate over the corpus: `5.4657%`
+- live authoritative-match rate over the current promoted probe: `39.2043%`
 
 Everything below is diagnostic context for improving that number.
 
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=14700`
-- `interpret_tail_live_fallback_total=702`
+- `interpret_tail_live_supported_total=14738`
+- `interpret_tail_live_fallback_total=664`
 - `interpret_tail_live_seen_total=15402`
 - `interpret_tail_live_unseen_formula_cells=35259`
-- `interpret_tail_live_promoted_function_supported_total=13450`
-- `interpret_tail_live_supported_rate=29.02`
+- `interpret_tail_live_promoted_function_supported_total=13488`
+- `interpret_tail_live_supported_rate=29.09`
 - `interpret_tail_live_seen_rate=30.40`
 
 Ambient live fallback reasons:
 
-- `unsupported_formula_shape=78`
+- `unsupported_formula_shape=40`
 - `unsupported_host_surface=12`
 - `parse_failure=4`
 - `unsupported_function=608`
@@ -63,20 +63,20 @@ Ambient live fallback reasons:
 ### Full Replay Corpus: Forced Interpret Observe
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=47150`
-- `interpret_tail_forced_interpret_fallback_total=351`
+- `interpret_tail_forced_interpret_supported_total=47169`
+- `interpret_tail_forced_interpret_fallback_total=332`
 - `interpret_tail_forced_interpret_seen_total=47501`
 - `interpret_tail_forced_interpret_unseen_formula_cells=3160`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=46525`
-- `interpret_tail_forced_interpret_supported_rate=93.07`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=46544`
+- `interpret_tail_forced_interpret_supported_rate=93.11`
 - `interpret_tail_forced_interpret_seen_rate=93.76`
 
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=7063`
-- `interpret_tail_authoritative_total=6742`
-- `interpret_tail_authoritative_fallback_total=321`
-- promoted-family authoritative rate: `95.45%`
+- `interpret_tail_authoritative_total=4218`
+- `interpret_tail_authoritative_fallback_total=2845`
+- promoted-family authoritative rate: `59.72%`
 
 ### Live-Target Filtered Promoted Probe
 
@@ -87,9 +87,9 @@ Ambient live fallback reasons:
 
 Promoted-family fallback reasons:
 
-- `shadow_mismatch=272`
+- `shadow_mismatch=2815`
 - `unsupported_function=14`
-- `unsupported_formula_shape=29`
+- `unsupported_formula_shape=10`
 - `unsupported_host_surface=6`
 
 ### Promoted Replay Eligibility Inventory
@@ -251,11 +251,14 @@ Still not true:
 - the dominant retained live blocker is now quality inside that newly admitted
   traffic, especially logical-fold shadow mismatches and math-scalar shadow
   mismatches, not simple lack of ambient reach
-- the live authoritative-match north-star has now moved off the floor on the
-  replay corpus to `47 / 50,661` (`0.0928%`), but it is still far below a
-  deletion-comfortable level
-- the raw promoted replay probe is now a diagnostic surface, not the
-  retirement denominator, even though it improved to `6742 / 321`
+- the live authoritative-match north-star has now moved decisively past the
+  first real milestone on the replay corpus to `2769 / 50,661` (`5.4657%`)
+- that gain came from imported live-host-truth parity on reference-driven
+  logical-fold and scalar-math roots, not from broader surface expansion
+- the raw promoted replay probe is now unambiguously a diagnostic surface, not
+  the retirement denominator: it intentionally regressed to `4218 / 2845`
+  because live-host parity now takes precedence over cached-workbook parity on
+  those imported rows
 - a focused live-host check now shows the replay-imported whole-row
   `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to
   `FormulaError::VariableExpected`
@@ -296,11 +299,10 @@ Still not true:
   parity and live-target filtered parity, and the filtered surface is empty:
   all `7063` promoted replay probe rows are imported host-truth artifacts under
   seam-off direct legacy interpretation
-- the latest replay-cached scalar parity slice left the ambient live totals
-  flat but cut raw promoted fallback from `483` to `321`; the dominant raw
-  retained buckets are now `math_scalar=172`, `logical_fold=53`,
-  `information_predicate=37`, and `lookup=0`, with round-family fallback still
-  at `0`
+- the dominant retained raw promoted buckets are now
+  `logical_fold=2157`, `math_scalar=626`, `information_predicate=30`,
+  `logical_constant=5`, and small structural residue; those counts are now
+  diagnostic debt, not the deletion-gating story
 - the next runtime milestone therefore should not be defined by the imported
   replay probe anymore; it should move to quality inside the new ambient live
   traffic and the remaining raw shadow-mismatch buckets, or to additional
@@ -367,9 +369,10 @@ The next pass is now constrained by the scope gate:
    retirement progress
 3. treat the raw promoted replay probe as a cached imported correctness
    surface, not as the live retirement denominator
-4. reduce residual fallback inside the new ambient live traffic, led by
-   logical-fold `shadow_mismatch`, math-scalar `shadow_mismatch`, and the
-   remaining round / `RATE` parity mismatches
+4. keep targeting slices that increase live authoritative-match directly,
+   starting with the remaining imported live-host-truth buckets that still
+   sit inside `information_predicate`, residual `logical_constant`, and
+   smaller lookup / structural residue
 5. use the logical-constant and date/time wrapper deletion milestones as the
    template for the next narrow retirement only after `math_scalar` /
    `logical_fold` mismatch reduction pays down more live fallback

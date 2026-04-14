@@ -143,10 +143,10 @@ This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=7063`
-- `interpret_tail_live_authoritative_match_total=47`
-- `interpret_tail_live_authoritative_fallback_total=7016`
-- live authoritative-match rate over the corpus: `0.0928%`
-- live authoritative-match rate over the current promoted probe: `0.6654%`
+- `interpret_tail_live_authoritative_match_total=2769`
+- `interpret_tail_live_authoritative_fallback_total=4294`
+- live authoritative-match rate over the corpus: `5.4657%`
+- live authoritative-match rate over the current promoted probe: `39.2043%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -156,17 +156,17 @@ This is the honest all-formula live-routing surface from the standing replay
 corpus:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=14700`
-- `interpret_tail_live_fallback_total=702`
+- `interpret_tail_live_supported_total=14738`
+- `interpret_tail_live_fallback_total=664`
 - `interpret_tail_live_seen_total=15402`
 - `interpret_tail_live_unseen_formula_cells=35259`
-- `interpret_tail_live_promoted_function_supported_total=13450`
-- `interpret_tail_live_supported_rate=29.02`
+- `interpret_tail_live_promoted_function_supported_total=13488`
+- `interpret_tail_live_supported_rate=29.09`
 - `interpret_tail_live_seen_rate=30.40`
 
 Current ambient fallback reasons:
 
-- `unsupported_formula_shape=78`
+- `unsupported_formula_shape=40`
 - `unsupported_host_surface=12`
 - `parse_failure=4`
 - `unsupported_function=608`
@@ -180,9 +180,9 @@ Interpretation:
   helpers, and bounded financial feeders
 - the main remaining ambient work is now parity quality inside those newly
   admitted families, not simple denominator reach
-- the live authoritative-match north-star has now measurably improved, but
-  these ambient reach numbers are still supporting diagnostics rather than a
-  retirement claim
+- the live authoritative-match north-star has now moved decisively above the
+  first milestone, but these ambient reach numbers are still supporting
+  diagnostics rather than a retirement claim
 
 ### Full Replay Corpus: Forced Interpret Observe
 
@@ -190,12 +190,12 @@ This is the new full-corpus measurement after explicitly dirtying and forcing
 every replay formula cell through Calc's live `Interpret()` path:
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=47150`
-- `interpret_tail_forced_interpret_fallback_total=351`
+- `interpret_tail_forced_interpret_supported_total=47169`
+- `interpret_tail_forced_interpret_fallback_total=332`
 - `interpret_tail_forced_interpret_seen_total=47501`
 - `interpret_tail_forced_interpret_unseen_formula_cells=3160`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=46525`
-- `interpret_tail_forced_interpret_supported_rate=93.07`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=46544`
+- `interpret_tail_forced_interpret_supported_rate=93.11`
 - `interpret_tail_forced_interpret_seen_rate=93.76`
 
 Interpretation:
@@ -211,15 +211,15 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=7063`
-- `interpret_tail_authoritative_total=6742`
-- `interpret_tail_authoritative_fallback_total=321`
-- promoted-family authoritative rate: `95.45%`
+- `interpret_tail_authoritative_total=4218`
+- `interpret_tail_authoritative_fallback_total=2845`
+- promoted-family authoritative rate: `59.72%`
 
 Current promoted-family fallback reasons:
 
-- `shadow_mismatch=272`
+- `shadow_mismatch=2815`
 - `unsupported_function=14`
-- `unsupported_formula_shape=29`
+- `unsupported_formula_shape=10`
 - `unsupported_host_surface=6`
 
 ### Live-Target Filtered Promoted Probe
@@ -238,6 +238,9 @@ Interpretation:
 - the promoted-family denominator is now much broader because scalar roots,
   round-family formulas, information predicates, logical folds, `NOT`, and
   bounded scalar-math feeder formulas are part of the delegated family
+- the raw promoted probe is now explicitly trading cached-workbook parity for
+  live-host parity on imported reference-driven logical/math roots, so a lower
+  raw authoritative rate is now compatible with a much stronger north-star
 - the raw promoted replay probe is now diagnostic, not the deletion
   denominator
 - the dominant remaining raw mismatch buckets are now `math_scalar=172`,
@@ -472,8 +475,10 @@ The next high-value pass is now constrained by the scope gate:
    surface, not as the live retirement denominator
 3. do not add new hard-route slices unless they remove a live fallback reason
    or live mismatch bucket
-4. reduce fallback inside the admitted ambient live traffic, led by
-   `math_scalar` and `logical_fold` shadow mismatch
+4. keep targeting slices that increase live authoritative-match directly,
+   led by the remaining imported live-host-truth buckets in
+   `information_predicate`, residual `logical_constant`, and smaller lookup /
+   structural residue
 5. use the logical-constant and date/time wrapper deletion milestones as the
    template for the next narrow retirement only after `math_scalar` /
    `logical_fold` mismatch reduction pays down more live fallback
