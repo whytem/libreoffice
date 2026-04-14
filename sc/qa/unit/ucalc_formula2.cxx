@@ -1497,6 +1497,30 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
         setaileval::resetStats();
 
+        m_pDoc->SetValue(34, 0, 0, 3.0);
+        m_pDoc->SetString(25, 20, 0, u"=RATE(AI1;-10;900)"_ustr);
+        m_pDoc->SetString(26, 20, 0, u"=ROUND(RATE(AI1;-10;900);6)"_ustr);
+        ASSERT_DOUBLES_EQUAL(-0.75626593687807, m_pDoc->GetValue(25, 20, 0));
+        ASSERT_DOUBLES_EQUAL(-0.756266, m_pDoc->GetValue(26, 20, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 2);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Rate)]
+            >= 1);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Round)]
+            >= 1);
+    }
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
         m_pDoc->SetString(3, 4, 0, u"=VLOOKUP(A5;B5:C7;2;0)"_ustr);
         m_pDoc->SetString(4, 4, 0, u"=VLOOKUP(A5;B5:C7;2;FALSE())"_ustr);
         m_pDoc->SetString(5, 4, 0,

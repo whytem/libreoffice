@@ -51,6 +51,7 @@
 #include <spreadsheetengine/detail/OdfFormulaParser.hxx>
 #include <spreadsheetengine/runtime/DateTimeParse.hxx>
 #include <spreadsheetengine/runtime/DateTimeParts.hxx>
+#include <spreadsheetengine/runtime/FinancialRuntime.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathFunctionRuntime.hxx>
 #include <spreadsheetengine/runtime/MathRounding.hxx>
@@ -98,6 +99,7 @@ enum class FunctionKind : sal_uInt8
     DateValue,
     TimeValue,
     NumberValue,
+    Rate,
     Round,
     MathScalar,
     InformationPredicate,
@@ -666,6 +668,8 @@ canonicalMathScalarFunctionName(api::StringView rFunctionName)
         return FunctionKind::TimeValue;
     if (rFunctionName == u"NUMBERVALUE")
         return FunctionKind::NumberValue;
+    if (rFunctionName == u"RATE")
+        return FunctionKind::Rate;
     if (rFunctionName == u"ROUND" || rFunctionName == u"ROUNDUP" || rFunctionName == u"ROUNDDOWN")
         return FunctionKind::Round;
     if (canonicalMathScalarFunctionName(rFunctionName))
@@ -3989,6 +3993,111 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
 }
 
+[[nodiscard]] inline EvaluationAttempt evaluateFinancialScalarFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
+{
+    auto materializeArgument = [&](const core::formula::Node& rArgument)
+        -> Materialization<api::CellValue> {
+        return materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+    };
+
+    auto materializeNumericArgument = [&](const core::formula::Node& rArgument,
+                                          std::optional<double> oEmptyDefault)
+        -> Materialization<double> {
+        const auto aArgument = materializeArgument(rArgument);
+        if (!aArgument.mbSupported)
+            return makeUnsupportedMaterialization<double>(aArgument.meFallbackReason);
+        if (!aArgument.moValue)
+            return makeMaterializedError<double>(aArgument.meError);
+        if (aArgument.moValue->isEmpty())
+        {
+            if (oEmptyDefault)
+                return makeMaterializedValue(*oEmptyDefault);
+            return makeMaterializedError<double>(api::Error::IllegalArgument);
+        }
+
+        const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aArgument.moValue);
+        if (!aNumber)
+            return makeMaterializedError<double>(aNumber.meError);
+        return makeMaterializedValue(aNumber.maValue);
+    };
+
+    if (eFunction == FunctionKind::Rate)
+    {
+        if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 6)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aPeriods = materializeNumericArgument(*rNode.maChildren[0], 0.0);
+        if (!aPeriods.mbSupported)
+            return makeUnsupported(eFunction, aPeriods.meFallbackReason);
+        if (!aPeriods.moValue)
+            return makeErrorResult(eFunction, aPeriods.meError);
+
+        const auto aPayment = materializeNumericArgument(*rNode.maChildren[1], 0.0);
+        if (!aPayment.mbSupported)
+            return makeUnsupported(eFunction, aPayment.meFallbackReason);
+        if (!aPayment.moValue)
+            return makeErrorResult(eFunction, aPayment.meError);
+
+        const auto aPresentValue = materializeNumericArgument(*rNode.maChildren[2], 0.0);
+        if (!aPresentValue.mbSupported)
+            return makeUnsupported(eFunction, aPresentValue.meFallbackReason);
+        if (!aPresentValue.moValue)
+            return makeErrorResult(eFunction, aPresentValue.meError);
+
+        double fFutureValue = 0.0;
+        if (rNode.maChildren.size() >= 4)
+        {
+            const auto aFutureValue = materializeNumericArgument(*rNode.maChildren[3], 0.0);
+            if (!aFutureValue.mbSupported)
+                return makeUnsupported(eFunction, aFutureValue.meFallbackReason);
+            if (!aFutureValue.moValue)
+                return makeErrorResult(eFunction, aFutureValue.meError);
+            fFutureValue = *aFutureValue.moValue;
+        }
+
+        bool bPayInAdvance = false;
+        if (rNode.maChildren.size() >= 5
+            && rNode.maChildren[4]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aPayType = materializeArgument(*rNode.maChildren[4]);
+            if (!aPayType.mbSupported)
+                return makeUnsupported(eFunction, aPayType.meFallbackReason);
+            if (!aPayType.moValue)
+                return makeErrorResult(eFunction, aPayType.meError);
+            if (aPayType.moValue->isEmpty())
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+            const auto aBool = coerceScalarToBool(rDoc, rContext, *aPayType.moValue);
+            if (!aBool)
+                return makeErrorResult(eFunction, aBool.meError);
+            bPayInAdvance = aBool.maValue;
+        }
+
+        double fGuess = 0.1;
+        if (rNode.maChildren.size() == 6
+            && rNode.maChildren[5]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aGuess = materializeNumericArgument(*rNode.maChildren[5], std::nullopt);
+            if (!aGuess.mbSupported)
+                return makeUnsupported(eFunction, aGuess.meFallbackReason);
+            if (!aGuess.moValue)
+                return makeErrorResult(eFunction, aGuess.meError);
+            fGuess = *aGuess.moValue;
+        }
+
+        const auto aRate = spreadsheetengine::core::finance::evaluateRate(
+            *aPeriods.moValue, *aPayment.moValue, *aPresentValue.moValue, fFutureValue,
+            bPayInAdvance, fGuess);
+        if (!aRate)
+            return makeErrorResult(eFunction, aRate.meError);
+        return makeNumericResult(eFunction, aRate.maValue, SvNumFormatType::PERCENT);
+    }
+
+    return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+}
+
 [[nodiscard]] inline EvaluationAttempt evaluateScalarUtilityFunction(
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero)
@@ -4691,6 +4800,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         case FunctionKind::NumberValue:
             return evaluateTextParsingFunction(
                 rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero);
+        case FunctionKind::Rate:
+            return evaluateFinancialScalarFunction(rRoot, eFunction, rDoc, rContext, rFormulaPos);
         case FunctionKind::Round:
         case FunctionKind::MathScalar:
             return eFunction == FunctionKind::MathScalar

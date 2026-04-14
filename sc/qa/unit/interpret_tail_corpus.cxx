@@ -951,6 +951,8 @@ const char* functionKindName(FunctionKind eFunction)
             return "timevalue";
         case FunctionKind::NumberValue:
             return "numbervalue";
+        case FunctionKind::Rate:
+            return "rate";
         case FunctionKind::Round:
             return "round";
         case FunctionKind::MathScalar:
@@ -1822,6 +1824,86 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedMatchFrequencyLiveHost
     const OUString aFormulaSource
         = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
     CPPUNIT_ASSERT_EQUAL(u"=of:=MATCH(1;FREQUENCY([.I126];[.H129:.M129]);0)"_ustr, aFormulaSource);
+
+    {
+        ScopedEnvironmentOverride aOffMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        pFormula->SetDirty();
+        pFormula->Interpret();
+    }
+
+    CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(aPos));
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalFoldLiveHostTruth)
+{
+    const OUString aWorkbookPath
+        = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/logical/fods/if.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for if.fods", static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    const ScAddress aPos(1, 2, 0); // Sheet1.B3
+    ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+    CPPUNIT_ASSERT(pFormula);
+
+    const OUString aFormulaSource
+        = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+    CPPUNIT_ASSERT_EQUAL(u"=of:=AND([.B8:.B95])"_ustr, aFormulaSource);
+
+    {
+        ScopedEnvironmentOverride aOffMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        pFormula->SetDirty();
+        pFormula->Interpret();
+    }
+
+    CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(aPos));
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedMathScalarLiveHostTruth)
+{
+    const OUString aWorkbookPath
+        = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/mathematical/fods/abs.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for abs.fods", static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    const ScAddress aPos(0, 4, 1); // Sheet2.A5
+    ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+    CPPUNIT_ASSERT(pFormula);
+
+    const OUString aFormulaSource
+        = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+    CPPUNIT_ASSERT_EQUAL(u"=of:=ABS([.J2])"_ustr, aFormulaSource);
 
     {
         ScopedEnvironmentOverride aOffMode(

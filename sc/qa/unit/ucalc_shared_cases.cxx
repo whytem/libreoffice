@@ -857,6 +857,22 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::api::formulavalue::ValueType::Value, aRound.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(12.35, aRound.maResult.mfValue, 1e-12);
 
+    m_pDoc->SetValue(34, 0, 0, 3.0);
+    const auto aRate = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=RATE(AI1;-10;900)", false);
+    CPPUNIT_ASSERT(aRate.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aRate.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-0.75626593687807, aRate.maResult.mfValue, 1e-12);
+
+    const auto aRoundedRate = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ROUND(RATE(AI1;-10;900);6)", false);
+    CPPUNIT_ASSERT(aRoundedRate.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aRoundedRate.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-0.756266, aRoundedRate.maResult.mfValue, 1e-12);
+
     const auto aAbs = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=ABS(-7.25)", false);
     CPPUNIT_ASSERT(aAbs.mbSupported);
