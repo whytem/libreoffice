@@ -1958,17 +1958,74 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRankedAggrega
         ASSERT_DOUBLES_EQUAL(9.75, m_pDoc->GetValue(1, 7, 0));
         ASSERT_DOUBLES_EQUAL(0.83, m_pDoc->GetValue(2, 7, 0));
         ASSERT_DOUBLES_EQUAL(0.7, m_pDoc->GetValue(3, 7, 0));
+        m_pDoc->SetString(4, 7, 0, u"=LARGE(A1:A4;2)"_ustr);
+        m_pDoc->SetString(5, 7, 0, u"=SMALL(B1:B4;2)"_ustr);
+        m_pDoc->SetString(6, 7, 0, u"=RANK.EQ(3;A1:A4)"_ustr);
+        m_pDoc->SetString(7, 7, 0, u"=RANK.AVG(2;{1;2;2;4})"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(4, 7, 0));
+        ASSERT_DOUBLES_EQUAL(8.0, m_pDoc->GetValue(5, 7, 0));
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(6, 7, 0));
+        ASSERT_DOUBLES_EQUAL(2.5, m_pDoc->GetValue(7, 7, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 4);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 8);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::RankedAggregate)]
-            >= 4);
+            >= 8);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::RankedAggregate)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorStatisticalAggregateAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineStatisticalAggregateAuthority"_ustr));
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"=MAX(A1:A4)"_ustr);
+        m_pDoc->SetString(1, 7, 0, u"=MINA({TRUE;2;\"x\"})"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=MEDIAN({1;9;3;5})"_ustr);
+        m_pDoc->SetString(3, 7, 0, u"=GEOMEAN({1;4;16})"_ustr);
+        m_pDoc->SetString(4, 7, 0, u"=HARMEAN({1;2;4})"_ustr);
+        m_pDoc->SetString(5, 7, 0, u"=VAR.S(A1:A4)"_ustr);
+        m_pDoc->SetString(6, 7, 0, u"=STDEV.P(A1:A4)"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(0, 7, 0));
+        ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(1, 7, 0));
+        ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(2, 7, 0));
+        ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(3, 7, 0));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(12.0 / 7.0, m_pDoc->GetValue(4, 7, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0 / 3.0, m_pDoc->GetValue(5, 7, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(std::sqrt(1.25), m_pDoc->GetValue(6, 7, 0), 1e-12);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 7);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::StatisticalAggregate)]
+            >= 7);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::StatisticalAggregate)]);
     }
 
     m_pDoc->DeleteTab(0);

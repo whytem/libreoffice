@@ -2797,6 +2797,109 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorRankedAggr
         spreadsheetengine::api::formulavalue::ValueType::Value,
         aPercentRankExc.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.7, aPercentRankExc.maResult.mfValue, 1e-12);
+
+    const auto aLarge = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=LARGE(A1:A4;2)", false);
+    CPPUNIT_ASSERT(aLarge.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::RankedAggregate, aLarge.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aLarge.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, aLarge.maResult.mfValue, 1e-12);
+
+    const auto aSmall = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=SMALL(B1:B4;2)", false);
+    CPPUNIT_ASSERT(aSmall.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::RankedAggregate, aSmall.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aSmall.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(8.0, aSmall.maResult.mfValue, 1e-12);
+
+    const auto aRankEq = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=RANK.EQ(3;A1:A4)", false);
+    CPPUNIT_ASSERT(aRankEq.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::RankedAggregate, aRankEq.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aRankEq.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aRankEq.maResult.mfValue, 1e-12);
+
+    const auto aRankAvg = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=RANK.AVG(2;{1;2;2;4})", false);
+    CPPUNIT_ASSERT(aRankAvg.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::RankedAggregate, aRankAvg.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aRankAvg.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.5, aRankAvg.maResult.mfValue, 1e-12);
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorStatisticalAggregateHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailStatisticalAggregateHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(3, 0, 0);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+
+    const auto aMax = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=MAX(A1:A4)", false);
+    CPPUNIT_ASSERT(aMax.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalAggregate, aMax.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMax.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, aMax.maResult.mfValue, 1e-12);
+
+    const auto aMinA = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=MINA({TRUE;2;\"x\"})", false);
+    CPPUNIT_ASSERT(aMinA.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalAggregate, aMinA.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMinA.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, aMinA.maResult.mfValue, 1e-12);
+
+    const auto aMedian = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=MEDIAN({1;9;3;5})", false);
+    CPPUNIT_ASSERT(aMedian.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalAggregate, aMedian.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMedian.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, aMedian.maResult.mfValue, 1e-12);
+
+    const auto aGeoMean = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=GEOMEAN({1;4;16})", false);
+    CPPUNIT_ASSERT(aGeoMean.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalAggregate, aGeoMean.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aGeoMean.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, aGeoMean.maResult.mfValue, 1e-12);
+
+    const auto aHarMean = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=HARMEAN({1;2;4})", false);
+    CPPUNIT_ASSERT(aHarMean.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalAggregate, aHarMean.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aHarMean.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(12.0 / 7.0, aHarMean.maResult.mfValue, 1e-12);
+
+    const auto aVarS = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=VAR.S(A1:A4)", false);
+    CPPUNIT_ASSERT(aVarS.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalAggregate, aVarS.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aVarS.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0 / 3.0, aVarS.maResult.mfValue, 1e-12);
+
+    const auto aStdevP = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=STDEV.P(A1:A4)", false);
+    CPPUNIT_ASSERT(aStdevP.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalAggregate, aStdevP.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aStdevP.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(std::sqrt(1.25), aStdevP.maResult.mfValue, 1e-12);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorBusinessDayHelper)
