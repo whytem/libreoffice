@@ -1145,6 +1145,8 @@ const char* functionKindName(FunctionKind eFunction)
             return "conditional";
         case FunctionKind::LogicalConstant:
             return "logical_constant";
+        case FunctionKind::TextUtility:
+            return "text_utility";
         case FunctionKind::Value:
             return "value";
         case FunctionKind::DateValue:
@@ -1557,7 +1559,7 @@ sal_uInt64 totalFallbackCount(const StatsSnapshot& rStats)
 sal_uInt64 promotedFunctionSupportedCount(const StatsSnapshot& rStats)
 {
     sal_uInt64 nPromotedFunctionSupported = 0;
-    for (std::size_t nIndex = static_cast<std::size_t>(FunctionKind::Value);
+    for (std::size_t nIndex = 1;
          nIndex < static_cast<std::size_t>(FunctionKind::Count); ++nIndex)
     {
         nPromotedFunctionSupported += rStats.maFunctionObserveCount[nIndex]

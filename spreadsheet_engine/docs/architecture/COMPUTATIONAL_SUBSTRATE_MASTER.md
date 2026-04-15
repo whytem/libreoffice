@@ -27,7 +27,7 @@ Today:
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to
-  `6490 / 50,661` (`12.8106%`) on the standing replay corpus
+  `6492 / 50,661` (`12.8146%`) on the standing replay corpus
 - the broad corpus lane now completes again with `BusinessDay` admitted on the
   default ambient surface after rejecting zero-workday `WORKDAY` weekend masks
   before they enter the shared runtime, and the next `BusinessDay` slice has
@@ -54,11 +54,11 @@ delegation.”
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=10162`
-- `interpret_tail_live_authoritative_match_total=6490`
-- `interpret_tail_live_authoritative_fallback_total=3672`
-- live authoritative-match rate over the corpus: `12.8106%`
-- live authoritative-match rate over the current promoted probe: `63.8646%`
+- `interpret_tail_live_authoritative_probe_formula_cells=11002`
+- `interpret_tail_live_authoritative_match_total=6492`
+- `interpret_tail_live_authoritative_fallback_total=4510`
+- live authoritative-match rate over the corpus: `12.8146%`
+- live authoritative-match rate over the current promoted probe: `59.0075%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -80,7 +80,7 @@ Dominant ambient fallback reasons:
 - `unsupported_formula_shape=46`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=280`
+- `unsupported_function=314`
 
 ### Full Replay Corpus: Live Unique-Cell Surface
 
@@ -89,12 +89,12 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=10565`
-- `interpret_tail_live_unique_supported_formula_cells=10400`
-- `interpret_tail_live_unique_fallback_formula_cells=165`
-- `interpret_tail_live_unique_unseen_formula_cells=40096`
-- `interpret_tail_live_unique_seen_rate=20.86`
-- `interpret_tail_live_unique_supported_rate=20.53`
+- `interpret_tail_live_unique_seen_formula_cells=11445`
+- `interpret_tail_live_unique_supported_formula_cells=11260`
+- `interpret_tail_live_unique_fallback_formula_cells=185`
+- `interpret_tail_live_unique_unseen_formula_cells=39216`
+- `interpret_tail_live_unique_seen_rate=22.59`
+- `interpret_tail_live_unique_supported_rate=22.23`
 
 ### Full Replay Corpus: Forced Interpret Observe Attempts
 
@@ -116,12 +116,12 @@ This is the direct-routing comparison surface after explicitly dirtying and
 forcing each replay formula cell once.
 
 - `interpret_tail_forced_direct_formula_cells=50661`
-- `interpret_tail_forced_direct_seen_formula_cells=10517`
-- `interpret_tail_forced_direct_supported_formula_cells=10352`
-- `interpret_tail_forced_direct_fallback_formula_cells=165`
-- `interpret_tail_forced_direct_unseen_formula_cells=40144`
-- `interpret_tail_forced_direct_seen_rate=20.76`
-- `interpret_tail_forced_direct_supported_rate=20.43`
+- `interpret_tail_forced_direct_seen_formula_cells=11397`
+- `interpret_tail_forced_direct_supported_formula_cells=11212`
+- `interpret_tail_forced_direct_fallback_formula_cells=185`
+- `interpret_tail_forced_direct_unseen_formula_cells=39264`
+- `interpret_tail_forced_direct_seen_rate=22.50`
+- `interpret_tail_forced_direct_supported_rate=22.13`
 
 ### Promoted-Family Probe
 
@@ -133,7 +133,7 @@ forcing each replay formula cell once.
 Dominant promoted-family fallback reasons:
 
 - `shadow_mismatch=5076`
-- `unsupported_function=0`
+- `unsupported_function=27`
 - `unsupported_formula_shape=7`
 - `unsupported_host_surface=0`
 
@@ -301,6 +301,23 @@ evaluation for:
 - `ISTEXT`
 - `ISNONTEXT`
 - `ISBLANK`
+- `CONCATENATE`
+- `CONCAT`
+- `CLEAN`
+- `CHAR`
+- `CODE`
+- `UNICHAR`
+- `UNICODE`
+- `UPPER`
+- `LOWER`
+- `PROPER`
+- `ASC`
+- `JIS`
+- `LEN`
+- `LEFT`
+- `RIGHT`
+- `T`
+- `EXACT`
 - `AND`
 - `OR`
 - `XOR`
@@ -357,7 +374,7 @@ The highest-value remaining blockers are now:
 
 1. quality inside the new ambient live traffic:
    the full replay corpus still has a broad live attempt wall, with
-   `unsupported_function=264`
+   `unsupported_function=314`
 2. live-authority headroom:
    the north-star is now `4935 / 50,661` (`9.7412%`), which is a real jump
    but still well short of deletion-comfortable territory
@@ -380,11 +397,11 @@ The highest-value remaining blockers are now:
    correctness surface, not a live seam-off retirement denominator
 
 The live authoritative-match north-star on the standing replay corpus has now
-improved to `6490 / 50,661` (`12.8106%`). The new honest live unique-cell
-inventory now shows `10565 / 50,661` formula cells seen (`20.86%`) and
-`10400 / 50,661` supported (`20.53%`) during the bulk live observe run, while
+improved to `6492 / 50,661` (`12.8146%`). The new honest live unique-cell
+inventory now shows `11445 / 50,661` formula cells seen (`22.59%`) and
+`11260 / 50,661` supported (`22.23%`) during the bulk live observe run, while
 the forced-direct comparison surface now sits at
-`10517 / 50,661` seen (`20.76%`) and `10352 / 50,661` supported (`20.43%`).
+`11397 / 50,661` seen (`22.50%`) and `11212 / 50,661` supported (`22.13%`).
 Those are the coverage-style numbers we should currently use alongside the
 north-star; the broader live and forced-interpret counters are still attempt
 telemetry rather than a deletion denominator.
@@ -399,12 +416,15 @@ then from fixing the zero-workday `WORKDAY` weekend-mask hang so
 `BusinessDay` can stay on the default ambient surface without blowing out the
 broad corpus lane, followed by widening that same `BusinessDay` family to
 cheap local reference, holiday-range, weekend-range, weekend-code-ref, and
-named-ref shapes, and now by admitting a bounded statistical aggregate slice
-for `MAX` / `MIN`, `MEDIAN`, `GEOMEAN` / `HARMEAN`, `VAR*` / `STDEV*`, plus
-the ranked extension for `LARGE` / `SMALL` / `RANK*`. It intentionally trades
-away a large amount of cached-workbook promoted-probe agreement, so the raw
-promoted probe must now be read strictly as diagnostics rather than as
-progress gating.
+named-ref shapes, then by admitting a bounded statistical aggregate slice for
+`MAX` / `MIN`, `MEDIAN`, `GEOMEAN` / `HARMEAN`, `VAR*` / `STDEV*`, plus the
+ranked extension for `LARGE` / `SMALL` / `RANK*`, then a bounded scalar
+`IF(...)` family, and now a bounded `text_utility` family covering
+`CONCATENATE` / `CONCAT`, `CLEAN`, `CHAR` / `CODE`, `UNICHAR` / `UNICODE`,
+case conversion, width conversion, `LEN`, `LEFT` / `RIGHT`, `T`, and `EXACT`.
+It intentionally trades away a large amount of cached-workbook promoted-probe
+agreement, so the raw promoted probe must now be read strictly as diagnostics
+rather than as progress gating.
 
 Inside the current families, the semantically distinct env-independent
 literal-array hard-route frontier is now frozen. New widening is out of scope

@@ -96,6 +96,24 @@ The currently promoted live evaluator family includes:
   - `DATEVALUE`
   - `TIMEVALUE`
   - `NUMBERVALUE`
+- text utility:
+  - `CONCATENATE`
+  - `CONCAT`
+  - `CLEAN`
+  - `CHAR`
+  - `CODE`
+  - `UNICHAR`
+  - `UNICODE`
+  - `UPPER`
+  - `LOWER`
+  - `PROPER`
+  - `ASC`
+  - `JIS`
+  - `LEN`
+  - `LEFT`
+  - `RIGHT`
+  - `T`
+  - `EXACT`
 - scalar utilities:
   - `IF`
   - `ROUND`
@@ -156,11 +174,11 @@ Two different denominators matter, and both are now reported.
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=10162`
-- `interpret_tail_live_authoritative_match_total=6490`
-- `interpret_tail_live_authoritative_fallback_total=3672`
-- live authoritative-match rate over the corpus: `12.8106%`
-- live authoritative-match rate over the current promoted probe: `63.8646%`
+- `interpret_tail_live_authoritative_probe_formula_cells=11002`
+- `interpret_tail_live_authoritative_match_total=6492`
+- `interpret_tail_live_authoritative_fallback_total=4510`
+- live authoritative-match rate over the corpus: `12.8146%`
+- live authoritative-match rate over the current promoted probe: `59.0075%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -182,7 +200,7 @@ Current ambient fallback reasons:
 - `unsupported_formula_shape=46`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=280`
+- `unsupported_function=314`
 
 ### Full Replay Corpus: Live Unique-Cell Surface
 
@@ -191,12 +209,12 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=10565`
-- `interpret_tail_live_unique_supported_formula_cells=10400`
-- `interpret_tail_live_unique_fallback_formula_cells=165`
-- `interpret_tail_live_unique_unseen_formula_cells=40096`
-- `interpret_tail_live_unique_seen_rate=20.86`
-- `interpret_tail_live_unique_supported_rate=20.53`
+- `interpret_tail_live_unique_seen_formula_cells=11445`
+- `interpret_tail_live_unique_supported_formula_cells=11260`
+- `interpret_tail_live_unique_fallback_formula_cells=185`
+- `interpret_tail_live_unique_unseen_formula_cells=39216`
+- `interpret_tail_live_unique_seen_rate=22.59`
+- `interpret_tail_live_unique_supported_rate=22.23`
 
 Interpretation:
 
@@ -226,7 +244,9 @@ Interpretation:
   contributing `203` live unique seen cells with `203` supported and `0`
   fallback after also closing the matrix-`IF(...)` criteria residue
 - a new bounded scalar `IF(...)` family now contributes `1887` live unique
-  seen cells with `1872` supported and `15` fallback
+  seen cells with `1873` supported and `14` fallback
+- a new bounded `text_utility` family now contributes `881` live unique seen
+  cells with `859` supported and `22` fallback
 - the main remaining ambient work is now the still-large
   `unsupported_function` wall, not simple denominator reach
 - the live authoritative-match north-star has now moved decisively above the
@@ -262,21 +282,21 @@ replay formula cell once, then classifying whether that formula cell was
 actually seen and supported by the seam:
 
 - `interpret_tail_forced_direct_formula_cells=50661`
-- `interpret_tail_forced_direct_seen_formula_cells=10517`
-- `interpret_tail_forced_direct_supported_formula_cells=10352`
-- `interpret_tail_forced_direct_fallback_formula_cells=165`
-- `interpret_tail_forced_direct_unseen_formula_cells=40144`
-- `interpret_tail_forced_direct_seen_rate=20.76`
-- `interpret_tail_forced_direct_supported_rate=20.43`
+- `interpret_tail_forced_direct_seen_formula_cells=11397`
+- `interpret_tail_forced_direct_supported_formula_cells=11212`
+- `interpret_tail_forced_direct_fallback_formula_cells=185`
+- `interpret_tail_forced_direct_unseen_formula_cells=39264`
+- `interpret_tail_forced_direct_seen_rate=22.50`
+- `interpret_tail_forced_direct_supported_rate=22.13`
 
 ### Promoted-Family Probe
 
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
-- `interpret_tail_probe_formula_cells=8234`
-- `interpret_tail_authoritative_total=2948`
-- `interpret_tail_authoritative_fallback_total=5083`
-- promoted-family authoritative rate: `36.71%`
+- `interpret_tail_probe_formula_cells=11002`
+- `interpret_tail_authoritative_total=4180`
+- `interpret_tail_authoritative_fallback_total=6822`
+- promoted-family authoritative rate: `38.00%`
 
 Current promoted-family fallback reasons:
 

@@ -3102,6 +3102,116 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConditiona
     CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, aReferenceBranch.maResult.mfValue, 1e-12);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorTextUtilityHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailTextUtilityHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(6, 0, 0);
+
+    m_pDoc->SetString(0, 0, 0, u"Abc"_ustr); // A1
+    m_pDoc->SetString(1, 0, 0, u"  Hello  "_ustr); // B1
+    m_pDoc->SetString(2, 0, 0, u"abc"_ustr); // C1
+
+    const auto aConcat = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=CONCATENATE(\"ab\";\"cd\")", false);
+    CPPUNIT_ASSERT(aConcat.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::TextUtility, aConcat.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aConcat.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        u"abcd"_ustr, spreadsheetengine::compat::libreoffice::toLibreOfficeString(aConcat.maResult.maString));
+
+    const auto aClean = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=CLEAN(\"A\"&CHAR(1)&\"B\")", false);
+    CPPUNIT_ASSERT(aClean.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::TextUtility, aClean.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aClean.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        u"AB"_ustr, spreadsheetengine::compat::libreoffice::toLibreOfficeString(aClean.maResult.maString));
+
+    const auto aChar = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=CHAR(65)", false);
+    CPPUNIT_ASSERT(aChar.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::TextUtility, aChar.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aChar.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        u"A"_ustr, spreadsheetengine::compat::libreoffice::toLibreOfficeString(aChar.maResult.maString));
+
+    const auto aCode = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=CODE(\"A\")", false);
+    CPPUNIT_ASSERT(aCode.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::TextUtility, aCode.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aCode.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(65.0, aCode.maResult.mfValue, 1e-12);
+
+    const auto aUnichar = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=UNICHAR(9731)", false);
+    CPPUNIT_ASSERT(aUnichar.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::TextUtility, aUnichar.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aUnichar.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"\u2603"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aUnichar.maResult.maString));
+
+    const auto aUpper = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=UPPER(A1)", false);
+    CPPUNIT_ASSERT(aUpper.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::TextUtility, aUpper.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aUpper.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        u"ABC"_ustr, spreadsheetengine::compat::libreoffice::toLibreOfficeString(aUpper.maResult.maString));
+
+    const auto aLower = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=LOWER(A1)", false);
+    CPPUNIT_ASSERT(aLower.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::TextUtility, aLower.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aLower.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        u"abc"_ustr, spreadsheetengine::compat::libreoffice::toLibreOfficeString(aLower.maResult.maString));
+
+    const auto aLen = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=LEN(B1)", false);
+    CPPUNIT_ASSERT(aLen.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::TextUtility, aLen.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aLen.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(9.0, aLen.maResult.mfValue, 1e-12);
+
+    const auto aRight = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=RIGHT(\"LibreOffice\";6)", false);
+    CPPUNIT_ASSERT(aRight.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::TextUtility, aRight.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aRight.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"Office"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aRight.maResult.maString));
+
+    const auto aT = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=T(123)", false);
+    CPPUNIT_ASSERT(aT.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::TextUtility, aT.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aT.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        u""_ustr, spreadsheetengine::compat::libreoffice::toLibreOfficeString(aT.maResult.maString));
+
+    const auto aExact = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=EXACT(A1;C1)", false);
+    CPPUNIT_ASSERT(aExact.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::TextUtility, aExact.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aExact.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, aExact.maResult.mfValue, 1e-12);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorBusinessDayHelper)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

@@ -50,6 +50,7 @@
 #include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
+#include <spreadsheetengine/compat/libreoffice/TextServices.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
 #include <spreadsheetengine/detail/OdfFormulaParser.hxx>
 #include <spreadsheetengine/runtime/DateTimeParse.hxx>
@@ -63,6 +64,7 @@
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
 #include <spreadsheetengine/runtime/QueryRuntime.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
+#include <spreadsheetengine/runtime/TextFunctionRuntime.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::interprettaileval
 {
@@ -102,6 +104,7 @@ enum class FunctionKind : sal_uInt8
     Unknown,
     Conditional,
     LogicalConstant,
+    TextUtility,
     Value,
     DateValue,
     TimeValue,
@@ -731,6 +734,18 @@ canonicalMathScalarFunctionName(api::StringView rFunctionName)
         return FunctionKind::Conditional;
     if (rFunctionName == u"TRUE" || rFunctionName == u"FALSE")
         return FunctionKind::LogicalConstant;
+    if (rFunctionName == u"CONCATENATE" || rFunctionName == u"CONCAT"
+        || rFunctionName == u"CLEAN" || rFunctionName == u"CHAR"
+        || rFunctionName == u"CODE" || rFunctionName == u"UNICHAR"
+        || rFunctionName == u"UNICODE" || rFunctionName == u"UPPER"
+        || rFunctionName == u"LOWER" || rFunctionName == u"PROPER"
+        || rFunctionName == u"ASC" || rFunctionName == u"JIS"
+        || rFunctionName == u"LEN" || rFunctionName == u"LEFT"
+        || rFunctionName == u"RIGHT" || rFunctionName == u"T"
+        || rFunctionName == u"EXACT")
+    {
+        return FunctionKind::TextUtility;
+    }
     if (rFunctionName == u"VALUE")
         return FunctionKind::Value;
     if (rFunctionName == u"DATEVALUE")
@@ -2625,6 +2640,7 @@ inline void putScalarIntoMatrix(
                 return makeMaterializedValue(api::CellValue::boolean(aFunctionName == u"TRUE"));
             }
             if (eFunction == FunctionKind::Conditional
+                || eFunction == FunctionKind::TextUtility
                 || eFunction == FunctionKind::MathScalar
                 || eFunction == FunctionKind::NumericAggregate
                 || eFunction == FunctionKind::RankedAggregate
@@ -6845,6 +6861,269 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return makeNumericAttempt(aDay.maValue, SvNumFormatType::NUMBER);
 }
 
+[[nodiscard]] inline EvaluationAttempt evaluateTextUtilityFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
+    bool bImportedCanonicalSource)
+{
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    auto materializeArgument = [&](const core::formula::Node& rArgument)
+        -> Materialization<api::CellValue> {
+        const auto aAttempt = evaluateScalarOrDelegatedNode(
+            rArgument, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 1,
+            bImportedCanonicalSource);
+        if (!aAttempt.mbSupported)
+            return makeUnsupportedMaterialization<api::CellValue>(aAttempt.meFallbackReason);
+        switch (aAttempt.maResult.meType)
+        {
+            case api::formulavalue::ValueType::Error:
+                return makeMaterializedValue(api::CellValue::error(aAttempt.maResult.meError));
+            case api::formulavalue::ValueType::String:
+                return makeMaterializedValue(api::CellValue::text(aAttempt.maResult.maString));
+            case api::formulavalue::ValueType::Value:
+                if (aAttempt.meFormatType == SvNumFormatType::LOGICAL)
+                    return makeMaterializedValue(
+                        api::CellValue::boolean(aAttempt.maResult.mfValue != 0.0));
+                return makeMaterializedValue(api::CellValue::number(aAttempt.maResult.mfValue));
+            case api::formulavalue::ValueType::Invalid:
+                return makeMaterializedValue(api::CellValue::empty());
+        }
+        return makeMaterializedValue(api::CellValue::empty());
+    };
+    auto materializeFirstValue = [&](const core::formula::Node& rArgument)
+        -> Materialization<api::CellValue> {
+        if (rArgument.meKind == core::formula::NodeKind::CellReference
+            || rArgument.meKind == core::formula::NodeKind::RangeReference
+            || rArgument.meKind == core::formula::NodeKind::NamedReference)
+        {
+            const auto aScalar
+                = materializeScalarizedReferenceValueNode(rArgument, rDoc, rContext, rFormulaPos);
+            if (!aScalar.mbSupported)
+                return makeUnsupportedMaterialization<api::CellValue>(aScalar.meFallbackReason);
+            if (!aScalar.moValue)
+                return makeMaterializedError<api::CellValue>(aScalar.meError);
+            return makeMaterializedValue(*aScalar.moValue);
+        }
+        return materializeArgument(rArgument);
+    };
+    auto materializeTextArgument = [&](const core::formula::Node& rArgument)
+        -> api::ValueResult<OUString> {
+        const auto aValue = materializeArgument(rArgument);
+        if (!aValue.mbSupported)
+            return api::ValueResult<OUString>::failure(api::Error::NoValue);
+        if (!aValue.moValue)
+            return api::ValueResult<OUString>::failure(aValue.meError);
+        const auto aText = coerceScalarToText(rDoc, rContext, *aValue.moValue);
+        if (!aText)
+            return api::ValueResult<OUString>::failure(aText.meError);
+        return api::ValueResult<OUString>::success(aText.maValue);
+    };
+
+    if (aFunctionName == u"CONCATENATE" || aFunctionName == u"CONCAT")
+    {
+        if (rNode.maChildren.empty())
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        OUString aResult;
+        for (const auto& rxChild : rNode.maChildren)
+        {
+            if (!rxChild)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            const auto aText = materializeTextArgument(*rxChild);
+            if (!aText)
+                return makeErrorResult(eFunction, aText.meError);
+            aResult += aText.maValue;
+        }
+        return makeStringResult(eFunction, aResult);
+    }
+
+    if (aFunctionName == u"CLEAN")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto aText = materializeTextArgument(*rNode.maChildren[0]);
+        if (!aText)
+            return makeErrorResult(eFunction, aText.meError);
+        return makeStringResult(eFunction, cleanPrintable(aText.maValue));
+    }
+
+    if (aFunctionName == u"CHAR")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto aValue = materializeArgument(*rNode.maChildren[0]);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorResult(eFunction, aValue.meError);
+        const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aValue.moValue);
+        if (!aNumber)
+            return makeErrorResult(eFunction, aNumber.meError);
+        const auto oWhole = coerceWholeNumber(aNumber.maValue);
+        if (!oWhole || *oWhole < 1 || *oWhole > 255)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto oChar = charFromValue(static_cast<double>(*oWhole));
+        if (!oChar)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        return makeStringResult(eFunction, *oChar);
+    }
+
+    if (aFunctionName == u"CODE")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto aText = materializeTextArgument(*rNode.maChildren[0]);
+        if (!aText)
+            return makeErrorResult(eFunction, aText.meError);
+        if (aText.maValue.isEmpty())
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        return makeNumericResult(
+            eFunction, static_cast<double>(codeFromText(aText.maValue)), SvNumFormatType::NUMBER);
+    }
+
+    if (aFunctionName == u"UNICHAR")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto aValue = materializeArgument(*rNode.maChildren[0]);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorResult(eFunction, aValue.meError);
+        const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aValue.moValue);
+        if (!aNumber)
+            return makeErrorResult(eFunction, aNumber.meError);
+        const auto oWhole = coerceWholeNumber(aNumber.maValue);
+        if (!oWhole || *oWhole < 0)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto oChar = unicharFromCodePoint(static_cast<sal_uInt32>(*oWhole));
+        if (!oChar)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        return makeStringResult(eFunction, *oChar);
+    }
+
+    if (aFunctionName == u"UNICODE")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto aText = materializeTextArgument(*rNode.maChildren[0]);
+        if (!aText)
+            return makeErrorResult(eFunction, aText.meError);
+        const auto oCode = unicodeFromText(aText.maValue);
+        if (!oCode)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        return makeNumericResult(eFunction, *oCode, SvNumFormatType::NUMBER);
+    }
+
+    if (aFunctionName == u"UPPER" || aFunctionName == u"LOWER" || aFunctionName == u"PROPER")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto aText = materializeTextArgument(*rNode.maChildren[0]);
+        if (!aText)
+            return makeErrorResult(eFunction, aText.meError);
+        if (aFunctionName == u"UPPER")
+            return makeStringResult(eFunction, uppercase(ScGlobal::getCharClass(), aText.maValue));
+        if (aFunctionName == u"LOWER")
+            return makeStringResult(eFunction, lowercase(ScGlobal::getCharClass(), aText.maValue));
+        return makeStringResult(eFunction, propercase(ScGlobal::getCharClass(), aText.maValue));
+    }
+
+    if (aFunctionName == u"ASC" || aFunctionName == u"JIS")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto aText = materializeTextArgument(*rNode.maChildren[0]);
+        if (!aText)
+            return makeErrorResult(eFunction, aText.meError);
+        return makeStringResult(
+            eFunction, aFunctionName == u"ASC" ? convertIntoHalfWidth(aText.maValue)
+                                               : convertIntoFullWidth(aText.maValue));
+    }
+
+    if (aFunctionName == u"LEN")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto aText = materializeTextArgument(*rNode.maChildren[0]);
+        if (!aText)
+            return makeErrorResult(eFunction, aText.meError);
+        return makeNumericResult(
+            eFunction, static_cast<double>(countCodePoints(aText.maValue)), SvNumFormatType::NUMBER);
+    }
+
+    if (aFunctionName == u"LEFT" || aFunctionName == u"RIGHT")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto aText = materializeTextArgument(*rNode.maChildren[0]);
+        if (!aText)
+            return makeErrorResult(eFunction, aText.meError);
+
+        sal_Int32 nLength = 1;
+        if (rNode.maChildren.size() == 2
+            && rNode.maChildren[1]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aLength = materializeArgument(*rNode.maChildren[1]);
+            if (!aLength.mbSupported)
+                return makeUnsupported(eFunction, aLength.meFallbackReason);
+            if (!aLength.moValue)
+                return makeErrorResult(eFunction, aLength.meError);
+            const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aLength.moValue);
+            if (!aNumber)
+                return makeErrorResult(eFunction, aNumber.meError);
+            const auto oWhole = coerceWholeNumber(aNumber.maValue);
+            if (!oWhole || *oWhole < 0)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            nLength = *oWhole;
+        }
+
+        return makeStringResult(eFunction,
+            toLibreOfficeString(spreadsheetengine::core::text::sliceTextLeftRight(
+                toApiString(aText.maValue), nLength, aFunctionName == u"RIGHT")));
+    }
+
+    if (aFunctionName == u"T")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto aValue = materializeFirstValue(*rNode.maChildren[0]);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorResult(eFunction, aValue.meError);
+        if (aValue.moValue->isError())
+            return makeErrorResult(eFunction, aValue.moValue->meError);
+        return makeStringResult(
+            eFunction, aValue.moValue->isText() ? toLibreOfficeString(aValue.moValue->maString) : u""_ustr);
+    }
+
+    if (aFunctionName == u"EXACT")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto aLeft = materializeFirstValue(*rNode.maChildren[0]);
+        if (!aLeft.mbSupported)
+            return makeUnsupported(eFunction, aLeft.meFallbackReason);
+        if (!aLeft.moValue)
+            return makeErrorResult(eFunction, aLeft.meError);
+        const auto aRight = materializeFirstValue(*rNode.maChildren[1]);
+        if (!aRight.mbSupported)
+            return makeUnsupported(eFunction, aRight.meFallbackReason);
+        if (!aRight.moValue)
+            return makeErrorResult(eFunction, aRight.meError);
+        const auto aLeftText = coerceScalarToText(rDoc, rContext, *aLeft.moValue);
+        if (!aLeftText)
+            return makeErrorResult(eFunction, aLeftText.meError);
+        const auto aRightText = coerceScalarToText(rDoc, rContext, *aRight.moValue);
+        if (!aRightText)
+            return makeErrorResult(eFunction, aRightText.meError);
+        return makeNumericResult(eFunction, aLeftText.maValue == aRightText.maValue ? 1.0 : 0.0,
+            SvNumFormatType::LOGICAL);
+    }
+
+    return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+}
+
 [[nodiscard]] inline EvaluationAttempt evaluateScalarUtilityFunction(
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
@@ -7698,6 +7977,10 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         case FunctionKind::TimeValue:
         case FunctionKind::NumberValue:
             return evaluateTextParsingFunction(
+                rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero,
+                bImportedCanonicalSource);
+        case FunctionKind::TextUtility:
+            return evaluateTextUtilityFunction(
                 rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero,
                 bImportedCanonicalSource);
         case FunctionKind::Rate:
