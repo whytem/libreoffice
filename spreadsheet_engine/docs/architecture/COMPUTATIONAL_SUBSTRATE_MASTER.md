@@ -27,7 +27,7 @@ Today:
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to
-  `4592 / 50,661` (`9.0642%`) on the standing replay corpus
+  `4925 / 50,661` (`9.7215%`) on the standing replay corpus
 - the broad corpus lane now completes again with `BusinessDay` admitted on the
   default ambient surface after rejecting zero-workday `WORKDAY` weekend masks
   before they enter the shared runtime, and the next `BusinessDay` slice has
@@ -53,11 +53,11 @@ delegation.”
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=7618`
-- `interpret_tail_live_authoritative_match_total=4592`
-- `interpret_tail_live_authoritative_fallback_total=3026`
-- live authoritative-match rate over the corpus: `9.0642%`
-- live authoritative-match rate over the current promoted probe: `60.2783%`
+- `interpret_tail_live_authoritative_probe_formula_cells=8031`
+- `interpret_tail_live_authoritative_match_total=4925`
+- `interpret_tail_live_authoritative_fallback_total=3106`
+- live authoritative-match rate over the corpus: `9.7215%`
+- live authoritative-match rate over the current promoted probe: `61.3249%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -66,20 +66,20 @@ Everything below is diagnostic context for improving that number.
 These are attempt totals from live observe, not unique-cell coverage.
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=50076`
-- `interpret_tail_live_fallback_total=362`
-- `interpret_tail_live_seen_total=50438`
-- `interpret_tail_live_unseen_formula_cells=223`
-- `interpret_tail_live_promoted_function_supported_total=48826`
-- `interpret_tail_live_supported_rate=98.85`
-- `interpret_tail_live_seen_rate=99.56`
+- `interpret_tail_live_supported_total=50954`
+- `interpret_tail_live_fallback_total=310`
+- `interpret_tail_live_seen_total=51264`
+- `interpret_tail_live_unseen_formula_cells=0`
+- `interpret_tail_live_promoted_function_supported_total=49704`
+- `interpret_tail_live_supported_rate=100.58`
+- `interpret_tail_live_seen_rate=101.19`
 
 Dominant ambient fallback reasons:
 
-- `unsupported_formula_shape=36`
+- `unsupported_formula_shape=40`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=322`
+- `unsupported_function=266`
 
 ### Full Replay Corpus: Live Unique-Cell Surface
 
@@ -88,12 +88,12 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=8092`
-- `interpret_tail_live_unique_supported_formula_cells=7914`
-- `interpret_tail_live_unique_fallback_formula_cells=178`
-- `interpret_tail_live_unique_unseen_formula_cells=42569`
-- `interpret_tail_live_unique_seen_rate=15.97`
-- `interpret_tail_live_unique_supported_rate=15.62`
+- `interpret_tail_live_unique_seen_formula_cells=8477`
+- `interpret_tail_live_unique_supported_formula_cells=8325`
+- `interpret_tail_live_unique_fallback_formula_cells=152`
+- `interpret_tail_live_unique_unseen_formula_cells=42184`
+- `interpret_tail_live_unique_seen_rate=16.73`
+- `interpret_tail_live_unique_supported_rate=16.43`
 
 ### Full Replay Corpus: Forced Interpret Observe Attempts
 
@@ -101,13 +101,13 @@ These are also attempt totals. The new forced-direct inventory below is the
 honest unique-cell surface for direct routing.
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=47795`
-- `interpret_tail_forced_interpret_fallback_total=181`
-- `interpret_tail_forced_interpret_seen_total=47976`
-- `interpret_tail_forced_interpret_unseen_formula_cells=2685`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=47168`
-- `interpret_tail_forced_interpret_supported_rate=94.34`
-- `interpret_tail_forced_interpret_seen_rate=94.70`
+- `interpret_tail_forced_interpret_supported_total=48234`
+- `interpret_tail_forced_interpret_fallback_total=155`
+- `interpret_tail_forced_interpret_seen_total=48389`
+- `interpret_tail_forced_interpret_unseen_formula_cells=2272`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=47607`
+- `interpret_tail_forced_interpret_supported_rate=95.21`
+- `interpret_tail_forced_interpret_seen_rate=95.52`
 
 ### Full Replay Corpus: Forced Direct Unique-Cell Surface
 
@@ -115,31 +115,31 @@ This is the direct-routing comparison surface after explicitly dirtying and
 forcing each replay formula cell once.
 
 - `interpret_tail_forced_direct_formula_cells=50661`
-- `interpret_tail_forced_direct_seen_formula_cells=8044`
-- `interpret_tail_forced_direct_supported_formula_cells=7866`
-- `interpret_tail_forced_direct_fallback_formula_cells=178`
-- `interpret_tail_forced_direct_unseen_formula_cells=42617`
-- `interpret_tail_forced_direct_seen_rate=15.88`
-- `interpret_tail_forced_direct_supported_rate=15.53`
+- `interpret_tail_forced_direct_seen_formula_cells=8429`
+- `interpret_tail_forced_direct_supported_formula_cells=8277`
+- `interpret_tail_forced_direct_fallback_formula_cells=152`
+- `interpret_tail_forced_direct_unseen_formula_cells=42232`
+- `interpret_tail_forced_direct_seen_rate=16.64`
+- `interpret_tail_forced_direct_supported_rate=16.34`
 
 ### Promoted-Family Probe
 
-- `interpret_tail_probe_formula_cells=7618`
-- `interpret_tail_authoritative_total=2848`
-- `interpret_tail_authoritative_fallback_total=4770`
-- promoted-family authoritative rate: `37.39%`
+- `interpret_tail_probe_formula_cells=8031`
+- `interpret_tail_authoritative_total=2948`
+- `interpret_tail_authoritative_fallback_total=5083`
+- promoted-family authoritative rate: `36.71%`
 
 Dominant promoted-family fallback reasons:
 
-- `shadow_mismatch=4729`
-- `unsupported_function=47`
-- `unsupported_formula_shape=5`
+- `shadow_mismatch=5076`
+- `unsupported_function=0`
+- `unsupported_formula_shape=7`
 - `unsupported_host_surface=0`
 
 ### Live-Target Filtered Promoted Probe
 
 - `interpret_tail_live_target_probe_formula_cells=0`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=7618`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=8031`
 - `interpret_tail_live_target_authoritative_total=0`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 
@@ -356,9 +356,9 @@ The highest-value remaining blockers are now:
 
 1. quality inside the new ambient live traffic:
    the full replay corpus still has a broad live attempt wall, with
-   `unsupported_function=322`
+   `unsupported_function=266`
 2. live-authority headroom:
-   the north-star is now `4592 / 50,661` (`9.0642%`), which is a real jump
+   the north-star is now `4925 / 50,661` (`9.7215%`), which is a real jump
    but still well short of deletion-comfortable territory
 3. imported live-host-truth residuals:
    the next likely north-star movers are now the broader ambient
@@ -379,26 +379,28 @@ The highest-value remaining blockers are now:
    correctness surface, not a live seam-off retirement denominator
 
 The live authoritative-match north-star on the standing replay corpus has now
-improved to `4592 / 50,661` (`9.0642%`). The new honest live unique-cell
-inventory now shows `8092 / 50,661` formula cells seen (`15.97%`) and
-`7914 / 50,661` supported (`15.62%`) during the bulk live observe run, while
-the forced-direct comparison surface sits just behind it at
-`8044 / 50,661` seen (`15.88%`) and `7866 / 50,661` supported (`15.53%`).
+improved to `4925 / 50,661` (`9.7215%`). The new honest live unique-cell
+inventory now shows `8477 / 50,661` formula cells seen (`16.73%`) and
+`8325 / 50,661` supported (`16.43%`) during the bulk live observe run, while
+the forced-direct comparison surface now sits at
+`8429 / 50,661` seen (`16.64%`) and `8277 / 50,661` supported (`16.34%`).
 Those are the coverage-style numbers we should currently use alongside the
 north-star; the broader live and forced-interpret counters are still attempt
 telemetry rather than a deletion denominator.
 
 That gain came first from aligning imported live host truth on
-reference-driven `logical_fold` / `math_scalar` roots, and now from extending
+reference-driven `logical_fold` / `math_scalar` roots, then from extending
 that same policy into imported direct `information_predicate` residue plus the
 follow-on imported direct `logical_fold` and nested-`XMATCH` `INDEX`
 residue, then from admitting a bounded ranked-statistical cluster for
-`QUARTILE*` and `PERCENTRANK*`, and now from admitting bounded
-calendar/date utility helpers, and then from fixing the zero-workday
-`WORKDAY` weekend-mask hang so `BusinessDay` can stay on the default ambient
-surface without blowing out the broad corpus lane, followed by widening that
-same `BusinessDay` family to cheap local reference, holiday-range,
-weekend-range, weekend-code-ref, and named-ref shapes. It intentionally trades
+`QUARTILE*` and `PERCENTRANK*`, then bounded calendar/date utility helpers,
+then from fixing the zero-workday `WORKDAY` weekend-mask hang so
+`BusinessDay` can stay on the default ambient surface without blowing out the
+broad corpus lane, followed by widening that same `BusinessDay` family to
+cheap local reference, holiday-range, weekend-range, weekend-code-ref, and
+named-ref shapes, and now by admitting a bounded statistical aggregate slice
+for `MAX` / `MIN`, `MEDIAN`, `GEOMEAN` / `HARMEAN`, `VAR*` / `STDEV*`, plus
+the ranked extension for `LARGE` / `SMALL` / `RANK*`. It intentionally trades
 away a large amount of cached-workbook promoted-probe agreement, so the raw
 promoted probe must now be read strictly as diagnostics rather than as
 progress gating.
