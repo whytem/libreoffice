@@ -35,6 +35,7 @@
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <optional>
 #include <set>
 #include <string>
@@ -50,6 +51,7 @@ using spreadsheetengine::compat::libreoffice::toLibreOfficeString;
 using spreadsheetengine::compat::libreoffice::interprettaileval::DiagnosticSample;
 using spreadsheetengine::compat::libreoffice::interprettaileval::FallbackReason;
 using spreadsheetengine::compat::libreoffice::interprettaileval::FunctionKind;
+using spreadsheetengine::compat::libreoffice::interprettaileval::ObservedFormulaCellStatus;
 using spreadsheetengine::compat::libreoffice::interprettaileval::StatsSnapshot;
 using spreadsheetengine::core::fods::loadWorkbook;
 using spreadsheetengine::core::workbook::Cell;
@@ -204,6 +206,18 @@ struct ObserveSurfaceInventory
         maFunctionSupportedCells {};
     std::array<std::size_t, static_cast<std::size_t>(FunctionKind::Count)> maFunctionFallbackCells {};
     std::array<std::size_t, static_cast<std::size_t>(FunctionKind::Count)> maFunctionUnseenCells {};
+};
+
+struct ScAddressLess
+{
+    bool operator()(const ScAddress& rLeft, const ScAddress& rRight) const
+    {
+        if (rLeft.Tab() != rRight.Tab())
+            return rLeft.Tab() < rRight.Tab();
+        if (rLeft.Row() != rRight.Row())
+            return rLeft.Row() < rRight.Row();
+        return rLeft.Col() < rRight.Col();
+    }
 };
 
 std::vector<ProbeDiagnosticSample>& probeDiagnosticSamples()
@@ -852,6 +866,77 @@ ObserveSurfaceInventory runForcedInterpretObserveSurface(const Workbook& rWorkbo
                                         + aDirectStats.mnAuthoritativeCount
                                     > 0;
             const bool bFallback = totalFallbackCount(aDirectStats) > 0;
+
+            if (bSeen)
+            {
+                ++aInventory.mnSeenFormulaCells;
+                ++aInventory.maFunctionSeenCells[static_cast<std::size_t>(eDirectFunction)];
+            }
+            else
+            {
+                ++aInventory.mnUnseenFormulaCells;
+                ++aInventory.maFunctionUnseenCells[static_cast<std::size_t>(eDirectFunction)];
+            }
+
+            if (bSupported)
+            {
+                ++aInventory.mnSupportedFormulaCells;
+                ++aInventory.maFunctionSupportedCells[static_cast<std::size_t>(eDirectFunction)];
+            }
+
+            if (bFallback)
+            {
+                ++aInventory.mnFallbackFormulaCells;
+                ++aInventory.maFunctionFallbackCells[static_cast<std::size_t>(eDirectFunction)];
+            }
+        }
+    }
+
+    return aInventory;
+}
+
+ObserveSurfaceInventory buildObserveSurfaceInventory(
+    const Workbook& rWorkbook, ScDocument& rDoc,
+    const std::vector<ObservedFormulaCellStatus>& rObservedCells,
+    const StatsSnapshot& rAttemptStats)
+{
+    ObserveSurfaceInventory aInventory;
+    aInventory.maAttemptStats = rAttemptStats;
+
+    std::map<ScAddress, ObservedFormulaCellStatus, ScAddressLess> aObservedByAddress;
+    for (const auto& rStatus : rObservedCells)
+        aObservedByAddress[rStatus.maAddress] = rStatus;
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    for (std::size_t nSheet = 0; nSheet < rWorkbook.maSheets.size(); ++nSheet)
+    {
+        for (const auto& rEntry : rWorkbook.maSheets[nSheet].maCells)
+        {
+            const Cell& rCell = rEntry.second;
+            if (!rCell.hasFormula())
+                continue;
+
+            const ScAddress aPos(static_cast<SCCOL>(rEntry.first.first),
+                static_cast<SCROW>(rEntry.first.second), static_cast<SCTAB>(nSheet));
+            ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+            if (!pFormula)
+                continue;
+
+            ++aInventory.mnFormulaCells;
+
+            const OUString aFormulaSource = pFormula->GetFormula(
+                formula::FormulaGrammar::GRAM_ODFF, pContext);
+            const FunctionKind eDirectFunction = classifySupportedProbeFunction(
+                std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()));
+            ++aInventory.maFunctionFormulaCells[static_cast<std::size_t>(eDirectFunction)];
+
+            const auto it = aObservedByAddress.find(aPos);
+            const bool bSeen = it != aObservedByAddress.end() && it->second.mbSeen;
+            const bool bSupported = it != aObservedByAddress.end() && it->second.mbSupported;
+            const bool bFallback = it != aObservedByAddress.end() && it->second.mbFallback;
 
             if (bSeen)
             {
@@ -3467,6 +3552,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     StatsSnapshot aLiveAuthoritativeProbeStats;
     StatsSnapshot aLiveTargetProbeStats;
     ReplayEligibilityInventory aReplayEligibilityInventory;
+    ObserveSurfaceInventory aLiveUniqueInventory;
     ObserveSurfaceInventory aForcedDirectInventory;
     std::vector<DiagnosticSample> aLiveDiagnosticSamples;
     resetProbeDiagnosticSamples();
@@ -3511,12 +3597,39 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                 rDoc.SetAllFormulasDirty(aDirtyCxt);
                 rDoc.InterpretCellsIfNeeded(aWorkbookRanges);
                 xDocShell->DoHardRecalc();
+                const StatsSnapshot aWorkbookLiveAttemptStats
+                    = spreadsheetengine::compat::libreoffice::interprettaileval::getStatsSnapshot();
+                const auto aWorkbookLiveInventory = buildObserveSurfaceInventory(
+                    aWorkbook, rDoc,
+                    spreadsheetengine::compat::libreoffice::interprettaileval::getObservedFormulaCellStatuses(),
+                    aWorkbookLiveAttemptStats);
                 appendDiagnosticSamples(aLiveDiagnosticSamples,
                     spreadsheetengine::compat::libreoffice::interprettaileval::getDiagnosticSamples());
                 spreadsheetengine::compat::libreoffice::interprettaileval::setDiagnosticWorkbookLabel(
                     OUString());
-                accumulateStats(aLiveStats,
-                    spreadsheetengine::compat::libreoffice::interprettaileval::getStatsSnapshot());
+                accumulateStats(aLiveStats, aWorkbookLiveAttemptStats);
+                aLiveUniqueInventory.mnFormulaCells += aWorkbookLiveInventory.mnFormulaCells;
+                aLiveUniqueInventory.mnSeenFormulaCells += aWorkbookLiveInventory.mnSeenFormulaCells;
+                aLiveUniqueInventory.mnSupportedFormulaCells
+                    += aWorkbookLiveInventory.mnSupportedFormulaCells;
+                aLiveUniqueInventory.mnFallbackFormulaCells
+                    += aWorkbookLiveInventory.mnFallbackFormulaCells;
+                aLiveUniqueInventory.mnUnseenFormulaCells
+                    += aWorkbookLiveInventory.mnUnseenFormulaCells;
+                for (std::size_t nIndex = 0;
+                     nIndex < static_cast<std::size_t>(FunctionKind::Count); ++nIndex)
+                {
+                    aLiveUniqueInventory.maFunctionFormulaCells[nIndex]
+                        += aWorkbookLiveInventory.maFunctionFormulaCells[nIndex];
+                    aLiveUniqueInventory.maFunctionSeenCells[nIndex]
+                        += aWorkbookLiveInventory.maFunctionSeenCells[nIndex];
+                    aLiveUniqueInventory.maFunctionSupportedCells[nIndex]
+                        += aWorkbookLiveInventory.maFunctionSupportedCells[nIndex];
+                    aLiveUniqueInventory.maFunctionFallbackCells[nIndex]
+                        += aWorkbookLiveInventory.maFunctionFallbackCells[nIndex];
+                    aLiveUniqueInventory.maFunctionUnseenCells[nIndex]
+                        += aWorkbookLiveInventory.maFunctionUnseenCells[nIndex];
+                }
             }
 
             {
@@ -3652,6 +3765,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     }
 
     printRoutingStats("interpret_tail_live", nFormulaCellCount, aLiveStats);
+    printObserveSurfaceInventory("interpret_tail_live_unique", aLiveUniqueInventory);
     printRoutingStats("interpret_tail_forced_interpret", aForcedDirectInventory.mnFormulaCells,
         aForcedInterpretStats);
     printObserveSurfaceInventory("interpret_tail_forced_direct", aForcedDirectInventory);
@@ -3680,6 +3794,21 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     CPPUNIT_ASSERT_MESSAGE(
         "all-formula InterpretTail live observe should now surface promoted-family support",
         promotedFunctionSupportedCount(aLiveStats) > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "full replay live unique inventory should see at least one formula cell",
+        aLiveUniqueInventory.mnSeenFormulaCells > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "full replay live unique inventory should support at least one formula cell",
+        aLiveUniqueInventory.mnSupportedFormulaCells > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "full replay live unique inventory should cover every formula cell in the corpus",
+        aLiveUniqueInventory.mnFormulaCells == nFormulaCellCount);
+    CPPUNIT_ASSERT_EQUAL(
+        aLiveUniqueInventory.mnFormulaCells,
+        aLiveUniqueInventory.mnSeenFormulaCells + aLiveUniqueInventory.mnUnseenFormulaCells);
+    CPPUNIT_ASSERT_MESSAGE(
+        "full replay live unique supported cells should be a subset of seen cells",
+        aLiveUniqueInventory.mnSupportedFormulaCells <= aLiveUniqueInventory.mnSeenFormulaCells);
     CPPUNIT_ASSERT_MESSAGE(
         "full replay forced-interpret observe should touch every formula cell in the corpus",
         aForcedDirectInventory.mnFormulaCells == nFormulaCellCount);

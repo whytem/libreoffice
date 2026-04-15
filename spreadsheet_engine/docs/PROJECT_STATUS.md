@@ -64,6 +64,20 @@ Ambient live fallback reasons:
 - `parse_failure=4`
 - `unsupported_function=322`
 
+### Full Replay Corpus: Live Unique-Cell Surface
+
+This is the honest per-formula-cell live-routing surface from the standing
+replay corpus. It counts whether each formula cell was actually seen and
+supported during the bulk live observe run.
+
+- `interpret_tail_live_unique_formula_cells=50661`
+- `interpret_tail_live_unique_seen_formula_cells=8092`
+- `interpret_tail_live_unique_supported_formula_cells=7914`
+- `interpret_tail_live_unique_fallback_formula_cells=178`
+- `interpret_tail_live_unique_unseen_formula_cells=42569`
+- `interpret_tail_live_unique_seen_rate=15.97`
+- `interpret_tail_live_unique_supported_rate=15.62`
+
 ### Full Replay Corpus: Forced Interpret Observe Attempts
 
 These are also attempt totals. The new unique-cell direct surface is the
@@ -80,8 +94,8 @@ honest coverage metric below.
 
 ### Full Replay Corpus: Forced Direct Unique-Cell Surface
 
-This is the new honest direct-routing denominator after dirtying and forcing
-each replay formula cell once, then classifying whether that formula cell was
+This is the direct-routing comparison surface after dirtying and forcing each
+replay formula cell once, then classifying whether that formula cell was
 actually seen and supported by the seam.
 
 - `interpret_tail_forced_direct_formula_cells=50661`

@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
+#include <map>
 #include <mutex>
 #include <numeric>
 #include <optional>
@@ -164,6 +165,14 @@ struct DiagnosticSample
     OUString maRootKind;
 };
 
+struct ObservedFormulaCellStatus
+{
+    ScAddress maAddress;
+    bool mbSeen = false;
+    bool mbSupported = false;
+    bool mbFallback = false;
+};
+
 namespace detail
 {
 
@@ -204,6 +213,24 @@ struct DiagnosticStore
     std::mutex maMutex;
     std::vector<DiagnosticSample> maSamples;
     OUString maWorkbookLabel;
+};
+
+struct AddressLess
+{
+    bool operator()(const ScAddress& rLeft, const ScAddress& rRight) const
+    {
+        if (rLeft.Tab() != rRight.Tab())
+            return rLeft.Tab() < rRight.Tab();
+        if (rLeft.Row() != rRight.Row())
+            return rLeft.Row() < rRight.Row();
+        return rLeft.Col() < rRight.Col();
+    }
+};
+
+struct ObserveSurfaceStore
+{
+    std::mutex maMutex;
+    std::map<ScAddress, ObservedFormulaCellStatus, AddressLess> maCells;
 };
 
 struct ReferencedFormulaMaterializationGuard
@@ -247,6 +274,24 @@ private:
 {
     static DiagnosticStore aStore;
     return aStore;
+}
+
+[[nodiscard]] inline ObserveSurfaceStore& observeSurfaceStore()
+{
+    static ObserveSurfaceStore aStore;
+    return aStore;
+}
+
+inline void markObservedFormulaCell(
+    const ScAddress& rFormulaPos, bool bSupported, bool bFallback)
+{
+    auto& rStore = observeSurfaceStore();
+    std::scoped_lock aGuard(rStore.maMutex);
+    auto& rStatus = rStore.maCells[rFormulaPos];
+    rStatus.maAddress = rFormulaPos;
+    rStatus.mbSeen = true;
+    rStatus.mbSupported = rStatus.mbSupported || bSupported;
+    rStatus.mbFallback = rStatus.mbFallback || bFallback;
 }
 
 [[nodiscard]] constexpr std::size_t toIndex(FallbackReason eReason)
@@ -7043,8 +7088,14 @@ inline void resetStats()
     }
 
     auto& rDiagnostics = detail::diagnosticStore();
-    std::scoped_lock aGuard(rDiagnostics.maMutex);
-    rDiagnostics.maSamples.clear();
+    {
+        std::scoped_lock aGuard(rDiagnostics.maMutex);
+        rDiagnostics.maSamples.clear();
+    }
+
+    auto& rObserveSurface = detail::observeSurfaceStore();
+    std::scoped_lock aObserveGuard(rObserveSurface.maMutex);
+    rObserveSurface.maCells.clear();
 }
 
 [[nodiscard]] inline StatsSnapshot getStatsSnapshot()
@@ -7087,6 +7138,12 @@ inline void recordObserveSupport(FunctionKind eFunction)
     rStore.maFunctionObserveCount[detail::toIndex(eFunction)].fetch_add(1);
 }
 
+inline void recordObserveSupport(const ScAddress& rFormulaPos, FunctionKind eFunction)
+{
+    recordObserveSupport(eFunction);
+    detail::markObservedFormulaCell(rFormulaPos, true, false);
+}
+
 inline void recordShadowCompareSupport(FunctionKind eFunction)
 {
     auto& rStore = detail::statsStore();
@@ -7094,11 +7151,23 @@ inline void recordShadowCompareSupport(FunctionKind eFunction)
     rStore.maFunctionShadowCompareCount[detail::toIndex(eFunction)].fetch_add(1);
 }
 
+inline void recordShadowCompareSupport(const ScAddress& rFormulaPos, FunctionKind eFunction)
+{
+    recordShadowCompareSupport(eFunction);
+    detail::markObservedFormulaCell(rFormulaPos, true, false);
+}
+
 inline void recordAuthoritativeRoute(FunctionKind eFunction)
 {
     auto& rStore = detail::statsStore();
     rStore.mnAuthoritativeCount.fetch_add(1);
     rStore.maFunctionAuthoritativeCount[detail::toIndex(eFunction)].fetch_add(1);
+}
+
+inline void recordAuthoritativeRoute(const ScAddress& rFormulaPos, FunctionKind eFunction)
+{
+    recordAuthoritativeRoute(eFunction);
+    detail::markObservedFormulaCell(rFormulaPos, true, false);
 }
 
 inline void recordAuthoritativeFallback(FallbackReason eReason, FunctionKind eFunction)
@@ -7110,12 +7179,26 @@ inline void recordAuthoritativeFallback(FallbackReason eReason, FunctionKind eFu
     rStore.maFunctionFallbackReasons[detail::toIndex(eFunction)][detail::toIndex(eReason)].fetch_add(1);
 }
 
+inline void recordAuthoritativeFallback(
+    const ScAddress& rFormulaPos, FallbackReason eReason, FunctionKind eFunction)
+{
+    recordAuthoritativeFallback(eReason, eFunction);
+    detail::markObservedFormulaCell(rFormulaPos, false, true);
+}
+
 inline void recordFallback(FallbackReason eReason, FunctionKind eFunction)
 {
     auto& rStore = detail::statsStore();
     rStore.maFallbackReasons[detail::toIndex(eReason)].fetch_add(1);
     rStore.maFunctionFallbackCount[detail::toIndex(eFunction)].fetch_add(1);
     rStore.maFunctionFallbackReasons[detail::toIndex(eFunction)][detail::toIndex(eReason)].fetch_add(1);
+}
+
+inline void recordFallback(
+    const ScAddress& rFormulaPos, FallbackReason eReason, FunctionKind eFunction)
+{
+    recordFallback(eReason, eFunction);
+    detail::markObservedFormulaCell(rFormulaPos, false, true);
 }
 
 inline void recordShadowMatch()
@@ -7140,6 +7223,17 @@ inline std::vector<DiagnosticSample> getDiagnosticSamples()
     auto& rStore = detail::diagnosticStore();
     std::scoped_lock aGuard(rStore.maMutex);
     return rStore.maSamples;
+}
+
+inline std::vector<ObservedFormulaCellStatus> getObservedFormulaCellStatuses()
+{
+    auto& rStore = detail::observeSurfaceStore();
+    std::scoped_lock aGuard(rStore.maMutex);
+    std::vector<ObservedFormulaCellStatus> aStatuses;
+    aStatuses.reserve(rStore.maCells.size());
+    for (const auto& rEntry : rStore.maCells)
+        aStatuses.push_back(rEntry.second);
+    return aStatuses;
 }
 
 } // namespace spreadsheetengine::compat::libreoffice::interprettaileval

@@ -2008,7 +2008,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                 aCanonicalFormulaSource.getLength()));
         if (aAttempt.mbSupported)
         {
-            setaileval::recordObserveSupport(aAttempt.meFunction);
+            setaileval::recordObserveSupport(aPos, aAttempt.meFunction);
             return;
         }
 
@@ -2016,7 +2016,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
             = aAttempt.meFunction != setaileval::FunctionKind::Unknown
                   ? aAttempt.meFunction
                   : eDelegatedFunction;
-        setaileval::recordFallback(aAttempt.meFallbackReason, eAttemptFunction);
+        setaileval::recordFallback(aPos, aAttempt.meFallbackReason, eAttemptFunction);
     };
 
     const auto applyEngineAuthoritativeResult =
@@ -2180,20 +2180,20 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                 {
                     if (pCode->GetCodeError() != FormulaError::NONE)
                         pCode->SetCodeError(FormulaError::NONE);
-                    setaileval::recordAuthoritativeRoute(aAttempt.meFunction);
+                    setaileval::recordAuthoritativeRoute(aPos, aAttempt.meFunction);
                     return;
                 }
 
                 setaileval::recordAuthoritativeFallback(
-                    setaileval::FallbackReason::ProjectionFailure, aAttempt.meFunction);
+                    aPos, setaileval::FallbackReason::ProjectionFailure, aAttempt.meFunction);
             }
             else if (eEngineRolloutMode == setaileval::RolloutMode::Observe)
             {
-                setaileval::recordObserveSupport(aAttempt.meFunction);
+                setaileval::recordObserveSupport(aPos, aAttempt.meFunction);
             }
             else if (eEngineRolloutMode == setaileval::RolloutMode::ShadowCompare)
             {
-                setaileval::recordShadowCompareSupport(aAttempt.meFunction);
+                setaileval::recordShadowCompareSupport(aPos, aAttempt.meFunction);
             }
         }
         else
@@ -2202,7 +2202,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                 || eEngineRolloutMode == setaileval::RolloutMode::AuthoritativeWithFallback)
             {
                 setaileval::recordAuthoritativeFallback(
-                    aAttempt.meFallbackReason, aAttempt.meFunction);
+                    aPos, aAttempt.meFallbackReason, aAttempt.meFunction);
             }
             else
             {
@@ -2210,7 +2210,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                     = aAttempt.meFunction != setaileval::FunctionKind::Unknown
                           ? aAttempt.meFunction
                           : getEngineDelegatedFunction();
-                setaileval::recordFallback(aAttempt.meFallbackReason, eAttemptFunction);
+                setaileval::recordFallback(aPos, aAttempt.meFallbackReason, eAttemptFunction);
             }
         }
     }
@@ -2248,12 +2248,14 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                 if (eEngineRolloutMode == setaileval::RolloutMode::AuthoritativeWithFallback)
                 {
                     setaileval::recordAuthoritativeFallback(
+                        aPos,
                         setaileval::FallbackReason::UnsupportedTailContext,
                         setaileval::FunctionKind::Unknown);
                 }
                 else
                 {
                     setaileval::recordFallback(
+                        aPos,
                         setaileval::FallbackReason::UnsupportedTailContext,
                         setaileval::FunctionKind::Unknown);
                 }
@@ -2273,17 +2275,17 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                     if (bEngineAuthoritativeWhileOff)
                     {
                         setaileval::recordAuthoritativeFallback(
-                            oEngineAttempt->meFallbackReason, oEngineAttempt->meFunction);
+                            aPos, oEngineAttempt->meFallbackReason, oEngineAttempt->meFunction);
                     }
                     else if (eEngineRolloutMode == setaileval::RolloutMode::AuthoritativeWithFallback)
                     {
                         setaileval::recordAuthoritativeFallback(
-                            oEngineAttempt->meFallbackReason, oEngineAttempt->meFunction);
+                            aPos, oEngineAttempt->meFallbackReason, oEngineAttempt->meFunction);
                     }
                     else
                     {
                         setaileval::recordFallback(
-                            oEngineAttempt->meFallbackReason, oEngineAttempt->meFunction);
+                            aPos, oEngineAttempt->meFallbackReason, oEngineAttempt->meFunction);
                     }
                 }
             }
@@ -2293,11 +2295,12 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
         {
             if (applyEngineAuthoritativeResult(*oEngineAttempt))
             {
-                setaileval::recordAuthoritativeRoute(oEngineAttempt->meFunction);
+                setaileval::recordAuthoritativeRoute(aPos, oEngineAttempt->meFunction);
                 return;
             }
 
             setaileval::recordAuthoritativeFallback(
+                aPos,
                 setaileval::FallbackReason::ProjectionFailure,
                 oEngineAttempt->meFunction);
         }
@@ -2307,20 +2310,21 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
             switch (eEngineRolloutMode)
             {
                 case setaileval::RolloutMode::Observe:
-                    setaileval::recordObserveSupport(oEngineAttempt->meFunction);
+                    setaileval::recordObserveSupport(aPos, oEngineAttempt->meFunction);
                     break;
                 case setaileval::RolloutMode::AuthoritativeWithFallback:
                     if (applyEngineAuthoritativeResult(*oEngineAttempt))
                     {
-                        setaileval::recordAuthoritativeRoute(oEngineAttempt->meFunction);
+                        setaileval::recordAuthoritativeRoute(aPos, oEngineAttempt->meFunction);
                         return;
                     }
                     setaileval::recordAuthoritativeFallback(
+                        aPos,
                         setaileval::FallbackReason::ProjectionFailure,
                         oEngineAttempt->meFunction);
                     break;
                 case setaileval::RolloutMode::ShadowCompare:
-                    setaileval::recordShadowCompareSupport(oEngineAttempt->meFunction);
+                    setaileval::recordShadowCompareSupport(aPos, oEngineAttempt->meFunction);
                     break;
                 case setaileval::RolloutMode::Off:
                     break;
@@ -5148,17 +5152,17 @@ void maybeRecordFormulaGroupInterpretTailRouting(
                                                                        : eDelegatedFunction;
         if (!aAttempt.mbSupported)
         {
-            setaileval::recordFallback(aAttempt.meFallbackReason, eAttemptFunction);
+            setaileval::recordFallback(aCellPos, aAttempt.meFallbackReason, eAttemptFunction);
             continue;
         }
 
         if (eRolloutMode == setaileval::RolloutMode::Observe)
         {
-            setaileval::recordObserveSupport(aAttempt.meFunction);
+            setaileval::recordObserveSupport(aCellPos, aAttempt.meFunction);
             continue;
         }
 
-        setaileval::recordShadowCompareSupport(aAttempt.meFunction);
+        setaileval::recordShadowCompareSupport(aCellPos, aAttempt.meFunction);
         recordInterpretTailShadowOutcome(aAttempt, static_cast<const ScFormulaCell&>(*pCell).GetResult());
     }
 }
