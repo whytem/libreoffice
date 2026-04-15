@@ -3000,6 +3000,14 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCriteriaAg
         spreadsheetengine::api::formulavalue::ValueType::Value, aArraySumIf.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(60.0, aArraySumIf.maResult.mfValue, 1e-12);
 
+    const auto aMatrixCountIf = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COUNTIF(IF(C1:C2=1;D1:D2;E1:E2);2)", false);
+    CPPUNIT_ASSERT(aMatrixCountIf.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::CriteriaAggregate, aMatrixCountIf.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMatrixCountIf.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aMatrixCountIf.maResult.mfValue, 1e-12);
+
     const auto aRangeCriteriaCountIf = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=COUNTIF(F1:F5;F1:F5)", false);
     CPPUNIT_ASSERT(aRangeCriteriaCountIf.mbSupported);
@@ -3009,6 +3017,15 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCriteriaAg
         spreadsheetengine::api::formulavalue::ValueType::Value,
         aRangeCriteriaCountIf.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aRangeCriteriaCountIf.maResult.mfValue, 1e-12);
+
+    const auto aMatrixCountIfs = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COUNTIFS(IF(C1:C2=1;D1:D2;E1:E2);2)", false);
+    CPPUNIT_ASSERT(aMatrixCountIfs.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::CriteriaAggregate,
+        aMatrixCountIfs.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMatrixCountIfs.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aMatrixCountIfs.maResult.mfValue, 1e-12);
 
     const auto aRangeCriteriaCountIfs = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=COUNTIFS(F1:F5;F1:F5)", false);

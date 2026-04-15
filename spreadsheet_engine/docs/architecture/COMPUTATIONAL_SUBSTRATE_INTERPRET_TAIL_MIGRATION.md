@@ -191,8 +191,8 @@ supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
 - `interpret_tail_live_unique_seen_formula_cells=8679`
-- `interpret_tail_live_unique_supported_formula_cells=8526`
-- `interpret_tail_live_unique_fallback_formula_cells=153`
+- `interpret_tail_live_unique_supported_formula_cells=8528`
+- `interpret_tail_live_unique_fallback_formula_cells=151`
 - `interpret_tail_live_unique_unseen_formula_cells=41982`
 - `interpret_tail_live_unique_seen_rate=17.13`
 - `interpret_tail_live_unique_supported_rate=16.83`
@@ -222,8 +222,8 @@ Interpretation:
   aggregate lane now also covers `LARGE` / `SMALL` / `RANK*`
 - a new bounded criteria-aggregate slice now admits `COUNTIF` / `COUNTIFS`,
   `SUMIF` / `SUMIFS`, `AVERAGEIF` / `AVERAGEIFS`, and `MAXIFS` / `MINIFS`,
-  contributing `203` live unique seen cells with `201` supported and `2`
-  fallback after closing the literal-array and range-criteria subshapes
+  contributing `203` live unique seen cells with `203` supported and `0`
+  fallback after also closing the matrix-`IF(...)` criteria residue
 - the main remaining ambient work is now the still-large
   `unsupported_function` wall, not simple denominator reach
 - the live authoritative-match north-star has now moved decisively above the
@@ -260,11 +260,11 @@ actually seen and supported by the seam:
 
 - `interpret_tail_forced_direct_formula_cells=50661`
 - `interpret_tail_forced_direct_seen_formula_cells=8631`
-- `interpret_tail_forced_direct_supported_formula_cells=8478`
-- `interpret_tail_forced_direct_fallback_formula_cells=153`
+- `interpret_tail_forced_direct_supported_formula_cells=8480`
+- `interpret_tail_forced_direct_fallback_formula_cells=151`
 - `interpret_tail_forced_direct_unseen_formula_cells=42030`
 - `interpret_tail_forced_direct_seen_rate=17.04`
-- `interpret_tail_forced_direct_supported_rate=16.73`
+- `interpret_tail_forced_direct_supported_rate=16.74`
 
 ### Promoted-Family Probe
 

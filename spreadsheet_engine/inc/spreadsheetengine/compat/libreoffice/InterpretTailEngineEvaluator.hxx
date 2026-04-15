@@ -3023,44 +3023,90 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
                 continue;
             }
 
-            const auto aLeftNumber = coerceScalarToNumber(rDoc, rContext, aLeftValue);
-            if (!aLeftNumber)
-            {
-                putScalarIntoMatrix(api::CellValue::error(aLeftNumber.meError), xMatrix, nColumn,
-                    nRow);
-                continue;
-            }
-            const auto aRightNumber = coerceScalarToNumber(rDoc, rContext, aRightValue);
-            if (!aRightNumber)
-            {
-                putScalarIntoMatrix(api::CellValue::error(aRightNumber.meError), xMatrix, nColumn,
-                    nRow);
-                continue;
-            }
-
             std::optional<api::CellValue> oResult;
             switch (rNode.meBinaryOperator)
             {
                 case core::formula::BinaryOperator::Add:
-                    oResult = api::CellValue::number(aLeftNumber.maValue + aRightNumber.maValue);
-                    break;
                 case core::formula::BinaryOperator::Subtract:
-                    oResult = api::CellValue::number(aLeftNumber.maValue - aRightNumber.maValue);
-                    break;
                 case core::formula::BinaryOperator::Multiply:
-                    oResult = api::CellValue::number(aLeftNumber.maValue * aRightNumber.maValue);
-                    break;
                 case core::formula::BinaryOperator::Divide:
-                    if (aRightNumber.maValue == 0.0)
-                        oResult = api::CellValue::error(api::Error::DivisionByZero);
-                    else
-                        oResult = api::CellValue::number(aLeftNumber.maValue / aRightNumber.maValue);
-                    break;
                 case core::formula::BinaryOperator::Power:
                 {
-                    const double fValue = std::pow(aLeftNumber.maValue, aRightNumber.maValue);
-                    oResult = std::isfinite(fValue) ? api::CellValue::number(fValue)
-                                                    : api::CellValue::error(api::Error::Domain);
+                    const auto aLeftNumber = coerceScalarToNumber(rDoc, rContext, aLeftValue);
+                    if (!aLeftNumber)
+                    {
+                        putScalarIntoMatrix(api::CellValue::error(aLeftNumber.meError), xMatrix,
+                            nColumn, nRow);
+                        continue;
+                    }
+                    const auto aRightNumber = coerceScalarToNumber(rDoc, rContext, aRightValue);
+                    if (!aRightNumber)
+                    {
+                        putScalarIntoMatrix(api::CellValue::error(aRightNumber.meError), xMatrix,
+                            nColumn, nRow);
+                        continue;
+                    }
+
+                    if (rNode.meBinaryOperator == core::formula::BinaryOperator::Add)
+                        oResult = api::CellValue::number(aLeftNumber.maValue + aRightNumber.maValue);
+                    else if (rNode.meBinaryOperator == core::formula::BinaryOperator::Subtract)
+                        oResult = api::CellValue::number(aLeftNumber.maValue - aRightNumber.maValue);
+                    else if (rNode.meBinaryOperator == core::formula::BinaryOperator::Multiply)
+                        oResult = api::CellValue::number(aLeftNumber.maValue * aRightNumber.maValue);
+                    else if (rNode.meBinaryOperator == core::formula::BinaryOperator::Divide)
+                    {
+                        if (aRightNumber.maValue == 0.0)
+                            oResult = api::CellValue::error(api::Error::DivisionByZero);
+                        else
+                            oResult = api::CellValue::number(
+                                aLeftNumber.maValue / aRightNumber.maValue);
+                    }
+                    else
+                    {
+                        const double fValue = std::pow(aLeftNumber.maValue, aRightNumber.maValue);
+                        oResult = std::isfinite(fValue)
+                                      ? api::CellValue::number(fValue)
+                                      : api::CellValue::error(api::Error::Domain);
+                    }
+                    break;
+                }
+                case core::formula::BinaryOperator::Equal:
+                case core::formula::BinaryOperator::NotEqual:
+                case core::formula::BinaryOperator::Less:
+                case core::formula::BinaryOperator::LessEqual:
+                case core::formula::BinaryOperator::Greater:
+                case core::formula::BinaryOperator::GreaterEqual:
+                {
+                    short nCompare = 0;
+                    if (aLeftValue.isText() && aRightValue.isText())
+                    {
+                        nCompare = ScGlobal::GetCollator().compareString(
+                            toLibreOfficeString(aLeftValue.maString),
+                            toLibreOfficeString(aRightValue.maString));
+                    }
+                    else
+                    {
+                        const auto aLeftNumber = coerceScalarToNumber(rDoc, rContext, aLeftValue);
+                        if (!aLeftNumber)
+                        {
+                            putScalarIntoMatrix(api::CellValue::error(aLeftNumber.meError), xMatrix,
+                                nColumn, nRow);
+                            continue;
+                        }
+                        const auto aRightNumber = coerceScalarToNumber(rDoc, rContext, aRightValue);
+                        if (!aRightNumber)
+                        {
+                            putScalarIntoMatrix(api::CellValue::error(aRightNumber.meError), xMatrix,
+                                nColumn, nRow);
+                            continue;
+                        }
+
+                        if (!rtl::math::approxEqual(aLeftNumber.maValue, aRightNumber.maValue))
+                            nCompare = aLeftNumber.maValue < aRightNumber.maValue ? -1 : 1;
+                    }
+
+                    oResult = api::CellValue::boolean(
+                        matchesComparisonResult(nCompare, rNode.meBinaryOperator));
                     break;
                 }
                 default:
@@ -3347,6 +3393,103 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
         return materializeIndexMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
     if (aFunctionName == u"ISNUMBER")
         return materializeIsNumberMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
+    if (aFunctionName == u"IF")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+        }
+
+        const auto aCondition = materializeMatrixNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+        if (!aCondition.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aCondition.meFallbackReason);
+        if (!aCondition.moValue)
+            return makeMaterializedError<ScMatrixRef>(aCondition.meError);
+
+        const auto aThen = materializeMatrixNode(*rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+        if (!aThen.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aThen.meFallbackReason);
+        if (!aThen.moValue)
+            return makeMaterializedError<ScMatrixRef>(aThen.meError);
+
+        ScMatrixRef xElseMatrix;
+        if (rNode.maChildren.size() == 3)
+        {
+            const auto aElse = materializeMatrixNode(*rNode.maChildren[2], rDoc, rContext, rFormulaPos);
+            if (!aElse.mbSupported)
+                return makeUnsupportedMaterialization<ScMatrixRef>(aElse.meFallbackReason);
+            if (!aElse.moValue)
+                return makeMaterializedError<ScMatrixRef>(aElse.meError);
+            xElseMatrix = *aElse.moValue;
+        }
+        else
+        {
+            xElseMatrix = makeSingleValueMatrix(api::CellValue::boolean(false));
+        }
+
+        SCSIZE nConditionColumns = 0;
+        SCSIZE nConditionRows = 0;
+        SCSIZE nThenColumns = 0;
+        SCSIZE nThenRows = 0;
+        SCSIZE nElseColumns = 0;
+        SCSIZE nElseRows = 0;
+        (*aCondition.moValue)->GetDimensions(nConditionColumns, nConditionRows);
+        (*aThen.moValue)->GetDimensions(nThenColumns, nThenRows);
+        xElseMatrix->GetDimensions(nElseColumns, nElseRows);
+
+        const SCSIZE nResultColumns
+            = std::max({ nConditionColumns, nThenColumns, nElseColumns });
+        const SCSIZE nResultRows = std::max({ nConditionRows, nThenRows, nElseRows });
+        ScMatrixRef xMatrix(new ScMatrix(nResultColumns, nResultRows));
+        for (SCSIZE nRow = 0; nRow < nResultRows; ++nRow)
+        {
+            for (SCSIZE nColumn = 0; nColumn < nResultColumns; ++nColumn)
+            {
+                SCSIZE nConditionColumn = nColumn;
+                SCSIZE nConditionRow = nRow;
+                if (!(*aCondition.moValue)
+                         ->ValidColRowOrReplicated(nConditionColumn, nConditionRow))
+                {
+                    return makeUnsupportedMaterialization<ScMatrixRef>(
+                        FallbackReason::UnsupportedFormulaShape);
+                }
+
+                const auto aConditionValue = lookupexecution::detail::toApiCellValue(
+                    (*aCondition.moValue)->Get(nConditionColumn, nConditionRow));
+                if (aConditionValue.isError())
+                {
+                    putScalarIntoMatrix(aConditionValue, xMatrix, nColumn, nRow);
+                    continue;
+                }
+
+                const auto aConditionBool
+                    = coerceScalarToBool(rDoc, rContext, aConditionValue);
+                if (!aConditionBool)
+                {
+                    putScalarIntoMatrix(api::CellValue::error(aConditionBool.meError), xMatrix,
+                        nColumn, nRow);
+                    continue;
+                }
+
+                ScMatrixRef xSelectedMatrix
+                    = aConditionBool.maValue ? *aThen.moValue : xElseMatrix;
+                SCSIZE nSelectedColumn = nColumn;
+                SCSIZE nSelectedRow = nRow;
+                if (!xSelectedMatrix->ValidColRowOrReplicated(nSelectedColumn, nSelectedRow))
+                {
+                    return makeUnsupportedMaterialization<ScMatrixRef>(
+                        FallbackReason::UnsupportedFormulaShape);
+                }
+
+                putScalarIntoMatrix(lookupexecution::detail::toApiCellValue(
+                                        xSelectedMatrix->Get(nSelectedColumn, nSelectedRow)),
+                    xMatrix, nColumn, nRow);
+            }
+        }
+
+        return makeMaterializedValue(xMatrix);
+    }
 
     if (aFunctionName != u"MMULT")
         return makeUnsupportedMaterialization<ScMatrixRef>(FallbackReason::UnsupportedFormulaShape);

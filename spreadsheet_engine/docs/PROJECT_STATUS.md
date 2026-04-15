@@ -72,8 +72,8 @@ supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
 - `interpret_tail_live_unique_seen_formula_cells=8679`
-- `interpret_tail_live_unique_supported_formula_cells=8526`
-- `interpret_tail_live_unique_fallback_formula_cells=153`
+- `interpret_tail_live_unique_supported_formula_cells=8528`
+- `interpret_tail_live_unique_fallback_formula_cells=151`
 - `interpret_tail_live_unique_unseen_formula_cells=41982`
 - `interpret_tail_live_unique_seen_rate=17.13`
 - `interpret_tail_live_unique_supported_rate=16.83`
@@ -100,11 +100,11 @@ actually seen and supported by the seam.
 
 - `interpret_tail_forced_direct_formula_cells=50661`
 - `interpret_tail_forced_direct_seen_formula_cells=8631`
-- `interpret_tail_forced_direct_supported_formula_cells=8478`
-- `interpret_tail_forced_direct_fallback_formula_cells=153`
+- `interpret_tail_forced_direct_supported_formula_cells=8480`
+- `interpret_tail_forced_direct_fallback_formula_cells=151`
 - `interpret_tail_forced_direct_unseen_formula_cells=42030`
 - `interpret_tail_forced_direct_seen_rate=17.04`
-- `interpret_tail_forced_direct_supported_rate=16.73`
+- `interpret_tail_forced_direct_supported_rate=16.74`
 
 ### Promoted-Family Probe
 
@@ -297,8 +297,8 @@ Still not true:
   reference, holiday-range, weekend-range, weekend-code-ref, and named-ref
   `BusinessDay` shapes, and now a bounded criteria-aggregate slice for
   `COUNTIF` / `COUNTIFS`, `SUMIF` / `SUMIFS`, `AVERAGEIF` / `AVERAGEIFS`, and
-  `MAXIFS` / `MINIFS`, with the literal-array and range-criteria residue now
-  closed and only the matrix-`IF(...)` criteria shapes left
+  `MAXIFS` / `MINIFS`, with the remaining matrix-`IF(...)` criteria residue
+  now closed on the live unique-cell surface
 - the raw promoted replay probe is now unambiguously a diagnostic surface, not
   the retirement denominator: it intentionally sits at `2948 / 5083`
   because live-host parity now takes precedence over cached-workbook parity on
