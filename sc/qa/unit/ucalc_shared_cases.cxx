@@ -2821,6 +2821,75 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorBusinessDa
     CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aNetworkDaysIntl.meFormatType);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCalendarUtilityHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailCalendarUtilityHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(3, 0, 0);
+
+    m_pDoc->SetString(0, 0, 0, u"2016-02-11"_ustr);
+    m_pDoc->SetString(0, 1, 0, u"2016-01-04"_ustr);
+    m_pDoc->SetString(0, 2, 0, u"2015-01-01"_ustr);
+    m_pDoc->SetValue(1, 0, 0, 2015.0);
+
+    const auto aDaysInMonth = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ORG.OPENOFFICE.DAYSINMONTH(A1)", false);
+    CPPUNIT_ASSERT(aDaysInMonth.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::CalendarUtility, aDaysInMonth.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aDaysInMonth.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(29.0, aDaysInMonth.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aDaysInMonth.meFormatType);
+
+    const auto aDaysInYear = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ORG.OPENOFFICE.DAYSINYEAR(A1)", false);
+    CPPUNIT_ASSERT(aDaysInYear.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::CalendarUtility, aDaysInYear.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aDaysInYear.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(366.0, aDaysInYear.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aDaysInYear.meFormatType);
+
+    const auto aIsLeapYear = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ORG.OPENOFFICE.ISLEAPYEAR(A1)", false);
+    CPPUNIT_ASSERT(aIsLeapYear.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::CalendarUtility, aIsLeapYear.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aIsLeapYear.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aIsLeapYear.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::LOGICAL, aIsLeapYear.meFormatType);
+
+    const auto aIsoWeek = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ISOWEEKNUM(A2)", false);
+    CPPUNIT_ASSERT(aIsoWeek.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::CalendarUtility, aIsoWeek.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aIsoWeek.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aIsoWeek.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aIsoWeek.meFormatType);
+
+    const auto aEasterSunday = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ORG.OPENOFFICE.EASTERSUNDAY(B1)", false);
+    CPPUNIT_ASSERT(aEasterSunday.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::CalendarUtility, aEasterSunday.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aEasterSunday.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(42099.0, aEasterSunday.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, aEasterSunday.meFormatType);
+
+    const auto aWeeksInYear = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ORG.OPENOFFICE.WEEKSINYEAR(A3)", false);
+    CPPUNIT_ASSERT(aWeeksInYear.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::CalendarUtility, aWeeksInYear.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aWeeksInYear.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(53.0, aWeeksInYear.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aWeeksInYear.meFormatType);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNormalization)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

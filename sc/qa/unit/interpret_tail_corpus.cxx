@@ -1008,6 +1008,8 @@ const char* functionKindName(FunctionKind eFunction)
             return "ranked_aggregate";
         case FunctionKind::BusinessDay:
             return "business_day";
+        case FunctionKind::CalendarUtility:
+            return "calendar_utility";
         case FunctionKind::MathScalar:
             return "math_scalar";
         case FunctionKind::InformationPredicate:

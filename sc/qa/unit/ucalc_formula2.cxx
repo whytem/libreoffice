@@ -2016,6 +2016,53 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorBusinessDayAu
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorCalendarUtilityAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineCalendarUtilityAuthority"_ustr));
+
+    m_pDoc->SetString(0, 0, 0, u"2016-02-11"_ustr);
+    m_pDoc->SetString(0, 1, 0, u"2016-01-04"_ustr);
+    m_pDoc->SetString(0, 2, 0, u"2015-01-01"_ustr);
+    m_pDoc->SetValue(1, 0, 0, 2015.0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"=ORG.OPENOFFICE.DAYSINMONTH(A1)"_ustr);
+        m_pDoc->SetString(1, 7, 0, u"=ORG.OPENOFFICE.DAYSINYEAR(A1)"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=ORG.OPENOFFICE.ISLEAPYEAR(A1)"_ustr);
+        m_pDoc->SetString(3, 7, 0, u"=ISOWEEKNUM(A2)"_ustr);
+        m_pDoc->SetString(4, 7, 0, u"=ORG.OPENOFFICE.EASTERSUNDAY(B1)"_ustr);
+        m_pDoc->SetString(5, 7, 0, u"=ORG.OPENOFFICE.WEEKSINYEAR(A3)"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(29.0, m_pDoc->GetValue(0, 7, 0));
+        ASSERT_DOUBLES_EQUAL(366.0, m_pDoc->GetValue(1, 7, 0));
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(2, 7, 0));
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(3, 7, 0));
+        ASSERT_DOUBLES_EQUAL(42099.0, m_pDoc->GetValue(4, 7, 0));
+        ASSERT_DOUBLES_EQUAL(53.0, m_pDoc->GetValue(5, 7, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 6);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::CalendarUtility)]
+            >= 6);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::CalendarUtility)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncLEN)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true); // turn auto calc on.

@@ -106,6 +106,7 @@ enum class FunctionKind : sal_uInt8
     NumericAggregate,
     RankedAggregate,
     BusinessDay,
+    CalendarUtility,
     MathScalar,
     InformationPredicate,
     LogicalFold,
@@ -702,6 +703,16 @@ canonicalMathScalarFunctionName(api::StringView rFunctionName)
         || rFunctionName == u"COM.MICROSOFT.NETWORKDAYS.INTL")
     {
         return FunctionKind::BusinessDay;
+    }
+    if (rFunctionName == u"DAYSINMONTH" || rFunctionName == u"ORG.OPENOFFICE.DAYSINMONTH"
+        || rFunctionName == u"DAYSINYEAR" || rFunctionName == u"ORG.OPENOFFICE.DAYSINYEAR"
+        || rFunctionName == u"ISLEAPYEAR" || rFunctionName == u"ORG.OPENOFFICE.ISLEAPYEAR"
+        || rFunctionName == u"ISOWEEKNUM"
+        || rFunctionName == u"EASTERSUNDAY" || rFunctionName == u"ORG.OPENOFFICE.EASTERSUNDAY"
+        || rFunctionName == u"WEEKSINYEAR"
+        || rFunctionName == u"ORG.OPENOFFICE.WEEKSINYEAR")
+    {
+        return FunctionKind::CalendarUtility;
     }
     if (canonicalMathScalarFunctionName(rFunctionName))
         return FunctionKind::MathScalar;
@@ -2499,7 +2510,8 @@ inline void putScalarIntoMatrix(
             if (eFunction == FunctionKind::MathScalar
                 || eFunction == FunctionKind::NumericAggregate
                 || eFunction == FunctionKind::RankedAggregate
-                || eFunction == FunctionKind::BusinessDay)
+                || eFunction == FunctionKind::BusinessDay
+                || eFunction == FunctionKind::CalendarUtility)
             {
                 auto aAttempt = evaluateFunctionNode(
                     rNode, rDoc, rContext, rFormulaPos, rDoc.GetCalcConfig().mbEmptyStringAsZero);
@@ -5387,6 +5399,182 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         SvNumFormatType::NUMBER);
 }
 
+[[nodiscard]] inline EvaluationAttempt evaluateCalendarUtilityFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
+{
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    const api::DateParts aNullDate = toApiDateParts(rDoc.GetFormatTable()->GetNullDate());
+
+    const auto makeNumericAttempt = [&](double fValue, SvNumFormatType eFormatType) {
+        return makeNumericResult(eFunction, fValue, eFormatType);
+    };
+    const auto makeErrorAttempt = [&](api::Error eError) {
+        return makeErrorResult(eFunction, eError);
+    };
+    const auto isLeapYear = [](std::int16_t nYear) {
+        return (nYear % 4 == 0 && nYear % 100 != 0) || (nYear % 400 == 0);
+    };
+    const auto daysInMonth = [&](std::uint16_t nMonth, std::int16_t nYear) -> double {
+        static constexpr std::array<std::uint16_t, 12> aMonthDays{
+            31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
+        };
+        if (nMonth < 1 || nMonth > aMonthDays.size())
+            return 0.0;
+        if (nMonth == 2 && isLeapYear(nYear))
+            return 29.0;
+        return static_cast<double>(aMonthDays[nMonth - 1]);
+    };
+    const auto materializeCalendarScalar
+        = [&](const core::formula::Node& rArgument) -> Materialization<api::CellValue> {
+        if (rArgument.meKind == core::formula::NodeKind::CellReference
+            || rArgument.meKind == core::formula::NodeKind::RangeReference
+            || rArgument.meKind == core::formula::NodeKind::NamedReference)
+        {
+            return materializeScalarizedReferenceValueNode(rArgument, rDoc, rContext, rFormulaPos);
+        }
+
+        if (rArgument.meKind == core::formula::NodeKind::FunctionCall)
+        {
+            const FunctionKind eChildFunction = classifyFunction(uppercaseAscii(rArgument.maPrimaryText));
+            if (eChildFunction == FunctionKind::LogicalConstant
+                || eChildFunction == FunctionKind::Value
+                || eChildFunction == FunctionKind::DateValue
+                || eChildFunction == FunctionKind::TimeValue
+                || eChildFunction == FunctionKind::NumberValue
+                || eChildFunction == FunctionKind::Round
+                || eChildFunction == FunctionKind::CalendarUtility
+                || eChildFunction == FunctionKind::MathScalar
+                || eChildFunction == FunctionKind::NumericAggregate
+                || eChildFunction == FunctionKind::RankedAggregate)
+            {
+                auto aAttempt = evaluateFunctionNode(
+                    rArgument, rDoc, rContext, rFormulaPos,
+                    rDoc.GetCalcConfig().mbEmptyStringAsZero);
+                if (!aAttempt.mbSupported)
+                    return makeUnsupportedMaterialization<api::CellValue>(aAttempt.meFallbackReason);
+
+                switch (aAttempt.maResult.meType)
+                {
+                    case api::formulavalue::ValueType::Value:
+                        return makeMaterializedValue(api::CellValue::number(aAttempt.maResult.mfValue));
+                    case api::formulavalue::ValueType::String:
+                        return makeMaterializedValue(api::CellValue::text(aAttempt.maResult.maString));
+                    case api::formulavalue::ValueType::Error:
+                        return makeMaterializedValue(api::CellValue::error(aAttempt.maResult.meError));
+                    default:
+                        break;
+                }
+            }
+        }
+
+        return materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+    };
+    const auto materializeCalendarDateArgument = [&](const core::formula::Node& rArgument)
+        -> Materialization<api::DateSerial> {
+        const auto aScalar = materializeCalendarScalar(rArgument);
+        if (!aScalar.mbSupported)
+            return makeUnsupportedMaterialization<api::DateSerial>(aScalar.meFallbackReason);
+        if (!aScalar.moValue)
+            return makeMaterializedError<api::DateSerial>(aScalar.meError);
+
+        const auto oDateSerial = spreadsheetengine::core::datetime::coerceToDateSerial(*aScalar.moValue);
+        if (!oDateSerial)
+            return makeMaterializedError<api::DateSerial>(api::Error::IllegalArgument);
+        return makeMaterializedValue(*oDateSerial);
+    };
+
+    if (aFunctionName == u"EASTERSUNDAY" || aFunctionName == u"ORG.OPENOFFICE.EASTERSUNDAY")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aScalar = materializeCalendarScalar(*rNode.maChildren[0]);
+        if (!aScalar.mbSupported)
+            return makeUnsupported(eFunction, aScalar.meFallbackReason);
+        if (!aScalar.moValue)
+            return makeErrorAttempt(aScalar.meError);
+        if (aScalar.moValue->isEmpty())
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aYearNumber = coerceScalarToNumber(rDoc, rContext, *aScalar.moValue);
+        if (!aYearNumber)
+            return makeErrorAttempt(aYearNumber.meError);
+
+        const auto oWholeYear = coerceWholeNumber(aYearNumber.maValue);
+        if (!oWholeYear || *oWholeYear < std::numeric_limits<std::int16_t>::min()
+            || *oWholeYear > std::numeric_limits<std::int16_t>::max())
+        {
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        }
+
+        std::int16_t nYear = static_cast<std::int16_t>(*oWholeYear);
+        if (nYear >= 0 && nYear < 100)
+        {
+            constexpr std::int16_t nTwoDigitYearStart = 1930;
+            if (nYear < (nTwoDigitYearStart % 100))
+                nYear = static_cast<std::int16_t>(nYear + (((nTwoDigitYearStart / 100) + 1) * 100));
+            else
+                nYear = static_cast<std::int16_t>(nYear + ((nTwoDigitYearStart / 100) * 100));
+        }
+
+        const auto aEaster = api::calendar::easterSundaySerial(aNullDate, nYear);
+        if (!aEaster)
+            return makeErrorAttempt(aEaster.meError);
+        return makeNumericAttempt(aEaster.maValue, SvNumFormatType::DATE);
+    }
+
+    if (rNode.maChildren.size() != 1)
+        return makeErrorAttempt(api::Error::IllegalArgument);
+
+    const auto aDateSerial = materializeCalendarDateArgument(*rNode.maChildren[0]);
+    if (!aDateSerial.mbSupported)
+        return makeUnsupported(eFunction, aDateSerial.meFallbackReason);
+    if (!aDateSerial.moValue)
+        return makeErrorAttempt(aDateSerial.meError);
+
+    const std::int16_t nYear = static_cast<std::int16_t>(
+        std::trunc(api::calendar::yearFromSerial(aNullDate, *aDateSerial.moValue)));
+    const std::uint16_t nMonth = static_cast<std::uint16_t>(
+        std::trunc(api::calendar::monthFromSerial(aNullDate, *aDateSerial.moValue)));
+    const bool bLeapYear = isLeapYear(nYear);
+
+    if (aFunctionName == u"DAYSINMONTH" || aFunctionName == u"ORG.OPENOFFICE.DAYSINMONTH")
+        return makeNumericAttempt(daysInMonth(nMonth, nYear), SvNumFormatType::NUMBER);
+
+    if (aFunctionName == u"DAYSINYEAR" || aFunctionName == u"ORG.OPENOFFICE.DAYSINYEAR")
+        return makeNumericAttempt(bLeapYear ? 366.0 : 365.0, SvNumFormatType::NUMBER);
+
+    if (aFunctionName == u"ISLEAPYEAR" || aFunctionName == u"ORG.OPENOFFICE.ISLEAPYEAR")
+        return makeNumericAttempt(bLeapYear ? 1.0 : 0.0, SvNumFormatType::LOGICAL);
+
+    if (aFunctionName == u"ISOWEEKNUM")
+    {
+        return makeNumericAttempt(
+            static_cast<double>(api::calendar::isoWeekOfYear(aNullDate, *aDateSerial.moValue)),
+            SvNumFormatType::NUMBER);
+    }
+
+    if (aFunctionName == u"WEEKSINYEAR" || aFunctionName == u"ORG.OPENOFFICE.WEEKSINYEAR")
+    {
+        const auto aJan1 = api::calendar::makeDateSerial(aNullDate, nYear, 1, 1, true);
+        if (!aJan1)
+            return makeErrorAttempt(aJan1.meError);
+
+        const auto aJan1Weekday = api::calendar::dayOfWeek(
+            aNullDate, static_cast<api::DateSerial>(std::trunc(aJan1.maValue)), 2);
+        if (!aJan1Weekday)
+            return makeErrorAttempt(aJan1Weekday.meError);
+
+        const double fWeeksInYear
+            = aJan1Weekday.maValue == 4 ? 53.0
+              : (aJan1Weekday.maValue == 3 && bLeapYear ? 53.0 : 52.0);
+        return makeNumericAttempt(fWeeksInYear, SvNumFormatType::NUMBER);
+    }
+
+    return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+}
+
 [[nodiscard]] inline EvaluationAttempt evaluateScalarUtilityFunction(
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
@@ -6216,6 +6404,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         case FunctionKind::NumericAggregate:
         case FunctionKind::RankedAggregate:
         case FunctionKind::BusinessDay:
+        case FunctionKind::CalendarUtility:
         case FunctionKind::MathScalar:
             return eFunction == FunctionKind::MathScalar
                        ? evaluateMathScalarFunction(
@@ -6231,6 +6420,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                                          bImportedCanonicalSource)
                                    : eFunction == FunctionKind::BusinessDay
                                          ? evaluateBusinessDayFunction(
+                                               rRoot, eFunction, rDoc, rContext, rFormulaPos)
+                                   : eFunction == FunctionKind::CalendarUtility
+                                         ? evaluateCalendarUtilityFunction(
                                                rRoot, eFunction, rDoc, rContext, rFormulaPos)
                              : evaluateScalarUtilityFunction(
                                    rRoot, eFunction, rDoc, rContext, rFormulaPos,
