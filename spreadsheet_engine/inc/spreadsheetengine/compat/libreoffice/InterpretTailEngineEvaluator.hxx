@@ -108,6 +108,7 @@ enum class FunctionKind : sal_uInt8
     BusinessDay,
     CalendarUtility,
     DateDifference,
+    DateConstructExtract,
     MathScalar,
     InformationPredicate,
     LogicalFold,
@@ -720,6 +721,11 @@ canonicalMathScalarFunctionName(api::StringView rFunctionName)
         || rFunctionName == u"WEEKS" || rFunctionName == u"ORG.OPENOFFICE.WEEKS")
     {
         return FunctionKind::DateDifference;
+    }
+    if (rFunctionName == u"DATE" || rFunctionName == u"YEAR" || rFunctionName == u"MONTH"
+        || rFunctionName == u"DAY")
+    {
+        return FunctionKind::DateConstructExtract;
     }
     if (canonicalMathScalarFunctionName(rFunctionName))
         return FunctionKind::MathScalar;
@@ -2519,7 +2525,8 @@ inline void putScalarIntoMatrix(
                 || eFunction == FunctionKind::RankedAggregate
                 || eFunction == FunctionKind::BusinessDay
                 || eFunction == FunctionKind::CalendarUtility
-                || eFunction == FunctionKind::DateDifference)
+                || eFunction == FunctionKind::DateDifference
+                || eFunction == FunctionKind::DateConstructExtract)
             {
                 auto aAttempt = evaluateFunctionNode(
                     rNode, rDoc, rContext, rFormulaPos, rDoc.GetCalcConfig().mbEmptyStringAsZero);
@@ -5837,6 +5844,149 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
 }
 
+[[nodiscard]] inline EvaluationAttempt evaluateDateConstructExtractFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
+{
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    const api::DateParts aNullDate = toApiDateParts(rDoc.GetFormatTable()->GetNullDate());
+
+    const auto makeNumericAttempt = [&](double fValue, SvNumFormatType eFormatType) {
+        return makeNumericResult(eFunction, fValue, eFormatType);
+    };
+    const auto makeErrorAttempt = [&](api::Error eError) {
+        return makeErrorResult(eFunction, eError);
+    };
+    const auto materializeDateConstructScalar
+        = [&](const core::formula::Node& rArgument) -> Materialization<api::CellValue> {
+        if (rArgument.meKind == core::formula::NodeKind::CellReference
+            || rArgument.meKind == core::formula::NodeKind::RangeReference
+            || rArgument.meKind == core::formula::NodeKind::NamedReference)
+        {
+            return materializeScalarizedReferenceValueNode(rArgument, rDoc, rContext, rFormulaPos);
+        }
+
+        if (rArgument.meKind == core::formula::NodeKind::FunctionCall)
+        {
+            const FunctionKind eChildFunction = classifyFunction(uppercaseAscii(rArgument.maPrimaryText));
+            if (eChildFunction == FunctionKind::LogicalConstant
+                || eChildFunction == FunctionKind::Value
+                || eChildFunction == FunctionKind::DateValue
+                || eChildFunction == FunctionKind::TimeValue
+                || eChildFunction == FunctionKind::NumberValue
+                || eChildFunction == FunctionKind::Round
+                || eChildFunction == FunctionKind::CalendarUtility
+                || eChildFunction == FunctionKind::DateDifference
+                || eChildFunction == FunctionKind::DateConstructExtract
+                || eChildFunction == FunctionKind::MathScalar
+                || eChildFunction == FunctionKind::NumericAggregate
+                || eChildFunction == FunctionKind::RankedAggregate)
+            {
+                auto aAttempt = evaluateFunctionNode(
+                    rArgument, rDoc, rContext, rFormulaPos,
+                    rDoc.GetCalcConfig().mbEmptyStringAsZero);
+                if (!aAttempt.mbSupported)
+                    return makeUnsupportedMaterialization<api::CellValue>(aAttempt.meFallbackReason);
+
+                switch (aAttempt.maResult.meType)
+                {
+                    case api::formulavalue::ValueType::Value:
+                        return makeMaterializedValue(api::CellValue::number(aAttempt.maResult.mfValue));
+                    case api::formulavalue::ValueType::String:
+                        return makeMaterializedValue(api::CellValue::text(aAttempt.maResult.maString));
+                    case api::formulavalue::ValueType::Error:
+                        return makeMaterializedValue(api::CellValue::error(aAttempt.maResult.meError));
+                    default:
+                        break;
+                }
+            }
+        }
+
+        return materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+    };
+
+    if (aFunctionName == u"DATE")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto materializeDatePart = [&](const core::formula::Node& rPart)
+            -> Materialization<double> {
+            const auto aScalar = materializeDateConstructScalar(rPart);
+            if (!aScalar.mbSupported)
+                return makeUnsupportedMaterialization<double>(aScalar.meFallbackReason);
+            if (!aScalar.moValue)
+                return makeMaterializedError<double>(aScalar.meError);
+            if (aScalar.moValue->isEmpty())
+                return makeMaterializedError<double>(api::Error::IllegalArgument);
+
+            const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aScalar.moValue);
+            if (!aNumber)
+                return makeMaterializedError<double>(aNumber.meError);
+            return makeMaterializedValue(aNumber.maValue);
+        };
+
+        const auto aYear = materializeDatePart(*rNode.maChildren[0]);
+        if (!aYear.mbSupported)
+            return makeUnsupported(eFunction, aYear.meFallbackReason);
+        if (!aYear.moValue)
+            return makeErrorAttempt(aYear.meError);
+
+        const auto aMonth = materializeDatePart(*rNode.maChildren[1]);
+        if (!aMonth.mbSupported)
+            return makeUnsupported(eFunction, aMonth.meFallbackReason);
+        if (!aMonth.moValue)
+            return makeErrorAttempt(aMonth.meError);
+
+        const auto aDay = materializeDatePart(*rNode.maChildren[2]);
+        if (!aDay.mbSupported)
+            return makeUnsupported(eFunction, aDay.meFallbackReason);
+        if (!aDay.moValue)
+            return makeErrorAttempt(aDay.meError);
+
+        const std::int16_t nYear = static_cast<std::int16_t>(std::trunc(*aYear.moValue));
+        const std::int16_t nMonth = static_cast<std::int16_t>(std::trunc(*aMonth.moValue));
+        const std::int16_t nDay = static_cast<std::int16_t>(std::trunc(*aDay.moValue));
+        if (nYear < 0)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aDateSerial
+            = api::calendar::makeDateSerial(aNullDate, nYear, nMonth, nDay, false);
+        if (!aDateSerial)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        return makeNumericAttempt(aDateSerial.maValue, SvNumFormatType::DATE);
+    }
+
+    if (rNode.maChildren.size() != 1)
+        return makeErrorAttempt(api::Error::IllegalArgument);
+
+    const auto aScalar = materializeDateConstructScalar(*rNode.maChildren[0]);
+    if (!aScalar.mbSupported)
+        return makeUnsupported(eFunction, aScalar.meFallbackReason);
+    if (!aScalar.moValue)
+        return makeErrorAttempt(aScalar.meError);
+
+    const auto oDateSerial = spreadsheetengine::core::datetime::coerceToDateSerial(*aScalar.moValue);
+    if (!oDateSerial)
+        return makeErrorAttempt(api::Error::IllegalArgument);
+
+    if (aFunctionName == u"YEAR")
+    {
+        return makeNumericAttempt(api::calendar::yearFromSerial(aNullDate, *oDateSerial),
+            SvNumFormatType::NUMBER);
+    }
+    if (aFunctionName == u"MONTH")
+    {
+        return makeNumericAttempt(api::calendar::monthFromSerial(aNullDate, *oDateSerial),
+            SvNumFormatType::NUMBER);
+    }
+
+    const auto aDay = api::calendar::dayFromSerial(aNullDate, *oDateSerial);
+    if (!aDay)
+        return makeErrorAttempt(aDay.meError);
+    return makeNumericAttempt(aDay.maValue, SvNumFormatType::NUMBER);
+}
+
 [[nodiscard]] inline EvaluationAttempt evaluateScalarUtilityFunction(
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
@@ -6668,6 +6818,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         case FunctionKind::BusinessDay:
         case FunctionKind::CalendarUtility:
         case FunctionKind::DateDifference:
+        case FunctionKind::DateConstructExtract:
         case FunctionKind::MathScalar:
             return eFunction == FunctionKind::MathScalar
                        ? evaluateMathScalarFunction(
@@ -6689,6 +6840,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                                                rRoot, eFunction, rDoc, rContext, rFormulaPos)
                                    : eFunction == FunctionKind::DateDifference
                                          ? evaluateDateDifferenceFunction(
+                                               rRoot, eFunction, rDoc, rContext, rFormulaPos)
+                                   : eFunction == FunctionKind::DateConstructExtract
+                                         ? evaluateDateConstructExtractFunction(
                                                rRoot, eFunction, rDoc, rContext, rFormulaPos)
                              : evaluateScalarUtilityFunction(
                                    rRoot, eFunction, rDoc, rContext, rFormulaPos,

@@ -1012,6 +1012,8 @@ const char* functionKindName(FunctionKind eFunction)
             return "calendar_utility";
         case FunctionKind::DateDifference:
             return "date_difference";
+        case FunctionKind::DateConstructExtract:
+            return "date_construct_extract";
         case FunctionKind::MathScalar:
             return "math_scalar";
         case FunctionKind::InformationPredicate:

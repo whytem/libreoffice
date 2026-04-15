@@ -2934,6 +2934,57 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorDateDiffer
     CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aWeeks.meFormatType);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorDateConstructExtractHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailDateConstructExtractHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(3, 0, 0);
+
+    m_pDoc->SetValue(0, 0, 0, 2020.0);
+    m_pDoc->SetValue(1, 0, 0, 2.0);
+    m_pDoc->SetValue(2, 0, 0, 29.0);
+    m_pDoc->SetString(0, 1, 0, u"2016-02-11"_ustr);
+
+    const auto aDate = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=DATE(A1;B1;C1)", false);
+    CPPUNIT_ASSERT(aDate.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::DateConstructExtract, aDate.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aDate.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(43890.0, aDate.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, aDate.meFormatType);
+
+    const auto aYear = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=YEAR(DATE(2016;2;11))", false);
+    CPPUNIT_ASSERT(aYear.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::DateConstructExtract, aYear.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aYear.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2016.0, aYear.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aYear.meFormatType);
+
+    const auto aMonth = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=MONTH(A2)", false);
+    CPPUNIT_ASSERT(aMonth.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::DateConstructExtract, aMonth.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMonth.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aMonth.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aMonth.meFormatType);
+
+    const auto aDay = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=DAY(A2)", false);
+    CPPUNIT_ASSERT(aDay.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::DateConstructExtract, aDay.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aDay.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(11.0, aDay.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aDay.meFormatType);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNormalization)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
