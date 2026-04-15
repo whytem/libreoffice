@@ -44,6 +44,7 @@ struct CriteriaAggregateInput
 {
     bool mbScalar = true;
     api::CellValue maScalar = api::CellValue::empty();
+    std::vector<api::CellValue> maValues;
     api::ResolvedReference maReference;
     api::MatrixSize mnColumns = 1;
     api::MatrixSize mnRows = 1;

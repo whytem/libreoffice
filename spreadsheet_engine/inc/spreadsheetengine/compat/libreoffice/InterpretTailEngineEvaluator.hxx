@@ -2868,6 +2868,20 @@ public:
             return api::ValueResult<api::CellValue>::success(rInput.maScalar);
         }
 
+        if (!rInput.maValues.empty())
+        {
+            const std::int64_t nLinearIndex
+                = static_cast<std::int64_t>(aCoordinate.mnRow) * rInput.mnColumns
+                  + aCoordinate.mnColumn;
+            if (nLinearIndex < 0
+                || static_cast<std::size_t>(nLinearIndex) >= rInput.maValues.size())
+            {
+                return api::ValueResult<api::CellValue>::failure(api::Error::IllegalArgument);
+            }
+            return api::ValueResult<api::CellValue>::success(
+                rInput.maValues[static_cast<std::size_t>(nLinearIndex)]);
+        }
+
         if (!rInput.maReference.containsOffset(aCoordinate.mnColumn, aCoordinate.mnRow))
             return api::ValueResult<api::CellValue>::failure(api::Error::IllegalArgument);
 
@@ -2905,6 +2919,38 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
         aInput.mnColumns = aDimensions.mnColumns;
         aInput.mnRows = aDimensions.mnRows;
         return makeMaterializedValue(aInput);
+    }
+
+    const bool bMatrixLike = rArgument.meKind == core::formula::NodeKind::ArrayConstant
+                             || rArgument.meKind == core::formula::NodeKind::BinaryOperation
+                             || rArgument.meKind == core::formula::NodeKind::FunctionCall;
+    if (bMatrixLike)
+    {
+        const auto aMatrix = materializeMatrixNode(rArgument, rDoc, rContext, rFormulaPos);
+        if (aMatrix.mbSupported && aMatrix.moValue)
+        {
+            CriteriaAggregateInput aInput;
+            aInput.mbScalar = false;
+            SCSIZE nColumns = 0;
+            SCSIZE nRows = 0;
+            (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+            aInput.mnColumns = static_cast<api::MatrixSize>(nColumns);
+            aInput.mnRows = static_cast<api::MatrixSize>(nRows);
+            aInput.maValues.reserve(aInput.mnColumns * aInput.mnRows);
+            for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+            {
+                for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                {
+                    aInput.maValues.push_back(lookupexecution::detail::toApiCellValue(
+                        (*aMatrix.moValue)->Get(nColumn, nRow)));
+                }
+            }
+            return makeMaterializedValue(std::move(aInput));
+        }
+        if (aMatrix.mbSupported && !aMatrix.moValue)
+            return makeMaterializedError<CriteriaAggregateInput>(aMatrix.meError);
+        if (!aMatrix.mbSupported && rArgument.meKind != core::formula::NodeKind::FunctionCall)
+            return makeUnsupportedMaterialization<CriteriaAggregateInput>(aMatrix.meFallbackReason);
     }
 
     const auto aScalar = materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
@@ -5432,7 +5478,31 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
     auto evaluateCriteria = [&](const core::formula::Node& rArgument)
         -> Materialization<CriteriaPredicate> {
-        const auto aArgument = materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+        auto aArgument = [&]() -> Materialization<api::CellValue> {
+            if (rArgument.meKind == core::formula::NodeKind::CellReference
+                || rArgument.meKind == core::formula::NodeKind::RangeReference
+                || rArgument.meKind == core::formula::NodeKind::NamedReference)
+            {
+                return materializeScalarizedReferenceValueNode(
+                    rArgument, rDoc, rContext, rFormulaPos);
+            }
+
+            if (rArgument.meKind == core::formula::NodeKind::ArrayConstant
+                || rArgument.meKind == core::formula::NodeKind::BinaryOperation
+                || rArgument.meKind == core::formula::NodeKind::FunctionCall)
+            {
+                const auto aMatrix = materializeMatrixNode(rArgument, rDoc, rContext, rFormulaPos);
+                if (aMatrix.mbSupported && aMatrix.moValue)
+                {
+                    return makeMaterializedValue(lookupexecution::detail::toApiCellValue(
+                        (*aMatrix.moValue)->Get(0, 0)));
+                }
+                if (aMatrix.mbSupported && !aMatrix.moValue)
+                    return makeMaterializedError<api::CellValue>(aMatrix.meError);
+            }
+
+            return materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+        }();
         if (!aArgument.mbSupported)
             return makeUnsupportedMaterialization<CriteriaPredicate>(aArgument.meFallbackReason);
         if (!aArgument.moValue)

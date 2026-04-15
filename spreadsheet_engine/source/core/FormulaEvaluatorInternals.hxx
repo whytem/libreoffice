@@ -887,6 +887,20 @@ public:
             return api::ValueResult<api::CellValue>::success(rInput.maScalar);
         }
 
+        if (!rInput.maValues.empty())
+        {
+            const std::int64_t nLinearIndex
+                = static_cast<std::int64_t>(aCoordinate.mnRow) * rInput.mnColumns
+                  + aCoordinate.mnColumn;
+            if (nLinearIndex < 0
+                || static_cast<std::size_t>(nLinearIndex) >= rInput.maValues.size())
+            {
+                return api::ValueResult<api::CellValue>::failure(api::Error::IllegalArgument);
+            }
+            return api::ValueResult<api::CellValue>::success(
+                rInput.maValues[static_cast<std::size_t>(nLinearIndex)]);
+        }
+
         EvaluationResult aResult = mrEvaluator.materializeReferenceValue(
             rInput.maReference, aCoordinate.mnColumn, aCoordinate.mnRow);
         if (!aResult)

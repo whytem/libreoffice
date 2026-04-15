@@ -2048,8 +2048,19 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorCriteriaAggre
     m_pDoc->SetValue(1, 2, 0, 30.0);
     m_pDoc->SetValue(1, 3, 0, 40.0);
     m_pDoc->SetValue(1, 4, 0, 50.0);
-    m_pDoc->SetValue(3, 0, 0, 2.0);
-    m_pDoc->SetString(3, 1, 0, u">2"_ustr);
+    m_pDoc->SetValue(7, 0, 0, 2.0);
+    m_pDoc->SetString(7, 1, 0, u">2"_ustr);
+    m_pDoc->SetValue(2, 0, 0, 1.0);
+    m_pDoc->SetValue(2, 1, 0, 0.0);
+    m_pDoc->SetValue(3, 0, 0, 3.0);
+    m_pDoc->SetValue(3, 1, 0, 4.0);
+    m_pDoc->SetValue(4, 0, 0, 2.0);
+    m_pDoc->SetValue(4, 1, 0, 2.0);
+    m_pDoc->SetValue(5, 0, 0, 11.0);
+    m_pDoc->SetValue(5, 1, 0, 12.0);
+    m_pDoc->SetValue(5, 2, 0, 11.0);
+    m_pDoc->SetValue(5, 3, 0, 13.0);
+    m_pDoc->SetValue(5, 4, 0, 14.0);
     CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(new ScRangeData(
         *m_pDoc, u"CriteriaData"_ustr, u"$EngineCriteriaAggregateAuthority.$A$1:$A$5"_ustr)));
     CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(new ScRangeData(
@@ -2060,23 +2071,29 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorCriteriaAggre
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
         setaileval::resetStats();
 
-        m_pDoc->SetString(0, 7, 0, u"=COUNTIF(A1:A5;D1)"_ustr);
+        m_pDoc->SetString(0, 7, 0, u"=COUNTIF(A1:A5;H1)"_ustr);
         m_pDoc->SetString(1, 7, 0, u"=COUNTIFS(A1:A5;\">1\";B1:B5;\"<50\")"_ustr);
-        m_pDoc->SetString(2, 7, 0, u"=SUMIF(CriteriaData;D1;ValueData)"_ustr);
-        m_pDoc->SetString(3, 7, 0, u"=AVERAGEIF(A1:A5;D2;B1:B5)"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=SUMIF(CriteriaData;H1;ValueData)"_ustr);
+        m_pDoc->SetString(3, 7, 0, u"=AVERAGEIF(A1:A5;H2;B1:B5)"_ustr);
+        m_pDoc->SetString(4, 7, 0, u"=SUMIF({-10|10|20|30};\">0\")"_ustr);
+        m_pDoc->SetString(5, 7, 0, u"=COUNTIF(F1:F5;F1:F5)"_ustr);
+        m_pDoc->SetString(6, 7, 0, u"=COUNTIFS(F1:F5;F1:F5)"_ustr);
 
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(0, 7, 0));
         ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(1, 7, 0));
         ASSERT_DOUBLES_EQUAL(50.0, m_pDoc->GetValue(2, 7, 0));
         ASSERT_DOUBLES_EQUAL(45.0, m_pDoc->GetValue(3, 7, 0));
+        ASSERT_DOUBLES_EQUAL(60.0, m_pDoc->GetValue(4, 7, 0));
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(5, 7, 0));
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(6, 7, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 4);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 7);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::CriteriaAggregate)]
-            >= 4);
+            >= 7);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::CriteriaAggregate)]);
