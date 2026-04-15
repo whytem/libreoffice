@@ -143,10 +143,10 @@ This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=7618`
-- `interpret_tail_live_authoritative_match_total=4598`
-- `interpret_tail_live_authoritative_fallback_total=3020`
-- live authoritative-match rate over the corpus: `9.0760%`
-- live authoritative-match rate over the current promoted probe: `60.3570%`
+- `interpret_tail_live_authoritative_match_total=4600`
+- `interpret_tail_live_authoritative_fallback_total=3018`
+- live authoritative-match rate over the corpus: `9.0800%`
+- live authoritative-match rate over the current promoted probe: `60.3833%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -156,12 +156,12 @@ This is the honest all-formula live-routing surface from the standing replay
 corpus:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=20392`
-- `interpret_tail_live_fallback_total=520`
+- `interpret_tail_live_supported_total=20548`
+- `interpret_tail_live_fallback_total=364`
 - `interpret_tail_live_seen_total=20912`
 - `interpret_tail_live_unseen_formula_cells=29749`
 - `interpret_tail_live_promoted_function_supported_total=19142`
-- `interpret_tail_live_supported_rate=40.25`
+- `interpret_tail_live_supported_rate=40.56`
 - `interpret_tail_live_seen_rate=41.28`
 
 Current ambient fallback reasons:
@@ -169,7 +169,7 @@ Current ambient fallback reasons:
 - `unsupported_formula_shape=36`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=480`
+- `unsupported_function=324`
 
 Interpretation:
 
@@ -186,6 +186,10 @@ Interpretation:
 - the broad corpus lane now completes again with `BusinessDay` admitted on
   the default ambient surface after rejecting zero-workday `WORKDAY` weekend
   masks before they enter the shared runtime
+- the next `BusinessDay` slice has now admitted cheap local reference,
+  holiday-range, weekend-range, weekend-code-ref, and named-ref shapes, which
+  moved that live family from `118 supported / 158 fallback` to
+  `274 supported / 2 fallback`
 - the main remaining ambient work is now the still-large
   `unsupported_function` wall, not simple denominator reach
 - the live authoritative-match north-star has now moved decisively above the
@@ -219,14 +223,14 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=7618`
-- `interpret_tail_authoritative_total=2813`
-- `interpret_tail_authoritative_fallback_total=4805`
-- promoted-family authoritative rate: `36.93%`
+- `interpret_tail_authoritative_total=2848`
+- `interpret_tail_authoritative_fallback_total=4770`
+- promoted-family authoritative rate: `37.39%`
 
 Current promoted-family fallback reasons:
 
-- `shadow_mismatch=4718`
-- `unsupported_function=101`
+- `shadow_mismatch=4729`
+- `unsupported_function=47`
 - `unsupported_formula_shape=5`
 - `unsupported_host_surface=0`
 
@@ -340,8 +344,8 @@ Interpretation:
   broader imported promoted-family surface, no longer dominated by a
   `BusinessDay` gating artifact
 - the dominant next target is now the broader ambient
-  `unsupported_function` wall, with `BusinessDay` now measurable on the
-  default ambient surface
+  `unsupported_function` wall, with `BusinessDay` now both measurable and
+  mostly admitted on the default ambient surface
 
 ## Hard-Routed Family
 

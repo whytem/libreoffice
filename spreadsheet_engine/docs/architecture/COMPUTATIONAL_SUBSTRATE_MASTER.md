@@ -27,10 +27,12 @@ Today:
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to
-  `4598 / 50,661` (`9.0760%`) on the standing replay corpus
+  `4600 / 50,661` (`9.0800%`) on the standing replay corpus
 - the broad corpus lane now completes again with `BusinessDay` admitted on the
   default ambient surface after rejecting zero-workday `WORKDAY` weekend masks
-  before they enter the shared runtime
+  before they enter the shared runtime, and the next `BusinessDay` slice has
+  now admitted cheap local reference, holiday-range, weekend-range,
+  weekend-code-ref, and named-ref shapes
 
 The active program is no longer “prove more substrate slices.”
 The active program is “use the substrate to underwrite live evaluator
@@ -52,22 +54,22 @@ This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=7618`
-- `interpret_tail_live_authoritative_match_total=4598`
-- `interpret_tail_live_authoritative_fallback_total=3020`
-- live authoritative-match rate over the corpus: `9.0760%`
-- live authoritative-match rate over the current promoted probe: `60.3570%`
+- `interpret_tail_live_authoritative_match_total=4600`
+- `interpret_tail_live_authoritative_fallback_total=3018`
+- live authoritative-match rate over the corpus: `9.0800%`
+- live authoritative-match rate over the current promoted probe: `60.3833%`
 
 Everything below is diagnostic context for improving that number.
 
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=20392`
-- `interpret_tail_live_fallback_total=520`
+- `interpret_tail_live_supported_total=20548`
+- `interpret_tail_live_fallback_total=364`
 - `interpret_tail_live_seen_total=20912`
 - `interpret_tail_live_unseen_formula_cells=29749`
 - `interpret_tail_live_promoted_function_supported_total=19142`
-- `interpret_tail_live_supported_rate=40.25`
+- `interpret_tail_live_supported_rate=40.56`
 - `interpret_tail_live_seen_rate=41.28`
 
 Dominant ambient fallback reasons:
@@ -75,7 +77,7 @@ Dominant ambient fallback reasons:
 - `unsupported_formula_shape=36`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=480`
+- `unsupported_function=324`
 
 ### Full Replay Corpus: Forced Interpret Observe
 
@@ -91,14 +93,14 @@ Dominant ambient fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=7618`
-- `interpret_tail_authoritative_total=2813`
-- `interpret_tail_authoritative_fallback_total=4805`
-- promoted-family authoritative rate: `36.93%`
+- `interpret_tail_authoritative_total=2848`
+- `interpret_tail_authoritative_fallback_total=4770`
+- promoted-family authoritative rate: `37.39%`
 
 Dominant promoted-family fallback reasons:
 
-- `shadow_mismatch=4718`
-- `unsupported_function=101`
+- `shadow_mismatch=4729`
+- `unsupported_function=47`
 - `unsupported_formula_shape=5`
 - `unsupported_host_surface=0`
 
@@ -324,7 +326,7 @@ The highest-value remaining blockers are now:
    the full replay corpus now shows `20,912` seen formulas out of `50,661`,
    but `520` of those seen routes still fall back
 2. live-authority headroom:
-   the north-star is now `4598 / 50,661` (`9.0760%`), which is a real jump
+   the north-star is now `4600 / 50,661` (`9.0800%`), which is a real jump
    but still well short of deletion-comfortable territory
 3. imported live-host-truth residuals:
    the next likely north-star movers are now the broader ambient
@@ -345,9 +347,9 @@ The highest-value remaining blockers are now:
    correctness surface, not a live seam-off retirement denominator
 
 The live authoritative-match north-star on the standing replay corpus has now
-improved to `4598 / 50,661` (`9.0760%`), while ambient live reach has widened
+improved to `4600 / 50,661` (`9.0800%`), while ambient live reach has widened
 to `20,912 / 50,661` seen formulas (`41.28%`) and
-`20,392 / 50,661` supported (`40.25%`). That remains the only number that
+`20,548 / 50,661` supported (`40.56%`). That remains the only number that
 should gate deletion claims.
 
 That gain came first from aligning imported live host truth on
@@ -356,9 +358,11 @@ that same policy into imported direct `information_predicate` residue plus the
 follow-on imported direct `logical_fold` and nested-`XMATCH` `INDEX`
 residue, then from admitting a bounded ranked-statistical cluster for
 `QUARTILE*` and `PERCENTRANK*`, and now from admitting bounded
-calendar/date utility helpers, and now from fixing the zero-workday
+calendar/date utility helpers, and then from fixing the zero-workday
 `WORKDAY` weekend-mask hang so `BusinessDay` can stay on the default ambient
-surface without blowing out the broad corpus lane. It intentionally trades
+surface without blowing out the broad corpus lane, followed by widening that
+same `BusinessDay` family to cheap local reference, holiday-range,
+weekend-range, weekend-code-ref, and named-ref shapes. It intentionally trades
 away a large amount of cached-workbook promoted-probe agreement, so the raw
 promoted probe must now be read strictly as diagnostics rather than as
 progress gating.

@@ -35,22 +35,22 @@ This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=7618`
-- `interpret_tail_live_authoritative_match_total=4598`
-- `interpret_tail_live_authoritative_fallback_total=3020`
-- live authoritative-match rate over the corpus: `9.0760%`
-- live authoritative-match rate over the current promoted probe: `60.3570%`
+- `interpret_tail_live_authoritative_match_total=4600`
+- `interpret_tail_live_authoritative_fallback_total=3018`
+- live authoritative-match rate over the corpus: `9.0800%`
+- live authoritative-match rate over the current promoted probe: `60.3833%`
 
 Everything below is diagnostic context for improving that number.
 
 ### Full Replay Corpus: Ambient Live Observe
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=20392`
-- `interpret_tail_live_fallback_total=520`
+- `interpret_tail_live_supported_total=20548`
+- `interpret_tail_live_fallback_total=364`
 - `interpret_tail_live_seen_total=20912`
 - `interpret_tail_live_unseen_formula_cells=29749`
 - `interpret_tail_live_promoted_function_supported_total=19142`
-- `interpret_tail_live_supported_rate=40.25`
+- `interpret_tail_live_supported_rate=40.56`
 - `interpret_tail_live_seen_rate=41.28`
 
 Ambient live fallback reasons:
@@ -58,7 +58,7 @@ Ambient live fallback reasons:
 - `unsupported_formula_shape=36`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=480`
+- `unsupported_function=324`
 
 ### Full Replay Corpus: Forced Interpret Observe
 
@@ -74,9 +74,9 @@ Ambient live fallback reasons:
 ### Promoted-Family Probe
 
 - `interpret_tail_probe_formula_cells=7618`
-- `interpret_tail_authoritative_total=2813`
-- `interpret_tail_authoritative_fallback_total=4805`
-- promoted-family authoritative rate: `36.93%`
+- `interpret_tail_authoritative_total=2848`
+- `interpret_tail_authoritative_fallback_total=4770`
+- promoted-family authoritative rate: `37.39%`
 
 ### Live-Target Filtered Promoted Probe
 
@@ -87,8 +87,8 @@ Ambient live fallback reasons:
 
 Promoted-family fallback reasons:
 
-- `shadow_mismatch=4718`
-- `unsupported_function=101`
+- `shadow_mismatch=4729`
+- `unsupported_function=47`
 - `unsupported_formula_shape=5`
 - `unsupported_host_surface=0`
 
@@ -249,18 +249,20 @@ Still not true:
 - multiple interpreter hard-route milestones have landed, but full legacy
   opcode retirement has not
 - the dominant retained live blocker is now the broader ambient
-  `unsupported_function=480` wall rather than residual quality inside the
+  `unsupported_function=324` wall rather than residual quality inside the
   already-admitted families
 - the live authoritative-match north-star has now moved to
-  `4598 / 50,661` (`9.0760%`) on the replay corpus
+  `4600 / 50,661` (`9.0800%`) on the replay corpus
 - that gain now includes imported direct information-predicate host-truth
   parity on unsupported expression roots, plus the follow-on imported
   direct logical-fold and nested-`XMATCH` `INDEX` host-truth cleanup, and the
   new bounded ranked-statistical plus calendar/date utility clusters, and a
   default-on `BusinessDay` family that now rejects zero-workday `WORKDAY`
-  weekend masks before entering the shared runtime
+  weekend masks before entering the shared runtime, plus newly admitted local
+  reference, holiday-range, weekend-range, weekend-code-ref, and named-ref
+  `BusinessDay` shapes
 - the raw promoted replay probe is now unambiguously a diagnostic surface, not
-  the retirement denominator: it intentionally sits at `2813 / 4805`
+  the retirement denominator: it intentionally sits at `2848 / 4770`
   because live-host parity now takes precedence over cached-workbook parity on
   those imported rows
 - a focused live-host check now shows the replay-imported whole-row
@@ -304,7 +306,7 @@ Still not true:
   all `7618` promoted replay probe rows are imported host-truth artifacts under
   seam-off direct legacy interpretation
 - the dominant retained live bucket is now the still-large ambient
-  `unsupported_function=480`; the raw promoted buckets remain diagnostic debt,
+  `unsupported_function=324`; the raw promoted buckets remain diagnostic debt,
   not the deletion-gating story
 - the next runtime milestone therefore should not be defined by the imported
   replay probe anymore; it should move to quality inside the new ambient live
