@@ -49,8 +49,8 @@ remain useful for hotspot steering, but they should not be read as the
 deletion denominator.
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=51350`
-- `interpret_tail_live_fallback_total=320`
+- `interpret_tail_live_supported_total=51358`
+- `interpret_tail_live_fallback_total=312`
 - `interpret_tail_live_seen_total=51670`
 - `interpret_tail_live_unseen_formula_cells=0`
 - `interpret_tail_live_promoted_function_supported_total=50093`
@@ -72,11 +72,11 @@ supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
 - `interpret_tail_live_unique_seen_formula_cells=8679`
-- `interpret_tail_live_unique_supported_formula_cells=8523`
-- `interpret_tail_live_unique_fallback_formula_cells=156`
+- `interpret_tail_live_unique_supported_formula_cells=8526`
+- `interpret_tail_live_unique_fallback_formula_cells=153`
 - `interpret_tail_live_unique_unseen_formula_cells=41982`
 - `interpret_tail_live_unique_seen_rate=17.13`
-- `interpret_tail_live_unique_supported_rate=16.82`
+- `interpret_tail_live_unique_supported_rate=16.83`
 
 ### Full Replay Corpus: Forced Interpret Observe Attempts
 
@@ -100,8 +100,8 @@ actually seen and supported by the seam.
 
 - `interpret_tail_forced_direct_formula_cells=50661`
 - `interpret_tail_forced_direct_seen_formula_cells=8631`
-- `interpret_tail_forced_direct_supported_formula_cells=8475`
-- `interpret_tail_forced_direct_fallback_formula_cells=156`
+- `interpret_tail_forced_direct_supported_formula_cells=8478`
+- `interpret_tail_forced_direct_fallback_formula_cells=153`
 - `interpret_tail_forced_direct_unseen_formula_cells=42030`
 - `interpret_tail_forced_direct_seen_rate=17.04`
 - `interpret_tail_forced_direct_supported_rate=16.73`
@@ -297,7 +297,8 @@ Still not true:
   reference, holiday-range, weekend-range, weekend-code-ref, and named-ref
   `BusinessDay` shapes, and now a bounded criteria-aggregate slice for
   `COUNTIF` / `COUNTIFS`, `SUMIF` / `SUMIFS`, `AVERAGEIF` / `AVERAGEIFS`, and
-  `MAXIFS` / `MINIFS`
+  `MAXIFS` / `MINIFS`, with the literal-array and range-criteria residue now
+  closed and only the matrix-`IF(...)` criteria shapes left
 - the raw promoted replay probe is now unambiguously a diagnostic surface, not
   the retirement denominator: it intentionally sits at `2948 / 5083`
   because live-host parity now takes precedence over cached-workbook parity on

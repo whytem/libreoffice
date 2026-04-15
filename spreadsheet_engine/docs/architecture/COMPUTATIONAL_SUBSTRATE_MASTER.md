@@ -67,8 +67,8 @@ Everything below is diagnostic context for improving that number.
 These are attempt totals from live observe, not unique-cell coverage.
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=51350`
-- `interpret_tail_live_fallback_total=320`
+- `interpret_tail_live_supported_total=51358`
+- `interpret_tail_live_fallback_total=312`
 - `interpret_tail_live_seen_total=51670`
 - `interpret_tail_live_unseen_formula_cells=0`
 - `interpret_tail_live_promoted_function_supported_total=50093`
@@ -90,11 +90,11 @@ supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
 - `interpret_tail_live_unique_seen_formula_cells=8679`
-- `interpret_tail_live_unique_supported_formula_cells=8523`
-- `interpret_tail_live_unique_fallback_formula_cells=156`
+- `interpret_tail_live_unique_supported_formula_cells=8526`
+- `interpret_tail_live_unique_fallback_formula_cells=153`
 - `interpret_tail_live_unique_unseen_formula_cells=41982`
 - `interpret_tail_live_unique_seen_rate=17.13`
-- `interpret_tail_live_unique_supported_rate=16.82`
+- `interpret_tail_live_unique_supported_rate=16.83`
 
 ### Full Replay Corpus: Forced Interpret Observe Attempts
 
@@ -117,8 +117,8 @@ forcing each replay formula cell once.
 
 - `interpret_tail_forced_direct_formula_cells=50661`
 - `interpret_tail_forced_direct_seen_formula_cells=8631`
-- `interpret_tail_forced_direct_supported_formula_cells=8475`
-- `interpret_tail_forced_direct_fallback_formula_cells=156`
+- `interpret_tail_forced_direct_supported_formula_cells=8478`
+- `interpret_tail_forced_direct_fallback_formula_cells=153`
 - `interpret_tail_forced_direct_unseen_formula_cells=42030`
 - `interpret_tail_forced_direct_seen_rate=17.04`
 - `interpret_tail_forced_direct_supported_rate=16.73`
@@ -382,9 +382,9 @@ The highest-value remaining blockers are now:
 The live authoritative-match north-star on the standing replay corpus has now
 improved to `4935 / 50,661` (`9.7412%`). The new honest live unique-cell
 inventory now shows `8679 / 50,661` formula cells seen (`17.13%`) and
-`8523 / 50,661` supported (`16.82%`) during the bulk live observe run, while
+`8526 / 50,661` supported (`16.83%`) during the bulk live observe run, while
 the forced-direct comparison surface now sits at
-`8631 / 50,661` seen (`17.04%`) and `8475 / 50,661` supported (`16.73%`).
+`8631 / 50,661` seen (`17.04%`) and `8478 / 50,661` supported (`16.73%`).
 Those are the coverage-style numbers we should currently use alongside the
 north-star; the broader live and forced-interpret counters are still attempt
 telemetry rather than a deletion denominator.
