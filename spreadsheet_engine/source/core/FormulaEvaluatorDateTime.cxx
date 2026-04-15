@@ -849,6 +849,8 @@ if (aFunctionName == u"BASISODATETIME")
         }
         if (!aWeekendMask)
             return makeFailure(aWeekendMask.meError);
+        if (!api::workday::hasAvailableWorkday(aWeekendMask.maValue))
+            return makeFailure(api::Error::IllegalArgument);
 
         const auto aHolidays = aContext.collectHolidaySerials(
             bIntl ? (rNode.maChildren.size() >= 4 ? rNode.maChildren[3].get() : nullptr)

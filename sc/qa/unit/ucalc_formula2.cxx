@@ -1997,19 +1997,22 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorBusinessDayAu
             u"=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);2;5;{\"2014-11-2\";\"2014-11-3\";\"2014-11-4\"})"_ustr);
         m_pDoc->SetString(3, 7, 0,
             u"=COM.MICROSOFT.NETWORKDAYS.INTL(DATE(2014;11;1);DATE(2014;11;30);1;{\"2014-11-11\";\"2014-11-28\";\"2014-11-27\"})"_ustr);
+        m_pDoc->SetString(4, 7, 0,
+            u"=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);2;{1;1;1;1;1;1;1};{\"2014-11-2\"})"_ustr);
 
         ASSERT_DOUBLES_EQUAL(41954.0, m_pDoc->GetValue(0, 7, 0));
         ASSERT_DOUBLES_EQUAL(17.0, m_pDoc->GetValue(1, 7, 0));
         ASSERT_DOUBLES_EQUAL(41951.0, m_pDoc->GetValue(2, 7, 0));
         ASSERT_DOUBLES_EQUAL(17.0, m_pDoc->GetValue(3, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(4, 7, 0)));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 4);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 5);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::BusinessDay)]
-            >= 4);
+            >= 5);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::BusinessDay)]);

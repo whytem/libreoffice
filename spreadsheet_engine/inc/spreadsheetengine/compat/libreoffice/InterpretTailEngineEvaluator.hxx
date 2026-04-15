@@ -283,7 +283,7 @@ private:
     {
         return envEnabled(pValue);
     }
-    return false;
+    return true;
 }
 
 [[nodiscard]] inline std::size_t diagnosticSampleLimit()
@@ -5291,6 +5291,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             return makeUnsupported(eFunction, aWeekendMask.meFallbackReason);
         if (!aWeekendMask.moValue)
             return makeErrorAttempt(aWeekendMask.meError);
+        if (!api::workday::hasAvailableWorkday(*aWeekendMask.moValue))
+            return makeErrorAttempt(api::Error::IllegalArgument);
 
         const auto aHolidays = collectHolidaySerials(
             bIntl ? (rNode.maChildren.size() >= 4 ? rNode.maChildren[3].get() : nullptr)

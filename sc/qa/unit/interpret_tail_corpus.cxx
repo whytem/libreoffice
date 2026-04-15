@@ -26,6 +26,7 @@
 #include <spreadsheetengine/detail/FodsLoader.hxx>
 #include <spreadsheetengine/detail/OdfFormulaParser.hxx>
 #include <spreadsheetengine/detail/WorkbookModel.hxx>
+#include <spreadsheetengine/runtime/DateTimeWorkday.hxx>
 
 #include <algorithm>
 #include <cstdlib>
@@ -1504,6 +1505,48 @@ void printLiveAuthoritativeSummary(
               << fProbeMatchRate << '\n';
     std::cout.flags(aOldFlags);
     std::cout.precision(nOldPrecision);
+}
+
+void printWorkdayRuntimeStats()
+{
+    if (!envEnabled("SPREADSHEET_ENGINE_WORKDAY_RUNTIME_STATS"))
+        return;
+
+    const auto aStats = spreadsheetengine::core::datetime::getWorkdayRuntimeStatsSnapshot();
+    std::cout << "workday_runtime_weekend_mask_sequence_calls="
+              << aStats.mnWeekendMaskSequenceCalls << '\n';
+    std::cout << "workday_runtime_weekend_mask_msspec_calls="
+              << aStats.mnWeekendMaskMsSpecCalls << '\n';
+    std::cout << "workday_runtime_count_calls=" << aStats.mnCountWorkdaysCalls << '\n';
+    std::cout << "workday_runtime_count_total_span_days="
+              << aStats.mnCountWorkdaysTotalSpanDays << '\n';
+    std::cout << "workday_runtime_count_max_span_days="
+              << aStats.mnCountWorkdaysMaxSpanDays << '\n';
+    std::cout << "workday_runtime_count_total_holiday_count="
+              << aStats.mnCountWorkdaysTotalHolidayCount << '\n';
+    std::cout << "workday_runtime_count_max_holiday_count="
+              << aStats.mnCountWorkdaysMaxHolidayCount << '\n';
+    std::cout << "workday_runtime_count_total_loop_iterations="
+              << aStats.mnCountWorkdaysTotalLoopIterations << '\n';
+    std::cout << "workday_runtime_count_max_loop_iterations="
+              << aStats.mnCountWorkdaysMaxLoopIterations << '\n';
+    std::cout << "workday_runtime_advance_calls=" << aStats.mnAdvanceWorkdayCalls << '\n';
+    std::cout << "workday_runtime_advance_total_requested_days="
+              << aStats.mnAdvanceWorkdayTotalRequestedDays << '\n';
+    std::cout << "workday_runtime_advance_max_requested_days="
+              << aStats.mnAdvanceWorkdayMaxRequestedDays << '\n';
+    std::cout << "workday_runtime_advance_total_holiday_count="
+              << aStats.mnAdvanceWorkdayTotalHolidayCount << '\n';
+    std::cout << "workday_runtime_advance_max_holiday_count="
+              << aStats.mnAdvanceWorkdayMaxHolidayCount << '\n';
+    std::cout << "workday_runtime_advance_total_calendar_steps="
+              << aStats.mnAdvanceWorkdayTotalCalendarSteps << '\n';
+    std::cout << "workday_runtime_advance_max_calendar_steps="
+              << aStats.mnAdvanceWorkdayMaxCalendarSteps << '\n';
+    std::cout << "workday_runtime_advance_total_weekend_skips="
+              << aStats.mnAdvanceWorkdayTotalWeekendSkips << '\n';
+    std::cout << "workday_runtime_advance_total_holiday_skips="
+              << aStats.mnAdvanceWorkdayTotalHolidaySkips << '\n';
 }
 
 void appendDiagnosticSamples(
@@ -3160,6 +3203,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     std::vector<DiagnosticSample> aLiveDiagnosticSamples;
     resetProbeDiagnosticSamples();
     resetReplayEligibilityDiagnosticSamples();
+    spreadsheetengine::core::datetime::resetWorkdayRuntimeStats();
 
     std::size_t nWorkbookCount = 0;
     std::size_t nFormulaCellCount = 0;
@@ -3333,6 +3377,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         printLiveTargetProbeSummary(aPrintedProbeRun);
     }
     printReplayEligibilityInventory(aReplayEligibilityInventory);
+    printWorkdayRuntimeStats();
     printDiagnosticSamples(aLiveDiagnosticSamples);
     printProbeDiagnosticSamples();
     printReplayEligibilityDiagnosticSamples();

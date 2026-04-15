@@ -47,6 +47,11 @@ inline api::ValueResult<api::WeekendMask> weekendMaskFromMsSpec(
     return api::ValueResult<api::WeekendMask>::failure(api::Error::IllegalArgument);
 }
 
+inline bool hasAvailableWorkday(const api::WeekendMask& rWeekendMask)
+{
+    return spreadsheetengine::core::datetime::hasAvailableWorkday(rWeekendMask);
+}
+
 inline api::DateSerial countWorkdays(api::DateSerial nDate1, api::DateSerial nDate2,
     const std::vector<api::DateSerial>& rSortedHolidays, const api::WeekendMask& rWeekendMask)
 {

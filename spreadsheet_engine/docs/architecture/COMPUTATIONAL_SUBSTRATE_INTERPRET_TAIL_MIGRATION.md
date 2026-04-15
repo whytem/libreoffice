@@ -156,12 +156,12 @@ This is the honest all-formula live-routing surface from the standing replay
 corpus:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=20274`
-- `interpret_tail_live_fallback_total=638`
+- `interpret_tail_live_supported_total=20392`
+- `interpret_tail_live_fallback_total=520`
 - `interpret_tail_live_seen_total=20912`
 - `interpret_tail_live_unseen_formula_cells=29749`
-- `interpret_tail_live_promoted_function_supported_total=19024`
-- `interpret_tail_live_supported_rate=40.02`
+- `interpret_tail_live_promoted_function_supported_total=19142`
+- `interpret_tail_live_supported_rate=40.25`
 - `interpret_tail_live_seen_rate=41.28`
 
 Current ambient fallback reasons:
@@ -169,7 +169,7 @@ Current ambient fallback reasons:
 - `unsupported_formula_shape=36`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=598`
+- `unsupported_function=480`
 
 Interpretation:
 
@@ -183,9 +183,9 @@ Interpretation:
   on the live surface
 - the imported direct logical-fold residue and the imported nested-`XMATCH`
   `INDEX` residue are now also closed on the live surface
-- the broad corpus lane now completes again with `BusinessDay` held behind an
-  explicit opt-in gate; that family remains focused proof coverage today, not
-  default ambient surface
+- the broad corpus lane now completes again with `BusinessDay` admitted on
+  the default ambient surface after rejecting zero-workday `WORKDAY` weekend
+  masks before they enter the shared runtime
 - the main remaining ambient work is now the still-large
   `unsupported_function` wall, not simple denominator reach
 - the live authoritative-match north-star has now moved decisively above the
@@ -198,12 +198,12 @@ This is the new full-corpus measurement after explicitly dirtying and forcing
 every replay formula cell through Calc's live `Interpret()` path:
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=47731`
-- `interpret_tail_forced_interpret_fallback_total=319`
+- `interpret_tail_forced_interpret_supported_total=47790`
+- `interpret_tail_forced_interpret_fallback_total=260`
 - `interpret_tail_forced_interpret_seen_total=48050`
 - `interpret_tail_forced_interpret_unseen_formula_cells=2611`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=47104`
-- `interpret_tail_forced_interpret_supported_rate=94.22`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=47163`
+- `interpret_tail_forced_interpret_supported_rate=94.33`
 - `interpret_tail_forced_interpret_seen_rate=94.85`
 
 Interpretation:
@@ -219,9 +219,9 @@ Interpretation:
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
 - `interpret_tail_probe_formula_cells=7618`
-- `interpret_tail_authoritative_total=2794`
-- `interpret_tail_authoritative_fallback_total=4824`
-- promoted-family authoritative rate: `36.68%`
+- `interpret_tail_authoritative_total=2813`
+- `interpret_tail_authoritative_fallback_total=4805`
+- promoted-family authoritative rate: `36.93%`
 
 Current promoted-family fallback reasons:
 
@@ -336,12 +336,12 @@ Interpretation:
   promoting bounded calendar/date utility helpers on top of the earlier
   scalar feeder, aggregate, and ranked-statistical widening
 - both shared and non-shared promoted replay formulas now reach the live seam
-- the residual replay work is now the `106` direct fallback cells on this
-  broader imported promoted-family surface, dominated by the explicit
-  `BusinessDay` opt-in gate plus small utility-family parity residue
+- the residual replay work is now the `76` direct fallback cells on this
+  broader imported promoted-family surface, no longer dominated by a
+  `BusinessDay` gating artifact
 - the dominant next target is now the broader ambient
-  `unsupported_function` wall, with `BusinessDay` intentionally kept out of the
-  default ambient surface until its evaluator cost is redesigned
+  `unsupported_function` wall, with `BusinessDay` now measurable on the
+  default ambient surface
 
 ## Hard-Routed Family
 

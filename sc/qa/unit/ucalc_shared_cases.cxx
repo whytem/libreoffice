@@ -2839,6 +2839,17 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorBusinessDa
     CPPUNIT_ASSERT_DOUBLES_EQUAL(41951.0, aWorkdayIntl.maResult.mfValue, 1e-12);
     CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, aWorkdayIntl.meFormatType);
 
+    const auto aWorkdayIntlAllWeekend = setaileval::tryEvaluateFormula(*m_pDoc, rContext,
+        aFormulaPos,
+        u"=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);2;{1;1;1;1;1;1;1};{\"2014-11-2\"})",
+        false);
+    CPPUNIT_ASSERT(aWorkdayIntlAllWeekend.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::BusinessDay, aWorkdayIntlAllWeekend.meFunction);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::Error,
+        aWorkdayIntlAllWeekend.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::IllegalArgument, aWorkdayIntlAllWeekend.maResult.meError);
+
     const auto aNetworkDaysIntl = setaileval::tryEvaluateFormula(*m_pDoc, rContext, aFormulaPos,
         u"=COM.MICROSOFT.NETWORKDAYS.INTL(DATE(2014;11;1);DATE(2014;11;30);1;{\"2014-11-11\";\"2014-11-28\";\"2014-11-27\"})",
         false);

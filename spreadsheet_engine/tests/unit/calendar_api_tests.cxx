@@ -45,6 +45,14 @@ int main()
             "weekendMaskFromMsSpec() invalid handling mismatch");
     }
 
+    const auto aAllWeekendSequence
+        = weekendMaskFromSequence({ 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 });
+    if (!aAllWeekendSequence || hasAvailableWorkday(aAllWeekendSequence.maValue))
+    {
+        return fail("spreadsheetengine_calendar_tests",
+            "weekendMaskFromSequence() all-weekend handling mismatch");
+    }
+
     const std::vector<DateSerial> aHolidaySerials { 8 };
     if (countWorkdays(1, 10, aHolidaySerials, aDefaultWeekendMask) != 7)
         return fail("spreadsheetengine_calendar_tests", "countWorkdays() mismatch");
