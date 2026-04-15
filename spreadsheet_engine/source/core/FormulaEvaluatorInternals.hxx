@@ -100,20 +100,7 @@ using spreadsheetengine::runtime::referencetext::formatAddressFunctionResult;
 
 [[nodiscard]] std::optional<std::int32_t> classifyLegacyErrorType(api::Error eError);
 
-[[nodiscard]] std::optional<int> weekdayIndexForFodsDate(api::DateSerial nDate);
-
-[[nodiscard]] bool isWeekendFodsDate(api::DateSerial nDate, const api::WeekendMask& rWeekendMask);
-
 [[nodiscard]] bool isLiteralArrayWeekendNode(const formula::Node& rNode);
-
-[[nodiscard]] bool isHolidayFodsDate(
-    api::DateSerial nDate, const std::vector<api::DateSerial>& rSortedHolidays);
-
-[[nodiscard]] api::DateSerial countWorkdaysFods(api::DateSerial nDate1, api::DateSerial nDate2,
-    const std::vector<api::DateSerial>& rSortedHolidays, const api::WeekendMask& rWeekendMask);
-
-[[nodiscard]] api::DateSerial advanceWorkdayFods(api::DateSerial nDate, api::DateSerial nDays,
-    const std::vector<api::DateSerial>& rSortedHolidays, const api::WeekendMask& rWeekendMask);
 
 [[nodiscard]] api::String formatBasisDateTime(double fSerialValue);
 

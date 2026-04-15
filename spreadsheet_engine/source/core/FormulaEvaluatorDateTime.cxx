@@ -856,7 +856,7 @@ if (aFunctionName == u"BASISODATETIME")
         if (!aHolidays)
             return makeFailure(aHolidays.meError);
 
-        return makeScalarResult(api::CellValue::number(advanceWorkdayFods(
+        return makeScalarResult(api::CellValue::number(sedatetime::advanceWorkday(
             static_cast<api::DateSerial>(*oStartDate), static_cast<api::DateSerial>(*oDays),
             aHolidays.maValue, aWeekendMask.maValue)));
     }
@@ -912,7 +912,7 @@ if (aFunctionName == u"BASISODATETIME")
         if (!aHolidays)
             return makeFailure(aHolidays.meError);
 
-        return makeScalarResult(api::CellValue::number(countWorkdaysFods(
+        return makeScalarResult(api::CellValue::number(sedatetime::countWorkdays(
             static_cast<api::DateSerial>(*oStartDate), static_cast<api::DateSerial>(*oEndDate),
             aHolidays.maValue, aWeekendMask.maValue)));
     }

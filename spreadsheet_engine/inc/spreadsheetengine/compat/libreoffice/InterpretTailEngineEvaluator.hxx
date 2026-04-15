@@ -5246,80 +5246,6 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         aHolidays.erase(std::unique(aHolidays.begin(), aHolidays.end()), aHolidays.end());
         return makeMaterializedValue(std::move(aHolidays));
     };
-    const auto weekdayIndexForDate = [&](api::DateSerial nDate) -> std::optional<int> {
-        const auto aWeekday = api::calendar::dayOfWeek(
-            toApiDateParts(rDoc.GetFormatTable()->GetNullDate()), nDate, 2);
-        if (!aWeekday || aWeekday.maValue < 1 || aWeekday.maValue > 7)
-            return std::nullopt;
-        return aWeekday.maValue - 1;
-    };
-    const auto countWorkdays = [&](api::DateSerial nDate1, api::DateSerial nDate2,
-                                   const std::vector<api::DateSerial>& rSortedHolidays,
-                                   const api::WeekendMask& rWeekendMask) {
-        std::int32_t nCount = 0;
-        const bool bReverse = nDate1 > nDate2;
-        if (bReverse)
-            std::swap(nDate1, nDate2);
-        const auto oWeekdayIndex = weekdayIndexForDate(nDate1);
-        if (!oWeekdayIndex)
-            return 0.0;
-        int nWeekdayIndex = *oWeekdayIndex;
-
-        while (nDate1 <= nDate2)
-        {
-            if (!rWeekendMask[static_cast<std::size_t>(nWeekdayIndex)]
-                && !std::binary_search(rSortedHolidays.begin(), rSortedHolidays.end(), nDate1))
-            {
-                ++nCount;
-            }
-            ++nDate1;
-            nWeekdayIndex = (nWeekdayIndex + 1) % 7;
-        }
-
-        return static_cast<double>(bReverse ? -nCount : nCount);
-    };
-    const auto advanceWorkday = [&](api::DateSerial nDate, api::DateSerial nDays,
-                                    const std::vector<api::DateSerial>& rSortedHolidays,
-                                    const api::WeekendMask& rWeekendMask) {
-        if (!nDays)
-            return static_cast<double>(nDate);
-        const auto oWeekdayIndex = weekdayIndexForDate(nDate);
-        if (!oWeekdayIndex)
-            return static_cast<double>(nDate);
-        int nWeekdayIndex = *oWeekdayIndex;
-
-        if (nDays > 0)
-        {
-            while (nDays)
-            {
-                do
-                {
-                    ++nDate;
-                    nWeekdayIndex = (nWeekdayIndex + 1) % 7;
-                } while (rWeekendMask[static_cast<std::size_t>(nWeekdayIndex)]);
-
-                if (!std::binary_search(rSortedHolidays.begin(), rSortedHolidays.end(), nDate))
-                    --nDays;
-            }
-        }
-        else
-        {
-            while (nDays)
-            {
-                do
-                {
-                    --nDate;
-                    nWeekdayIndex = (nWeekdayIndex + 6) % 7;
-                } while (rWeekendMask[static_cast<std::size_t>(nWeekdayIndex)]);
-
-                if (!std::binary_search(rSortedHolidays.begin(), rSortedHolidays.end(), nDate))
-                    ++nDays;
-            }
-        }
-
-        return static_cast<double>(nDate);
-    };
-
     const bool bWorkdayFunction = aFunctionName == u"WORKDAY"
                                   || aFunctionName == u"WORKDAY.INTL"
                                   || aFunctionName == u"COM.MICROSOFT.WORKDAY.INTL";
@@ -5375,8 +5301,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             return makeErrorAttempt(aHolidays.meError);
 
         return makeNumericAttempt(
-            advanceWorkday(*aStartDate.moValue, *aDays.moValue, *aHolidays.moValue,
-                *aWeekendMask.moValue),
+            static_cast<double>(api::workday::advanceWorkday(
+                *aStartDate.moValue, *aDays.moValue, *aHolidays.moValue,
+                *aWeekendMask.moValue)),
             SvNumFormatType::DATE);
     }
 
@@ -5422,8 +5349,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         return makeErrorAttempt(aHolidays.meError);
 
     return makeNumericAttempt(
-        countWorkdays(*aStartDate.moValue, *aEndDate.moValue, *aHolidays.moValue,
-            *aWeekendMask.moValue),
+        static_cast<double>(api::workday::countWorkdays(
+            *aStartDate.moValue, *aEndDate.moValue, *aHolidays.moValue,
+            *aWeekendMask.moValue)),
         SvNumFormatType::NUMBER);
 }
 

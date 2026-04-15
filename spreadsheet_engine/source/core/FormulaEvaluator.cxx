@@ -307,20 +307,6 @@ std::optional<std::int32_t> classifyLegacyErrorType(api::Error eError)
     }
 }
 
-std::optional<int> weekdayIndexForFodsDate(api::DateSerial nDate)
-{
-    const auto aWeekday = api::calendar::dayOfWeek(sedatetime::defaultNullDate(), nDate, 2);
-    if (!aWeekday || aWeekday.maValue < 1 || aWeekday.maValue > 7)
-        return std::nullopt;
-    return aWeekday.maValue - 1;
-}
-
-bool isWeekendFodsDate(api::DateSerial nDate, const api::WeekendMask& rWeekendMask)
-{
-    const auto oWeekdayIndex = weekdayIndexForFodsDate(nDate);
-    return oWeekdayIndex && rWeekendMask[static_cast<std::size_t>(*oWeekdayIndex)];
-}
-
 bool isLiteralArrayWeekendNode(const formula::Node& rNode)
 {
     switch (rNode.meKind)
@@ -335,68 +321,6 @@ bool isLiteralArrayWeekendNode(const formula::Node& rNode)
         default:
             return false;
     }
-}
-
-bool isHolidayFodsDate(api::DateSerial nDate, const std::vector<api::DateSerial>& rSortedHolidays)
-{
-    return std::binary_search(rSortedHolidays.begin(), rSortedHolidays.end(), nDate);
-}
-
-api::DateSerial countWorkdaysFods(api::DateSerial nDate1, api::DateSerial nDate2,
-    const std::vector<api::DateSerial>& rSortedHolidays, const api::WeekendMask& rWeekendMask)
-{
-    std::int32_t nCount = 0;
-    const bool bReverse = nDate1 > nDate2;
-    if (bReverse)
-        std::swap(nDate1, nDate2);
-
-    while (nDate1 <= nDate2)
-    {
-        if (!isWeekendFodsDate(nDate1, rWeekendMask)
-            && !isHolidayFodsDate(nDate1, rSortedHolidays))
-        {
-            ++nCount;
-        }
-        ++nDate1;
-    }
-
-    return bReverse ? -nCount : nCount;
-}
-
-api::DateSerial advanceWorkdayFods(api::DateSerial nDate, api::DateSerial nDays,
-    const std::vector<api::DateSerial>& rSortedHolidays, const api::WeekendMask& rWeekendMask)
-{
-    if (!nDays)
-        return nDate;
-
-    if (nDays > 0)
-    {
-        while (nDays)
-        {
-            do
-            {
-                ++nDate;
-            } while (isWeekendFodsDate(nDate, rWeekendMask));
-
-            if (!isHolidayFodsDate(nDate, rSortedHolidays))
-                --nDays;
-        }
-    }
-    else
-    {
-        while (nDays)
-        {
-            do
-            {
-                --nDate;
-            } while (isWeekendFodsDate(nDate, rWeekendMask));
-
-            if (!isHolidayFodsDate(nDate, rSortedHolidays))
-                ++nDays;
-        }
-    }
-
-    return nDate;
 }
 
 api::String formatBasisDateTime(double fSerialValue)
