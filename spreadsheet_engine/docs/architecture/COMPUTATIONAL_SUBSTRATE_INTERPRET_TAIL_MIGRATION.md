@@ -143,38 +143,38 @@ This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=7618`
-- `interpret_tail_live_authoritative_match_total=4600`
-- `interpret_tail_live_authoritative_fallback_total=3018`
-- live authoritative-match rate over the corpus: `9.0800%`
-- live authoritative-match rate over the current promoted probe: `60.3833%`
+- `interpret_tail_live_authoritative_match_total=4592`
+- `interpret_tail_live_authoritative_fallback_total=3026`
+- live authoritative-match rate over the corpus: `9.0642%`
+- live authoritative-match rate over the current promoted probe: `60.2783%`
 
 Everything below is diagnostic context for improving that number.
 
-### Full Replay Corpus: Ambient Live Observe
+### Full Replay Corpus: Ambient Live Observe Attempts
 
-This is the honest all-formula live-routing surface from the standing replay
-corpus:
+These are attempt totals from live observe, not unique-cell coverage:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=20548`
-- `interpret_tail_live_fallback_total=364`
-- `interpret_tail_live_seen_total=20912`
-- `interpret_tail_live_unseen_formula_cells=29749`
-- `interpret_tail_live_promoted_function_supported_total=19142`
-- `interpret_tail_live_supported_rate=40.56`
-- `interpret_tail_live_seen_rate=41.28`
+- `interpret_tail_live_supported_total=50076`
+- `interpret_tail_live_fallback_total=362`
+- `interpret_tail_live_seen_total=50438`
+- `interpret_tail_live_unseen_formula_cells=223`
+- `interpret_tail_live_promoted_function_supported_total=48826`
+- `interpret_tail_live_supported_rate=98.85`
+- `interpret_tail_live_seen_rate=99.56`
 
 Current ambient fallback reasons:
 
 - `unsupported_formula_shape=36`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=324`
+- `unsupported_function=322`
 
 Interpretation:
 
 - the seam now measures the full replay corpus
-- the ambient live-routing denominator is real, not curated
+- these live observe totals are useful hotspot telemetry, but they are still
+  attempt counters rather than a unique-cell retirement denominator
 - the ambient replay surface now includes large real traffic from
   information predicates, logical folds, round-family formulas, scalar-math
   helpers, bounded financial feeders, bounded numeric aggregates, bounded
@@ -196,27 +196,41 @@ Interpretation:
   first milestone, but these ambient reach numbers are still supporting
   diagnostics rather than a retirement claim
 
-### Full Replay Corpus: Forced Interpret Observe
+### Full Replay Corpus: Forced Interpret Observe Attempts
 
-This is the new full-corpus measurement after explicitly dirtying and forcing
-every replay formula cell through Calc's live `Interpret()` path:
+These are also attempt totals after explicitly dirtying and forcing every
+replay formula cell through Calc's live `Interpret()` path:
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=47790`
-- `interpret_tail_forced_interpret_fallback_total=260`
-- `interpret_tail_forced_interpret_seen_total=48050`
-- `interpret_tail_forced_interpret_unseen_formula_cells=2611`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=47163`
-- `interpret_tail_forced_interpret_supported_rate=94.33`
-- `interpret_tail_forced_interpret_seen_rate=94.85`
+- `interpret_tail_forced_interpret_supported_total=47795`
+- `interpret_tail_forced_interpret_fallback_total=181`
+- `interpret_tail_forced_interpret_seen_total=47976`
+- `interpret_tail_forced_interpret_unseen_formula_cells=2685`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=47168`
+- `interpret_tail_forced_interpret_supported_rate=94.34`
+- `interpret_tail_forced_interpret_seen_rate=94.70`
 
 Interpretation:
 
-- forced interpret now confirms that a much larger fraction of the corpus
+- forced interpret still confirms that a much larger fraction of the corpus
   reaches the seam when explicitly dirtied and interpreted
 - the retained forced-interpret fallback is now dominated by formulas outside
   the promoted family plus unsupported utility-family subshapes, not by simple
   replay reach failure
+
+### Full Replay Corpus: Forced Direct Unique-Cell Surface
+
+This is the new honest direct-routing denominator after dirtying and forcing
+each replay formula cell once, then classifying whether that formula cell was
+actually seen and supported by the seam:
+
+- `interpret_tail_forced_direct_formula_cells=50661`
+- `interpret_tail_forced_direct_seen_formula_cells=8044`
+- `interpret_tail_forced_direct_supported_formula_cells=7866`
+- `interpret_tail_forced_direct_fallback_formula_cells=178`
+- `interpret_tail_forced_direct_unseen_formula_cells=42617`
+- `interpret_tail_forced_direct_seen_rate=15.88`
+- `interpret_tail_forced_direct_supported_rate=15.53`
 
 ### Promoted-Family Probe
 
