@@ -2031,6 +2031,60 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorStatisticalAg
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorCriteriaAggregateAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineCriteriaAggregateAuthority"_ustr));
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 2.0);
+    m_pDoc->SetValue(0, 3, 0, 3.0);
+    m_pDoc->SetValue(0, 4, 0, 4.0);
+    m_pDoc->SetValue(1, 0, 0, 10.0);
+    m_pDoc->SetValue(1, 1, 0, 20.0);
+    m_pDoc->SetValue(1, 2, 0, 30.0);
+    m_pDoc->SetValue(1, 3, 0, 40.0);
+    m_pDoc->SetValue(1, 4, 0, 50.0);
+    m_pDoc->SetValue(3, 0, 0, 2.0);
+    m_pDoc->SetString(3, 1, 0, u">2"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(new ScRangeData(
+        *m_pDoc, u"CriteriaData"_ustr, u"$EngineCriteriaAggregateAuthority.$A$1:$A$5"_ustr)));
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(new ScRangeData(
+        *m_pDoc, u"ValueData"_ustr, u"$EngineCriteriaAggregateAuthority.$B$1:$B$5"_ustr)));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"=COUNTIF(A1:A5;D1)"_ustr);
+        m_pDoc->SetString(1, 7, 0, u"=COUNTIFS(A1:A5;\">1\";B1:B5;\"<50\")"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=SUMIF(CriteriaData;D1;ValueData)"_ustr);
+        m_pDoc->SetString(3, 7, 0, u"=AVERAGEIF(A1:A5;D2;B1:B5)"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(0, 7, 0));
+        ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(1, 7, 0));
+        ASSERT_DOUBLES_EQUAL(50.0, m_pDoc->GetValue(2, 7, 0));
+        ASSERT_DOUBLES_EQUAL(45.0, m_pDoc->GetValue(3, 7, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 4);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::CriteriaAggregate)]
+            >= 4);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::CriteriaAggregate)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorBusinessDayAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

@@ -2902,6 +2902,85 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorStatistica
     CPPUNIT_ASSERT_DOUBLES_EQUAL(std::sqrt(1.25), aStdevP.maResult.mfValue, 1e-12);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCriteriaAggregateHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailCriteriaAggregateHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(6, 0, 0);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 2.0);
+    m_pDoc->SetValue(0, 3, 0, 3.0);
+    m_pDoc->SetValue(0, 4, 0, 4.0);
+    m_pDoc->SetValue(1, 0, 0, 10.0);
+    m_pDoc->SetValue(1, 1, 0, 20.0);
+    m_pDoc->SetValue(1, 2, 0, 30.0);
+    m_pDoc->SetValue(1, 3, 0, 40.0);
+    m_pDoc->SetValue(1, 4, 0, 50.0);
+    m_pDoc->SetValue(3, 0, 0, 2.0);
+    m_pDoc->SetString(3, 1, 0, u">2"_ustr);
+
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(new ScRangeData(
+        *m_pDoc, u"CriteriaData"_ustr,
+        u"$InterpretTailCriteriaAggregateHelper.$A$1:$A$5"_ustr)));
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(new ScRangeData(
+        *m_pDoc, u"ValueData"_ustr,
+        u"$InterpretTailCriteriaAggregateHelper.$B$1:$B$5"_ustr)));
+
+    const auto aCountIf = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COUNTIF(A1:A5;D1)", false);
+    CPPUNIT_ASSERT(aCountIf.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::CriteriaAggregate, aCountIf.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aCountIf.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aCountIf.maResult.mfValue, 1e-12);
+
+    const auto aCountIfs = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COUNTIFS(A1:A5;\">1\";B1:B5;\"<50\")", false);
+    CPPUNIT_ASSERT(aCountIfs.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::CriteriaAggregate, aCountIfs.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aCountIfs.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, aCountIfs.maResult.mfValue, 1e-12);
+
+    const auto aSumIf = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=SUMIF(CriteriaData;D1;ValueData)", false);
+    CPPUNIT_ASSERT(aSumIf.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::CriteriaAggregate, aSumIf.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aSumIf.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(50.0, aSumIf.maResult.mfValue, 1e-12);
+
+    const auto aAverageIf = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=AVERAGEIF(A1:A5;D2;B1:B5)", false);
+    CPPUNIT_ASSERT(aAverageIf.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::CriteriaAggregate, aAverageIf.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aAverageIf.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(45.0, aAverageIf.maResult.mfValue, 1e-12);
+
+    const auto aMaxIfs = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=MAXIFS(ValueData;CriteriaData;\">1\")", false);
+    CPPUNIT_ASSERT(aMaxIfs.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::CriteriaAggregate, aMaxIfs.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMaxIfs.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(50.0, aMaxIfs.maResult.mfValue, 1e-12);
+
+    const auto aMinIfs = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=MINIFS(ValueData;CriteriaData;\">1\";ValueData;\">25\")",
+        false);
+    CPPUNIT_ASSERT(aMinIfs.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::CriteriaAggregate, aMinIfs.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMinIfs.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(30.0, aMinIfs.maResult.mfValue, 1e-12);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorBusinessDayHelper)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
