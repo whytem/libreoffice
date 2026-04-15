@@ -2063,6 +2063,50 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorCalendarUtili
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorDateDifferenceAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineDateDifferenceAuthority"_ustr));
+
+    m_pDoc->SetString(0, 0, 0, u"2010-04-03"_ustr);
+    m_pDoc->SetString(1, 0, 0, u"2011-06-17"_ustr);
+    m_pDoc->SetString(0, 1, 0, u"2021-11-14"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"2021-11-15"_ustr);
+    m_pDoc->SetValue(2, 0, 0, 0.0);
+    m_pDoc->SetValue(2, 1, 0, 1.0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"=ORG.OPENOFFICE.MONTHS(A1;B1;C1)"_ustr);
+        m_pDoc->SetString(1, 7, 0,
+            u"=ORG.OPENOFFICE.YEARS(DATE(2014;1;15);DATE(2016;4;1);0)"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=ORG.OPENOFFICE.WEEKS(A2;B2;C2)"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(14.0, m_pDoc->GetValue(0, 7, 0));
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(1, 7, 0));
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(2, 7, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 3);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::DateDifference)]
+            >= 3);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::DateDifference)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncLEN)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true); // turn auto calc on.

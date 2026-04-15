@@ -2890,6 +2890,50 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCalendarUt
     CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aWeeksInYear.meFormatType);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorDateDifferenceHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailDateDifferenceHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(3, 0, 0);
+
+    m_pDoc->SetString(0, 0, 0, u"2010-04-03"_ustr);
+    m_pDoc->SetString(1, 0, 0, u"2011-06-17"_ustr);
+    m_pDoc->SetString(0, 1, 0, u"2021-11-14"_ustr);
+    m_pDoc->SetString(1, 1, 0, u"2021-11-15"_ustr);
+    m_pDoc->SetValue(2, 0, 0, 0.0);
+    m_pDoc->SetValue(2, 1, 0, 1.0);
+
+    const auto aMonths = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ORG.OPENOFFICE.MONTHS(A1;B1;C1)", false);
+    CPPUNIT_ASSERT(aMonths.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::DateDifference, aMonths.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMonths.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(14.0, aMonths.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aMonths.meFormatType);
+
+    const auto aYears = setaileval::tryEvaluateFormula(*m_pDoc, rContext, aFormulaPos,
+        u"=ORG.OPENOFFICE.YEARS(DATE(2014;1;15);DATE(2016;4;1);0)", false);
+    CPPUNIT_ASSERT(aYears.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::DateDifference, aYears.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aYears.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aYears.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aYears.meFormatType);
+
+    const auto aWeeks = setaileval::tryEvaluateFormula(*m_pDoc, rContext, aFormulaPos,
+        u"=ORG.OPENOFFICE.WEEKS(A2;B2;C2)", false);
+    CPPUNIT_ASSERT(aWeeks.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::DateDifference, aWeeks.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aWeeks.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aWeeks.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aWeeks.meFormatType);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNormalization)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

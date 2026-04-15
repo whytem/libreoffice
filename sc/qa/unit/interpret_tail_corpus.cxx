@@ -1010,6 +1010,8 @@ const char* functionKindName(FunctionKind eFunction)
             return "business_day";
         case FunctionKind::CalendarUtility:
             return "calendar_utility";
+        case FunctionKind::DateDifference:
+            return "date_difference";
         case FunctionKind::MathScalar:
             return "math_scalar";
         case FunctionKind::InformationPredicate:
