@@ -37,6 +37,33 @@
 namespace
 {
 
+class ScopedEnvironmentOverride
+{
+    std::string maName;
+    std::optional<std::string> moOriginalValue;
+
+public:
+    ScopedEnvironmentOverride(const char* pName, const char* pValue)
+        : maName(pName)
+    {
+        if (const char* pOriginal = std::getenv(pName))
+            moOriginalValue = pOriginal;
+
+        if (pValue)
+            setenv(maName.c_str(), pValue, 1);
+        else
+            unsetenv(maName.c_str());
+    }
+
+    ~ScopedEnvironmentOverride()
+    {
+        if (moOriginalValue)
+            setenv(maName.c_str(), moOriginalValue->c_str(), 1);
+        else
+            unsetenv(maName.c_str());
+    }
+};
+
 struct SharedCaseRow
 {
     std::vector<std::string> maColumns;
@@ -2776,6 +2803,8 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorBusinessDa
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
 
+    ScopedEnvironmentOverride aBusinessDay(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENABLE_BUSINESSDAY", "1");
     sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
     m_pDoc->InsertTab(0, u"InterpretTailBusinessDayHelper"_ustr);
     ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();

@@ -276,6 +276,16 @@ private:
     return false;
 }
 
+[[nodiscard]] inline bool businessDayAmbientEnabled()
+{
+    if (const char* pValue
+        = std::getenv("SPREADSHEET_ENGINE_INTERPRET_TAIL_ENABLE_BUSINESSDAY"))
+    {
+        return envEnabled(pValue);
+    }
+    return false;
+}
+
 [[nodiscard]] inline std::size_t diagnosticSampleLimit()
 {
     if (const char* pValue = std::getenv("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_DIAGNOSTIC_LIMIT"))
@@ -4903,6 +4913,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
 {
+    if (!businessDayAmbientEnabled())
+        return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+
     if (!isBoundedAmbientBusinessDayNode(rNode))
         return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
 

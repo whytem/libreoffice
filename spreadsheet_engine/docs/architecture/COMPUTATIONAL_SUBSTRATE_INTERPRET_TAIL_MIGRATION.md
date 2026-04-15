@@ -142,11 +142,11 @@ Two different denominators matter, and both are now reported.
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=7365`
-- `interpret_tail_live_authoritative_match_total=4596`
-- `interpret_tail_live_authoritative_fallback_total=2769`
-- live authoritative-match rate over the corpus: `9.0721%`
-- live authoritative-match rate over the current promoted probe: `62.4033%`
+- `interpret_tail_live_authoritative_probe_formula_cells=7618`
+- `interpret_tail_live_authoritative_match_total=4598`
+- `interpret_tail_live_authoritative_fallback_total=3020`
+- live authoritative-match rate over the corpus: `9.0760%`
+- live authoritative-match rate over the current promoted probe: `60.3570%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -156,20 +156,20 @@ This is the honest all-formula live-routing surface from the standing replay
 corpus:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=19972`
-- `interpret_tail_live_fallback_total=434`
-- `interpret_tail_live_seen_total=20406`
-- `interpret_tail_live_unseen_formula_cells=30255`
-- `interpret_tail_live_promoted_function_supported_total=18722`
-- `interpret_tail_live_supported_rate=39.42`
-- `interpret_tail_live_seen_rate=40.28`
+- `interpret_tail_live_supported_total=20274`
+- `interpret_tail_live_fallback_total=638`
+- `interpret_tail_live_seen_total=20912`
+- `interpret_tail_live_unseen_formula_cells=29749`
+- `interpret_tail_live_promoted_function_supported_total=19024`
+- `interpret_tail_live_supported_rate=40.02`
+- `interpret_tail_live_seen_rate=41.28`
 
 Current ambient fallback reasons:
 
-- `unsupported_formula_shape=24`
+- `unsupported_formula_shape=36`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=406`
+- `unsupported_function=598`
 
 Interpretation:
 
@@ -177,12 +177,15 @@ Interpretation:
 - the ambient live-routing denominator is real, not curated
 - the ambient replay surface now includes large real traffic from
   information predicates, logical folds, round-family formulas, scalar-math
-  helpers, bounded financial feeders, bounded numeric aggregates, and bounded
-  ranked statistical helpers
+  helpers, bounded financial feeders, bounded numeric aggregates, bounded
+  ranked statistical helpers, and bounded calendar/date utility helpers
 - the imported direct information-predicate host-truth residue is now closed
   on the live surface
 - the imported direct logical-fold residue and the imported nested-`XMATCH`
   `INDEX` residue are now also closed on the live surface
+- the broad corpus lane now completes again with `BusinessDay` held behind an
+  explicit opt-in gate; that family remains focused proof coverage today, not
+  default ambient surface
 - the main remaining ambient work is now the still-large
   `unsupported_function` wall, not simple denominator reach
 - the live authoritative-match north-star has now moved decisively above the
@@ -195,13 +198,13 @@ This is the new full-corpus measurement after explicitly dirtying and forcing
 every replay formula cell through Calc's live `Interpret()` path:
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=47580`
-- `interpret_tail_forced_interpret_fallback_total=217`
-- `interpret_tail_forced_interpret_seen_total=47797`
-- `interpret_tail_forced_interpret_unseen_formula_cells=2864`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=46953`
-- `interpret_tail_forced_interpret_supported_rate=93.92`
-- `interpret_tail_forced_interpret_seen_rate=94.35`
+- `interpret_tail_forced_interpret_supported_total=47731`
+- `interpret_tail_forced_interpret_fallback_total=319`
+- `interpret_tail_forced_interpret_seen_total=48050`
+- `interpret_tail_forced_interpret_unseen_formula_cells=2611`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=47104`
+- `interpret_tail_forced_interpret_supported_rate=94.22`
+- `interpret_tail_forced_interpret_seen_rate=94.85`
 
 Interpretation:
 
@@ -215,17 +218,17 @@ Interpretation:
 
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
-- `interpret_tail_probe_formula_cells=7365`
-- `interpret_tail_authoritative_total=2715`
-- `interpret_tail_authoritative_fallback_total=4650`
-- promoted-family authoritative rate: `36.86%`
+- `interpret_tail_probe_formula_cells=7618`
+- `interpret_tail_authoritative_total=2794`
+- `interpret_tail_authoritative_fallback_total=4824`
+- promoted-family authoritative rate: `36.68%`
 
 Current promoted-family fallback reasons:
 
-- `shadow_mismatch=2815`
-- `unsupported_function=14`
-- `unsupported_formula_shape=10`
-- `unsupported_host_surface=6`
+- `shadow_mismatch=4718`
+- `unsupported_function=101`
+- `unsupported_formula_shape=5`
+- `unsupported_host_surface=0`
 
 ### Live-Target Filtered Promoted Probe
 
@@ -234,7 +237,7 @@ with the seam forced `off` already disagrees with the imported cached workbook
 result:
 
 - `interpret_tail_live_target_probe_formula_cells=0`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=7365`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=7618`
 - `interpret_tail_live_target_authoritative_total=0`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 
@@ -309,20 +312,20 @@ This is the new per-cell replay inventory over the promoted-family replay
 surface after forcing each promoted replay formula through direct live
 `Interpret()`:
 
-- `interpret_tail_replay_promoted_formula_cells=7365`
-- `interpret_tail_replay_promoted_direct_seen=7354`
-- `interpret_tail_replay_promoted_direct_supported=7352`
-- `interpret_tail_replay_promoted_direct_fallback=2`
+- `interpret_tail_replay_promoted_formula_cells=7618`
+- `interpret_tail_replay_promoted_direct_seen=7607`
+- `interpret_tail_replay_promoted_direct_supported=7501`
+- `interpret_tail_replay_promoted_direct_fallback=106`
 - `interpret_tail_replay_promoted_direct_unseen=11`
-- `interpret_tail_replay_promoted_shared_formula_cells=3350`
-- `interpret_tail_replay_promoted_shared_top_formula_cells=739`
-- `interpret_tail_replay_promoted_shared_member_formula_cells=2602`
-- `interpret_tail_replay_promoted_non_shared_formula_cells=4015`
+- `interpret_tail_replay_promoted_shared_formula_cells=3383`
+- `interpret_tail_replay_promoted_shared_top_formula_cells=755`
+- `interpret_tail_replay_promoted_shared_member_formula_cells=2628`
+- `interpret_tail_replay_promoted_non_shared_formula_cells=4235`
 - `interpret_tail_replay_promoted_unseen_shared_top=0`
 - `interpret_tail_replay_promoted_unseen_shared_member=2`
 - `interpret_tail_replay_promoted_unseen_non_shared=8`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=7365`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=7618`
 - `interpret_tail_replay_promoted_dirty_after_interpret=0`
 
 Interpretation:
@@ -330,13 +333,15 @@ Interpretation:
 - the pre-tail replay eligibility blocker is cleared for the promoted replay
   surface
 - the latest slice widened the replay-promoted denominator materially by
-  promoting a bounded ranked-statistical cluster on top of the earlier scalar
-  feeder and aggregate widening
+  promoting bounded calendar/date utility helpers on top of the earlier
+  scalar feeder, aggregate, and ranked-statistical widening
 - both shared and non-shared promoted replay formulas now reach the live seam
-- the residual replay work is now the `2` direct fallback cells on this
-  broader imported promoted-family surface
+- the residual replay work is now the `106` direct fallback cells on this
+  broader imported promoted-family surface, dominated by the explicit
+  `BusinessDay` opt-in gate plus small utility-family parity residue
 - the dominant next target is now the broader ambient
-  `unsupported_function` wall, led by the bounded business-day cluster
+  `unsupported_function` wall, with `BusinessDay` intentionally kept out of the
+  default ambient surface until its evaluator cost is redesigned
 
 ## Hard-Routed Family
 

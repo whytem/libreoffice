@@ -1985,6 +1985,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorBusinessDayAu
     {
         ScopedEnvironmentOverride aMode(
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        ScopedEnvironmentOverride aBusinessDay(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENABLE_BUSINESSDAY", "1");
         setaileval::resetStats();
 
         m_pDoc->SetString(0, 7, 0,
