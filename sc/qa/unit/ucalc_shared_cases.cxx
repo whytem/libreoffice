@@ -3212,6 +3212,74 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorTextUtilit
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, aExact.maResult.mfValue, 1e-12);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorStatisticalDistributionHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailStatisticalDistributionHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(6, 0, 0);
+
+    const auto aFisher
+        = setaileval::tryEvaluateFormula(*m_pDoc, rContext, aFormulaPos, u"=FISHER(0.5)", false);
+    CPPUNIT_ASSERT(aFisher.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalDistribution, aFisher.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aFisher.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5493061443340549, aFisher.maResult.mfValue, 1e-12);
+
+    const auto aFisherInv = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=FISHERINV(0.5)", false);
+    CPPUNIT_ASSERT(aFisherInv.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        setaileval::FunctionKind::StatisticalDistribution, aFisherInv.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aFisherInv.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.46211715726000974, aFisherInv.maResult.mfValue, 1e-12);
+
+    const auto aPoisson = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=POISSON(1;1;FALSE())", false);
+    CPPUNIT_ASSERT(aPoisson.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalDistribution, aPoisson.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aPoisson.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.36787944117144233, aPoisson.maResult.mfValue, 1e-12);
+
+    const auto aBinom = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=BINOMDIST(2;5;0.5;FALSE())", false);
+    CPPUNIT_ASSERT(aBinom.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalDistribution, aBinom.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aBinom.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.3125, aBinom.maResult.mfValue, 1e-12);
+
+    const auto aRange = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=BINOM.DIST.RANGE(5;0.5;1;2)", false);
+    CPPUNIT_ASSERT(aRange.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalDistribution, aRange.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aRange.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.46875, aRange.maResult.mfValue, 1e-12);
+
+    const auto aBeta = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=BETADIST(0.5;2;3)", false);
+    CPPUNIT_ASSERT(aBeta.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalDistribution, aBeta.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aBeta.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.6875, aBeta.maResult.mfValue, 1e-12);
+
+    const auto aBetaDist = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=BETA.DIST(0.5;2;3;FALSE())", false);
+    CPPUNIT_ASSERT(aBetaDist.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        setaileval::FunctionKind::StatisticalDistribution, aBetaDist.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aBetaDist.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.5, aBetaDist.maResult.mfValue, 1e-12);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorBusinessDayHelper)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

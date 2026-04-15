@@ -1165,6 +1165,8 @@ const char* functionKindName(FunctionKind eFunction)
             return "ranked_aggregate";
         case FunctionKind::StatisticalAggregate:
             return "statistical_aggregate";
+        case FunctionKind::StatisticalDistribution:
+            return "statistical_distribution";
         case FunctionKind::CriteriaAggregate:
             return "criteria_aggregate";
         case FunctionKind::BusinessDay:

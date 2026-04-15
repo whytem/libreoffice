@@ -54,11 +54,11 @@ delegation.”
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=11002`
+- `interpret_tail_live_authoritative_probe_formula_cells=12041`
 - `interpret_tail_live_authoritative_match_total=6492`
-- `interpret_tail_live_authoritative_fallback_total=4510`
+- `interpret_tail_live_authoritative_fallback_total=5549`
 - live authoritative-match rate over the corpus: `12.8146%`
-- live authoritative-match rate over the current promoted probe: `59.0075%`
+- live authoritative-match rate over the current promoted probe: `53.9158%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -89,12 +89,12 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=11445`
-- `interpret_tail_live_unique_supported_formula_cells=11260`
-- `interpret_tail_live_unique_fallback_formula_cells=185`
-- `interpret_tail_live_unique_unseen_formula_cells=39216`
-- `interpret_tail_live_unique_seen_rate=22.59`
-- `interpret_tail_live_unique_supported_rate=22.23`
+- `interpret_tail_live_unique_seen_formula_cells=12484`
+- `interpret_tail_live_unique_supported_formula_cells=12297`
+- `interpret_tail_live_unique_fallback_formula_cells=187`
+- `interpret_tail_live_unique_unseen_formula_cells=38177`
+- `interpret_tail_live_unique_seen_rate=24.64`
+- `interpret_tail_live_unique_supported_rate=24.27`
 
 ### Full Replay Corpus: Forced Interpret Observe Attempts
 
@@ -116,19 +116,19 @@ This is the direct-routing comparison surface after explicitly dirtying and
 forcing each replay formula cell once.
 
 - `interpret_tail_forced_direct_formula_cells=50661`
-- `interpret_tail_forced_direct_seen_formula_cells=11397`
-- `interpret_tail_forced_direct_supported_formula_cells=11212`
-- `interpret_tail_forced_direct_fallback_formula_cells=185`
-- `interpret_tail_forced_direct_unseen_formula_cells=39264`
-- `interpret_tail_forced_direct_seen_rate=22.50`
-- `interpret_tail_forced_direct_supported_rate=22.13`
+- `interpret_tail_forced_direct_seen_formula_cells=12436`
+- `interpret_tail_forced_direct_supported_formula_cells=12249`
+- `interpret_tail_forced_direct_fallback_formula_cells=187`
+- `interpret_tail_forced_direct_unseen_formula_cells=38225`
+- `interpret_tail_forced_direct_seen_rate=24.55`
+- `interpret_tail_forced_direct_supported_rate=24.18`
 
 ### Promoted-Family Probe
 
-- `interpret_tail_probe_formula_cells=8031`
-- `interpret_tail_authoritative_total=2948`
-- `interpret_tail_authoritative_fallback_total=5083`
-- promoted-family authoritative rate: `36.71%`
+- `interpret_tail_probe_formula_cells=12041`
+- `interpret_tail_authoritative_total=4843`
+- `interpret_tail_authoritative_fallback_total=7198`
+- promoted-family authoritative rate: `40.22%`
 
 Dominant promoted-family fallback reasons:
 
@@ -140,7 +140,7 @@ Dominant promoted-family fallback reasons:
 ### Live-Target Filtered Promoted Probe
 
 - `interpret_tail_live_target_probe_formula_cells=0`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=8031`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=12041`
 - `interpret_tail_live_target_authoritative_total=0`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 
@@ -318,6 +318,16 @@ evaluation for:
 - `RIGHT`
 - `T`
 - `EXACT`
+- `FISHER`
+- `FISHERINV`
+- `POISSON`
+- `POISSON.DIST`
+- `BINOMDIST`
+- `BINOM.DIST`
+- `BINOM.DIST.RANGE`
+- `B`
+- `BETADIST`
+- `BETA.DIST`
 - `AND`
 - `OR`
 - `XOR`
@@ -396,12 +406,12 @@ The highest-value remaining blockers are now:
    the raw promoted replay probe is now confirmed to be a cached imported
    correctness surface, not a live seam-off retirement denominator
 
-The live authoritative-match north-star on the standing replay corpus has now
-improved to `6492 / 50,661` (`12.8146%`). The new honest live unique-cell
-inventory now shows `11445 / 50,661` formula cells seen (`22.59%`) and
-`11260 / 50,661` supported (`22.23%`) during the bulk live observe run, while
+The live authoritative-match north-star on the standing replay corpus remains
+`6492 / 50,661` (`12.8146%`). The new honest live unique-cell inventory now
+shows `12484 / 50,661` formula cells seen (`24.64%`) and
+`12297 / 50,661` supported (`24.27%`) during the bulk live observe run, while
 the forced-direct comparison surface now sits at
-`11397 / 50,661` seen (`22.50%`) and `11212 / 50,661` supported (`22.13%`).
+`12436 / 50,661` seen (`24.55%`) and `12249 / 50,661` supported (`24.18%`).
 Those are the coverage-style numbers we should currently use alongside the
 north-star; the broader live and forced-interpret counters are still attempt
 telemetry rather than a deletion denominator.
@@ -419,12 +429,16 @@ cheap local reference, holiday-range, weekend-range, weekend-code-ref, and
 named-ref shapes, then by admitting a bounded statistical aggregate slice for
 `MAX` / `MIN`, `MEDIAN`, `GEOMEAN` / `HARMEAN`, `VAR*` / `STDEV*`, plus the
 ranked extension for `LARGE` / `SMALL` / `RANK*`, then a bounded scalar
-`IF(...)` family, and now a bounded `text_utility` family covering
+`IF(...)` family, then a bounded `text_utility` family covering
 `CONCATENATE` / `CONCAT`, `CLEAN`, `CHAR` / `CODE`, `UNICHAR` / `UNICODE`,
-case conversion, width conversion, `LEN`, `LEFT` / `RIGHT`, `T`, and `EXACT`.
-It intentionally trades away a large amount of cached-workbook promoted-probe
-agreement, so the raw promoted probe must now be read strictly as diagnostics
-rather than as progress gating.
+case conversion, width conversion, `LEN`, `LEFT` / `RIGHT`, `T`, and `EXACT`,
+and now a bounded `statistical_distribution` family covering `FISHER` /
+`FISHERINV`, `POISSON*`, `BINOMDIST` / `BINOM.DIST*`, and `BETADIST` /
+`BETA.DIST`. That latest slice widened the live unique-cell denominator
+materially but did not move the north-star, because the whole family currently
+lands inside the imported host-truth-artifact probe band. So the next best
+work is mismatch reduction inside existing admitted families, not more
+coverage-only widening of the same kind.
 
 Inside the current families, the semantically distinct env-independent
 literal-array hard-route frontier is now frozen. New widening is out of scope

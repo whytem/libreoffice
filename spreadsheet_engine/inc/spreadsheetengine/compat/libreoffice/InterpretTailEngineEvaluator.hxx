@@ -61,6 +61,7 @@
 #include <spreadsheetengine/runtime/MathFunctionRuntime.hxx>
 #include <spreadsheetengine/runtime/MathRounding.hxx>
 #include <spreadsheetengine/runtime/MathScalar.hxx>
+#include <spreadsheetengine/runtime/MathStatistical.hxx>
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
 #include <spreadsheetengine/runtime/QueryRuntime.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
@@ -114,6 +115,7 @@ enum class FunctionKind : sal_uInt8
     NumericAggregate,
     RankedAggregate,
     StatisticalAggregate,
+    StatisticalDistribution,
     CriteriaAggregate,
     BusinessDay,
     CalendarUtility,
@@ -796,6 +798,14 @@ canonicalMathScalarFunctionName(api::StringView rFunctionName)
         || rFunctionName == u"STDEVA" || rFunctionName == u"STDEVPA")
     {
         return FunctionKind::StatisticalAggregate;
+    }
+    if (rFunctionName == u"FISHER" || rFunctionName == u"FISHERINV"
+        || rFunctionName == u"POISSON" || rFunctionName == u"POISSON.DIST"
+        || rFunctionName == u"BINOMDIST" || rFunctionName == u"BINOM.DIST"
+        || rFunctionName == u"BINOM.DIST.RANGE" || rFunctionName == u"B"
+        || rFunctionName == u"BETADIST" || rFunctionName == u"BETA.DIST")
+    {
+        return FunctionKind::StatisticalDistribution;
     }
     if (rFunctionName == u"COUNTIF" || rFunctionName == u"COUNTIFS"
         || rFunctionName == u"SUMIF" || rFunctionName == u"SUMIFS"
@@ -2645,6 +2655,7 @@ inline void putScalarIntoMatrix(
                 || eFunction == FunctionKind::NumericAggregate
                 || eFunction == FunctionKind::RankedAggregate
                 || eFunction == FunctionKind::StatisticalAggregate
+                || eFunction == FunctionKind::StatisticalDistribution
                 || eFunction == FunctionKind::CriteriaAggregate
                 || eFunction == FunctionKind::BusinessDay
                 || eFunction == FunctionKind::CalendarUtility
@@ -5918,6 +5929,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                 || eChildFunction == FunctionKind::NumericAggregate
                 || eChildFunction == FunctionKind::RankedAggregate
                 || eChildFunction == FunctionKind::StatisticalAggregate
+                || eChildFunction == FunctionKind::StatisticalDistribution
                 || eChildFunction == FunctionKind::CriteriaAggregate)
             {
                 auto aAttempt = evaluateFunctionNode(
@@ -6331,6 +6343,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                 || eChildFunction == FunctionKind::NumericAggregate
                 || eChildFunction == FunctionKind::RankedAggregate
                 || eChildFunction == FunctionKind::StatisticalAggregate
+                || eChildFunction == FunctionKind::StatisticalDistribution
                 || eChildFunction == FunctionKind::CriteriaAggregate)
             {
                 auto aAttempt = evaluateFunctionNode(
@@ -6549,6 +6562,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                 || eChildFunction == FunctionKind::NumericAggregate
                 || eChildFunction == FunctionKind::RankedAggregate
                 || eChildFunction == FunctionKind::StatisticalAggregate
+                || eChildFunction == FunctionKind::StatisticalDistribution
                 || eChildFunction == FunctionKind::CriteriaAggregate)
             {
                 auto aAttempt = evaluateFunctionNode(
@@ -6754,6 +6768,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                 || eChildFunction == FunctionKind::NumericAggregate
                 || eChildFunction == FunctionKind::RankedAggregate
                 || eChildFunction == FunctionKind::StatisticalAggregate
+                || eChildFunction == FunctionKind::StatisticalDistribution
                 || eChildFunction == FunctionKind::CriteriaAggregate)
             {
                 auto aAttempt = evaluateFunctionNode(
@@ -6859,6 +6874,312 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     if (!aDay)
         return makeErrorAttempt(aDay.meError);
     return makeNumericAttempt(aDay.maValue, SvNumFormatType::NUMBER);
+}
+
+[[nodiscard]] inline EvaluationAttempt evaluateStatisticalDistributionFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
+    bool bImportedCanonicalSource)
+{
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    auto materializeArgument = [&](const core::formula::Node& rArgument)
+        -> Materialization<api::CellValue> {
+        const auto aAttempt = evaluateScalarOrDelegatedNode(
+            rArgument, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 1,
+            bImportedCanonicalSource);
+        if (!aAttempt.mbSupported)
+            return makeUnsupportedMaterialization<api::CellValue>(aAttempt.meFallbackReason);
+        switch (aAttempt.maResult.meType)
+        {
+            case api::formulavalue::ValueType::Error:
+                return makeMaterializedValue(api::CellValue::error(aAttempt.maResult.meError));
+            case api::formulavalue::ValueType::String:
+                return makeMaterializedValue(api::CellValue::text(aAttempt.maResult.maString));
+            case api::formulavalue::ValueType::Value:
+                if (aAttempt.meFormatType == SvNumFormatType::LOGICAL)
+                    return makeMaterializedValue(
+                        api::CellValue::boolean(aAttempt.maResult.mfValue != 0.0));
+                return makeMaterializedValue(api::CellValue::number(aAttempt.maResult.mfValue));
+            case api::formulavalue::ValueType::Invalid:
+                return makeMaterializedValue(api::CellValue::empty());
+        }
+        return makeMaterializedValue(api::CellValue::empty());
+    };
+    auto materializeNumber = [&](const core::formula::Node& rArgument)
+        -> Materialization<double> {
+        const auto aValue = materializeArgument(rArgument);
+        if (!aValue.mbSupported)
+            return makeUnsupportedMaterialization<double>(aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeMaterializedError<double>(aValue.meError);
+        const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aValue.moValue);
+        if (!aNumber)
+            return makeMaterializedError<double>(aNumber.meError);
+        return makeMaterializedValue(aNumber.maValue);
+    };
+    auto materializeBool = [&](const core::formula::Node& rArgument)
+        -> Materialization<bool> {
+        const auto aValue = materializeArgument(rArgument);
+        if (!aValue.mbSupported)
+            return makeUnsupportedMaterialization<bool>(aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeMaterializedError<bool>(aValue.meError);
+        const auto aBool = coerceScalarToBool(rDoc, rContext, *aValue.moValue);
+        if (!aBool)
+            return makeMaterializedError<bool>(aBool.meError);
+        return makeMaterializedValue(aBool.maValue);
+    };
+    const auto makeNumericAttempt = [&](double fValue) {
+        return makeNumericResult(eFunction, fValue, SvNumFormatType::NUMBER);
+    };
+    const auto makeErrorAttempt = [&](api::Error eError) {
+        return makeErrorResult(eFunction, eError);
+    };
+    const auto makeUnsupportedAttempt = [&](FallbackReason eReason) {
+        return makeUnsupported(eFunction, eReason);
+    };
+
+    if (aFunctionName == u"FISHER")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aNumber = materializeNumber(*rNode.maChildren[0]);
+        if (!aNumber.mbSupported)
+            return makeUnsupportedAttempt(aNumber.meFallbackReason);
+        if (!aNumber.moValue)
+            return makeErrorAttempt(aNumber.meError);
+        const auto aFisher = spreadsheetengine::core::math::fisherTransform(*aNumber.moValue);
+        if (!aFisher)
+            return makeErrorAttempt(aFisher.meError);
+        return makeNumericAttempt(aFisher.maValue);
+    }
+
+    if (aFunctionName == u"FISHERINV")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aNumber = materializeNumber(*rNode.maChildren[0]);
+        if (!aNumber.mbSupported)
+            return makeUnsupportedAttempt(aNumber.meFallbackReason);
+        if (!aNumber.moValue)
+            return makeErrorAttempt(aNumber.meError);
+        return makeNumericAttempt(
+            spreadsheetengine::core::math::inverseFisherTransform(*aNumber.moValue));
+    }
+
+    if (aFunctionName == u"POISSON" || aFunctionName == u"POISSON.DIST")
+    {
+        const bool bLegacyPoisson = aFunctionName == u"POISSON";
+        if ((bLegacyPoisson && (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3))
+            || (!bLegacyPoisson && rNode.maChildren.size() != 3))
+        {
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        }
+
+        const auto aX = materializeNumber(*rNode.maChildren[0]);
+        if (!aX.mbSupported)
+            return makeUnsupportedAttempt(aX.meFallbackReason);
+        if (!aX.moValue)
+            return makeErrorAttempt(aX.meError);
+
+        const auto aLambda = materializeNumber(*rNode.maChildren[1]);
+        if (!aLambda.mbSupported)
+            return makeUnsupportedAttempt(aLambda.meFallbackReason);
+        if (!aLambda.moValue)
+            return makeErrorAttempt(aLambda.meError);
+
+        bool bCumulative = true;
+        if (rNode.maChildren.size() == 3)
+        {
+            const auto aBool = materializeBool(*rNode.maChildren[2]);
+            if (!aBool.mbSupported)
+                return makeUnsupportedAttempt(aBool.meFallbackReason);
+            if (!aBool.moValue)
+                return makeErrorAttempt(aBool.meError);
+            bCumulative = *aBool.moValue;
+        }
+
+        const auto aPoisson = spreadsheetengine::core::math::evaluatePoissonDistribution(
+            *aX.moValue, *aLambda.moValue, bCumulative);
+        if (!aPoisson)
+            return makeErrorAttempt(aPoisson.meError);
+        return makeNumericAttempt(aPoisson.maValue);
+    }
+
+    if (aFunctionName == u"BINOMDIST" || aFunctionName == u"BINOM.DIST")
+    {
+        if (rNode.maChildren.size() != 4)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aX = materializeNumber(*rNode.maChildren[0]);
+        if (!aX.mbSupported)
+            return makeUnsupportedAttempt(aX.meFallbackReason);
+        if (!aX.moValue)
+            return makeErrorAttempt(aX.meError);
+
+        const auto aTrials = materializeNumber(*rNode.maChildren[1]);
+        if (!aTrials.mbSupported)
+            return makeUnsupportedAttempt(aTrials.meFallbackReason);
+        if (!aTrials.moValue)
+            return makeErrorAttempt(aTrials.meError);
+
+        const auto aProbability = materializeNumber(*rNode.maChildren[2]);
+        if (!aProbability.mbSupported)
+            return makeUnsupportedAttempt(aProbability.meFallbackReason);
+        if (!aProbability.moValue)
+            return makeErrorAttempt(aProbability.meError);
+
+        const auto aCumulative = materializeBool(*rNode.maChildren[3]);
+        if (!aCumulative.mbSupported)
+            return makeUnsupportedAttempt(aCumulative.meFallbackReason);
+        if (!aCumulative.moValue)
+            return makeErrorAttempt(aCumulative.meError);
+
+        const auto aBinomial = spreadsheetengine::core::math::evaluateBinomialDistribution(
+            *aX.moValue, *aTrials.moValue, *aProbability.moValue, *aCumulative.moValue);
+        if (!aBinomial)
+            return makeErrorAttempt(aBinomial.meError);
+        return makeNumericAttempt(aBinomial.maValue);
+    }
+
+    if (aFunctionName == u"BINOM.DIST.RANGE" || aFunctionName == u"B")
+    {
+        if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 4)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aTrials = materializeNumber(*rNode.maChildren[0]);
+        if (!aTrials.mbSupported)
+            return makeUnsupportedAttempt(aTrials.meFallbackReason);
+        if (!aTrials.moValue)
+            return makeErrorAttempt(aTrials.meError);
+
+        const auto aProbability = materializeNumber(*rNode.maChildren[1]);
+        if (!aProbability.mbSupported)
+            return makeUnsupportedAttempt(aProbability.meFallbackReason);
+        if (!aProbability.moValue)
+            return makeErrorAttempt(aProbability.meError);
+
+        const auto aStart = materializeNumber(*rNode.maChildren[2]);
+        if (!aStart.mbSupported)
+            return makeUnsupportedAttempt(aStart.meFallbackReason);
+        if (!aStart.moValue)
+            return makeErrorAttempt(aStart.meError);
+
+        double fEnd = *aStart.moValue;
+        if (rNode.maChildren.size() == 4)
+        {
+            const auto aEnd = materializeNumber(*rNode.maChildren[3]);
+            if (!aEnd.mbSupported)
+                return makeUnsupportedAttempt(aEnd.meFallbackReason);
+            if (!aEnd.moValue)
+                return makeErrorAttempt(aEnd.meError);
+            fEnd = *aEnd.moValue;
+        }
+
+        const auto aRange = spreadsheetengine::core::math::evaluateBinomialRangeDistribution(
+            *aTrials.moValue, *aProbability.moValue, *aStart.moValue, fEnd);
+        if (!aRange)
+            return makeErrorAttempt(aRange.meError);
+        return makeNumericAttempt(aRange.maValue);
+    }
+
+    if (aFunctionName == u"BETADIST" || aFunctionName == u"BETA.DIST")
+    {
+        const bool bMicrosoftOrder = aFunctionName == u"BETA.DIST";
+        if ((bMicrosoftOrder && (rNode.maChildren.size() < 4 || rNode.maChildren.size() > 6))
+            || (!bMicrosoftOrder && (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 6)))
+        {
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        }
+
+        const auto aX = materializeNumber(*rNode.maChildren[0]);
+        if (!aX.mbSupported)
+            return makeUnsupportedAttempt(aX.meFallbackReason);
+        if (!aX.moValue)
+            return makeErrorAttempt(aX.meError);
+
+        const auto aAlpha = materializeNumber(*rNode.maChildren[1]);
+        if (!aAlpha.mbSupported)
+            return makeUnsupportedAttempt(aAlpha.meFallbackReason);
+        if (!aAlpha.moValue)
+            return makeErrorAttempt(aAlpha.meError);
+
+        const auto aBeta = materializeNumber(*rNode.maChildren[2]);
+        if (!aBeta.mbSupported)
+            return makeUnsupportedAttempt(aBeta.meFallbackReason);
+        if (!aBeta.moValue)
+            return makeErrorAttempt(aBeta.meError);
+
+        bool bCumulative = true;
+        double fLowerBound = 0.0;
+        double fUpperBound = 1.0;
+        if (bMicrosoftOrder)
+        {
+            const auto aCumulative = materializeBool(*rNode.maChildren[3]);
+            if (!aCumulative.mbSupported)
+                return makeUnsupportedAttempt(aCumulative.meFallbackReason);
+            if (!aCumulative.moValue)
+                return makeErrorAttempt(aCumulative.meError);
+            bCumulative = *aCumulative.moValue;
+            if (rNode.maChildren.size() >= 5)
+            {
+                const auto aLower = materializeNumber(*rNode.maChildren[4]);
+                if (!aLower.mbSupported)
+                    return makeUnsupportedAttempt(aLower.meFallbackReason);
+                if (!aLower.moValue)
+                    return makeErrorAttempt(aLower.meError);
+                fLowerBound = *aLower.moValue;
+            }
+            if (rNode.maChildren.size() >= 6)
+            {
+                const auto aUpper = materializeNumber(*rNode.maChildren[5]);
+                if (!aUpper.mbSupported)
+                    return makeUnsupportedAttempt(aUpper.meFallbackReason);
+                if (!aUpper.moValue)
+                    return makeErrorAttempt(aUpper.meError);
+                fUpperBound = *aUpper.moValue;
+            }
+        }
+        else
+        {
+            if (rNode.maChildren.size() >= 4)
+            {
+                const auto aLower = materializeNumber(*rNode.maChildren[3]);
+                if (!aLower.mbSupported)
+                    return makeUnsupportedAttempt(aLower.meFallbackReason);
+                if (!aLower.moValue)
+                    return makeErrorAttempt(aLower.meError);
+                fLowerBound = *aLower.moValue;
+            }
+            if (rNode.maChildren.size() >= 5)
+            {
+                const auto aUpper = materializeNumber(*rNode.maChildren[4]);
+                if (!aUpper.mbSupported)
+                    return makeUnsupportedAttempt(aUpper.meFallbackReason);
+                if (!aUpper.moValue)
+                    return makeErrorAttempt(aUpper.meError);
+                fUpperBound = *aUpper.moValue;
+            }
+            if (rNode.maChildren.size() == 6)
+            {
+                const auto aCumulative = materializeBool(*rNode.maChildren[5]);
+                if (!aCumulative.mbSupported)
+                    return makeUnsupportedAttempt(aCumulative.meFallbackReason);
+                if (!aCumulative.moValue)
+                    return makeErrorAttempt(aCumulative.meError);
+                bCumulative = *aCumulative.moValue;
+            }
+        }
+
+        const auto aDistribution = spreadsheetengine::core::math::evaluateBetaDistribution(
+            *aX.moValue, *aAlpha.moValue, *aBeta.moValue, fLowerBound, fUpperBound,
+            bCumulative, bMicrosoftOrder);
+        if (!aDistribution)
+            return makeErrorAttempt(aDistribution.meError);
+        return makeNumericAttempt(aDistribution.maValue);
+    }
+
+    return makeUnsupportedAttempt(FallbackReason::UnsupportedFunction);
 }
 
 [[nodiscard]] inline EvaluationAttempt evaluateTextUtilityFunction(
@@ -7989,6 +8310,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         case FunctionKind::NumericAggregate:
         case FunctionKind::RankedAggregate:
         case FunctionKind::StatisticalAggregate:
+        case FunctionKind::StatisticalDistribution:
         case FunctionKind::CriteriaAggregate:
         case FunctionKind::BusinessDay:
         case FunctionKind::CalendarUtility:
@@ -8008,9 +8330,13 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                                          rRoot, eFunction, rDoc, rContext, rFormulaPos,
                                          bImportedCanonicalSource)
                                    : eFunction == FunctionKind::StatisticalAggregate
-                                         ? evaluateStatisticalAggregateFunction(
+                                   ? evaluateStatisticalAggregateFunction(
                                                rRoot, eFunction, rDoc, rContext, rFormulaPos,
                                                bImportedCanonicalSource)
+                                   : eFunction == FunctionKind::StatisticalDistribution
+                                         ? evaluateStatisticalDistributionFunction(
+                                               rRoot, eFunction, rDoc, rContext, rFormulaPos,
+                                               bEmptyStringAsZero, bImportedCanonicalSource)
                                    : eFunction == FunctionKind::CriteriaAggregate
                                          ? evaluateCriteriaAggregateFunction(
                                                rRoot, eFunction, rDoc, rContext, rFormulaPos)

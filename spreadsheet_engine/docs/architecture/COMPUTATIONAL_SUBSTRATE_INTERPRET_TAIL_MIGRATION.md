@@ -114,6 +114,17 @@ The currently promoted live evaluator family includes:
   - `RIGHT`
   - `T`
   - `EXACT`
+- statistical distributions:
+  - `FISHER`
+  - `FISHERINV`
+  - `POISSON`
+  - `POISSON.DIST`
+  - `BINOMDIST`
+  - `BINOM.DIST`
+  - `BINOM.DIST.RANGE`
+  - `B`
+  - `BETADIST`
+  - `BETA.DIST`
 - scalar utilities:
   - `IF`
   - `ROUND`
@@ -174,11 +185,11 @@ Two different denominators matter, and both are now reported.
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=11002`
+- `interpret_tail_live_authoritative_probe_formula_cells=12041`
 - `interpret_tail_live_authoritative_match_total=6492`
-- `interpret_tail_live_authoritative_fallback_total=4510`
+- `interpret_tail_live_authoritative_fallback_total=5549`
 - live authoritative-match rate over the corpus: `12.8146%`
-- live authoritative-match rate over the current promoted probe: `59.0075%`
+- live authoritative-match rate over the current promoted probe: `53.9158%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -209,12 +220,12 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=11445`
-- `interpret_tail_live_unique_supported_formula_cells=11260`
-- `interpret_tail_live_unique_fallback_formula_cells=185`
-- `interpret_tail_live_unique_unseen_formula_cells=39216`
-- `interpret_tail_live_unique_seen_rate=22.59`
-- `interpret_tail_live_unique_supported_rate=22.23`
+- `interpret_tail_live_unique_seen_formula_cells=12484`
+- `interpret_tail_live_unique_supported_formula_cells=12297`
+- `interpret_tail_live_unique_fallback_formula_cells=187`
+- `interpret_tail_live_unique_unseen_formula_cells=38177`
+- `interpret_tail_live_unique_seen_rate=24.64`
+- `interpret_tail_live_unique_supported_rate=24.27`
 
 Interpretation:
 
@@ -247,8 +258,11 @@ Interpretation:
   seen cells with `1873` supported and `14` fallback
 - a new bounded `text_utility` family now contributes `881` live unique seen
   cells with `859` supported and `22` fallback
+- a new bounded `statistical_distribution` family now contributes `1039`
+  live unique seen cells with `1037` supported and `2` fallback
 - the main remaining ambient work is now the still-large
-  `unsupported_function` wall, not simple denominator reach
+  `unsupported_function` wall plus the still-heavy mismatch buckets inside the
+  imported host-truth-artifact probe band, not simple denominator reach
 - the live authoritative-match north-star has now moved decisively above the
   first milestone, but these ambient reach numbers are still supporting
   diagnostics rather than a retirement claim
@@ -282,21 +296,21 @@ replay formula cell once, then classifying whether that formula cell was
 actually seen and supported by the seam:
 
 - `interpret_tail_forced_direct_formula_cells=50661`
-- `interpret_tail_forced_direct_seen_formula_cells=11397`
-- `interpret_tail_forced_direct_supported_formula_cells=11212`
-- `interpret_tail_forced_direct_fallback_formula_cells=185`
-- `interpret_tail_forced_direct_unseen_formula_cells=39264`
-- `interpret_tail_forced_direct_seen_rate=22.50`
-- `interpret_tail_forced_direct_supported_rate=22.13`
+- `interpret_tail_forced_direct_seen_formula_cells=12436`
+- `interpret_tail_forced_direct_supported_formula_cells=12249`
+- `interpret_tail_forced_direct_fallback_formula_cells=187`
+- `interpret_tail_forced_direct_unseen_formula_cells=38225`
+- `interpret_tail_forced_direct_seen_rate=24.55`
+- `interpret_tail_forced_direct_supported_rate=24.18`
 
 ### Promoted-Family Probe
 
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
-- `interpret_tail_probe_formula_cells=11002`
-- `interpret_tail_authoritative_total=4180`
-- `interpret_tail_authoritative_fallback_total=6822`
-- promoted-family authoritative rate: `38.00%`
+- `interpret_tail_probe_formula_cells=12041`
+- `interpret_tail_authoritative_total=4843`
+- `interpret_tail_authoritative_fallback_total=7198`
+- promoted-family authoritative rate: `40.22%`
 
 Current promoted-family fallback reasons:
 
@@ -312,7 +326,7 @@ with the seam forced `off` already disagrees with the imported cached workbook
 result:
 
 - `interpret_tail_live_target_probe_formula_cells=0`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=8031`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=12041`
 - `interpret_tail_live_target_authoritative_total=0`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 
@@ -387,20 +401,20 @@ This is the new per-cell replay inventory over the promoted-family replay
 surface after forcing each promoted replay formula through direct live
 `Interpret()`:
 
-- `interpret_tail_replay_promoted_formula_cells=8031`
-- `interpret_tail_replay_promoted_direct_seen=7983`
-- `interpret_tail_replay_promoted_direct_supported=7976`
-- `interpret_tail_replay_promoted_direct_fallback=7`
+- `interpret_tail_replay_promoted_formula_cells=12041`
+- `interpret_tail_replay_promoted_direct_seen=11993`
+- `interpret_tail_replay_promoted_direct_supported=11948`
+- `interpret_tail_replay_promoted_direct_fallback=45`
 - `interpret_tail_replay_promoted_direct_unseen=48`
-- `interpret_tail_replay_promoted_shared_formula_cells=3468`
-- `interpret_tail_replay_promoted_shared_top_formula_cells=762`
-- `interpret_tail_replay_promoted_shared_member_formula_cells=2706`
-- `interpret_tail_replay_promoted_non_shared_formula_cells=4563`
+- `interpret_tail_replay_promoted_shared_formula_cells=7128`
+- `interpret_tail_replay_promoted_shared_top_formula_cells=874`
+- `interpret_tail_replay_promoted_shared_member_formula_cells=6254`
+- `interpret_tail_replay_promoted_non_shared_formula_cells=4913`
 - `interpret_tail_replay_promoted_unseen_shared_top=5`
 - `interpret_tail_replay_promoted_unseen_shared_member=19`
 - `interpret_tail_replay_promoted_unseen_non_shared=24`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=8031`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=12041`
 - `interpret_tail_replay_promoted_dirty_after_interpret=48`
 
 Interpretation:

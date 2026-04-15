@@ -2208,6 +2208,51 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorTextUtilityAu
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorStatisticalDistributionAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineStatisticalDistributionAuthority"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 0, 0, u"=FISHER(0.5)"_ustr);
+        m_pDoc->SetString(1, 0, 0, u"=FISHERINV(0.5)"_ustr);
+        m_pDoc->SetString(2, 0, 0, u"=POISSON(1;1;FALSE())"_ustr);
+        m_pDoc->SetString(3, 0, 0, u"=BINOMDIST(2;5;0.5;FALSE())"_ustr);
+        m_pDoc->SetString(4, 0, 0, u"=BINOM.DIST.RANGE(5;0.5;1;2)"_ustr);
+        m_pDoc->SetString(5, 0, 0, u"=BETADIST(0.5;2;3)"_ustr);
+        m_pDoc->SetString(6, 0, 0, u"=BETA.DIST(0.5;2;3;FALSE())"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(0.5493061443340549, m_pDoc->GetValue(0, 0, 0));
+        ASSERT_DOUBLES_EQUAL(0.46211715726000974, m_pDoc->GetValue(1, 0, 0));
+        ASSERT_DOUBLES_EQUAL(0.36787944117144233, m_pDoc->GetValue(2, 0, 0));
+        ASSERT_DOUBLES_EQUAL(0.3125, m_pDoc->GetValue(3, 0, 0));
+        ASSERT_DOUBLES_EQUAL(0.46875, m_pDoc->GetValue(4, 0, 0));
+        ASSERT_DOUBLES_EQUAL(0.6875, m_pDoc->GetValue(5, 0, 0));
+        ASSERT_DOUBLES_EQUAL(1.5, m_pDoc->GetValue(6, 0, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeFallbackCount <= 1);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::StatisticalDistribution)]
+            >= 1);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::StatisticalDistribution)]
+            <= 1);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorBusinessDayAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
