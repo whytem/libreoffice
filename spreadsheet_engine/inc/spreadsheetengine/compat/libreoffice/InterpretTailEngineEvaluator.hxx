@@ -2416,6 +2416,19 @@ template <typename T>
         {
             return *oImportedCachedValue;
         }
+
+        // Local dirty formula dependencies can still expose stale numeric host
+        // values here. Prefer the bounded referenced-formula path before we
+        // trust those values so authority-mode roots can read fresh helper
+        // dates/numbers without forcing full host interpretation first.
+        if (pFormula->NeedsInterpret())
+        {
+            if (const auto oFormulaValue
+                = tryMaterializeBoundedReferencedFormulaCellValue(rDoc, rContext, rAddress))
+            {
+                return *oFormulaValue;
+            }
+        }
     }
 
     auto aValue = readHostDocumentCellValue(rDoc, rAddress).maValue;
@@ -4949,6 +4962,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         return makeErrorResult(eFunction, eError);
     };
     constexpr api::DateSerial kMaxBusinessDaySpan = 62;
+    const bool bImportedBusinessDayRoot = isImportedCachedFormulaRoot(rDoc, rFormulaPos);
     const auto isBoundedBusinessDaySpan = [&](api::DateSerial nStart, api::DateSerial nFinish) {
         return std::llabs(static_cast<long long>(nFinish) - static_cast<long long>(nStart))
                <= kMaxBusinessDaySpan;
@@ -5294,7 +5308,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (!isBoundedBusinessDaySpan(*aStartDate.moValue,
                 *aStartDate.moValue + static_cast<api::DateSerial>(*aDays.moValue)))
         {
-            return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+            return bImportedBusinessDayRoot
+                       ? makeErrorAttempt(api::Error::VariableExpected)
+                       : makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
         }
 
         const auto aWeekendMask = bIntl
@@ -5345,7 +5361,11 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     if (!aEndDate.moValue)
         return makeErrorAttempt(aEndDate.meError);
     if (!isBoundedBusinessDaySpan(*aStartDate.moValue, *aEndDate.moValue))
-        return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+    {
+        return bImportedBusinessDayRoot
+                   ? makeErrorAttempt(api::Error::VariableExpected)
+                   : makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+    }
 
     const auto aWeekendMask = bIntl
                                   ? evaluateWeekendMaskArgument(

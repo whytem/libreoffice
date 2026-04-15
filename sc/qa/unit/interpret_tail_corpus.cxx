@@ -26,6 +26,8 @@
 #include <spreadsheetengine/detail/FodsLoader.hxx>
 #include <spreadsheetengine/detail/OdfFormulaParser.hxx>
 #include <spreadsheetengine/detail/WorkbookModel.hxx>
+#include <spreadsheetengine/runtime/DateTimeParse.hxx>
+#include <spreadsheetengine/runtime/DateTimeParts.hxx>
 #include <spreadsheetengine/runtime/DateTimeWorkday.hxx>
 
 #include <algorithm>
@@ -135,6 +137,7 @@ void recordProbeAuthoritativeRoute(StatsSnapshot& rStats, FunctionKind eFunction
 void recordProbeAuthoritativeFallback(
     StatsSnapshot& rStats, FallbackReason eReason, FunctionKind eFunction);
 ProbeValue probeValueFromWorkbookCell(const Cell& rCell);
+ProbeValue probeWorkbookComparableValueFromWorkbookCell(const Cell& rCell);
 ProbeValue probeValueFromLiveHostCell(ScDocument& rDoc, const ScAddress& rPos);
 ProbeValue probeValueFromEngineAttempt(
     const spreadsheetengine::compat::libreoffice::interprettaileval::EvaluationAttempt& rAttempt);
@@ -734,12 +737,14 @@ SupportedProbeRun runSupportedInterpretTailProbe(
             }
 
             const ProbeValue aWorkbookValue = probeValueFromWorkbookCell(rCell);
+            const ProbeValue aWorkbookComparableValue
+                = probeWorkbookComparableValueFromWorkbookCell(rCell);
             const ProbeValue aEngineValue = probeValueFromEngineAttempt(aAttempt);
             pFormula->SetDirty();
             pFormula->Interpret();
             const ProbeValue aLiveHostValue = probeValueFromLiveHostCell(rDoc, aPos);
 
-            const bool bMatchesWorkbook = probeValuesMatch(aEngineValue, aWorkbookValue);
+            const bool bMatchesWorkbook = probeValuesMatch(aEngineValue, aWorkbookComparableValue);
             const bool bMatchesLiveHost = probeValuesMatch(aEngineValue, aLiveHostValue);
             const bool bHostTruthArtifact = !probeValuesMatch(aWorkbookValue, aLiveHostValue);
 
@@ -769,7 +774,8 @@ SupportedProbeRun runSupportedInterpretTailProbe(
             {
                 maybeAddProbeDiagnosticSample(
                     rWorkbookLabel, rDoc, aPos, aFormulaSource, aAttempt.meFunction, u"authoritative"_ustr,
-                    probeValueToDiagnosticString(aWorkbookValue), probeValueToDiagnosticString(aEngineValue));
+                    probeValueToDiagnosticString(aWorkbookValue),
+                    probeValueToDiagnosticString(aEngineValue));
                 recordProbeAuthoritativeRoute(aRun.maRawStats, aAttempt.meFunction);
             }
             else
@@ -1178,6 +1184,67 @@ ProbeValue probeValueFromWorkbookCell(const Cell& rCell)
         aValue.meKind = ProbeValue::Kind::String;
         aValue.maString = toLibreOfficeString(rExpected.maString);
     }
+    return aValue;
+}
+
+ProbeValue probeWorkbookComparableValueFromWorkbookCell(const Cell& rCell)
+{
+    ProbeValue aValue = probeValueFromWorkbookCell(rCell);
+    if (aValue.meKind != ProbeValue::Kind::String)
+        return aValue;
+
+    const auto aLexical = !rCell.maRawValue.empty() ? rCell.maRawValue : rCell.maValue.maString;
+    if (rCell.maRawValueType == u"date")
+    {
+        if (const auto oStoredDate = spreadsheetengine::core::datetime::parseStoredDateValue(
+                aLexical))
+        {
+            aValue.meKind = ProbeValue::Kind::Number;
+            aValue.mfValue = *oStoredDate;
+            aValue.maString.clear();
+            return aValue;
+        }
+
+        if (const auto oParsed = spreadsheetengine::core::datetime::parseStandaloneNumberText(
+                aLexical))
+        {
+            if (oParsed->meKind == spreadsheetengine::api::NumberParseResult::Kind::Date
+                || oParsed->meKind == spreadsheetengine::api::NumberParseResult::Kind::DateTime)
+            {
+                aValue.meKind = ProbeValue::Kind::Number;
+                aValue.mfValue = oParsed->mfValue;
+                aValue.maString.clear();
+                return aValue;
+            }
+        }
+    }
+
+    if (rCell.maRawValueType == u"time")
+    {
+        if (const auto oDuration = spreadsheetengine::core::datetime::parseOdfTimeDuration(
+                aLexical))
+        {
+            aValue.meKind = ProbeValue::Kind::Number;
+            aValue.mfValue = spreadsheetengine::core::datetime::normalizeTimeFraction(*oDuration);
+            aValue.maString.clear();
+            return aValue;
+        }
+
+        if (const auto oParsed = spreadsheetengine::core::datetime::parseStandaloneNumberText(
+                aLexical))
+        {
+            if (oParsed->meKind == spreadsheetengine::api::NumberParseResult::Kind::Time
+                || oParsed->meKind == spreadsheetengine::api::NumberParseResult::Kind::DateTime)
+            {
+                aValue.meKind = ProbeValue::Kind::Number;
+                aValue.mfValue
+                    = spreadsheetengine::core::datetime::normalizeTimeFraction(oParsed->mfValue);
+                aValue.maString.clear();
+                return aValue;
+            }
+        }
+    }
+
     return aValue;
 }
 
@@ -3102,6 +3169,95 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedDateValueMonthNameLive
 
         CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(aPos));
     }
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedBusinessDayLongSpanParity)
+{
+    const OUString aWorkbookPath
+        = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/date_time/fods/workday.intl.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for workday.intl.fods",
+        static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    const ScAddress aPos(0, 25, 1); // Sheet2.A26
+    ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+    CPPUNIT_ASSERT(pFormula);
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    const OUString aFormulaSource
+        = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+    const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
+    CPPUNIT_ASSERT_EQUAL(
+        u"=of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2012;1;1);90;11)"_ustr, aFormulaSource);
+
+    const auto aAttempt
+        = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
+            rDoc, *pContext, aPos,
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+            rDoc.GetCalcConfig().mbEmptyStringAsZero, pFormula->GetCode(),
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()));
+    CPPUNIT_ASSERT(aAttempt.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error, aAttempt.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::VariableExpected, aAttempt.maResult.meError);
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedBusinessDayLongSpanLiveHostTruth)
+{
+    const OUString aWorkbookPath
+        = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/date_time/fods/workday.intl.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for workday.intl.fods",
+        static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    const ScAddress aPos(0, 25, 1); // Sheet2.A26
+    ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+    CPPUNIT_ASSERT(pFormula);
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    const OUString aFormulaSource
+        = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+    CPPUNIT_ASSERT_EQUAL(
+        u"=of:=COM.MICROSOFT.WORKDAY.INTL(DATE(2012;1;1);90;11)"_ustr, aFormulaSource);
+
+    {
+        ScopedEnvironmentOverride aOffMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        pFormula->SetDirty();
+        pFormula->Interpret();
+    }
+
+    CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(aPos));
 }
 
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedDateValueReferencedFormulaParity)
