@@ -2809,6 +2809,28 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorBusinessDa
     m_pDoc->InsertTab(0, u"InterpretTailBusinessDayHelper"_ustr);
     ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
     const ScAddress aFormulaPos(3, 0, 0);
+    m_pDoc->SetString(10, 1, 0, u"=DATE(2014;11;1)"_ustr); // K2
+    m_pDoc->SetValue(10, 2, 0, 5.0); // K3
+    m_pDoc->SetString(10, 3, 0, u"=DATE(2014;11;2)"_ustr); // K4
+    m_pDoc->SetString(10, 4, 0, u"=DATE(2014;11;3)"_ustr); // K5
+    m_pDoc->SetString(10, 5, 0, u"=DATE(2014;11;4)"_ustr); // K6
+    m_pDoc->SetString(10, 6, 0, u"=DATE(2014;11;30)"_ustr); // K7
+    m_pDoc->SetValue(11, 1, 0, 5.0); // L2
+    m_pDoc->SetValue(12, 0, 0, 0.0); // M1
+    m_pDoc->SetValue(12, 1, 0, 0.0); // M2
+    m_pDoc->SetValue(12, 2, 0, 0.0); // M3
+    m_pDoc->SetValue(12, 3, 0, 0.0); // M4
+    m_pDoc->SetValue(12, 4, 0, 0.0); // M5
+    m_pDoc->SetValue(12, 5, 0, 1.0); // M6
+    m_pDoc->SetValue(12, 6, 0, 1.0); // M7
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(new ScRangeData(
+        *m_pDoc, u"BusinessStart"_ustr, u"$InterpretTailBusinessDayHelper.$K$2"_ustr)));
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(new ScRangeData(
+        *m_pDoc, u"BusinessEnd"_ustr, u"$InterpretTailBusinessDayHelper.$K$7"_ustr)));
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(new ScRangeData(
+        *m_pDoc, u"BusinessHolidays"_ustr, u"$InterpretTailBusinessDayHelper.$K$4:$K$6"_ustr)));
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(new ScRangeData(
+        *m_pDoc, u"BusinessWeekend"_ustr, u"$InterpretTailBusinessDayHelper.$M$1:$M$7"_ustr)));
 
     const auto aWorkday = setaileval::tryEvaluateFormula(*m_pDoc, rContext, aFormulaPos,
         u"=WORKDAY(DATE(2014;11;1);5;{\"2014-11-2\";\"2014-11-3\";\"2014-11-4\"})", false);
@@ -2859,6 +2881,65 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorBusinessDa
         aNetworkDaysIntl.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(17.0, aNetworkDaysIntl.maResult.mfValue, 1e-12);
     CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aNetworkDaysIntl.meFormatType);
+
+    const auto aWorkdayFromRefs = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=WORKDAY(K2;K3;K4:K6)", false);
+    CPPUNIT_ASSERT(aWorkdayFromRefs.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::BusinessDay, aWorkdayFromRefs.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aWorkdayFromRefs.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(41954.0, aWorkdayFromRefs.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, aWorkdayFromRefs.meFormatType);
+
+    const auto aWorkdayIntlFromRefs = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.WORKDAY.INTL(K2;2;L2;K4:K6)", false);
+    CPPUNIT_ASSERT(aWorkdayIntlFromRefs.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::BusinessDay, aWorkdayIntlFromRefs.meFunction);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::Value,
+        aWorkdayIntlFromRefs.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(41951.0, aWorkdayIntlFromRefs.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, aWorkdayIntlFromRefs.meFormatType);
+
+    const auto aNetworkDaysFromRefs = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=NETWORKDAYS(K2;K7;K4:K6)", false);
+    CPPUNIT_ASSERT(aNetworkDaysFromRefs.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::BusinessDay, aNetworkDaysFromRefs.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aNetworkDaysFromRefs.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(18.0, aNetworkDaysFromRefs.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aNetworkDaysFromRefs.meFormatType);
+
+    const auto aNetworkDaysIntlFromRange = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos,
+        u"=COM.MICROSOFT.NETWORKDAYS.INTL(K2;K7;M1:M7;K4:K6)", false);
+    CPPUNIT_ASSERT(aNetworkDaysIntlFromRange.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        setaileval::FunctionKind::BusinessDay, aNetworkDaysIntlFromRange.meFunction);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::Value,
+        aNetworkDaysIntlFromRange.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(18.0, aNetworkDaysIntlFromRange.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aNetworkDaysIntlFromRange.meFormatType);
+
+    const auto aNetworkDaysIntlBinaryEnd = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.NETWORKDAYS.INTL(K2;K2+6;M1:M7)", false);
+    CPPUNIT_ASSERT(aNetworkDaysIntlBinaryEnd.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        setaileval::FunctionKind::BusinessDay, aNetworkDaysIntlBinaryEnd.meFunction);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::Value,
+        aNetworkDaysIntlBinaryEnd.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, aNetworkDaysIntlBinaryEnd.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aNetworkDaysIntlBinaryEnd.meFormatType);
+
+    const auto aNamedNetworkDaysIntl = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos,
+        u"=COM.MICROSOFT.NETWORKDAYS.INTL(BusinessStart;BusinessEnd;BusinessWeekend;BusinessHolidays)",
+        false);
+    CPPUNIT_ASSERT(aNamedNetworkDaysIntl.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::BusinessDay, aNamedNetworkDaysIntl.meFunction);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::Value,
+        aNamedNetworkDaysIntl.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(18.0, aNamedNetworkDaysIntl.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aNamedNetworkDaysIntl.meFormatType);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCalendarUtilityHelper)

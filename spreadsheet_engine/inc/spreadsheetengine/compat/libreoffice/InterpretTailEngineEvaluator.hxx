@@ -3627,22 +3627,43 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return true;
 }
 
-[[nodiscard]] inline bool isLiteralBusinessDayScalarNode(const core::formula::Node& rNode)
+[[nodiscard]] inline bool isAmbientBusinessDayScalarNode(const core::formula::Node& rNode)
 {
-    return isLiteralOnlyNode(rNode) || isLiteralDateConstructorNode(rNode);
+    if (isLiteralOnlyNode(rNode) || isLiteralDateConstructorNode(rNode))
+        return true;
+
+    switch (rNode.meKind)
+    {
+        case core::formula::NodeKind::CellReference:
+        case core::formula::NodeKind::RangeReference:
+        case core::formula::NodeKind::NamedReference:
+            return true;
+        case core::formula::NodeKind::UnaryOperation:
+            return rNode.maChildren.size() == 1 && rNode.maChildren[0]
+                   && isAmbientBusinessDayScalarNode(*rNode.maChildren[0]);
+        case core::formula::NodeKind::BinaryOperation:
+            return rNode.maChildren.size() == 2 && rNode.maChildren[0] && rNode.maChildren[1]
+                   && isAmbientBusinessDayScalarNode(*rNode.maChildren[0])
+                   && isAmbientBusinessDayScalarNode(*rNode.maChildren[1]);
+        default:
+            return false;
+    }
 }
 
-[[nodiscard]] inline bool isLiteralBusinessDayHolidayNode(const core::formula::Node& rNode)
+[[nodiscard]] inline bool isAmbientBusinessDayHolidayNode(const core::formula::Node& rNode)
 {
     return rNode.meKind == core::formula::NodeKind::EmptyArgument
-           || isLiteralBusinessDayScalarNode(rNode)
-           || isLiteralVectorArrayConstantNode(rNode);
+           || isAmbientBusinessDayScalarNode(rNode)
+           || rNode.meKind == core::formula::NodeKind::ArrayConstant;
 }
 
-[[nodiscard]] inline bool isLiteralBusinessDayWeekendNode(const core::formula::Node& rNode)
+[[nodiscard]] inline bool isAmbientBusinessDayWeekendNode(const core::formula::Node& rNode)
 {
-    if (rNode.meKind == core::formula::NodeKind::EmptyArgument || isLiteralOnlyNode(rNode))
+    if (rNode.meKind == core::formula::NodeKind::EmptyArgument
+        || isAmbientBusinessDayScalarNode(rNode))
+    {
         return true;
+    }
 
     sal_Int32 nLength = 0;
     return isLiteralVectorArrayConstantNode(rNode, &nLength) && nLength == 7;
@@ -3671,9 +3692,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)
         return false;
 
-    if (!rNode.maChildren[0] || !isLiteralBusinessDayScalarNode(*rNode.maChildren[0]))
+    if (!rNode.maChildren[0] || !isAmbientBusinessDayScalarNode(*rNode.maChildren[0]))
         return false;
-    if (!rNode.maChildren[1] || !isLiteralBusinessDayScalarNode(*rNode.maChildren[1]))
+    if (!rNode.maChildren[1] || !isAmbientBusinessDayScalarNode(*rNode.maChildren[1]))
         return false;
 
     if (bWorkdayFunction)
@@ -3681,29 +3702,29 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (bIntl)
         {
             return (rNode.maChildren.size() < 3 || !rNode.maChildren[2]
-                        || isLiteralBusinessDayWeekendNode(*rNode.maChildren[2]))
+                        || isAmbientBusinessDayWeekendNode(*rNode.maChildren[2]))
                    && (rNode.maChildren.size() < 4 || !rNode.maChildren[3]
-                           || isLiteralBusinessDayHolidayNode(*rNode.maChildren[3]));
+                           || isAmbientBusinessDayHolidayNode(*rNode.maChildren[3]));
         }
 
         return (rNode.maChildren.size() < 3 || !rNode.maChildren[2]
-                    || isLiteralBusinessDayHolidayNode(*rNode.maChildren[2]))
+                    || isAmbientBusinessDayHolidayNode(*rNode.maChildren[2]))
                && (rNode.maChildren.size() < 4 || !rNode.maChildren[3]
-                       || isLiteralBusinessDayWeekendNode(*rNode.maChildren[3]));
+                       || isAmbientBusinessDayWeekendNode(*rNode.maChildren[3]));
     }
 
     if (bIntl)
     {
         return (rNode.maChildren.size() < 3 || !rNode.maChildren[2]
-                    || isLiteralBusinessDayWeekendNode(*rNode.maChildren[2]))
+                    || isAmbientBusinessDayWeekendNode(*rNode.maChildren[2]))
                && (rNode.maChildren.size() < 4 || !rNode.maChildren[3]
-                       || isLiteralBusinessDayHolidayNode(*rNode.maChildren[3]));
+                       || isAmbientBusinessDayHolidayNode(*rNode.maChildren[3]));
     }
 
     return (rNode.maChildren.size() < 3 || !rNode.maChildren[2]
-                || isLiteralBusinessDayHolidayNode(*rNode.maChildren[2]))
+                || isAmbientBusinessDayHolidayNode(*rNode.maChildren[2]))
            && (rNode.maChildren.size() < 4 || !rNode.maChildren[3]
-                   || isLiteralBusinessDayWeekendNode(*rNode.maChildren[3]));
+                   || isAmbientBusinessDayWeekendNode(*rNode.maChildren[3]));
 }
 
 [[nodiscard]] inline bool isHardRoutedNode(
