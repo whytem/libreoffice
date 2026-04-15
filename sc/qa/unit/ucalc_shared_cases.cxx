@@ -2772,6 +2772,55 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorRankedAggr
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.7, aPercentRankExc.maResult.mfValue, 1e-12);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorBusinessDayHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailBusinessDayHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(3, 0, 0);
+
+    const auto aWorkday = setaileval::tryEvaluateFormula(*m_pDoc, rContext, aFormulaPos,
+        u"=WORKDAY(DATE(2014;11;1);5;{\"2014-11-2\";\"2014-11-3\";\"2014-11-4\"})", false);
+    CPPUNIT_ASSERT(aWorkday.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::BusinessDay, aWorkday.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aWorkday.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(41954.0, aWorkday.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, aWorkday.meFormatType);
+
+    const auto aNetworkDays = setaileval::tryEvaluateFormula(*m_pDoc, rContext, aFormulaPos,
+        u"=NETWORKDAYS(DATE(2014;11;1);DATE(2014;11;30);{\"2014-11-11\";\"2014-11-28\";\"2014-11-27\"})",
+        false);
+    CPPUNIT_ASSERT(aNetworkDays.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::BusinessDay, aNetworkDays.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aNetworkDays.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(17.0, aNetworkDays.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aNetworkDays.meFormatType);
+
+    const auto aWorkdayIntl = setaileval::tryEvaluateFormula(*m_pDoc, rContext, aFormulaPos,
+        u"=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);2;5;{\"2014-11-2\";\"2014-11-3\";\"2014-11-4\"})",
+        false);
+    CPPUNIT_ASSERT(aWorkdayIntl.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::BusinessDay, aWorkdayIntl.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aWorkdayIntl.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(41951.0, aWorkdayIntl.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::DATE, aWorkdayIntl.meFormatType);
+
+    const auto aNetworkDaysIntl = setaileval::tryEvaluateFormula(*m_pDoc, rContext, aFormulaPos,
+        u"=COM.MICROSOFT.NETWORKDAYS.INTL(DATE(2014;11;1);DATE(2014;11;30);1;{\"2014-11-11\";\"2014-11-28\";\"2014-11-27\"})",
+        false);
+    CPPUNIT_ASSERT(aNetworkDaysIntl.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::BusinessDay, aNetworkDaysIntl.meFunction);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::formulavalue::ValueType::Value,
+        aNetworkDaysIntl.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(17.0, aNetworkDaysIntl.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aNetworkDaysIntl.meFormatType);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNormalization)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

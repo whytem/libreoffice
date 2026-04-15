@@ -1974,6 +1974,48 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRankedAggrega
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorBusinessDayAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineBusinessDayAuthority"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0,
+            u"=WORKDAY(DATE(2014;11;1);5;{\"2014-11-2\";\"2014-11-3\";\"2014-11-4\"})"_ustr);
+        m_pDoc->SetString(1, 7, 0,
+            u"=NETWORKDAYS(DATE(2014;11;1);DATE(2014;11;30);{\"2014-11-11\";\"2014-11-28\";\"2014-11-27\"})"_ustr);
+        m_pDoc->SetString(2, 7, 0,
+            u"=COM.MICROSOFT.WORKDAY.INTL(DATE(2014;11;1);2;5;{\"2014-11-2\";\"2014-11-3\";\"2014-11-4\"})"_ustr);
+        m_pDoc->SetString(3, 7, 0,
+            u"=COM.MICROSOFT.NETWORKDAYS.INTL(DATE(2014;11;1);DATE(2014;11;30);1;{\"2014-11-11\";\"2014-11-28\";\"2014-11-27\"})"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(41954.0, m_pDoc->GetValue(0, 7, 0));
+        ASSERT_DOUBLES_EQUAL(17.0, m_pDoc->GetValue(1, 7, 0));
+        ASSERT_DOUBLES_EQUAL(41951.0, m_pDoc->GetValue(2, 7, 0));
+        ASSERT_DOUBLES_EQUAL(17.0, m_pDoc->GetValue(3, 7, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 4);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::BusinessDay)]
+            >= 4);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::BusinessDay)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncLEN)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true); // turn auto calc on.

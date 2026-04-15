@@ -40,6 +40,7 @@
 #include <spreadsheetengine/api/Math.hxx>
 #include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Calendar.hxx>
+#include <spreadsheetengine/api/Workday.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
@@ -104,6 +105,7 @@ enum class FunctionKind : sal_uInt8
     Round,
     NumericAggregate,
     RankedAggregate,
+    BusinessDay,
     MathScalar,
     InformationPredicate,
     LogicalFold,
@@ -692,6 +694,14 @@ canonicalMathScalarFunctionName(api::StringView rFunctionName)
         || rFunctionName == u"COM.MICROSOFT.PERCENTRANK.EXC")
     {
         return FunctionKind::RankedAggregate;
+    }
+    if (rFunctionName == u"WORKDAY" || rFunctionName == u"NETWORKDAYS"
+        || rFunctionName == u"WORKDAY.INTL"
+        || rFunctionName == u"COM.MICROSOFT.WORKDAY.INTL"
+        || rFunctionName == u"NETWORKDAYS.INTL"
+        || rFunctionName == u"COM.MICROSOFT.NETWORKDAYS.INTL")
+    {
+        return FunctionKind::BusinessDay;
     }
     if (canonicalMathScalarFunctionName(rFunctionName))
         return FunctionKind::MathScalar;
@@ -2488,7 +2498,8 @@ inline void putScalarIntoMatrix(
             }
             if (eFunction == FunctionKind::MathScalar
                 || eFunction == FunctionKind::NumericAggregate
-                || eFunction == FunctionKind::RankedAggregate)
+                || eFunction == FunctionKind::RankedAggregate
+                || eFunction == FunctionKind::BusinessDay)
             {
                 auto aAttempt = evaluateFunctionNode(
                     rNode, rDoc, rContext, rFormulaPos, rDoc.GetCalcConfig().mbEmptyStringAsZero);
@@ -4766,6 +4777,518 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
 }
 
+[[nodiscard]] inline EvaluationAttempt evaluateBusinessDayFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
+{
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+
+    const auto makeNumericAttempt = [&](double fValue, SvNumFormatType eFormatType) {
+        return makeNumericResult(eFunction, fValue, eFormatType);
+    };
+    const auto makeErrorAttempt = [&](api::Error eError) {
+        return makeErrorResult(eFunction, eError);
+    };
+    constexpr api::DateSerial kMaxBusinessDaySpan = 62;
+    const auto isBoundedBusinessDaySpan = [&](api::DateSerial nStart, api::DateSerial nFinish) {
+        return std::llabs(static_cast<long long>(nFinish) - static_cast<long long>(nStart))
+               <= kMaxBusinessDaySpan;
+    };
+    const auto materializeBusinessDayScalar
+        = [&](const core::formula::Node& rArgument) -> Materialization<api::CellValue> {
+        if (rArgument.meKind == core::formula::NodeKind::EmptyArgument)
+            return makeMaterializedValue(api::CellValue::empty());
+
+        if (rArgument.meKind == core::formula::NodeKind::FunctionCall)
+        {
+            const api::String aChildName = uppercaseAscii(rArgument.maPrimaryText);
+            if (aChildName == u"DATE")
+            {
+                if (rArgument.maChildren.size() != 3)
+                    return makeMaterializedError<api::CellValue>(api::Error::IllegalArgument);
+
+                const auto materializeDatePart = [&](const core::formula::Node& rPart)
+                    -> Materialization<double> {
+                    const auto aScalar = materializeScalarizedReferenceValueNode(
+                        rPart, rDoc, rContext, rFormulaPos);
+                    if (!aScalar.mbSupported)
+                        return makeUnsupportedMaterialization<double>(aScalar.meFallbackReason);
+                    if (!aScalar.moValue)
+                        return makeMaterializedError<double>(aScalar.meError);
+
+                    const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aScalar.moValue);
+                    if (!aNumber)
+                        return makeMaterializedError<double>(aNumber.meError);
+                    return makeMaterializedValue(aNumber.maValue);
+                };
+
+                const auto aYear = materializeDatePart(*rArgument.maChildren[0]);
+                if (!aYear.mbSupported)
+                    return makeUnsupportedMaterialization<api::CellValue>(aYear.meFallbackReason);
+                if (!aYear.moValue)
+                    return makeMaterializedError<api::CellValue>(aYear.meError);
+
+                const auto aMonth = materializeDatePart(*rArgument.maChildren[1]);
+                if (!aMonth.mbSupported)
+                    return makeUnsupportedMaterialization<api::CellValue>(aMonth.meFallbackReason);
+                if (!aMonth.moValue)
+                    return makeMaterializedError<api::CellValue>(aMonth.meError);
+
+                const auto aDay = materializeDatePart(*rArgument.maChildren[2]);
+                if (!aDay.mbSupported)
+                    return makeUnsupportedMaterialization<api::CellValue>(aDay.meFallbackReason);
+                if (!aDay.moValue)
+                    return makeMaterializedError<api::CellValue>(aDay.meError);
+
+                const std::int16_t nYear = static_cast<std::int16_t>(std::trunc(*aYear.moValue));
+                const std::int16_t nMonth = static_cast<std::int16_t>(std::trunc(*aMonth.moValue));
+                const std::int16_t nDay = static_cast<std::int16_t>(std::trunc(*aDay.moValue));
+                if (nYear < 0)
+                    return makeMaterializedError<api::CellValue>(api::Error::IllegalArgument);
+
+                const auto aDateSerial = api::calendar::makeDateSerial(
+                    toApiDateParts(rDoc.GetFormatTable()->GetNullDate()), nYear, nMonth, nDay,
+                    false);
+                if (!aDateSerial)
+                    return makeMaterializedError<api::CellValue>(api::Error::IllegalArgument);
+                return makeMaterializedValue(api::CellValue::number(aDateSerial.maValue));
+            }
+
+            const FunctionKind eChildFunction = classifyFunction(aChildName);
+            if (eChildFunction == FunctionKind::Value || eChildFunction == FunctionKind::DateValue
+                || eChildFunction == FunctionKind::TimeValue
+                || eChildFunction == FunctionKind::NumberValue
+                || eChildFunction == FunctionKind::MathScalar
+                || eChildFunction == FunctionKind::Round
+                || eChildFunction == FunctionKind::NumericAggregate
+                || eChildFunction == FunctionKind::RankedAggregate)
+            {
+                auto aAttempt = evaluateFunctionNode(
+                    rArgument, rDoc, rContext, rFormulaPos,
+                    rDoc.GetCalcConfig().mbEmptyStringAsZero);
+                if (!aAttempt.mbSupported)
+                {
+                    return makeUnsupportedMaterialization<api::CellValue>(
+                        aAttempt.meFallbackReason);
+                }
+
+                switch (aAttempt.maResult.meType)
+                {
+                    case api::formulavalue::ValueType::Value:
+                        return makeMaterializedValue(
+                            api::CellValue::number(aAttempt.maResult.mfValue));
+                    case api::formulavalue::ValueType::String:
+                        return makeMaterializedValue(
+                            api::CellValue::text(aAttempt.maResult.maString));
+                    case api::formulavalue::ValueType::Error:
+                        return makeMaterializedValue(
+                            api::CellValue::error(aAttempt.maResult.meError));
+                    default:
+                        break;
+                }
+            }
+        }
+
+        return materializeScalarizedReferenceValueNode(rArgument, rDoc, rContext, rFormulaPos);
+    };
+    const auto coerceBusinessDayDateSerial = [&](const api::CellValue& rValue)
+        -> api::ValueResult<api::DateSerial> {
+        if (rValue.isError())
+            return api::ValueResult<api::DateSerial>::failure(rValue.meError);
+        if (rValue.isEmpty())
+            return api::ValueResult<api::DateSerial>::success(0);
+        if (rValue.isText())
+        {
+            const OUString aText = toLibreOfficeString(rValue.maString);
+            const auto aParsedDate = textparsingexecution::evaluateDateValue(rDoc, rContext, aText);
+            if (aParsedDate)
+            {
+                return api::ValueResult<api::DateSerial>::success(
+                    static_cast<api::DateSerial>(std::floor(aParsedDate.maValue)));
+            }
+            if (const auto oStandalone = tryStandaloneParsedDateValue(aText))
+            {
+                return api::ValueResult<api::DateSerial>::success(
+                    static_cast<api::DateSerial>(std::floor(*oStandalone)));
+            }
+            if (const auto oIsoFallback = tryIsoDateValueFallback(rDoc, aText))
+            {
+                return api::ValueResult<api::DateSerial>::success(
+                    static_cast<api::DateSerial>(std::floor(*oIsoFallback)));
+            }
+            return api::ValueResult<api::DateSerial>::failure(api::Error::IllegalArgument);
+        }
+        return api::ValueResult<api::DateSerial>::success(
+            static_cast<api::DateSerial>(std::floor(rValue.mfNumber)));
+    };
+    const auto materializeBusinessDayDateArgument = [&](const core::formula::Node& rArgument)
+        -> Materialization<api::DateSerial> {
+        const auto aScalar = materializeBusinessDayScalar(rArgument);
+        if (!aScalar.mbSupported)
+            return makeUnsupportedMaterialization<api::DateSerial>(aScalar.meFallbackReason);
+        if (!aScalar.moValue)
+            return makeMaterializedError<api::DateSerial>(aScalar.meError);
+
+        const auto aDateSerial = coerceBusinessDayDateSerial(*aScalar.moValue);
+        if (!aDateSerial)
+            return makeMaterializedError<api::DateSerial>(aDateSerial.meError);
+        return makeMaterializedValue(aDateSerial.maValue);
+    };
+    const auto materializeBusinessDayWholeArgument = [&](const core::formula::Node& rArgument)
+        -> Materialization<api::DateSerial> {
+        const auto aScalar = materializeBusinessDayScalar(rArgument);
+        if (!aScalar.mbSupported)
+            return makeUnsupportedMaterialization<api::DateSerial>(aScalar.meFallbackReason);
+        if (!aScalar.moValue)
+            return makeMaterializedError<api::DateSerial>(aScalar.meError);
+
+        const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aScalar.moValue);
+        if (!aNumber)
+            return makeMaterializedError<api::DateSerial>(aNumber.meError);
+        const auto oWhole = coerceWholeNumber(std::trunc(aNumber.maValue));
+        if (!oWhole)
+            return makeMaterializedError<api::DateSerial>(api::Error::IllegalArgument);
+        return makeMaterializedValue(static_cast<api::DateSerial>(*oWhole));
+    };
+    const auto evaluateWeekendMaskArgument = [&](const core::formula::Node* pArgument,
+                                                 bool bWorkdayFunction,
+                                                 bool bSequenceCompatible)
+        -> Materialization<api::WeekendMask> {
+        if (!pArgument || pArgument->meKind == core::formula::NodeKind::EmptyArgument)
+            return makeMaterializedValue(api::workday::defaultWeekendMask());
+
+        const bool bMatrixLike = pArgument->meKind == core::formula::NodeKind::CellReference
+                                 || pArgument->meKind == core::formula::NodeKind::RangeReference
+                                 || pArgument->meKind == core::formula::NodeKind::NamedReference
+                                 || pArgument->meKind == core::formula::NodeKind::ArrayConstant
+                                 || pArgument->meKind == core::formula::NodeKind::BinaryOperation;
+        if (bSequenceCompatible && bMatrixLike)
+        {
+            const auto aMatrix = materializeMatrixNode(*pArgument, rDoc, rContext, rFormulaPos);
+            if (!aMatrix.mbSupported)
+                return makeUnsupportedMaterialization<api::WeekendMask>(aMatrix.meFallbackReason);
+            if (!aMatrix.moValue)
+                return makeMaterializedError<api::WeekendMask>(aMatrix.meError);
+
+            std::vector<double> aWeekendSequence;
+            SCSIZE nColumns = 0;
+            SCSIZE nRows = 0;
+            (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+            for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+            {
+                for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                {
+                    const auto aValue = lookupexecution::detail::toApiCellValue(
+                        (*aMatrix.moValue)->Get(nColumn, nRow));
+                    if (aValue.isError())
+                        return makeMaterializedError<api::WeekendMask>(aValue.meError);
+                    if (aValue.isEmpty())
+                        continue;
+                    const auto aNumber = coerceScalarToNumber(rDoc, rContext, aValue);
+                    if (!aNumber)
+                        return makeMaterializedError<api::WeekendMask>(aNumber.meError);
+                    aWeekendSequence.push_back(aNumber.maValue);
+                }
+            }
+
+            if (aWeekendSequence.size() == 7)
+            {
+                const auto aMask = api::workday::weekendMaskFromSequence(aWeekendSequence);
+                if (!aMask)
+                    return makeMaterializedError<api::WeekendMask>(aMask.meError);
+                return makeMaterializedValue(aMask.maValue);
+            }
+
+            if (aWeekendSequence.size() > 1)
+                return makeMaterializedError<api::WeekendMask>(api::Error::IllegalArgument);
+        }
+
+        const auto aScalar = materializeBusinessDayScalar(*pArgument);
+        if (!aScalar.mbSupported)
+            return makeUnsupportedMaterialization<api::WeekendMask>(aScalar.meFallbackReason);
+        if (!aScalar.moValue)
+            return makeMaterializedError<api::WeekendMask>(aScalar.meError);
+
+        const api::CellValue& rValue = *aScalar.moValue;
+        if (rValue.isError())
+            return makeMaterializedError<api::WeekendMask>(rValue.meError);
+        if (rValue.isEmpty())
+            return makeMaterializedError<api::WeekendMask>(api::Error::IllegalArgument);
+
+        if (rValue.isText())
+        {
+            if (rValue.maString.size() != 7)
+                return makeMaterializedError<api::WeekendMask>(api::Error::IllegalArgument);
+            const auto aMask = api::workday::weekendMaskFromMsSpec(
+                rValue.maString, bWorkdayFunction);
+            if (!aMask)
+                return makeMaterializedError<api::WeekendMask>(aMask.meError);
+            return makeMaterializedValue(aMask.maValue);
+        }
+
+        const auto aNumber = coerceScalarToNumber(rDoc, rContext, rValue);
+        if (!aNumber)
+            return makeMaterializedError<api::WeekendMask>(aNumber.meError);
+        const auto oWholeNumber = coerceWholeNumber(aNumber.maValue);
+        if (!oWholeNumber)
+            return makeMaterializedError<api::WeekendMask>(api::Error::IllegalArgument);
+        if ((*oWholeNumber < 1 || *oWholeNumber > 7)
+            && (*oWholeNumber < 11 || *oWholeNumber > 17))
+        {
+            return makeMaterializedError<api::WeekendMask>(api::Error::IllegalArgument);
+        }
+
+        const api::String aSpec = toApiString(OUString::number(*oWholeNumber));
+        const auto aMask = api::workday::weekendMaskFromMsSpec(aSpec, bWorkdayFunction);
+        if (!aMask)
+            return makeMaterializedError<api::WeekendMask>(aMask.meError);
+        return makeMaterializedValue(aMask.maValue);
+    };
+    const auto collectHolidaySerials = [&](const core::formula::Node* pArgument)
+        -> Materialization<std::vector<api::DateSerial>> {
+        std::vector<api::DateSerial> aHolidays;
+        if (!pArgument || pArgument->meKind == core::formula::NodeKind::EmptyArgument)
+            return makeMaterializedValue(std::move(aHolidays));
+
+        const bool bMatrixLike = pArgument->meKind == core::formula::NodeKind::CellReference
+                                 || pArgument->meKind == core::formula::NodeKind::RangeReference
+                                 || pArgument->meKind == core::formula::NodeKind::NamedReference
+                                 || pArgument->meKind == core::formula::NodeKind::ArrayConstant
+                                 || pArgument->meKind == core::formula::NodeKind::BinaryOperation
+                                 || pArgument->meKind == core::formula::NodeKind::FunctionCall;
+        if (bMatrixLike)
+        {
+            const auto aMatrix = materializeMatrixNode(*pArgument, rDoc, rContext, rFormulaPos);
+            if (!aMatrix.mbSupported)
+                return makeUnsupportedMaterialization<std::vector<api::DateSerial>>(
+                    aMatrix.meFallbackReason);
+            if (!aMatrix.moValue)
+                return makeMaterializedError<std::vector<api::DateSerial>>(aMatrix.meError);
+
+            SCSIZE nColumns = 0;
+            SCSIZE nRows = 0;
+            (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+            for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+            {
+                for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                {
+                    const auto aValue = lookupexecution::detail::toApiCellValue(
+                        (*aMatrix.moValue)->Get(nColumn, nRow));
+                    if (aValue.isEmpty())
+                        continue;
+                    const auto aDateSerial = coerceBusinessDayDateSerial(aValue);
+                    if (!aDateSerial)
+                        return makeMaterializedError<std::vector<api::DateSerial>>(
+                            aDateSerial.meError);
+                    aHolidays.push_back(aDateSerial.maValue);
+                }
+            }
+        }
+        else
+        {
+            const auto aScalar = materializeBusinessDayScalar(*pArgument);
+            if (!aScalar.mbSupported)
+            {
+                return makeUnsupportedMaterialization<std::vector<api::DateSerial>>(
+                    aScalar.meFallbackReason);
+            }
+            if (!aScalar.moValue)
+                return makeMaterializedError<std::vector<api::DateSerial>>(aScalar.meError);
+            if (!aScalar.moValue->isEmpty())
+            {
+                const auto aDateSerial = coerceBusinessDayDateSerial(*aScalar.moValue);
+                if (!aDateSerial)
+                    return makeMaterializedError<std::vector<api::DateSerial>>(
+                        aDateSerial.meError);
+                aHolidays.push_back(aDateSerial.maValue);
+            }
+        }
+
+        std::sort(aHolidays.begin(), aHolidays.end());
+        aHolidays.erase(std::unique(aHolidays.begin(), aHolidays.end()), aHolidays.end());
+        return makeMaterializedValue(std::move(aHolidays));
+    };
+    const auto weekdayIndexForDate = [&](api::DateSerial nDate) -> std::optional<int> {
+        const auto aWeekday = api::calendar::dayOfWeek(
+            toApiDateParts(rDoc.GetFormatTable()->GetNullDate()), nDate, 2);
+        if (!aWeekday || aWeekday.maValue < 1 || aWeekday.maValue > 7)
+            return std::nullopt;
+        return aWeekday.maValue - 1;
+    };
+    const auto countWorkdays = [&](api::DateSerial nDate1, api::DateSerial nDate2,
+                                   const std::vector<api::DateSerial>& rSortedHolidays,
+                                   const api::WeekendMask& rWeekendMask) {
+        std::int32_t nCount = 0;
+        const bool bReverse = nDate1 > nDate2;
+        if (bReverse)
+            std::swap(nDate1, nDate2);
+        const auto oWeekdayIndex = weekdayIndexForDate(nDate1);
+        if (!oWeekdayIndex)
+            return 0.0;
+        int nWeekdayIndex = *oWeekdayIndex;
+
+        while (nDate1 <= nDate2)
+        {
+            if (!rWeekendMask[static_cast<std::size_t>(nWeekdayIndex)]
+                && !std::binary_search(rSortedHolidays.begin(), rSortedHolidays.end(), nDate1))
+            {
+                ++nCount;
+            }
+            ++nDate1;
+            nWeekdayIndex = (nWeekdayIndex + 1) % 7;
+        }
+
+        return static_cast<double>(bReverse ? -nCount : nCount);
+    };
+    const auto advanceWorkday = [&](api::DateSerial nDate, api::DateSerial nDays,
+                                    const std::vector<api::DateSerial>& rSortedHolidays,
+                                    const api::WeekendMask& rWeekendMask) {
+        if (!nDays)
+            return static_cast<double>(nDate);
+        const auto oWeekdayIndex = weekdayIndexForDate(nDate);
+        if (!oWeekdayIndex)
+            return static_cast<double>(nDate);
+        int nWeekdayIndex = *oWeekdayIndex;
+
+        if (nDays > 0)
+        {
+            while (nDays)
+            {
+                do
+                {
+                    ++nDate;
+                    nWeekdayIndex = (nWeekdayIndex + 1) % 7;
+                } while (rWeekendMask[static_cast<std::size_t>(nWeekdayIndex)]);
+
+                if (!std::binary_search(rSortedHolidays.begin(), rSortedHolidays.end(), nDate))
+                    --nDays;
+            }
+        }
+        else
+        {
+            while (nDays)
+            {
+                do
+                {
+                    --nDate;
+                    nWeekdayIndex = (nWeekdayIndex + 6) % 7;
+                } while (rWeekendMask[static_cast<std::size_t>(nWeekdayIndex)]);
+
+                if (!std::binary_search(rSortedHolidays.begin(), rSortedHolidays.end(), nDate))
+                    ++nDays;
+            }
+        }
+
+        return static_cast<double>(nDate);
+    };
+
+    const bool bWorkdayFunction = aFunctionName == u"WORKDAY"
+                                  || aFunctionName == u"WORKDAY.INTL"
+                                  || aFunctionName == u"COM.MICROSOFT.WORKDAY.INTL";
+    const bool bIntl = aFunctionName == u"WORKDAY.INTL"
+                       || aFunctionName == u"COM.MICROSOFT.WORKDAY.INTL"
+                       || aFunctionName == u"NETWORKDAYS.INTL"
+                       || aFunctionName == u"COM.MICROSOFT.NETWORKDAYS.INTL";
+
+    if (bWorkdayFunction)
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aStartDate = materializeBusinessDayDateArgument(*rNode.maChildren[0]);
+        if (!aStartDate.mbSupported)
+            return makeUnsupported(eFunction, aStartDate.meFallbackReason);
+        if (!aStartDate.moValue)
+            return makeErrorAttempt(aStartDate.meError);
+
+        const auto aDays = materializeBusinessDayWholeArgument(*rNode.maChildren[1]);
+        if (!aDays.mbSupported)
+            return makeUnsupported(eFunction, aDays.meFallbackReason);
+        if (!aDays.moValue)
+            return makeErrorAttempt(aDays.meError);
+        if (!isBoundedBusinessDaySpan(*aStartDate.moValue,
+                *aStartDate.moValue + static_cast<api::DateSerial>(*aDays.moValue)))
+        {
+            return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+        }
+
+        const auto aWeekendMask = bIntl
+                                      ? evaluateWeekendMaskArgument(
+                                            rNode.maChildren.size() >= 3
+                                                ? rNode.maChildren[2].get()
+                                                : nullptr,
+                                            true, true)
+                                      : (rNode.maChildren.size() == 4
+                                             ? evaluateWeekendMaskArgument(
+                                                   rNode.maChildren[3].get(), true, true)
+                                             : makeMaterializedValue(
+                                                   api::workday::defaultWeekendMask()));
+        if (!aWeekendMask.mbSupported)
+            return makeUnsupported(eFunction, aWeekendMask.meFallbackReason);
+        if (!aWeekendMask.moValue)
+            return makeErrorAttempt(aWeekendMask.meError);
+
+        const auto aHolidays = collectHolidaySerials(
+            bIntl ? (rNode.maChildren.size() >= 4 ? rNode.maChildren[3].get() : nullptr)
+                  : (rNode.maChildren.size() >= 3 ? rNode.maChildren[2].get() : nullptr));
+        if (!aHolidays.mbSupported)
+            return makeUnsupported(eFunction, aHolidays.meFallbackReason);
+        if (!aHolidays.moValue)
+            return makeErrorAttempt(aHolidays.meError);
+
+        return makeNumericAttempt(
+            advanceWorkday(*aStartDate.moValue, *aDays.moValue, *aHolidays.moValue,
+                *aWeekendMask.moValue),
+            SvNumFormatType::DATE);
+    }
+
+    if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)
+        return makeErrorAttempt(api::Error::IllegalArgument);
+
+    const auto aStartDate = materializeBusinessDayDateArgument(*rNode.maChildren[0]);
+    if (!aStartDate.mbSupported)
+        return makeUnsupported(eFunction, aStartDate.meFallbackReason);
+    if (!aStartDate.moValue)
+        return makeErrorAttempt(aStartDate.meError);
+
+    const auto aEndDate = materializeBusinessDayDateArgument(*rNode.maChildren[1]);
+    if (!aEndDate.mbSupported)
+        return makeUnsupported(eFunction, aEndDate.meFallbackReason);
+    if (!aEndDate.moValue)
+        return makeErrorAttempt(aEndDate.meError);
+    if (!isBoundedBusinessDaySpan(*aStartDate.moValue, *aEndDate.moValue))
+        return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+
+    const auto aWeekendMask = bIntl
+                                  ? evaluateWeekendMaskArgument(
+                                        rNode.maChildren.size() >= 3
+                                            ? rNode.maChildren[2].get()
+                                            : nullptr,
+                                        false, true)
+                                  : (rNode.maChildren.size() == 4
+                                         ? evaluateWeekendMaskArgument(
+                                               rNode.maChildren[3].get(), false, true)
+                                         : makeMaterializedValue(
+                                               api::workday::defaultWeekendMask()));
+    if (!aWeekendMask.mbSupported)
+        return makeUnsupported(eFunction, aWeekendMask.meFallbackReason);
+    if (!aWeekendMask.moValue)
+        return makeErrorAttempt(aWeekendMask.meError);
+
+    const auto aHolidays = collectHolidaySerials(
+        bIntl ? (rNode.maChildren.size() >= 4 ? rNode.maChildren[3].get() : nullptr)
+              : (rNode.maChildren.size() >= 3 ? rNode.maChildren[2].get() : nullptr));
+    if (!aHolidays.mbSupported)
+        return makeUnsupported(eFunction, aHolidays.meFallbackReason);
+    if (!aHolidays.moValue)
+        return makeErrorAttempt(aHolidays.meError);
+
+    return makeNumericAttempt(
+        countWorkdays(*aStartDate.moValue, *aEndDate.moValue, *aHolidays.moValue,
+            *aWeekendMask.moValue),
+        SvNumFormatType::NUMBER);
+}
+
 [[nodiscard]] inline EvaluationAttempt evaluateScalarUtilityFunction(
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
@@ -5594,6 +6117,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         case FunctionKind::Round:
         case FunctionKind::NumericAggregate:
         case FunctionKind::RankedAggregate:
+        case FunctionKind::BusinessDay:
         case FunctionKind::MathScalar:
             return eFunction == FunctionKind::MathScalar
                        ? evaluateMathScalarFunction(
@@ -5603,10 +6127,13 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                              ? evaluateNumericAggregateFunction(
                                    rRoot, eFunction, rDoc, rContext, rFormulaPos,
                                    bImportedCanonicalSource)
-                             : eFunction == FunctionKind::RankedAggregate
+                       : eFunction == FunctionKind::RankedAggregate
                                    ? evaluateRankedAggregateFunction(
                                          rRoot, eFunction, rDoc, rContext, rFormulaPos,
                                          bImportedCanonicalSource)
+                                   : eFunction == FunctionKind::BusinessDay
+                                         ? evaluateBusinessDayFunction(
+                                               rRoot, eFunction, rDoc, rContext, rFormulaPos)
                              : evaluateScalarUtilityFunction(
                                    rRoot, eFunction, rDoc, rContext, rFormulaPos,
                                    bEmptyStringAsZero, bImportedCanonicalSource);
