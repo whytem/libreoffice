@@ -3574,6 +3574,101 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     }
 }
 
+[[nodiscard]] inline bool isLiteralDateConstructorNode(const core::formula::Node& rNode)
+{
+    if (rNode.meKind != core::formula::NodeKind::FunctionCall
+        || uppercaseAscii(rNode.maPrimaryText) != u"DATE" || rNode.maChildren.size() != 3)
+    {
+        return false;
+    }
+
+    for (const auto& rxChild : rNode.maChildren)
+    {
+        if (!rxChild || !isLiteralOnlyNode(*rxChild))
+            return false;
+    }
+    return true;
+}
+
+[[nodiscard]] inline bool isLiteralBusinessDayScalarNode(const core::formula::Node& rNode)
+{
+    return isLiteralOnlyNode(rNode) || isLiteralDateConstructorNode(rNode);
+}
+
+[[nodiscard]] inline bool isLiteralBusinessDayHolidayNode(const core::formula::Node& rNode)
+{
+    return rNode.meKind == core::formula::NodeKind::EmptyArgument
+           || isLiteralBusinessDayScalarNode(rNode)
+           || isLiteralVectorArrayConstantNode(rNode);
+}
+
+[[nodiscard]] inline bool isLiteralBusinessDayWeekendNode(const core::formula::Node& rNode)
+{
+    if (rNode.meKind == core::formula::NodeKind::EmptyArgument || isLiteralOnlyNode(rNode))
+        return true;
+
+    sal_Int32 nLength = 0;
+    return isLiteralVectorArrayConstantNode(rNode, &nLength) && nLength == 7;
+}
+
+[[nodiscard]] inline bool isBoundedAmbientBusinessDayNode(const core::formula::Node& rNode)
+{
+    if (rNode.meKind != core::formula::NodeKind::FunctionCall)
+        return false;
+
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    const bool bWorkdayFunction = aFunctionName == u"WORKDAY"
+                                  || aFunctionName == u"WORKDAY.INTL"
+                                  || aFunctionName == u"COM.MICROSOFT.WORKDAY.INTL";
+    const bool bIntl = aFunctionName == u"WORKDAY.INTL"
+                       || aFunctionName == u"COM.MICROSOFT.WORKDAY.INTL"
+                       || aFunctionName == u"NETWORKDAYS.INTL"
+                       || aFunctionName == u"COM.MICROSOFT.NETWORKDAYS.INTL";
+    if (!bWorkdayFunction && aFunctionName != u"NETWORKDAYS"
+        && aFunctionName != u"NETWORKDAYS.INTL"
+        && aFunctionName != u"COM.MICROSOFT.NETWORKDAYS.INTL")
+    {
+        return false;
+    }
+
+    if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)
+        return false;
+
+    if (!rNode.maChildren[0] || !isLiteralBusinessDayScalarNode(*rNode.maChildren[0]))
+        return false;
+    if (!rNode.maChildren[1] || !isLiteralBusinessDayScalarNode(*rNode.maChildren[1]))
+        return false;
+
+    if (bWorkdayFunction)
+    {
+        if (bIntl)
+        {
+            return (rNode.maChildren.size() < 3 || !rNode.maChildren[2]
+                        || isLiteralBusinessDayWeekendNode(*rNode.maChildren[2]))
+                   && (rNode.maChildren.size() < 4 || !rNode.maChildren[3]
+                           || isLiteralBusinessDayHolidayNode(*rNode.maChildren[3]));
+        }
+
+        return (rNode.maChildren.size() < 3 || !rNode.maChildren[2]
+                    || isLiteralBusinessDayHolidayNode(*rNode.maChildren[2]))
+               && (rNode.maChildren.size() < 4 || !rNode.maChildren[3]
+                       || isLiteralBusinessDayWeekendNode(*rNode.maChildren[3]));
+    }
+
+    if (bIntl)
+    {
+        return (rNode.maChildren.size() < 3 || !rNode.maChildren[2]
+                    || isLiteralBusinessDayWeekendNode(*rNode.maChildren[2]))
+               && (rNode.maChildren.size() < 4 || !rNode.maChildren[3]
+                       || isLiteralBusinessDayHolidayNode(*rNode.maChildren[3]));
+    }
+
+    return (rNode.maChildren.size() < 3 || !rNode.maChildren[2]
+                || isLiteralBusinessDayHolidayNode(*rNode.maChildren[2]))
+           && (rNode.maChildren.size() < 4 || !rNode.maChildren[3]
+                   || isLiteralBusinessDayWeekendNode(*rNode.maChildren[3]));
+}
+
 [[nodiscard]] inline bool isHardRoutedNode(
     const core::formula::Node& rNode)
 {
@@ -4781,6 +4876,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
 {
+    if (!isBoundedAmbientBusinessDayNode(rNode))
+        return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+
     const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
 
     const auto makeNumericAttempt = [&](double fValue, SvNumFormatType eFormatType) {
