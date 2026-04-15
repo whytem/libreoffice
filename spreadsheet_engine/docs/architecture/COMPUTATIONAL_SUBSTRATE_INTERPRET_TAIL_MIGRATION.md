@@ -97,6 +97,7 @@ The currently promoted live evaluator family includes:
   - `TIMEVALUE`
   - `NUMBERVALUE`
 - scalar utilities:
+  - `IF`
   - `ROUND`
   - `ROUNDUP`
   - `ROUNDDOWN`
@@ -155,11 +156,11 @@ Two different denominators matter, and both are now reported.
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=8234`
-- `interpret_tail_live_authoritative_match_total=4935`
-- `interpret_tail_live_authoritative_fallback_total=3299`
-- live authoritative-match rate over the corpus: `9.7412%`
-- live authoritative-match rate over the current promoted probe: `59.9344%`
+- `interpret_tail_live_authoritative_probe_formula_cells=10162`
+- `interpret_tail_live_authoritative_match_total=6490`
+- `interpret_tail_live_authoritative_fallback_total=3672`
+- live authoritative-match rate over the corpus: `12.8106%`
+- live authoritative-match rate over the current promoted probe: `63.8646%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -168,9 +169,9 @@ Everything below is diagnostic context for improving that number.
 These are attempt totals from live observe, not unique-cell coverage:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=51358`
-- `interpret_tail_live_fallback_total=312`
-- `interpret_tail_live_seen_total=51670`
+- `interpret_tail_live_supported_total=52868`
+- `interpret_tail_live_fallback_total=328`
+- `interpret_tail_live_seen_total=53196`
 - `interpret_tail_live_unseen_formula_cells=0`
 - `interpret_tail_live_promoted_function_supported_total=50093`
 - `interpret_tail_live_supported_rate=101.36`
@@ -178,10 +179,10 @@ These are attempt totals from live observe, not unique-cell coverage:
 
 Current ambient fallback reasons:
 
-- `unsupported_formula_shape=40`
+- `unsupported_formula_shape=46`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=264`
+- `unsupported_function=280`
 
 ### Full Replay Corpus: Live Unique-Cell Surface
 
@@ -190,12 +191,12 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=8679`
-- `interpret_tail_live_unique_supported_formula_cells=8528`
-- `interpret_tail_live_unique_fallback_formula_cells=151`
-- `interpret_tail_live_unique_unseen_formula_cells=41982`
-- `interpret_tail_live_unique_seen_rate=17.13`
-- `interpret_tail_live_unique_supported_rate=16.83`
+- `interpret_tail_live_unique_seen_formula_cells=10565`
+- `interpret_tail_live_unique_supported_formula_cells=10400`
+- `interpret_tail_live_unique_fallback_formula_cells=165`
+- `interpret_tail_live_unique_unseen_formula_cells=40096`
+- `interpret_tail_live_unique_seen_rate=20.86`
+- `interpret_tail_live_unique_supported_rate=20.53`
 
 Interpretation:
 
@@ -224,6 +225,8 @@ Interpretation:
   `SUMIF` / `SUMIFS`, `AVERAGEIF` / `AVERAGEIFS`, and `MAXIFS` / `MINIFS`,
   contributing `203` live unique seen cells with `203` supported and `0`
   fallback after also closing the matrix-`IF(...)` criteria residue
+- a new bounded scalar `IF(...)` family now contributes `1887` live unique
+  seen cells with `1872` supported and `15` fallback
 - the main remaining ambient work is now the still-large
   `unsupported_function` wall, not simple denominator reach
 - the live authoritative-match north-star has now moved decisively above the
@@ -259,12 +262,12 @@ replay formula cell once, then classifying whether that formula cell was
 actually seen and supported by the seam:
 
 - `interpret_tail_forced_direct_formula_cells=50661`
-- `interpret_tail_forced_direct_seen_formula_cells=8631`
-- `interpret_tail_forced_direct_supported_formula_cells=8480`
-- `interpret_tail_forced_direct_fallback_formula_cells=151`
-- `interpret_tail_forced_direct_unseen_formula_cells=42030`
-- `interpret_tail_forced_direct_seen_rate=17.04`
-- `interpret_tail_forced_direct_supported_rate=16.74`
+- `interpret_tail_forced_direct_seen_formula_cells=10517`
+- `interpret_tail_forced_direct_supported_formula_cells=10352`
+- `interpret_tail_forced_direct_fallback_formula_cells=165`
+- `interpret_tail_forced_direct_unseen_formula_cells=40144`
+- `interpret_tail_forced_direct_seen_rate=20.76`
+- `interpret_tail_forced_direct_supported_rate=20.43`
 
 ### Promoted-Family Probe
 

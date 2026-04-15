@@ -100,6 +100,7 @@ enum class MismatchReason : sal_uInt8
 enum class FunctionKind : sal_uInt8
 {
     Unknown,
+    Conditional,
     LogicalConstant,
     Value,
     DateValue,
@@ -726,6 +727,8 @@ canonicalMathScalarFunctionName(api::StringView rFunctionName)
 
 [[nodiscard]] inline FunctionKind classifyFunction(api::StringView rFunctionName)
 {
+    if (rFunctionName == u"IF")
+        return FunctionKind::Conditional;
     if (rFunctionName == u"TRUE" || rFunctionName == u"FALSE")
         return FunctionKind::LogicalConstant;
     if (rFunctionName == u"VALUE")
@@ -2621,7 +2624,8 @@ inline void putScalarIntoMatrix(
             {
                 return makeMaterializedValue(api::CellValue::boolean(aFunctionName == u"TRUE"));
             }
-            if (eFunction == FunctionKind::MathScalar
+            if (eFunction == FunctionKind::Conditional
+                || eFunction == FunctionKind::MathScalar
                 || eFunction == FunctionKind::NumericAggregate
                 || eFunction == FunctionKind::RankedAggregate
                 || eFunction == FunctionKind::StatisticalAggregate
@@ -6926,6 +6930,34 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         return makeMaterializedValue(api::CellValue::boolean(bResult));
     };
 
+    if (eFunction == FunctionKind::Conditional)
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aCondition = materializeArgument(*rNode.maChildren[0]);
+        if (!aCondition.mbSupported)
+            return makeUnsupported(eFunction, aCondition.meFallbackReason);
+        if (!aCondition.moValue)
+            return makeErrorResult(eFunction, aCondition.meError);
+
+        const auto aBool = coerceScalarToBool(rDoc, rContext, *aCondition.moValue);
+        if (!aBool)
+            return makeErrorResult(eFunction, aBool.meError);
+
+        if (!aBool.maValue && rNode.maChildren.size() < 3)
+            return makeNumericResult(eFunction, 0.0, SvNumFormatType::LOGICAL);
+
+        const auto& rxSelected = aBool.maValue ? rNode.maChildren[1] : rNode.maChildren[2];
+        if (!rxSelected)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        auto aBranch = evaluateScalarOrDelegatedNode(*rxSelected, eFunction, rDoc, rContext,
+            rFormulaPos, bEmptyStringAsZero, 1, bImportedCanonicalSource);
+        aBranch.meFunction = eFunction;
+        return aBranch;
+    }
+
     if (eFunction == FunctionKind::Round)
     {
         if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
@@ -7652,6 +7684,10 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const FunctionKind eFunction = classifyFunction(aFunctionName);
     switch (eFunction)
     {
+        case FunctionKind::Conditional:
+            return evaluateScalarUtilityFunction(
+                rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero,
+                bImportedCanonicalSource);
         case FunctionKind::LogicalConstant:
             if (!rRoot.maChildren.empty())
                 return makeErrorResult(eFunction, api::Error::IllegalArgument);

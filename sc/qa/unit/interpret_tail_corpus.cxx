@@ -1141,6 +1141,8 @@ const char* functionKindName(FunctionKind eFunction)
     {
         case FunctionKind::Unknown:
             return "unknown";
+        case FunctionKind::Conditional:
+            return "conditional";
         case FunctionKind::LogicalConstant:
             return "logical_constant";
         case FunctionKind::Value:

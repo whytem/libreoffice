@@ -2106,6 +2106,53 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorCriteriaAggre
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorConditionalAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineConditionalAuthority"_ustr));
+    m_pDoc->SetValue(0, 0, 0, 2.0);
+    m_pDoc->SetValue(1, 0, 0, 10.0);
+    m_pDoc->SetValue(2, 0, 0, 20.0);
+    m_pDoc->SetValue(3, 0, 0, 5.0);
+    m_pDoc->SetString(4, 0, 0, u""_ustr);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"=IF(TRUE;42;99)"_ustr);
+        m_pDoc->SetString(1, 7, 0, u"=IF(FALSE;42;99)"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=IF(FALSE;42)"_ustr);
+        m_pDoc->SetString(3, 7, 0, u"=IF(TRUE;7;1/0)"_ustr);
+        m_pDoc->SetString(4, 7, 0, u"=IF(ISBLANK(E1);ABS(B1-C1)<D1;0)"_ustr);
+        m_pDoc->SetString(5, 7, 0, u"=IF(A1=2;B1;C1)"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(42.0, m_pDoc->GetValue(0, 7, 0));
+        ASSERT_DOUBLES_EQUAL(99.0, m_pDoc->GetValue(1, 7, 0));
+        ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(2, 7, 0));
+        ASSERT_DOUBLES_EQUAL(7.0, m_pDoc->GetValue(3, 7, 0));
+        ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(4, 7, 0));
+        ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(5, 7, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 6);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Conditional)]
+            >= 6);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Conditional)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorBusinessDayAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

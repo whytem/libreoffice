@@ -3038,6 +3038,70 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCriteriaAg
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aRangeCriteriaCountIfs.maResult.mfValue, 1e-12);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConditionalHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailConditionalHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(5, 0, 0);
+
+    m_pDoc->SetValue(0, 0, 0, 2.0); // A1
+    m_pDoc->SetValue(1, 0, 0, 10.0); // B1
+    m_pDoc->SetValue(2, 0, 0, 20.0); // C1
+    m_pDoc->SetValue(3, 0, 0, 5.0); // D1
+    m_pDoc->SetString(4, 0, 0, u""_ustr); // E1
+
+    const auto aTrueBranch = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=IF(TRUE;42;99)", false);
+    CPPUNIT_ASSERT(aTrueBranch.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conditional, aTrueBranch.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aTrueBranch.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(42.0, aTrueBranch.maResult.mfValue, 1e-12);
+
+    const auto aFalseBranch = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=IF(FALSE;42;99)", false);
+    CPPUNIT_ASSERT(aFalseBranch.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conditional, aFalseBranch.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aFalseBranch.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(99.0, aFalseBranch.maResult.mfValue, 1e-12);
+
+    const auto aOmittedElse = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=IF(FALSE;42)", false);
+    CPPUNIT_ASSERT(aOmittedElse.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conditional, aOmittedElse.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aOmittedElse.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, aOmittedElse.maResult.mfValue, 1e-12);
+
+    const auto aLazyElse = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=IF(TRUE;7;1/0)", false);
+    CPPUNIT_ASSERT(aLazyElse.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conditional, aLazyElse.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aLazyElse.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(7.0, aLazyElse.maResult.mfValue, 1e-12);
+
+    const auto aNestedCondition = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=IF(ISBLANK(E1);ABS(B1-C1)<D1;0)", false);
+    CPPUNIT_ASSERT(aNestedCondition.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conditional, aNestedCondition.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aNestedCondition.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, aNestedCondition.maResult.mfValue, 1e-12);
+
+    const auto aReferenceBranch = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=IF(A1=2;B1;C1)", false);
+    CPPUNIT_ASSERT(aReferenceBranch.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conditional, aReferenceBranch.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aReferenceBranch.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, aReferenceBranch.maResult.mfValue, 1e-12);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorBusinessDayHelper)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
