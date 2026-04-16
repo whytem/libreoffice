@@ -2193,6 +2193,40 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorFormulaTextAu
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorFormulaTextDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineFormulaTextDefaultOn"_ustr));
+
+    m_pDoc->SetString(0, 0, 0, u"=SUM(1;2)"_ustr);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(1, 0, 0, u"=FORMULA(A1)"_ustr);
+
+        CPPUNIT_ASSERT_EQUAL(u"=SUM(1;2)"_ustr, m_pDoc->GetString(1, 0, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::FormulaText)]
+            >= 1);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::FormulaText)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorTextUtilityAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

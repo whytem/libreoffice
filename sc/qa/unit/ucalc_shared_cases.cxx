@@ -3145,6 +3145,9 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorFormulaTex
         spreadsheetengine::api::formulavalue::ValueType::String, aIntersect.maResult.meType);
     CPPUNIT_ASSERT_EQUAL(aExpectedIntersect,
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(aIntersect.maResult.maString));
+
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=FORMULA(A1)"));
+    CPPUNIT_ASSERT(!setaileval::isFamilyLocalDefaultOnFormula(u"=SUM(1;2)"));
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorTextUtilityHelper)

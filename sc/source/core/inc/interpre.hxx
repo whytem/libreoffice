@@ -615,7 +615,6 @@ private:
     void ScIsRef();
     void ScIsValue();
     void ScIsFormula();
-    void ScFormula();
     void ScRoman();
     void ScArabic();
     void ScIsNV();

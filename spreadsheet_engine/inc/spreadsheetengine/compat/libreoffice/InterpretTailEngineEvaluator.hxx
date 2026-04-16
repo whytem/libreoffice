@@ -8593,6 +8593,22 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
            && detail::isHardRoutedNode(*aParse.mpRoot);
 }
 
+[[nodiscard]] inline bool isFamilyLocalDefaultOnFormula(std::u16string_view rFormulaSource)
+{
+    const api::String aNormalized = detail::normalizeFormulaSource(rFormulaSource);
+    const auto aParse = core::formula::parseFormula(aNormalized);
+    if (!aParse || !aParse.mpRoot
+        || aParse.mpRoot->meKind != core::formula::NodeKind::FunctionCall)
+    {
+        return false;
+    }
+
+    const FunctionKind eFunction
+        = detail::classifyFunction(detail::uppercaseAscii(aParse.mpRoot->maPrimaryText));
+    return eFunction == FunctionKind::LogicalConstant
+           || eFunction == FunctionKind::FormulaText;
+}
+
 inline void resetStats()
 {
     auto& rStore = detail::statsStore();

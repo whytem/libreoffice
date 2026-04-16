@@ -1978,12 +1978,13 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                                && cMatrixFlag == ScMatrixMode::NONE && !pCode->IsHyperLink()
                                && !rContext.pInterpreter
                                && !rDocument.IsThreadedGroupCalcInProgress();
-    // Logical constants are the first explicit family-local default-on
-    // rollout. Keep that policy separate from the broader frozen hard-route
-    // frontier so future retirement work has a narrower template.
+    // Family-local default-on rollout stays intentionally narrower than the
+    // frozen hard-route frontier so legacy retirement can proceed slice by
+    // slice with explicit ownership.
     const bool bDefaultAuthoritativeEngineFamily
         = bTailEligible
-          && getEngineDelegatedFunction() == setaileval::FunctionKind::LogicalConstant;
+          && (getEngineDelegatedFunction() == setaileval::FunctionKind::LogicalConstant
+              || getEngineDelegatedFunction() == setaileval::FunctionKind::FormulaText);
     const bool bHardRoutedEngineFamily
         = bTailEligible && !bDefaultAuthoritativeEngineFamily
           && setaileval::isHardRoutedFormula(std::u16string_view(

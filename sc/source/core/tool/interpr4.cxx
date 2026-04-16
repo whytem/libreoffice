@@ -70,6 +70,7 @@
 #include <tokenarray.hxx>
 #include <compiler.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx>
 #include <spreadsheetengine/compat/libreoffice/MatrixFrameExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
@@ -83,6 +84,7 @@
 using namespace com::sun::star;
 using namespace formula;
 namespace seexternalexec = spreadsheetengine::compat::libreoffice::externalreferenceexecution;
+namespace seformulainspect = spreadsheetengine::compat::libreoffice::formulainspection;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 namespace setextparseexec = spreadsheetengine::compat::libreoffice::textparsingexecution;
@@ -4044,6 +4046,86 @@ StackVar ScInterpreter::Interpret()
                         else
                             PushIllegalArgument();
                     };
+                const auto pushLegacyFormulaText = [&]() {
+                    if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
+                        && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
+                        && !pMyFormulaCell->IsHyperLinkCell()
+                        && !mrDoc.IsThreadedGroupCalcInProgress() && !IsInArrayContext())
+                    {
+                        const OUString aFormulaSource
+                            = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
+                        if (setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
+                                aFormulaSource.getStr(), aFormulaSource.getLength())))
+                        {
+                            SAL_WARN("sc.core",
+                                "family-local default-on FORMULA reached ScInterpreter for "
+                                    << aFormulaSource);
+                            OSL_FAIL("family-local default-on FORMULA reached ScInterpreter");
+                        }
+                    }
+
+                    OUString aFormula;
+                    switch (GetStackType())
+                    {
+                        case svDoubleRef:
+                            if (IsInArrayContext())
+                            {
+                                SCCOL nCol1, nCol2;
+                                SCROW nRow1, nRow2;
+                                SCTAB nTab1, nTab2;
+                                PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+                                if (nGlobalError != FormulaError::NONE)
+                                    break;
+
+                                if (nTab1 != nTab2)
+                                {
+                                    SetError(FormulaError::IllegalArgument);
+                                    break;
+                                }
+
+                                const auto aMatrixResult = seformulainspect::buildFormulaTextMatrix(
+                                    mrDoc, mrContext,
+                                    ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2), mrStrPool,
+                                    [this](SCSIZE nColumns, SCSIZE nRows) {
+                                        return GetNewMat(nColumns, nRows, true);
+                                    });
+                                if (aMatrixResult.meFailure
+                                    == seformulainspect::MatrixInspectionFailure::IllegalArgument)
+                                {
+                                    SetError(FormulaError::IllegalArgument);
+                                    break;
+                                }
+                                if (aMatrixResult.meFailure
+                                    == seformulainspect::MatrixInspectionFailure::MatrixSize)
+                                {
+                                    break;
+                                }
+
+                                PushMatrix(aMatrixResult.mpMatrix);
+                                return;
+                            }
+                            [[fallthrough]];
+                        case svSingleRef:
+                        {
+                            ScAddress aAdr;
+                            if (!PopDoubleRefOrSingleRef(aAdr))
+                                break;
+
+                            const auto aFormulaText
+                                = seformulainspect::formulaTextForCell(mrDoc, mrContext, aAdr);
+                            if (!aFormulaText)
+                                SetError(selibreoffice::toFormulaError(aFormulaText.meError));
+                            else
+                                aFormula = aFormulaText.maValue;
+                        }
+                        break;
+                        default:
+                            PopError();
+                            SetError(FormulaError::NotAvailable);
+                    }
+
+                    PushString(aFormula);
+                };
 
                 switch( eOp )
                 {
@@ -4169,7 +4251,7 @@ StackVar ScInterpreter::Interpret()
                     case ocIsRef            : ScIsRef();                    break;
                     case ocIsValue          : ScIsValue();                  break;
                     case ocIsFormula        : ScIsFormula();                break;
-                    case ocFormula          : ScFormula();                  break;
+                    case ocFormula          : pushLegacyFormulaText();      break;
                     case ocIsNA             : ScIsNV();                     break;
                     case ocIsErr            : ScIsErr();                    break;
                     case ocIsError          : ScIsError();                  break;
