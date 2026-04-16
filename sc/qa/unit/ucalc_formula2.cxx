@@ -2068,6 +2068,42 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRoundSigAutho
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorConversionAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineConversionAuthority"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"=CONVERT(1;\"m\";\"mi\")"_ustr);
+        m_pDoc->SetString(1, 7, 0, u"=CONVERT(2;\"C\";\"F\")"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=ORG.OPENOFFICE.CONVERT(100;\"ATS\";\"EUR\")"_ustr);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.000621371192237, m_pDoc->GetValue(0, 7, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(35.6, m_pDoc->GetValue(1, 7, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(7.26728341678597, m_pDoc->GetValue(2, 7, 0), 1e-12);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 3);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Conversion)]
+            >= 3);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Conversion)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorCriteriaAggregateAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

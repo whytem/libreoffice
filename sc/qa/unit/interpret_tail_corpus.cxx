@@ -1167,6 +1167,8 @@ const char* functionKindName(FunctionKind eFunction)
             return "rate";
         case FunctionKind::Round:
             return "round";
+        case FunctionKind::Conversion:
+            return "conversion";
         case FunctionKind::NumericAggregate:
             return "numeric_aggregate";
         case FunctionKind::RankedAggregate:
@@ -1177,6 +1179,8 @@ const char* functionKindName(FunctionKind eFunction)
             return "statistical_distribution";
         case FunctionKind::CriteriaAggregate:
             return "criteria_aggregate";
+        case FunctionKind::Aggregate:
+            return "aggregate";
         case FunctionKind::BusinessDay:
             return "business_day";
         case FunctionKind::CalendarUtility:

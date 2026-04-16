@@ -2931,6 +2931,40 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorRoundSigHe
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1230.0, aAlias.maResult.mfValue, 1e-12);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConversionHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailConversionHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(3, 0, 0);
+
+    const auto aDistance = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=CONVERT(1;\"m\";\"mi\")", false);
+    CPPUNIT_ASSERT(aDistance.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conversion, aDistance.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aDistance.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.000621371192237, aDistance.maResult.mfValue, 1e-12);
+
+    const auto aTemperature = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=CONVERT(2;\"C\";\"F\")", false);
+    CPPUNIT_ASSERT(aTemperature.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conversion, aTemperature.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aTemperature.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(35.6, aTemperature.maResult.mfValue, 1e-12);
+
+    const auto aAlias = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ORG.OPENOFFICE.CONVERT(100;\"ATS\";\"EUR\")", false);
+    CPPUNIT_ASSERT(aAlias.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conversion, aAlias.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aAlias.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(7.26728341678597, aAlias.maResult.mfValue, 1e-12);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCriteriaAggregateHelper)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
