@@ -96,6 +96,30 @@ Next routing policy:
 - then burn down `text_utility`
 - then burn down `conditional`
 
+### Unknown Bucket Root Split
+
+The top live unique roots inside `FunctionKind::Unknown` are now explicit:
+
+- `COM.MICROSOFT.CHOOSECOLS`: `11` unique unsupported-function cells
+- `COM.MICROSOFT.CHOOSEROWS`: `11` unique unsupported-function cells
+- `MDETERM`: `7`
+- `COM.MICROSOFT.UNIQUE`: `7`
+- `COM.MICROSOFT.SORT`: `6`
+- `COM.MICROSOFT.SORTBY`: `6`
+- `PROB`: `6`
+- `COM.MICROSOFT.TEXTSPLIT`: `4`
+- `COM.MICROSOFT.HSTACK`: `4`
+- `GROWTH`: `4`
+
+Updated next routing policy:
+
+- first take the bounded selector cluster:
+  `COM.MICROSOFT.CHOOSECOLS` / `COM.MICROSOFT.CHOOSEROWS`
+- then decide between the classic scalar/matrix cluster:
+  `MDETERM`, `PROB`, `GROWTH`
+- only then consider the heavier dynamic-array spill cluster:
+  `UNIQUE`, `SORT`, `SORTBY`, `TEXTSPLIT`, `HSTACK`
+
 ### Full Replay Corpus: Forced Interpret Observe Attempts
 
 These are also attempt totals. The new unique-cell direct surface is the

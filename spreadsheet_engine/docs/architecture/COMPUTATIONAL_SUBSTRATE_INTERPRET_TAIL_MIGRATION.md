@@ -283,6 +283,13 @@ Interpretation:
 - the live unique unsupported-function routing table is now explicit:
   `unknown=130`, `text_utility=19`, `conditional=8`; that ordering now drives
   the next ambient family-selection work instead of intuition
+- the `unknown` bucket is now also split by live unique root name:
+  `CHOOSECOLS=11`, `CHOOSEROWS=11`, `MDETERM=7`, `UNIQUE=7`, `SORT=6`,
+  `SORTBY=6`, `PROB=6`, `TEXTSPLIT=4`, `HSTACK=4`, `GROWTH=4`
+- that makes the next routing policy concrete:
+  first `CHOOSECOLS` / `CHOOSEROWS`, then `MDETERM` / `PROB` / `GROWTH`,
+  and only then the heavier spill cluster (`UNIQUE`, `SORT`, `SORTBY`,
+  `TEXTSPLIT`, `HSTACK`)
 - the main remaining ambient work is now the still-large
   `unsupported_function` wall plus the still-heavy mismatch buckets inside the
   imported host-truth-artifact probe band, not simple denominator reach

@@ -133,6 +133,26 @@ Routing policy:
 - then target `text_utility`
 - then target `conditional`
 
+Unknown root split:
+
+- `COM.MICROSOFT.CHOOSECOLS`: `11`
+- `COM.MICROSOFT.CHOOSEROWS`: `11`
+- `MDETERM`: `7`
+- `COM.MICROSOFT.UNIQUE`: `7`
+- `COM.MICROSOFT.SORT`: `6`
+- `COM.MICROSOFT.SORTBY`: `6`
+- `PROB`: `6`
+- `COM.MICROSOFT.TEXTSPLIT`: `4`
+- `COM.MICROSOFT.HSTACK`: `4`
+- `GROWTH`: `4`
+
+That now sharpens the next routing policy:
+
+- first the bounded selector cluster: `CHOOSECOLS` / `CHOOSEROWS`
+- then the classic scalar/matrix cluster: `MDETERM`, `PROB`, `GROWTH`
+- only then the spill-heavy dynamic-array cluster:
+  `UNIQUE`, `SORT`, `SORTBY`, `TEXTSPLIT`, `HSTACK`
+
 ### Full Replay Corpus: Forced Interpret Observe Attempts
 
 These are also attempt totals. The new forced-direct inventory below is the
