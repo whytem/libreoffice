@@ -1964,29 +1964,6 @@ void ScInterpreter::ScDecimal()
         PushIllegalArgument();
 }
 
-void ScInterpreter::ScConvertOOo()
-{   // Value, FromUnit, ToUnit
-    if ( !MustHaveParamCount( GetByte(), 3 ) )
-        return;
-
-    OUString aToUnit = GetString().getString();
-    OUString aFromUnit = GetString().getString();
-    double fVal = GetDouble();
-    if ( nGlobalError != FormulaError::NONE )
-        PushError( nGlobalError);
-    else
-    {
-        // first of all search for the given order; if it can't be found then search for the inverse
-        double fConv;
-        if ( ScGlobal::GetUnitConverter()->GetValue( fConv, aFromUnit, aToUnit ) )
-            PushDouble( fVal * fConv );
-        else if ( ScGlobal::GetUnitConverter()->GetValue( fConv, aToUnit, aFromUnit ) )
-            PushDouble( fVal / fConv );
-        else
-            PushNA();
-    }
-}
-
 void ScInterpreter::ScRoman()
 {   // Value [Mode]
     sal_uInt8 nParamCount = GetByte();

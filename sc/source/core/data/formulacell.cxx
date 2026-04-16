@@ -1984,7 +1984,8 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
     const bool bDefaultAuthoritativeEngineFamily
         = bTailEligible
           && (getEngineDelegatedFunction() == setaileval::FunctionKind::LogicalConstant
-              || getEngineDelegatedFunction() == setaileval::FunctionKind::FormulaText);
+              || getEngineDelegatedFunction() == setaileval::FunctionKind::FormulaText
+              || getEngineDelegatedFunction() == setaileval::FunctionKind::Conversion);
     const bool bHardRoutedEngineFamily
         = bTailEligible && !bDefaultAuthoritativeEngineFamily
           && setaileval::isHardRoutedFormula(std::u16string_view(

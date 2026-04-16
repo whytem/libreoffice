@@ -2963,6 +2963,10 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConversion
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value, aAlias.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(7.26728341678597, aAlias.maResult.mfValue, 1e-12);
+
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=CONVERT(1;\"m\";\"mi\")"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(
+        u"=ORG.OPENOFFICE.CONVERT(100;\"ATS\";\"EUR\")"));
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorAggregateHelper)

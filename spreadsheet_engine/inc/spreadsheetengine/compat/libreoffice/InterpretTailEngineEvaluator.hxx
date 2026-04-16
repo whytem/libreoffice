@@ -8910,7 +8910,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const FunctionKind eFunction
         = detail::classifyFunction(detail::uppercaseAscii(aParse.mpRoot->maPrimaryText));
     return eFunction == FunctionKind::LogicalConstant
-           || eFunction == FunctionKind::FormulaText;
+           || eFunction == FunctionKind::FormulaText
+           || eFunction == FunctionKind::Conversion;
 }
 
 inline void resetStats()

@@ -63,6 +63,7 @@
 #include <jumpmatrix.hxx>
 #include <parclass.hxx>
 #include <externalrefmgr.hxx>
+#include <unitconv.hxx>
 #include <formula/FormulaCompiler.hxx>
 #include <macromgr.hxx>
 #include <doubleref.hxx>
@@ -4046,6 +4047,43 @@ StackVar ScInterpreter::Interpret()
                         else
                             PushIllegalArgument();
                     };
+                const auto pushLegacyConvert = [&]() {
+                    if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
+                        && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
+                        && !pMyFormulaCell->IsHyperLinkCell()
+                        && !mrDoc.IsThreadedGroupCalcInProgress())
+                    {
+                        const OUString aFormulaSource
+                            = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
+                        if (setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
+                                aFormulaSource.getStr(), aFormulaSource.getLength())))
+                        {
+                            SAL_WARN("sc.core",
+                                "family-local default-on CONVERT reached ScInterpreter for "
+                                    << aFormulaSource);
+                            OSL_FAIL("family-local default-on CONVERT reached ScInterpreter");
+                        }
+                    }
+
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+
+                    OUString aToUnit = GetString().getString();
+                    OUString aFromUnit = GetString().getString();
+                    double fVal = GetDouble();
+                    if (nGlobalError != FormulaError::NONE)
+                        PushError(nGlobalError);
+                    else
+                    {
+                        double fConv;
+                        if (ScGlobal::GetUnitConverter()->GetValue(fConv, aFromUnit, aToUnit))
+                            PushDouble(fVal * fConv);
+                        else if (ScGlobal::GetUnitConverter()->GetValue(fConv, aToUnit, aFromUnit))
+                            PushDouble(fVal / fConv);
+                        else
+                            PushNA();
+                    }
+                };
                 const auto pushLegacyFormulaText = [&]() {
                     if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
                         && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
@@ -4569,7 +4607,7 @@ StackVar ScInterpreter::Interpret()
                     case ocDde              : ScDde();                      break;
                     case ocBase             : ScBase();                     break;
                     case ocDecimal          : ScDecimal();                  break;
-                    case ocConvertOOo       : ScConvertOOo();               break;
+                    case ocConvertOOo       : pushLegacyConvert();          break;
                     case ocEuroConvert      : ScEuroConvert();              break;
                     case ocRoman            : ScRoman();                    break;
                     case ocArabic           : ScArabic();                   break;
