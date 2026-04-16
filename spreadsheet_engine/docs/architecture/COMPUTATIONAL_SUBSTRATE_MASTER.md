@@ -19,7 +19,7 @@ Today:
 - debug and CI-style builds default that seam to `observe`
 - an eighty-five-slice env-independent logical/text/match/xmatch/lookup/index
   cluster is now engine-first even with rollout explicitly `off`
-- six real narrow legacy deletion milestones have landed:
+- seven real narrow legacy deletion milestones have landed:
   `ScInterpreter::ScTrue()` / `ScFalse()` are retired behind an explicit
   family-local default-on logical-constant path, and the dedicated
   `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair is retired while
@@ -35,7 +35,10 @@ Today:
   path while preserving inline nested legacy execution at opcode dispatch,
   and now the dedicated `ScInterpreter::ScEuroConvert()` wrapper is retired
   behind the family-local default-on conversion path while preserving inline
-  nested legacy execution at opcode dispatch
+  nested legacy execution at opcode dispatch, and now the dedicated
+  `ScInterpreter::ScBase()` / `ScDecimal()` / `ScRoman()` / `ScArabic()`
+  wrappers are retired behind that same conversion family-local default-on
+  path while preserving inline nested legacy execution at opcode dispatch
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to
@@ -45,8 +48,9 @@ Today:
   before they enter the shared runtime, and the next `BusinessDay` slice has
   now admitted cheap local reference, holiday-range, weekend-range,
   weekend-code-ref, and named-ref shapes, with the latest bounded ambient wall
-  move now also admitting `CONVERT` and `AGGREGATE` while pinning focused
-  `ROUNDSIG` / `ORG.LIBREOFFICE.ROUNDSIG` coverage
+  move now also admitting `CONVERT`, the numeral-conversion roots
+  `BASE` / `DECIMAL` / `ROMAN` / `ARABIC`, and `AGGREGATE` while pinning
+  focused `ROUNDSIG` / `ORG.LIBREOFFICE.ROUNDSIG` coverage
 
 The active program is no longer “prove more substrate slices.”
 The active program is “use the substrate to underwrite live evaluator

@@ -279,14 +279,15 @@ Still not true:
 
 - no broad default-on rollout exists beyond the narrow logical-constant,
   formula-text, and conversion families plus the narrow `ROUNDSIG` slice
-- six narrow legacy deletion milestones have landed:
+- seven narrow legacy deletion milestones have landed:
   `ScInterpreter::ScTrue()` / `ScFalse()` and the dedicated
   `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair, plus the dedicated
   `ScInterpreter::ScFormula()` wrapper, and now the dedicated
   `ScInterpreter::ScConvertOOo()` wrapper, and now the dedicated
   `ScInterpreter::ScRoundSignificant()` wrapper, and now the dedicated
-  `ScInterpreter::ScEuroConvert()` wrapper; broader legacy retirement has not
-  started
+  `ScInterpreter::ScEuroConvert()` wrapper, and now the dedicated
+  `ScInterpreter::ScBase()` / `ScDecimal()` / `ScRoman()` / `ScArabic()`
+  wrappers; broader legacy retirement has not started
 - multiple interpreter hard-route milestones have landed, but full legacy
   opcode retirement has not
 - the dominant retained live blocker is now the broader ambient
@@ -314,8 +315,10 @@ Still not true:
   `FORMULA(...)` live-host-truth alignment that contributes
   `14278` live unique seen cells with `14278` supported and `0` fallback,
   followed now by a bounded `CONVERT` slice that contributes
-  `308` live unique seen cells with `308` supported and `0` fallback, plus a
-  bounded `AGGREGATE` slice that contributes `212` live unique seen cells with
+  `308` live unique seen cells with `308` supported and `0` fallback, with
+  the same conversion family now also carrying default-on numeral-conversion
+  `BASE` / `DECIMAL` / `ROMAN` / `ARABIC` retirement, plus a bounded
+  `AGGREGATE` slice that contributes `212` live unique seen cells with
   `211` supported and `1` fallback, while the same pass also pins focused
   `ROUNDSIG` / `ORG.LIBREOFFICE.ROUNDSIG` live-seam coverage
 - the raw promoted replay probe is now unambiguously a diagnostic surface, not
