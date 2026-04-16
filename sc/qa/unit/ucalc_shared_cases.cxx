@@ -2929,6 +2929,11 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorRoundSigHe
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value, aAlias.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1230.0, aAlias.maResult.mfValue, 1e-12);
+
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=ROUNDSIG(1234.567;3)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(
+        u"=ORG.LIBREOFFICE.ROUNDSIG(1234.567;3)"));
+    CPPUNIT_ASSERT(!setaileval::isFamilyLocalDefaultOnFormula(u"=ABS(12)"));
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConversionHelper)

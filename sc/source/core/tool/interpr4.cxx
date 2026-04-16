@@ -4084,6 +4084,44 @@ StackVar ScInterpreter::Interpret()
                             PushNA();
                     }
                 };
+                const auto pushLegacyRoundSignificant = [&]() {
+                    if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
+                        && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
+                        && !pMyFormulaCell->IsHyperLinkCell()
+                        && !mrDoc.IsThreadedGroupCalcInProgress())
+                    {
+                        const OUString aFormulaSource
+                            = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
+                        if (setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
+                                aFormulaSource.getStr(), aFormulaSource.getLength())))
+                        {
+                            SAL_WARN("sc.core",
+                                "family-local default-on ROUNDSIG reached ScInterpreter for "
+                                    << aFormulaSource);
+                            OSL_FAIL("family-local default-on ROUNDSIG reached ScInterpreter");
+                        }
+                    }
+
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+
+                    double fDigits = ::rtl::math::approxFloor(GetDouble());
+                    double fX = GetDouble();
+                    if (nGlobalError != FormulaError::NONE || fDigits < 1.0)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+
+                    if (fX == 0.0)
+                        PushDouble(0.0);
+                    else
+                    {
+                        double fRes;
+                        RoundSignificant(fX, fDigits, fRes);
+                        PushDouble(fRes);
+                    }
+                };
                 const auto pushLegacyFormulaText = [&]() {
                     if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
                         && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
@@ -4327,7 +4365,7 @@ StackVar ScInterpreter::Interpret()
                     case ocMod              : ScMod();                      break;
                     case ocPower            : ScPower();                    break;
                     case ocRound            : ScRound();                    break;
-                    case ocRoundSig         : ScRoundSignificant();         break;
+                    case ocRoundSig         : pushLegacyRoundSignificant(); break;
                     case ocRoundUp          : ScRoundUp();                  break;
                     case ocTrunc            :
                     case ocRoundDown        : ScRoundDown();                break;

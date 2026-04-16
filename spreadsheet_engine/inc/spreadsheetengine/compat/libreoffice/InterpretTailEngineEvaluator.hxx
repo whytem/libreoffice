@@ -8907,8 +8907,14 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         return false;
     }
 
-    const FunctionKind eFunction
-        = detail::classifyFunction(detail::uppercaseAscii(aParse.mpRoot->maPrimaryText));
+    const api::String aUpperFunctionName = detail::uppercaseAscii(aParse.mpRoot->maPrimaryText);
+    const FunctionKind eFunction = detail::classifyFunction(aUpperFunctionName);
+    if (eFunction == FunctionKind::MathScalar)
+    {
+        const auto oCanonicalName = detail::canonicalMathScalarFunctionName(aUpperFunctionName);
+        return oCanonicalName && *oCanonicalName == u"ROUNDSIG";
+    }
+
     return eFunction == FunctionKind::LogicalConstant
            || eFunction == FunctionKind::FormulaText
            || eFunction == FunctionKind::Conversion;

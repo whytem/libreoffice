@@ -574,30 +574,6 @@ void ScInterpreter::RoundSignificant( double fX, double fDigits, double &fRes )
     fRes = semath::roundToSignificantDigits( fX, fDigits );
 }
 
-// tdf#105931
-void ScInterpreter::ScRoundSignificant()
-{
-    if ( !MustHaveParamCount( GetByte(), 2 ) )
-        return;
-
-    double fDigits = ::rtl::math::approxFloor( GetDouble() );
-    double fX = GetDouble();
-    if ( nGlobalError != FormulaError::NONE || fDigits < 1.0 )
-    {
-        PushIllegalArgument();
-        return;
-    }
-
-    if ( fX == 0.0 )
-        PushDouble( 0.0 );
-    else
-    {
-        double fRes;
-        RoundSignificant( fX, fDigits, fRes );
-        PushDouble( fRes );
-    }
-}
-
 /** tdf69552 ODFF1.2 function CEILING and Excel function CEILING.MATH
     In essence, the difference between the two is that ODFF-CEILING needs to
     have arguments value and significance of the same sign and with

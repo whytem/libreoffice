@@ -1981,15 +1981,15 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
     // Family-local default-on rollout stays intentionally narrower than the
     // frozen hard-route frontier so legacy retirement can proceed slice by
     // slice with explicit ownership.
+    const OUString& rEngineFormulaSource = getEngineFormulaSource();
     const bool bDefaultAuthoritativeEngineFamily
         = bTailEligible
-          && (getEngineDelegatedFunction() == setaileval::FunctionKind::LogicalConstant
-              || getEngineDelegatedFunction() == setaileval::FunctionKind::FormulaText
-              || getEngineDelegatedFunction() == setaileval::FunctionKind::Conversion);
+          && setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
+              rEngineFormulaSource.getStr(), rEngineFormulaSource.getLength()));
     const bool bHardRoutedEngineFamily
         = bTailEligible && !bDefaultAuthoritativeEngineFamily
           && setaileval::isHardRoutedFormula(std::u16string_view(
-              getEngineFormulaSource().getStr(), getEngineFormulaSource().getLength()));
+              rEngineFormulaSource.getStr(), rEngineFormulaSource.getLength()));
     const bool bEngineAuthoritativeWhileOff
         = bDefaultAuthoritativeEngineFamily || bHardRoutedEngineFamily;
     const auto maybeRecordPreRpnObserve = [&]() {

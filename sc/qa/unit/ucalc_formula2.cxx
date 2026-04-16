@@ -2383,6 +2383,43 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorConversionDef
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRoundSigDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineRoundSigDefaultOn"_ustr));
+
+    m_pDoc->SetValue(0, 0, 0, 1234.567);
+    m_pDoc->SetValue(1, 0, 0, 3.0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"=ROUNDSIG(A1;B1)"_ustr);
+        m_pDoc->SetString(1, 7, 0, u"=ORG.LIBREOFFICE.ROUNDSIG(1234.567;3)"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(1230.0, m_pDoc->GetValue(0, 7, 0));
+        ASSERT_DOUBLES_EQUAL(1230.0, m_pDoc->GetValue(1, 7, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 2);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::MathScalar)]
+            >= 2);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::MathScalar)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorTextUtilityAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
