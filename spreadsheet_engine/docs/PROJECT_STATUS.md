@@ -277,12 +277,13 @@ Today:
 
 Still not true:
 
-- no broad default-on rollout exists beyond the narrow logical-constant and
-  formula-text families
-- three narrow legacy deletion milestones have landed:
+- no broad default-on rollout exists beyond the narrow logical-constant,
+  formula-text, and conversion families
+- four narrow legacy deletion milestones have landed:
   `ScInterpreter::ScTrue()` / `ScFalse()` and the dedicated
   `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair, plus the dedicated
-  `ScInterpreter::ScFormula()` wrapper; broader legacy retirement has not
+  `ScInterpreter::ScFormula()` wrapper, and now the dedicated
+  `ScInterpreter::ScConvertOOo()` wrapper; broader legacy retirement has not
   started
 - multiple interpreter hard-route milestones have landed, but full legacy
   opcode retirement has not
