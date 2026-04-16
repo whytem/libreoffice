@@ -2965,6 +2965,59 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConversion
     CPPUNIT_ASSERT_DOUBLES_EQUAL(7.26728341678597, aAlias.maResult.mfValue, 1e-12);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorAggregateHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailAggregateHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(7, 0, 0);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 4.0);
+    m_pDoc->SetValue(0, 3, 0, 8.0);
+    m_pDoc->SetValue(0, 4, 0, 16.0);
+    m_pDoc->SetValue(0, 5, 0, 32.0);
+    m_pDoc->SetRowHidden(2, 4, 0, true);
+    m_pDoc->SetValue(1, 0, 0, 10.0);
+    m_pDoc->SetValue(1, 1, 0, 30.0);
+    m_pDoc->SetString(1, 2, 0, u"=AGGREGATE(9;6;B1:B2)"_ustr);
+
+    const auto aHiddenSum = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.AGGREGATE(9;5;A1:A6)", false);
+    CPPUNIT_ASSERT(aHiddenSum.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Aggregate, aHiddenSum.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aHiddenSum.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(35.0, aHiddenSum.maResult.mfValue, 1e-12);
+
+    const auto aNestedSkip = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=AGGREGATE(1;0;B1:B2;B3)", false);
+    CPPUNIT_ASSERT(aNestedSkip.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Aggregate, aNestedSkip.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aNestedSkip.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(20.0, aNestedSkip.maResult.mfValue, 1e-12);
+
+    const auto aScalarSum = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.AGGREGATE(9;6;3;4;5)", false);
+    CPPUNIT_ASSERT(aScalarSum.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Aggregate, aScalarSum.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aScalarSum.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(12.0, aScalarSum.maResult.mfValue, 1e-12);
+
+    const auto aLarge = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.AGGREGATE(14;6;{1;4;8;16};2)", false);
+    CPPUNIT_ASSERT(aLarge.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Aggregate, aLarge.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aLarge.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(8.0, aLarge.maResult.mfValue, 1e-12);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCriteriaAggregateHelper)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
