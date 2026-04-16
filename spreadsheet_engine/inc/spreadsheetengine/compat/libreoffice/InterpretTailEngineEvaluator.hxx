@@ -104,6 +104,7 @@ enum class FunctionKind : sal_uInt8
 {
     Unknown,
     Conditional,
+    FormulaText,
     LogicalConstant,
     TextUtility,
     Value,
@@ -734,6 +735,8 @@ canonicalMathScalarFunctionName(api::StringView rFunctionName)
 {
     if (rFunctionName == u"IF")
         return FunctionKind::Conditional;
+    if (rFunctionName == u"FORMULA")
+        return FunctionKind::FormulaText;
     if (rFunctionName == u"TRUE" || rFunctionName == u"FALSE")
         return FunctionKind::LogicalConstant;
     if (rFunctionName == u"CONCATENATE" || rFunctionName == u"CONCAT"
@@ -2394,6 +2397,19 @@ template <typename T>
     }
 
     return std::nullopt;
+}
+
+[[nodiscard]] inline std::optional<ScAddress> formulaTextTargetAddress(
+    const core::formula::Node& rNode, const ScDocument& rDoc, const ScAddress& rFormulaPos)
+{
+    const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+    if (!aRange.mbSupported || !aRange.moValue)
+        return std::nullopt;
+
+    if (aRange.moValue->aStart == aRange.moValue->aEnd)
+        return aRange.moValue->aStart;
+
+    return tryImplicitIntersectionAddress(*aRange.moValue, rFormulaPos);
 }
 
 [[nodiscard]] inline std::optional<api::CellValue> tryMaterializeBoundedReferencedFormulaCellValue(
@@ -7445,6 +7461,40 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
 }
 
+[[nodiscard]] inline EvaluationAttempt evaluateFormulaTextFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bImportedCanonicalSource)
+{
+    if (rNode.maChildren.size() != 1)
+        return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+    if ((bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
+        && containsReferenceLikeDescendant(rNode))
+    {
+        return makeErrorResult(eFunction, api::Error::VariableExpected);
+    }
+
+    const auto oTargetAddress = formulaTextTargetAddress(*rNode.maChildren[0], rDoc, rFormulaPos);
+    if (!oTargetAddress || *oTargetAddress == rFormulaPos)
+        return makeUnsupported(eFunction, FallbackReason::UnsupportedHostSurface);
+
+    ScRefCellValue aTargetCell(const_cast<ScDocument&>(rDoc), *oTargetAddress);
+    if (aTargetCell.getType() != CELLTYPE_FORMULA)
+        return makeErrorResult(eFunction, api::Error::NotAvailable);
+
+    ScFormulaCell* pFormula = aTargetCell.getFormula();
+    if (!pFormula)
+        return makeErrorResult(eFunction, api::Error::NotAvailable);
+
+    OUString aFormula
+        = pFormula->GetFormula(formula::FormulaGrammar::GRAM_NATIVE_UI, &rContext);
+    if (aFormula.startsWith(u"=of:="_ustr))
+        aFormula = u"="_ustr + aFormula.copy(5);
+    if (pFormula->GetMatrixFlag() != ScMatrixMode::NONE && !aFormula.startsWith(u"{="_ustr))
+        aFormula = u"{"_ustr + aFormula + u"}"_ustr;
+    return makeStringResult(eFunction, aFormula);
+}
+
 [[nodiscard]] inline EvaluationAttempt evaluateScalarUtilityFunction(
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
@@ -8288,6 +8338,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             return evaluateScalarUtilityFunction(
                 rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero,
                 bImportedCanonicalSource);
+        case FunctionKind::FormulaText:
+            return evaluateFormulaTextFunction(
+                rRoot, eFunction, rDoc, rContext, rFormulaPos, bImportedCanonicalSource);
         case FunctionKind::LogicalConstant:
             if (!rRoot.maChildren.empty())
                 return makeErrorResult(eFunction, api::Error::IllegalArgument);

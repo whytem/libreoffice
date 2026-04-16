@@ -3102,6 +3102,51 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConditiona
     CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, aReferenceBranch.maResult.mfValue, 1e-12);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorFormulaTextHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailFormulaTextHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+
+    m_pDoc->SetString(0, 0, 0, u"=SUM(1;2)"_ustr); // A1
+    m_pDoc->SetValue(0, 1, 0, 7.0); // A2
+    m_pDoc->SetString(0, 2, 0, u"=A1*2"_ustr); // A3
+
+    m_pDoc->SetString(1, 0, 0, u"=FORMULA(A1)"_ustr); // B1
+    m_pDoc->SetString(1, 2, 0, u"=FORMULA(A1:A3)"_ustr); // B3
+
+    const OUString aExpectedScalar = m_pDoc->GetString(1, 0, 0);
+    const OUString aExpectedIntersect = m_pDoc->GetString(1, 2, 0);
+
+    const auto aScalar = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(1, 0, 0), u"=FORMULA(A1)", false);
+    CPPUNIT_ASSERT(aScalar.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::FormulaText, aScalar.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aScalar.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(aExpectedScalar,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aScalar.maResult.maString));
+
+    const auto aNonFormula = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(1, 1, 0), u"=FORMULA(A2)", false);
+    CPPUNIT_ASSERT(aNonFormula.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::FormulaText, aNonFormula.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error, aNonFormula.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::Error::NotAvailable, aNonFormula.maResult.meError);
+
+    const auto aIntersect = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, ScAddress(1, 2, 0), u"=FORMULA(A1:A3)", false);
+    CPPUNIT_ASSERT(aIntersect.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::FormulaText, aIntersect.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aIntersect.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(aExpectedIntersect,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aIntersect.maResult.maString));
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorTextUtilityHelper)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

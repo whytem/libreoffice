@@ -105,6 +105,7 @@ struct ProbeDiagnosticSample
     OUString maFunctionName;
     OUString maOutcome;
     OUString maCalcResult;
+    OUString maLiveHostResult;
     OUString maEngineResult;
 };
 
@@ -254,7 +255,8 @@ void resetReplayEligibilityDiagnosticSamples()
 
 void maybeAddProbeDiagnosticSample(const OUString& rWorkbookLabel, const ScDocument& rDoc,
     const ScAddress& rPos, const OUString& rFormulaSource, FunctionKind eFunction,
-    const OUString& rOutcome, const OUString& rCalcResult, const OUString& rEngineResult)
+    const OUString& rOutcome, const OUString& rCalcResult, const OUString& rLiveHostResult,
+    const OUString& rEngineResult)
 {
     if (!envEnabled("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_PROBE_DIAGNOSTICS"))
         return;
@@ -287,6 +289,7 @@ void maybeAddProbeDiagnosticSample(const OUString& rWorkbookLabel, const ScDocum
     aSample.maFunctionName = OUString::fromUtf8(functionKindName(eFunction));
     aSample.maOutcome = rOutcome;
     aSample.maCalcResult = rCalcResult;
+    aSample.maLiveHostResult = rLiveHostResult;
     aSample.maEngineResult = rEngineResult;
     rSamples.push_back(std::move(aSample));
 }
@@ -761,7 +764,8 @@ SupportedProbeRun runSupportedInterpretTailProbe(
                 maybeAddProbeDiagnosticSample(
                     rWorkbookLabel, rDoc, aPos, aFormulaSource,
                     aAttempt.meFunction != FunctionKind::Unknown ? aAttempt.meFunction : eProbeFunction,
-                    u"fallback"_ustr, OUString(), OUString::fromUtf8(fallbackReasonName(aAttempt.meFallbackReason)));
+                    u"fallback"_ustr, OUString(), probeValueToDiagnosticString(aLiveHostValue),
+                    OUString::fromUtf8(fallbackReasonName(aAttempt.meFallbackReason)));
                 recordProbeAuthoritativeFallback(
                     aRun.maRawStats, aAttempt.meFallbackReason,
                     aAttempt.meFunction != FunctionKind::Unknown ? aAttempt.meFunction : eProbeFunction);
@@ -807,6 +811,7 @@ SupportedProbeRun runSupportedInterpretTailProbe(
                 maybeAddProbeDiagnosticSample(
                     rWorkbookLabel, rDoc, aPos, aFormulaSource, aAttempt.meFunction, u"authoritative"_ustr,
                     probeValueToDiagnosticString(aWorkbookValue),
+                    probeValueToDiagnosticString(aLiveHostValue),
                     probeValueToDiagnosticString(aEngineValue));
                 recordProbeAuthoritativeRoute(aRun.maRawStats, aAttempt.meFunction);
             }
@@ -815,6 +820,7 @@ SupportedProbeRun runSupportedInterpretTailProbe(
                 maybeAddProbeDiagnosticSample(
                     rWorkbookLabel, rDoc, aPos, aFormulaSource, aAttempt.meFunction,
                     u"shadow_mismatch"_ustr, probeValueToDiagnosticString(aWorkbookValue),
+                    probeValueToDiagnosticString(aLiveHostValue),
                     probeValueToDiagnosticString(aEngineValue));
                 recordProbeAuthoritativeFallback(
                     aRun.maRawStats, FallbackReason::ShadowMismatch, aAttempt.meFunction);
@@ -1143,6 +1149,8 @@ const char* functionKindName(FunctionKind eFunction)
             return "unknown";
         case FunctionKind::Conditional:
             return "conditional";
+        case FunctionKind::FormulaText:
+            return "formula_text";
         case FunctionKind::LogicalConstant:
             return "logical_constant";
         case FunctionKind::TextUtility:
@@ -1903,6 +1911,8 @@ void printProbeDiagnosticSamples()
                   << rSample.maFormulaSource.toUtf8().getStr() << '\n';
         std::cout << "interpret_tail_probe_diagnostic_" << nIndex << "_calc_result="
                   << rSample.maCalcResult.toUtf8().getStr() << '\n';
+        std::cout << "interpret_tail_probe_diagnostic_" << nIndex << "_live_host_result="
+                  << rSample.maLiveHostResult.toUtf8().getStr() << '\n';
         std::cout << "interpret_tail_probe_diagnostic_" << nIndex << "_engine_result="
                   << rSample.maEngineResult.toUtf8().getStr() << '\n';
     }
@@ -2282,6 +2292,61 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalFoldLiveHostTru
     }
 
     CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(aPos));
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedFormulaTextLiveHostTruth)
+{
+    const struct ImportedFormulaTextCase
+    {
+        OUString maWorkbookPath;
+        ScAddress maPos;
+        OUString maExpectedFormula;
+    } aCases[] = {
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/logical/fods/if.fods"),
+            ScAddress(3, 3, 1), u"=of:=FORMULA([.A4])"_ustr }, // Sheet2.D4
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/logical/fods/and.fods"),
+            ScAddress(3, 7, 1), u"=of:=FORMULA([.A8])"_ustr }, // Sheet2.D8
+    };
+
+    for (const auto& rCase : aCases)
+    {
+        const std::string aWorkbookPathUtf8(rCase.maWorkbookPath.toUtf8().getStr());
+        const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+        CPPUNIT_ASSERT_MESSAGE(("loadWorkbook failed for formula-text host truth case: "
+                                   + aWorkbookPathUtf8)
+                                       .c_str(),
+            static_cast<bool>(aLoadResult));
+
+        Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+        normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+        ScDocShellRef xDocShell = new ScDocShell(
+            SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+            | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+        xDocShell->DoInitUnitTest();
+        ScDocument& rDoc = xDocShell->GetDocument();
+        (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+        ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+        ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+        CPPUNIT_ASSERT(pContext);
+
+        ScFormulaCell* pFormula = rDoc.GetFormulaCell(rCase.maPos);
+        CPPUNIT_ASSERT(pFormula);
+
+        const OUString aFormulaSource
+            = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+        CPPUNIT_ASSERT_EQUAL(rCase.maExpectedFormula, aFormulaSource);
+
+        {
+            ScopedEnvironmentOverride aOffMode(
+                "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+            pFormula->SetDirty();
+            pFormula->Interpret();
+        }
+
+        CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(rCase.maPos));
+    }
 }
 
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalFoldDirectParity)
