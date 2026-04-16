@@ -279,13 +279,14 @@ Still not true:
 
 - no broad default-on rollout exists beyond the narrow logical-constant,
   formula-text, and conversion families plus the narrow `ROUNDSIG` slice
-- five narrow legacy deletion milestones have landed:
+- six narrow legacy deletion milestones have landed:
   `ScInterpreter::ScTrue()` / `ScFalse()` and the dedicated
   `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair, plus the dedicated
   `ScInterpreter::ScFormula()` wrapper, and now the dedicated
   `ScInterpreter::ScConvertOOo()` wrapper, and now the dedicated
-  `ScInterpreter::ScRoundSignificant()` wrapper; broader legacy retirement has
-  not started
+  `ScInterpreter::ScRoundSignificant()` wrapper, and now the dedicated
+  `ScInterpreter::ScEuroConvert()` wrapper; broader legacy retirement has not
+  started
 - multiple interpreter hard-route milestones have landed, but full legacy
   opcode retirement has not
 - the dominant retained live blocker is now the broader ambient

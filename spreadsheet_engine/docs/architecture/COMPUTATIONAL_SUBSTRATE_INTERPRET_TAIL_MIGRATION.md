@@ -54,15 +54,16 @@ Today:
 What is still not true:
 
 - no broad default-on production rollout exists beyond the narrow
-  logical-constant, formula-text, and conversion families plus the narrow
-  `ROUNDSIG` slice
-- five narrow legacy deletion milestones have landed:
+  logical-constant and formula-text families, the conversion family, and the
+  narrow `ROUNDSIG` slice
+- six narrow legacy deletion milestones have landed:
   `ScInterpreter::ScTrue()` / `ScFalse()` and the dedicated
   `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair, plus the dedicated
   `ScInterpreter::ScFormula()` wrapper, and now the dedicated
   `ScInterpreter::ScConvertOOo()` wrapper, and now the dedicated
-  `ScInterpreter::ScRoundSignificant()` wrapper; broader legacy retirement has
-  not started
+  `ScInterpreter::ScRoundSignificant()` wrapper, and now the dedicated
+  `ScInterpreter::ScEuroConvert()` wrapper; broader legacy retirement has not
+  started
 - the full replay corpus now shows strong ambient live-seam traffic, but most
   retained fallback now lives inside the newly admitted scalar utility traffic
 - the next dominant live blocker is no longer simple reach; it is the quality
