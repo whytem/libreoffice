@@ -17,8 +17,10 @@ Today:
 - the live migration program now runs through a real `InterpretTail` seam in
   production Calc code
 - debug and CI-style builds default that seam to `observe`
-- an eighty-five-slice env-independent logical/text/match/xmatch/lookup/index
-  cluster is now engine-first even with rollout explicitly `off`
+- an eighty-three-slice env-independent hard-route cluster is still
+  engine-first even with rollout explicitly `off`, and logical constants,
+  formula text, conversion, significant rounding, and bitwise now also have
+  family-local default-on rollout paths
 - eight real narrow legacy deletion milestones have landed:
   `ScInterpreter::ScTrue()` / `ScFalse()` are retired behind an explicit
   family-local default-on logical-constant path, and the dedicated
@@ -75,11 +77,11 @@ delegation.”
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=26839`
+- `interpret_tail_live_authoritative_probe_formula_cells=26934`
 - `interpret_tail_live_authoritative_match_total=20762`
-- `interpret_tail_live_authoritative_fallback_total=6077`
+- `interpret_tail_live_authoritative_fallback_total=6172`
 - live authoritative-match rate over the corpus: `40.9822%`
-- live authoritative-match rate over the current promoted probe: `77.3576%`
+- live authoritative-match rate over the current promoted probe: `77.0847%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -110,12 +112,26 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=27282`
-- `interpret_tail_live_unique_supported_formula_cells=27094`
-- `interpret_tail_live_unique_fallback_formula_cells=188`
-- `interpret_tail_live_unique_unseen_formula_cells=23379`
-- `interpret_tail_live_unique_seen_rate=53.85`
-- `interpret_tail_live_unique_supported_rate=53.48`
+- `interpret_tail_live_unique_seen_formula_cells=27377`
+- `interpret_tail_live_unique_supported_formula_cells=27187`
+- `interpret_tail_live_unique_fallback_formula_cells=190`
+- `interpret_tail_live_unique_unsupported_function_formula_cells=157`
+- `interpret_tail_live_unique_unseen_formula_cells=23284`
+- `interpret_tail_live_unique_seen_rate=54.04`
+- `interpret_tail_live_unique_supported_rate=53.66`
+
+### Live Unique Unsupported-Function Top-N
+
+- `unknown`: `130` unique unsupported-function cells
+- `text_utility`: `19` unique unsupported-function cells
+- `conditional`: `8` unique unsupported-function cells
+
+Routing policy:
+
+- first split the dominant `unknown` bucket into classifiable root families or
+  formula shapes
+- then target `text_utility`
+- then target `conditional`
 
 ### Full Replay Corpus: Forced Interpret Observe Attempts
 
@@ -137,19 +153,19 @@ This is the direct-routing comparison surface after explicitly dirtying and
 forcing each replay formula cell once.
 
 - `interpret_tail_forced_direct_formula_cells=50661`
-- `interpret_tail_forced_direct_seen_formula_cells=27226`
-- `interpret_tail_forced_direct_supported_formula_cells=27038`
-- `interpret_tail_forced_direct_fallback_formula_cells=188`
-- `interpret_tail_forced_direct_unseen_formula_cells=23435`
-- `interpret_tail_forced_direct_seen_rate=53.74`
-- `interpret_tail_forced_direct_supported_rate=53.37`
+- `interpret_tail_forced_direct_seen_formula_cells=27321`
+- `interpret_tail_forced_direct_supported_formula_cells=27131`
+- `interpret_tail_forced_direct_fallback_formula_cells=190`
+- `interpret_tail_forced_direct_unseen_formula_cells=23284`
+- `interpret_tail_forced_direct_seen_rate=53.93`
+- `interpret_tail_forced_direct_supported_rate=53.55`
 
-### Promoted-Family Probe
+### Raw Cached-Workbook Promoted Probe
 
-- `interpret_tail_probe_formula_cells=26839`
-- `interpret_tail_authoritative_total=5263`
-- `interpret_tail_authoritative_fallback_total=21576`
-- promoted-family authoritative rate: `19.61%`
+- `interpret_tail_probe_formula_cells=26934`
+- `interpret_tail_authoritative_total=5356`
+- `interpret_tail_authoritative_fallback_total=21578`
+- raw promoted authoritative rate: `19.89%`
 
 Dominant promoted-family fallback reasons:
 
@@ -158,118 +174,43 @@ Dominant promoted-family fallback reasons:
 - `unsupported_formula_shape=19`
 - `unsupported_host_surface=0`
 
-### Live-Target Filtered Promoted Probe
+### Live-Reachable vs Imported-Artifact Promoted Probe
 
-- `interpret_tail_live_target_probe_formula_cells=0`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=26839`
-- `interpret_tail_live_target_authoritative_total=0`
-- `interpret_tail_live_target_authoritative_fallback_total=0`
+- `interpret_tail_probe_live_reachable_formula_cells=0`
+- `interpret_tail_probe_imported_artifact_formula_cells=26934`
+- live-reachable promoted rate: `0.00%`
+- imported-artifact-only promoted rate: `100.00%`
 
-### Hard-Quarantined Calc Paths
+Interpretation:
 
-- `85` env-independent engine-first slices:
-  - `TRUE()`
-  - `FALSE()`
-  - string-literal `VALUE`
-- string-literal `DATEVALUE`
-- string-literal `TIMEVALUE`
-- literal-only `NUMBERVALUE`
-- bounded scalar `RATE`
-- exact `MATCH(<literal>; <1D literal array>; 0)`
-  - default-approximate `MATCH(<literal>; <ascending numeric 1D literal array>)`
-  - approximate-ascending `MATCH(<literal>; <ascending numeric 1D literal array>; 1)`
-  - approximate-descending `MATCH(<literal>; <descending numeric 1D literal array>; -1)`
-  - default-exact `XMATCH(<literal>; <1D literal array>)`
-  - exact `XMATCH(<literal>; <1D literal array>; 0)`
-  - exact-forward `XMATCH(<literal>; <1D literal array>; 0; 1)`
-  - exact-reverse `XMATCH(<literal>; <1D literal array>; 0; -1)`
-  - exact-binary-ascending `XMATCH(<literal>; <ascending numeric 1D literal array>; 0; 2)`
-  - exact-binary-descending `XMATCH(<literal>; <descending numeric 1D literal array>; 0; -2)`
-  - default-exact-forward `XMATCH(<literal>; <1D literal array> ;; 1)`
-  - default-exact-reverse `XMATCH(<literal>; <1D literal array> ;; -1)`
-  - default-exact-binary-ascending `XMATCH(<literal>; <ascending numeric 1D literal array> ;; 2)`
-  - default-exact-binary-descending `XMATCH(<literal>; <descending numeric 1D literal array> ;; -2)`
-  - next-larger `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; 1)`
-  - next-smaller `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; -1)`
-  - next-larger-forward `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; 1; 1)`
-  - next-smaller-forward `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; -1; 1)`
-  - next-larger-reverse `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; 1; -1)`
-  - next-smaller-reverse `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; -1; -1)`
-  - next-larger-binary-ascending `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; 1; 2)`
-  - next-smaller-binary-ascending `XMATCH(<numeric literal>; <ascending numeric 1D literal array>; -1; 2)`
-  - next-larger-binary-descending `XMATCH(<numeric literal>; <descending numeric 1D literal array>; 1; -2)`
-  - next-smaller-binary-descending `XMATCH(<numeric literal>; <descending numeric 1D literal array>; -1; -2)`
-  - `LOOKUP(<literal>; <1D literal vector>)`
-  - `LOOKUP(<literal>; <1D literal vector>; <1D literal result vector>)`
-  - `LOOKUP(<literal>; <2D literal matrix>)`
-  - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
-  - `VLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
-  - `VLOOKUP(<literal>; <ascending numeric 2D literal array>; <positive whole>)`
-  - `VLOOKUP(<literal>; <ascending numeric 2D literal array>; <positive whole>; TRUE())`
-  - `HLOOKUP(<literal>; <2D literal array>; <positive whole>; 0)`
-  - `HLOOKUP(<literal>; <2D literal array>; <positive whole>; FALSE())`
-  - `HLOOKUP(<literal>; <ascending numeric 2D literal array>; <positive whole>)`
-  - `HLOOKUP(<literal>; <ascending numeric 2D literal array>; <positive whole>; TRUE())`
-  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>)`
-  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>)`
-  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0)`
-  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>; 0)`
-  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0; 1)`
-  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; 1)`
-  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;; 0; -1)`
-  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; -1)`
-  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;;; 1)`
-  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found> ;; 1)`
-  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector> ;;; -1)`
-  - `XLOOKUP(<literal>; <1D literal array>; <1D literal result vector>; <literal if_not_found> ;; -1)`
-  - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 0; 2)`
-  - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; 2)`
-  - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;;; 2)`
-  - `XLOOKUP(<literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found> ;; 2)`
-  - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector> ;; 0; -2)`
-  - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 0; -2)`
-  - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector> ;;; -2)`
-  - `XLOOKUP(<literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found> ;; -2)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 1)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 1)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; -1)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; -1)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 1; 1)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 1; 1)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; -1; 1)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; -1; 1)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 1; -1)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 1; -1)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; -1; -1)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; -1; -1)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; 1; 2)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 1; 2)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector> ;; -1; 2)`
-  - `XLOOKUP(<numeric literal>; <ascending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; -1; 2)`
-  - `XLOOKUP(<numeric literal>; <descending numeric 1D literal array>; <1D literal result vector> ;; 1; -2)`
-  - `XLOOKUP(<numeric literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; 1; -2)`
-  - `XLOOKUP(<numeric literal>; <descending numeric 1D literal array>; <1D literal result vector> ;; -1; -2)`
-  - `XLOOKUP(<numeric literal>; <descending numeric 1D literal array>; <1D literal result vector>; <literal if_not_found>; -1; -2)`
-  - `INDEX(<2D literal array>; <positive whole>)`
-  - `INDEX(<2D literal array>; <positive whole>; <positive whole>)`
-  - `INDEX(<2D literal array>; 0; <positive whole>)`
-  - `INDEX(<2D literal array>; <positive whole>; 0)`
-- `TRUE()` / `FALSE()` now also have an explicit family-local default-on
-  rollout path, and their dedicated `ScInterpreter` subroutines are deleted
-- the dedicated `ScInterpreter` wrapper pair for string-literal `DATEVALUE` /
-  `TIMEVALUE` is also deleted; nested legacy evaluation remains inline at
-  dispatch while the existing env-`off` engine-first root slice stays intact
-- the corresponding legacy interpreter entries now warn on normal reach for
-  those narrow slices:
-  - `ScInterpreter::ScValue()`
-  - `ScInterpreter::ScNumberValue()`
-  - `ScInterpreter::ScMatch()`
-  - `ScInterpreter::ScXMatch()`
-  - `ScInterpreter::ScLookup()`
-  - `ScInterpreter::ScVLookup()`
-  - `ScInterpreter::ScHLookup()`
-  - `ScInterpreter::ScXLookup()`
-  - `ScInterpreter::ScIndex()`
+- the promoted probe is now diagnostic-only and only meaningful when split
+  into live-reachable vs imported-artifact-only buckets
+- the `shadow_mismatch=21530` wall is overwhelmingly imported cached-workbook
+  debt, not a live parity denominator
+
+### Engine-Authoritative Families
+
+Default-on families:
+
+- logical constants
+- formula text
+- conversion family
+- significant rounding
+- bitwise family
+
+Hard-routed env-independent slices:
+
+- `83` slices remain in the explicit hard-route quarantine surface
+- they are concentrated in text parsing, bounded `RATE`, and the literal-array
+  lookup/match/index families
+
+Legacy quarantine policy:
+
+- `interpr4.cxx` now routes all family-local default-on warnings through a
+  shared helper instead of duplicating the same guard boilerplate per opcode
+- string-literal `DATEVALUE` / `TIMEVALUE` wrapper bodies remain deleted even
+  though their root slices are still env-`off` hard-routes rather than
+  default-on families
 
 ## Strategic Position
 
@@ -429,10 +370,10 @@ The highest-value remaining blockers are now:
 
 The live authoritative-match north-star on the standing replay corpus is now
 `20762 / 50,661` (`40.9822%`). The honest live unique-cell inventory now
-shows `27282 / 50,661` formula cells seen (`53.85%`) and
-`27094 / 50,661` supported (`53.48%`) during the bulk live observe run, while
+shows `27377 / 50,661` formula cells seen (`54.04%`) and
+`27187 / 50,661` supported (`53.66%`) during the bulk live observe run, while
 the forced-direct comparison surface now sits at
-`27226 / 50,661` seen (`53.74%`) and `27038 / 50,661` supported (`53.37%`).
+`27321 / 50,661` seen (`53.93%`) and `27131 / 50,661` supported (`53.55%`).
 Those are the coverage-style numbers we should currently use alongside the
 north-star; the broader live and forced-interpret counters are still attempt
 telemetry rather than a deletion denominator.
@@ -465,7 +406,7 @@ north-star mover: imported reference-target `FORMULA(...)` roots now match
 live Calc `FormulaError::VariableExpected` instead of replay-cached workbook
 strings, which added `14278 / 14278` supported cells on the live unique
 surface and moved the deletion-gating metric decisively above the `25%`
-milestone. The raw promoted replay probe now sits at `5263 / 26839` and still
+milestone. The raw promoted replay probe now sits at `5356 / 26934` and still
 carries `14278` `formula_text` shadow mismatches, so it remains purely
 diagnostic rather than a retirement denominator.
 

@@ -29,9 +29,10 @@ Today:
 - release-style builds still default to `off` unless explicitly opted in
 - `observe`, `shadowcompare`, and `authority` are all live on the production
   Calc path
-- an eighty-five-slice env-independent logical/text/match/xmatch/lookup/index
-  cluster is now engine-first even with rollout set to `off`; see
-  [Hard-Routed Family](#hard-routed-family) below
+- an eighty-three-slice env-independent hard-route cluster is still
+  engine-first even with rollout set to `off`, and logical constants,
+  formula text, conversion, significant rounding, and bitwise now also have
+  family-local default-on rollout paths
 - direct scalar-root formulas and a bounded scalar utility cluster now also
   ride the live seam: arithmetic/reference/concat/comparison roots plus
   `ROUND`, `ROUNDUP`, `ROUNDDOWN`, information predicates, logical folds, and
@@ -194,11 +195,11 @@ Two different denominators matter, and both are now reported.
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=26839`
+- `interpret_tail_live_authoritative_probe_formula_cells=26934`
 - `interpret_tail_live_authoritative_match_total=20762`
-- `interpret_tail_live_authoritative_fallback_total=6077`
+- `interpret_tail_live_authoritative_fallback_total=6172`
 - live authoritative-match rate over the corpus: `40.9822%`
-- live authoritative-match rate over the current promoted probe: `77.3576%`
+- live authoritative-match rate over the current promoted probe: `77.0847%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -229,12 +230,13 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=27282`
-- `interpret_tail_live_unique_supported_formula_cells=27094`
-- `interpret_tail_live_unique_fallback_formula_cells=188`
-- `interpret_tail_live_unique_unseen_formula_cells=23379`
-- `interpret_tail_live_unique_seen_rate=53.85`
-- `interpret_tail_live_unique_supported_rate=53.48`
+- `interpret_tail_live_unique_seen_formula_cells=27377`
+- `interpret_tail_live_unique_supported_formula_cells=27187`
+- `interpret_tail_live_unique_fallback_formula_cells=190`
+- `interpret_tail_live_unique_unsupported_function_formula_cells=157`
+- `interpret_tail_live_unique_unseen_formula_cells=23284`
+- `interpret_tail_live_unique_seen_rate=54.04`
+- `interpret_tail_live_unique_supported_rate=53.66`
 
 Interpretation:
 
@@ -278,6 +280,9 @@ Interpretation:
   seen cells with `211` supported and `1` fallback, while focused
   `ROUNDSIG` / `ORG.LIBREOFFICE.ROUNDSIG` live-seam coverage is now pinned in
   the validation suite
+- the live unique unsupported-function routing table is now explicit:
+  `unknown=130`, `text_utility=19`, `conditional=8`; that ordering now drives
+  the next ambient family-selection work instead of intuition
 - the main remaining ambient work is now the still-large
   `unsupported_function` wall plus the still-heavy mismatch buckets inside the
   imported host-truth-artifact probe band, not simple denominator reach
@@ -314,21 +319,21 @@ replay formula cell once, then classifying whether that formula cell was
 actually seen and supported by the seam:
 
 - `interpret_tail_forced_direct_formula_cells=50661`
-- `interpret_tail_forced_direct_seen_formula_cells=27226`
-- `interpret_tail_forced_direct_supported_formula_cells=27038`
-- `interpret_tail_forced_direct_fallback_formula_cells=188`
-- `interpret_tail_forced_direct_unseen_formula_cells=23435`
-- `interpret_tail_forced_direct_seen_rate=53.74`
-- `interpret_tail_forced_direct_supported_rate=53.37`
+- `interpret_tail_forced_direct_seen_formula_cells=27321`
+- `interpret_tail_forced_direct_supported_formula_cells=27131`
+- `interpret_tail_forced_direct_fallback_formula_cells=190`
+- `interpret_tail_forced_direct_unseen_formula_cells=23284`
+- `interpret_tail_forced_direct_seen_rate=53.93`
+- `interpret_tail_forced_direct_supported_rate=53.55`
 
-### Promoted-Family Probe
+### Raw Cached-Workbook Promoted Probe
 
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
-- `interpret_tail_probe_formula_cells=26839`
-- `interpret_tail_authoritative_total=5263`
-- `interpret_tail_authoritative_fallback_total=21576`
-- promoted-family authoritative rate: `19.61%`
+- `interpret_tail_probe_formula_cells=26934`
+- `interpret_tail_authoritative_total=5356`
+- `interpret_tail_authoritative_fallback_total=21578`
+- raw promoted authoritative rate: `19.89%`
 
 Current promoted-family fallback reasons:
 
@@ -337,27 +342,28 @@ Current promoted-family fallback reasons:
 - `unsupported_formula_shape=19`
 - `unsupported_host_surface=0`
 
-### Live-Target Filtered Promoted Probe
+### Live-Reachable vs Imported-Artifact Promoted Probe
 
-This is the same promoted replay probe after excluding rows where live Calc
-with the seam forced `off` already disagrees with the imported cached workbook
-result:
+This is the same promoted replay probe, explicitly split into the only two
+surfaces that are still interpretable:
 
-- `interpret_tail_live_target_probe_formula_cells=0`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=26839`
+- `interpret_tail_probe_live_reachable_formula_cells=0`
+- `interpret_tail_probe_imported_artifact_formula_cells=26934`
 - `interpret_tail_live_target_authoritative_total=0`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
+- live-reachable promoted rate: `0.00%`
+- imported-artifact-only promoted rate: `100.00%`
 
 Interpretation:
 
 - the promoted-family denominator is now much broader because scalar roots,
   round-family formulas, information predicates, logical folds, `NOT`, and
   bounded scalar-math feeder formulas are part of the delegated family
-- the raw promoted probe is now explicitly trading cached-workbook parity for
-  live-host parity on imported reference-driven logical/math roots, so a lower
-  raw authoritative rate is now compatible with a much stronger north-star
 - the raw promoted replay probe is now diagnostic, not the deletion
-  denominator
+  denominator, and it is only legible once split into live-reachable vs
+  imported-artifact-only buckets
+- the dominant `shadow_mismatch=21530` residual is overwhelmingly imported
+  cached-workbook debt, not live-reachable parity failure
 - the dominant remaining raw mismatch buckets are now `math_scalar=172`,
   `logical_fold=53`, `information_predicate=37`, and `lookup=0`, with
   round-family fallback still at `0`
@@ -419,20 +425,20 @@ This is the new per-cell replay inventory over the promoted-family replay
 surface after forcing each promoted replay formula through direct live
 `Interpret()`:
 
-- `interpret_tail_replay_promoted_formula_cells=26839`
-- `interpret_tail_replay_promoted_direct_seen=26783`
-- `interpret_tail_replay_promoted_direct_supported=26737`
-- `interpret_tail_replay_promoted_direct_fallback=46`
+- `interpret_tail_replay_promoted_formula_cells=26934`
+- `interpret_tail_replay_promoted_direct_seen=26878`
+- `interpret_tail_replay_promoted_direct_supported=26830`
+- `interpret_tail_replay_promoted_direct_fallback=48`
 - `interpret_tail_replay_promoted_direct_unseen=56`
 - `interpret_tail_replay_promoted_shared_formula_cells=21741`
 - `interpret_tail_replay_promoted_shared_top_formula_cells=1606`
 - `interpret_tail_replay_promoted_shared_member_formula_cells=20135`
-- `interpret_tail_replay_promoted_non_shared_formula_cells=5098`
+- `interpret_tail_replay_promoted_non_shared_formula_cells=5181`
 - `interpret_tail_replay_promoted_unseen_shared_top=5`
 - `interpret_tail_replay_promoted_unseen_shared_member=27`
 - `interpret_tail_replay_promoted_unseen_non_shared=24`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=8`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=26839`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=26934`
 - `interpret_tail_replay_promoted_dirty_after_interpret=56`
 
 Interpretation:
@@ -560,10 +566,11 @@ Current meaning:
   legacy paths and emit a debug warning if normal interpreter execution
   reaches them
 
-This latest hard-route milestone extends the adjacent default/approximate
-`MATCH` plus omitted/approximate extended-match hard-quarantined Calc path
-cluster on the migration track and brings the env-independent engine-first
-total to `85` slices.
+That earlier hard-route milestone completed the adjacent
+default/approximate `MATCH` plus omitted/approximate extended-match
+quarantine frontier. Since then, part of that older surface has moved into
+family-local default-on rollout, leaving `83` env-independent hard-routed
+slices plus the newer default-on families.
 
 ## Scope Policy
 
