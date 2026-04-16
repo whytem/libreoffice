@@ -39,7 +39,9 @@
 #include <iostream>
 #include <map>
 #include <optional>
+#include <regex>
 #include <set>
+#include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -268,19 +270,14 @@ std::size_t countLegacyInterpreterSubroutines()
     if (!aStream.is_open())
         return 0;
 
-    std::size_t nCount = 0;
-    std::string aLine;
-    while (std::getline(aStream, aLine))
-    {
-        const auto nVoid = aLine.find("void Sc");
-        if (nVoid == std::string::npos)
-            continue;
-        const auto nOpenParen = aLine.find('(', nVoid);
-        if (nOpenParen == std::string::npos)
-            continue;
-        ++nCount;
-    }
-    return nCount;
+    std::ostringstream aBuffer;
+    aBuffer << aStream.rdbuf();
+    const std::string aText = aBuffer.str();
+    static const std::regex aPattern(R"(\bvoid\s+(Sc[A-Za-z0-9_]+)\s*\()");
+
+    return static_cast<std::size_t>(
+        std::distance(std::sregex_iterator(aText.begin(), aText.end(), aPattern),
+            std::sregex_iterator()));
 }
 
 void resetProbeDiagnosticSamples()
