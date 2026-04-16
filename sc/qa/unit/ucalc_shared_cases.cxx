@@ -2902,6 +2902,35 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorStatistica
     CPPUNIT_ASSERT_DOUBLES_EQUAL(std::sqrt(1.25), aStdevP.maResult.mfValue, 1e-12);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorRoundSigHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailRoundSigHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(3, 0, 0);
+
+    m_pDoc->SetValue(0, 0, 0, 1234.567);
+    m_pDoc->SetValue(1, 0, 0, 3.0);
+
+    const auto aRoundSig = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ROUNDSIG(A1;B1)", false);
+    CPPUNIT_ASSERT(aRoundSig.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aRoundSig.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aRoundSig.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1230.0, aRoundSig.maResult.mfValue, 1e-12);
+
+    const auto aAlias = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ORG.LIBREOFFICE.ROUNDSIG(1234.567;3)", false);
+    CPPUNIT_ASSERT(aAlias.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aAlias.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aAlias.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1230.0, aAlias.maResult.mfValue, 1e-12);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCriteriaAggregateHelper)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
