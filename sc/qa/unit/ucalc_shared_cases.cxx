@@ -3524,6 +3524,22 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConditiona
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value, aReferenceBranch.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, aReferenceBranch.maResult.mfValue, 1e-12);
+
+    const auto aIfs = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=IFS(A1=1;11;A1=2;22)", false);
+    CPPUNIT_ASSERT(aIfs.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conditional, aIfs.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aIfs.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(22.0, aIfs.maResult.mfValue, 1e-12);
+
+    const auto aSwitch = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.SWITCH(A1;1;11;2;22;99)", false);
+    CPPUNIT_ASSERT(aSwitch.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conditional, aSwitch.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aSwitch.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(22.0, aSwitch.maResult.mfValue, 1e-12);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorFormulaTextHelper)
@@ -3682,6 +3698,91 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorTextUtilit
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value, aExact.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, aExact.maResult.mfValue, 1e-12);
+
+    const auto aTextAfter = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=TEXTAFTER(\"alpha-beta-gamma\";\"-\";2)", false);
+    CPPUNIT_ASSERT(aTextAfter.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::TextUtility, aTextAfter.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aTextAfter.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"gamma"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aTextAfter.maResult.maString));
+
+    const auto aTextAfterAlias = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos,
+        u"=COM.MICROSOFT.TEXTAFTER(\"alpha-beta-gamma\";\"-\";3;0;0;\"tail\")", false);
+    CPPUNIT_ASSERT(aTextAfterAlias.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::TextUtility, aTextAfterAlias.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aTextAfterAlias.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"tail"_ustr, spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                                            aTextAfterAlias.maResult.maString));
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSpillArrayHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailSpillArrayHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(6, 0, 0);
+
+    m_pDoc->SetValue(0, 0, 0, 9.0);
+    m_pDoc->SetValue(1, 0, 0, 30.0);
+    m_pDoc->SetValue(0, 1, 0, 1.0);
+    m_pDoc->SetValue(1, 1, 0, 10.0);
+    m_pDoc->SetValue(0, 2, 0, 5.0);
+    m_pDoc->SetValue(1, 2, 0, 20.0);
+    m_pDoc->SetValue(3, 0, 0, 1.0);
+    m_pDoc->SetValue(3, 1, 0, 1.0);
+    m_pDoc->SetValue(3, 2, 0, 2.0);
+    m_pDoc->SetValue(3, 3, 0, 2.0);
+    m_pDoc->SetValue(3, 4, 0, 3.0);
+
+    const auto aUnique = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.UNIQUE(D1:D5;;TRUE())", false);
+    CPPUNIT_ASSERT(aUnique.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::SpillArray, aUnique.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aUnique.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, aUnique.maResult.mfValue, 1e-12);
+
+    const auto aSort = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.SORT(A1:B3;2;-1)", false);
+    CPPUNIT_ASSERT(aSort.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::SpillArray, aSort.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aSort.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(9.0, aSort.maResult.mfValue, 1e-12);
+
+    const auto aSortBy = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.SORTBY(A1:B3;B1:B3;1)", false);
+    CPPUNIT_ASSERT(aSortBy.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::SpillArray, aSortBy.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aSortBy.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aSortBy.maResult.mfValue, 1e-12);
+
+    const auto aTextSplit = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos,
+        u"=COM.MICROSOFT.TEXTSPLIT(\"alpha,beta/gamma\";\",\";\"/\")", false);
+    CPPUNIT_ASSERT(aTextSplit.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::SpillArray, aTextSplit.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aTextSplit.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        u"alpha"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aTextSplit.maResult.maString));
+
+    const auto aHStack = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.HSTACK({10|11};{20|21})", false);
+    CPPUNIT_ASSERT(aHStack.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::SpillArray, aHStack.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aHStack.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, aHStack.maResult.mfValue, 1e-12);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorStatisticalDistributionHelper)

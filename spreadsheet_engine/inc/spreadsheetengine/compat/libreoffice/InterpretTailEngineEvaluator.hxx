@@ -39,6 +39,7 @@
 
 #include <spreadsheetengine/api/FormulaResult.hxx>
 #include <spreadsheetengine/api/Array.hxx>
+#include <spreadsheetengine/api/Logic.hxx>
 #include <spreadsheetengine/api/Math.hxx>
 #include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Calendar.hxx>
@@ -70,6 +71,7 @@
 #include <spreadsheetengine/runtime/QueryRuntime.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 #include <spreadsheetengine/runtime/TextFunctionRuntime.hxx>
+#include <spreadsheetengine/runtime/TextRuntimeSupport.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::interprettaileval
 {
@@ -137,6 +139,7 @@ enum class FunctionKind : sal_uInt8
     Match,
     XMatch,
     Selector,
+    SpillArray,
     Lookup,
     VLookup,
     HLookup,
@@ -776,10 +779,31 @@ canonicalSelectorFunctionName(api::StringView rFunctionName)
     return std::nullopt;
 }
 
+[[nodiscard]] inline std::optional<api::StringView>
+canonicalSpillFunctionName(api::StringView rFunctionName)
+{
+    if (rFunctionName == u"UNIQUE" || rFunctionName == u"COM.MICROSOFT.UNIQUE")
+        return api::StringView(u"UNIQUE");
+    if (rFunctionName == u"SORT" || rFunctionName == u"COM.MICROSOFT.SORT")
+        return api::StringView(u"SORT");
+    if (rFunctionName == u"SORTBY" || rFunctionName == u"COM.MICROSOFT.SORTBY")
+        return api::StringView(u"SORTBY");
+    if (rFunctionName == u"TEXTSPLIT" || rFunctionName == u"COM.MICROSOFT.TEXTSPLIT")
+        return api::StringView(u"TEXTSPLIT");
+    if (rFunctionName == u"HSTACK" || rFunctionName == u"COM.MICROSOFT.HSTACK")
+        return api::StringView(u"HSTACK");
+
+    return std::nullopt;
+}
+
 [[nodiscard]] inline FunctionKind classifyFunction(api::StringView rFunctionName)
 {
-    if (rFunctionName == u"IF")
+    if (rFunctionName == u"IF" || rFunctionName == u"IFS"
+        || rFunctionName == u"COM.MICROSOFT.IFS" || rFunctionName == u"SWITCH"
+        || rFunctionName == u"COM.MICROSOFT.SWITCH")
+    {
         return FunctionKind::Conditional;
+    }
     if (rFunctionName == u"FORMULA")
         return FunctionKind::FormulaText;
     if (rFunctionName == u"TRUE" || rFunctionName == u"FALSE")
@@ -792,7 +816,8 @@ canonicalSelectorFunctionName(api::StringView rFunctionName)
         || rFunctionName == u"ASC" || rFunctionName == u"JIS"
         || rFunctionName == u"LEN" || rFunctionName == u"LEFT"
         || rFunctionName == u"RIGHT" || rFunctionName == u"T"
-        || rFunctionName == u"EXACT")
+        || rFunctionName == u"EXACT" || rFunctionName == u"TEXTAFTER"
+        || rFunctionName == u"COM.MICROSOFT.TEXTAFTER")
     {
         return FunctionKind::TextUtility;
     }
@@ -918,6 +943,8 @@ canonicalSelectorFunctionName(api::StringView rFunctionName)
         return FunctionKind::XMatch;
     if (canonicalSelectorFunctionName(rFunctionName))
         return FunctionKind::Selector;
+    if (canonicalSpillFunctionName(rFunctionName))
+        return FunctionKind::SpillArray;
     if (rFunctionName == u"LOOKUP")
         return FunctionKind::Lookup;
     if (rFunctionName == u"VLOOKUP")
@@ -1358,7 +1385,9 @@ template <typename T>
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos,
     bool bImportedCanonicalSource)
 {
-    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    if (aFunctionName == u"COM.MICROSOFT.TEXTAFTER")
+        aFunctionName = u"TEXTAFTER"_ustr;
     const auto oCanonical = canonicalMathScalarFunctionName(aFunctionName);
     if (!oCanonical)
         return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
@@ -3599,6 +3628,831 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
     return makeMaterializedValue(xMatrix);
 }
 
+[[nodiscard]] inline bool spillValuesEqual(const api::CellValue& rLeft, const api::CellValue& rRight,
+    const ScDocument& rDoc, ScInterpreterContext& rContext)
+{
+    if (rLeft.isError() || rRight.isError())
+        return rLeft.isError() && rRight.isError() && rLeft.meError == rRight.meError;
+    if (rLeft.isEmpty() || rRight.isEmpty())
+        return rLeft.isEmpty() && rRight.isEmpty();
+    if (rLeft.isText() || rRight.isText())
+    {
+        if (!rLeft.isText() || !rRight.isText())
+            return false;
+        return spreadsheetengine::core::query::compareFoldedText(rLeft.maString, rRight.maString)
+               == 0;
+    }
+
+    const auto aLeftNumber = coerceScalarToNumber(rDoc, rContext, rLeft);
+    const auto aRightNumber = coerceScalarToNumber(rDoc, rContext, rRight);
+    if (!aLeftNumber || !aRightNumber)
+        return false;
+    return rtl::math::approxEqual(aLeftNumber.maValue, aRightNumber.maValue);
+}
+
+[[nodiscard]] inline api::ValueResult<int> spillCompareValues(
+    const api::CellValue& rLeft, const api::CellValue& rRight, const ScDocument& rDoc,
+    ScInterpreterContext& rContext)
+{
+    if (rLeft.isError() && rRight.isError())
+        return api::ValueResult<int>::success(
+            static_cast<int>(rLeft.meError) - static_cast<int>(rRight.meError));
+    if (rLeft.isError())
+        return api::ValueResult<int>::success(1);
+    if (rRight.isError())
+        return api::ValueResult<int>::success(-1);
+
+    if (rLeft.isEmpty() && rRight.isEmpty())
+        return api::ValueResult<int>::success(0);
+    if (rLeft.isEmpty())
+        return api::ValueResult<int>::success(1);
+    if (rRight.isEmpty())
+        return api::ValueResult<int>::success(-1);
+
+    const bool bLeftText = rLeft.isText();
+    const bool bRightText = rRight.isText();
+    if (bLeftText && bRightText)
+        return api::ValueResult<int>::success(
+            spreadsheetengine::core::query::compareFoldedText(
+                rLeft.maString, rRight.maString));
+    if (bLeftText)
+        return api::ValueResult<int>::success(1);
+    if (bRightText)
+        return api::ValueResult<int>::success(-1);
+
+    const auto aLeftNumber = coerceScalarToNumber(rDoc, rContext, rLeft);
+    const auto aRightNumber = coerceScalarToNumber(rDoc, rContext, rRight);
+    if (!aLeftNumber || !aRightNumber)
+        return api::ValueResult<int>::failure(api::Error::IllegalArgument);
+    if (rtl::math::approxEqual(aLeftNumber.maValue, aRightNumber.maValue))
+        return api::ValueResult<int>::success(0);
+    return api::ValueResult<int>::success(
+        aLeftNumber.maValue < aRightNumber.maValue ? -1 : 1);
+}
+
+[[nodiscard]] inline std::vector<api::String> spillSplitText(
+    const api::String& rText, const std::vector<api::String>& rDelimiters, bool bIgnoreEmpty,
+    bool bMatchMode)
+{
+    std::vector<api::String> aParts;
+    if (rDelimiters.empty() || rText.empty())
+    {
+        aParts.push_back(rText);
+        return aParts;
+    }
+
+    const api::String aSearchText
+        = bMatchMode ? api::text::lowercase(
+                           spreadsheetengine::core::text::defaultCaseMappingService(), rText)
+                     : rText;
+    std::size_t nStart = 0;
+    while (nStart < rText.size())
+    {
+        std::size_t nBestIndex = rText.size();
+        std::size_t nBestLength = 0;
+        for (const auto& rDelimiter : rDelimiters)
+        {
+            if (rDelimiter.empty())
+                continue;
+            const api::String aSearchDelimiter = bMatchMode
+                                                     ? api::text::lowercase(
+                                                           spreadsheetengine::core::text::defaultCaseMappingService(),
+                                                           rDelimiter)
+                                                     : rDelimiter;
+            const std::size_t nIndex = aSearchText.find(aSearchDelimiter, nStart);
+            if (nIndex != api::String::npos && nIndex < nBestIndex)
+            {
+                nBestIndex = nIndex;
+                nBestLength = rDelimiter.size();
+            }
+        }
+
+        const std::size_t nSliceEnd = nBestIndex == api::String::npos ? rText.size() : nBestIndex;
+        api::String aPart = rText.substr(nStart, nSliceEnd - nStart);
+        if (!bIgnoreEmpty || !aPart.empty())
+            aParts.push_back(std::move(aPart));
+
+        if (nBestIndex == api::String::npos || nBestIndex >= rText.size())
+            break;
+        nStart = nBestIndex + nBestLength;
+    }
+
+    return aParts;
+}
+
+[[nodiscard]] inline Materialization<ScMatrixRef> materializeSpillMatrixFunctionCall(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    const auto oCanonical = canonicalSpillFunctionName(aFunctionName);
+    if (!oCanonical)
+        return makeUnsupportedMaterialization<ScMatrixRef>(FallbackReason::UnsupportedFunction);
+
+    const auto collectTextVector = [&](const core::formula::Node& rArgument)
+        -> Materialization<std::vector<api::String>> {
+        std::vector<api::String> aValues;
+        const auto aMatrix = materializeMatrixNode(rArgument, rDoc, rContext, rFormulaPos);
+        if (!aMatrix.mbSupported)
+            return makeUnsupportedMaterialization<std::vector<api::String>>(
+                aMatrix.meFallbackReason);
+        if (!aMatrix.moValue)
+            return makeMaterializedError<std::vector<api::String>>(aMatrix.meError);
+
+        SCSIZE nColumns = 0;
+        SCSIZE nRows = 0;
+        (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+        for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+        {
+            for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+            {
+                const auto aValue = lookupexecution::detail::toApiCellValue(
+                    (*aMatrix.moValue)->Get(nColumn, nRow));
+                if (aValue.isError())
+                    return makeMaterializedError<std::vector<api::String>>(aValue.meError);
+                const auto aText = coerceScalarToText(rDoc, rContext, aValue);
+                if (!aText)
+                    return makeMaterializedError<std::vector<api::String>>(aText.meError);
+                aValues.push_back(toApiString(aText.maValue));
+            }
+        }
+
+        return makeMaterializedValue(std::move(aValues));
+    };
+
+    if (*oCanonical == u"UNIQUE")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+        }
+
+        const auto aSource = materializeMatrixNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+        if (!aSource.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aSource.meFallbackReason);
+        if (!aSource.moValue)
+            return makeMaterializedError<ScMatrixRef>(aSource.meError);
+
+        bool bByColumn = false;
+        if (rNode.maChildren.size() >= 2
+            && rNode.maChildren[1]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aByColumn = materializeScalarNode(
+                *rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+            if (!aByColumn.mbSupported)
+                return makeUnsupportedMaterialization<ScMatrixRef>(aByColumn.meFallbackReason);
+            if (!aByColumn.moValue)
+                return makeMaterializedError<ScMatrixRef>(aByColumn.meError);
+            const auto aBool = coerceScalarToBool(rDoc, rContext, *aByColumn.moValue);
+            if (!aBool)
+                return makeMaterializedValue(
+                    makeSingleValueMatrix(api::CellValue::error(aBool.meError)));
+            bByColumn = aBool.maValue;
+        }
+
+        bool bExactlyOnce = false;
+        if (rNode.maChildren.size() >= 3
+            && rNode.maChildren[2]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aExactlyOnce = materializeScalarNode(
+                *rNode.maChildren[2], rDoc, rContext, rFormulaPos);
+            if (!aExactlyOnce.mbSupported)
+                return makeUnsupportedMaterialization<ScMatrixRef>(aExactlyOnce.meFallbackReason);
+            if (!aExactlyOnce.moValue)
+                return makeMaterializedError<ScMatrixRef>(aExactlyOnce.meError);
+            const auto aBool = coerceScalarToBool(rDoc, rContext, *aExactlyOnce.moValue);
+            if (!aBool)
+                return makeMaterializedValue(
+                    makeSingleValueMatrix(api::CellValue::error(aBool.meError)));
+            bExactlyOnce = aBool.maValue;
+        }
+
+        SCSIZE nColumns = 0;
+        SCSIZE nRows = 0;
+        (*aSource.moValue)->GetDimensions(nColumns, nRows);
+        const SCSIZE nUnits = bByColumn ? nColumns : nRows;
+        if (nUnits < 1)
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+        }
+
+        auto unitEquals = [&](SCSIZE nLeft, SCSIZE nRight) {
+            if (bByColumn)
+            {
+                for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+                {
+                    const auto aLeft = lookupexecution::detail::toApiCellValue(
+                        (*aSource.moValue)->Get(nLeft, nRow));
+                    const auto aRight = lookupexecution::detail::toApiCellValue(
+                        (*aSource.moValue)->Get(nRight, nRow));
+                    if (!spillValuesEqual(aLeft, aRight, rDoc, rContext))
+                        return false;
+                }
+                return true;
+            }
+
+            for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+            {
+                const auto aLeft = lookupexecution::detail::toApiCellValue(
+                    (*aSource.moValue)->Get(nColumn, nLeft));
+                const auto aRight = lookupexecution::detail::toApiCellValue(
+                    (*aSource.moValue)->Get(nColumn, nRight));
+                if (!spillValuesEqual(aLeft, aRight, rDoc, rContext))
+                    return false;
+            }
+            return true;
+        };
+
+        std::vector<SCSIZE> aSelections;
+        for (SCSIZE nIndex = 0; nIndex < nUnits; ++nIndex)
+        {
+            std::size_t nOccurrences = 0;
+            bool bSeenEarlier = false;
+            for (SCSIZE nOther = 0; nOther < nUnits; ++nOther)
+            {
+                if (!unitEquals(nIndex, nOther))
+                    continue;
+                ++nOccurrences;
+                if (nOther < nIndex)
+                    bSeenEarlier = true;
+            }
+
+            if (bExactlyOnce)
+            {
+                if (nOccurrences == 1)
+                    aSelections.push_back(nIndex);
+            }
+            else if (!bSeenEarlier)
+            {
+                aSelections.push_back(nIndex);
+            }
+        }
+
+        if (aSelections.empty())
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::NotAvailable)));
+        }
+
+        const SCSIZE nResultColumns = bByColumn ? static_cast<SCSIZE>(aSelections.size()) : nColumns;
+        const SCSIZE nResultRows = bByColumn ? nRows : static_cast<SCSIZE>(aSelections.size());
+        ScMatrixRef xMatrix(new ScMatrix(nResultColumns, nResultRows));
+        if (bByColumn)
+        {
+            for (std::size_t nSelectionIndex = 0; nSelectionIndex < aSelections.size();
+                 ++nSelectionIndex)
+            {
+                for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+                {
+                    putScalarIntoMatrix(lookupexecution::detail::toApiCellValue(
+                                            (*aSource.moValue)->Get(aSelections[nSelectionIndex], nRow)),
+                        xMatrix, static_cast<SCSIZE>(nSelectionIndex), nRow);
+                }
+            }
+        }
+        else
+        {
+            for (std::size_t nSelectionIndex = 0; nSelectionIndex < aSelections.size();
+                 ++nSelectionIndex)
+            {
+                for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                {
+                    putScalarIntoMatrix(lookupexecution::detail::toApiCellValue(
+                                            (*aSource.moValue)->Get(nColumn, aSelections[nSelectionIndex])),
+                        xMatrix, nColumn, static_cast<SCSIZE>(nSelectionIndex));
+                }
+            }
+        }
+
+        return makeMaterializedValue(xMatrix);
+    }
+
+    if (*oCanonical == u"HSTACK")
+    {
+        if (rNode.maChildren.empty())
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+        }
+
+        std::vector<ScMatrixRef> aInputs;
+        SCSIZE nResultColumns = 0;
+        SCSIZE nResultRows = 0;
+        for (const auto& rxChild : rNode.maChildren)
+        {
+            if (!rxChild)
+            {
+                return makeMaterializedValue(
+                    makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+            }
+            const auto aInput = materializeMatrixNode(*rxChild, rDoc, rContext, rFormulaPos);
+            if (!aInput.mbSupported)
+                return makeUnsupportedMaterialization<ScMatrixRef>(aInput.meFallbackReason);
+            if (!aInput.moValue)
+                return makeMaterializedError<ScMatrixRef>(aInput.meError);
+
+            SCSIZE nColumns = 0;
+            SCSIZE nRows = 0;
+            (*aInput.moValue)->GetDimensions(nColumns, nRows);
+            nResultColumns += nColumns;
+            nResultRows = std::max(nResultRows, nRows);
+            aInputs.push_back(*aInput.moValue);
+        }
+
+        ScMatrixRef xMatrix(new ScMatrix(nResultColumns, nResultRows));
+        SCSIZE nDestColumn = 0;
+        for (const auto& xInput : aInputs)
+        {
+            SCSIZE nColumns = 0;
+            SCSIZE nRows = 0;
+            xInput->GetDimensions(nColumns, nRows);
+            for (SCSIZE nRow = 0; nRow < nResultRows; ++nRow)
+            {
+                for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                {
+                    const api::CellValue aValue = nRow < nRows
+                                                      ? lookupexecution::detail::toApiCellValue(
+                                                            xInput->Get(nColumn, nRow))
+                                                      : api::CellValue::error(api::Error::NotAvailable);
+                    putScalarIntoMatrix(aValue, xMatrix, nDestColumn + nColumn, nRow);
+                }
+            }
+            nDestColumn += nColumns;
+        }
+
+        return makeMaterializedValue(xMatrix);
+    }
+
+    if (*oCanonical == u"SORT" || *oCanonical == u"SORTBY")
+    {
+        if (*oCanonical == u"SORT")
+        {
+            if (rNode.maChildren.empty() || rNode.maChildren.size() > 4)
+            {
+                return makeMaterializedValue(
+                    makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+            }
+
+            const auto aSource = materializeMatrixNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+            if (!aSource.mbSupported)
+                return makeUnsupportedMaterialization<ScMatrixRef>(aSource.meFallbackReason);
+            if (!aSource.moValue)
+                return makeMaterializedError<ScMatrixRef>(aSource.meError);
+
+            sal_Int32 nSortIndex = 1;
+            if (rNode.maChildren.size() >= 2
+                && rNode.maChildren[1]->meKind != core::formula::NodeKind::EmptyArgument)
+            {
+                const auto aIndex = normalizeWholeMaterializedArgument(
+                    *rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+                if (!aIndex.mbSupported)
+                    return makeUnsupportedMaterialization<ScMatrixRef>(aIndex.meFallbackReason);
+                if (!aIndex.moValue || *aIndex.moValue < 1)
+                {
+                    return makeMaterializedValue(makeSingleValueMatrix(api::CellValue::error(
+                        aIndex.moValue ? api::Error::IllegalArgument : aIndex.meError)));
+                }
+                nSortIndex = *aIndex.moValue;
+            }
+
+            sal_Int32 nSortOrder = 1;
+            if (rNode.maChildren.size() >= 3
+                && rNode.maChildren[2]->meKind != core::formula::NodeKind::EmptyArgument)
+            {
+                const auto aOrder = normalizeWholeMaterializedArgument(
+                    *rNode.maChildren[2], rDoc, rContext, rFormulaPos);
+                if (!aOrder.mbSupported)
+                    return makeUnsupportedMaterialization<ScMatrixRef>(aOrder.meFallbackReason);
+                if (!aOrder.moValue || (*aOrder.moValue != 1 && *aOrder.moValue != -1))
+                {
+                    return makeMaterializedValue(makeSingleValueMatrix(api::CellValue::error(
+                        aOrder.moValue ? api::Error::IllegalArgument : aOrder.meError)));
+                }
+                nSortOrder = *aOrder.moValue;
+            }
+
+            bool bByColumn = false;
+            if (rNode.maChildren.size() == 4
+                && rNode.maChildren[3]->meKind != core::formula::NodeKind::EmptyArgument)
+            {
+                const auto aByColumn = materializeScalarNode(
+                    *rNode.maChildren[3], rDoc, rContext, rFormulaPos);
+                if (!aByColumn.mbSupported)
+                    return makeUnsupportedMaterialization<ScMatrixRef>(aByColumn.meFallbackReason);
+                if (!aByColumn.moValue)
+                    return makeMaterializedError<ScMatrixRef>(aByColumn.meError);
+                const auto aBool = coerceScalarToBool(rDoc, rContext, *aByColumn.moValue);
+                if (!aBool)
+                    return makeMaterializedValue(
+                        makeSingleValueMatrix(api::CellValue::error(aBool.meError)));
+                bByColumn = aBool.maValue;
+            }
+
+            SCSIZE nColumns = 0;
+            SCSIZE nRows = 0;
+            (*aSource.moValue)->GetDimensions(nColumns, nRows);
+            const bool bSortRows = !bByColumn;
+            const SCSIZE nAxisLength = bSortRows ? nRows : nColumns;
+            const SCSIZE nKeyLimit = bSortRows ? nColumns : nRows;
+            if (static_cast<SCSIZE>(nSortIndex) > nKeyLimit || nSortIndex < 1)
+            {
+                return makeMaterializedValue(
+                    makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+            }
+
+            std::vector<SCSIZE> aOrder(static_cast<std::size_t>(nAxisLength));
+            std::iota(aOrder.begin(), aOrder.end(), 0);
+            std::optional<api::Error> oSortError;
+            std::stable_sort(aOrder.begin(), aOrder.end(), [&](SCSIZE nLeft, SCSIZE nRight) {
+                const api::CellValue& rLeftValue = bSortRows
+                                                       ? lookupexecution::detail::toApiCellValue(
+                                                             (*aSource.moValue)->Get(
+                                                                 static_cast<SCSIZE>(nSortIndex - 1), nLeft))
+                                                       : lookupexecution::detail::toApiCellValue(
+                                                             (*aSource.moValue)->Get(
+                                                                 nLeft, static_cast<SCSIZE>(nSortIndex - 1)));
+                const api::CellValue& rRightValue = bSortRows
+                                                        ? lookupexecution::detail::toApiCellValue(
+                                                              (*aSource.moValue)->Get(
+                                                                  static_cast<SCSIZE>(nSortIndex - 1), nRight))
+                                                        : lookupexecution::detail::toApiCellValue(
+                                                              (*aSource.moValue)->Get(
+                                                                  nRight, static_cast<SCSIZE>(nSortIndex - 1)));
+                const auto aCompare = spillCompareValues(rLeftValue, rRightValue, rDoc, rContext);
+                if (!aCompare)
+                {
+                    oSortError = aCompare.meError;
+                    return nLeft < nRight;
+                }
+                if (aCompare.maValue == 0)
+                    return nLeft < nRight;
+                return nSortOrder > 0 ? aCompare.maValue < 0 : aCompare.maValue > 0;
+            });
+            if (oSortError)
+            {
+                return makeMaterializedValue(
+                    makeSingleValueMatrix(api::CellValue::error(*oSortError)));
+            }
+
+            ScMatrixRef xMatrix(new ScMatrix(nColumns, nRows));
+            if (bSortRows)
+            {
+                for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+                {
+                    const SCSIZE nSourceRow = aOrder[nRow];
+                    for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                    {
+                        putScalarIntoMatrix(lookupexecution::detail::toApiCellValue(
+                                                (*aSource.moValue)->Get(nColumn, nSourceRow)),
+                            xMatrix, nColumn, nRow);
+                    }
+                }
+            }
+            else
+            {
+                for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                {
+                    const SCSIZE nSourceColumn = aOrder[nColumn];
+                    for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+                    {
+                        putScalarIntoMatrix(lookupexecution::detail::toApiCellValue(
+                                                (*aSource.moValue)->Get(nSourceColumn, nRow)),
+                            xMatrix, nColumn, nRow);
+                    }
+                }
+            }
+
+            return makeMaterializedValue(xMatrix);
+        }
+
+        if (rNode.maChildren.size() < 2)
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+        }
+
+        const auto aSource = materializeMatrixNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+        if (!aSource.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aSource.meFallbackReason);
+        if (!aSource.moValue)
+            return makeMaterializedError<ScMatrixRef>(aSource.meError);
+
+        struct SortKeyMatrix
+        {
+            ScMatrixRef mxMatrix;
+            sal_Int32 mnOrder = 1;
+        };
+
+        std::vector<SortKeyMatrix> aKeys;
+        for (std::size_t nIndex = 1; nIndex < rNode.maChildren.size();)
+        {
+            const auto aKey = materializeMatrixNode(*rNode.maChildren[nIndex], rDoc, rContext, rFormulaPos);
+            if (!aKey.mbSupported)
+                return makeUnsupportedMaterialization<ScMatrixRef>(aKey.meFallbackReason);
+            if (!aKey.moValue)
+                return makeMaterializedError<ScMatrixRef>(aKey.meError);
+            ++nIndex;
+
+            sal_Int32 nSortOrder = 1;
+            if (nIndex < rNode.maChildren.size()
+                && rNode.maChildren[nIndex]->meKind != core::formula::NodeKind::EmptyArgument)
+            {
+                const auto aOrder = normalizeWholeMaterializedArgument(
+                    *rNode.maChildren[nIndex], rDoc, rContext, rFormulaPos);
+                if (!aOrder.mbSupported)
+                    return makeUnsupportedMaterialization<ScMatrixRef>(aOrder.meFallbackReason);
+                if (!aOrder.moValue || (*aOrder.moValue != 1 && *aOrder.moValue != -1))
+                {
+                    return makeMaterializedValue(makeSingleValueMatrix(api::CellValue::error(
+                        aOrder.moValue ? api::Error::IllegalArgument : aOrder.meError)));
+                }
+                nSortOrder = *aOrder.moValue;
+            }
+            if (nIndex < rNode.maChildren.size())
+                ++nIndex;
+
+            aKeys.push_back({ *aKey.moValue, nSortOrder });
+        }
+
+        if (aKeys.empty())
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+        }
+
+        SCSIZE nSourceColumns = 0;
+        SCSIZE nSourceRows = 0;
+        (*aSource.moValue)->GetDimensions(nSourceColumns, nSourceRows);
+        SCSIZE nKeyColumns = 0;
+        SCSIZE nKeyRows = 0;
+        aKeys.front().mxMatrix->GetDimensions(nKeyColumns, nKeyRows);
+
+        const bool bSortRows = nKeyColumns == 1 && nKeyRows > 1;
+        const bool bSortColumns = nKeyRows == 1 && nKeyColumns > 1;
+        if (!bSortRows && !bSortColumns)
+        {
+            if (nKeyColumns == 1 && nKeyRows == 1)
+                return makeMaterializedValue(makeSingleValueMatrix(
+                    lookupexecution::detail::toApiCellValue((*aSource.moValue)->Get(0, 0))));
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+        }
+
+        const SCSIZE nAxisLength = bSortRows ? nKeyRows : nKeyColumns;
+        for (const auto& rKey : aKeys)
+        {
+            SCSIZE nColumns = 0;
+            SCSIZE nRows = 0;
+            rKey.mxMatrix->GetDimensions(nColumns, nRows);
+            if (bSortRows)
+            {
+                if (nColumns != 1 || nRows != nAxisLength)
+                {
+                    return makeMaterializedValue(makeSingleValueMatrix(
+                        api::CellValue::error(api::Error::IllegalArgument)));
+                }
+            }
+            else if (nRows != 1 || nColumns != nAxisLength)
+            {
+                return makeMaterializedValue(
+                    makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+            }
+        }
+
+        if ((bSortRows && nSourceRows != nAxisLength)
+            || (bSortColumns && nSourceColumns != nAxisLength))
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+        }
+
+        std::vector<SCSIZE> aOrder(static_cast<std::size_t>(nAxisLength));
+        std::iota(aOrder.begin(), aOrder.end(), 0);
+        std::optional<api::Error> oSortError;
+        std::stable_sort(aOrder.begin(), aOrder.end(), [&](SCSIZE nLeft, SCSIZE nRight) {
+            for (const auto& rKey : aKeys)
+            {
+                const api::CellValue rLeftValue = bSortRows
+                                                      ? lookupexecution::detail::toApiCellValue(
+                                                            rKey.mxMatrix->Get(0, nLeft))
+                                                      : lookupexecution::detail::toApiCellValue(
+                                                            rKey.mxMatrix->Get(nLeft, 0));
+                const api::CellValue rRightValue = bSortRows
+                                                       ? lookupexecution::detail::toApiCellValue(
+                                                             rKey.mxMatrix->Get(0, nRight))
+                                                       : lookupexecution::detail::toApiCellValue(
+                                                             rKey.mxMatrix->Get(nRight, 0));
+                const auto aCompare = spillCompareValues(rLeftValue, rRightValue, rDoc, rContext);
+                if (!aCompare)
+                {
+                    oSortError = aCompare.meError;
+                    return nLeft < nRight;
+                }
+                if (aCompare.maValue == 0)
+                    continue;
+                return rKey.mnOrder > 0 ? aCompare.maValue < 0 : aCompare.maValue > 0;
+            }
+            return nLeft < nRight;
+        });
+        if (oSortError)
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(*oSortError)));
+        }
+
+        ScMatrixRef xMatrix(new ScMatrix(nSourceColumns, nSourceRows));
+        if (bSortRows)
+        {
+            for (SCSIZE nRow = 0; nRow < nSourceRows; ++nRow)
+            {
+                const SCSIZE nSourceRow = aOrder[nRow];
+                for (SCSIZE nColumn = 0; nColumn < nSourceColumns; ++nColumn)
+                {
+                    putScalarIntoMatrix(lookupexecution::detail::toApiCellValue(
+                                            (*aSource.moValue)->Get(nColumn, nSourceRow)),
+                        xMatrix, nColumn, nRow);
+                }
+            }
+        }
+        else
+        {
+            for (SCSIZE nColumn = 0; nColumn < nSourceColumns; ++nColumn)
+            {
+                const SCSIZE nSourceColumn = aOrder[nColumn];
+                for (SCSIZE nRow = 0; nRow < nSourceRows; ++nRow)
+                {
+                    putScalarIntoMatrix(lookupexecution::detail::toApiCellValue(
+                                            (*aSource.moValue)->Get(nSourceColumn, nRow)),
+                        xMatrix, nColumn, nRow);
+                }
+            }
+        }
+
+        return makeMaterializedValue(xMatrix);
+    }
+
+    if (*oCanonical == u"TEXTSPLIT")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 6)
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+        }
+
+        const auto aText = materializeScalarNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+        if (!aText.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aText.meFallbackReason);
+        if (!aText.moValue)
+            return makeMaterializedError<ScMatrixRef>(aText.meError);
+        const auto aTextString = coerceScalarToText(rDoc, rContext, *aText.moValue);
+        if (!aTextString)
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(aTextString.meError)));
+        }
+        if (aTextString.maValue.isEmpty())
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+        }
+
+        std::vector<api::String> aColumnDelimiters;
+        if (rNode.maChildren.size() >= 2
+            && rNode.maChildren[1]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aDelimiters = collectTextVector(*rNode.maChildren[1]);
+            if (!aDelimiters.mbSupported)
+                return makeUnsupportedMaterialization<ScMatrixRef>(aDelimiters.meFallbackReason);
+            if (!aDelimiters.moValue)
+                return makeMaterializedError<ScMatrixRef>(aDelimiters.meError);
+            aColumnDelimiters = *aDelimiters.moValue;
+        }
+
+        std::vector<api::String> aRowDelimiters;
+        if (rNode.maChildren.size() >= 3
+            && rNode.maChildren[2]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aDelimiters = collectTextVector(*rNode.maChildren[2]);
+            if (!aDelimiters.mbSupported)
+                return makeUnsupportedMaterialization<ScMatrixRef>(aDelimiters.meFallbackReason);
+            if (!aDelimiters.moValue)
+                return makeMaterializedError<ScMatrixRef>(aDelimiters.meError);
+            aRowDelimiters = *aDelimiters.moValue;
+        }
+
+        bool bIgnoreEmpty = false;
+        if (rNode.maChildren.size() >= 4
+            && rNode.maChildren[3]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aIgnore = materializeScalarNode(
+                *rNode.maChildren[3], rDoc, rContext, rFormulaPos);
+            if (!aIgnore.mbSupported)
+                return makeUnsupportedMaterialization<ScMatrixRef>(aIgnore.meFallbackReason);
+            if (!aIgnore.moValue)
+                return makeMaterializedError<ScMatrixRef>(aIgnore.meError);
+            const auto aBool = coerceScalarToBool(rDoc, rContext, *aIgnore.moValue);
+            if (!aBool)
+            {
+                return makeMaterializedValue(
+                    makeSingleValueMatrix(api::CellValue::error(aBool.meError)));
+            }
+            bIgnoreEmpty = aBool.maValue;
+        }
+
+        bool bMatchMode = false;
+        if (rNode.maChildren.size() >= 5
+            && rNode.maChildren[4]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aMatchModeValue = materializeScalarNode(
+                *rNode.maChildren[4], rDoc, rContext, rFormulaPos);
+            if (!aMatchModeValue.mbSupported)
+                return makeUnsupportedMaterialization<ScMatrixRef>(aMatchModeValue.meFallbackReason);
+            if (!aMatchModeValue.moValue)
+                return makeMaterializedError<ScMatrixRef>(aMatchModeValue.meError);
+            const auto aBool = coerceScalarToBool(rDoc, rContext, *aMatchModeValue.moValue);
+            if (!aBool)
+            {
+                return makeMaterializedValue(
+                    makeSingleValueMatrix(api::CellValue::error(aBool.meError)));
+            }
+            bMatchMode = aBool.maValue;
+        }
+
+        std::optional<api::CellValue> oPadWith;
+        if (rNode.maChildren.size() == 6
+            && rNode.maChildren[5]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aPad = materializeScalarNode(*rNode.maChildren[5], rDoc, rContext, rFormulaPos);
+            if (!aPad.mbSupported)
+                return makeUnsupportedMaterialization<ScMatrixRef>(aPad.meFallbackReason);
+            if (!aPad.moValue)
+                return makeMaterializedError<ScMatrixRef>(aPad.meError);
+            oPadWith = *aPad.moValue;
+        }
+
+        const auto aRows = spillSplitText(toApiString(aTextString.maValue), aRowDelimiters,
+            bIgnoreEmpty, bMatchMode);
+        if (aRows.empty())
+        {
+            if (oPadWith)
+                return makeMaterializedValue(makeSingleValueMatrix(*oPadWith));
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::NotAvailable)));
+        }
+
+        std::vector<std::vector<api::String>> aColumnsByRow;
+        aColumnsByRow.reserve(aRows.size());
+        std::size_t nMaxColumns = 0;
+        for (const auto& rRow : aRows)
+        {
+            auto aColumns = spillSplitText(rRow, aColumnDelimiters, bIgnoreEmpty, bMatchMode);
+            nMaxColumns = std::max(nMaxColumns, aColumns.size());
+            aColumnsByRow.push_back(std::move(aColumns));
+        }
+
+        if (nMaxColumns == 0)
+        {
+            if (oPadWith)
+                return makeMaterializedValue(makeSingleValueMatrix(*oPadWith));
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::NotAvailable)));
+        }
+
+        ScMatrixRef xMatrix(new ScMatrix(static_cast<SCSIZE>(nMaxColumns),
+            static_cast<SCSIZE>(aColumnsByRow.size())));
+        for (std::size_t nRow = 0; nRow < aColumnsByRow.size(); ++nRow)
+        {
+            for (std::size_t nColumn = 0; nColumn < nMaxColumns; ++nColumn)
+            {
+                api::CellValue aValue;
+                if (nColumn < aColumnsByRow[nRow].size())
+                {
+                    aValue = aColumnsByRow[nRow][nColumn].empty()
+                                 ? api::CellValue::empty()
+                                 : api::CellValue::text(aColumnsByRow[nRow][nColumn]);
+                }
+                else if (oPadWith)
+                {
+                    aValue = *oPadWith;
+                }
+                else
+                {
+                    aValue = api::CellValue::error(api::Error::NotAvailable);
+                }
+
+                putScalarIntoMatrix(
+                    aValue, xMatrix, static_cast<SCSIZE>(nColumn), static_cast<SCSIZE>(nRow));
+            }
+        }
+
+        return makeMaterializedValue(xMatrix);
+    }
+
+    return makeUnsupportedMaterialization<ScMatrixRef>(FallbackReason::UnsupportedFunction);
+}
+
 [[nodiscard]] inline Materialization<ScMatrixRef> materializeIsNumberMatrixFunctionCall(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
@@ -3644,6 +4498,8 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
         return materializeIndexMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
     if (eFunction == FunctionKind::Selector)
         return materializeSelectorMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
+    if (eFunction == FunctionKind::SpillArray)
+        return materializeSpillMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
     if (aFunctionName == u"ISNUMBER")
         return materializeIsNumberMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
     if (aFunctionName == u"IF")
@@ -8165,7 +9021,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos, bool bEmptyStringAsZero,
     bool bImportedCanonicalSource)
 {
-    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    if (aFunctionName == u"COM.MICROSOFT.TEXTAFTER")
+        aFunctionName = u"TEXTAFTER"_ustr;
     auto materializeArgument = [&](const core::formula::Node& rArgument)
         -> Materialization<api::CellValue> {
         const auto aAttempt = evaluateScalarOrDelegatedNode(
@@ -8420,6 +9278,112 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             SvNumFormatType::LOGICAL);
     }
 
+    if (aFunctionName == u"TEXTAFTER")
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 6)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aText = materializeTextArgument(*rNode.maChildren[0]);
+        if (!aText)
+            return makeErrorResult(eFunction, aText.meError);
+
+        std::vector<api::String> aDelimiters;
+        const auto aDelimiterMatrix
+            = materializeMatrixNode(*rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+        if (!aDelimiterMatrix.mbSupported)
+            return makeUnsupported(eFunction, aDelimiterMatrix.meFallbackReason);
+        if (!aDelimiterMatrix.moValue)
+            return makeErrorResult(eFunction, aDelimiterMatrix.meError);
+
+        SCSIZE nDelimiterColumns = 0;
+        SCSIZE nDelimiterRows = 0;
+        (*aDelimiterMatrix.moValue)->GetDimensions(nDelimiterColumns, nDelimiterRows);
+        for (SCSIZE nRow = 0; nRow < nDelimiterRows; ++nRow)
+        {
+            for (SCSIZE nColumn = 0; nColumn < nDelimiterColumns; ++nColumn)
+            {
+                const auto aValue = lookupexecution::detail::toApiCellValue(
+                    (*aDelimiterMatrix.moValue)->Get(nColumn, nRow));
+                if (aValue.isError())
+                    return makeErrorResult(eFunction, aValue.meError);
+                const auto aDelimiter = coerceScalarToText(rDoc, rContext, aValue);
+                if (!aDelimiter)
+                    return makeErrorResult(eFunction, aDelimiter.meError);
+                aDelimiters.push_back(toApiString(aDelimiter.maValue));
+            }
+        }
+        if (aDelimiters.empty())
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        sal_Int32 nInstance = 1;
+        if (rNode.maChildren.size() >= 3
+            && rNode.maChildren[2]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aInstance = materializeArgument(*rNode.maChildren[2]);
+            if (!aInstance.mbSupported)
+                return makeUnsupported(eFunction, aInstance.meFallbackReason);
+            if (!aInstance.moValue)
+                return makeErrorResult(eFunction, aInstance.meError);
+            const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aInstance.moValue);
+            if (!aNumber)
+                return makeErrorResult(eFunction, aNumber.meError);
+            const auto oWhole = coerceWholeNumber(aNumber.maValue);
+            if (!oWhole || *oWhole == 0)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            nInstance = *oWhole;
+        }
+
+        bool bCaseInsensitive = false;
+        if (rNode.maChildren.size() >= 4
+            && rNode.maChildren[3]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aMatchMode = materializeArgument(*rNode.maChildren[3]);
+            if (!aMatchMode.mbSupported)
+                return makeUnsupported(eFunction, aMatchMode.meFallbackReason);
+            if (!aMatchMode.moValue)
+                return makeErrorResult(eFunction, aMatchMode.meError);
+            const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aMatchMode.moValue);
+            if (!aNumber)
+                return makeErrorResult(eFunction, aNumber.meError);
+            const auto oWhole = coerceWholeNumber(aNumber.maValue);
+            if (!oWhole || (*oWhole != 0 && *oWhole != 1))
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            bCaseInsensitive = *oWhole == 1;
+        }
+
+        bool bMatchEnd = false;
+        if (rNode.maChildren.size() >= 5
+            && rNode.maChildren[4]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aMatchEnd = materializeArgument(*rNode.maChildren[4]);
+            if (!aMatchEnd.mbSupported)
+                return makeUnsupported(eFunction, aMatchEnd.meFallbackReason);
+            if (!aMatchEnd.moValue)
+                return makeErrorResult(eFunction, aMatchEnd.meError);
+            const auto aBool = coerceScalarToBool(rDoc, rContext, *aMatchEnd.moValue);
+            if (!aBool)
+                return makeErrorResult(eFunction, aBool.meError);
+            bMatchEnd = aBool.maValue;
+        }
+
+        const auto oResult = spreadsheetengine::core::text::textAfter(
+            toApiString(aText.maValue), aDelimiters, nInstance, bCaseInsensitive, bMatchEnd);
+        if (!oResult)
+        {
+            if (rNode.maChildren.size() >= 6
+                && rNode.maChildren[5]->meKind != core::formula::NodeKind::EmptyArgument)
+            {
+                auto aFallback = evaluateScalarOrDelegatedNode(*rNode.maChildren[5], eFunction,
+                    rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 1, bImportedCanonicalSource);
+                aFallback.meFunction = eFunction;
+                return aFallback;
+            }
+            return makeErrorResult(eFunction, api::Error::NotAvailable);
+        }
+
+        return makeStringResult(eFunction, toLibreOfficeString(*oResult));
+    }
+
     return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
 }
 
@@ -8463,6 +9427,11 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     bool bImportedCanonicalSource)
 {
     const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    api::String aCanonicalFunctionName = aFunctionName;
+    if (aCanonicalFunctionName == u"COM.MICROSOFT.IFS")
+        aCanonicalFunctionName = u"IFS"_ustr;
+    else if (aCanonicalFunctionName == u"COM.MICROSOFT.SWITCH")
+        aCanonicalFunctionName = u"SWITCH"_ustr;
     auto materializeArgument = [&](const core::formula::Node& rArgument)
         -> Materialization<api::CellValue> {
         const auto aAttempt = evaluateScalarOrDelegatedNode(
@@ -8544,30 +9513,164 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
     if (eFunction == FunctionKind::Conditional)
     {
-        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
-            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        if (aCanonicalFunctionName == u"IF")
+        {
+            if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-        const auto aCondition = materializeArgument(*rNode.maChildren[0]);
-        if (!aCondition.mbSupported)
-            return makeUnsupported(eFunction, aCondition.meFallbackReason);
-        if (!aCondition.moValue)
-            return makeErrorResult(eFunction, aCondition.meError);
+            const auto aCondition = materializeArgument(*rNode.maChildren[0]);
+            if (!aCondition.mbSupported)
+                return makeUnsupported(eFunction, aCondition.meFallbackReason);
+            if (!aCondition.moValue)
+                return makeErrorResult(eFunction, aCondition.meError);
 
-        const auto aBool = coerceScalarToBool(rDoc, rContext, *aCondition.moValue);
-        if (!aBool)
-            return makeErrorResult(eFunction, aBool.meError);
+            const auto aBool = coerceScalarToBool(rDoc, rContext, *aCondition.moValue);
+            if (!aBool)
+                return makeErrorResult(eFunction, aBool.meError);
 
-        if (!aBool.maValue && rNode.maChildren.size() < 3)
-            return makeNumericResult(eFunction, 0.0, SvNumFormatType::LOGICAL);
+            if (!aBool.maValue && rNode.maChildren.size() < 3)
+                return makeNumericResult(eFunction, 0.0, SvNumFormatType::LOGICAL);
 
-        const auto& rxSelected = aBool.maValue ? rNode.maChildren[1] : rNode.maChildren[2];
-        if (!rxSelected)
-            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            const auto& rxSelected = aBool.maValue ? rNode.maChildren[1] : rNode.maChildren[2];
+            if (!rxSelected)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-        auto aBranch = evaluateScalarOrDelegatedNode(*rxSelected, eFunction, rDoc, rContext,
-            rFormulaPos, bEmptyStringAsZero, 1, bImportedCanonicalSource);
-        aBranch.meFunction = eFunction;
-        return aBranch;
+            auto aBranch = evaluateScalarOrDelegatedNode(*rxSelected, eFunction, rDoc, rContext,
+                rFormulaPos, bEmptyStringAsZero, 1, bImportedCanonicalSource);
+            aBranch.meFunction = eFunction;
+            return aBranch;
+        }
+
+        if (aCanonicalFunctionName == u"IFS")
+        {
+            if (rNode.maChildren.empty())
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+            for (std::size_t nIndex = 0; nIndex < rNode.maChildren.size(); nIndex += 2)
+            {
+                const auto aCondition = materializeArgument(*rNode.maChildren[nIndex]);
+                const std::int16_t nRemaining
+                    = static_cast<std::int16_t>(rNode.maChildren.size() - nIndex - 1);
+
+                bool bCondition = false;
+                bool bConditionError = false;
+                if (!aCondition.mbSupported)
+                    return makeUnsupported(eFunction, aCondition.meFallbackReason);
+                if (!aCondition.moValue)
+                    bConditionError = true;
+                else
+                {
+                    const auto aBool = coerceScalarToBool(rDoc, rContext, *aCondition.moValue);
+                    if (!aBool)
+                        bConditionError = true;
+                    else
+                        bCondition = aBool.maValue;
+                }
+
+                switch (api::logic::evaluateIfsCondition(bCondition, bConditionError, nRemaining))
+                {
+                    case api::logic::IfsAction::SelectCurrentResult:
+                    {
+                        auto aBranch = evaluateScalarOrDelegatedNode(*rNode.maChildren[nIndex + 1],
+                            eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 1,
+                            bImportedCanonicalSource);
+                        aBranch.meFunction = eFunction;
+                        return aBranch;
+                    }
+                    case api::logic::IfsAction::SkipCurrentResult:
+                        break;
+                    case api::logic::IfsAction::ReturnParameterExpected:
+                        return makeErrorResult(eFunction, api::Error::IllegalArgument);
+                    case api::logic::IfsAction::ReturnNotAvailable:
+                        return makeErrorResult(eFunction, api::Error::NotAvailable);
+                    case api::logic::IfsAction::ReturnNoValue:
+                        return makeErrorResult(eFunction, api::Error::NoValue);
+                }
+            }
+
+            return makeErrorResult(eFunction, api::Error::NotAvailable);
+        }
+
+        if (aCanonicalFunctionName == u"SWITCH")
+        {
+            if (rNode.maChildren.size() < 3)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+            const auto aReference = materializeArgument(*rNode.maChildren[0]);
+            if (!aReference.mbSupported)
+                return makeUnsupported(eFunction, aReference.meFallbackReason);
+            if (!aReference.moValue)
+                return makeErrorResult(eFunction, aReference.meError);
+
+            const api::CellValue aReferenceValue = *aReference.moValue;
+            const bool bReferenceIsText = aReferenceValue.isText() || aReferenceValue.isEmpty();
+            std::size_t nIndex = 1;
+            while (nIndex + 1 < rNode.maChildren.size())
+            {
+                const auto aCase = materializeArgument(*rNode.maChildren[nIndex]);
+                if (!aCase.mbSupported)
+                    return makeUnsupported(eFunction, aCase.meFallbackReason);
+                if (!aCase.moValue)
+                {
+                    if (nIndex + 2 >= rNode.maChildren.size())
+                        return makeErrorResult(eFunction, aCase.meError);
+                    nIndex += 2;
+                    continue;
+                }
+
+                bool bMatched = false;
+                if (bReferenceIsText)
+                {
+                    const auto aReferenceText = coerceScalarToText(rDoc, rContext, aReferenceValue);
+                    const auto aCaseText = coerceScalarToText(rDoc, rContext, *aCase.moValue);
+                    if (!aReferenceText || !aCaseText)
+                        return makeErrorResult(eFunction, api::Error::NoValue);
+                    bMatched = spreadsheetengine::core::query::compareFoldedText(
+                                   toApiString(aReferenceText.maValue),
+                                   toApiString(aCaseText.maValue))
+                               == 0;
+                }
+                else
+                {
+                    const auto aReferenceNumber
+                        = coerceScalarToNumber(rDoc, rContext, aReferenceValue);
+                    const auto aCaseNumber = coerceScalarToNumber(rDoc, rContext, *aCase.moValue);
+                    if (!aReferenceNumber || !aCaseNumber)
+                    {
+                        if (nIndex + 2 >= rNode.maChildren.size())
+                            return makeErrorResult(eFunction, api::Error::NoValue);
+                        nIndex += 2;
+                        continue;
+                    }
+                    bMatched
+                        = rtl::math::approxEqual(aReferenceNumber.maValue, aCaseNumber.maValue);
+                }
+
+                if (bMatched)
+                {
+                    auto aBranch = evaluateScalarOrDelegatedNode(*rNode.maChildren[nIndex + 1],
+                        eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 1,
+                        bImportedCanonicalSource);
+                    aBranch.meFunction = eFunction;
+                    return aBranch;
+                }
+
+                nIndex += 2;
+            }
+
+            if (nIndex < rNode.maChildren.size())
+            {
+                auto aBranch = evaluateScalarOrDelegatedNode(*rNode.maChildren[nIndex], eFunction,
+                    rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 1,
+                    bImportedCanonicalSource);
+                aBranch.meFunction = eFunction;
+                return aBranch;
+            }
+
+            return makeErrorResult(eFunction, api::Error::NotAvailable);
+        }
+
+        return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
     }
 
     if (eFunction == FunctionKind::Round)
@@ -9358,6 +10461,26 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         eFunction, lookupexecution::detail::toApiCellValue((*aMatrix.moValue)->Get(0, 0)));
 }
 
+[[nodiscard]] inline EvaluationAttempt evaluateSpillArrayFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
+{
+    const auto aMatrix = materializeSpillMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
+    if (!aMatrix.mbSupported)
+        return makeUnsupported(eFunction, aMatrix.meFallbackReason);
+    if (!aMatrix.moValue)
+        return makeErrorResult(eFunction, aMatrix.meError);
+
+    SCSIZE nColumns = 0;
+    SCSIZE nRows = 0;
+    (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+    if (nColumns < 1 || nRows < 1)
+        return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+    return makeScalarAttempt(
+        eFunction, lookupexecution::detail::toApiCellValue((*aMatrix.moValue)->Get(0, 0)));
+}
+
 [[nodiscard]] inline EvaluationAttempt evaluateFunctionNode(
     const core::formula::Node& rRoot, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos, bool bEmptyStringAsZero, bool bImportedCanonicalSource)
@@ -9462,6 +10585,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                 bImportedCanonicalSource);
         case FunctionKind::Selector:
             return evaluateSelectorFunction(rRoot, eFunction, rDoc, rContext, rFormulaPos);
+        case FunctionKind::SpillArray:
+            return evaluateSpillArrayFunction(rRoot, eFunction, rDoc, rContext, rFormulaPos);
         case FunctionKind::Match:
         case FunctionKind::XMatch:
         case FunctionKind::Lookup:

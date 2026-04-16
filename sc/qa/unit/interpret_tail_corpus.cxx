@@ -1377,6 +1377,8 @@ const char* functionKindName(FunctionKind eFunction)
             return "xmatch";
         case FunctionKind::Selector:
             return "selector";
+        case FunctionKind::SpillArray:
+            return "spill_array";
         case FunctionKind::Lookup:
             return "lookup";
         case FunctionKind::VLookup:

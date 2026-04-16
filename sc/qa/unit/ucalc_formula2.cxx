@@ -2590,6 +2590,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorConditionalAu
         m_pDoc->SetString(3, 7, 0, u"=IF(TRUE;7;1/0)"_ustr);
         m_pDoc->SetString(4, 7, 0, u"=IF(ISBLANK(E1);ABS(B1-C1)<D1;0)"_ustr);
         m_pDoc->SetString(5, 7, 0, u"=IF(A1=2;B1;C1)"_ustr);
+        m_pDoc->SetString(6, 7, 0, u"=IFS(A1=1;11;A1=2;22)"_ustr);
+        m_pDoc->SetString(7, 7, 0, u"=COM.MICROSOFT.SWITCH(A1;1;11;2;22;99)"_ustr);
 
         ASSERT_DOUBLES_EQUAL(42.0, m_pDoc->GetValue(0, 7, 0));
         ASSERT_DOUBLES_EQUAL(99.0, m_pDoc->GetValue(1, 7, 0));
@@ -2597,14 +2599,16 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorConditionalAu
         ASSERT_DOUBLES_EQUAL(7.0, m_pDoc->GetValue(3, 7, 0));
         ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(4, 7, 0));
         ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(5, 7, 0));
+        ASSERT_DOUBLES_EQUAL(22.0, m_pDoc->GetValue(6, 7, 0));
+        ASSERT_DOUBLES_EQUAL(22.0, m_pDoc->GetValue(7, 7, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 6);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 8);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Conditional)]
-            >= 6);
+            >= 8);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Conditional)]);
@@ -2839,6 +2843,9 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorTextUtilityAu
         m_pDoc->SetString(8, 7, 0, u"=RIGHT(\"LibreOffice\";6)"_ustr);
         m_pDoc->SetString(9, 7, 0, u"=T(123)"_ustr);
         m_pDoc->SetString(10, 7, 0, u"=EXACT(A1;C1)"_ustr);
+        m_pDoc->SetString(11, 7, 0, u"=TEXTAFTER(\"alpha-beta-gamma\";\"-\";2)"_ustr);
+        m_pDoc->SetString(
+            12, 7, 0, u"=COM.MICROSOFT.TEXTAFTER(\"alpha-beta-gamma\";\"-\";3;0;0;\"tail\")"_ustr);
 
         CPPUNIT_ASSERT_EQUAL(u"abcd"_ustr, m_pDoc->GetString(0, 7, 0));
         CPPUNIT_ASSERT_EQUAL(u"AB"_ustr, m_pDoc->GetString(1, 7, 0));
@@ -2851,17 +2858,72 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorTextUtilityAu
         CPPUNIT_ASSERT_EQUAL(u"Office"_ustr, m_pDoc->GetString(8, 7, 0));
         CPPUNIT_ASSERT_EQUAL(u""_ustr, m_pDoc->GetString(9, 7, 0));
         ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(10, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"gamma"_ustr, m_pDoc->GetString(11, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"tail"_ustr, m_pDoc->GetString(12, 7, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 11);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 13);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::TextUtility)]
-            >= 11);
+            >= 13);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::TextUtility)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorSpillArrayAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineSpillArrayAuthority"_ustr));
+
+    m_pDoc->SetValue(0, 0, 0, 9.0);
+    m_pDoc->SetValue(1, 0, 0, 30.0);
+    m_pDoc->SetValue(0, 1, 0, 1.0);
+    m_pDoc->SetValue(1, 1, 0, 10.0);
+    m_pDoc->SetValue(0, 2, 0, 5.0);
+    m_pDoc->SetValue(1, 2, 0, 20.0);
+    m_pDoc->SetValue(3, 0, 0, 1.0);
+    m_pDoc->SetValue(3, 1, 0, 1.0);
+    m_pDoc->SetValue(3, 2, 0, 2.0);
+    m_pDoc->SetValue(3, 3, 0, 2.0);
+    m_pDoc->SetValue(3, 4, 0, 3.0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"=COM.MICROSOFT.UNIQUE(D1:D5;;TRUE())"_ustr);
+        m_pDoc->SetString(1, 7, 0, u"=COM.MICROSOFT.SORT(A1:B3;2;-1)"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=COM.MICROSOFT.SORTBY(A1:B3;B1:B3;1)"_ustr);
+        m_pDoc->SetString(
+            3, 7, 0, u"=COM.MICROSOFT.TEXTSPLIT(\"alpha,beta/gamma\";\",\";\"/\")"_ustr);
+        m_pDoc->SetString(4, 7, 0, u"=COM.MICROSOFT.HSTACK({10|11};{20|21})"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(0, 7, 0));
+        ASSERT_DOUBLES_EQUAL(9.0, m_pDoc->GetValue(1, 7, 0));
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(2, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"alpha"_ustr, m_pDoc->GetString(3, 7, 0));
+        ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(4, 7, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 5);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::SpillArray)]
+            >= 5);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::SpillArray)]);
     }
 
     m_pDoc->DeleteTab(0);
