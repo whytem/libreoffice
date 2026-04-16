@@ -187,11 +187,11 @@ Two different denominators matter, and both are now reported.
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=26319`
+- `interpret_tail_live_authoritative_probe_formula_cells=26839`
 - `interpret_tail_live_authoritative_match_total=20762`
-- `interpret_tail_live_authoritative_fallback_total=5557`
+- `interpret_tail_live_authoritative_fallback_total=6077`
 - live authoritative-match rate over the corpus: `40.9822%`
-- live authoritative-match rate over the current promoted probe: `78.8860%`
+- live authoritative-match rate over the current promoted probe: `77.3576%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -200,9 +200,9 @@ Everything below is diagnostic context for improving that number.
 These are attempt totals from live observe, not unique-cell coverage:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=90648`
-- `interpret_tail_live_fallback_total=384`
-- `interpret_tail_live_seen_total=91032`
+- `interpret_tail_live_supported_total=91686`
+- `interpret_tail_live_fallback_total=386`
+- `interpret_tail_live_seen_total=92072`
 - `interpret_tail_live_unseen_formula_cells=0`
 - `interpret_tail_live_promoted_function_supported_total=87717`
 - `interpret_tail_live_supported_rate=178.93`
@@ -222,12 +222,12 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=26762`
-- `interpret_tail_live_unique_supported_formula_cells=26575`
-- `interpret_tail_live_unique_fallback_formula_cells=187`
-- `interpret_tail_live_unique_unseen_formula_cells=23899`
-- `interpret_tail_live_unique_seen_rate=52.83`
-- `interpret_tail_live_unique_supported_rate=52.46`
+- `interpret_tail_live_unique_seen_formula_cells=27282`
+- `interpret_tail_live_unique_supported_formula_cells=27094`
+- `interpret_tail_live_unique_fallback_formula_cells=188`
+- `interpret_tail_live_unique_unseen_formula_cells=23379`
+- `interpret_tail_live_unique_seen_rate=53.85`
+- `interpret_tail_live_unique_supported_rate=53.48`
 
 Interpretation:
 
@@ -265,6 +265,12 @@ Interpretation:
 - imported `FORMULA(...)` live-host-truth alignment now contributes `14278`
   live unique seen cells with `14278` supported and `0` fallback, and is the
   biggest single north-star mover so far
+- the latest bounded ambient wall move now also admits `CONVERT`, which
+  contributes `308` live unique seen cells with `308` supported and `0`
+  fallback, plus a bounded `AGGREGATE` slice contributing `212` live unique
+  seen cells with `211` supported and `1` fallback, while focused
+  `ROUNDSIG` / `ORG.LIBREOFFICE.ROUNDSIG` live-seam coverage is now pinned in
+  the validation suite
 - the main remaining ambient work is now the still-large
   `unsupported_function` wall plus the still-heavy mismatch buckets inside the
   imported host-truth-artifact probe band, not simple denominator reach
@@ -278,13 +284,13 @@ These are also attempt totals after explicitly dirtying and forcing every
 replay formula cell through Calc's live `Interpret()` path:
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=1680876`
-- `interpret_tail_forced_interpret_fallback_total=192`
-- `interpret_tail_forced_interpret_seen_total=1681068`
+- `interpret_tail_forced_interpret_supported_total=1681397`
+- `interpret_tail_forced_interpret_fallback_total=193`
+- `interpret_tail_forced_interpret_seen_total=1681590`
 - `interpret_tail_forced_interpret_unseen_formula_cells=0`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=1680575`
-- `interpret_tail_forced_interpret_supported_rate=3317.89`
-- `interpret_tail_forced_interpret_seen_rate=3318.27`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=1681096`
+- `interpret_tail_forced_interpret_supported_rate=3318.92`
+- `interpret_tail_forced_interpret_seen_rate=3319.30`
 
 Interpretation:
 
@@ -301,27 +307,27 @@ replay formula cell once, then classifying whether that formula cell was
 actually seen and supported by the seam:
 
 - `interpret_tail_forced_direct_formula_cells=50661`
-- `interpret_tail_forced_direct_seen_formula_cells=26706`
-- `interpret_tail_forced_direct_supported_formula_cells=26519`
-- `interpret_tail_forced_direct_fallback_formula_cells=187`
-- `interpret_tail_forced_direct_unseen_formula_cells=23955`
-- `interpret_tail_forced_direct_seen_rate=52.72`
-- `interpret_tail_forced_direct_supported_rate=52.35`
+- `interpret_tail_forced_direct_seen_formula_cells=27226`
+- `interpret_tail_forced_direct_supported_formula_cells=27038`
+- `interpret_tail_forced_direct_fallback_formula_cells=188`
+- `interpret_tail_forced_direct_unseen_formula_cells=23435`
+- `interpret_tail_forced_direct_seen_rate=53.74`
+- `interpret_tail_forced_direct_supported_rate=53.37`
 
 ### Promoted-Family Probe
 
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
-- `interpret_tail_probe_formula_cells=26319`
-- `interpret_tail_authoritative_total=4843`
-- `interpret_tail_authoritative_fallback_total=21476`
-- promoted-family authoritative rate: `18.40%`
+- `interpret_tail_probe_formula_cells=26839`
+- `interpret_tail_authoritative_total=5263`
+- `interpret_tail_authoritative_fallback_total=21576`
+- promoted-family authoritative rate: `19.61%`
 
 Current promoted-family fallback reasons:
 
-- `shadow_mismatch=21431`
+- `shadow_mismatch=21530`
 - `unsupported_function=27`
-- `unsupported_formula_shape=18`
+- `unsupported_formula_shape=19`
 - `unsupported_host_surface=0`
 
 ### Live-Target Filtered Promoted Probe
@@ -331,7 +337,7 @@ with the seam forced `off` already disagrees with the imported cached workbook
 result:
 
 - `interpret_tail_live_target_probe_formula_cells=0`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=26319`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=26839`
 - `interpret_tail_live_target_authoritative_total=0`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 
@@ -406,20 +412,20 @@ This is the new per-cell replay inventory over the promoted-family replay
 surface after forcing each promoted replay formula through direct live
 `Interpret()`:
 
-- `interpret_tail_replay_promoted_formula_cells=26319`
-- `interpret_tail_replay_promoted_direct_seen=26263`
-- `interpret_tail_replay_promoted_direct_supported=26218`
-- `interpret_tail_replay_promoted_direct_fallback=45`
+- `interpret_tail_replay_promoted_formula_cells=26839`
+- `interpret_tail_replay_promoted_direct_seen=26783`
+- `interpret_tail_replay_promoted_direct_supported=26737`
+- `interpret_tail_replay_promoted_direct_fallback=46`
 - `interpret_tail_replay_promoted_direct_unseen=56`
-- `interpret_tail_replay_promoted_shared_formula_cells=21346`
-- `interpret_tail_replay_promoted_shared_top_formula_cells=1533`
-- `interpret_tail_replay_promoted_shared_member_formula_cells=19813`
-- `interpret_tail_replay_promoted_non_shared_formula_cells=4973`
+- `interpret_tail_replay_promoted_shared_formula_cells=21741`
+- `interpret_tail_replay_promoted_shared_top_formula_cells=1606`
+- `interpret_tail_replay_promoted_shared_member_formula_cells=20135`
+- `interpret_tail_replay_promoted_non_shared_formula_cells=5098`
 - `interpret_tail_replay_promoted_unseen_shared_top=5`
 - `interpret_tail_replay_promoted_unseen_shared_member=27`
 - `interpret_tail_replay_promoted_unseen_non_shared=24`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=8`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=26319`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=26839`
 - `interpret_tail_replay_promoted_dirty_after_interpret=56`
 
 Interpretation:
