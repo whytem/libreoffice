@@ -57,6 +57,7 @@
 #include <spreadsheetengine/runtime/DateTimeParts.hxx>
 #include <spreadsheetengine/runtime/FinancialRuntime.hxx>
 #include <spreadsheetengine/runtime/ConversionRuntime.hxx>
+#include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/runtime/MathAggregate.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathFunctionRuntime.hxx>
@@ -744,6 +745,14 @@ canonicalConversionFunctionName(api::StringView rFunctionName)
     }
     if (rFunctionName == u"EUROCONVERT")
         return api::StringView(u"EUROCONVERT");
+    if (rFunctionName == u"DECIMAL")
+        return api::StringView(u"DECIMAL");
+    if (rFunctionName == u"BASE")
+        return api::StringView(u"BASE");
+    if (rFunctionName == u"ROMAN")
+        return api::StringView(u"ROMAN");
+    if (rFunctionName == u"ARABIC")
+        return api::StringView(u"ARABIC");
 
     return std::nullopt;
 }
@@ -5015,6 +5024,140 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             return makeNumericResult(eFunction, aEuroConverted.maValue, SvNumFormatType::NUMBER);
 
         return makeErrorResult(eFunction, api::Error::IllegalArgument);
+    }
+
+    if (*oCanonicalName == u"DECIMAL")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aText = materializeScalarNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+        if (!aText.mbSupported)
+            return makeUnsupported(eFunction, aText.meFallbackReason);
+        if (!aText.moValue)
+            return makeErrorResult(eFunction, aText.meError);
+        const auto aTextValue = coerceScalarToText(rDoc, rContext, *aText.moValue);
+        if (!aTextValue)
+            return makeErrorResult(eFunction, aTextValue.meError);
+
+        const auto aBase = materializeScalarNode(*rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+        if (!aBase.mbSupported)
+            return makeUnsupported(eFunction, aBase.meFallbackReason);
+        if (!aBase.moValue)
+            return makeErrorResult(eFunction, aBase.meError);
+        const auto aBaseValue = coerceScalarToNumber(rDoc, rContext, *aBase.moValue);
+        if (!aBaseValue)
+            return makeErrorResult(eFunction, aBaseValue.meError);
+
+        const auto aDecimal = spreadsheetengine::core::convert::evaluateDecimalValue(
+            toApiString(aTextValue.maValue), aBaseValue.maValue);
+        if (!aDecimal)
+            return makeErrorResult(eFunction, aDecimal.meError);
+        return makeNumericResult(eFunction, aDecimal.maValue, SvNumFormatType::NUMBER);
+    }
+
+    if (*oCanonicalName == u"BASE")
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aValue = materializeScalarNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorResult(eFunction, aValue.meError);
+        const auto aValueNumber = coerceScalarToNumber(rDoc, rContext, *aValue.moValue);
+        if (!aValueNumber)
+            return makeErrorResult(eFunction, aValueNumber.meError);
+
+        const auto aBase = materializeScalarNode(*rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+        if (!aBase.mbSupported)
+            return makeUnsupported(eFunction, aBase.meFallbackReason);
+        if (!aBase.moValue)
+            return makeErrorResult(eFunction, aBase.meError);
+        const auto aBaseNumber = coerceScalarToNumber(rDoc, rContext, *aBase.moValue);
+        if (!aBaseNumber)
+            return makeErrorResult(eFunction, aBaseNumber.meError);
+
+        std::optional<double> ofMinLength;
+        if (rNode.maChildren.size() == 3
+            && rNode.maChildren[2]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aMinLength = materializeScalarNode(
+                *rNode.maChildren[2], rDoc, rContext, rFormulaPos);
+            if (!aMinLength.mbSupported)
+                return makeUnsupported(eFunction, aMinLength.meFallbackReason);
+            if (!aMinLength.moValue)
+                return makeErrorResult(eFunction, aMinLength.meError);
+            const auto aMinLengthNumber = coerceScalarToNumber(rDoc, rContext, *aMinLength.moValue);
+            if (!aMinLengthNumber)
+                return makeErrorResult(eFunction, aMinLengthNumber.meError);
+            ofMinLength = aMinLengthNumber.maValue;
+        }
+
+        const auto aBaseText = spreadsheetengine::core::convert::evaluateBaseValue(
+            aValueNumber.maValue, aBaseNumber.maValue, ofMinLength);
+        if (!aBaseText)
+            return makeErrorResult(eFunction, aBaseText.meError);
+        return makeStringResult(eFunction, toLibreOfficeString(aBaseText.maValue));
+    }
+
+    if (*oCanonicalName == u"ROMAN")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aValue = materializeScalarNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorResult(eFunction, aValue.meError);
+        const auto aValueNumber = coerceScalarToNumber(rDoc, rContext, *aValue.moValue);
+        if (!aValueNumber)
+            return makeErrorResult(eFunction, aValueNumber.meError);
+
+        std::optional<double> ofMode;
+        if (rNode.maChildren.size() == 2
+            && rNode.maChildren[1]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aMode = materializeScalarNode(*rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+            if (!aMode.mbSupported)
+                return makeUnsupported(eFunction, aMode.meFallbackReason);
+            if (!aMode.moValue)
+                return makeErrorResult(eFunction, aMode.meError);
+            const auto aModeNumber = coerceScalarToNumber(rDoc, rContext, *aMode.moValue);
+            if (!aModeNumber)
+                return makeErrorResult(eFunction, aModeNumber.meError);
+            ofMode = aModeNumber.maValue;
+        }
+
+        const auto aRoman = spreadsheetengine::core::convert::evaluateRomanValue(
+            aValueNumber.maValue, ofMode);
+        if (!aRoman)
+            return makeErrorResult(eFunction, aRoman.meError);
+        return makeStringResult(eFunction, toLibreOfficeString(aRoman.maValue));
+    }
+
+    if (*oCanonicalName == u"ARABIC")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aRoman = materializeScalarNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+        if (!aRoman.mbSupported)
+            return makeUnsupported(eFunction, aRoman.meFallbackReason);
+        if (!aRoman.moValue)
+            return makeErrorResult(eFunction, aRoman.meError);
+        const auto aRomanText = coerceScalarToText(rDoc, rContext, *aRoman.moValue);
+        if (!aRomanText)
+            return makeErrorResult(eFunction, aRomanText.meError);
+
+        const auto oArabic = spreadsheetengine::core::convert::convertFromRoman(
+            toApiString(aRomanText.maValue));
+        if (!oArabic)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        return makeNumericResult(
+            eFunction, static_cast<double>(*oArabic), SvNumFormatType::NUMBER);
     }
 
     if (*oCanonicalName != u"CONVERT")

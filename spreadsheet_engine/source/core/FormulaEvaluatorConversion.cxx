@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <array>
 
+#include <spreadsheetengine/runtime/NumeralConversion.hxx>
+
 namespace spreadsheetengine::core::eval
 {
 namespace
@@ -37,6 +39,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateConversionFamily(
         api::StringView(u"DEC2HEX"),
         api::StringView(u"BASE"),
         api::StringView(u"ROMAN"),
+        api::StringView(u"ARABIC"),
     };
     if (!matchesFunctionRegistry(rFunctionName, kConversionFunctions))
         return std::nullopt;
@@ -313,7 +316,27 @@ if (aFunctionName == u"EUROCONVERT")
         return makeScalarResult(api::CellValue::text(aResult.maValue));
     }
 
-        return makeFailure(api::Error::IllegalArgument);
+    if (aFunctionName == u"ARABIC")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aRomanArgument
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
+        if (!aRomanArgument)
+            return aRomanArgument;
+
+        const auto aRoman = coerceToString(aRomanArgument.maValue.maValue);
+        if (!aRoman)
+            return makeFailure(aRoman.meError);
+
+        const auto oArabic = seconvert::convertFromRoman(aRoman.maValue);
+        if (!oArabic)
+            return makeFailure(api::Error::IllegalArgument);
+        return makeScalarResult(api::CellValue::number(static_cast<double>(*oArabic)));
+    }
+
+    return makeFailure(api::Error::IllegalArgument);
 }
 
 } // namespace spreadsheetengine::core::eval

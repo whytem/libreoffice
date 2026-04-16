@@ -71,6 +71,7 @@
 #include <tokenarray.hxx>
 #include <compiler.hxx>
 #include <spreadsheetengine/runtime/ConversionRuntime.hxx>
+#include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx>
@@ -4050,22 +4051,25 @@ StackVar ScInterpreter::Interpret()
                             PushIllegalArgument();
                     };
                 const auto pushLegacyConvert = [&]() {
-                    if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
-                        && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
-                        && !pMyFormulaCell->IsHyperLinkCell()
-                        && !mrDoc.IsThreadedGroupCalcInProgress())
-                    {
-                        const OUString aFormulaSource
-                            = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
-                        if (setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
-                                aFormulaSource.getStr(), aFormulaSource.getLength())))
+                    const auto aMaybeWarn = [&]() {
+                        if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
+                            && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
+                            && !pMyFormulaCell->IsHyperLinkCell()
+                            && !mrDoc.IsThreadedGroupCalcInProgress())
                         {
-                            SAL_WARN("sc.core",
-                                "family-local default-on CONVERT reached ScInterpreter for "
-                                    << aFormulaSource);
-                            OSL_FAIL("family-local default-on CONVERT reached ScInterpreter");
+                            const OUString aFormulaSource
+                                = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
+                            if (setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
+                                    aFormulaSource.getStr(), aFormulaSource.getLength())))
+                            {
+                                SAL_WARN("sc.core",
+                                    "family-local default-on CONVERT reached ScInterpreter for "
+                                        << aFormulaSource);
+                                OSL_FAIL("family-local default-on CONVERT reached ScInterpreter");
+                            }
                         }
-                    }
+                    };
+                    aMaybeWarn();
 
                     if (!MustHaveParamCount(GetByte(), 3))
                         return;
@@ -4084,6 +4088,27 @@ StackVar ScInterpreter::Interpret()
                             PushDouble(fVal / fConv);
                         else
                             PushNA();
+                    }
+                };
+                const auto pushLegacyNumeralConversion = [&](std::u16string_view rFunctionName) {
+                    if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
+                        && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
+                        && !pMyFormulaCell->IsHyperLinkCell()
+                        && !mrDoc.IsThreadedGroupCalcInProgress())
+                    {
+                        const OUString aFormulaSource
+                            = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
+                        if (setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
+                                aFormulaSource.getStr(), aFormulaSource.getLength())))
+                        {
+                            SAL_WARN(
+                                "sc.core",
+                                "family-local default-on "
+                                    << OUString(rFunctionName.data(), rFunctionName.size())
+                                    << " reached ScInterpreter for " << aFormulaSource);
+                            OSL_FAIL("family-local default-on numeral conversion reached "
+                                     "ScInterpreter");
+                        }
                     }
                 };
                 const auto pushLegacyRoundSignificant = [&]() {
@@ -4125,22 +4150,7 @@ StackVar ScInterpreter::Interpret()
                     }
                 };
                 const auto pushLegacyEuroConvert = [&]() {
-                    if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
-                        && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
-                        && !pMyFormulaCell->IsHyperLinkCell()
-                        && !mrDoc.IsThreadedGroupCalcInProgress())
-                    {
-                        const OUString aFormulaSource
-                            = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
-                        if (setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
-                                aFormulaSource.getStr(), aFormulaSource.getLength())))
-                        {
-                            SAL_WARN("sc.core",
-                                "family-local default-on EUROCONVERT reached ScInterpreter for "
-                                    << aFormulaSource);
-                            OSL_FAIL("family-local default-on EUROCONVERT reached ScInterpreter");
-                        }
-                    }
+                    pushLegacyNumeralConversion(u"EUROCONVERT");
 
                     sal_uInt8 nParamCount = GetByte();
                     if (!MustHaveParamCount(nParamCount, 3, 5))
@@ -4201,6 +4211,97 @@ StackVar ScInterpreter::Interpret()
                     }
 
                     PushDouble(fRes);
+                };
+                const auto pushLegacyBase = [&]() {
+                    pushLegacyNumeralConversion(u"BASE");
+
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 2, 3))
+                        return;
+
+                    std::optional<double> ofMinLength;
+                    if (nParamCount == 3)
+                        ofMinLength = GetDouble();
+                    const double fBase = GetDouble();
+                    const double fValue = GetDouble();
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+
+                    const auto aResult = seconvert::evaluateBaseValue(fValue, fBase, ofMinLength);
+                    if (aResult)
+                        PushString(selibreoffice::toLibreOfficeString(aResult.maValue));
+                    else if (aResult.meError == spreadsheetengine::api::Error::StringOverflow)
+                        PushError(FormulaError::StringOverflow);
+                    else
+                        PushIllegalArgument();
+                };
+                const auto pushLegacyDecimal = [&]() {
+                    pushLegacyNumeralConversion(u"DECIMAL");
+
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+
+                    const double fBase = GetDouble();
+                    const OUString aText = GetString().getString();
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+
+                    const auto aResult
+                        = seconvert::evaluateDecimalValue(selibreoffice::toApiString(aText), fBase);
+                    if (aResult)
+                        PushDouble(aResult.maValue);
+                    else
+                        PushIllegalArgument();
+                };
+                const auto pushLegacyRoman = [&]() {
+                    pushLegacyNumeralConversion(u"ROMAN");
+
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 2))
+                        return;
+
+                    std::optional<double> ofMode;
+                    if (nParamCount == 2)
+                        ofMode = GetDouble();
+                    const double fValue = GetDouble();
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushError(nGlobalError);
+                        return;
+                    }
+
+                    const auto aResult = seconvert::evaluateRomanValue(fValue, ofMode);
+                    if (aResult)
+                        PushString(selibreoffice::toLibreOfficeString(aResult.maValue));
+                    else
+                        PushIllegalArgument();
+                };
+                const auto pushLegacyArabic = [&]() {
+                    pushLegacyNumeralConversion(u"ARABIC");
+
+                    if (!MustHaveParamCount(GetByte(), 1))
+                        return;
+
+                    const OUString aRoman = GetString().getString();
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushError(nGlobalError);
+                        return;
+                    }
+
+                    if (const auto oArabic
+                        = seconvert::convertFromRoman(selibreoffice::toApiString(aRoman)))
+                    {
+                        PushInt(*oArabic);
+                    }
+                    else
+                        PushIllegalArgument();
                 };
                 const auto pushLegacyFormulaText = [&]() {
                     if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
@@ -4723,12 +4824,12 @@ StackVar ScInterpreter::Interpret()
                     case ocCurrent          : ScCurrent();                  break;
                     case ocStyle            : ScStyle();                    break;
                     case ocDde              : ScDde();                      break;
-                    case ocBase             : ScBase();                     break;
-                    case ocDecimal          : ScDecimal();                  break;
+                    case ocBase             : pushLegacyBase();             break;
+                    case ocDecimal          : pushLegacyDecimal();          break;
                     case ocConvertOOo       : pushLegacyConvert();          break;
                     case ocEuroConvert      : pushLegacyEuroConvert();      break;
-                    case ocRoman            : ScRoman();                    break;
-                    case ocArabic           : ScArabic();                   break;
+                    case ocRoman            : pushLegacyRoman();            break;
+                    case ocArabic           : pushLegacyArabic();           break;
                     case ocInfo             : ScInfo();                     break;
                     case ocHyperLink        : ScHyperLink();                break;
                     case ocBahtText         : ScBahtText();                 break;

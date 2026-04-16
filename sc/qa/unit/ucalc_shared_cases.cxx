@@ -2996,11 +2996,47 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConversion
         aEuroConvertPrecision.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(23964.0, aEuroConvertPrecision.maResult.mfValue, 1e-12);
 
+    const auto aDecimal = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=DECIMAL(\"FF\";16)", false);
+    CPPUNIT_ASSERT(aDecimal.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conversion, aDecimal.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aDecimal.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(255.0, aDecimal.maResult.mfValue, 1e-12);
+
+    const auto aBase = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=BASE(255;16;4)", false);
+    CPPUNIT_ASSERT(aBase.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conversion, aBase.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aBase.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        u"00FF"_ustr, spreadsheetengine::compat::libreoffice::toLibreOfficeString(aBase.maResult.maString));
+
+    const auto aRoman = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ROMAN(1999)", false);
+    CPPUNIT_ASSERT(aRoman.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conversion, aRoman.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aRoman.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        u"MCMXCIX"_ustr, spreadsheetengine::compat::libreoffice::toLibreOfficeString(aRoman.maResult.maString));
+
+    const auto aArabic = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ARABIC(\"MCMXCIX\")", false);
+    CPPUNIT_ASSERT(aArabic.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conversion, aArabic.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aArabic.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1999.0, aArabic.maResult.mfValue, 1e-12);
+
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=CONVERT(1;\"m\";\"mi\")"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(
         u"=ORG.OPENOFFICE.CONVERT(100;\"ATS\";\"EUR\")"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(
         u"=EUROCONVERT(100;\"ATS\";\"EUR\")"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=BASE(255;16;4)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=ARABIC(\"MCMXCIX\")"));
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorAggregateHelper)

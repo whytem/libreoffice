@@ -615,8 +615,6 @@ private:
     void ScIsRef();
     void ScIsValue();
     void ScIsFormula();
-    void ScRoman();
-    void ScArabic();
     void ScIsNV();
     void ScIsErr();
     void ScIsError();
@@ -853,8 +851,6 @@ public:
     void ScCurrent();
     void ScStyle();
     void ScDde();
-    void ScBase();
-    void ScDecimal();
     static void RoundSignificant( double fX, double fDigits, double &fRes );
 
     // financial functions
