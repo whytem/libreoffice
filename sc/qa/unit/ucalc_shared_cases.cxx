@@ -3284,6 +3284,67 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCriteriaAg
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aRangeCriteriaCountIfs.maResult.mfValue, 1e-12);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSelectorHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailSelectorHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(4, 0, 0);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(1, 0, 0, 2.0);
+    m_pDoc->SetValue(2, 0, 0, 3.0);
+    m_pDoc->SetValue(0, 1, 0, 4.0);
+    m_pDoc->SetValue(1, 1, 0, 5.0);
+    m_pDoc->SetValue(2, 1, 0, 6.0);
+    m_pDoc->SetValue(0, 2, 0, 7.0);
+    m_pDoc->SetValue(1, 2, 0, 8.0);
+    m_pDoc->SetValue(2, 2, 0, 9.0);
+
+    const auto aChooseCols = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=CHOOSECOLS(A1:C3;3;1)", false);
+    CPPUNIT_ASSERT(aChooseCols.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Selector, aChooseCols.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aChooseCols.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, aChooseCols.maResult.mfValue, 1e-12);
+
+    const auto aChooseColsAlias = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.CHOOSECOLS(A1:C3;{2|1})", false);
+    CPPUNIT_ASSERT(aChooseColsAlias.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Selector, aChooseColsAlias.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aChooseColsAlias.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aChooseColsAlias.maResult.mfValue, 1e-12);
+
+    const auto aChooseRows = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=CHOOSEROWS(A1:C3;3;1)", false);
+    CPPUNIT_ASSERT(aChooseRows.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Selector, aChooseRows.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aChooseRows.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(7.0, aChooseRows.maResult.mfValue, 1e-12);
+
+    const auto aChooseRowsAlias = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.CHOOSEROWS(A1:C3;{-1|2})", false);
+    CPPUNIT_ASSERT(aChooseRowsAlias.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Selector, aChooseRowsAlias.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aChooseRowsAlias.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(7.0, aChooseRowsAlias.maResult.mfValue, 1e-12);
+
+    const auto aInvalid = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=CHOOSECOLS(A1:C3;0)", false);
+    CPPUNIT_ASSERT(aInvalid.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Selector, aInvalid.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error, aInvalid.maResult.meType);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConditionalHelper)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

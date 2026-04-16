@@ -38,6 +38,7 @@
 #include <tokenarray.hxx>
 
 #include <spreadsheetengine/api/FormulaResult.hxx>
+#include <spreadsheetengine/api/Array.hxx>
 #include <spreadsheetengine/api/Math.hxx>
 #include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Calendar.hxx>
@@ -132,6 +133,7 @@ enum class FunctionKind : sal_uInt8
     Not,
     Match,
     XMatch,
+    Selector,
     Lookup,
     VLookup,
     HLookup,
@@ -760,6 +762,17 @@ canonicalConversionFunctionName(api::StringView rFunctionName)
     return std::nullopt;
 }
 
+[[nodiscard]] inline std::optional<api::StringView>
+canonicalSelectorFunctionName(api::StringView rFunctionName)
+{
+    if (rFunctionName == u"CHOOSECOLS" || rFunctionName == u"COM.MICROSOFT.CHOOSECOLS")
+        return api::StringView(u"CHOOSECOLS");
+    if (rFunctionName == u"CHOOSEROWS" || rFunctionName == u"COM.MICROSOFT.CHOOSEROWS")
+        return api::StringView(u"CHOOSEROWS");
+
+    return std::nullopt;
+}
+
 [[nodiscard]] inline FunctionKind classifyFunction(api::StringView rFunctionName)
 {
     if (rFunctionName == u"IF")
@@ -895,6 +908,8 @@ canonicalConversionFunctionName(api::StringView rFunctionName)
         return FunctionKind::Match;
     if (rFunctionName == u"XMATCH" || rFunctionName == u"COM.MICROSOFT.XMATCH")
         return FunctionKind::XMatch;
+    if (canonicalSelectorFunctionName(rFunctionName))
+        return FunctionKind::Selector;
     if (rFunctionName == u"LOOKUP")
         return FunctionKind::Lookup;
     if (rFunctionName == u"VLOOKUP")
@@ -2711,7 +2726,8 @@ inline void putScalarIntoMatrix(
                 || eFunction == FunctionKind::BusinessDay
                 || eFunction == FunctionKind::CalendarUtility
                 || eFunction == FunctionKind::DateDifference
-                || eFunction == FunctionKind::DateConstructExtract)
+                || eFunction == FunctionKind::DateConstructExtract
+                || eFunction == FunctionKind::Selector)
             {
                 auto aAttempt = evaluateFunctionNode(
                     rNode, rDoc, rContext, rFormulaPos, rDoc.GetCalcConfig().mbEmptyStringAsZero);
@@ -3430,6 +3446,145 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
     return materializeMatrixSlice(*aMatrixSource.moValue, aSelection.maValue);
 }
 
+[[nodiscard]] inline Materialization<ScMatrixRef> materializeSelectorMatrixFunctionCall(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    if (rNode.maChildren.size() < 2)
+    {
+        return makeMaterializedValue(
+            makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+    }
+
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    const auto oCanonical = canonicalSelectorFunctionName(aFunctionName);
+    if (!oCanonical)
+        return makeUnsupportedMaterialization<ScMatrixRef>(FallbackReason::UnsupportedFunction);
+    const bool bChooseColumns = *oCanonical == u"CHOOSECOLS";
+
+    const auto aSource = materializeMatrixNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+    if (!aSource.mbSupported)
+        return makeUnsupportedMaterialization<ScMatrixRef>(aSource.meFallbackReason);
+    if (!aSource.moValue)
+        return makeMaterializedError<ScMatrixRef>(aSource.meError);
+
+    SCSIZE nSourceColumns = 0;
+    SCSIZE nSourceRows = 0;
+    (*aSource.moValue)->GetDimensions(nSourceColumns, nSourceRows);
+    if (nSourceColumns < 1 || nSourceRows < 1)
+    {
+        return makeMaterializedValue(
+            makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+    }
+
+    const api::MatrixSize nSelectableDimension = static_cast<api::MatrixSize>(
+        bChooseColumns ? nSourceColumns : nSourceRows);
+    std::vector<api::MatrixSize> aSelections;
+    for (std::size_t nIndex = 1; nIndex < rNode.maChildren.size(); ++nIndex)
+    {
+        const auto& rxChild = rNode.maChildren[nIndex];
+        if (!rxChild || rxChild->meKind == core::formula::NodeKind::EmptyArgument)
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+        }
+
+        const auto aSelectionMatrix = materializeMatrixNode(*rxChild, rDoc, rContext, rFormulaPos);
+        if (!aSelectionMatrix.mbSupported)
+        {
+            return makeUnsupportedMaterialization<ScMatrixRef>(aSelectionMatrix.meFallbackReason);
+        }
+        if (!aSelectionMatrix.moValue)
+            return makeMaterializedError<ScMatrixRef>(aSelectionMatrix.meError);
+
+        SCSIZE nSelectionColumns = 0;
+        SCSIZE nSelectionRows = 0;
+        (*aSelectionMatrix.moValue)->GetDimensions(nSelectionColumns, nSelectionRows);
+        for (SCSIZE nRow = 0; nRow < nSelectionRows; ++nRow)
+        {
+            for (SCSIZE nColumn = 0; nColumn < nSelectionColumns; ++nColumn)
+            {
+                const auto aValue = lookupexecution::detail::toApiCellValue(
+                    (*aSelectionMatrix.moValue)->Get(nColumn, nRow));
+                if (aValue.isError())
+                {
+                    return makeMaterializedValue(makeSingleValueMatrix(aValue));
+                }
+                if (aValue.isEmpty() || aValue.isText())
+                {
+                    return makeMaterializedValue(makeSingleValueMatrix(
+                        api::CellValue::error(api::Error::IllegalArgument)));
+                }
+
+                const auto aNumber = coerceScalarToNumber(rDoc, rContext, aValue);
+                if (!aNumber)
+                {
+                    return makeMaterializedValue(makeSingleValueMatrix(
+                        api::CellValue::error(aNumber.meError)));
+                }
+                if (!std::isfinite(aNumber.maValue)
+                    || aNumber.maValue < static_cast<double>(std::numeric_limits<std::int32_t>::min())
+                    || aNumber.maValue > static_cast<double>(std::numeric_limits<std::int32_t>::max()))
+                {
+                    return makeMaterializedValue(makeSingleValueMatrix(
+                        api::CellValue::error(api::Error::IllegalArgument)));
+                }
+
+                const std::int32_t nRequestedIndex = static_cast<std::int32_t>(aNumber.maValue);
+                const auto aSelection = api::array::normalizeSelectionIndex(
+                    nRequestedIndex, nSelectableDimension);
+                if (!aSelection)
+                {
+                    return makeMaterializedValue(makeSingleValueMatrix(
+                        api::CellValue::error(aSelection.meError)));
+                }
+
+                aSelections.push_back(aSelection.maValue);
+            }
+        }
+    }
+
+    if (aSelections.empty())
+    {
+        return makeMaterializedValue(
+            makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+    }
+
+    const SCSIZE nResultColumns
+        = bChooseColumns ? static_cast<SCSIZE>(aSelections.size()) : nSourceColumns;
+    const SCSIZE nResultRows
+        = bChooseColumns ? nSourceRows : static_cast<SCSIZE>(aSelections.size());
+    ScMatrixRef xMatrix(new ScMatrix(nResultColumns, nResultRows));
+    if (bChooseColumns)
+    {
+        for (std::size_t nSelectionIndex = 0; nSelectionIndex < aSelections.size(); ++nSelectionIndex)
+        {
+            const SCSIZE nSourceColumn = static_cast<SCSIZE>(aSelections[nSelectionIndex]);
+            for (SCSIZE nRow = 0; nRow < nSourceRows; ++nRow)
+            {
+                putScalarIntoMatrix(lookupexecution::detail::toApiCellValue(
+                                        (*aSource.moValue)->Get(nSourceColumn, nRow)),
+                    xMatrix, static_cast<SCSIZE>(nSelectionIndex), nRow);
+            }
+        }
+    }
+    else
+    {
+        for (std::size_t nSelectionIndex = 0; nSelectionIndex < aSelections.size(); ++nSelectionIndex)
+        {
+            const SCSIZE nSourceRow = static_cast<SCSIZE>(aSelections[nSelectionIndex]);
+            for (SCSIZE nColumn = 0; nColumn < nSourceColumns; ++nColumn)
+            {
+                putScalarIntoMatrix(lookupexecution::detail::toApiCellValue(
+                                        (*aSource.moValue)->Get(nColumn, nSourceRow)),
+                    xMatrix, nColumn, static_cast<SCSIZE>(nSelectionIndex));
+            }
+        }
+    }
+
+    return makeMaterializedValue(xMatrix);
+}
+
 [[nodiscard]] inline Materialization<ScMatrixRef> materializeIsNumberMatrixFunctionCall(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
@@ -3473,6 +3628,8 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
         return materializeXLookupMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
     if (eFunction == FunctionKind::Index)
         return materializeIndexMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
+    if (eFunction == FunctionKind::Selector)
+        return materializeSelectorMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
     if (aFunctionName == u"ISNUMBER")
         return materializeIsNumberMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
     if (aFunctionName == u"IF")
@@ -8849,6 +9006,26 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
 }
 
+[[nodiscard]] inline EvaluationAttempt evaluateSelectorFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
+{
+    const auto aMatrix = materializeSelectorMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
+    if (!aMatrix.mbSupported)
+        return makeUnsupported(eFunction, aMatrix.meFallbackReason);
+    if (!aMatrix.moValue)
+        return makeErrorResult(eFunction, aMatrix.meError);
+
+    SCSIZE nColumns = 0;
+    SCSIZE nRows = 0;
+    (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+    if (nColumns < 1 || nRows < 1)
+        return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+    return makeScalarAttempt(
+        eFunction, lookupexecution::detail::toApiCellValue((*aMatrix.moValue)->Get(0, 0)));
+}
+
 [[nodiscard]] inline EvaluationAttempt evaluateFunctionNode(
     const core::formula::Node& rRoot, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos, bool bEmptyStringAsZero, bool bImportedCanonicalSource)
@@ -8944,6 +9121,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             return evaluateScalarUtilityFunction(
                 rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero,
                 bImportedCanonicalSource);
+        case FunctionKind::Selector:
+            return evaluateSelectorFunction(rRoot, eFunction, rDoc, rContext, rFormulaPos);
         case FunctionKind::Match:
         case FunctionKind::XMatch:
         case FunctionKind::Lookup:
