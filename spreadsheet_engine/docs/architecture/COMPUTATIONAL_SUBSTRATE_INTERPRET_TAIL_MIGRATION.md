@@ -50,7 +50,8 @@ Today:
   falling out as generic host-surface fallout
 - the latest deliberate family expansion materially raised the ambient live
   denominator instead of only refining replay-imported parity inside already-
-  promoted families
+  promoted families, and the next routing slice now also admits bounded
+  `matrix_math` / `MDETERM`
 
 What is still not true:
 
@@ -69,9 +70,10 @@ What is still not true:
   `ScBitOr()` / `ScBitXor()` / `ScBitLshift()` / `ScBitRshift()`
   wrappers; broader legacy retirement has not started
 - the full replay corpus now shows strong ambient live-seam traffic, but most
-  retained fallback now lives inside the newly admitted scalar utility traffic
-- the next dominant live blocker is no longer simple reach; it is the quality
-  of logical-fold, round, and related scalar utility support
+  retained fallback now lives inside the remaining ambient
+  `unsupported_function` wall rather than simple denominator reach
+- the next dominant live blocker is no longer simple reach; it is the
+  remaining bounded-family admission work led by `PROB` and `GROWTH`
 - no promoted family has moved from observe-only replay reach into a broader
   replay authority lane yet
 
@@ -164,6 +166,8 @@ The currently promoted live evaluator family includes:
   - `LARGE`
   - `SMALL`
   - `RANK*`
+- matrix math:
+  - `MDETERM`
 - lookup and index:
   - `MATCH`
   - `XMATCH`
@@ -195,11 +199,11 @@ Two different denominators matter, and both are now reported.
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=26996`
+- `interpret_tail_live_authoritative_probe_formula_cells=27008`
 - `interpret_tail_live_authoritative_match_total=20762`
-- `interpret_tail_live_authoritative_fallback_total=6234`
+- `interpret_tail_live_authoritative_fallback_total=6246`
 - live authoritative-match rate over the corpus: `40.9822%`
-- live authoritative-match rate over the current promoted probe: `76.9077%`
+- live authoritative-match rate over the current promoted probe: `76.8735%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -208,20 +212,20 @@ Everything below is diagnostic context for improving that number.
 These are attempt totals from live observe, not unique-cell coverage:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=92032`
-- `interpret_tail_live_fallback_total=354`
-- `interpret_tail_live_seen_total=92386`
+- `interpret_tail_live_supported_total=92062`
+- `interpret_tail_live_fallback_total=348`
+- `interpret_tail_live_seen_total=92410`
 - `interpret_tail_live_unseen_formula_cells=0`
-- `interpret_tail_live_promoted_function_supported_total=91430`
-- `interpret_tail_live_supported_rate=181.66`
-- `interpret_tail_live_seen_rate=182.36`
+- `interpret_tail_live_promoted_function_supported_total=91460`
+- `interpret_tail_live_supported_rate=181.72`
+- `interpret_tail_live_seen_rate=182.41`
 
 Current ambient fallback reasons:
 
-- `unsupported_formula_shape=80`
+- `unsupported_formula_shape=88`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=270`
+- `unsupported_function=256`
 
 ### Full Replay Corpus: Live Unique-Cell Surface
 
@@ -230,13 +234,13 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=27417`
-- `interpret_tail_live_unique_supported_formula_cells=27245`
-- `interpret_tail_live_unique_fallback_formula_cells=172`
-- `interpret_tail_live_unique_unsupported_function_formula_cells=135`
+- `interpret_tail_live_unique_seen_formula_cells=27422`
+- `interpret_tail_live_unique_supported_formula_cells=27255`
+- `interpret_tail_live_unique_fallback_formula_cells=167`
+- `interpret_tail_live_unique_unsupported_function_formula_cells=128`
 - `interpret_tail_live_unique_unseen_formula_cells=23284`
-- `interpret_tail_live_unique_seen_rate=54.12`
-- `interpret_tail_live_unique_supported_rate=53.78`
+- `interpret_tail_live_unique_seen_rate=54.14`
+- `interpret_tail_live_unique_supported_rate=53.80`
 
 Interpretation:
 
@@ -262,6 +266,9 @@ Interpretation:
   the live unique surface as `selector=62` cells, `58` supported / `4`
   fallback, and reduced the remaining live unique `unknown` wall from
   `130` to `108`
+- the new bounded `matrix_math` slice now admits `MDETERM`, contributing
+  `12` live unique seen cells with `10` supported and `2` fallback, and
+  reduces that same `unknown` wall from `108` to `101`
 - a new bounded statistical aggregate slice now admits `MAX` / `MIN`,
   `MEDIAN`, `GEOMEAN` / `HARMEAN`, and `VAR*` / `STDEV*`, while the ranked
   aggregate lane now also covers `LARGE` / `SMALL` / `RANK*`
@@ -281,20 +288,22 @@ Interpretation:
 - the latest bounded ambient wall move now also admits `CONVERT`, which
   contributes `308` live unique seen cells with `308` supported and `0`
   fallback, plus a bounded `AGGREGATE` slice contributing `212` live unique
-  seen cells with `211` supported and `1` fallback, while focused
-  `ROUNDSIG` / `ORG.LIBREOFFICE.ROUNDSIG` live-seam coverage is now pinned in
-  the validation suite
+  seen cells with `211` supported and `1` fallback, and now a bounded
+  `matrix_math` slice contributing `12` live unique seen cells with `10`
+  supported and `2` fallback, while focused `ROUNDSIG` /
+  `ORG.LIBREOFFICE.ROUNDSIG` live-seam coverage is now pinned in the
+  validation suite
 - the live unique unsupported-function routing table is now explicit:
-  `unknown=108`, `text_utility=19`, `conditional=8`; that ordering now drives
+  `unknown=101`, `text_utility=19`, `conditional=8`; that ordering now drives
   the next ambient family-selection work instead of intuition
 - the bounded selector cluster `CHOOSECOLS` / `CHOOSEROWS` is now admitted as
   `selector=62` live unique cells, `58` supported / `4` fallback
 - the remaining `unknown` bucket is now split by live unique root name:
-  `MDETERM=7`, `UNIQUE=7`, `SORT=6`, `SORTBY=6`, `PROB=6`, `TEXTSPLIT=4`,
+  `UNIQUE=7`, `SORT=6`, `SORTBY=6`, `PROB=6`, `TEXTSPLIT=4`,
   `HSTACK=4`, `GROWTH=4`, `TEXTAFTER=3`, `FORECAST.ETS.MULT=3`
 - that makes the next routing policy concrete:
-  first `MDETERM` / `PROB` / `GROWTH`, and only then the heavier spill
-  cluster (`UNIQUE`, `SORT`, `SORTBY`, `TEXTSPLIT`, `HSTACK`)
+  first `PROB`, then `GROWTH`, and only then the heavier spill cluster
+  (`UNIQUE`, `SORT`, `SORTBY`, `TEXTSPLIT`, `HSTACK`)
 - the main remaining ambient work is now the still-large
   `unsupported_function` wall plus the still-heavy mismatch buckets inside the
   imported host-truth-artifact probe band, not simple denominator reach
@@ -331,27 +340,27 @@ replay formula cell once, then classifying whether that formula cell was
 actually seen and supported by the seam:
 
 - `interpret_tail_forced_direct_formula_cells=50661`
-- `interpret_tail_forced_direct_seen_formula_cells=27361`
-- `interpret_tail_forced_direct_supported_formula_cells=27189`
-- `interpret_tail_forced_direct_fallback_formula_cells=172`
+- `interpret_tail_forced_direct_seen_formula_cells=27366`
+- `interpret_tail_forced_direct_supported_formula_cells=27199`
+- `interpret_tail_forced_direct_fallback_formula_cells=167`
 - `interpret_tail_forced_direct_unseen_formula_cells=23284`
-- `interpret_tail_forced_direct_seen_rate=54.01`
-- `interpret_tail_forced_direct_supported_rate=53.67`
+- `interpret_tail_forced_direct_seen_rate=54.02`
+- `interpret_tail_forced_direct_supported_rate=53.69`
 
 ### Raw Cached-Workbook Promoted Probe
 
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
-- `interpret_tail_probe_formula_cells=26996`
-- `interpret_tail_authoritative_total=5414`
-- `interpret_tail_authoritative_fallback_total=21582`
-- raw promoted authoritative rate: `20.05%`
+- `interpret_tail_probe_formula_cells=27008`
+- `interpret_tail_authoritative_total=5423`
+- `interpret_tail_authoritative_fallback_total=21585`
+- raw promoted authoritative rate: `20.08%`
 
 Current promoted-family fallback reasons:
 
 - `shadow_mismatch=21530`
 - `unsupported_function=27`
-- `unsupported_formula_shape=25`
+- `unsupported_formula_shape=28`
 - `unsupported_host_surface=0`
 
 ### Live-Reachable vs Imported-Artifact Promoted Probe
@@ -360,7 +369,7 @@ This is the same promoted replay probe, explicitly split into the only two
 surfaces that are still interpretable:
 
 - `interpret_tail_probe_live_reachable_formula_cells=0`
-- `interpret_tail_probe_imported_artifact_formula_cells=26996`
+- `interpret_tail_probe_imported_artifact_formula_cells=27008`
 - `interpret_tail_live_target_authoritative_total=0`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 - live-reachable promoted rate: `0.00%`
@@ -376,6 +385,8 @@ Interpretation:
   imported-artifact-only buckets
 - the dominant `shadow_mismatch=21530` residual is overwhelmingly imported
   cached-workbook debt, not live-reachable parity failure
+- the raw promoted authoritative rate has only nudged to `20.08%`, so this
+  surface remains useful for diagnostics but not for retirement steering
 - the dominant remaining raw mismatch buckets are now `math_scalar=172`,
   `logical_fold=53`, `information_predicate=37`, and `lookup=0`, with
   round-family fallback still at `0`
@@ -437,20 +448,20 @@ This is the new per-cell replay inventory over the promoted-family replay
 surface after forcing each promoted replay formula through direct live
 `Interpret()`:
 
-- `interpret_tail_replay_promoted_formula_cells=26996`
-- `interpret_tail_replay_promoted_direct_seen=26940`
-- `interpret_tail_replay_promoted_direct_supported=26888`
-- `interpret_tail_replay_promoted_direct_fallback=52`
+- `interpret_tail_replay_promoted_formula_cells=27008`
+- `interpret_tail_replay_promoted_direct_seen=26952`
+- `interpret_tail_replay_promoted_direct_supported=26898`
+- `interpret_tail_replay_promoted_direct_fallback=54`
 - `interpret_tail_replay_promoted_direct_unseen=56`
-- `interpret_tail_replay_promoted_shared_formula_cells=21753`
+- `interpret_tail_replay_promoted_shared_formula_cells=21758`
 - `interpret_tail_replay_promoted_shared_top_formula_cells=1609`
 - `interpret_tail_replay_promoted_shared_member_formula_cells=20144`
-- `interpret_tail_replay_promoted_non_shared_formula_cells=5243`
+- `interpret_tail_replay_promoted_non_shared_formula_cells=5250`
 - `interpret_tail_replay_promoted_unseen_shared_top=5`
 - `interpret_tail_replay_promoted_unseen_shared_member=27`
 - `interpret_tail_replay_promoted_unseen_non_shared=24`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=8`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=26996`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=27008`
 - `interpret_tail_replay_promoted_dirty_after_interpret=56`
 
 Interpretation:
@@ -465,8 +476,9 @@ Interpretation:
   broader imported promoted-family surface, no longer dominated by a
   `BusinessDay` gating artifact
 - the dominant next target is now the broader ambient
-  `unsupported_function` wall, with `BusinessDay` now both measurable and
-  mostly admitted on the default ambient surface
+  `unsupported_function` wall, now led by `PROB` and then `GROWTH`, with
+  `BusinessDay` now both measurable and mostly admitted on the default
+  ambient surface
 
 ## Hard-Routed Family
 
