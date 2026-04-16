@@ -3240,6 +3240,47 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorGrowthHelp
         spreadsheetengine::api::formulavalue::ValueType::Error, aInvalid.maResult.meType);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorForecastHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailForecastHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(7, 0, 0);
+
+    m_pDoc->SetValue(0, 0, 0, 3.0);
+    m_pDoc->SetValue(0, 1, 0, 5.0);
+    m_pDoc->SetValue(0, 2, 0, 7.0);
+    m_pDoc->SetValue(1, 0, 0, 1.0);
+    m_pDoc->SetValue(1, 1, 0, 2.0);
+    m_pDoc->SetValue(1, 2, 0, 3.0);
+
+    const auto aIntercept = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=INTERCEPT(A1:A3;B1:B3)", false);
+    CPPUNIT_ASSERT(aIntercept.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalDistribution,
+        aIntercept.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aIntercept.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aIntercept.maResult.mfValue, 1e-12);
+
+    const auto aForecast = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=FORECAST(4;A1:A3;B1:B3)", false);
+    CPPUNIT_ASSERT(aForecast.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalDistribution, aForecast.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aForecast.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(9.0, aForecast.maResult.mfValue, 1e-12);
+
+    const auto aInvalid = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=INTERCEPT({1;2};{1;2;3})", false);
+    CPPUNIT_ASSERT(aInvalid.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalDistribution, aInvalid.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error, aInvalid.maResult.meType);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCriteriaAggregateHelper)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

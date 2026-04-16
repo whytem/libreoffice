@@ -879,6 +879,7 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
         || rFunctionName == u"POISSON" || rFunctionName == u"POISSON.DIST"
         || rFunctionName == u"BINOMDIST" || rFunctionName == u"BINOM.DIST"
         || rFunctionName == u"BINOM.DIST.RANGE" || rFunctionName == u"B"
+        || rFunctionName == u"INTERCEPT" || rFunctionName == u"FORECAST"
         || rFunctionName == u"BETADIST" || rFunctionName == u"BETA.DIST"
         || rFunctionName == u"PROB")
     {
@@ -8511,6 +8512,120 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const auto makeUnsupportedAttempt = [&](FallbackReason eReason) {
         return makeUnsupported(eFunction, eReason);
     };
+    const auto materializeOneDimensionalValueSequence =
+        [&](const core::formula::Node& rArgument) -> Materialization<std::vector<api::CellValue>> {
+        const auto aMatrix = materializeMatrixNode(rArgument, rDoc, rContext, rFormulaPos);
+        if (!aMatrix.mbSupported)
+        {
+            return makeUnsupportedMaterialization<std::vector<api::CellValue>>(
+                aMatrix.meFallbackReason);
+        }
+        if (!aMatrix.moValue)
+            return makeMaterializedError<std::vector<api::CellValue>>(aMatrix.meError);
+
+        SCSIZE nColumns = 0;
+        SCSIZE nRows = 0;
+        (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+        if (nColumns == 0 || nRows == 0)
+            return makeMaterializedError<std::vector<api::CellValue>>(api::Error::IllegalArgument);
+        if (nColumns != 1 && nRows != 1)
+        {
+            return makeUnsupportedMaterialization<std::vector<api::CellValue>>(
+                FallbackReason::UnsupportedFormulaShape);
+        }
+
+        std::vector<api::CellValue> aValues;
+        aValues.reserve(nColumns * nRows);
+        for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+        {
+            for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                aValues.push_back(
+                    lookupexecution::detail::toApiCellValue((*aMatrix.moValue)->Get(nColumn, nRow)));
+        }
+        return makeMaterializedValue(std::move(aValues));
+    };
+
+    struct RegressionStats
+    {
+        double fCount = 0.0;
+        double fMeanX = 0.0;
+        double fMeanY = 0.0;
+        double fSumDeltaXDeltaY = 0.0;
+        double fSumSqrDeltaX = 0.0;
+    };
+
+    const auto collectRegressionStats =
+        [&](const core::formula::Node& rKnownY, const core::formula::Node& rKnownX)
+        -> Materialization<RegressionStats> {
+        const auto aKnownYValues = materializeOneDimensionalValueSequence(rKnownY);
+        if (!aKnownYValues.mbSupported)
+            return makeUnsupportedMaterialization<RegressionStats>(aKnownYValues.meFallbackReason);
+        if (!aKnownYValues.moValue)
+            return makeMaterializedError<RegressionStats>(aKnownYValues.meError);
+
+        const auto aKnownXValues = materializeOneDimensionalValueSequence(rKnownX);
+        if (!aKnownXValues.mbSupported)
+            return makeUnsupportedMaterialization<RegressionStats>(aKnownXValues.meFallbackReason);
+        if (!aKnownXValues.moValue)
+            return makeMaterializedError<RegressionStats>(aKnownXValues.meError);
+
+        if (aKnownYValues.moValue->size() != aKnownXValues.moValue->size())
+            return makeMaterializedError<RegressionStats>(api::Error::IllegalArgument);
+
+        RegressionStats aStats;
+        double fSumX = 0.0;
+        double fSumY = 0.0;
+        for (std::size_t nIndex = 0; nIndex < aKnownYValues.moValue->size(); ++nIndex)
+        {
+            const api::CellValue& rY = (*aKnownYValues.moValue)[nIndex];
+            const api::CellValue& rX = (*aKnownXValues.moValue)[nIndex];
+            if (rY.isError())
+                return makeMaterializedError<RegressionStats>(rY.meError);
+            if (rX.isError())
+                return makeMaterializedError<RegressionStats>(rX.meError);
+            if ((rY.isText() || rY.isEmpty()) || (rX.isText() || rX.isEmpty()))
+                continue;
+
+            const auto aY = coerceScalarToNumber(rDoc, rContext, rY);
+            if (!aY)
+                return makeMaterializedError<RegressionStats>(aY.meError);
+            const auto aX = coerceScalarToNumber(rDoc, rContext, rX);
+            if (!aX)
+                return makeMaterializedError<RegressionStats>(aX.meError);
+
+            fSumX += aX.maValue;
+            fSumY += aY.maValue;
+            aStats.fCount += 1.0;
+        }
+
+        if (aStats.fCount < 1.0)
+            return makeMaterializedError<RegressionStats>(api::Error::NoValue);
+
+        aStats.fMeanX = fSumX / aStats.fCount;
+        aStats.fMeanY = fSumY / aStats.fCount;
+
+        for (std::size_t nIndex = 0; nIndex < aKnownYValues.moValue->size(); ++nIndex)
+        {
+            const api::CellValue& rY = (*aKnownYValues.moValue)[nIndex];
+            const api::CellValue& rX = (*aKnownXValues.moValue)[nIndex];
+            if ((rY.isText() || rY.isEmpty()) || (rX.isText() || rX.isEmpty()))
+                continue;
+
+            const auto aY = coerceScalarToNumber(rDoc, rContext, rY);
+            if (!aY)
+                return makeMaterializedError<RegressionStats>(aY.meError);
+            const auto aX = coerceScalarToNumber(rDoc, rContext, rX);
+            if (!aX)
+                return makeMaterializedError<RegressionStats>(aX.meError);
+
+            const double fDeltaX = aX.maValue - aStats.fMeanX;
+            const double fDeltaY = aY.maValue - aStats.fMeanY;
+            aStats.fSumDeltaXDeltaY += fDeltaX * fDeltaY;
+            aStats.fSumSqrDeltaX += fDeltaX * fDeltaX;
+        }
+
+        return makeMaterializedValue(aStats);
+    };
 
     if (aFunctionName == u"FISHER")
     {
@@ -8750,6 +8865,37 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (!aDistribution)
             return makeErrorAttempt(aDistribution.meError);
         return makeNumericAttempt(aDistribution.maValue);
+    }
+
+    if (aFunctionName == u"INTERCEPT" || aFunctionName == u"FORECAST")
+    {
+        if (rNode.maChildren.size() != 2 + (aFunctionName == u"FORECAST" ? 1 : 0))
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const core::formula::Node& rKnownY
+            = *rNode.maChildren[aFunctionName == u"FORECAST" ? 1 : 0];
+        const core::formula::Node& rKnownX
+            = *rNode.maChildren[aFunctionName == u"FORECAST" ? 2 : 1];
+        const auto aStats = collectRegressionStats(rKnownY, rKnownX);
+        if (!aStats.mbSupported)
+            return makeUnsupportedAttempt(aStats.meFallbackReason);
+        if (!aStats.moValue)
+            return makeErrorAttempt(aStats.meError);
+        if (rtl::math::approxEqual(aStats.moValue->fSumSqrDeltaX, 0.0))
+            return makeErrorAttempt(api::Error::DivisionByZero);
+
+        const double fSlope = aStats.moValue->fSumDeltaXDeltaY / aStats.moValue->fSumSqrDeltaX;
+        const double fIntercept = aStats.moValue->fMeanY - fSlope * aStats.moValue->fMeanX;
+        if (aFunctionName == u"INTERCEPT")
+            return makeNumericAttempt(fIntercept);
+
+        const auto aForecastX = materializeNumber(*rNode.maChildren[0]);
+        if (!aForecastX.mbSupported)
+            return makeUnsupportedAttempt(aForecastX.meFallbackReason);
+        if (!aForecastX.moValue)
+            return makeErrorAttempt(aForecastX.meError);
+        return makeNumericAttempt(
+            aStats.moValue->fMeanY + fSlope * (*aForecastX.moValue - aStats.moValue->fMeanX));
     }
 
     if (aFunctionName == u"PROB")
