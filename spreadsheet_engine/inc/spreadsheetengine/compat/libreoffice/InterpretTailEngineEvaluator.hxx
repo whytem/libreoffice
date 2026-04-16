@@ -122,6 +122,7 @@ enum class FunctionKind : sal_uInt8
     RankedAggregate,
     StatisticalAggregate,
     StatisticalDistribution,
+    GrowthProjection,
     CriteriaAggregate,
     Aggregate,
     BusinessDay,
@@ -857,6 +858,8 @@ canonicalSelectorFunctionName(api::StringView rFunctionName)
     {
         return FunctionKind::StatisticalDistribution;
     }
+    if (rFunctionName == u"GROWTH")
+        return FunctionKind::GrowthProjection;
     if (rFunctionName == u"COUNTIF" || rFunctionName == u"COUNTIFS"
         || rFunctionName == u"SUMIF" || rFunctionName == u"SUMIFS"
         || rFunctionName == u"AVERAGEIF" || rFunctionName == u"AVERAGEIFS"
@@ -1199,6 +1202,10 @@ template <typename T>
 [[nodiscard]] inline Materialization<ScMatrixRef> materializeMatrixNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos);
+
+[[nodiscard]] inline EvaluationAttempt evaluateGrowthFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos);
 
 [[nodiscard]] inline Materialization<lookupexecution::LookupInputSource> materializeLookupInputSourceNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
@@ -2726,6 +2733,7 @@ inline void putScalarIntoMatrix(
                 || eFunction == FunctionKind::RankedAggregate
                 || eFunction == FunctionKind::StatisticalAggregate
                 || eFunction == FunctionKind::StatisticalDistribution
+                || eFunction == FunctionKind::GrowthProjection
                 || eFunction == FunctionKind::CriteriaAggregate
                 || eFunction == FunctionKind::Aggregate
                 || eFunction == FunctionKind::BusinessDay
@@ -6625,6 +6633,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                 || eChildFunction == FunctionKind::RankedAggregate
                 || eChildFunction == FunctionKind::StatisticalAggregate
                 || eChildFunction == FunctionKind::StatisticalDistribution
+                || eChildFunction == FunctionKind::GrowthProjection
                 || eChildFunction == FunctionKind::CriteriaAggregate
                 || eChildFunction == FunctionKind::Aggregate)
             {
@@ -7041,6 +7050,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                 || eChildFunction == FunctionKind::RankedAggregate
                 || eChildFunction == FunctionKind::StatisticalAggregate
                 || eChildFunction == FunctionKind::StatisticalDistribution
+                || eChildFunction == FunctionKind::GrowthProjection
                 || eChildFunction == FunctionKind::CriteriaAggregate
                 || eChildFunction == FunctionKind::Aggregate)
             {
@@ -7262,6 +7272,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                 || eChildFunction == FunctionKind::RankedAggregate
                 || eChildFunction == FunctionKind::StatisticalAggregate
                 || eChildFunction == FunctionKind::StatisticalDistribution
+                || eChildFunction == FunctionKind::GrowthProjection
                 || eChildFunction == FunctionKind::CriteriaAggregate
                 || eChildFunction == FunctionKind::Aggregate)
             {
@@ -7470,6 +7481,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                 || eChildFunction == FunctionKind::RankedAggregate
                 || eChildFunction == FunctionKind::StatisticalAggregate
                 || eChildFunction == FunctionKind::StatisticalDistribution
+                || eChildFunction == FunctionKind::GrowthProjection
                 || eChildFunction == FunctionKind::CriteriaAggregate
                 || eChildFunction == FunctionKind::Aggregate)
             {
@@ -7954,6 +7966,198 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     }
 
     return makeUnsupportedAttempt(FallbackReason::UnsupportedFunction);
+}
+
+[[nodiscard]] inline EvaluationAttempt evaluateGrowthFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
+{
+    const auto makeNumericAttempt = [&](double fValue) {
+        return makeNumericResult(eFunction, fValue, SvNumFormatType::NUMBER);
+    };
+    const auto makeErrorAttempt = [&](api::Error eError) {
+        return makeErrorResult(eFunction, eError);
+    };
+    const auto materializeOneDimensionalSequence =
+        [&](const core::formula::Node* pArgument, bool bRequirePositive,
+            bool* pWasOmitted = nullptr) -> Materialization<std::vector<double>> {
+        if (pWasOmitted)
+            *pWasOmitted = false;
+
+        if (!pArgument)
+            return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+        if (pArgument->meKind == core::formula::NodeKind::EmptyArgument)
+        {
+            if (pWasOmitted)
+                *pWasOmitted = true;
+            return makeMaterializedValue(std::vector<double> {});
+        }
+
+        const auto aMatrix = materializeMatrixNode(*pArgument, rDoc, rContext, rFormulaPos);
+        if (!aMatrix.mbSupported)
+            return makeUnsupportedMaterialization<std::vector<double>>(aMatrix.meFallbackReason);
+        if (!aMatrix.moValue)
+            return makeMaterializedError<std::vector<double>>(aMatrix.meError);
+
+        SCSIZE nColumns = 0;
+        SCSIZE nRows = 0;
+        (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+        if (nColumns == 0 || nRows == 0)
+            return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+        if (nColumns != 1 && nRows != 1)
+        {
+            return makeUnsupportedMaterialization<std::vector<double>>(
+                FallbackReason::UnsupportedFormulaShape);
+        }
+
+        std::vector<double> aValues;
+        aValues.reserve(nColumns * nRows);
+        for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+        {
+            for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+            {
+                const auto aValue = lookupexecution::detail::toApiCellValue(
+                    (*aMatrix.moValue)->Get(nColumn, nRow));
+                if (!aValue.isNumber())
+                {
+                    if (aValue.isError())
+                        return makeMaterializedError<std::vector<double>>(aValue.meError);
+                    return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+                }
+
+                if (bRequirePositive && !(aValue.mfNumber > 0.0))
+                    return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+                aValues.push_back(aValue.mfNumber);
+            }
+        }
+
+        return makeMaterializedValue(std::move(aValues));
+    };
+
+    const auto materializeConstantFlag = [&](const core::formula::Node* pArgument)
+        -> Materialization<bool> {
+        if (!pArgument || pArgument->meKind == core::formula::NodeKind::EmptyArgument)
+            return makeMaterializedValue(true);
+
+        const auto aScalar
+            = materializeScalarizedReferenceValueNode(*pArgument, rDoc, rContext, rFormulaPos);
+        if (!aScalar.mbSupported)
+            return makeUnsupportedMaterialization<bool>(aScalar.meFallbackReason);
+        if (!aScalar.moValue)
+            return makeMaterializedError<bool>(aScalar.meError);
+
+        if (aScalar.moValue->isBoolean())
+            return makeMaterializedValue(aScalar.moValue->mfNumber != 0.0);
+        if (aScalar.moValue->isNumber())
+            return makeMaterializedValue(aScalar.moValue->mfNumber != 0.0);
+        return makeMaterializedError<bool>(api::Error::IllegalArgument);
+    };
+
+    if (rNode.maChildren.empty() || rNode.maChildren.size() > 4)
+        return makeErrorAttempt(api::Error::IllegalArgument);
+
+    const auto aKnownY = materializeOneDimensionalSequence(&*rNode.maChildren[0], true);
+    if (!aKnownY.mbSupported)
+        return makeUnsupported(eFunction, aKnownY.meFallbackReason);
+    if (!aKnownY.moValue)
+        return makeErrorAttempt(aKnownY.meError);
+    if (aKnownY.moValue->empty())
+        return makeErrorAttempt(api::Error::IllegalArgument);
+
+    std::vector<double> aKnownX;
+    if (rNode.maChildren.size() >= 2)
+    {
+        const auto aKnownXValues = materializeOneDimensionalSequence(
+            &*rNode.maChildren[1], false);
+        if (!aKnownXValues.mbSupported)
+            return makeUnsupported(eFunction, aKnownXValues.meFallbackReason);
+        if (!aKnownXValues.moValue)
+            return makeErrorAttempt(aKnownXValues.meError);
+        aKnownX = *aKnownXValues.moValue;
+    }
+
+    if (aKnownX.empty())
+    {
+        aKnownX.reserve(aKnownY.moValue->size());
+        for (std::size_t nIndex = 0; nIndex < aKnownY.moValue->size(); ++nIndex)
+            aKnownX.push_back(static_cast<double>(nIndex + 1));
+    }
+
+    if (aKnownX.size() != aKnownY.moValue->size())
+        return makeErrorAttempt(api::Error::IllegalArgument);
+
+    std::vector<double> aNewX;
+    if (rNode.maChildren.size() >= 3)
+    {
+        const auto aNewXValues = materializeOneDimensionalSequence(
+            &*rNode.maChildren[2], false);
+        if (!aNewXValues.mbSupported)
+            return makeUnsupported(eFunction, aNewXValues.meFallbackReason);
+        if (!aNewXValues.moValue)
+            return makeErrorAttempt(aNewXValues.meError);
+        aNewX = *aNewXValues.moValue;
+    }
+
+    if (aNewX.empty())
+        aNewX = aKnownX;
+    if (aNewX.empty())
+        return makeErrorAttempt(api::Error::IllegalArgument);
+
+    const auto aConstant = materializeConstantFlag(
+        rNode.maChildren.size() >= 4 ? &*rNode.maChildren[3] : nullptr);
+    if (!aConstant.mbSupported)
+        return makeUnsupported(eFunction, aConstant.meFallbackReason);
+    if (!aConstant.moValue)
+        return makeErrorAttempt(aConstant.meError);
+
+    std::vector<double> aLoggedY;
+    aLoggedY.reserve(aKnownY.moValue->size());
+    for (double fValue : *aKnownY.moValue)
+        aLoggedY.push_back(std::log(fValue));
+
+    double fSlope = 0.0;
+    double fIntercept = 0.0;
+    if (*aConstant.moValue)
+    {
+        const double fCount = static_cast<double>(aKnownX.size());
+        const double fMeanX
+            = std::accumulate(aKnownX.begin(), aKnownX.end(), 0.0) / fCount;
+        const double fMeanY
+            = std::accumulate(aLoggedY.begin(), aLoggedY.end(), 0.0) / fCount;
+
+        double fSumDeltaXDeltaY = 0.0;
+        double fSumSqrDeltaX = 0.0;
+        for (std::size_t nIndex = 0; nIndex < aKnownX.size(); ++nIndex)
+        {
+            const double fDeltaX = aKnownX[nIndex] - fMeanX;
+            const double fDeltaY = aLoggedY[nIndex] - fMeanY;
+            fSumDeltaXDeltaY += fDeltaX * fDeltaY;
+            fSumSqrDeltaX += fDeltaX * fDeltaX;
+        }
+
+        if (rtl::math::approxEqual(fSumSqrDeltaX, 0.0))
+            return makeErrorAttempt(api::Error::NoValue);
+
+        fSlope = fSumDeltaXDeltaY / fSumSqrDeltaX;
+        fIntercept = fMeanY - fSlope * fMeanX;
+    }
+    else
+    {
+        double fSumXY = 0.0;
+        double fSumX2 = 0.0;
+        for (std::size_t nIndex = 0; nIndex < aKnownX.size(); ++nIndex)
+        {
+            fSumXY += aKnownX[nIndex] * aLoggedY[nIndex];
+            fSumX2 += aKnownX[nIndex] * aKnownX[nIndex];
+        }
+
+        if (rtl::math::approxEqual(fSumX2, 0.0))
+            return makeErrorAttempt(api::Error::NoValue);
+
+        fSlope = fSumXY / fSumX2;
+    }
+
+    return makeNumericAttempt(std::exp(fIntercept + fSlope * aNewX.front()));
 }
 
 [[nodiscard]] inline EvaluationAttempt evaluateTextUtilityFunction(
@@ -9193,6 +9397,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         case FunctionKind::RankedAggregate:
         case FunctionKind::StatisticalAggregate:
         case FunctionKind::StatisticalDistribution:
+        case FunctionKind::GrowthProjection:
         case FunctionKind::CriteriaAggregate:
         case FunctionKind::Aggregate:
         case FunctionKind::BusinessDay:
@@ -9225,6 +9430,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                                          ? evaluateStatisticalDistributionFunction(
                                                rRoot, eFunction, rDoc, rContext, rFormulaPos,
                                                bEmptyStringAsZero, bImportedCanonicalSource)
+                                   : eFunction == FunctionKind::GrowthProjection
+                                         ? evaluateGrowthFunction(
+                                               rRoot, eFunction, rDoc, rContext, rFormulaPos)
                                    : eFunction == FunctionKind::CriteriaAggregate
                                          ? evaluateCriteriaAggregateFunction(
                                                rRoot, eFunction, rDoc, rContext, rFormulaPos)

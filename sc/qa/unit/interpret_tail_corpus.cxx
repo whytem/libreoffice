@@ -1347,6 +1347,8 @@ const char* functionKindName(FunctionKind eFunction)
             return "statistical_aggregate";
         case FunctionKind::StatisticalDistribution:
             return "statistical_distribution";
+        case FunctionKind::GrowthProjection:
+            return "growth_projection";
         case FunctionKind::CriteriaAggregate:
             return "criteria_aggregate";
         case FunctionKind::Aggregate:

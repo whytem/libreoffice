@@ -3189,6 +3189,49 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorProbabilit
         spreadsheetengine::api::formulavalue::ValueType::Error, aInvalid.maResult.meType);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorGrowthHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailGrowthHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(7, 0, 0);
+
+    const auto aImplicitX
+        = setaileval::tryEvaluateFormula(*m_pDoc, rContext, aFormulaPos, u"=GROWTH({4;5;6})", false);
+    CPPUNIT_ASSERT(aImplicitX.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::GrowthProjection, aImplicitX.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aImplicitX.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.02730745306701, aImplicitX.maResult.mfValue, 1e-12);
+
+    const auto aExplicitNewX = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos,
+        u"=GROWTH({4;5;6};{10;20;30};{15;30;45})", false);
+    CPPUNIT_ASSERT(aExplicitNewX.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::GrowthProjection, aExplicitNewX.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aExplicitNewX.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.45694834338361, aExplicitNewX.maResult.mfValue, 1e-12);
+
+    const auto aNoIntercept = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos,
+        u"=GROWTH({4;5;6};{10;20;30};{15;30;45};0)", false);
+    CPPUNIT_ASSERT(aNoIntercept.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::GrowthProjection, aNoIntercept.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aNoIntercept.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.91343785655985, aNoIntercept.maResult.mfValue, 1e-12);
+
+    const auto aInvalid = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=GROWTH({4;-5;6})", false);
+    CPPUNIT_ASSERT(aInvalid.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::GrowthProjection, aInvalid.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error, aInvalid.maResult.meType);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCriteriaAggregateHelper)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
