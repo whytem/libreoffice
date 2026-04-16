@@ -2127,10 +2127,11 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorConversionAut
         m_pDoc->SetString(3, 7, 0, u"=EUROCONVERT(100;\"ATS\";\"EUR\")"_ustr);
         m_pDoc->SetString(4, 7, 0, u"=EUROCONVERT(100;\"ATS\";\"EUR\";TRUE())"_ustr);
         m_pDoc->SetString(5, 7, 0, u"=EUROCONVERT(100;\"EUR\";\"SIT\";;3)"_ustr);
-        m_pDoc->SetString(6, 7, 0, u"=DECIMAL(\"FF\";16)"_ustr);
-        m_pDoc->SetString(7, 7, 0, u"=BASE(255;16;4)"_ustr);
-        m_pDoc->SetString(8, 7, 0, u"=ROMAN(1999)"_ustr);
-        m_pDoc->SetString(9, 7, 0, u"=ARABIC(\"MCMXCIX\")"_ustr);
+        m_pDoc->SetString(6, 7, 0, u"=CONVERT(1;\"Pica\";\"survey_mi\")"_ustr);
+        m_pDoc->SetString(7, 7, 0, u"=DECIMAL(\"FF\";16)"_ustr);
+        m_pDoc->SetString(8, 7, 0, u"=BASE(255;16;4)"_ustr);
+        m_pDoc->SetString(9, 7, 0, u"=ROMAN(1999)"_ustr);
+        m_pDoc->SetString(10, 7, 0, u"=ARABIC(\"MCMXCIX\")"_ustr);
 
         CPPUNIT_ASSERT_DOUBLES_EQUAL(0.000621371192237, m_pDoc->GetValue(0, 7, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(35.6, m_pDoc->GetValue(1, 7, 0), 1e-12);
@@ -2138,18 +2139,19 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorConversionAut
         CPPUNIT_ASSERT_DOUBLES_EQUAL(7.27, m_pDoc->GetValue(3, 7, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(7.26728341678597, m_pDoc->GetValue(4, 7, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(23964.0, m_pDoc->GetValue(5, 7, 0), 1e-12);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(255.0, m_pDoc->GetValue(6, 7, 0), 1e-12);
-        CPPUNIT_ASSERT_EQUAL(u"00FF"_ustr, m_pDoc->GetString(7, 7, 0));
-        CPPUNIT_ASSERT_EQUAL(u"MCMXCIX"_ustr, m_pDoc->GetString(8, 7, 0));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1999.0, m_pDoc->GetValue(9, 7, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.63046611952801E-06, m_pDoc->GetValue(6, 7, 0), 1e-18);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(255.0, m_pDoc->GetValue(7, 7, 0), 1e-12);
+        CPPUNIT_ASSERT_EQUAL(u"00FF"_ustr, m_pDoc->GetString(8, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"MCMXCIX"_ustr, m_pDoc->GetString(9, 7, 0));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1999.0, m_pDoc->GetValue(10, 7, 0), 1e-12);
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 10);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 11);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Conversion)]
-            >= 10);
+            >= 11);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Conversion)]);

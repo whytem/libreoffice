@@ -3025,6 +3025,14 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConversion
         spreadsheetengine::api::formulavalue::ValueType::Value, aAlias.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(7.26728341678597, aAlias.maResult.mfValue, 1e-12);
 
+    const auto aMultiHop = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=CONVERT(1;\"Pica\";\"survey_mi\")", false);
+    CPPUNIT_ASSERT(aMultiHop.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conversion, aMultiHop.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMultiHop.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.63046611952801E-06, aMultiHop.maResult.mfValue, 1e-18);
+
     const auto aEuroConvert = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=EUROCONVERT(100;\"ATS\";\"EUR\")", false);
     CPPUNIT_ASSERT(aEuroConvert.mbSupported);

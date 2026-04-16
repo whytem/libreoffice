@@ -406,23 +406,23 @@ api::ValueResult<double> evaluateConvertValue(
 
     for (std::size_t nIndex = 0; nIndex < aPending.size(); ++nIndex)
     {
-        const PendingUnitConversion& rCurrent = aPending[nIndex];
-        if (rCurrent.maUnit == aNormalizedTo)
-            return api::ValueResult<double>::success(fValue * rCurrent.mfFactor);
+        const PendingUnitConversion aCurrent = aPending[nIndex];
+        if (aCurrent.maUnit == aNormalizedTo)
+            return api::ValueResult<double>::success(fValue * aCurrent.mfFactor);
 
         for (const auto& rConversion : kKnownConversions)
         {
             api::String aNextUnit;
             double fNextFactor = 1.0;
-            if (canonicalizeUnitSymbol(rConversion.maFromUnit) == rCurrent.maUnit)
+            if (canonicalizeUnitSymbol(rConversion.maFromUnit) == aCurrent.maUnit)
             {
                 aNextUnit = canonicalizeUnitSymbol(rConversion.maToUnit);
-                fNextFactor = rCurrent.mfFactor * rConversion.mfFactor;
+                fNextFactor = aCurrent.mfFactor * rConversion.mfFactor;
             }
-            else if (canonicalizeUnitSymbol(rConversion.maToUnit) == rCurrent.maUnit)
+            else if (canonicalizeUnitSymbol(rConversion.maToUnit) == aCurrent.maUnit)
             {
                 aNextUnit = canonicalizeUnitSymbol(rConversion.maFromUnit);
-                fNextFactor = rCurrent.mfFactor / rConversion.mfFactor;
+                fNextFactor = aCurrent.mfFactor / rConversion.mfFactor;
             }
             else
             {
@@ -442,23 +442,23 @@ api::ValueResult<double> evaluateConvertValue(
 
     for (std::size_t nIndex = 0; nIndex < aFoldedPending.size(); ++nIndex)
     {
-        const PendingUnitConversion& rCurrent = aFoldedPending[nIndex];
-        if (rCurrent.maUnit == aFoldedTo)
-            return api::ValueResult<double>::success(fValue * rCurrent.mfFactor);
+        const PendingUnitConversion aCurrent = aFoldedPending[nIndex];
+        if (aCurrent.maUnit == aFoldedTo)
+            return api::ValueResult<double>::success(fValue * aCurrent.mfFactor);
 
         for (const auto& rConversion : kKnownConversions)
         {
             api::String aNextUnit;
             double fNextFactor = 1.0;
-            if (foldUnitSymbol(rConversion.maFromUnit) == rCurrent.maUnit)
+            if (foldUnitSymbol(rConversion.maFromUnit) == aCurrent.maUnit)
             {
                 aNextUnit = foldUnitSymbol(rConversion.maToUnit);
-                fNextFactor = rCurrent.mfFactor * rConversion.mfFactor;
+                fNextFactor = aCurrent.mfFactor * rConversion.mfFactor;
             }
-            else if (foldUnitSymbol(rConversion.maToUnit) == rCurrent.maUnit)
+            else if (foldUnitSymbol(rConversion.maToUnit) == aCurrent.maUnit)
             {
                 aNextUnit = foldUnitSymbol(rConversion.maFromUnit);
-                fNextFactor = rCurrent.mfFactor / rConversion.mfFactor;
+                fNextFactor = aCurrent.mfFactor / rConversion.mfFactor;
             }
             else
             {
