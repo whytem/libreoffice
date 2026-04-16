@@ -2936,6 +2936,62 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorRoundSigHe
     CPPUNIT_ASSERT(!setaileval::isFamilyLocalDefaultOnFormula(u"=ABS(12)"));
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorBitwiseHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailBitwiseHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(5, 0, 0);
+
+    const auto aBitAnd = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=BITAND(6;3)", false);
+    CPPUNIT_ASSERT(aBitAnd.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aBitAnd.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aBitAnd.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aBitAnd.maResult.mfValue, 1e-12);
+
+    const auto aBitOr = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=BITOR(6;3)", false);
+    CPPUNIT_ASSERT(aBitOr.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aBitOr.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aBitOr.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(7.0, aBitOr.maResult.mfValue, 1e-12);
+
+    const auto aBitXor = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=BITXOR(6;3)", false);
+    CPPUNIT_ASSERT(aBitXor.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aBitXor.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aBitXor.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, aBitXor.maResult.mfValue, 1e-12);
+
+    const auto aBitLshift = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=BITLSHIFT(6;1)", false);
+    CPPUNIT_ASSERT(aBitLshift.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aBitLshift.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aBitLshift.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(12.0, aBitLshift.maResult.mfValue, 1e-12);
+
+    const auto aBitRshift = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=BITRSHIFT(6;1)", false);
+    CPPUNIT_ASSERT(aBitRshift.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aBitRshift.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aBitRshift.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, aBitRshift.maResult.mfValue, 1e-12);
+
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=BITAND(6;3)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=BITOR(6;3)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=BITXOR(6;3)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=BITLSHIFT(6;1)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=BITRSHIFT(6;1)"));
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConversionHelper)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

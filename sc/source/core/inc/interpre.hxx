@@ -779,11 +779,6 @@ public:
     void ScGetPivotData();
     void ScHyperLink();
     void ScBahtText();
-    void ScBitAnd();
-    void ScBitOr();
-    void ScBitXor();
-    void ScBitRshift();
-    void ScBitLshift();
     void ScTTT();
     void ScDebugVar();
 

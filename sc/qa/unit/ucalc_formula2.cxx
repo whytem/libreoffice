@@ -2068,6 +2068,46 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRoundSigAutho
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorBitwiseAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineBitwiseAuthority"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"=BITAND(6;3)"_ustr);
+        m_pDoc->SetString(1, 7, 0, u"=BITOR(6;3)"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=BITXOR(6;3)"_ustr);
+        m_pDoc->SetString(3, 7, 0, u"=BITLSHIFT(6;1)"_ustr);
+        m_pDoc->SetString(4, 7, 0, u"=BITRSHIFT(6;1)"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(0, 7, 0));
+        ASSERT_DOUBLES_EQUAL(7.0, m_pDoc->GetValue(1, 7, 0));
+        ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(2, 7, 0));
+        ASSERT_DOUBLES_EQUAL(12.0, m_pDoc->GetValue(3, 7, 0));
+        ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(4, 7, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 5);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::MathScalar)]
+            >= 5);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::MathScalar)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorConversionAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
@@ -2440,6 +2480,46 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRoundSigDefau
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MathScalar)]
             >= 2);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::MathScalar)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorBitwiseDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineBitwiseDefaultOn"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 0, 0, u"=BITAND(6;3)"_ustr);
+        m_pDoc->SetString(1, 0, 0, u"=BITOR(6;3)"_ustr);
+        m_pDoc->SetString(2, 0, 0, u"=BITXOR(6;3)"_ustr);
+        m_pDoc->SetString(3, 0, 0, u"=BITLSHIFT(6;1)"_ustr);
+        m_pDoc->SetString(4, 0, 0, u"=BITRSHIFT(6;1)"_ustr);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(0, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(7.0, m_pDoc->GetValue(1, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(2, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(12.0, m_pDoc->GetValue(3, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(4, 0, 0), 1e-12);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 5);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::MathScalar)]
+            >= 5);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MathScalar)]);

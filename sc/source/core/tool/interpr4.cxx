@@ -71,6 +71,7 @@
 #include <tokenarray.hxx>
 #include <compiler.hxx>
 #include <spreadsheetengine/runtime/ConversionRuntime.hxx>
+#include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
@@ -4149,6 +4150,37 @@ StackVar ScInterpreter::Interpret()
                         PushDouble(fRes);
                     }
                 };
+                const auto pushLegacyBitwise = [&](std::u16string_view rFunctionName,
+                                                   auto aOperator) {
+                    if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
+                        && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
+                        && !pMyFormulaCell->IsHyperLinkCell()
+                        && !mrDoc.IsThreadedGroupCalcInProgress())
+                    {
+                        const OUString aFormulaSource
+                            = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
+                        if (setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
+                                aFormulaSource.getStr(), aFormulaSource.getLength())))
+                        {
+                            SAL_WARN(
+                                "sc.core",
+                                "family-local default-on "
+                                    << OUString(rFunctionName.data(), rFunctionName.size())
+                                    << " reached ScInterpreter for " << aFormulaSource);
+                            OSL_FAIL("family-local default-on bitwise slice reached ScInterpreter");
+                        }
+                    }
+
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+
+                    const double fRight = GetDouble();
+                    const double fLeft = GetDouble();
+                    if (std::optional<double> fResult = aOperator(fLeft, fRight))
+                        PushDouble(*fResult);
+                    else
+                        PushIllegalArgument();
+                };
                 const auto pushLegacyEuroConvert = [&]() {
                     pushLegacyNumeralConversion(u"EUROCONVERT");
 
@@ -4845,11 +4877,41 @@ StackVar ScInterpreter::Interpret()
                     case ocSearchB          : ScSearchB();                  break;
                     case ocUnicode          : ScUnicode();                  break;
                     case ocUnichar          : ScUnichar();                  break;
-                    case ocBitAnd           : ScBitAnd();                   break;
-                    case ocBitOr            : ScBitOr();                    break;
-                    case ocBitXor           : ScBitXor();                   break;
-                    case ocBitRshift        : ScBitRshift();                break;
-                    case ocBitLshift        : ScBitLshift();                break;
+                    case ocBitAnd           :
+                        pushLegacyBitwise(u"BITAND",
+                                          [](double fLeft, double fRight) {
+                                              return spreadsheetengine::core::math::computeBitAnd(
+                                                  fLeft, fRight);
+                                          });
+                        break;
+                    case ocBitOr            :
+                        pushLegacyBitwise(u"BITOR",
+                                          [](double fLeft, double fRight) {
+                                              return spreadsheetengine::core::math::computeBitOr(
+                                                  fLeft, fRight);
+                                          });
+                        break;
+                    case ocBitXor           :
+                        pushLegacyBitwise(u"BITXOR",
+                                          [](double fLeft, double fRight) {
+                                              return spreadsheetengine::core::math::computeBitXor(
+                                                  fLeft, fRight);
+                                          });
+                        break;
+                    case ocBitRshift        :
+                        pushLegacyBitwise(u"BITRSHIFT",
+                                          [](double fLeft, double fRight) {
+                                              return spreadsheetengine::core::math::computeBitRightShift(
+                                                  fLeft, fRight);
+                                          });
+                        break;
+                    case ocBitLshift        :
+                        pushLegacyBitwise(u"BITLSHIFT",
+                                          [](double fLeft, double fRight) {
+                                              return spreadsheetengine::core::math::computeBitLeftShift(
+                                                  fLeft, fRight);
+                                          });
+                        break;
                     case ocTTT              : ScTTT();                      break;
                     case ocDebugVar         : ScDebugVar();                 break;
                     case ocNone : nFuncFmtType = SvNumFormatType::UNDEFINED;    break;
