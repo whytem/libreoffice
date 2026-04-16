@@ -855,7 +855,6 @@ public:
     void ScDde();
     void ScBase();
     void ScDecimal();
-    void ScEuroConvert();
     static void RoundSignificant( double fX, double fDigits, double &fRes );
 
     // financial functions

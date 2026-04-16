@@ -2969,9 +2969,38 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConversion
         spreadsheetengine::api::formulavalue::ValueType::Value, aAlias.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(7.26728341678597, aAlias.maResult.mfValue, 1e-12);
 
+    const auto aEuroConvert = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=EUROCONVERT(100;\"ATS\";\"EUR\")", false);
+    CPPUNIT_ASSERT(aEuroConvert.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conversion, aEuroConvert.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aEuroConvert.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(7.27, aEuroConvert.maResult.mfValue, 1e-12);
+
+    const auto aEuroConvertFullPrecision = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=EUROCONVERT(100;\"ATS\";\"EUR\";TRUE())", false);
+    CPPUNIT_ASSERT(aEuroConvertFullPrecision.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conversion, aEuroConvertFullPrecision.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aEuroConvertFullPrecision.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(7.26728341678597, aEuroConvertFullPrecision.maResult.mfValue,
+        1e-12);
+
+    const auto aEuroConvertPrecision = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=EUROCONVERT(100;\"EUR\";\"SIT\";;3)", false);
+    CPPUNIT_ASSERT(aEuroConvertPrecision.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conversion, aEuroConvertPrecision.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aEuroConvertPrecision.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(23964.0, aEuroConvertPrecision.maResult.mfValue, 1e-12);
+
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=CONVERT(1;\"m\";\"mi\")"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(
         u"=ORG.OPENOFFICE.CONVERT(100;\"ATS\";\"EUR\")"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(
+        u"=EUROCONVERT(100;\"ATS\";\"EUR\")"));
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorAggregateHelper)

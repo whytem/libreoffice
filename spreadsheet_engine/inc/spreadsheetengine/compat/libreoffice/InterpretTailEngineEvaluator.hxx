@@ -742,6 +742,8 @@ canonicalConversionFunctionName(api::StringView rFunctionName)
     {
         return api::StringView(u"CONVERT");
     }
+    if (rFunctionName == u"EUROCONVERT")
+        return api::StringView(u"EUROCONVERT");
 
     return std::nullopt;
 }
@@ -4936,6 +4938,84 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const auto oCanonicalName = canonicalConversionFunctionName(uppercaseAscii(rNode.maPrimaryText));
     if (!oCanonicalName)
         return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+
+    if (*oCanonicalName == u"EUROCONVERT")
+    {
+        if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 5)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aValue = materializeScalarNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorResult(eFunction, aValue.meError);
+        const auto aValueNumber = coerceScalarToNumber(rDoc, rContext, *aValue.moValue);
+        if (!aValueNumber)
+            return makeErrorResult(eFunction, aValueNumber.meError);
+
+        const auto aFromUnit
+            = materializeScalarNode(*rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+        if (!aFromUnit.mbSupported)
+            return makeUnsupported(eFunction, aFromUnit.meFallbackReason);
+        if (!aFromUnit.moValue)
+            return makeErrorResult(eFunction, aFromUnit.meError);
+        const auto aFromText = coerceScalarToText(rDoc, rContext, *aFromUnit.moValue);
+        if (!aFromText)
+            return makeErrorResult(eFunction, aFromText.meError);
+
+        const auto aToUnit = materializeScalarNode(*rNode.maChildren[2], rDoc, rContext, rFormulaPos);
+        if (!aToUnit.mbSupported)
+            return makeUnsupported(eFunction, aToUnit.meFallbackReason);
+        if (!aToUnit.moValue)
+            return makeErrorResult(eFunction, aToUnit.meError);
+        const auto aToText = coerceScalarToText(rDoc, rContext, *aToUnit.moValue);
+        if (!aToText)
+            return makeErrorResult(eFunction, aToText.meError);
+
+        bool bFullPrecision = false;
+        if (rNode.maChildren.size() >= 4
+            && rNode.maChildren[3]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aFullPrecision
+                = materializeScalarNode(*rNode.maChildren[3], rDoc, rContext, rFormulaPos);
+            if (!aFullPrecision.mbSupported)
+                return makeUnsupported(eFunction, aFullPrecision.meFallbackReason);
+            if (!aFullPrecision.moValue)
+                return makeErrorResult(eFunction, aFullPrecision.meError);
+            const auto aBool = coerceScalarToBool(rDoc, rContext, *aFullPrecision.moValue);
+            if (!aBool)
+                return makeErrorResult(eFunction, aBool.meError);
+            bFullPrecision = aBool.maValue;
+        }
+
+        if (rNode.maChildren.size() == 5)
+        {
+            if (rNode.maChildren[4]->meKind == core::formula::NodeKind::EmptyArgument)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+            const auto aPrecision
+                = materializeScalarNode(*rNode.maChildren[4], rDoc, rContext, rFormulaPos);
+            if (!aPrecision.mbSupported)
+                return makeUnsupported(eFunction, aPrecision.meFallbackReason);
+            if (!aPrecision.moValue)
+                return makeErrorResult(eFunction, aPrecision.meError);
+            const auto aPrecisionNumber = coerceScalarToNumber(rDoc, rContext, *aPrecision.moValue);
+            if (!aPrecisionNumber)
+                return makeErrorResult(eFunction, aPrecisionNumber.meError);
+            const auto oWholePrecision
+                = spreadsheetengine::core::coercion::toWholeNumber(aPrecisionNumber.maValue);
+            if (!oWholePrecision || *oWholePrecision < 3)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        }
+
+        const auto aEuroConverted = spreadsheetengine::core::convert::evaluateEuroConvertValue(
+            aValueNumber.maValue, toApiString(aFromText.maValue), toApiString(aToText.maValue), true,
+            !bFullPrecision);
+        if (aEuroConverted)
+            return makeNumericResult(eFunction, aEuroConverted.maValue, SvNumFormatType::NUMBER);
+
+        return makeErrorResult(eFunction, api::Error::IllegalArgument);
+    }
 
     if (*oCanonicalName != u"CONVERT")
         return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);

@@ -70,6 +70,7 @@
 #include <queryparam.hxx>
 #include <tokenarray.hxx>
 #include <compiler.hxx>
+#include <spreadsheetengine/runtime/ConversionRuntime.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx>
@@ -87,6 +88,7 @@ using namespace formula;
 namespace seexternalexec = spreadsheetengine::compat::libreoffice::externalreferenceexecution;
 namespace seformulainspect = spreadsheetengine::compat::libreoffice::formulainspection;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
+namespace seconvert = spreadsheetengine::core::convert;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 namespace setextparseexec = spreadsheetengine::compat::libreoffice::textparsingexecution;
 
@@ -4122,6 +4124,84 @@ StackVar ScInterpreter::Interpret()
                         PushDouble(fRes);
                     }
                 };
+                const auto pushLegacyEuroConvert = [&]() {
+                    if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
+                        && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
+                        && !pMyFormulaCell->IsHyperLinkCell()
+                        && !mrDoc.IsThreadedGroupCalcInProgress())
+                    {
+                        const OUString aFormulaSource
+                            = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
+                        if (setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
+                                aFormulaSource.getStr(), aFormulaSource.getLength())))
+                        {
+                            SAL_WARN("sc.core",
+                                "family-local default-on EUROCONVERT reached ScInterpreter for "
+                                    << aFormulaSource);
+                            OSL_FAIL("family-local default-on EUROCONVERT reached ScInterpreter");
+                        }
+                    }
+
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 3, 5))
+                        return;
+
+                    double fPrecision = 0.0;
+                    if (nParamCount == 5)
+                    {
+                        fPrecision = ::rtl::math::approxFloor(GetDouble());
+                        if (fPrecision < 3)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+                    }
+
+                    bool bFullPrecision = nParamCount >= 4 && GetBool();
+                    OUString aToUnit = GetString().getString();
+                    OUString aFromUnit = GetString().getString();
+                    double fVal = GetDouble();
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushError(nGlobalError);
+                        return;
+                    }
+
+                    const auto aConverted = seconvert::evaluateEuroConvertValue(
+                        fVal, selibreoffice::toApiString(aFromUnit),
+                        selibreoffice::toApiString(aToUnit), true, !bFullPrecision);
+                    if (!aConverted)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+
+                    double fRes = aConverted.maValue;
+                    if (fPrecision && !aFromUnit.equalsIgnoreAsciiCase("EUR")
+                        && !aFromUnit.equalsIgnoreAsciiCase(aToUnit))
+                    {
+                        const auto aIntermediate = seconvert::evaluateEuroConvertValue(
+                            fVal, selibreoffice::toApiString(aFromUnit), u"EUR", true, false);
+                        if (!aIntermediate)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+                        const double fRoundedIntermediate
+                            = ::rtl::math::round(aIntermediate.maValue, static_cast<int>(fPrecision));
+                        const auto aTriangulated = seconvert::evaluateEuroConvertValue(
+                            fRoundedIntermediate, u"EUR", selibreoffice::toApiString(aToUnit), true,
+                            !bFullPrecision);
+                        if (!aTriangulated)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+                        fRes = aTriangulated.maValue;
+                    }
+
+                    PushDouble(fRes);
+                };
                 const auto pushLegacyFormulaText = [&]() {
                     if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
                         && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
@@ -4646,7 +4726,7 @@ StackVar ScInterpreter::Interpret()
                     case ocBase             : ScBase();                     break;
                     case ocDecimal          : ScDecimal();                  break;
                     case ocConvertOOo       : pushLegacyConvert();          break;
-                    case ocEuroConvert      : ScEuroConvert();              break;
+                    case ocEuroConvert      : pushLegacyEuroConvert();      break;
                     case ocRoman            : ScRoman();                    break;
                     case ocArabic           : ScArabic();                   break;
                     case ocInfo             : ScInfo();                     break;
