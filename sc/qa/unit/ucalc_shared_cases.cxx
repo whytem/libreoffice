@@ -3099,6 +3099,10 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorAggregateH
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
 
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(
+        u"=COM.MICROSOFT.AGGREGATE(9;5;A1:A6)"));
+    CPPUNIT_ASSERT(!setaileval::isFamilyLocalDefaultOnFormula(u"=SUBTOTAL(9;A1:A6)"));
+
     sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
     m_pDoc->InsertTab(0, u"InterpretTailAggregateHelper"_ustr);
     ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
@@ -3146,6 +3150,43 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorAggregateH
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value, aLarge.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(8.0, aLarge.maResult.mfValue, 1e-12);
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorProbabilityHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=PROB(A1:A3;B1:B3;3;2)"));
+    CPPUNIT_ASSERT(!setaileval::isFamilyLocalDefaultOnFormula(u"=POISSON(2;3;TRUE())"));
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailProbabilityHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(7, 0, 0);
+
+    m_pDoc->SetValue(0, 0, 0, 0.2);
+    m_pDoc->SetValue(0, 1, 0, 0.3);
+    m_pDoc->SetValue(0, 2, 0, 0.5);
+    m_pDoc->SetValue(1, 0, 0, 1.0);
+    m_pDoc->SetValue(1, 1, 0, 2.0);
+    m_pDoc->SetValue(1, 2, 0, 3.0);
+
+    const auto aProbability = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=PROB(A1:A3;B1:B3;3;2)", false);
+    CPPUNIT_ASSERT(aProbability.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalDistribution,
+        aProbability.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aProbability.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.8, aProbability.maResult.mfValue, 1e-12);
+
+    m_pDoc->SetString(0, 1, 0, u"x"_ustr);
+    const auto aInvalid = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=PROB(A1:A3;B1:B3;2)", false);
+    CPPUNIT_ASSERT(aInvalid.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalDistribution, aInvalid.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error, aInvalid.maResult.meType);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCriteriaAggregateHelper)
@@ -3348,6 +3389,9 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSelectorHe
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorMatrixMathHelper)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=MDETERM(A1:B2)"));
+    CPPUNIT_ASSERT(!setaileval::isFamilyLocalDefaultOnFormula(u"=MMULT(A1:B2;C1:D2)"));
 
     sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
     m_pDoc->InsertTab(0, u"InterpretTailMatrixMathHelper"_ustr);

@@ -852,7 +852,8 @@ canonicalSelectorFunctionName(api::StringView rFunctionName)
         || rFunctionName == u"POISSON" || rFunctionName == u"POISSON.DIST"
         || rFunctionName == u"BINOMDIST" || rFunctionName == u"BINOM.DIST"
         || rFunctionName == u"BINOM.DIST.RANGE" || rFunctionName == u"B"
-        || rFunctionName == u"BETADIST" || rFunctionName == u"BETA.DIST")
+        || rFunctionName == u"BETADIST" || rFunctionName == u"BETA.DIST"
+        || rFunctionName == u"PROB")
     {
         return FunctionKind::StatisticalDistribution;
     }
@@ -7880,6 +7881,78 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         return makeNumericAttempt(aDistribution.maValue);
     }
 
+    if (aFunctionName == u"PROB")
+    {
+        if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 4)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aUpper = materializeNumber(*rNode.maChildren[2]);
+        if (!aUpper.mbSupported)
+            return makeUnsupportedAttempt(aUpper.meFallbackReason);
+        if (!aUpper.moValue)
+            return makeErrorAttempt(aUpper.meError);
+
+        double fLower = *aUpper.moValue;
+        if (rNode.maChildren.size() == 4)
+        {
+            const auto aLower = materializeNumber(*rNode.maChildren[3]);
+            if (!aLower.mbSupported)
+                return makeUnsupportedAttempt(aLower.meFallbackReason);
+            if (!aLower.moValue)
+                return makeErrorAttempt(aLower.meError);
+            fLower = *aLower.moValue;
+        }
+
+        const auto aProbabilities
+            = materializeMatrixNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+        if (!aProbabilities.mbSupported)
+            return makeUnsupportedAttempt(aProbabilities.meFallbackReason);
+        if (!aProbabilities.moValue)
+            return makeErrorAttempt(aProbabilities.meError);
+
+        const auto aValues = materializeMatrixNode(*rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+        if (!aValues.mbSupported)
+            return makeUnsupportedAttempt(aValues.meFallbackReason);
+        if (!aValues.moValue)
+            return makeErrorAttempt(aValues.meError);
+
+        SCSIZE nProbCols = 0, nProbRows = 0, nValueCols = 0, nValueRows = 0;
+        (*aProbabilities.moValue)->GetDimensions(nProbCols, nProbRows);
+        (*aValues.moValue)->GetDimensions(nValueCols, nValueRows);
+        if (nProbCols != nValueCols || nProbRows != nValueRows || nProbCols == 0 || nProbRows == 0)
+            return makeErrorAttempt(api::Error::NotAvailable);
+
+        std::vector<double> aProbabilityValues;
+        std::vector<double> aDataValues;
+        aProbabilityValues.reserve(nProbCols * nProbRows);
+        aDataValues.reserve(nProbCols * nProbRows);
+        for (SCSIZE nRow = 0; nRow < nProbRows; ++nRow)
+        {
+            for (SCSIZE nColumn = 0; nColumn < nProbCols; ++nColumn)
+            {
+                const auto aProbability = lookupexecution::detail::toApiCellValue(
+                    (*aProbabilities.moValue)->Get(nColumn, nRow));
+                const auto aValue
+                    = lookupexecution::detail::toApiCellValue((*aValues.moValue)->Get(nColumn, nRow));
+                if (aProbability.isError())
+                    return makeErrorAttempt(aProbability.meError);
+                if (aValue.isError())
+                    return makeErrorAttempt(aValue.meError);
+                if (!aProbability.isNumber() || !aValue.isNumber())
+                    return makeErrorAttempt(api::Error::IllegalArgument);
+
+                aProbabilityValues.push_back(aProbability.mfNumber);
+                aDataValues.push_back(aValue.mfNumber);
+            }
+        }
+
+        const auto aProbability = spreadsheetengine::core::math::evaluateProbability(
+            aProbabilityValues, aDataValues, fLower, *aUpper.moValue);
+        if (!aProbability)
+            return makeErrorAttempt(aProbability.meError);
+        return makeNumericAttempt(aProbability.maValue);
+    }
+
     return makeUnsupportedAttempt(FallbackReason::UnsupportedFunction);
 }
 
@@ -9380,10 +9453,14 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                    || *oCanonicalName == u"BITOR" || *oCanonicalName == u"BITXOR"
                    || *oCanonicalName == u"BITLSHIFT" || *oCanonicalName == u"BITRSHIFT");
     }
+    if (aUpperFunctionName == u"PROB")
+        return true;
 
     return eFunction == FunctionKind::LogicalConstant
            || eFunction == FunctionKind::FormulaText
-           || eFunction == FunctionKind::Conversion;
+           || eFunction == FunctionKind::Conversion
+           || eFunction == FunctionKind::Aggregate
+           || eFunction == FunctionKind::MatrixMath;
 }
 
 inline void resetStats()

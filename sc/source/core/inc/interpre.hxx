@@ -892,7 +892,6 @@ public:
     // matrix functions
     void ScMatValue();
     static void MEMat(const ScMatrixRef& mM, SCSIZE n);
-    void ScMatDet();
     void ScMatInv();
     void ScMatMult();
     void ScMatSequence();
@@ -1000,7 +999,6 @@ private:
     void ScModalValue();
     void ScModalValue_MS( bool bSingle );
     void ScAveDev();
-    void ScAggregate();
     void ScDevSq();
     void ScZTest();
     void ScTTest();
@@ -1019,7 +1017,6 @@ private:
     void ScConfidence();
     void ScConfidenceT();
     void ScTrimMean();
-    void ScProbability();
     void ScCorrel();
     void ScCovarianceP();
     void ScCovarianceS();

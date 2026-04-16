@@ -3291,67 +3291,6 @@ void ScInterpreter::ScDevSq()
     GetStVarParams( false /*bTextAsZero*/, VarResult);
 }
 
-void ScInterpreter::ScProbability()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 3, 4 ) )
-        return;
-    double fUp, fLo;
-    fUp = GetDouble();
-    if (nParamCount == 4)
-        fLo = GetDouble();
-    else
-        fLo = fUp;
-    if (fLo > fUp)
-        std::swap( fLo, fUp );
-    ScMatrixRef pMatP = GetMatrix();
-    ScMatrixRef pMatW = GetMatrix();
-    if (!pMatP || !pMatW)
-        PushIllegalParameter();
-    else
-    {
-        SCSIZE nC1, nC2;
-        SCSIZE nR1, nR2;
-        pMatP->GetDimensions(nC1, nR1);
-        pMatW->GetDimensions(nC2, nR2);
-        if (nC1 != nC2 || nR1 != nR2 || nC1 == 0 || nR1 == 0 ||
-            nC2 == 0 || nR2 == 0)
-            PushNA();
-        else
-        {
-            KahanSum fSum = 0.0;
-            KahanSum fRes = 0.0;
-            bool bStop = false;
-            double fP, fW;
-            for ( SCSIZE i = 0; i < nC1 && !bStop; i++ )
-            {
-                for (SCSIZE j = 0; j < nR1 && !bStop; ++j )
-                {
-                    if (pMatP->IsValue(i,j) && pMatW->IsValue(i,j))
-                    {
-                        fP = pMatP->GetDouble(i,j);
-                        fW = pMatW->GetDouble(i,j);
-                        if (fP < 0.0 || fP > 1.0)
-                            bStop = true;
-                        else
-                        {
-                            fSum += fP;
-                            if (fW >= fLo && fW <= fUp)
-                                fRes += fP;
-                        }
-                    }
-                    else
-                        SetError( FormulaError::IllegalArgument);
-                }
-            }
-            if (bStop || std::abs((fSum -1.0).get()) > 1.0E-7)
-                PushNoValue();
-            else
-                PushDouble(fRes.get());
-        }
-    }
-}
-
 void ScInterpreter::ScCorrel()
 {
     // This is identical to ScPearson()

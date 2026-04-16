@@ -905,53 +905,6 @@ static void lcl_LUP_solve( const ScMatrix* mLU, const SCSIZE n,
 #endif
 }
 
-void ScInterpreter::ScMatDet()
-{
-    if ( !MustHaveParamCount( GetByte(), 1 ) )
-        return;
-
-    ScMatrixRef pMat = GetMatrix();
-    if (!pMat)
-    {
-        PushIllegalParameter();
-        return;
-    }
-    if ( !pMat->IsNumeric() )
-    {
-        PushNoValue();
-        return;
-    }
-    SCSIZE nC, nR;
-    pMat->GetDimensions(nC, nR);
-    if ( nC != nR || nC == 0 )
-        PushIllegalArgument();
-    else if (!ScMatrix::IsSizeAllocatable( nC, nR))
-        PushError( FormulaError::MatrixSize);
-    else
-    {
-        // LUP decomposition is done inplace, use copy.
-        ScMatrixRef xLU = pMat->Clone();
-        if (!xLU)
-            PushError( FormulaError::CodeOverflow);
-        else
-        {
-            std::vector< SCSIZE> P(nR);
-            int nDetSign = lcl_LUP_decompose( xLU.get(), nR, P);
-            if (!nDetSign)
-                PushInt(0);     // singular matrix
-            else
-            {
-                // In an LU matrix the determinant is simply the product of
-                // all diagonal elements.
-                double fDet = nDetSign;
-                for (SCSIZE i=0; i < nR; ++i)
-                    fDet *= xLU->GetDouble( i, i);
-                PushDouble( fDet);
-            }
-        }
-    }
-}
-
 void ScInterpreter::ScMatInv()
 {
     if ( !MustHaveParamCount( GetByte(), 1 ) )

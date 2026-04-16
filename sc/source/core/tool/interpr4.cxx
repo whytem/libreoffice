@@ -72,6 +72,7 @@
 #include <compiler.hxx>
 #include <spreadsheetengine/runtime/ConversionRuntime.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
+#include <spreadsheetengine/runtime/MathMatrix.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
@@ -4119,6 +4120,271 @@ StackVar ScInterpreter::Interpret()
                         PushDouble(fRes);
                     }
                 };
+                const auto pushLegacyMatrixDeterminant = [&]() {
+                    warnIfLegacyDispatchReached(
+                        "family-local default-on", u"MDETERM",
+                        [](std::u16string_view rFormula) {
+                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                        },
+                        "family-local default-on MDETERM reached ScInterpreter");
+
+                    if (!MustHaveParamCount(GetByte(), 1))
+                        return;
+
+                    ScMatrixRef pMat = GetMatrix();
+                    if (!pMat)
+                    {
+                        PushIllegalParameter();
+                        return;
+                    }
+                    if (!pMat->IsNumeric())
+                    {
+                        PushNoValue();
+                        return;
+                    }
+
+                    SCSIZE nColumns = 0;
+                    SCSIZE nRows = 0;
+                    pMat->GetDimensions(nColumns, nRows);
+                    if (nColumns != nRows || nColumns == 0)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    if (!ScMatrix::IsSizeAllocatable(nColumns, nRows))
+                    {
+                        PushError(FormulaError::MatrixSize);
+                        return;
+                    }
+
+                    std::vector<double> aValues;
+                    aValues.reserve(nColumns * nRows);
+                    for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+                    {
+                        for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                            aValues.push_back(pMat->GetDouble(nColumn, nRow));
+                    }
+
+                    const auto aDeterminant
+                        = spreadsheetengine::core::math::evaluateMatrixDeterminant(
+                            aValues, static_cast<std::size_t>(nColumns));
+                    if (!aDeterminant)
+                        PushError(spreadsheetengine::compat::libreoffice::toFormulaError(
+                            aDeterminant.meError));
+                    else
+                        PushDouble(aDeterminant.maValue);
+                };
+                const auto pushLegacyAggregate = [&]() {
+                    warnIfLegacyDispatchReached(
+                        "family-local default-on", u"AGGREGATE",
+                        [](std::u16string_view rFormula) {
+                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                        },
+                        "family-local default-on AGGREGATE reached ScInterpreter");
+
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCountMinWithStackCheck(nParamCount, 3))
+                        return;
+
+                    const FormulaError nErr = nGlobalError;
+                    nGlobalError = FormulaError::NONE;
+
+                    const FormulaToken* pFuncToken = pStack[sp - nParamCount];
+                    PushWithoutError(*pFuncToken);
+                    sal_Int32 nFunc = GetInt32();
+                    const FormulaToken* pOptionToken = pStack[sp - (nParamCount - 1)];
+                    PushWithoutError(*pOptionToken);
+                    sal_Int32 nOption = GetInt32();
+
+                    if (nGlobalError != FormulaError::NONE || nFunc < 1 || nFunc > 19)
+                    {
+                        nGlobalError = nErr;
+                        PushIllegalArgument();
+                        return;
+                    }
+
+                    switch (nOption)
+                    {
+                        case 0:
+                            mnSubTotalFlags = SubtotalFlags::IgnoreNestedStAg;
+                            break;
+                        case 1:
+                            mnSubTotalFlags
+                                = SubtotalFlags::IgnoreHidden | SubtotalFlags::IgnoreNestedStAg;
+                            break;
+                        case 2:
+                            mnSubTotalFlags
+                                = SubtotalFlags::IgnoreErrVal | SubtotalFlags::IgnoreNestedStAg;
+                            break;
+                        case 3:
+                            mnSubTotalFlags = SubtotalFlags::IgnoreHidden
+                                              | SubtotalFlags::IgnoreErrVal
+                                              | SubtotalFlags::IgnoreNestedStAg;
+                            break;
+                        case 4:
+                            mnSubTotalFlags = SubtotalFlags::NONE;
+                            break;
+                        case 5:
+                            mnSubTotalFlags = SubtotalFlags::IgnoreHidden;
+                            break;
+                        case 6:
+                            mnSubTotalFlags = SubtotalFlags::IgnoreErrVal;
+                            break;
+                        case 7:
+                            mnSubTotalFlags
+                                = SubtotalFlags::IgnoreHidden | SubtotalFlags::IgnoreErrVal;
+                            break;
+                        default:
+                            nGlobalError = nErr;
+                            PushIllegalArgument();
+                            return;
+                    }
+
+                    if ((mnSubTotalFlags & SubtotalFlags::IgnoreErrVal) == SubtotalFlags::NONE)
+                        nGlobalError = nErr;
+
+                    cPar = nParamCount - 2;
+                    switch (nFunc)
+                    {
+                        case AGGREGATE_FUNC_AVE:
+                            ScAverage();
+                            break;
+                        case AGGREGATE_FUNC_CNT:
+                            ScCount();
+                            break;
+                        case AGGREGATE_FUNC_CNT2:
+                            ScCount2();
+                            break;
+                        case AGGREGATE_FUNC_MAX:
+                            ScMax();
+                            break;
+                        case AGGREGATE_FUNC_MIN:
+                            ScMin();
+                            break;
+                        case AGGREGATE_FUNC_PROD:
+                            ScProduct();
+                            break;
+                        case AGGREGATE_FUNC_STD:
+                            ScStDev();
+                            break;
+                        case AGGREGATE_FUNC_STDP:
+                            ScStDevP();
+                            break;
+                        case AGGREGATE_FUNC_SUM:
+                            ScSum();
+                            break;
+                        case AGGREGATE_FUNC_VAR:
+                            ScVar();
+                            break;
+                        case AGGREGATE_FUNC_VARP:
+                            ScVarP();
+                            break;
+                        case AGGREGATE_FUNC_MEDIAN:
+                            ScMedian();
+                            break;
+                        case AGGREGATE_FUNC_MODSNGL:
+                            ScModalValue();
+                            break;
+                        case AGGREGATE_FUNC_LARGE:
+                            ScLarge();
+                            break;
+                        case AGGREGATE_FUNC_SMALL:
+                            ScSmall();
+                            break;
+                        case AGGREGATE_FUNC_PERCINC:
+                            ScPercentile(true);
+                            break;
+                        case AGGREGATE_FUNC_QRTINC:
+                            ScQuartile(true);
+                            break;
+                        case AGGREGATE_FUNC_PERCEXC:
+                            ScPercentile(false);
+                            break;
+                        case AGGREGATE_FUNC_QRTEXC:
+                            ScQuartile(false);
+                            break;
+                        default:
+                            nGlobalError = nErr;
+                            PushIllegalArgument();
+                            mnSubTotalFlags = SubtotalFlags::NONE;
+                            return;
+                    }
+                    mnSubTotalFlags = SubtotalFlags::NONE;
+
+                    FormulaConstTokenRef xRef(PopToken());
+                    Pop();
+                    Pop();
+                    PushTokenRef(xRef);
+                };
+                const auto pushLegacyProbability = [&]() {
+                    warnIfLegacyDispatchReached(
+                        "family-local default-on", u"PROB",
+                        [](std::u16string_view rFormula) {
+                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                        },
+                        "family-local default-on PROB reached ScInterpreter");
+
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 3, 4))
+                        return;
+
+                    double fUpper = GetDouble();
+                    double fLower = nParamCount == 4 ? GetDouble() : fUpper;
+                    if (fLower > fUpper)
+                        std::swap(fLower, fUpper);
+
+                    ScMatrixRef pMatProbabilities = GetMatrix();
+                    ScMatrixRef pMatValues = GetMatrix();
+                    if (!pMatProbabilities || !pMatValues)
+                    {
+                        PushIllegalParameter();
+                        return;
+                    }
+
+                    SCSIZE nProbCols = 0, nProbRows = 0, nValueCols = 0, nValueRows = 0;
+                    pMatProbabilities->GetDimensions(nProbCols, nProbRows);
+                    pMatValues->GetDimensions(nValueCols, nValueRows);
+                    if (nProbCols != nValueCols || nProbRows != nValueRows || nProbCols == 0
+                        || nProbRows == 0 || nValueCols == 0 || nValueRows == 0)
+                    {
+                        PushNA();
+                        return;
+                    }
+
+                    KahanSum fSum = 0.0;
+                    KahanSum fResult = 0.0;
+                    bool bStop = false;
+                    for (SCSIZE nColumn = 0; nColumn < nProbCols && !bStop; ++nColumn)
+                    {
+                        for (SCSIZE nRow = 0; nRow < nProbRows && !bStop; ++nRow)
+                        {
+                            if (pMatProbabilities->IsValue(nColumn, nRow)
+                                && pMatValues->IsValue(nColumn, nRow))
+                            {
+                                const double fProbability
+                                    = pMatProbabilities->GetDouble(nColumn, nRow);
+                                const double fValue = pMatValues->GetDouble(nColumn, nRow);
+                                if (fProbability < 0.0 || fProbability > 1.0)
+                                    bStop = true;
+                                else
+                                {
+                                    fSum += fProbability;
+                                    if (fValue >= fLower && fValue <= fUpper)
+                                        fResult += fProbability;
+                                }
+                            }
+                            else
+                            {
+                                SetError(FormulaError::IllegalArgument);
+                            }
+                        }
+                    }
+
+                    if (bStop || std::abs((fSum - 1.0).get()) > 1.0E-7)
+                        PushNoValue();
+                    else
+                        PushDouble(fResult.get());
+                };
                 const auto pushLegacyBitwise = [&](std::u16string_view rFunctionName,
                                                    auto aOperator) {
                     warnIfLegacyDispatchReached(
@@ -4609,7 +4875,7 @@ StackVar ScInterpreter::Interpret()
                     case ocEffect           : ScEffect();                   break;
                     case ocNominal          : ScNominal();                  break;
                     case ocSubTotal         : ScSubTotal();                 break;
-                    case ocAggregate        : ScAggregate();                break;
+                    case ocAggregate        : pushLegacyAggregate();        break;
                     case ocDBSum            : ScDBSum();                    break;
                     case ocDBCount          : ScDBCount();                  break;
                     case ocDBCount2         : ScDBCount2();                 break;
@@ -4663,7 +4929,7 @@ StackVar ScInterpreter::Interpret()
                     case ocMaxIfs_MS        : ScMaxIfs_MS();                break;
                     case ocMatValue         : ScMatValue();                 break;
                     case ocMatrixUnit       : ScEMat();                     break;
-                    case ocMatDet           : ScMatDet();                   break;
+                    case ocMatDet           : pushLegacyMatrixDeterminant();break;
                     case ocMatInv           : ScMatInv();                   break;
                     case ocMatMult          : ScMatMult();                  break;
                     case ocMatSequence      : ScMatSequence();              break;
@@ -4746,7 +5012,7 @@ StackVar ScInterpreter::Interpret()
                     case ocConfidence_N     : ScConfidence();               break;
                     case ocConfidence_T     : ScConfidenceT();              break;
                     case ocTrimMean         : ScTrimMean();                 break;
-                    case ocProb             : ScProbability();              break;
+                    case ocProb             : pushLegacyProbability();      break;
                     case ocCorrel           : ScCorrel();                   break;
                     case ocCovar            :
                     case ocCovarianceP      : ScCovarianceP();              break;
