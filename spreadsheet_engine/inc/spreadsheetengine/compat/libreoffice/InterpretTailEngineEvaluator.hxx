@@ -817,7 +817,8 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
         || rFunctionName == u"LEN" || rFunctionName == u"LEFT"
         || rFunctionName == u"RIGHT" || rFunctionName == u"T"
         || rFunctionName == u"EXACT" || rFunctionName == u"TEXTAFTER"
-        || rFunctionName == u"COM.MICROSOFT.TEXTAFTER")
+        || rFunctionName == u"COM.MICROSOFT.TEXTAFTER" || rFunctionName == u"TEXTBEFORE"
+        || rFunctionName == u"COM.MICROSOFT.TEXTBEFORE")
     {
         return FunctionKind::TextUtility;
     }
@@ -1388,6 +1389,8 @@ template <typename T>
     api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
     if (aFunctionName == u"COM.MICROSOFT.TEXTAFTER")
         aFunctionName = u"TEXTAFTER"_ustr;
+    else if (aFunctionName == u"COM.MICROSOFT.TEXTBEFORE")
+        aFunctionName = u"TEXTBEFORE"_ustr;
     const auto oCanonical = canonicalMathScalarFunctionName(aFunctionName);
     if (!oCanonical)
         return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
@@ -9024,6 +9027,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
     if (aFunctionName == u"COM.MICROSOFT.TEXTAFTER")
         aFunctionName = u"TEXTAFTER"_ustr;
+    else if (aFunctionName == u"COM.MICROSOFT.TEXTBEFORE")
+        aFunctionName = u"TEXTBEFORE"_ustr;
     auto materializeArgument = [&](const core::formula::Node& rArgument)
         -> Materialization<api::CellValue> {
         const auto aAttempt = evaluateScalarOrDelegatedNode(
@@ -9367,6 +9372,112 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         }
 
         const auto oResult = spreadsheetengine::core::text::textAfter(
+            toApiString(aText.maValue), aDelimiters, nInstance, bCaseInsensitive, bMatchEnd);
+        if (!oResult)
+        {
+            if (rNode.maChildren.size() >= 6
+                && rNode.maChildren[5]->meKind != core::formula::NodeKind::EmptyArgument)
+            {
+                auto aFallback = evaluateScalarOrDelegatedNode(*rNode.maChildren[5], eFunction,
+                    rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 1, bImportedCanonicalSource);
+                aFallback.meFunction = eFunction;
+                return aFallback;
+            }
+            return makeErrorResult(eFunction, api::Error::NotAvailable);
+        }
+
+        return makeStringResult(eFunction, toLibreOfficeString(*oResult));
+    }
+
+    if (aFunctionName == u"TEXTBEFORE")
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 6)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aText = materializeTextArgument(*rNode.maChildren[0]);
+        if (!aText)
+            return makeErrorResult(eFunction, aText.meError);
+
+        std::vector<api::String> aDelimiters;
+        const auto aDelimiterMatrix
+            = materializeMatrixNode(*rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+        if (!aDelimiterMatrix.mbSupported)
+            return makeUnsupported(eFunction, aDelimiterMatrix.meFallbackReason);
+        if (!aDelimiterMatrix.moValue)
+            return makeErrorResult(eFunction, aDelimiterMatrix.meError);
+
+        SCSIZE nDelimiterColumns = 0;
+        SCSIZE nDelimiterRows = 0;
+        (*aDelimiterMatrix.moValue)->GetDimensions(nDelimiterColumns, nDelimiterRows);
+        for (SCSIZE nRow = 0; nRow < nDelimiterRows; ++nRow)
+        {
+            for (SCSIZE nColumn = 0; nColumn < nDelimiterColumns; ++nColumn)
+            {
+                const auto aValue = lookupexecution::detail::toApiCellValue(
+                    (*aDelimiterMatrix.moValue)->Get(nColumn, nRow));
+                if (aValue.isError())
+                    return makeErrorResult(eFunction, aValue.meError);
+                const auto aDelimiter = coerceScalarToText(rDoc, rContext, aValue);
+                if (!aDelimiter)
+                    return makeErrorResult(eFunction, aDelimiter.meError);
+                aDelimiters.push_back(toApiString(aDelimiter.maValue));
+            }
+        }
+        if (aDelimiters.empty())
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        sal_Int32 nInstance = 1;
+        if (rNode.maChildren.size() >= 3
+            && rNode.maChildren[2]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aInstance = materializeArgument(*rNode.maChildren[2]);
+            if (!aInstance.mbSupported)
+                return makeUnsupported(eFunction, aInstance.meFallbackReason);
+            if (!aInstance.moValue)
+                return makeErrorResult(eFunction, aInstance.meError);
+            const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aInstance.moValue);
+            if (!aNumber)
+                return makeErrorResult(eFunction, aNumber.meError);
+            const auto oWhole = coerceWholeNumber(aNumber.maValue);
+            if (!oWhole || *oWhole == 0)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            nInstance = *oWhole;
+        }
+
+        bool bCaseInsensitive = false;
+        if (rNode.maChildren.size() >= 4
+            && rNode.maChildren[3]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aMatchMode = materializeArgument(*rNode.maChildren[3]);
+            if (!aMatchMode.mbSupported)
+                return makeUnsupported(eFunction, aMatchMode.meFallbackReason);
+            if (!aMatchMode.moValue)
+                return makeErrorResult(eFunction, aMatchMode.meError);
+            const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aMatchMode.moValue);
+            if (!aNumber)
+                return makeErrorResult(eFunction, aNumber.meError);
+            const auto oWhole = coerceWholeNumber(aNumber.maValue);
+            if (!oWhole || (*oWhole != 0 && *oWhole != 1))
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            bCaseInsensitive = *oWhole == 1;
+        }
+
+        bool bMatchEnd = false;
+        if (rNode.maChildren.size() >= 5
+            && rNode.maChildren[4]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aMatchEnd = materializeArgument(*rNode.maChildren[4]);
+            if (!aMatchEnd.mbSupported)
+                return makeUnsupported(eFunction, aMatchEnd.meFallbackReason);
+            if (!aMatchEnd.moValue)
+                return makeErrorResult(eFunction, aMatchEnd.meError);
+            const auto aBool = coerceScalarToBool(rDoc, rContext, *aMatchEnd.moValue);
+            if (!aBool)
+                return makeErrorResult(eFunction, aBool.meError);
+            bMatchEnd = aBool.maValue;
+        }
+
+        const auto oResult = spreadsheetengine::core::text::textBefore(
             toApiString(aText.maValue), aDelimiters, nInstance, bCaseInsensitive, bMatchEnd);
         if (!oResult)
         {

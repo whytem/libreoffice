@@ -3718,6 +3718,28 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorTextUtilit
         aTextAfterAlias.maResult.meType);
     CPPUNIT_ASSERT_EQUAL(u"tail"_ustr, spreadsheetengine::compat::libreoffice::toLibreOfficeString(
                                             aTextAfterAlias.maResult.maString));
+
+    const auto aTextBefore = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos,
+        u"=TEXTBEFORE(\"Brown, Lucas, Manager:1234:5678\";\",\";2)", false);
+    CPPUNIT_ASSERT(aTextBefore.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::TextUtility, aTextBefore.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aTextBefore.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"Brown, Lucas"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aTextBefore.maResult.maString));
+
+    const auto aTextBeforeNotFound = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos,
+        u"=TEXTBEFORE(\"Brown, Lucas\";\"xxx\";;;;\"Not Found\")", false);
+    CPPUNIT_ASSERT(aTextBeforeNotFound.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::TextUtility, aTextBeforeNotFound.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String,
+        aTextBeforeNotFound.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"Not Found"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aTextBeforeNotFound.maResult.maString));
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSpillArrayHelper)

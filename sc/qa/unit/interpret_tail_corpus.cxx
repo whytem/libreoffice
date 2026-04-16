@@ -2739,6 +2739,53 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalFoldDirectParit
     }
 }
 
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedTextBeforeParity)
+{
+    const OUString aWorkbookPath
+        = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/spreadsheet/fods/textbefore.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for textbefore.fods",
+        static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    const ScAddress aPos(0, 6, 1); // Sheet2.A7
+    ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+    CPPUNIT_ASSERT(pFormula);
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    const OUString aFormulaSource
+        = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+    const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
+    CPPUNIT_ASSERT_EQUAL(
+        u"=of:=COM.MICROSOFT.TEXTBEFORE([.F3]; \",\"; 2)"_ustr, aFormulaSource);
+
+    const auto aAttempt
+        = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
+            rDoc, *pContext, aPos,
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+            rDoc.GetCalcConfig().mbEmptyStringAsZero, pFormula->GetCode(),
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()));
+    CPPUNIT_ASSERT(aAttempt.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aAttempt.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"Brown, Lucas"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(aAttempt.maResult.maString));
+}
+
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalFoldDirectLiveHostTruth)
 {
     const struct ImportedLogicalFoldCase
