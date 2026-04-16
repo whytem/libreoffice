@@ -91,10 +91,16 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_probe_formula_cells=27204`
 - `interpret_tail_live_authoritative_match_total=20761`
 - `interpret_tail_live_authoritative_fallback_total=6443`
+- `legacy_interpreter_subroutine_count=380`
 - live authoritative-match rate over the corpus: `40.9802%`
 - live authoritative-match rate over the current promoted probe: `76.3160%`
 
 Everything below is diagnostic context for improving that number.
+
+The north-star measures live authority transfer. `legacy_interpreter_subroutine_count`
+is the blunt retirement-progress companion metric, derived from the remaining
+`void Sc*()` declarations in [interpre.hxx](/home/ubuntu/repos/libreoffice/sc/source/core/inc/interpre.hxx).
+Lower is better.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 

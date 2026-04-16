@@ -34,6 +34,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <map>
@@ -254,6 +255,32 @@ bool envEnabled(const char* pName)
 
     const std::string aValue(pValue);
     return !aValue.empty() && aValue != "0" && aValue != "off" && aValue != "false";
+}
+
+std::size_t countLegacyInterpreterSubroutines()
+{
+    const std::filesystem::path aRepoRoot
+        = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
+    const std::filesystem::path aHeaderPath
+        = aRepoRoot / "sc" / "source" / "core" / "inc" / "interpre.hxx";
+
+    std::ifstream aStream(aHeaderPath);
+    if (!aStream.is_open())
+        return 0;
+
+    std::size_t nCount = 0;
+    std::string aLine;
+    while (std::getline(aStream, aLine))
+    {
+        const auto nVoid = aLine.find("void Sc");
+        if (nVoid == std::string::npos)
+            continue;
+        const auto nOpenParen = aLine.find('(', nVoid);
+        if (nOpenParen == std::string::npos)
+            continue;
+        ++nCount;
+    }
+    return nCount;
 }
 
 void resetProbeDiagnosticSamples()
@@ -2083,7 +2110,8 @@ void printLiveTargetProbeSummary(const SupportedProbeRun& rRun)
 }
 
 void printLiveAuthoritativeSummary(
-    std::size_t nCorpusFormulaCount, const SupportedProbeRun& rRun)
+    std::size_t nCorpusFormulaCount, const SupportedProbeRun& rRun,
+    std::size_t nLegacyInterpreterSubroutineCount)
 {
     const sal_uInt64 nAuthoritative = rRun.maLiveAuthoritativeStats.mnAuthoritativeCount;
     const sal_uInt64 nFallback = rRun.maLiveAuthoritativeStats.mnAuthoritativeFallbackCount;
@@ -2104,6 +2132,8 @@ void printLiveAuthoritativeSummary(
               << nAuthoritative << '\n';
     std::cout << "interpret_tail_live_authoritative_fallback_total="
               << nFallback << '\n';
+    std::cout << "legacy_interpreter_subroutine_count="
+              << nLegacyInterpreterSubroutineCount << '\n';
 
     const auto aOldFlags = std::cout.flags();
     const auto nOldPrecision = std::cout.precision();
@@ -4236,6 +4266,9 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     printTopUnknownRootInventory("interpret_tail_forced_direct", aForcedDirectInventory);
     printStats(nWorkbookCount, nFormulaCellCount, aProbeStats);
     std::cout << "interpret_tail_probe_formula_cells=" << nProbeFormulaCount << '\n';
+    const std::size_t nLegacyInterpreterSubroutineCount = countLegacyInterpreterSubroutines();
+    CPPUNIT_ASSERT_MESSAGE("legacy interpreter subroutine metric should scan interpre.hxx",
+        nLegacyInterpreterSubroutineCount > 0);
     {
         SupportedProbeRun aPrintedProbeRun;
         aPrintedProbeRun.mnRawFormulaCount = nProbeFormulaCount;
@@ -4245,7 +4278,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         aPrintedProbeRun.mnHostTruthArtifactFormulaCount = nProbeHostTruthArtifactFormulaCount;
         aPrintedProbeRun.maLiveTargetStats = aLiveTargetProbeStats;
         aPrintedProbeRun.maHostTruthArtifactFunctionCount = aProbeHostTruthArtifactFunctionCount;
-        printLiveAuthoritativeSummary(nFormulaCellCount, aPrintedProbeRun);
+        printLiveAuthoritativeSummary(
+            nFormulaCellCount, aPrintedProbeRun, nLegacyInterpreterSubroutineCount);
         printLiveTargetProbeSummary(aPrintedProbeRun);
     }
     printReplayEligibilityInventory(aReplayEligibilityInventory);
