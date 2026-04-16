@@ -39,6 +39,7 @@ $(eval $(call gb_Library_use_libraries,spreadsheetengine,\
 $(eval $(call gb_Library_add_exception_objects,spreadsheetengine,\
     spreadsheet_engine/source/compat/formula/FormulaGrammar \
     spreadsheet_engine/source/core/MathBitwise \
+    spreadsheet_engine/source/core/MathMatrix \
     spreadsheet_engine/source/core/CalcConfig \
     spreadsheet_engine/source/core/CompiledFormulaInflation \
     spreadsheet_engine/source/core/CompilerSupport \

@@ -1359,6 +1359,8 @@ const char* functionKindName(FunctionKind eFunction)
             return "date_difference";
         case FunctionKind::DateConstructExtract:
             return "date_construct_extract";
+        case FunctionKind::MatrixMath:
+            return "matrix_math";
         case FunctionKind::MathScalar:
             return "math_scalar";
         case FunctionKind::InformationPredicate:

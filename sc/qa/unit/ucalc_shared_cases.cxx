@@ -3345,6 +3345,36 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSelectorHe
         spreadsheetengine::api::formulavalue::ValueType::Error, aInvalid.maResult.meType);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorMatrixMathHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailMatrixMathHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(4, 0, 0);
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(1, 0, 0, 2.0);
+    m_pDoc->SetValue(0, 1, 0, 3.0);
+    m_pDoc->SetValue(1, 1, 0, 4.0);
+
+    const auto aDet = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=MDETERM(A1:B2)", false);
+    CPPUNIT_ASSERT(aDet.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MatrixMath, aDet.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aDet.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-2.0, aDet.maResult.mfValue, 1e-12);
+
+    const auto aInvalid = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=MDETERM(A1:B2;1)", false);
+    CPPUNIT_ASSERT(aInvalid.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MatrixMath, aInvalid.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error, aInvalid.maResult.meType);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConditionalHelper)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

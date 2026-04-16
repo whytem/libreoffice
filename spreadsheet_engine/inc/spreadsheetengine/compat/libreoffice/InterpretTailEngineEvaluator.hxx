@@ -62,6 +62,7 @@
 #include <spreadsheetengine/runtime/MathAggregate.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathFunctionRuntime.hxx>
+#include <spreadsheetengine/runtime/MathMatrix.hxx>
 #include <spreadsheetengine/runtime/MathRounding.hxx>
 #include <spreadsheetengine/runtime/MathScalar.hxx>
 #include <spreadsheetengine/runtime/MathStatistical.hxx>
@@ -127,6 +128,7 @@ enum class FunctionKind : sal_uInt8
     CalendarUtility,
     DateDifference,
     DateConstructExtract,
+    MatrixMath,
     MathScalar,
     InformationPredicate,
     LogicalFold,
@@ -892,6 +894,8 @@ canonicalSelectorFunctionName(api::StringView rFunctionName)
     {
         return FunctionKind::DateConstructExtract;
     }
+    if (rFunctionName == u"MDETERM")
+        return FunctionKind::MatrixMath;
     if (canonicalMathScalarFunctionName(rFunctionName))
         return FunctionKind::MathScalar;
     if (rFunctionName == u"ISERROR" || rFunctionName == u"ISERR" || rFunctionName == u"ISNUMBER"
@@ -2727,6 +2731,7 @@ inline void putScalarIntoMatrix(
                 || eFunction == FunctionKind::CalendarUtility
                 || eFunction == FunctionKind::DateDifference
                 || eFunction == FunctionKind::DateConstructExtract
+                || eFunction == FunctionKind::MatrixMath
                 || eFunction == FunctionKind::Selector)
             {
                 auto aAttempt = evaluateFunctionNode(
@@ -9006,6 +9011,56 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
 }
 
+[[nodiscard]] inline EvaluationAttempt evaluateMatrixMathFunction(
+    const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
+{
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    if (aFunctionName != u"MDETERM")
+        return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+    if (rNode.maChildren.size() != 1)
+        return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+    const auto aMatrix = materializeMatrixNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+    if (!aMatrix.mbSupported)
+        return makeUnsupported(eFunction, aMatrix.meFallbackReason);
+    if (!aMatrix.moValue)
+        return makeErrorResult(eFunction, aMatrix.meError);
+
+    SCSIZE nColumns = 0;
+    SCSIZE nRows = 0;
+    (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+    if (nColumns != nRows || nColumns == 0)
+        return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+    std::vector<double> aValues;
+    aValues.reserve(nColumns * nRows);
+    for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+    {
+        for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+        {
+            const auto aValue = lookupexecution::detail::toApiCellValue(
+                (*aMatrix.moValue)->Get(nColumn, nRow));
+            if (aValue.isError())
+                return makeErrorResult(eFunction, aValue.meError);
+            if (aValue.isText())
+                return makeErrorResult(eFunction, api::Error::NoValue);
+            if (aValue.isEmpty())
+            {
+                aValues.push_back(0.0);
+                continue;
+            }
+            aValues.push_back(aValue.mfNumber);
+        }
+    }
+
+    const auto aDeterminant = spreadsheetengine::core::math::evaluateMatrixDeterminant(
+        aValues, static_cast<std::size_t>(nColumns));
+    if (!aDeterminant)
+        return makeErrorResult(eFunction, aDeterminant.meError);
+    return makeNumericResult(eFunction, aDeterminant.maValue, SvNumFormatType::NUMBER);
+}
+
 [[nodiscard]] inline EvaluationAttempt evaluateSelectorFunction(
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
@@ -9071,9 +9126,12 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         case FunctionKind::CalendarUtility:
         case FunctionKind::DateDifference:
         case FunctionKind::DateConstructExtract:
+        case FunctionKind::MatrixMath:
         case FunctionKind::MathScalar:
             return eFunction == FunctionKind::Conversion
                        ? evaluateConversionFunction(rRoot, eFunction, rDoc, rContext, rFormulaPos)
+                       : eFunction == FunctionKind::MatrixMath
+                       ? evaluateMatrixMathFunction(rRoot, eFunction, rDoc, rContext, rFormulaPos)
                        : eFunction == FunctionKind::MathScalar
                        ? evaluateMathScalarFunction(
                              rRoot, eFunction, rDoc, rContext, rFormulaPos,
