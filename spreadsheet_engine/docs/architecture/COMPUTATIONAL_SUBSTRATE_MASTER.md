@@ -56,7 +56,7 @@ Today:
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to
-  `20762 / 50,661` (`40.9822%`) on the standing replay corpus
+  `20761 / 50,661` (`40.9802%`) on the standing replay corpus
 - the broad corpus lane now completes again with `BusinessDay` admitted on the
   default ambient surface after rejecting zero-workday `WORKDAY` weekend masks
   before they enter the shared runtime, and the next `BusinessDay` slice has
@@ -112,7 +112,7 @@ Dominant ambient fallback reasons:
 - `unsupported_formula_shape=90`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=236`
+- `unsupported_function=182`
 
 ### Full Replay Corpus: Live Unique-Cell Surface
 
@@ -121,19 +121,19 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=27435`
-- `interpret_tail_live_unique_supported_formula_cells=27277`
-- `interpret_tail_live_unique_fallback_formula_cells=158`
-- `interpret_tail_live_unique_unsupported_function_formula_cells=118`
-- `interpret_tail_live_unique_unseen_formula_cells=23284`
-- `interpret_tail_live_unique_seen_rate=54.15`
-- `interpret_tail_live_unique_supported_rate=53.84`
+- `interpret_tail_live_unique_seen_formula_cells=27536`
+- `interpret_tail_live_unique_supported_formula_cells=27395`
+- `interpret_tail_live_unique_fallback_formula_cells=141`
+- `interpret_tail_live_unique_unsupported_function_formula_cells=91`
+- `interpret_tail_live_unique_unseen_formula_cells=23125`
+- `interpret_tail_live_unique_seen_rate=54.35`
+- `interpret_tail_live_unique_supported_rate=54.08`
 
 ### Live Unique Unsupported-Function Top-N
 
-- `unknown`: `91` unique unsupported-function cells
+- `unknown`: `61` unique unsupported-function cells
 - `text_utility`: `19` unique unsupported-function cells
-- `conditional`: `8` unique unsupported-function cells
+- `conditional`: `11` unique unsupported-function cells
 
 Routing policy:
 
@@ -144,13 +144,12 @@ Routing policy:
 
 Unknown root split:
 
-- `COM.MICROSOFT.UNIQUE`: `7`
-- `COM.MICROSOFT.SORT`: `6`
-- `COM.MICROSOFT.SORTBY`: `6`
-- `COM.MICROSOFT.TEXTSPLIT`: `4`
-- `COM.MICROSOFT.HSTACK`: `4`
-- `COM.MICROSOFT.TEXTAFTER`: `3`
 - `ORG.LIBREOFFICE.FORECAST.ETS.MULT`: `3`
+- `COM.MICROSOFT.FORECAST.ETS`: `3`
+- `COM.MICROSOFT.MODE.MULT`: `3`
+- `COM.MICROSOFT.VSTACK`: `3`
+- `FORECAST`: `3`
+- `COM.MICROSOFT.TEXTBEFORE`: `2`
 
 That now sharpens the next routing policy:
 
@@ -163,8 +162,14 @@ That now sharpens the next routing policy:
 - the new bounded `growth_projection` slice now carries `GROWTH` as
   `10` live unique cells, `10` supported / `0` fallback, removing it from the
   `unknown` wall
-- only then the spill-heavy dynamic-array cluster:
-  `UNIQUE`, `SORT`, `SORTBY`, `TEXTSPLIT`, `HSTACK`, `TEXTAFTER`
+- `TEXTAFTER(...)` is now admitted through `text_utility`
+- `IFS(...)` / `SWITCH(...)` are now admitted through `conditional`
+- the spill-heavy dynamic-array cluster
+  (`UNIQUE`, `SORT`, `SORTBY`, `TEXTSPLIT`, `HSTACK`) is now admitted as
+  `spill_array=83` live unique cells with `73` supported / `10` fallback and
+  `unsupported_function=0`
+- the next routing move should now pivot to the remaining forecasting /
+  statistical unknown roots plus adjacent scalar `TEXTBEFORE(...)` work
 
 ### Full Replay Corpus: Forced Interpret Observe Attempts
 
@@ -390,9 +395,9 @@ The highest-value remaining blockers are now:
 
 1. quality inside the new ambient live traffic:
    the full replay corpus still has a broad live attempt wall, with
-   `unsupported_function=236`
+   `unsupported_function=182`
 2. live-authority headroom:
-   the north-star is now `20762 / 50,661` (`40.9822%`), which is a real jump
+   the north-star is now `20761 / 50,661` (`40.9802%`), which is a real jump
    but still well short of deletion-comfortable territory
 3. imported live-host-truth residuals:
    the next likely north-star movers are now the broader ambient

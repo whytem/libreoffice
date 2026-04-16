@@ -236,7 +236,7 @@ Current ambient fallback reasons:
 - `unsupported_formula_shape=90`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=236`
+- `unsupported_function=182`
 
 ### Full Replay Corpus: Live Unique-Cell Surface
 
@@ -245,13 +245,13 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=27435`
-- `interpret_tail_live_unique_supported_formula_cells=27277`
-- `interpret_tail_live_unique_fallback_formula_cells=158`
-- `interpret_tail_live_unique_unsupported_function_formula_cells=118`
-- `interpret_tail_live_unique_unseen_formula_cells=23284`
-- `interpret_tail_live_unique_seen_rate=54.15`
-- `interpret_tail_live_unique_supported_rate=53.84`
+- `interpret_tail_live_unique_seen_formula_cells=27536`
+- `interpret_tail_live_unique_supported_formula_cells=27395`
+- `interpret_tail_live_unique_fallback_formula_cells=141`
+- `interpret_tail_live_unique_unsupported_function_formula_cells=91`
+- `interpret_tail_live_unique_unseen_formula_cells=23125`
+- `interpret_tail_live_unique_seen_rate=54.35`
+- `interpret_tail_live_unique_supported_rate=54.08`
 
 Interpretation:
 
@@ -311,15 +311,19 @@ Interpretation:
   `ORG.LIBREOFFICE.ROUNDSIG` live-seam coverage is now pinned in the
   validation suite
 - the live unique unsupported-function routing table is now explicit:
-  `unknown=91`, `text_utility=19`, `conditional=8`; that ordering now drives
+  `unknown=61`, `text_utility=19`, `conditional=11`; that ordering now drives
   the next ambient family-selection work instead of intuition
 - the remaining `unknown` bucket is now split by live unique root name:
-  `UNIQUE=7`, `SORT=6`, `SORTBY=6`, `TEXTSPLIT=4`, `HSTACK=4`,
-  `TEXTAFTER=3`, `FORECAST.ETS.MULT=3`, `FORECAST.ETS=3`
+  `FORECAST.ETS.MULT=3`, `FORECAST.ETS=3`, `MODE.MULT=3`, `VSTACK=3`,
+  `FORECAST=3`, `TEXTBEFORE=2`
 - that makes the next routing policy concrete:
-  first the spill-heavy dynamic-array cluster
-  (`UNIQUE`, `SORT`, `SORTBY`, `TEXTSPLIT`, `HSTACK`, `TEXTAFTER`)
-  and then the remaining forecasting/statistical roots
+  `TEXTAFTER(...)` is now admitted through `text_utility`,
+  `IFS(...)` / `SWITCH(...)` are now admitted through `conditional`,
+  and the spill-heavy dynamic-array cluster
+  (`UNIQUE`, `SORT`, `SORTBY`, `TEXTSPLIT`, `HSTACK`) is now admitted as
+  `spill_array=83` live unique cells with `73` supported / `10` fallback,
+  so the next bounded routing work should move to the remaining
+  forecasting/statistical roots plus scalar `TEXTBEFORE(...)`
 - the main remaining ambient work is now the still-large
   `unsupported_function` wall plus the still-heavy mismatch buckets inside the
   imported host-truth-artifact probe band, not simple denominator reach

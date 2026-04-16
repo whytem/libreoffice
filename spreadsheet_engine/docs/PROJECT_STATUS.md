@@ -62,7 +62,7 @@ Ambient live fallback reasons:
 - `unsupported_formula_shape=90`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=236`
+- `unsupported_function=182`
 
 ### Full Replay Corpus: Live Unique-Cell Surface
 
@@ -71,23 +71,23 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=27435`
-- `interpret_tail_live_unique_supported_formula_cells=27277`
-- `interpret_tail_live_unique_fallback_formula_cells=158`
-- `interpret_tail_live_unique_unsupported_function_formula_cells=118`
-- `interpret_tail_live_unique_unseen_formula_cells=23284`
-- `interpret_tail_live_unique_seen_rate=54.15`
-- `interpret_tail_live_unique_supported_rate=53.84`
+- `interpret_tail_live_unique_seen_formula_cells=27536`
+- `interpret_tail_live_unique_supported_formula_cells=27395`
+- `interpret_tail_live_unique_fallback_formula_cells=141`
+- `interpret_tail_live_unique_unsupported_function_formula_cells=91`
+- `interpret_tail_live_unique_unseen_formula_cells=23125`
+- `interpret_tail_live_unique_seen_rate=54.35`
+- `interpret_tail_live_unique_supported_rate=54.08`
 
 ### Live Unique Unsupported-Function Top-N
 
 This is now the routing table for the next ambient `unsupported_function`
 work. It is unique-cell inventory, not attempt telemetry.
 
-- `interpret_tail_live_unique_unsupported_function_formula_cells=118`
-- `unknown`: `91` unique unsupported-function cells
+- `interpret_tail_live_unique_unsupported_function_formula_cells=91`
+- `unknown`: `61` unique unsupported-function cells
 - `text_utility`: `19` unique unsupported-function cells
-- `conditional`: `8` unique unsupported-function cells
+- `conditional`: `11` unique unsupported-function cells
 
 Next routing policy:
 
@@ -100,14 +100,14 @@ Next routing policy:
 
 The top live unique roots still inside `FunctionKind::Unknown` are now:
 
-- `COM.MICROSOFT.UNIQUE`: `7` unique unsupported-function cells
-- `COM.MICROSOFT.SORT`: `6`
-- `COM.MICROSOFT.SORTBY`: `6`
-- `COM.MICROSOFT.TEXTSPLIT`: `4`
-- `COM.MICROSOFT.HSTACK`: `4`
-- `COM.MICROSOFT.TEXTAFTER`: `3`
-- `ORG.LIBREOFFICE.FORECAST.ETS.MULT`: `3`
+- `ORG.LIBREOFFICE.FORECAST.ETS.MULT`: `3` unique unsupported-function cells
 - `COM.MICROSOFT.FORECAST.ETS`: `3`
+- `COM.MICROSOFT.MODE.MULT`: `3`
+- `COM.MICROSOFT.VSTACK`: `3`
+- `FORECAST`: `3`
+- `COM.MICROSOFT.TEXTBEFORE`: `2`
+- `COM.MICROSOFT.MODE.SNGL`: `2`
+- `COMPLEX`: `2`
 
 Updated next routing policy:
 
@@ -123,8 +123,17 @@ Updated next routing policy:
 - the new bounded `growth_projection` slice now carries `GROWTH` as
   `10` live unique cells, `10` supported / `0` fallback, removing it from the
   `unknown` wall
-- only then consider the heavier dynamic-array spill cluster:
-  `UNIQUE`, `SORT`, `SORTBY`, `TEXTSPLIT`, `HSTACK`, `TEXTAFTER`
+- the scalar `TEXTAFTER(...)` slice is now admitted through `text_utility`
+- the `IFS(...)` / `SWITCH(...)` scalar slice is now admitted through
+  `conditional`
+- the spill-heavy dynamic-array cluster
+  (`UNIQUE`, `SORT`, `SORTBY`, `TEXTSPLIT`, `HSTACK`) is now admitted as
+  `spill_array=83` live unique cells, `73` supported / `10` fallback, with
+  `unsupported_function=0` and the residual concentrated in
+  `unsupported_formula_shape=10`
+- next routing should now move off the spill cluster and onto the remaining
+  forecasting/statistical unknown roots plus the adjacent scalar
+  `TEXTBEFORE(...)` residue
 
 ### Full Replay Corpus: Forced Interpret Observe Attempts
 
@@ -295,7 +304,7 @@ Still not true:
 - multiple interpreter hard-route milestones have landed, but full legacy
   opcode retirement has not
 - the dominant retained live blocker is now the broader ambient
-  `unsupported_function=236` wall rather than residual quality inside the
+  `unsupported_function=182` wall rather than residual quality inside the
   already-admitted families
 - the live authoritative-match north-star has now moved to
   `20761 / 50,661` (`40.9802%`) on the replay corpus
