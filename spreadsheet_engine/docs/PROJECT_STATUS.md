@@ -276,11 +276,13 @@ Today:
 
 Still not true:
 
-- no broad default-on rollout exists beyond logical constants
-- two narrow legacy deletion milestones have landed:
+- no broad default-on rollout exists beyond the narrow logical-constant and
+  formula-text families
+- three narrow legacy deletion milestones have landed:
   `ScInterpreter::ScTrue()` / `ScFalse()` and the dedicated
-  `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair; broader legacy
-  retirement has not started
+  `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair, plus the dedicated
+  `ScInterpreter::ScFormula()` wrapper; broader legacy retirement has not
+  started
 - multiple interpreter hard-route milestones have landed, but full legacy
   opcode retirement has not
 - the dominant retained live blocker is now the broader ambient

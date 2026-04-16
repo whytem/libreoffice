@@ -19,11 +19,14 @@ Today:
 - debug and CI-style builds default that seam to `observe`
 - an eighty-five-slice env-independent logical/text/match/xmatch/lookup/index
   cluster is now engine-first even with rollout explicitly `off`
-- two real narrow legacy deletion milestones have landed:
+- three real narrow legacy deletion milestones have landed:
   `ScInterpreter::ScTrue()` / `ScFalse()` are retired behind an explicit
   family-local default-on logical-constant path, and the dedicated
   `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair is retired while
-  preserving inline nested legacy execution
+  preserving inline nested legacy execution, and the dedicated
+  `ScInterpreter::ScFormula()` wrapper is now retired behind a family-local
+  default-on `FORMULA(...)` path while preserving inline nested/array legacy
+  execution at opcode dispatch
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to

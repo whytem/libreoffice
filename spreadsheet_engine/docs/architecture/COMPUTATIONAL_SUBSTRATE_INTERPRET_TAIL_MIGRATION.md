@@ -53,11 +53,13 @@ Today:
 
 What is still not true:
 
-- no broad default-on production rollout exists beyond logical constants
-- two narrow legacy deletion milestones have landed:
+- no broad default-on production rollout exists beyond the narrow
+  logical-constant and formula-text families
+- three narrow legacy deletion milestones have landed:
   `ScInterpreter::ScTrue()` / `ScFalse()` and the dedicated
-  `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair; broader legacy
-  retirement has not started
+  `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair, plus the dedicated
+  `ScInterpreter::ScFormula()` wrapper; broader legacy retirement has not
+  started
 - the full replay corpus now shows strong ambient live-seam traffic, but most
   retained fallback now lives inside the newly admitted scalar utility traffic
 - the next dominant live blocker is no longer simple reach; it is the quality
