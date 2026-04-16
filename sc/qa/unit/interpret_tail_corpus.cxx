@@ -196,6 +196,14 @@ struct ReplayEligibilityInventory
 
 struct ObserveSurfaceInventory
 {
+    struct UnknownRootInventoryEntry
+    {
+        std::size_t mnFormulaCells = 0;
+        std::size_t mnFallbackFormulaCells = 0;
+        std::size_t mnUnsupportedFunctionFormulaCells = 0;
+        std::size_t mnUnseenFormulaCells = 0;
+    };
+
     std::size_t mnFormulaCells = 0;
     std::size_t mnSeenFormulaCells = 0;
     std::size_t mnSupportedFormulaCells = 0;
@@ -211,6 +219,7 @@ struct ObserveSurfaceInventory
     std::array<std::size_t, static_cast<std::size_t>(FunctionKind::Count)> maFunctionUnseenCells {};
     std::array<std::size_t, static_cast<std::size_t>(FunctionKind::Count)>
         maFunctionUnsupportedFunctionCells {};
+    std::map<OUString, UnknownRootInventoryEntry> maUnknownRootInventory;
 };
 
 struct ScAddressLess
@@ -698,6 +707,127 @@ FunctionKind classifySupportedProbeFunction(std::u16string_view rFormula)
     return setaileval::detail::classifyDelegatedFunctionNode(*aParse.mpRoot);
 }
 
+OUString binaryOperatorLabel(spreadsheetengine::core::formula::BinaryOperator eOperator)
+{
+    using spreadsheetengine::core::formula::BinaryOperator;
+    switch (eOperator)
+    {
+        case BinaryOperator::Add:
+            return u"operator:+"_ustr;
+        case BinaryOperator::Subtract:
+            return u"operator:-"_ustr;
+        case BinaryOperator::Multiply:
+            return u"operator:*"_ustr;
+        case BinaryOperator::Divide:
+            return u"operator:/"_ustr;
+        case BinaryOperator::Power:
+            return u"operator:^"_ustr;
+        case BinaryOperator::Concat:
+            return u"operator:&"_ustr;
+        case BinaryOperator::Equal:
+            return u"operator:="_ustr;
+        case BinaryOperator::NotEqual:
+            return u"operator:<>"_ustr;
+        case BinaryOperator::Less:
+            return u"operator:<"_ustr;
+        case BinaryOperator::LessEqual:
+            return u"operator:<="_ustr;
+        case BinaryOperator::Greater:
+            return u"operator:>"_ustr;
+        case BinaryOperator::GreaterEqual:
+            return u"operator:>="_ustr;
+    }
+
+    return u"operator:binary"_ustr;
+}
+
+OUString unaryOperatorLabel(spreadsheetengine::core::formula::UnaryOperator eOperator)
+{
+    using spreadsheetengine::core::formula::UnaryOperator;
+    switch (eOperator)
+    {
+        case UnaryOperator::Plus:
+            return u"operator:unary+"_ustr;
+        case UnaryOperator::Minus:
+            return u"operator:unary-"_ustr;
+    }
+
+    return u"operator:unary"_ustr;
+}
+
+OUString classifyUnknownRootLabel(std::u16string_view rFormula)
+{
+    namespace seformula = spreadsheetengine::core::formula;
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    const auto aNormalized = setaileval::detail::normalizeFormulaSource(rFormula);
+    const auto aParse = seformula::parseFormula(aNormalized);
+    if (!aParse || !aParse.mpRoot)
+        return u"parse_failure"_ustr;
+
+    const auto& rRoot = *aParse.mpRoot;
+    switch (rRoot.meKind)
+    {
+        case seformula::NodeKind::FunctionCall:
+            return toLibreOfficeString(setaileval::detail::uppercaseAscii(rRoot.maPrimaryText));
+        case seformula::NodeKind::BinaryOperation:
+            return binaryOperatorLabel(rRoot.meBinaryOperator);
+        case seformula::NodeKind::UnaryOperation:
+            return unaryOperatorLabel(rRoot.meUnaryOperator);
+        case seformula::NodeKind::CellReference:
+            return u"root:cell_reference"_ustr;
+        case seformula::NodeKind::RangeReference:
+            return u"root:range_reference"_ustr;
+        case seformula::NodeKind::NamedReference:
+            return u"root:named_reference"_ustr;
+        case seformula::NodeKind::RangeConstructor:
+            return u"root:range_constructor"_ustr;
+        case seformula::NodeKind::ReferenceList:
+            return u"root:reference_list"_ustr;
+        case seformula::NodeKind::ArrayConstant:
+            return u"root:array_constant"_ustr;
+        case seformula::NodeKind::NumberLiteral:
+            return u"root:number_literal"_ustr;
+        case seformula::NodeKind::StringLiteral:
+            return u"root:string_literal"_ustr;
+        case seformula::NodeKind::BooleanLiteral:
+            return u"root:boolean_literal"_ustr;
+        case seformula::NodeKind::ErrorLiteral:
+            return u"root:error_literal"_ustr;
+        case seformula::NodeKind::EmptyArgument:
+            return u"root:empty_argument"_ustr;
+    }
+
+    return u"root:unknown"_ustr;
+}
+
+void recordUnknownRootInventory(ObserveSurfaceInventory& rInventory, const OUString& rRootLabel,
+    bool bFallback, bool bUnsupportedFunction, bool bSeen)
+{
+    auto& rEntry = rInventory.maUnknownRootInventory[rRootLabel];
+    ++rEntry.mnFormulaCells;
+    if (bFallback)
+        ++rEntry.mnFallbackFormulaCells;
+    if (bUnsupportedFunction)
+        ++rEntry.mnUnsupportedFunctionFormulaCells;
+    if (!bSeen)
+        ++rEntry.mnUnseenFormulaCells;
+}
+
+void accumulateUnknownRootInventory(
+    ObserveSurfaceInventory& rTarget, const ObserveSurfaceInventory& rSource)
+{
+    for (const auto& rEntry : rSource.maUnknownRootInventory)
+    {
+        auto& rTargetEntry = rTarget.maUnknownRootInventory[rEntry.first];
+        rTargetEntry.mnFormulaCells += rEntry.second.mnFormulaCells;
+        rTargetEntry.mnFallbackFormulaCells += rEntry.second.mnFallbackFormulaCells;
+        rTargetEntry.mnUnsupportedFunctionFormulaCells
+            += rEntry.second.mnUnsupportedFunctionFormulaCells;
+        rTargetEntry.mnUnseenFormulaCells += rEntry.second.mnUnseenFormulaCells;
+    }
+}
+
 SupportedProbeRun runSupportedInterpretTailProbe(
     const Workbook& rWorkbook, ScDocument& rDoc, const OUString& rWorkbookLabel)
 {
@@ -863,6 +993,10 @@ ObserveSurfaceInventory runForcedInterpretObserveSurface(const Workbook& rWorkbo
             const FunctionKind eDirectFunction = classifySupportedProbeFunction(
                 std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()));
             ++aInventory.maFunctionFormulaCells[static_cast<std::size_t>(eDirectFunction)];
+            const OUString aUnknownRootLabel = eDirectFunction == FunctionKind::Unknown
+                ? classifyUnknownRootLabel(
+                      std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()))
+                : OUString();
 
             spreadsheetengine::compat::libreoffice::interprettaileval::resetStats();
             pFormula->SetDirty();
@@ -910,6 +1044,10 @@ ObserveSurfaceInventory runForcedInterpretObserveSurface(const Workbook& rWorkbo
                 ++aInventory.maFunctionUnsupportedFunctionCells[static_cast<std::size_t>(
                     eDirectFunction)];
             }
+
+            if (eDirectFunction == FunctionKind::Unknown)
+                recordUnknownRootInventory(
+                    aInventory, aUnknownRootLabel, bFallback, bUnsupportedFunction, bSeen);
         }
     }
 
@@ -953,6 +1091,10 @@ ObserveSurfaceInventory buildObserveSurfaceInventory(
             const FunctionKind eDirectFunction = classifySupportedProbeFunction(
                 std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()));
             ++aInventory.maFunctionFormulaCells[static_cast<std::size_t>(eDirectFunction)];
+            const OUString aUnknownRootLabel = eDirectFunction == FunctionKind::Unknown
+                ? classifyUnknownRootLabel(
+                      std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()))
+                : OUString();
 
             const auto it = aObservedByAddress.find(aPos);
             const bool bSeen = it != aObservedByAddress.end() && it->second.mbSeen;
@@ -990,6 +1132,10 @@ ObserveSurfaceInventory buildObserveSurfaceInventory(
                 ++aInventory.maFunctionUnsupportedFunctionCells[static_cast<std::size_t>(
                     eDirectFunction)];
             }
+
+            if (eDirectFunction == FunctionKind::Unknown)
+                recordUnknownRootInventory(
+                    aInventory, aUnknownRootLabel, bFallback, bUnsupportedFunction, bSeen);
         }
     }
 
@@ -1776,6 +1922,64 @@ void printTopUnsupportedFunctionInventory(
                   << "_fallback_formula_cells=" << rEntry.mnFallbackFormulaCells << '\n';
         std::cout << aPrefix << "_top_unsupported_function_" << nIndex
                   << "_unseen_formula_cells=" << rEntry.mnUnseenFormulaCells << '\n';
+    }
+}
+
+void printTopUnknownRootInventory(
+    std::string_view aPrefix, const ObserveSurfaceInventory& rInventory, std::size_t nLimit = 10)
+{
+    using UnknownRootInventoryEntry = ObserveSurfaceInventory::UnknownRootInventoryEntry;
+    struct RankedUnknownRoot
+    {
+        OUString maLabel;
+        UnknownRootInventoryEntry maEntry;
+    };
+
+    std::vector<RankedUnknownRoot> aEntries;
+    aEntries.reserve(rInventory.maUnknownRootInventory.size());
+    for (const auto& rEntry : rInventory.maUnknownRootInventory)
+    {
+        if (!rEntry.second.mnUnsupportedFunctionFormulaCells)
+            continue;
+        aEntries.push_back({ rEntry.first, rEntry.second });
+    }
+
+    std::sort(aEntries.begin(), aEntries.end(),
+        [](const RankedUnknownRoot& rLeft, const RankedUnknownRoot& rRight) {
+            if (rLeft.maEntry.mnUnsupportedFunctionFormulaCells
+                != rRight.maEntry.mnUnsupportedFunctionFormulaCells)
+            {
+                return rLeft.maEntry.mnUnsupportedFunctionFormulaCells
+                       > rRight.maEntry.mnUnsupportedFunctionFormulaCells;
+            }
+            if (rLeft.maEntry.mnUnseenFormulaCells != rRight.maEntry.mnUnseenFormulaCells)
+                return rLeft.maEntry.mnUnseenFormulaCells > rRight.maEntry.mnUnseenFormulaCells;
+            if (rLeft.maEntry.mnFallbackFormulaCells != rRight.maEntry.mnFallbackFormulaCells)
+                return rLeft.maEntry.mnFallbackFormulaCells
+                       > rRight.maEntry.mnFallbackFormulaCells;
+            return rLeft.maLabel < rRight.maLabel;
+        });
+
+    if (aEntries.size() > nLimit)
+        aEntries.resize(nLimit);
+
+    std::cout << aPrefix << "_top_unknown_root_count=" << aEntries.size() << '\n';
+    for (std::size_t nIndex = 0; nIndex < aEntries.size(); ++nIndex)
+    {
+        const auto& rEntry = aEntries[nIndex];
+        std::cout << aPrefix << "_top_unknown_root_" << nIndex
+                  << "_label=" << rEntry.maLabel.toUtf8().getStr() << '\n';
+        std::cout << aPrefix << "_top_unknown_root_" << nIndex
+                  << "_unsupported_function_formula_cells="
+                  << rEntry.maEntry.mnUnsupportedFunctionFormulaCells << '\n';
+        std::cout << aPrefix << "_top_unknown_root_" << nIndex
+                  << "_formula_cells=" << rEntry.maEntry.mnFormulaCells << '\n';
+        std::cout << aPrefix << "_top_unknown_root_" << nIndex
+                  << "_fallback_formula_cells=" << rEntry.maEntry.mnFallbackFormulaCells
+                  << '\n';
+        std::cout << aPrefix << "_top_unknown_root_" << nIndex
+                  << "_unseen_formula_cells=" << rEntry.maEntry.mnUnseenFormulaCells
+                  << '\n';
     }
 }
 
@@ -3825,6 +4029,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                     aLiveUniqueInventory.maFunctionUnseenCells[nIndex]
                         += aWorkbookLiveInventory.maFunctionUnseenCells[nIndex];
                 }
+                accumulateUnknownRootInventory(aLiveUniqueInventory, aWorkbookLiveInventory);
             }
 
             {
@@ -3870,6 +4075,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                     aForcedDirectInventory.maFunctionUnseenCells[nIndex]
                         += aWorkbookForcedDirectInventory.maFunctionUnseenCells[nIndex];
                 }
+                accumulateUnknownRootInventory(
+                    aForcedDirectInventory, aWorkbookForcedDirectInventory);
             }
 
             {
@@ -3966,10 +4173,12 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     printRoutingStats("interpret_tail_live", nFormulaCellCount, aLiveStats);
     printObserveSurfaceInventory("interpret_tail_live_unique", aLiveUniqueInventory);
     printTopUnsupportedFunctionInventory("interpret_tail_live_unique", aLiveUniqueInventory);
+    printTopUnknownRootInventory("interpret_tail_live_unique", aLiveUniqueInventory);
     printRoutingStats("interpret_tail_forced_interpret", aForcedDirectInventory.mnFormulaCells,
         aForcedInterpretStats);
     printObserveSurfaceInventory("interpret_tail_forced_direct", aForcedDirectInventory);
     printTopUnsupportedFunctionInventory("interpret_tail_forced_direct", aForcedDirectInventory);
+    printTopUnknownRootInventory("interpret_tail_forced_direct", aForcedDirectInventory);
     printStats(nWorkbookCount, nFormulaCellCount, aProbeStats);
     std::cout << "interpret_tail_probe_formula_cells=" << nProbeFormulaCount << '\n';
     {
