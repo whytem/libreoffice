@@ -31,6 +31,7 @@
 #include <spreadsheetengine/runtime/DateTimeWorkday.hxx>
 
 #include <algorithm>
+#include <cstring>
 #include <cstdlib>
 #include <filesystem>
 #include <iomanip>
@@ -200,6 +201,7 @@ struct ObserveSurfaceInventory
     std::size_t mnSupportedFormulaCells = 0;
     std::size_t mnFallbackFormulaCells = 0;
     std::size_t mnUnseenFormulaCells = 0;
+    std::size_t mnUnsupportedFunctionFormulaCells = 0;
     StatsSnapshot maAttemptStats;
     std::array<std::size_t, static_cast<std::size_t>(FunctionKind::Count)> maFunctionFormulaCells {};
     std::array<std::size_t, static_cast<std::size_t>(FunctionKind::Count)> maFunctionSeenCells {};
@@ -207,6 +209,8 @@ struct ObserveSurfaceInventory
         maFunctionSupportedCells {};
     std::array<std::size_t, static_cast<std::size_t>(FunctionKind::Count)> maFunctionFallbackCells {};
     std::array<std::size_t, static_cast<std::size_t>(FunctionKind::Count)> maFunctionUnseenCells {};
+    std::array<std::size_t, static_cast<std::size_t>(FunctionKind::Count)>
+        maFunctionUnsupportedFunctionCells {};
 };
 
 struct ScAddressLess
@@ -872,6 +876,10 @@ ObserveSurfaceInventory runForcedInterpretObserveSurface(const Workbook& rWorkbo
                                         + aDirectStats.mnAuthoritativeCount
                                     > 0;
             const bool bFallback = totalFallbackCount(aDirectStats) > 0;
+            const bool bUnsupportedFunction
+                = aDirectStats.maFallbackReasons[static_cast<std::size_t>(
+                      FallbackReason::UnsupportedFunction)]
+                  > 0;
 
             if (bSeen)
             {
@@ -894,6 +902,13 @@ ObserveSurfaceInventory runForcedInterpretObserveSurface(const Workbook& rWorkbo
             {
                 ++aInventory.mnFallbackFormulaCells;
                 ++aInventory.maFunctionFallbackCells[static_cast<std::size_t>(eDirectFunction)];
+            }
+
+            if (bUnsupportedFunction)
+            {
+                ++aInventory.mnUnsupportedFunctionFormulaCells;
+                ++aInventory.maFunctionUnsupportedFunctionCells[static_cast<std::size_t>(
+                    eDirectFunction)];
             }
         }
     }
@@ -943,6 +958,8 @@ ObserveSurfaceInventory buildObserveSurfaceInventory(
             const bool bSeen = it != aObservedByAddress.end() && it->second.mbSeen;
             const bool bSupported = it != aObservedByAddress.end() && it->second.mbSupported;
             const bool bFallback = it != aObservedByAddress.end() && it->second.mbFallback;
+            const bool bUnsupportedFunction
+                = it != aObservedByAddress.end() && it->second.mbUnsupportedFunctionFallback;
 
             if (bSeen)
             {
@@ -965,6 +982,13 @@ ObserveSurfaceInventory buildObserveSurfaceInventory(
             {
                 ++aInventory.mnFallbackFormulaCells;
                 ++aInventory.maFunctionFallbackCells[static_cast<std::size_t>(eDirectFunction)];
+            }
+
+            if (bUnsupportedFunction)
+            {
+                ++aInventory.mnUnsupportedFunctionFormulaCells;
+                ++aInventory.maFunctionUnsupportedFunctionCells[static_cast<std::size_t>(
+                    eDirectFunction)];
             }
         }
     }
@@ -1658,6 +1682,8 @@ void printObserveSurfaceInventory(
               << rInventory.mnSupportedFormulaCells << '\n';
     std::cout << aPrefix << "_fallback_formula_cells="
               << rInventory.mnFallbackFormulaCells << '\n';
+    std::cout << aPrefix << "_unsupported_function_formula_cells="
+              << rInventory.mnUnsupportedFunctionFormulaCells << '\n';
     std::cout << aPrefix << "_unseen_formula_cells=" << rInventory.mnUnseenFormulaCells
               << '\n';
 
@@ -1684,8 +1710,72 @@ void printObserveSurfaceInventory(
                   << "_fallback_formula_cells="
                   << rInventory.maFunctionFallbackCells[nIndex] << '\n';
         std::cout << aPrefix << "_function_" << pName
+                  << "_unsupported_function_formula_cells="
+                  << rInventory.maFunctionUnsupportedFunctionCells[nIndex] << '\n';
+        std::cout << aPrefix << "_function_" << pName
                   << "_unseen_formula_cells=" << rInventory.maFunctionUnseenCells[nIndex]
                   << '\n';
+    }
+}
+
+void printTopUnsupportedFunctionInventory(
+    std::string_view aPrefix, const ObserveSurfaceInventory& rInventory, std::size_t nLimit = 10)
+{
+    struct RankedUnsupportedFunction
+    {
+        FunctionKind meFunction = FunctionKind::Unknown;
+        std::size_t mnUnsupportedFunctionFormulaCells = 0;
+        std::size_t mnFormulaCells = 0;
+        std::size_t mnUnseenFormulaCells = 0;
+        std::size_t mnFallbackFormulaCells = 0;
+    };
+
+    std::vector<RankedUnsupportedFunction> aEntries;
+    for (std::size_t nIndex = 0; nIndex < static_cast<std::size_t>(FunctionKind::Count); ++nIndex)
+    {
+        const std::size_t nUnsupportedFunctionFormulaCells
+            = rInventory.maFunctionUnsupportedFunctionCells[nIndex];
+        if (!nUnsupportedFunctionFormulaCells)
+            continue;
+
+        aEntries.push_back({ static_cast<FunctionKind>(nIndex), nUnsupportedFunctionFormulaCells,
+            rInventory.maFunctionFormulaCells[nIndex], rInventory.maFunctionUnseenCells[nIndex],
+            rInventory.maFunctionFallbackCells[nIndex] });
+    }
+
+    std::sort(aEntries.begin(), aEntries.end(),
+        [](const RankedUnsupportedFunction& rLeft, const RankedUnsupportedFunction& rRight) {
+            if (rLeft.mnUnsupportedFunctionFormulaCells != rRight.mnUnsupportedFunctionFormulaCells)
+            {
+                return rLeft.mnUnsupportedFunctionFormulaCells > rRight.mnUnsupportedFunctionFormulaCells;
+            }
+            if (rLeft.mnUnseenFormulaCells != rRight.mnUnseenFormulaCells)
+                return rLeft.mnUnseenFormulaCells > rRight.mnUnseenFormulaCells;
+            if (rLeft.mnFallbackFormulaCells != rRight.mnFallbackFormulaCells)
+                return rLeft.mnFallbackFormulaCells > rRight.mnFallbackFormulaCells;
+            return std::strcmp(functionKindName(rLeft.meFunction), functionKindName(rRight.meFunction))
+                   < 0;
+        });
+
+    if (aEntries.size() > nLimit)
+        aEntries.resize(nLimit);
+
+    std::cout << aPrefix << "_top_unsupported_function_count=" << aEntries.size() << '\n';
+    for (std::size_t nIndex = 0; nIndex < aEntries.size(); ++nIndex)
+    {
+        const auto& rEntry = aEntries[nIndex];
+        const char* pName = functionKindName(rEntry.meFunction);
+        std::cout << aPrefix << "_top_unsupported_function_" << nIndex
+                  << "_name=" << pName << '\n';
+        std::cout << aPrefix << "_top_unsupported_function_" << nIndex
+                  << "_unsupported_function_formula_cells="
+                  << rEntry.mnUnsupportedFunctionFormulaCells << '\n';
+        std::cout << aPrefix << "_top_unsupported_function_" << nIndex
+                  << "_formula_cells=" << rEntry.mnFormulaCells << '\n';
+        std::cout << aPrefix << "_top_unsupported_function_" << nIndex
+                  << "_fallback_formula_cells=" << rEntry.mnFallbackFormulaCells << '\n';
+        std::cout << aPrefix << "_top_unsupported_function_" << nIndex
+                  << "_unseen_formula_cells=" << rEntry.mnUnseenFormulaCells << '\n';
     }
 }
 
@@ -1740,14 +1830,36 @@ void printStats(std::size_t nWorkbookCount, std::size_t nFormulaCellCount, const
 
 void printLiveTargetProbeSummary(const SupportedProbeRun& rRun)
 {
+    const double fLiveReachableRate = rRun.mnRawFormulaCount
+                                          ? (static_cast<double>(rRun.mnLiveTargetFormulaCount)
+                                             * 100.0 / static_cast<double>(rRun.mnRawFormulaCount))
+                                          : 0.0;
+    const double fImportedArtifactRate = rRun.mnRawFormulaCount
+                                             ? (static_cast<double>(rRun.mnHostTruthArtifactFormulaCount)
+                                                * 100.0
+                                                / static_cast<double>(rRun.mnRawFormulaCount))
+                                             : 0.0;
+
     std::cout << "interpret_tail_live_target_probe_formula_cells="
               << rRun.mnLiveTargetFormulaCount << '\n';
+    std::cout << "interpret_tail_probe_live_reachable_formula_cells="
+              << rRun.mnLiveTargetFormulaCount << '\n';
     std::cout << "interpret_tail_probe_host_truth_artifact_formula_cells="
+              << rRun.mnHostTruthArtifactFormulaCount << '\n';
+    std::cout << "interpret_tail_probe_imported_artifact_formula_cells="
               << rRun.mnHostTruthArtifactFormulaCount << '\n';
     std::cout << "interpret_tail_live_target_authoritative_total="
               << rRun.maLiveTargetStats.mnAuthoritativeCount << '\n';
     std::cout << "interpret_tail_live_target_authoritative_fallback_total="
               << rRun.maLiveTargetStats.mnAuthoritativeFallbackCount << '\n';
+
+    const auto aOldFlags = std::cout.flags();
+    const auto nOldPrecision = std::cout.precision();
+    std::cout << std::fixed << std::setprecision(2);
+    std::cout << "interpret_tail_probe_live_reachable_rate=" << fLiveReachableRate << '\n';
+    std::cout << "interpret_tail_probe_imported_artifact_rate=" << fImportedArtifactRate << '\n';
+    std::cout.flags(aOldFlags);
+    std::cout.precision(nOldPrecision);
 
     for (std::size_t nIndex = 1; nIndex < static_cast<std::size_t>(FunctionKind::Count); ++nIndex)
     {
@@ -3693,6 +3805,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                     += aWorkbookLiveInventory.mnSupportedFormulaCells;
                 aLiveUniqueInventory.mnFallbackFormulaCells
                     += aWorkbookLiveInventory.mnFallbackFormulaCells;
+                aLiveUniqueInventory.mnUnsupportedFunctionFormulaCells
+                    += aWorkbookLiveInventory.mnUnsupportedFunctionFormulaCells;
                 aLiveUniqueInventory.mnUnseenFormulaCells
                     += aWorkbookLiveInventory.mnUnseenFormulaCells;
                 for (std::size_t nIndex = 0;
@@ -3706,6 +3820,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                         += aWorkbookLiveInventory.maFunctionSupportedCells[nIndex];
                     aLiveUniqueInventory.maFunctionFallbackCells[nIndex]
                         += aWorkbookLiveInventory.maFunctionFallbackCells[nIndex];
+                    aLiveUniqueInventory.maFunctionUnsupportedFunctionCells[nIndex]
+                        += aWorkbookLiveInventory.maFunctionUnsupportedFunctionCells[nIndex];
                     aLiveUniqueInventory.maFunctionUnseenCells[nIndex]
                         += aWorkbookLiveInventory.maFunctionUnseenCells[nIndex];
                 }
@@ -3734,6 +3850,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                     += aWorkbookForcedDirectInventory.mnSupportedFormulaCells;
                 aForcedDirectInventory.mnFallbackFormulaCells
                     += aWorkbookForcedDirectInventory.mnFallbackFormulaCells;
+                aForcedDirectInventory.mnUnsupportedFunctionFormulaCells
+                    += aWorkbookForcedDirectInventory.mnUnsupportedFunctionFormulaCells;
                 aForcedDirectInventory.mnUnseenFormulaCells
                     += aWorkbookForcedDirectInventory.mnUnseenFormulaCells;
                 for (std::size_t nIndex = 0;
@@ -3747,6 +3865,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                         += aWorkbookForcedDirectInventory.maFunctionSupportedCells[nIndex];
                     aForcedDirectInventory.maFunctionFallbackCells[nIndex]
                         += aWorkbookForcedDirectInventory.maFunctionFallbackCells[nIndex];
+                    aForcedDirectInventory.maFunctionUnsupportedFunctionCells[nIndex]
+                        += aWorkbookForcedDirectInventory.maFunctionUnsupportedFunctionCells[nIndex];
                     aForcedDirectInventory.maFunctionUnseenCells[nIndex]
                         += aWorkbookForcedDirectInventory.maFunctionUnseenCells[nIndex];
                 }
@@ -3845,13 +3965,16 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
 
     printRoutingStats("interpret_tail_live", nFormulaCellCount, aLiveStats);
     printObserveSurfaceInventory("interpret_tail_live_unique", aLiveUniqueInventory);
+    printTopUnsupportedFunctionInventory("interpret_tail_live_unique", aLiveUniqueInventory);
     printRoutingStats("interpret_tail_forced_interpret", aForcedDirectInventory.mnFormulaCells,
         aForcedInterpretStats);
     printObserveSurfaceInventory("interpret_tail_forced_direct", aForcedDirectInventory);
+    printTopUnsupportedFunctionInventory("interpret_tail_forced_direct", aForcedDirectInventory);
     printStats(nWorkbookCount, nFormulaCellCount, aProbeStats);
     std::cout << "interpret_tail_probe_formula_cells=" << nProbeFormulaCount << '\n';
     {
         SupportedProbeRun aPrintedProbeRun;
+        aPrintedProbeRun.mnRawFormulaCount = nProbeFormulaCount;
         aPrintedProbeRun.mnLiveAuthoritativeFormulaCount = nLiveAuthoritativeProbeFormulaCount;
         aPrintedProbeRun.maLiveAuthoritativeStats = aLiveAuthoritativeProbeStats;
         aPrintedProbeRun.mnLiveTargetFormulaCount = nLiveTargetProbeFormulaCount;

@@ -187,6 +187,7 @@ struct ObservedFormulaCellStatus
     bool mbSeen = false;
     bool mbSupported = false;
     bool mbFallback = false;
+    bool mbUnsupportedFunctionFallback = false;
 };
 
 namespace detail
@@ -298,8 +299,8 @@ private:
     return aStore;
 }
 
-inline void markObservedFormulaCell(
-    const ScAddress& rFormulaPos, bool bSupported, bool bFallback)
+inline void markObservedFormulaCell(const ScAddress& rFormulaPos, bool bSupported, bool bFallback,
+    bool bUnsupportedFunctionFallback = false)
 {
     auto& rStore = observeSurfaceStore();
     std::scoped_lock aGuard(rStore.maMutex);
@@ -308,6 +309,8 @@ inline void markObservedFormulaCell(
     rStatus.mbSeen = true;
     rStatus.mbSupported = rStatus.mbSupported || bSupported;
     rStatus.mbFallback = rStatus.mbFallback || bFallback;
+    rStatus.mbUnsupportedFunctionFallback
+        = rStatus.mbUnsupportedFunctionFallback || bUnsupportedFunctionFallback;
 }
 
 [[nodiscard]] constexpr std::size_t toIndex(FallbackReason eReason)
@@ -9268,7 +9271,8 @@ inline void recordAuthoritativeFallback(
     const ScAddress& rFormulaPos, FallbackReason eReason, FunctionKind eFunction)
 {
     recordAuthoritativeFallback(eReason, eFunction);
-    detail::markObservedFormulaCell(rFormulaPos, false, true);
+    detail::markObservedFormulaCell(
+        rFormulaPos, false, true, eReason == FallbackReason::UnsupportedFunction);
 }
 
 inline void recordFallback(FallbackReason eReason, FunctionKind eFunction)
@@ -9283,7 +9287,8 @@ inline void recordFallback(
     const ScAddress& rFormulaPos, FallbackReason eReason, FunctionKind eFunction)
 {
     recordFallback(eReason, eFunction);
-    detail::markObservedFormulaCell(rFormulaPos, false, true);
+    detail::markObservedFormulaCell(
+        rFormulaPos, false, true, eReason == FallbackReason::UnsupportedFunction);
 }
 
 inline void recordShadowMatch()

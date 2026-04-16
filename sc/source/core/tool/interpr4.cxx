@@ -3998,24 +3998,40 @@ StackVar ScInterpreter::Interpret()
                 }
 
                 namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
-                const auto pushLegacyLogicalConstant = [&](bool bValue) {
-                    if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
-                        && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
-                        && !pMyFormulaCell->IsHyperLinkCell()
-                        && !mrDoc.IsThreadedGroupCalcInProgress())
+                const auto warnIfLegacyDispatchReached = [&](const char* pRouteLabel,
+                                                            std::u16string_view rFunctionName,
+                                                            auto aClassifier,
+                                                            const char* pFailureMessage,
+                                                            bool bRequireNonArrayContext = false) {
+                    if (!pMyFormulaCell || pMyFormulaCell->IsIterCell()
+                        || pMyFormulaCell->GetMatrixFlag() != ScMatrixMode::NONE
+                        || pMyFormulaCell->IsHyperLinkCell()
+                        || mrDoc.IsThreadedGroupCalcInProgress()
+                        || (bRequireNonArrayContext && IsInArrayContext()))
                     {
-                        const OUString aFormulaSource
-                            = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
-                        if (setaileval::isHardRoutedFormula(std::u16string_view(
-                                aFormulaSource.getStr(), aFormulaSource.getLength())))
-                        {
-                            SAL_WARN("sc.core",
-                                "family-local default-on "
-                                    << (bValue ? "TRUE()" : "FALSE()")
-                                    << " reached ScInterpreter for " << aFormulaSource);
-                            OSL_FAIL("family-local default-on logical constant reached ScInterpreter");
-                        }
+                        return;
                     }
+
+                    const OUString aFormulaSource
+                        = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
+                    const std::u16string_view aFormulaView(aFormulaSource.getStr(),
+                        aFormulaSource.getLength());
+                    if (!aClassifier(aFormulaView))
+                        return;
+
+                    SAL_WARN("sc.core",
+                        pRouteLabel << " "
+                                    << OUString(rFunctionName.data(), rFunctionName.size())
+                                    << " reached ScInterpreter for " << aFormulaSource);
+                    OSL_FAIL(pFailureMessage);
+                };
+                const auto pushLegacyLogicalConstant = [&](bool bValue) {
+                    warnIfLegacyDispatchReached(
+                        "family-local default-on", bValue ? u"TRUE()" : u"FALSE()",
+                        [](std::u16string_view rFormula) {
+                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                        },
+                        "family-local default-on logical constant reached ScInterpreter");
 
                     nFuncFmtType = SvNumFormatType::LOGICAL;
                     PushInt(bValue ? 1 : 0);
@@ -4023,23 +4039,12 @@ StackVar ScInterpreter::Interpret()
                 const auto pushLegacyDateOrTimeValue =
                     [&](const char* pFunctionName, SvNumFormatType eFormatType,
                         auto aEvaluator) {
-                        if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
-                            && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
-                            && !pMyFormulaCell->IsHyperLinkCell()
-                            && !mrDoc.IsThreadedGroupCalcInProgress())
-                        {
-                            const OUString aFormulaSource
-                                = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
-                            if (setaileval::isHardRoutedFormula(std::u16string_view(
-                                    aFormulaSource.getStr(), aFormulaSource.getLength())))
-                            {
-                                SAL_WARN("sc.core",
-                                    "literal-only hard-routed " << pFunctionName
-                                        << " reached ScInterpreter for " << aFormulaSource);
-                                OSL_FAIL("literal-only hard-routed text parsing slice reached "
-                                         "ScInterpreter");
-                            }
-                        }
+                        warnIfLegacyDispatchReached(
+                            "literal-only hard-routed", OUString::createFromAscii(pFunctionName),
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isHardRoutedFormula(rFormula);
+                            },
+                            "literal-only hard-routed text parsing slice reached ScInterpreter");
 
                         const OUString aInputString = GetString().getString();
                         const auto aResult = aEvaluator(aInputString);
@@ -4052,25 +4057,12 @@ StackVar ScInterpreter::Interpret()
                             PushIllegalArgument();
                     };
                 const auto pushLegacyConvert = [&]() {
-                    const auto aMaybeWarn = [&]() {
-                        if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
-                            && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
-                            && !pMyFormulaCell->IsHyperLinkCell()
-                            && !mrDoc.IsThreadedGroupCalcInProgress())
-                        {
-                            const OUString aFormulaSource
-                                = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
-                            if (setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
-                                    aFormulaSource.getStr(), aFormulaSource.getLength())))
-                            {
-                                SAL_WARN("sc.core",
-                                    "family-local default-on CONVERT reached ScInterpreter for "
-                                        << aFormulaSource);
-                                OSL_FAIL("family-local default-on CONVERT reached ScInterpreter");
-                            }
-                        }
-                    };
-                    aMaybeWarn();
+                    warnIfLegacyDispatchReached(
+                        "family-local default-on", u"CONVERT",
+                        [](std::u16string_view rFormula) {
+                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                        },
+                        "family-local default-on CONVERT reached ScInterpreter");
 
                     if (!MustHaveParamCount(GetByte(), 3))
                         return;
@@ -4092,43 +4084,20 @@ StackVar ScInterpreter::Interpret()
                     }
                 };
                 const auto pushLegacyNumeralConversion = [&](std::u16string_view rFunctionName) {
-                    if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
-                        && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
-                        && !pMyFormulaCell->IsHyperLinkCell()
-                        && !mrDoc.IsThreadedGroupCalcInProgress())
-                    {
-                        const OUString aFormulaSource
-                            = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
-                        if (setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
-                                aFormulaSource.getStr(), aFormulaSource.getLength())))
-                        {
-                            SAL_WARN(
-                                "sc.core",
-                                "family-local default-on "
-                                    << OUString(rFunctionName.data(), rFunctionName.size())
-                                    << " reached ScInterpreter for " << aFormulaSource);
-                            OSL_FAIL("family-local default-on numeral conversion reached "
-                                     "ScInterpreter");
-                        }
-                    }
+                    warnIfLegacyDispatchReached(
+                        "family-local default-on", rFunctionName,
+                        [](std::u16string_view rFormula) {
+                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                        },
+                        "family-local default-on numeral conversion reached ScInterpreter");
                 };
                 const auto pushLegacyRoundSignificant = [&]() {
-                    if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
-                        && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
-                        && !pMyFormulaCell->IsHyperLinkCell()
-                        && !mrDoc.IsThreadedGroupCalcInProgress())
-                    {
-                        const OUString aFormulaSource
-                            = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
-                        if (setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
-                                aFormulaSource.getStr(), aFormulaSource.getLength())))
-                        {
-                            SAL_WARN("sc.core",
-                                "family-local default-on ROUNDSIG reached ScInterpreter for "
-                                    << aFormulaSource);
-                            OSL_FAIL("family-local default-on ROUNDSIG reached ScInterpreter");
-                        }
-                    }
+                    warnIfLegacyDispatchReached(
+                        "family-local default-on", u"ROUNDSIG",
+                        [](std::u16string_view rFormula) {
+                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                        },
+                        "family-local default-on ROUNDSIG reached ScInterpreter");
 
                     if (!MustHaveParamCount(GetByte(), 2))
                         return;
@@ -4152,24 +4121,12 @@ StackVar ScInterpreter::Interpret()
                 };
                 const auto pushLegacyBitwise = [&](std::u16string_view rFunctionName,
                                                    auto aOperator) {
-                    if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
-                        && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
-                        && !pMyFormulaCell->IsHyperLinkCell()
-                        && !mrDoc.IsThreadedGroupCalcInProgress())
-                    {
-                        const OUString aFormulaSource
-                            = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
-                        if (setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
-                                aFormulaSource.getStr(), aFormulaSource.getLength())))
-                        {
-                            SAL_WARN(
-                                "sc.core",
-                                "family-local default-on "
-                                    << OUString(rFunctionName.data(), rFunctionName.size())
-                                    << " reached ScInterpreter for " << aFormulaSource);
-                            OSL_FAIL("family-local default-on bitwise slice reached ScInterpreter");
-                        }
-                    }
+                    warnIfLegacyDispatchReached(
+                        "family-local default-on", rFunctionName,
+                        [](std::u16string_view rFormula) {
+                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                        },
+                        "family-local default-on bitwise slice reached ScInterpreter");
 
                     if (!MustHaveParamCount(GetByte(), 2))
                         return;
@@ -4336,22 +4293,12 @@ StackVar ScInterpreter::Interpret()
                         PushIllegalArgument();
                 };
                 const auto pushLegacyFormulaText = [&]() {
-                    if (pMyFormulaCell && !pMyFormulaCell->IsIterCell()
-                        && pMyFormulaCell->GetMatrixFlag() == ScMatrixMode::NONE
-                        && !pMyFormulaCell->IsHyperLinkCell()
-                        && !mrDoc.IsThreadedGroupCalcInProgress() && !IsInArrayContext())
-                    {
-                        const OUString aFormulaSource
-                            = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
-                        if (setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
-                                aFormulaSource.getStr(), aFormulaSource.getLength())))
-                        {
-                            SAL_WARN("sc.core",
-                                "family-local default-on FORMULA reached ScInterpreter for "
-                                    << aFormulaSource);
-                            OSL_FAIL("family-local default-on FORMULA reached ScInterpreter");
-                        }
-                    }
+                    warnIfLegacyDispatchReached(
+                        "family-local default-on", u"FORMULA",
+                        [](std::u16string_view rFormula) {
+                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                        },
+                        "family-local default-on FORMULA reached ScInterpreter", true);
 
                     OUString aFormula;
                     switch (GetStackType())
