@@ -71,6 +71,9 @@
 #include <tokenarray.hxx>
 #include <compiler.hxx>
 #include <spreadsheetengine/runtime/ConversionRuntime.hxx>
+#include <spreadsheetengine/runtime/DateTimeParts.hxx>
+#include <spreadsheetengine/runtime/DateTimeWeek.hxx>
+#include <spreadsheetengine/runtime/DateTimeWorkday.hxx>
 #include <spreadsheetengine/runtime/MathFunctionRuntime.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathMatrix.hxx>
@@ -101,6 +104,7 @@ namespace sejumpexec = spreadsheetengine::compat::libreoffice::jumpexecution;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace selogic = spreadsheetengine::api::logic;
 namespace seconvert = spreadsheetengine::core::convert;
+namespace sedatetime = spreadsheetengine::core::datetime;
 namespace semath = spreadsheetengine::core::math;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 namespace seswitchexec = spreadsheetengine::compat::libreoffice::switchexecution;
@@ -5121,6 +5125,280 @@ StackVar ScInterpreter::Interpret()
                         else
                             PushIllegalArgument();
                     };
+                const auto warnIfLegacyDateFamilyReached = [&](std::u16string_view rFunctionName) {
+                    warnIfLegacyDispatchReached(
+                        "family-local default-on", rFunctionName,
+                        [](std::u16string_view rFormula) {
+                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                        },
+                        "family-local default-on date family reached ScInterpreter");
+                };
+                const auto pushLegacyCurrentDate = [&]() {
+                    warnIfLegacyDateFamilyReached(u"TODAY");
+                    nFuncFmtType = SvNumFormatType::DATE;
+                    Date aActDate(Date::SYSTEM);
+                    tools::Long nDiff = aActDate - mrContext.NFGetNullDate();
+                    PushDouble(static_cast<double>(nDiff));
+                };
+                const auto pushLegacyCurrentTime = [&]() {
+                    warnIfLegacyDateFamilyReached(u"NOW");
+                    nFuncFmtType = SvNumFormatType::DATETIME;
+                    DateTime aActTime(DateTime::SYSTEM);
+                    tools::Long nDiff = aActTime - mrContext.NFGetNullDate();
+                    double fTime = aActTime.GetHour()
+                                       / static_cast<double>(::tools::Time::hourPerDay)
+                                   + aActTime.GetMin()
+                                       / static_cast<double>(::tools::Time::minutePerDay)
+                                   + aActTime.GetSec()
+                                       / static_cast<double>(::tools::Time::secondPerDay)
+                                   + aActTime.GetNanoSec()
+                                       / static_cast<double>(::tools::Time::nanoSecPerDay);
+                    PushDouble(static_cast<double>(nDiff) + fTime);
+                };
+                const auto pushLegacyExtractYear = [&]() {
+                    warnIfLegacyDateFamilyReached(u"YEAR");
+                    PushDouble(sedatetime::extractYear(
+                        selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32()));
+                };
+                const auto pushLegacyExtractMonth = [&]() {
+                    warnIfLegacyDateFamilyReached(u"MONTH");
+                    PushDouble(sedatetime::extractMonth(
+                        selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32()));
+                };
+                const auto pushLegacyExtractDay = [&]() {
+                    warnIfLegacyDateFamilyReached(u"DAY");
+                    if (std::optional<double> fDay = sedatetime::extractDay(
+                            selibreoffice::toApiDateParts(mrContext.NFGetNullDate()),
+                            GetFloor32()))
+                        PushDouble(*fDay);
+                    else
+                    {
+                        SetError(FormulaError::IllegalArgument);
+                        PushDouble(HUGE_VAL);
+                    }
+                };
+                const auto pushLegacyExtractMinute = [&]() {
+                    warnIfLegacyDateFamilyReached(u"MINUTE");
+                    PushDouble(sedatetime::extractMinute(GetDouble()));
+                };
+                const auto pushLegacyExtractSecond = [&]() {
+                    warnIfLegacyDateFamilyReached(u"SECOND");
+                    PushDouble(sedatetime::extractSecond(GetDouble()));
+                };
+                const auto pushLegacyExtractHour = [&]() {
+                    warnIfLegacyDateFamilyReached(u"HOUR");
+                    PushDouble(sedatetime::extractHour(GetDouble()));
+                };
+                const auto pushLegacyDayOfWeek = [&]() {
+                    warnIfLegacyDateFamilyReached(u"WEEKDAY");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 2))
+                        return;
+
+                    sal_Int16 nFlag = (nParamCount == 2) ? GetInt16() : 1;
+                    const auto aResult = sedatetime::computeDayOfWeek(
+                        selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32(),
+                        nFlag);
+                    if (!aResult.mbValid)
+                        SetError(FormulaError::IllegalArgument);
+                    PushInt(aResult.mnValue);
+                };
+                const auto pushLegacyWeeknumOOo = [&]() {
+                    warnIfLegacyDateFamilyReached(u"WEEKNUM");
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+                    const sal_Int16 nFlag = GetInt16();
+                    PushInt(sedatetime::computeWeeknumOOo(
+                        selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32(),
+                        nFlag));
+                };
+                const auto pushLegacyWeekOfYear = [&]() {
+                    warnIfLegacyDateFamilyReached(u"WEEKNUM");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 2))
+                        return;
+                    sal_Int16 nFlag = (nParamCount == 1) ? 1 : GetInt16WithDefault(1);
+                    if (std::optional<int> nWeek = sedatetime::computeWeekOfYear(
+                            selibreoffice::toApiDateParts(mrContext.NFGetNullDate()),
+                            GetFloor32(), nFlag))
+                        PushInt(*nWeek);
+                    else
+                        PushIllegalArgument();
+                };
+                const auto pushLegacyIsoWeekOfYear = [&]() {
+                    warnIfLegacyDateFamilyReached(u"ISOWEEKNUM");
+                    if (!MustHaveParamCount(GetByte(), 1))
+                        return;
+                    PushInt(sedatetime::computeIsoWeekOfYear(
+                        selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32()));
+                };
+                const auto pushLegacyEasterSunday = [&]() {
+                    warnIfLegacyDateFamilyReached(u"EASTERSUNDAY");
+                    nFuncFmtType = SvNumFormatType::DATE;
+                    if (!MustHaveParamCount(GetByte(), 1))
+                        return;
+                    sal_Int16 nYear = GetInt16();
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushError(nGlobalError);
+                        return;
+                    }
+                    if (nYear < 100)
+                        nYear = mrContext.NFExpandTwoDigitYear(nYear);
+                    if (std::optional<double> fSerial = sedatetime::computeEasterSundaySerial(
+                            selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), nYear))
+                        PushDouble(*fSerial);
+                    else
+                        PushIllegalArgument();
+                };
+                const auto pushLegacyNetworkdays = [&](bool bOOXML_Version) {
+                    warnIfLegacyDateFamilyReached(
+                        bOOXML_Version ? u"NETWORKDAYS.INTL" : u"NETWORKDAYS");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 2, 4))
+                        return;
+
+                    std::vector<double> nSortArray;
+                    bool bWeekendMask[7];
+                    const Date& rNullDate = mrContext.NFGetNullDate();
+                    sal_Int32 nNullDate = rNullDate.GetAsNormalizedDays();
+                    FormulaError nErr = bOOXML_Version
+                                            ? GetWeekendAndHolidayMasks_MS(
+                                                  nParamCount, nNullDate, nSortArray,
+                                                  bWeekendMask, false)
+                                            : GetWeekendAndHolidayMasks(
+                                                  nParamCount, nNullDate, nSortArray,
+                                                  bWeekendMask);
+                    if (nErr != FormulaError::NONE)
+                    {
+                        PushError(nErr);
+                        return;
+                    }
+                    sal_Int32 nDate2 = GetFloor32();
+                    sal_Int32 nDate1 = GetFloor32();
+                    if (nGlobalError != FormulaError::NONE
+                        || (nDate1 > SAL_MAX_INT32 - nNullDate)
+                        || nDate2 > (SAL_MAX_INT32 - nNullDate))
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    nDate2 += nNullDate;
+                    nDate1 += nNullDate;
+                    const auto aHolidaySerials = selibreoffice::toApiDateSerials(nSortArray);
+                    PushDouble(static_cast<double>(sedatetime::countWorkdays(
+                        nDate1, nDate2, aHolidaySerials,
+                        selibreoffice::toApiWeekendMask(bWeekendMask))));
+                };
+                const auto pushLegacyWorkdayMs = [&]() {
+                    warnIfLegacyDateFamilyReached(u"WORKDAY.INTL");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 2, 4))
+                        return;
+
+                    nFuncFmtType = SvNumFormatType::DATE;
+                    std::vector<double> nSortArray;
+                    bool bWeekendMask[7];
+                    const Date& rNullDate = mrContext.NFGetNullDate();
+                    sal_Int32 nNullDate = rNullDate.GetAsNormalizedDays();
+                    FormulaError nErr = GetWeekendAndHolidayMasks_MS(
+                        nParamCount, nNullDate, nSortArray, bWeekendMask, true);
+                    if (nErr != FormulaError::NONE)
+                    {
+                        PushError(nErr);
+                        return;
+                    }
+                    sal_Int32 nDays = GetFloor32();
+                    sal_Int32 nDate = GetFloor32();
+                    if (nGlobalError != FormulaError::NONE
+                        || (nDate > SAL_MAX_INT32 - nNullDate))
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    nDate += nNullDate;
+                    if (!nDays)
+                    {
+                        PushDouble(static_cast<double>(nDate - nNullDate));
+                        return;
+                    }
+                    const auto aHolidaySerials = selibreoffice::toApiDateSerials(nSortArray);
+                    PushDouble(static_cast<double>(sedatetime::advanceWorkday(
+                                   nDate, nDays, aHolidaySerials,
+                                   selibreoffice::toApiWeekendMask(bWeekendMask))
+                               - nNullDate));
+                };
+                const auto pushLegacyDate = [&]() {
+                    warnIfLegacyDateFamilyReached(u"DATE");
+                    nFuncFmtType = SvNumFormatType::DATE;
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+                    sal_Int16 nDay = GetInt16();
+                    sal_Int16 nMonth = GetInt16();
+                    if (IsMissing())
+                        SetError(FormulaError::ParameterExpected);
+                    sal_Int16 nYear = GetInt16();
+                    if (nGlobalError != FormulaError::NONE || nYear < 0)
+                        PushIllegalArgument();
+                    else
+                        PushDouble(GetDateSerial(nYear, nMonth, nDay, false));
+                };
+                const auto pushLegacyTime = [&]() {
+                    warnIfLegacyDateFamilyReached(u"TIME");
+                    nFuncFmtType = SvNumFormatType::TIME;
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+                    double fSec = GetDouble();
+                    double fMin = GetDouble();
+                    double fHour = GetDouble();
+                    if (std::optional<double> fTime = sedatetime::makeTimeSerial(
+                            fHour, fMin, fSec))
+                        PushDouble(*fTime);
+                    else
+                        PushIllegalArgument();
+                };
+                const auto pushLegacyDiffDate = [&]() {
+                    warnIfLegacyDateFamilyReached(u"DAYS");
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+                    double fDate2 = GetDouble();
+                    double fDate1 = GetDouble();
+                    PushDouble(sedatetime::computeDiffDate(fDate1, fDate2));
+                };
+                const auto pushLegacyDiffDate360 = [&]() {
+                    warnIfLegacyDateFamilyReached(u"DAYS360");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 2, 3))
+                        return;
+                    bool bFlag = nParamCount == 3 && GetBool();
+                    sal_Int32 nDate2 = GetFloor32();
+                    sal_Int32 nDate1 = GetFloor32();
+                    if (nGlobalError != FormulaError::NONE)
+                        PushError(nGlobalError);
+                    else
+                        PushDouble(sedatetime::computeDiffDate360(
+                            selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), nDate1,
+                            nDate2, bFlag));
+                };
+                const auto pushLegacyDateDif = [&]() {
+                    warnIfLegacyDateFamilyReached(u"DATEDIF");
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+                    OUString aInterval = GetString().getString();
+                    sal_Int32 nDate2 = GetFloor32();
+                    sal_Int32 nDate1 = GetFloor32();
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushError(nGlobalError);
+                        return;
+                    }
+                    if (std::optional<double> fResult = sedatetime::computeDateDif(
+                            selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), nDate1,
+                            nDate2, selibreoffice::toApiString(aInterval)))
+                        PushDouble(*fResult);
+                    else
+                        PushIllegalArgument();
+                };
                 const auto pushLegacyConvert = [&]() {
                     warnIfLegacyDispatchReached(
                         "family-local default-on", u"CONVERT",
@@ -7050,8 +7328,8 @@ StackVar ScInterpreter::Interpret()
                     case ocWrapRows         : ScWrapColsOrRows(false);  break;
                     case ocTrue             : pushLegacyLogicalConstant(true);  break;
                     case ocFalse            : pushLegacyLogicalConstant(false); break;
-                    case ocGetActDate       : ScGetActDate();           break;
-                    case ocGetActTime       : ScGetActTime();           break;
+                    case ocGetActDate       : pushLegacyCurrentDate();  break;
+                    case ocGetActTime       : pushLegacyCurrentTime();  break;
                     case ocNotAvail         : PushError( FormulaError::NotAvailable); break;
                     case ocDeg              :
                         pushLegacyMathScalarUnary(u"DEGREES", semath::computeDegrees);
@@ -7134,20 +7412,20 @@ StackVar ScInterpreter::Interpret()
                     case ocFact             :
                         pushLegacyUnaryCalcMathValueResult(semath::evaluateFactorialValue);
                         break;
-                    case ocGetYear          : ScGetYear();              break;
-                    case ocGetMonth         : ScGetMonth();             break;
-                    case ocGetDay           : ScGetDay();               break;
-                    case ocGetDayOfWeek     : ScGetDayOfWeek();         break;
-                    case ocWeek             : ScGetWeekOfYear();        break;
-                    case ocIsoWeeknum       : ScGetIsoWeekOfYear();     break;
-                    case ocWeeknumOOo       : ScWeeknumOOo();           break;
-                    case ocEasterSunday     : ScEasterSunday();         break;
-                    case ocNetWorkdays      : ScNetWorkdays( false);    break;
-                    case ocNetWorkdays_MS   : ScNetWorkdays( true );    break;
-                    case ocWorkday_MS       : ScWorkdayMS();            break;
-                    case ocGetHour          : ScGetHour();              break;
-                    case ocGetMin           : ScGetMin();               break;
-                    case ocGetSec           : ScGetSec();               break;
+                    case ocGetYear          : pushLegacyExtractYear();  break;
+                    case ocGetMonth         : pushLegacyExtractMonth(); break;
+                    case ocGetDay           : pushLegacyExtractDay();   break;
+                    case ocGetDayOfWeek     : pushLegacyDayOfWeek();    break;
+                    case ocWeek             : pushLegacyWeekOfYear();   break;
+                    case ocIsoWeeknum       : pushLegacyIsoWeekOfYear(); break;
+                    case ocWeeknumOOo       : pushLegacyWeeknumOOo();   break;
+                    case ocEasterSunday     : pushLegacyEasterSunday(); break;
+                    case ocNetWorkdays      : pushLegacyNetworkdays(false); break;
+                    case ocNetWorkdays_MS   : pushLegacyNetworkdays(true); break;
+                    case ocWorkday_MS       : pushLegacyWorkdayMs();    break;
+                    case ocGetHour          : pushLegacyExtractHour();  break;
+                    case ocGetMin           : pushLegacyExtractMinute(); break;
+                    case ocGetSec           : pushLegacyExtractSecond(); break;
                     case ocPlusMinus        :
                         warnIfLegacyScalarRootReached(u"UNARY_PLUS");
                         PushInt(semath::computePlusMinus(GetDouble()));
@@ -7295,11 +7573,11 @@ StackVar ScInterpreter::Interpret()
                     case ocLog              : pushLegacyLog();              break;
                     case ocGCD              : pushLegacyGcdOrLcm(u"GCD", false); break;
                     case ocLCM              : pushLegacyGcdOrLcm(u"LCM", true); break;
-                    case ocGetDate          : ScGetDate();              break;
-                    case ocGetTime          : ScGetTime();              break;
-                    case ocGetDiffDate      : ScGetDiffDate();          break;
-                    case ocGetDiffDate360   : ScGetDiffDate360();       break;
-                    case ocGetDateDif       : ScGetDateDif();           break;
+                    case ocGetDate          : pushLegacyDate();         break;
+                    case ocGetTime          : pushLegacyTime();         break;
+                    case ocGetDiffDate      : pushLegacyDiffDate();     break;
+                    case ocGetDiffDate360   : pushLegacyDiffDate360();  break;
+                    case ocGetDateDif       : pushLegacyDateDif();      break;
                     case ocMin              : ScMin()       ;               break;
                     case ocMinA             : ScMin( true );                break;
                     case ocMax              : ScMax();                      break;

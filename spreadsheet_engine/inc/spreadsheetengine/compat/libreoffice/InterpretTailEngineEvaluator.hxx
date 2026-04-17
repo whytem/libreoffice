@@ -12709,6 +12709,10 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
            || eFunction == FunctionKind::Conditional
            || eFunction == FunctionKind::TextUtility
            || eFunction == FunctionKind::Aggregate
+           || eFunction == FunctionKind::BusinessDay
+           || eFunction == FunctionKind::CalendarUtility
+           || eFunction == FunctionKind::DateDifference
+           || eFunction == FunctionKind::DateConstructExtract
            || eFunction == FunctionKind::MatrixMath;
 }
 

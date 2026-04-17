@@ -697,32 +697,12 @@ public:
      */
     double GetDateSerial( sal_Int16 nYear, sal_Int16 nMonth, sal_Int16 nDay, bool bStrict );
 
-    void ScGetActDate();
-    void ScGetActTime();
-    void ScGetYear();
-    void ScGetMonth();
-    void ScGetDay();
-    void ScGetDayOfWeek();
-    void ScGetWeekOfYear();
-    void ScGetIsoWeekOfYear();
-    void ScWeeknumOOo();
-    void ScEasterSunday();
     FormulaError GetWeekendAndHolidayMasks( const sal_uInt8 nParamCount, const sal_Int32 nNullDate,
             ::std::vector<double>& rSortArray, bool bWeekendMask[ 7 ] );
     FormulaError GetWeekendAndHolidayMasks_MS( const sal_uInt8 nParamCount, const sal_Int32 nNullDate,
             ::std::vector<double>& rSortArray, bool bWeekendMask[ 7 ], bool bWorkdayFunction );
     static inline sal_Int16 GetDayOfWeek( sal_Int32 n );
-    void ScNetWorkdays( bool bOOXML_Version );
-    void ScWorkdayMS();
-    void ScGetHour();
-    void ScGetMin();
-    void ScGetSec();
     void RoundNumber( rtl_math_RoundingMode eMode );
-    void ScGetDate();
-    void ScGetTime();
-    void ScGetDiffDate();
-    void ScGetDiffDate360();
-    void ScGetDateDif();
     void ScAmpersand();
     void ScMul();
     void ScDiv();
