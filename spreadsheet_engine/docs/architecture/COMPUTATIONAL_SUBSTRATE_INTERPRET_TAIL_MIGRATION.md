@@ -214,12 +214,12 @@ Two different denominators matter, and both are now reported.
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=38016`
-- `interpret_tail_live_authoritative_match_total=38012`
+- `interpret_tail_live_authoritative_probe_formula_cells=43961`
+- `interpret_tail_live_authoritative_match_total=43957`
 - `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=278`
-- live authoritative-match rate over the corpus: `75.0321%`
-- live authoritative-match rate over the current promoted probe: `99.9895%`
+- `legacy_interpreter_subroutine_count=220`
+- live authoritative-match rate over the corpus: `86.7669%`
+- live authoritative-match rate over the current promoted probe: `99.9909%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -233,13 +233,13 @@ Lower is better.
 These are attempt totals from live observe, not unique-cell coverage:
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=78410`
+- `interpret_tail_live_supported_total=90300`
 - `interpret_tail_live_fallback_total=0`
-- `interpret_tail_live_seen_total=78410`
+- `interpret_tail_live_seen_total=90300`
 - `interpret_tail_live_unseen_formula_cells=0`
-- `interpret_tail_live_promoted_function_supported_total=78280`
-- `interpret_tail_live_supported_rate=154.77`
-- `interpret_tail_live_seen_rate=154.77`
+- `interpret_tail_live_promoted_function_supported_total=90170`
+- `interpret_tail_live_supported_rate=178.24`
+- `interpret_tail_live_seen_rate=178.24`
 
 Current ambient fallback reasons:
 
@@ -255,13 +255,13 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=38081`
-- `interpret_tail_live_unique_supported_formula_cells=38081`
+- `interpret_tail_live_unique_seen_formula_cells=44026`
+- `interpret_tail_live_unique_supported_formula_cells=44026`
 - `interpret_tail_live_unique_fallback_formula_cells=0`
 - `interpret_tail_live_unique_unsupported_function_formula_cells=0`
-- `interpret_tail_live_unique_unseen_formula_cells=12580`
-- `interpret_tail_live_unique_seen_rate=75.17`
-- `interpret_tail_live_unique_supported_rate=75.17`
+- `interpret_tail_live_unique_unseen_formula_cells=6635`
+- `interpret_tail_live_unique_seen_rate=86.90`
+- `interpret_tail_live_unique_supported_rate=86.90`
 
 Interpretation:
 
@@ -361,8 +361,8 @@ replay formula cell through Calc's live `Interpret()` path:
 - `interpret_tail_forced_interpret_seen_total=2290267`
 - `interpret_tail_forced_interpret_unseen_formula_cells=0`
 - `interpret_tail_forced_interpret_promoted_function_supported_total=2290202`
-- `interpret_tail_forced_interpret_supported_rate=4520.77`
-- `interpret_tail_forced_interpret_seen_rate=4520.77`
+- `interpret_tail_forced_interpret_supported_rate=5229.88`
+- `interpret_tail_forced_interpret_seen_rate=5229.88`
 
 Interpretation:
 
@@ -379,25 +379,25 @@ replay formula cell once, then classifying whether that formula cell was
 actually seen and supported by the seam:
 
 - `interpret_tail_forced_direct_formula_cells=50661`
-- `interpret_tail_forced_direct_seen_formula_cells=38078`
-- `interpret_tail_forced_direct_supported_formula_cells=38078`
+- `interpret_tail_forced_direct_seen_formula_cells=44023`
+- `interpret_tail_forced_direct_supported_formula_cells=44023`
 - `interpret_tail_forced_direct_fallback_formula_cells=0`
-- `interpret_tail_forced_direct_unseen_formula_cells=12583`
-- `interpret_tail_forced_direct_seen_rate=75.16`
-- `interpret_tail_forced_direct_supported_rate=75.16`
+- `interpret_tail_forced_direct_unseen_formula_cells=6638`
+- `interpret_tail_forced_direct_seen_rate=86.90`
+- `interpret_tail_forced_direct_supported_rate=86.90`
 
 ### Raw Cached-Workbook Promoted Probe
 
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
-- `interpret_tail_probe_formula_cells=38016`
+- `interpret_tail_probe_formula_cells=43961`
 - `interpret_tail_authoritative_total=300`
-- `interpret_tail_authoritative_fallback_total=37716`
-- raw promoted authoritative rate: `0.79%`
+- `interpret_tail_authoritative_fallback_total=43661`
+- raw promoted authoritative rate: `0.68%`
 
 Current promoted-family fallback reasons:
 
-- `shadow_mismatch=37716`
+- `shadow_mismatch=43661`
 - `unsupported_function=0`
 - `unsupported_formula_shape=0`
 - `unsupported_host_surface=0`
@@ -408,12 +408,12 @@ This is the same promoted replay probe, explicitly split into the only two
 surfaces that are still interpretable:
 
 - `interpret_tail_probe_live_reachable_formula_cells=300`
-- `interpret_tail_probe_imported_artifact_formula_cells=37716`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=37716`
+- `interpret_tail_probe_imported_artifact_formula_cells=43661`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=43661`
 - `interpret_tail_live_target_authoritative_total=300`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
-- live-reachable promoted rate: `0.79%`
-- imported-artifact-only promoted rate: `99.21%`
+- live-reachable promoted rate: `0.68%`
+- imported-artifact-only promoted rate: `99.32%`
 
 Interpretation:
 
@@ -423,12 +423,12 @@ Interpretation:
 - the raw promoted replay probe is now diagnostic, not the deletion
   denominator, and it is only legible once split into live-reachable vs
   imported-artifact-only buckets
-- the dominant `shadow_mismatch=37716` residual is overwhelmingly imported
+- the dominant `shadow_mismatch=43661` residual is overwhelmingly imported
   cached-workbook debt, not live-reachable parity failure
-- the raw promoted authoritative rate is now `0.79%`, so this
+- the raw promoted authoritative rate is now `0.68%`, so this
   surface remains useful for diagnostics but not for retirement steering
 - the promoted probe is now best read as `300` live-reachable rows plus
-  `37716` imported-artifact rows, not as a single parity percentage
+  `43661` imported-artifact rows, not as a single parity percentage
 - a focused host-truth test now shows the replay-imported whole-row
   `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to
   `FormulaError::VariableExpected`
@@ -487,9 +487,9 @@ This is the new per-cell replay inventory over the promoted-family replay
 surface after forcing each promoted replay formula through direct live
 `Interpret()`:
 
-- `interpret_tail_replay_promoted_formula_cells=38016`
-- `interpret_tail_replay_promoted_direct_seen=38013`
-- `interpret_tail_replay_promoted_direct_supported=38013`
+- `interpret_tail_replay_promoted_formula_cells=43961`
+- `interpret_tail_replay_promoted_direct_seen=43958`
+- `interpret_tail_replay_promoted_direct_supported=43958`
 - `interpret_tail_replay_promoted_direct_fallback=0`
 - `interpret_tail_replay_promoted_direct_unseen=3`
 - `interpret_tail_replay_promoted_shared_formula_cells=31605`
@@ -500,7 +500,7 @@ surface after forcing each promoted replay formula through direct live
 - `interpret_tail_replay_promoted_unseen_shared_member=0`
 - `interpret_tail_replay_promoted_unseen_non_shared=3`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=8`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=38016`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=43961`
 - `interpret_tail_replay_promoted_dirty_after_interpret=3`
 
 Interpretation:
