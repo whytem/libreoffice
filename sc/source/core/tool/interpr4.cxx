@@ -71,10 +71,12 @@
 #include <tokenarray.hxx>
 #include <compiler.hxx>
 #include <spreadsheetengine/runtime/ConversionRuntime.hxx>
+#include <spreadsheetengine/runtime/MathFunctionRuntime.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathMatrix.hxx>
 #include <spreadsheetengine/runtime/MathRounding.hxx>
 #include <spreadsheetengine/runtime/MathScalar.hxx>
+#include <spreadsheetengine/runtime/MathTranscendental.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
@@ -4068,6 +4070,21 @@ StackVar ScInterpreter::Interpret()
                             rLabel, "family-local default-on math scalar reached ScInterpreter");
                         PushDouble(aEvaluator(GetDouble()));
                     };
+                const auto pushLegacyMathScalarNullary =
+                    [&](std::u16string_view rLabel, auto aEvaluator) {
+                        warnIfLegacyDefaultOnReached(
+                            rLabel, "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(aEvaluator());
+                    };
+                const auto pushLegacyMathScalarUnaryOptional =
+                    [&](std::u16string_view rLabel, auto aEvaluator) {
+                        warnIfLegacyDefaultOnReached(
+                            rLabel, "family-local default-on math scalar reached ScInterpreter");
+                        if (std::optional<double> fResult = aEvaluator(GetDouble()))
+                            PushDouble(*fResult);
+                        else
+                            PushIllegalArgument();
+                    };
                 const auto pushLegacyRound =
                     [&](std::u16string_view rLabel, rtl_math_RoundingMode eMode) {
                         warnIfLegacyDefaultOnReached(
@@ -4335,6 +4352,80 @@ StackVar ScInterpreter::Interpret()
                         }
                     }
                     PushDouble(fy);
+                };
+                const auto pushLegacyCombin = [&](std::u16string_view rLabel,
+                                                  bool bAllowRepetition) {
+                    warnIfLegacyDefaultOnReached(
+                        rLabel, "family-local default-on math scalar reached ScInterpreter");
+                    if (MustHaveParamCount(GetByte(), 2))
+                    {
+                        const double k = GetDouble();
+                        const double n = GetDouble();
+                        const auto aResult = semath::evaluateCombinValue(
+                            n, k, bAllowRepetition);
+                        if (!aResult)
+                        {
+                            PushError(selibreoffice::toFormulaError(aResult.meError));
+                            return;
+                        }
+                        PushDouble(aResult.maValue);
+                    }
+                };
+                const auto pushLegacyColor = [&]() {
+                    warnIfLegacyDefaultOnReached(
+                        u"COLOR", "family-local default-on math scalar reached ScInterpreter");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 3, 4))
+                        return;
+
+                    double nAlpha = 0;
+                    if (nParamCount == 4)
+                        nAlpha = rtl::math::approxFloor(GetDouble());
+                    if (nAlpha < 0 || nAlpha > 255)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+
+                    double nBlue = rtl::math::approxFloor(GetDouble());
+                    if (nBlue < 0 || nBlue > 255)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+
+                    double nGreen = rtl::math::approxFloor(GetDouble());
+                    if (nGreen < 0 || nGreen > 255)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+
+                    double nRed = rtl::math::approxFloor(GetDouble());
+                    if (nRed < 0 || nRed > 255)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+
+                    PushDouble(256 * 256 * 256 * nAlpha + 256 * 256 * nRed + 256 * nGreen
+                               + nBlue);
+                };
+                const auto pushLegacyRawSubtract = [&]() {
+                    warnIfLegacyDefaultOnReached(
+                        u"RAWSUBTRACT",
+                        "family-local default-on math scalar reached ScInterpreter");
+                    short nParamCount = GetByte();
+                    if (!MustHaveParamCountMin(nParamCount, 2))
+                        return;
+
+                    ReverseStack(nParamCount);
+                    double fRes = GetDouble();
+                    while (nGlobalError == FormulaError::NONE && --nParamCount > 0)
+                        fRes -= GetDouble();
+                    while (nParamCount-- > 0)
+                        PopError();
+                    PushDouble(fRes);
                 };
                 const auto pushLegacyDateOrTimeValue =
                     [&](const char* pFunctionName, SvNumFormatType eFormatType,
@@ -6259,7 +6350,9 @@ StackVar ScInterpreter::Interpret()
                         PushInt(100);
                         ScSyntheticBinaryOp(ocDiv, &ScInterpreter::ScDiv);
                         break;
-                    case ocPi               : ScPi();                       break;
+                    case ocPi               :
+                        pushLegacyMathScalarNullary(u"PI", semath::computePi);
+                        break;
                     case ocRandom           : ScRandom();                   break;
                     case ocRandArray        : ScRandArray();                break;
                     case ocRandomNV         : ScRandom();                   break;
@@ -6286,31 +6379,81 @@ StackVar ScInterpreter::Interpret()
                     case ocGetActDate       : ScGetActDate();               break;
                     case ocGetActTime       : ScGetActTime();               break;
                     case ocNotAvail         : PushError( FormulaError::NotAvailable); break;
-                    case ocDeg              : ScDeg();                      break;
-                    case ocRad              : ScRad();                      break;
-                    case ocSin              : ScSin();                      break;
-                    case ocCos              : ScCos();                      break;
-                    case ocTan              : ScTan();                      break;
-                    case ocCot              : ScCot();                      break;
-                    case ocArcSin           : ScArcSin();                   break;
-                    case ocArcCos           : ScArcCos();                   break;
-                    case ocArcTan           : ScArcTan();                   break;
-                    case ocArcCot           : ScArcCot();                   break;
-                    case ocSinHyp           : ScSinHyp();                   break;
-                    case ocCosHyp           : ScCosHyp();                   break;
-                    case ocTanHyp           : ScTanHyp();                   break;
-                    case ocCotHyp           : ScCotHyp();                   break;
-                    case ocArcSinHyp        : ScArcSinHyp();                break;
-                    case ocArcCosHyp        : ScArcCosHyp();                break;
-                    case ocArcTanHyp        : ScArcTanHyp();                break;
-                    case ocArcCotHyp        : ScArcCotHyp();                break;
-                    case ocCosecant         : ScCosecant();                 break;
-                    case ocSecant           : ScSecant();                   break;
-                    case ocCosecantHyp      : ScCosecantHyp();              break;
-                    case ocSecantHyp        : ScSecantHyp();                break;
-                    case ocExp              : ScExp();                      break;
-                    case ocLn               : ScLn();                       break;
-                    case ocLog10            : ScLog10();                    break;
+                    case ocDeg              :
+                        pushLegacyMathScalarUnary(u"DEGREES", semath::computeDegrees);
+                        break;
+                    case ocRad              :
+                        pushLegacyMathScalarUnary(u"RADIANS", semath::computeRadians);
+                        break;
+                    case ocSin              :
+                        pushLegacyMathScalarUnary(u"SIN", semath::computeSin);
+                        break;
+                    case ocCos              :
+                        pushLegacyMathScalarUnary(u"COS", semath::computeCos);
+                        break;
+                    case ocTan              :
+                        pushLegacyMathScalarUnary(u"TAN", semath::computeTan);
+                        break;
+                    case ocCot              :
+                        pushLegacyMathScalarUnary(u"COT", semath::computeCot);
+                        break;
+                    case ocArcSin           :
+                        pushLegacyMathScalarUnary(u"ASIN", semath::computeArcSin);
+                        break;
+                    case ocArcCos           :
+                        pushLegacyMathScalarUnary(u"ACOS", semath::computeArcCos);
+                        break;
+                    case ocArcTan           :
+                        pushLegacyMathScalarUnary(u"ATAN", semath::computeArcTan);
+                        break;
+                    case ocArcCot           :
+                        pushLegacyMathScalarUnary(u"ACOT", semath::computeArcCot);
+                        break;
+                    case ocSinHyp           :
+                        pushLegacyMathScalarUnary(u"SINH", semath::computeSinHyp);
+                        break;
+                    case ocCosHyp           :
+                        pushLegacyMathScalarUnary(u"COSH", semath::computeCosHyp);
+                        break;
+                    case ocTanHyp           :
+                        pushLegacyMathScalarUnary(u"TANH", semath::computeTanHyp);
+                        break;
+                    case ocCotHyp           :
+                        pushLegacyMathScalarUnary(u"COTH", semath::computeCotHyp);
+                        break;
+                    case ocArcSinHyp        :
+                        pushLegacyMathScalarUnary(u"ASINH", semath::computeArcSinHyp);
+                        break;
+                    case ocArcCosHyp        :
+                        pushLegacyMathScalarUnaryOptional(u"ACOSH", semath::computeArcCosHyp);
+                        break;
+                    case ocArcTanHyp        :
+                        pushLegacyMathScalarUnaryOptional(u"ATANH", semath::computeArcTanHyp);
+                        break;
+                    case ocArcCotHyp        :
+                        pushLegacyMathScalarUnaryOptional(u"ACOTH", semath::computeArcCotHyp);
+                        break;
+                    case ocCosecant         :
+                        pushLegacyMathScalarUnary(u"CSC", semath::computeCosecant);
+                        break;
+                    case ocSecant           :
+                        pushLegacyMathScalarUnary(u"SEC", semath::computeSecant);
+                        break;
+                    case ocCosecantHyp      :
+                        pushLegacyMathScalarUnary(u"CSCH", semath::computeCosecantHyp);
+                        break;
+                    case ocSecantHyp        :
+                        pushLegacyMathScalarUnary(u"SECH", semath::computeSecantHyp);
+                        break;
+                    case ocExp              :
+                        pushLegacyMathScalarUnary(u"EXP", semath::computeExp);
+                        break;
+                    case ocLn               :
+                        pushLegacyMathScalarUnaryOptional(u"LN", semath::computeLn);
+                        break;
+                    case ocLog10            :
+                        pushLegacyMathScalarUnaryOptional(u"LOG10", semath::computeLog10);
+                        break;
                     case ocSqrt             : ScSqrt();                     break;
                     case ocFact             : ScFact();                     break;
                     case ocGetYear          : ScGetYear();                  break;
@@ -6461,7 +6604,7 @@ StackVar ScInterpreter::Interpret()
                     case ocSumX2MY2         : ScSumX2MY2();                 break;
                     case ocSumX2DY2         : ScSumX2DY2();                 break;
                     case ocSumXMY2          : ScSumXMY2();                  break;
-                    case ocRawSubtract      : ScRawSubtract();              break;
+                    case ocRawSubtract      : pushLegacyRawSubtract();      break;
                     case ocLog              : pushLegacyLog();              break;
                     case ocGCD              : pushLegacyGcdOrLcm(u"GCD", false); break;
                     case ocLCM              : pushLegacyGcdOrLcm(u"LCM", true); break;
@@ -6517,7 +6660,7 @@ StackVar ScInterpreter::Interpret()
                     case ocFilterXML        : ScFilterXML();                break;
                     case ocWebservice       : ScWebservice();               break;
                     case ocEncodeURL        : ScEncodeURL();                break;
-                    case ocColor            : ScColor();                    break;
+                    case ocColor            : pushLegacyColor();            break;
                     case ocErf_MS           : ScErf();                      break;
                     case ocErfc_MS          : ScErfc();                     break;
                     case ocIpmt             : ScIpmt();                     break;
@@ -6596,8 +6739,8 @@ StackVar ScInterpreter::Interpret()
                     case ocBinomDist_MS     : ScBinomDist();                break;
                     case ocPoissonDist      : ScPoissonDist( true );        break;
                     case ocPoissonDist_MS   : ScPoissonDist( false );       break;
-                    case ocCombin           : ScCombin();                   break;
-                    case ocCombinA          : ScCombinA();                  break;
+                    case ocCombin           : pushLegacyCombin(u"COMBIN", false);  break;
+                    case ocCombinA          : pushLegacyCombin(u"COMBINA", true);  break;
                     case ocPermut           : ScPermut();                   break;
                     case ocPermutationA     : ScPermutationA();             break;
                     case ocHypGeomDist      : ScHypGeomDist( 4 );           break;

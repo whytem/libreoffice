@@ -860,26 +860,4 @@ void ScInterpreter::ScCount2()
  * But use the "raw" IEEE 754 double subtraction.
  * So no Kahan summation
  */
-void ScInterpreter::ScRawSubtract()
-{
-    short nParamCount = GetByte();
-    if (!MustHaveParamCountMin( nParamCount, 2))
-        return;
-
-    // Reverse stack to process arguments from left to right.
-    ReverseStack( nParamCount);
-    // Obtain the minuend.
-    double fRes = GetDouble();
-
-    while (nGlobalError == FormulaError::NONE && --nParamCount > 0)
-    {
-        // Simple single values without matrix support.
-        fRes -= GetDouble();
-    }
-    while (nParamCount-- > 0)
-        PopError();
-
-    PushDouble( fRes);
-}
-
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

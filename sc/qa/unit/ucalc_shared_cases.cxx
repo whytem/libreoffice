@@ -3034,6 +3034,60 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorMathScalar
     CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aLcm.meFunction);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(24.0, aLcm.maResult.mfValue, 1e-12);
 
+    const auto aPi = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=PI()", false);
+    CPPUNIT_ASSERT(aPi.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aPi.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(M_PI, aPi.maResult.mfValue, 1e-12);
+
+    const auto aSin = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=SIN(0)", false);
+    CPPUNIT_ASSERT(aSin.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aSin.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, aSin.maResult.mfValue, 1e-12);
+
+    const auto aAcosh = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ACOSH(2)", false);
+    CPPUNIT_ASSERT(aAcosh.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aAcosh.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.3169578969248168, aAcosh.maResult.mfValue, 1e-12);
+
+    const auto aLn = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=LN(EXP(1))", false);
+    CPPUNIT_ASSERT(aLn.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aLn.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aLn.maResult.mfValue, 1e-12);
+
+    const auto aLog10 = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=LOG10(100)", false);
+    CPPUNIT_ASSERT(aLog10.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aLog10.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aLog10.maResult.mfValue, 1e-12);
+
+    const auto aCombin = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COMBIN(5;2)", false);
+    CPPUNIT_ASSERT(aCombin.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aCombin.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, aCombin.maResult.mfValue, 1e-12);
+
+    const auto aCombina = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COMBINA(3;2)", false);
+    CPPUNIT_ASSERT(aCombina.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aCombina.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(6.0, aCombina.maResult.mfValue, 1e-12);
+
+    const auto aColor = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COLOR(1;2;3)", false);
+    CPPUNIT_ASSERT(aColor.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aColor.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(66051.0, aColor.maResult.mfValue, 1e-12);
+
+    const auto aRawSubtract = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=RAWSUBTRACT(10;1;2)", false);
+    CPPUNIT_ASSERT(aRawSubtract.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aRawSubtract.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(7.0, aRawSubtract.maResult.mfValue, 1e-12);
+
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=ABS(-3)"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=INT(3.9)"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=CEILING(5.2;1)"));
@@ -3046,6 +3100,15 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorMathScalar
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=MOD(22;3)"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=GCD(24;18)"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=LCM(6;8)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=PI()"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=SIN(0)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=ACOSH(2)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=LN(EXP(1))"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=LOG10(100)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=COMBIN(5;2)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=COMBINA(3;2)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=COLOR(1;2;3)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=RAWSUBTRACT(10;1;2)"));
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorRoundHelper)

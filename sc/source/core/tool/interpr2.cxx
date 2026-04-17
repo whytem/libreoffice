@@ -558,22 +558,6 @@ void ScInterpreter::RoundSignificant( double fX, double fDigits, double &fRes )
     This is why ODFF-FLOOR is exported to Excel as FLOOR.MATH and
     FLOOR.MATH is imported in Calc as FLOOR.MATH
  */
-void ScInterpreter::ScLn()
-{
-    if (std::optional<double> fResult = semath::computeLn( GetDouble() ))
-        PushDouble(*fResult);
-    else
-        PushIllegalArgument();
-}
-
-void ScInterpreter::ScLog10()
-{
-    if (std::optional<double> fResult = semath::computeLog10( GetDouble() ))
-        PushDouble(*fResult);
-    else
-        PushIllegalArgument();
-}
-
 void ScInterpreter::ScNPV()
 {
     nFuncFmtType = SvNumFormatType::CURRENCY;

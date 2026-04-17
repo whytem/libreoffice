@@ -336,38 +336,6 @@ void ScInterpreter::ScFact()
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::ScCombin()
-{
-    if ( MustHaveParamCount( GetByte(), 2 ) )
-    {
-        const double k = GetDouble();
-        const double n = GetDouble();
-        const auto aResult = semath::evaluateCombinValue(n, k, false);
-        if (!aResult)
-        {
-            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-            return;
-        }
-        PushDouble(aResult.maValue);
-    }
-}
-
-void ScInterpreter::ScCombinA()
-{
-    if ( MustHaveParamCount( GetByte(), 2 ) )
-    {
-        const double k = GetDouble();
-        const double n = GetDouble();
-        const auto aResult = semath::evaluateCombinValue(n, k, true);
-        if (!aResult)
-        {
-            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-            return;
-        }
-        PushDouble(aResult.maValue);
-    }
-}
-
 void ScInterpreter::ScPermut()
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )

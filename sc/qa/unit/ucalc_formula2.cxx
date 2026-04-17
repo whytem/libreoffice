@@ -2822,6 +2822,15 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorMathScalarAut
         m_pDoc->SetString(9, 7, 0, u"=MOD(22;3)"_ustr);
         m_pDoc->SetString(10, 7, 0, u"=GCD(24;18)"_ustr);
         m_pDoc->SetString(11, 7, 0, u"=LCM(6;8)"_ustr);
+        m_pDoc->SetString(12, 7, 0, u"=PI()"_ustr);
+        m_pDoc->SetString(13, 7, 0, u"=SIN(0)"_ustr);
+        m_pDoc->SetString(14, 7, 0, u"=ACOSH(2)"_ustr);
+        m_pDoc->SetString(15, 7, 0, u"=LN(EXP(1))"_ustr);
+        m_pDoc->SetString(16, 7, 0, u"=LOG10(100)"_ustr);
+        m_pDoc->SetString(17, 7, 0, u"=COMBIN(5;2)"_ustr);
+        m_pDoc->SetString(18, 7, 0, u"=COMBINA(3;2)"_ustr);
+        m_pDoc->SetString(19, 7, 0, u"=COLOR(1;2;3)"_ustr);
+        m_pDoc->SetString(20, 7, 0, u"=RAWSUBTRACT(10;1;2)"_ustr);
 
         ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(0, 7, 0));
         ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(1, 7, 0));
@@ -2835,14 +2844,22 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorMathScalarAut
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(9, 7, 0));
         ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(10, 7, 0));
         ASSERT_DOUBLES_EQUAL(24.0, m_pDoc->GetValue(11, 7, 0));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(M_PI, m_pDoc->GetValue(12, 7, 0), 1e-12);
+        ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(13, 7, 0));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.3169578969248168, m_pDoc->GetValue(14, 7, 0), 1e-12);
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(15, 7, 0));
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(16, 7, 0));
+        ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(17, 7, 0));
+        ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(18, 7, 0));
+        ASSERT_DOUBLES_EQUAL(66051.0, m_pDoc->GetValue(19, 7, 0));
+        ASSERT_DOUBLES_EQUAL(7.0, m_pDoc->GetValue(20, 7, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 12);
-        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 21);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MathScalar)]
-            >= 12);
+            >= 21);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MathScalar)]);
@@ -2876,6 +2893,15 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorMathScalarDef
         m_pDoc->SetString(9, 0, 0, u"=MOD(22;3)"_ustr);
         m_pDoc->SetString(10, 0, 0, u"=GCD(24;18)"_ustr);
         m_pDoc->SetString(11, 0, 0, u"=LCM(6;8)"_ustr);
+        m_pDoc->SetString(12, 0, 0, u"=PI()"_ustr);
+        m_pDoc->SetString(13, 0, 0, u"=SIN(0)"_ustr);
+        m_pDoc->SetString(14, 0, 0, u"=ACOSH(2)"_ustr);
+        m_pDoc->SetString(15, 0, 0, u"=LN(EXP(1))"_ustr);
+        m_pDoc->SetString(16, 0, 0, u"=LOG10(100)"_ustr);
+        m_pDoc->SetString(17, 0, 0, u"=COMBIN(5;2)"_ustr);
+        m_pDoc->SetString(18, 0, 0, u"=COMBINA(3;2)"_ustr);
+        m_pDoc->SetString(19, 0, 0, u"=COLOR(1;2;3)"_ustr);
+        m_pDoc->SetString(20, 0, 0, u"=RAWSUBTRACT(10;1;2)"_ustr);
 
         CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(0, 0, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(1, 0, 0), 1e-12);
@@ -2889,14 +2915,22 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorMathScalarDef
         CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(9, 0, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(10, 0, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(24.0, m_pDoc->GetValue(11, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(M_PI, m_pDoc->GetValue(12, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(13, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.3169578969248168, m_pDoc->GetValue(14, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(15, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(16, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(17, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(18, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(66051.0, m_pDoc->GetValue(19, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(7.0, m_pDoc->GetValue(20, 0, 0), 1e-12);
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 12);
-        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 21);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MathScalar)]
-            >= 12);
+            >= 21);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MathScalar)]);

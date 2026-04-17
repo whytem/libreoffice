@@ -559,37 +559,11 @@ private:
     void ScIntersect();
     void ScRangeFunc();
     void ScUnionFunc();
-    void ScPi();
     void ScRandom();
     void ScRandbetween();
     void ScRandArray();
     void ScRandomImpl( const std::function<double( double fFirst, double fLast )>& RandomFunc,
             double fFirst, double fLast );
-    void ScDeg();
-    void ScRad();
-    void ScSin();
-    void ScCos();
-    void ScTan();
-    void ScCot();
-    void ScArcSin();
-    void ScArcCos();
-    void ScArcTan();
-    void ScArcCot();
-    void ScSinHyp();
-    void ScCosHyp();
-    void ScTanHyp();
-    void ScCotHyp();
-    void ScArcSinHyp();
-    void ScArcCosHyp();
-    void ScArcTanHyp();
-    void ScArcCotHyp();
-    void ScCosecant();
-    void ScSecant();
-    void ScCosecantHyp();
-    void ScSecantHyp();
-    void ScExp();
-    void ScLn();
-    void ScLog10();
     void ScSqrt();
     bool IsString();
     void ScType();
@@ -621,7 +595,6 @@ private:
     void ScVarP( bool bTextAsZero = false );
     void ScStDev( bool bTextAsZero = false );
     void ScStDevP( bool bTextAsZero = false );
-    void ScRawSubtract();
     void ScColumns();
     void ScRows();
     void ScSheets();
@@ -887,8 +860,6 @@ private:
     void ScExpDist();
     void ScBinomDist();
     void ScPoissonDist( bool bODFF );
-    void ScCombin();
-    void ScCombinA();
     void ScPermut();
     void ScPermutationA();
     void ScB();
@@ -967,7 +938,6 @@ private:
     void ScFilterXML();
     void ScWebservice();
     void ScEncodeURL();
-    void ScColor();
     void ScErf();
     void ScErfc();
 
