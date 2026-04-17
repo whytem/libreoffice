@@ -2141,6 +2141,32 @@ void printLiveAuthoritativeSummary(
               << fProbeMatchRate << '\n';
     std::cout.flags(aOldFlags);
     std::cout.precision(nOldPrecision);
+
+    std::cout << std::fixed << std::setprecision(2);
+    for (std::size_t nIndex = 1; nIndex < static_cast<std::size_t>(FunctionKind::Count); ++nIndex)
+    {
+        const auto eFunction = static_cast<FunctionKind>(nIndex);
+        const sal_uInt64 nFunctionAuthoritative
+            = rRun.maLiveAuthoritativeStats.maFunctionAuthoritativeCount[nIndex];
+        const sal_uInt64 nFunctionFallback
+            = rRun.maLiveAuthoritativeStats.maFunctionFallbackCount[nIndex];
+        const sal_uInt64 nFunctionAttempts = nFunctionAuthoritative + nFunctionFallback;
+        const double fFunctionMatchRate
+            = nFunctionAttempts ? (static_cast<double>(nFunctionAuthoritative) * 100.0
+                                 / static_cast<double>(nFunctionAttempts))
+                               : 0.0;
+        const char* pName = functionKindName(eFunction);
+        std::cout << "interpret_tail_live_authoritative_function_" << pName
+                  << "_match=" << nFunctionAuthoritative << '\n';
+        std::cout << "interpret_tail_live_authoritative_function_" << pName
+                  << "_fallback=" << nFunctionFallback << '\n';
+        std::cout << "interpret_tail_live_authoritative_function_" << pName
+                  << "_attempts=" << nFunctionAttempts << '\n';
+        std::cout << "interpret_tail_live_authoritative_function_" << pName
+                  << "_match_rate=" << fFunctionMatchRate << '\n';
+    }
+    std::cout.flags(aOldFlags);
+    std::cout.precision(nOldPrecision);
 }
 
 void printWorkdayRuntimeStats()
