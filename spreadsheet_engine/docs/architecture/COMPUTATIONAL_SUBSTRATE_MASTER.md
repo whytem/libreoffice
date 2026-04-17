@@ -61,9 +61,10 @@ Today:
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to
-  `20761 / 50,661` (`40.9802%`) on the standing replay corpus, with the broad
+  `27201 / 50,661` (`53.6922%`) on the standing replay corpus, with the broad
   corpus lane stable again after fixing the intermittent `CONVERT(...)`
-  runtime crash in the shared BFS conversion path
+  runtime crash in the shared BFS conversion path and then aligning imported
+  root host truth for token-backed `VariableExpected` cells
 - the broad corpus lane now completes again with `BusinessDay` admitted on the
   default ambient surface after rejecting zero-workday `WORKDAY` weekend masks
   before they enter the shared runtime, and the next `BusinessDay` slice has
@@ -94,11 +95,11 @@ This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=27204`
-- `interpret_tail_live_authoritative_match_total=20761`
-- `interpret_tail_live_authoritative_fallback_total=6443`
+- `interpret_tail_live_authoritative_match_total=27201`
+- `interpret_tail_live_authoritative_fallback_total=3`
 - `legacy_interpreter_subroutine_count=340`
-- live authoritative-match rate over the corpus: `40.9802%`
-- live authoritative-match rate over the current promoted probe: `76.3160%`
+- live authoritative-match rate over the corpus: `53.6922%`
+- live authoritative-match rate over the current promoted probe: `99.9890%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -112,20 +113,20 @@ Lower is better.
 These are attempt totals from live observe, not unique-cell coverage.
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=92486`
-- `interpret_tail_live_fallback_total=294`
-- `interpret_tail_live_seen_total=92780`
+- `interpret_tail_live_supported_total=56418`
+- `interpret_tail_live_fallback_total=26`
+- `interpret_tail_live_seen_total=56444`
 - `interpret_tail_live_unseen_formula_cells=0`
-- `interpret_tail_live_promoted_function_supported_total=91884`
-- `interpret_tail_live_supported_rate=182.56`
-- `interpret_tail_live_seen_rate=183.14`
+- `interpret_tail_live_promoted_function_supported_total=55668`
+- `interpret_tail_live_supported_rate=111.36`
+- `interpret_tail_live_seen_rate=111.42`
 
 Dominant ambient fallback reasons:
 
-- `unsupported_formula_shape=122`
+- `unsupported_formula_shape=20`
 - `unsupported_host_surface=0`
 - `parse_failure=4`
-- `unsupported_function=168`
+- `unsupported_function=2`
 
 ### Full Replay Corpus: Live Unique-Cell Surface
 
@@ -135,63 +136,37 @@ supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
 - `interpret_tail_live_unique_seen_formula_cells=27571`
-- `interpret_tail_live_unique_supported_formula_cells=27435`
-- `interpret_tail_live_unique_fallback_formula_cells=136`
-- `interpret_tail_live_unique_unsupported_function_formula_cells=84`
+- `interpret_tail_live_unique_supported_formula_cells=27558`
+- `interpret_tail_live_unique_fallback_formula_cells=13`
+- `interpret_tail_live_unique_unsupported_function_formula_cells=1`
 - `interpret_tail_live_unique_unseen_formula_cells=23090`
 - `interpret_tail_live_unique_seen_rate=54.42`
-- `interpret_tail_live_unique_supported_rate=54.15`
+- `interpret_tail_live_unique_supported_rate=54.40`
 
 ### Live Unique Unsupported-Function Top-N
 
-- `unknown`: `54` unique unsupported-function cells
-- `text_utility`: `19` unique unsupported-function cells
-- `conditional`: `11` unique unsupported-function cells
+- `unknown`: `1` unique unsupported-function cell
 
 Routing policy:
 
-- first keep burning down the smaller `unknown` bucket by taking the highest-
-  count bounded roots directly
-- then target `text_utility`
-- then target `conditional`
+- classify and admit `ERROR.TYPE`
+- then reassess whether any residual live gap is unsupported function or now
+  mostly unsupported shape
 
 Unknown root split:
 
-- `ORG.LIBREOFFICE.FORECAST.ETS.MULT`: `3`
-- `COM.MICROSOFT.FORECAST.ETS`: `3`
-- `COM.MICROSOFT.MODE.MULT`: `3`
-- `COM.MICROSOFT.VSTACK`: `3`
-- `COM.MICROSOFT.MODE.SNGL`: `2`
-- `COMPLEX`: `2`
-- `KURT`: `2`
-- `MODE`: `2`
-- `COM.MICROSOFT.COVARIANCE.P`: `2`
-- `COM.MICROSOFT.COVARIANCE.S`: `2`
+- `ERROR.TYPE`: `1`
 
 That now sharpens the next routing policy:
 
-- the bounded selector cluster is now admitted and tracked as
-  `selector=62` live unique cells, `58` supported / `4` fallback
-- the new `matrix_math` family now carries `MDETERM` as
-  `12` live unique cells, `10` supported / `2` fallback
-- the `PROB(...)` slice is now admitted and default-on through the
-  `statistical_distribution` family, removing it from the `unknown` wall
-- the new bounded `growth_projection` slice now carries `GROWTH` as
-  `10` live unique cells, `10` supported / `0` fallback, removing it from the
-  `unknown` wall
-- `TEXTAFTER(...)` is now admitted through `text_utility`
-- `TEXTBEFORE(...)` is now admitted through `text_utility`, with focused
-  imported parity proof
-- `IFS(...)` / `SWITCH(...)` are now admitted through `conditional`
-- the spill-heavy dynamic-array cluster
-  (`UNIQUE`, `SORT`, `SORTBY`, `TEXTSPLIT`, `HSTACK`) is now admitted as
-  `spill_array=83` live unique cells with `73` supported / `10` fallback and
-  `unsupported_function=0`
-- the bounded `FORECAST(...)` / `INTERCEPT(...)` regression slice is now
-  admitted through `statistical_distribution`, removing both roots from the
-  live unique `unknown` wall
-- the next routing move should now pivot to the remaining bounded
-  forecasting/statistical unknown roots, starting with
+- the imported-root host-truth pass now treats token-backed
+  `VariableExpected` as authoritative live host truth at the seam
+- that clears the prior live-authoritative fallback walls for
+  `statistical_distribution`, `text_utility`, `lookup`, `conversion`,
+  `aggregate`, `round`, `calendar_utility`, `match`, `vlookup`, `xlookup`,
+  and adjacent imported-root families
+- the remaining live unique unsupported-function wall is now just
+  `ERROR.TYPE=1`
   `MODE.MULT` / `MODE.SNGL`, `KURT`, and adjacent covariance roots before
   heavier ETS or spill-shaped work
 
@@ -215,25 +190,25 @@ This is the direct-routing comparison surface after explicitly dirtying and
 forcing each replay formula cell once.
 
 - `interpret_tail_forced_direct_formula_cells=50661`
-- `interpret_tail_forced_direct_seen_formula_cells=27515`
-- `interpret_tail_forced_direct_supported_formula_cells=27379`
-- `interpret_tail_forced_direct_fallback_formula_cells=136`
+- `interpret_tail_forced_direct_seen_formula_cells=27569`
+- `interpret_tail_forced_direct_supported_formula_cells=27556`
+- `interpret_tail_forced_direct_fallback_formula_cells=13`
 - `interpret_tail_forced_direct_unseen_formula_cells=23146`
-- `interpret_tail_forced_direct_seen_rate=54.31`
-- `interpret_tail_forced_direct_supported_rate=54.04`
+- `interpret_tail_forced_direct_seen_rate=54.42`
+- `interpret_tail_forced_direct_supported_rate=54.39`
 
 ### Raw Cached-Workbook Promoted Probe
 
 - `interpret_tail_probe_formula_cells=27204`
-- `interpret_tail_authoritative_total=5587`
-- `interpret_tail_authoritative_fallback_total=21617`
-- raw promoted authoritative rate: `20.54%`
+- `interpret_tail_authoritative_total=0`
+- `interpret_tail_authoritative_fallback_total=27204`
+- raw promoted authoritative rate: `0.00%`
 
 Dominant promoted-family fallback reasons:
 
-- `shadow_mismatch=21547`
-- `unsupported_function=27`
-- `unsupported_formula_shape=29`
+- `shadow_mismatch=27204`
+- `unsupported_function=0`
+- `unsupported_formula_shape=0`
 - `unsupported_host_surface=0`
 
 ### Live-Reachable vs Imported-Artifact Promoted Probe
@@ -247,9 +222,9 @@ Interpretation:
 
 - the promoted probe is now diagnostic-only and only meaningful when split
   into live-reachable vs imported-artifact-only buckets
-- the `shadow_mismatch=21547` wall is overwhelmingly imported cached-workbook
+- the `shadow_mismatch=27204` wall is overwhelmingly imported cached-workbook
   debt, not a live parity denominator
-- the raw promoted authoritative rate has only nudged to `20.54%`, so this
+- the raw promoted authoritative rate is now `0.00%`, so this
   surface remains useful for diagnostics but not for retirement steering
 
 ### Engine-Authoritative Families
@@ -417,36 +392,24 @@ remain archived reference material only.
 
 The highest-value remaining blockers are now:
 
-1. quality inside the new ambient live traffic:
-   the full replay corpus still has a broad live attempt wall, with
-   `unsupported_function=168`
-2. live-authority headroom:
-   the north-star is now `20761 / 50,661` (`40.9802%`), which is a real jump
-   but still well short of deletion-comfortable territory
-3. imported live-host-truth residuals:
-   the next likely north-star movers are now the broader ambient
-   `unsupported_function` wall rather than the tiny imported residue buckets
-4. raw promoted diagnostic debt:
-   `logical_fold=2157` fallback and `math_scalar=626` fallback now reflect
-   cached-workbook disagreement after the live-host parity pivot
-5. smaller live and raw residue:
-   ambient live now has `logical_fold=6`, `INDEX=2`, while the raw promoted
-   diagnostic surface still carries
-   `logical_constant=5`
-6. first real Calc-path retirement:
-   the logical-constant pair now has explicit family-local default-on routing
-   and its dedicated `ScInterpreter` subroutines are deleted, but broader
-   interpreter retirement is still ahead
-7. imported replay denominator honesty:
-   the raw promoted replay probe is now confirmed to be a cached imported
-   correctness surface, not a live seam-off retirement denominator
+1. residual live-shape gaps:
+   the full replay corpus now has a small live attempt wall dominated by
+   `unsupported_formula_shape=20`
+2. the last live unsupported-function residue:
+   the live unique unsupported-function wall is now just `ERROR.TYPE=1`
+3. raw promoted diagnostic debt:
+   the raw promoted replay probe is now entirely imported-artifact-only and
+   remains a cached-workbook diagnostic surface, not a retirement denominator
+4. further Calc-path retirement:
+   the next broad value now comes from turning more engine-owned families into
+   default-on wrapper deletions rather than widening hard routes
 
 The live authoritative-match north-star on the standing replay corpus is now
-`20761 / 50,661` (`40.9802%`). The honest live unique-cell inventory now
+`27201 / 50,661` (`53.6922%`). The honest live unique-cell inventory now
 shows `27571 / 50,661` formula cells seen (`54.42%`) and
-`27435 / 50,661` supported (`54.15%`) during the bulk live observe run, while
+`27558 / 50,661` supported (`54.40%`) during the bulk live observe run, while
 the forced-direct comparison surface now sits at
-`27515 / 50,661` seen (`54.31%`) and `27379 / 50,661` supported (`54.04%`).
+`27569 / 50,661` seen (`54.42%`) and `27556 / 50,661` supported (`54.39%`).
 Those are the coverage-style numbers we should currently use alongside the
 north-star; the broader live and forced-interpret counters are still attempt
 telemetry rather than a deletion denominator.
@@ -482,10 +445,9 @@ validation suite. The imported `FORMULA(...)` slice remains the biggest single
 north-star mover: imported reference-target `FORMULA(...)` roots now match
 live Calc `FormulaError::VariableExpected` instead of replay-cached workbook
 strings, which added `14278 / 14278` supported cells on the live unique
-surface and moved the deletion-gating metric decisively above the `25%`
-milestone. The raw promoted replay probe now sits at `5587 / 27204` and still
-carries `14278` `formula_text` shadow mismatches, so it remains purely
-diagnostic rather than a retirement denominator.
+surface and moved the deletion-gating metric decisively above the `50%`
+milestone. The raw promoted replay probe now sits at `0 / 27204` and remains
+purely diagnostic rather than a retirement denominator.
 
 Inside the current families, the semantically distinct env-independent
 literal-array hard-route frontier is now frozen. New widening is out of scope
