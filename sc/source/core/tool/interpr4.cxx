@@ -4042,6 +4042,14 @@ StackVar ScInterpreter::Interpret()
                     nFuncFmtType = SvNumFormatType::LOGICAL;
                     PushInt(bValue ? 1 : 0);
                 };
+                const auto warnIfLegacyScalarRootReached = [&](std::u16string_view rLabel) {
+                    warnIfLegacyDispatchReached(
+                        "family-local default-on", rLabel,
+                        [](std::u16string_view rFormula) {
+                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                        },
+                        "family-local default-on scalar root reached ScInterpreter");
+                };
                 const auto pushLegacyDateOrTimeValue =
                     [&](const char* pFunctionName, SvNumFormatType eFormatType,
                         auto aEvaluator) {
@@ -5878,18 +5886,60 @@ StackVar ScInterpreter::Interpret()
                     case ocChoose           : ScChooseJump();               break;
                     case ocChooseCols       : ScChooseCols();               break;
                     case ocChooseRows       : ScChooseRows();               break;
-                    case ocAdd              : ScAdd();                      break;
-                    case ocSub              : ScSub();                      break;
+                    case ocAdd              :
+                        warnIfLegacyScalarRootReached(u"ADD");
+                        CalculateAddSub(false);
+                        break;
+                    case ocSub              :
+                        warnIfLegacyScalarRootReached(u"SUB");
+                        CalculateAddSub(true);
+                        break;
                     case ocMul              : ScMul();                      break;
                     case ocDiv              : ScDiv();                      break;
                     case ocAmpersand        : ScAmpersand();                break;
                     case ocPow              : ScPow();                      break;
-                    case ocEqual            : ScEqual();                    break;
-                    case ocNotEqual         : ScNotEqual();                 break;
-                    case ocLess             : ScLess();                     break;
-                    case ocGreater          : ScGreater();                  break;
-                    case ocLessEqual        : ScLessEqual();                break;
-                    case ocGreaterEqual     : ScGreaterEqual();             break;
+                    case ocEqual            :
+                        warnIfLegacyScalarRootReached(u"EQUAL");
+                        ScCompareOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                ComparisonMode::Equal,
+                            SC_EQUAL);
+                        break;
+                    case ocNotEqual         :
+                        warnIfLegacyScalarRootReached(u"NOT_EQUAL");
+                        ScCompareOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                ComparisonMode::NotEqual,
+                            SC_NOT_EQUAL);
+                        break;
+                    case ocLess             :
+                        warnIfLegacyScalarRootReached(u"LESS");
+                        ScCompareOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                ComparisonMode::Less,
+                            SC_LESS);
+                        break;
+                    case ocGreater          :
+                        warnIfLegacyScalarRootReached(u"GREATER");
+                        ScCompareOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                ComparisonMode::Greater,
+                            SC_GREATER);
+                        break;
+                    case ocLessEqual        :
+                        warnIfLegacyScalarRootReached(u"LESS_EQUAL");
+                        ScCompareOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                ComparisonMode::LessEqual,
+                            SC_LESS_EQUAL);
+                        break;
+                    case ocGreaterEqual     :
+                        warnIfLegacyScalarRootReached(u"GREATER_EQUAL");
+                        ScCompareOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                ComparisonMode::GreaterEqual,
+                            SC_GREATER_EQUAL);
+                        break;
                     case ocAnd              :
                         pushLegacyLogicalFold(
                             u"AND", spreadsheetengine::compat::libreoffice::interpreterdispatch::
@@ -5910,8 +5960,19 @@ StackVar ScInterpreter::Interpret()
                     case ocUnion            : ScUnionFunc();                break;
                     case ocNot              : pushLegacyNot();              break;
                     case ocNegSub           :
-                    case ocNeg              : ScNeg();                      break;
-                    case ocPercentSign      : ScPercentSign();              break;
+                    case ocNeg              :
+                        warnIfLegacyScalarRootReached(u"NEGATE");
+                        nFuncFmtType = nCurFmtType;
+                        ScUnaryMatrixOrScalarOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                UnaryMatrixScalarMode::Negate);
+                        break;
+                    case ocPercentSign      :
+                        warnIfLegacyScalarRootReached(u"PERCENT");
+                        nFuncFmtType = SvNumFormatType::PERCENT;
+                        PushInt(100);
+                        ScSyntheticBinaryOp(ocDiv, &ScInterpreter::ScDiv);
+                        break;
                     case ocPi               : ScPi();                       break;
                     case ocRandom           : ScRandom();                   break;
                     case ocRandArray        : ScRandArray();                break;
@@ -6054,7 +6115,10 @@ StackVar ScInterpreter::Interpret()
                     case ocChar             : pushLegacyChar();             break;
                     case ocArcTan2          : ScArcTan2();                  break;
                     case ocMod              : ScMod();                      break;
-                    case ocPower            : ScPower();                    break;
+                    case ocPower            :
+                        if (MustHaveParamCount(GetByte(), 2))
+                            ScPow();
+                        break;
                     case ocRound            : ScRound();                    break;
                     case ocRoundSig         : pushLegacyRoundSignificant(); break;
                     case ocRoundUp          : ScRoundUp();                  break;
@@ -6329,8 +6393,71 @@ StackVar ScInterpreter::Interpret()
                     case ocExternal         : ScExternal();                 break;
                     case ocTableOp          : ScTableOp();                  break;
                     case ocStop :                                           break;
-                    case ocErrorType        : ScErrorType();                break;
-                    case ocErrorType_ODF    : ScErrorType_ODF();            break;
+                    case ocErrorType:
+                    {
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", u"ERRORTYPE",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            "family-local default-on ERRORTYPE reached ScInterpreter", true);
+                        FormulaError nErr = GetErrorType();
+                        if (nErr != FormulaError::NONE)
+                        {
+                            nGlobalError = FormulaError::NONE;
+                            PushDouble(static_cast<double>(nErr));
+                        }
+                        else
+                            PushNA();
+                    }
+                    break;
+                    case ocErrorType_ODF:
+                    {
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", u"ERROR.TYPE",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            "family-local default-on ERROR.TYPE reached ScInterpreter", true);
+                        FormulaError nErr = GetErrorType();
+                        sal_uInt16 nErrType = 0;
+
+                        switch (nErr)
+                        {
+                            case FormulaError::NoCode:
+                                nErrType = 1;
+                                break;
+                            case FormulaError::DivisionByZero:
+                                nErrType = 2;
+                                break;
+                            case FormulaError::NoValue:
+                                nErrType = 3;
+                                break;
+                            case FormulaError::NoRef:
+                                nErrType = 4;
+                                break;
+                            case FormulaError::NoName:
+                                nErrType = 5;
+                                break;
+                            case FormulaError::IllegalFPOperation:
+                                nErrType = 6;
+                                break;
+                            case FormulaError::NotAvailable:
+                                nErrType = 7;
+                                break;
+                            default:
+                                break;
+                        }
+
+                        if (nErrType)
+                        {
+                            nGlobalError = FormulaError::NONE;
+                            PushDouble(nErrType);
+                        }
+                        else
+                            PushNA();
+                    }
+                    break;
                     case ocCurrent          : ScCurrent();                  break;
                     case ocStyle            : ScStyle();                    break;
                     case ocDde              : ScDde();                      break;

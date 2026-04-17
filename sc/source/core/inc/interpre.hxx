@@ -556,14 +556,6 @@ private:
      */
     sc::RangeMatrix CompareMat( ScQueryOp eOp, sc::CompareOptions* pOptions = nullptr );
     ScMatrixRef QueryMat( const ScMatrixRef& pMat, sc::CompareOptions& rOptions );
-    void ScEqual();
-    void ScNotEqual();
-    void ScLess();
-    void ScGreater();
-    void ScLessEqual();
-    void ScGreaterEqual();
-    void ScNeg();
-    void ScPercentSign();
     void ScIntersect();
     void ScRangeFunc();
     void ScUnionFunc();
@@ -734,8 +726,6 @@ public:
     void ScMacro();
     bool SetSbxVariable( SbxVariable* pVar, const ScAddress& );
     FormulaError GetErrorType();
-    void ScErrorType();
-    void ScErrorType_ODF();
     void ScDBArea();
     void ScColRowNameAuto();
     void ScGetPivotData();
@@ -798,10 +788,7 @@ public:
     void ScGetDiffDate();
     void ScGetDiffDate360();
     void ScGetDateDif();
-    void ScPower();
     void ScAmpersand();
-    void ScAdd();
-    void ScSub();
     void ScMul();
     void ScDiv();
     void ScPow();

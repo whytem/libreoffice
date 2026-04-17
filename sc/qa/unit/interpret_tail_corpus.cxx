@@ -1384,6 +1384,8 @@ const char* functionKindName(FunctionKind eFunction)
     {
         case FunctionKind::Unknown:
             return "unknown";
+        case FunctionKind::ScalarRoot:
+            return "scalar_root";
         case FunctionKind::Conditional:
             return "conditional";
         case FunctionKind::FormulaText:
@@ -2055,6 +2057,55 @@ void printTopUnknownRootInventory(
         std::cout << aPrefix << "_top_unknown_root_" << nIndex
                   << "_unseen_formula_cells=" << rEntry.maEntry.mnUnseenFormulaCells
                   << '\n';
+    }
+}
+
+void printTopUnknownRootSurfaceInventory(
+    std::string_view aPrefix, const ObserveSurfaceInventory& rInventory, std::size_t nLimit = 10)
+{
+    using UnknownRootInventoryEntry = ObserveSurfaceInventory::UnknownRootInventoryEntry;
+    struct RankedUnknownRoot
+    {
+        OUString maLabel;
+        UnknownRootInventoryEntry maEntry;
+    };
+
+    std::vector<RankedUnknownRoot> aEntries;
+    aEntries.reserve(rInventory.maUnknownRootInventory.size());
+    for (const auto& rEntry : rInventory.maUnknownRootInventory)
+        aEntries.push_back({ rEntry.first, rEntry.second });
+
+    std::sort(aEntries.begin(), aEntries.end(),
+        [](const RankedUnknownRoot& rLeft, const RankedUnknownRoot& rRight) {
+            if (rLeft.maEntry.mnFormulaCells != rRight.maEntry.mnFormulaCells)
+                return rLeft.maEntry.mnFormulaCells > rRight.maEntry.mnFormulaCells;
+            if (rLeft.maEntry.mnUnseenFormulaCells != rRight.maEntry.mnUnseenFormulaCells)
+                return rLeft.maEntry.mnUnseenFormulaCells > rRight.maEntry.mnUnseenFormulaCells;
+            if (rLeft.maEntry.mnFallbackFormulaCells != rRight.maEntry.mnFallbackFormulaCells)
+                return rLeft.maEntry.mnFallbackFormulaCells > rRight.maEntry.mnFallbackFormulaCells;
+            return rLeft.maLabel < rRight.maLabel;
+        });
+
+    if (aEntries.size() > nLimit)
+        aEntries.resize(nLimit);
+
+    std::cout << aPrefix << "_top_unknown_surface_root_count=" << aEntries.size() << '\n';
+    for (std::size_t nIndex = 0; nIndex < aEntries.size(); ++nIndex)
+    {
+        const auto& rEntry = aEntries[nIndex];
+        std::cout << aPrefix << "_top_unknown_surface_root_" << nIndex
+                  << "_label=" << rEntry.maLabel.toUtf8().getStr() << '\n';
+        std::cout << aPrefix << "_top_unknown_surface_root_" << nIndex
+                  << "_formula_cells=" << rEntry.maEntry.mnFormulaCells << '\n';
+        std::cout << aPrefix << "_top_unknown_surface_root_" << nIndex
+                  << "_fallback_formula_cells=" << rEntry.maEntry.mnFallbackFormulaCells
+                  << '\n';
+        std::cout << aPrefix << "_top_unknown_surface_root_" << nIndex
+                  << "_unseen_formula_cells=" << rEntry.maEntry.mnUnseenFormulaCells
+                  << '\n';
+        std::cout << aPrefix << "_top_unknown_surface_root_" << nIndex
+                  << "_unsupported_function_formula_cells="
+                  << rEntry.maEntry.mnUnsupportedFunctionFormulaCells << '\n';
     }
 }
 
@@ -3368,6 +3419,158 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedInformationPredicateDi
     }
 }
 
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedErrorTypeParity)
+{
+    const OUString aWorkbookPath = m_directories.getPathFromSrc(
+        u"/sc/qa/unit/data/functions/spreadsheet/fods/error.type.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for error.type parity case",
+        static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    const ScAddress aPos(0, 27, 1); // Sheet2.A28
+    ScFormulaCell* pFormula = rDoc.GetFormulaCell(aPos);
+    CPPUNIT_ASSERT(pFormula);
+
+    const OUString aFormulaSource
+        = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+    const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
+    CPPUNIT_ASSERT_EQUAL(u"=of:=ERROR.TYPE({#N/A})"_ustr, aFormulaSource);
+
+    const auto aAttempt
+        = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
+            rDoc, *pContext, aPos,
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+            rDoc.GetCalcConfig().mbEmptyStringAsZero, pFormula->GetCode(),
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()));
+    CPPUNIT_ASSERT(aAttempt.mbSupported);
+
+    {
+        ScopedEnvironmentOverride aOffMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        pFormula->SetDirty();
+        pFormula->Interpret();
+    }
+
+    const auto aHostValue
+        = spreadsheetengine::compat::libreoffice::readHostDocumentCellValue(rDoc, aPos);
+    CPPUNIT_ASSERT(aHostValue);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::CellValueKind::Error, aHostValue.maValue.meKind);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error, aAttempt.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(aHostValue.maValue.meError, aAttempt.maResult.meError);
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedTokenBackedArrayParseParity)
+{
+    const struct ImportedArrayParseCase
+    {
+        ScAddress maPos;
+        OUString maExpectedFormula;
+    } aCases[]
+        = { { ScAddress(0, 13, 1),
+                u"=of:=MEDIAN({DATE(2015|3|4)|DATE(2015|2|1)|DATE(2015|3|4)})"_ustr },
+              { ScAddress(7, 47, 1),
+                  u"=of:=COM.MICROSOFT.MODE.MULT({DATE(2015|3|4)|DATE(2015|2|1)|DATE(2015|3|4)})"_ustr } };
+
+    const OUString aWorkbookPath
+        = m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/statistical/fods/median.fods");
+    const std::string aWorkbookPathUtf8(aWorkbookPath.toUtf8().getStr());
+    const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+    CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for median.fods parse parity case",
+        static_cast<bool>(aLoadResult));
+
+    Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+    normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+    ScDocShellRef xDocShell
+        = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                         | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+    xDocShell->DoInitUnitTest();
+    ScDocument& rDoc = xDocShell->GetDocument();
+    (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+    ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+    ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+    CPPUNIT_ASSERT(pContext);
+
+    for (const auto& rCase : aCases)
+    {
+        ScFormulaCell* pFormula = rDoc.GetFormulaCell(rCase.maPos);
+        CPPUNIT_ASSERT(pFormula);
+
+        const OUString aFormulaSource
+            = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+        const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
+        CPPUNIT_ASSERT_EQUAL(rCase.maExpectedFormula, aFormulaSource);
+
+        const auto aAttempt
+            = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
+                rDoc, *pContext, rCase.maPos,
+                std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+                rDoc.GetCalcConfig().mbEmptyStringAsZero, pFormula->GetCode(),
+                std::u16string_view(aCanonicalFormulaSource.getStr(),
+                    aCanonicalFormulaSource.getLength()));
+        CPPUNIT_ASSERT(aAttempt.mbSupported);
+
+        const auto aHostValue
+            = spreadsheetengine::compat::libreoffice::readHostDocumentCellValue(rDoc, rCase.maPos);
+        CPPUNIT_ASSERT(aHostValue);
+        switch (aHostValue.maValue.meKind)
+        {
+            case spreadsheetengine::api::CellValueKind::Number:
+            case spreadsheetengine::api::CellValueKind::Boolean:
+                CPPUNIT_ASSERT_EQUAL(
+                    spreadsheetengine::api::formulavalue::ValueType::Value,
+                    aAttempt.maResult.meType);
+                CPPUNIT_ASSERT_DOUBLES_EQUAL(
+                    aHostValue.maValue.mfNumber, aAttempt.maResult.mfValue, 1e-12);
+                break;
+            case spreadsheetengine::api::CellValueKind::Text:
+                CPPUNIT_ASSERT_EQUAL(
+                    spreadsheetengine::api::formulavalue::ValueType::String,
+                    aAttempt.maResult.meType);
+                CPPUNIT_ASSERT_EQUAL(
+                    spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                        aHostValue.maValue.maString),
+                    spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                        aAttempt.maResult.maString));
+                break;
+            case spreadsheetengine::api::CellValueKind::Error:
+                CPPUNIT_ASSERT_EQUAL(
+                    spreadsheetengine::api::formulavalue::ValueType::Error,
+                    aAttempt.maResult.meType);
+                CPPUNIT_ASSERT_EQUAL(aHostValue.maValue.meError, aAttempt.maResult.meError);
+                break;
+            case spreadsheetengine::api::CellValueKind::Empty:
+                CPPUNIT_ASSERT_EQUAL(
+                    spreadsheetengine::api::formulavalue::ValueType::String,
+                    aAttempt.maResult.meType);
+                CPPUNIT_ASSERT_EQUAL(
+                    u""_ustr,
+                    spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                        aAttempt.maResult.maString));
+                break;
+        }
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedInformationPredicateDirectLiveHostTruth)
 {
     const struct ImportedPredicateHostTruthCase
@@ -4414,11 +4617,13 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     printObserveSurfaceInventory("interpret_tail_live_unique", aLiveUniqueInventory);
     printTopUnsupportedFunctionInventory("interpret_tail_live_unique", aLiveUniqueInventory);
     printTopUnknownRootInventory("interpret_tail_live_unique", aLiveUniqueInventory);
+    printTopUnknownRootSurfaceInventory("interpret_tail_live_unique", aLiveUniqueInventory);
     printRoutingStats("interpret_tail_forced_interpret", aForcedDirectInventory.mnFormulaCells,
         aForcedInterpretStats);
     printObserveSurfaceInventory("interpret_tail_forced_direct", aForcedDirectInventory);
     printTopUnsupportedFunctionInventory("interpret_tail_forced_direct", aForcedDirectInventory);
     printTopUnknownRootInventory("interpret_tail_forced_direct", aForcedDirectInventory);
+    printTopUnknownRootSurfaceInventory("interpret_tail_forced_direct", aForcedDirectInventory);
     printStats(nWorkbookCount, nFormulaCellCount, aProbeStats);
     std::cout << "interpret_tail_probe_formula_cells=" << nProbeFormulaCount << '\n';
     const std::size_t nLegacyInterpreterSubroutineCount = countLegacyInterpreterSubroutines();

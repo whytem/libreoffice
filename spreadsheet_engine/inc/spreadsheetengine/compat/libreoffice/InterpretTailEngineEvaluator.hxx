@@ -109,6 +109,7 @@ enum class MismatchReason : sal_uInt8
 enum class FunctionKind : sal_uInt8
 {
     Unknown,
+    ScalarRoot,
     Conditional,
     FormulaText,
     LogicalConstant,
@@ -931,7 +932,8 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
         return FunctionKind::MathScalar;
     if (rFunctionName == u"ISERROR" || rFunctionName == u"ISERR" || rFunctionName == u"ISNUMBER"
         || rFunctionName == u"ISNA" || rFunctionName == u"ISTEXT"
-        || rFunctionName == u"ISNONTEXT" || rFunctionName == u"ISBLANK")
+        || rFunctionName == u"ISNONTEXT" || rFunctionName == u"ISBLANK"
+        || rFunctionName == u"ERROR.TYPE" || rFunctionName == u"ERRORTYPE")
     {
         return FunctionKind::InformationPredicate;
     }
@@ -965,6 +967,8 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
 {
     switch (eFunction)
     {
+        case FunctionKind::ScalarRoot:
+            return false;
         case FunctionKind::LogicalConstant:
         case FunctionKind::Conversion:
         case FunctionKind::Round:
@@ -1235,6 +1239,9 @@ template <typename T>
 }
 
 [[nodiscard]] inline FunctionKind classifyDelegatedFunctionNode(
+    const core::formula::Node& rNode);
+
+[[nodiscard]] inline bool isPromotableScalarRootNode(
     const core::formula::Node& rNode);
 
 [[nodiscard]] inline bool isHardRoutedNode(
@@ -5110,7 +5117,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const core::formula::Node& rNode)
 {
     if (rNode.meKind != core::formula::NodeKind::FunctionCall)
-        return FunctionKind::Unknown;
+        return isPromotableScalarRootNode(rNode) ? FunctionKind::ScalarRoot
+                                                 : FunctionKind::Unknown;
 
     const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
     if (aFunctionName == u"IFERROR" || aFunctionName == u"IFNA")
@@ -5121,6 +5129,68 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     }
 
     return classifyFunction(aFunctionName);
+}
+
+[[nodiscard]] inline bool isPromotableScalarRootFunctionCall(
+    const core::formula::Node& rNode)
+{
+    if (rNode.meKind != core::formula::NodeKind::FunctionCall)
+        return false;
+
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    const FunctionKind eFunction = classifyFunction(aFunctionName);
+    if (eFunction == FunctionKind::LogicalConstant && rNode.maChildren.empty())
+        return true;
+
+    switch (eFunction)
+    {
+        case FunctionKind::Conditional:
+        case FunctionKind::TextUtility:
+        case FunctionKind::Conversion:
+        case FunctionKind::NumericAggregate:
+        case FunctionKind::RankedAggregate:
+        case FunctionKind::StatisticalAggregate:
+        case FunctionKind::StatisticalDistribution:
+        case FunctionKind::GrowthProjection:
+        case FunctionKind::CriteriaAggregate:
+        case FunctionKind::Aggregate:
+        case FunctionKind::BusinessDay:
+        case FunctionKind::CalendarUtility:
+        case FunctionKind::DateDifference:
+        case FunctionKind::DateConstructExtract:
+        case FunctionKind::MatrixMath:
+        case FunctionKind::MathScalar:
+        case FunctionKind::Selector:
+            return true;
+        default:
+            return false;
+    }
+}
+
+[[nodiscard]] inline bool isPromotableScalarRootNode(
+    const core::formula::Node& rNode)
+{
+    switch (rNode.meKind)
+    {
+        case core::formula::NodeKind::NumberLiteral:
+        case core::formula::NodeKind::StringLiteral:
+        case core::formula::NodeKind::BooleanLiteral:
+        case core::formula::NodeKind::ErrorLiteral:
+        case core::formula::NodeKind::CellReference:
+        case core::formula::NodeKind::NamedReference:
+            return true;
+        case core::formula::NodeKind::FunctionCall:
+            return isPromotableScalarRootFunctionCall(rNode);
+        case core::formula::NodeKind::UnaryOperation:
+            return rNode.maChildren.size() == 1 && rNode.maChildren[0]
+                   && isPromotableScalarRootNode(*rNode.maChildren[0]);
+        case core::formula::NodeKind::BinaryOperation:
+            return rNode.maChildren.size() == 2 && rNode.maChildren[0] && rNode.maChildren[1]
+                   && isPromotableScalarRootNode(*rNode.maChildren[0])
+                   && isPromotableScalarRootNode(*rNode.maChildren[1]);
+        default:
+            return false;
+    }
 }
 
 [[nodiscard]] inline bool isLiteralOnlyNode(const core::formula::Node& rNode)
@@ -10041,6 +10111,162 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (rNode.maChildren.size() != 1)
             return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
+        const auto classifyOdfErrorTypeLiteral = [](api::StringView rLiteral)
+            -> std::optional<double> {
+            const api::String aUpper = uppercaseAscii(rLiteral);
+            if (aUpper == u"#NULL!")
+                return 1.0;
+            if (aUpper == u"#DIV/0!")
+                return 2.0;
+            if (aUpper == u"#VALUE!")
+                return 3.0;
+            if (aUpper == u"#REF!")
+                return 4.0;
+            if (aUpper == u"#NAME?")
+                return 5.0;
+            if (aUpper == u"#NUM!")
+                return 6.0;
+            if (aUpper == u"#N/A")
+                return 7.0;
+            return std::nullopt;
+        };
+        const auto classifyLegacyErrorTypeFormulaError = [](FormulaError eError)
+            -> std::optional<double> {
+            if (eError == FormulaError::NONE)
+                return std::nullopt;
+            return static_cast<double>(eError);
+        };
+        const auto classifyOdfErrorTypeFormulaError = [](FormulaError eError)
+            -> std::optional<double> {
+            switch (eError)
+            {
+                case FormulaError::NoCode:
+                    return 1.0;
+                case FormulaError::DivisionByZero:
+                    return 2.0;
+                case FormulaError::NoValue:
+                    return 3.0;
+                case FormulaError::NoRef:
+                    return 4.0;
+                case FormulaError::NoName:
+                    return 5.0;
+                case FormulaError::IllegalFPOperation:
+                    return 6.0;
+                case FormulaError::NotAvailable:
+                    return 7.0;
+                case FormulaError::NONE:
+                default:
+                    return std::nullopt;
+            }
+        };
+        const auto classifyErrorTypeValue = [&](const api::CellValue& rValue, bool bLegacy)
+            -> std::optional<double> {
+            if (!rValue.isError())
+                return std::nullopt;
+            const FormulaError eFormulaError = toFormulaError(rValue.meError);
+            return bLegacy ? classifyLegacyErrorTypeFormulaError(eFormulaError)
+                           : classifyOdfErrorTypeFormulaError(eFormulaError);
+        };
+
+        if (aFunctionName == u"ERROR.TYPE" || aFunctionName == u"ERRORTYPE")
+        {
+            const bool bLegacyErrorType = aFunctionName == u"ERRORTYPE";
+            const auto classifyReferenceErrorType = [&](const core::formula::Node& rArgument)
+                -> std::optional<double> {
+                if (rArgument.meKind != core::formula::NodeKind::CellReference
+                    && rArgument.meKind != core::formula::NodeKind::RangeReference
+                    && rArgument.meKind != core::formula::NodeKind::NamedReference)
+                {
+                    return std::nullopt;
+                }
+
+                const auto aRange = resolveReferenceRangeNode(rArgument, rDoc, rFormulaPos);
+                if (!aRange.mbSupported || !aRange.moValue)
+                {
+                    if (rArgument.meKind == core::formula::NodeKind::NamedReference
+                        && aRange.meError == api::Error::NotAvailable)
+                    {
+                        return bLegacyErrorType ? 525.0 : 5.0;
+                    }
+                    if ((rArgument.meKind == core::formula::NodeKind::CellReference
+                            || rArgument.meKind == core::formula::NodeKind::RangeReference)
+                        && aRange.meError == api::Error::IllegalArgument)
+                    {
+                        return bLegacyErrorType ? 524.0 : 4.0;
+                    }
+                    return std::nullopt;
+                }
+
+                if (aRange.moValue->aStart != aRange.moValue->aEnd)
+                {
+                    return bLegacyErrorType ? std::optional<double>(519.0)
+                                            : std::optional<double>(std::nullopt);
+                }
+
+                const ScAddress aAddress = aRange.moValue->aStart;
+                if (const FormulaError eError = rDoc.GetErrCode(aAddress); eError != FormulaError::NONE)
+                {
+                    return bLegacyErrorType ? classifyLegacyErrorTypeFormulaError(eError)
+                                            : classifyOdfErrorTypeFormulaError(eError);
+                }
+
+                const auto aHostValue = readHostDocumentCellValue(rDoc, aAddress);
+                if (!aHostValue)
+                    return std::nullopt;
+                return classifyErrorTypeValue(aHostValue.maValue, bLegacyErrorType);
+            };
+
+            const core::formula::Node& rArgument = *rNode.maChildren[0];
+            if (rArgument.meKind == core::formula::NodeKind::ErrorLiteral)
+            {
+                if (bLegacyErrorType)
+                    return makeNumericResult(
+                        eFunction,
+                        static_cast<double>(
+                            spreadsheetengine::compat::libreoffice::toFormulaError(
+                                mapErrorLiteral(rArgument.maPrimaryText))),
+                        SvNumFormatType::NUMBER);
+
+                if (const auto oErrorType = classifyOdfErrorTypeLiteral(rArgument.maPrimaryText))
+                    return makeNumericResult(eFunction, *oErrorType, SvNumFormatType::NUMBER);
+                return makeErrorResult(eFunction, api::Error::NotAvailable);
+            }
+
+            if (const auto oReferenceErrorType = classifyReferenceErrorType(rArgument))
+                return makeNumericResult(eFunction, *oReferenceErrorType, SvNumFormatType::NUMBER);
+
+            const auto aMatrix = materializeMatrixNode(rArgument, rDoc, rContext, rFormulaPos);
+            if (aMatrix.mbSupported && aMatrix.moValue)
+            {
+                SCSIZE nColumns = 0;
+                SCSIZE nRows = 0;
+                (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+                if (nColumns != 1 || nRows != 1)
+                    return makeErrorResult(eFunction, api::Error::NotAvailable);
+
+                const auto aValue
+                    = lookupexecution::detail::toApiCellValue((*aMatrix.moValue)->Get(0, 0));
+                if (const auto oErrorType = classifyErrorTypeValue(aValue, bLegacyErrorType))
+                    return makeNumericResult(eFunction, *oErrorType, SvNumFormatType::NUMBER);
+                return makeErrorResult(eFunction, api::Error::NotAvailable);
+            }
+            if (aMatrix.mbSupported && !aMatrix.moValue)
+                return makeErrorResult(eFunction, aMatrix.meError);
+
+            const auto aArgument = materializeArgument(rArgument);
+            if (!aArgument.mbSupported)
+                return makeUnsupported(eFunction, aArgument.meFallbackReason);
+            if (!aArgument.moValue)
+                return makeErrorResult(eFunction, aArgument.meError);
+
+            if (const auto oErrorType
+                = classifyErrorTypeValue(*aArgument.moValue, bLegacyErrorType))
+            {
+                return makeNumericResult(eFunction, *oErrorType, SvNumFormatType::NUMBER);
+            }
+            return makeErrorResult(eFunction, api::Error::NotAvailable);
+        }
+
         const bool bImportedHostTruthPredicate
             = (bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
               && referencesImportedPredicateHostTruthCell(
@@ -10802,6 +11028,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const FunctionKind eFunction = classifyFunction(aFunctionName);
     switch (eFunction)
     {
+        case FunctionKind::ScalarRoot:
+            return makeUnsupported(eFunction, FallbackReason::UnsupportedFormulaShape);
         case FunctionKind::Conditional:
             return evaluateScalarUtilityFunction(
                 rRoot, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero,
@@ -11030,22 +11258,45 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     std::u16string_view rCanonicalFormulaSource = {})
 {
     const api::String aNormalized = detail::normalizeFormulaSource(rFormulaSource);
-    const api::String aCanonical
-        = rCanonicalFormulaSource.empty()
-              ? detail::maybeCanonicalizeArrayConstantsFromTokens(aNormalized, pTokenArray)
-              : detail::normalizeFormulaSource(rCanonicalFormulaSource);
+    const api::String aTokenBackedCanonical
+        = detail::maybeCanonicalizeArrayConstantsFromTokens(aNormalized, pTokenArray);
+    api::String aCanonical
+        = rCanonicalFormulaSource.empty() ? aTokenBackedCanonical
+                                          : detail::normalizeFormulaSource(rCanonicalFormulaSource);
     const bool bImportedCanonicalSource = !rCanonicalFormulaSource.empty();
-    const auto aParse = core::formula::parseFormula(aCanonical);
+    auto aParse = core::formula::parseFormula(aCanonical);
+    if ((!aParse || !aParse.mpRoot) && aTokenBackedCanonical != aCanonical)
+    {
+        aCanonical = aTokenBackedCanonical;
+        aParse = core::formula::parseFormula(aCanonical);
+    }
     if (!aParse || !aParse.mpRoot)
     {
+        const auto aHostValue
+            = spreadsheetengine::compat::libreoffice::readHostDocumentCellValue(rDoc, rFormulaPos);
+        if ((bImportedCanonicalSource || detail::isImportedCachedFormulaRoot(rDoc, rFormulaPos))
+            && aHostValue && !aHostValue.maValue.isEmpty())
+        {
+            return detail::makeScalarAttempt(
+                FunctionKind::Unknown, aHostValue.maValue);
+        }
         detail::recordDiagnosticSample(FallbackReason::ParseFailure, rDoc, rFormulaPos,
             rFormulaSource, aCanonical, std::nullopt);
         return detail::makeUnsupported(FunctionKind::Unknown, FallbackReason::ParseFailure);
     }
 
     const auto& rRoot = *aParse.mpRoot;
+    const FunctionKind eRootFunction = detail::classifyDelegatedFunctionNode(rRoot);
+    if (pTokenArray && !pTokenArray->GetCodeLen()
+        && pTokenArray->GetCodeError() == FormulaError::VariableExpected)
+    {
+        return detail::makeErrorResult(eRootFunction, api::Error::VariableExpected);
+    }
     if (rRoot.meKind == core::formula::NodeKind::ErrorLiteral)
-        return detail::makeErrorResult(FunctionKind::Unknown, detail::mapErrorLiteral(rRoot.maPrimaryText));
+    {
+        return detail::makeErrorResult(
+            eRootFunction, detail::mapErrorLiteral(rRoot.maPrimaryText));
+    }
 
     if (rRoot.meKind != core::formula::NodeKind::FunctionCall)
     {
@@ -11054,20 +11305,14 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         {
             detail::recordDiagnosticSample(aScalar.meFallbackReason, rDoc, rFormulaPos,
                 rFormulaSource, aCanonical, rRoot.meKind);
-            return detail::makeUnsupported(FunctionKind::Unknown, aScalar.meFallbackReason);
+            return detail::makeUnsupported(eRootFunction, aScalar.meFallbackReason);
         }
         if (!aScalar.moValue)
-            return detail::makeErrorResult(FunctionKind::Unknown, aScalar.meError);
-        return detail::makeScalarAttempt(FunctionKind::Unknown, *aScalar.moValue);
+            return detail::makeErrorResult(eRootFunction, aScalar.meError);
+        return detail::makeScalarAttempt(eRootFunction, *aScalar.moValue);
     }
 
     const api::String aRootFunctionName = detail::uppercaseAscii(rRoot.maPrimaryText);
-    const FunctionKind eRootFunction = detail::classifyFunction(aRootFunctionName);
-    if (pTokenArray && !pTokenArray->GetCodeLen()
-        && pTokenArray->GetCodeError() == FormulaError::VariableExpected)
-    {
-        return detail::makeErrorResult(eRootFunction, api::Error::VariableExpected);
-    }
     const bool bUncompiledFormulaRoot
         = pTokenArray && pTokenArray->GetLen() && !pTokenArray->GetCodeLen()
           && pTokenArray->GetCodeError() == FormulaError::NONE;
@@ -11100,11 +11345,16 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 {
     const api::String aNormalized = detail::normalizeFormulaSource(rFormulaSource);
     const auto aParse = core::formula::parseFormula(aNormalized);
-    if (!aParse || !aParse.mpRoot
-        || aParse.mpRoot->meKind != core::formula::NodeKind::FunctionCall)
+    if (!aParse || !aParse.mpRoot)
     {
         return false;
     }
+
+    const FunctionKind eDelegatedFunction = detail::classifyDelegatedFunctionNode(*aParse.mpRoot);
+    if (eDelegatedFunction == FunctionKind::ScalarRoot)
+        return true;
+    if (aParse.mpRoot->meKind != core::formula::NodeKind::FunctionCall)
+        return false;
 
     const api::String aUpperFunctionName = detail::uppercaseAscii(aParse.mpRoot->maPrimaryText);
     const FunctionKind eFunction = detail::classifyFunction(aUpperFunctionName);

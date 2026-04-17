@@ -1583,51 +1583,6 @@ void ScInterpreter::ScMatchOp(bool bExtended)
     PushDouble(static_cast<double>(aResolvedIndex.maValue + 1));
 }
 
-void ScInterpreter::ScEqual()
-{
-    ScCompareOp(seinterpre::ComparisonMode::Equal, SC_EQUAL);
-}
-
-void ScInterpreter::ScNotEqual()
-{
-    ScCompareOp(seinterpre::ComparisonMode::NotEqual, SC_NOT_EQUAL);
-}
-
-void ScInterpreter::ScLess()
-{
-    ScCompareOp(seinterpre::ComparisonMode::Less, SC_LESS);
-}
-
-void ScInterpreter::ScGreater()
-{
-    ScCompareOp(seinterpre::ComparisonMode::Greater, SC_GREATER);
-}
-
-void ScInterpreter::ScLessEqual()
-{
-    ScCompareOp(seinterpre::ComparisonMode::LessEqual, SC_LESS_EQUAL);
-}
-
-void ScInterpreter::ScGreaterEqual()
-{
-    ScCompareOp(seinterpre::ComparisonMode::GreaterEqual, SC_GREATER_EQUAL);
-}
-
-void ScInterpreter::ScNeg()
-{
-    // Simple negation doesn't change current format type to number, keep
-    // current type.
-    nFuncFmtType = nCurFmtType;
-    ScUnaryMatrixOrScalarOp(seinterpre::UnaryMatrixScalarMode::Negate);
-}
-
-void ScInterpreter::ScPercentSign()
-{
-    nFuncFmtType = SvNumFormatType::PERCENT;
-    PushInt( 100 );
-    ScSyntheticBinaryOp(ocDiv, &ScInterpreter::ScDiv);
-}
-
 void ScInterpreter::ScPi()
 {
     PushDouble(semath::computePi());
@@ -9330,76 +9285,6 @@ FormulaError ScInterpreter::GetErrorType()
     }
     nGlobalError = nOldError;
     return nErr;
-}
-
-void ScInterpreter::ScErrorType()
-{
-    FormulaError nErr = GetErrorType();
-    if ( nErr != FormulaError::NONE )
-    {
-        nGlobalError = FormulaError::NONE;
-        PushDouble( static_cast<double>(nErr) );
-    }
-    else
-    {
-        PushNA();
-    }
-}
-
-void ScInterpreter::ScErrorType_ODF()
-{
-    FormulaError nErr = GetErrorType();
-    sal_uInt16 nErrType;
-
-    switch ( nErr )
-    {
-        case FormulaError::NoCode :             // #NULL!
-            nErrType = 1;
-            break;
-        case FormulaError::DivisionByZero :     // #DIV/0!
-            nErrType = 2;
-            break;
-        case FormulaError::NoValue :            // #VALUE!
-            nErrType = 3;
-            break;
-        case FormulaError::NoRef :              // #REF!
-            nErrType = 4;
-            break;
-        case FormulaError::NoName :             // #NAME?
-            nErrType = 5;
-            break;
-        case FormulaError::IllegalFPOperation : // #NUM!
-            nErrType = 6;
-            break;
-        case FormulaError::NotAvailable :       // #N/A
-            nErrType = 7;
-            break;
-        /*
-        #GETTING_DATA is a message that can appear in Excel when a large or
-        complex worksheet is being calculated. In Excel 2007 and newer,
-        operations are grouped so more complicated cells may finish after
-        earlier ones do. While the calculations are still processing, the
-        unfinished cells may display #GETTING_DATA.
-        Because the message is temporary and disappears when the calculations
-        complete, this isn’t a true error.
-        No calc error code known (yet).
-
-        case :                       // GETTING_DATA
-            nErrType = 8;
-            break;
-        */
-        default :
-            nErrType = 0;
-            break;
-    }
-
-    if ( nErrType )
-    {
-        nGlobalError =FormulaError::NONE;
-        PushDouble( nErrType );
-    }
-    else
-        PushNA();
 }
 
 static bool MayBeRegExp( std::u16string_view rStr )

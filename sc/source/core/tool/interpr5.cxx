@@ -1226,11 +1226,6 @@ static void lcl_GetDiffDateTimeFmtType( SvNumFormatType& nFuncFmt, SvNumFormatTy
     }
 }
 
-void ScInterpreter::ScAdd()
-{
-    CalculateAddSub(false);
-}
-
 void ScInterpreter::CalculateAddSub(bool _bSub)
 {
     ScMatrixRef pMat1 = nullptr;
@@ -1470,11 +1465,6 @@ void ScInterpreter::ScAmpersand()
     }
 }
 
-void ScInterpreter::ScSub()
-{
-    CalculateAddSub(true);
-}
-
 void ScInterpreter::ScMul()
 {
     ScMatrixRef pMat1 = nullptr;
@@ -1628,12 +1618,6 @@ void ScInterpreter::ScDiv()
         }
         PushDouble( div( fVal1, fVal2) );
     }
-}
-
-void ScInterpreter::ScPower()
-{
-    if ( MustHaveParamCount( GetByte(), 2 ) )
-        ScPow();
 }
 
 void ScInterpreter::ScPow()
