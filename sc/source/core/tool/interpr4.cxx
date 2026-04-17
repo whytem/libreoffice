@@ -5146,28 +5146,28 @@ StackVar ScInterpreter::Interpret()
                             ScVarP();
                             break;
                         case AGGREGATE_FUNC_MEDIAN:
-                            ScMedian();
+                            handleMedian();
                             break;
                         case AGGREGATE_FUNC_MODSNGL:
                             handleModalValue();
                             break;
                         case AGGREGATE_FUNC_LARGE:
-                            ScLarge();
+                            handleLarge();
                             break;
                         case AGGREGATE_FUNC_SMALL:
-                            ScSmall();
+                            handleSmall();
                             break;
                         case AGGREGATE_FUNC_PERCINC:
-                            ScPercentile(true);
+                            handlePercentile(true);
                             break;
                         case AGGREGATE_FUNC_QRTINC:
-                            ScQuartile(true);
+                            handleQuartile(true);
                             break;
                         case AGGREGATE_FUNC_PERCEXC:
-                            ScPercentile(false);
+                            handlePercentile(false);
                             break;
                         case AGGREGATE_FUNC_QRTEXC:
-                            ScQuartile(false);
+                            handleQuartile(false);
                             break;
                         default:
                             nGlobalError = nErr;
@@ -7146,9 +7146,9 @@ StackVar ScInterpreter::Interpret()
                     case ocFV               : ScFV();                       break;
                     case ocNper             : ScNper();                     break;
                     case ocRate             : ScRate();                     break;
-                    case ocFilterXML        : ScFilterXML();                break;
-                    case ocWebservice       : ScWebservice();               break;
-                    case ocEncodeURL        : ScEncodeURL();                break;
+                    case ocFilterXML        : handleFilterXML();            break;
+                    case ocWebservice       : handleWebservice();           break;
+                    case ocEncodeURL        : handleEncodeURL();            break;
                     case ocColor            : pushLegacyColor();            break;
                     case ocErf_MS           :
                         if (MustHaveParamCount(GetByte(), 1))
@@ -7255,59 +7255,59 @@ StackVar ScInterpreter::Interpret()
                     case ocChiSqDist        : pushLegacyChiSqDist(u"CHISQDIST", false); break;
                     case ocChiSqDist_MS     : pushLegacyChiSqDist(u"CHISQ.DIST", true); break;
                     case ocStandard         : pushLegacyStandardize();      break;
-                    case ocAveDev           : ScAveDev();                   break;
-                    case ocDevSq            : ScDevSq();                    break;
+                    case ocAveDev           : handleAveDev();               break;
+                    case ocDevSq            : handleDevSq();                break;
                     case ocKurt             : handleKurt();                 break;
-                    case ocSkew             : ScSkew();                     break;
-                    case ocSkewp            : ScSkewp();                    break;
+                    case ocSkew             : handleSkew();                 break;
+                    case ocSkewp            : handleSkewp();                break;
                     case ocModalValue       : handleModalValue();           break;
-                    case ocModalValue_MS    : ScModalValue_MS( true );      break;
-                    case ocModalValue_Multi : ScModalValue_MS( false );     break;
-                    case ocMedian           : ScMedian();                   break;
-                    case ocGeoMean          : ScGeoMean();                  break;
-                    case ocHarMean          : ScHarMean();                  break;
+                    case ocModalValue_MS    : handleModalValueMS( true );   break;
+                    case ocModalValue_Multi : handleModalValueMS( false );  break;
+                    case ocMedian           : handleMedian();               break;
+                    case ocGeoMean          : handleGeoMean();              break;
+                    case ocHarMean          : handleHarMean();              break;
                     case ocWeibull          :
                     case ocWeibull_MS       : pushLegacyWeibull();          break;
                     case ocBinomInv         :
                     case ocCritBinom        : ScCritBinom();                break;
                     case ocNegBinomVert     : ScNegBinomDist();             break;
                     case ocNegBinomDist_MS  : ScNegBinomDist_MS();          break;
-                    case ocNoName           : ScNoName();                   break;
-                    case ocBad              : ScBadName();                  break;
+                    case ocNoName           : handleNoName();               break;
+                    case ocBad              : handleBadName();              break;
                     case ocZTest            :
-                    case ocZTest_MS         : ScZTest();                    break;
+                    case ocZTest_MS         : handleZTest();                break;
                     case ocTTest            :
-                    case ocTTest_MS         : ScTTest();                    break;
+                    case ocTTest_MS         : handleTTest();                break;
                     case ocFTest            :
-                    case ocFTest_MS         : ScFTest();                    break;
+                    case ocFTest_MS         : handleFTest();                break;
                     case ocRank             :
-                    case ocRank_Eq          : ScRank( false );              break;
-                    case ocRank_Avg         : ScRank( true );               break;
+                    case ocRank_Eq          : handleRank( false );          break;
+                    case ocRank_Avg         : handleRank( true );           break;
                     case ocPercentile       :
-                    case ocPercentile_Inc   : ScPercentile( true );         break;
-                    case ocPercentile_Exc   : ScPercentile( false );        break;
+                    case ocPercentile_Inc   : handlePercentile( true );     break;
+                    case ocPercentile_Exc   : handlePercentile( false );    break;
                     case ocPercentrank      :
-                    case ocPercentrank_Inc  : ScPercentrank( true );        break;
-                    case ocPercentrank_Exc  : ScPercentrank( false );       break;
-                    case ocLarge            : ScLarge();                    break;
-                    case ocSmall            : ScSmall();                    break;
-                    case ocFrequency        : ScFrequency();                break;
+                    case ocPercentrank_Inc  : handlePercentrank( true );    break;
+                    case ocPercentrank_Exc  : handlePercentrank( false );   break;
+                    case ocLarge            : handleLarge();                break;
+                    case ocSmall            : handleSmall();                break;
+                    case ocFrequency        : handleFrequency();            break;
                     case ocQuartile         :
-                    case ocQuartile_Inc     : ScQuartile( true );           break;
-                    case ocQuartile_Exc     : ScQuartile( false );          break;
+                    case ocQuartile_Inc     : handleQuartile( true );       break;
+                    case ocQuartile_Exc     : handleQuartile( false );      break;
                     case ocNormInv          :
-                    case ocNormInv_MS       : ScNormInv();                  break;
+                    case ocNormInv_MS       : handleNormInv();              break;
                     case ocSNormInv         :
                     case ocSNormInv_MS      : pushLegacySNormInv();         break;
                     case ocConfidence       :
-                    case ocConfidence_N     : ScConfidence();               break;
-                    case ocConfidence_T     : ScConfidenceT();              break;
-                    case ocTrimMean         : ScTrimMean();                 break;
+                    case ocConfidence_N     : handleConfidence();           break;
+                    case ocConfidence_T     : handleConfidenceT();          break;
+                    case ocTrimMean         : handleTrimMean();             break;
                     case ocProb             : pushLegacyProbability();      break;
                     case ocCorrel           : handleCorrel();               break;
                     case ocCovar            :
-                    case ocCovarianceP      : ScCovarianceP();              break;
-                    case ocCovarianceS      : ScCovarianceS();              break;
+                    case ocCovarianceP      : handleCovarianceP();          break;
+                    case ocCovarianceS      : handleCovarianceS();          break;
                     case ocPearson          : handlePearson();              break;
                     case ocRSQ              : handleRSQ();                  break;
                     case ocSTEYX            : handleSTEYX();                break;
@@ -7315,8 +7315,8 @@ StackVar ScInterpreter::Interpret()
                     case ocIntercept        : handleIntercept();            break;
                     case ocTrend            : handleTrend();                break;
                     case ocGrowth           : handleGrowth();               break;
-                    case ocLinest           : ScLinest();                   break;
-                    case ocLogest           : ScLogest();                   break;
+                    case ocLinest           : handleLinest();               break;
+                    case ocLogest           : handleLogest();               break;
                     case ocForecast_LIN     :
                     case ocForecast         : handleForecast();             break;
                     case ocForecast_ETS_ADD : ScForecast_Ets( etsAdd );       break;
@@ -7338,7 +7338,7 @@ StackVar ScInterpreter::Interpret()
                     case ocGammaInv         :
                     case ocGammaInv_MS      : pushLegacyGammaInverse();     break;
                     case ocChiTest          :
-                    case ocChiTest_MS       : ScChiTest();                  break;
+                    case ocChiTest_MS       : handleChiTest();              break;
                     case ocChiInv           :
                     case ocChiInv_MS        : pushLegacyChiInv(u"CHIINV");  break;
                     case ocChiSqInv         :
@@ -7355,7 +7355,7 @@ StackVar ScInterpreter::Interpret()
                     case ocBetaDist_MS      : ScBetaDist_MS();              break;
                     case ocBetaInv          :
                     case ocBetaInv_MS       : ScBetaInv();                  break;
-                    case ocFourier          : ScFourier();                  break;
+                    case ocFourier          : handleFourier();              break;
                     case ocExternal         : ScExternal();                 break;
                     case ocTableOp          : ScTableOp();                  break;
                     case ocStop :                                           break;
@@ -7433,7 +7433,7 @@ StackVar ScInterpreter::Interpret()
                     case ocEuroConvert      : pushLegacyEuroConvert();      break;
                     case ocRoman            : pushLegacyRoman();            break;
                     case ocArabic           : pushLegacyArabic();           break;
-                    case ocInfo             : ScInfo();                     break;
+                    case ocInfo             : handleInfo();                 break;
                     case ocHyperLink        : ScHyperLink();                break;
                     case ocBahtText         : ScBahtText();                 break;
                     case ocGetPivotData     : ScGetPivotData();             break;
@@ -7447,13 +7447,13 @@ StackVar ScInterpreter::Interpret()
                             return selibreoffice::convertIntoHalfWidth(rText);
                         });
                         break;
-                    case ocLenB             : ScLenB();                     break;
-                    case ocRightB           : ScRightB();                   break;
-                    case ocLeftB            : ScLeftB();                    break;
-                    case ocMidB             : ScMidB();                     break;
-                    case ocReplaceB         : ScReplaceB();                 break;
-                    case ocFindB            : ScFindB();                    break;
-                    case ocSearchB          : ScSearchB();                  break;
+                    case ocLenB             : handleLenB();                 break;
+                    case ocRightB           : handleRightB();               break;
+                    case ocLeftB            : handleLeftB();                break;
+                    case ocMidB             : handleMidB();                 break;
+                    case ocReplaceB         : handleReplaceB();             break;
+                    case ocFindB            : handleFindB();                break;
+                    case ocSearchB          : handleSearchB();              break;
                     case ocUnicode          : pushLegacyUnicode();          break;
                     case ocUnichar          : pushLegacyUnichar();          break;
                     case ocBitAnd           :

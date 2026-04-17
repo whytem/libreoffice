@@ -1663,7 +1663,7 @@ void ScInterpreter::ScSumXMY2()
     }
 }
 
-void ScInterpreter::ScFrequency()
+void ScInterpreter::handleFrequency()
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
@@ -2180,13 +2180,13 @@ bool ScInterpreter::CheckMatrix(bool _bLOG, sal_uInt8& nCase, SCSIZE& nCX,
 }
 
 // LINEST
-void ScInterpreter::ScLinest()
+void ScInterpreter::handleLinest()
 {
     CalculateRGPRKP(false);
 }
 
 // LOGEST
-void ScInterpreter::ScLogest()
+void ScInterpreter::handleLogest()
 {
     CalculateRGPRKP(true);
 }
@@ -3116,7 +3116,7 @@ void ScInterpreter::ScMatRef()
     }
 }
 
-void ScInterpreter::ScInfo()
+void ScInterpreter::handleInfo()
 {
     if( !MustHaveParamCount( GetByte(), 1 ) )
         return;

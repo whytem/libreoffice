@@ -37,7 +37,7 @@ using namespace com::sun::star;
 
 // TODO: Add new methods for ScInterpreter here.
 
-void ScInterpreter::ScFilterXML()
+void ScInterpreter::handleFilterXML()
 {
     sal_uInt8 nParamCount = GetByte();
     if (!MustHaveParamCount( nParamCount, 2 ) )
@@ -272,7 +272,7 @@ static bool lcl_FunctionAccessLoadWebServiceLink( OUString& rResult, ScDocument*
     return true;
 }
 
-void ScInterpreter::ScWebservice()
+void ScInterpreter::handleWebservice()
 {
     sal_uInt8 nParamCount = GetByte();
     if (!MustHaveParamCount( nParamCount, 1 ) )
@@ -413,7 +413,7 @@ void ScInterpreter::ScWebservice()
 
  @see fdo#76870
 */
-void ScInterpreter::ScEncodeURL()
+void ScInterpreter::handleEncodeURL()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 1 ) )

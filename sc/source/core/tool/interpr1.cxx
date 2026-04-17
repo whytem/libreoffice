@@ -8416,7 +8416,7 @@ static sal_Int32 getLengthB(std::u16string_view str)
     else
         return lcl_getLengthB( str, str.size() );
 }
-void ScInterpreter::ScLenB()
+void ScInterpreter::handleLenB()
 {
     PushDouble( getLengthB(GetString().getString()) );
 }
@@ -8448,7 +8448,7 @@ static OUString lcl_RightB(const OUString &rStr, sal_Int32 n)
     }
     return rStr;
 }
-void ScInterpreter::ScRightB()
+void ScInterpreter::handleRightB()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 1, 2 ) )
@@ -8497,7 +8497,7 @@ static OUString lcl_LeftB(const OUString &rStr, sal_Int32 n)
     }
     return rStr;
 }
-void ScInterpreter::ScLeftB()
+void ScInterpreter::handleLeftB()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 1, 2 ) )
@@ -8518,7 +8518,7 @@ void ScInterpreter::ScLeftB()
     OUString aStr(lcl_LeftB(GetString().getString(), n));
     PushString( aStr );
 }
-void ScInterpreter::ScMidB()
+void ScInterpreter::handleMidB()
 {
     if ( !MustHaveParamCount( GetByte(), 3 ) )
         return;
@@ -8538,7 +8538,7 @@ void ScInterpreter::ScMidB()
     }
 }
 
-void ScInterpreter::ScReplaceB()
+void ScInterpreter::handleReplaceB()
 {
     if ( !MustHaveParamCount( GetByte(), 4 ) )
         return;
@@ -8561,7 +8561,7 @@ void ScInterpreter::ScReplaceB()
     }
 }
 
-void ScInterpreter::ScFindB()
+void ScInterpreter::handleFindB()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 2, 3 ) )
@@ -8595,7 +8595,7 @@ void ScInterpreter::ScFindB()
     }
 }
 
-void ScInterpreter::ScSearchB()
+void ScInterpreter::handleSearchB()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 2, 3 ) )
