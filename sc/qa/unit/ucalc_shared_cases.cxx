@@ -3789,6 +3789,10 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorTextUtilit
     CPPUNIT_ASSERT_EQUAL(u"Not Found"_ustr,
         spreadsheetengine::compat::libreoffice::toLibreOfficeString(
             aTextBeforeNotFound.maResult.maString));
+
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=UPPER(A1)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(
+        u"=COM.MICROSOFT.TEXTAFTER(\"alpha-beta\";\"-\")"));
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSpillArrayHelper)

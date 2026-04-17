@@ -4628,6 +4628,459 @@ StackVar ScInterpreter::Interpret()
 
                     PushString(aFormula);
                 };
+                const auto warnTextUtilityDispatch = [&](std::u16string_view rFunctionName) {
+                    warnIfLegacyDispatchReached(
+                        "family-local default-on", rFunctionName,
+                        [](std::u16string_view rFormula) {
+                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                        },
+                        "family-local default-on text utility reached ScInterpreter");
+                };
+                const auto pushLegacyUnaryTextTransform =
+                    [&](std::u16string_view rFunctionName, auto aTransform) {
+                        warnTextUtilityDispatch(rFunctionName);
+                        PushString(aTransform(GetString().getString()));
+                    };
+                const auto pushLegacyLen = [&]() {
+                    warnTextUtilityDispatch(u"LEN");
+                    PushDouble(selibreoffice::countCodePoints(GetString().getString()));
+                };
+                const auto pushLegacyT = [&]() {
+                    warnTextUtilityDispatch(u"T");
+                    switch (GetStackType())
+                    {
+                        case svDoubleRef:
+                        case svSingleRef:
+                        {
+                            ScAddress aAdr;
+                            if (!PopDoubleRefOrSingleRef(aAdr))
+                            {
+                                PushInt(0);
+                                return;
+                            }
+                            bool bValue = false;
+                            ScRefCellValue aCell(mrDoc, aAdr);
+                            if (GetCellErrCode(aCell) == FormulaError::NONE)
+                            {
+                                switch (aCell.getType())
+                                {
+                                    case CELLTYPE_VALUE:
+                                        bValue = true;
+                                        break;
+                                    case CELLTYPE_FORMULA:
+                                        bValue = aCell.getFormula()->IsValue();
+                                        break;
+                                    default:
+                                        break;
+                                }
+                            }
+                            if (bValue)
+                                PushString(OUString());
+                            else
+                            {
+                                svl::SharedString aStr;
+                                GetCellString(aStr, aCell);
+                                PushString(aStr);
+                            }
+                        }
+                        break;
+                        case svMatrix:
+                        case svExternalSingleRef:
+                        case svExternalDoubleRef:
+                        {
+                            double fVal;
+                            svl::SharedString aStr;
+                            ScMatValType nMatValType = GetDoubleOrStringFromMatrix(fVal, aStr);
+                            if (ScMatrix::IsValueType(nMatValType))
+                                PushString(svl::SharedString::getEmptyString());
+                            else
+                                PushString(aStr);
+                        }
+                        break;
+                        case svDouble:
+                        {
+                            PopError();
+                            PushString(OUString());
+                        }
+                        break;
+                        case svString:
+                            break;
+                        default:
+                            PushError(FormulaError::UnknownOpCode);
+                    }
+                };
+                const auto pushLegacyClean = [&]() {
+                    warnTextUtilityDispatch(u"CLEAN");
+                    PushString(selibreoffice::cleanPrintable(GetString().getString()));
+                };
+                const auto pushLegacyCode = [&]() {
+                    warnTextUtilityDispatch(u"CODE");
+                    PushInt(selibreoffice::codeFromText(GetString().getString()));
+                };
+                const auto pushLegacyChar = [&]() {
+                    warnTextUtilityDispatch(u"CHAR");
+                    if (auto aStr = selibreoffice::charFromValue(GetDouble()))
+                        PushString(*aStr);
+                    else
+                        PushIllegalArgument();
+                };
+                const auto pushLegacyJisAsc = [&](std::u16string_view rFunctionName,
+                                                  auto aTransform) {
+                    warnTextUtilityDispatch(rFunctionName);
+                    if (MustHaveParamCount(GetByte(), 1))
+                        PushString(aTransform(GetString().getString()));
+                };
+                const auto pushLegacyUnicode = [&]() {
+                    warnTextUtilityDispatch(u"UNICODE");
+                    if (MustHaveParamCount(GetByte(), 1))
+                    {
+                        if (std::optional<double> fValue
+                            = selibreoffice::unicodeFromText(GetString().getString()))
+                        {
+                            PushDouble(*fValue);
+                        }
+                        else
+                            PushIllegalParameter();
+                    }
+                };
+                const auto pushLegacyUnichar = [&]() {
+                    warnTextUtilityDispatch(u"UNICHAR");
+                    if (MustHaveParamCount(GetByte(), 1))
+                    {
+                        sal_uInt32 nCodePoint = GetUInt32();
+                        if (nGlobalError != FormulaError::NONE)
+                            PushIllegalArgument();
+                        else if (auto aStr = selibreoffice::unicharFromCodePoint(nCodePoint))
+                            PushString(*aStr);
+                        else
+                            PushIllegalArgument();
+                    }
+                };
+                const auto pushLegacyTextBeforeAfter = [&](bool bBefore) {
+                    warnTextUtilityDispatch(bBefore ? u"TEXTBEFORE" : u"TEXTAFTER");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 6))
+                        return;
+
+                    std::optional<svl::SharedString> aIfNotFound;
+                    if (nParamCount == 6)
+                        aIfNotFound = GetString();
+
+                    bool bMatchEnd = false;
+                    if (nParamCount >= 5)
+                    {
+                        if (!IsMissing())
+                            bMatchEnd = GetBool();
+                        else
+                            Pop();
+                    }
+
+                    bool bMatchMode = false;
+                    if (nParamCount >= 4)
+                    {
+                        if (!IsMissing())
+                            bMatchMode = GetBool();
+                        else
+                            Pop();
+                    }
+
+                    sal_Int32 nInstanceNum(1);
+                    if (nParamCount >= 3)
+                    {
+                        if (!IsMissing())
+                            nInstanceNum = GetInt32WithDefault(1);
+                        else
+                            Pop();
+                    }
+
+                    if (nInstanceNum == 0)
+                    {
+                        PushError(FormulaError::NotAvailable);
+                        return;
+                    }
+
+                    std::vector<svl::SharedString> aDelimiters;
+                    if (nParamCount >= 2)
+                    {
+                        switch (GetStackType())
+                        {
+                            case svSingleRef:
+                            case svDoubleRef:
+                            case svMatrix:
+                            case svExternalSingleRef:
+                            case svExternalDoubleRef:
+                            {
+                                ScMatrixRef pMatSource = GetMatrix();
+                                if (!pMatSource)
+                                {
+                                    PushIllegalParameter();
+                                    return;
+                                }
+
+                                SCSIZE nsC = 0;
+                                SCSIZE nsR = 0;
+                                pMatSource->GetDimensions(nsC, nsR);
+                                for (SCSIZE i = 0; i < nsC; ++i)
+                                {
+                                    for (SCSIZE j = 0; j < nsR; ++j)
+                                        aDelimiters.push_back(pMatSource->GetString(i, j));
+                                }
+                            }
+                            break;
+                            default:
+                                aDelimiters.push_back(GetString());
+                        }
+                    }
+
+                    svl::SharedString sText = GetString();
+                    if (sText.isEmpty())
+                    {
+                        PushIllegalParameter();
+                        return;
+                    }
+
+                    std::vector<sal_Int32> aDelimiterPositions;
+                    if (bMatchEnd && !bBefore)
+                        aDelimiterPositions.push_back(0);
+
+                    OUString sStr(sText.getString());
+                    const sal_Int32 nLength(sStr.getLength());
+                    sal_Int32 nStart(0);
+                    while (nStart < nLength)
+                    {
+                        sal_Int32 nIndex = nLength;
+                        sal_Int32 nDelLength(0);
+                        bool bFound = false;
+
+                        for (auto& rDelimiter : aDelimiters)
+                        {
+                            if (rDelimiter.isEmpty())
+                                continue;
+
+                            OUString sDelimiter = rDelimiter.getString();
+                            sal_Int32 nDelimiterIndex = bMatchMode
+                                                            ? ScGlobal::getCharClass()
+                                                                  .lowercase(sStr)
+                                                                  .indexOf(
+                                                                      ScGlobal::getCharClass()
+                                                                          .lowercase(sDelimiter),
+                                                                      nStart)
+                                                            : sStr.indexOf(sDelimiter, nStart);
+
+                            if (nDelimiterIndex != -1 && nDelimiterIndex < nIndex)
+                            {
+                                bFound = true;
+                                nDelLength = sDelimiter.getLength();
+                                nIndex = nDelimiterIndex;
+                            }
+                        }
+
+                        if (bFound)
+                        {
+                            aDelimiterPositions.push_back(
+                                bBefore ? nIndex : nIndex + nDelLength);
+                        }
+
+                        nStart = nIndex + nDelLength;
+                    }
+
+                    if (bMatchEnd && bBefore)
+                        aDelimiterPositions.push_back(nLength);
+
+                    const sal_Int32 nSize(aDelimiterPositions.size());
+                    if (nSize == 0 || std::abs(nInstanceNum) > nSize)
+                    {
+                        if (aIfNotFound.has_value())
+                            PushString(aIfNotFound.value());
+                        else
+                            PushError(FormulaError::NotAvailable);
+                        return;
+                    }
+
+                    if (nInstanceNum < 0)
+                        nInstanceNum = nSize + nInstanceNum + 1;
+
+                    const sal_Int32 nDelimiterPos(aDelimiterPositions[nInstanceNum - 1]);
+                    if (bBefore)
+                        PushString(sStr.copy(0, nDelimiterPos));
+                    else
+                        PushString(sStr.copy(nDelimiterPos, nLength - nDelimiterPos));
+                };
+                const auto pushLegacyExact = [&]() {
+                    warnTextUtilityDispatch(u"EXACT");
+                    nFuncFmtType = SvNumFormatType::LOGICAL;
+                    if (MustHaveParamCount(GetByte(), 2))
+                    {
+                        svl::SharedString s1 = GetString();
+                        svl::SharedString s2 = GetString();
+                        PushInt(int(s1 == s2));
+                    }
+                };
+                const auto pushLegacyLeftRight = [&](bool bRight) {
+                    warnTextUtilityDispatch(bRight ? u"RIGHT" : u"LEFT");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 2))
+                        return;
+
+                    sal_Int32 n = 1;
+                    if (nParamCount == 2)
+                    {
+                        n = GetStringPositionArgument();
+                        if (n < 0)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+                    }
+
+                    OUString aStr = GetString().getString();
+                    if (!bRight)
+                    {
+                        sal_Int32 nIdx = 0;
+                        sal_Int32 nCnt = 0;
+                        while (nIdx < aStr.getLength() && n > nCnt++)
+                            aStr.iterateCodePoints(&nIdx);
+                        PushString(aStr.copy(0, nIdx));
+                        return;
+                    }
+
+                    const sal_Int32 nLen = aStr.getLength();
+                    if (nLen <= n)
+                    {
+                        PushString(aStr);
+                        return;
+                    }
+
+                    sal_Int32 nIdx = nLen;
+                    sal_Int32 nCnt = 0;
+                    while (nIdx > 0 && n > nCnt)
+                    {
+                        aStr.iterateCodePoints(&nIdx, -1);
+                        ++nCnt;
+                    }
+                    PushString(aStr.copy(nIdx, nLen - nIdx));
+                };
+                const auto pushLegacyConcatMs = [&]() {
+                    warnTextUtilityDispatch(u"CONCAT");
+                    OUStringBuffer aResBuf;
+                    short nParamCount = GetByte();
+                    ReverseStack(nParamCount);
+
+                    size_t nRefInList = 0;
+                    while (nParamCount-- > 0 && nGlobalError == FormulaError::NONE)
+                    {
+                        switch (GetStackType())
+                        {
+                            case svString:
+                            case svDouble:
+                            {
+                                OUString aStr = GetString().getString();
+                                if (CheckStringResultLen(aResBuf, aStr.getLength()))
+                                    aResBuf.append(aStr);
+                            }
+                            break;
+                            case svSingleRef:
+                            {
+                                ScAddress aAdr;
+                                PopSingleRef(aAdr);
+                                if (nGlobalError != FormulaError::NONE)
+                                    break;
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                if (!aCell.hasEmptyValue())
+                                {
+                                    svl::SharedString aSS;
+                                    GetCellString(aSS, aCell);
+                                    const OUString& rStr = aSS.getString();
+                                    if (CheckStringResultLen(aResBuf, rStr.getLength()))
+                                        aResBuf.append(rStr);
+                                }
+                            }
+                            break;
+                            case svDoubleRef:
+                            case svRefList:
+                            {
+                                ScRange aRange;
+                                PopDoubleRef(aRange, nParamCount, nRefInList);
+                                if (nGlobalError != FormulaError::NONE)
+                                    break;
+                                SCCOL nCol1, nCol2;
+                                SCROW nRow1, nRow2;
+                                SCTAB nTab1, nTab2;
+                                aRange.GetVars(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+                                if (nTab1 != nTab2)
+                                {
+                                    SetError(FormulaError::IllegalParameter);
+                                    break;
+                                }
+                                PutInOrder(nRow1, nRow2);
+                                PutInOrder(nCol1, nCol2);
+                                ScAddress aAdr;
+                                aAdr.SetTab(nTab1);
+                                for (SCROW nRow = nRow1; nRow <= nRow2; ++nRow)
+                                {
+                                    for (SCCOL nCol = nCol1; nCol <= nCol2; ++nCol)
+                                    {
+                                        aAdr.SetRow(nRow);
+                                        aAdr.SetCol(nCol);
+                                        ScRefCellValue aCell(mrDoc, aAdr);
+                                        if (!aCell.hasEmptyValue())
+                                        {
+                                            svl::SharedString aSS;
+                                            GetCellString(aSS, aCell);
+                                            const OUString& rStr = aSS.getString();
+                                            if (CheckStringResultLen(aResBuf, rStr.getLength()))
+                                                aResBuf.append(rStr);
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                            case svMatrix:
+                            case svExternalSingleRef:
+                            case svExternalDoubleRef:
+                            {
+                                ScMatrixRef pMat = GetMatrix();
+                                if (!pMat)
+                                    break;
+
+                                SCSIZE nC = 0;
+                                SCSIZE nR = 0;
+                                pMat->GetDimensions(nC, nR);
+                                if (nC == 0 || nR == 0)
+                                {
+                                    SetError(FormulaError::IllegalArgument);
+                                    break;
+                                }
+
+                                for (SCSIZE k = 0; k < nR; ++k)
+                                {
+                                    for (SCSIZE j = 0; j < nC; ++j)
+                                    {
+                                        if (pMat->IsStringOrEmpty(j, k))
+                                        {
+                                            OUString aStr = pMat->GetString(j, k).getString();
+                                            if (CheckStringResultLen(aResBuf, aStr.getLength()))
+                                                aResBuf.append(aStr);
+                                        }
+                                        else if (pMat->IsValue(j, k))
+                                        {
+                                            OUString aStr
+                                                = pMat->GetString(mrContext, j, k).getString();
+                                            if (CheckStringResultLen(aResBuf, aStr.getLength()))
+                                                aResBuf.append(aStr);
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                            default:
+                                PopError();
+                                SetError(FormulaError::IllegalArgument);
+                                break;
+                        }
+                    }
+                    PushString(aResBuf.makeStringAndClear());
+                };
 
                 switch( eOp )
                 {
@@ -4678,8 +5131,8 @@ StackVar ScInterpreter::Interpret()
                     case ocHStack           : ScHStack();                   break;
                     case ocVStack           : ScVStack();                   break;
                     case ocTake             : ScTake();                     break;
-                    case ocTextAfter        : ScTextAfter();                break;
-                    case ocTextBefore       : ScTextBefore();               break;
+                    case ocTextAfter        : pushLegacyTextBeforeAfter(false); break;
+                    case ocTextBefore       : pushLegacyTextBeforeAfter(true);  break;
                     case ocTextSplit        : ScTextSplit();                break;
                     case ocToCol            : ScToCol();                    break;
                     case ocToRow            : ScToRow();                    break;
@@ -4776,17 +5229,35 @@ StackVar ScInterpreter::Interpret()
                                     mrDoc, mrContext, rInputString);
                             });
                         break;
-                    case ocCode             : ScCode();                     break;
+                    case ocCode             : pushLegacyCode();             break;
                     case ocTrim             : ScTrim();                     break;
-                    case ocUpper            : ScUpper();                    break;
-                    case ocProper           : ScProper();                   break;
-                    case ocLower            : ScLower();                    break;
-                    case ocLen              : ScLen();                      break;
-                    case ocT                : ScT();                        break;
-                    case ocClean            : ScClean();                    break;
+                    case ocUpper            :
+                        pushLegacyUnaryTextTransform(
+                            u"UPPER", [&](const OUString& rText) {
+                                return selibreoffice::uppercase(
+                                    ScGlobal::getCharClass(), rText);
+                            });
+                        break;
+                    case ocProper           :
+                        pushLegacyUnaryTextTransform(
+                            u"PROPER", [&](const OUString& rText) {
+                                return selibreoffice::propercase(
+                                    ScGlobal::getCharClass(), rText);
+                            });
+                        break;
+                    case ocLower            :
+                        pushLegacyUnaryTextTransform(
+                            u"LOWER", [&](const OUString& rText) {
+                                return selibreoffice::lowercase(
+                                    ScGlobal::getCharClass(), rText);
+                            });
+                        break;
+                    case ocLen              : pushLegacyLen();              break;
+                    case ocT                : pushLegacyT();                break;
+                    case ocClean            : pushLegacyClean();            break;
                     case ocValue            : ScValue();                    break;
                     case ocNumberValue      : ScNumberValue();              break;
-                    case ocChar             : ScChar();                     break;
+                    case ocChar             : pushLegacyChar();             break;
                     case ocArcTan2          : ScArcTan2();                  break;
                     case ocMod              : ScMod();                      break;
                     case ocPower            : ScPower();                    break;
@@ -4911,9 +5382,9 @@ StackVar ScInterpreter::Interpret()
                     case ocReplace          : ScReplace();                  break;
                     case ocFixed            : ScFixed();                    break;
                     case ocFind             : ScFind();                     break;
-                    case ocExact            : ScExact();                    break;
-                    case ocLeft             : ScLeft();                     break;
-                    case ocRight            : ScRight();                    break;
+                    case ocExact            : pushLegacyExact();            break;
+                    case ocLeft             : pushLegacyLeftRight(false);   break;
+                    case ocRight            : pushLegacyLeftRight(true);    break;
                     case ocSearch           : ScSearch();                   break;
                     case ocMid              : ScMid();                      break;
                     case ocText             : ScText();                     break;
@@ -4921,7 +5392,7 @@ StackVar ScInterpreter::Interpret()
                     case ocRegex            : ScRegex();                    break;
                     case ocRept             : ScRept();                     break;
                     case ocConcat           : ScConcat();                   break;
-                    case ocConcat_MS        : ScConcat_MS();                break;
+                    case ocConcat_MS        : pushLegacyConcatMs();         break;
                     case ocTextJoin_MS      : ScTextJoin_MS();              break;
                     case ocIfs_MS           : ScIfs_MS();                   break;
                     case ocSwitch_MS        : ScSwitch_MS();                break;
@@ -5079,8 +5550,16 @@ StackVar ScInterpreter::Interpret()
                     case ocHyperLink        : ScHyperLink();                break;
                     case ocBahtText         : ScBahtText();                 break;
                     case ocGetPivotData     : ScGetPivotData();             break;
-                    case ocJis              : ScJis();                      break;
-                    case ocAsc              : ScAsc();                      break;
+                    case ocJis              :
+                        pushLegacyJisAsc(u"JIS", [&](const OUString& rText) {
+                            return selibreoffice::convertIntoFullWidth(rText);
+                        });
+                        break;
+                    case ocAsc              :
+                        pushLegacyJisAsc(u"ASC", [&](const OUString& rText) {
+                            return selibreoffice::convertIntoHalfWidth(rText);
+                        });
+                        break;
                     case ocLenB             : ScLenB();                     break;
                     case ocRightB           : ScRightB();                   break;
                     case ocLeftB            : ScLeftB();                    break;
@@ -5088,8 +5567,8 @@ StackVar ScInterpreter::Interpret()
                     case ocReplaceB         : ScReplaceB();                 break;
                     case ocFindB            : ScFindB();                    break;
                     case ocSearchB          : ScSearchB();                  break;
-                    case ocUnicode          : ScUnicode();                  break;
-                    case ocUnichar          : ScUnichar();                  break;
+                    case ocUnicode          : pushLegacyUnicode();          break;
+                    case ocUnichar          : pushLegacyUnichar();          break;
                     case ocBitAnd           :
                         pushLegacyBitwise(u"BITAND",
                                           [](double fLeft, double fRight) {

@@ -3057,94 +3057,6 @@ void ScInterpreter::ScTrim()
     PushString(selibreoffice::trimRepeatedSpaces(GetString().getString()));
 }
 
-void ScInterpreter::ScUpper()
-{
-    PushString(selibreoffice::uppercase(ScGlobal::getCharClass(), GetString().getString()));
-}
-
-void ScInterpreter::ScProper()
-{
-//2do: what to do with I18N-CJK ?!?
-    PushString(selibreoffice::propercase(ScGlobal::getCharClass(), GetString().getString()));
-}
-
-void ScInterpreter::ScLower()
-{
-    PushString(selibreoffice::lowercase(ScGlobal::getCharClass(), GetString().getString()));
-}
-
-void ScInterpreter::ScLen()
-{
-    PushDouble(selibreoffice::countCodePoints(GetString().getString()));
-}
-
-void ScInterpreter::ScT()
-{
-    switch ( GetStackType() )
-    {
-        case svDoubleRef :
-        case svSingleRef :
-        {
-            ScAddress aAdr;
-            if ( !PopDoubleRefOrSingleRef( aAdr ) )
-            {
-                PushInt(0);
-                return ;
-            }
-            bool bValue = false;
-            ScRefCellValue aCell(mrDoc, aAdr);
-            if (GetCellErrCode(aCell) == FormulaError::NONE)
-            {
-                switch (aCell.getType())
-                {
-                    case CELLTYPE_VALUE :
-                        bValue = true;
-                        break;
-                    case CELLTYPE_FORMULA :
-                        bValue = aCell.getFormula()->IsValue();
-                        break;
-                    default:
-                        ; // nothing
-                }
-            }
-            if ( bValue )
-                PushString(OUString());
-            else
-            {
-                // like GetString()
-                svl::SharedString aStr;
-                GetCellString(aStr, aCell);
-                PushString(aStr);
-            }
-        }
-        break;
-        case svMatrix:
-        case svExternalSingleRef:
-        case svExternalDoubleRef:
-        {
-            double fVal;
-            svl::SharedString aStr;
-            ScMatValType nMatValType = GetDoubleOrStringFromMatrix( fVal, aStr);
-            if (ScMatrix::IsValueType( nMatValType))
-                PushString(svl::SharedString::getEmptyString());
-            else
-                PushString( aStr);
-        }
-        break;
-        case svDouble :
-        {
-            PopError();
-            PushString( OUString() );
-        }
-        break;
-        case svString :
-            ;   // leave on stack
-        break;
-        default :
-            PushError( FormulaError::UnknownOpCode);
-    }
-}
-
 void ScInterpreter::ScValue()
 {
     const std::optional<OUString> oQuarantinedFormula
@@ -3300,25 +3212,6 @@ void ScInterpreter::ScNumberValue()
 }
 
 
-void ScInterpreter::ScClean()
-{
-    PushString(selibreoffice::cleanPrintable(GetString().getString()));
-}
-
-
-void ScInterpreter::ScCode()
-{
-    PushInt(selibreoffice::codeFromText(GetString().getString()));
-}
-
-void ScInterpreter::ScChar()
-{
-    if (auto aStr = selibreoffice::charFromValue(GetDouble()))
-        PushString(*aStr);
-    else
-        PushIllegalArgument();
-}
-
 /* ODFF:
  * Summary: Converts half-width to full-width ASCII and katakana characters.
  * Semantics: Conversion is done for half-width ASCII and katakana characters,
@@ -3329,49 +3222,12 @@ void ScInterpreter::ScChar()
  * http://www.unicode.org/charts/charindex2.html#H
  * http://www.unicode.org/charts/charindex2.html#F
  */
-void ScInterpreter::ScJis()
-{
-    if (MustHaveParamCount( GetByte(), 1))
-        PushString(selibreoffice::convertIntoFullWidth(GetString().getString()));
-}
-
 /* ODFF:
  * Summary: Converts full-width to half-width ASCII and katakana characters.
  * Semantics: Conversion is done for full-width ASCII and katakana characters,
  * other characters are simply copied from T to the result. This is the
  * complementary function to JIS.
  */
-void ScInterpreter::ScAsc()
-{
-    if (MustHaveParamCount( GetByte(), 1))
-        PushString(selibreoffice::convertIntoHalfWidth(GetString().getString()));
-}
-
-void ScInterpreter::ScUnicode()
-{
-    if ( MustHaveParamCount( GetByte(), 1 ) )
-    {
-        if (std::optional<double> fValue = selibreoffice::unicodeFromText(GetString().getString()))
-            PushDouble(*fValue);
-        else
-            PushIllegalParameter();
-    }
-}
-
-void ScInterpreter::ScUnichar()
-{
-    if ( MustHaveParamCount( GetByte(), 1 ) )
-    {
-        sal_uInt32 nCodePoint = GetUInt32();
-        if (nGlobalError != FormulaError::NONE)
-            PushIllegalArgument();
-        else if (auto aStr = selibreoffice::unicharFromCodePoint(nCodePoint))
-            PushString(*aStr);
-        else
-            PushIllegalArgument();
-    }
-}
-
 bool ScInterpreter::SwitchToArrayRefList( ScMatrixRef& xResMat, SCSIZE nMatRows, double fCurrent,
         const std::function<void( SCSIZE i, double fCurrent )>& MatOpFunc, bool bDoMatOp )
 {
@@ -7448,186 +7304,6 @@ void ScInterpreter::ScTake()
     ScTakeOrDrop(/*bTake*/ true);
 }
 
-void ScInterpreter::ScTextAfter()
-{
-    ScTextBeforeOrAfter(/*bBefore*/ false);
-}
-
-void ScInterpreter::ScTextBefore()
-{
-    ScTextBeforeOrAfter(/*bBefore*/ true);
-}
-
-void ScInterpreter::ScTextBeforeOrAfter(bool bBefore)
-{
-    sal_uInt8 nParamCount = GetByte();
-    if (!MustHaveParamCount(nParamCount, 1, 6))
-        return;
-
-    // 6rd argument optional - if_not_found
-    std::optional<svl::SharedString> aIfNotFound;
-    if (nParamCount == 6)
-        aIfNotFound = GetString();
-
-    // 5rd argument optional - match_end
-    bool bMatchEnd = false;
-    if (nParamCount >= 5)
-    {
-        if (!IsMissing())
-        {
-            bMatchEnd = GetBool();
-        }
-        else
-            Pop();
-    }
-
-    // 4rd argument optional - match_mode
-    bool bMatchMode = false;
-    if (nParamCount >= 4)
-    {
-        if (!IsMissing())
-        {
-            bMatchMode = GetBool();
-        }
-        else
-            Pop();
-    }
-
-    // 3nd argument optional - instance_num
-    sal_Int32 nInstanceNum(1);
-    if (nParamCount >= 3)
-    {
-        if (!IsMissing())
-        {
-            nInstanceNum = GetInt32WithDefault(1);
-        }
-        else
-            Pop();
-    }
-
-    if (nInstanceNum == 0)
-    {
-        PushError(FormulaError::NotAvailable);
-        return;
-    }
-
-    // 2nd argument delimiter
-    std::vector<svl::SharedString> aDelimiters;
-    if (nParamCount >= 2)
-    {
-        ScMatrixRef pMatSource = nullptr;
-        SCSIZE nsC = 0, nsR = 0;
-        switch (GetStackType())
-        {
-            case svSingleRef:
-            case svDoubleRef:
-            case svMatrix:
-            case svExternalSingleRef:
-            case svExternalDoubleRef:
-            {
-                pMatSource = GetMatrix();
-                if (!pMatSource)
-                {
-                    PushIllegalParameter();
-                    return;
-                }
-
-                pMatSource->GetDimensions(nsC, nsR);
-                for (SCSIZE i = 0; i < nsC; i++)
-                {
-                    for (SCSIZE j = 0; j < nsR; j++)
-                    {
-                        aDelimiters.push_back(pMatSource->GetString(i,j));
-                    }
-                }
-            }
-            break;
-
-            default:
-                aDelimiters.push_back(GetString());
-        }
-    }
-
-    // 1st argument: text
-    svl::SharedString sText = GetString();
-    if (sText.isEmpty())
-    {
-        PushIllegalParameter();
-        return;
-    }
-
-    std::vector<sal_Int32> aDelimiterPositions;
-    if (bMatchEnd && !bBefore)
-        aDelimiterPositions.push_back(0);
-
-    OUString sStr(sText.getString());
-    const sal_Int32 nLength (sStr.getLength());
-    sal_Int32 nStart(0);
-    while (nStart < nLength)
-    {
-        sal_Int32 nIndex = nLength;
-        sal_Int32 nDelLength(0);
-        bool bFound = false;
-
-        // Find the first delimiter
-        for (auto& rDelimiter : aDelimiters)
-        {
-            if (rDelimiter.isEmpty())
-                continue;
-
-            OUString sDelimiter = rDelimiter.getString();
-            sal_Int32 nDelimiterIndex;
-            if (bMatchMode)
-            {
-                nDelimiterIndex = ScGlobal::getCharClass().lowercase(sStr).indexOf(
-                        ScGlobal::getCharClass().lowercase(sDelimiter), nStart);
-            }
-            else
-                nDelimiterIndex = sStr.indexOf(sDelimiter, nStart);
-
-            if (nDelimiterIndex != -1 && nDelimiterIndex < nIndex)
-            {
-                bFound = true;
-                nDelLength = sDelimiter.getLength();
-                nIndex = nDelimiterIndex;
-            }
-        }
-
-        if (bFound)
-        {
-            if (bBefore)
-                aDelimiterPositions.push_back(nIndex);
-            else
-                aDelimiterPositions.push_back(nIndex + nDelLength);
-        }
-
-        nStart = nIndex + nDelLength;
-    }
-
-    if (bMatchEnd && bBefore)
-        aDelimiterPositions.push_back(nLength);
-
-    sal_Int32 nSize(aDelimiterPositions.size());
-    if (nSize == 0 || std::abs(nInstanceNum) > nSize)
-    {
-        if (aIfNotFound.has_value())
-            PushString(aIfNotFound.value());
-        else
-            PushError(FormulaError::NotAvailable);
-    }
-    else
-    {
-        if (nInstanceNum < 0)
-            nInstanceNum = nSize + nInstanceNum + 1;
-
-        sal_Int32 aDelPos(aDelimiterPositions[nInstanceNum - 1]);
-        if (bBefore)
-            PushString(sStr.copy(0, aDelPos));
-        else
-            PushString(sStr.copy(aDelPos, nLength - aDelPos));
-    }
-}
-
 static std::vector<OUString> lcl_SplitText(const OUString& rText, const std::vector<svl::SharedString>& rDelimiters,
         bool bIgnoreEmpty, bool bMatchMode)
 {
@@ -9508,44 +9184,6 @@ void ScInterpreter::ScFind()
     }
 }
 
-void ScInterpreter::ScExact()
-{
-    nFuncFmtType = SvNumFormatType::LOGICAL;
-    if ( MustHaveParamCount( GetByte(), 2 ) )
-    {
-        svl::SharedString s1 = GetString();
-        svl::SharedString s2 = GetString();
-        PushInt(int(s1 == s2));
-    }
-}
-
-void ScInterpreter::ScLeft()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 1, 2 ) )
-        return;
-
-    sal_Int32 n;
-    if (nParamCount == 2)
-    {
-        n = GetStringPositionArgument();
-        if (n < 0)
-        {
-            PushIllegalArgument();
-            return ;
-        }
-    }
-    else
-        n = 1;
-    OUString aStr = GetString().getString();
-    sal_Int32 nIdx = 0;
-    sal_Int32 nCnt = 0;
-    while ( nIdx < aStr.getLength() && n > nCnt++ )
-        aStr.iterateCodePoints( &nIdx );
-    aStr = aStr.copy( 0, nIdx );
-    PushString( aStr );
-}
-
 namespace {
 
 struct UBlockScript {
@@ -9822,42 +9460,6 @@ void ScInterpreter::ScSearchB()
             int nBytePos = lcl_getLengthB( aSubStr, nPos );
             PushDouble( nBytePos + nStart );
         }
-    }
-}
-
-void ScInterpreter::ScRight()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 1, 2 ) )
-        return;
-
-    sal_Int32 n;
-    if (nParamCount == 2)
-    {
-        n = GetStringPositionArgument();
-        if (n < 0)
-        {
-            PushIllegalArgument();
-            return ;
-        }
-    }
-    else
-        n = 1;
-    OUString aStr = GetString().getString();
-    sal_Int32 nLen = aStr.getLength();
-    if ( nLen <= n )
-        PushString( aStr );
-    else
-    {
-        sal_Int32 nIdx = nLen;
-        sal_Int32 nCnt = 0;
-        while ( nIdx > 0 && n > nCnt )
-        {
-            aStr.iterateCodePoints( &nIdx, -1 );
-            ++nCnt;
-        }
-        aStr = aStr.copy( nIdx, nLen - nIdx );
-        PushString( aStr );
     }
 }
 

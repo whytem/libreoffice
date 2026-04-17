@@ -2878,6 +2878,52 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorTextUtilityAu
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorTextUtilityDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineTextUtilityDefaultOn"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 0, 0, u"=UPPER(\"Abc\")"_ustr);
+        m_pDoc->SetString(1, 0, 0, u"=LEFT(\"LibreOffice\";5)"_ustr);
+        m_pDoc->SetString(2, 0, 0, u"=RIGHT(\"LibreOffice\";6)"_ustr);
+        m_pDoc->SetString(3, 0, 0, u"=TEXTAFTER(\"alpha-beta-gamma\";\"-\";2)"_ustr);
+        m_pDoc->SetString(4, 0, 0, u"=TEXTBEFORE(\"Brown, Lucas, Manager\";\",\";2)"_ustr);
+        m_pDoc->SetString(5, 0, 0, u"=CONCAT(\"a\";\"b\";\"c\")"_ustr);
+        m_pDoc->SetString(6, 0, 0, u"=EXACT(\"A\";\"a\")"_ustr);
+        m_pDoc->SetString(7, 0, 0, u"=T(123)"_ustr);
+
+        CPPUNIT_ASSERT_EQUAL(u"ABC"_ustr, m_pDoc->GetString(0, 0, 0));
+        CPPUNIT_ASSERT_EQUAL(u"Libre"_ustr, m_pDoc->GetString(1, 0, 0));
+        CPPUNIT_ASSERT_EQUAL(u"Office"_ustr, m_pDoc->GetString(2, 0, 0));
+        CPPUNIT_ASSERT_EQUAL(u"gamma"_ustr, m_pDoc->GetString(3, 0, 0));
+        CPPUNIT_ASSERT_EQUAL(u"Brown, Lucas"_ustr, m_pDoc->GetString(4, 0, 0));
+        CPPUNIT_ASSERT_EQUAL(u"abc"_ustr, m_pDoc->GetString(5, 0, 0));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(6, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_EQUAL(u""_ustr, m_pDoc->GetString(7, 0, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::TextUtility)]
+            >= 1);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::TextUtility)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorSpillArrayAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

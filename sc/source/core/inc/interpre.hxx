@@ -622,21 +622,9 @@ private:
     void ScIsEven();
     void ScIsOdd();
     void ScN();
-    void ScCode();
     void ScTrim();
-    void ScUpper();
-    void ScProper();
-    void ScLower();
-    void ScLen();
-    void ScT();
     void ScValue();
     void ScNumberValue();
-    void ScClean();
-    void ScChar();
-    void ScJis();
-    void ScAsc();
-    void ScUnicode();
-    void ScUnichar();
     void ScMin( bool bTextAsZero = false );
     void ScMax( bool bTextAsZero = false );
     /** Check for array of references to determine the maximum size of a return
@@ -690,8 +678,6 @@ private:
     void ScHStack();
     void ScVStack();
     void ScTake();
-    void ScTextAfter();
-    void ScTextBefore();
     void ScTextSplit();
     void ScToCol();
     void ScToRow();
@@ -711,7 +697,6 @@ private:
         spreadsheetengine::compat::libreoffice::interpreterdispatch::UnaryMatrixScalarMode eMode);
     void ScSyntheticBinaryOp(OpCode eOpCode, void (ScInterpreter::*pOperation)());
     void ScMatchOp(bool bExtended);
-    void ScTextBeforeOrAfter(bool bBefore);
     void ScChooseColsOrRows(bool bCols);
     void ScToColOrRow(bool bCol);
     void ScWrapColsOrRows(bool bCols);
@@ -751,9 +736,6 @@ public:
     void ScReplace();
     void ScFixed();
     void ScFind();
-    void ScExact();
-    void ScLeft();
-    void ScRight();
     void ScSearch();
     void ScMid();
     void ScText();
@@ -761,7 +743,6 @@ public:
     void ScRept();
     void ScRegex();
     void ScConcat();
-    void ScConcat_MS();
     void ScTextJoin_MS();
     void ScIfs_MS();
     void ScSwitch_MS();
