@@ -37,7 +37,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_probe_formula_cells=50348`
 - `interpret_tail_live_authoritative_match_total=50344`
 - `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=235`
+- `legacy_interpreter_subroutine_count=185`
 - live authoritative-match rate over the corpus: `99.3743%`
 - live authoritative-match rate over the current promoted probe: `99.9921%`
 

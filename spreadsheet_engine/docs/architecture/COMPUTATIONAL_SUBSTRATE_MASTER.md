@@ -41,14 +41,17 @@ Today:
   evaluator families, and the latest mechanical relocation wave now
   collapses the statistical/test, forecasting, byte-text, and web
   wrapper declarations into internal helper paths, while the latest
-  date/time, financial, and text mechanical relocation wave brings the blunt
+  date/time, financial, and text mechanical relocation wave briefly brought the blunt
   retirement metric down to `legacy_interpreter_subroutine_count=50`, and the
   latest genuine standalone statistical-distribution relocation retires the
   legacy `ScB`, `ScNormDist`, `ScHypGeomDist`, `ScLogNormDist`,
   `ScLogNormInv`, `ScBetaDist_MS`, `ScBetaInv`, `ScCritBinom`,
   `ScNegBinomDist`, and `ScNegBinomDist_MS` wrappers; after restoring earlier
   rename-only wrapper name changes, the honest blunt metric now sits at
-  `legacy_interpreter_subroutine_count=235`
+  `legacy_interpreter_subroutine_count=235`; the latest genuine date/time
+  retirement pass then removed the dedicated `TODAY`/`NOW`, date-part,
+  week-number, workday/networkdays, and `DATE`/`TIME`/date-difference wrappers,
+  bringing the honest blunt metric down again to `legacy_interpreter_subroutine_count=185`
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to
@@ -58,8 +61,8 @@ Today:
   host truth for token-backed `VariableExpected` cells, promoting the
   supported unknown-root band into real evaluator families, then promoting
   the remaining high-volume imported unknown roots into real probe families,
-  and finally shrinking the remaining `void Sc*()` declaration surface to
-  `50`
+  and then genuinely retiring the dedicated date/time wrapper surface to
+  `185`
 - the broad corpus lane now completes again with `BusinessDay` admitted on the
   default ambient surface after rejecting zero-workday `WORKDAY` weekend masks
   before they enter the shared runtime, and the next `BusinessDay` slice has
@@ -92,7 +95,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_probe_formula_cells=50348`
 - `interpret_tail_live_authoritative_match_total=50344`
 - `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=235`
+- `legacy_interpreter_subroutine_count=185`
 - live authoritative-match rate over the corpus: `99.3743%`
 - live authoritative-match rate over the current promoted probe: `99.9921%`
 
