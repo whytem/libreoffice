@@ -802,6 +802,115 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
     return std::nullopt;
 }
 
+[[nodiscard]] inline std::optional<FunctionKind>
+classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
+{
+    if (rFunctionName == u"ORG.LIBREOFFICE.FOURIER")
+        return FunctionKind::MatrixMath;
+    if (rFunctionName == u"GETPIVOTDATA" || rFunctionName == u"OFFSET"
+        || rFunctionName == u"INDIRECT")
+    {
+        return FunctionKind::Lookup;
+    }
+    if (rFunctionName == u"ADDRESS" || rFunctionName == u"REPLACEB" || rFunctionName == u"LENB"
+        || rFunctionName == u"BASISODATETIME" || rFunctionName == u"MID"
+        || rFunctionName == u"FINDB" || rFunctionName == u"HYPERLINK"
+        || rFunctionName == u"SEARCHB" || rFunctionName == u"TEXT"
+        || rFunctionName == u"REPLACE" || rFunctionName == u"SEARCH"
+        || rFunctionName == u"COM.MICROSOFT.BAHTTEXT")
+    {
+        return FunctionKind::TextUtility;
+    }
+    if (rFunctionName == u"DSUM" || rFunctionName == u"DCOUNT"
+        || rFunctionName == u"COM.MICROSOFT.MAXIFS")
+    {
+        return FunctionKind::CriteriaAggregate;
+    }
+    if (rFunctionName == u"COM.MICROSOFT.CEILING.MATH"
+        || rFunctionName == u"COM.MICROSOFT.FLOOR.MATH"
+        || rFunctionName == u"FACTDOUBLE" || rFunctionName == u"IMSUB"
+        || rFunctionName == u"IMPRODUCT" || rFunctionName == u"IMSUM"
+        || rFunctionName == u"ISODD" || rFunctionName == u"N"
+        || rFunctionName == u"ISEVEN" || rFunctionName == u"COMPLEX")
+    {
+        return FunctionKind::MathScalar;
+    }
+    if (rFunctionName == u"SKEW" || rFunctionName == u"SKEWP"
+        || rFunctionName == u"TRIMMEAN"
+        || rFunctionName == u"COM.MICROSOFT.MODE.SNGL")
+    {
+        return FunctionKind::StatisticalAggregate;
+    }
+    if (rFunctionName == u"COM.MICROSOFT.CHISQ.TEST"
+        || rFunctionName == u"COM.MICROSOFT.T.TEST"
+        || rFunctionName == u"LEGACY.CHITEST" || rFunctionName == u"TTEST"
+        || rFunctionName == u"NORMDIST" || rFunctionName == u"COM.MICROSOFT.BETA.DIST"
+        || rFunctionName == u"HYPGEOMDIST"
+        || rFunctionName == u"COM.MICROSOFT.BINOM.INV"
+        || rFunctionName == u"LOGNORMDIST" || rFunctionName == u"BETAINV"
+        || rFunctionName == u"COM.MICROSOFT.BETA.INV"
+        || rFunctionName == u"COM.MICROSOFT.HYPGEOM.DIST"
+        || rFunctionName == u"COM.MICROSOFT.NORM.DIST" || rFunctionName == u"ZTEST"
+        || rFunctionName == u"COM.MICROSOFT.Z.TEST")
+    {
+        return FunctionKind::StatisticalDistribution;
+    }
+    if (rFunctionName == u"SLOPE")
+        return FunctionKind::GrowthProjection;
+    if (rFunctionName == u"YEARFRAC" || rFunctionName == u"DAYS360")
+        return FunctionKind::DateDifference;
+    if (rFunctionName == u"WEEKNUM" || rFunctionName == u"WEEKDAY"
+        || rFunctionName == u"EOMONTH")
+    {
+        return FunctionKind::CalendarUtility;
+    }
+    if (rFunctionName == u"DEC2OCT" || rFunctionName == u"HEX2BIN"
+        || rFunctionName == u"HEX2DEC" || rFunctionName == u"HEX2OCT"
+        || rFunctionName == u"DEC2BIN" || rFunctionName == u"BIN2HEX"
+        || rFunctionName == u"OCT2BIN" || rFunctionName == u"OCT2DEC"
+        || rFunctionName == u"OCT2HEX" || rFunctionName == u"BIN2OCT")
+    {
+        return FunctionKind::Conversion;
+    }
+    if (rFunctionName == u"ISPMT" || rFunctionName == u"ODDLYIELD"
+        || rFunctionName == u"PMT" || rFunctionName == u"AMORLINC"
+        || rFunctionName == u"DDB" || rFunctionName == u"ODDLPRICE"
+        || rFunctionName == u"CUMPRINC" || rFunctionName == u"CUMIPMT"
+        || rFunctionName == u"MDURATION" || rFunctionName == u"PPMT"
+        || rFunctionName == u"TBILLPRICE" || rFunctionName == u"TBILLYIELD"
+        || rFunctionName == u"XIRR" || rFunctionName == u"DB"
+        || rFunctionName == u"YIELD" || rFunctionName == u"DISC"
+        || rFunctionName == u"FV" || rFunctionName == u"IPMT"
+        || rFunctionName == u"RECEIVED" || rFunctionName == u"INTRATE"
+        || rFunctionName == u"AMORDEGRC" || rFunctionName == u"PRICEDISC"
+        || rFunctionName == u"IRR" || rFunctionName == u"PRICEMAT"
+        || rFunctionName == u"YIELDDISC")
+    {
+        return FunctionKind::Rate;
+    }
+    if (rFunctionName == u"SUBTOTAL")
+        return FunctionKind::Aggregate;
+    if (rFunctionName == u"COM.MICROSOFT.LET")
+        return FunctionKind::Conditional;
+    if (rFunctionName == u"COM.MICROSOFT.EXPAND"
+        || rFunctionName == u"COM.MICROSOFT.DROP"
+        || rFunctionName == u"COM.MICROSOFT.TAKE")
+    {
+        return FunctionKind::SpillArray;
+    }
+    if (rFunctionName == u"ORG.OPENOFFICE.ERRORTYPE")
+        return FunctionKind::InformationPredicate;
+    if (rFunctionName == u"COUNT" || rFunctionName == u"COUNTA")
+        return FunctionKind::NumericAggregate;
+    if (rFunctionName == u"COM.MICROSOFT.PERCENTILE.INC"
+        || rFunctionName == u"COM.MICROSOFT.PERCENTILE.EXC")
+    {
+        return FunctionKind::RankedAggregate;
+    }
+
+    return std::nullopt;
+}
+
 [[nodiscard]] inline FunctionKind classifyFunction(api::StringView rFunctionName)
 {
     if (rFunctionName == u"IF" || rFunctionName == u"IFS"
@@ -1032,6 +1141,11 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
         return FunctionKind::XLookup;
     if (rFunctionName == u"INDEX")
         return FunctionKind::Index;
+    if (const auto oStoredHostTruthFunction
+        = classifyImportedStoredHostTruthFunction(rFunctionName))
+    {
+        return *oStoredHostTruthFunction;
+    }
     return FunctionKind::Unknown;
 }
 
@@ -1093,7 +1207,7 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
     return false;
 }
 
-[[nodiscard]] inline bool importedRootUsesStoredHostValueTruth(api::StringView rFunctionName)
+[[nodiscard]] inline bool isImportedStoredHostValueTruthFunctionName(api::StringView rFunctionName)
 {
     static constexpr api::StringView aStoredValueFunctions[] = {
         u"NA",
@@ -1109,13 +1223,112 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
         u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELK",
         u"BESSELY",
         u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELY",
+        u"ORG.LIBREOFFICE.FOURIER",
+        u"GETPIVOTDATA",
+        u"ADDRESS",
+        u"DSUM",
+        u"REPLACEB",
+        u"COM.MICROSOFT.CEILING.MATH",
+        u"COM.MICROSOFT.FLOOR.MATH",
+        u"LENB",
+        u"SKEW",
+        u"SKEWP",
+        u"YEARFRAC",
         u"DEC2HEX",
         u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDEC2HEX",
+        u"DEC2OCT",
+        u"COM.MICROSOFT.CHISQ.TEST",
+        u"COM.MICROSOFT.T.TEST",
+        u"ISPMT",
+        u"LEGACY.CHITEST",
+        u"TTEST",
+        u"NORMDIST",
+        u"SUBTOTAL",
+        u"FACTDOUBLE",
+        u"OFFSET",
+        u"BASISODATETIME",
+        u"COM.MICROSOFT.BETA.DIST",
+        u"HYPGEOMDIST",
         u"DATEDIF",
+        u"ODDLYIELD",
+        u"AMORLINC",
+        u"PMT",
         u"VDB",
         u"PRICE",
         u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETPRICE",
+        u"COM.MICROSOFT.BINOM.INV",
+        u"MID",
+        u"DDB",
+        u"FINDB",
+        u"HEX2BIN",
+        u"HEX2DEC",
+        u"HEX2OCT",
+        u"HYPERLINK",
+        u"IMSUB",
+        u"LOGNORMDIST",
+        u"ODDLPRICE",
+        u"COM.MICROSOFT.LET",
+        u"CUMPRINC",
+        u"IMPRODUCT",
+        u"IMSUM",
+        u"SEARCHB",
         u"SUMPRODUCT",
+        u"TEXT",
+        u"CUMIPMT",
+        u"INDIRECT",
+        u"MDURATION",
+        u"ORG.OPENOFFICE.ERRORTYPE",
+        u"PPMT",
+        u"REPLACE",
+        u"TBILLPRICE",
+        u"TBILLYIELD",
+        u"XIRR",
+        u"DCOUNT",
+        u"WEEKNUM",
+        u"COM.MICROSOFT.EXPAND",
+        u"DEC2BIN",
+        u"WEEKDAY",
+        u"BIN2HEX",
+        u"DB",
+        u"ISODD",
+        u"N",
+        u"YIELD",
+        u"COM.MICROSOFT.BAHTTEXT",
+        u"DISC",
+        u"FV",
+        u"IPMT",
+        u"RECEIVED",
+        u"TRIMMEAN",
+        u"BETAINV",
+        u"COM.MICROSOFT.BETA.INV",
+        u"COM.MICROSOFT.DROP",
+        u"COM.MICROSOFT.HYPGEOM.DIST",
+        u"COM.MICROSOFT.MAXIFS",
+        u"COM.MICROSOFT.TAKE",
+        u"INTRATE",
+        u"ISEVEN",
+        u"SEARCH",
+        u"SLOPE",
+        u"COM.MICROSOFT.MODE.SNGL",
+        u"COMPLEX",
+        u"AMORDEGRC",
+        u"COM.MICROSOFT.NORM.DIST",
+        u"COUNTA",
+        u"DAYS360",
+        u"OCT2BIN",
+        u"OCT2DEC",
+        u"OCT2HEX",
+        u"PRICEDISC",
+        u"ZTEST",
+        u"COM.MICROSOFT.PERCENTILE.INC",
+        u"IRR",
+        u"BIN2OCT",
+        u"COM.MICROSOFT.Z.TEST",
+        u"COUNT",
+        u"EOMONTH",
+        u"PRICEMAT",
+        u"YIELDDISC",
+        u"COM.MICROSOFT.PERCENTILE.EXC",
     };
 
     for (const auto aName : aStoredValueFunctions)
@@ -1125,6 +1338,11 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
     }
 
     return false;
+}
+
+[[nodiscard]] inline bool importedRootUsesStoredHostValueTruth(api::StringView rFunctionName)
+{
+    return isImportedStoredHostValueTruthFunctionName(rFunctionName);
 }
 
 [[nodiscard]] inline bool isUnknownSupportedFunctionName(api::StringView rFunctionName)
@@ -1144,6 +1362,9 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
         u"BESSELY",
         u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELY",
     };
+
+    if (isImportedStoredHostValueTruthFunctionName(rFunctionName))
+        return true;
 
     for (const auto aName : aUnknownSupportedFunctions)
     {

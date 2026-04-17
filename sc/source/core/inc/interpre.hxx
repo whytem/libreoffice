@@ -674,18 +674,18 @@ public:
     void ScDBVar();
     void ScDBVarP();
     void ScIndirect();
-    void ScAddressFunc();
+    void handleAddressFunc();
     void ScOffset();
     void ScIndex();
     void ScMultiArea();
     void ScAreas();
     void ScCurrency();
-    void ScReplace();
+    void handleReplace();
     void ScFixed();
-    void ScFind();
-    void ScSearch();
-    void ScMid();
-    void ScText();
+    void handleFind();
+    void handleSearch();
+    void handleMid();
+    void handleText();
     void ScSubstitute();
     void ScRept();
     void ScRegex();
@@ -701,7 +701,7 @@ public:
     void ScDBArea();
     void ScColRowNameAuto();
     void ScGetPivotData();
-    void ScHyperLink();
+    void handleHyperLink();
     void ScBahtText();
     void ScTTT();
     void ScDebugVar();
@@ -718,32 +718,32 @@ public:
      */
     double GetDateSerial( sal_Int16 nYear, sal_Int16 nMonth, sal_Int16 nDay, bool bStrict );
 
-    void ScGetActDate();
-    void ScGetActTime();
-    void ScGetYear();
-    void ScGetMonth();
-    void ScGetDay();
-    void ScGetDayOfWeek();
-    void ScGetWeekOfYear();
-    void ScGetIsoWeekOfYear();
-    void ScWeeknumOOo();
-    void ScEasterSunday();
+    void handleGetActDate();
+    void handleGetActTime();
+    void handleGetYear();
+    void handleGetMonth();
+    void handleGetDay();
+    void handleGetDayOfWeek();
+    void handleGetWeekOfYear();
+    void handleGetIsoWeekOfYear();
+    void handleWeeknumOOo();
+    void handleEasterSunday();
     FormulaError GetWeekendAndHolidayMasks( const sal_uInt8 nParamCount, const sal_Int32 nNullDate,
             ::std::vector<double>& rSortArray, bool bWeekendMask[ 7 ] );
     FormulaError GetWeekendAndHolidayMasks_MS( const sal_uInt8 nParamCount, const sal_Int32 nNullDate,
             ::std::vector<double>& rSortArray, bool bWeekendMask[ 7 ], bool bWorkdayFunction );
     static inline sal_Int16 GetDayOfWeek( sal_Int32 n );
-    void ScNetWorkdays( bool bOOXML_Version );
-    void ScWorkday_MS();
-    void ScGetHour();
-    void ScGetMin();
-    void ScGetSec();
+    void handleNetWorkdays( bool bOOXML_Version );
+    void handleWorkdayMS();
+    void handleGetHour();
+    void handleGetMin();
+    void handleGetSec();
     void RoundNumber( rtl_math_RoundingMode eMode );
-    void ScGetDate();
-    void ScGetTime();
-    void ScGetDiffDate();
-    void ScGetDiffDate360();
-    void ScGetDateDif();
+    void handleGetDate();
+    void handleGetTime();
+    void handleGetDiffDate();
+    void handleGetDiffDate360();
+    void handleGetDateDif();
     void ScAmpersand();
     void ScMul();
     void ScDiv();
@@ -754,41 +754,41 @@ public:
     static void RoundSignificant( double fX, double fDigits, double &fRes );
 
     // financial functions
-    void ScNPV();
-    void ScIRR();
-    void ScMIRR();
-    void ScISPMT();
+    void handleNPV();
+    void handleIRR();
+    void handleMIRR();
+    void handleISPMT();
 
     static double ScGetPV(double fRate, double fNper, double fPmt,
                           double fFv, bool bPayInAdvance);
-    void ScPV();
-    void ScSYD();
+    void handlePV();
+    void handleSYD();
     static double ScGetDDB(double fCost, double fSalvage, double fLife,
                            double fPeriod, double fFactor);
-    void ScDDB();
-    void ScDB();
+    void handleDDB();
+    void handleDB();
     static double ScInterVDB(double fCost, double fSalvage, double fLife, double fLife1,
                              double fPeriod, double fFactor);
-    void ScVDB();
-    void ScPDuration();
-    void ScSLN();
+    void handleVDB();
+    void handlePDuration();
+    void handleSLN();
     static double ScGetPMT(double fRate, double fNper, double fPv,
                            double fFv, bool bPayInAdvance);
-    void ScPMT();
-    void ScRRI();
+    void handlePMT();
+    void handleRRI();
     static double ScGetFV(double fRate, double fNper, double fPmt,
                           double fPv, bool bPayInAdvance);
-    void ScFV();
-    void ScNper();
-    void ScRate();
+    void handleFV();
+    void handleNper();
+    void handleRate();
     double ScGetIpmt(double fRate, double fPer, double fNper, double fPv,
                                  double fFv, bool bPayInAdvance, double& fPmt);
-    void ScIpmt();
-    void ScPpmt();
-    void ScCumIpmt();
-    void ScCumPrinc();
-    void ScEffect();
-    void ScNominal();
+    void handleIpmt();
+    void handlePpmt();
+    void handleCumIpmt();
+    void handleCumPrinc();
+    void handleEffect();
+    void handleNominal();
     void handleIntercept();
 
     // matrix functions

@@ -7681,7 +7681,7 @@ void ScInterpreter::ScIndirect()
     }
 }
 
-void ScInterpreter::ScAddressFunc()
+void ScInterpreter::handleAddressFunc()
 {
     OUString sTabStr;
 
@@ -8235,7 +8235,7 @@ void ScInterpreter::ScCurrency()
     PushString(aStr);
 }
 
-void ScInterpreter::ScReplace()
+void ScInterpreter::handleReplace()
 {
     if ( !MustHaveParamCount( GetByte(), 4 ) )
         return;
@@ -8328,7 +8328,7 @@ void ScInterpreter::ScFixed()
         PushString(aStr);
 }
 
-void ScInterpreter::ScFind()
+void ScInterpreter::handleFind()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 2, 3 ) )
@@ -8640,7 +8640,7 @@ void ScInterpreter::handleSearchB()
     }
 }
 
-void ScInterpreter::ScSearch()
+void ScInterpreter::handleSearch()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 2, 3 ) )
@@ -8870,7 +8870,7 @@ void ScInterpreter::ScRegex()
     PushString( aResult);
 }
 
-void ScInterpreter::ScMid()
+void ScInterpreter::handleMid()
 {
     if ( !MustHaveParamCount( GetByte(), 3 ) )
         return;
@@ -8904,7 +8904,7 @@ void ScInterpreter::ScMid()
     }
 }
 
-void ScInterpreter::ScText()
+void ScInterpreter::handleText()
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
