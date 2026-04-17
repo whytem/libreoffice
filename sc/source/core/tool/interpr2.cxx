@@ -520,21 +520,6 @@ void ScInterpreter::ScGetDateDif()
         PushIllegalArgument();               // unsupported format
 }
 
-void ScInterpreter::ScPlusMinus()
-{
-    PushInt( semath::computePlusMinus( GetDouble() ) );
-}
-
-void ScInterpreter::ScAbs()
-{
-    PushDouble( semath::computeAbs( GetDouble() ) );
-}
-
-void ScInterpreter::ScInt()
-{
-    PushDouble( semath::computeInt( GetDouble() ) );
-}
-
 void ScInterpreter::RoundNumber( rtl_math_RoundingMode eMode )
 {
     sal_uInt8 nParamCount = GetByte();
@@ -554,21 +539,6 @@ void ScInterpreter::RoundNumber( rtl_math_RoundingMode eMode )
     PushDouble(fVal);
 }
 
-void ScInterpreter::ScRound()
-{
-    RoundNumber( rtl_math_RoundingMode_Corrected );
-}
-
-void ScInterpreter::ScRoundDown()
-{
-    RoundNumber( rtl_math_RoundingMode_Down );
-}
-
-void ScInterpreter::ScRoundUp()
-{
-    RoundNumber( rtl_math_RoundingMode_Up );
-}
-
 void ScInterpreter::RoundSignificant( double fX, double fDigits, double &fRes )
 {
     fRes = semath::roundToSignificantDigits( fX, fDigits );
@@ -581,75 +551,6 @@ void ScInterpreter::RoundSignificant( double fX, double fDigits, double &fRes )
     This is why ODFF-CEILING is exported to Excel as CEILING.MATH and
     CEILING.MATH is imported in Calc as CEILING.MATH
  */
-void ScInterpreter::ScCeil( bool bODFF )
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 1, 3 ) )
-        return;
-
-    bool bAbs = nParamCount == 3 && GetBool();
-    double fDec, fVal;
-    if ( nParamCount == 1 )
-    {
-        fVal = GetDouble();
-        fDec = ( fVal < 0 ? -1 : 1 );
-    }
-    else
-    {
-        bool bArgumentMissing = IsMissing();
-        fDec = GetDouble();
-        fVal = GetDouble();
-        if ( bArgumentMissing )
-            fDec = ( fVal < 0 ? -1 : 1 );
-    }
-    if ( fVal == 0 || fDec == 0.0 )
-        PushInt( 0 );
-    else
-    {
-        if (std::optional<double> fResult = semath::computeCeiling( fVal, fDec, bAbs, bODFF ))
-            PushDouble(*fResult);
-        else
-            PushIllegalArgument();
-    }
-}
-
-void ScInterpreter::ScCeil_MS()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 2 ) )
-        return;
-
-    double fDec = GetDouble();
-    double fVal = GetDouble();
-    if (std::optional<double> fResult = semath::computeCeilingMs( fVal, fDec ))
-        PushDouble(*fResult);
-    else
-        PushIllegalArgument();
-}
-
-void ScInterpreter::ScCeil_Precise()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 1, 2 ) )
-        return;
-
-    double fDec, fVal;
-    if ( nParamCount == 1 )
-    {
-        fVal = GetDouble();
-        fDec = 1.0;
-    }
-    else
-    {
-        fDec = std::abs( GetDoubleWithDefault( 1.0 ));
-        fVal = GetDouble();
-    }
-    if ( fDec == 0.0 || fVal == 0.0 )
-        PushInt( 0 );
-    else
-        PushDouble(semath::computeCeilingPrecise( fVal, fDec ));
-}
-
 /** tdf69552 ODFF1.2 function FLOOR and Excel function FLOOR.MATH
     In essence, the difference between the two is that ODFF-FLOOR needs to
     have arguments value and significance of the same sign and with
@@ -657,100 +558,6 @@ void ScInterpreter::ScCeil_Precise()
     This is why ODFF-FLOOR is exported to Excel as FLOOR.MATH and
     FLOOR.MATH is imported in Calc as FLOOR.MATH
  */
-void ScInterpreter::ScFloor( bool bODFF )
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 1, 3 ) )
-        return;
-
-    bool bAbs = ( nParamCount == 3 && GetBool() );
-    double fDec, fVal;
-    if ( nParamCount == 1 )
-    {
-        fVal = GetDouble();
-        fDec = ( fVal < 0 ? -1 : 1 );
-    }
-    else
-    {
-        bool bArgumentMissing = IsMissing();
-        fDec = GetDouble();
-        fVal = GetDouble();
-        if ( bArgumentMissing )
-            fDec = ( fVal < 0 ? -1 : 1 );
-    }
-    if ( fDec == 0.0 || fVal == 0.0 )
-        PushInt( 0 );
-    else
-    {
-        if (std::optional<double> fResult = semath::computeFloor( fVal, fDec, bAbs, bODFF ))
-            PushDouble(*fResult);
-        else
-            PushIllegalArgument();
-    }
-}
-
-void ScInterpreter::ScFloor_MS()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 2 ) )
-        return;
-
-    double fDec = GetDouble();
-    double fVal = GetDouble();
-    if (std::optional<double> fResult = semath::computeFloorMs( fVal, fDec ))
-        PushDouble(*fResult);
-    else
-        PushIllegalArgument();
-}
-
-void ScInterpreter::ScFloor_Precise()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 1, 2 ) )
-        return;
-
-    double fDec = nParamCount == 1 ? 1.0 : std::abs( GetDoubleWithDefault( 1.0 ) );
-    double fVal = GetDouble();
-    if ( fDec == 0.0 || fVal == 0.0 )
-        PushInt( 0 );
-    else
-        PushDouble(semath::computeFloorPrecise( fVal, fDec ));
-}
-
-void ScInterpreter::ScEven()
-{
-    PushDouble(semath::computeEven(GetDouble()));
-}
-
-void ScInterpreter::ScOdd()
-{
-    PushDouble(semath::computeOdd(GetDouble()));
-}
-
-void ScInterpreter::ScArcTan2()
-{
-    if ( MustHaveParamCount( GetByte(), 2 ) )
-    {
-        double fVal2 = GetDouble();
-        double fVal1 = GetDouble();
-        PushDouble( semath::computeArcTan2( fVal2, fVal1 ) );
-    }
-}
-
-void ScInterpreter::ScLog()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 1, 2 ) )
-        return;
-
-    double fBase = nParamCount == 2 ? GetDouble() : 10.0;
-    double fVal = GetDouble();
-    if (std::optional<double> fResult = semath::computeLog( fVal, fBase ))
-        PushDouble(*fResult);
-    else
-        PushIllegalArgument();
-}
-
 void ScInterpreter::ScLn()
 {
     if (std::optional<double> fResult = semath::computeLn( GetDouble() ))
@@ -1480,24 +1287,6 @@ void ScInterpreter::ScNominal()
             PushDouble(semath::computeNominalAnnualRate(fEffective, fPeriods));
         }
     }
-}
-
-void ScInterpreter::ScMod()
-{
-    if ( !MustHaveParamCount( GetByte(), 2 ) )
-        return;
-
-    double fDenom   = GetDouble();   // Denominator
-    if ( fDenom == 0.0 )
-    {
-        PushError(FormulaError::DivisionByZero);
-        return;
-    }
-    double fNum = GetDouble();   // Numerator
-    if (std::optional<double> fResult = semath::computeMod( fNum, fDenom ))
-        PushDouble(*fResult);
-    else
-        PushError( FormulaError::NoValue );
 }
 
 void ScInterpreter::ScIntersect()

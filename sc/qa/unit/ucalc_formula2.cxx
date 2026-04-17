@@ -2715,27 +2715,33 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorScalarRootAut
 
         m_pDoc->SetString(0, 7, 0, u"=A1"_ustr);
         m_pDoc->SetString(1, 7, 0, u"=A1+B1"_ustr);
-        m_pDoc->SetString(2, 7, 0, u"=C1/D1"_ustr);
-        m_pDoc->SetString(3, 7, 0, u"=A1=2"_ustr);
-        m_pDoc->SetString(4, 7, 0, u"=E1&F1"_ustr);
-        m_pDoc->SetString(5, 7, 0, u"=-C1"_ustr);
-        m_pDoc->SetString(6, 7, 0, u"=SUM(A1:D1)+1"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=A1*B1"_ustr);
+        m_pDoc->SetString(3, 7, 0, u"=C1/D1"_ustr);
+        m_pDoc->SetString(4, 7, 0, u"=B1^D1"_ustr);
+        m_pDoc->SetString(5, 7, 0, u"=A1=2"_ustr);
+        m_pDoc->SetString(6, 7, 0, u"=E1&F1"_ustr);
+        m_pDoc->SetString(7, 7, 0, u"=-C1"_ustr);
+        m_pDoc->SetString(8, 7, 0, u"=+A1"_ustr);
+        m_pDoc->SetString(9, 7, 0, u"=SUM(A1:D1)+1"_ustr);
 
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(0, 7, 0));
         ASSERT_DOUBLES_EQUAL(12.0, m_pDoc->GetValue(1, 7, 0));
-        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(2, 7, 0));
-        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(3, 7, 0));
-        CPPUNIT_ASSERT_EQUAL(u"abcd"_ustr, m_pDoc->GetString(4, 7, 0));
-        ASSERT_DOUBLES_EQUAL(-4.0, m_pDoc->GetValue(5, 7, 0));
-        ASSERT_DOUBLES_EQUAL(19.0, m_pDoc->GetValue(6, 7, 0));
+        ASSERT_DOUBLES_EQUAL(20.0, m_pDoc->GetValue(2, 7, 0));
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(3, 7, 0));
+        ASSERT_DOUBLES_EQUAL(100.0, m_pDoc->GetValue(4, 7, 0));
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(5, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"abcd"_ustr, m_pDoc->GetString(6, 7, 0));
+        ASSERT_DOUBLES_EQUAL(-4.0, m_pDoc->GetValue(7, 7, 0));
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(8, 7, 0));
+        ASSERT_DOUBLES_EQUAL(19.0, m_pDoc->GetValue(9, 7, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 7);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 10);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::ScalarRoot)]
-            >= 7);
+            >= 10);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::ScalarRoot)]);
@@ -2763,23 +2769,209 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorScalarRootDef
         setaileval::resetStats();
 
         m_pDoc->SetString(0, 7, 0, u"=A1+B1"_ustr);
-        m_pDoc->SetString(1, 7, 0, u"=C1&D1"_ustr);
-        m_pDoc->SetString(2, 7, 0, u"=A1=2"_ustr);
+        m_pDoc->SetString(1, 7, 0, u"=A1*B1"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=C1&D1"_ustr);
+        m_pDoc->SetString(3, 7, 0, u"=A1^B1"_ustr);
+        m_pDoc->SetString(4, 7, 0, u"=A1=2"_ustr);
+        m_pDoc->SetString(5, 7, 0, u"=+A1"_ustr);
 
         ASSERT_DOUBLES_EQUAL(12.0, m_pDoc->GetValue(0, 7, 0));
-        CPPUNIT_ASSERT_EQUAL(u"abcd"_ustr, m_pDoc->GetString(1, 7, 0));
-        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(2, 7, 0));
+        ASSERT_DOUBLES_EQUAL(20.0, m_pDoc->GetValue(1, 7, 0));
+        CPPUNIT_ASSERT_EQUAL(u"abcd"_ustr, m_pDoc->GetString(2, 7, 0));
+        ASSERT_DOUBLES_EQUAL(1024.0, m_pDoc->GetValue(3, 7, 0));
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(4, 7, 0));
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(5, 7, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 6);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::ScalarRoot)]
+            >= 6);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::ScalarRoot)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorMathScalarAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineMathScalarAuthority"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"=ABS(-3)"_ustr);
+        m_pDoc->SetString(1, 7, 0, u"=INT(3.9)"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=CEILING(5.2;1)"_ustr);
+        m_pDoc->SetString(3, 7, 0, u"=FLOOR(5.8;1)"_ustr);
+        m_pDoc->SetString(4, 7, 0, u"=EVEN(3)"_ustr);
+        m_pDoc->SetString(5, 7, 0, u"=ODD(2)"_ustr);
+        m_pDoc->SetString(6, 7, 0, u"=ATAN2(1;1)"_ustr);
+        m_pDoc->SetString(7, 7, 0, u"=LOG(8;2)"_ustr);
+        m_pDoc->SetString(8, 7, 0, u"=POWER(3;2)"_ustr);
+        m_pDoc->SetString(9, 7, 0, u"=MOD(22;3)"_ustr);
+        m_pDoc->SetString(10, 7, 0, u"=GCD(24;18)"_ustr);
+        m_pDoc->SetString(11, 7, 0, u"=LCM(6;8)"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(0, 7, 0));
+        ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(1, 7, 0));
+        ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(2, 7, 0));
+        ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(3, 7, 0));
+        ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(4, 7, 0));
+        ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(5, 7, 0));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(M_PI_4, m_pDoc->GetValue(6, 7, 0), 1e-12);
+        ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(7, 7, 0));
+        ASSERT_DOUBLES_EQUAL(9.0, m_pDoc->GetValue(8, 7, 0));
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(9, 7, 0));
+        ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(10, 7, 0));
+        ASSERT_DOUBLES_EQUAL(24.0, m_pDoc->GetValue(11, 7, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 12);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::MathScalar)]
+            >= 12);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::MathScalar)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorMathScalarDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineMathScalarDefaultOn"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 0, 0, u"=ABS(-3)"_ustr);
+        m_pDoc->SetString(1, 0, 0, u"=INT(3.9)"_ustr);
+        m_pDoc->SetString(2, 0, 0, u"=CEILING(5.2;1)"_ustr);
+        m_pDoc->SetString(3, 0, 0, u"=FLOOR(5.8;1)"_ustr);
+        m_pDoc->SetString(4, 0, 0, u"=EVEN(3)"_ustr);
+        m_pDoc->SetString(5, 0, 0, u"=ODD(2)"_ustr);
+        m_pDoc->SetString(6, 0, 0, u"=ATAN2(1;1)"_ustr);
+        m_pDoc->SetString(7, 0, 0, u"=LOG(8;2)"_ustr);
+        m_pDoc->SetString(8, 0, 0, u"=POWER(3;2)"_ustr);
+        m_pDoc->SetString(9, 0, 0, u"=MOD(22;3)"_ustr);
+        m_pDoc->SetString(10, 0, 0, u"=GCD(24;18)"_ustr);
+        m_pDoc->SetString(11, 0, 0, u"=LCM(6;8)"_ustr);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(0, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(1, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(2, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(3, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(4, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(5, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(M_PI_4, m_pDoc->GetValue(6, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(7, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(9.0, m_pDoc->GetValue(8, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(9, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(10, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(24.0, m_pDoc->GetValue(11, 0, 0), 1e-12);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 12);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::MathScalar)]
+            >= 12);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::MathScalar)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRoundAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineRoundAuthority"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 0, 0, u"=ROUND(12.345;2)"_ustr);
+        m_pDoc->SetString(1, 0, 0, u"=ROUNDUP(12.341;2)"_ustr);
+        m_pDoc->SetString(2, 0, 0, u"=ROUNDDOWN(12.349;2)"_ustr);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(12.35, m_pDoc->GetValue(0, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(12.35, m_pDoc->GetValue(1, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(12.34, m_pDoc->GetValue(2, 0, 0), 1e-12);
 
         const auto aStats = setaileval::getStatsSnapshot();
         CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 3);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
-                setaileval::FunctionKind::ScalarRoot)]
+                setaileval::FunctionKind::Round)]
             >= 3);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
-                setaileval::FunctionKind::ScalarRoot)]);
+                setaileval::FunctionKind::Round)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRoundDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineRoundDefaultOn"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 0, 0, u"=ROUND(12.345;2)"_ustr);
+        m_pDoc->SetString(1, 0, 0, u"=ROUNDUP(12.341;2)"_ustr);
+        m_pDoc->SetString(2, 0, 0, u"=ROUNDDOWN(12.349;2)"_ustr);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(12.35, m_pDoc->GetValue(0, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(12.35, m_pDoc->GetValue(1, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(12.34, m_pDoc->GetValue(2, 0, 0), 1e-12);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 3);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Round)]
+            >= 3);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Round)]);
     }
 
     m_pDoc->DeleteTab(0);

@@ -73,6 +73,8 @@
 #include <spreadsheetengine/runtime/ConversionRuntime.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathMatrix.hxx>
+#include <spreadsheetengine/runtime/MathRounding.hxx>
+#include <spreadsheetengine/runtime/MathScalar.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
@@ -96,6 +98,7 @@ namespace sejumpexec = spreadsheetengine::compat::libreoffice::jumpexecution;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace selogic = spreadsheetengine::api::logic;
 namespace seconvert = spreadsheetengine::core::convert;
+namespace semath = spreadsheetengine::core::math;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 namespace seswitchexec = spreadsheetengine::compat::libreoffice::switchexecution;
 namespace setextparseexec = spreadsheetengine::compat::libreoffice::textparsingexecution;
@@ -4050,6 +4053,289 @@ StackVar ScInterpreter::Interpret()
                         },
                         "family-local default-on scalar root reached ScInterpreter");
                 };
+                const auto warnIfLegacyDefaultOnReached =
+                    [&](std::u16string_view rLabel, const char* pFailureMessage) {
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", rLabel,
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            pFailureMessage);
+                    };
+                const auto pushLegacyMathScalarUnary =
+                    [&](std::u16string_view rLabel, auto aEvaluator) {
+                        warnIfLegacyDefaultOnReached(
+                            rLabel, "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(aEvaluator(GetDouble()));
+                    };
+                const auto pushLegacyRound =
+                    [&](std::u16string_view rLabel, rtl_math_RoundingMode eMode) {
+                        warnIfLegacyDefaultOnReached(
+                            rLabel, "family-local default-on round reached ScInterpreter");
+                        RoundNumber(eMode);
+                    };
+                const auto pushLegacyArcTan2 = [&]() {
+                    warnIfLegacyDefaultOnReached(
+                        u"ATAN2", "family-local default-on math scalar reached ScInterpreter");
+                    if (MustHaveParamCount(GetByte(), 2))
+                    {
+                        double fVal2 = GetDouble();
+                        double fVal1 = GetDouble();
+                        PushDouble(semath::computeArcTan2(fVal2, fVal1));
+                    }
+                };
+                const auto pushLegacyLog = [&]() {
+                    warnIfLegacyDefaultOnReached(
+                        u"LOG", "family-local default-on math scalar reached ScInterpreter");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 2))
+                        return;
+
+                    double fBase = nParamCount == 2 ? GetDouble() : 10.0;
+                    double fVal = GetDouble();
+                    if (std::optional<double> fResult = semath::computeLog(fVal, fBase))
+                        PushDouble(*fResult);
+                    else
+                        PushIllegalArgument();
+                };
+                const auto pushLegacyMod = [&]() {
+                    warnIfLegacyDefaultOnReached(
+                        u"MOD", "family-local default-on math scalar reached ScInterpreter");
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+
+                    double fDenom = GetDouble();
+                    if (fDenom == 0.0)
+                    {
+                        PushError(FormulaError::DivisionByZero);
+                        return;
+                    }
+
+                    double fNum = GetDouble();
+                    if (std::optional<double> fResult = semath::computeMod(fNum, fDenom))
+                        PushDouble(*fResult);
+                    else
+                        PushError(FormulaError::NoValue);
+                };
+                const auto pushLegacyCeil = [&](std::u16string_view rLabel, bool bODFF) {
+                    warnIfLegacyDefaultOnReached(
+                        rLabel, "family-local default-on math scalar reached ScInterpreter");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 3))
+                        return;
+
+                    bool bAbs = nParamCount == 3 && GetBool();
+                    double fDec;
+                    double fVal;
+                    if (nParamCount == 1)
+                    {
+                        fVal = GetDouble();
+                        fDec = (fVal < 0 ? -1 : 1);
+                    }
+                    else
+                    {
+                        bool bArgumentMissing = IsMissing();
+                        fDec = GetDouble();
+                        fVal = GetDouble();
+                        if (bArgumentMissing)
+                            fDec = (fVal < 0 ? -1 : 1);
+                    }
+
+                    if (fVal == 0 || fDec == 0.0)
+                        PushInt(0);
+                    else if (std::optional<double> fResult
+                             = semath::computeCeiling(fVal, fDec, bAbs, bODFF))
+                        PushDouble(*fResult);
+                    else
+                        PushIllegalArgument();
+                };
+                const auto pushLegacyCeilMs = [&](std::u16string_view rLabel) {
+                    warnIfLegacyDefaultOnReached(
+                        rLabel, "family-local default-on math scalar reached ScInterpreter");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 2))
+                        return;
+
+                    double fDec = GetDouble();
+                    double fVal = GetDouble();
+                    if (std::optional<double> fResult = semath::computeCeilingMs(fVal, fDec))
+                        PushDouble(*fResult);
+                    else
+                        PushIllegalArgument();
+                };
+                const auto pushLegacyCeilPrecise = [&](std::u16string_view rLabel) {
+                    warnIfLegacyDefaultOnReached(
+                        rLabel, "family-local default-on math scalar reached ScInterpreter");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 2))
+                        return;
+
+                    double fDec;
+                    double fVal;
+                    if (nParamCount == 1)
+                    {
+                        fVal = GetDouble();
+                        fDec = 1.0;
+                    }
+                    else
+                    {
+                        fDec = std::abs(GetDoubleWithDefault(1.0));
+                        fVal = GetDouble();
+                    }
+                    if (fDec == 0.0 || fVal == 0.0)
+                        PushInt(0);
+                    else
+                        PushDouble(semath::computeCeilingPrecise(fVal, fDec));
+                };
+                const auto pushLegacyFloor = [&](std::u16string_view rLabel, bool bODFF) {
+                    warnIfLegacyDefaultOnReached(
+                        rLabel, "family-local default-on math scalar reached ScInterpreter");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 3))
+                        return;
+
+                    bool bAbs = (nParamCount == 3 && GetBool());
+                    double fDec;
+                    double fVal;
+                    if (nParamCount == 1)
+                    {
+                        fVal = GetDouble();
+                        fDec = (fVal < 0 ? -1 : 1);
+                    }
+                    else
+                    {
+                        bool bArgumentMissing = IsMissing();
+                        fDec = GetDouble();
+                        fVal = GetDouble();
+                        if (bArgumentMissing)
+                            fDec = (fVal < 0 ? -1 : 1);
+                    }
+
+                    if (fDec == 0.0 || fVal == 0.0)
+                        PushInt(0);
+                    else if (std::optional<double> fResult
+                             = semath::computeFloor(fVal, fDec, bAbs, bODFF))
+                        PushDouble(*fResult);
+                    else
+                        PushIllegalArgument();
+                };
+                const auto pushLegacyFloorMs = [&](std::u16string_view rLabel) {
+                    warnIfLegacyDefaultOnReached(
+                        rLabel, "family-local default-on math scalar reached ScInterpreter");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 2))
+                        return;
+
+                    double fDec = GetDouble();
+                    double fVal = GetDouble();
+                    if (std::optional<double> fResult = semath::computeFloorMs(fVal, fDec))
+                        PushDouble(*fResult);
+                    else
+                        PushIllegalArgument();
+                };
+                const auto pushLegacyFloorPrecise = [&](std::u16string_view rLabel) {
+                    warnIfLegacyDefaultOnReached(
+                        rLabel, "family-local default-on math scalar reached ScInterpreter");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 2))
+                        return;
+
+                    double fDec = nParamCount == 1 ? 1.0 : std::abs(GetDoubleWithDefault(1.0));
+                    double fVal = GetDouble();
+                    if (fDec == 0.0 || fVal == 0.0)
+                        PushInt(0);
+                    else
+                        PushDouble(semath::computeFloorPrecise(fVal, fDec));
+                };
+                const auto pushLegacyGcdOrLcm = [&](std::u16string_view rLabel, bool bLcm) {
+                    warnIfLegacyDefaultOnReached(
+                        rLabel, "family-local default-on math scalar reached ScInterpreter");
+                    short nParamCount = GetByte();
+                    if (!MustHaveParamCountMin(nParamCount, 1))
+                        return;
+
+                    double fx;
+                    double fy = bLcm ? 1.0 : 0.0;
+                    ScRange aRange;
+                    size_t nRefInList = 0;
+                    const auto aAccumulate = [&](double fInput) -> bool {
+                        fx = ::rtl::math::approxFloor(fInput);
+                        if (fx < 0.0)
+                        {
+                            PushIllegalArgument();
+                            return false;
+                        }
+                        if (bLcm)
+                        {
+                            if (fx == 0.0 || fy == 0.0)
+                                fy = 0.0;
+                            else
+                                fy = fx * fy / ScGetGCD(fx, fy);
+                        }
+                        else
+                            fy = ScGetGCD(fx, fy);
+                        return true;
+                    };
+
+                    while (nGlobalError == FormulaError::NONE && nParamCount-- > 0)
+                    {
+                        switch (GetStackType())
+                        {
+                            case svDouble:
+                            case svString:
+                            case svSingleRef:
+                                if (!aAccumulate(GetDouble()))
+                                    return;
+                                break;
+                            case svDoubleRef:
+                            case svRefList:
+                            {
+                                FormulaError nErr = FormulaError::NONE;
+                                PopDoubleRef(aRange, nParamCount, nRefInList);
+                                double nCellVal;
+                                ScValueIterator aValIter(mrContext, aRange, mnSubTotalFlags);
+                                if (aValIter.GetFirst(nCellVal, nErr))
+                                {
+                                    do
+                                    {
+                                        if (!aAccumulate(nCellVal))
+                                            return;
+                                    } while (nErr == FormulaError::NONE
+                                             && aValIter.GetNext(nCellVal, nErr));
+                                }
+                                SetError(nErr);
+                            }
+                            break;
+                            case svMatrix:
+                            case svExternalSingleRef:
+                            case svExternalDoubleRef:
+                            {
+                                ScMatrixRef pMat = GetMatrix();
+                                if (pMat)
+                                {
+                                    SCSIZE nC;
+                                    SCSIZE nR;
+                                    pMat->GetDimensions(nC, nR);
+                                    if (nC == 0 || nR == 0)
+                                        SetError(FormulaError::IllegalArgument);
+                                    else
+                                    {
+                                        double nVal = bLcm ? pMat->GetLcm() : pMat->GetGcd();
+                                        if (bLcm)
+                                            fy = (nVal * fy) / ScGetGCD(nVal, fy);
+                                        else
+                                            fy = ScGetGCD(nVal, fy);
+                                    }
+                                }
+                            }
+                            break;
+                            default:
+                                SetError(FormulaError::IllegalParameter);
+                                break;
+                        }
+                    }
+                    PushDouble(fy);
+                };
                 const auto pushLegacyDateOrTimeValue =
                     [&](const char* pFunctionName, SvNumFormatType eFormatType,
                         auto aEvaluator) {
@@ -6041,11 +6327,22 @@ StackVar ScInterpreter::Interpret()
                     case ocGetHour          : ScGetHour();                  break;
                     case ocGetMin           : ScGetMin();                   break;
                     case ocGetSec           : ScGetSec();                   break;
-                    case ocPlusMinus        : ScPlusMinus();                break;
-                    case ocAbs              : ScAbs();                      break;
-                    case ocInt              : ScInt();                      break;
-                    case ocEven             : ScEven();                     break;
-                    case ocOdd              : ScOdd();                      break;
+                    case ocPlusMinus        :
+                        warnIfLegacyScalarRootReached(u"UNARY_PLUS");
+                        PushInt(semath::computePlusMinus(GetDouble()));
+                        break;
+                    case ocAbs              :
+                        pushLegacyMathScalarUnary(u"ABS", semath::computeAbs);
+                        break;
+                    case ocInt              :
+                        pushLegacyMathScalarUnary(u"INT", semath::computeInt);
+                        break;
+                    case ocEven             :
+                        pushLegacyMathScalarUnary(u"EVEN", semath::computeEven);
+                        break;
+                    case ocOdd              :
+                        pushLegacyMathScalarUnary(u"ODD", semath::computeOdd);
+                        break;
                     case ocPhi              : ScPhi();                      break;
                     case ocGauss            : ScGauss();                    break;
                     case ocStdNormDist      : ScStdNormDist();              break;
@@ -6113,35 +6410,61 @@ StackVar ScInterpreter::Interpret()
                     case ocValue            : ScValue();                    break;
                     case ocNumberValue      : ScNumberValue();              break;
                     case ocChar             : pushLegacyChar();             break;
-                    case ocArcTan2          : ScArcTan2();                  break;
-                    case ocMod              : ScMod();                      break;
+                    case ocArcTan2          : pushLegacyArcTan2();          break;
+                    case ocMod              : pushLegacyMod();              break;
                     case ocPower            :
                         if (MustHaveParamCount(GetByte(), 2))
                             ScPow();
                         break;
-                    case ocRound            : ScRound();                    break;
+                    case ocRound            :
+                        pushLegacyRound(u"ROUND", rtl_math_RoundingMode_Corrected);
+                        break;
                     case ocRoundSig         : pushLegacyRoundSignificant(); break;
-                    case ocRoundUp          : ScRoundUp();                  break;
+                    case ocRoundUp          :
+                        pushLegacyRound(u"ROUNDUP", rtl_math_RoundingMode_Up);
+                        break;
                     case ocTrunc            :
-                    case ocRoundDown        : ScRoundDown();                break;
-                    case ocCeil             : ScCeil( true );               break;
-                    case ocCeil_MS          : ScCeil_MS();                  break;
+                        pushLegacyRound(u"TRUNC", rtl_math_RoundingMode_Down);
+                        break;
+                    case ocRoundDown        :
+                        pushLegacyRound(u"ROUNDDOWN", rtl_math_RoundingMode_Down);
+                        break;
+                    case ocCeil             :
+                        pushLegacyCeil(u"CEILING", true);
+                        break;
+                    case ocCeil_MS          :
+                        pushLegacyCeilMs(u"COM.MICROSOFT.CEILING");
+                        break;
                     case ocCeil_Precise     :
-                    case ocCeil_ISO         : ScCeil_Precise();             break;
-                    case ocCeil_Math        : ScCeil( false );              break;
-                    case ocFloor            : ScFloor( true );              break;
-                    case ocFloor_MS         : ScFloor_MS();                 break;
-                    case ocFloor_Precise    : ScFloor_Precise();            break;
-                    case ocFloor_Math       : ScFloor( false );             break;
+                        pushLegacyCeilPrecise(u"CEILING.PRECISE");
+                        break;
+                    case ocCeil_ISO         :
+                        pushLegacyCeilPrecise(u"ISO.CEILING");
+                        break;
+                    case ocCeil_Math        :
+                        pushLegacyCeil(u"CEILING.MATH", false);
+                        break;
+                    case ocFloor            :
+                        pushLegacyFloor(u"FLOOR", true);
+                        break;
+                    case ocFloor_MS         :
+                        pushLegacyFloorMs(u"COM.MICROSOFT.FLOOR");
+                        break;
+                    case ocFloor_Precise    :
+                        pushLegacyFloorPrecise(u"FLOOR.PRECISE");
+                        break;
+                    case ocFloor_Math       :
+                        pushLegacyFloor(u"FLOOR.MATH", false);
+                        break;
                     case ocSumProduct       : ScSumProduct();               break;
                     case ocSumSQ            : ScSumSQ();                    break;
                     case ocSumX2MY2         : ScSumX2MY2();                 break;
                     case ocSumX2DY2         : ScSumX2DY2();                 break;
                     case ocSumXMY2          : ScSumXMY2();                  break;
                     case ocRawSubtract      : ScRawSubtract();              break;
-                    case ocLog              : ScLog();                      break;
-                    case ocGCD              : ScGCD();                      break;
-                    case ocLCM              : ScLCM();                      break;
+                    case ocLog              : pushLegacyLog();              break;
+                    case ocGCD              : pushLegacyGcdOrLcm(u"GCD", false); break;
+                    case ocLCM              : pushLegacyGcdOrLcm(u"LCM", true); break;
                     case ocGetDate          : ScGetDate();                  break;
                     case ocGetTime          : ScGetTime();                  break;
                     case ocGetDiffDate      : ScGetDiffDate();              break;

@@ -11361,11 +11361,10 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     if (eFunction == FunctionKind::MathScalar)
     {
         const auto oCanonicalName = detail::canonicalMathScalarFunctionName(aUpperFunctionName);
-        return oCanonicalName
-               && (*oCanonicalName == u"ROUNDSIG" || *oCanonicalName == u"BITAND"
-                   || *oCanonicalName == u"BITOR" || *oCanonicalName == u"BITXOR"
-                   || *oCanonicalName == u"BITLSHIFT" || *oCanonicalName == u"BITRSHIFT");
+        return oCanonicalName.has_value();
     }
+    if (eFunction == FunctionKind::Round)
+        return true;
     if (aUpperFunctionName == u"PROB")
         return true;
     if (aUpperFunctionName == u"IFERROR" || aUpperFunctionName == u"IFNA")

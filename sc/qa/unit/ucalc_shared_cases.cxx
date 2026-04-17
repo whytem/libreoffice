@@ -2950,7 +2950,134 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorRoundSigHe
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=ROUNDSIG(1234.567;3)"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(
         u"=ORG.LIBREOFFICE.ROUNDSIG(1234.567;3)"));
-    CPPUNIT_ASSERT(!setaileval::isFamilyLocalDefaultOnFormula(u"=ABS(12)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=ABS(12)"));
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorMathScalarHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailMathScalarHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(8, 0, 0);
+
+    const auto aAbs = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ABS(-3)", false);
+    CPPUNIT_ASSERT(aAbs.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aAbs.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, aAbs.maResult.mfValue, 1e-12);
+
+    const auto aInt = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=INT(3.9)", false);
+    CPPUNIT_ASSERT(aInt.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aInt.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, aInt.maResult.mfValue, 1e-12);
+
+    const auto aCeiling = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=CEILING(5.2;1)", false);
+    CPPUNIT_ASSERT(aCeiling.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aCeiling.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(6.0, aCeiling.maResult.mfValue, 1e-12);
+
+    const auto aFloor = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=FLOOR(5.8;1)", false);
+    CPPUNIT_ASSERT(aFloor.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aFloor.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, aFloor.maResult.mfValue, 1e-12);
+
+    const auto aEven = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=EVEN(3)", false);
+    CPPUNIT_ASSERT(aEven.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aEven.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, aEven.maResult.mfValue, 1e-12);
+
+    const auto aOdd = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ODD(2)", false);
+    CPPUNIT_ASSERT(aOdd.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aOdd.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, aOdd.maResult.mfValue, 1e-12);
+
+    const auto aArcTan2 = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ATAN2(1;1)", false);
+    CPPUNIT_ASSERT(aArcTan2.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aArcTan2.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(M_PI_4, aArcTan2.maResult.mfValue, 1e-12);
+
+    const auto aLog = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=LOG(8;2)", false);
+    CPPUNIT_ASSERT(aLog.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aLog.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, aLog.maResult.mfValue, 1e-12);
+
+    const auto aPowerFn = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=POWER(3;2)", false);
+    CPPUNIT_ASSERT(aPowerFn.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aPowerFn.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(9.0, aPowerFn.maResult.mfValue, 1e-12);
+
+    const auto aMod = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=MOD(22;3)", false);
+    CPPUNIT_ASSERT(aMod.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aMod.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aMod.maResult.mfValue, 1e-12);
+
+    const auto aGcd = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=GCD(24;18)", false);
+    CPPUNIT_ASSERT(aGcd.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aGcd.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(6.0, aGcd.maResult.mfValue, 1e-12);
+
+    const auto aLcm = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=LCM(6;8)", false);
+    CPPUNIT_ASSERT(aLcm.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aLcm.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(24.0, aLcm.maResult.mfValue, 1e-12);
+
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=ABS(-3)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=INT(3.9)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=CEILING(5.2;1)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=FLOOR(5.8;1)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=EVEN(3)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=ODD(2)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=ATAN2(1;1)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=LOG(8;2)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=POWER(3;2)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=MOD(22;3)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=GCD(24;18)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=LCM(6;8)"));
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorRoundHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailRoundHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(8, 0, 0);
+
+    const auto aRound = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ROUND(12.345;2)", false);
+    CPPUNIT_ASSERT(aRound.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Round, aRound.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(12.35, aRound.maResult.mfValue, 1e-12);
+
+    const auto aRoundUp = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ROUNDUP(12.341;2)", false);
+    CPPUNIT_ASSERT(aRoundUp.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Round, aRoundUp.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(12.35, aRoundUp.maResult.mfValue, 1e-12);
+
+    const auto aRoundDown = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ROUNDDOWN(12.349;2)", false);
+    CPPUNIT_ASSERT(aRoundDown.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Round, aRoundDown.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(12.34, aRoundDown.maResult.mfValue, 1e-12);
+
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=ROUND(12.345;2)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=ROUNDUP(12.341;2)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=ROUNDDOWN(12.349;2)"));
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorBitwiseHelper)
@@ -3695,6 +3822,14 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorScalarRoot
         spreadsheetengine::api::formulavalue::ValueType::Value, aAddition.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(12.0, aAddition.maResult.mfValue, 1e-12);
 
+    const auto aMultiplication = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=A1*B1", false);
+    CPPUNIT_ASSERT(aMultiplication.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::ScalarRoot, aMultiplication.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMultiplication.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(20.0, aMultiplication.maResult.mfValue, 1e-12);
+
     const auto aDivision = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=C1/D1", false);
     CPPUNIT_ASSERT(aDivision.mbSupported);
@@ -3702,6 +3837,14 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorScalarRoot
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value, aDivision.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aDivision.maResult.mfValue, 1e-12);
+
+    const auto aPower = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=B1^D1", false);
+    CPPUNIT_ASSERT(aPower.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::ScalarRoot, aPower.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aPower.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(100.0, aPower.maResult.mfValue, 1e-12);
 
     const auto aComparison = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=A1=2", false);
@@ -3728,6 +3871,14 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorScalarRoot
         spreadsheetengine::api::formulavalue::ValueType::Value, aUnary.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(-4.0, aUnary.maResult.mfValue, 1e-12);
 
+    const auto aUnaryPlus = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=+A1", false);
+    CPPUNIT_ASSERT(aUnaryPlus.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::ScalarRoot, aUnaryPlus.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aUnaryPlus.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aUnaryPlus.maResult.mfValue, 1e-12);
+
     const auto aNested = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=SUM(A1:D1)+1", false);
     CPPUNIT_ASSERT(aNested.mbSupported);
@@ -3738,8 +3889,11 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorScalarRoot
 
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=A1"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=A1+B1"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=A1*B1"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=B1^D1"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=E1&F1"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=-C1"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=+A1"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=SUM(A1:D1)+1"));
 }
 

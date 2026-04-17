@@ -766,23 +766,7 @@ public:
     void ScGetHour();
     void ScGetMin();
     void ScGetSec();
-    void ScPlusMinus();
-    void ScAbs();
-    void ScInt();
-    void ScEven();
-    void ScOdd();
-    void ScCeil( bool bODFF );
-    void ScCeil_MS();
-    void ScCeil_Precise();
-    void ScFloor( bool bODFF );
-    void ScFloor_MS();
-    void ScFloor_Precise();
     void RoundNumber( rtl_math_RoundingMode eMode );
-    void ScRound();
-    void ScRoundUp();
-    void ScRoundDown();
-    void ScArcTan2();
-    void ScLog();
     void ScGetDate();
     void ScGetTime();
     void ScGetDiffDate();
@@ -833,10 +817,7 @@ public:
     void ScCumPrinc();
     void ScEffect();
     void ScNominal();
-    void ScMod();
     void ScIntercept();
-    void ScGCD();
-    void ScLCM();
 
     // matrix functions
     void ScMatValue();
