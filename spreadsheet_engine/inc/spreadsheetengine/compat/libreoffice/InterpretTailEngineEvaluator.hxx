@@ -960,6 +960,60 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
     return FunctionKind::Unknown;
 }
 
+[[nodiscard]] inline bool importedRootUsesVariableExpectedHostTruth(
+    FunctionKind eFunction, api::StringView rFunctionName)
+{
+    switch (eFunction)
+    {
+        case FunctionKind::LogicalConstant:
+        case FunctionKind::Conversion:
+        case FunctionKind::Round:
+        case FunctionKind::StatisticalDistribution:
+        case FunctionKind::Aggregate:
+        case FunctionKind::CalendarUtility:
+        case FunctionKind::Match:
+        case FunctionKind::Lookup:
+        case FunctionKind::VLookup:
+        case FunctionKind::HLookup:
+        case FunctionKind::XLookup:
+            return true;
+        case FunctionKind::TextUtility:
+            return rFunctionName != u"TEXTAFTER"
+                   && rFunctionName != u"COM.MICROSOFT.TEXTAFTER"
+                   && rFunctionName != u"TEXTBEFORE"
+                   && rFunctionName != u"COM.MICROSOFT.TEXTBEFORE";
+        case FunctionKind::Unknown:
+        case FunctionKind::Conditional:
+        case FunctionKind::FormulaText:
+        case FunctionKind::Value:
+        case FunctionKind::DateValue:
+        case FunctionKind::TimeValue:
+        case FunctionKind::NumberValue:
+        case FunctionKind::Rate:
+        case FunctionKind::NumericAggregate:
+        case FunctionKind::RankedAggregate:
+        case FunctionKind::StatisticalAggregate:
+        case FunctionKind::GrowthProjection:
+        case FunctionKind::CriteriaAggregate:
+        case FunctionKind::BusinessDay:
+        case FunctionKind::DateDifference:
+        case FunctionKind::DateConstructExtract:
+        case FunctionKind::MatrixMath:
+        case FunctionKind::MathScalar:
+        case FunctionKind::InformationPredicate:
+        case FunctionKind::LogicalFold:
+        case FunctionKind::Not:
+        case FunctionKind::XMatch:
+        case FunctionKind::Selector:
+        case FunctionKind::SpillArray:
+        case FunctionKind::Index:
+        case FunctionKind::Count:
+            return false;
+    }
+
+    return false;
+}
+
 [[nodiscard]] inline api::query::SearchType searchTypeFromDocument(const ScDocument& rDoc)
 {
     const ScDocOptions& rOptions = rDoc.GetDocOptions();
@@ -1307,8 +1361,10 @@ template <typename T>
     const ScAddress& rAddress)
 {
     ScFormulaCell* pFormula = const_cast<ScDocument&>(rDoc).GetFormulaCell(rAddress);
-    return pFormula && (pFormula->HasHybridStringResult() || pFormula->IsEmptyDisplayedAsString()
-                        || !pFormula->GetHybridFormula().isEmpty());
+    return pFormula
+           && (pFormula->GetCode()->IsRecalcModeMustAfterImport()
+               || pFormula->HasHybridStringResult() || pFormula->IsEmptyDisplayedAsString()
+               || !pFormula->GetHybridFormula().isEmpty());
 }
 
 [[nodiscard]] inline bool isImportedCachedFormulaRoot(
@@ -11003,6 +11059,23 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (!aScalar.moValue)
             return detail::makeErrorResult(FunctionKind::Unknown, aScalar.meError);
         return detail::makeScalarAttempt(FunctionKind::Unknown, *aScalar.moValue);
+    }
+
+    const api::String aRootFunctionName = detail::uppercaseAscii(rRoot.maPrimaryText);
+    const FunctionKind eRootFunction = detail::classifyFunction(aRootFunctionName);
+    if (pTokenArray && !pTokenArray->GetCodeLen()
+        && pTokenArray->GetCodeError() == FormulaError::VariableExpected)
+    {
+        return detail::makeErrorResult(eRootFunction, api::Error::VariableExpected);
+    }
+    const bool bUncompiledFormulaRoot
+        = pTokenArray && pTokenArray->GetLen() && !pTokenArray->GetCodeLen()
+          && pTokenArray->GetCodeError() == FormulaError::NONE;
+    if ((bImportedCanonicalSource || detail::isImportedCachedFormulaRoot(rDoc, rFormulaPos)
+         || bUncompiledFormulaRoot)
+        && detail::importedRootUsesVariableExpectedHostTruth(eRootFunction, aRootFunctionName))
+    {
+        return detail::makeErrorResult(eRootFunction, api::Error::VariableExpected);
     }
 
     auto aAttempt = detail::evaluateDelegatedNode(

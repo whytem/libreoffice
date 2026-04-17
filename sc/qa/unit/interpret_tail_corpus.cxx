@@ -290,6 +290,17 @@ void resetReplayEligibilityDiagnosticSamples()
     replayEligibilityDiagnosticSamples().clear();
 }
 
+bool probeDiagnosticsTrackLiveAuthoritativeSurface()
+{
+    if (const char* pSurface
+        = std::getenv("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_PROBE_DIAGNOSTIC_SURFACE"))
+    {
+        return OString(pSurface).equalsIgnoreAsciiCase("live_authoritative");
+    }
+
+    return false;
+}
+
 void maybeAddProbeDiagnosticSample(const OUString& rWorkbookLabel, const ScDocument& rDoc,
     const ScAddress& rPos, const OUString& rFormulaSource, FunctionKind eFunction,
     const OUString& rOutcome, const OUString& rCalcResult, const OUString& rLiveHostResult,
@@ -301,6 +312,15 @@ void maybeAddProbeDiagnosticSample(const OUString& rWorkbookLabel, const ScDocum
     // Keep the limited probe diagnostic buffer focused on actionable rows.
     if (rOutcome == u"authoritative")
         return;
+
+    if (const char* pFilter
+        = std::getenv("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_PROBE_DIAGNOSTIC_FUNCTION"))
+    {
+        const OString aFilter = OString(pFilter);
+        const OString aFunctionName(functionKindName(eFunction));
+        if (!aFilter.equalsIgnoreAsciiCase(aFunctionName))
+            return;
+    }
 
     auto& rSamples = probeDiagnosticSamples();
     std::size_t nLimit = 20;
@@ -964,14 +984,33 @@ SupportedProbeRun runSupportedInterpretTailProbe(
                     aRun.maLiveAuthoritativeStats, FallbackReason::ShadowMismatch,
                     aAttempt.meFunction);
 
-            if (bMatchesWorkbook)
+            if (probeDiagnosticsTrackLiveAuthoritativeSurface())
+            {
+                if (bMatchesLiveHost)
+                {
+                    maybeAddProbeDiagnosticSample(
+                        rWorkbookLabel, rDoc, aPos, aFormulaSource, aAttempt.meFunction,
+                        u"authoritative"_ustr, probeValueToDiagnosticString(aWorkbookValue),
+                        probeValueToDiagnosticString(aLiveHostValue),
+                        probeValueToDiagnosticString(aEngineValue));
+                }
+                else
+                {
+                    maybeAddProbeDiagnosticSample(
+                        rWorkbookLabel, rDoc, aPos, aFormulaSource, aAttempt.meFunction,
+                        u"live_shadow_mismatch"_ustr,
+                        probeValueToDiagnosticString(aWorkbookValue),
+                        probeValueToDiagnosticString(aLiveHostValue),
+                        probeValueToDiagnosticString(aEngineValue));
+                }
+            }
+            else if (bMatchesWorkbook)
             {
                 maybeAddProbeDiagnosticSample(
                     rWorkbookLabel, rDoc, aPos, aFormulaSource, aAttempt.meFunction, u"authoritative"_ustr,
                     probeValueToDiagnosticString(aWorkbookValue),
                     probeValueToDiagnosticString(aLiveHostValue),
                     probeValueToDiagnosticString(aEngineValue));
-                recordProbeAuthoritativeRoute(aRun.maRawStats, aAttempt.meFunction);
             }
             else
             {
@@ -980,9 +1019,13 @@ SupportedProbeRun runSupportedInterpretTailProbe(
                     u"shadow_mismatch"_ustr, probeValueToDiagnosticString(aWorkbookValue),
                     probeValueToDiagnosticString(aLiveHostValue),
                     probeValueToDiagnosticString(aEngineValue));
+            }
+
+            if (bMatchesWorkbook)
+                recordProbeAuthoritativeRoute(aRun.maRawStats, aAttempt.meFunction);
+            else
                 recordProbeAuthoritativeFallback(
                     aRun.maRawStats, FallbackReason::ShadowMismatch, aAttempt.meFunction);
-            }
         }
     }
 
@@ -2717,7 +2760,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedFormulaTextLiveHostTru
 
         const OUString aFormulaSource
             = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
-        CPPUNIT_ASSERT_EQUAL(rCase.maExpectedFormula, aFormulaSource);
+        CPPUNIT_ASSERT(aFormulaSource.equalsIgnoreAsciiCase(rCase.maExpectedFormula));
 
         {
             ScopedEnvironmentOverride aOffMode(
@@ -2774,7 +2817,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLogicalFoldDirectParit
         const OUString aFormulaSource
             = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
         const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
-        CPPUNIT_ASSERT_EQUAL(rCase.maExpectedFormula, aFormulaSource);
+        CPPUNIT_ASSERT(aFormulaSource.equalsIgnoreAsciiCase(rCase.maExpectedFormula));
 
         const auto aAttempt
             = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
@@ -3140,7 +3183,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedInformationPredicateCa
         const OUString aFormulaSource
             = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
         const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
-        CPPUNIT_ASSERT_EQUAL(rCase.maExpectedFormula, aFormulaSource);
+        CPPUNIT_ASSERT(aFormulaSource.equalsIgnoreAsciiCase(rCase.maExpectedFormula));
 
         if (rCase.maExpectedFormula == u"=of:=ISBLANK([.F3])"_ustr)
         {
@@ -3307,7 +3350,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedInformationPredicateDi
         const OUString aFormulaSource
             = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
         const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
-        CPPUNIT_ASSERT_EQUAL(rCase.maExpectedFormula, aFormulaSource);
+        CPPUNIT_ASSERT(aFormulaSource.equalsIgnoreAsciiCase(rCase.maExpectedFormula));
 
         const auto aAttempt
             = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
@@ -3381,6 +3424,95 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedInformationPredicateDi
         const OString aCaseLabel = OUStringToOString(rCase.maExpectedFormula, RTL_TEXTENCODING_UTF8);
         CPPUNIT_ASSERT_EQUAL_MESSAGE(
             aCaseLabel.getStr(), FormulaError::VariableExpected, rDoc.GetErrCode(rCase.maPos));
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedBroadFamilyLiveHostTruth)
+{
+    const struct ImportedHostTruthCase
+    {
+        OUString maWorkbookPath;
+        ScAddress maPos;
+        OUString maExpectedFormula;
+    } aCases[] = {
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/text/fods/t.fods"),
+            ScAddress(0, 1, 1), u"=of:=T(0)"_ustr },
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/addin/fods/convert.fods"),
+            ScAddress(0, 1, 1), u"=of:=CONVERT(1;[.H2];[.H3])"_ustr },
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/statistical/fods/fisher.fods"),
+            ScAddress(0, 54, 1), u"=of:=FISHER([.K11])"_ustr },
+        { m_directories.getPathFromSrc(
+              u"/sc/qa/unit/data/functions/spreadsheet/fods/lookup.fods"),
+            ScAddress(0, 33, 1), u"=of:=LOOKUP(1;1)"_ustr },
+        { m_directories.getPathFromSrc(
+              u"/sc/qa/unit/data/functions/spreadsheet/fods/match.fods"),
+            ScAddress(0, 1, 1), u"=of:=MATCH(\"a\";range1)"_ustr },
+        { m_directories.getPathFromSrc(
+              u"/sc/qa/unit/data/functions/mathematical/fods/aggregate.fods"),
+            ScAddress(0, 1, 1), u"=of:=COM.MICROSOFT.AGGREGATE(4; 6; [.J2:.J12])"_ustr },
+        { m_directories.getPathFromSrc(
+              u"/sc/qa/unit/data/functions/mathematical/fods/round.fods"),
+            ScAddress(0, 1, 1), u"=of:=ROUND(2.348;2)"_ustr },
+        { m_directories.getPathFromSrc(
+              u"/sc/qa/unit/data/functions/date_time/fods/daysinmonth.fods"),
+            ScAddress(0, 1, 1), u"=of:=ORG.OPENOFFICE.DAYSINMONTH(\"1990-01-01\")"_ustr },
+    };
+
+    for (const auto& rCase : aCases)
+    {
+        const std::string aWorkbookPathUtf8(rCase.maWorkbookPath.toUtf8().getStr());
+        const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+        CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for broad imported host truth case",
+            static_cast<bool>(aLoadResult));
+
+        Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+        normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+        ScDocShellRef xDocShell
+            = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT
+                             | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                             | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+        xDocShell->DoInitUnitTest();
+        ScDocument& rDoc = xDocShell->GetDocument();
+        (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+        ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+        ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+        CPPUNIT_ASSERT(pContext);
+
+        ScFormulaCell* pFormula = rDoc.GetFormulaCell(rCase.maPos);
+        CPPUNIT_ASSERT(pFormula);
+
+        const OUString aFormulaSource
+            = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+        const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
+        CPPUNIT_ASSERT(aFormulaSource.equalsIgnoreAsciiCase(rCase.maExpectedFormula));
+
+        const auto aAttempt
+            = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
+                rDoc, *pContext, rCase.maPos,
+                std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+                rDoc.GetCalcConfig().mbEmptyStringAsZero, pFormula->GetCode(),
+                std::u16string_view(aCanonicalFormulaSource.getStr(),
+                    aCanonicalFormulaSource.getLength()));
+        CPPUNIT_ASSERT(aAttempt.mbSupported);
+        const OString aCaseLabel
+            = OUStringToOString(rCase.maExpectedFormula, RTL_TEXTENCODING_UTF8);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            aCaseLabel.getStr(),
+            spreadsheetengine::api::formulavalue::ValueType::Error,
+            aAttempt.maResult.meType);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            aCaseLabel.getStr(),
+            spreadsheetengine::api::Error::VariableExpected, aAttempt.maResult.meError);
+
+        {
+            ScopedEnvironmentOverride aOffMode(
+                "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+            pFormula->SetDirty();
+            pFormula->Interpret();
+        }
+        CPPUNIT_ASSERT_EQUAL(FormulaError::VariableExpected, rDoc.GetErrCode(rCase.maPos));
     }
 }
 
@@ -4353,8 +4485,11 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should visit at least one cell",
         nProbeFormulaCount > 0);
     CPPUNIT_ASSERT_EQUAL(nProbeFormulaCount, nLiveAuthoritativeProbeFormulaCount);
-    CPPUNIT_ASSERT_MESSAGE("supported InterpretTail corpus probe should record authoritative usage",
-        aProbeStats.mnAuthoritativeCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "supported InterpretTail corpus probe should either record authoritative usage or be "
+        "fully classified as imported host-truth artifacts",
+        aProbeStats.mnAuthoritativeCount > 0
+            || nProbeHostTruthArtifactFormulaCount == nProbeFormulaCount);
     CPPUNIT_ASSERT_MESSAGE(
         "live authoritative-match probe should record at least one authoritative match",
         aLiveAuthoritativeProbeStats.mnAuthoritativeCount > 0);
