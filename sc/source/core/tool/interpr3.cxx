@@ -1366,16 +1366,6 @@ void ScInterpreter::CalculateSmallLarge(bool bSmall)
     }
 }
 
-void ScInterpreter::ScLarge()
-{
-    CalculateSmallLarge(false);
-}
-
-void ScInterpreter::ScSmall()
-{
-    CalculateSmallLarge(true);
-}
-
 void ScInterpreter::ScPercentrank( bool bInclusive )
 {
     sal_uInt8 nParamCount = GetByte();
@@ -2556,27 +2546,6 @@ void ScInterpreter::ScDevSq()
     GetStVarParams( false /*bTextAsZero*/, VarResult);
 }
 
-void ScInterpreter::ScCorrel()
-{
-    // This is identical to ScPearson()
-    ScPearson();
-}
-
-void ScInterpreter::ScCovarianceP()
-{
-    CalculatePearsonCovar( false, false, false );
-}
-
-void ScInterpreter::ScCovarianceS()
-{
-    CalculatePearsonCovar( false, false, true );
-}
-
-void ScInterpreter::ScPearson()
-{
-    CalculatePearsonCovar( true, false, false );
-}
-
 void ScInterpreter::CalculatePearsonCovar( bool _bPearson, bool _bStexy, bool _bSample )
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )
@@ -2668,8 +2637,8 @@ void ScInterpreter::CalculatePearsonCovar( bool _bPearson, bool _bStexy, bool _b
 
 void ScInterpreter::ScRSQ()
 {
-    // Same as ScPearson()*ScPearson()
-    ScPearson();
+    // Same as Pearson()*Pearson()
+    CalculatePearsonCovar( true, false, false );
     if (nGlobalError != FormulaError::NONE)
         return;
 
@@ -2687,10 +2656,6 @@ void ScInterpreter::ScRSQ()
     }
 }
 
-void ScInterpreter::ScSTEYX()
-{
-    CalculatePearsonCovar( true, true, false );
-}
 void ScInterpreter::CalculateSlopeIntercept(bool bSlope)
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )
@@ -2759,16 +2724,6 @@ void ScInterpreter::CalculateSlopeIntercept(bool bSlope)
                 PushDouble( fMeanY - fSumDeltaXDeltaY.get() / fSumSqrDeltaX.get() * fMeanX);
         }
     }
-}
-
-void ScInterpreter::ScSlope()
-{
-    CalculateSlopeIntercept(true);
-}
-
-void ScInterpreter::ScIntercept()
-{
-    CalculateSlopeIntercept(false);
 }
 
 void ScInterpreter::ScForecast()

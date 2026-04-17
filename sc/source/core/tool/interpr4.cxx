@@ -5350,10 +5350,10 @@ StackVar ScInterpreter::Interpret()
                             ScModalValue();
                             break;
                         case AGGREGATE_FUNC_LARGE:
-                            ScLarge();
+                            CalculateSmallLarge(false);
                             break;
                         case AGGREGATE_FUNC_SMALL:
-                            ScSmall();
+                            CalculateSmallLarge(true);
                             break;
                         case AGGREGATE_FUNC_PERCINC:
                             ScPercentile(true);
@@ -6935,8 +6935,8 @@ StackVar ScInterpreter::Interpret()
                     case ocIfError          : pushLegacyIfError(false);     break;
                     case ocIfNA             : pushLegacyIfError(true);      break;
                     case ocChoose           : ScChooseJump();               break;
-                    case ocChooseCols       : ScChooseCols();           break;
-                    case ocChooseRows       : ScChooseRows();           break;
+                    case ocChooseCols       : ScChooseColsOrRows(true); break;
+                    case ocChooseRows       : ScChooseColsOrRows(false); break;
                     case ocAdd              :
                         warnIfLegacyScalarRootReached(u"ADD");
                         CalculateAddSub(false);
@@ -7034,20 +7034,20 @@ StackVar ScInterpreter::Interpret()
                     case ocFilter           : ScFilter();               break;
                     case ocSort             : ScSort();                 break;
                     case ocSortBy           : ScSortBy();               break;
-                    case ocDrop             : ScDrop();                 break;
+                    case ocDrop             : ScTakeOrDrop(false);      break;
                     case ocExpand           : ScExpand();               break;
-                    case ocHStack           : ScHStack();               break;
-                    case ocVStack           : ScVStack();               break;
-                    case ocTake             : ScTake();                 break;
+                    case ocHStack           : ScHorizontalOrVerticalStack(true); break;
+                    case ocVStack           : ScHorizontalOrVerticalStack(false); break;
+                    case ocTake             : ScTakeOrDrop(true);       break;
                     case ocTextAfter        : pushLegacyTextBeforeAfter(false); break;
                     case ocTextBefore       : pushLegacyTextBeforeAfter(true);  break;
                     case ocTextSplit        : ScTextSplit();            break;
-                    case ocToCol            : ScToCol();                break;
-                    case ocToRow            : ScToRow();                break;
+                    case ocToCol            : ScToColOrRow(true);       break;
+                    case ocToRow            : ScToColOrRow(false);      break;
                     case ocUnique           : ScUnique();               break;
                     case ocLet              : ScLet();                  break;
-                    case ocWrapCols         : ScWrapCols();             break;
-                    case ocWrapRows         : ScWrapRows();             break;
+                    case ocWrapCols         : ScWrapColsOrRows(true);   break;
+                    case ocWrapRows         : ScWrapColsOrRows(false);  break;
                     case ocTrue             : pushLegacyLogicalConstant(true);  break;
                     case ocFalse            : pushLegacyLogicalConstant(false); break;
                     case ocGetActDate       : ScGetActDate();           break;
@@ -7379,19 +7379,83 @@ StackVar ScInterpreter::Interpret()
                     case ocDBVarP           : ScDBVarP();                   break;
                     case ocIndirect         : ScIndirect();                 break;
                     case ocAddress          : ScAddressFunc();          break;
-                    case ocMatch            : ScMatch();                break;
-                    case ocXMatch           : ScXMatch();               break;
+                    case ocMatch:
+                    {
+                        warnIfLegacyDispatchReached(
+                            "literal-only hard-routed", u"MATCH",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isHardRoutedFormula(rFormula);
+                            },
+                            "hard-routed MATCH reached ScInterpreter");
+                        ScMatchOp(false);
+                    }
+                    break;
+                    case ocXMatch:
+                    {
+                        warnIfLegacyDispatchReached(
+                            "literal-only hard-routed", u"XMATCH",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isHardRoutedFormula(rFormula);
+                            },
+                            "hard-routed XMATCH reached ScInterpreter");
+                        ScMatchOp(true);
+                    }
+                    break;
                     case ocCountEmptyCells  : ScCountEmptyCells();      break;
                     case ocCountIf          : ScCountIf();              break;
-                    case ocSumIf            : ScSumIf();                break;
-                    case ocAverageIf        : ScAverageIf();            break;
-                    case ocSumIfs           : ScSumIfs();               break;
-                    case ocAverageIfs       : ScAverageIfs();           break;
-                    case ocCountIfs         : ScCountIfs();             break;
+                    case ocSumIf            : IterateParametersIf(ifSUMIF); break;
+                    case ocAverageIf        : IterateParametersIf(ifAVERAGEIF); break;
+                    case ocSumIfs:
+                    {
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (nParamCount < 3 || (nParamCount % 2 != 1))
+                            PushError(FormulaError::ParameterExpected);
+                        else
+                            IterateParametersIfs(
+                                [](const sc::ParamIfsResult& rRes) { return rRes.mfSum.get(); });
+                    }
+                    break;
+                    case ocAverageIfs:
+                    {
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (nParamCount < 3 || (nParamCount % 2 != 1))
+                            PushError(FormulaError::ParameterExpected);
+                        else
+                            IterateParametersIfs([](const sc::ParamIfsResult& rRes) {
+                                return sc::div(rRes.mfSum.get(), rRes.mfCount);
+                            });
+                    }
+                    break;
+                    case ocCountIfs:
+                    {
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (nParamCount < 2 || (nParamCount % 2 != 0))
+                            PushError(FormulaError::ParameterExpected);
+                        else
+                            IterateParametersIfs(
+                                [](const sc::ParamIfsResult& rRes) { return rRes.mfCount; });
+                    }
+                    break;
                     case ocLookup           : ScLookup();               break;
-                    case ocVLookup          : ScVLookup();              break;
+                    case ocVLookup:
+                        warnIfLegacyDispatchReached(
+                            "literal-only hard-routed", u"VLOOKUP",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isHardRoutedFormula(rFormula);
+                            },
+                            "hard-routed VLOOKUP reached ScInterpreter");
+                        CalculateLookup(false);
+                        break;
                     case ocXLookup          : ScXLookup();              break;
-                    case ocHLookup          : ScHLookup();              break;
+                    case ocHLookup:
+                        warnIfLegacyDispatchReached(
+                            "literal-only hard-routed", u"HLOOKUP",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isHardRoutedFormula(rFormula);
+                            },
+                            "hard-routed HLOOKUP reached ScInterpreter");
+                        CalculateLookup(true);
+                        break;
                     case ocIndex            : ScIndex();                    break;
                     case ocMultiArea        : ScMultiArea();                break;
                     case ocOffset           : ScOffset();                   break;
@@ -7414,8 +7478,32 @@ StackVar ScInterpreter::Interpret()
                     case ocTextJoin_MS      : ScTextJoin_MS();              break;
                     case ocIfs_MS           : pushLegacyIfs();              break;
                     case ocSwitch_MS        : pushLegacySwitch();           break;
-                    case ocMinIfs_MS        : ScMinIfs_MS();                break;
-                    case ocMaxIfs_MS        : ScMaxIfs_MS();                break;
+                    case ocMinIfs_MS:
+                    {
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (nParamCount < 3 || (nParamCount % 2 != 1))
+                            PushError(FormulaError::ParameterExpected);
+                        else
+                            IterateParametersIfs([](const sc::ParamIfsResult& rRes) {
+                                return (rRes.mfMin < std::numeric_limits<double>::max())
+                                           ? rRes.mfMin
+                                           : 0.0;
+                            });
+                    }
+                    break;
+                    case ocMaxIfs_MS:
+                    {
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (nParamCount < 3 || (nParamCount % 2 != 1))
+                            PushError(FormulaError::ParameterExpected);
+                        else
+                            IterateParametersIfs([](const sc::ParamIfsResult& rRes) {
+                                return (rRes.mfMax > std::numeric_limits<double>::lowest())
+                                           ? rRes.mfMax
+                                           : 0.0;
+                            });
+                    }
+                    break;
                     case ocMatValue         : ScMatValue();                 break;
                     case ocMatrixUnit       : ScEMat();                     break;
                     case ocMatDet           : pushLegacyMatrixDeterminant();break;
@@ -7487,8 +7575,8 @@ StackVar ScInterpreter::Interpret()
                     case ocPercentrank      :
                     case ocPercentrank_Inc  : ScPercentrank( true );    break;
                     case ocPercentrank_Exc  : ScPercentrank( false );   break;
-                    case ocLarge            : ScLarge();                break;
-                    case ocSmall            : ScSmall();                break;
+                    case ocLarge            : CalculateSmallLarge(false); break;
+                    case ocSmall            : CalculateSmallLarge(true);  break;
                     case ocFrequency        : ScFrequency();            break;
                     case ocQuartile         :
                     case ocQuartile_Inc     : ScQuartile( true );       break;
@@ -7502,15 +7590,15 @@ StackVar ScInterpreter::Interpret()
                     case ocConfidence_T     : ScConfidenceT();          break;
                     case ocTrimMean         : ScTrimMean();             break;
                     case ocProb             : pushLegacyProbability();      break;
-                    case ocCorrel           : ScCorrel();               break;
+                    case ocCorrel           : CalculatePearsonCovar(true, false, false); break;
                     case ocCovar            :
-                    case ocCovarianceP      : ScCovarianceP();          break;
-                    case ocCovarianceS      : ScCovarianceS();          break;
-                    case ocPearson          : ScPearson();              break;
+                    case ocCovarianceP      : CalculatePearsonCovar(false, false, false); break;
+                    case ocCovarianceS      : CalculatePearsonCovar(false, false, true); break;
+                    case ocPearson          : CalculatePearsonCovar(true, false, false); break;
                     case ocRSQ              : ScRSQ();                  break;
-                    case ocSTEYX            : ScSTEYX();                break;
-                    case ocSlope            : ScSlope();                break;
-                    case ocIntercept        : ScIntercept();            break;
+                    case ocSTEYX            : CalculatePearsonCovar(true, true, false); break;
+                    case ocSlope            : CalculateSlopeIntercept(true); break;
+                    case ocIntercept        : CalculateSlopeIntercept(false); break;
                     case ocTrend            : ScTrend();                break;
                     case ocGrowth           : ScGrowth();               break;
                     case ocLinest           : ScLinest();               break;

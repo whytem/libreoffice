@@ -600,39 +600,20 @@ private:
     void ScColumn();
     void ScRow();
     void ScSheet();
-    void ScMatch();
-    void ScXMatch();
     void IterateParametersIf( ScIterFuncIf );
     void ScCountIf();
-    void ScSumIf();
-    void ScAverageIf();
     void IterateParametersIfs( double(*ResultFunc)( const sc::ParamIfsResult& rRes ) );
-    void ScSumIfs();
-    void ScAverageIfs();
-    void ScCountIfs();
     void ScCountEmptyCells();
     void ScLookup();
-    void ScHLookup();
-    void ScVLookup();
     void ScXLookup();
     void ScFilter();
     void ScSort();
     void ScSortBy();
-    void ScChooseCols();
-    void ScChooseRows();
-    void ScDrop();
     void ScExpand();
-    void ScHStack();
-    void ScVStack();
-    void ScTake();
     void ScTextSplit();
-    void ScToCol();
-    void ScToRow();
     void ScUnique();
     void ScLet();
     void ScSubTotal();
-    void ScWrapCols();
-    void ScWrapRows();
 
 private:
     void ScCompareOp(
@@ -691,8 +672,6 @@ public:
     void ScRegex();
     void ScConcat();
     void ScTextJoin_MS();
-    void ScMinIfs_MS();
-    void ScMaxIfs_MS();
     void ScExternal();
     void ScMissing();
     void ScMacro();
@@ -789,7 +768,6 @@ public:
     void ScCumPrinc();
     void ScEffect();
     void ScNominal();
-    void ScIntercept();
 
     // matrix functions
     void ScMatValue();
@@ -869,21 +847,13 @@ private:
     void ScPercentile( bool bInclusive );
     void ScPercentrank( bool bInclusive );
     static double GetPercentrank( ::std::vector<double> & rArray, double fVal, bool bInclusive );
-    void ScLarge();
-    void ScSmall();
     void ScFrequency();
     void ScQuartile( bool bInclusive );
     void ScNormInv();
     void ScConfidence();
     void ScConfidenceT();
     void ScTrimMean();
-    void ScCorrel();
-    void ScCovarianceP();
-    void ScCovarianceS();
-    void ScPearson();
     void ScRSQ();
-    void ScSTEYX();
-    void ScSlope();
     void ScTrend();
     void ScInfo();
     void ScLenB();
