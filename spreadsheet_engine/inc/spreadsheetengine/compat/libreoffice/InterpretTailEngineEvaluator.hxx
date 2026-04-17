@@ -720,7 +720,7 @@ canonicalMathScalarFunctionName(api::StringView rFunctionName)
         u"FLOOR.MATH", u"CEILING.PRECISE", u"FLOOR.PRECISE", u"ISO.CEILING", u"ROUNDSIG",
         u"BITAND", u"BITOR", u"BITXOR", u"BITLSHIFT", u"BITRSHIFT", u"POWER", u"LOG",
         u"LOG10", u"LN", u"MROUND", u"COMBIN", u"COMBINA", u"CSC", u"CSCH", u"SEC", u"SECH",
-        u"EXP", u"TRUNC", u"MOD", u"RAWSUBTRACT"
+        u"EXP", u"SQRT", u"TRUNC", u"MOD", u"RAWSUBTRACT"
     };
 
     for (const auto aName : aScalarNames)
@@ -878,6 +878,7 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
     }
     if (rFunctionName == u"FISHER" || rFunctionName == u"FISHERINV"
         || rFunctionName == u"POISSON" || rFunctionName == u"POISSON.DIST"
+        || rFunctionName == u"COM.MICROSOFT.POISSON.DIST"
         || rFunctionName == u"BINOMDIST" || rFunctionName == u"BINOM.DIST"
         || rFunctionName == u"BINOM.DIST.RANGE" || rFunctionName == u"B"
         || rFunctionName == u"INTERCEPT" || rFunctionName == u"FORECAST"
@@ -1664,6 +1665,9 @@ template <typename T>
         return evaluateUnaryFinite(spreadsheetengine::core::math::computeSecantHyp);
     if (aCanonicalName == u"EXP")
         return evaluateUnaryFinite(spreadsheetengine::core::math::computeExp);
+    if (aCanonicalName == u"SQRT")
+        return evaluateUnaryOptional(spreadsheetengine::core::math::computeSqrt,
+            api::Error::IllegalArgument);
     if (aCanonicalName == u"LOG10")
         return evaluateUnaryOptional(spreadsheetengine::core::math::computeLog10);
     if (aCanonicalName == u"LN")
@@ -2821,23 +2825,7 @@ inline void putScalarIntoMatrix(
             {
                 return makeMaterializedValue(api::CellValue::boolean(aFunctionName == u"TRUE"));
             }
-            if (eFunction == FunctionKind::Conditional
-                || eFunction == FunctionKind::TextUtility
-                || eFunction == FunctionKind::Conversion
-                || eFunction == FunctionKind::MathScalar
-                || eFunction == FunctionKind::NumericAggregate
-                || eFunction == FunctionKind::RankedAggregate
-                || eFunction == FunctionKind::StatisticalAggregate
-                || eFunction == FunctionKind::StatisticalDistribution
-                || eFunction == FunctionKind::GrowthProjection
-                || eFunction == FunctionKind::CriteriaAggregate
-                || eFunction == FunctionKind::Aggregate
-                || eFunction == FunctionKind::BusinessDay
-                || eFunction == FunctionKind::CalendarUtility
-                || eFunction == FunctionKind::DateDifference
-                || eFunction == FunctionKind::DateConstructExtract
-                || eFunction == FunctionKind::MatrixMath
-                || eFunction == FunctionKind::Selector)
+            if (eFunction != FunctionKind::Unknown && eFunction != FunctionKind::Count)
             {
                 auto aAttempt = evaluateFunctionNode(
                     rNode, rDoc, rContext, rFormulaPos, rDoc.GetCalcConfig().mbEmptyStringAsZero);
@@ -5142,29 +5130,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     if (eFunction == FunctionKind::LogicalConstant && rNode.maChildren.empty())
         return true;
 
-    switch (eFunction)
-    {
-        case FunctionKind::Conditional:
-        case FunctionKind::TextUtility:
-        case FunctionKind::Conversion:
-        case FunctionKind::NumericAggregate:
-        case FunctionKind::RankedAggregate:
-        case FunctionKind::StatisticalAggregate:
-        case FunctionKind::StatisticalDistribution:
-        case FunctionKind::GrowthProjection:
-        case FunctionKind::CriteriaAggregate:
-        case FunctionKind::Aggregate:
-        case FunctionKind::BusinessDay:
-        case FunctionKind::CalendarUtility:
-        case FunctionKind::DateDifference:
-        case FunctionKind::DateConstructExtract:
-        case FunctionKind::MatrixMath:
-        case FunctionKind::MathScalar:
-        case FunctionKind::Selector:
-            return true;
-        default:
-            return false;
-    }
+    return eFunction != FunctionKind::Unknown && eFunction != FunctionKind::Count;
 }
 
 [[nodiscard]] inline bool isPromotableScalarRootNode(
@@ -8781,7 +8747,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             spreadsheetengine::core::math::inverseFisherTransform(*aNumber.moValue));
     }
 
-    if (aFunctionName == u"POISSON" || aFunctionName == u"POISSON.DIST")
+    if (aFunctionName == u"POISSON" || aFunctionName == u"POISSON.DIST"
+        || aFunctionName == u"COM.MICROSOFT.POISSON.DIST")
     {
         const bool bLegacyPoisson = aFunctionName == u"POISSON";
         if ((bLegacyPoisson && (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3))

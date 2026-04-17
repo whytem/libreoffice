@@ -3040,6 +3040,12 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorMathScalar
     CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aPi.meFunction);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(M_PI, aPi.maResult.mfValue, 1e-12);
 
+    const auto aSqrt = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=SQRT(4)", false);
+    CPPUNIT_ASSERT(aSqrt.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aSqrt.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aSqrt.maResult.mfValue, 1e-12);
+
     const auto aSin = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=SIN(0)", false);
     CPPUNIT_ASSERT(aSin.mbSupported);
@@ -3868,6 +3874,7 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorScalarRoot
     m_pDoc->SetValue(3, 0, 0, 2.0); // D1
     m_pDoc->SetString(4, 0, 0, u"ab"_ustr); // E1
     m_pDoc->SetString(5, 0, 0, u"cd"_ustr); // F1
+    m_pDoc->SetString(0, 1, 0, u"=2"_ustr); // A2
 
     const auto aReference = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=A1", false);
@@ -3950,6 +3957,38 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorScalarRoot
         spreadsheetengine::api::formulavalue::ValueType::Value, aNested.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(19.0, aNested.maResult.mfValue, 1e-12);
 
+    const auto aRoundComparison = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ROUND(1.25;1)=1.3", false);
+    CPPUNIT_ASSERT(aRoundComparison.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::ScalarRoot, aRoundComparison.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aRoundComparison.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aRoundComparison.maResult.mfValue, 1e-12);
+
+    const auto aMatchComparison = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=MATCH(2;{1;2;3};0)=2", false);
+    CPPUNIT_ASSERT(aMatchComparison.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::ScalarRoot, aMatchComparison.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aMatchComparison.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aMatchComparison.maResult.mfValue, 1e-12);
+
+    const auto aSqrtComparison = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=SQRT(4)=2", false);
+    CPPUNIT_ASSERT(aSqrtComparison.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::ScalarRoot, aSqrtComparison.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aSqrtComparison.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aSqrtComparison.maResult.mfValue, 1e-12);
+
+    const auto aPoissonAliasComparison = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.POISSON.DIST(1;1;TRUE())>0.73", false);
+    CPPUNIT_ASSERT(aPoissonAliasComparison.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::ScalarRoot, aPoissonAliasComparison.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aPoissonAliasComparison.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aPoissonAliasComparison.maResult.mfValue, 1e-12);
+
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=A1"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=A1+B1"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=A1*B1"));
@@ -3958,6 +3997,12 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorScalarRoot
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=-C1"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=+A1"));
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=SUM(A1:D1)+1"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=ROUND(1.25;1)=1.3"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=MATCH(2;{1;2;3};0)=2"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=SQRT(4)=2"));
+    CPPUNIT_ASSERT(
+        setaileval::isFamilyLocalDefaultOnFormula(
+            u"=COM.MICROSOFT.POISSON.DIST(1;1;TRUE())>0.73"));
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorTextUtilityHelper)
