@@ -1382,7 +1382,7 @@ void ScInterpreter::ScForecast_Ets( ScETSType eETSType )
     }
 }
 
-void ScInterpreter::ScTextJoin_MS()
+void ScInterpreter::doTextJoin_MS()
 {
     short nParamCount = GetByte();
 

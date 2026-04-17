@@ -1841,7 +1841,7 @@ void lclAppendBlock( OUStringBuffer& rText, std::string_view block )
 
 } // namespace
 
-void ScInterpreter::ScBahtText()
+void ScInterpreter::doBahtText()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 1 ) )
@@ -1904,7 +1904,7 @@ void ScInterpreter::ScBahtText()
     PushString(aText.makeStringAndClear());
 }
 
-void ScInterpreter::ScGetPivotData()
+void ScInterpreter::doGetPivotData()
 {
     sal_uInt8 nParamCount = GetByte();
 

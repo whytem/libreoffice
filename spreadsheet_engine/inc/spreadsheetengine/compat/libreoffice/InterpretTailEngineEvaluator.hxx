@@ -817,12 +817,19 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
         || rFunctionName == u"FINDB" || rFunctionName == u"HYPERLINK"
         || rFunctionName == u"SEARCHB" || rFunctionName == u"TEXT"
         || rFunctionName == u"REPLACE" || rFunctionName == u"SEARCH"
-        || rFunctionName == u"COM.MICROSOFT.BAHTTEXT")
+        || rFunctionName == u"COM.MICROSOFT.BAHTTEXT"
+        || rFunctionName == u"COM.MICROSOFT.TEXTJOIN"
+        || rFunctionName == u"FIND" || rFunctionName == u"SUBSTITUTE"
+        || rFunctionName == u"ORG.LIBREOFFICE.REGEX" || rFunctionName == u"LEFTB"
+        || rFunctionName == u"COM.MICROSOFT.CONCAT" || rFunctionName == u"DOLLAR"
+        || rFunctionName == u"FIXED" || rFunctionName == u"RIGHTB")
     {
         return FunctionKind::TextUtility;
     }
     if (rFunctionName == u"DSUM" || rFunctionName == u"DCOUNT"
-        || rFunctionName == u"COM.MICROSOFT.MAXIFS")
+        || rFunctionName == u"COM.MICROSOFT.MAXIFS"
+        || rFunctionName == u"DCOUNTA" || rFunctionName == u"DGET"
+        || rFunctionName == u"DVAR" || rFunctionName == u"DVARP")
     {
         return FunctionKind::CriteriaAggregate;
     }
@@ -831,13 +838,26 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
         || rFunctionName == u"FACTDOUBLE" || rFunctionName == u"IMSUB"
         || rFunctionName == u"IMPRODUCT" || rFunctionName == u"IMSUM"
         || rFunctionName == u"ISODD" || rFunctionName == u"N"
-        || rFunctionName == u"ISEVEN" || rFunctionName == u"COMPLEX")
+        || rFunctionName == u"ISEVEN" || rFunctionName == u"COMPLEX"
+        || rFunctionName == u"IMDIV" || rFunctionName == u"DELTA"
+        || rFunctionName == u"GESTEP" || rFunctionName == u"IMPOWER"
+        || rFunctionName == u"IMARGUMENT" || rFunctionName == u"IMCONJUGATE"
+        || rFunctionName == u"IMCSCH" || rFunctionName == u"IMEXP"
+        || rFunctionName == u"IMLN" || rFunctionName == u"IMLOG10"
+        || rFunctionName == u"IMLOG2" || rFunctionName == u"IMSEC"
+        || rFunctionName == u"IMSECH" || rFunctionName == u"IMSIN"
+        || rFunctionName == u"QUOTIENT" || rFunctionName == u"IMABS"
+        || rFunctionName == u"IMCOS" || rFunctionName == u"IMCOSH"
+        || rFunctionName == u"IMCOT" || rFunctionName == u"IMCSC"
+        || rFunctionName == u"IMSINH" || rFunctionName == u"IMSQRT"
+        || rFunctionName == u"IMTAN")
     {
         return FunctionKind::MathScalar;
     }
     if (rFunctionName == u"SKEW" || rFunctionName == u"SKEWP"
         || rFunctionName == u"TRIMMEAN"
-        || rFunctionName == u"COM.MICROSOFT.MODE.SNGL")
+        || rFunctionName == u"COM.MICROSOFT.MODE.SNGL"
+        || rFunctionName == u"KURT" || rFunctionName == u"AVERAGEA")
     {
         return FunctionKind::StatisticalAggregate;
     }
@@ -851,16 +871,34 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
         || rFunctionName == u"COM.MICROSOFT.BETA.INV"
         || rFunctionName == u"COM.MICROSOFT.HYPGEOM.DIST"
         || rFunctionName == u"COM.MICROSOFT.NORM.DIST" || rFunctionName == u"ZTEST"
-        || rFunctionName == u"COM.MICROSOFT.Z.TEST")
+        || rFunctionName == u"COM.MICROSOFT.Z.TEST"
+        || rFunctionName == u"COM.MICROSOFT.GAMMA.DIST"
+        || rFunctionName == u"COM.MICROSOFT.NEGBINOM.DIST"
+        || rFunctionName == u"CRITBINOM" || rFunctionName == u"NORMINV"
+        || rFunctionName == u"COM.MICROSOFT.BINOM.DIST"
+        || rFunctionName == u"NEGBINOMDIST"
+        || rFunctionName == u"COM.MICROSOFT.CONFIDENCE.NORM"
+        || rFunctionName == u"COM.MICROSOFT.CONFIDENCE.T"
+        || rFunctionName == u"CONFIDENCE" || rFunctionName == u"LEGACY.CHIINV"
+        || rFunctionName == u"COM.MICROSOFT.LOGNORM.INV"
+        || rFunctionName == u"FTEST"
+        || rFunctionName == u"COM.MICROSOFT.LOGNORM.DIST"
+        || rFunctionName == u"COM.MICROSOFT.NORM.INV"
+        || rFunctionName == u"COM.MICROSOFT.CHISQ.DIST"
+        || rFunctionName == u"LOGINV")
     {
         return FunctionKind::StatisticalDistribution;
     }
-    if (rFunctionName == u"SLOPE")
+    if (rFunctionName == u"SLOPE" || rFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.MULT"
+        || rFunctionName == u"COM.MICROSOFT.FORECAST.ETS"
+        || rFunctionName == u"RSQ" || rFunctionName == u"STEYX")
         return FunctionKind::GrowthProjection;
     if (rFunctionName == u"YEARFRAC" || rFunctionName == u"DAYS360")
         return FunctionKind::DateDifference;
     if (rFunctionName == u"WEEKNUM" || rFunctionName == u"WEEKDAY"
-        || rFunctionName == u"EOMONTH")
+        || rFunctionName == u"EOMONTH"
+        || rFunctionName == u"SECOND" || rFunctionName == u"TIME"
+        || rFunctionName == u"MINUTE" || rFunctionName == u"HOUR")
     {
         return FunctionKind::CalendarUtility;
     }
@@ -868,7 +906,8 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
         || rFunctionName == u"HEX2DEC" || rFunctionName == u"HEX2OCT"
         || rFunctionName == u"DEC2BIN" || rFunctionName == u"BIN2HEX"
         || rFunctionName == u"OCT2BIN" || rFunctionName == u"OCT2DEC"
-        || rFunctionName == u"OCT2HEX" || rFunctionName == u"BIN2OCT")
+        || rFunctionName == u"OCT2HEX" || rFunctionName == u"BIN2OCT"
+        || rFunctionName == u"BIN2DEC")
     {
         return FunctionKind::Conversion;
     }
@@ -884,29 +923,52 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
         || rFunctionName == u"RECEIVED" || rFunctionName == u"INTRATE"
         || rFunctionName == u"AMORDEGRC" || rFunctionName == u"PRICEDISC"
         || rFunctionName == u"IRR" || rFunctionName == u"PRICEMAT"
-        || rFunctionName == u"YIELDDISC")
+        || rFunctionName == u"YIELDDISC" || rFunctionName == u"MIRR"
+        || rFunctionName == u"NPER" || rFunctionName == u"PV"
+        || rFunctionName == u"COUPDAYS" || rFunctionName == u"COUPDAYBS"
+        || rFunctionName == u"COUPDAYSNC" || rFunctionName == u"COUPNCD"
+        || rFunctionName == u"COUPNUM" || rFunctionName == u"COUPPCD"
+        || rFunctionName == u"NOMINAL" || rFunctionName == u"SLN"
+        || rFunctionName == u"SYD" || rFunctionName == u"ACCRINTM"
+        || rFunctionName == u"RRI" || rFunctionName == u"NPV"
+        || rFunctionName == u"TBILLEQ" || rFunctionName == u"PDURATION")
     {
         return FunctionKind::Rate;
     }
     if (rFunctionName == u"SUBTOTAL")
         return FunctionKind::Aggregate;
-    if (rFunctionName == u"COM.MICROSOFT.LET")
+    if (rFunctionName == u"COM.MICROSOFT.LET" || rFunctionName == u"CHOOSE")
         return FunctionKind::Conditional;
     if (rFunctionName == u"COM.MICROSOFT.EXPAND"
         || rFunctionName == u"COM.MICROSOFT.DROP"
-        || rFunctionName == u"COM.MICROSOFT.TAKE")
+        || rFunctionName == u"COM.MICROSOFT.TAKE"
+        || rFunctionName == u"COM.MICROSOFT.WRAPCOLS"
+        || rFunctionName == u"COM.MICROSOFT.WRAPROWS"
+        || rFunctionName == u"COM.MICROSOFT.VSTACK"
+        || rFunctionName == u"COM.MICROSOFT.SEQUENCE"
+        || rFunctionName == u"COM.MICROSOFT.FILTER")
     {
         return FunctionKind::SpillArray;
     }
-    if (rFunctionName == u"ORG.OPENOFFICE.ERRORTYPE")
+    if (rFunctionName == u"ORG.OPENOFFICE.ERRORTYPE" || rFunctionName == u"ISREF")
         return FunctionKind::InformationPredicate;
     if (rFunctionName == u"COUNT" || rFunctionName == u"COUNTA")
         return FunctionKind::NumericAggregate;
+    if (rFunctionName == u"ROW" || rFunctionName == u"COLUMN"
+        || rFunctionName == u"COLUMNS" || rFunctionName == u"SHEETS"
+        || rFunctionName == u"TYPE")
+    {
+        return FunctionKind::ScalarRoot;
+    }
     if (rFunctionName == u"COM.MICROSOFT.PERCENTILE.INC"
-        || rFunctionName == u"COM.MICROSOFT.PERCENTILE.EXC")
+        || rFunctionName == u"COM.MICROSOFT.PERCENTILE.EXC"
+        || rFunctionName == u"COM.MICROSOFT.MODE.MULT"
+        || rFunctionName == u"PERCENTILE" || rFunctionName == u"MODE")
     {
         return FunctionKind::RankedAggregate;
     }
+    if (rFunctionName == u"FREQUENCY")
+        return FunctionKind::MatrixMath;
 
     return std::nullopt;
 }
@@ -1329,6 +1391,102 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
         u"PRICEMAT",
         u"YIELDDISC",
         u"COM.MICROSOFT.PERCENTILE.EXC",
+        u"MIRR",
+        u"KURT",
+        u"ORG.LIBREOFFICE.FORECAST.ETS.MULT",
+        u"COM.MICROSOFT.GAMMA.DIST",
+        u"COM.MICROSOFT.NEGBINOM.DIST",
+        u"COM.MICROSOFT.TEXTJOIN",
+        u"COUPDAYS",
+        u"CRITBINOM",
+        u"IMDIV",
+        u"NORMINV",
+        u"NPER",
+        u"PV",
+        u"COM.MICROSOFT.BINOM.DIST",
+        u"DELTA",
+        u"FIND",
+        u"GESTEP",
+        u"NEGBINOMDIST",
+        u"SUBSTITUTE",
+        u"COM.MICROSOFT.FORECAST.ETS",
+        u"COM.MICROSOFT.MODE.MULT",
+        u"COM.MICROSOFT.CONFIDENCE.NORM",
+        u"COM.MICROSOFT.CONFIDENCE.T",
+        u"CONFIDENCE",
+        u"COUPDAYBS",
+        u"COUPDAYSNC",
+        u"COUPNCD",
+        u"COUPNUM",
+        u"COUPPCD",
+        u"IMPOWER",
+        u"LEGACY.CHIINV",
+        u"NOMINAL",
+        u"RSQ",
+        u"SECOND",
+        u"SLN",
+        u"SYD",
+        u"ROW",
+        u"ACCRINTM",
+        u"COM.MICROSOFT.LOGNORM.INV",
+        u"ORG.LIBREOFFICE.REGEX",
+        u"RRI",
+        u"STEYX",
+        u"TIME",
+        u"FTEST",
+        u"NPV",
+        u"PERCENTILE",
+        u"MODE",
+        u"COLUMN",
+        u"COM.MICROSOFT.LOGNORM.DIST",
+        u"COM.MICROSOFT.NORM.INV",
+        u"COM.MICROSOFT.WRAPCOLS",
+        u"COM.MICROSOFT.WRAPROWS",
+        u"FREQUENCY",
+        u"LEFTB",
+        u"TBILLEQ",
+        u"AVERAGEA",
+        u"COLUMNS",
+        u"COM.MICROSOFT.VSTACK",
+        u"BIN2DEC",
+        u"CHOOSE",
+        u"COM.MICROSOFT.CONCAT",
+        u"COM.MICROSOFT.SEQUENCE",
+        u"DOLLAR",
+        u"IMARGUMENT",
+        u"IMCONJUGATE",
+        u"IMCSCH",
+        u"IMEXP",
+        u"IMLN",
+        u"IMLOG10",
+        u"IMLOG2",
+        u"IMSEC",
+        u"IMSECH",
+        u"IMSIN",
+        u"ISREF",
+        u"LOGINV",
+        u"MINUTE",
+        u"QUOTIENT",
+        u"COM.MICROSOFT.FILTER",
+        u"SHEETS",
+        u"TYPE",
+        u"COM.MICROSOFT.CHISQ.DIST",
+        u"DCOUNTA",
+        u"DGET",
+        u"DVAR",
+        u"DVARP",
+        u"FIXED",
+        u"HOUR",
+        u"IMABS",
+        u"IMCOS",
+        u"IMCOSH",
+        u"IMCOT",
+        u"IMCSC",
+        u"IMSINH",
+        u"IMSQRT",
+        u"IMTAN",
+        u"PDURATION",
+        u"RIGHTB",
     };
 
     for (const auto aName : aStoredValueFunctions)

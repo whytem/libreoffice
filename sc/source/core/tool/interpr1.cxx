@@ -1644,7 +1644,7 @@ void ScInterpreter::ScRandomImpl( const std::function<double( double fFirst, dou
     }
 }
 
-void ScInterpreter::ScRandom()
+void ScInterpreter::doRandom()
 {
     auto RandomFunc = [this]( double, double )
     {
@@ -1733,7 +1733,7 @@ void ScInterpreter::ScRandArray()
     }
 }
 
-void ScInterpreter::ScRandbetween()
+void ScInterpreter::doRandbetween()
 {
     if (!MustHaveParamCount( GetByte(), 2))
         return;
@@ -1924,7 +1924,7 @@ FormulaGrammar::AddressConvention resolveCellInfoAddressConvention(
 
 }
 
-void ScInterpreter::ScCell()
+void ScInterpreter::doCell()
 {   // ATTRIBUTE ; [REF]
     sal_uInt8 nParamCount = GetByte();
     if( !MustHaveParamCount( nParamCount, 1, 2 ) )
@@ -1939,7 +1939,7 @@ void ScInterpreter::ScCell()
             case svExternalDoubleRef:
             {
                 // Let's handle external reference separately...
-                ScCellExternal();
+                doCellExternal();
                 return;
             }
             case svDoubleRef:
@@ -2034,7 +2034,7 @@ void ScInterpreter::ScCell()
     }
 }
 
-void ScInterpreter::ScCellExternal()
+void ScInterpreter::doCellExternal()
 {
     sal_uInt16 nFileId;
     OUString aTabName;
@@ -2431,7 +2431,7 @@ bool ScInterpreter::SwitchToArrayRefList( ScMatrixRef& xResMat, SCSIZE nMatRows,
     return true;
 }
 
-void ScInterpreter::ScMin( bool bTextAsZero )
+void ScInterpreter::doMin( bool bTextAsZero )
 {
     short nParamCount = GetByte();
     if (!MustHaveParamCountMin( nParamCount, 1))
@@ -2588,7 +2588,7 @@ void ScInterpreter::ScMin( bool bTextAsZero )
     }
 }
 
-void ScInterpreter::ScMax( bool bTextAsZero )
+void ScInterpreter::doMax( bool bTextAsZero )
 {
     short nParamCount = GetByte();
     if (!MustHaveParamCountMin( nParamCount, 1))
@@ -2966,7 +2966,7 @@ void ScInterpreter::GetStVarParams( bool bTextAsZero, double(*VarResult)( double
     }
 }
 
-void ScInterpreter::ScVar( bool bTextAsZero )
+void ScInterpreter::doVar( bool bTextAsZero )
 {
     auto VarResult = []( double fVal, size_t nValCount )
     {
@@ -2978,7 +2978,7 @@ void ScInterpreter::ScVar( bool bTextAsZero )
     GetStVarParams( bTextAsZero, VarResult );
 }
 
-void ScInterpreter::ScVarP( bool bTextAsZero )
+void ScInterpreter::doVarP( bool bTextAsZero )
 {
     auto VarResult = []( double fVal, size_t nValCount )
     {
@@ -2988,7 +2988,7 @@ void ScInterpreter::ScVarP( bool bTextAsZero )
 
 }
 
-void ScInterpreter::ScStDev( bool bTextAsZero )
+void ScInterpreter::doStDev( bool bTextAsZero )
 {
     auto VarResult = []( double fVal, size_t nValCount )
     {
@@ -3000,7 +3000,7 @@ void ScInterpreter::ScStDev( bool bTextAsZero )
     GetStVarParams( bTextAsZero, VarResult );
 }
 
-void ScInterpreter::ScStDevP( bool bTextAsZero )
+void ScInterpreter::doStDevP( bool bTextAsZero )
 {
     auto VarResult = []( double fVal, size_t nValCount )
     {
@@ -5091,7 +5091,7 @@ void ScInterpreter::handleCountIfs()
     IterateParametersIfs(ResultFunc);
 }
 
-void ScInterpreter::ScMinIfs_MS()
+void ScInterpreter::doMinIfs_MS()
 {
     sal_uInt8 nParamCount = GetByte();
 
@@ -5109,7 +5109,7 @@ void ScInterpreter::ScMinIfs_MS()
 }
 
 
-void ScInterpreter::ScMaxIfs_MS()
+void ScInterpreter::doMaxIfs_MS()
 {
     sal_uInt8 nParamCount = GetByte();
 
@@ -7057,7 +7057,7 @@ void ScInterpreter::handleLet()
     aCode.Jump(pJump[nOrgJumpCount], pJump[nOrgJumpCount]);
 }
 
-void ScInterpreter::ScSubTotal()
+void ScInterpreter::doSubTotal()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCountMinWithStackCheck( nParamCount, 2 ) )
@@ -7083,17 +7083,17 @@ void ScInterpreter::ScSubTotal()
         cPar = nParamCount - 1;
         switch( nFunc )
         {
-            case SUBTOTAL_FUNC_AVE  : ScAverage(); break;
-            case SUBTOTAL_FUNC_CNT  : ScCount();   break;
-            case SUBTOTAL_FUNC_CNT2 : ScCount2();  break;
-            case SUBTOTAL_FUNC_MAX  : ScMax();     break;
-            case SUBTOTAL_FUNC_MIN  : ScMin();     break;
-            case SUBTOTAL_FUNC_PROD : ScProduct(); break;
-            case SUBTOTAL_FUNC_STD  : ScStDev();   break;
-            case SUBTOTAL_FUNC_STDP : ScStDevP();  break;
-            case SUBTOTAL_FUNC_SUM  : ScSum();     break;
-            case SUBTOTAL_FUNC_VAR  : ScVar();     break;
-            case SUBTOTAL_FUNC_VARP : ScVarP();    break;
+            case SUBTOTAL_FUNC_AVE  : doAverage(); break;
+            case SUBTOTAL_FUNC_CNT  : doCount();   break;
+            case SUBTOTAL_FUNC_CNT2 : doCount2();  break;
+            case SUBTOTAL_FUNC_MAX  : doMax();     break;
+            case SUBTOTAL_FUNC_MIN  : doMin();     break;
+            case SUBTOTAL_FUNC_PROD : doProduct(); break;
+            case SUBTOTAL_FUNC_STD  : doStDev();   break;
+            case SUBTOTAL_FUNC_STDP : doStDevP();  break;
+            case SUBTOTAL_FUNC_SUM  : doSum();     break;
+            case SUBTOTAL_FUNC_VAR  : doVar();     break;
+            case SUBTOTAL_FUNC_VARP : doVarP();    break;
             default : PushIllegalArgument();       break;
         }
     }
@@ -7422,12 +7422,12 @@ void ScInterpreter::DBIterator( ScIterFunc eFunc )
     PushDouble( fRes );
 }
 
-void ScInterpreter::ScDBSum()
+void ScInterpreter::doDBSum()
 {
     DBIterator( ifSUM );
 }
 
-void ScInterpreter::ScDBCount()
+void ScInterpreter::doDBCount()
 {
     bool bMissingField = true;
     std::unique_ptr<ScDBQueryParamBase> pQueryParam( GetDBParams(bMissingField) );
@@ -7485,7 +7485,7 @@ void ScInterpreter::ScDBCount()
         PushIllegalParameter();
 }
 
-void ScInterpreter::ScDBCount2()
+void ScInterpreter::doDBCount2()
 {
     bool bMissingField = true;
     std::unique_ptr<ScDBQueryParamBase> pQueryParam( GetDBParams(bMissingField) );
@@ -7515,22 +7515,22 @@ void ScInterpreter::ScDBCount2()
         PushIllegalParameter();
 }
 
-void ScInterpreter::ScDBAverage()
+void ScInterpreter::doDBAverage()
 {
     DBIterator( ifAVERAGE );
 }
 
-void ScInterpreter::ScDBMax()
+void ScInterpreter::doDBMax()
 {
     DBIterator( ifMAX );
 }
 
-void ScInterpreter::ScDBMin()
+void ScInterpreter::doDBMin()
 {
     DBIterator( ifMIN );
 }
 
-void ScInterpreter::ScDBProduct()
+void ScInterpreter::doDBProduct()
 {
     DBIterator( ifPRODUCT );
 }
@@ -7563,7 +7563,7 @@ void ScInterpreter::GetDBStVarParams( std::vector<double>& rValues )
         SetError( FormulaError::IllegalParameter);
 }
 
-void ScInterpreter::ScDBStdDev()
+void ScInterpreter::doDBStdDev()
 {
     std::vector<double> aValues;
     GetDBStVarParams(aValues);
@@ -7579,7 +7579,7 @@ void ScInterpreter::ScDBStdDev()
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::ScDBStdDevP()
+void ScInterpreter::doDBStdDevP()
 {
     std::vector<double> aValues;
     GetDBStVarParams(aValues);
@@ -7595,7 +7595,7 @@ void ScInterpreter::ScDBStdDevP()
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::ScDBVar()
+void ScInterpreter::doDBVar()
 {
     std::vector<double> aValues;
     GetDBStVarParams(aValues);
@@ -7611,7 +7611,7 @@ void ScInterpreter::ScDBVar()
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::ScDBVarP()
+void ScInterpreter::doDBVarP()
 {
     std::vector<double> aValues;
     GetDBStVarParams(aValues);
@@ -7627,7 +7627,7 @@ void ScInterpreter::ScDBVarP()
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::ScIndirect()
+void ScInterpreter::doIndirect()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 1, 2 )  )
@@ -7767,7 +7767,7 @@ void ScInterpreter::handleAddressFunc()
         PushString(aAddress.maValue);
 }
 
-void ScInterpreter::ScOffset()
+void ScInterpreter::doOffset()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 3, 5 ) )
@@ -7931,7 +7931,7 @@ void ScInterpreter::ScOffset()
     } // end switch
 }
 
-void ScInterpreter::ScIndex()
+void ScInterpreter::doIndex()
 {
     const std::optional<OUString> oQuarantinedFormula
         = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
@@ -8138,7 +8138,7 @@ void ScInterpreter::ScMultiArea()
     }
 }
 
-void ScInterpreter::ScAreas()
+void ScInterpreter::doAreas()
 {
     sal_uInt8 nParamCount = GetByte();
     if (!MustHaveParamCount( nParamCount, 1))
@@ -8178,7 +8178,7 @@ void ScInterpreter::ScAreas()
     PushDouble(fCount);
 }
 
-void ScInterpreter::ScCurrency()
+void ScInterpreter::doCurrency()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 1, 2 ) )
@@ -8272,7 +8272,7 @@ void ScInterpreter::handleReplace()
     }
 }
 
-void ScInterpreter::ScFixed()
+void ScInterpreter::doFixed()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 1, 3 ) )
@@ -8686,7 +8686,7 @@ void ScInterpreter::handleSearch()
     }
 }
 
-void ScInterpreter::ScRegex()
+void ScInterpreter::doRegex()
 {
     const sal_uInt8 nParamCount = GetByte();
     if (!MustHaveParamCount( nParamCount, 2, 4))
@@ -8988,7 +8988,7 @@ void ScInterpreter::handleText()
     }
 }
 
-void ScInterpreter::ScSubstitute()
+void ScInterpreter::doSubstitute()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 3, 4 ) )
@@ -9034,7 +9034,7 @@ void ScInterpreter::ScSubstitute()
     PushString(oResult ? oResult->makeStringAndClear() : sStr);
 }
 
-void ScInterpreter::ScRept()
+void ScInterpreter::doRept()
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
@@ -9059,7 +9059,7 @@ void ScInterpreter::ScRept()
     }
 }
 
-void ScInterpreter::ScConcat()
+void ScInterpreter::doConcat()
 {
     sal_uInt8 nParamCount = GetByte();
 

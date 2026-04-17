@@ -461,7 +461,7 @@ sc::RangeMatrix ScInterpreter::GetRangeMatrix()
     return aRet;
 }
 
-void ScInterpreter::ScMatValue()
+void ScInterpreter::doMatValue()
 {
     if ( !MustHaveParamCount( GetByte(), 3 ) )
         return;
@@ -973,7 +973,7 @@ void ScInterpreter::ScMatSequence()
     }
 }
 
-void ScInterpreter::ScMatTrans()
+void ScInterpreter::doMatTrans()
 {
     if ( !MustHaveParamCount( GetByte(), 1 ) )
         return;
@@ -1220,7 +1220,7 @@ void ScInterpreter::CalculateAddSub(bool _bSub)
     }
 }
 
-void ScInterpreter::ScAmpersand()
+void ScInterpreter::doAmpersand()
 {
     ScMatrixRef pMat1 = nullptr;
     ScMatrixRef pMat2 = nullptr;
@@ -1311,7 +1311,7 @@ void ScInterpreter::ScAmpersand()
     }
 }
 
-void ScInterpreter::ScMul()
+void ScInterpreter::doMul()
 {
     ScMatrixRef pMat1 = nullptr;
     ScMatrixRef pMat2 = nullptr;
@@ -1388,7 +1388,7 @@ void ScInterpreter::ScMul()
     }
 }
 
-void ScInterpreter::ScDiv()
+void ScInterpreter::doDiv()
 {
     ScMatrixRef pMat1 = nullptr;
     ScMatrixRef pMat2 = nullptr;
@@ -1466,7 +1466,7 @@ void ScInterpreter::ScDiv()
     }
 }
 
-void ScInterpreter::ScPow()
+void ScInterpreter::doPow()
 {
     ScMatrixRef pMat1 = nullptr;
     ScMatrixRef pMat2 = nullptr;
