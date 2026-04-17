@@ -230,7 +230,7 @@ double ScInterpreter::GetBetaDist(double fXin, double fAlpha, double fBeta)
     return semath::betaCdf(fXin, fAlpha, fBeta);
 }
 
-void ScInterpreter::ScBetaDist()
+void ScInterpreter::handleBetaDist()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 3, 6 ) ) // expanded, see #i91547#
@@ -309,7 +309,7 @@ void ScInterpreter::ScGauss()
     PushDouble(semath::gaussValue(GetDouble()));
 }
 
-void ScInterpreter::ScFisher()
+void ScInterpreter::handleFisher()
 {
     const auto aResult = semath::fisherTransform(GetDouble());
     if (!aResult)
@@ -320,7 +320,7 @@ void ScInterpreter::ScFisher()
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::ScFisherInv()
+void ScInterpreter::handleFisherInv()
 {
     PushDouble(semath::inverseFisherTransform(GetDouble()));
 }
@@ -402,7 +402,7 @@ void ScInterpreter::ScB()
     }
 }
 
-void ScInterpreter::ScBinomDist()
+void ScInterpreter::handleBinomDist()
 {
     if ( !MustHaveParamCount( GetByte(), 4 ) )
         return;
@@ -685,7 +685,7 @@ void ScInterpreter::ScWeibull()
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::ScPoissonDist( bool bODFF )
+void ScInterpreter::handlePoissonDist( bool bODFF )
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, ( bODFF ? 2 : 3 ), 3 ) )
@@ -1395,7 +1395,7 @@ void ScInterpreter::ScChiTest()
     PushDouble(GetChiDist(fChi.get(), fDF));
 }
 
-void ScInterpreter::ScKurt()
+void ScInterpreter::handleKurt()
 {
     KahanSum fSum;
     double fCount;
@@ -1929,7 +1929,7 @@ void ScInterpreter::ScQuartile( bool bInclusive )
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::ScModalValue()
+void ScInterpreter::handleModalValue()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCountMin( nParamCount, 1 ) )
@@ -3259,10 +3259,10 @@ void ScInterpreter::ScDevSq()
     GetStVarParams( false /*bTextAsZero*/, VarResult);
 }
 
-void ScInterpreter::ScCorrel()
+void ScInterpreter::handleCorrel()
 {
-    // This is identical to ScPearson()
-    ScPearson();
+    // This is identical to handlePearson()
+    handlePearson();
 }
 
 void ScInterpreter::ScCovarianceP()
@@ -3275,7 +3275,7 @@ void ScInterpreter::ScCovarianceS()
     CalculatePearsonCovar( false, false, true );
 }
 
-void ScInterpreter::ScPearson()
+void ScInterpreter::handlePearson()
 {
     CalculatePearsonCovar( true, false, false );
 }
@@ -3369,10 +3369,10 @@ void ScInterpreter::CalculatePearsonCovar( bool _bPearson, bool _bStexy, bool _b
     }
 }
 
-void ScInterpreter::ScRSQ()
+void ScInterpreter::handleRSQ()
 {
-    // Same as ScPearson()*ScPearson()
-    ScPearson();
+    // Same as handlePearson()*handlePearson()
+    handlePearson();
     if (nGlobalError != FormulaError::NONE)
         return;
 
@@ -3390,7 +3390,7 @@ void ScInterpreter::ScRSQ()
     }
 }
 
-void ScInterpreter::ScSTEYX()
+void ScInterpreter::handleSTEYX()
 {
     CalculatePearsonCovar( true, true, false );
 }
@@ -3464,17 +3464,17 @@ void ScInterpreter::CalculateSlopeIntercept(bool bSlope)
     }
 }
 
-void ScInterpreter::ScSlope()
+void ScInterpreter::handleSlope()
 {
     CalculateSlopeIntercept(true);
 }
 
-void ScInterpreter::ScIntercept()
+void ScInterpreter::handleIntercept()
 {
     CalculateSlopeIntercept(false);
 }
 
-void ScInterpreter::ScForecast()
+void ScInterpreter::handleForecast()
 {
     if ( !MustHaveParamCount( GetByte(), 3 ) )
         return;

@@ -1756,7 +1756,7 @@ void ScInterpreter::ScRandbetween()
     ScRandomImpl( RandomFunc, fMin, fMax);
 }
 
-void ScInterpreter::ScSqrt()
+void ScInterpreter::handleSqrt()
 {
     if (std::optional<double> fResult = semath::computeSqrt(GetDouble()))
         PushDouble(*fResult);
@@ -1832,7 +1832,7 @@ bool ScInterpreter::IsString()
     return bRes;
 }
 
-void ScInterpreter::ScType()
+void ScInterpreter::handleType()
 {
     short nType = 0;
     switch ( GetStackType() )
@@ -2220,7 +2220,7 @@ bool ScInterpreter::IsEven()
     return bRes;
 }
 
-void ScInterpreter::ScN()
+void ScInterpreter::handleN()
 {
     FormulaError nErr = nGlobalError;
     nGlobalError = FormulaError::NONE;
@@ -2237,12 +2237,12 @@ void ScInterpreter::ScN()
     PushDouble(fVal);
 }
 
-void ScInterpreter::ScTrim()
+void ScInterpreter::handleTrim()
 {
     PushString(selibreoffice::trimRepeatedSpaces(GetString().getString()));
 }
 
-void ScInterpreter::ScValue()
+void ScInterpreter::handleValue()
 {
     const std::optional<OUString> oQuarantinedFormula
         = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
@@ -2330,7 +2330,7 @@ void ScInterpreter::ScValue()
 }
 
 // fdo#57180
-void ScInterpreter::ScNumberValue()
+void ScInterpreter::handleNumberValue()
 {
     const std::optional<OUString> oQuarantinedFormula
         = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
@@ -3037,7 +3037,7 @@ void ScInterpreter::ScStDevP( bool bTextAsZero )
      */
 }
 
-void ScInterpreter::ScColumns()
+void ScInterpreter::handleColumns()
 {
     sal_uInt8 nParamCount = GetByte();
     double fValue = 0.0;
@@ -3098,7 +3098,7 @@ void ScInterpreter::ScColumns()
     PushDouble(fValue);
 }
 
-void ScInterpreter::ScRows()
+void ScInterpreter::handleRows()
 {
     sal_uInt8 nParamCount = GetByte();
     double fValue = 0.0;
@@ -3159,7 +3159,7 @@ void ScInterpreter::ScRows()
     PushDouble(fValue);
 }
 
-void ScInterpreter::ScSheets()
+void ScInterpreter::handleSheets()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( nParamCount == 0 )
@@ -3213,7 +3213,7 @@ void ScInterpreter::ScSheets()
     }
 }
 
-void ScInterpreter::ScColumn()
+void ScInterpreter::handleColumn()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 0, 1 ) )
@@ -3345,7 +3345,7 @@ void ScInterpreter::ScColumn()
     PushDouble( nVal );
 }
 
-void ScInterpreter::ScRow()
+void ScInterpreter::handleRow()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 0, 1 ) )
@@ -3476,7 +3476,7 @@ void ScInterpreter::ScRow()
     PushDouble( nVal );
 }
 
-void ScInterpreter::ScSheet()
+void ScInterpreter::handleSheet()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 0, 1 ) )
@@ -3536,7 +3536,7 @@ void ScInterpreter::ScSheet()
     PushDouble(fValue);
 }
 
-void ScInterpreter::ScMatch()
+void ScInterpreter::handleMatch()
 {
     const std::optional<OUString> oQuarantinedFormula
         = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
@@ -3550,7 +3550,7 @@ void ScInterpreter::ScMatch()
     ScMatchOp(false);
 }
 
-void ScInterpreter::ScXMatch()
+void ScInterpreter::handleXMatch()
 {
     const std::optional<OUString> oQuarantinedFormula
         = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
@@ -3600,7 +3600,7 @@ bool isCellContentEmpty( const ScRefCellValue& rCell )
 
 }
 
-void ScInterpreter::ScCountEmptyCells()
+void ScInterpreter::handleCountEmptyCells()
 {
     if ( !MustHaveParamCount( GetByte(), 1 ) )
         return;
@@ -4105,17 +4105,17 @@ void ScInterpreter::IterateParametersIf( ScIterFuncIf eFunc )
         PushDouble( fRes);
 }
 
-void ScInterpreter::ScSumIf()
+void ScInterpreter::handleSumIf()
 {
     IterateParametersIf( ifSUMIF);
 }
 
-void ScInterpreter::ScAverageIf()
+void ScInterpreter::handleAverageIf()
 {
     IterateParametersIf( ifAVERAGEIF);
 }
 
-void ScInterpreter::ScCountIf()
+void ScInterpreter::handleCountIf()
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
@@ -5047,7 +5047,7 @@ void ScInterpreter::IterateParametersIfs( double(*ResultFunc)( const sc::ParamIf
         PushDouble( ResultFunc( aRes));
 }
 
-void ScInterpreter::ScSumIfs()
+void ScInterpreter::handleSumIfs()
 {
     // ScMutationGuard aShouldFail(pDok, ScMutationGuardFlags::CORE);
     sal_uInt8 nParamCount = GetByte();
@@ -5065,7 +5065,7 @@ void ScInterpreter::ScSumIfs()
     IterateParametersIfs(ResultFunc);
 }
 
-void ScInterpreter::ScAverageIfs()
+void ScInterpreter::handleAverageIfs()
 {
     sal_uInt8 nParamCount = GetByte();
 
@@ -5082,7 +5082,7 @@ void ScInterpreter::ScAverageIfs()
     IterateParametersIfs(ResultFunc);
 }
 
-void ScInterpreter::ScCountIfs()
+void ScInterpreter::handleCountIfs()
 {
     sal_uInt8 nParamCount = GetByte();
 
@@ -5134,7 +5134,7 @@ void ScInterpreter::ScMaxIfs_MS()
     IterateParametersIfs(ResultFunc);
 }
 
-void ScInterpreter::ScLookup()
+void ScInterpreter::handleLookup()
 {
     const std::optional<OUString> oQuarantinedFormula
         = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
@@ -5196,7 +5196,7 @@ void ScInterpreter::ScLookup()
     PushLookupExecutionResult(aResult.maValue, false);
 }
 
-void ScInterpreter::ScHLookup()
+void ScInterpreter::handleHLookup()
 {
     const std::optional<OUString> oQuarantinedFormula
         = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
@@ -5339,7 +5339,7 @@ bool ScInterpreter::FillEntry(ScQueryEntry& rEntry)
     return true;
 }
 
-void ScInterpreter::ScVLookup()
+void ScInterpreter::handleVLookup()
 {
     const std::optional<OUString> oQuarantinedFormula
         = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
@@ -5353,7 +5353,7 @@ void ScInterpreter::ScVLookup()
     CalculateLookup(false);
 }
 
-void ScInterpreter::ScXLookup()
+void ScInterpreter::handleXLookup()
 {
     const std::optional<OUString> oQuarantinedFormula
         = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
@@ -5462,7 +5462,7 @@ void ScInterpreter::ScXLookup()
     PushLookupExecutionResult(aResult.maValue, true);
 }
 
-void ScInterpreter::ScFilter()
+void ScInterpreter::handleFilter()
 {
     sal_uInt8 nParamCount = GetByte();
     if (!MustHaveParamCount(nParamCount, 2, 3))
@@ -5639,7 +5639,7 @@ void ScInterpreter::ScFilter()
         PushError(FormulaError::NestedArray);
 }
 
-void ScInterpreter::ScSort()
+void ScInterpreter::handleSort()
 {
     sal_uInt8 nParamCount = GetByte();
     if (!MustHaveParamCount(nParamCount, 1, 4))
@@ -5799,7 +5799,7 @@ void ScInterpreter::ScSort()
     }
 }
 
-void ScInterpreter::ScSortBy()
+void ScInterpreter::handleSortBy()
 {
     sal_uInt8 nParamCount = GetByte();
 
@@ -6146,12 +6146,12 @@ void ScInterpreter::ScTakeOrDrop(bool bTake)
     PushMatrix(pResMat);
 }
 
-void ScInterpreter::ScChooseCols()
+void ScInterpreter::handleChooseCols()
 {
     ScChooseColsOrRows(/*bCols*/ true);
 }
 
-void ScInterpreter::ScChooseRows()
+void ScInterpreter::handleChooseRows()
 {
     ScChooseColsOrRows(/*bCols*/ false);
 }
@@ -6275,12 +6275,12 @@ void ScInterpreter::ScChooseColsOrRows(bool bCols)
     PushMatrix(pResMat);
 }
 
-void ScInterpreter::ScDrop()
+void ScInterpreter::handleDrop()
 {
     ScTakeOrDrop(/*bTake*/ false);
 }
 
-void ScInterpreter::ScExpand()
+void ScInterpreter::handleExpand()
 {
     sal_uInt8 nParamCount = GetByte();
     if (!MustHaveParamCount(nParamCount, 2, 4))
@@ -6387,12 +6387,12 @@ void ScInterpreter::ScExpand()
     PushMatrix(pResMat);
 }
 
-void ScInterpreter::ScHStack()
+void ScInterpreter::handleHStack()
 {
     ScHorizontalOrVerticalStack(/*bHorizontal*/ true);
 }
 
-void ScInterpreter::ScVStack()
+void ScInterpreter::handleVStack()
 {
     ScHorizontalOrVerticalStack(/*bHorizontal*/ false);
 }
@@ -6484,7 +6484,7 @@ void ScInterpreter::ScHorizontalOrVerticalStack(bool bHorizontal)
     PushMatrix(pResMat);
 }
 
-void ScInterpreter::ScTake()
+void ScInterpreter::handleTake()
 {
     ScTakeOrDrop(/*bTake*/ true);
 }
@@ -6540,7 +6540,7 @@ static std::vector<OUString> lcl_SplitText(const OUString& rText, const std::vec
     return aResStr;
 }
 
-void ScInterpreter::ScTextSplit()
+void ScInterpreter::handleTextSplit()
 {
     sal_uInt8 nParamCount = GetByte();
     if (!MustHaveParamCount(nParamCount, 1, 6))
@@ -6794,17 +6794,17 @@ void ScInterpreter::ScToColOrRow(bool bCol)
     PushMatrix(pResMat);
 }
 
-void ScInterpreter::ScToCol()
+void ScInterpreter::handleToCol()
 {
     ScToColOrRow(/*bCol*/ true);
 }
 
-void ScInterpreter::ScToRow()
+void ScInterpreter::handleToRow()
 {
     ScToColOrRow(/*bCol*/ false);
 }
 
-void ScInterpreter::ScUnique()
+void ScInterpreter::handleUnique()
 {
     sal_uInt8 nParamCount = GetByte();
     if (!MustHaveParamCount(nParamCount, 1, 3))
@@ -6924,7 +6924,7 @@ void ScInterpreter::ScUnique()
     PushMatrix(pResMat);
 }
 
-void ScInterpreter::ScLet()
+void ScInterpreter::handleLet()
 {
     const short* pJump = pCur->GetJump();
     short nJumpCount = pJump[0];
@@ -7214,12 +7214,12 @@ void ScInterpreter::ScWrapColsOrRows(bool bCols)
     PushMatrix(pResMat);
 }
 
-void ScInterpreter::ScWrapCols()
+void ScInterpreter::handleWrapCols()
 {
     ScWrapColsOrRows(/*bCols*/ true);
 }
 
-void ScInterpreter::ScWrapRows()
+void ScInterpreter::handleWrapRows()
 {
     ScWrapColsOrRows(/*bCols*/ false);
 }

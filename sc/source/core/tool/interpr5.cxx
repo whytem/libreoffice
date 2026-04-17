@@ -2705,12 +2705,12 @@ void ScInterpreter::CalculateRGPRKP(bool _bRKP)
     }
 }
 
-void ScInterpreter::ScTrend()
+void ScInterpreter::handleTrend()
 {
     CalculateTrendGrowth(false);
 }
 
-void ScInterpreter::ScGrowth()
+void ScInterpreter::handleGrowth()
 {
     CalculateTrendGrowth(true);
 }
