@@ -3493,6 +3493,15 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorStatisticalDi
         m_pDoc->SetString(34, 0, 0, u"=CHISQ.INV.RT(0.05;2)"_ustr);
         m_pDoc->SetString(35, 0, 0, u"=CHISQ.DIST.RT(3;2)"_ustr);
         m_pDoc->SetString(36, 0, 0, u"=GAMMA.DIST(0.8;1;1;TRUE())"_ustr);
+        m_pDoc->SetString(37, 0, 0, u"=NORMDIST(1;2;3;TRUE())"_ustr);
+        m_pDoc->SetString(38, 0, 0, u"=NORM.DIST(1;2;3;FALSE())"_ustr);
+        m_pDoc->SetString(39, 0, 0, u"=HYPGEOMDIST(1;2;3;4)"_ustr);
+        m_pDoc->SetString(40, 0, 0, u"=HYPGEOM.DIST(1;2;3;4;TRUE())"_ustr);
+        m_pDoc->SetString(41, 0, 0, u"=LOGNORMDIST(1)"_ustr);
+        m_pDoc->SetString(42, 0, 0, u"=LOGINV(0.5)"_ustr);
+        m_pDoc->SetString(43, 0, 0, u"=CRITBINOM(5;0.5;0.7)"_ustr);
+        m_pDoc->SetString(44, 0, 0, u"=NEGBINOMDIST(3;4;0.5)"_ustr);
+        m_pDoc->SetString(45, 0, 0, u"=NEGBINOM.DIST(3;4;0.5;TRUE())"_ustr);
 
         ASSERT_DOUBLES_EQUAL(0.5493061443340549, m_pDoc->GetValue(0, 0, 0));
         ASSERT_DOUBLES_EQUAL(0.46211715726000974, m_pDoc->GetValue(1, 0, 0));
@@ -3531,6 +3540,15 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorStatisticalDi
         CPPUNIT_ASSERT_DOUBLES_EQUAL(5.99146454710798, m_pDoc->GetValue(34, 0, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(0.22313016014843, m_pDoc->GetValue(35, 0, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(0.550671035882778, m_pDoc->GetValue(36, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.36944134018176367, m_pDoc->GetValue(37, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.12579440923099774, m_pDoc->GetValue(38, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(39, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(40, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(41, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(42, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(43, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.2734375, m_pDoc->GetValue(44, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.36328125, m_pDoc->GetValue(45, 0, 0), 1e-12);
 
         const auto aStats = setaileval::getStatsSnapshot();
         CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 1);
@@ -3538,6 +3556,42 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorStatisticalDi
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::StatisticalDistribution)]
             >= 1);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorStatisticalDistributionDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineStatisticalDistributionDefaultOn"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 0, 0, u"=NORMDIST(1;2;3;TRUE())"_ustr);
+        m_pDoc->SetString(1, 0, 0, u"=LOGINV(0.5)"_ustr);
+        m_pDoc->SetString(2, 0, 0, u"=CRITBINOM(5;0.5;0.7)"_ustr);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.36944134018176367, m_pDoc->GetValue(0, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(1, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(2, 0, 0), 1e-12);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::StatisticalDistribution)]
+            >= 1);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::StatisticalDistribution)]);
     }
 
     m_pDoc->DeleteTab(0);

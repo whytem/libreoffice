@@ -4299,6 +4299,33 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorStatistica
         spreadsheetengine::api::formulavalue::ValueType::Value, aRange.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.46875, aRange.maResult.mfValue, 1e-12);
 
+    const auto aNormDist = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=NORMDIST(1;2;3;TRUE())", false);
+    CPPUNIT_ASSERT(aNormDist.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        setaileval::FunctionKind::StatisticalDistribution, aNormDist.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aNormDist.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.36944134018176367, aNormDist.maResult.mfValue, 1e-12);
+
+    const auto aLogNormInv = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=LOGINV(0.5)", false);
+    CPPUNIT_ASSERT(aLogNormInv.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        setaileval::FunctionKind::StatisticalDistribution, aLogNormInv.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aLogNormInv.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aLogNormInv.maResult.mfValue, 1e-12);
+
+    const auto aCritBinom = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=CRITBINOM(5;0.5;0.7)", false);
+    CPPUNIT_ASSERT(aCritBinom.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        setaileval::FunctionKind::StatisticalDistribution, aCritBinom.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aCritBinom.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, aCritBinom.maResult.mfValue, 1e-12);
+
     const auto aBeta = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=BETADIST(0.5;2;3)", false);
     CPPUNIT_ASSERT(aBeta.mbSupported);

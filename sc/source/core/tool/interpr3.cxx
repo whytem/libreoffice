@@ -199,70 +199,6 @@ void ScInterpreter::handleBetaDist()
   and different constraints apply.
   Basically, function is identical with ScInterpreter::ScBetaDist()
 */
-void ScInterpreter::ScBetaDist_MS()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 4, 6 ) )
-        return;
-    double fLowerBound, fUpperBound;
-    double alpha, beta, x;
-    bool bIsCumulative;
-    if (nParamCount == 6)
-        fUpperBound = GetDouble();
-    else
-        fUpperBound = 1.0;
-    if (nParamCount >= 5)
-        fLowerBound = GetDouble();
-    else
-        fLowerBound = 0.0;
-    bIsCumulative = GetBool();
-    beta = GetDouble();
-    alpha = GetDouble();
-    x = GetDouble();
-    const auto aResult = semath::evaluateBetaDistribution(
-        x, alpha, beta, fLowerBound, fUpperBound, bIsCumulative, true);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
-void ScInterpreter::ScB()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 3, 4 ) )
-        return ;
-    if (nParamCount == 3)   // mass function
-    {
-        const double x = GetDouble();
-        const double p = GetDouble();
-        const double n = GetDouble();
-        const auto aResult = semath::evaluateBinomialDistribution(x, n, p, false);
-        if (!aResult)
-        {
-            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-            return;
-        }
-        PushDouble(aResult.maValue);
-    }
-    else
-    {   // nParamCount == 4
-        const double xe = GetDouble();
-        const double xs = GetDouble();
-        const double p = GetDouble();
-        const double n = GetDouble();
-        const auto aResult = semath::evaluateBinomialRangeDistribution(n, p, xs, xe);
-        if (!aResult)
-        {
-            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-            return;
-        }
-        PushDouble(aResult.maValue);
-    }
-}
-
 void ScInterpreter::handleBinomDist()
 {
     if ( !MustHaveParamCount( GetByte(), 4 ) )
@@ -273,95 +209,6 @@ void ScInterpreter::handleBinomDist()
     double n      = GetDouble();
     double x      = GetDouble();
     const auto aResult = semath::evaluateBinomialDistribution(x, n, p, bIsCum);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
-void ScInterpreter::ScCritBinom()
-{
-    if ( !MustHaveParamCount( GetByte(), 3 ) )
-        return;
-
-    double alpha  = GetDouble();
-    double p      = GetDouble();
-    double n      = GetDouble();
-    const auto aResult = semath::evaluateBinomialInverse(n, p, alpha);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
-void ScInterpreter::ScNegBinomDist()
-{
-    if ( !MustHaveParamCount( GetByte(), 3 ) )
-        return;
-
-    const double p = GetDouble();
-    const double s = GetDouble();
-    const double f = GetDouble();
-    const auto aResult = semath::evaluateNegativeBinomialDistribution(f, s, p, false, false);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
-void ScInterpreter::ScNegBinomDist_MS()
-{
-    if ( !MustHaveParamCount( GetByte(), 4 ) )
-        return;
-
-    const bool bCumulative = GetBool();
-    const double p = GetDouble();
-    const double s = GetDouble();
-    const double f = GetDouble();
-    const auto aResult = semath::evaluateNegativeBinomialDistribution(
-        f, s, p, bCumulative, true);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
-void ScInterpreter::ScNormDist( int nMinParamCount )
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, nMinParamCount, 4 ) )
-        return;
-    bool bCumulative = nParamCount != 4 || GetBool();
-    double sigma = GetDouble();                 // standard deviation
-    double mue = GetDouble();                   // mean
-    double x = GetDouble();                     // x
-    const auto aResult = semath::evaluateNormalDistribution(x, mue, sigma, bCumulative);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
-void ScInterpreter::ScLogNormDist( int nMinParamCount ) //expanded, see #i100119# and fdo72158
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, nMinParamCount, 4 ) )
-        return;
-    bool bCumulative = nParamCount != 4 || GetBool(); // cumulative
-    double sigma = nParamCount >= 3 ? GetDouble() : 1.0; // standard deviation
-    double mue = nParamCount >= 2 ? GetDouble() : 0.0;   // mean
-    double x = GetDouble();                              // x
-    const auto aResult = semath::evaluateLogNormalDistribution(x, mue, sigma, bCumulative);
     if (!aResult)
     {
         PushError(lcl_ToCalcMathFormulaError(aResult.meError));
@@ -389,33 +236,6 @@ void ScInterpreter::handlePoissonDist( bool bODFF )
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::ScHypGeomDist( int nMinParamCount )
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, nMinParamCount, 5 ) )
-        return;
-
-    bool bCumulative = ( nParamCount == 5 && GetBool() );
-    double N = ::rtl::math::approxFloor(GetDouble());
-    double M = ::rtl::math::approxFloor(GetDouble());
-    double n = ::rtl::math::approxFloor(GetDouble());
-    double x = ::rtl::math::approxFloor(GetDouble());
-
-    if ( (x < 0.0) || (n < x) || (N < n) || (N < M) || (M < 0.0) )
-    {
-        PushIllegalArgument();
-        return;
-    }
-
-    const auto aResult = semath::evaluateHypergeometricDistribution(x, n, M, N, bCumulative);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
 
 void ScInterpreter::handleNormInv()
 {
@@ -432,50 +252,6 @@ void ScInterpreter::handleNormInv()
         }
         PushDouble(aResult.maValue);
     }
-}
-
-void ScInterpreter::ScLogNormInv()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( MustHaveParamCount( nParamCount, 1, 3 ) )
-    {
-        double fSigma = ( nParamCount == 3 ? GetDouble() : 1.0 );  // Stddev
-        double fMue = ( nParamCount >= 2 ? GetDouble() : 0.0 );    // Mean
-        double fP = GetDouble();                                   // p
-        const auto aResult = semath::evaluateLogNormalInverse(fP, fMue, fSigma);
-        if (!aResult)
-        {
-            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-            return;
-        }
-        PushDouble(aResult.maValue);
-    }
-}
-
-void ScInterpreter::ScBetaInv()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 3, 5 ) )
-        return;
-    double fP, fA, fB, fAlpha, fBeta;
-    if (nParamCount == 5)
-        fB = GetDouble();
-    else
-        fB = 1.0;
-    if (nParamCount >= 4)
-        fA = GetDouble();
-    else
-        fA = 0.0;
-    fBeta  = GetDouble();
-    fAlpha = GetDouble();
-    fP     = GetDouble();
-    const auto aResult = semath::evaluateBetaInverse(fP, fAlpha, fBeta, fA, fB);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
 }
 
 double ScInterpreter::GetTInv( double fAlpha, double fSize, int nType )

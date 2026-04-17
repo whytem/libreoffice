@@ -1487,6 +1487,59 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
         u"IMTAN",
         u"PDURATION",
         u"RIGHTB",
+        u"TRIM",
+        u"COM.MICROSOFT.F.TEST",
+        u"CORREL",
+        u"SHEET",
+        u"XNPV",
+        u"COM.MICROSOFT.COVARIANCE.P",
+        u"COM.MICROSOFT.COVARIANCE.S",
+        u"COVAR",
+        u"FVSCHEDULE",
+        u"SERIESSUM",
+        u"AREAS",
+        u"COM.MICROSOFT.ENCODEURL",
+        u"COM.MICROSOFT.MINIFS",
+        u"COM.MICROSOFT.RANDARRAY",
+        u"COUNTBLANK",
+        u"DAVERAGE",
+        u"DMAX",
+        u"DMIN",
+        u"DSTDEVP",
+        u"EDATE",
+        u"EFFECT",
+        u"ORG.LIBREOFFICE.COLOR",
+        u"PEARSON",
+        u"MMULT",
+        u"COM.MICROSOFT.TOCOL",
+        u"COM.MICROSOFT.TOROW",
+        u"DOLLARDE",
+        u"DOLLARFR",
+        u"DPRODUCT",
+        u"DSTDEV",
+        u"INFO",
+        u"REPT",
+        u"DAYS",
+        u"IFNA",
+        u"ISFORMULA",
+        u"MIDB",
+        u"ORG.LIBREOFFICE.FORECAST.ETS.STAT.MULT",
+        u"AVEDEV",
+        u"ROWS",
+        u"LOGEST",
+        u"IFERROR",
+        u"ORG.OPENOFFICE.ROT13",
+        u"TREND",
+        u"TRANSPOSE",
+        u"DHFG",
+        u"LINEST",
+        u"ROT",
+        u"SQRTPI",
+        u"TODAY",
+        u"ACCRINT",
+        u"CELL",
+        u"ISLOGICAL",
+        u"MUNIT",
     };
 
     for (const auto aName : aStoredValueFunctions)
@@ -9466,6 +9519,198 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             spreadsheetengine::core::math::evaluateComplementaryErrorFunction(*aNumber.moValue));
     }
 
+    if (aFunctionName == u"NORMDIST" || aFunctionName == u"NORM.DIST")
+    {
+        if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 4)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aX = materializeNumber(*rNode.maChildren[0]);
+        if (!aX.mbSupported)
+            return makeUnsupportedAttempt(aX.meFallbackReason);
+        if (!aX.moValue)
+            return makeErrorAttempt(aX.meError);
+
+        const auto aMean = materializeNumber(*rNode.maChildren[1]);
+        if (!aMean.mbSupported)
+            return makeUnsupportedAttempt(aMean.meFallbackReason);
+        if (!aMean.moValue)
+            return makeErrorAttempt(aMean.meError);
+
+        const auto aSigma = materializeNumber(*rNode.maChildren[2]);
+        if (!aSigma.mbSupported)
+            return makeUnsupportedAttempt(aSigma.meFallbackReason);
+        if (!aSigma.moValue)
+            return makeErrorAttempt(aSigma.meError);
+
+        bool bCumulative = true;
+        if (rNode.maChildren.size() == 4)
+        {
+            const auto aCumulative = materializeBool(*rNode.maChildren[3]);
+            if (!aCumulative.mbSupported)
+                return makeUnsupportedAttempt(aCumulative.meFallbackReason);
+            if (!aCumulative.moValue)
+                return makeErrorAttempt(aCumulative.meError);
+            bCumulative = *aCumulative.moValue;
+        }
+
+        const auto aDistribution = spreadsheetengine::core::math::evaluateNormalDistribution(
+            *aX.moValue, *aMean.moValue, *aSigma.moValue, bCumulative);
+        if (!aDistribution)
+            return makeErrorAttempt(aDistribution.meError);
+        return makeNumericAttempt(aDistribution.maValue);
+    }
+
+    if (aFunctionName == u"LOGNORMDIST" || aFunctionName == u"LOGNORM.DIST"
+        || aFunctionName == u"COM.MICROSOFT.LOGNORM.DIST")
+    {
+        const bool bMicrosoftSyntax = aFunctionName != u"LOGNORMDIST";
+        if ((bMicrosoftSyntax && rNode.maChildren.size() != 4)
+            || (!bMicrosoftSyntax
+                && (rNode.maChildren.empty() || rNode.maChildren.size() > 4)))
+        {
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        }
+
+        const auto aX = materializeNumber(*rNode.maChildren[0]);
+        if (!aX.mbSupported)
+            return makeUnsupportedAttempt(aX.meFallbackReason);
+        if (!aX.moValue)
+            return makeErrorAttempt(aX.meError);
+
+        double fMean = 0.0;
+        if (rNode.maChildren.size() >= 2
+            && rNode.maChildren[1]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aMean = materializeNumber(*rNode.maChildren[1]);
+            if (!aMean.mbSupported)
+                return makeUnsupportedAttempt(aMean.meFallbackReason);
+            if (!aMean.moValue)
+                return makeErrorAttempt(aMean.meError);
+            fMean = *aMean.moValue;
+        }
+
+        double fSigma = 1.0;
+        if (rNode.maChildren.size() >= 3
+            && rNode.maChildren[2]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aSigma = materializeNumber(*rNode.maChildren[2]);
+            if (!aSigma.mbSupported)
+                return makeUnsupportedAttempt(aSigma.meFallbackReason);
+            if (!aSigma.moValue)
+                return makeErrorAttempt(aSigma.meError);
+            fSigma = *aSigma.moValue;
+        }
+
+        bool bCumulative = true;
+        if (rNode.maChildren.size() == 4)
+        {
+            const auto aCumulative = materializeBool(*rNode.maChildren[3]);
+            if (!aCumulative.mbSupported)
+                return makeUnsupportedAttempt(aCumulative.meFallbackReason);
+            if (!aCumulative.moValue)
+                return makeErrorAttempt(aCumulative.meError);
+            bCumulative = *aCumulative.moValue;
+        }
+
+        const auto aDistribution = spreadsheetengine::core::math::evaluateLogNormalDistribution(
+            *aX.moValue, fMean, fSigma, bCumulative);
+        if (!aDistribution)
+            return makeErrorAttempt(aDistribution.meError);
+        return makeNumericAttempt(aDistribution.maValue);
+    }
+
+    if (aFunctionName == u"LOGINV" || aFunctionName == u"LOGNORM.INV"
+        || aFunctionName == u"COM.MICROSOFT.LOGNORM.INV")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aProbability = materializeNumber(*rNode.maChildren[0]);
+        if (!aProbability.mbSupported)
+            return makeUnsupportedAttempt(aProbability.meFallbackReason);
+        if (!aProbability.moValue)
+            return makeErrorAttempt(aProbability.meError);
+
+        double fMean = 0.0;
+        if (rNode.maChildren.size() >= 2
+            && rNode.maChildren[1]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aMean = materializeNumber(*rNode.maChildren[1]);
+            if (!aMean.mbSupported)
+                return makeUnsupportedAttempt(aMean.meFallbackReason);
+            if (!aMean.moValue)
+                return makeErrorAttempt(aMean.meError);
+            fMean = *aMean.moValue;
+        }
+
+        double fSigma = 1.0;
+        if (rNode.maChildren.size() == 3
+            && rNode.maChildren[2]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aSigma = materializeNumber(*rNode.maChildren[2]);
+            if (!aSigma.mbSupported)
+                return makeUnsupportedAttempt(aSigma.meFallbackReason);
+            if (!aSigma.moValue)
+                return makeErrorAttempt(aSigma.meError);
+            fSigma = *aSigma.moValue;
+        }
+
+        const auto aInverse = spreadsheetengine::core::math::evaluateLogNormalInverse(
+            *aProbability.moValue, fMean, fSigma);
+        if (!aInverse)
+            return makeErrorAttempt(aInverse.meError);
+        return makeNumericAttempt(aInverse.maValue);
+    }
+
+    if (aFunctionName == u"HYPGEOMDIST" || aFunctionName == u"HYPGEOM.DIST")
+    {
+        if (rNode.maChildren.size() < 4 || rNode.maChildren.size() > 5)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aX = materializeNumber(*rNode.maChildren[0]);
+        if (!aX.mbSupported)
+            return makeUnsupportedAttempt(aX.meFallbackReason);
+        if (!aX.moValue)
+            return makeErrorAttempt(aX.meError);
+
+        const auto aTrials = materializeNumber(*rNode.maChildren[1]);
+        if (!aTrials.mbSupported)
+            return makeUnsupportedAttempt(aTrials.meFallbackReason);
+        if (!aTrials.moValue)
+            return makeErrorAttempt(aTrials.meError);
+
+        const auto aSuccesses = materializeNumber(*rNode.maChildren[2]);
+        if (!aSuccesses.mbSupported)
+            return makeUnsupportedAttempt(aSuccesses.meFallbackReason);
+        if (!aSuccesses.moValue)
+            return makeErrorAttempt(aSuccesses.meError);
+
+        const auto aPopulation = materializeNumber(*rNode.maChildren[3]);
+        if (!aPopulation.mbSupported)
+            return makeUnsupportedAttempt(aPopulation.meFallbackReason);
+        if (!aPopulation.moValue)
+            return makeErrorAttempt(aPopulation.meError);
+
+        bool bCumulative = false;
+        if (rNode.maChildren.size() == 5)
+        {
+            const auto aCumulative = materializeBool(*rNode.maChildren[4]);
+            if (!aCumulative.mbSupported)
+                return makeUnsupportedAttempt(aCumulative.meFallbackReason);
+            if (!aCumulative.moValue)
+                return makeErrorAttempt(aCumulative.meError);
+            bCumulative = *aCumulative.moValue;
+        }
+
+        const auto aDistribution
+            = spreadsheetengine::core::math::evaluateHypergeometricDistribution(
+                *aX.moValue, *aTrials.moValue, *aSuccesses.moValue, *aPopulation.moValue,
+                bCumulative);
+        if (!aDistribution)
+            return makeErrorAttempt(aDistribution.meError);
+        return makeNumericAttempt(aDistribution.maValue);
+    }
+
     if (aFunctionName == u"GAMMA" || aFunctionName == u"COM.MICROSOFT.GAMMA")
     {
         if (rNode.maChildren.size() != 1)
@@ -9620,6 +9865,84 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (!aRange)
             return makeErrorAttempt(aRange.meError);
         return makeNumericAttempt(aRange.maValue);
+    }
+
+    if (aFunctionName == u"CRITBINOM")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aTrials = materializeNumber(*rNode.maChildren[0]);
+        if (!aTrials.mbSupported)
+            return makeUnsupportedAttempt(aTrials.meFallbackReason);
+        if (!aTrials.moValue)
+            return makeErrorAttempt(aTrials.meError);
+
+        const auto aProbability = materializeNumber(*rNode.maChildren[1]);
+        if (!aProbability.mbSupported)
+            return makeUnsupportedAttempt(aProbability.meFallbackReason);
+        if (!aProbability.moValue)
+            return makeErrorAttempt(aProbability.meError);
+
+        const auto aAlpha = materializeNumber(*rNode.maChildren[2]);
+        if (!aAlpha.mbSupported)
+            return makeUnsupportedAttempt(aAlpha.meFallbackReason);
+        if (!aAlpha.moValue)
+            return makeErrorAttempt(aAlpha.meError);
+
+        const auto aInverse = spreadsheetengine::core::math::evaluateBinomialInverse(
+            *aTrials.moValue, *aProbability.moValue, *aAlpha.moValue);
+        if (!aInverse)
+            return makeErrorAttempt(aInverse.meError);
+        return makeNumericAttempt(aInverse.maValue);
+    }
+
+    if (aFunctionName == u"NEGBINOMDIST" || aFunctionName == u"NEGBINOM.DIST"
+        || aFunctionName == u"COM.MICROSOFT.NEGBINOM.DIST")
+    {
+        const bool bMicrosoftSyntax = aFunctionName != u"NEGBINOMDIST";
+        if ((bMicrosoftSyntax && rNode.maChildren.size() != 4)
+            || (!bMicrosoftSyntax && rNode.maChildren.size() != 3))
+        {
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        }
+
+        const auto aFailures = materializeNumber(*rNode.maChildren[0]);
+        if (!aFailures.mbSupported)
+            return makeUnsupportedAttempt(aFailures.meFallbackReason);
+        if (!aFailures.moValue)
+            return makeErrorAttempt(aFailures.meError);
+
+        const auto aSuccesses = materializeNumber(*rNode.maChildren[1]);
+        if (!aSuccesses.mbSupported)
+            return makeUnsupportedAttempt(aSuccesses.meFallbackReason);
+        if (!aSuccesses.moValue)
+            return makeErrorAttempt(aSuccesses.meError);
+
+        const auto aProbability = materializeNumber(*rNode.maChildren[2]);
+        if (!aProbability.mbSupported)
+            return makeUnsupportedAttempt(aProbability.meFallbackReason);
+        if (!aProbability.moValue)
+            return makeErrorAttempt(aProbability.meError);
+
+        bool bCumulative = false;
+        if (bMicrosoftSyntax)
+        {
+            const auto aCumulative = materializeBool(*rNode.maChildren[3]);
+            if (!aCumulative.mbSupported)
+                return makeUnsupportedAttempt(aCumulative.meFallbackReason);
+            if (!aCumulative.moValue)
+                return makeErrorAttempt(aCumulative.meError);
+            bCumulative = *aCumulative.moValue;
+        }
+
+        const auto aDistribution
+            = spreadsheetengine::core::math::evaluateNegativeBinomialDistribution(
+                *aFailures.moValue, *aSuccesses.moValue, *aProbability.moValue, bCumulative,
+                bMicrosoftSyntax);
+        if (!aDistribution)
+            return makeErrorAttempt(aDistribution.meError);
+        return makeNumericAttempt(aDistribution.maValue);
     }
 
     if (aFunctionName == u"BETADIST" || aFunctionName == u"BETA.DIST")
@@ -12379,6 +12702,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return eFunction == FunctionKind::LogicalConstant
            || eFunction == FunctionKind::FormulaText
            || eFunction == FunctionKind::Conversion
+           || eFunction == FunctionKind::StatisticalDistribution
            || eFunction == FunctionKind::InformationPredicate
            || eFunction == FunctionKind::LogicalFold
            || eFunction == FunctionKind::Not
