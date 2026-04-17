@@ -46,8 +46,9 @@ Today:
   latest genuine standalone statistical-distribution relocation retires the
   legacy `ScB`, `ScNormDist`, `ScHypGeomDist`, `ScLogNormDist`,
   `ScLogNormInv`, `ScBetaDist_MS`, `ScBetaInv`, `ScCritBinom`,
-  `ScNegBinomDist`, and `ScNegBinomDist_MS` wrappers, taking the metric to
-  `legacy_interpreter_subroutine_count=40`
+  `ScNegBinomDist`, and `ScNegBinomDist_MS` wrappers; after restoring earlier
+  rename-only wrapper name changes, the honest blunt metric now sits at
+  `legacy_interpreter_subroutine_count=235`
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to
@@ -91,7 +92,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_probe_formula_cells=50348`
 - `interpret_tail_live_authoritative_match_total=50344`
 - `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=40`
+- `legacy_interpreter_subroutine_count=235`
 - live authoritative-match rate over the corpus: `99.3743%`
 - live authoritative-match rate over the current promoted probe: `99.9921%`
 
@@ -100,7 +101,8 @@ Everything below is diagnostic context for improving that number.
 The north-star measures live authority transfer. `legacy_interpreter_subroutine_count`
 is the blunt retirement-progress companion metric, derived from the remaining
 `void Sc*()` declarations in [interpre.hxx](/home/ubuntu/repos/libreoffice/sc/source/core/inc/interpre.hxx).
-Lower is better.
+Lower is better. The current value reflects the restored original `Sc*` names
+after backing out earlier rename-only metric compression.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 
