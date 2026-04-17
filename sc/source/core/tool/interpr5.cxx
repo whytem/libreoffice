@@ -461,7 +461,7 @@ sc::RangeMatrix ScInterpreter::GetRangeMatrix()
     return aRet;
 }
 
-void ScInterpreter::doMatValue()
+void ScInterpreter::ScMatValue()
 {
     if ( !MustHaveParamCount( GetByte(), 3 ) )
         return;
@@ -973,7 +973,7 @@ void ScInterpreter::ScMatSequence()
     }
 }
 
-void ScInterpreter::doMatTrans()
+void ScInterpreter::ScMatTrans()
 {
     if ( !MustHaveParamCount( GetByte(), 1 ) )
         return;
@@ -1220,7 +1220,7 @@ void ScInterpreter::CalculateAddSub(bool _bSub)
     }
 }
 
-void ScInterpreter::doAmpersand()
+void ScInterpreter::ScAmpersand()
 {
     ScMatrixRef pMat1 = nullptr;
     ScMatrixRef pMat2 = nullptr;
@@ -1311,7 +1311,7 @@ void ScInterpreter::doAmpersand()
     }
 }
 
-void ScInterpreter::doMul()
+void ScInterpreter::ScMul()
 {
     ScMatrixRef pMat1 = nullptr;
     ScMatrixRef pMat2 = nullptr;
@@ -1388,7 +1388,7 @@ void ScInterpreter::doMul()
     }
 }
 
-void ScInterpreter::doDiv()
+void ScInterpreter::ScDiv()
 {
     ScMatrixRef pMat1 = nullptr;
     ScMatrixRef pMat2 = nullptr;
@@ -1466,7 +1466,7 @@ void ScInterpreter::doDiv()
     }
 }
 
-void ScInterpreter::doPow()
+void ScInterpreter::ScPow()
 {
     ScMatrixRef pMat1 = nullptr;
     ScMatrixRef pMat2 = nullptr;
@@ -1663,7 +1663,7 @@ void ScInterpreter::ScSumXMY2()
     }
 }
 
-void ScInterpreter::handleFrequency()
+void ScInterpreter::ScFrequency()
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
@@ -2180,13 +2180,13 @@ bool ScInterpreter::CheckMatrix(bool _bLOG, sal_uInt8& nCase, SCSIZE& nCX,
 }
 
 // LINEST
-void ScInterpreter::handleLinest()
+void ScInterpreter::ScLinest()
 {
     CalculateRGPRKP(false);
 }
 
 // LOGEST
-void ScInterpreter::handleLogest()
+void ScInterpreter::ScLogest()
 {
     CalculateRGPRKP(true);
 }
@@ -2705,12 +2705,12 @@ void ScInterpreter::CalculateRGPRKP(bool _bRKP)
     }
 }
 
-void ScInterpreter::handleTrend()
+void ScInterpreter::ScTrend()
 {
     CalculateTrendGrowth(false);
 }
 
-void ScInterpreter::handleGrowth()
+void ScInterpreter::ScGrowth()
 {
     CalculateTrendGrowth(true);
 }
@@ -3116,7 +3116,7 @@ void ScInterpreter::ScMatRef()
     }
 }
 
-void ScInterpreter::handleInfo()
+void ScInterpreter::ScInfo()
 {
     if( !MustHaveParamCount( GetByte(), 1 ) )
         return;

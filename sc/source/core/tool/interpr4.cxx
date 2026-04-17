@@ -2429,7 +2429,7 @@ svl::SharedString ScInterpreter::GetStringFromDouble( double fVal )
     return mrStrPool.intern(mrContext.NFGetInputLineString(fVal, nIndex));
 }
 
-void ScInterpreter::doDBGet()
+void ScInterpreter::ScDBGet()
 {
     bool bMissingField = false;
     std::unique_ptr<ScDBQueryParamBase> pQueryParam( GetDBParams(bMissingField) );
@@ -5311,61 +5311,61 @@ StackVar ScInterpreter::Interpret()
                     switch (nFunc)
                     {
                         case AGGREGATE_FUNC_AVE:
-                            doAverage();
+                            ScAverage();
                             break;
                         case AGGREGATE_FUNC_CNT:
-                            doCount();
+                            ScCount();
                             break;
                         case AGGREGATE_FUNC_CNT2:
-                            doCount2();
+                            ScCount2();
                             break;
                         case AGGREGATE_FUNC_MAX:
-                            doMax();
+                            ScMax();
                             break;
                         case AGGREGATE_FUNC_MIN:
-                            doMin();
+                            ScMin();
                             break;
                         case AGGREGATE_FUNC_PROD:
-                            doProduct();
+                            ScProduct();
                             break;
                         case AGGREGATE_FUNC_STD:
-                            doStDev();
+                            ScStDev();
                             break;
                         case AGGREGATE_FUNC_STDP:
-                            doStDevP();
+                            ScStDevP();
                             break;
                         case AGGREGATE_FUNC_SUM:
-                            doSum();
+                            ScSum();
                             break;
                         case AGGREGATE_FUNC_VAR:
-                            doVar();
+                            ScVar();
                             break;
                         case AGGREGATE_FUNC_VARP:
-                            doVarP();
+                            ScVarP();
                             break;
                         case AGGREGATE_FUNC_MEDIAN:
-                            handleMedian();
+                            ScMedian();
                             break;
                         case AGGREGATE_FUNC_MODSNGL:
-                            handleModalValue();
+                            ScModalValue();
                             break;
                         case AGGREGATE_FUNC_LARGE:
-                            handleLarge();
+                            ScLarge();
                             break;
                         case AGGREGATE_FUNC_SMALL:
-                            handleSmall();
+                            ScSmall();
                             break;
                         case AGGREGATE_FUNC_PERCINC:
-                            handlePercentile(true);
+                            ScPercentile(true);
                             break;
                         case AGGREGATE_FUNC_QRTINC:
-                            handleQuartile(true);
+                            ScQuartile(true);
                             break;
                         case AGGREGATE_FUNC_PERCEXC:
-                            handlePercentile(false);
+                            ScPercentile(false);
                             break;
                         case AGGREGATE_FUNC_QRTEXC:
-                            handleQuartile(false);
+                            ScQuartile(false);
                             break;
                         default:
                             nGlobalError = nErr;
@@ -6935,8 +6935,8 @@ StackVar ScInterpreter::Interpret()
                     case ocIfError          : pushLegacyIfError(false);     break;
                     case ocIfNA             : pushLegacyIfError(true);      break;
                     case ocChoose           : ScChooseJump();               break;
-                    case ocChooseCols       : handleChooseCols();           break;
-                    case ocChooseRows       : handleChooseRows();           break;
+                    case ocChooseCols       : ScChooseCols();           break;
+                    case ocChooseRows       : ScChooseRows();           break;
                     case ocAdd              :
                         warnIfLegacyScalarRootReached(u"ADD");
                         CalculateAddSub(false);
@@ -6945,10 +6945,10 @@ StackVar ScInterpreter::Interpret()
                         warnIfLegacyScalarRootReached(u"SUB");
                         CalculateAddSub(true);
                         break;
-                    case ocMul              : doMul();                      break;
-                    case ocDiv              : doDiv();                      break;
-                    case ocAmpersand        : doAmpersand();                break;
-                    case ocPow              : doPow();                      break;
+                    case ocMul              : ScMul();                      break;
+                    case ocDiv              : ScDiv();                      break;
+                    case ocAmpersand        : ScAmpersand();                break;
+                    case ocPow              : ScPow();                      break;
                     case ocEqual            :
                         warnIfLegacyScalarRootReached(u"EQUAL");
                         ScCompareOp(
@@ -7022,36 +7022,36 @@ StackVar ScInterpreter::Interpret()
                         warnIfLegacyScalarRootReached(u"PERCENT");
                         nFuncFmtType = SvNumFormatType::PERCENT;
                         PushInt(100);
-                        ScSyntheticBinaryOp(ocDiv, &ScInterpreter::doDiv);
+                        ScSyntheticBinaryOp(ocDiv, &ScInterpreter::ScDiv);
                         break;
                     case ocPi               :
                         pushLegacyMathScalarNullary(u"PI", semath::computePi);
                         break;
-                    case ocRandom           : doRandom();                   break;
+                    case ocRandom           : ScRandom();                   break;
                     case ocRandArray        : ScRandArray();                break;
-                    case ocRandomNV         : doRandom();                   break;
-                    case ocRandbetweenNV    : doRandbetween();              break;
-                    case ocFilter           : handleFilter();               break;
-                    case ocSort             : handleSort();                 break;
-                    case ocSortBy           : handleSortBy();               break;
-                    case ocDrop             : handleDrop();                 break;
-                    case ocExpand           : handleExpand();               break;
-                    case ocHStack           : handleHStack();               break;
-                    case ocVStack           : handleVStack();               break;
-                    case ocTake             : handleTake();                 break;
+                    case ocRandomNV         : ScRandom();                   break;
+                    case ocRandbetweenNV    : ScRandbetween();              break;
+                    case ocFilter           : ScFilter();               break;
+                    case ocSort             : ScSort();                 break;
+                    case ocSortBy           : ScSortBy();               break;
+                    case ocDrop             : ScDrop();                 break;
+                    case ocExpand           : ScExpand();               break;
+                    case ocHStack           : ScHStack();               break;
+                    case ocVStack           : ScVStack();               break;
+                    case ocTake             : ScTake();                 break;
                     case ocTextAfter        : pushLegacyTextBeforeAfter(false); break;
                     case ocTextBefore       : pushLegacyTextBeforeAfter(true);  break;
-                    case ocTextSplit        : handleTextSplit();            break;
-                    case ocToCol            : handleToCol();                break;
-                    case ocToRow            : handleToRow();                break;
-                    case ocUnique           : handleUnique();               break;
-                    case ocLet              : handleLet();                  break;
-                    case ocWrapCols         : handleWrapCols();             break;
-                    case ocWrapRows         : handleWrapRows();             break;
+                    case ocTextSplit        : ScTextSplit();            break;
+                    case ocToCol            : ScToCol();                break;
+                    case ocToRow            : ScToRow();                break;
+                    case ocUnique           : ScUnique();               break;
+                    case ocLet              : ScLet();                  break;
+                    case ocWrapCols         : ScWrapCols();             break;
+                    case ocWrapRows         : ScWrapRows();             break;
                     case ocTrue             : pushLegacyLogicalConstant(true);  break;
                     case ocFalse            : pushLegacyLogicalConstant(false); break;
-                    case ocGetActDate       : handleGetActDate();           break;
-                    case ocGetActTime       : handleGetActTime();           break;
+                    case ocGetActDate       : ScGetActDate();           break;
+                    case ocGetActTime       : ScGetActTime();           break;
                     case ocNotAvail         : PushError( FormulaError::NotAvailable); break;
                     case ocDeg              :
                         pushLegacyMathScalarUnary(u"DEGREES", semath::computeDegrees);
@@ -7134,20 +7134,20 @@ StackVar ScInterpreter::Interpret()
                     case ocFact             :
                         pushLegacyUnaryCalcMathValueResult(semath::evaluateFactorialValue);
                         break;
-                    case ocGetYear          : handleGetYear();              break;
-                    case ocGetMonth         : handleGetMonth();             break;
-                    case ocGetDay           : handleGetDay();               break;
-                    case ocGetDayOfWeek     : handleGetDayOfWeek();         break;
-                    case ocWeek             : handleGetWeekOfYear();        break;
-                    case ocIsoWeeknum       : handleGetIsoWeekOfYear();     break;
-                    case ocWeeknumOOo       : handleWeeknumOOo();           break;
-                    case ocEasterSunday     : handleEasterSunday();         break;
-                    case ocNetWorkdays      : handleNetWorkdays( false);    break;
-                    case ocNetWorkdays_MS   : handleNetWorkdays( true );    break;
-                    case ocWorkday_MS       : handleWorkdayMS();            break;
-                    case ocGetHour          : handleGetHour();              break;
-                    case ocGetMin           : handleGetMin();               break;
-                    case ocGetSec           : handleGetSec();               break;
+                    case ocGetYear          : ScGetYear();              break;
+                    case ocGetMonth         : ScGetMonth();             break;
+                    case ocGetDay           : ScGetDay();               break;
+                    case ocGetDayOfWeek     : ScGetDayOfWeek();         break;
+                    case ocWeek             : ScGetWeekOfYear();        break;
+                    case ocIsoWeeknum       : ScGetIsoWeekOfYear();     break;
+                    case ocWeeknumOOo       : ScWeeknumOOo();           break;
+                    case ocEasterSunday     : ScEasterSunday();         break;
+                    case ocNetWorkdays      : ScNetWorkdays( false);    break;
+                    case ocNetWorkdays_MS   : ScNetWorkdays( true );    break;
+                    case ocWorkday_MS       : ScWorkdayMS();            break;
+                    case ocGetHour          : ScGetHour();              break;
+                    case ocGetMin           : ScGetMin();               break;
+                    case ocGetSec           : ScGetSec();               break;
                     case ocPlusMinus        :
                         warnIfLegacyScalarRootReached(u"UNARY_PLUS");
                         PushInt(semath::computePlusMinus(GetDouble()));
@@ -7183,8 +7183,8 @@ StackVar ScInterpreter::Interpret()
                     case ocIsString         : pushLegacyIsString(false);    break;
                     case ocIsNonString      : pushLegacyIsString(true);     break;
                     case ocIsLogical        : pushLegacyIsLogical();        break;
-                    case ocType             : handleType();                 break;
-                    case ocCell             : doCell();                     break;
+                    case ocType             : ScType();                 break;
+                    case ocCell             : ScCell();                     break;
                     case ocIsRef            : pushLegacyIsRef();            break;
                     case ocIsValue          : pushLegacyIsValue();          break;
                     case ocIsFormula        : pushLegacyIsFormula();        break;
@@ -7194,7 +7194,7 @@ StackVar ScInterpreter::Interpret()
                     case ocIsError          : pushLegacyIsErrLike(u"ISERROR", true); break;
                     case ocIsEven           : pushLegacyIsEvenOdd(false);   break;
                     case ocIsOdd            : pushLegacyIsEvenOdd(true);    break;
-                    case ocN                : handleN();                    break;
+                    case ocN                : ScN();                    break;
                     case ocGetDateValue     :
                         pushLegacyDateOrTimeValue(
                             "DATEVALUE", SvNumFormatType::DATE,
@@ -7212,7 +7212,7 @@ StackVar ScInterpreter::Interpret()
                             });
                         break;
                     case ocCode             : pushLegacyCode();             break;
-                    case ocTrim             : handleTrim();                 break;
+                    case ocTrim             : ScTrim();                 break;
                     case ocUpper            :
                         pushLegacyUnaryTextTransform(
                             u"UPPER", [&](const OUString& rText) {
@@ -7237,14 +7237,14 @@ StackVar ScInterpreter::Interpret()
                     case ocLen              : pushLegacyLen();              break;
                     case ocT                : pushLegacyT();                break;
                     case ocClean            : pushLegacyClean();            break;
-                    case ocValue            : handleValue();                break;
-                    case ocNumberValue      : handleNumberValue();          break;
+                    case ocValue            : ScValue();                break;
+                    case ocNumberValue      : ScNumberValue();          break;
                     case ocChar             : pushLegacyChar();             break;
                     case ocArcTan2          : pushLegacyArcTan2();          break;
                     case ocMod              : pushLegacyMod();              break;
                     case ocPower            :
                         if (MustHaveParamCount(GetByte(), 2))
-                            doPow();
+                            ScPow();
                         break;
                     case ocRound            :
                         pushLegacyRound(u"ROUND", rtl_math_RoundingMode_Corrected);
@@ -7287,7 +7287,7 @@ StackVar ScInterpreter::Interpret()
                         pushLegacyFloor(u"FLOOR.MATH", false);
                         break;
                     case ocSumProduct       : ScSumProduct();               break;
-                    case ocSumSQ            : doSumSQ();                    break;
+                    case ocSumSQ            : ScSumSQ();                    break;
                     case ocSumX2MY2         : ScSumX2MY2();                 break;
                     case ocSumX2DY2         : ScSumX2DY2();                 break;
                     case ocSumXMY2          : ScSumXMY2();                  break;
@@ -7295,58 +7295,58 @@ StackVar ScInterpreter::Interpret()
                     case ocLog              : pushLegacyLog();              break;
                     case ocGCD              : pushLegacyGcdOrLcm(u"GCD", false); break;
                     case ocLCM              : pushLegacyGcdOrLcm(u"LCM", true); break;
-                    case ocGetDate          : handleGetDate();              break;
-                    case ocGetTime          : handleGetTime();              break;
-                    case ocGetDiffDate      : handleGetDiffDate();          break;
-                    case ocGetDiffDate360   : handleGetDiffDate360();       break;
-                    case ocGetDateDif       : handleGetDateDif();           break;
-                    case ocMin              : doMin()       ;               break;
-                    case ocMinA             : doMin( true );                break;
-                    case ocMax              : doMax();                      break;
-                    case ocMaxA             : doMax( true );                break;
-                    case ocSum              : doSum();                      break;
-                    case ocProduct          : doProduct();                  break;
-                    case ocNPV              : handleNPV();                  break;
-                    case ocIRR              : handleIRR();                  break;
-                    case ocMIRR             : handleMIRR();                 break;
-                    case ocISPMT            : handleISPMT();                break;
-                    case ocAverage          : doAverage()       ;           break;
-                    case ocAverageA         : doAverage( true );            break;
-                    case ocCount            : doCount();                    break;
-                    case ocCount2           : doCount2();                   break;
+                    case ocGetDate          : ScGetDate();              break;
+                    case ocGetTime          : ScGetTime();              break;
+                    case ocGetDiffDate      : ScGetDiffDate();          break;
+                    case ocGetDiffDate360   : ScGetDiffDate360();       break;
+                    case ocGetDateDif       : ScGetDateDif();           break;
+                    case ocMin              : ScMin()       ;               break;
+                    case ocMinA             : ScMin( true );                break;
+                    case ocMax              : ScMax();                      break;
+                    case ocMaxA             : ScMax( true );                break;
+                    case ocSum              : ScSum();                      break;
+                    case ocProduct          : ScProduct();                  break;
+                    case ocNPV              : ScNPV();                  break;
+                    case ocIRR              : ScIRR();                  break;
+                    case ocMIRR             : ScMIRR();                 break;
+                    case ocISPMT            : ScISPMT();                break;
+                    case ocAverage          : ScAverage()       ;           break;
+                    case ocAverageA         : ScAverage( true );            break;
+                    case ocCount            : ScCount();                    break;
+                    case ocCount2           : ScCount2();                   break;
                     case ocVar              :
-                    case ocVarS             : doVar();                      break;
-                    case ocVarA             : doVar( true );                break;
+                    case ocVarS             : ScVar();                      break;
+                    case ocVarA             : ScVar( true );                break;
                     case ocVarP             :
-                    case ocVarP_MS          : doVarP();                     break;
-                    case ocVarPA            : doVarP( true );               break;
+                    case ocVarP_MS          : ScVarP();                     break;
+                    case ocVarPA            : ScVarP( true );               break;
                     case ocStDev            :
-                    case ocStDevS           : doStDev();                    break;
-                    case ocStDevA           : doStDev( true );              break;
+                    case ocStDevS           : ScStDev();                    break;
+                    case ocStDevA           : ScStDev( true );              break;
                     case ocStDevP           :
-                    case ocStDevP_MS        : doStDevP();                   break;
-                    case ocStDevPA          : doStDevP( true );             break;
-                    case ocPV               : handlePV();                   break;
-                    case ocSYD              : handleSYD();                  break;
-                    case ocDDB              : handleDDB();                  break;
-                    case ocDB               : handleDB();                   break;
-                    case ocVBD              : handleVDB();                  break;
-                    case ocPDuration        : handlePDuration();            break;
-                    case ocSLN              : handleSLN();                  break;
-                    case ocPMT              : handlePMT();                  break;
-                    case ocColumns          : handleColumns();              break;
-                    case ocRows             : handleRows();                 break;
-                    case ocSheets           : handleSheets();               break;
-                    case ocColumn           : handleColumn();               break;
-                    case ocRow              : handleRow();                  break;
-                    case ocSheet            : handleSheet();                break;
-                    case ocRRI              : handleRRI();                  break;
-                    case ocFV               : handleFV();                   break;
-                    case ocNper             : handleNper();                 break;
-                    case ocRate             : handleRate();                 break;
-                    case ocFilterXML        : handleFilterXML();            break;
-                    case ocWebservice       : handleWebservice();           break;
-                    case ocEncodeURL        : handleEncodeURL();            break;
+                    case ocStDevP_MS        : ScStDevP();                   break;
+                    case ocStDevPA          : ScStDevP( true );             break;
+                    case ocPV               : ScPV();                   break;
+                    case ocSYD              : ScSYD();                  break;
+                    case ocDDB              : ScDDB();                  break;
+                    case ocDB               : ScDB();                   break;
+                    case ocVBD              : ScVDB();                  break;
+                    case ocPDuration        : ScPDuration();            break;
+                    case ocSLN              : ScSLN();                  break;
+                    case ocPMT              : ScPMT();                  break;
+                    case ocColumns          : ScColumns();              break;
+                    case ocRows             : ScRows();                 break;
+                    case ocSheets           : ScSheets();               break;
+                    case ocColumn           : ScColumn();               break;
+                    case ocRow              : ScRow();                  break;
+                    case ocSheet            : ScSheet();                break;
+                    case ocRRI              : ScRRI();                  break;
+                    case ocFV               : ScFV();                   break;
+                    case ocNper             : ScNper();                 break;
+                    case ocRate             : ScRate();                 break;
+                    case ocFilterXML        : ScFilterXML();            break;
+                    case ocWebservice       : ScWebservice();           break;
+                    case ocEncodeURL        : ScEncodeURL();            break;
                     case ocColor            : pushLegacyColor();            break;
                     case ocErf_MS           :
                         if (MustHaveParamCount(GetByte(), 1))
@@ -7357,72 +7357,72 @@ StackVar ScInterpreter::Interpret()
                             pushLegacyUnaryValueResult(
                                 semath::evaluateComplementaryErrorFunction);
                         break;
-                    case ocIpmt             : handleIpmt();                 break;
-                    case ocPpmt             : handlePpmt();                 break;
-                    case ocCumIpmt          : handleCumIpmt();              break;
-                    case ocCumPrinc         : handleCumPrinc();             break;
-                    case ocEffect           : handleEffect();               break;
-                    case ocNominal          : handleNominal();              break;
-                    case ocSubTotal         : doSubTotal();                 break;
+                    case ocIpmt             : ScIpmt();                 break;
+                    case ocPpmt             : ScPpmt();                 break;
+                    case ocCumIpmt          : ScCumIpmt();              break;
+                    case ocCumPrinc         : ScCumPrinc();             break;
+                    case ocEffect           : ScEffect();               break;
+                    case ocNominal          : ScNominal();              break;
+                    case ocSubTotal         : ScSubTotal();                 break;
                     case ocAggregate        : pushLegacyAggregate();        break;
-                    case ocDBSum            : doDBSum();                    break;
-                    case ocDBCount          : doDBCount();                  break;
-                    case ocDBCount2         : doDBCount2();                 break;
-                    case ocDBAverage        : doDBAverage();                break;
-                    case ocDBGet            : doDBGet();                    break;
-                    case ocDBMax            : doDBMax();                    break;
-                    case ocDBMin            : doDBMin();                    break;
-                    case ocDBProduct        : doDBProduct();                break;
-                    case ocDBStdDev         : doDBStdDev();                 break;
-                    case ocDBStdDevP        : doDBStdDevP();                break;
-                    case ocDBVar            : doDBVar();                    break;
-                    case ocDBVarP           : doDBVarP();                   break;
-                    case ocIndirect         : doIndirect();                 break;
-                    case ocAddress          : handleAddressFunc();          break;
-                    case ocMatch            : handleMatch();                break;
-                    case ocXMatch           : handleXMatch();               break;
-                    case ocCountEmptyCells  : handleCountEmptyCells();      break;
-                    case ocCountIf          : handleCountIf();              break;
-                    case ocSumIf            : handleSumIf();                break;
-                    case ocAverageIf        : handleAverageIf();            break;
-                    case ocSumIfs           : handleSumIfs();               break;
-                    case ocAverageIfs       : handleAverageIfs();           break;
-                    case ocCountIfs         : handleCountIfs();             break;
-                    case ocLookup           : handleLookup();               break;
-                    case ocVLookup          : handleVLookup();              break;
-                    case ocXLookup          : handleXLookup();              break;
-                    case ocHLookup          : handleHLookup();              break;
-                    case ocIndex            : doIndex();                    break;
+                    case ocDBSum            : ScDBSum();                    break;
+                    case ocDBCount          : ScDBCount();                  break;
+                    case ocDBCount2         : ScDBCount2();                 break;
+                    case ocDBAverage        : ScDBAverage();                break;
+                    case ocDBGet            : ScDBGet();                    break;
+                    case ocDBMax            : ScDBMax();                    break;
+                    case ocDBMin            : ScDBMin();                    break;
+                    case ocDBProduct        : ScDBProduct();                break;
+                    case ocDBStdDev         : ScDBStdDev();                 break;
+                    case ocDBStdDevP        : ScDBStdDevP();                break;
+                    case ocDBVar            : ScDBVar();                    break;
+                    case ocDBVarP           : ScDBVarP();                   break;
+                    case ocIndirect         : ScIndirect();                 break;
+                    case ocAddress          : ScAddressFunc();          break;
+                    case ocMatch            : ScMatch();                break;
+                    case ocXMatch           : ScXMatch();               break;
+                    case ocCountEmptyCells  : ScCountEmptyCells();      break;
+                    case ocCountIf          : ScCountIf();              break;
+                    case ocSumIf            : ScSumIf();                break;
+                    case ocAverageIf        : ScAverageIf();            break;
+                    case ocSumIfs           : ScSumIfs();               break;
+                    case ocAverageIfs       : ScAverageIfs();           break;
+                    case ocCountIfs         : ScCountIfs();             break;
+                    case ocLookup           : ScLookup();               break;
+                    case ocVLookup          : ScVLookup();              break;
+                    case ocXLookup          : ScXLookup();              break;
+                    case ocHLookup          : ScHLookup();              break;
+                    case ocIndex            : ScIndex();                    break;
                     case ocMultiArea        : ScMultiArea();                break;
-                    case ocOffset           : doOffset();                   break;
-                    case ocAreas            : doAreas();                    break;
-                    case ocCurrency         : doCurrency();                 break;
-                    case ocReplace          : handleReplace();              break;
-                    case ocFixed            : doFixed();                    break;
-                    case ocFind             : handleFind();                 break;
+                    case ocOffset           : ScOffset();                   break;
+                    case ocAreas            : ScAreas();                    break;
+                    case ocCurrency         : ScCurrency();                 break;
+                    case ocReplace          : ScReplace();              break;
+                    case ocFixed            : ScFixed();                    break;
+                    case ocFind             : ScFind();                 break;
                     case ocExact            : pushLegacyExact();            break;
                     case ocLeft             : pushLegacyLeftRight(false);   break;
                     case ocRight            : pushLegacyLeftRight(true);    break;
-                    case ocSearch           : handleSearch();               break;
-                    case ocMid              : handleMid();                  break;
-                    case ocText             : handleText();                 break;
-                    case ocSubstitute       : doSubstitute();               break;
-                    case ocRegex            : doRegex();                    break;
-                    case ocRept             : doRept();                     break;
-                    case ocConcat           : doConcat();                   break;
+                    case ocSearch           : ScSearch();               break;
+                    case ocMid              : ScMid();                  break;
+                    case ocText             : ScText();                 break;
+                    case ocSubstitute       : ScSubstitute();               break;
+                    case ocRegex            : ScRegex();                    break;
+                    case ocRept             : ScRept();                     break;
+                    case ocConcat           : ScConcat();                   break;
                     case ocConcat_MS        : pushLegacyConcatMs();         break;
-                    case ocTextJoin_MS      : doTextJoin_MS();              break;
+                    case ocTextJoin_MS      : ScTextJoin_MS();              break;
                     case ocIfs_MS           : pushLegacyIfs();              break;
                     case ocSwitch_MS        : pushLegacySwitch();           break;
-                    case ocMinIfs_MS        : doMinIfs_MS();                break;
-                    case ocMaxIfs_MS        : doMaxIfs_MS();                break;
-                    case ocMatValue         : doMatValue();                 break;
+                    case ocMinIfs_MS        : ScMinIfs_MS();                break;
+                    case ocMaxIfs_MS        : ScMaxIfs_MS();                break;
+                    case ocMatValue         : ScMatValue();                 break;
                     case ocMatrixUnit       : ScEMat();                     break;
                     case ocMatDet           : pushLegacyMatrixDeterminant();break;
                     case ocMatInv           : ScMatInv();                   break;
                     case ocMatMult          : ScMatMult();                  break;
                     case ocMatSequence      : ScMatSequence();              break;
-                    case ocMatTrans         : doMatTrans();                 break;
+                    case ocMatTrans         : ScMatTrans();                 break;
                     case ocMatRef           : ScMatRef();                   break;
                     case ocB                : pushLegacyBinomDistLegacy();  break;
                     case ocNormDist         : pushLegacyNormDist(u"NORMDIST", 3); break;
@@ -7430,9 +7430,9 @@ StackVar ScInterpreter::Interpret()
                     case ocExpDist          :
                     case ocExpDist_MS       : pushLegacyExponentialDist();  break;
                     case ocBinomDist        :
-                    case ocBinomDist_MS     : handleBinomDist();            break;
-                    case ocPoissonDist      : handlePoissonDist( true );    break;
-                    case ocPoissonDist_MS   : handlePoissonDist( false );   break;
+                    case ocBinomDist_MS     : ScBinomDist();            break;
+                    case ocPoissonDist      : ScPoissonDist( true );    break;
+                    case ocPoissonDist_MS   : ScPoissonDist( false );   break;
                     case ocCombin           : pushLegacyCombin(u"COMBIN", false);  break;
                     case ocCombinA          : pushLegacyCombin(u"COMBINA", true);  break;
                     case ocPermut           : pushLegacyPermutation(false); break;
@@ -7453,70 +7453,70 @@ StackVar ScInterpreter::Interpret()
                     case ocChiSqDist        : pushLegacyChiSqDist(u"CHISQDIST", false); break;
                     case ocChiSqDist_MS     : pushLegacyChiSqDist(u"CHISQ.DIST", true); break;
                     case ocStandard         : pushLegacyStandardize();      break;
-                    case ocAveDev           : handleAveDev();               break;
-                    case ocDevSq            : handleDevSq();                break;
-                    case ocKurt             : handleKurt();                 break;
-                    case ocSkew             : handleSkew();                 break;
-                    case ocSkewp            : handleSkewp();                break;
-                    case ocModalValue       : handleModalValue();           break;
-                    case ocModalValue_MS    : handleModalValueMS( true );   break;
-                    case ocModalValue_Multi : handleModalValueMS( false );  break;
-                    case ocMedian           : handleMedian();               break;
-                    case ocGeoMean          : handleGeoMean();              break;
-                    case ocHarMean          : handleHarMean();              break;
+                    case ocAveDev           : ScAveDev();               break;
+                    case ocDevSq            : ScDevSq();                break;
+                    case ocKurt             : ScKurt();                 break;
+                    case ocSkew             : ScSkew();                 break;
+                    case ocSkewp            : ScSkewp();                break;
+                    case ocModalValue       : ScModalValue();           break;
+                    case ocModalValue_MS    : ScModalValue_MS( true );   break;
+                    case ocModalValue_Multi : ScModalValue_MS( false );  break;
+                    case ocMedian           : ScMedian();               break;
+                    case ocGeoMean          : ScGeoMean();              break;
+                    case ocHarMean          : ScHarMean();              break;
                     case ocWeibull          :
                     case ocWeibull_MS       : pushLegacyWeibull();          break;
                     case ocBinomInv         :
                     case ocCritBinom        : pushLegacyCritBinom();        break;
                     case ocNegBinomVert     : pushLegacyNegBinomDist(u"NEGBINOMDIST", false); break;
                     case ocNegBinomDist_MS  : pushLegacyNegBinomDist(u"NEGBINOM.DIST", true); break;
-                    case ocNoName           : handleNoName();               break;
-                    case ocBad              : handleBadName();              break;
+                    case ocNoName           : ScNoName();               break;
+                    case ocBad              : ScBadName();              break;
                     case ocZTest            :
-                    case ocZTest_MS         : handleZTest();                break;
+                    case ocZTest_MS         : ScZTest();                break;
                     case ocTTest            :
-                    case ocTTest_MS         : handleTTest();                break;
+                    case ocTTest_MS         : ScTTest();                break;
                     case ocFTest            :
-                    case ocFTest_MS         : handleFTest();                break;
+                    case ocFTest_MS         : ScFTest();                break;
                     case ocRank             :
-                    case ocRank_Eq          : handleRank( false );          break;
-                    case ocRank_Avg         : handleRank( true );           break;
+                    case ocRank_Eq          : ScRank( false );          break;
+                    case ocRank_Avg         : ScRank( true );           break;
                     case ocPercentile       :
-                    case ocPercentile_Inc   : handlePercentile( true );     break;
-                    case ocPercentile_Exc   : handlePercentile( false );    break;
+                    case ocPercentile_Inc   : ScPercentile( true );     break;
+                    case ocPercentile_Exc   : ScPercentile( false );    break;
                     case ocPercentrank      :
-                    case ocPercentrank_Inc  : handlePercentrank( true );    break;
-                    case ocPercentrank_Exc  : handlePercentrank( false );   break;
-                    case ocLarge            : handleLarge();                break;
-                    case ocSmall            : handleSmall();                break;
-                    case ocFrequency        : handleFrequency();            break;
+                    case ocPercentrank_Inc  : ScPercentrank( true );    break;
+                    case ocPercentrank_Exc  : ScPercentrank( false );   break;
+                    case ocLarge            : ScLarge();                break;
+                    case ocSmall            : ScSmall();                break;
+                    case ocFrequency        : ScFrequency();            break;
                     case ocQuartile         :
-                    case ocQuartile_Inc     : handleQuartile( true );       break;
-                    case ocQuartile_Exc     : handleQuartile( false );      break;
+                    case ocQuartile_Inc     : ScQuartile( true );       break;
+                    case ocQuartile_Exc     : ScQuartile( false );      break;
                     case ocNormInv          :
-                    case ocNormInv_MS       : handleNormInv();              break;
+                    case ocNormInv_MS       : ScNormInv();              break;
                     case ocSNormInv         :
                     case ocSNormInv_MS      : pushLegacySNormInv();         break;
                     case ocConfidence       :
-                    case ocConfidence_N     : handleConfidence();           break;
-                    case ocConfidence_T     : handleConfidenceT();          break;
-                    case ocTrimMean         : handleTrimMean();             break;
+                    case ocConfidence_N     : ScConfidence();           break;
+                    case ocConfidence_T     : ScConfidenceT();          break;
+                    case ocTrimMean         : ScTrimMean();             break;
                     case ocProb             : pushLegacyProbability();      break;
-                    case ocCorrel           : handleCorrel();               break;
+                    case ocCorrel           : ScCorrel();               break;
                     case ocCovar            :
-                    case ocCovarianceP      : handleCovarianceP();          break;
-                    case ocCovarianceS      : handleCovarianceS();          break;
-                    case ocPearson          : handlePearson();              break;
-                    case ocRSQ              : handleRSQ();                  break;
-                    case ocSTEYX            : handleSTEYX();                break;
-                    case ocSlope            : handleSlope();                break;
-                    case ocIntercept        : handleIntercept();            break;
-                    case ocTrend            : handleTrend();                break;
-                    case ocGrowth           : handleGrowth();               break;
-                    case ocLinest           : handleLinest();               break;
-                    case ocLogest           : handleLogest();               break;
+                    case ocCovarianceP      : ScCovarianceP();          break;
+                    case ocCovarianceS      : ScCovarianceS();          break;
+                    case ocPearson          : ScPearson();              break;
+                    case ocRSQ              : ScRSQ();                  break;
+                    case ocSTEYX            : ScSTEYX();                break;
+                    case ocSlope            : ScSlope();                break;
+                    case ocIntercept        : ScIntercept();            break;
+                    case ocTrend            : ScTrend();                break;
+                    case ocGrowth           : ScGrowth();               break;
+                    case ocLinest           : ScLinest();               break;
+                    case ocLogest           : ScLogest();               break;
                     case ocForecast_LIN     :
-                    case ocForecast         : handleForecast();             break;
+                    case ocForecast         : ScForecast();             break;
                     case ocForecast_ETS_ADD : ScForecast_Ets( etsAdd );       break;
                     case ocForecast_ETS_SEA : ScForecast_Ets( etsSeason );    break;
                     case ocForecast_ETS_MUL : ScForecast_Ets( etsMult );      break;
@@ -7536,7 +7536,7 @@ StackVar ScInterpreter::Interpret()
                     case ocGammaInv         :
                     case ocGammaInv_MS      : pushLegacyGammaInverse();     break;
                     case ocChiTest          :
-                    case ocChiTest_MS       : handleChiTest();              break;
+                    case ocChiTest_MS       : ScChiTest();              break;
                     case ocChiInv           :
                     case ocChiInv_MS        : pushLegacyChiInv(u"CHIINV");  break;
                     case ocChiSqInv         :
@@ -7549,11 +7549,11 @@ StackVar ScInterpreter::Interpret()
                     case ocFInv_LT          : pushLegacyFInv(u"F.INV", true); break;
                     case ocLogInv           :
                     case ocLogInv_MS        : pushLegacyLogNormInv();       break;
-                    case ocBetaDist         : handleBetaDist();             break;
+                    case ocBetaDist         : ScBetaDist();             break;
                     case ocBetaDist_MS      : pushLegacyBetaDistMS();       break;
                     case ocBetaInv          :
                     case ocBetaInv_MS       : pushLegacyBetaInv(u"BETAINV"); break;
-                    case ocFourier          : handleFourier();              break;
+                    case ocFourier          : ScFourier();              break;
                     case ocExternal         : ScExternal();                 break;
                     case ocTableOp          : ScTableOp();                  break;
                     case ocStop :                                           break;
@@ -7631,10 +7631,10 @@ StackVar ScInterpreter::Interpret()
                     case ocEuroConvert      : pushLegacyEuroConvert();      break;
                     case ocRoman            : pushLegacyRoman();            break;
                     case ocArabic           : pushLegacyArabic();           break;
-                    case ocInfo             : handleInfo();                 break;
-                    case ocHyperLink        : handleHyperLink();            break;
-                    case ocBahtText         : doBahtText();                 break;
-                    case ocGetPivotData     : doGetPivotData();             break;
+                    case ocInfo             : ScInfo();                 break;
+                    case ocHyperLink        : ScHyperLink();            break;
+                    case ocBahtText         : ScBahtText();                 break;
+                    case ocGetPivotData     : ScGetPivotData();             break;
                     case ocJis              :
                         pushLegacyJisAsc(u"JIS", [&](const OUString& rText) {
                             return selibreoffice::convertIntoFullWidth(rText);
@@ -7645,13 +7645,13 @@ StackVar ScInterpreter::Interpret()
                             return selibreoffice::convertIntoHalfWidth(rText);
                         });
                         break;
-                    case ocLenB             : handleLenB();                 break;
-                    case ocRightB           : handleRightB();               break;
-                    case ocLeftB            : handleLeftB();                break;
-                    case ocMidB             : handleMidB();                 break;
-                    case ocReplaceB         : handleReplaceB();             break;
-                    case ocFindB            : handleFindB();                break;
-                    case ocSearchB          : handleSearchB();              break;
+                    case ocLenB             : ScLenB();                 break;
+                    case ocRightB           : ScRightB();               break;
+                    case ocLeftB            : ScLeftB();                break;
+                    case ocMidB             : ScMidB();                 break;
+                    case ocReplaceB         : ScReplaceB();             break;
+                    case ocFindB            : ScFindB();                break;
+                    case ocSearchB          : ScSearchB();              break;
                     case ocUnicode          : pushLegacyUnicode();          break;
                     case ocUnichar          : pushLegacyUnichar();          break;
                     case ocBitAnd           :

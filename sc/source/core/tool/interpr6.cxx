@@ -825,32 +825,32 @@ void ScInterpreter::IterateParameters( ScIterFunc eFunc, bool bTextAsZero )
     }
 }
 
-void ScInterpreter::doSumSQ()
+void ScInterpreter::ScSumSQ()
 {
     IterateParameters( ifSUMSQ );
 }
 
-void ScInterpreter::doSum()
+void ScInterpreter::ScSum()
 {
     IterateParameters( ifSUM );
 }
 
-void ScInterpreter::doProduct()
+void ScInterpreter::ScProduct()
 {
     IterateParameters( ifPRODUCT );
 }
 
-void ScInterpreter::doAverage( bool bTextAsZero )
+void ScInterpreter::ScAverage( bool bTextAsZero )
 {
     IterateParameters( ifAVERAGE, bTextAsZero );
 }
 
-void ScInterpreter::doCount()
+void ScInterpreter::ScCount()
 {
     IterateParameters( ifCOUNT );
 }
 
-void ScInterpreter::doCount2()
+void ScInterpreter::ScCount2()
 {
     IterateParameters( ifCOUNT2 );
 }

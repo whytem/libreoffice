@@ -94,7 +94,7 @@ double ScInterpreter::GetDateSerial( sal_Int16 nYear, sal_Int16 nMonth, sal_Int1
     return 0;
 }
 
-void ScInterpreter::handleGetActDate()
+void ScInterpreter::ScGetActDate()
 {
     nFuncFmtType = SvNumFormatType::DATE;
     Date aActDate( Date::SYSTEM );
@@ -102,7 +102,7 @@ void ScInterpreter::handleGetActDate()
     PushDouble(static_cast<double>(nDiff));
 }
 
-void ScInterpreter::handleGetActTime()
+void ScInterpreter::ScGetActTime()
 {
     nFuncFmtType = SvNumFormatType::DATETIME;
     DateTime aActTime( DateTime::SYSTEM );
@@ -114,19 +114,19 @@ void ScInterpreter::handleGetActTime()
     PushDouble( static_cast<double>(nDiff) + fTime );
 }
 
-void ScInterpreter::handleGetYear()
+void ScInterpreter::ScGetYear()
 {
     PushDouble(sedatetime::extractYear(
         selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32()));
 }
 
-void ScInterpreter::handleGetMonth()
+void ScInterpreter::ScGetMonth()
 {
     PushDouble(sedatetime::extractMonth(
         selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32()));
 }
 
-void ScInterpreter::handleGetDay()
+void ScInterpreter::ScGetDay()
 {
     if (std::optional<double> fDay
         = sedatetime::extractDay(selibreoffice::toApiDateParts(mrContext.NFGetNullDate()),
@@ -139,22 +139,22 @@ void ScInterpreter::handleGetDay()
     }
 }
 
-void ScInterpreter::handleGetMin()
+void ScInterpreter::ScGetMin()
 {
     PushDouble(sedatetime::extractMinute(GetDouble()));
 }
 
-void ScInterpreter::handleGetSec()
+void ScInterpreter::ScGetSec()
 {
     PushDouble(sedatetime::extractSecond(GetDouble()));
 }
 
-void ScInterpreter::handleGetHour()
+void ScInterpreter::ScGetHour()
 {
     PushDouble(sedatetime::extractHour(GetDouble()));
 }
 
-void ScInterpreter::handleGetDayOfWeek()
+void ScInterpreter::ScGetDayOfWeek()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 1, 2 ) )
@@ -174,7 +174,7 @@ void ScInterpreter::handleGetDayOfWeek()
     PushInt(aResult.mnValue);
 }
 
-void ScInterpreter::handleWeeknumOOo()
+void ScInterpreter::ScWeeknumOOo()
 {
     if ( MustHaveParamCount( GetByte(), 2 ) )
     {
@@ -184,7 +184,7 @@ void ScInterpreter::handleWeeknumOOo()
     }
 }
 
-void ScInterpreter::handleGetWeekOfYear()
+void ScInterpreter::ScGetWeekOfYear()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 1, 2 ) )
@@ -199,14 +199,14 @@ void ScInterpreter::handleGetWeekOfYear()
         PushIllegalArgument();
 }
 
-void ScInterpreter::handleGetIsoWeekOfYear()
+void ScInterpreter::ScGetIsoWeekOfYear()
 {
     if ( MustHaveParamCount( GetByte(), 1 ) )
         PushInt(sedatetime::computeIsoWeekOfYear(
             selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32()));
 }
 
-void ScInterpreter::handleEasterSunday()
+void ScInterpreter::ScEasterSunday()
 {
     nFuncFmtType = SvNumFormatType::DATE;
     if ( !MustHaveParamCount( GetByte(), 1 ) )
@@ -330,7 +330,7 @@ FormulaError ScInterpreter::GetWeekendAndHolidayMasks_MS(
     return nErr;
 }
 
-void ScInterpreter::handleNetWorkdays( bool bOOXML_Version )
+void ScInterpreter::ScNetWorkdays( bool bOOXML_Version )
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 2, 4 ) )
@@ -372,7 +372,7 @@ void ScInterpreter::handleNetWorkdays( bool bOOXML_Version )
     }
 }
 
-void ScInterpreter::handleWorkdayMS()
+void ScInterpreter::ScWorkdayMS()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 2, 4 ) )
@@ -412,7 +412,7 @@ void ScInterpreter::handleWorkdayMS()
     }
 }
 
-void ScInterpreter::handleGetDate()
+void ScInterpreter::ScGetDate()
 {
     nFuncFmtType = SvNumFormatType::DATE;
     if ( !MustHaveParamCount( GetByte(), 3 ) )
@@ -429,7 +429,7 @@ void ScInterpreter::handleGetDate()
         PushDouble(GetDateSerial(nYear, nMonth, nDay, false));
 }
 
-void ScInterpreter::handleGetTime()
+void ScInterpreter::ScGetTime()
 {
     nFuncFmtType = SvNumFormatType::TIME;
     if ( MustHaveParamCount( GetByte(), 3 ) )
@@ -444,7 +444,7 @@ void ScInterpreter::handleGetTime()
     }
 }
 
-void ScInterpreter::handleGetDiffDate()
+void ScInterpreter::ScGetDiffDate()
 {
     if ( MustHaveParamCount( GetByte(), 2 ) )
     {
@@ -454,7 +454,7 @@ void ScInterpreter::handleGetDiffDate()
     }
 }
 
-void ScInterpreter::handleGetDiffDate360()
+void ScInterpreter::ScGetDiffDate360()
 {
     /* Implementation follows
      * http://www.bondmarkets.com/eCommerce/SMD_Fields_030802.pdf
@@ -496,7 +496,7 @@ void ScInterpreter::handleGetDiffDate360()
 }
 
 // fdo#44456 function DATEDIF as defined in ODF1.2 (Par. 6.10.3)
-void ScInterpreter::handleGetDateDif()
+void ScInterpreter::ScGetDateDif()
 {
     if ( !MustHaveParamCount( GetByte(), 3 ) )
         return;
@@ -558,7 +558,7 @@ void ScInterpreter::RoundSignificant( double fX, double fDigits, double &fRes )
     This is why ODFF-FLOOR is exported to Excel as FLOOR.MATH and
     FLOOR.MATH is imported in Calc as FLOOR.MATH
  */
-void ScInterpreter::handleNPV()
+void ScInterpreter::ScNPV()
 {
     nFuncFmtType = SvNumFormatType::CURRENCY;
     short nParamCount = GetByte();
@@ -656,7 +656,7 @@ void ScInterpreter::handleNPV()
     PushDouble(fVal.get());
 }
 
-void ScInterpreter::handleIRR()
+void ScInterpreter::ScIRR()
 {
     nFuncFmtType = SvNumFormatType::PERCENT;
     sal_uInt8 nParamCount = GetByte();
@@ -757,7 +757,7 @@ void ScInterpreter::handleIRR()
         PushError( FormulaError::NoConvergence);
 }
 
-void ScInterpreter::handleMIRR()
+void ScInterpreter::ScMIRR()
 {   // range_of_values ; rate_invest ; rate_reinvest
     nFuncFmtType = SvNumFormatType::PERCENT;
     if ( !MustHaveParamCount( GetByte(), 3 ) )
@@ -882,7 +882,7 @@ void ScInterpreter::handleMIRR()
     }
 }
 
-void ScInterpreter::handleISPMT()
+void ScInterpreter::ScISPMT()
 {   // rate ; period ; total_periods ; invest
     if( MustHaveParamCount( GetByte(), 4 ) )
     {
@@ -906,7 +906,7 @@ double ScInterpreter::ScGetPV(double fRate, double fNper, double fPmt,
     return semath::computePresentValue(fRate, fNper, fPmt, fFv, bPayInAdvance);
 }
 
-void ScInterpreter::handlePV()
+void ScInterpreter::ScPV()
 {
     nFuncFmtType = SvNumFormatType::CURRENCY;
     sal_uInt8 nParamCount = GetByte();
@@ -921,7 +921,7 @@ void ScInterpreter::handlePV()
     PushDouble(ScGetPV(fRate, fNper, fPmt, fFv, bPayInAdvance));
 }
 
-void ScInterpreter::handleSYD()
+void ScInterpreter::ScSYD()
 {
     nFuncFmtType = SvNumFormatType::CURRENCY;
     if ( MustHaveParamCount( GetByte(), 4 ) )
@@ -940,7 +940,7 @@ double ScInterpreter::ScGetDDB(double fCost, double fSalvage, double fLife,
     return semath::computeDoubleDecliningBalance(fCost, fSalvage, fLife, fPeriod, fFactor);
 }
 
-void ScInterpreter::handleDDB()
+void ScInterpreter::ScDDB()
 {
     nFuncFmtType = SvNumFormatType::CURRENCY;
     sal_uInt8 nParamCount = GetByte();
@@ -959,7 +959,7 @@ void ScInterpreter::handleDDB()
         PushDouble(ScGetDDB(fCost, fSalvage, fLife, fPeriod, fFactor));
 }
 
-void ScInterpreter::handleDB()
+void ScInterpreter::ScDB()
 {
     nFuncFmtType = SvNumFormatType::CURRENCY;
     sal_uInt8 nParamCount = GetByte();
@@ -988,7 +988,7 @@ double ScInterpreter::ScInterVDB(double fCost, double fSalvage, double fLife,
         fCost, fSalvage, fLife, fLife1, fPeriod, fFactor);
 }
 
-void ScInterpreter::handleVDB()
+void ScInterpreter::ScVDB()
 {
     nFuncFmtType = SvNumFormatType::CURRENCY;
     sal_uInt8 nParamCount = GetByte();
@@ -1012,7 +1012,7 @@ void ScInterpreter::handleVDB()
     PushDouble(fVdb.get());
 }
 
-void ScInterpreter::handlePDuration()
+void ScInterpreter::ScPDuration()
 {
     if ( MustHaveParamCount( GetByte(), 3 ) )
     {
@@ -1026,7 +1026,7 @@ void ScInterpreter::handlePDuration()
     }
 }
 
-void ScInterpreter::handleSLN()
+void ScInterpreter::ScSLN()
 {
     nFuncFmtType = SvNumFormatType::CURRENCY;
     if ( MustHaveParamCount( GetByte(), 3 ) )
@@ -1044,7 +1044,7 @@ double ScInterpreter::ScGetPMT(double fRate, double fNper, double fPv,
     return semath::computePayment(fRate, fNper, fPv, fFv, bPayInAdvance);
 }
 
-void ScInterpreter::handlePMT()
+void ScInterpreter::ScPMT()
 {
     nFuncFmtType = SvNumFormatType::CURRENCY;
     sal_uInt8 nParamCount = GetByte();
@@ -1058,7 +1058,7 @@ void ScInterpreter::handlePMT()
     PushDouble(ScGetPMT(fRate, fNper, fPv, fFv, bPayInAdvance));
 }
 
-void ScInterpreter::handleRRI()
+void ScInterpreter::ScRRI()
 {
     nFuncFmtType = SvNumFormatType::PERCENT;
     if ( MustHaveParamCount( GetByte(), 3 ) )
@@ -1080,7 +1080,7 @@ double ScInterpreter::ScGetFV(double fRate, double fNper, double fPmt,
     return semath::computeFutureValue(fRate, fNper, fPmt, fPv, bPayInAdvance);
 }
 
-void ScInterpreter::handleFV()
+void ScInterpreter::ScFV()
 {
     nFuncFmtType = SvNumFormatType::CURRENCY;
     sal_uInt8 nParamCount = GetByte();
@@ -1094,7 +1094,7 @@ void ScInterpreter::handleFV()
     PushDouble(ScGetFV(fRate, fNper, fPmt, fPv, bPayInAdvance));
 }
 
-void ScInterpreter::handleNper()
+void ScInterpreter::ScNper()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 3, 5 ) )
@@ -1109,7 +1109,7 @@ void ScInterpreter::handleNper()
 }
 
 // In Calc UI it is the function RATE(Nper;Pmt;Pv;Fv;Type;Guess)
-void ScInterpreter::handleRate()
+void ScInterpreter::ScRate()
 {
     nFuncFmtType = SvNumFormatType::PERCENT;
     sal_uInt8 nParamCount = GetByte();
@@ -1146,7 +1146,7 @@ double ScInterpreter::ScGetIpmt(double fRate, double fPer, double fNper, double 
     return aResult.mfInterest;
 }
 
-void ScInterpreter::handleIpmt()
+void ScInterpreter::ScIpmt()
 {
     nFuncFmtType = SvNumFormatType::CURRENCY;
     sal_uInt8 nParamCount = GetByte();
@@ -1167,7 +1167,7 @@ void ScInterpreter::handleIpmt()
     }
 }
 
-void ScInterpreter::handlePpmt()
+void ScInterpreter::ScPpmt()
 {
     nFuncFmtType = SvNumFormatType::CURRENCY;
     sal_uInt8 nParamCount = GetByte();
@@ -1189,7 +1189,7 @@ void ScInterpreter::handlePpmt()
     }
 }
 
-void ScInterpreter::handleCumIpmt()
+void ScInterpreter::ScCumIpmt()
 {
     nFuncFmtType = SvNumFormatType::CURRENCY;
     if ( !MustHaveParamCount( GetByte(), 6 ) )
@@ -1213,7 +1213,7 @@ void ScInterpreter::handleCumIpmt()
     }
 }
 
-void ScInterpreter::handleCumPrinc()
+void ScInterpreter::ScCumPrinc()
 {
     nFuncFmtType = SvNumFormatType::CURRENCY;
     if ( !MustHaveParamCount( GetByte(), 6 ) )
@@ -1237,7 +1237,7 @@ void ScInterpreter::handleCumPrinc()
     }
 }
 
-void ScInterpreter::handleEffect()
+void ScInterpreter::ScEffect()
 {
     nFuncFmtType = SvNumFormatType::PERCENT;
     if ( !MustHaveParamCount( GetByte(), 2 ) )
@@ -1256,7 +1256,7 @@ void ScInterpreter::handleEffect()
     }
 }
 
-void ScInterpreter::handleNominal()
+void ScInterpreter::ScNominal()
 {
     nFuncFmtType = SvNumFormatType::PERCENT;
     if ( MustHaveParamCount( GetByte(), 2 ) )
@@ -1667,7 +1667,7 @@ void ScInterpreter::ScDde()
     mpLinkManager->CloseCachedComps();
 }
 
-void ScInterpreter::handleHyperLink()
+void ScInterpreter::ScHyperLink()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 1, 2 ) )
@@ -1841,7 +1841,7 @@ void lclAppendBlock( OUStringBuffer& rText, std::string_view block )
 
 } // namespace
 
-void ScInterpreter::doBahtText()
+void ScInterpreter::ScBahtText()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 1 ) )
@@ -1904,7 +1904,7 @@ void ScInterpreter::doBahtText()
     PushString(aText.makeStringAndClear());
 }
 
-void ScInterpreter::doGetPivotData()
+void ScInterpreter::ScGetPivotData()
 {
     sal_uInt8 nParamCount = GetByte();
 

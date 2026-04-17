@@ -68,12 +68,12 @@ FormulaError lcl_ToCalcMathFormulaError(spreadsheetengine::api::Error eError)
 
 // General functions
 
-void ScInterpreter::handleNoName()
+void ScInterpreter::ScNoName()
 {
     PushError(FormulaError::NoName);
 }
 
-void ScInterpreter::handleBadName()
+void ScInterpreter::ScBadName()
 {
     short nParamCount = GetByte();
     while (nParamCount-- > 0)
@@ -160,7 +160,7 @@ double ScInterpreter::GetBetaDist(double fXin, double fAlpha, double fBeta)
     return semath::betaCdf(fXin, fAlpha, fBeta);
 }
 
-void ScInterpreter::handleBetaDist()
+void ScInterpreter::ScBetaDist()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 3, 6 ) ) // expanded, see #i91547#
@@ -199,7 +199,7 @@ void ScInterpreter::handleBetaDist()
   and different constraints apply.
   Basically, function is identical with ScInterpreter::ScBetaDist()
 */
-void ScInterpreter::handleBinomDist()
+void ScInterpreter::ScBinomDist()
 {
     if ( !MustHaveParamCount( GetByte(), 4 ) )
         return;
@@ -218,7 +218,7 @@ void ScInterpreter::handleBinomDist()
 }
 
 
-void ScInterpreter::handlePoissonDist( bool bODFF )
+void ScInterpreter::ScPoissonDist( bool bODFF )
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, ( bODFF ? 2 : 3 ), 3 ) )
@@ -237,7 +237,7 @@ void ScInterpreter::handlePoissonDist( bool bODFF )
 }
 
 
-void ScInterpreter::handleNormInv()
+void ScInterpreter::ScNormInv()
 {
     if ( MustHaveParamCount( GetByte(), 3 ) )
     {
@@ -265,7 +265,7 @@ double ScInterpreter::GetTInv( double fAlpha, double fSize, int nType )
     return aResult.maValue;
 }
 
-void ScInterpreter::handleConfidence()
+void ScInterpreter::ScConfidence()
 {
     if ( MustHaveParamCount( GetByte(), 3 ) )
     {
@@ -282,7 +282,7 @@ void ScInterpreter::handleConfidence()
     }
 }
 
-void ScInterpreter::handleConfidenceT()
+void ScInterpreter::ScConfidenceT()
 {
     if ( MustHaveParamCount( GetByte(), 3 ) )
     {
@@ -299,7 +299,7 @@ void ScInterpreter::handleConfidenceT()
     }
 }
 
-void ScInterpreter::handleZTest()
+void ScInterpreter::ScZTest()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 2, 3 ) )
@@ -493,7 +493,7 @@ bool ScInterpreter::CalculateTest(bool _bTemplin
     }
     return true;
 }
-void ScInterpreter::handleTTest()
+void ScInterpreter::ScTTest()
 {
     if ( !MustHaveParamCount( GetByte(), 4 ) )
         return;
@@ -576,7 +576,7 @@ void ScInterpreter::handleTTest()
     PushDouble( GetTDist( fT, fF, static_cast<int>(fTails) ) );
 }
 
-void ScInterpreter::handleFTest()
+void ScInterpreter::ScFTest()
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
@@ -626,7 +626,7 @@ void ScInterpreter::handleFTest()
     PushDouble(2.0*std::min(fFcdf, 1.0 - fFcdf));
 }
 
-void ScInterpreter::handleChiTest()
+void ScInterpreter::ScChiTest()
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
@@ -707,7 +707,7 @@ void ScInterpreter::handleChiTest()
     PushDouble(GetChiDist(fChi.get(), fDF));
 }
 
-void ScInterpreter::handleKurt()
+void ScInterpreter::ScKurt()
 {
     KahanSum fSum;
     double fCount;
@@ -724,7 +724,7 @@ void ScInterpreter::handleKurt()
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::handleHarMean()
+void ScInterpreter::ScHarMean()
 {
     short nParamCount = GetByte();
     std::vector<double> aValues;
@@ -835,7 +835,7 @@ void ScInterpreter::handleHarMean()
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::handleGeoMean()
+void ScInterpreter::ScGeoMean()
 {
     short nParamCount = GetByte();
     std::vector<double> aValues;
@@ -1102,7 +1102,7 @@ bool ScInterpreter::CalculateSkew(KahanSum& fSum, double& fCount, std::vector<do
     return true;
 }
 
-void ScInterpreter::handleSkew()
+void ScInterpreter::ScSkew()
 {
     KahanSum fSum;
     double fCount = 0.0;
@@ -1119,7 +1119,7 @@ void ScInterpreter::handleSkew()
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::handleSkewp()
+void ScInterpreter::ScSkewp()
 {
     KahanSum fSum;
     double fCount = 0.0;
@@ -1136,7 +1136,7 @@ void ScInterpreter::handleSkewp()
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::handleMedian()
+void ScInterpreter::ScMedian()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCountMin( nParamCount, 1 )  )
@@ -1168,7 +1168,7 @@ double ScInterpreter::GetPercentile(std::vector<double> & rArray, double fPercen
     return aResult ? aResult.maValue : 0.0;
 }
 
-void ScInterpreter::handlePercentile( bool bInclusive )
+void ScInterpreter::ScPercentile( bool bInclusive )
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
@@ -1197,7 +1197,7 @@ void ScInterpreter::handlePercentile( bool bInclusive )
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::handleQuartile( bool bInclusive )
+void ScInterpreter::ScQuartile( bool bInclusive )
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
@@ -1226,7 +1226,7 @@ void ScInterpreter::handleQuartile( bool bInclusive )
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::handleModalValue()
+void ScInterpreter::ScModalValue()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCountMin( nParamCount, 1 ) )
@@ -1248,7 +1248,7 @@ void ScInterpreter::handleModalValue()
     PushDouble(*std::min_element(aModes.maValue.begin(), aModes.maValue.end()));
 }
 
-void ScInterpreter::handleModalValueMS( bool bSingle )
+void ScInterpreter::ScModalValue_MS( bool bSingle )
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCountMin( nParamCount, 1 ) )
@@ -1366,17 +1366,17 @@ void ScInterpreter::CalculateSmallLarge(bool bSmall)
     }
 }
 
-void ScInterpreter::handleLarge()
+void ScInterpreter::ScLarge()
 {
     CalculateSmallLarge(false);
 }
 
-void ScInterpreter::handleSmall()
+void ScInterpreter::ScSmall()
 {
     CalculateSmallLarge(true);
 }
 
-void ScInterpreter::handlePercentrank( bool bInclusive )
+void ScInterpreter::ScPercentrank( bool bInclusive )
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 2, 3 ) )
@@ -1471,7 +1471,7 @@ double ScInterpreter::GetPercentrank(std::vector<double> & rArray, double fVal, 
     return fRes;
 }
 
-void ScInterpreter::handleTrimMean()
+void ScInterpreter::ScTrimMean()
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )
         return;
@@ -2322,7 +2322,7 @@ void ScInterpreter::QuickSort(std::vector<double>& rSortArray, std::vector<tools
     lcl_QuickSort(0, n-1, rSortArray, pIndexOrder);
 }
 
-void ScInterpreter::handleRank( bool bAverage )
+void ScInterpreter::ScRank( bool bAverage )
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 2, 3 ) )
@@ -2389,7 +2389,7 @@ void ScInterpreter::handleRank( bool bAverage )
     }
 }
 
-void ScInterpreter::handleAveDev()
+void ScInterpreter::ScAveDev()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCountMin( nParamCount, 1 ) )
@@ -2547,7 +2547,7 @@ void ScInterpreter::handleAveDev()
     PushDouble(rVal.get() / rValCount);
 }
 
-void ScInterpreter::handleDevSq()
+void ScInterpreter::ScDevSq()
 {
     auto VarResult = []( double fVal, size_t /*nValCount*/ )
     {
@@ -2556,23 +2556,23 @@ void ScInterpreter::handleDevSq()
     GetStVarParams( false /*bTextAsZero*/, VarResult);
 }
 
-void ScInterpreter::handleCorrel()
+void ScInterpreter::ScCorrel()
 {
-    // This is identical to handlePearson()
-    handlePearson();
+    // This is identical to ScPearson()
+    ScPearson();
 }
 
-void ScInterpreter::handleCovarianceP()
+void ScInterpreter::ScCovarianceP()
 {
     CalculatePearsonCovar( false, false, false );
 }
 
-void ScInterpreter::handleCovarianceS()
+void ScInterpreter::ScCovarianceS()
 {
     CalculatePearsonCovar( false, false, true );
 }
 
-void ScInterpreter::handlePearson()
+void ScInterpreter::ScPearson()
 {
     CalculatePearsonCovar( true, false, false );
 }
@@ -2666,10 +2666,10 @@ void ScInterpreter::CalculatePearsonCovar( bool _bPearson, bool _bStexy, bool _b
     }
 }
 
-void ScInterpreter::handleRSQ()
+void ScInterpreter::ScRSQ()
 {
-    // Same as handlePearson()*handlePearson()
-    handlePearson();
+    // Same as ScPearson()*ScPearson()
+    ScPearson();
     if (nGlobalError != FormulaError::NONE)
         return;
 
@@ -2687,7 +2687,7 @@ void ScInterpreter::handleRSQ()
     }
 }
 
-void ScInterpreter::handleSTEYX()
+void ScInterpreter::ScSTEYX()
 {
     CalculatePearsonCovar( true, true, false );
 }
@@ -2761,17 +2761,17 @@ void ScInterpreter::CalculateSlopeIntercept(bool bSlope)
     }
 }
 
-void ScInterpreter::handleSlope()
+void ScInterpreter::ScSlope()
 {
     CalculateSlopeIntercept(true);
 }
 
-void ScInterpreter::handleIntercept()
+void ScInterpreter::ScIntercept()
 {
     CalculateSlopeIntercept(false);
 }
 
-void ScInterpreter::handleForecast()
+void ScInterpreter::ScForecast()
 {
     if ( !MustHaveParamCount( GetByte(), 3 ) )
         return;
@@ -3532,7 +3532,7 @@ ScMatrixRef ScFFT::Compute(const std::function<ScMatrixGenerator>& rMatGenFunc)
     return rMatGenFunc(2, nPoints, aArray);
 }
 
-void ScInterpreter::handleFourier()
+void ScInterpreter::ScFourier()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 2, 5 ) )
