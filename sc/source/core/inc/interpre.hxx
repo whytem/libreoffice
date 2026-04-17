@@ -525,7 +525,6 @@ private:
     inline void TreatDoubleError( double& rVal );
     void ScIfJump();
     void ScIfJumpNotMatrix( const short* pJump, short nJumpCount );
-    void ScIfError( bool bNAonly );
     void ScChooseJump();
 
     // Be sure to only call this if pStack[sp-nStackLevel] really contains a
@@ -563,10 +562,6 @@ private:
     void ScGreater();
     void ScLessEqual();
     void ScGreaterEqual();
-    void ScAnd();
-    void ScOr();
-    void ScXor();
-    void ScNot();
     void ScNeg();
     void ScPercentSign();
     void ScIntersect();
@@ -732,8 +727,6 @@ public:
     void ScRegex();
     void ScConcat();
     void ScTextJoin_MS();
-    void ScIfs_MS();
-    void ScSwitch_MS();
     void ScMinIfs_MS();
     void ScMaxIfs_MS();
     void ScExternal();

@@ -31,9 +31,10 @@ Today:
   Calc path
 - an eighty-three-slice env-independent hard-route cluster is still
   engine-first even with rollout set to `off`, and logical constants,
-  formula text, conversion, significant rounding, bitwise, aggregate,
-  matrix determinant, and a narrow `PROB(...)` slice now also have
-  family-local default-on rollout paths
+  logical folds, `NOT`, conditionals, text utility, formula text,
+  conversion, information predicates, significant rounding, bitwise,
+  aggregate, matrix determinant, and a narrow `PROB(...)` slice now also
+  have family-local default-on rollout paths
 - direct scalar-root formulas and a bounded scalar utility cluster now also
   ride the live seam: arithmetic/reference/concat/comparison roots plus
   `ROUND`, `ROUNDUP`, `ROUNDDOWN`, information predicates, logical folds, and
@@ -58,10 +59,11 @@ Today:
 What is still not true:
 
 - no broad default-on production rollout exists beyond the narrow
-  logical-constant and formula-text families, the conversion family, the
-  narrow `ROUNDSIG` and bitwise scalar slices, the bounded aggregate and
-  matrix-determinant slices, and the narrow `PROB(...)` slice
-- eleven narrow legacy deletion milestones have landed:
+  logical-constant, logical, conditional, text-utility, formula-text,
+  conversion, and information-predicate families, the narrow `ROUNDSIG`
+  and bitwise scalar slices, the bounded aggregate and matrix-determinant
+  slices, and the narrow `PROB(...)` slice
+- fourteen narrow legacy deletion milestones have landed:
   `ScInterpreter::ScTrue()` / `ScFalse()` and the dedicated
   `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair, plus the dedicated
   `ScInterpreter::ScFormula()` wrapper, and now the dedicated
@@ -73,8 +75,10 @@ What is still not true:
   `ScBitOr()` / `ScBitXor()` / `ScBitLshift()` / `ScBitRshift()`
   wrappers, and now the dedicated `ScInterpreter::ScMatDet()` wrapper, and
   now the dedicated `ScInterpreter::ScAggregate()` wrapper, and now the
-  dedicated `ScInterpreter::ScProbability()` wrapper; broader legacy
-  retirement has not started
+  dedicated `ScInterpreter::ScProbability()` wrapper, and now the dedicated
+  text-utility wrappers, and now the dedicated information-predicate
+  wrappers, and now the dedicated logical-fold / `NOT` / conditional
+  wrappers; broader legacy retirement has not started
 - the full replay corpus now shows strong ambient live-seam traffic, but most
   retained fallback now lives inside the remaining ambient
   `unsupported_function` wall rather than simple denominator reach
@@ -213,7 +217,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_probe_formula_cells=27204`
 - `interpret_tail_live_authoritative_match_total=20761`
 - `interpret_tail_live_authoritative_fallback_total=6443`
-- `legacy_interpreter_subroutine_count=378`
+- `legacy_interpreter_subroutine_count=340`
 - live authoritative-match rate over the corpus: `40.9802%`
 - live authoritative-match rate over the current promoted probe: `76.3160%`
 

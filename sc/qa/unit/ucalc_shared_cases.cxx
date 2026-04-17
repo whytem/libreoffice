@@ -3592,6 +3592,13 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConditiona
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value, aSwitch.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(22.0, aSwitch.maResult.mfValue, 1e-12);
+
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=IF(TRUE;42;99)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=IFERROR(1/0;42)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=IFS(TRUE;11;FALSE;22)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(
+        u"=COM.MICROSOFT.SWITCH(2;1;11;2;22;99)"));
+    CPPUNIT_ASSERT(!setaileval::isFamilyLocalDefaultOnFormula(u"=ABS(42)"));
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorFormulaTextHelper)

@@ -535,147 +535,6 @@ void ScInterpreter::ScIfJumpNotMatrix( const short* pJump, short nJumpCount )
     }
 }
 
-
-void ScInterpreter::ScIfError( bool bNAonly )
-{
-    const short* pJump = pCur->GetJump();
-    short nJumpCount = pJump[ 0 ];
-    if (!sp || nJumpCount != 2)
-    {
-        // Reset nGlobalError here to not propagate the old error, if any.
-        nGlobalError = (sp ? FormulaError::ParameterExpected : FormulaError::UnknownStackVariable);
-        PushError( nGlobalError);
-        aCode.Jump( pJump[ nJumpCount  ], pJump[ nJumpCount ] );
-        return;
-    }
-
-    FormulaConstTokenRef xToken( pStack[ sp - 1 ] );
-    bool bError = false;
-    FormulaError nOldGlobalError = nGlobalError;
-    nGlobalError = FormulaError::NONE;
-
-    MatrixJumpConditionToMatrix();
-    switch (GetStackType())
-    {
-        default:
-            Pop();
-            // Act on implicitly propagated error, if any.
-            if (nOldGlobalError != FormulaError::NONE)
-                nGlobalError = nOldGlobalError;
-            if (nGlobalError != FormulaError::NONE)
-                bError = true;
-            break;
-        case svError:
-            PopError();
-            bError = true;
-            break;
-        case svDoubleRef:
-        case svSingleRef:
-            {
-                ScAddress aAdr;
-                if (!PopDoubleRefOrSingleRef( aAdr))
-                    bError = true;
-                else
-                {
-
-                    ScRefCellValue aCell(mrDoc, aAdr);
-                    nGlobalError = GetCellErrCode(aCell);
-                    if (sejumpexec::matchesIfErrorPolicy(nGlobalError, bNAonly))
-                        bError = true;
-                }
-            }
-            break;
-        case svExternalSingleRef:
-        case svExternalDoubleRef:
-        {
-            double fVal;
-            svl::SharedString aStr;
-            // Handles also existing jump matrix case and sets error on
-            // elements.
-            GetDoubleOrStringFromMatrix( fVal, aStr);
-            if (nGlobalError != FormulaError::NONE)
-                bError = true;
-        }
-        break;
-        case svMatrix:
-            {
-                const ScMatrixRef pMat = PopMatrix();
-                if (!pMat || (nGlobalError != FormulaError::NONE && (!bNAonly || nGlobalError == FormulaError::NotAvailable)))
-                {
-                    bError = true;
-                    break;  // switch
-                }
-                // If the matrix has no queried error at all we can simply use
-                // it as result and don't need to bother with jump matrix.
-                SCSIZE nErrorCol = ::std::numeric_limits<SCSIZE>::max(),
-                       nErrorRow = ::std::numeric_limits<SCSIZE>::max();
-                SCSIZE nCols, nRows;
-                pMat->GetDimensions( nCols, nRows );
-                if (nCols == 0 || nRows == 0)
-                {
-                    bError = true;
-                    break;  // switch
-                }
-                if (const auto oFirstError
-                    = sejumpexec::findFirstIfErrorCoordinate(*pMat, bNAonly))
-                {
-                    bError = true;
-                    nErrorCol = oFirstError->mnColumn;
-                    nErrorRow = oFirstError->mnRow;
-                }
-                if (!bError)
-                    break;  // switch, we're done and have the result
-
-                FormulaConstTokenRef xNew;
-                ScTokenMatrixMap::const_iterator aMapIter;
-                if ((aMapIter = maTokenMatrixMap.find( pCur)) != maTokenMatrixMap.end())
-                {
-                    xNew = (*aMapIter).second;
-                }
-                else
-                {
-                    std::shared_ptr<ScJumpMatrix> pJumpMat( std::make_shared<ScJumpMatrix>(
-                                pCur->GetOpCode(), nCols, nRows));
-                    // Init all jumps to no error to save single calls. Error
-                    // is the exceptional condition.
-                    const double fFlagResult = CreateDoubleError( FormulaError::JumpMatHasResult);
-                    pJumpMat->SetAllJumps( fFlagResult, pJump[ nJumpCount ], pJump[ nJumpCount ] );
-                    sejumpexec::initializeIfErrorJumpMatrix(
-                        *pMat, *pJumpMat, pJump, nJumpCount, bNAonly,
-                        { nErrorCol, nErrorRow });
-                    xNew = new ScJumpMatrixToken(std::move(pJumpMat));
-                    GetTokenMatrixMap().emplace( pCur, xNew );
-                }
-                nGlobalError = nOldGlobalError;
-                PushTokenRef( xNew );
-                // set endpoint of path for main code line
-                aCode.Jump( pJump[ nJumpCount ], pJump[ nJumpCount ] );
-                return;
-            }
-            break;
-    }
-
-    const auto eIfErrorAction = selogic::selectIfErrorAction(
-        nGlobalError == FormulaError::NotAvailable
-            ? spreadsheetengine::api::Error::NotAvailable
-            : (bError ? spreadsheetengine::api::Error::IllegalArgument
-                      : spreadsheetengine::api::Error::None),
-        bNAonly);
-    if (bError && eIfErrorAction == selogic::IfErrorAction::EvaluateAlternate)
-    {
-        // error, calculate 2nd argument
-        nGlobalError = FormulaError::NONE;
-        aCode.Jump( pJump[ 1 ], pJump[ nJumpCount ] );
-    }
-    else
-    {
-        // no error, push 1st argument and continue
-        nGlobalError = nOldGlobalError;
-        PushTokenRef( xToken);
-        aCode.Jump( pJump[ nJumpCount ], pJump[ nJumpCount ] );
-    }
-}
-
 void ScInterpreter::ScChooseJump()
 {
     // We have to set a jump, if there was none chosen because of an error set
@@ -1754,21 +1613,6 @@ void ScInterpreter::ScGreaterEqual()
     ScCompareOp(seinterpre::ComparisonMode::GreaterEqual, SC_GREATER_EQUAL);
 }
 
-void ScInterpreter::ScAnd()
-{
-    ScLogicalFoldOp(seinterpre::LogicalFoldMode::And);
-}
-
-void ScInterpreter::ScOr()
-{
-    ScLogicalFoldOp(seinterpre::LogicalFoldMode::Or);
-}
-
-void ScInterpreter::ScXor()
-{
-    ScLogicalFoldOp(seinterpre::LogicalFoldMode::Xor);
-}
-
 void ScInterpreter::ScNeg()
 {
     // Simple negation doesn't change current format type to number, keep
@@ -1782,12 +1626,6 @@ void ScInterpreter::ScPercentSign()
     nFuncFmtType = SvNumFormatType::PERCENT;
     PushInt( 100 );
     ScSyntheticBinaryOp(ocDiv, &ScInterpreter::ScDiv);
-}
-
-void ScInterpreter::ScNot()
-{
-    nFuncFmtType = SvNumFormatType::LOGICAL;
-    ScUnaryMatrixOrScalarOp(seinterpre::UnaryMatrixScalarMode::LogicalNot);
 }
 
 void ScInterpreter::ScPi()

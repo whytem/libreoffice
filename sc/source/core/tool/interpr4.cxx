@@ -77,7 +77,9 @@
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx>
+#include <spreadsheetengine/compat/libreoffice/JumpExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/MatrixFrameExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/SwitchExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
 
 #include <map>
@@ -90,9 +92,12 @@ using namespace com::sun::star;
 using namespace formula;
 namespace seexternalexec = spreadsheetengine::compat::libreoffice::externalreferenceexecution;
 namespace seformulainspect = spreadsheetengine::compat::libreoffice::formulainspection;
+namespace sejumpexec = spreadsheetengine::compat::libreoffice::jumpexecution;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
+namespace selogic = spreadsheetengine::api::logic;
 namespace seconvert = spreadsheetengine::core::convert;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
+namespace seswitchexec = spreadsheetengine::compat::libreoffice::switchexecution;
 namespace setextparseexec = spreadsheetengine::compat::libreoffice::textparsingexecution;
 
 #define ADDIN_MAXSTRLEN 256
@@ -5525,6 +5530,339 @@ StackVar ScInterpreter::Interpret()
                     warnInformationPredicateDispatch(bOdd ? u"ISODD" : u"ISEVEN");
                     PushInt(int(bOdd ? !IsEven() : IsEven()));
                 };
+                const auto warnLogicalDispatch = [&](std::u16string_view rFunctionName) {
+                    warnIfLegacyDispatchReached(
+                        "family-local default-on", rFunctionName,
+                        [](std::u16string_view rFormula) {
+                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                        },
+                        "family-local default-on logical slice reached ScInterpreter");
+                };
+                const auto pushLegacyLogicalFold = [&](std::u16string_view rFunctionName,
+                                                       spreadsheetengine::compat::libreoffice::
+                                                           interpreterdispatch::LogicalFoldMode
+                                                               eMode) {
+                    warnLogicalDispatch(rFunctionName);
+                    ScLogicalFoldOp(eMode);
+                };
+                const auto pushLegacyNot = [&]() {
+                    warnLogicalDispatch(u"NOT");
+                    nFuncFmtType = SvNumFormatType::LOGICAL;
+                    ScUnaryMatrixOrScalarOp(
+                        spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                            UnaryMatrixScalarMode::LogicalNot);
+                };
+                const auto warnConditionalDispatch = [&](std::u16string_view rFunctionName) {
+                    warnIfLegacyDispatchReached(
+                        "family-local default-on", rFunctionName,
+                        [](std::u16string_view rFormula) {
+                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                        },
+                        "family-local default-on conditional slice reached ScInterpreter");
+                };
+                const auto pushLegacyIfJump = [&]() {
+                    warnConditionalDispatch(u"IF");
+                    ScIfJump();
+                };
+                const auto pushLegacyIfError = [&](bool bNAonly) {
+                    warnConditionalDispatch(bNAonly ? u"IFNA" : u"IFERROR");
+
+                    const short* pJump = pCur->GetJump();
+                    short nJumpCount = pJump[0];
+                    if (!sp || nJumpCount != 2)
+                    {
+                        nGlobalError = (sp ? FormulaError::ParameterExpected
+                                           : FormulaError::UnknownStackVariable);
+                        PushError(nGlobalError);
+                        aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                        return;
+                    }
+
+                    FormulaConstTokenRef xToken(pStack[sp - 1]);
+                    bool bError = false;
+                    FormulaError nOldGlobalError = nGlobalError;
+                    nGlobalError = FormulaError::NONE;
+
+                    MatrixJumpConditionToMatrix();
+                    switch (GetStackType())
+                    {
+                        default:
+                            Pop();
+                            if (nOldGlobalError != FormulaError::NONE)
+                                nGlobalError = nOldGlobalError;
+                            if (nGlobalError != FormulaError::NONE)
+                                bError = true;
+                            break;
+                        case svError:
+                            PopError();
+                            bError = true;
+                            break;
+                        case svDoubleRef:
+                        case svSingleRef:
+                        {
+                            ScAddress aAdr;
+                            if (!PopDoubleRefOrSingleRef(aAdr))
+                                bError = true;
+                            else
+                            {
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                nGlobalError = GetCellErrCode(aCell);
+                                if (sejumpexec::matchesIfErrorPolicy(nGlobalError, bNAonly))
+                                    bError = true;
+                            }
+                        }
+                        break;
+                        case svExternalSingleRef:
+                        case svExternalDoubleRef:
+                        {
+                            double fVal;
+                            svl::SharedString aStr;
+                            GetDoubleOrStringFromMatrix(fVal, aStr);
+                            if (nGlobalError != FormulaError::NONE)
+                                bError = true;
+                        }
+                        break;
+                        case svMatrix:
+                        {
+                            const ScMatrixRef pMat = PopMatrix();
+                            if (!pMat
+                                || (nGlobalError != FormulaError::NONE
+                                    && (!bNAonly || nGlobalError == FormulaError::NotAvailable)))
+                            {
+                                bError = true;
+                                break;
+                            }
+
+                            SCSIZE nErrorCol = ::std::numeric_limits<SCSIZE>::max();
+                            SCSIZE nErrorRow = ::std::numeric_limits<SCSIZE>::max();
+                            SCSIZE nCols, nRows;
+                            pMat->GetDimensions(nCols, nRows);
+                            if (nCols == 0 || nRows == 0)
+                            {
+                                bError = true;
+                                break;
+                            }
+                            if (const auto oFirstError
+                                = sejumpexec::findFirstIfErrorCoordinate(*pMat, bNAonly))
+                            {
+                                bError = true;
+                                nErrorCol = oFirstError->mnColumn;
+                                nErrorRow = oFirstError->mnRow;
+                            }
+                            if (!bError)
+                                break;
+
+                            FormulaConstTokenRef xNew;
+                            ScTokenMatrixMap::const_iterator aMapIter;
+                            if ((aMapIter = maTokenMatrixMap.find(pCur))
+                                != maTokenMatrixMap.end())
+                            {
+                                xNew = (*aMapIter).second;
+                            }
+                            else
+                            {
+                                std::shared_ptr<ScJumpMatrix> pJumpMat(
+                                    std::make_shared<ScJumpMatrix>(pCur->GetOpCode(), nCols, nRows));
+                                const double fFlagResult
+                                    = CreateDoubleError(FormulaError::JumpMatHasResult);
+                                pJumpMat->SetAllJumps(
+                                    fFlagResult, pJump[nJumpCount], pJump[nJumpCount]);
+                                sejumpexec::initializeIfErrorJumpMatrix(
+                                    *pMat, *pJumpMat, pJump, nJumpCount, bNAonly,
+                                    { nErrorCol, nErrorRow });
+                                xNew = new ScJumpMatrixToken(std::move(pJumpMat));
+                                GetTokenMatrixMap().emplace(pCur, xNew);
+                            }
+                            nGlobalError = nOldGlobalError;
+                            PushTokenRef(xNew);
+                            aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                            return;
+                        }
+                    }
+
+                    const auto eIfErrorAction = selogic::selectIfErrorAction(
+                        nGlobalError == FormulaError::NotAvailable
+                            ? spreadsheetengine::api::Error::NotAvailable
+                            : (bError ? spreadsheetengine::api::Error::IllegalArgument
+                                      : spreadsheetengine::api::Error::None),
+                        bNAonly);
+                    if (bError && eIfErrorAction == selogic::IfErrorAction::EvaluateAlternate)
+                    {
+                        nGlobalError = FormulaError::NONE;
+                        aCode.Jump(pJump[1], pJump[nJumpCount]);
+                    }
+                    else
+                    {
+                        nGlobalError = nOldGlobalError;
+                        PushTokenRef(xToken);
+                        aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                    }
+                };
+                const auto pushLegacyIfs = [&]() {
+                    warnConditionalDispatch(u"IFS");
+
+                    short nParamCount = GetByte();
+                    ReverseStack(nParamCount);
+
+                    nGlobalError = FormulaError::NONE;
+                    bool bFinished = false;
+                    while (nParamCount > 0 && !bFinished && nGlobalError == FormulaError::NONE)
+                    {
+                        bool bVal = GetBool();
+                        nParamCount--;
+                        switch (spreadsheetengine::api::logic::evaluateIfsCondition(
+                                    bVal, nGlobalError != FormulaError::NONE, nParamCount))
+                        {
+                            case spreadsheetengine::api::logic::IfsAction::SelectCurrentResult:
+                                bFinished = true;
+                                break;
+                            case spreadsheetengine::api::logic::IfsAction::SkipCurrentResult:
+                                Pop();
+                                nParamCount--;
+                                break;
+                            case spreadsheetengine::api::logic::IfsAction::ReturnParameterExpected:
+                                PushParameterExpected();
+                                return;
+                            case spreadsheetengine::api::logic::IfsAction::ReturnNotAvailable:
+                                PushNA();
+                                return;
+                            case spreadsheetengine::api::logic::IfsAction::ReturnNoValue:
+                                PushNoValue();
+                                return;
+                        }
+                    }
+
+                    if (nGlobalError != FormulaError::NONE || !bFinished)
+                    {
+                        if (!bFinished)
+                            PushNA();
+                        if (nGlobalError != FormulaError::NONE)
+                            PushNoValue();
+                        return;
+                    }
+
+                    FormulaConstTokenRef xToken(PopToken());
+                    if (xToken)
+                    {
+                        while (nParamCount > 1)
+                        {
+                            Pop();
+                            nParamCount--;
+                        }
+                        PushTokenRef(xToken);
+                    }
+                    else
+                        PushError(FormulaError::UnknownStackVariable);
+                };
+                const auto pushLegacySwitch = [&]() {
+                    warnConditionalDispatch(u"COM.MICROSOFT.SWITCH");
+
+                    short nParamCount = GetByte();
+                    if (!MustHaveParamCountMin(nParamCount, 3))
+                        return;
+
+                    ReverseStack(nParamCount);
+
+                    nGlobalError = FormulaError::NONE;
+                    seswitchexec::SwitchValue aReference;
+                    switch (GetStackType())
+                    {
+                        case svDouble:
+                            aReference = seswitchexec::makeNumericSwitchValue(GetDouble());
+                            break;
+                        case svString:
+                            aReference = seswitchexec::makeTextSwitchValue(GetString());
+                            break;
+                        case svSingleRef:
+                        case svDoubleRef:
+                        {
+                            ScAddress aAdr;
+                            if (!PopDoubleRefOrSingleRef(aAdr))
+                                break;
+                            ScRefCellValue aCell(mrDoc, aAdr);
+                            if (!(aCell.hasString() || aCell.hasEmptyValue() || aCell.isEmpty()))
+                                aReference
+                                    = seswitchexec::makeNumericSwitchValue(GetCellValue(aAdr, aCell));
+                            else
+                            {
+                                svl::SharedString aRefStr;
+                                GetCellString(aRefStr, aCell);
+                                aReference = seswitchexec::makeTextSwitchValue(aRefStr);
+                            }
+                        }
+                        break;
+                        case svExternalSingleRef:
+                        case svExternalDoubleRef:
+                        case svMatrix:
+                        {
+                            double fRefVal = 0.0;
+                            svl::SharedString aRefStr;
+                            if (ScMatrix::IsValueType(GetDoubleOrStringFromMatrix(fRefVal, aRefStr)))
+                                aReference = seswitchexec::makeNumericSwitchValue(fRefVal);
+                            else
+                                aReference = seswitchexec::makeTextSwitchValue(aRefStr);
+                        }
+                        break;
+                        default:
+                            PopError();
+                            PushIllegalArgument();
+                            return;
+                    }
+
+                    nParamCount--;
+                    bool bFinished = false;
+                    while (nParamCount > 1 && !bFinished && nGlobalError == FormulaError::NONE)
+                    {
+                        seswitchexec::SwitchValue aCandidate;
+                        if (aReference.mbNumeric)
+                            aCandidate = seswitchexec::makeNumericSwitchValue(GetDouble());
+                        else
+                            aCandidate = seswitchexec::makeTextSwitchValue(GetString());
+                        nParamCount--;
+                        if ((nGlobalError != FormulaError::NONE && nParamCount < 2)
+                            || seswitchexec::matchesSwitchCase(aReference, aCandidate))
+                        {
+                            bFinished = true;
+                        }
+                        else
+                        {
+                            if (nParamCount >= 2)
+                            {
+                                Pop();
+                                nParamCount--;
+                                bFinished = (nParamCount == 1);
+                            }
+                            else
+                            {
+                                PushNA();
+                                return;
+                            }
+                            nGlobalError = FormulaError::NONE;
+                        }
+                    }
+
+                    if (nGlobalError != FormulaError::NONE || !bFinished)
+                    {
+                        if (!bFinished)
+                            PushNA();
+                        else
+                            PushError(nGlobalError);
+                        return;
+                    }
+
+                    FormulaConstTokenRef xToken(PopToken());
+                    if (xToken)
+                    {
+                        while (nParamCount > 1)
+                        {
+                            Pop();
+                            nParamCount--;
+                        }
+                        PushTokenRef(xToken);
+                    }
+                    else
+                        PushError(FormulaError::UnknownStackVariable);
+                };
 
                 switch( eOp )
                 {
@@ -5534,9 +5872,9 @@ StackVar ScInterpreter::Interpret()
                     case ocMacro            : ScMacro();                    break;
                     case ocDBArea           : ScDBArea();                   break;
                     case ocColRowNameAuto   : ScColRowNameAuto();           break;
-                    case ocIf               : ScIfJump();                   break;
-                    case ocIfError          : ScIfError( false );           break;
-                    case ocIfNA             : ScIfError( true );            break;
+                    case ocIf               : pushLegacyIfJump();           break;
+                    case ocIfError          : pushLegacyIfError(false);     break;
+                    case ocIfNA             : pushLegacyIfError(true);      break;
                     case ocChoose           : ScChooseJump();               break;
                     case ocChooseCols       : ScChooseCols();               break;
                     case ocChooseRows       : ScChooseRows();               break;
@@ -5552,13 +5890,25 @@ StackVar ScInterpreter::Interpret()
                     case ocGreater          : ScGreater();                  break;
                     case ocLessEqual        : ScLessEqual();                break;
                     case ocGreaterEqual     : ScGreaterEqual();             break;
-                    case ocAnd              : ScAnd();                      break;
-                    case ocOr               : ScOr();                       break;
-                    case ocXor              : ScXor();                      break;
+                    case ocAnd              :
+                        pushLegacyLogicalFold(
+                            u"AND", spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                        LogicalFoldMode::And);
+                        break;
+                    case ocOr               :
+                        pushLegacyLogicalFold(
+                            u"OR", spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                       LogicalFoldMode::Or);
+                        break;
+                    case ocXor              :
+                        pushLegacyLogicalFold(
+                            u"XOR", spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                        LogicalFoldMode::Xor);
+                        break;
                     case ocIntersect        : ScIntersect();                break;
                     case ocRange            : ScRangeFunc();                break;
                     case ocUnion            : ScUnionFunc();                break;
-                    case ocNot              : ScNot();                      break;
+                    case ocNot              : pushLegacyNot();              break;
                     case ocNegSub           :
                     case ocNeg              : ScNeg();                      break;
                     case ocPercentSign      : ScPercentSign();              break;
@@ -5838,8 +6188,8 @@ StackVar ScInterpreter::Interpret()
                     case ocConcat           : ScConcat();                   break;
                     case ocConcat_MS        : pushLegacyConcatMs();         break;
                     case ocTextJoin_MS      : ScTextJoin_MS();              break;
-                    case ocIfs_MS           : ScIfs_MS();                   break;
-                    case ocSwitch_MS        : ScSwitch_MS();                break;
+                    case ocIfs_MS           : pushLegacyIfs();              break;
+                    case ocSwitch_MS        : pushLegacySwitch();           break;
                     case ocMinIfs_MS        : ScMinIfs_MS();                break;
                     case ocMaxIfs_MS        : ScMaxIfs_MS();                break;
                     case ocMatValue         : ScMatValue();                 break;

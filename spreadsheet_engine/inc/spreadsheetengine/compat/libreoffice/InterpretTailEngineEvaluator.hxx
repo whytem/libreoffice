@@ -11045,11 +11045,16 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     }
     if (aUpperFunctionName == u"PROB")
         return true;
+    if (aUpperFunctionName == u"IFERROR" || aUpperFunctionName == u"IFNA")
+        return true;
 
     return eFunction == FunctionKind::LogicalConstant
            || eFunction == FunctionKind::FormulaText
            || eFunction == FunctionKind::Conversion
            || eFunction == FunctionKind::InformationPredicate
+           || eFunction == FunctionKind::LogicalFold
+           || eFunction == FunctionKind::Not
+           || eFunction == FunctionKind::Conditional
            || eFunction == FunctionKind::TextUtility
            || eFunction == FunctionKind::Aggregate
            || eFunction == FunctionKind::MatrixMath;

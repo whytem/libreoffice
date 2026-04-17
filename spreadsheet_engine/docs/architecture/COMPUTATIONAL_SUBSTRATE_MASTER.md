@@ -19,10 +19,11 @@ Today:
 - debug and CI-style builds default that seam to `observe`
 - an eighty-three-slice env-independent hard-route cluster is still
   engine-first even with rollout explicitly `off`, and logical constants,
-  formula text, conversion, significant rounding, bitwise, aggregate,
-  matrix determinant, and `PROB` now also have family-local default-on
-  rollout paths
-- eleven real narrow legacy deletion milestones have landed:
+  logical folds, `NOT`, conditionals, text utility, formula text,
+  conversion, information predicates, significant rounding, bitwise,
+  aggregate, matrix determinant, and `PROB` now also have family-local
+  default-on rollout paths
+- fourteen real narrow legacy deletion milestones have landed:
   `ScInterpreter::ScTrue()` / `ScFalse()` are retired behind an explicit
   family-local default-on logical-constant path, and the dedicated
   `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair is retired while
@@ -52,7 +53,11 @@ Today:
   family-local default-on `AGGREGATE(...)` slice, and now the dedicated
   `ScInterpreter::ScProbability()` wrapper is retired behind a narrow
   family-local default-on `PROB(...)` slice while preserving inline nested
-  legacy execution at opcode dispatch
+  legacy execution at opcode dispatch, and now the dedicated text-utility
+  wrappers and information-predicate wrappers are retired behind their
+  family-local default-on paths, and now the dedicated logical-fold /
+  `NOT` / conditional wrappers are retired behind those same narrow
+  default-on paths
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to
@@ -91,7 +96,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_probe_formula_cells=27204`
 - `interpret_tail_live_authoritative_match_total=20761`
 - `interpret_tail_live_authoritative_fallback_total=6443`
-- `legacy_interpreter_subroutine_count=378`
+- `legacy_interpreter_subroutine_count=340`
 - live authoritative-match rate over the corpus: `40.9802%`
 - live authoritative-match rate over the current promoted probe: `76.3160%`
 

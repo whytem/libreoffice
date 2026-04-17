@@ -37,7 +37,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_probe_formula_cells=27204`
 - `interpret_tail_live_authoritative_match_total=20761`
 - `interpret_tail_live_authoritative_fallback_total=6443`
-- `legacy_interpreter_subroutine_count=378`
+- `legacy_interpreter_subroutine_count=340`
 - live authoritative-match rate over the corpus: `40.9802%`
 - live authoritative-match rate over the current promoted probe: `76.3160%`
 
@@ -277,9 +277,10 @@ Today:
 - `authority` mode authoritatively bypasses `ScInterpreter` for supported
   promoted families
 - the env-`off` hard-route boundary now covers an eighty-three-slice
-  quarantine cluster, while logical constants, formula text, conversion,
-  significant rounding, bitwise, aggregate, matrix determinant, and `PROB`
-  now also have family-local default-on rollout paths
+  quarantine cluster, while logical constants, logical folds, `NOT`,
+  conditionals, text utility, formula text, conversion, information
+  predicates, significant rounding, bitwise, aggregate, matrix determinant,
+  and `PROB` now also have family-local default-on rollout paths
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
@@ -301,9 +302,10 @@ Today:
 Still not true:
 
 - no broad default-on rollout exists beyond the narrow logical-constant,
-  formula-text, and conversion families plus the narrow `ROUNDSIG`,
-  bitwise, aggregate, matrix-determinant, and `PROB` slices
-- eleven narrow legacy deletion milestones have landed:
+  logical, conditional, text-utility, formula-text, conversion, and
+  information-predicate families plus the narrow `ROUNDSIG`, bitwise,
+  aggregate, matrix-determinant, and `PROB` slices
+- fourteen narrow legacy deletion milestones have landed:
   `ScInterpreter::ScTrue()` / `ScFalse()` and the dedicated
   `ScGetDateValue()` / `ScGetTimeValue()` wrapper pair, plus the dedicated
   `ScInterpreter::ScFormula()` wrapper, and now the dedicated
@@ -315,8 +317,10 @@ Still not true:
   `ScBitOr()` / `ScBitXor()` / `ScBitLshift()` / `ScBitRshift()`
   wrappers, and now the dedicated `ScInterpreter::ScMatDet()` wrapper,
   and now the dedicated `ScInterpreter::ScAggregate()` wrapper, and now the
-  dedicated `ScInterpreter::ScProbability()` wrapper; broader legacy
-  retirement has not started
+  dedicated `ScInterpreter::ScProbability()` wrapper, and now the dedicated
+  text-utility wrappers, and now the dedicated information-predicate
+  wrappers, and now the dedicated logical-fold / `NOT` / conditional
+  wrappers; broader legacy retirement has not started
 - multiple interpreter hard-route milestones have landed, but full legacy
   opcode retirement has not
 - the dominant retained live blocker is now the broader ambient
