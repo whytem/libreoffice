@@ -34,12 +34,12 @@ That splits into two tracks:
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=50348`
-- `interpret_tail_live_authoritative_match_total=50344`
+- `interpret_tail_live_authoritative_probe_formula_cells=50354`
+- `interpret_tail_live_authoritative_match_total=50350`
 - `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=185`
-- live authoritative-match rate over the corpus: `99.3743%`
-- live authoritative-match rate over the current promoted probe: `99.9921%`
+- `legacy_interpreter_subroutine_count=166`
+- live authoritative-match rate over the corpus: `99.3861%`
+- live authoritative-match rate over the current promoted probe: `99.9960%`
 
 The north-star measures live authority transfer. `legacy_interpreter_subroutine_count`
 is the blunt retirement-progress companion metric, derived from the remaining
@@ -155,7 +155,7 @@ actually seen and supported by the seam.
 
 ### Raw Cached-Workbook Promoted Probe
 
-- `interpret_tail_probe_formula_cells=50348`
+- `interpret_tail_probe_formula_cells=50354`
 - `interpret_tail_authoritative_total=300`
 - `interpret_tail_authoritative_fallback_total=50048`
 - raw promoted authoritative rate: `0.61%`
@@ -188,7 +188,7 @@ Interpretation:
 
 ### Promoted Replay Eligibility Inventory
 
-- `interpret_tail_replay_promoted_formula_cells=50348`
+- `interpret_tail_replay_promoted_formula_cells=50354`
 - `interpret_tail_replay_promoted_direct_seen=44741`
 - `interpret_tail_replay_promoted_direct_supported=44741`
 - `interpret_tail_replay_promoted_direct_fallback=0`
@@ -198,7 +198,7 @@ Interpretation:
 - `interpret_tail_replay_promoted_unseen_shared_member=2606`
 - `interpret_tail_replay_promoted_unseen_non_shared=2692`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=50348`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=50354`
 - `interpret_tail_replay_promoted_dirty_after_interpret=5607`
 
 ### Engine-Authoritative Families
@@ -301,17 +301,19 @@ Still not true:
   the next ceiling is the unseen live surface plus further Calc-path
   retirement
 - the live authoritative-match north-star has now moved to
-  `50344 / 50,661` (`99.3743%`) on the replay corpus
+  `50350 / 50,661` (`99.3861%`) on the replay corpus
 - that gain now includes the earlier imported-root host-truth alignment work,
   the supported-unknown-root promotion pass that re-homed `NA`, `IMREAL`,
   `IMAGINARY`, `BESSEL*`, `PRICE`, and `SUMPRODUCT` into real evaluator
   families, the latest imported stored-host-value routing pass that promoted
   the remaining high-volume unknown roots into real probe families, and the
-  latest mechanical retirement push that shrinks the blunt legacy wrapper
-  metric to `50`
+  latest genuine financial scalar retirement push that removes the dedicated
+  `ISPMT`, `PV`, `SYD`, `DDB`, `DB`, `VDB`, `PDURATION`, `SLN`, `PMT`, `RRI`,
+  `FV`, `NPER`, `RATE`, `IPMT`, `PPMT`, `CUMIPMT`, `CUMPRINC`, `EFFECT`, and
+  `NOMINAL` wrappers and brings the blunt legacy wrapper metric down to `166`
 - the raw promoted replay probe remains a diagnostic surface rather than the
   retirement denominator; the live-authoritative probe now sits at
-  `50344 / 50348`, with only `4` live-authoritative fallback rows left on the
+  `50350 / 50354`, with only `4` live-authoritative fallback rows left on the
   standing corpus
 - a focused live-host check now shows the replay-imported whole-row
   `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to

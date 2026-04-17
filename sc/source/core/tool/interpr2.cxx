@@ -558,23 +558,6 @@ void ScInterpreter::ScMIRR()
     }
 }
 
-void ScInterpreter::ScISPMT()
-{   // rate ; period ; total_periods ; invest
-    if( MustHaveParamCount( GetByte(), 4 ) )
-    {
-        double fInvest = GetDouble();
-        double fTotal = GetDouble();
-        double fPeriod = GetDouble();
-        double fRate = GetDouble();
-
-        if( nGlobalError != FormulaError::NONE )
-            PushError( nGlobalError);
-        else
-            PushDouble( semath::computeInterestSchedulePayment(
-                fRate, fPeriod, fTotal, fInvest ) );
-    }
-}
-
 // financial functions
 double ScInterpreter::ScGetPV(double fRate, double fNper, double fPmt,
                               double fFv, bool bPayInAdvance)
@@ -582,79 +565,10 @@ double ScInterpreter::ScGetPV(double fRate, double fNper, double fPmt,
     return semath::computePresentValue(fRate, fNper, fPmt, fFv, bPayInAdvance);
 }
 
-void ScInterpreter::ScPV()
-{
-    nFuncFmtType = SvNumFormatType::CURRENCY;
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 3, 5 ) )
-        return;
-
-    bool bPayInAdvance = nParamCount == 5 && GetBool();
-    double fFv   = nParamCount >= 4 ? GetDouble() : 0;
-    double fPmt  = GetDouble();
-    double fNper = GetDouble();
-    double fRate = GetDouble();
-    PushDouble(ScGetPV(fRate, fNper, fPmt, fFv, bPayInAdvance));
-}
-
-void ScInterpreter::ScSYD()
-{
-    nFuncFmtType = SvNumFormatType::CURRENCY;
-    if ( MustHaveParamCount( GetByte(), 4 ) )
-    {
-        double fPer = GetDouble();
-        double fLife = GetDouble();
-        double fSalvage = GetDouble();
-        double fCost = GetDouble();
-        PushDouble(semath::computeSumOfYearsDepreciation(fCost, fSalvage, fLife, fPer));
-    }
-}
-
 double ScInterpreter::ScGetDDB(double fCost, double fSalvage, double fLife,
                 double fPeriod, double fFactor)
 {
     return semath::computeDoubleDecliningBalance(fCost, fSalvage, fLife, fPeriod, fFactor);
-}
-
-void ScInterpreter::ScDDB()
-{
-    nFuncFmtType = SvNumFormatType::CURRENCY;
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 4, 5 ) )
-        return;
-
-    double fFactor = nParamCount == 5 ? GetDouble() : 2.0;
-    double fPeriod = GetDouble();
-    double fLife   = GetDouble();
-    double fSalvage    = GetDouble();
-    double fCost    = GetDouble();
-    if (fCost < 0.0 || fSalvage < 0.0 || fFactor <= 0.0 || fSalvage > fCost
-                    || fPeriod < 1.0 || fPeriod > fLife)
-        PushIllegalArgument();
-    else
-        PushDouble(ScGetDDB(fCost, fSalvage, fLife, fPeriod, fFactor));
-}
-
-void ScInterpreter::ScDB()
-{
-    nFuncFmtType = SvNumFormatType::CURRENCY;
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 4, 5 ) )
-        return ;
-    double fMonths = nParamCount == 4 ? 12.0 : ::rtl::math::approxFloor(GetDouble());
-    double fPeriod = GetDouble();
-    double fLife = GetDouble();
-    double fSalvage = GetDouble();
-    double fCost = GetDouble();
-    if (fMonths < 1.0 || fMonths > 12.0 || fLife > 1200.0 || fSalvage < 0.0 ||
-        fPeriod > (fLife + 1.0) || fSalvage > fCost || fCost <= 0.0 ||
-        fLife <= 0 || fPeriod <= 0 )
-    {
-        PushIllegalArgument();
-        return;
-    }
-    PushDouble(semath::computeFixedDecliningBalance(
-        fCost, fSalvage, fLife, fPeriod, fMonths));
 }
 
 double ScInterpreter::ScInterVDB(double fCost, double fSalvage, double fLife,
@@ -664,152 +578,16 @@ double ScInterpreter::ScInterVDB(double fCost, double fSalvage, double fLife,
         fCost, fSalvage, fLife, fLife1, fPeriod, fFactor);
 }
 
-void ScInterpreter::ScVDB()
-{
-    nFuncFmtType = SvNumFormatType::CURRENCY;
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 5, 7 ) )
-        return;
-
-    KahanSum fVdb = 0.0;
-    bool bNoSwitch = nParamCount == 7 && GetBool();
-    double  fFactor = nParamCount >= 6 ? GetDouble() : 2.0;
-    double fEnd   = GetDouble();
-    double fStart = GetDouble();
-    double fLife  = GetDouble();
-    double fSalvage   = GetDouble();
-    double fCost   = GetDouble();
-    if (fStart < 0.0 || fEnd < fStart || fEnd > fLife || fCost < 0.0
-                      || fSalvage > fCost || fFactor <= 0.0)
-        PushIllegalArgument();
-    else
-        fVdb = semath::computeVariableDecliningBalance(
-            fCost, fSalvage, fLife, fStart, fEnd, fFactor, bNoSwitch);
-    PushDouble(fVdb.get());
-}
-
-void ScInterpreter::ScPDuration()
-{
-    if ( MustHaveParamCount( GetByte(), 3 ) )
-    {
-        double fFuture = GetDouble();
-        double fPresent = GetDouble();
-        double fRate = GetDouble();
-        if ( fFuture <= 0.0 || fPresent <= 0.0 || fRate <= 0.0 )
-            PushIllegalArgument();
-        else
-            PushDouble( semath::computePaybackDuration( fRate, fPresent, fFuture ) );
-    }
-}
-
-void ScInterpreter::ScSLN()
-{
-    nFuncFmtType = SvNumFormatType::CURRENCY;
-    if ( MustHaveParamCount( GetByte(), 3 ) )
-    {
-        double fLife = GetDouble();
-        double fSalvage = GetDouble();
-        double fCost = GetDouble();
-        PushDouble(semath::computeStraightLineDepreciation(fCost, fSalvage, fLife));
-    }
-}
-
 double ScInterpreter::ScGetPMT(double fRate, double fNper, double fPv,
                        double fFv, bool bPayInAdvance)
 {
     return semath::computePayment(fRate, fNper, fPv, fFv, bPayInAdvance);
 }
 
-void ScInterpreter::ScPMT()
-{
-    nFuncFmtType = SvNumFormatType::CURRENCY;
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 3, 5 ) )
-        return;
-    bool bPayInAdvance = nParamCount == 5 && GetBool();
-    double fFv   = nParamCount >= 4 ? GetDouble() : 0;
-    double fPv   = GetDouble();
-    double fNper = GetDouble();
-    double fRate = GetDouble();
-    PushDouble(ScGetPMT(fRate, fNper, fPv, fFv, bPayInAdvance));
-}
-
-void ScInterpreter::ScRRI()
-{
-    nFuncFmtType = SvNumFormatType::PERCENT;
-    if ( MustHaveParamCount( GetByte(), 3 ) )
-    {
-        double fFutureValue = GetDouble();
-        double fPresentValue = GetDouble();
-        double fNrOfPeriods = GetDouble();
-        if ( fNrOfPeriods <= 0.0  || fPresentValue == 0.0 )
-            PushIllegalArgument();
-        else
-            PushDouble(semath::computeGrowthRateOverPeriods(
-                fNrOfPeriods, fPresentValue, fFutureValue));
-    }
-}
-
 double ScInterpreter::ScGetFV(double fRate, double fNper, double fPmt,
                               double fPv, bool bPayInAdvance)
 {
     return semath::computeFutureValue(fRate, fNper, fPmt, fPv, bPayInAdvance);
-}
-
-void ScInterpreter::ScFV()
-{
-    nFuncFmtType = SvNumFormatType::CURRENCY;
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 3, 5 ) )
-        return;
-    bool bPayInAdvance = nParamCount == 5 && GetBool();
-    double fPv   = nParamCount >= 4 ? GetDouble() : 0;
-    double fPmt  = GetDouble();
-    double fNper = GetDouble();
-    double fRate = GetDouble();
-    PushDouble(ScGetFV(fRate, fNper, fPmt, fPv, bPayInAdvance));
-}
-
-void ScInterpreter::ScNper()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 3, 5 ) )
-        return;
-    bool bPayInAdvance = nParamCount == 5 && GetBool();
-    double fFV   = nParamCount >= 4 ? GetDouble() : 0;
-    double fPV   = GetDouble();      // Present Value
-    double fPmt  = GetDouble();      // Payment
-    double fRate = GetDouble();
-    PushDouble(semath::computePeriodsForFutureValue(
-        fRate, fPmt, fPV, fFV, bPayInAdvance));
-}
-
-// In Calc UI it is the function RATE(Nper;Pmt;Pv;Fv;Type;Guess)
-void ScInterpreter::ScRate()
-{
-    nFuncFmtType = SvNumFormatType::PERCENT;
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 3, 6 ) )
-        return;
-
-    // defaults for missing arguments, see ODFF spec
-    double fGuess = nParamCount == 6 ? GetDouble() : 0.1;
-    bool bDefaultGuess = nParamCount != 6;
-    bool bPayType = nParamCount >= 5 && GetBool();
-    double fFv = nParamCount >= 4 ? GetDouble() : 0;
-    double fPv = GetDouble();
-    double fPayment = GetDouble();
-    double fNper = GetDouble();
-    if (fNper <= 0.0) // constraint from ODFF spec
-    {
-        PushIllegalArgument();
-        return;
-    }
-    const semath::FinancialRateResult aResult = semath::solveRate(
-        fNper, fPayment, fPv, fFv, bPayType, fGuess, bDefaultGuess);
-    if (!aResult.mbConverged)
-        SetError(FormulaError::NoConvergence);
-    PushDouble(aResult.mfRate);
 }
 
 double ScInterpreter::ScGetIpmt(double fRate, double fPer, double fNper, double fPv,
@@ -820,133 +598,6 @@ double ScInterpreter::ScGetIpmt(double fRate, double fPer, double fNper, double 
     fPmt = aResult.mfPayment;
     nFuncFmtType = SvNumFormatType::CURRENCY;
     return aResult.mfInterest;
-}
-
-void ScInterpreter::ScIpmt()
-{
-    nFuncFmtType = SvNumFormatType::CURRENCY;
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 4, 6 ) )
-        return;
-    bool bPayInAdvance = nParamCount == 6 && GetBool();
-    double fFv   = nParamCount >= 5 ? GetDouble() : 0;
-    double fPv   = GetDouble();
-    double fNper = GetDouble();
-    double fPer  = GetDouble();
-    double fRate = GetDouble();
-    if (fPer < 1.0 || fPer > fNper)
-        PushIllegalArgument();
-    else
-    {
-        double fPmt;
-        PushDouble(ScGetIpmt(fRate, fPer, fNper, fPv, fFv, bPayInAdvance, fPmt));
-    }
-}
-
-void ScInterpreter::ScPpmt()
-{
-    nFuncFmtType = SvNumFormatType::CURRENCY;
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 4, 6 ) )
-        return;
-    bool bPayInAdvance = nParamCount == 6 && GetBool();
-    double fFv   = nParamCount >= 5 ? GetDouble() : 0;
-    double fPv   = GetDouble();
-    double fNper = GetDouble();
-    double fPer  = GetDouble();
-    double fRate = GetDouble();
-    if (fPer < 1.0 || fPer > fNper)
-        PushIllegalArgument();
-    else
-    {
-        double fPmt;
-        double fInterestPer = ScGetIpmt(fRate, fPer, fNper, fPv, fFv, bPayInAdvance, fPmt);
-        PushDouble(fPmt - fInterestPer);
-    }
-}
-
-void ScInterpreter::ScCumIpmt()
-{
-    nFuncFmtType = SvNumFormatType::CURRENCY;
-    if ( !MustHaveParamCount( GetByte(), 6 ) )
-        return;
-
-    double fFlag  = GetDoubleWithDefault( -1.0 );
-    double fEnd   = ::rtl::math::approxFloor(GetDouble());
-    double fStart = ::rtl::math::approxFloor(GetDouble());
-    double fPv    = GetDouble();
-    double fNper  = GetDouble();
-    double fRate  = GetDouble();
-    if (fStart < 1.0 || fEnd < fStart || fRate <= 0.0 ||
-        fEnd > fNper  || fNper <= 0.0 || fPv <= 0.0 ||
-        ( fFlag != 0.0 && fFlag != 1.0 ))
-        PushIllegalArgument();
-    else
-    {
-        bool bPayInAdvance = static_cast<bool>(fFlag);
-        PushDouble(semath::computeCumulativeInterest(
-            fRate, fStart, fEnd, fNper, fPv, 0.0, bPayInAdvance));
-    }
-}
-
-void ScInterpreter::ScCumPrinc()
-{
-    nFuncFmtType = SvNumFormatType::CURRENCY;
-    if ( !MustHaveParamCount( GetByte(), 6 ) )
-        return;
-
-    double fFlag  = GetDoubleWithDefault( -1.0 );
-    double fEnd   = ::rtl::math::approxFloor(GetDouble());
-    double fStart = ::rtl::math::approxFloor(GetDouble());
-    double fPv    = GetDouble();
-    double fNper  = GetDouble();
-    double fRate  = GetDouble();
-    if (fStart < 1.0 || fEnd < fStart || fRate <= 0.0 ||
-        fEnd > fNper  || fNper <= 0.0 || fPv <= 0.0 ||
-        ( fFlag != 0.0 && fFlag != 1.0 ))
-        PushIllegalArgument();
-    else
-    {
-        bool bPayInAdvance = static_cast<bool>(fFlag);
-        PushDouble(semath::computeCumulativePrincipal(
-            fRate, fStart, fEnd, fNper, fPv, 0.0, bPayInAdvance));
-    }
-}
-
-void ScInterpreter::ScEffect()
-{
-    nFuncFmtType = SvNumFormatType::PERCENT;
-    if ( !MustHaveParamCount( GetByte(), 2 ) )
-        return;
-
-    double fPeriods = GetDouble();
-    double fNominal = GetDouble();
-    if (fPeriods < 1.0 || fNominal < 0.0)
-        PushIllegalArgument();
-    else if ( fNominal == 0.0 )
-        PushDouble( 0.0 );
-    else
-    {
-        fPeriods = ::rtl::math::approxFloor(fPeriods);
-        PushDouble(semath::computeEffectiveAnnualRate(fNominal, fPeriods));
-    }
-}
-
-void ScInterpreter::ScNominal()
-{
-    nFuncFmtType = SvNumFormatType::PERCENT;
-    if ( MustHaveParamCount( GetByte(), 2 ) )
-    {
-        double fPeriods = GetDouble();
-        double fEffective = GetDouble();
-        if (fPeriods < 1.0 || fEffective <= 0.0)
-            PushIllegalArgument();
-        else
-        {
-            fPeriods = ::rtl::math::approxFloor(fPeriods);
-            PushDouble(semath::computeNominalAnnualRate(fEffective, fPeriods));
-        }
-    }
 }
 
 void ScInterpreter::ScIntersect()

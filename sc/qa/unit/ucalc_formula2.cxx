@@ -3846,6 +3846,46 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorFinancialScal
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorFinancialScalarDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineFinancialScalarDefaultOn"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 0, 0, u"=PMT(0.01;12;1000;0;0)"_ustr);
+        m_pDoc->SetString(1, 0, 0, u"=RATE(12;-88.8487886783416;1000;0;0;0.01)"_ustr);
+        m_pDoc->SetString(2, 0, 0, u"=VDB(35000;7500;36;10;20;2)"_ustr);
+        m_pDoc->SetString(3, 0, 0, u"=EFFECT(0.05;12)"_ustr);
+        m_pDoc->SetString(4, 0, 0, u"=NOMINAL(0.051161897881733;12)"_ustr);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(-88.8487886783416, m_pDoc->GetValue(0, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.01, m_pDoc->GetValue(1, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(8603.80245372397, m_pDoc->GetValue(2, 0, 0), 1e-9);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.05116189788173319, m_pDoc->GetValue(3, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.05, m_pDoc->GetValue(4, 0, 0), 1e-12);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 5);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Rate)]
+            >= 5);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Rate)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorDateConstructExtractAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

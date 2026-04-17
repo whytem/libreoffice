@@ -1009,9 +1009,15 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
         return FunctionKind::TimeValue;
     if (rFunctionName == u"NUMBERVALUE")
         return FunctionKind::NumberValue;
-    if (rFunctionName == u"RATE")
-        return FunctionKind::Rate;
-    if (rFunctionName == u"VDB" || rFunctionName == u"PRICE"
+    if (rFunctionName == u"RATE" || rFunctionName == u"PV" || rFunctionName == u"FV"
+        || rFunctionName == u"PMT" || rFunctionName == u"NPV" || rFunctionName == u"RRI"
+        || rFunctionName == u"ISPMT" || rFunctionName == u"IPMT"
+        || rFunctionName == u"PPMT" || rFunctionName == u"CUMIPMT"
+        || rFunctionName == u"CUMPRINC" || rFunctionName == u"DDB"
+        || rFunctionName == u"DB" || rFunctionName == u"VDB"
+        || rFunctionName == u"SLN" || rFunctionName == u"SYD"
+        || rFunctionName == u"EFFECT" || rFunctionName == u"NOMINAL"
+        || rFunctionName == u"PDURATION" || rFunctionName == u"PRICE"
         || rFunctionName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETPRICE")
         return FunctionKind::Rate;
     if (rFunctionName == u"ROUND" || rFunctionName == u"ROUNDUP" || rFunctionName == u"ROUNDDOWN")
@@ -6553,6 +6559,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
 {
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+
     auto materializeArgument = [&](const core::formula::Node& rArgument)
         -> Materialization<api::CellValue> {
         return materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
@@ -6579,9 +6587,616 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         return makeMaterializedValue(aNumber.maValue);
     };
 
+    const auto collectNumericSeriesValues = [&]() -> Materialization<std::vector<double>> {
+        if (rNode.maChildren.size() < 2)
+            return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+
+        std::vector<double> aValues;
+        for (std::size_t nIndex = 1; nIndex < rNode.maChildren.size(); ++nIndex)
+        {
+            const auto& rxChild = rNode.maChildren[nIndex];
+            if (!rxChild)
+                return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+
+            const bool bMatrixLike = rxChild->meKind == core::formula::NodeKind::CellReference
+                                     || rxChild->meKind == core::formula::NodeKind::RangeReference
+                                     || rxChild->meKind == core::formula::NodeKind::NamedReference
+                                     || rxChild->meKind == core::formula::NodeKind::ArrayConstant
+                                     || rxChild->meKind == core::formula::NodeKind::BinaryOperation
+                                     || rxChild->meKind == core::formula::NodeKind::FunctionCall;
+            if (bMatrixLike)
+            {
+                const auto aMatrix = materializeMatrixNode(*rxChild, rDoc, rContext, rFormulaPos);
+                if (!aMatrix.mbSupported)
+                    return makeUnsupportedMaterialization<std::vector<double>>(
+                        aMatrix.meFallbackReason);
+                if (!aMatrix.moValue)
+                    return makeMaterializedError<std::vector<double>>(aMatrix.meError);
+
+                SCSIZE nColumns = 0;
+                SCSIZE nRows = 0;
+                (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+                for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+                {
+                    for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                    {
+                        const auto aValue = lookupexecution::detail::toApiCellValue(
+                            (*aMatrix.moValue)->Get(nColumn, nRow));
+                        if (aValue.isEmpty())
+                            continue;
+                        if (aValue.isText())
+                            return makeMaterializedError<std::vector<double>>(
+                                api::Error::IllegalArgument);
+
+                        const auto aNumber = coerceScalarToNumber(rDoc, rContext, aValue);
+                        if (!aNumber)
+                            return makeMaterializedError<std::vector<double>>(aNumber.meError);
+                        aValues.push_back(aNumber.maValue);
+                    }
+                }
+                continue;
+            }
+
+            const auto aScalar = materializeScalarNode(*rxChild, rDoc, rContext, rFormulaPos);
+            if (!aScalar.mbSupported)
+                return makeUnsupportedMaterialization<std::vector<double>>(
+                    aScalar.meFallbackReason);
+            if (!aScalar.moValue)
+                return makeMaterializedError<std::vector<double>>(aScalar.meError);
+            if (aScalar.moValue->isEmpty())
+                continue;
+            if (aScalar.moValue->isText())
+                return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+
+            const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aScalar.moValue);
+            if (!aNumber)
+                return makeMaterializedError<std::vector<double>>(aNumber.meError);
+            aValues.push_back(aNumber.maValue);
+        }
+
+        return makeMaterializedValue(std::move(aValues));
+    };
+
     if (eFunction == FunctionKind::Rate)
     {
-        if (uppercaseAscii(rNode.maPrimaryText) == u"VDB")
+        if (aFunctionName == u"FV" || aFunctionName == u"PV" || aFunctionName == u"PMT")
+        {
+            if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 5)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+            const auto aRate = materializeNumericArgument(*rNode.maChildren[0], 0.0);
+            if (!aRate.mbSupported)
+                return makeUnsupported(eFunction, aRate.meFallbackReason);
+            if (!aRate.moValue)
+                return makeErrorResult(eFunction, aRate.meError);
+            const auto aNper = materializeNumericArgument(*rNode.maChildren[1], 0.0);
+            if (!aNper.mbSupported)
+                return makeUnsupported(eFunction, aNper.meFallbackReason);
+            if (!aNper.moValue)
+                return makeErrorResult(eFunction, aNper.meError);
+            const auto aPayment = materializeNumericArgument(*rNode.maChildren[2], 0.0);
+            if (!aPayment.mbSupported)
+                return makeUnsupported(eFunction, aPayment.meFallbackReason);
+            if (!aPayment.moValue)
+                return makeErrorResult(eFunction, aPayment.meError);
+
+            double fEndpoint = 0.0;
+            if (rNode.maChildren.size() >= 4)
+            {
+                const auto aEndpoint = materializeNumericArgument(*rNode.maChildren[3], 0.0);
+                if (!aEndpoint.mbSupported)
+                    return makeUnsupported(eFunction, aEndpoint.meFallbackReason);
+                if (!aEndpoint.moValue)
+                    return makeErrorResult(eFunction, aEndpoint.meError);
+                fEndpoint = *aEndpoint.moValue;
+            }
+
+            bool bPayInAdvance = false;
+            if (rNode.maChildren.size() == 5)
+            {
+                const auto aPayType = materializeArgument(*rNode.maChildren[4]);
+                if (!aPayType.mbSupported)
+                    return makeUnsupported(eFunction, aPayType.meFallbackReason);
+                if (!aPayType.moValue)
+                    return makeErrorResult(eFunction, aPayType.meError);
+                if (!aPayType.moValue->isEmpty())
+                {
+                    const auto aBool = coerceScalarToBool(rDoc, rContext, *aPayType.moValue);
+                    if (!aBool)
+                        return makeErrorResult(eFunction, aBool.meError);
+                    bPayInAdvance = aBool.maValue;
+                }
+            }
+
+            if (aFunctionName == u"FV")
+            {
+                const auto aResult = spreadsheetengine::core::finance::evaluateFutureValue(
+                    *aRate.moValue, *aNper.moValue, *aPayment.moValue, fEndpoint, bPayInAdvance);
+                if (!aResult)
+                    return makeErrorResult(eFunction, aResult.meError);
+                return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::CURRENCY);
+            }
+            if (aFunctionName == u"PV")
+            {
+                const auto aResult = spreadsheetengine::core::finance::evaluatePresentValue(
+                    *aRate.moValue, *aNper.moValue, *aPayment.moValue, fEndpoint, bPayInAdvance);
+                if (!aResult)
+                    return makeErrorResult(eFunction, aResult.meError);
+                return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::CURRENCY);
+            }
+            const auto aResult = spreadsheetengine::core::finance::evaluatePayment(
+                *aRate.moValue, *aNper.moValue, *aPayment.moValue, fEndpoint, bPayInAdvance);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::CURRENCY);
+        }
+
+        if (aFunctionName == u"NPER")
+        {
+            if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 5)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+            const auto aRate = materializeNumericArgument(*rNode.maChildren[0], 0.0);
+            if (!aRate.mbSupported)
+                return makeUnsupported(eFunction, aRate.meFallbackReason);
+            if (!aRate.moValue)
+                return makeErrorResult(eFunction, aRate.meError);
+            const auto aPayment = materializeNumericArgument(*rNode.maChildren[1], 0.0);
+            if (!aPayment.mbSupported)
+                return makeUnsupported(eFunction, aPayment.meFallbackReason);
+            if (!aPayment.moValue)
+                return makeErrorResult(eFunction, aPayment.meError);
+            const auto aPresentValue = materializeNumericArgument(*rNode.maChildren[2], 0.0);
+            if (!aPresentValue.mbSupported)
+                return makeUnsupported(eFunction, aPresentValue.meFallbackReason);
+            if (!aPresentValue.moValue)
+                return makeErrorResult(eFunction, aPresentValue.meError);
+
+            double fFutureValue = 0.0;
+            if (rNode.maChildren.size() >= 4)
+            {
+                const auto aFutureValue = materializeNumericArgument(*rNode.maChildren[3], 0.0);
+                if (!aFutureValue.mbSupported)
+                    return makeUnsupported(eFunction, aFutureValue.meFallbackReason);
+                if (!aFutureValue.moValue)
+                    return makeErrorResult(eFunction, aFutureValue.meError);
+                fFutureValue = *aFutureValue.moValue;
+            }
+
+            bool bPayInAdvance = false;
+            if (rNode.maChildren.size() == 5)
+            {
+                const auto aPayType = materializeArgument(*rNode.maChildren[4]);
+                if (!aPayType.mbSupported)
+                    return makeUnsupported(eFunction, aPayType.meFallbackReason);
+                if (!aPayType.moValue)
+                    return makeErrorResult(eFunction, aPayType.meError);
+                if (!aPayType.moValue->isEmpty())
+                {
+                    const auto aBool = coerceScalarToBool(rDoc, rContext, *aPayType.moValue);
+                    if (!aBool)
+                        return makeErrorResult(eFunction, aBool.meError);
+                    bPayInAdvance = aBool.maValue;
+                }
+            }
+
+            const auto aResult = spreadsheetengine::core::finance::evaluatePeriodsForFutureValue(
+                *aRate.moValue, *aPayment.moValue, *aPresentValue.moValue, fFutureValue,
+                bPayInAdvance);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::NUMBER);
+        }
+
+        if (aFunctionName == u"NOMINAL")
+        {
+            if (rNode.maChildren.size() != 2)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+            const auto aRate = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+            if (!aRate.mbSupported)
+                return makeUnsupported(eFunction, aRate.meFallbackReason);
+            if (!aRate.moValue)
+                return makeErrorResult(eFunction, aRate.meError);
+            const auto aPeriods = materializeNumericArgument(*rNode.maChildren[1], std::nullopt);
+            if (!aPeriods.mbSupported)
+                return makeUnsupported(eFunction, aPeriods.meFallbackReason);
+            if (!aPeriods.moValue)
+                return makeErrorResult(eFunction, aPeriods.meError);
+
+            const auto aResult = spreadsheetengine::core::finance::evaluateNominal(
+                *aRate.moValue, *aPeriods.moValue);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::PERCENT);
+        }
+
+        if (aFunctionName == u"EFFECT")
+        {
+            if (rNode.maChildren.size() != 2)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+            const auto aNominal = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+            if (!aNominal.mbSupported)
+                return makeUnsupported(eFunction, aNominal.meFallbackReason);
+            if (!aNominal.moValue)
+                return makeErrorResult(eFunction, aNominal.meError);
+            const auto aPeriods = materializeNumericArgument(*rNode.maChildren[1], std::nullopt);
+            if (!aPeriods.mbSupported)
+                return makeUnsupported(eFunction, aPeriods.meFallbackReason);
+            if (!aPeriods.moValue)
+                return makeErrorResult(eFunction, aPeriods.meError);
+
+            const auto aResult = spreadsheetengine::core::finance::evaluateEffectiveAnnualRate(
+                *aNominal.moValue, *aPeriods.moValue);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::PERCENT);
+        }
+
+        if (aFunctionName == u"NPV")
+        {
+            const auto aRate = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+            if (!aRate.mbSupported)
+                return makeUnsupported(eFunction, aRate.meFallbackReason);
+            if (!aRate.moValue)
+                return makeErrorResult(eFunction, aRate.meError);
+            const auto aValues = collectNumericSeriesValues();
+            if (!aValues.mbSupported)
+                return makeUnsupported(eFunction, aValues.meFallbackReason);
+            if (!aValues.moValue)
+                return makeErrorResult(eFunction, aValues.meError);
+
+            const auto aResult = spreadsheetengine::core::finance::evaluateNetPresentValueNumbers(
+                *aRate.moValue, *aValues.moValue);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::CURRENCY);
+        }
+
+        if (aFunctionName == u"RRI")
+        {
+            if (rNode.maChildren.size() != 3)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            const auto aPeriods = materializeNumericArgument(*rNode.maChildren[0], 0.0);
+            const auto aPresentValue = materializeNumericArgument(*rNode.maChildren[1], 0.0);
+            const auto aFutureValue = materializeNumericArgument(*rNode.maChildren[2], 0.0);
+            if (!aPeriods.mbSupported)
+                return makeUnsupported(eFunction, aPeriods.meFallbackReason);
+            if (!aPresentValue.mbSupported)
+                return makeUnsupported(eFunction, aPresentValue.meFallbackReason);
+            if (!aFutureValue.mbSupported)
+                return makeUnsupported(eFunction, aFutureValue.meFallbackReason);
+            if (!aPeriods.moValue || !aPresentValue.moValue || !aFutureValue.moValue)
+                return makeErrorResult(
+                    eFunction, !aPeriods.moValue    ? aPeriods.meError
+                               : !aPresentValue.moValue ? aPresentValue.meError
+                                                        : aFutureValue.meError);
+
+            const auto aResult = spreadsheetengine::core::finance::evaluateGrowthRateOverPeriods(
+                *aPeriods.moValue, *aPresentValue.moValue, *aFutureValue.moValue);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::PERCENT);
+        }
+
+        if (aFunctionName == u"ISPMT")
+        {
+            if (rNode.maChildren.size() != 4)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            const auto aRate = materializeNumericArgument(*rNode.maChildren[0], 0.0);
+            const auto aPeriod = materializeNumericArgument(*rNode.maChildren[1], 0.0);
+            const auto aTotal = materializeNumericArgument(*rNode.maChildren[2], 0.0);
+            const auto aInvest = materializeNumericArgument(*rNode.maChildren[3], 0.0);
+            if (!aRate.mbSupported)
+                return makeUnsupported(eFunction, aRate.meFallbackReason);
+            if (!aPeriod.mbSupported)
+                return makeUnsupported(eFunction, aPeriod.meFallbackReason);
+            if (!aTotal.mbSupported)
+                return makeUnsupported(eFunction, aTotal.meFallbackReason);
+            if (!aInvest.mbSupported)
+                return makeUnsupported(eFunction, aInvest.meFallbackReason);
+            if (!aRate.moValue || !aPeriod.moValue || !aTotal.moValue || !aInvest.moValue)
+                return makeErrorResult(
+                    eFunction, !aRate.moValue      ? aRate.meError
+                               : !aPeriod.moValue  ? aPeriod.meError
+                               : !aTotal.moValue   ? aTotal.meError
+                                                   : aInvest.meError);
+
+            const auto aResult = spreadsheetengine::core::finance::evaluateInterestSchedulePayment(
+                *aRate.moValue, *aPeriod.moValue, *aTotal.moValue, *aInvest.moValue);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::NUMBER);
+        }
+
+        if (aFunctionName == u"IPMT" || aFunctionName == u"PPMT")
+        {
+            if (rNode.maChildren.size() < 4 || rNode.maChildren.size() > 6)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            const auto aRate = materializeNumericArgument(*rNode.maChildren[0], 0.0);
+            const auto aPeriod = materializeNumericArgument(*rNode.maChildren[1], 0.0);
+            const auto aTotal = materializeNumericArgument(*rNode.maChildren[2], 0.0);
+            const auto aPresentValue = materializeNumericArgument(*rNode.maChildren[3], 0.0);
+            if (!aRate.mbSupported)
+                return makeUnsupported(eFunction, aRate.meFallbackReason);
+            if (!aPeriod.mbSupported)
+                return makeUnsupported(eFunction, aPeriod.meFallbackReason);
+            if (!aTotal.mbSupported)
+                return makeUnsupported(eFunction, aTotal.meFallbackReason);
+            if (!aPresentValue.mbSupported)
+                return makeUnsupported(eFunction, aPresentValue.meFallbackReason);
+            if (!aRate.moValue || !aPeriod.moValue || !aTotal.moValue || !aPresentValue.moValue)
+                return makeErrorResult(
+                    eFunction, !aRate.moValue ? aRate.meError
+                               : !aPeriod.moValue ? aPeriod.meError
+                               : !aTotal.moValue ? aTotal.meError
+                                                 : aPresentValue.meError);
+
+            double fFutureValue = 0.0;
+            if (rNode.maChildren.size() >= 5)
+            {
+                const auto aFutureValue = materializeNumericArgument(*rNode.maChildren[4], 0.0);
+                if (!aFutureValue.mbSupported)
+                    return makeUnsupported(eFunction, aFutureValue.meFallbackReason);
+                if (!aFutureValue.moValue)
+                    return makeErrorResult(eFunction, aFutureValue.meError);
+                fFutureValue = *aFutureValue.moValue;
+            }
+
+            bool bPayInAdvance = false;
+            if (rNode.maChildren.size() == 6)
+            {
+                const auto aPayType = materializeArgument(*rNode.maChildren[5]);
+                if (!aPayType.mbSupported)
+                    return makeUnsupported(eFunction, aPayType.meFallbackReason);
+                if (!aPayType.moValue)
+                    return makeErrorResult(eFunction, aPayType.meError);
+                if (!aPayType.moValue->isEmpty())
+                {
+                    const auto aBool = coerceScalarToBool(rDoc, rContext, *aPayType.moValue);
+                    if (!aBool)
+                        return makeErrorResult(eFunction, aBool.meError);
+                    bPayInAdvance = aBool.maValue;
+                }
+            }
+
+            if (aFunctionName == u"IPMT")
+            {
+                const auto aResult = spreadsheetengine::core::finance::evaluateInterestPayment(
+                    *aRate.moValue, *aPeriod.moValue, *aTotal.moValue,
+                    *aPresentValue.moValue, fFutureValue, bPayInAdvance);
+                if (!aResult)
+                    return makeErrorResult(eFunction, aResult.meError);
+                return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::CURRENCY);
+            }
+
+            const auto aResult = spreadsheetengine::core::finance::evaluatePrincipalPayment(
+                *aRate.moValue, *aPeriod.moValue, *aTotal.moValue, *aPresentValue.moValue,
+                fFutureValue, bPayInAdvance);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::CURRENCY);
+        }
+
+        if (aFunctionName == u"CUMIPMT" || aFunctionName == u"CUMPRINC")
+        {
+            if (rNode.maChildren.size() != 6)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            const auto aRate = materializeNumericArgument(*rNode.maChildren[0], 0.0);
+            const auto aTotal = materializeNumericArgument(*rNode.maChildren[1], 0.0);
+            const auto aPresentValue = materializeNumericArgument(*rNode.maChildren[2], 0.0);
+            const auto aStart = materializeNumericArgument(*rNode.maChildren[3], 0.0);
+            const auto aEnd = materializeNumericArgument(*rNode.maChildren[4], 0.0);
+            if (!aRate.mbSupported)
+                return makeUnsupported(eFunction, aRate.meFallbackReason);
+            if (!aTotal.mbSupported)
+                return makeUnsupported(eFunction, aTotal.meFallbackReason);
+            if (!aPresentValue.mbSupported)
+                return makeUnsupported(eFunction, aPresentValue.meFallbackReason);
+            if (!aStart.mbSupported)
+                return makeUnsupported(eFunction, aStart.meFallbackReason);
+            if (!aEnd.mbSupported)
+                return makeUnsupported(eFunction, aEnd.meFallbackReason);
+            if (!aRate.moValue || !aTotal.moValue || !aPresentValue.moValue || !aStart.moValue
+                || !aEnd.moValue)
+                return makeErrorResult(
+                    eFunction, !aRate.moValue         ? aRate.meError
+                               : !aTotal.moValue      ? aTotal.meError
+                               : !aPresentValue.moValue ? aPresentValue.meError
+                               : !aStart.moValue      ? aStart.meError
+                                                      : aEnd.meError);
+            if (rNode.maChildren[5]->meKind == core::formula::NodeKind::EmptyArgument)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            const auto aPayType = materializeArgument(*rNode.maChildren[5]);
+            if (!aPayType.mbSupported)
+                return makeUnsupported(eFunction, aPayType.meFallbackReason);
+            if (!aPayType.moValue)
+                return makeErrorResult(eFunction, aPayType.meError);
+            if (aPayType.moValue->isEmpty())
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            const auto aBool = coerceScalarToBool(rDoc, rContext, *aPayType.moValue);
+            if (!aBool)
+                return makeErrorResult(eFunction, aBool.meError);
+
+            if (aFunctionName == u"CUMIPMT")
+            {
+                const auto aResult = spreadsheetengine::core::finance::evaluateCumulativeInterest(
+                    *aRate.moValue, *aTotal.moValue, *aPresentValue.moValue, *aStart.moValue,
+                    *aEnd.moValue, aBool.maValue);
+                if (!aResult)
+                    return makeErrorResult(eFunction, aResult.meError);
+                return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::CURRENCY);
+            }
+
+            const auto aResult = spreadsheetengine::core::finance::evaluateCumulativePrincipal(
+                *aRate.moValue, *aTotal.moValue, *aPresentValue.moValue, *aStart.moValue,
+                *aEnd.moValue, aBool.maValue);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::CURRENCY);
+        }
+
+        if (aFunctionName == u"DDB")
+        {
+            if (rNode.maChildren.size() < 4 || rNode.maChildren.size() > 5)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            const auto aCost = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+            const auto aSalvage = materializeNumericArgument(*rNode.maChildren[1], std::nullopt);
+            const auto aLife = materializeNumericArgument(*rNode.maChildren[2], std::nullopt);
+            const auto aPeriod = materializeNumericArgument(*rNode.maChildren[3], std::nullopt);
+            if (!aCost.mbSupported)
+                return makeUnsupported(eFunction, aCost.meFallbackReason);
+            if (!aSalvage.mbSupported)
+                return makeUnsupported(eFunction, aSalvage.meFallbackReason);
+            if (!aLife.mbSupported)
+                return makeUnsupported(eFunction, aLife.meFallbackReason);
+            if (!aPeriod.mbSupported)
+                return makeUnsupported(eFunction, aPeriod.meFallbackReason);
+            if (!aCost.moValue || !aSalvage.moValue || !aLife.moValue || !aPeriod.moValue)
+                return makeErrorResult(
+                    eFunction, !aCost.moValue ? aCost.meError
+                               : !aSalvage.moValue ? aSalvage.meError
+                               : !aLife.moValue ? aLife.meError
+                                                : aPeriod.meError);
+            double fFactor = 2.0;
+            if (rNode.maChildren.size() == 5)
+            {
+                if (rNode.maChildren[4]->meKind == core::formula::NodeKind::EmptyArgument)
+                    return makeErrorResult(eFunction, api::Error::IllegalArgument);
+                const auto aFactor = materializeNumericArgument(*rNode.maChildren[4], std::nullopt);
+                if (!aFactor.mbSupported)
+                    return makeUnsupported(eFunction, aFactor.meFallbackReason);
+                if (!aFactor.moValue)
+                    return makeErrorResult(eFunction, aFactor.meError);
+                fFactor = *aFactor.moValue;
+            }
+            const auto aResult = spreadsheetengine::core::finance::evaluateDoubleDecliningBalance(
+                *aCost.moValue, *aSalvage.moValue, *aLife.moValue, *aPeriod.moValue, fFactor);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::CURRENCY);
+        }
+
+        if (aFunctionName == u"DB")
+        {
+            if (rNode.maChildren.size() < 4 || rNode.maChildren.size() > 5)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            const auto aCost = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+            const auto aSalvage = materializeNumericArgument(*rNode.maChildren[1], std::nullopt);
+            const auto aLife = materializeNumericArgument(*rNode.maChildren[2], std::nullopt);
+            const auto aPeriod = materializeNumericArgument(*rNode.maChildren[3], std::nullopt);
+            if (!aCost.mbSupported)
+                return makeUnsupported(eFunction, aCost.meFallbackReason);
+            if (!aSalvage.mbSupported)
+                return makeUnsupported(eFunction, aSalvage.meFallbackReason);
+            if (!aLife.mbSupported)
+                return makeUnsupported(eFunction, aLife.meFallbackReason);
+            if (!aPeriod.mbSupported)
+                return makeUnsupported(eFunction, aPeriod.meFallbackReason);
+            if (!aCost.moValue || !aSalvage.moValue || !aLife.moValue || !aPeriod.moValue)
+                return makeErrorResult(
+                    eFunction, !aCost.moValue ? aCost.meError
+                               : !aSalvage.moValue ? aSalvage.meError
+                               : !aLife.moValue ? aLife.meError
+                                                : aPeriod.meError);
+            double fMonths = 12.0;
+            if (rNode.maChildren.size() == 5)
+            {
+                const auto aMonths = materializeNumericArgument(*rNode.maChildren[4], std::nullopt);
+                if (!aMonths.mbSupported)
+                    return makeUnsupported(eFunction, aMonths.meFallbackReason);
+                if (!aMonths.moValue)
+                    return makeErrorResult(eFunction, aMonths.meError);
+                fMonths = ::rtl::math::approxFloor(*aMonths.moValue);
+            }
+            const auto aResult = spreadsheetengine::core::finance::evaluateFixedDecliningBalance(
+                *aCost.moValue, *aSalvage.moValue, *aLife.moValue, *aPeriod.moValue, fMonths);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::CURRENCY);
+        }
+
+        if (aFunctionName == u"SLN")
+        {
+            if (rNode.maChildren.size() != 3)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            const auto aCost = materializeNumericArgument(*rNode.maChildren[0], 0.0);
+            const auto aSalvage = materializeNumericArgument(*rNode.maChildren[1], 0.0);
+            const auto aLife = materializeNumericArgument(*rNode.maChildren[2], 0.0);
+            if (!aCost.mbSupported)
+                return makeUnsupported(eFunction, aCost.meFallbackReason);
+            if (!aSalvage.mbSupported)
+                return makeUnsupported(eFunction, aSalvage.meFallbackReason);
+            if (!aLife.mbSupported)
+                return makeUnsupported(eFunction, aLife.meFallbackReason);
+            if (!aCost.moValue || !aSalvage.moValue || !aLife.moValue)
+                return makeErrorResult(
+                    eFunction, !aCost.moValue ? aCost.meError
+                               : !aSalvage.moValue ? aSalvage.meError
+                                                   : aLife.meError);
+            const auto aResult = spreadsheetengine::core::finance::evaluateStraightLineDepreciation(
+                *aCost.moValue, *aSalvage.moValue, *aLife.moValue);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::CURRENCY);
+        }
+
+        if (aFunctionName == u"SYD")
+        {
+            if (rNode.maChildren.size() != 4)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            const auto aCost = materializeNumericArgument(*rNode.maChildren[0], 0.0);
+            const auto aSalvage = materializeNumericArgument(*rNode.maChildren[1], 0.0);
+            const auto aLife = materializeNumericArgument(*rNode.maChildren[2], 0.0);
+            const auto aPeriod = materializeNumericArgument(*rNode.maChildren[3], 0.0);
+            if (!aCost.mbSupported)
+                return makeUnsupported(eFunction, aCost.meFallbackReason);
+            if (!aSalvage.mbSupported)
+                return makeUnsupported(eFunction, aSalvage.meFallbackReason);
+            if (!aLife.mbSupported)
+                return makeUnsupported(eFunction, aLife.meFallbackReason);
+            if (!aPeriod.mbSupported)
+                return makeUnsupported(eFunction, aPeriod.meFallbackReason);
+            if (!aCost.moValue || !aSalvage.moValue || !aLife.moValue || !aPeriod.moValue)
+                return makeErrorResult(
+                    eFunction, !aCost.moValue ? aCost.meError
+                               : !aSalvage.moValue ? aSalvage.meError
+                               : !aLife.moValue ? aLife.meError
+                                                : aPeriod.meError);
+            const auto aResult = spreadsheetengine::core::finance::evaluateSumOfYearsDepreciation(
+                *aCost.moValue, *aSalvage.moValue, *aLife.moValue, *aPeriod.moValue);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::CURRENCY);
+        }
+
+        if (aFunctionName == u"PDURATION")
+        {
+            if (rNode.maChildren.size() != 3)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            const auto aRate = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+            const auto aPresent = materializeNumericArgument(*rNode.maChildren[1], std::nullopt);
+            const auto aFuture = materializeNumericArgument(*rNode.maChildren[2], std::nullopt);
+            if (!aRate.mbSupported)
+                return makeUnsupported(eFunction, aRate.meFallbackReason);
+            if (!aPresent.mbSupported)
+                return makeUnsupported(eFunction, aPresent.meFallbackReason);
+            if (!aFuture.mbSupported)
+                return makeUnsupported(eFunction, aFuture.meFallbackReason);
+            if (!aRate.moValue || !aPresent.moValue || !aFuture.moValue)
+                return makeErrorResult(
+                    eFunction, !aRate.moValue ? aRate.meError
+                               : !aPresent.moValue ? aPresent.meError
+                                                   : aFuture.meError);
+            const auto aResult = spreadsheetengine::core::finance::evaluatePaybackDuration(
+                *aRate.moValue, *aPresent.moValue, *aFuture.moValue);
+            if (!aResult)
+                return makeErrorResult(eFunction, aResult.meError);
+            return makeNumericResult(eFunction, aResult.maValue, SvNumFormatType::NUMBER);
+        }
+
+        if (aFunctionName == u"VDB")
         {
             if (rNode.maChildren.size() < 5 || rNode.maChildren.size() > 7)
                 return makeErrorResult(eFunction, api::Error::IllegalArgument);
@@ -6656,6 +7271,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                 return makeErrorResult(eFunction, aDepreciation.meError);
             return makeNumericResult(eFunction, aDepreciation.maValue, SvNumFormatType::CURRENCY);
         }
+
+        if (aFunctionName != u"RATE")
+            return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
 
         if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 6)
             return makeErrorResult(eFunction, api::Error::IllegalArgument);
@@ -12702,6 +13320,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return eFunction == FunctionKind::LogicalConstant
            || eFunction == FunctionKind::FormulaText
            || eFunction == FunctionKind::Conversion
+           || eFunction == FunctionKind::Rate
            || eFunction == FunctionKind::StatisticalDistribution
            || eFunction == FunctionKind::InformationPredicate
            || eFunction == FunctionKind::LogicalFold

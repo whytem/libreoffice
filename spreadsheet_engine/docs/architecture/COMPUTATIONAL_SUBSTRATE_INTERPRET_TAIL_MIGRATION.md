@@ -254,12 +254,12 @@ Two different denominators matter, and both are now reported.
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=50348`
-- `interpret_tail_live_authoritative_match_total=50344`
+- `interpret_tail_live_authoritative_probe_formula_cells=50354`
+- `interpret_tail_live_authoritative_match_total=50350`
 - `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=185`
-- live authoritative-match rate over the corpus: `99.3743%`
-- live authoritative-match rate over the current promoted probe: `99.9921%`
+- `legacy_interpreter_subroutine_count=166`
+- live authoritative-match rate over the corpus: `99.3861%`
+- live authoritative-match rate over the current promoted probe: `99.9960%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -313,6 +313,12 @@ Interpretation:
   `VariableExpected` as authoritative live host truth at the seam, and the
   latest scalar-root / round / math-scalar retirement push then carried the
   live unique fallback and unsupported-function residue all the way to `0`
+- the latest genuine financial scalar retirement pass now removes the
+  dedicated `ISPMT`, `PV`, `SYD`, `DDB`, `DB`, `VDB`, `PDURATION`, `SLN`,
+  `PMT`, `RRI`, `FV`, `NPER`, `RATE`, `IPMT`, `PPMT`, `CUMIPMT`,
+  `CUMPRINC`, `EFFECT`, and `NOMINAL` wrappers while preserving the same
+  engine-authoritative live behavior, bringing
+  `legacy_interpreter_subroutine_count` down from `185` to `166`
 - the ambient replay surface now includes large real traffic from
   information predicates, logical folds, round-family formulas, scalar-math
   helpers, bounded financial feeders, bounded numeric aggregates, bounded
@@ -431,7 +437,7 @@ actually seen and supported by the seam:
 
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
-- `interpret_tail_probe_formula_cells=50348`
+- `interpret_tail_probe_formula_cells=50354`
 - `interpret_tail_authoritative_total=300`
 - `interpret_tail_authoritative_fallback_total=50048`
 - raw promoted authoritative rate: `0.61%`
@@ -528,7 +534,7 @@ This is the new per-cell replay inventory over the promoted-family replay
 surface after forcing each promoted replay formula through direct live
 `Interpret()`:
 
-- `interpret_tail_replay_promoted_formula_cells=50348`
+- `interpret_tail_replay_promoted_formula_cells=50354`
 - `interpret_tail_replay_promoted_direct_seen=44741`
 - `interpret_tail_replay_promoted_direct_supported=44741`
 - `interpret_tail_replay_promoted_direct_fallback=0`
@@ -541,7 +547,7 @@ surface after forcing each promoted replay formula through direct live
 - `interpret_tail_replay_promoted_unseen_shared_member=2606`
 - `interpret_tail_replay_promoted_unseen_non_shared=2692`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=50348`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=50354`
 - `interpret_tail_replay_promoted_dirty_after_interpret=5607`
 
 Interpretation:

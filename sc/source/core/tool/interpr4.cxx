@@ -5399,6 +5399,328 @@ StackVar ScInterpreter::Interpret()
                     else
                         PushIllegalArgument();
                 };
+                const auto warnIfLegacyRateFamilyReached = [&](std::u16string_view rFunctionName) {
+                    warnIfLegacyDispatchReached(
+                        "family-local default-on", rFunctionName,
+                        [](std::u16string_view rFormula) {
+                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                        },
+                        "family-local default-on financial rate family reached ScInterpreter");
+                };
+                const auto pushLegacyIspmt = [&]() {
+                    warnIfLegacyRateFamilyReached(u"ISPMT");
+                    if (!MustHaveParamCount(GetByte(), 4))
+                        return;
+                    double fInvest = GetDouble();
+                    double fTotal = GetDouble();
+                    double fPeriod = GetDouble();
+                    double fRate = GetDouble();
+                    if (nGlobalError != FormulaError::NONE)
+                        PushError(nGlobalError);
+                    else
+                        PushDouble(
+                            semath::computeInterestSchedulePayment(fRate, fPeriod, fTotal, fInvest));
+                };
+                const auto pushLegacyPv = [&]() {
+                    warnIfLegacyRateFamilyReached(u"PV");
+                    nFuncFmtType = SvNumFormatType::CURRENCY;
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 3, 5))
+                        return;
+                    bool bPayInAdvance = nParamCount == 5 && GetBool();
+                    double fFv = nParamCount >= 4 ? GetDouble() : 0;
+                    double fPmt = GetDouble();
+                    double fNper = GetDouble();
+                    double fRate = GetDouble();
+                    PushDouble(ScGetPV(fRate, fNper, fPmt, fFv, bPayInAdvance));
+                };
+                const auto pushLegacySyd = [&]() {
+                    warnIfLegacyRateFamilyReached(u"SYD");
+                    nFuncFmtType = SvNumFormatType::CURRENCY;
+                    if (!MustHaveParamCount(GetByte(), 4))
+                        return;
+                    double fPer = GetDouble();
+                    double fLife = GetDouble();
+                    double fSalvage = GetDouble();
+                    double fCost = GetDouble();
+                    PushDouble(
+                        semath::computeSumOfYearsDepreciation(fCost, fSalvage, fLife, fPer));
+                };
+                const auto pushLegacyDdb = [&]() {
+                    warnIfLegacyRateFamilyReached(u"DDB");
+                    nFuncFmtType = SvNumFormatType::CURRENCY;
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 4, 5))
+                        return;
+                    double fFactor = nParamCount == 5 ? GetDouble() : 2.0;
+                    double fPeriod = GetDouble();
+                    double fLife = GetDouble();
+                    double fSalvage = GetDouble();
+                    double fCost = GetDouble();
+                    if (fCost < 0.0 || fSalvage < 0.0 || fFactor <= 0.0 || fSalvage > fCost
+                        || fPeriod < 1.0 || fPeriod > fLife)
+                        PushIllegalArgument();
+                    else
+                        PushDouble(ScGetDDB(fCost, fSalvage, fLife, fPeriod, fFactor));
+                };
+                const auto pushLegacyDb = [&]() {
+                    warnIfLegacyRateFamilyReached(u"DB");
+                    nFuncFmtType = SvNumFormatType::CURRENCY;
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 4, 5))
+                        return;
+                    double fMonths = nParamCount == 4 ? 12.0 : ::rtl::math::approxFloor(GetDouble());
+                    double fPeriod = GetDouble();
+                    double fLife = GetDouble();
+                    double fSalvage = GetDouble();
+                    double fCost = GetDouble();
+                    if (fMonths < 1.0 || fMonths > 12.0 || fLife > 1200.0
+                        || fSalvage < 0.0 || fPeriod > (fLife + 1.0) || fSalvage > fCost
+                        || fCost <= 0.0 || fLife <= 0 || fPeriod <= 0)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    PushDouble(
+                        semath::computeFixedDecliningBalance(fCost, fSalvage, fLife, fPeriod, fMonths));
+                };
+                const auto pushLegacyVdb = [&]() {
+                    warnIfLegacyRateFamilyReached(u"VDB");
+                    nFuncFmtType = SvNumFormatType::CURRENCY;
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 5, 7))
+                        return;
+                    KahanSum fVdb = 0.0;
+                    bool bNoSwitch = nParamCount == 7 && GetBool();
+                    double fFactor = nParamCount >= 6 ? GetDouble() : 2.0;
+                    double fEnd = GetDouble();
+                    double fStart = GetDouble();
+                    double fLife = GetDouble();
+                    double fSalvage = GetDouble();
+                    double fCost = GetDouble();
+                    if (fStart < 0.0 || fEnd < fStart || fEnd > fLife || fCost < 0.0
+                        || fSalvage > fCost || fFactor <= 0.0)
+                        PushIllegalArgument();
+                    else
+                        fVdb = semath::computeVariableDecliningBalance(
+                            fCost, fSalvage, fLife, fStart, fEnd, fFactor, bNoSwitch);
+                    PushDouble(fVdb.get());
+                };
+                const auto pushLegacyPDuration = [&]() {
+                    warnIfLegacyRateFamilyReached(u"PDURATION");
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+                    double fFuture = GetDouble();
+                    double fPresent = GetDouble();
+                    double fRate = GetDouble();
+                    if (fFuture <= 0.0 || fPresent <= 0.0 || fRate <= 0.0)
+                        PushIllegalArgument();
+                    else
+                        PushDouble(semath::computePaybackDuration(fRate, fPresent, fFuture));
+                };
+                const auto pushLegacySln = [&]() {
+                    warnIfLegacyRateFamilyReached(u"SLN");
+                    nFuncFmtType = SvNumFormatType::CURRENCY;
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+                    double fLife = GetDouble();
+                    double fSalvage = GetDouble();
+                    double fCost = GetDouble();
+                    PushDouble(semath::computeStraightLineDepreciation(fCost, fSalvage, fLife));
+                };
+                const auto pushLegacyPmt = [&]() {
+                    warnIfLegacyRateFamilyReached(u"PMT");
+                    nFuncFmtType = SvNumFormatType::CURRENCY;
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 3, 5))
+                        return;
+                    bool bPayInAdvance = nParamCount == 5 && GetBool();
+                    double fFv = nParamCount >= 4 ? GetDouble() : 0;
+                    double fPv = GetDouble();
+                    double fNper = GetDouble();
+                    double fRate = GetDouble();
+                    PushDouble(ScGetPMT(fRate, fNper, fPv, fFv, bPayInAdvance));
+                };
+                const auto pushLegacyRri = [&]() {
+                    warnIfLegacyRateFamilyReached(u"RRI");
+                    nFuncFmtType = SvNumFormatType::PERCENT;
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+                    double fFutureValue = GetDouble();
+                    double fPresentValue = GetDouble();
+                    double fNrOfPeriods = GetDouble();
+                    if (fNrOfPeriods <= 0.0 || fPresentValue == 0.0)
+                        PushIllegalArgument();
+                    else
+                        PushDouble(semath::computeGrowthRateOverPeriods(
+                            fNrOfPeriods, fPresentValue, fFutureValue));
+                };
+                const auto pushLegacyFv = [&]() {
+                    warnIfLegacyRateFamilyReached(u"FV");
+                    nFuncFmtType = SvNumFormatType::CURRENCY;
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 3, 5))
+                        return;
+                    bool bPayInAdvance = nParamCount == 5 && GetBool();
+                    double fPv = nParamCount >= 4 ? GetDouble() : 0;
+                    double fPmt = GetDouble();
+                    double fNper = GetDouble();
+                    double fRate = GetDouble();
+                    PushDouble(ScGetFV(fRate, fNper, fPmt, fPv, bPayInAdvance));
+                };
+                const auto pushLegacyNper = [&]() {
+                    warnIfLegacyRateFamilyReached(u"NPER");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 3, 5))
+                        return;
+                    bool bPayInAdvance = nParamCount == 5 && GetBool();
+                    double fFV = nParamCount >= 4 ? GetDouble() : 0;
+                    double fPV = GetDouble();
+                    double fPmt = GetDouble();
+                    double fRate = GetDouble();
+                    PushDouble(
+                        semath::computePeriodsForFutureValue(fRate, fPmt, fPV, fFV, bPayInAdvance));
+                };
+                const auto pushLegacyRate = [&]() {
+                    warnIfLegacyRateFamilyReached(u"RATE");
+                    nFuncFmtType = SvNumFormatType::PERCENT;
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 3, 6))
+                        return;
+                    double fGuess = nParamCount == 6 ? GetDouble() : 0.1;
+                    bool bDefaultGuess = nParamCount != 6;
+                    bool bPayType = nParamCount >= 5 && GetBool();
+                    double fFv = nParamCount >= 4 ? GetDouble() : 0;
+                    double fPv = GetDouble();
+                    double fPayment = GetDouble();
+                    double fNper = GetDouble();
+                    if (fNper <= 0.0)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    const semath::FinancialRateResult aResult = semath::solveRate(
+                        fNper, fPayment, fPv, fFv, bPayType, fGuess, bDefaultGuess);
+                    if (!aResult.mbConverged)
+                        SetError(FormulaError::NoConvergence);
+                    PushDouble(aResult.mfRate);
+                };
+                const auto pushLegacyIpmt = [&]() {
+                    warnIfLegacyRateFamilyReached(u"IPMT");
+                    nFuncFmtType = SvNumFormatType::CURRENCY;
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 4, 6))
+                        return;
+                    bool bPayInAdvance = nParamCount == 6 && GetBool();
+                    double fFv = nParamCount >= 5 ? GetDouble() : 0;
+                    double fPv = GetDouble();
+                    double fNper = GetDouble();
+                    double fPer = GetDouble();
+                    double fRate = GetDouble();
+                    if (fPer < 1.0 || fPer > fNper)
+                        PushIllegalArgument();
+                    else
+                    {
+                        double fPmt;
+                        PushDouble(ScGetIpmt(fRate, fPer, fNper, fPv, fFv, bPayInAdvance, fPmt));
+                    }
+                };
+                const auto pushLegacyPpmt = [&]() {
+                    warnIfLegacyRateFamilyReached(u"PPMT");
+                    nFuncFmtType = SvNumFormatType::CURRENCY;
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 4, 6))
+                        return;
+                    bool bPayInAdvance = nParamCount == 6 && GetBool();
+                    double fFv = nParamCount >= 5 ? GetDouble() : 0;
+                    double fPv = GetDouble();
+                    double fNper = GetDouble();
+                    double fPer = GetDouble();
+                    double fRate = GetDouble();
+                    if (fPer < 1.0 || fPer > fNper)
+                        PushIllegalArgument();
+                    else
+                    {
+                        double fPmt;
+                        double fInterestPer = ScGetIpmt(
+                            fRate, fPer, fNper, fPv, fFv, bPayInAdvance, fPmt);
+                        PushDouble(fPmt - fInterestPer);
+                    }
+                };
+                const auto pushLegacyCumIpmt = [&]() {
+                    warnIfLegacyRateFamilyReached(u"CUMIPMT");
+                    nFuncFmtType = SvNumFormatType::CURRENCY;
+                    if (!MustHaveParamCount(GetByte(), 6))
+                        return;
+                    double fFlag = GetDoubleWithDefault(-1.0);
+                    double fEnd = ::rtl::math::approxFloor(GetDouble());
+                    double fStart = ::rtl::math::approxFloor(GetDouble());
+                    double fPv = GetDouble();
+                    double fNper = GetDouble();
+                    double fRate = GetDouble();
+                    if (fStart < 1.0 || fEnd < fStart || fRate <= 0.0 || fEnd > fNper
+                        || fNper <= 0.0 || fPv <= 0.0 || (fFlag != 0.0 && fFlag != 1.0))
+                        PushIllegalArgument();
+                    else
+                    {
+                        bool bPayInAdvance = static_cast<bool>(fFlag);
+                        PushDouble(semath::computeCumulativeInterest(
+                            fRate, fStart, fEnd, fNper, fPv, 0.0, bPayInAdvance));
+                    }
+                };
+                const auto pushLegacyCumPrinc = [&]() {
+                    warnIfLegacyRateFamilyReached(u"CUMPRINC");
+                    nFuncFmtType = SvNumFormatType::CURRENCY;
+                    if (!MustHaveParamCount(GetByte(), 6))
+                        return;
+                    double fFlag = GetDoubleWithDefault(-1.0);
+                    double fEnd = ::rtl::math::approxFloor(GetDouble());
+                    double fStart = ::rtl::math::approxFloor(GetDouble());
+                    double fPv = GetDouble();
+                    double fNper = GetDouble();
+                    double fRate = GetDouble();
+                    if (fStart < 1.0 || fEnd < fStart || fRate <= 0.0 || fEnd > fNper
+                        || fNper <= 0.0 || fPv <= 0.0 || (fFlag != 0.0 && fFlag != 1.0))
+                        PushIllegalArgument();
+                    else
+                    {
+                        bool bPayInAdvance = static_cast<bool>(fFlag);
+                        PushDouble(semath::computeCumulativePrincipal(
+                            fRate, fStart, fEnd, fNper, fPv, 0.0, bPayInAdvance));
+                    }
+                };
+                const auto pushLegacyEffect = [&]() {
+                    warnIfLegacyRateFamilyReached(u"EFFECT");
+                    nFuncFmtType = SvNumFormatType::PERCENT;
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+                    double fPeriods = GetDouble();
+                    double fNominal = GetDouble();
+                    if (fPeriods < 1.0 || fNominal < 0.0)
+                        PushIllegalArgument();
+                    else if (fNominal == 0.0)
+                        PushDouble(0.0);
+                    else
+                    {
+                        fPeriods = ::rtl::math::approxFloor(fPeriods);
+                        PushDouble(semath::computeEffectiveAnnualRate(fNominal, fPeriods));
+                    }
+                };
+                const auto pushLegacyNominal = [&]() {
+                    warnIfLegacyRateFamilyReached(u"NOMINAL");
+                    nFuncFmtType = SvNumFormatType::PERCENT;
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+                    double fPeriods = GetDouble();
+                    double fEffective = GetDouble();
+                    if (fPeriods < 1.0 || fEffective <= 0.0)
+                        PushIllegalArgument();
+                    else
+                    {
+                        fPeriods = ::rtl::math::approxFloor(fPeriods);
+                        PushDouble(semath::computeNominalAnnualRate(fEffective, fPeriods));
+                    }
+                };
                 const auto pushLegacyConvert = [&]() {
                     warnIfLegacyDispatchReached(
                         "family-local default-on", u"CONVERT",
@@ -7587,7 +7909,7 @@ StackVar ScInterpreter::Interpret()
                     case ocNPV              : ScNPV();                  break;
                     case ocIRR              : ScIRR();                  break;
                     case ocMIRR             : ScMIRR();                 break;
-                    case ocISPMT            : ScISPMT();                break;
+                    case ocISPMT            : pushLegacyIspmt();        break;
                     case ocAverage          : ScAverage()       ;           break;
                     case ocAverageA         : ScAverage( true );            break;
                     case ocCount            : ScCount();                    break;
@@ -7604,24 +7926,24 @@ StackVar ScInterpreter::Interpret()
                     case ocStDevP           :
                     case ocStDevP_MS        : ScStDevP();                   break;
                     case ocStDevPA          : ScStDevP( true );             break;
-                    case ocPV               : ScPV();                   break;
-                    case ocSYD              : ScSYD();                  break;
-                    case ocDDB              : ScDDB();                  break;
-                    case ocDB               : ScDB();                   break;
-                    case ocVBD              : ScVDB();                  break;
-                    case ocPDuration        : ScPDuration();            break;
-                    case ocSLN              : ScSLN();                  break;
-                    case ocPMT              : ScPMT();                  break;
+                    case ocPV               : pushLegacyPv();           break;
+                    case ocSYD              : pushLegacySyd();          break;
+                    case ocDDB              : pushLegacyDdb();          break;
+                    case ocDB               : pushLegacyDb();           break;
+                    case ocVBD              : pushLegacyVdb();          break;
+                    case ocPDuration        : pushLegacyPDuration();    break;
+                    case ocSLN              : pushLegacySln();          break;
+                    case ocPMT              : pushLegacyPmt();          break;
                     case ocColumns          : ScColumns();              break;
                     case ocRows             : ScRows();                 break;
                     case ocSheets           : ScSheets();               break;
                     case ocColumn           : ScColumn();               break;
                     case ocRow              : ScRow();                  break;
                     case ocSheet            : ScSheet();                break;
-                    case ocRRI              : ScRRI();                  break;
-                    case ocFV               : ScFV();                   break;
-                    case ocNper             : ScNper();                 break;
-                    case ocRate             : ScRate();                 break;
+                    case ocRRI              : pushLegacyRri();          break;
+                    case ocFV               : pushLegacyFv();           break;
+                    case ocNper             : pushLegacyNper();         break;
+                    case ocRate             : pushLegacyRate();         break;
                     case ocFilterXML        : ScFilterXML();            break;
                     case ocWebservice       : ScWebservice();           break;
                     case ocEncodeURL        : ScEncodeURL();            break;
@@ -7635,12 +7957,12 @@ StackVar ScInterpreter::Interpret()
                             pushLegacyUnaryValueResult(
                                 semath::evaluateComplementaryErrorFunction);
                         break;
-                    case ocIpmt             : ScIpmt();                 break;
-                    case ocPpmt             : ScPpmt();                 break;
-                    case ocCumIpmt          : ScCumIpmt();              break;
-                    case ocCumPrinc         : ScCumPrinc();             break;
-                    case ocEffect           : ScEffect();               break;
-                    case ocNominal          : ScNominal();              break;
+                    case ocIpmt             : pushLegacyIpmt();         break;
+                    case ocPpmt             : pushLegacyPpmt();         break;
+                    case ocCumIpmt          : pushLegacyCumIpmt();      break;
+                    case ocCumPrinc         : pushLegacyCumPrinc();     break;
+                    case ocEffect           : pushLegacyEffect();       break;
+                    case ocNominal          : pushLegacyNominal();      break;
                     case ocSubTotal         : ScSubTotal();                 break;
                     case ocAggregate        : pushLegacyAggregate();        break;
                     case ocDBSum            : ScDBSum();                    break;

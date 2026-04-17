@@ -716,38 +716,18 @@ public:
     void ScNPV();
     void ScIRR();
     void ScMIRR();
-    void ScISPMT();
-
     static double ScGetPV(double fRate, double fNper, double fPmt,
                           double fFv, bool bPayInAdvance);
-    void ScPV();
-    void ScSYD();
     static double ScGetDDB(double fCost, double fSalvage, double fLife,
                            double fPeriod, double fFactor);
-    void ScDDB();
-    void ScDB();
     static double ScInterVDB(double fCost, double fSalvage, double fLife, double fLife1,
                              double fPeriod, double fFactor);
-    void ScVDB();
-    void ScPDuration();
-    void ScSLN();
     static double ScGetPMT(double fRate, double fNper, double fPv,
                            double fFv, bool bPayInAdvance);
-    void ScPMT();
-    void ScRRI();
     static double ScGetFV(double fRate, double fNper, double fPmt,
                           double fPv, bool bPayInAdvance);
-    void ScFV();
-    void ScNper();
-    void ScRate();
     double ScGetIpmt(double fRate, double fPer, double fNper, double fPv,
                                  double fFv, bool bPayInAdvance, double& fPmt);
-    void ScIpmt();
-    void ScPpmt();
-    void ScCumIpmt();
-    void ScCumPrinc();
-    void ScEffect();
-    void ScNominal();
 
     // matrix functions
     void ScMatValue();

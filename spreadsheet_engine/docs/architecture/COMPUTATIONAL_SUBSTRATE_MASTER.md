@@ -51,18 +51,24 @@ Today:
   `legacy_interpreter_subroutine_count=235`; the latest genuine date/time
   retirement pass then removed the dedicated `TODAY`/`NOW`, date-part,
   week-number, workday/networkdays, and `DATE`/`TIME`/date-difference wrappers,
-  bringing the honest blunt metric down again to `legacy_interpreter_subroutine_count=185`
+  bringing the honest blunt metric down again to `legacy_interpreter_subroutine_count=185`;
+  the latest genuine financial scalar retirement pass then removes the
+  dedicated `ISPMT`, `PV`, `SYD`, `DDB`, `DB`, `VDB`, `PDURATION`, `SLN`,
+  `PMT`, `RRI`, `FV`, `NPER`, `RATE`, `IPMT`, `PPMT`, `CUMIPMT`,
+  `CUMPRINC`, `EFFECT`, and `NOMINAL` wrappers, bringing the honest blunt
+  metric down further to `legacy_interpreter_subroutine_count=166`
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to
-  `50344 / 50,661` (`99.3743%`) on the standing replay corpus, with the broad
+  `50350 / 50,661` (`99.3861%`) on the standing replay corpus, with the broad
   corpus lane stable again after fixing the intermittent `CONVERT(...)`
   runtime crash in the shared BFS conversion path, aligning imported root
   host truth for token-backed `VariableExpected` cells, promoting the
   supported unknown-root band into real evaluator families, then promoting
   the remaining high-volume imported unknown roots into real probe families,
-  and then genuinely retiring the dedicated date/time wrapper surface to
-  `185`
+  then genuinely retiring the dedicated date/time wrapper surface to `185`,
+  and now genuinely retiring the dedicated financial scalar wrapper surface
+  to `166`
 - the broad corpus lane now completes again with `BusinessDay` admitted on the
   default ambient surface after rejecting zero-workday `WORKDAY` weekend masks
   before they enter the shared runtime, and the next `BusinessDay` slice has
@@ -92,12 +98,12 @@ delegation.”
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=50348`
-- `interpret_tail_live_authoritative_match_total=50344`
+- `interpret_tail_live_authoritative_probe_formula_cells=50354`
+- `interpret_tail_live_authoritative_match_total=50350`
 - `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=185`
-- live authoritative-match rate over the corpus: `99.3743%`
-- live authoritative-match rate over the current promoted probe: `99.9921%`
+- `legacy_interpreter_subroutine_count=166`
+- live authoritative-match rate over the corpus: `99.3861%`
+- live authoritative-match rate over the current promoted probe: `99.9960%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -206,7 +212,7 @@ forcing each replay formula cell once.
 
 ### Raw Cached-Workbook Promoted Probe
 
-- `interpret_tail_probe_formula_cells=50348`
+- `interpret_tail_probe_formula_cells=50354`
 - `interpret_tail_authoritative_total=300`
 - `interpret_tail_authoritative_fallback_total=50048`
 - raw promoted authoritative rate: `0.61%`
@@ -416,7 +422,7 @@ The highest-value remaining blockers are now:
    from the Calc side while holding the live authoritative rate above `90%`
 
 The live authoritative-match north-star on the standing replay corpus is now
-`50344 / 50,661` (`99.3743%`). The honest live unique-cell inventory now
+`50350 / 50,661` (`99.3861%`). The honest live unique-cell inventory now
 shows `50612 / 50,661` formula cells seen (`99.90%`) and
 `50612 / 50,661` supported (`99.90%`) during the bulk live observe run, while
 the forced-direct comparison surface now sits at
@@ -435,7 +441,7 @@ clusters are all engine-owned, seam-admitted, or mechanically relocated
 paths, with the blunt retirement metric now down to `50` while the live
 unique surface widens further without reintroducing any live fallback or
 unsupported-function residue. The raw promoted replay probe now sits at
-`300 / 50348` and remains purely diagnostic rather than a retirement
+`300 / 50354` and remains purely diagnostic rather than a retirement
 denominator.
 
 Inside the current families, the semantically distinct env-independent
