@@ -1756,14 +1756,6 @@ void ScInterpreter::ScRandbetween()
     ScRandomImpl( RandomFunc, fMin, fMax);
 }
 
-void ScInterpreter::handleSqrt()
-{
-    if (std::optional<double> fResult = semath::computeSqrt(GetDouble()))
-        PushDouble(*fResult);
-    else
-        PushIllegalArgument();
-}
-
 bool ScInterpreter::IsString()
 {
     nFuncFmtType = SvNumFormatType::LOGICAL;

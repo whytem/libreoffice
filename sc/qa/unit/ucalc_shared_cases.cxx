@@ -3046,6 +3046,12 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorMathScalar
     CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aSqrt.meFunction);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aSqrt.maResult.mfValue, 1e-12);
 
+    const auto aFact = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=FACT(5.9)", false);
+    CPPUNIT_ASSERT(aFact.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aFact.meFunction);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(120.0, aFact.maResult.mfValue, 1e-12);
+
     const auto aSin = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=SIN(0)", false);
     CPPUNIT_ASSERT(aSin.mbSupported);
@@ -4292,6 +4298,60 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorStatistica
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value, aBetaDist.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.5, aBetaDist.maResult.mfValue, 1e-12);
+
+    const auto aGamma = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=GAMMA(5)", false);
+    CPPUNIT_ASSERT(aGamma.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        setaileval::FunctionKind::StatisticalDistribution, aGamma.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aGamma.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(24.0, aGamma.maResult.mfValue, 1e-12);
+
+    const auto aGammaLn = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=GAMMALN(5)", false);
+    CPPUNIT_ASSERT(aGammaLn.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        setaileval::FunctionKind::StatisticalDistribution, aGammaLn.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aGammaLn.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.1780538303479458, aGammaLn.maResult.mfValue, 1e-12);
+
+    const auto aErf = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ERF.PRECISE(1)", false);
+    CPPUNIT_ASSERT(aErf.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        setaileval::FunctionKind::StatisticalDistribution, aErf.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aErf.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.8427007929497149, aErf.maResult.mfValue, 1e-12);
+
+    const auto aErfc = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=ERFC.PRECISE(1)", false);
+    CPPUNIT_ASSERT(aErfc.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        setaileval::FunctionKind::StatisticalDistribution, aErfc.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aErfc.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.15729920705028513, aErfc.maResult.mfValue, 1e-12);
+
+    const auto aPhi = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=PHI(0)", false);
+    CPPUNIT_ASSERT(aPhi.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        setaileval::FunctionKind::StatisticalDistribution, aPhi.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aPhi.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.3989422804014327, aPhi.maResult.mfValue, 1e-12);
+
+    const auto aGauss = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=GAUSS(1)", false);
+    CPPUNIT_ASSERT(aGauss.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        setaileval::FunctionKind::StatisticalDistribution, aGauss.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aGauss.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.3413447460685429, aGauss.maResult.mfValue, 1e-12);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorBusinessDayHelper)

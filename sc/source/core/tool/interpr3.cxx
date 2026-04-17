@@ -189,30 +189,6 @@ void ScInterpreter::ScChiSqDist_MS()
     }
 }
 
-void ScInterpreter::ScGamma()
-{
-    double x = GetDouble();
-    const auto aResult = semath::evaluateGammaValue(x);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
-void ScInterpreter::ScLogGamma()
-{
-    double x = GetDouble();
-    const auto aResult = semath::evaluateLogGammaValue(x);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
 double ScInterpreter::GetBeta(double fAlpha, double fBeta)
 {
     return semath::betaValue(fAlpha, fBeta);
@@ -291,43 +267,6 @@ void ScInterpreter::ScBetaDist_MS()
     x = GetDouble();
     const auto aResult = semath::evaluateBetaDistribution(
         x, alpha, beta, fLowerBound, fUpperBound, bIsCumulative, true);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
-void ScInterpreter::ScPhi()
-{
-    PushDouble(semath::evaluateNormalDistribution(GetDouble(), 0.0, 1.0, false).maValue);
-}
-
-void ScInterpreter::ScGauss()
-{
-    PushDouble(semath::gaussValue(GetDouble()));
-}
-
-void ScInterpreter::handleFisher()
-{
-    const auto aResult = semath::fisherTransform(GetDouble());
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
-void ScInterpreter::handleFisherInv()
-{
-    PushDouble(semath::inverseFisherTransform(GetDouble()));
-}
-
-void ScInterpreter::ScFact()
-{
-    const auto aResult = semath::evaluateFactorialValue(GetDouble());
     if (!aResult)
     {
         PushError(lcl_ToCalcMathFormulaError(aResult.meError));

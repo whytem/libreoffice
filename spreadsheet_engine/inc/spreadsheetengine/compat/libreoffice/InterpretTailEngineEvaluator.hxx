@@ -720,7 +720,7 @@ canonicalMathScalarFunctionName(api::StringView rFunctionName)
         u"FLOOR.MATH", u"CEILING.PRECISE", u"FLOOR.PRECISE", u"ISO.CEILING", u"ROUNDSIG",
         u"BITAND", u"BITOR", u"BITXOR", u"BITLSHIFT", u"BITRSHIFT", u"POWER", u"LOG",
         u"LOG10", u"LN", u"MROUND", u"COMBIN", u"COMBINA", u"CSC", u"CSCH", u"SEC", u"SECH",
-        u"EXP", u"SQRT", u"TRUNC", u"MOD", u"RAWSUBTRACT"
+        u"EXP", u"SQRT", u"FACT", u"TRUNC", u"MOD", u"RAWSUBTRACT"
     };
 
     for (const auto aName : aScalarNames)
@@ -877,6 +877,14 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
         return FunctionKind::StatisticalAggregate;
     }
     if (rFunctionName == u"FISHER" || rFunctionName == u"FISHERINV"
+        || rFunctionName == u"GAUSS" || rFunctionName == u"PHI"
+        || rFunctionName == u"GAMMA" || rFunctionName == u"COM.MICROSOFT.GAMMA"
+        || rFunctionName == u"GAMMALN" || rFunctionName == u"GAMMALN.PRECISE"
+        || rFunctionName == u"COM.MICROSOFT.GAMMALN.PRECISE"
+        || rFunctionName == u"ERF" || rFunctionName == u"ERF.PRECISE"
+        || rFunctionName == u"COM.MICROSOFT.ERF.PRECISE"
+        || rFunctionName == u"ERFC" || rFunctionName == u"ERFC.PRECISE"
+        || rFunctionName == u"COM.MICROSOFT.ERFC.PRECISE"
         || rFunctionName == u"POISSON" || rFunctionName == u"POISSON.DIST"
         || rFunctionName == u"COM.MICROSOFT.POISSON.DIST"
         || rFunctionName == u"BINOMDIST" || rFunctionName == u"BINOM.DIST"
@@ -1566,6 +1574,15 @@ template <typename T>
             return makeErrorAttempt(rResult.meError);
         return makeNumericAttempt(rResult.maValue);
     };
+    const auto finishCalcMathValue = [&](const api::ValueResult<double>& rResult) {
+        if (!rResult)
+        {
+            return makeErrorAttempt(
+                rResult.meError == api::Error::Domain ? api::Error::IllegalArgument
+                                                      : rResult.meError);
+        }
+        return makeNumericAttempt(rResult.maValue);
+    };
     const auto finishOptionalValue = [&](const std::optional<double>& oValue,
                                          api::Error eError = api::Error::IllegalArgument) {
         if (!oValue)
@@ -1668,6 +1685,18 @@ template <typename T>
     if (aCanonicalName == u"SQRT")
         return evaluateUnaryOptional(spreadsheetengine::core::math::computeSqrt,
             api::Error::IllegalArgument);
+    if (aCanonicalName == u"FACT")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aValue = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorAttempt(aValue.meError);
+        return finishCalcMathValue(spreadsheetengine::core::math::evaluateFactorialValue(
+            *aValue.moValue));
+    }
     if (aCanonicalName == u"LOG10")
         return evaluateUnaryOptional(spreadsheetengine::core::math::computeLog10);
     if (aCanonicalName == u"LN")
@@ -8604,6 +8633,15 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const auto makeUnsupportedAttempt = [&](FallbackReason eReason) {
         return makeUnsupported(eFunction, eReason);
     };
+    const auto finishCalcMathAttempt = [&](const api::ValueResult<double>& rResult) {
+        if (!rResult)
+        {
+            return makeErrorAttempt(
+                rResult.meError == api::Error::Domain ? api::Error::IllegalArgument
+                                                      : rResult.meError);
+        }
+        return makeNumericAttempt(rResult.maValue);
+    };
     const auto materializeOneDimensionalValueSequence =
         [&](const core::formula::Node& rArgument) -> Materialization<std::vector<api::CellValue>> {
         const auto aMatrix = materializeMatrixNode(rArgument, rDoc, rContext, rFormulaPos);
@@ -8719,6 +8757,89 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         return makeMaterializedValue(aStats);
     };
 
+    if (aFunctionName == u"GAUSS")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aNumber = materializeNumber(*rNode.maChildren[0]);
+        if (!aNumber.mbSupported)
+            return makeUnsupportedAttempt(aNumber.meFallbackReason);
+        if (!aNumber.moValue)
+            return makeErrorAttempt(aNumber.meError);
+        return makeNumericAttempt(spreadsheetengine::core::math::gaussValue(*aNumber.moValue));
+    }
+
+    if (aFunctionName == u"PHI")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aNumber = materializeNumber(*rNode.maChildren[0]);
+        if (!aNumber.mbSupported)
+            return makeUnsupportedAttempt(aNumber.meFallbackReason);
+        if (!aNumber.moValue)
+            return makeErrorAttempt(aNumber.meError);
+        const auto aPhi = spreadsheetengine::core::math::evaluateNormalDistribution(
+            *aNumber.moValue, 0.0, 1.0, false);
+        if (!aPhi)
+            return makeErrorAttempt(aPhi.meError);
+        return makeNumericAttempt(aPhi.maValue);
+    }
+
+    if (aFunctionName == u"GAMMALN" || aFunctionName == u"GAMMALN.PRECISE"
+        || aFunctionName == u"COM.MICROSOFT.GAMMALN.PRECISE")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aNumber = materializeNumber(*rNode.maChildren[0]);
+        if (!aNumber.mbSupported)
+            return makeUnsupportedAttempt(aNumber.meFallbackReason);
+        if (!aNumber.moValue)
+            return makeErrorAttempt(aNumber.meError);
+        return finishCalcMathAttempt(
+            spreadsheetengine::core::math::evaluateLogGammaValue(*aNumber.moValue));
+    }
+
+    if (aFunctionName == u"ERF" || aFunctionName == u"ERF.PRECISE"
+        || aFunctionName == u"COM.MICROSOFT.ERF.PRECISE")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aNumber = materializeNumber(*rNode.maChildren[0]);
+        if (!aNumber.mbSupported)
+            return makeUnsupportedAttempt(aNumber.meFallbackReason);
+        if (!aNumber.moValue)
+            return makeErrorAttempt(aNumber.meError);
+        return finishCalcMathAttempt(
+            spreadsheetengine::core::math::evaluateErrorFunction(*aNumber.moValue));
+    }
+
+    if (aFunctionName == u"ERFC" || aFunctionName == u"ERFC.PRECISE"
+        || aFunctionName == u"COM.MICROSOFT.ERFC.PRECISE")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aNumber = materializeNumber(*rNode.maChildren[0]);
+        if (!aNumber.mbSupported)
+            return makeUnsupportedAttempt(aNumber.meFallbackReason);
+        if (!aNumber.moValue)
+            return makeErrorAttempt(aNumber.meError);
+        return finishCalcMathAttempt(
+            spreadsheetengine::core::math::evaluateComplementaryErrorFunction(*aNumber.moValue));
+    }
+
+    if (aFunctionName == u"GAMMA" || aFunctionName == u"COM.MICROSOFT.GAMMA")
+    {
+        if (rNode.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aNumber = materializeNumber(*rNode.maChildren[0]);
+        if (!aNumber.mbSupported)
+            return makeUnsupportedAttempt(aNumber.meFallbackReason);
+        if (!aNumber.moValue)
+            return makeErrorAttempt(aNumber.meError);
+        return finishCalcMathAttempt(
+            spreadsheetengine::core::math::evaluateGammaValue(*aNumber.moValue));
+    }
+
     if (aFunctionName == u"FISHER")
     {
         if (rNode.maChildren.size() != 1)
@@ -8729,9 +8850,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (!aNumber.moValue)
             return makeErrorAttempt(aNumber.meError);
         const auto aFisher = spreadsheetengine::core::math::fisherTransform(*aNumber.moValue);
-        if (!aFisher)
-            return makeErrorAttempt(aFisher.meError);
-        return makeNumericAttempt(aFisher.maValue);
+        return finishCalcMathAttempt(aFisher);
     }
 
     if (aFunctionName == u"FISHERINV")

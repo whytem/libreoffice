@@ -76,6 +76,7 @@
 #include <spreadsheetengine/runtime/MathMatrix.hxx>
 #include <spreadsheetengine/runtime/MathRounding.hxx>
 #include <spreadsheetengine/runtime/MathScalar.hxx>
+#include <spreadsheetengine/runtime/MathStatistical.hxx>
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
@@ -4085,6 +4086,32 @@ StackVar ScInterpreter::Interpret()
                         else
                             PushIllegalArgument();
                     };
+                const auto toCalcMathFormulaError =
+                    [](spreadsheetengine::api::Error eError) {
+                        if (eError == spreadsheetengine::api::Error::Domain)
+                            return FormulaError::IllegalArgument;
+                        return selibreoffice::toFormulaError(eError);
+                    };
+                const auto pushLegacyUnaryValueResult =
+                    [&](auto aEvaluator) {
+                        const auto aResult = aEvaluator(GetDouble());
+                        if (!aResult)
+                        {
+                            PushError(selibreoffice::toFormulaError(aResult.meError));
+                            return;
+                        }
+                        PushDouble(aResult.maValue);
+                    };
+                const auto pushLegacyUnaryCalcMathValueResult =
+                    [&](auto aEvaluator) {
+                        const auto aResult = aEvaluator(GetDouble());
+                        if (!aResult)
+                        {
+                            PushError(toCalcMathFormulaError(aResult.meError));
+                            return;
+                        }
+                        PushDouble(aResult.maValue);
+                    };
                 const auto pushLegacyRound =
                     [&](std::u16string_view rLabel, rtl_math_RoundingMode eMode) {
                         warnIfLegacyDefaultOnReached(
@@ -6454,8 +6481,12 @@ StackVar ScInterpreter::Interpret()
                     case ocLog10            :
                         pushLegacyMathScalarUnaryOptional(u"LOG10", semath::computeLog10);
                         break;
-                    case ocSqrt             : handleSqrt();                 break;
-                    case ocFact             : ScFact();                     break;
+                    case ocSqrt             :
+                        pushLegacyMathScalarUnaryOptional(u"SQRT", semath::computeSqrt);
+                        break;
+                    case ocFact             :
+                        pushLegacyUnaryCalcMathValueResult(semath::evaluateFactorialValue);
+                        break;
                     case ocGetYear          : ScGetYear();                  break;
                     case ocGetMonth         : ScGetMonth();                 break;
                     case ocGetDay           : ScGetDay();                   break;
@@ -6486,12 +6517,21 @@ StackVar ScInterpreter::Interpret()
                     case ocOdd              :
                         pushLegacyMathScalarUnary(u"ODD", semath::computeOdd);
                         break;
-                    case ocPhi              : ScPhi();                      break;
-                    case ocGauss            : ScGauss();                    break;
+                    case ocPhi              :
+                        PushDouble(semath::evaluateNormalDistribution(GetDouble(), 0.0, 1.0, false)
+                                       .maValue);
+                        break;
+                    case ocGauss            :
+                        PushDouble(semath::gaussValue(GetDouble()));
+                        break;
                     case ocStdNormDist      : ScStdNormDist();              break;
                     case ocStdNormDist_MS   : ScStdNormDist_MS();           break;
-                    case ocFisher           : handleFisher();               break;
-                    case ocFisherInv        : handleFisherInv();            break;
+                    case ocFisher           :
+                        pushLegacyUnaryCalcMathValueResult(semath::fisherTransform);
+                        break;
+                    case ocFisherInv        :
+                        PushDouble(semath::inverseFisherTransform(GetDouble()));
+                        break;
                     case ocIsEmpty          : pushLegacyIsEmpty();          break;
                     case ocIsString         : pushLegacyIsString(false);    break;
                     case ocIsNonString      : pushLegacyIsString(true);     break;
@@ -6661,8 +6701,15 @@ StackVar ScInterpreter::Interpret()
                     case ocWebservice       : ScWebservice();               break;
                     case ocEncodeURL        : ScEncodeURL();                break;
                     case ocColor            : pushLegacyColor();            break;
-                    case ocErf_MS           : ScErf();                      break;
-                    case ocErfc_MS          : ScErfc();                     break;
+                    case ocErf_MS           :
+                        if (MustHaveParamCount(GetByte(), 1))
+                            pushLegacyUnaryValueResult(semath::evaluateErrorFunction);
+                        break;
+                    case ocErfc_MS          :
+                        if (MustHaveParamCount(GetByte(), 1))
+                            pushLegacyUnaryValueResult(
+                                semath::evaluateComplementaryErrorFunction);
+                        break;
                     case ocIpmt             : ScIpmt();                     break;
                     case ocPpmt             : ScPpmt();                     break;
                     case ocCumIpmt          : ScCumIpmt();                  break;
@@ -6831,8 +6878,12 @@ StackVar ScInterpreter::Interpret()
                     case ocForecast_ETS_STA : ScForecast_Ets( etsStatAdd );   break;
                     case ocForecast_ETS_STM : ScForecast_Ets( etsStatMult );  break;
                     case ocGammaLn          :
-                    case ocGammaLn_MS       : ScLogGamma();                 break;
-                    case ocGamma            : ScGamma();                    break;
+                    case ocGammaLn_MS       :
+                        pushLegacyUnaryCalcMathValueResult(semath::evaluateLogGammaValue);
+                        break;
+                    case ocGamma            :
+                        pushLegacyUnaryCalcMathValueResult(semath::evaluateGammaValue);
+                        break;
                     case ocGammaDist        : ScGammaDist( true );          break;
                     case ocGammaDist_MS     : ScGammaDist( false );         break;
                     case ocGammaInv         :

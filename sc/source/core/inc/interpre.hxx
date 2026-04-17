@@ -564,7 +564,6 @@ private:
     void ScRandArray();
     void ScRandomImpl( const std::function<double( double fFirst, double fLast )>& RandomFunc,
             double fFirst, double fLast );
-    void handleSqrt();
     bool IsString();
     void handleType();
     void ScCell();
@@ -845,15 +844,8 @@ private:
     double GetTDist( double T, double fDF, int nType );
     double GetBeta(double fAlpha, double fBeta);
     static double GetLogBeta(double fAlpha, double fBeta);
-    void ScLogGamma();
-    void ScGamma();
-    void ScPhi();
-    void ScGauss();
     void ScStdNormDist();
     void ScStdNormDist_MS();
-    void handleFisher();
-    void handleFisherInv();
-    void ScFact();
     void ScNormDist( int nMinParamCount );
     void ScGammaDist( bool bODFF );
     void ScGammaInv();
@@ -938,8 +930,6 @@ private:
     void ScFilterXML();
     void ScWebservice();
     void ScEncodeURL();
-    void ScErf();
-    void ScErfc();
 
     // probability density function; fLambda is "scale" parameter
     double GetGammaDistPDF(double fX, double fAlpha, double fLambda);
