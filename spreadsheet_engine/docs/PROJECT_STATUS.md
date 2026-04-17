@@ -37,7 +37,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_probe_formula_cells=50348`
 - `interpret_tail_live_authoritative_match_total=50344`
 - `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=50`
+- `legacy_interpreter_subroutine_count=40`
 - live authoritative-match rate over the corpus: `99.3743%`
 - live authoritative-match rate over the current promoted probe: `99.9921%`
 
@@ -77,13 +77,13 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=50380`
-- `interpret_tail_live_unique_supported_formula_cells=50380`
+- `interpret_tail_live_unique_seen_formula_cells=50612`
+- `interpret_tail_live_unique_supported_formula_cells=50612`
 - `interpret_tail_live_unique_fallback_formula_cells=0`
 - `interpret_tail_live_unique_unsupported_function_formula_cells=0`
-- `interpret_tail_live_unique_unseen_formula_cells=281`
-- `interpret_tail_live_unique_seen_rate=99.45`
-- `interpret_tail_live_unique_supported_rate=99.45`
+- `interpret_tail_live_unique_unseen_formula_cells=49`
+- `interpret_tail_live_unique_seen_rate=99.90`
+- `interpret_tail_live_unique_supported_rate=99.90`
 
 ### Live Unique Unsupported-Function Top-N
 
@@ -109,13 +109,13 @@ Top unseen unknown-surface roots:
 - `operator:+`: `34` formula cells, `34` unseen
 - `parse_failure`: `14` formula cells, `12` unseen
 - `root:array_constant`: `10` formula cells, `0` unseen
-- `TRIM`: `7` formula cells, `7` unseen
-- `COM.MICROSOFT.F.TEST`: `7` formula cells, `6` unseen
-- `CORREL`: `7` formula cells, `6` unseen
-- `SHEET`: `7` formula cells, `6` unseen
-- `XNPV`: `7` formula cells, `6` unseen
-- `COM.MICROSOFT.COVARIANCE.P`: `7` formula cells, `5` unseen
-- `COM.MICROSOFT.COVARIANCE.S`: `7` formula cells, `5` unseen
+- `COM.MICROSOFT.COVARIANCE.P`: `7` formula cells, `0` unseen
+- `COM.MICROSOFT.COVARIANCE.S`: `7` formula cells, `0` unseen
+- `COM.MICROSOFT.F.TEST`: `7` formula cells, `0` unseen
+- `CORREL`: `7` formula cells, `0` unseen
+- `COVAR`: `7` formula cells, `0` unseen
+- `PEARSON`: `7` formula cells, `0` unseen
+- `SHEET`: `7` formula cells, `0` unseen
 
 Updated next routing policy:
 
@@ -145,12 +145,12 @@ replay formula cell once, then classifying whether that formula cell was
 actually seen and supported by the seam.
 
 - `interpret_tail_forced_direct_formula_cells=50661`
-- `interpret_tail_forced_direct_seen_formula_cells=44824`
-- `interpret_tail_forced_direct_supported_formula_cells=44824`
+- `interpret_tail_forced_direct_seen_formula_cells=44773`
+- `interpret_tail_forced_direct_supported_formula_cells=44773`
 - `interpret_tail_forced_direct_fallback_formula_cells=0`
-- `interpret_tail_forced_direct_unseen_formula_cells=5837`
-- `interpret_tail_forced_direct_seen_rate=88.49`
-- `interpret_tail_forced_direct_supported_rate=88.49`
+- `interpret_tail_forced_direct_unseen_formula_cells=5888`
+- `interpret_tail_forced_direct_seen_rate=88.38`
+- `interpret_tail_forced_direct_supported_rate=88.38`
 
 ### Raw Cached-Workbook Promoted Probe
 
@@ -188,17 +188,17 @@ Interpretation:
 ### Promoted Replay Eligibility Inventory
 
 - `interpret_tail_replay_promoted_formula_cells=50348`
-- `interpret_tail_replay_promoted_direct_seen=44792`
-- `interpret_tail_replay_promoted_direct_supported=44792`
+- `interpret_tail_replay_promoted_direct_seen=44741`
+- `interpret_tail_replay_promoted_direct_supported=44741`
 - `interpret_tail_replay_promoted_direct_fallback=0`
-- `interpret_tail_replay_promoted_direct_unseen=5556`
+- `interpret_tail_replay_promoted_direct_unseen=5607`
 - `interpret_tail_replay_promoted_shared_formula_cells=40577`
 - `interpret_tail_replay_promoted_non_shared_formula_cells=9771`
 - `interpret_tail_replay_promoted_unseen_shared_member=2606`
 - `interpret_tail_replay_promoted_unseen_non_shared=2692`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
 - `interpret_tail_replay_promoted_needs_interpret_after_dirty=50348`
-- `interpret_tail_replay_promoted_dirty_after_interpret=5556`
+- `interpret_tail_replay_promoted_dirty_after_interpret=5607`
 
 ### Engine-Authoritative Families
 

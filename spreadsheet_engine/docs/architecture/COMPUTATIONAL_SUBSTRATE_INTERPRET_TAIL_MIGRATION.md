@@ -81,7 +81,10 @@ What is still not true:
   wrappers, and now the dedicated `FACT`, `GAMMA`, `GAMMALN`, `PHI`,
   `GAUSS`, `ERF`, and `ERFC` wrappers, and now the dedicated chi-square,
   chi, gamma-distribution, Student-t, F-distribution, chi-square inverse,
-  Student-t inverse, F inverse, and chi inverse wrappers; broader legacy
+  Student-t inverse, F inverse, and chi inverse wrappers, and now the
+  dedicated `ScB`, `ScNormDist`, `ScHypGeomDist`, `ScLogNormDist`,
+  `ScLogNormInv`, `ScBetaDist_MS`, `ScBetaInv`, `ScCritBinom`,
+  `ScNegBinomDist`, and `ScNegBinomDist_MS` wrappers; broader legacy
   retirement has not started
 - the full replay corpus now shows strong ambient live-seam traffic, but most
   retained fallback now lives inside the remaining ambient
@@ -254,7 +257,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_probe_formula_cells=50348`
 - `interpret_tail_live_authoritative_match_total=50344`
 - `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=50`
+- `legacy_interpreter_subroutine_count=40`
 - live authoritative-match rate over the corpus: `99.3743%`
 - live authoritative-match rate over the current promoted probe: `99.9921%`
 
@@ -292,13 +295,13 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=50380`
-- `interpret_tail_live_unique_supported_formula_cells=50380`
+- `interpret_tail_live_unique_seen_formula_cells=50612`
+- `interpret_tail_live_unique_supported_formula_cells=50612`
 - `interpret_tail_live_unique_fallback_formula_cells=0`
 - `interpret_tail_live_unique_unsupported_function_formula_cells=0`
-- `interpret_tail_live_unique_unseen_formula_cells=281`
-- `interpret_tail_live_unique_seen_rate=99.45`
-- `interpret_tail_live_unique_supported_rate=99.45`
+- `interpret_tail_live_unique_unseen_formula_cells=49`
+- `interpret_tail_live_unique_seen_rate=99.90`
+- `interpret_tail_live_unique_supported_rate=99.90`
 
 Interpretation:
 
@@ -416,12 +419,12 @@ replay formula cell once, then classifying whether that formula cell was
 actually seen and supported by the seam:
 
 - `interpret_tail_forced_direct_formula_cells=50661`
-- `interpret_tail_forced_direct_seen_formula_cells=44824`
-- `interpret_tail_forced_direct_supported_formula_cells=44824`
+- `interpret_tail_forced_direct_seen_formula_cells=44773`
+- `interpret_tail_forced_direct_supported_formula_cells=44773`
 - `interpret_tail_forced_direct_fallback_formula_cells=0`
-- `interpret_tail_forced_direct_unseen_formula_cells=5837`
-- `interpret_tail_forced_direct_seen_rate=88.49`
-- `interpret_tail_forced_direct_supported_rate=88.49`
+- `interpret_tail_forced_direct_unseen_formula_cells=5888`
+- `interpret_tail_forced_direct_seen_rate=88.38`
+- `interpret_tail_forced_direct_supported_rate=88.38`
 
 ### Raw Cached-Workbook Promoted Probe
 
@@ -525,10 +528,10 @@ surface after forcing each promoted replay formula through direct live
 `Interpret()`:
 
 - `interpret_tail_replay_promoted_formula_cells=50348`
-- `interpret_tail_replay_promoted_direct_seen=44792`
-- `interpret_tail_replay_promoted_direct_supported=44792`
+- `interpret_tail_replay_promoted_direct_seen=44741`
+- `interpret_tail_replay_promoted_direct_supported=44741`
 - `interpret_tail_replay_promoted_direct_fallback=0`
-- `interpret_tail_replay_promoted_direct_unseen=5556`
+- `interpret_tail_replay_promoted_direct_unseen=5607`
 - `interpret_tail_replay_promoted_shared_formula_cells=40577`
 - `interpret_tail_replay_promoted_shared_top_formula_cells=3105`
 - `interpret_tail_replay_promoted_shared_member_formula_cells=37472`
@@ -538,7 +541,7 @@ surface after forcing each promoted replay formula through direct live
 - `interpret_tail_replay_promoted_unseen_non_shared=2692`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
 - `interpret_tail_replay_promoted_needs_interpret_after_dirty=50348`
-- `interpret_tail_replay_promoted_dirty_after_interpret=5556`
+- `interpret_tail_replay_promoted_dirty_after_interpret=5607`
 
 Interpretation:
 
@@ -549,7 +552,7 @@ Interpretation:
   earlier text/conversion/statistical widening
 - both shared and non-shared promoted replay formulas now reach the live seam
 - the direct replay-promoted surface is now fallback-free on the standing
-  corpus, but still has a meaningful unseen tail (`5556` cells), especially
+  corpus, but still has a meaningful unseen tail (`5607` cells), especially
   across shared-member and non-shared replay formulas
 - the dominant next target is now broader retirement and unseen-surface
   reduction rather than replay fallback cleanup
