@@ -275,38 +275,6 @@ void ScInterpreter::ScBetaDist_MS()
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::ScPermut()
-{
-    if ( !MustHaveParamCount( GetByte(), 2 ) )
-        return;
-
-    const double k = GetDouble();
-    const double n = GetDouble();
-    const auto aResult = semath::evaluatePermutationValue(n, k);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
-void ScInterpreter::ScPermutationA()
-{
-    if ( MustHaveParamCount( GetByte(), 2 ) )
-    {
-        const double k = GetDouble();
-        const double n = GetDouble();
-        const auto aResult = semath::evaluatePermutationAValue(n, k);
-        if (!aResult)
-        {
-            PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-            return;
-        }
-        PushDouble(aResult.maValue);
-    }
-}
-
 void ScInterpreter::ScB()
 {
     sal_uInt8 nParamCount = GetByte();
@@ -448,42 +416,6 @@ void ScInterpreter::ScLogNormDist( int nMinParamCount ) //expanded, see #i100119
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::ScStdNormDist()
-{
-    PushDouble(semath::evaluateNormalDistribution(GetDouble(), 0.0, 1.0, true).maValue);
-}
-
-void ScInterpreter::ScStdNormDist_MS()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 2 ) )
-        return;
-    bool bCumulative = GetBool();                        // cumulative
-    double x = GetDouble();                              // x
-
-    if (bCumulative)
-        PushDouble(semath::evaluateNormalDistribution(x, 0.0, 1.0, true).maValue);
-    else
-        PushDouble(semath::evaluateNormalDistribution(x, 0.0, 1.0, false).maValue);
-}
-
-void ScInterpreter::ScExpDist()
-{
-    if ( !MustHaveParamCount( GetByte(), 3 ) )
-        return;
-
-    const bool bCumulative = GetDouble() != 0.0;
-    const double lambda = GetDouble();
-    const double x = GetDouble();
-    const auto aResult = semath::evaluateExponentialDistribution(x, lambda, bCumulative);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
 void ScInterpreter::ScTDist()
 {
     if ( !MustHaveParamCount( GetByte(), 3 ) )
@@ -606,24 +538,6 @@ void ScInterpreter::ScChiDist( bool bODFF )
     PushDouble(fResult);
 }
 
-void ScInterpreter::ScWeibull()
-{
-    if ( !MustHaveParamCount( GetByte(), 4 ) )
-        return;
-
-    const bool bCumulative = GetDouble() != 0.0;
-    const double beta = GetDouble();
-    const double alpha = GetDouble();
-    const double x = GetDouble();
-    const auto aResult = semath::evaluateWeibullDistribution(x, alpha, beta, bCumulative);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
 void ScInterpreter::handlePoissonDist( bool bODFF )
 {
     sal_uInt8 nParamCount = GetByte();
@@ -711,18 +625,6 @@ void ScInterpreter::ScNormInv()
     }
 }
 
-void ScInterpreter::ScSNormInv()
-{
-    double x = GetDouble();
-    const auto aResult = semath::evaluateStandardNormalInverse(x);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
 void ScInterpreter::ScLogNormInv()
 {
     sal_uInt8 nParamCount = GetByte();
@@ -739,22 +641,6 @@ void ScInterpreter::ScLogNormInv()
         }
         PushDouble(aResult.maValue);
     }
-}
-
-void ScInterpreter::ScGammaInv()
-{
-    if ( !MustHaveParamCount( GetByte(), 3 ) )
-        return;
-    double fBeta  = GetDouble();
-    double fAlpha = GetDouble();
-    double fP = GetDouble();
-    const auto aResult = semath::evaluateGammaInverse(fP, fAlpha, fBeta);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScBetaInv()
@@ -1624,21 +1510,6 @@ void ScInterpreter::ScGeoMean()
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::ScStandard()
-{
-    if ( MustHaveParamCount( GetByte(), 3 ) )
-    {
-        double sigma = GetDouble();
-        double mue   = GetDouble();
-        double x     = GetDouble();
-        if (sigma < 0.0)
-            PushError( FormulaError::IllegalArgument);
-        else if (sigma == 0.0)
-            PushError( FormulaError::DivisionByZero);
-        else
-            PushDouble((x-mue)/sigma);
-    }
-}
 bool ScInterpreter::CalculateSkew(KahanSum& fSum, double& fCount, std::vector<double>& values)
 {
     short nParamCount = GetByte();

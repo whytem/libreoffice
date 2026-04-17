@@ -844,16 +844,10 @@ private:
     double GetTDist( double T, double fDF, int nType );
     double GetBeta(double fAlpha, double fBeta);
     static double GetLogBeta(double fAlpha, double fBeta);
-    void ScStdNormDist();
-    void ScStdNormDist_MS();
     void ScNormDist( int nMinParamCount );
     void ScGammaDist( bool bODFF );
-    void ScGammaInv();
-    void ScExpDist();
     void handleBinomDist();
     void handlePoissonDist( bool bODFF );
-    void ScPermut();
-    void ScPermutationA();
     void ScB();
     void ScHypGeomDist( int nMinParamCount );
     void ScLogNormDist( int nMinParamCount );
@@ -867,7 +861,6 @@ private:
     void ScChiSqDist(); // returns left tail or density
     void ScChiSqDist_MS();
     void ScChiSqInv(); // inverse to CHISQDIST
-    void ScWeibull();
     void handleBetaDist();
     void ScBetaDist_MS();
     void ScFInv();
@@ -881,7 +874,6 @@ private:
     void handleKurt();
     void ScHarMean();
     void ScGeoMean();
-    void ScStandard();
     void ScSkew();
     void ScSkewp();
     void ScMedian();
@@ -906,7 +898,6 @@ private:
     void ScFrequency();
     void ScQuartile( bool bInclusive );
     void ScNormInv();
-    void ScSNormInv();
     void ScConfidence();
     void ScConfidenceT();
     void ScTrimMean();

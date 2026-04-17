@@ -4112,6 +4112,114 @@ StackVar ScInterpreter::Interpret()
                         }
                         PushDouble(aResult.maValue);
                     };
+                const auto pushLegacyStdNormDist = [&](bool bMicrosoftSyntax) {
+                    if (!MustHaveParamCount(GetByte(), bMicrosoftSyntax ? 2 : 1))
+                        return;
+
+                    bool bCumulative = true;
+                    double fX = 0.0;
+                    if (bMicrosoftSyntax)
+                    {
+                        bCumulative = GetBool();
+                        fX = GetDouble();
+                    }
+                    else
+                        fX = GetDouble();
+
+                    PushDouble(semath::evaluateNormalDistribution(fX, 0.0, 1.0, bCumulative)
+                                   .maValue);
+                };
+                const auto pushLegacyExponentialDist = [&]() {
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+
+                    const bool bCumulative = GetDouble() != 0.0;
+                    const double fLambda = GetDouble();
+                    const double fX = GetDouble();
+                    const auto aResult
+                        = semath::evaluateExponentialDistribution(fX, fLambda, bCumulative);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyPermutation = [&](bool bAllowRepetition) {
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+
+                    const double fK = GetDouble();
+                    const double fN = GetDouble();
+                    const auto aResult = bAllowRepetition
+                                             ? semath::evaluatePermutationAValue(fN, fK)
+                                             : semath::evaluatePermutationValue(fN, fK);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyWeibull = [&]() {
+                    if (!MustHaveParamCount(GetByte(), 4))
+                        return;
+
+                    const bool bCumulative = GetDouble() != 0.0;
+                    const double fBeta = GetDouble();
+                    const double fAlpha = GetDouble();
+                    const double fX = GetDouble();
+                    const auto aResult
+                        = semath::evaluateWeibullDistribution(fX, fAlpha, fBeta, bCumulative);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacySNormInv = [&]() {
+                    if (!MustHaveParamCount(GetByte(), 1))
+                        return;
+
+                    const auto aResult = semath::evaluateStandardNormalInverse(GetDouble());
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyGammaInverse = [&]() {
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+
+                    const double fBeta = GetDouble();
+                    const double fAlpha = GetDouble();
+                    const double fProbability = GetDouble();
+                    const auto aResult
+                        = semath::evaluateGammaInverse(fProbability, fAlpha, fBeta);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyStandardize = [&]() {
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+
+                    const double fSigma = GetDouble();
+                    const double fMean = GetDouble();
+                    const double fX = GetDouble();
+                    if (fSigma < 0.0)
+                        PushError(FormulaError::IllegalArgument);
+                    else if (fSigma == 0.0)
+                        PushError(FormulaError::DivisionByZero);
+                    else
+                        PushDouble((fX - fMean) / fSigma);
+                };
                 const auto pushLegacyRound =
                     [&](std::u16string_view rLabel, rtl_math_RoundingMode eMode) {
                         warnIfLegacyDefaultOnReached(
@@ -6524,8 +6632,8 @@ StackVar ScInterpreter::Interpret()
                     case ocGauss            :
                         PushDouble(semath::gaussValue(GetDouble()));
                         break;
-                    case ocStdNormDist      : ScStdNormDist();              break;
-                    case ocStdNormDist_MS   : ScStdNormDist_MS();           break;
+                    case ocStdNormDist      : pushLegacyStdNormDist(false); break;
+                    case ocStdNormDist_MS   : pushLegacyStdNormDist(true);  break;
                     case ocFisher           :
                         pushLegacyUnaryCalcMathValueResult(semath::fisherTransform);
                         break;
@@ -6781,15 +6889,15 @@ StackVar ScInterpreter::Interpret()
                     case ocNormDist         : ScNormDist( 3 );              break;
                     case ocNormDist_MS      : ScNormDist( 4 );              break;
                     case ocExpDist          :
-                    case ocExpDist_MS       : ScExpDist();                  break;
+                    case ocExpDist_MS       : pushLegacyExponentialDist();  break;
                     case ocBinomDist        :
                     case ocBinomDist_MS     : handleBinomDist();            break;
                     case ocPoissonDist      : handlePoissonDist( true );    break;
                     case ocPoissonDist_MS   : handlePoissonDist( false );   break;
                     case ocCombin           : pushLegacyCombin(u"COMBIN", false);  break;
                     case ocCombinA          : pushLegacyCombin(u"COMBINA", true);  break;
-                    case ocPermut           : ScPermut();                   break;
-                    case ocPermutationA     : ScPermutationA();             break;
+                    case ocPermut           : pushLegacyPermutation(false); break;
+                    case ocPermutationA     : pushLegacyPermutation(true);  break;
                     case ocHypGeomDist      : ScHypGeomDist( 4 );           break;
                     case ocHypGeomDist_MS   : ScHypGeomDist( 5 );           break;
                     case ocLogNormDist      : ScLogNormDist( 1 );           break;
@@ -6805,7 +6913,7 @@ StackVar ScInterpreter::Interpret()
                     case ocChiDist_MS       : ScChiDist( false );           break;
                     case ocChiSqDist        : ScChiSqDist();                break;
                     case ocChiSqDist_MS     : ScChiSqDist_MS();             break;
-                    case ocStandard         : ScStandard();                 break;
+                    case ocStandard         : pushLegacyStandardize();      break;
                     case ocAveDev           : ScAveDev();                   break;
                     case ocDevSq            : ScDevSq();                    break;
                     case ocKurt             : handleKurt();                 break;
@@ -6818,7 +6926,7 @@ StackVar ScInterpreter::Interpret()
                     case ocGeoMean          : ScGeoMean();                  break;
                     case ocHarMean          : ScHarMean();                  break;
                     case ocWeibull          :
-                    case ocWeibull_MS       : ScWeibull();                  break;
+                    case ocWeibull_MS       : pushLegacyWeibull();          break;
                     case ocBinomInv         :
                     case ocCritBinom        : ScCritBinom();                break;
                     case ocNegBinomVert     : ScNegBinomDist();             break;
@@ -6849,7 +6957,7 @@ StackVar ScInterpreter::Interpret()
                     case ocNormInv          :
                     case ocNormInv_MS       : ScNormInv();                  break;
                     case ocSNormInv         :
-                    case ocSNormInv_MS      : ScSNormInv();                 break;
+                    case ocSNormInv_MS      : pushLegacySNormInv();         break;
                     case ocConfidence       :
                     case ocConfidence_N     : ScConfidence();               break;
                     case ocConfidence_T     : ScConfidenceT();              break;
@@ -6887,7 +6995,7 @@ StackVar ScInterpreter::Interpret()
                     case ocGammaDist        : ScGammaDist( true );          break;
                     case ocGammaDist_MS     : ScGammaDist( false );         break;
                     case ocGammaInv         :
-                    case ocGammaInv_MS      : ScGammaInv();                 break;
+                    case ocGammaInv_MS      : pushLegacyGammaInverse();     break;
                     case ocChiTest          :
                     case ocChiTest_MS       : ScChiTest();                  break;
                     case ocChiInv           :
