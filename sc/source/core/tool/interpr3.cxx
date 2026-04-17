@@ -142,52 +142,6 @@ double ScInterpreter::GetChiSqDistPDF(double fX, double fDF)
     return aResult ? aResult.maValue : HUGE_VAL;
 }
 
-void ScInterpreter::ScChiSqDist()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 2, 3 ) )
-        return;
-    bool bCumulative;
-    if (nParamCount == 3)
-        bCumulative = GetBool();
-    else
-        bCumulative = true;
-    double fDF = ::rtl::math::approxFloor(GetDouble());
-    if (fDF < 1.0)
-        PushIllegalArgument();
-    else
-    {
-        double fX = GetDouble();
-        if (bCumulative)
-            PushDouble(GetChiSqDistCDF(fX,fDF));
-        else
-            PushDouble(GetChiSqDistPDF(fX,fDF));
-    }
-}
-
-void ScInterpreter::ScChiSqDist_MS()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 3, 3 ) )
-        return;
-    bool bCumulative = GetBool();
-    double fDF = ::rtl::math::approxFloor( GetDouble() );
-    if ( fDF < 1.0 || fDF > 1E10 )
-        PushIllegalArgument();
-    else
-    {
-        double fX = GetDouble();
-        if ( fX < 0 )
-            PushIllegalArgument();
-        else
-        {
-            if ( bCumulative )
-                PushDouble( GetChiSqDistCDF( fX, fDF ) );
-            else
-                PushDouble( GetChiSqDistPDF( fX, fDF ) );
-        }
-    }
-}
 
 double ScInterpreter::GetBeta(double fAlpha, double fBeta)
 {
@@ -416,127 +370,6 @@ void ScInterpreter::ScLogNormDist( int nMinParamCount ) //expanded, see #i100119
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::ScTDist()
-{
-    if ( !MustHaveParamCount( GetByte(), 3 ) )
-        return;
-    double fFlag = ::rtl::math::approxFloor(GetDouble());
-    double fDF   = ::rtl::math::approxFloor(GetDouble());
-    double T     = GetDouble();
-    if (fDF < 1.0 || T < 0.0 || (fFlag != 1.0 && fFlag != 2.0) )
-    {
-        PushIllegalArgument();
-        return;
-    }
-    PushDouble( GetTDist( T, fDF, static_cast<int>(fFlag) ) );
-}
-
-void ScInterpreter::ScTDist_T( int nTails )
-{
-    if ( !MustHaveParamCount( GetByte(), 2 ) )
-        return;
-    double fDF = ::rtl::math::approxFloor( GetDouble() );
-    double fT  = GetDouble();
-    if ( fDF < 1.0 || ( nTails == 2 && fT < 0.0 ) )
-    {
-        PushIllegalArgument();
-        return;
-    }
-    double fRes = GetTDist( fT, fDF, nTails );
-    if ( nTails == 1 && fT < 0.0 )
-        PushDouble( 1.0 - fRes ); // tdf#105937, right tail, negative X
-    else
-        PushDouble( fRes );
-}
-
-void ScInterpreter::ScTDist_MS()
-{
-    if ( !MustHaveParamCount( GetByte(), 3 ) )
-        return;
-    bool   bCumulative = GetBool();
-    double fDF = ::rtl::math::approxFloor( GetDouble() );
-    double T   = GetDouble();
-    if ( fDF < 1.0 )
-    {
-        PushIllegalArgument();
-        return;
-    }
-    PushDouble( GetTDist( T, fDF, ( bCumulative ? 4 : 3 ) ) );
-}
-
-void ScInterpreter::ScFDist()
-{
-    if ( !MustHaveParamCount( GetByte(), 3 ) )
-        return;
-    double fF2 = ::rtl::math::approxFloor(GetDouble());
-    double fF1 = ::rtl::math::approxFloor(GetDouble());
-    double fF  = GetDouble();
-    if (fF < 0.0 || fF1 < 1.0 || fF2 < 1.0 || fF1 >= 1.0E10 || fF2 >= 1.0E10)
-    {
-        PushIllegalArgument();
-        return;
-    }
-    PushDouble(GetFDist(fF, fF1, fF2));
-}
-
-void ScInterpreter::ScFDist_LT()
-{
-    int nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 3, 4 ) )
-        return;
-    bool bCum;
-    if ( nParamCount == 3 )
-        bCum = true;
-    else if ( IsMissing() )
-    {
-        bCum = true;
-        Pop();
-    }
-    else
-        bCum = GetBool();
-    double fF2 = ::rtl::math::approxFloor( GetDouble() );
-    double fF1 = ::rtl::math::approxFloor( GetDouble() );
-    double fF  = GetDouble();
-    if ( fF < 0.0 || fF1 < 1.0 || fF2 < 1.0 || fF1 >= 1.0E10 || fF2 >= 1.0E10 )
-    {
-        PushIllegalArgument();
-        return;
-    }
-    if ( bCum )
-    {
-        // left tail cumulative distribution
-        PushDouble( 1.0 - GetFDist( fF, fF1, fF2 ) );
-    }
-    else
-    {
-        // probability density function
-        PushDouble( pow( fF1 / fF2, fF1 / 2 ) * pow( fF, ( fF1 / 2 ) - 1 ) /
-                    ( pow( ( 1 + ( fF * fF1 / fF2 ) ), ( fF1 + fF2 ) / 2 ) *
-                      GetBeta( fF1 / 2, fF2 / 2 ) ) );
-    }
-}
-
-void ScInterpreter::ScChiDist( bool bODFF )
-{
-    double fResult;
-    if ( !MustHaveParamCount( GetByte(), 2 ) )
-        return;
-    double fDF  = ::rtl::math::approxFloor(GetDouble());
-    double fChi = GetDouble();
-    if ( fDF < 1.0 // x<=0 returns 1, see ODFF1.2 6.18.11
-       || ( !bODFF && fChi < 0 ) ) // Excel does not accept negative fChi
-    {
-        PushIllegalArgument();
-        return;
-    }
-    fResult = GetChiDist( fChi, fDF);
-    if (nGlobalError != FormulaError::NONE)
-    {
-        PushError( nGlobalError);
-        return;
-    }
-    PushDouble(fResult);
-}
 
 void ScInterpreter::handlePoissonDist( bool bODFF )
 {
@@ -583,30 +416,6 @@ void ScInterpreter::ScHypGeomDist( int nMinParamCount )
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::ScGammaDist( bool bODFF )
-{
-    sal_uInt8 nMinParamCount = ( bODFF ? 3 : 4 );
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, nMinParamCount, 4 ) )
-        return;
-    bool bCumulative;
-    if (nParamCount == 4)
-        bCumulative = GetBool();
-    else
-        bCumulative = true;
-    double fBeta = GetDouble();                 // scale
-    double fAlpha = GetDouble();                // shape
-    double fX = GetDouble();                    // x
-    if ((!bODFF && fX < 0) || fAlpha <= 0.0 || fBeta <= 0.0)
-        PushIllegalArgument();
-    else
-    {
-        if (bCumulative)                        // distribution
-            PushDouble( GetGammaDist( fX, fAlpha, fBeta));
-        else                                    // density
-            PushDouble( GetGammaDistPDF( fX, fAlpha, fBeta));
-    }
-}
 
 void ScInterpreter::ScNormInv()
 {
@@ -669,30 +478,6 @@ void ScInterpreter::ScBetaInv()
     PushDouble(aResult.maValue);
 }
 
-void ScInterpreter::ScTInv( int nType )
-{
-    if ( !MustHaveParamCount( GetByte(), 2 ) )
-        return;
-    double fDF  = ::rtl::math::approxFloor(GetDouble());
-    double fP = GetDouble();
-    if (fDF < 1.0 || fP <= 0.0 || fP > 1.0 )
-    {
-        PushIllegalArgument();
-        return;
-    }
-    if ( nType == 4 ) // left-tailed cumulative t-distribution
-    {
-        if ( fP == 1.0 )
-            PushIllegalArgument();
-        else if ( fP < 0.5 )
-            PushDouble( -GetTInv( 1 - fP, fDF, nType ) );
-        else
-            PushDouble( GetTInv( fP, fDF, nType ) );
-    }
-    else
-        PushDouble( GetTInv( fP, fDF, nType ) );
-};
-
 double ScInterpreter::GetTInv( double fAlpha, double fSize, int nType )
 {
     const auto aResult = semath::evaluateTInverse(fAlpha, fSize, nType);
@@ -702,80 +487,6 @@ double ScInterpreter::GetTInv( double fAlpha, double fSize, int nType )
         return HUGE_VAL;
     }
     return aResult.maValue;
-}
-
-void ScInterpreter::ScFInv()
-{
-    if ( !MustHaveParamCount( GetByte(), 3 ) )
-        return;
-    double fF2 = ::rtl::math::approxFloor(GetDouble());
-    double fF1 = ::rtl::math::approxFloor(GetDouble());
-    double fP  = GetDouble();
-    if (fP <= 0.0 || fF1 < 1.0 || fF2 < 1.0 || fF1 >= 1.0E10 || fF2 >= 1.0E10 || fP > 1.0)
-    {
-        PushIllegalArgument();
-        return;
-    }
-
-    const auto aResult = semath::evaluateFInverseRightTail(fP, fF1, fF2);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
-void ScInterpreter::ScFInv_LT()
-{
-    if ( !MustHaveParamCount( GetByte(), 3 ) )
-        return;
-    double fF2 = ::rtl::math::approxFloor(GetDouble());
-    double fF1 = ::rtl::math::approxFloor(GetDouble());
-    double fP  = GetDouble();
-    if (fP <= 0.0 || fF1 < 1.0 || fF2 < 1.0 || fF1 >= 1.0E10 || fF2 >= 1.0E10 || fP > 1.0)
-    {
-        PushIllegalArgument();
-        return;
-    }
-
-    const auto aResult = semath::evaluateFInverseRightTail(1.0 - fP, fF1, fF2);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
-void ScInterpreter::ScChiInv()
-{
-    if ( !MustHaveParamCount( GetByte(), 2 ) )
-        return;
-    double fDF  = ::rtl::math::approxFloor(GetDouble());
-    double fP = GetDouble();
-    const auto aResult = semath::evaluateLegacyChiInverse(fP, fDF);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
-}
-
-void ScInterpreter::ScChiSqInv()
-{
-    if ( !MustHaveParamCount( GetByte(), 2 ) )
-        return;
-    double fDF  = ::rtl::math::approxFloor(GetDouble());
-    double fP = GetDouble();
-    const auto aResult = semath::evaluateChiSquareInverse(fP, fDF);
-    if (!aResult)
-    {
-        PushError(lcl_ToCalcMathFormulaError(aResult.meError));
-        return;
-    }
-    PushDouble(aResult.maValue);
 }
 
 void ScInterpreter::ScConfidence()

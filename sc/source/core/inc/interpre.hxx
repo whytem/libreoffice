@@ -845,28 +845,14 @@ private:
     double GetBeta(double fAlpha, double fBeta);
     static double GetLogBeta(double fAlpha, double fBeta);
     void ScNormDist( int nMinParamCount );
-    void ScGammaDist( bool bODFF );
     void handleBinomDist();
     void handlePoissonDist( bool bODFF );
     void ScB();
     void ScHypGeomDist( int nMinParamCount );
     void ScLogNormDist( int nMinParamCount );
     void ScLogNormInv();
-    void ScTDist();
-    void ScTDist_MS();
-    void ScTDist_T( int nTails );
-    void ScFDist();
-    void ScFDist_LT();
-    void ScChiDist( bool bODFF);   // for LEGACY.CHIDIST, returns right tail
-    void ScChiSqDist(); // returns left tail or density
-    void ScChiSqDist_MS();
-    void ScChiSqInv(); // inverse to CHISQDIST
     void handleBetaDist();
     void ScBetaDist_MS();
-    void ScFInv();
-    void ScFInv_LT();
-    void ScTInv( int nType );
-    void ScChiInv();
     void ScBetaInv();
     void ScCritBinom();
     void ScNegBinomDist();

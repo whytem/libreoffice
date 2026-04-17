@@ -3475,6 +3475,20 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorStatisticalDi
         m_pDoc->SetString(20, 0, 0, u"=ERFC.PRECISE(1)"_ustr);
         m_pDoc->SetString(21, 0, 0, u"=PHI(0)"_ustr);
         m_pDoc->SetString(22, 0, 0, u"=GAUSS(1)"_ustr);
+        m_pDoc->SetString(23, 0, 0, u"=CHISQDIST(2;4)"_ustr);
+        m_pDoc->SetString(24, 0, 0, u"=CHIDIST(2;4)"_ustr);
+        m_pDoc->SetString(25, 0, 0, u"=GAMMADIST(2;1;2;TRUE())"_ustr);
+        m_pDoc->SetString(26, 0, 0, u"=TDIST(1;1;2)"_ustr);
+        m_pDoc->SetString(27, 0, 0, u"=T.DIST.RT(1;10)"_ustr);
+        m_pDoc->SetString(28, 0, 0, u"=FDIST(1;2;2)"_ustr);
+        m_pDoc->SetString(29, 0, 0, u"=F.DIST.RT(0.8;8;12)"_ustr);
+        m_pDoc->SetString(30, 0, 0, u"=TINV(0.5;1)"_ustr);
+        m_pDoc->SetString(31, 0, 0, u"=FINV(0.5;2;2)"_ustr);
+        m_pDoc->SetString(32, 0, 0, u"=CHIINV(0.7357588823428847;4)"_ustr);
+        m_pDoc->SetString(33, 0, 0, u"=CHISQINV(0.26424111765711533;4)"_ustr);
+        m_pDoc->SetString(34, 0, 0, u"=CHISQ.INV.RT(0.05;2)"_ustr);
+        m_pDoc->SetString(35, 0, 0, u"=CHISQ.DIST.RT(3;2)"_ustr);
+        m_pDoc->SetString(36, 0, 0, u"=GAMMA.DIST(0.8;1;1;TRUE())"_ustr);
 
         ASSERT_DOUBLES_EQUAL(0.5493061443340549, m_pDoc->GetValue(0, 0, 0));
         ASSERT_DOUBLES_EQUAL(0.46211715726000974, m_pDoc->GetValue(1, 0, 0));
@@ -3499,6 +3513,20 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorStatisticalDi
         CPPUNIT_ASSERT_DOUBLES_EQUAL(0.15729920705028513, m_pDoc->GetValue(20, 0, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(0.3989422804014327, m_pDoc->GetValue(21, 0, 0), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(0.3413447460685429, m_pDoc->GetValue(22, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.26424111765711533, m_pDoc->GetValue(23, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.7357588823428847, m_pDoc->GetValue(24, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.6321205588285577, m_pDoc->GetValue(25, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(26, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.17044656615103, m_pDoc->GetValue(27, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(28, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.614339643745812, m_pDoc->GetValue(29, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(30, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(31, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(32, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(33, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(5.99146454710798, m_pDoc->GetValue(34, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.22313016014843, m_pDoc->GetValue(35, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.550671035882778, m_pDoc->GetValue(36, 0, 0), 1e-12);
 
         const auto aStats = setaileval::getStatsSnapshot();
         CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 1);

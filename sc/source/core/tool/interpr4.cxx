@@ -4220,6 +4220,347 @@ StackVar ScInterpreter::Interpret()
                     else
                         PushDouble((fX - fMean) / fSigma);
                 };
+                const auto warnIfLegacyStatisticalDistributionReached =
+                    [&](std::u16string_view rLabel) {
+                        warnIfLegacyDefaultOnReached(
+                            rLabel,
+                            "family-local default-on statistical distribution reached "
+                            "ScInterpreter");
+                    };
+                const auto pushLegacyChiSqDist =
+                    [&](std::u16string_view rLabel, bool bMicrosoftSyntax) {
+                        warnIfLegacyStatisticalDistributionReached(rLabel);
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, bMicrosoftSyntax ? 3 : 2,
+                                bMicrosoftSyntax ? 3 : 3))
+                        {
+                            return;
+                        }
+
+                        bool bCumulative = true;
+                        if (bMicrosoftSyntax || nParamCount == 3)
+                            bCumulative = GetBool();
+
+                        const double fDF = ::rtl::math::approxFloor(GetDouble());
+                        if (fDF < 1.0 || (bMicrosoftSyntax && fDF > 1E10))
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+
+                        const double fX = GetDouble();
+                        if (bMicrosoftSyntax && fX < 0.0)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+
+                        const auto aResult = semath::evaluateChiSquareDistribution(
+                            fX, fDF, bCumulative, false);
+                        if (!aResult)
+                        {
+                            PushError(toCalcMathFormulaError(aResult.meError));
+                            return;
+                        }
+                        PushDouble(aResult.maValue);
+                    };
+                const auto pushLegacyTDistLegacy = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"TDIST");
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+
+                    const double fFlag = ::rtl::math::approxFloor(GetDouble());
+                    const double fDF = ::rtl::math::approxFloor(GetDouble());
+                    const double fT = GetDouble();
+                    if (fDF < 1.0 || fT < 0.0 || (fFlag != 1.0 && fFlag != 2.0))
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+
+                    const auto aResult = semath::evaluateStudentDistribution(
+                        fT, fDF, static_cast<int>(fFlag));
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyTDistTails =
+                    [&](std::u16string_view rLabel, int nTails) {
+                        warnIfLegacyStatisticalDistributionReached(rLabel);
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            return;
+
+                        const double fDF = ::rtl::math::approxFloor(GetDouble());
+                        const double fT = GetDouble();
+                        if (fDF < 1.0 || (nTails == 2 && fT < 0.0))
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+
+                        const auto aResult = semath::evaluateStudentDistribution(fT, fDF, nTails);
+                        if (!aResult)
+                        {
+                            PushError(toCalcMathFormulaError(aResult.meError));
+                            return;
+                        }
+
+                        if (nTails == 1 && fT < 0.0)
+                            PushDouble(1.0 - aResult.maValue);
+                        else
+                            PushDouble(aResult.maValue);
+                    };
+                const auto pushLegacyTDistMs = [&](std::u16string_view rLabel) {
+                    warnIfLegacyStatisticalDistributionReached(rLabel);
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+
+                    const bool bCumulative = GetBool();
+                    const double fDF = ::rtl::math::approxFloor(GetDouble());
+                    const double fT = GetDouble();
+                    if (fDF < 1.0)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+
+                    const auto aResult
+                        = semath::evaluateStudentDistribution(fT, fDF, bCumulative ? 4 : 3);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyFDistRightTail =
+                    [&](std::u16string_view rLabel) {
+                        warnIfLegacyStatisticalDistributionReached(rLabel);
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            return;
+
+                        const double fDF2 = ::rtl::math::approxFloor(GetDouble());
+                        const double fDF1 = ::rtl::math::approxFloor(GetDouble());
+                        const double fRatio = GetDouble();
+                        if (fRatio < 0.0 || fDF1 < 1.0 || fDF2 < 1.0 || fDF1 >= 1.0E10
+                            || fDF2 >= 1.0E10)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+
+                        const auto aResult
+                            = semath::evaluateFRightTailDistribution(fRatio, fDF1, fDF2);
+                        if (!aResult)
+                        {
+                            PushError(toCalcMathFormulaError(aResult.meError));
+                            return;
+                        }
+                        PushDouble(aResult.maValue);
+                    };
+                const auto pushLegacyFDistLeftTail =
+                    [&](std::u16string_view rLabel) {
+                        warnIfLegacyStatisticalDistributionReached(rLabel);
+                        const int nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 3, 4))
+                            return;
+
+                        bool bCumulative = true;
+                        if (nParamCount == 4)
+                        {
+                            if (IsMissing())
+                            {
+                                Pop();
+                            }
+                            else
+                            {
+                                bCumulative = GetBool();
+                            }
+                        }
+
+                        const double fDF2 = ::rtl::math::approxFloor(GetDouble());
+                        const double fDF1 = ::rtl::math::approxFloor(GetDouble());
+                        const double fRatio = GetDouble();
+                        if (fRatio < 0.0 || fDF1 < 1.0 || fDF2 < 1.0 || fDF1 >= 1.0E10
+                            || fDF2 >= 1.0E10)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+
+                        if (bCumulative)
+                        {
+                            const auto aRightTail
+                                = semath::evaluateFRightTailDistribution(fRatio, fDF1, fDF2);
+                            if (!aRightTail)
+                            {
+                                PushError(toCalcMathFormulaError(aRightTail.meError));
+                                return;
+                            }
+                            PushDouble(1.0 - aRightTail.maValue);
+                            return;
+                        }
+
+                        PushDouble(pow(fDF1 / fDF2, fDF1 / 2.0)
+                                   * pow(fRatio, (fDF1 / 2.0) - 1.0)
+                                   / (pow(1.0 + (fRatio * fDF1 / fDF2),
+                                          (fDF1 + fDF2) / 2.0)
+                                      * GetBeta(fDF1 / 2.0, fDF2 / 2.0)));
+                    };
+                const auto pushLegacyChiDist =
+                    [&](std::u16string_view rLabel, bool bOdfSyntax) {
+                        warnIfLegacyStatisticalDistributionReached(rLabel);
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            return;
+
+                        const double fDF = ::rtl::math::approxFloor(GetDouble());
+                        const double fChi = GetDouble();
+                        if (fDF < 1.0 || (!bOdfSyntax && fChi < 0.0))
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+
+                        const auto aResult = semath::evaluateLegacyChiDist(fChi, fDF);
+                        if (!aResult)
+                        {
+                            PushError(toCalcMathFormulaError(aResult.meError));
+                            return;
+                        }
+                        PushDouble(aResult.maValue);
+                    };
+                const auto pushLegacyGammaDist =
+                    [&](std::u16string_view rLabel, bool bOdfSyntax) {
+                        warnIfLegacyStatisticalDistributionReached(rLabel);
+                        const sal_uInt8 nMinParamCount = bOdfSyntax ? 3 : 4;
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, nMinParamCount, 4))
+                            return;
+
+                        bool bCumulative = true;
+                        if (nParamCount == 4)
+                            bCumulative = GetBool();
+
+                        const double fBeta = GetDouble();
+                        const double fAlpha = GetDouble();
+                        const double fX = GetDouble();
+                        if ((!bOdfSyntax && fX < 0.0) || fAlpha <= 0.0 || fBeta <= 0.0)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+
+                        const auto aResult = semath::evaluateGammaDistribution(
+                            fX, fAlpha, fBeta, bCumulative, !bOdfSyntax);
+                        if (!aResult)
+                        {
+                            PushError(toCalcMathFormulaError(aResult.meError));
+                            return;
+                        }
+                        PushDouble(aResult.maValue);
+                    };
+                const auto pushLegacyTInv =
+                    [&](std::u16string_view rLabel, int nType) {
+                        warnIfLegacyStatisticalDistributionReached(rLabel);
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            return;
+
+                        const double fDF = ::rtl::math::approxFloor(GetDouble());
+                        const double fProbability = GetDouble();
+                        if (fDF < 1.0 || fProbability <= 0.0 || fProbability > 1.0)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+
+                        if (nType == 4)
+                        {
+                            if (fProbability == 1.0)
+                            {
+                                PushIllegalArgument();
+                                return;
+                            }
+
+                            const auto aProbability = fProbability < 0.5 ? 1.0 - fProbability
+                                                                          : fProbability;
+                            const auto aResult
+                                = semath::evaluateTInverse(aProbability, fDF, nType);
+                            if (!aResult)
+                            {
+                                PushError(toCalcMathFormulaError(aResult.meError));
+                                return;
+                            }
+                            PushDouble(fProbability < 0.5 ? -aResult.maValue : aResult.maValue);
+                            return;
+                        }
+
+                        const auto aResult = semath::evaluateTInverse(fProbability, fDF, nType);
+                        if (!aResult)
+                        {
+                            PushError(toCalcMathFormulaError(aResult.meError));
+                            return;
+                        }
+                        PushDouble(aResult.maValue);
+                    };
+                const auto pushLegacyFInv =
+                    [&](std::u16string_view rLabel, bool bLeftTail) {
+                        warnIfLegacyStatisticalDistributionReached(rLabel);
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            return;
+
+                        const double fDF2 = ::rtl::math::approxFloor(GetDouble());
+                        const double fDF1 = ::rtl::math::approxFloor(GetDouble());
+                        const double fProbability = GetDouble();
+                        if (fProbability <= 0.0 || fProbability > 1.0 || fDF1 < 1.0
+                            || fDF2 < 1.0 || fDF1 >= 1.0E10 || fDF2 >= 1.0E10)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+
+                        const auto aRightTail = bLeftTail ? 1.0 - fProbability : fProbability;
+                        const auto aResult
+                            = semath::evaluateFInverseRightTail(aRightTail, fDF1, fDF2);
+                        if (!aResult)
+                        {
+                            PushError(toCalcMathFormulaError(aResult.meError));
+                            return;
+                        }
+                        PushDouble(aResult.maValue);
+                    };
+                const auto pushLegacyChiInv = [&](std::u16string_view rLabel) {
+                    warnIfLegacyStatisticalDistributionReached(rLabel);
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+
+                    const double fDF = ::rtl::math::approxFloor(GetDouble());
+                    const double fProbability = GetDouble();
+                    const auto aResult = semath::evaluateLegacyChiInverse(fProbability, fDF);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyChiSqInv = [&](std::u16string_view rLabel) {
+                    warnIfLegacyStatisticalDistributionReached(rLabel);
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+
+                    const double fDF = ::rtl::math::approxFloor(GetDouble());
+                    const double fProbability = GetDouble();
+                    const auto aResult = semath::evaluateChiSquareInverse(fProbability, fDF);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
                 const auto pushLegacyRound =
                     [&](std::u16string_view rLabel, rtl_math_RoundingMode eMode) {
                         warnIfLegacyDefaultOnReached(
@@ -6902,17 +7243,17 @@ StackVar ScInterpreter::Interpret()
                     case ocHypGeomDist_MS   : ScHypGeomDist( 5 );           break;
                     case ocLogNormDist      : ScLogNormDist( 1 );           break;
                     case ocLogNormDist_MS   : ScLogNormDist( 4 );           break;
-                    case ocTDist            : ScTDist();                    break;
-                    case ocTDist_MS         : ScTDist_MS();                 break;
-                    case ocTDist_RT         : ScTDist_T( 1 );               break;
-                    case ocTDist_2T         : ScTDist_T( 2 );               break;
+                    case ocTDist            : pushLegacyTDistLegacy();      break;
+                    case ocTDist_MS         : pushLegacyTDistMs(u"T.DIST"); break;
+                    case ocTDist_RT         : pushLegacyTDistTails(u"T.DIST.RT", 1); break;
+                    case ocTDist_2T         : pushLegacyTDistTails(u"T.DIST.2T", 2); break;
                     case ocFDist            :
-                    case ocFDist_RT         : ScFDist();                    break;
-                    case ocFDist_LT         : ScFDist_LT();                 break;
-                    case ocChiDist          : ScChiDist( true );            break;
-                    case ocChiDist_MS       : ScChiDist( false );           break;
-                    case ocChiSqDist        : ScChiSqDist();                break;
-                    case ocChiSqDist_MS     : ScChiSqDist_MS();             break;
+                    case ocFDist_RT         : pushLegacyFDistRightTail(u"FDIST"); break;
+                    case ocFDist_LT         : pushLegacyFDistLeftTail(u"F.DIST"); break;
+                    case ocChiDist          : pushLegacyChiDist(u"LEGACY.CHIDIST", true); break;
+                    case ocChiDist_MS       : pushLegacyChiDist(u"CHISQ.DIST.RT", false); break;
+                    case ocChiSqDist        : pushLegacyChiSqDist(u"CHISQDIST", false); break;
+                    case ocChiSqDist_MS     : pushLegacyChiSqDist(u"CHISQ.DIST", true); break;
                     case ocStandard         : pushLegacyStandardize();      break;
                     case ocAveDev           : ScAveDev();                   break;
                     case ocDevSq            : ScDevSq();                    break;
@@ -6992,22 +7333,22 @@ StackVar ScInterpreter::Interpret()
                     case ocGamma            :
                         pushLegacyUnaryCalcMathValueResult(semath::evaluateGammaValue);
                         break;
-                    case ocGammaDist        : ScGammaDist( true );          break;
-                    case ocGammaDist_MS     : ScGammaDist( false );         break;
+                    case ocGammaDist        : pushLegacyGammaDist(u"GAMMADIST", true); break;
+                    case ocGammaDist_MS     : pushLegacyGammaDist(u"GAMMA.DIST", false); break;
                     case ocGammaInv         :
                     case ocGammaInv_MS      : pushLegacyGammaInverse();     break;
                     case ocChiTest          :
                     case ocChiTest_MS       : ScChiTest();                  break;
                     case ocChiInv           :
-                    case ocChiInv_MS        : ScChiInv();                   break;
+                    case ocChiInv_MS        : pushLegacyChiInv(u"CHIINV");  break;
                     case ocChiSqInv         :
-                    case ocChiSqInv_MS      : ScChiSqInv();                 break;
+                    case ocChiSqInv_MS      : pushLegacyChiSqInv(u"CHISQ.INV"); break;
                     case ocTInv             :
-                    case ocTInv_2T          : ScTInv( 2 );                  break;
-                    case ocTInv_MS          : ScTInv( 4 );                  break;
+                    case ocTInv_2T          : pushLegacyTInv(u"TINV", 2);   break;
+                    case ocTInv_MS          : pushLegacyTInv(u"T.INV", 4);  break;
                     case ocFInv             :
-                    case ocFInv_RT          : ScFInv();                     break;
-                    case ocFInv_LT          : ScFInv_LT();                  break;
+                    case ocFInv_RT          : pushLegacyFInv(u"LEGACY.FINV", false); break;
+                    case ocFInv_LT          : pushLegacyFInv(u"F.INV", true); break;
                     case ocLogInv           :
                     case ocLogInv_MS        : ScLogNormInv();               break;
                     case ocBetaDist         : handleBetaDist();             break;
