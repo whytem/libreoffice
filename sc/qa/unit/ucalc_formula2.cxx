@@ -2924,6 +2924,50 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorTextUtilityDe
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorInformationPredicateDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineInformationPredicateDefaultOn"_ustr));
+
+    m_pDoc->SetString(1, 0, 0, u"=1+1"_ustr);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 0, 0, u"=ISERROR(1/0)"_ustr);
+        m_pDoc->SetString(0, 1, 0, u"=ISTEXT(\"abc\")"_ustr);
+        m_pDoc->SetString(0, 2, 0, u"=ISNONTEXT(1)"_ustr);
+        m_pDoc->SetString(0, 3, 0, u"=ISBLANK(A10)"_ustr);
+        m_pDoc->SetString(0, 4, 0, u"=ISFORMULA(B1)"_ustr);
+        m_pDoc->SetString(0, 5, 0, u"=ISNA(NA())"_ustr);
+        m_pDoc->SetString(0, 6, 0, u"=ISEVEN(4)"_ustr);
+        m_pDoc->SetString(0, 7, 0, u"=ISODD(3)"_ustr);
+
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(0, 0, 0));
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(0, 1, 0));
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(0, 2, 0));
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(0, 3, 0));
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(0, 4, 0));
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(0, 5, 0));
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(0, 6, 0));
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(0, 7, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::InformationPredicate)]
+            >= 1);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorSpillArrayAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

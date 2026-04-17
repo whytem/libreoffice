@@ -1244,6 +1244,9 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         spreadsheetengine::api::Error::VariableExpected,
         aImportedIsBlankRef.maResult.meError);
 
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=ISERROR(1/0)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=ISODD(3)"));
+
     const auto aRoundUpFractionalDigits = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=ROUNDUP(31415.92654;3.3)", false);
     CPPUNIT_ASSERT(aRoundUpFractionalDigits.mbSupported);

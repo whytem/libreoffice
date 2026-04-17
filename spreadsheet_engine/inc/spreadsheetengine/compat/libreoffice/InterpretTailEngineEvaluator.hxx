@@ -11049,6 +11049,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     return eFunction == FunctionKind::LogicalConstant
            || eFunction == FunctionKind::FormulaText
            || eFunction == FunctionKind::Conversion
+           || eFunction == FunctionKind::InformationPredicate
            || eFunction == FunctionKind::TextUtility
            || eFunction == FunctionKind::Aggregate
            || eFunction == FunctionKind::MatrixMath;

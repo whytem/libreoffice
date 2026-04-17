@@ -5081,6 +5081,450 @@ StackVar ScInterpreter::Interpret()
                     }
                     PushString(aResBuf.makeStringAndClear());
                 };
+                const auto warnInformationPredicateDispatch
+                    = [&](std::u16string_view rFunctionName) {
+                          warnIfLegacyDispatchReached(
+                              "family-local default-on", rFunctionName,
+                              [](std::u16string_view rFormula) {
+                                  return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                              },
+                              "family-local default-on information predicate reached "
+                              "ScInterpreter");
+                      };
+                const auto pushLegacyIsEmpty = [&]() {
+                    warnInformationPredicateDispatch(u"ISBLANK");
+                    short nRes = 0;
+                    nFuncFmtType = SvNumFormatType::LOGICAL;
+                    switch (GetRawStackType())
+                    {
+                        case svEmptyCell:
+                        {
+                            FormulaConstTokenRef p = PopToken();
+                            if (!static_cast<const ScEmptyCellToken*>(p.get())->IsInherited())
+                                nRes = 1;
+                        }
+                        break;
+                        case svDoubleRef:
+                        case svSingleRef:
+                        {
+                            ScAddress aAdr;
+                            if (!PopDoubleRefOrSingleRef(aAdr))
+                                break;
+                            ScRefCellValue aCell(mrDoc, aAdr);
+                            if (aCell.getType() == CELLTYPE_NONE)
+                                nRes = 1;
+                        }
+                        break;
+                        case svExternalSingleRef:
+                        case svExternalDoubleRef:
+                        case svMatrix:
+                        {
+                            ScMatrixRef pMat = GetMatrix();
+                            if (!pMat)
+                                break;
+                            if (!pJumpMatrix)
+                                nRes = pMat->IsEmptyCell(0, 0) ? 1 : 0;
+                            else
+                            {
+                                SCSIZE nCols, nRows, nC, nR;
+                                pMat->GetDimensions(nCols, nRows);
+                                pJumpMatrix->GetPos(nC, nR);
+                                if (nC < nCols && nR < nRows)
+                                    nRes = pMat->IsEmptyCell(nC, nR) ? 1 : 0;
+                            }
+                        }
+                        break;
+                        default:
+                            Pop();
+                    }
+                    nGlobalError = FormulaError::NONE;
+                    PushInt(nRes);
+                };
+                const auto pushLegacyIsString = [&](bool bInvert) {
+                    warnInformationPredicateDispatch(bInvert ? u"ISNONTEXT" : u"ISTEXT");
+                    PushInt(int(bInvert ? !IsString() : IsString()));
+                };
+                const auto pushLegacyIsLogical = [&]() {
+                    warnInformationPredicateDispatch(u"ISLOGICAL");
+                    bool bRes = false;
+                    switch (GetStackType())
+                    {
+                        case svDoubleRef:
+                        case svSingleRef:
+                        {
+                            ScAddress aAdr;
+                            if (!PopDoubleRefOrSingleRef(aAdr))
+                                break;
+
+                            ScRefCellValue aCell(mrDoc, aAdr);
+                            if (GetCellErrCode(aCell) == FormulaError::NONE && aCell.hasNumeric())
+                            {
+                                const sal_uInt32 nFormat = GetCellNumberFormat(aAdr, aCell);
+                                bRes = (mrContext.NFGetType(nFormat) == SvNumFormatType::LOGICAL);
+                            }
+                        }
+                        break;
+                        case svMatrix:
+                        {
+                            double fVal;
+                            svl::SharedString aStr;
+                            const ScMatValType nMatValType = GetDoubleOrStringFromMatrix(fVal, aStr);
+                            bRes = (nMatValType == ScMatValType::Boolean);
+                        }
+                        break;
+                        default:
+                            PopError();
+                            if (nGlobalError == FormulaError::NONE)
+                                bRes = (nCurFmtType == SvNumFormatType::LOGICAL);
+                    }
+                    nCurFmtType = nFuncFmtType = SvNumFormatType::LOGICAL;
+                    nGlobalError = FormulaError::NONE;
+                    PushInt(int(bRes));
+                };
+                const auto pushLegacyIsRef = [&]() {
+                    warnInformationPredicateDispatch(u"ISREF");
+                    nFuncFmtType = SvNumFormatType::LOGICAL;
+                    bool bRes = false;
+                    switch (GetStackType())
+                    {
+                        case svSingleRef:
+                        {
+                            ScAddress aAdr;
+                            PopSingleRef(aAdr);
+                            if (nGlobalError == FormulaError::NONE)
+                                bRes = true;
+                        }
+                        break;
+                        case svDoubleRef:
+                        {
+                            ScRange aRange;
+                            PopDoubleRef(aRange);
+                            if (nGlobalError == FormulaError::NONE)
+                                bRes = true;
+                        }
+                        break;
+                        case svRefList:
+                        {
+                            FormulaConstTokenRef x = PopToken();
+                            if (nGlobalError == FormulaError::NONE)
+                                bRes = !x->GetRefList()->empty();
+                        }
+                        break;
+                        case svExternalSingleRef:
+                        {
+                            ScExternalRefCache::TokenRef pToken;
+                            PopExternalSingleRef(pToken);
+                            if (nGlobalError == FormulaError::NONE)
+                                bRes = true;
+                        }
+                        break;
+                        case svExternalDoubleRef:
+                        {
+                            ScExternalRefCache::TokenArrayRef pArray;
+                            PopExternalDoubleRef(pArray);
+                            if (nGlobalError == FormulaError::NONE)
+                                bRes = true;
+                        }
+                        break;
+                        default:
+                            Pop();
+                    }
+                    nGlobalError = FormulaError::NONE;
+                    PushInt(int(bRes));
+                };
+                const auto pushLegacyIsValue = [&]() {
+                    warnInformationPredicateDispatch(u"ISNUMBER");
+                    nFuncFmtType = SvNumFormatType::LOGICAL;
+                    bool bRes = false;
+                    switch (GetRawStackType())
+                    {
+                        case svDouble:
+                            Pop();
+                            bRes = true;
+                            break;
+                        case svDoubleRef:
+                        case svSingleRef:
+                        {
+                            ScAddress aAdr;
+                            if (!PopDoubleRefOrSingleRef(aAdr))
+                                break;
+                            ScRefCellValue aCell(mrDoc, aAdr);
+                            if (GetCellErrCode(aCell) == FormulaError::NONE)
+                            {
+                                switch (aCell.getType())
+                                {
+                                    case CELLTYPE_VALUE:
+                                        bRes = true;
+                                        break;
+                                    case CELLTYPE_FORMULA:
+                                        bRes = (aCell.getFormula()->IsValue()
+                                                && !aCell.getFormula()->IsEmpty());
+                                        break;
+                                    default:
+                                        break;
+                                }
+                            }
+                        }
+                        break;
+                        case svExternalSingleRef:
+                        {
+                            ScExternalRefCache::TokenRef pToken;
+                            PopExternalSingleRef(pToken);
+                            if (nGlobalError == FormulaError::NONE && pToken->GetType() == svDouble)
+                                bRes = true;
+                        }
+                        break;
+                        case svExternalDoubleRef:
+                        case svMatrix:
+                        {
+                            ScMatrixRef pMat = GetMatrix();
+                            if (!pMat)
+                                break;
+                            if (!pJumpMatrix)
+                            {
+                                if (pMat->GetErrorIfNotString(0, 0) == FormulaError::NONE)
+                                    bRes = pMat->IsValue(0, 0);
+                            }
+                            else
+                            {
+                                SCSIZE nCols, nRows, nC, nR;
+                                pMat->GetDimensions(nCols, nRows);
+                                pJumpMatrix->GetPos(nC, nR);
+                                if (nC < nCols && nR < nRows
+                                    && pMat->GetErrorIfNotString(nC, nR) == FormulaError::NONE)
+                                {
+                                    bRes = pMat->IsValue(nC, nR);
+                                }
+                            }
+                        }
+                        break;
+                        default:
+                            Pop();
+                    }
+                    nGlobalError = FormulaError::NONE;
+                    PushInt(int(bRes));
+                };
+                const auto pushLegacyIsFormula = [&]() {
+                    warnInformationPredicateDispatch(u"ISFORMULA");
+                    nFuncFmtType = SvNumFormatType::LOGICAL;
+                    bool bRes = false;
+                    switch (GetStackType())
+                    {
+                        case svDoubleRef:
+                            if (IsInArrayContext())
+                            {
+                                SCCOL nCol1, nCol2;
+                                SCROW nRow1, nRow2;
+                                SCTAB nTab1, nTab2;
+                                PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+                                if (nGlobalError != FormulaError::NONE)
+                                {
+                                    PushError(nGlobalError);
+                                    return;
+                                }
+                                if (nTab1 != nTab2)
+                                {
+                                    PushIllegalArgument();
+                                    return;
+                                }
+
+                                const auto aMatrixResult = seformulainspect::buildIsFormulaMatrix(
+                                    mrDoc, mrContext,
+                                    ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2),
+                                    [this](SCSIZE nColumns, SCSIZE nRows) {
+                                        return GetNewMat(nColumns, nRows, true);
+                                    });
+                                if (aMatrixResult.meFailure
+                                    == seformulainspect::MatrixInspectionFailure::IllegalArgument)
+                                {
+                                    PushIllegalArgument();
+                                    return;
+                                }
+                                if (aMatrixResult.meFailure
+                                    == seformulainspect::MatrixInspectionFailure::MatrixSize)
+                                {
+                                    PushError(FormulaError::MatrixSize);
+                                    return;
+                                }
+
+                                PushMatrix(aMatrixResult.mpMatrix);
+                                return;
+                            }
+                            [[fallthrough]];
+                        case svSingleRef:
+                        {
+                            ScAddress aAdr;
+                            if (!PopDoubleRefOrSingleRef(aAdr))
+                                break;
+                            bRes = seformulainspect::isFormulaCell(mrDoc, mrContext, aAdr);
+                        }
+                        break;
+                        default:
+                            Pop();
+                    }
+                    nGlobalError = FormulaError::NONE;
+                    PushInt(int(bRes));
+                };
+                const auto pushLegacyIsNA = [&]() {
+                    warnInformationPredicateDispatch(u"ISNA");
+                    nFuncFmtType = SvNumFormatType::LOGICAL;
+                    bool bRes = false;
+                    switch (GetStackType())
+                    {
+                        case svDoubleRef:
+                        case svSingleRef:
+                        {
+                            ScAddress aAdr;
+                            const bool bOk = PopDoubleRefOrSingleRef(aAdr);
+                            if (nGlobalError == FormulaError::NotAvailable)
+                                bRes = true;
+                            else if (bOk)
+                            {
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                bRes = (GetCellErrCode(aCell) == FormulaError::NotAvailable);
+                            }
+                        }
+                        break;
+                        case svExternalSingleRef:
+                        {
+                            ScExternalRefCache::TokenRef pToken;
+                            PopExternalSingleRef(pToken);
+                            if (nGlobalError == FormulaError::NotAvailable
+                                || (pToken && pToken->GetType() == svError
+                                    && pToken->GetError() == FormulaError::NotAvailable))
+                            {
+                                bRes = true;
+                            }
+                        }
+                        break;
+                        case svExternalDoubleRef:
+                        case svMatrix:
+                        {
+                            ScMatrixRef pMat = GetMatrix();
+                            if (!pMat)
+                                break;
+                            if (!pJumpMatrix)
+                                bRes = (pMat->GetErrorIfNotString(0, 0)
+                                        == FormulaError::NotAvailable);
+                            else
+                            {
+                                SCSIZE nCols, nRows, nC, nR;
+                                pMat->GetDimensions(nCols, nRows);
+                                pJumpMatrix->GetPos(nC, nR);
+                                if (nC < nCols && nR < nRows)
+                                {
+                                    bRes = (pMat->GetErrorIfNotString(nC, nR)
+                                            == FormulaError::NotAvailable);
+                                }
+                            }
+                        }
+                        break;
+                        default:
+                            PopError();
+                            if (nGlobalError == FormulaError::NotAvailable)
+                                bRes = true;
+                    }
+                    nGlobalError = FormulaError::NONE;
+                    PushInt(int(bRes));
+                };
+                const auto pushLegacyIsErrLike = [&](std::u16string_view rFunctionName,
+                                                     bool bTreatNAAsError) {
+                    warnInformationPredicateDispatch(rFunctionName);
+                    nFuncFmtType = SvNumFormatType::LOGICAL;
+                    bool bRes = false;
+                    switch (GetStackType())
+                    {
+                        case svDoubleRef:
+                        case svSingleRef:
+                        {
+                            ScAddress aAdr;
+                            const bool bOk = PopDoubleRefOrSingleRef(aAdr);
+                            if (!bOk || (nGlobalError != FormulaError::NONE
+                                         && (bTreatNAAsError
+                                                 || nGlobalError != FormulaError::NotAvailable)))
+                            {
+                                bRes = true;
+                            }
+                            else
+                            {
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                const FormulaError nErr = GetCellErrCode(aCell);
+                                bRes = bTreatNAAsError ? (nErr != FormulaError::NONE)
+                                                       : (nErr != FormulaError::NONE
+                                                          && nErr != FormulaError::NotAvailable);
+                            }
+                        }
+                        break;
+                        case svExternalSingleRef:
+                        {
+                            ScExternalRefCache::TokenRef pToken;
+                            PopExternalSingleRef(pToken);
+                            if (bTreatNAAsError)
+                            {
+                                bRes = (nGlobalError != FormulaError::NONE
+                                        || pToken->GetType() == svError);
+                            }
+                            else if ((nGlobalError != FormulaError::NONE
+                                      && nGlobalError != FormulaError::NotAvailable)
+                                     || !pToken
+                                     || (pToken->GetType() == svError
+                                         && pToken->GetError() != FormulaError::NotAvailable))
+                            {
+                                bRes = true;
+                            }
+                        }
+                        break;
+                        case svExternalDoubleRef:
+                        case svMatrix:
+                        {
+                            ScMatrixRef pMat = GetMatrix();
+                            if (nGlobalError != FormulaError::NONE || !pMat)
+                            {
+                                bRes = bTreatNAAsError
+                                           ? (nGlobalError != FormulaError::NONE || !pMat)
+                                           : ((nGlobalError != FormulaError::NONE
+                                               && nGlobalError != FormulaError::NotAvailable)
+                                              || !pMat);
+                            }
+                            else
+                            {
+                                const auto getErr = [&](SCSIZE nC, SCSIZE nR) {
+                                    return pMat->GetErrorIfNotString(nC, nR);
+                                };
+                                FormulaError nErr = FormulaError::NONE;
+                                if (!pJumpMatrix)
+                                    nErr = getErr(0, 0);
+                                else
+                                {
+                                    SCSIZE nCols, nRows, nC, nR;
+                                    pMat->GetDimensions(nCols, nRows);
+                                    pJumpMatrix->GetPos(nC, nR);
+                                    if (nC < nCols && nR < nRows)
+                                        nErr = getErr(nC, nR);
+                                }
+                                bRes = bTreatNAAsError ? (nErr != FormulaError::NONE)
+                                                       : (nErr != FormulaError::NONE
+                                                          && nErr != FormulaError::NotAvailable);
+                            }
+                        }
+                        break;
+                        default:
+                            PopError();
+                            if (bTreatNAAsError)
+                                bRes = (nGlobalError != FormulaError::NONE);
+                            else if (nGlobalError != FormulaError::NONE
+                                     && nGlobalError != FormulaError::NotAvailable)
+                            {
+                                bRes = true;
+                            }
+                    }
+                    nGlobalError = FormulaError::NONE;
+                    PushInt(int(bRes));
+                };
+                const auto pushLegacyIsEvenOdd = [&](bool bOdd) {
+                    warnInformationPredicateDispatch(bOdd ? u"ISODD" : u"ISEVEN");
+                    PushInt(int(bOdd ? !IsEven() : IsEven()));
+                };
 
                 switch( eOp )
                 {
@@ -5197,21 +5641,21 @@ StackVar ScInterpreter::Interpret()
                     case ocStdNormDist_MS   : ScStdNormDist_MS();           break;
                     case ocFisher           : ScFisher();                   break;
                     case ocFisherInv        : ScFisherInv();                break;
-                    case ocIsEmpty          : ScIsEmpty();                  break;
-                    case ocIsString         : ScIsString();                 break;
-                    case ocIsNonString      : ScIsNonString();              break;
-                    case ocIsLogical        : ScIsLogical();                break;
+                    case ocIsEmpty          : pushLegacyIsEmpty();          break;
+                    case ocIsString         : pushLegacyIsString(false);    break;
+                    case ocIsNonString      : pushLegacyIsString(true);     break;
+                    case ocIsLogical        : pushLegacyIsLogical();        break;
                     case ocType             : ScType();                     break;
                     case ocCell             : ScCell();                     break;
-                    case ocIsRef            : ScIsRef();                    break;
-                    case ocIsValue          : ScIsValue();                  break;
-                    case ocIsFormula        : ScIsFormula();                break;
+                    case ocIsRef            : pushLegacyIsRef();            break;
+                    case ocIsValue          : pushLegacyIsValue();          break;
+                    case ocIsFormula        : pushLegacyIsFormula();        break;
                     case ocFormula          : pushLegacyFormulaText();      break;
-                    case ocIsNA             : ScIsNV();                     break;
-                    case ocIsErr            : ScIsErr();                    break;
-                    case ocIsError          : ScIsError();                  break;
-                    case ocIsEven           : ScIsEven();                   break;
-                    case ocIsOdd            : ScIsOdd();                    break;
+                    case ocIsNA             : pushLegacyIsNA();             break;
+                    case ocIsErr            : pushLegacyIsErrLike(u"ISERR", false); break;
+                    case ocIsError          : pushLegacyIsErrLike(u"ISERROR", true); break;
+                    case ocIsEven           : pushLegacyIsEvenOdd(false);   break;
+                    case ocIsOdd            : pushLegacyIsEvenOdd(true);    break;
                     case ocN                : ScN();                        break;
                     case ocGetDateValue     :
                         pushLegacyDateOrTimeValue(
