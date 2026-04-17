@@ -3719,6 +3719,131 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedBroadFamilyLiveHostTru
     }
 }
 
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedStoredValueHostTruth)
+{
+    const struct ImportedStoredValueCase
+    {
+        OUString maWorkbookPath;
+        ScAddress maPos;
+        OUString maFormulaFragment;
+    } aCases[] = {
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/information/fods/na.fods"),
+            ScAddress(0, 1, 1), u"NA()"_ustr },
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/addin/fods/imreal.fods"),
+            ScAddress(0, 1, 1), u"IMREAL("_ustr },
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/addin/fods/imaginary.fods"),
+            ScAddress(0, 1, 1), u"IMAGINARY("_ustr },
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/addin/fods/besseli.fods"),
+            ScAddress(0, 1, 1), u"BESSELI("_ustr },
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/addin/fods/besselj.fods"),
+            ScAddress(0, 1, 1), u"BESSELJ("_ustr },
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/addin/fods/besselk.fods"),
+            ScAddress(0, 1, 1), u"BESSELK("_ustr },
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/addin/fods/bessely.fods"),
+            ScAddress(0, 1, 1), u"BESSELY("_ustr },
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/addin/fods/dec2hex.fods"),
+            ScAddress(0, 1, 1), u"DEC2HEX("_ustr },
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/date_time/fods/datedif.fods"),
+            ScAddress(0, 1, 1), u"DATEDIF("_ustr },
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/financial/fods/vdb.fods"),
+            ScAddress(0, 1, 1), u"VDB("_ustr },
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/financial/fods/price.fods"),
+            ScAddress(0, 1, 1), u"PRICE("_ustr },
+        { m_directories.getPathFromSrc(u"/sc/qa/unit/data/functions/array/fods/sumproduct.fods"),
+            ScAddress(0, 1, 1), u"SUMPRODUCT("_ustr },
+    };
+
+    auto assertAttemptMatchesHostValue = [](OUString const& rLabel,
+                                            const spreadsheetengine::compat::libreoffice::interprettaileval::EvaluationAttempt& rAttempt,
+                                            const auto& rHostValue) {
+        const OString aLabel = OUStringToOString(rLabel, RTL_TEXTENCODING_UTF8);
+        switch (rHostValue.maValue.meKind)
+        {
+            case spreadsheetengine::api::CellValueKind::Number:
+            case spreadsheetengine::api::CellValueKind::Boolean:
+                CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                    aLabel.getStr(),
+                    spreadsheetengine::api::formulavalue::ValueType::Value,
+                    rAttempt.maResult.meType);
+                CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(
+                    aLabel.getStr(),
+                    rHostValue.maValue.mfNumber, rAttempt.maResult.mfValue, 1e-12);
+                break;
+            case spreadsheetengine::api::CellValueKind::Text:
+                CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                    aLabel.getStr(),
+                    spreadsheetengine::api::formulavalue::ValueType::String,
+                    rAttempt.maResult.meType);
+                CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                    aLabel.getStr(),
+                    spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                        rHostValue.maValue.maString),
+                    spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+                        rAttempt.maResult.maString));
+                break;
+            case spreadsheetengine::api::CellValueKind::Error:
+                CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                    aLabel.getStr(),
+                    spreadsheetengine::api::formulavalue::ValueType::Error,
+                    rAttempt.maResult.meType);
+                CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                    aLabel.getStr(), rHostValue.maValue.meError, rAttempt.maResult.meError);
+                break;
+            case spreadsheetengine::api::CellValueKind::Empty:
+                CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                    aLabel.getStr(),
+                    spreadsheetengine::api::formulavalue::ValueType::String,
+                    rAttempt.maResult.meType);
+                CPPUNIT_ASSERT_MESSAGE(aLabel.getStr(), rAttempt.maResult.maString.empty());
+                break;
+        }
+    };
+
+    for (const auto& rCase : aCases)
+    {
+        const std::string aWorkbookPathUtf8(rCase.maWorkbookPath.toUtf8().getStr());
+        const auto aLoadResult = loadWorkbook(aWorkbookPathUtf8);
+        CPPUNIT_ASSERT_MESSAGE("loadWorkbook failed for stored-value host truth case",
+            static_cast<bool>(aLoadResult));
+
+        Workbook aWorkbook = aLoadResult.maValue.maWorkbook;
+        normalizeWorkbookSheetNamesForCalc(aWorkbook);
+
+        ScDocShellRef xDocShell
+            = new ScDocShell(SfxModelFlags::EMBEDDED_OBJECT
+                             | SfxModelFlags::DISABLE_EMBEDDED_SCRIPTS
+                             | SfxModelFlags::DISABLE_DOCUMENT_RECOVERY);
+        xDocShell->DoInitUnitTest();
+        ScDocument& rDoc = xDocShell->GetDocument();
+        (void)materializeWorkbookToCalc(aWorkbook, rDoc, aWorkbookPathUtf8);
+
+        ScInterpreterContextGetterGuard aContextGetterGuard(rDoc, rDoc.GetFormatTable());
+        ScInterpreterContext* pContext = aContextGetterGuard.GetInterpreterContext();
+        CPPUNIT_ASSERT(pContext);
+
+        ScFormulaCell* pFormula = rDoc.GetFormulaCell(rCase.maPos);
+        CPPUNIT_ASSERT(pFormula);
+
+        const OUString aFormulaSource
+            = pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, pContext);
+        const OUString aCanonicalFormulaSource = pFormula->GetHybridFormula();
+
+        const auto aAttempt
+            = spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
+                rDoc, *pContext, rCase.maPos,
+                std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+                rDoc.GetCalcConfig().mbEmptyStringAsZero, pFormula->GetCode(),
+                std::u16string_view(aCanonicalFormulaSource.getStr(),
+                    aCanonicalFormulaSource.getLength()));
+        CPPUNIT_ASSERT(aAttempt.mbSupported);
+
+        const auto aHostValue
+            = spreadsheetengine::compat::libreoffice::readHostDocumentCellValue(rDoc, rCase.maPos);
+        CPPUNIT_ASSERT(aHostValue);
+        assertAttemptMatchesHostValue(rCase.maFormulaFragment, aAttempt, aHostValue);
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedLookupArrayFormRangeParity)
 {
     const OUString aWorkbookPath

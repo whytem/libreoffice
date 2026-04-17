@@ -1999,7 +1999,11 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
         const OUString& aFormulaSource = getEngineFormulaSource();
         const OUString aCanonicalFormulaSource = GetHybridFormula();
         const auto eDelegatedFunction = getEngineDelegatedFunction();
-        if (eDelegatedFunction == setaileval::FunctionKind::Unknown)
+        const bool bUnknownSupportedFormula
+            = eDelegatedFunction == setaileval::FunctionKind::Unknown
+              && setaileval::isUnknownSupportedFormula(std::u16string_view(
+                  aFormulaSource.getStr(), aFormulaSource.getLength()));
+        if (eDelegatedFunction == setaileval::FunctionKind::Unknown && !bUnknownSupportedFormula)
             return;
 
         auto aAttempt = setaileval::tryEvaluateFormula(

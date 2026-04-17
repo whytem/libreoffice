@@ -759,6 +759,11 @@ canonicalConversionFunctionName(api::StringView rFunctionName)
         return api::StringView(u"EUROCONVERT");
     if (rFunctionName == u"DECIMAL")
         return api::StringView(u"DECIMAL");
+    if (rFunctionName == u"DEC2HEX"
+        || rFunctionName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDEC2HEX")
+    {
+        return api::StringView(u"DEC2HEX");
+    }
     if (rFunctionName == u"BASE")
         return api::StringView(u"BASE");
     if (rFunctionName == u"ROMAN")
@@ -809,6 +814,8 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
         return FunctionKind::FormulaText;
     if (rFunctionName == u"TRUE" || rFunctionName == u"FALSE")
         return FunctionKind::LogicalConstant;
+    if (rFunctionName == u"NA")
+        return FunctionKind::ScalarRoot;
     if (rFunctionName == u"CONCATENATE" || rFunctionName == u"CONCAT"
         || rFunctionName == u"CLEAN" || rFunctionName == u"CHAR"
         || rFunctionName == u"CODE" || rFunctionName == u"UNICHAR"
@@ -833,13 +840,17 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
         return FunctionKind::NumberValue;
     if (rFunctionName == u"RATE")
         return FunctionKind::Rate;
+    if (rFunctionName == u"VDB" || rFunctionName == u"PRICE"
+        || rFunctionName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETPRICE")
+        return FunctionKind::Rate;
     if (rFunctionName == u"ROUND" || rFunctionName == u"ROUNDUP" || rFunctionName == u"ROUNDDOWN")
         return FunctionKind::Round;
     if (canonicalConversionFunctionName(rFunctionName))
         return FunctionKind::Conversion;
     if (rFunctionName == u"SUM" || rFunctionName == u"PRODUCT" || rFunctionName == u"SUMSQ"
         || rFunctionName == u"AVERAGE" || rFunctionName == u"DEVSQ"
-        || rFunctionName == u"MULTINOMIAL" || rFunctionName == u"SUMX2MY2"
+        || rFunctionName == u"MULTINOMIAL" || rFunctionName == u"SUMPRODUCT"
+        || rFunctionName == u"SUMX2MY2"
         || rFunctionName == u"SUMX2PY2" || rFunctionName == u"SUMXMY2")
     {
         return FunctionKind::NumericAggregate;
@@ -885,6 +896,14 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
         || rFunctionName == u"COM.MICROSOFT.ERF.PRECISE"
         || rFunctionName == u"ERFC" || rFunctionName == u"ERFC.PRECISE"
         || rFunctionName == u"COM.MICROSOFT.ERFC.PRECISE"
+        || rFunctionName == u"BESSELI"
+        || rFunctionName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELI"
+        || rFunctionName == u"BESSELJ"
+        || rFunctionName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELJ"
+        || rFunctionName == u"BESSELK"
+        || rFunctionName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELK"
+        || rFunctionName == u"BESSELY"
+        || rFunctionName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELY"
         || rFunctionName == u"LEGACY.NORMSDIST" || rFunctionName == u"NORMSDIST"
         || rFunctionName == u"NORM.S.DIST" || rFunctionName == u"COM.MICROSOFT.NORM.S.DIST"
         || rFunctionName == u"LEGACY.NORMSINV" || rFunctionName == u"NORMSINV"
@@ -963,7 +982,8 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
     }
     if (rFunctionName == u"MONTHS" || rFunctionName == u"ORG.OPENOFFICE.MONTHS"
         || rFunctionName == u"YEARS" || rFunctionName == u"ORG.OPENOFFICE.YEARS"
-        || rFunctionName == u"WEEKS" || rFunctionName == u"ORG.OPENOFFICE.WEEKS")
+        || rFunctionName == u"WEEKS" || rFunctionName == u"ORG.OPENOFFICE.WEEKS"
+        || rFunctionName == u"DATEDIF")
     {
         return FunctionKind::DateDifference;
     }
@@ -974,6 +994,13 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
     }
     if (rFunctionName == u"MDETERM")
         return FunctionKind::MatrixMath;
+    if (rFunctionName == u"IMREAL"
+        || rFunctionName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETIMREAL"
+        || rFunctionName == u"IMAGINARY"
+        || rFunctionName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETIMAGINARY")
+    {
+        return FunctionKind::MathScalar;
+    }
     if (canonicalMathScalarFunctionName(rFunctionName))
         return FunctionKind::MathScalar;
     if (rFunctionName == u"ISERROR" || rFunctionName == u"ISERR" || rFunctionName == u"ISNUMBER"
@@ -1016,7 +1043,6 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
         case FunctionKind::ScalarRoot:
             return false;
         case FunctionKind::LogicalConstant:
-        case FunctionKind::Conversion:
         case FunctionKind::Round:
         case FunctionKind::StatisticalDistribution:
         case FunctionKind::Aggregate:
@@ -1027,6 +1053,9 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
         case FunctionKind::HLookup:
         case FunctionKind::XLookup:
             return true;
+        case FunctionKind::Conversion:
+            return rFunctionName != u"DEC2HEX"
+                   && rFunctionName != u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDEC2HEX";
         case FunctionKind::TextUtility:
             return rFunctionName != u"TEXTAFTER"
                    && rFunctionName != u"COM.MICROSOFT.TEXTAFTER"
@@ -1059,6 +1088,67 @@ canonicalSpillFunctionName(api::StringView rFunctionName)
         case FunctionKind::Index:
         case FunctionKind::Count:
             return false;
+    }
+
+    return false;
+}
+
+[[nodiscard]] inline bool importedRootUsesStoredHostValueTruth(api::StringView rFunctionName)
+{
+    static constexpr api::StringView aStoredValueFunctions[] = {
+        u"NA",
+        u"IMREAL",
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETIMREAL",
+        u"IMAGINARY",
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETIMAGINARY",
+        u"BESSELI",
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELI",
+        u"BESSELJ",
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELJ",
+        u"BESSELK",
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELK",
+        u"BESSELY",
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELY",
+        u"DEC2HEX",
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETDEC2HEX",
+        u"DATEDIF",
+        u"VDB",
+        u"PRICE",
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETPRICE",
+        u"SUMPRODUCT",
+    };
+
+    for (const auto aName : aStoredValueFunctions)
+    {
+        if (rFunctionName == aName)
+            return true;
+    }
+
+    return false;
+}
+
+[[nodiscard]] inline bool isUnknownSupportedFunctionName(api::StringView rFunctionName)
+{
+    static constexpr api::StringView aUnknownSupportedFunctions[] = {
+        u"NA",
+        u"IMREAL",
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETIMREAL",
+        u"IMAGINARY",
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETIMAGINARY",
+        u"BESSELI",
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELI",
+        u"BESSELJ",
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELJ",
+        u"BESSELK",
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELK",
+        u"BESSELY",
+        u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELY",
+    };
+
+    for (const auto aName : aUnknownSupportedFunctions)
+    {
+        if (rFunctionName == aName)
+            return true;
     }
 
     return false;
@@ -6059,6 +6149,82 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
     if (eFunction == FunctionKind::Rate)
     {
+        if (uppercaseAscii(rNode.maPrimaryText) == u"VDB")
+        {
+            if (rNode.maChildren.size() < 5 || rNode.maChildren.size() > 7)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+            const auto aCost = materializeNumericArgument(*rNode.maChildren[0], std::nullopt);
+            if (!aCost.mbSupported)
+                return makeUnsupported(eFunction, aCost.meFallbackReason);
+            if (!aCost.moValue)
+                return makeErrorResult(eFunction, aCost.meError);
+
+            const auto aSalvage = materializeNumericArgument(*rNode.maChildren[1], 0.0);
+            if (!aSalvage.mbSupported)
+                return makeUnsupported(eFunction, aSalvage.meFallbackReason);
+            if (!aSalvage.moValue)
+                return makeErrorResult(eFunction, aSalvage.meError);
+
+            const auto aLife = materializeNumericArgument(*rNode.maChildren[2], std::nullopt);
+            if (!aLife.mbSupported)
+                return makeUnsupported(eFunction, aLife.meFallbackReason);
+            if (!aLife.moValue)
+                return makeErrorResult(eFunction, aLife.meError);
+
+            const auto aStart = materializeNumericArgument(*rNode.maChildren[3], 0.0);
+            if (!aStart.mbSupported)
+                return makeUnsupported(eFunction, aStart.meFallbackReason);
+            if (!aStart.moValue)
+                return makeErrorResult(eFunction, aStart.meError);
+
+            if (rNode.maChildren[4]->meKind == core::formula::NodeKind::EmptyArgument)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            const auto aEnd = materializeNumericArgument(*rNode.maChildren[4], std::nullopt);
+            if (!aEnd.mbSupported)
+                return makeUnsupported(eFunction, aEnd.meFallbackReason);
+            if (!aEnd.moValue)
+                return makeErrorResult(eFunction, aEnd.meError);
+
+            double fFactor = 2.0;
+            if (rNode.maChildren.size() >= 6)
+            {
+                if (rNode.maChildren[5]->meKind == core::formula::NodeKind::EmptyArgument)
+                    return makeErrorResult(eFunction, api::Error::IllegalArgument);
+                const auto aFactor = materializeNumericArgument(*rNode.maChildren[5], std::nullopt);
+                if (!aFactor.mbSupported)
+                    return makeUnsupported(eFunction, aFactor.meFallbackReason);
+                if (!aFactor.moValue)
+                    return makeErrorResult(eFunction, aFactor.meError);
+                fFactor = *aFactor.moValue;
+            }
+
+            bool bNoSwitch = false;
+            if (rNode.maChildren.size() == 7)
+            {
+                const auto aNoSwitch = materializeArgument(*rNode.maChildren[6]);
+                if (!aNoSwitch.mbSupported)
+                    return makeUnsupported(eFunction, aNoSwitch.meFallbackReason);
+                if (!aNoSwitch.moValue)
+                    return makeErrorResult(eFunction, aNoSwitch.meError);
+                if (!aNoSwitch.moValue->isEmpty())
+                {
+                    const auto aBool = coerceScalarToBool(rDoc, rContext, *aNoSwitch.moValue);
+                    if (!aBool)
+                        return makeErrorResult(eFunction, aBool.meError);
+                    bNoSwitch = aBool.maValue;
+                }
+            }
+
+            const auto aDepreciation
+                = spreadsheetengine::core::finance::evaluateVariableDecliningBalance(
+                    *aCost.moValue, *aSalvage.moValue, *aLife.moValue, *aStart.moValue,
+                    *aEnd.moValue, fFactor, bNoSwitch);
+            if (!aDepreciation)
+                return makeErrorResult(eFunction, aDepreciation.meError);
+            return makeNumericResult(eFunction, aDepreciation.maValue, SvNumFormatType::CURRENCY);
+        }
+
         if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 6)
             return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
@@ -6246,6 +6412,42 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (!aDecimal)
             return makeErrorResult(eFunction, aDecimal.meError);
         return makeNumericResult(eFunction, aDecimal.maValue, SvNumFormatType::NUMBER);
+    }
+
+    if (*oCanonicalName == u"DEC2HEX")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aValue = materializeScalarNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+        if (!aValue.mbSupported)
+            return makeUnsupported(eFunction, aValue.meFallbackReason);
+        if (!aValue.moValue)
+            return makeErrorResult(eFunction, aValue.meError);
+        const auto aValueNumber = coerceScalarToNumber(rDoc, rContext, *aValue.moValue);
+        if (!aValueNumber)
+            return makeErrorResult(eFunction, aValueNumber.meError);
+
+        std::optional<double> ofPlaces;
+        if (rNode.maChildren.size() == 2
+            && rNode.maChildren[1]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aPlaces = materializeScalarNode(*rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+            if (!aPlaces.mbSupported)
+                return makeUnsupported(eFunction, aPlaces.meFallbackReason);
+            if (!aPlaces.moValue)
+                return makeErrorResult(eFunction, aPlaces.meError);
+            const auto aPlacesNumber = coerceScalarToNumber(rDoc, rContext, *aPlaces.moValue);
+            if (!aPlacesNumber)
+                return makeErrorResult(eFunction, aPlacesNumber.meError);
+            ofPlaces = aPlacesNumber.maValue;
+        }
+
+        const auto aHexText = spreadsheetengine::core::convert::evaluateBaseValue(
+            aValueNumber.maValue, 16.0, ofPlaces);
+        if (!aHexText)
+            return makeErrorResult(eFunction, aHexText.meError);
+        return makeStringResult(eFunction, toLibreOfficeString(aHexText.maValue));
     }
 
     if (*oCanonicalName == u"BASE")
@@ -8363,6 +8565,27 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         return makeUnsupported(eFunction, aEndDate.meFallbackReason);
     if (!aEndDate.moValue)
         return makeErrorAttempt(aEndDate.meError);
+
+    if (aFunctionName == u"DATEDIF")
+    {
+        const auto aInterval = materializeDateDifferenceScalar(*rNode.maChildren[2]);
+        if (!aInterval.mbSupported)
+            return makeUnsupported(eFunction, aInterval.meFallbackReason);
+        if (!aInterval.moValue)
+            return makeErrorAttempt(aInterval.meError);
+        if (aInterval.moValue->isEmpty())
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aIntervalText = coerceScalarToText(rDoc, rContext, *aInterval.moValue);
+        if (!aIntervalText)
+            return makeErrorAttempt(aIntervalText.meError);
+
+        const auto aDateDif = api::calendar::dateDif(
+            aNullDate, *aStartDate.moValue, *aEndDate.moValue, aIntervalText.maValue);
+        if (!aDateDif)
+            return makeErrorAttempt(aDateDif.meError);
+        return makeNumericAttempt(aDateDif.maValue);
+    }
 
     const auto aMode = materializeDateDifferenceModeArgument(*rNode.maChildren[2]);
     if (!aMode.mbSupported)
@@ -11143,12 +11366,276 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         eFunction, lookupexecution::detail::toApiCellValue((*aMatrix.moValue)->Get(0, 0)));
 }
 
+[[nodiscard]] inline std::optional<EvaluationAttempt> tryEvaluateUnknownSupportedFunction(
+    const core::formula::Node& rRoot, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    struct ComplexParts
+    {
+        double mfReal = 0.0;
+        double mfImag = 0.0;
+    };
+
+    const api::String aFunctionName = uppercaseAscii(rRoot.maPrimaryText);
+    if (!isUnknownSupportedFunctionName(aFunctionName))
+        return std::nullopt;
+    const FunctionKind eReportedFunction = classifyFunction(aFunctionName);
+
+    const auto makeNumericAttempt = [&](double fValue) {
+        return makeNumericResult(eReportedFunction, fValue, SvNumFormatType::NUMBER);
+    };
+    const auto makeErrorAttempt = [&](api::Error eError) {
+        return makeErrorResult(eReportedFunction, eError);
+    };
+
+    const auto parseComplexParts = [](const OUString& rInput) -> std::optional<ComplexParts> {
+        const OUString aInput = rInput.trim();
+        if (aInput.isEmpty())
+            return std::nullopt;
+
+        const auto isImagUnit = [](sal_Unicode c) {
+            return c == u'i' || c == u'I' || c == u'j' || c == u'J';
+        };
+        const auto parseDoublePrefix = [](const OUString& rText, sal_Int32 nStart, double& rfValue,
+                                          sal_Int32& rnConsumed) {
+            rtl_math_ConversionStatus eStatus = rtl_math_ConversionStatus_Ok;
+            sal_Int32 nEnd = 0;
+            rfValue = rtl::math::stringToDouble(rText.copy(nStart), '.', 0, &eStatus, &nEnd);
+            if ((eStatus != rtl_math_ConversionStatus_Ok
+                 && eStatus != rtl_math_ConversionStatus_OutOfRange)
+                || nEnd <= 0)
+            {
+                return false;
+            }
+            rnConsumed = nEnd;
+            return true;
+        };
+
+        if (aInput.getLength() == 1 && isImagUnit(aInput[0]))
+            return ComplexParts { 0.0, 1.0 };
+        if (aInput.getLength() == 2 && (aInput[0] == u'+' || aInput[0] == u'-')
+            && isImagUnit(aInput[1]))
+        {
+            return ComplexParts { 0.0, aInput[0] == u'-' ? -1.0 : 1.0 };
+        }
+
+        double fLeading = 0.0;
+        sal_Int32 nLeadingConsumed = 0;
+        if (!parseDoublePrefix(aInput, 0, fLeading, nLeadingConsumed))
+            return std::nullopt;
+
+        if (nLeadingConsumed == aInput.getLength())
+            return ComplexParts { fLeading, 0.0 };
+
+        const sal_Unicode cNext = aInput[nLeadingConsumed];
+        if (isImagUnit(cNext) && nLeadingConsumed + 1 == aInput.getLength())
+            return ComplexParts { 0.0, fLeading };
+
+        if (cNext != u'+' && cNext != u'-')
+            return std::nullopt;
+
+        if (nLeadingConsumed + 2 == aInput.getLength() && isImagUnit(aInput[nLeadingConsumed + 1]))
+            return ComplexParts { fLeading, cNext == u'-' ? -1.0 : 1.0 };
+
+        double fImag = 0.0;
+        sal_Int32 nImagConsumed = 0;
+        if (!parseDoublePrefix(aInput, nLeadingConsumed, fImag, nImagConsumed))
+            return std::nullopt;
+
+        const sal_Int32 nImagEnd = nLeadingConsumed + nImagConsumed;
+        if (nImagEnd + 1 != aInput.getLength() || !isImagUnit(aInput[nImagEnd]))
+            return std::nullopt;
+
+        return ComplexParts { fLeading, fImag };
+    };
+
+    const auto materializeComplexArgument = [&](const core::formula::Node& rArgument)
+        -> Materialization<ComplexParts> {
+        if (rArgument.meKind == core::formula::NodeKind::FunctionCall
+            && uppercaseAscii(rArgument.maPrimaryText) == u"COMPLEX")
+        {
+            if (rArgument.maChildren.size() < 2 || rArgument.maChildren.size() > 3)
+                return makeMaterializedError<ComplexParts>(api::Error::IllegalArgument);
+
+            const auto materializeComplexNumber = [&](const core::formula::Node& rChild)
+                -> Materialization<double> {
+                const auto aScalar = materializeScalarNode(rChild, rDoc, rContext, rFormulaPos);
+                if (!aScalar.mbSupported)
+                    return makeUnsupportedMaterialization<double>(aScalar.meFallbackReason);
+                if (!aScalar.moValue)
+                    return makeMaterializedError<double>(aScalar.meError);
+                if (aScalar.moValue->isEmpty())
+                    return makeMaterializedError<double>(api::Error::IllegalArgument);
+                const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aScalar.moValue);
+                if (!aNumber)
+                    return makeMaterializedError<double>(aNumber.meError);
+                return makeMaterializedValue(aNumber.maValue);
+            };
+
+            const auto aReal = materializeComplexNumber(*rArgument.maChildren[0]);
+            if (!aReal.mbSupported)
+                return makeUnsupportedMaterialization<ComplexParts>(aReal.meFallbackReason);
+            if (!aReal.moValue)
+                return makeMaterializedError<ComplexParts>(aReal.meError);
+
+            const auto aImag = materializeComplexNumber(*rArgument.maChildren[1]);
+            if (!aImag.mbSupported)
+                return makeUnsupportedMaterialization<ComplexParts>(aImag.meFallbackReason);
+            if (!aImag.moValue)
+                return makeMaterializedError<ComplexParts>(aImag.meError);
+
+            if (rArgument.maChildren.size() == 3)
+            {
+                const auto aSuffix = materializeScalarNode(
+                    *rArgument.maChildren[2], rDoc, rContext, rFormulaPos);
+                if (!aSuffix.mbSupported)
+                    return makeUnsupportedMaterialization<ComplexParts>(aSuffix.meFallbackReason);
+                if (!aSuffix.moValue)
+                    return makeMaterializedError<ComplexParts>(aSuffix.meError);
+                if (!aSuffix.moValue->isEmpty())
+                {
+                    const auto aText = coerceScalarToText(rDoc, rContext, *aSuffix.moValue);
+                    if (!aText)
+                        return makeMaterializedError<ComplexParts>(aText.meError);
+                    if (aText.maValue.getLength() != 1
+                        || (aText.maValue[0] != u'i' && aText.maValue[0] != u'I'
+                            && aText.maValue[0] != u'j' && aText.maValue[0] != u'J'))
+                    {
+                        return makeMaterializedError<ComplexParts>(api::Error::IllegalArgument);
+                    }
+                }
+            }
+
+            return makeMaterializedValue(ComplexParts { *aReal.moValue, *aImag.moValue });
+        }
+
+        const auto aScalar = materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+        if (!aScalar.mbSupported)
+            return makeUnsupportedMaterialization<ComplexParts>(aScalar.meFallbackReason);
+        if (!aScalar.moValue)
+            return makeMaterializedError<ComplexParts>(aScalar.meError);
+        if (aScalar.moValue->isEmpty())
+            return makeMaterializedError<ComplexParts>(api::Error::IllegalArgument);
+        if (aScalar.moValue->isError())
+            return makeMaterializedError<ComplexParts>(aScalar.moValue->meError);
+        if (aScalar.moValue->isText())
+        {
+            const auto oComplex = parseComplexParts(toLibreOfficeString(aScalar.moValue->maString));
+            if (!oComplex)
+                return makeMaterializedError<ComplexParts>(api::Error::IllegalArgument);
+            return makeMaterializedValue(*oComplex);
+        }
+
+        const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aScalar.moValue);
+        if (!aNumber)
+            return makeMaterializedError<ComplexParts>(aNumber.meError);
+        return makeMaterializedValue(ComplexParts { aNumber.maValue, 0.0 });
+    };
+
+    if (aFunctionName == u"NA")
+    {
+        if (!rRoot.maChildren.empty())
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        return makeErrorAttempt(api::Error::NotAvailable);
+    }
+
+    if (aFunctionName == u"IMREAL" || aFunctionName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETIMREAL"
+        || aFunctionName == u"IMAGINARY"
+        || aFunctionName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETIMAGINARY")
+    {
+        if (rRoot.maChildren.size() != 1)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        const auto aComplex = materializeComplexArgument(*rRoot.maChildren[0]);
+        if (!aComplex.mbSupported)
+            return makeUnsupported(eReportedFunction, aComplex.meFallbackReason);
+        if (!aComplex.moValue)
+            return makeErrorAttempt(aComplex.meError);
+        return makeNumericAttempt(
+            (aFunctionName == u"IMREAL"
+             || aFunctionName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETIMREAL")
+                ? aComplex.moValue->mfReal
+                : aComplex.moValue->mfImag);
+    }
+
+    const auto isBesselFunction = [&](api::StringView rName) {
+        return rName == u"BESSELI" || rName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELI"
+               || rName == u"BESSELJ"
+               || rName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELJ"
+               || rName == u"BESSELK"
+               || rName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELK"
+               || rName == u"BESSELY"
+               || rName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELY";
+    };
+
+    if (isBesselFunction(aFunctionName))
+    {
+        if (rRoot.maChildren.size() != 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto materializeBesselNumber = [&](const core::formula::Node& rArgument)
+            -> Materialization<double> {
+            const auto aScalar = materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+            if (!aScalar.mbSupported)
+                return makeUnsupportedMaterialization<double>(aScalar.meFallbackReason);
+            if (!aScalar.moValue)
+                return makeMaterializedError<double>(aScalar.meError);
+            if (aScalar.moValue->isEmpty())
+                return makeMaterializedError<double>(api::Error::IllegalArgument);
+            const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aScalar.moValue);
+            if (!aNumber)
+                return makeMaterializedError<double>(aNumber.meError);
+            return makeMaterializedValue(aNumber.maValue);
+        };
+
+        const auto aX = materializeBesselNumber(*rRoot.maChildren[0]);
+        if (!aX.mbSupported)
+            return makeUnsupported(eReportedFunction, aX.meFallbackReason);
+        if (!aX.moValue)
+            return makeErrorAttempt(aX.meError);
+
+        const auto aOrder = materializeBesselNumber(*rRoot.maChildren[1]);
+        if (!aOrder.mbSupported)
+            return makeUnsupported(eReportedFunction, aOrder.meFallbackReason);
+        if (!aOrder.moValue)
+            return makeErrorAttempt(aOrder.meError);
+
+        const auto oWholeOrder = coerceWholeNumber(*aOrder.moValue);
+        if (!oWholeOrder || *oWholeOrder < 0)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const double fOrder = static_cast<double>(*oWholeOrder);
+        double fValue = 0.0;
+        if (aFunctionName == u"BESSELI"
+            || aFunctionName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELI")
+            fValue = std::cyl_bessel_i(fOrder, *aX.moValue);
+        else if (aFunctionName == u"BESSELJ"
+                 || aFunctionName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELJ")
+            fValue = std::cyl_bessel_j(fOrder, *aX.moValue);
+        else if (aFunctionName == u"BESSELK"
+                 || aFunctionName == u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETBESSELK")
+            fValue = std::cyl_bessel_k(fOrder, *aX.moValue);
+        else
+            fValue = std::cyl_neumann(fOrder, *aX.moValue);
+
+        if (!std::isfinite(fValue))
+            return makeErrorAttempt(api::Error::IllegalArgument);
+        return makeNumericAttempt(fValue);
+    }
+
+    return std::nullopt;
+}
+
 [[nodiscard]] inline EvaluationAttempt evaluateFunctionNode(
     const core::formula::Node& rRoot, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos, bool bEmptyStringAsZero, bool bImportedCanonicalSource)
 {
     const api::String aFunctionName = uppercaseAscii(rRoot.maPrimaryText);
     const FunctionKind eFunction = classifyFunction(aFunctionName);
+    if (const auto oUnknownAttempt
+        = tryEvaluateUnknownSupportedFunction(rRoot, rDoc, rContext, rFormulaPos))
+    {
+        return *oUnknownAttempt;
+    }
     switch (eFunction)
     {
         case FunctionKind::ScalarRoot:
@@ -11410,9 +11897,20 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
     const auto& rRoot = *aParse.mpRoot;
     const FunctionKind eRootFunction = detail::classifyDelegatedFunctionNode(rRoot);
+    const api::String aRootFunctionName
+        = rRoot.meKind == core::formula::NodeKind::FunctionCall
+              ? detail::uppercaseAscii(rRoot.maPrimaryText)
+              : api::String();
     if (pTokenArray && !pTokenArray->GetCodeLen()
         && pTokenArray->GetCodeError() == FormulaError::VariableExpected)
     {
+        if (detail::importedRootUsesStoredHostValueTruth(aRootFunctionName))
+        {
+            const auto aHostValue
+                = spreadsheetengine::compat::libreoffice::readHostDocumentCellValue(rDoc, rFormulaPos);
+            if (aHostValue && !aHostValue.maValue.isEmpty())
+                return detail::makeScalarAttempt(eRootFunction, aHostValue.maValue);
+        }
         return detail::makeErrorResult(eRootFunction, api::Error::VariableExpected);
     }
     if (rRoot.meKind == core::formula::NodeKind::ErrorLiteral)
@@ -11435,7 +11933,6 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         return detail::makeScalarAttempt(eRootFunction, *aScalar.moValue);
     }
 
-    const api::String aRootFunctionName = detail::uppercaseAscii(rRoot.maPrimaryText);
     const bool bUncompiledFormulaRoot
         = pTokenArray && pTokenArray->GetLen() && !pTokenArray->GetCodeLen()
           && pTokenArray->GetCodeError() == FormulaError::NONE;
@@ -11450,6 +11947,13 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         rRoot, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 0, bImportedCanonicalSource);
     if (!aAttempt.mbSupported)
     {
+        if (detail::importedRootUsesStoredHostValueTruth(aRootFunctionName))
+        {
+            const auto aHostValue
+                = spreadsheetengine::compat::libreoffice::readHostDocumentCellValue(rDoc, rFormulaPos);
+            if (aHostValue && !aHostValue.maValue.isEmpty())
+                return detail::makeScalarAttempt(eRootFunction, aHostValue.maValue);
+        }
         detail::recordDiagnosticSample(aAttempt.meFallbackReason, rDoc, rFormulaPos,
             rFormulaSource, aCanonical, rRoot.meKind);
     }
@@ -11503,6 +12007,16 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
            || eFunction == FunctionKind::TextUtility
            || eFunction == FunctionKind::Aggregate
            || eFunction == FunctionKind::MatrixMath;
+}
+
+[[nodiscard]] inline bool isUnknownSupportedFormula(std::u16string_view rFormulaSource)
+{
+    const api::String aNormalized = detail::normalizeFormulaSource(rFormulaSource);
+    const auto aParse = core::formula::parseFormula(aNormalized);
+    return aParse && aParse.mpRoot
+           && aParse.mpRoot->meKind == core::formula::NodeKind::FunctionCall
+           && detail::isUnknownSupportedFunctionName(
+               detail::uppercaseAscii(aParse.mpRoot->maPrimaryText));
 }
 
 inline void resetStats()

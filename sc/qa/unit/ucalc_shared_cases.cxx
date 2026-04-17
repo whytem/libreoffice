@@ -968,6 +968,13 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorHelper)
         aRoundedRate.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(-0.756266, aRoundedRate.maResult.mfValue, 1e-12);
 
+    const auto aVdb = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=VDB(35000;7500;36;10;20;2)", false);
+    CPPUNIT_ASSERT(aVdb.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aVdb.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(8603.80245372397, aVdb.maResult.mfValue, 1e-12);
+
     const auto aAbs = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=ABS(-7.25)", false);
     CPPUNIT_ASSERT(aAbs.mbSupported);
@@ -3287,6 +3294,16 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConversion
         spreadsheetengine::api::formulavalue::ValueType::Value, aDecimal.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(255.0, aDecimal.maResult.mfValue, 1e-12);
 
+    const auto aDec2Hex = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=DEC2HEX(100;8)", false);
+    CPPUNIT_ASSERT(aDec2Hex.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Conversion, aDec2Hex.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::String, aDec2Hex.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(u"00000064"_ustr,
+        spreadsheetengine::compat::libreoffice::toLibreOfficeString(
+            aDec2Hex.maResult.maString));
+
     const auto aBase = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=BASE(255;16;4)", false);
     CPPUNIT_ASSERT(aBase.mbSupported);
@@ -4608,6 +4625,77 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorDateDiffer
         spreadsheetengine::api::formulavalue::ValueType::Value, aWeeks.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aWeeks.maResult.mfValue, 1e-12);
     CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aWeeks.meFormatType);
+
+    const auto aDateDif = setaileval::tryEvaluateFormula(*m_pDoc, rContext, aFormulaPos,
+        u"=DATEDIF(A1;B1;\"d\")", false);
+    CPPUNIT_ASSERT(aDateDif.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::DateDifference, aDateDif.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aDateDif.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(440.0, aDateDif.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aDateDif.meFormatType);
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorFinancialScalarHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailFinancialScalarHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(3, 0, 0);
+
+    const auto aVdb = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=VDB(35000;7500;36;10;20;2)", false);
+    CPPUNIT_ASSERT(aVdb.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Rate, aVdb.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aVdb.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(8603.80245372397, aVdb.maResult.mfValue, 1e-9);
+    CPPUNIT_ASSERT_EQUAL(SvNumFormatType::CURRENCY, aVdb.meFormatType);
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorUnknownSupportHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailUnknownSupportHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(3, 0, 0);
+
+    const auto aNa = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=NA()", false);
+    CPPUNIT_ASSERT(aNa.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::ScalarRoot, aNa.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Error, aNa.maResult.meType);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::Error::NotAvailable, aNa.maResult.meError);
+
+    const auto aImreal = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=IMREAL(\"5+12j\")", false);
+    CPPUNIT_ASSERT(aImreal.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aImreal.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aImreal.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, aImreal.maResult.mfValue, 1e-12);
+
+    const auto aImaginary = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=IMAGINARY(COMPLEX(0;5))", false);
+    CPPUNIT_ASSERT(aImaginary.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MathScalar, aImaginary.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aImaginary.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, aImaginary.maResult.mfValue, 1e-12);
+
+    const auto aBessel = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=BESSELI(1.5;1)", false);
+    CPPUNIT_ASSERT(aBessel.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalDistribution, aBessel.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aBessel.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.981666428577908, aBessel.maResult.mfValue, 1e-12);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorDateConstructExtractHelper)
