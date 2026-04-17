@@ -34,11 +34,11 @@ That splits into two tracks:
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=43961`
-- `interpret_tail_live_authoritative_match_total=43957`
+- `interpret_tail_live_authoritative_probe_formula_cells=44152`
+- `interpret_tail_live_authoritative_match_total=44148`
 - `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=220`
-- live authoritative-match rate over the corpus: `86.7669%`
+- `legacy_interpreter_subroutine_count=213`
+- live authoritative-match rate over the corpus: `87.1440%`
 - live authoritative-match rate over the current promoted probe: `99.9909%`
 
 The north-star measures live authority transfer. `legacy_interpreter_subroutine_count`
@@ -55,13 +55,13 @@ remain useful for hotspot steering, but they should not be read as the
 deletion denominator.
 
 - `interpret_tail_live_formula_cells=50661`
-- `interpret_tail_live_supported_total=90300`
+- `interpret_tail_live_supported_total=90682`
 - `interpret_tail_live_fallback_total=0`
-- `interpret_tail_live_seen_total=90300`
+- `interpret_tail_live_seen_total=90682`
 - `interpret_tail_live_unseen_formula_cells=0`
-- `interpret_tail_live_promoted_function_supported_total=90170`
-- `interpret_tail_live_supported_rate=178.24`
-- `interpret_tail_live_seen_rate=178.24`
+- `interpret_tail_live_promoted_function_supported_total=90552`
+- `interpret_tail_live_supported_rate=178.99`
+- `interpret_tail_live_seen_rate=178.99`
 
 Ambient live fallback reasons:
 
@@ -77,13 +77,13 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=44026`
-- `interpret_tail_live_unique_supported_formula_cells=44026`
+- `interpret_tail_live_unique_seen_formula_cells=44217`
+- `interpret_tail_live_unique_supported_formula_cells=44217`
 - `interpret_tail_live_unique_fallback_formula_cells=0`
 - `interpret_tail_live_unique_unsupported_function_formula_cells=0`
-- `interpret_tail_live_unique_unseen_formula_cells=6635`
-- `interpret_tail_live_unique_seen_rate=86.90`
-- `interpret_tail_live_unique_supported_rate=86.90`
+- `interpret_tail_live_unique_unseen_formula_cells=6444`
+- `interpret_tail_live_unique_seen_rate=87.28`
+- `interpret_tail_live_unique_supported_rate=87.28`
 
 ### Live Unique Unsupported-Function Top-N
 
@@ -116,13 +116,13 @@ These are also attempt totals. The new unique-cell direct surface is the
 honest coverage metric below.
 
 - `interpret_tail_forced_interpret_formula_cells=50661`
-- `interpret_tail_forced_interpret_supported_total=2649510`
+- `interpret_tail_forced_interpret_supported_total=2649701`
 - `interpret_tail_forced_interpret_fallback_total=0`
-- `interpret_tail_forced_interpret_seen_total=2649510`
+- `interpret_tail_forced_interpret_seen_total=2649701`
 - `interpret_tail_forced_interpret_unseen_formula_cells=0`
-- `interpret_tail_forced_interpret_promoted_function_supported_total=2649445`
-- `interpret_tail_forced_interpret_supported_rate=5229.88`
-- `interpret_tail_forced_interpret_seen_rate=5229.88`
+- `interpret_tail_forced_interpret_promoted_function_supported_total=2649636`
+- `interpret_tail_forced_interpret_supported_rate=5230.26`
+- `interpret_tail_forced_interpret_seen_rate=5230.26`
 
 ### Full Replay Corpus: Forced Direct Unique-Cell Surface
 
@@ -131,23 +131,23 @@ replay formula cell once, then classifying whether that formula cell was
 actually seen and supported by the seam.
 
 - `interpret_tail_forced_direct_formula_cells=50661`
-- `interpret_tail_forced_direct_seen_formula_cells=44023`
-- `interpret_tail_forced_direct_supported_formula_cells=44023`
+- `interpret_tail_forced_direct_seen_formula_cells=44214`
+- `interpret_tail_forced_direct_supported_formula_cells=44214`
 - `interpret_tail_forced_direct_fallback_formula_cells=0`
-- `interpret_tail_forced_direct_unseen_formula_cells=6638`
-- `interpret_tail_forced_direct_seen_rate=86.90`
-- `interpret_tail_forced_direct_supported_rate=86.90`
+- `interpret_tail_forced_direct_unseen_formula_cells=6447`
+- `interpret_tail_forced_direct_seen_rate=87.27`
+- `interpret_tail_forced_direct_supported_rate=87.27`
 
 ### Raw Cached-Workbook Promoted Probe
 
-- `interpret_tail_probe_formula_cells=43961`
+- `interpret_tail_probe_formula_cells=44152`
 - `interpret_tail_authoritative_total=300`
-- `interpret_tail_authoritative_fallback_total=43661`
+- `interpret_tail_authoritative_fallback_total=43852`
 - raw promoted authoritative rate: `0.68%`
 
 Raw promoted fallback reasons:
 
-- `shadow_mismatch=43661`
+- `shadow_mismatch=43852`
 - `unsupported_function=0`
 - `unsupported_formula_shape=0`
 - `unsupported_host_surface=0`
@@ -158,8 +158,8 @@ Raw promoted fallback reasons:
 - `interpret_tail_live_target_authoritative_total=300`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 - `interpret_tail_probe_live_reachable_rate=0.68%`
-- `interpret_tail_probe_imported_artifact_formula_cells=43661`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=43661`
+- `interpret_tail_probe_imported_artifact_formula_cells=43852`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=43852`
 - `interpret_tail_probe_imported_artifact_rate=99.32%`
 
 Interpretation:
@@ -168,14 +168,14 @@ Interpretation:
   not a live parity denominator
 - the promoted probe is only interpretable when split into live-reachable vs
   imported-artifact-only buckets
-- the `shadow_mismatch=43661` wall is real diagnostic debt, but it is almost
+- the `shadow_mismatch=43852` wall is real diagnostic debt, but it is almost
   entirely on imported-artifact-only rows rather than live-reachable parity rows
 
 ### Promoted Replay Eligibility Inventory
 
-- `interpret_tail_replay_promoted_formula_cells=43961`
-- `interpret_tail_replay_promoted_direct_seen=43958`
-- `interpret_tail_replay_promoted_direct_supported=43958`
+- `interpret_tail_replay_promoted_formula_cells=44152`
+- `interpret_tail_replay_promoted_direct_seen=44149`
+- `interpret_tail_replay_promoted_direct_supported=44149`
 - `interpret_tail_replay_promoted_direct_fallback=0`
 - `interpret_tail_replay_promoted_direct_unseen=3`
 - `interpret_tail_replay_promoted_shared_formula_cells=31605`
@@ -183,7 +183,7 @@ Interpretation:
 - `interpret_tail_replay_promoted_unseen_shared_member=0`
 - `interpret_tail_replay_promoted_unseen_non_shared=3`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=43961`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=44152`
 - `interpret_tail_replay_promoted_dirty_after_interpret=3`
 
 ### Engine-Authoritative Families
@@ -200,7 +200,7 @@ Default-on families:
 - round family: `ROUND(...)`, `ROUNDUP(...)`, `ROUNDDOWN(...)`
 - significant rounding: `ROUNDSIG(...)`, `ORG.LIBREOFFICE.ROUNDSIG(...)`
 - math-scalar family: bounded scalar trig, inverse-trig, hyperbolic,
-  logarithmic, modular, combinatoric, and helper roots
+  logarithmic, modular, factorial/combinatoric, and helper roots
 - information predicates, logical folds, `NOT`, and conditionals
 - bitwise family: `BITAND`, `BITOR`, `BITXOR`, `BITLSHIFT`, `BITRSHIFT`
 - aggregate wrapper: `AGGREGATE(...)`, `COM.MICROSOFT.AGGREGATE(...)`
@@ -270,7 +270,9 @@ Still not true:
   `MDETERM`, `AGGREGATE`, `PROB`, text-utility, information-predicate, and
   logical/conditional retirements, the latest push also retires the
   scalar-root, `ERROR.TYPE`, round-family, and broad math-scalar wrapper
-  clusters
+  clusters, and the current unary special-function cleanup also retires the
+  dedicated `FACT`, `GAMMA`, `GAMMALN`, `PHI`, `GAUSS`, `ERF`, and `ERFC`
+  wrappers
 - multiple interpreter hard-route milestones have landed, but full legacy
   opcode retirement has not
 - the dominant retained live blocker is no longer unsupported function or
@@ -278,14 +280,14 @@ Still not true:
   the next ceiling is the unseen live surface plus further Calc-path
   retirement
 - the live authoritative-match north-star has now moved to
-  `43957 / 50,661` (`86.7669%`) on the replay corpus
+  `44148 / 50,661` (`87.1440%`) on the replay corpus
 - that gain now includes the earlier imported-root host-truth alignment work,
   plus the latest broad retirement push that makes scalar-root formulas,
   `ERROR.TYPE`, round-family roots, and bounded math-scalar roots default-on
   engine-owned families while deleting their dedicated legacy wrappers
 - the raw promoted replay probe is now unambiguously a diagnostic surface, not
-  the retirement denominator: it now sits at `300 / 43961`, with the
-  remaining `43661` fallback rows entirely dominated by imported host-truth
+  the retirement denominator: it now sits at `300 / 44152`, with the
+  remaining `43852` fallback rows entirely dominated by imported host-truth
   artifacts after the live-host-truth pivot
 - a focused live-host check now shows the replay-imported whole-row
   `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to
@@ -326,7 +328,7 @@ Still not true:
 - the promoted replay probe is now explicitly split into raw cached-workbook
   parity and live-target filtered parity: `300` rows are live-reachable and
   authoritative under seam-off direct legacy interpretation, while the
-  remaining `43661` rows are imported host-truth artifacts
+  remaining `43852` rows are imported host-truth artifacts
 - the dominant retained live bucket is now unsupported shape rather than
   unsupported function; the raw promoted buckets remain diagnostic debt, not
   the deletion-gating story
@@ -375,6 +377,12 @@ The live delegated evaluator family currently includes:
 - `EXACT`
 - `FISHER`
 - `FISHERINV`
+- `GAUSS`
+- `PHI`
+- `GAMMA`
+- `GAMMALN`
+- `ERF`
+- `ERFC`
 - `POISSON`
 - `POISSON.DIST`
 - `BINOMDIST`
@@ -403,7 +411,7 @@ The live delegated evaluator family currently includes:
 - bounded scalar-math helpers under comparison ranges:
   `ABS`, `PI`, trig / inverse-trig / hyperbolic variants, scalar rounding
   variants, bitwise helpers, `POWER`, `LOG`, `EXP`, `MOD`, `TRUNC`,
-  `GCD`, `LCM`, and related aliases
+  `FACT`, `GCD`, `LCM`, and related aliases
 - bounded `IFERROR(...)` / `IFNA(...)` wrappers around promoted roots
 
 ## Scope Policy
