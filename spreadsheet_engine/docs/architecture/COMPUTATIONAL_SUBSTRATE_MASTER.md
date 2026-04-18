@@ -106,8 +106,8 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_match_total=50350`
 - `interpret_tail_live_authoritative_fallback_total=4`
 - `legacy_interpreter_subroutine_count=100`
-- `interp4_dispatch_legacy_lambda_count=157`
-- `interp4_dispatch_legacy_dispatch_target_count=156`
+- `interp4_dispatch_legacy_lambda_count=96`
+- `interp4_dispatch_legacy_dispatch_target_count=96`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
 - live authoritative-match rate over the corpus: `99.3861%`
 - live authoritative-match rate over the current promoted probe: `99.9960%`
@@ -122,7 +122,7 @@ companion metric for [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/cor
 it counts `pushLegacy*` lambdas that still compute through Calc even after
 wrapper deletion. If wrapper count falls while lambda count does not, we are
 shuffling implementation inside Calc rather than moving authority into the
-standalone engine. The quarantine audit currently shows `156 / 156`
+standalone engine. The quarantine audit currently shows `96 / 96`
 dispatch-reachable lambdas warning when reached.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
@@ -445,8 +445,8 @@ Those are the coverage-style numbers we should currently use alongside the
 north-star; the broader live and forced-interpret counters are still attempt
 telemetry rather than a deletion denominator. The latest genuine text-utility
 retirement pass brings the honest blunt Calc-wrapper metric down to `100`, and
-the follow-on compat-heavy statistical relocation pass cuts the relocated-legacy
-companion metric to `157` `pushLegacy*` lambdas still resident in `Interpret()`,
+the follow-on scalar/default-on dispatch collapse cuts the relocated-legacy
+companion metric to `96` `pushLegacy*` lambdas still resident in `Interpret()`,
 so wrapper deletion should not be read as full standalone-engine migration by
 itself.
 
