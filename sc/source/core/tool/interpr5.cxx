@@ -1520,67 +1520,6 @@ void ScInterpreter::ScPow()
     }
 }
 
-void ScInterpreter::ScSumProduct()
-{
-    short nParamCount = GetByte();
-    if ( !MustHaveParamCountMin( nParamCount, 1) )
-        return;
-
-    // XXX NOTE: Excel returns #VALUE! for reference list and 0 (why?) for
-    // array of references. We calculate the proper individual arrays if sizes
-    // match.
-
-    size_t nInRefList = 0;
-    ScMatrixRef pMatLast;
-    ScMatrixRef pMat;
-
-    pMatLast = GetMatrix( --nParamCount, nInRefList);
-    if (!pMatLast)
-    {
-        PushIllegalParameter();
-        return;
-    }
-
-    SCSIZE nC, nCLast, nR, nRLast;
-    pMatLast->GetDimensions(nCLast, nRLast);
-    std::vector<double> aResArray;
-    pMatLast->GetDoubleArray(aResArray);
-
-    while (nParamCount--)
-    {
-        pMat = GetMatrix( nParamCount, nInRefList);
-        if (!pMat)
-        {
-            PushIllegalParameter();
-            return;
-        }
-        pMat->GetDimensions(nC, nR);
-        if (nC != nCLast || nR != nRLast)
-        {
-            PushNoValue();
-            return;
-        }
-
-        pMat->MergeDoubleArrayMultiply(aResArray);
-    }
-
-    KahanSum fSum = 0.0;
-    for( double fPosArray : aResArray )
-    {
-        FormulaError nErr = GetDoubleErrorValue(fPosArray);
-        if (nErr == FormulaError::NONE)
-            fSum += fPosArray;
-        else if (nErr != FormulaError::ElementNaN)
-        {
-            // Propagate the first error encountered, ignore "this is not a number" elements.
-            PushError(nErr);
-            return;
-        }
-    }
-
-    PushDouble(fSum.get());
-}
-
 void ScInterpreter::ScSumX2MY2()
 {
     CalculateSumX2MY2SumX2DY2(false);
@@ -2708,11 +2647,6 @@ void ScInterpreter::CalculateRGPRKP(bool _bRKP)
 void ScInterpreter::ScTrend()
 {
     CalculateTrendGrowth(false);
-}
-
-void ScInterpreter::ScGrowth()
-{
-    CalculateTrendGrowth(true);
 }
 
 void ScInterpreter::CalculateTrendGrowth(bool _bGrowth)

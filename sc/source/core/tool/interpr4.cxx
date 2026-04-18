@@ -4069,6 +4069,18 @@ StackVar ScInterpreter::Interpret()
                             },
                             pFailureMessage);
                     };
+                const auto warnIfLegacyNumericAggregateReached =
+                    [&](std::u16string_view rLabel) {
+                        warnIfLegacyDefaultOnReached(
+                            rLabel,
+                            "family-local default-on numeric aggregate reached ScInterpreter");
+                    };
+                const auto warnIfLegacyGrowthProjectionReached =
+                    [&](std::u16string_view rLabel) {
+                        warnIfLegacyDefaultOnReached(
+                            rLabel,
+                            "family-local default-on growth projection reached ScInterpreter");
+                    };
                 const auto pushLegacyMathScalarUnary =
                     [&](std::u16string_view rLabel, auto aEvaluator) {
                         warnIfLegacyDefaultOnReached(
@@ -6206,6 +6218,329 @@ StackVar ScInterpreter::Interpret()
                         },
                         "family-local default-on financial rate family reached ScInterpreter");
                 };
+                const auto pushLegacyNpv = [&]() {
+                    warnIfLegacyRateFamilyReached(u"NPV");
+                    nFuncFmtType = SvNumFormatType::CURRENCY;
+                    short nParamCount = GetByte();
+                    if (!MustHaveParamCountMin(nParamCount, 2))
+                        return;
+
+                    KahanSum fVal = 0.0;
+                    ReverseStack(nParamCount);
+                    if (nGlobalError == FormulaError::NONE)
+                    {
+                        double fCount = 1.0;
+                        const double fRate = GetDouble();
+                        --nParamCount;
+                        size_t nRefInList = 0;
+                        ScRange aRange;
+                        while (nParamCount-- > 0)
+                        {
+                            switch (GetStackType())
+                            {
+                                case svDouble:
+                                {
+                                    fVal += GetDouble() / pow(1.0 + fRate, fCount);
+                                    fCount++;
+                                }
+                                break;
+                                case svSingleRef:
+                                {
+                                    ScAddress aAdr;
+                                    PopSingleRef(aAdr);
+                                    ScRefCellValue aCell(mrDoc, aAdr);
+                                    if (!aCell.hasEmptyValue() && aCell.hasNumeric())
+                                    {
+                                        const double fCellVal = GetCellValue(aAdr, aCell);
+                                        fVal += fCellVal / pow(1.0 + fRate, fCount);
+                                        fCount++;
+                                    }
+                                }
+                                break;
+                                case svDoubleRef:
+                                case svRefList:
+                                {
+                                    FormulaError nErr = FormulaError::NONE;
+                                    double fCellVal = 0.0;
+                                    PopDoubleRef(aRange, nParamCount, nRefInList);
+                                    ScHorizontalValueIterator aValIter(mrDoc, aRange);
+                                    while ((nErr == FormulaError::NONE)
+                                           && aValIter.GetNext(fCellVal, nErr))
+                                    {
+                                        fVal += fCellVal / pow(1.0 + fRate, fCount);
+                                        fCount++;
+                                    }
+                                    if (nErr != FormulaError::NONE)
+                                        SetError(nErr);
+                                }
+                                break;
+                                case svMatrix:
+                                case svExternalSingleRef:
+                                case svExternalDoubleRef:
+                                {
+                                    ScMatrixRef pMat = GetMatrix();
+                                    if (pMat)
+                                    {
+                                        SCSIZE nC = 0;
+                                        SCSIZE nR = 0;
+                                        pMat->GetDimensions(nC, nR);
+                                        if (nC == 0 || nR == 0)
+                                        {
+                                            PushIllegalArgument();
+                                            return;
+                                        }
+
+                                        for (SCSIZE j = 0; j < nC; j++)
+                                        {
+                                            for (SCSIZE k = 0; k < nR; ++k)
+                                            {
+                                                if (!pMat->IsValue(j, k))
+                                                {
+                                                    PushIllegalArgument();
+                                                    return;
+                                                }
+                                                const double fX = pMat->GetDouble(j, k);
+                                                fVal += fX / pow(1.0 + fRate, fCount);
+                                                fCount++;
+                                            }
+                                        }
+                                    }
+                                }
+                                break;
+                                default:
+                                    SetError(FormulaError::IllegalParameter);
+                                    break;
+                            }
+                        }
+                    }
+                    PushDouble(fVal.get());
+                };
+                const auto pushLegacyIrr = [&]() {
+                    warnIfLegacyRateFamilyReached(u"IRR");
+                    nFuncFmtType = SvNumFormatType::PERCENT;
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 2))
+                        return;
+
+                    constexpr double fEpsilon = 1.0E-7;
+                    const double fEstimated = nParamCount == 2 ? GetDouble() : 0.1;
+                    double fEps = 1.0;
+                    double x = fEstimated == -1.0 ? 0.1 : fEstimated;
+                    double fValue = 0.0;
+
+                    ScRange aRange;
+                    ScMatrixRef pMat;
+                    SCSIZE nC = 0;
+                    SCSIZE nR = 0;
+                    bool bIsMatrix = false;
+                    switch (GetStackType())
+                    {
+                        case svDoubleRef:
+                            PopDoubleRef(aRange);
+                            break;
+                        case svMatrix:
+                        case svExternalSingleRef:
+                        case svExternalDoubleRef:
+                            pMat = GetMatrix();
+                            if (pMat)
+                            {
+                                pMat->GetDimensions(nC, nR);
+                                if (nC == 0 || nR == 0)
+                                {
+                                    PushIllegalParameter();
+                                    return;
+                                }
+                                bIsMatrix = true;
+                            }
+                            else
+                            {
+                                PushIllegalParameter();
+                                return;
+                            }
+                            break;
+                        default:
+                            PushIllegalParameter();
+                            return;
+                    }
+
+                    constexpr sal_uInt16 nIterationsMax = 20;
+                    sal_uInt16 nItCount = 0;
+                    FormulaError nIterError = FormulaError::NONE;
+                    while (fEps > fEpsilon && nItCount < nIterationsMax
+                           && nGlobalError == FormulaError::NONE)
+                    {
+                        KahanSum fNom = 0.0;
+                        KahanSum fDenom = 0.0;
+                        double fCount = 0.0;
+                        if (bIsMatrix)
+                        {
+                            for (SCSIZE j = 0; j < nC && nGlobalError == FormulaError::NONE; j++)
+                            {
+                                for (SCSIZE k = 0; k < nR; k++)
+                                {
+                                    if (!pMat->IsValue(j, k))
+                                        continue;
+                                    fValue = pMat->GetDouble(j, k);
+                                    if (nGlobalError != FormulaError::NONE)
+                                        break;
+
+                                    fNom += fValue / pow(1.0 + x, fCount);
+                                    fDenom += -fCount * fValue / pow(1.0 + x, fCount + 1.0);
+                                    fCount++;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            ScValueIterator aValIter(mrContext, aRange, mnSubTotalFlags);
+                            bool bLoop = aValIter.GetFirst(fValue, nIterError);
+                            while (bLoop && nIterError == FormulaError::NONE)
+                            {
+                                fNom += fValue / pow(1.0 + x, fCount);
+                                fDenom += -fCount * fValue / pow(1.0 + x, fCount + 1.0);
+                                fCount++;
+                                bLoop = aValIter.GetNext(fValue, nIterError);
+                            }
+                            SetError(nIterError);
+                        }
+                        const double xNew
+                            = x - o3tl::div_allow_zero(fNom.get(), fDenom.get());
+                        nItCount++;
+                        fEps = std::abs(xNew - x);
+                        x = xNew;
+                    }
+                    if (fEstimated == 0.0 && std::abs(x) < fEpsilon)
+                        x = 0.0;
+                    if (fEps < fEpsilon)
+                        PushDouble(x);
+                    else
+                        PushError(FormulaError::NoConvergence);
+                };
+                const auto pushLegacyMirr = [&]() {
+                    warnIfLegacyRateFamilyReached(u"MIRR");
+                    nFuncFmtType = SvNumFormatType::PERCENT;
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+
+                    const double fRate1_reinvest = GetDouble() + 1;
+                    const double fRate1_invest = GetDouble() + 1;
+
+                    ScRange aRange;
+                    ScMatrixRef pMat;
+                    SCSIZE nC = 0;
+                    SCSIZE nR = 0;
+                    bool bIsMatrix = false;
+                    switch (GetStackType())
+                    {
+                        case svDoubleRef:
+                            PopDoubleRef(aRange);
+                            break;
+                        case svMatrix:
+                        case svExternalSingleRef:
+                        case svExternalDoubleRef:
+                            pMat = GetMatrix();
+                            if (pMat)
+                            {
+                                pMat->GetDimensions(nC, nR);
+                                if (nC == 0 || nR == 0)
+                                    SetError(FormulaError::IllegalArgument);
+                                bIsMatrix = true;
+                            }
+                            else
+                                SetError(FormulaError::IllegalArgument);
+                            break;
+                        default:
+                            SetError(FormulaError::IllegalParameter);
+                            break;
+                    }
+
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushError(nGlobalError);
+                        return;
+                    }
+
+                    KahanSum fNPV_reinvest = 0.0;
+                    double fPow_reinvest = 1.0;
+                    KahanSum fNPV_invest = 0.0;
+                    double fPow_invest = 1.0;
+                    sal_uLong nCount = 0;
+                    bool bHasPosValue = false;
+                    bool bHasNegValue = false;
+
+                    if (bIsMatrix)
+                    {
+                        for (SCSIZE j = 0; j < nC; j++)
+                        {
+                            for (SCSIZE k = 0; k < nR; ++k)
+                            {
+                                if (!pMat->IsValue(j, k))
+                                    continue;
+                                const double fX = pMat->GetDouble(j, k);
+                                if (nGlobalError != FormulaError::NONE)
+                                    break;
+
+                                if (fX > 0.0)
+                                {
+                                    bHasPosValue = true;
+                                    fNPV_reinvest += fX * fPow_reinvest;
+                                }
+                                else if (fX < 0.0)
+                                {
+                                    bHasNegValue = true;
+                                    fNPV_invest += fX * fPow_invest;
+                                }
+                                fPow_reinvest /= fRate1_reinvest;
+                                fPow_invest /= fRate1_invest;
+                                nCount++;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        ScValueIterator aValIter(mrContext, aRange, mnSubTotalFlags);
+                        double fCellValue = 0.0;
+                        FormulaError nIterError = FormulaError::NONE;
+
+                        bool bLoop = aValIter.GetFirst(fCellValue, nIterError);
+                        while (bLoop)
+                        {
+                            if (fCellValue > 0.0)
+                            {
+                                bHasPosValue = true;
+                                fNPV_reinvest += fCellValue * fPow_reinvest;
+                            }
+                            else if (fCellValue < 0.0)
+                            {
+                                bHasNegValue = true;
+                                fNPV_invest += fCellValue * fPow_invest;
+                            }
+                            fPow_reinvest /= fRate1_reinvest;
+                            fPow_invest /= fRate1_invest;
+                            nCount++;
+
+                            bLoop = aValIter.GetNext(fCellValue, nIterError);
+                        }
+
+                        if (nIterError != FormulaError::NONE)
+                            SetError(nIterError);
+                    }
+
+                    if (!(bHasPosValue && bHasNegValue))
+                        SetError(FormulaError::IllegalArgument);
+
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushError(nGlobalError);
+                        return;
+                    }
+
+                    double fResult = -o3tl::div_allow_zero(
+                        fNPV_reinvest.get(), fNPV_invest.get());
+                    fResult *= pow(fRate1_reinvest, static_cast<double>(nCount - 1));
+                    fResult = pow(fResult, div(1.0, (nCount - 1)));
+                    PushDouble(fResult - 1.0);
+                };
                 const auto pushLegacyIspmt = [&]() {
                     warnIfLegacyRateFamilyReached(u"ISPMT");
                     if (!MustHaveParamCount(GetByte(), 4))
@@ -6519,6 +6854,62 @@ StackVar ScInterpreter::Interpret()
                         fPeriods = ::rtl::math::approxFloor(fPeriods);
                         PushDouble(semath::computeNominalAnnualRate(fEffective, fPeriods));
                     }
+                };
+                const auto pushLegacySumProduct = [&]() {
+                    warnIfLegacyNumericAggregateReached(u"SUMPRODUCT");
+
+                    short nParamCount = GetByte();
+                    if (!MustHaveParamCountMin(nParamCount, 1))
+                        return;
+
+                    size_t nInRefList = 0;
+                    ScMatrixRef pMatLast = GetMatrix(--nParamCount, nInRefList);
+                    if (!pMatLast)
+                    {
+                        PushIllegalParameter();
+                        return;
+                    }
+
+                    SCSIZE nCLast = 0;
+                    SCSIZE nRLast = 0;
+                    pMatLast->GetDimensions(nCLast, nRLast);
+                    std::vector<double> aResArray;
+                    pMatLast->GetDoubleArray(aResArray);
+
+                    while (nParamCount--)
+                    {
+                        ScMatrixRef pMat = GetMatrix(nParamCount, nInRefList);
+                        if (!pMat)
+                        {
+                            PushIllegalParameter();
+                            return;
+                        }
+                        SCSIZE nC = 0;
+                        SCSIZE nR = 0;
+                        pMat->GetDimensions(nC, nR);
+                        if (nC != nCLast || nR != nRLast)
+                        {
+                            PushNoValue();
+                            return;
+                        }
+
+                        pMat->MergeDoubleArrayMultiply(aResArray);
+                    }
+
+                    KahanSum fSum = 0.0;
+                    for (double fPosArray : aResArray)
+                    {
+                        FormulaError nErr = GetDoubleErrorValue(fPosArray);
+                        if (nErr == FormulaError::NONE)
+                            fSum += fPosArray;
+                        else if (nErr != FormulaError::ElementNaN)
+                        {
+                            PushError(nErr);
+                            return;
+                        }
+                    }
+
+                    PushDouble(fSum.get());
                 };
                 const auto pushLegacyConvert = [&]() {
                     warnIfLegacyDispatchReached(
@@ -6847,6 +7238,430 @@ StackVar ScInterpreter::Interpret()
                         PushNoValue();
                     else
                         PushDouble(fResult.get());
+                };
+                const auto pushLegacyZTest = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"ZTEST");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 2, 3))
+                        return;
+
+                    double sigma = 0.0;
+                    if (nParamCount == 3)
+                    {
+                        sigma = GetDouble();
+                        if (sigma <= 0.0)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+                    }
+                    const double x = GetDouble();
+
+                    KahanSum fSum = 0.0;
+                    KahanSum fSumSqr = 0.0;
+                    double fVal = 0.0;
+                    double fValCount = 0.0;
+                    switch (GetStackType())
+                    {
+                        case svDouble:
+                            fVal = GetDouble();
+                            fSum += fVal;
+                            fSumSqr += fVal * fVal;
+                            fValCount++;
+                            break;
+                        case svSingleRef:
+                        {
+                            ScAddress aAdr;
+                            PopSingleRef(aAdr);
+                            ScRefCellValue aCell(mrDoc, aAdr);
+                            if (aCell.hasNumeric())
+                            {
+                                fVal = GetCellValue(aAdr, aCell);
+                                fSum += fVal;
+                                fSumSqr += fVal * fVal;
+                                fValCount++;
+                            }
+                        }
+                        break;
+                        case svRefList:
+                        case svDoubleRef:
+                        {
+                            short nParam = 1;
+                            size_t nRefInList = 0;
+                            while (nParam-- > 0)
+                            {
+                                ScRange aRange;
+                                FormulaError nErr = FormulaError::NONE;
+                                PopDoubleRef(aRange, nParam, nRefInList);
+                                ScValueIterator aValIter(mrContext, aRange, mnSubTotalFlags);
+                                if (aValIter.GetFirst(fVal, nErr))
+                                {
+                                    fSum += fVal;
+                                    fSumSqr += fVal * fVal;
+                                    fValCount++;
+                                    while ((nErr == FormulaError::NONE)
+                                           && aValIter.GetNext(fVal, nErr))
+                                    {
+                                        fSum += fVal;
+                                        fSumSqr += fVal * fVal;
+                                        fValCount++;
+                                    }
+                                    SetError(nErr);
+                                }
+                            }
+                        }
+                        break;
+                        case svMatrix:
+                        case svExternalSingleRef:
+                        case svExternalDoubleRef:
+                        {
+                            ScMatrixRef pMat = GetMatrix();
+                            if (pMat)
+                            {
+                                const SCSIZE nCount = pMat->GetElementCount();
+                                if (pMat->IsNumeric())
+                                {
+                                    for (SCSIZE i = 0; i < nCount; i++)
+                                    {
+                                        fVal = pMat->GetDouble(i);
+                                        fSum += fVal;
+                                        fSumSqr += fVal * fVal;
+                                        fValCount++;
+                                    }
+                                }
+                                else
+                                {
+                                    for (SCSIZE i = 0; i < nCount; i++)
+                                    {
+                                        if (!pMat->IsStringOrEmpty(i))
+                                        {
+                                            fVal = pMat->GetDouble(i);
+                                            fSum += fVal;
+                                            fSumSqr += fVal * fVal;
+                                            fValCount++;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                        default:
+                            SetError(FormulaError::IllegalParameter);
+                            break;
+                    }
+
+                    if (fValCount <= 1.0)
+                    {
+                        PushError(FormulaError::DivisionByZero);
+                        return;
+                    }
+
+                    const double fMean = fSum.get() / fValCount;
+                    if (nParamCount != 3)
+                    {
+                        sigma = (fSumSqr - fSum * fSum / fValCount).get() / (fValCount - 1.0);
+                        if (sigma == 0.0)
+                        {
+                            PushError(FormulaError::DivisionByZero);
+                            return;
+                        }
+                        PushDouble(
+                            0.5 - semath::gaussValue((fMean - x) / sqrt(sigma / fValCount)));
+                    }
+                    else
+                    {
+                        PushDouble(
+                            0.5
+                            - semath::gaussValue((fMean - x) * sqrt(fValCount) / sigma));
+                    }
+                };
+                const auto pushLegacyTTest = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"TTEST");
+                    if (!MustHaveParamCount(GetByte(), 4))
+                        return;
+
+                    double fTyp = ::rtl::math::approxFloor(GetDouble());
+                    double fTails = ::rtl::math::approxFloor(GetDouble());
+                    if (fTails != 1.0 && fTails != 2.0)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+
+                    ScMatrixRef pMat2 = GetMatrix();
+                    ScMatrixRef pMat1 = GetMatrix();
+                    if (!pMat1 || !pMat2)
+                    {
+                        PushIllegalParameter();
+                        return;
+                    }
+
+                    double fT = 0.0;
+                    double fF = 0.0;
+                    SCSIZE nC1 = 0, nC2 = 0, nR1 = 0, nR2 = 0;
+                    pMat1->GetDimensions(nC1, nR1);
+                    pMat2->GetDimensions(nC2, nR2);
+                    if (fTyp == 1.0)
+                    {
+                        if (nC1 != nC2 || nR1 != nR2)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+                        double fCount = 0.0;
+                        KahanSum fSum1 = 0.0;
+                        KahanSum fSum2 = 0.0;
+                        KahanSum fSumSqrD = 0.0;
+                        for (SCSIZE i = 0; i < nC1; i++)
+                        {
+                            for (SCSIZE j = 0; j < nR1; j++)
+                            {
+                                if (!pMat1->IsStringOrEmpty(i, j)
+                                    && !pMat2->IsStringOrEmpty(i, j))
+                                {
+                                    const double fVal1 = pMat1->GetDouble(i, j);
+                                    const double fVal2 = pMat2->GetDouble(i, j);
+                                    fSum1 += fVal1;
+                                    fSum2 += fVal2;
+                                    fSumSqrD += (fVal1 - fVal2) * (fVal1 - fVal2);
+                                    fCount++;
+                                }
+                            }
+                        }
+                        if (fCount < 1.0)
+                        {
+                            PushNoValue();
+                            return;
+                        }
+                        KahanSum fSumD = fSum1 - fSum2;
+                        const double fDivider = (fSumSqrD * fCount - fSumD * fSumD).get();
+                        if (fDivider == 0.0)
+                        {
+                            PushError(FormulaError::DivisionByZero);
+                            return;
+                        }
+                        fT = std::abs(fSumD.get()) * sqrt((fCount - 1.0) / fDivider);
+                        fF = fCount - 1.0;
+                    }
+                    else if (fTyp == 2.0)
+                    {
+                        if (!CalculateTest(false, nC1, nC2, nR1, nR2, pMat1, pMat2, fT, fF))
+                            return;
+                    }
+                    else if (fTyp == 3.0)
+                    {
+                        if (!CalculateTest(true, nC1, nC2, nR1, nR2, pMat1, pMat2, fT, fF))
+                            return;
+                    }
+                    else
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    PushDouble(GetTDist(fT, fF, static_cast<int>(fTails)));
+                };
+                const auto pushLegacyFTest = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"FTEST");
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+
+                    ScMatrixRef pMat2 = GetMatrix();
+                    ScMatrixRef pMat1 = GetMatrix();
+                    if (!pMat1 || !pMat2)
+                    {
+                        PushIllegalParameter();
+                        return;
+                    }
+
+                    const auto aVal1 = pMat1->CollectKahan(sc::op::kOpSumAndSumSquare);
+                    const auto aVal2 = pMat2->CollectKahan(sc::op::kOpSumAndSumSquare);
+                    const double fCount1 = aVal1.mnCount;
+                    const double fCount2 = aVal2.mnCount;
+                    const KahanSum fSum1 = aVal1.maAccumulator[0];
+                    const KahanSum fSumSqr1 = aVal1.maAccumulator[1];
+                    const KahanSum fSum2 = aVal2.maAccumulator[0];
+                    const KahanSum fSumSqr2 = aVal2.maAccumulator[1];
+
+                    if (fCount1 < 2.0 || fCount2 < 2.0)
+                    {
+                        PushNoValue();
+                        return;
+                    }
+                    const double fS1
+                        = (fSumSqr1 - fSum1 * fSum1 / fCount1).get() / (fCount1 - 1.0);
+                    const double fS2
+                        = (fSumSqr2 - fSum2 * fSum2 / fCount2).get() / (fCount2 - 1.0);
+                    if (fS1 == 0.0 || fS2 == 0.0)
+                    {
+                        PushNoValue();
+                        return;
+                    }
+
+                    double fF = 0.0;
+                    double fF1 = 0.0;
+                    double fF2 = 0.0;
+                    if (fS1 > fS2)
+                    {
+                        fF = fS1 / fS2;
+                        fF1 = fCount1 - 1.0;
+                        fF2 = fCount2 - 1.0;
+                    }
+                    else
+                    {
+                        fF = fS2 / fS1;
+                        fF1 = fCount2 - 1.0;
+                        fF2 = fCount1 - 1.0;
+                    }
+                    const double fFcdf = GetFDist(fF, fF1, fF2);
+                    PushDouble(2.0 * std::min(fFcdf, 1.0 - fFcdf));
+                };
+                const auto pushLegacyChiTest = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"LEGACY.CHITEST");
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+
+                    ScMatrixRef pMat2 = GetMatrix();
+                    ScMatrixRef pMat1 = GetMatrix();
+                    if (!pMat1 || !pMat2)
+                    {
+                        PushIllegalParameter();
+                        return;
+                    }
+                    SCSIZE nC1 = 0, nC2 = 0, nR1 = 0, nR2 = 0;
+                    pMat1->GetDimensions(nC1, nR1);
+                    pMat2->GetDimensions(nC2, nR2);
+                    if (nR1 != nR2 || nC1 != nC2)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    KahanSum fChi = 0.0;
+                    bool bEmpty = true;
+                    for (SCSIZE i = 0; i < nC1; i++)
+                    {
+                        for (SCSIZE j = 0; j < nR1; j++)
+                        {
+                            if (!(pMat1->IsEmpty(i, j) || pMat2->IsEmpty(i, j)))
+                            {
+                                bEmpty = false;
+                                if (!pMat1->IsStringOrEmpty(i, j) && !pMat2->IsStringOrEmpty(i, j))
+                                {
+                                    const double fValX = pMat1->GetDouble(i, j);
+                                    const double fValE = pMat2->GetDouble(i, j);
+                                    if (fValE == 0.0)
+                                    {
+                                        PushError(FormulaError::DivisionByZero);
+                                        return;
+                                    }
+                                    volatile double fTemp1
+                                        = (fValX - fValE) * (fValX - fValE);
+                                    const double fTemp2 = fTemp1;
+                                    if (std::isinf(fTemp2))
+                                    {
+                                        PushError(FormulaError::NoConvergence);
+                                        return;
+                                    }
+                                    fChi += sc::divide(fTemp2, fValE);
+                                }
+                                else
+                                {
+                                    PushIllegalArgument();
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    if (bEmpty)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    double fDF = 0.0;
+                    if (nC1 == 1 || nR1 == 1)
+                    {
+                        fDF = static_cast<double>(nC1 * nR1 - 1);
+                        if (fDF == 0.0)
+                        {
+                            PushNoValue();
+                            return;
+                        }
+                    }
+                    else
+                        fDF = static_cast<double>(nC1 - 1) * static_cast<double>(nR1 - 1);
+                    PushDouble(GetChiDist(fChi.get(), fDF));
+                };
+                const auto pushLegacyForecast = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"FORECAST");
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+
+                    ScMatrixRef pMat1 = GetMatrix();
+                    ScMatrixRef pMat2 = GetMatrix();
+                    if (!pMat1 || !pMat2)
+                    {
+                        PushIllegalParameter();
+                        return;
+                    }
+                    SCSIZE nC1 = 0, nC2 = 0, nR1 = 0, nR2 = 0;
+                    pMat1->GetDimensions(nC1, nR1);
+                    pMat2->GetDimensions(nC2, nR2);
+                    if (nR1 != nR2 || nC1 != nC2)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    const double fVal = GetDouble();
+                    double fCount = 0.0;
+                    KahanSum fSumX = 0.0;
+                    KahanSum fSumY = 0.0;
+
+                    for (SCSIZE i = 0; i < nC1; i++)
+                    {
+                        for (SCSIZE j = 0; j < nR1; j++)
+                        {
+                            if (!pMat1->IsStringOrEmpty(i, j) && !pMat2->IsStringOrEmpty(i, j))
+                            {
+                                fSumX += pMat1->GetDouble(i, j);
+                                fSumY += pMat2->GetDouble(i, j);
+                                fCount++;
+                            }
+                        }
+                    }
+                    if (fCount < 1.0)
+                    {
+                        PushNoValue();
+                        return;
+                    }
+
+                    KahanSum fSumDeltaXDeltaY = 0.0;
+                    KahanSum fSumSqrDeltaX = 0.0;
+                    const double fMeanX = fSumX.get() / fCount;
+                    const double fMeanY = fSumY.get() / fCount;
+                    for (SCSIZE i = 0; i < nC1; i++)
+                    {
+                        for (SCSIZE j = 0; j < nR1; j++)
+                        {
+                            if (!pMat1->IsStringOrEmpty(i, j) && !pMat2->IsStringOrEmpty(i, j))
+                            {
+                                const double fValX = pMat1->GetDouble(i, j);
+                                const double fValY = pMat2->GetDouble(i, j);
+                                fSumDeltaXDeltaY += (fValX - fMeanX) * (fValY - fMeanY);
+                                fSumSqrDeltaX += (fValX - fMeanX) * (fValX - fMeanX);
+                            }
+                        }
+                    }
+                    if (fSumSqrDeltaX == 0.0)
+                        PushError(FormulaError::DivisionByZero);
+                    else
+                    {
+                        PushDouble(fMeanY
+                                   + fSumDeltaXDeltaY.get() / fSumSqrDeltaX.get()
+                                         * (fVal - fMeanX));
+                    }
+                };
+                const auto pushLegacyGrowth = [&]() {
+                    warnIfLegacyGrowthProjectionReached(u"GROWTH");
+                    CalculateTrendGrowth(true);
                 };
                 const auto pushLegacyBitwise = [&](std::u16string_view rFunctionName,
                                                    auto aOperator) {
@@ -8685,7 +9500,7 @@ StackVar ScInterpreter::Interpret()
                     case ocFloor_Math       :
                         pushLegacyFloor(u"FLOOR.MATH", false);
                         break;
-                    case ocSumProduct       : ScSumProduct();               break;
+                    case ocSumProduct       : pushLegacySumProduct();       break;
                     case ocSumSQ            : ScSumSQ();                    break;
                     case ocSumX2MY2         : ScSumX2MY2();                 break;
                     case ocSumX2DY2         : ScSumX2DY2();                 break;
@@ -8705,9 +9520,9 @@ StackVar ScInterpreter::Interpret()
                     case ocMaxA             : ScMax( true );                break;
                     case ocSum              : ScSum();                      break;
                     case ocProduct          : ScProduct();                  break;
-                    case ocNPV              : ScNPV();                  break;
-                    case ocIRR              : ScIRR();                  break;
-                    case ocMIRR             : ScMIRR();                 break;
+                    case ocNPV              : pushLegacyNpv();          break;
+                    case ocIRR              : pushLegacyIrr();          break;
+                    case ocMIRR             : pushLegacyMirr();         break;
                     case ocISPMT            : pushLegacyIspmt();        break;
                     case ocAverage          : ScAverage()       ;           break;
                     case ocAverageA         : ScAverage( true );            break;
@@ -8960,11 +9775,11 @@ StackVar ScInterpreter::Interpret()
                     case ocNoName           : ScNoName();               break;
                     case ocBad              : ScBadName();              break;
                     case ocZTest            :
-                    case ocZTest_MS         : ScZTest();                break;
+                    case ocZTest_MS         : pushLegacyZTest();        break;
                     case ocTTest            :
-                    case ocTTest_MS         : ScTTest();                break;
+                    case ocTTest_MS         : pushLegacyTTest();        break;
                     case ocFTest            :
-                    case ocFTest_MS         : ScFTest();                break;
+                    case ocFTest_MS         : pushLegacyFTest();        break;
                     case ocRank             :
                     case ocRank_Eq          : pushLegacyRank(false);    break;
                     case ocRank_Avg         : pushLegacyRank(true);     break;
@@ -8999,11 +9814,11 @@ StackVar ScInterpreter::Interpret()
                     case ocSlope            : CalculateSlopeIntercept(true); break;
                     case ocIntercept        : CalculateSlopeIntercept(false); break;
                     case ocTrend            : ScTrend();                break;
-                    case ocGrowth           : ScGrowth();               break;
+                    case ocGrowth           : pushLegacyGrowth();       break;
                     case ocLinest           : ScLinest();               break;
                     case ocLogest           : ScLogest();               break;
                     case ocForecast_LIN     :
-                    case ocForecast         : ScForecast();             break;
+                    case ocForecast         : pushLegacyForecast();     break;
                     case ocForecast_ETS_ADD : ScForecast_Ets( etsAdd );       break;
                     case ocForecast_ETS_SEA : ScForecast_Ets( etsSeason );    break;
                     case ocForecast_ETS_MUL : ScForecast_Ets( etsMult );      break;
@@ -9023,7 +9838,7 @@ StackVar ScInterpreter::Interpret()
                     case ocGammaInv         :
                     case ocGammaInv_MS      : pushLegacyGammaInverse();     break;
                     case ocChiTest          :
-                    case ocChiTest_MS       : ScChiTest();              break;
+                    case ocChiTest_MS       : pushLegacyChiTest();      break;
                     case ocChiInv           :
                     case ocChiInv_MS        : pushLegacyChiInv(u"CHIINV");  break;
                     case ocChiSqInv         :

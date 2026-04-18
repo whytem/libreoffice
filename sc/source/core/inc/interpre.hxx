@@ -713,9 +713,6 @@ public:
     static void RoundSignificant( double fX, double fDigits, double &fRes );
 
     // financial functions
-    void ScNPV();
-    void ScIRR();
-    void ScMIRR();
     static double ScGetPV(double fRate, double fNper, double fPmt,
                           double fFv, bool bPayInAdvance);
     static double ScGetDDB(double fCost, double fSalvage, double fLife,
@@ -739,11 +736,9 @@ public:
     void ScEMat();
     void ScMatRef();
     ScMatrixRef MatConcat(const ScMatrixRef& pMat1, const ScMatrixRef& pMat2);
-    void ScSumProduct();
     void ScSumX2MY2();
     void ScSumX2DY2();
     void ScSumXMY2();
-    void ScGrowth();
     bool CalculateSkew(KahanSum& fSum, double& fCount, std::vector<double>& values);
     void CalculateSlopeIntercept(bool bSlope);
     void CalculateSmallLarge(bool bSmall);
@@ -762,8 +757,6 @@ public:
     bool CheckMatrix(bool _bLOG,sal_uInt8& nCase,SCSIZE& nCX,SCSIZE& nCY,SCSIZE& nRX,SCSIZE& nRY,SCSIZE& M,SCSIZE& N,ScMatrixRef& pMatX,ScMatrixRef& pMatY);
     void ScLinest();
     void ScLogest();
-    void ScForecast();
-    void ScForecast_Ets( ScETSType eETSType );
     void ScFourier();
     void ScNoName();
     void ScBadName();
@@ -786,10 +779,6 @@ private:
     void GetNumberSequenceArray( sal_uInt8 nParamCount, ::std::vector<double>& rArray, bool bConvertTextInArray );
     void GetSortArray( sal_uInt8 nParamCount, ::std::vector<double>& rSortArray, ::std::vector<tools::Long>* pIndexOrder, bool bConvertTextInArray, bool bAllowEmptyArray );
     static void QuickSort(::std::vector<double>& rSortArray, ::std::vector<tools::Long>* pIndexOrder);
-    void ScZTest();
-    void ScTTest();
-    void ScFTest();
-    void ScChiTest();
     static double GetPercentrank( ::std::vector<double> & rArray, double fVal, bool bInclusive );
     void ScFrequency();
     void ScTrend();
@@ -805,6 +794,7 @@ private:
     void ScFilterXML();
     void ScWebservice();
     void ScEncodeURL();
+    void ScForecast_Ets( ScETSType eETSType );
 
     // probability density function; fLambda is "scale" parameter
     double GetGammaDistPDF(double fX, double fAlpha, double fLambda);

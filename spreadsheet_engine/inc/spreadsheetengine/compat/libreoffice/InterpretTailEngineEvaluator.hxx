@@ -8008,6 +8008,83 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         }
         return makeMaterializedValue(std::move(aPair));
     };
+    const auto evaluateSumProduct = [&]() -> EvaluationAttempt {
+        if (rNode.maChildren.empty())
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        SCSIZE nColumns = 0;
+        SCSIZE nRows = 0;
+        bool bHaveDimensions = false;
+        std::vector<double> aProducts;
+        std::vector<bool> aIgnore;
+
+        for (const auto& rxChild : rNode.maChildren)
+        {
+            if (!rxChild)
+                return makeErrorAttempt(api::Error::IllegalArgument);
+
+            const auto aMatrix = materializeMatrixNode(*rxChild, rDoc, rContext, rFormulaPos);
+            if (!aMatrix.mbSupported)
+                return makeUnsupported(eFunction, aMatrix.meFallbackReason);
+            if (!aMatrix.moValue)
+                return makeErrorAttempt(aMatrix.meError);
+
+            SCSIZE nChildColumns = 0;
+            SCSIZE nChildRows = 0;
+            (*aMatrix.moValue)->GetDimensions(nChildColumns, nChildRows);
+            if (!bHaveDimensions)
+            {
+                nColumns = nChildColumns;
+                nRows = nChildRows;
+                if (nColumns == 0 || nRows == 0)
+                    return makeErrorAttempt(api::Error::IllegalArgument);
+                aProducts.assign(nColumns * nRows, 1.0);
+                aIgnore.assign(nColumns * nRows, false);
+                bHaveDimensions = true;
+            }
+            else if (nChildColumns != nColumns || nChildRows != nRows)
+                return makeErrorAttempt(api::Error::IllegalArgument);
+
+            std::size_t nIndex = 0;
+            for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+            {
+                for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn, ++nIndex)
+                {
+                    if (aIgnore[nIndex])
+                        continue;
+
+                    const auto aValue = lookupexecution::detail::toApiCellValue(
+                        (*aMatrix.moValue)->Get(nColumn, nRow));
+                    if (aValue.isText())
+                    {
+                        aIgnore[nIndex] = true;
+                        continue;
+                    }
+
+                    double fNumeric = 0.0;
+                    if (aValue.isEmpty())
+                        fNumeric = 0.0;
+                    else
+                    {
+                        const auto aNumber = coerceScalarToNumber(rDoc, rContext, aValue);
+                        if (!aNumber)
+                            return makeErrorAttempt(aNumber.meError);
+                        fNumeric = aNumber.maValue;
+                    }
+
+                    aProducts[nIndex] *= fNumeric;
+                }
+            }
+        }
+
+        double fTotal = 0.0;
+        for (std::size_t nIndex = 0; nIndex < aProducts.size(); ++nIndex)
+        {
+            if (!aIgnore[nIndex])
+                fTotal += aProducts[nIndex];
+        }
+        return makeNumericAttempt(fTotal);
+    };
 
     if (aFunctionName == u"SUM" || aFunctionName == u"PRODUCT" || aFunctionName == u"SUMSQ"
         || aFunctionName == u"AVERAGE" || aFunctionName == u"DEVSQ"
@@ -8082,6 +8159,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             return makeErrorAttempt(api::Error::Domain);
         return makeNumericAttempt(static_cast<double>(std::round(fResult)));
     }
+
+    if (aFunctionName == u"SUMPRODUCT")
+        return evaluateSumProduct();
 
     if (aFunctionName == u"SUMX2MY2" || aFunctionName == u"SUMX2PY2" || aFunctionName == u"SUMXMY2")
     {
@@ -13312,6 +13392,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     }
     if (eFunction == FunctionKind::Round)
         return true;
+    if (aUpperFunctionName == u"GROWTH")
+        return true;
     if (aUpperFunctionName == u"PROB")
         return true;
     if (aUpperFunctionName == u"IFERROR" || aUpperFunctionName == u"IFNA")
@@ -13321,6 +13403,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
            || eFunction == FunctionKind::FormulaText
            || eFunction == FunctionKind::Conversion
            || eFunction == FunctionKind::Rate
+           || eFunction == FunctionKind::NumericAggregate
            || eFunction == FunctionKind::StatisticalDistribution
            || eFunction == FunctionKind::InformationPredicate
            || eFunction == FunctionKind::LogicalFold
