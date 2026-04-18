@@ -299,6 +299,14 @@ struct Interp4EngineDispatchInventory
     std::size_t mnAttemptCaseCount = 0;
 };
 
+void accumulateDispatchRuntimeStats(ScInterpreterDispatchRuntimeStatsSnapshot& rAccumulator,
+                                    const ScInterpreterDispatchRuntimeStatsSnapshot& rDelta)
+{
+    rAccumulator.mnEngineAttemptedCount += rDelta.mnEngineAttemptedCount;
+    rAccumulator.mnEngineSucceededCount += rDelta.mnEngineSucceededCount;
+    rAccumulator.mnEngineDeclinedCount += rDelta.mnEngineDeclinedCount;
+}
+
 Interp4LegacyLambdaInventory countInterp4LegacyLambdas()
 {
     const std::filesystem::path aRepoRoot
@@ -2409,7 +2417,8 @@ void printLiveAuthoritativeSummary(
     std::size_t nLegacyInterpreterSubroutineCount,
     const Interp4LegacyLambdaInventory& rLegacyLambdaInventory,
     const Interp4EngineDispatchInventory& rEngineDispatchInventory,
-    const ScInterpreterDispatchRuntimeStatsSnapshot& rDispatchRuntimeStats)
+    const ScInterpreterDispatchRuntimeStatsSnapshot& rLiveDispatchRuntimeStats,
+    const ScInterpreterDispatchRuntimeStatsSnapshot& rSeamDisabledDispatchRuntimeStats)
 {
     const sal_uInt64 nAuthoritative = rRun.maLiveAuthoritativeStats.mnAuthoritativeCount;
     const sal_uInt64 nFallback = rRun.maLiveAuthoritativeStats.mnAuthoritativeFallbackCount;
@@ -2441,11 +2450,17 @@ void printLiveAuthoritativeSummary(
     std::cout << "interp4_dispatch_engine_attempt_count="
               << rEngineDispatchInventory.mnAttemptCaseCount << '\n';
     std::cout << "interp4_dispatch_engine_attempted_total="
-              << rDispatchRuntimeStats.mnEngineAttemptedCount << '\n';
+              << rLiveDispatchRuntimeStats.mnEngineAttemptedCount << '\n';
     std::cout << "interp4_dispatch_engine_succeeded_total="
-              << rDispatchRuntimeStats.mnEngineSucceededCount << '\n';
+              << rLiveDispatchRuntimeStats.mnEngineSucceededCount << '\n';
     std::cout << "interp4_dispatch_engine_declined_total="
-              << rDispatchRuntimeStats.mnEngineDeclinedCount << '\n';
+              << rLiveDispatchRuntimeStats.mnEngineDeclinedCount << '\n';
+    std::cout << "interp4_dispatch_engine_attempted_total_seam_disabled="
+              << rSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount << '\n';
+    std::cout << "interp4_dispatch_engine_succeeded_total_seam_disabled="
+              << rSeamDisabledDispatchRuntimeStats.mnEngineSucceededCount << '\n';
+    std::cout << "interp4_dispatch_engine_declined_total_seam_disabled="
+              << rSeamDisabledDispatchRuntimeStats.mnEngineDeclinedCount << '\n';
     std::cout << "interp4_dispatch_legacy_quarantine_covered_lambda_count="
               << rLegacyLambdaInventory.mnQuarantineCoveredLambdaCount << '\n';
     std::cout << "interp4_dispatch_legacy_quarantine_missing_lambda_count="
@@ -2475,24 +2490,40 @@ void printLiveAuthoritativeSummary(
               << fCorpusMatchRate << '\n';
     std::cout << "interpret_tail_live_authoritative_probe_match_rate="
               << fProbeMatchRate << '\n';
-    const double fEngineSuccessRate = rDispatchRuntimeStats.mnEngineAttemptedCount
+    const double fEngineSuccessRate = rLiveDispatchRuntimeStats.mnEngineAttemptedCount
                                           ? (static_cast<double>(
-                                                 rDispatchRuntimeStats.mnEngineSucceededCount)
+                                                 rLiveDispatchRuntimeStats.mnEngineSucceededCount)
                                              * 100.0
                                              / static_cast<double>(
-                                                 rDispatchRuntimeStats.mnEngineAttemptedCount))
+                                                 rLiveDispatchRuntimeStats.mnEngineAttemptedCount))
                                           : 0.0;
-    const double fEngineDeclineRate = rDispatchRuntimeStats.mnEngineAttemptedCount
+    const double fEngineDeclineRate = rLiveDispatchRuntimeStats.mnEngineAttemptedCount
                                           ? (static_cast<double>(
-                                                 rDispatchRuntimeStats.mnEngineDeclinedCount)
+                                                 rLiveDispatchRuntimeStats.mnEngineDeclinedCount)
                                              * 100.0
                                              / static_cast<double>(
-                                                 rDispatchRuntimeStats.mnEngineAttemptedCount))
+                                                 rLiveDispatchRuntimeStats.mnEngineAttemptedCount))
                                           : 0.0;
+    const double fSeamDisabledEngineSuccessRate
+        = rSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount
+              ? (static_cast<double>(rSeamDisabledDispatchRuntimeStats.mnEngineSucceededCount)
+                 * 100.0
+                 / static_cast<double>(rSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount))
+              : 0.0;
+    const double fSeamDisabledEngineDeclineRate
+        = rSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount
+              ? (static_cast<double>(rSeamDisabledDispatchRuntimeStats.mnEngineDeclinedCount)
+                 * 100.0
+                 / static_cast<double>(rSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount))
+              : 0.0;
     std::cout << "interp4_dispatch_engine_success_rate="
               << fEngineSuccessRate << '\n';
     std::cout << "interp4_dispatch_engine_decline_rate="
               << fEngineDeclineRate << '\n';
+    std::cout << "interp4_dispatch_engine_success_rate_seam_disabled="
+              << fSeamDisabledEngineSuccessRate << '\n';
+    std::cout << "interp4_dispatch_engine_decline_rate_seam_disabled="
+              << fSeamDisabledEngineDeclineRate << '\n';
     std::cout.flags(aOldFlags);
     std::cout.precision(nOldPrecision);
 
@@ -4781,7 +4812,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     resetProbeDiagnosticSamples();
     resetReplayEligibilityDiagnosticSamples();
     spreadsheetengine::core::datetime::resetWorkdayRuntimeStats();
-    resetScInterpreterDispatchRuntimeStats();
+    ScInterpreterDispatchRuntimeStatsSnapshot aLiveDispatchRuntimeStats;
+    ScInterpreterDispatchRuntimeStatsSnapshot aSeamDisabledDispatchRuntimeStats;
 
     std::size_t nWorkbookCount = 0;
     std::size_t nFormulaCellCount = 0;
@@ -4814,6 +4846,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
             {
                 ScopedEnvironmentOverride aObserveMode(
                     "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "observe");
+                resetScInterpreterDispatchRuntimeStats();
                 spreadsheetengine::compat::libreoffice::interprettaileval::resetStats();
                 spreadsheetengine::compat::libreoffice::interprettaileval::setDiagnosticWorkbookLabel(
                     OUString::fromUtf8(rWorkbookPath.string()));
@@ -4821,6 +4854,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                 rDoc.SetAllFormulasDirty(aDirtyCxt);
                 rDoc.InterpretCellsIfNeeded(aWorkbookRanges);
                 xDocShell->DoHardRecalc();
+                accumulateDispatchRuntimeStats(aLiveDispatchRuntimeStats,
+                    getScInterpreterDispatchRuntimeStatsSnapshot());
                 const StatsSnapshot aWorkbookLiveAttemptStats
                     = spreadsheetengine::compat::libreoffice::interprettaileval::getStatsSnapshot();
                 const auto aWorkbookLiveInventory = buildObserveSurfaceInventory(
@@ -4859,6 +4894,18 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                         += aWorkbookLiveInventory.maFunctionUnseenCells[nIndex];
                 }
                 accumulateUnknownRootInventory(aLiveUniqueInventory, aWorkbookLiveInventory);
+            }
+
+            {
+                ScopedEnvironmentOverride aOffMode(
+                    "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+                resetScInterpreterDispatchRuntimeStats();
+                sc::SetFormulaDirtyContext aDirtyCxt;
+                rDoc.SetAllFormulasDirty(aDirtyCxt);
+                rDoc.InterpretCellsIfNeeded(aWorkbookRanges);
+                xDocShell->DoHardRecalc();
+                accumulateDispatchRuntimeStats(aSeamDisabledDispatchRuntimeStats,
+                    getScInterpreterDispatchRuntimeStatsSnapshot());
             }
 
             {
@@ -5023,7 +5070,11 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     const auto aEngineDispatchInventory = countInterp4EngineDispatchAttempts();
     CPPUNIT_ASSERT_MESSAGE("interp4 engine attempt metric should scan interpr4.cxx",
         aEngineDispatchInventory.mnAttemptCaseCount > 0);
-    const auto aDispatchRuntimeStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "seam-disabled engine dispatch accounting should stay balanced",
+        aSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount,
+        aSeamDisabledDispatchRuntimeStats.mnEngineSucceededCount
+            + aSeamDisabledDispatchRuntimeStats.mnEngineDeclinedCount);
     {
         SupportedProbeRun aPrintedProbeRun;
         aPrintedProbeRun.mnRawFormulaCount = nProbeFormulaCount;
@@ -5035,7 +5086,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         aPrintedProbeRun.maHostTruthArtifactFunctionCount = aProbeHostTruthArtifactFunctionCount;
         printLiveAuthoritativeSummary(
             nFormulaCellCount, aPrintedProbeRun, nLegacyInterpreterSubroutineCount,
-            aLegacyLambdaInventory, aEngineDispatchInventory, aDispatchRuntimeStats);
+            aLegacyLambdaInventory, aEngineDispatchInventory, aLiveDispatchRuntimeStats,
+            aSeamDisabledDispatchRuntimeStats);
         printLiveTargetProbeSummary(aPrintedProbeRun);
     }
     printReplayEligibilityInventory(aReplayEligibilityInventory);
