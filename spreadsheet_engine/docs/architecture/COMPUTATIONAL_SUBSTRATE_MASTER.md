@@ -106,6 +106,9 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_match_total=50350`
 - `interpret_tail_live_authoritative_fallback_total=4`
 - `legacy_interpreter_subroutine_count=100`
+- `interp4_dispatch_legacy_lambda_count=192`
+- `interp4_dispatch_legacy_dispatch_target_count=191`
+- `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
 - live authoritative-match rate over the corpus: `99.3861%`
 - live authoritative-match rate over the current promoted probe: `99.9960%`
 
@@ -114,8 +117,13 @@ Everything below is diagnostic context for improving that number.
 The north-star measures live authority transfer. `legacy_interpreter_subroutine_count`
 is the blunt retirement-progress companion metric, derived from the remaining
 `void Sc*()` declarations in [interpre.hxx](/home/ubuntu/repos/libreoffice/sc/source/core/inc/interpre.hxx).
-Lower is better. The current value reflects the restored original `Sc*` names
-after backing out earlier rename-only metric compression.
+Lower is better. `interp4_dispatch_legacy_lambda_count` is the relocated-legacy
+companion metric for [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx):
+it counts `pushLegacy*` lambdas that still compute through Calc even after
+wrapper deletion. If wrapper count falls while lambda count does not, we are
+shuffling implementation inside Calc rather than moving authority into the
+standalone engine. The quarantine audit currently shows `191 / 191`
+dispatch-reachable lambdas warning when reached.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 
@@ -161,6 +169,8 @@ Routing policy:
 
 - keep `unsupported_function=0` as a regression guard
 - steer the next phase off unseen live surface and wrapper retirement
+- prioritize true engine admissions that reduce the relocated-legacy lambda
+  surface instead of growing `Interpret()` further
 
 Unknown-surface tail:
 
@@ -434,7 +444,10 @@ the forced-direct comparison surface now sits at
 Those are the coverage-style numbers we should currently use alongside the
 north-star; the broader live and forced-interpret counters are still attempt
 telemetry rather than a deletion denominator. The latest genuine text-utility
-retirement pass also brings the honest blunt Calc-wrapper metric down to `100`.
+retirement pass also brings the honest blunt Calc-wrapper metric down to `100`,
+but the relocated-legacy companion metric shows `192` `pushLegacy*` lambdas
+still resident in `Interpret()`, so wrapper deletion should not be read as
+full standalone-engine migration by itself.
 
 That gain came first from imported-root host-truth alignment and the earlier
 bounded family admissions, and now further from the supported-unknown-root

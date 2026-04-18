@@ -38,14 +38,23 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_match_total=50350`
 - `interpret_tail_live_authoritative_fallback_total=4`
 - `legacy_interpreter_subroutine_count=100`
+- `interp4_dispatch_legacy_lambda_count=192`
+- `interp4_dispatch_legacy_dispatch_target_count=191`
+- `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
 - live authoritative-match rate over the corpus: `99.3861%`
 - live authoritative-match rate over the current promoted probe: `99.9960%`
 
 The north-star measures live authority transfer. `legacy_interpreter_subroutine_count`
 is the blunt retirement-progress companion metric, derived from the remaining
 `void Sc*()` declarations in [interpre.hxx](/home/ubuntu/repos/libreoffice/sc/source/core/inc/interpre.hxx).
-Lower is better. The current value reflects the restored original `Sc*` names
-after backing out earlier rename-only metric compression.
+Lower is better. `interp4_dispatch_legacy_lambda_count` is the relocated-legacy
+companion metric: it counts `pushLegacy*` lambdas still living inside
+[interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx).
+If the wrapper count falls while the lambda count stays flat or rises, we are
+relocating Calc logic rather than moving authority into the standalone engine.
+The current value reflects the restored original `Sc*` names after backing out
+earlier rename-only metric compression, and the quarantine audit currently
+shows `191 / 191` dispatch-reachable legacy lambdas warning when reached.
 
 Everything below is diagnostic context for improving that number.
 
@@ -98,6 +107,9 @@ Next routing policy:
 - keep `unsupported_function=0` as an explicit regression guard
 - steer the next phase off unseen live surface and wrapper-retirement
   opportunities rather than unsupported-function admission
+- prioritize true engine admissions that reduce
+  `interp4_dispatch_legacy_lambda_count`, not more lambda relocation into
+  `Interpret()`
 
 ### Unknown Bucket Root Split
 
@@ -310,7 +322,9 @@ Still not true:
   latest genuine text-utility retirement push that removes the dedicated
   `SEARCH`, `REGEX`, `TEXTJOIN`, `BAHTTEXT`, the `*B` byte-text wrappers, and
   `ENCODEURL` wrappers after the earlier financial-scalar relocation, bringing
-  the blunt legacy wrapper metric down to `100`
+  the blunt legacy wrapper metric down to `100`; the new relocated-legacy
+  companion metric now shows `192` `pushLegacy*` lambdas still present in
+  `Interpret()`, with `191` reachable from opcode dispatch
 - the raw promoted replay probe remains a diagnostic surface rather than the
   retirement denominator; the live-authoritative probe now sits at
   `50350 / 50354`, with only `4` live-authoritative fallback rows left on the

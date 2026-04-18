@@ -258,6 +258,9 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_match_total=50350`
 - `interpret_tail_live_authoritative_fallback_total=4`
 - `legacy_interpreter_subroutine_count=100`
+- `interp4_dispatch_legacy_lambda_count=192`
+- `interp4_dispatch_legacy_dispatch_target_count=191`
+- `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
 - live authoritative-match rate over the corpus: `99.3861%`
 - live authoritative-match rate over the current promoted probe: `99.9960%`
 
@@ -266,8 +269,12 @@ Everything below is diagnostic context for improving that number.
 The north-star measures live authority transfer. `legacy_interpreter_subroutine_count`
 is the blunt retirement-progress companion metric, derived from the remaining
 `void Sc*()` declarations in [interpre.hxx](/home/ubuntu/repos/libreoffice/sc/source/core/inc/interpre.hxx).
-Lower is better. The current value reflects the restored original `Sc*` names
-after backing out earlier rename-only metric compression.
+Lower is better. `interp4_dispatch_legacy_lambda_count` is the relocated-legacy
+companion metric: it counts `pushLegacy*` lambdas still computing inside
+[interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx)
+after wrapper deletion. The quarantine audit currently shows `191 / 191`
+dispatch-reachable lambdas warning when reached, but the absolute count makes
+clear that relocation and engine migration are different kinds of progress.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 
@@ -317,6 +324,10 @@ Interpretation:
   `SEARCH`, `REGEX`, `TEXTJOIN`, `BAHTTEXT`, the `*B` byte-text wrappers, and
   `ENCODEURL` while preserving the same engine-authoritative live behavior,
   bringing `legacy_interpreter_subroutine_count` down from `112` to `100`
+- the new relocated-legacy companion metric now shows `192` `pushLegacy*`
+  lambdas still present in `Interpret()`, with `191` reachable from opcode
+  dispatch; future work should reduce that surface rather than treating wrapper
+  deletion alone as migration
 - the ambient replay surface now includes large real traffic from
   information predicates, logical folds, round-family formulas, scalar-math
   helpers, bounded financial feeders, bounded numeric aggregates, bounded
