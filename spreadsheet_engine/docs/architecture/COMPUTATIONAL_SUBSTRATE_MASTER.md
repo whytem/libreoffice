@@ -309,6 +309,30 @@ The active current-state ledger is
 [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md).
 The latest replay eligibility closeout is now folded into that migration ledger.
 
+## Next Initiative: Engine RPN Evaluator
+
+The project has now reached the point where the remaining evaluator work is
+better described as one subsystem initiative than as another sequence of leaf
+function ports.
+
+The surviving surface is dominated by:
+
+- operator opcodes over polymorphic stack values
+- jump/control-flow opcodes
+- reference-producing and reference-consuming opcodes
+- matrix broadcast and matrix-frame state
+- criteria/database iteration
+- stack/runtime state such as error and format propagation
+
+That initiative is now tracked in:
+
+- [COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md)
+- [COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
+
+The key policy change is that wrapper deletion alone is no longer treated as
+equivalent to engine migration. The leading metric for the next phase is
+reduction in `interp4_dispatch_legacy_lambda_count`.
+
 ## Engine-Owned Today
 
 The engine broadly owns:
@@ -532,26 +556,19 @@ live retirement denominator.
 
 ## Recommended Next Pass
 
-The next pass should:
+The next pass is now the `RpnEvaluator` subsystem initiative:
 
-1. do not add new hard-route slices unless they remove a live fallback reason
-   or live mismatch bucket
-2. treat live authoritative-match as the single north-star metric for
-   retirement progress
-3. treat the raw promoted replay probe as a cached imported correctness
-   surface, not as the live retirement denominator
-4. keep targeting slices that increase live authoritative-match directly,
-   led now by unseen live surface and additional wrapper retirement rather
-   than by replay-probe cleanup
-5. keep `NETWORKDAYS`, `WORKDAY`, `NETWORKDAYS.INTL`, and `WORKDAY.INTL`
-   behind explicit opt-in until the ambient evaluator path is cheap enough for
-   broad corpus measurement
-6. treat `unsupported_function=0` as a regression guard and focus the next
-   measurable push on unseen-surface reductions
-7. use the broadened scalar-root / round / math-scalar retirement pass as the
-   template for the next large Calc wrapper-deletion batch
-8. only return to imported replay parity if we intentionally decide to
-   rehabilitate legacy seam-off imported-formula execution
+1. complete the host-boundary audit and define the minimal engine-facing host
+   contract for full RPN evaluation
+2. build the engine stack-value model and typed coercion layer
+3. move arithmetic, concat, comparison, and unary operator dispatch into the
+   engine
+4. move control-flow opcodes (`IF`, `CHOOSE`, `LET`, matrix-aware jumps) into
+   the engine RPN loop
+5. only then resume broader leaf-function retirement against those engine
+   primitives
+6. keep `unsupported_function=0` and `fallback=0` as regression guards while
+   this subsystem work lands
 
 ## Navigation
 

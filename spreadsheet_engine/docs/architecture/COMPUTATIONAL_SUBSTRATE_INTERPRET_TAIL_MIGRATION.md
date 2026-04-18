@@ -14,6 +14,7 @@ Use it for:
 - the current hard-routed or quarantined paths
 - the current next target
 - the active next-slice plan
+- the active next subsystem initiative
 
 The older per-pass plan, decision, and evidence documents are retained in
 [../archive/interpret_tail/](../archive/interpret_tail/) for history only.
@@ -711,25 +712,39 @@ historical reference material, not active roadmap work.
 
 ## Current Next Target
 
-The latest replay closeout is now folded into this migration ledger.
+The latest replay closeout is now folded into this migration ledger, but the
+next target is no longer "the next 62 lambdas" as if they were a flat
+function queue.
 
-The next high-value pass is now constrained by the scope gate:
+The remaining work is now a single subsystem initiative:
 
-1. treat live authoritative-match as the single north-star metric for
-   deletion progress
-2. treat the raw promoted replay probe as a cached imported correctness
-   surface, not as the live retirement denominator
-3. do not add new hard-route slices unless they remove a live fallback reason
-   or live mismatch bucket
-4. keep targeting slices that reduce the unseen live surface directly, using
-   the live unique inventory rather than attempt counters or replay-probe
-   percentages
-5. use the logical-constant, formula-text, conversion, bitwise, aggregate,
-   matrix-determinant, narrow `PROB(...)`, and broadened scalar-root / round /
-   math-scalar wrapper deletion milestones as
-   the template for future narrow retirements
-6. only return to imported replay parity if we intentionally decide to
-   rehabilitate legacy seam-off imported-formula execution
+- build an engine-native `RpnEvaluator`
+- shrink `interp4_dispatch_legacy_lambda_count` through genuine engine-side
+  operator, control-flow, reference, and matrix execution
+- use wrapper deletion only as a companion metric, not the lead story
+
+The planning documents for that phase are now:
+
+- [COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md)
+- [COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
+
+## Current Next Pass
+
+The current next pass is:
+
+1. complete the host-boundary audit
+2. define the minimal host contract for full engine-side RPN evaluation
+3. build the engine stack-value model and typed coercion layer
+4. move the operator opcode block into the engine
+5. then move control-flow opcodes into the engine loop
+
+Guardrails:
+
+- keep `unsupported_function=0`
+- keep `fallback=0`
+- prefer shrinking `interp4_dispatch_legacy_lambda_count` over shrinking
+  `legacy_interpreter_subroutine_count` if only one can move honestly in the
+  short term
 
 ## Historical Archive
 

@@ -7,6 +7,8 @@ Start here for the active migration story:
 - [architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md](architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
 
 ## Objective
 
@@ -62,6 +64,34 @@ test / growth block out of `Interpret()` and into
 so it is a real reduction in the relocated legacy surface rather than another
 wrapper-count-only cleanup.
 
+## Next Initiative: Engine RPN Evaluator
+
+The remaining migration work is now better understood as one subsystem
+initiative than as another flat queue of leaf functions.
+
+What remains is dominated by:
+
+- operator semantics over polymorphic stack values
+- jump/control-flow opcodes
+- reference-shaped operands
+- matrix-frame state
+- criteria/database iteration
+- stack/runtime state such as error and format propagation
+
+That go-forward path is now tracked in:
+
+- [architecture/COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
+
+Immediate consequence:
+
+- the next honest migration metric is reduction in
+  `interp4_dispatch_legacy_lambda_count`
+- no new `pushLegacy*` lambdas should be treated as progress unless they are
+  temporary compatibility fallbacks for already engine-owned roots
+- the first prerequisite before opcode-by-opcode migration is a fixed
+  host-boundary audit
+
 Everything below is diagnostic context for improving that number.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
@@ -111,11 +141,11 @@ the right place to publish any new regression if one appears.
 Next routing policy:
 
 - keep `unsupported_function=0` as an explicit regression guard
-- steer the next phase off unseen live surface and wrapper-retirement
-  opportunities rather than unsupported-function admission
-- prioritize true engine admissions that reduce
-  `interp4_dispatch_legacy_lambda_count`, not more lambda relocation into
-  `Interpret()`
+- steer the next phase off unseen live surface and genuine reduction in
+  `interp4_dispatch_legacy_lambda_count`
+- treat wrapper deletion as secondary unless the relocated legacy dispatch
+  surface also falls
+- use the host-boundary audit as the design gate for the next subsystem work
 
 ### Unknown Bucket Root Split
 
@@ -476,32 +506,26 @@ historical reference material, not active roadmap.
 
 ## Recommended Next Pass
 
-The next pass is now constrained by the scope gate:
+The next pass is now the `RpnEvaluator` subsystem initiative:
 
-1. do not add new hard-route slices unless they remove a live fallback reason
-   or a live mismatch bucket
-2. treat live authoritative-match as the single north-star metric for
-   retirement progress
-3. treat the raw promoted replay probe as a cached imported correctness
-   surface, not as the live retirement denominator
-4. keep targeting slices that increase live authoritative-match directly,
-   starting now with unseen live surface and broader wrapper retirement
-   rather than reopening replay-probe cleanup
-5. keep `NETWORKDAYS`, `WORKDAY`, `NETWORKDAYS.INTL`, and `WORKDAY.INTL`
-   behind explicit opt-in until the ambient evaluator path is cheap enough for
-   broad corpus measurement
-6. treat `unsupported_function=0` as a regression guard and focus the next
-   measurable push on unseen-surface reduction
-7. use the broadened scalar-root / round / math-scalar retirement pass as the
-   template for the next large Calc wrapper-deletion batch
-8. only return to imported replay parity if we intentionally decide to
-   rehabilitate legacy seam-off imported-formula execution
+1. complete the host-boundary audit and lock the minimal host contract for
+   full engine-side RPN evaluation
+2. build the engine stack-value model and typed coercion layer
+3. move arithmetic, concat, comparison, and unary operator dispatch into the
+   engine
+4. move jump/control-flow semantics into the engine RPN loop
+5. only then resume broader leaf-function retirement against those engine
+   primitives
+6. keep `unsupported_function=0` and `fallback=0` as regression guards while
+   this subsystem work lands
 
 ## References
 
 - [architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md](architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_REPLAY_REACH_DIAGNOSTIC_PLAN.md)
 - [archive/interpret_tail/](archive/interpret_tail/)
 - [archive/pre_pivot_substrate/](archive/pre_pivot_substrate/)
