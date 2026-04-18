@@ -856,8 +856,10 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
     }
     if (rFunctionName == u"SKEW" || rFunctionName == u"SKEWP"
         || rFunctionName == u"TRIMMEAN"
+        || rFunctionName == u"MODE.SNGL"
         || rFunctionName == u"COM.MICROSOFT.MODE.SNGL"
-        || rFunctionName == u"KURT" || rFunctionName == u"AVERAGEA")
+        || rFunctionName == u"KURT" || rFunctionName == u"AVERAGEA"
+        || rFunctionName == u"AVEDEV")
     {
         return FunctionKind::StatisticalAggregate;
     }
@@ -8584,6 +8586,131 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
         return makeMaterializedValue(std::move(aValues));
     };
+    const auto collectNumericSampleValues = [&]()
+        -> Materialization<std::vector<double>> {
+        if (rNode.maChildren.empty())
+            return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+
+        std::vector<double> aValues;
+        for (const auto& rxChild : rNode.maChildren)
+        {
+            if (!rxChild)
+                return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+
+            const bool bMatrixLike = rxChild->meKind == core::formula::NodeKind::CellReference
+                                     || rxChild->meKind == core::formula::NodeKind::RangeReference
+                                     || rxChild->meKind == core::formula::NodeKind::NamedReference
+                                     || rxChild->meKind == core::formula::NodeKind::ArrayConstant
+                                     || rxChild->meKind == core::formula::NodeKind::BinaryOperation
+                                     || rxChild->meKind == core::formula::NodeKind::FunctionCall;
+            if (bMatrixLike)
+            {
+                const auto aMatrix = materializeMatrixNode(*rxChild, rDoc, rContext, rFormulaPos);
+                if (!aMatrix.mbSupported)
+                {
+                    return makeUnsupportedMaterialization<std::vector<double>>(
+                        aMatrix.meFallbackReason);
+                }
+                if (!aMatrix.moValue)
+                    return makeMaterializedError<std::vector<double>>(aMatrix.meError);
+
+                SCSIZE nColumns = 0;
+                SCSIZE nRows = 0;
+                (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+                for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+                {
+                    for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                    {
+                        const auto aValue = lookupexecution::detail::toApiCellValue(
+                            (*aMatrix.moValue)->Get(nColumn, nRow));
+                        if (aValue.isError())
+                            return makeMaterializedError<std::vector<double>>(aValue.meError);
+                        if (aValue.isEmpty() || aValue.isText() || aValue.isBoolean())
+                            continue;
+                        const auto aNumber = coerceScalarToNumber(rDoc, rContext, aValue);
+                        if (!aNumber)
+                            return makeMaterializedError<std::vector<double>>(aNumber.meError);
+                        aValues.push_back(aNumber.maValue);
+                    }
+                }
+                continue;
+            }
+
+            const auto aScalar = materializeScalarNode(*rxChild, rDoc, rContext, rFormulaPos);
+            if (!aScalar.mbSupported)
+                return makeUnsupportedMaterialization<std::vector<double>>(aScalar.meFallbackReason);
+            if (!aScalar.moValue)
+                return makeMaterializedError<std::vector<double>>(aScalar.meError);
+            if (aScalar.moValue->isEmpty())
+                continue;
+            if (aScalar.moValue->isText())
+                return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+
+            const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aScalar.moValue);
+            if (!aNumber)
+                return makeMaterializedError<std::vector<double>>(aNumber.meError);
+            aValues.push_back(aNumber.maValue);
+        }
+
+        return makeMaterializedValue(std::move(aValues));
+    };
+    const auto collectModeValues = [&]()
+        -> Materialization<std::vector<double>> {
+        if (rNode.maChildren.empty())
+            return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+
+        std::vector<double> aValues;
+        for (const auto& rxChild : rNode.maChildren)
+        {
+            if (!rxChild)
+                return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+
+            const bool bMatrixLike = rxChild->meKind == core::formula::NodeKind::CellReference
+                                     || rxChild->meKind == core::formula::NodeKind::RangeReference
+                                     || rxChild->meKind == core::formula::NodeKind::NamedReference
+                                     || rxChild->meKind == core::formula::NodeKind::ArrayConstant
+                                     || rxChild->meKind == core::formula::NodeKind::BinaryOperation
+                                     || rxChild->meKind == core::formula::NodeKind::FunctionCall;
+            if (bMatrixLike)
+            {
+                const auto aMatrix = materializeMatrixNode(*rxChild, rDoc, rContext, rFormulaPos);
+                if (!aMatrix.mbSupported)
+                {
+                    return makeUnsupportedMaterialization<std::vector<double>>(
+                        aMatrix.meFallbackReason);
+                }
+                if (!aMatrix.moValue)
+                    return makeMaterializedError<std::vector<double>>(aMatrix.meError);
+
+                SCSIZE nColumns = 0;
+                SCSIZE nRows = 0;
+                (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
+                for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+                {
+                    for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                    {
+                        const auto aValue = lookupexecution::detail::toApiCellValue(
+                            (*aMatrix.moValue)->Get(nColumn, nRow));
+                        if (aValue.isError())
+                            return makeMaterializedError<std::vector<double>>(aValue.meError);
+                        if (aValue.isNumber())
+                            aValues.push_back(aValue.mfNumber);
+                    }
+                }
+                continue;
+            }
+
+            const auto aScalar = materializeScalarNode(*rxChild, rDoc, rContext, rFormulaPos);
+            if (!aScalar.mbSupported)
+                return makeUnsupportedMaterialization<std::vector<double>>(aScalar.meFallbackReason);
+            if (!aScalar.moValue)
+                return makeMaterializedError<std::vector<double>>(aScalar.meError);
+            if (aScalar.moValue->isNumber())
+                aValues.push_back(aScalar.moValue->mfNumber);
+        }
+
+        return makeMaterializedValue(std::move(aValues));
+    };
 
     if (aFunctionName == u"MAX" || aFunctionName == u"MAXA" || aFunctionName == u"MIN"
         || aFunctionName == u"MINA")
@@ -8620,6 +8747,41 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         if (!aMedian)
             return makeErrorAttempt(aMedian.meError);
         return makeNumericAttempt(aMedian.maValue);
+    }
+
+    if (aFunctionName == u"MODE.SNGL" || aFunctionName == u"COM.MICROSOFT.MODE.SNGL")
+    {
+        const auto aValues = collectModeValues();
+        if (!aValues.mbSupported)
+            return makeUnsupported(eFunction, aValues.meFallbackReason);
+        if (!aValues.moValue)
+            return makeErrorAttempt(aValues.meError);
+
+        const auto aMode = spreadsheetengine::core::math::evaluateModeSingle(*aValues.moValue);
+        if (!aMode)
+            return makeErrorAttempt(aMode.meError);
+        return makeNumericAttempt(aMode.maValue);
+    }
+
+    if (aFunctionName == u"AVEDEV")
+    {
+        const auto aValues = collectNumericSampleValues();
+        if (!aValues.mbSupported)
+            return makeUnsupported(eFunction, aValues.meFallbackReason);
+        if (!aValues.moValue)
+            return makeErrorAttempt(aValues.meError);
+        if (aValues.moValue->empty())
+            return makeErrorAttempt(api::Error::NoValue);
+
+        double fSum = 0.0;
+        for (double fValue : *aValues.moValue)
+            fSum += fValue;
+        const double fMean = fSum / static_cast<double>(aValues.moValue->size());
+
+        double fDeviation = 0.0;
+        for (double fValue : *aValues.moValue)
+            fDeviation += std::abs(fValue - fMean);
+        return makeNumericAttempt(fDeviation / static_cast<double>(aValues.moValue->size()));
     }
 
     if (aFunctionName == u"GEOMEAN" || aFunctionName == u"HARMEAN")
