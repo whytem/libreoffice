@@ -330,6 +330,21 @@ InterpreterDispatchRuntimeStatsStore& interpreterDispatchRuntimeStatsStore()
     return aStore;
 }
 
+struct InterpreterReachabilityStatsStore
+{
+    std::atomic<sal_uInt64> mnFormulaCellInterpretCount { 0 };
+    std::atomic<sal_uInt64> mnFormulaGroupAttemptCount { 0 };
+    std::atomic<sal_uInt64> mnFormulaGroupHandledCount { 0 };
+    std::atomic<sal_uInt64> mnInterpretTailCount { 0 };
+    std::atomic<sal_uInt64> mnClassicInterpretCount { 0 };
+};
+
+InterpreterReachabilityStatsStore& interpreterReachabilityStatsStore()
+{
+    static InterpreterReachabilityStatsStore aStore;
+    return aStore;
+}
+
 void addDispatchRuntimeStat(std::atomic<sal_uInt64>& rTarget, sal_uInt64 nDelta = 1)
 {
     rTarget.fetch_add(nDelta, std::memory_order_relaxed);
@@ -358,6 +373,56 @@ ScInterpreterDispatchRuntimeStatsSnapshot getScInterpreterDispatchRuntimeStatsSn
         = rStore.mnEngineSucceededCount.load(std::memory_order_relaxed);
     aSnapshot.mnEngineDeclinedCount
         = rStore.mnEngineDeclinedCount.load(std::memory_order_relaxed);
+    return aSnapshot;
+}
+
+void resetScInterpreterReachabilityStats()
+{
+    auto& rStore = interpreterReachabilityStatsStore();
+    rStore.mnFormulaCellInterpretCount.store(0, std::memory_order_relaxed);
+    rStore.mnFormulaGroupAttemptCount.store(0, std::memory_order_relaxed);
+    rStore.mnFormulaGroupHandledCount.store(0, std::memory_order_relaxed);
+    rStore.mnInterpretTailCount.store(0, std::memory_order_relaxed);
+    rStore.mnClassicInterpretCount.store(0, std::memory_order_relaxed);
+}
+
+void addScInterpreterReachabilityStat(ScInterpreterReachabilityStat eStat, sal_uInt64 nDelta)
+{
+    auto& rStore = interpreterReachabilityStatsStore();
+    switch (eStat)
+    {
+        case ScInterpreterReachabilityStat::FormulaCellInterpret:
+            addDispatchRuntimeStat(rStore.mnFormulaCellInterpretCount, nDelta);
+            return;
+        case ScInterpreterReachabilityStat::FormulaGroupAttempt:
+            addDispatchRuntimeStat(rStore.mnFormulaGroupAttemptCount, nDelta);
+            return;
+        case ScInterpreterReachabilityStat::FormulaGroupHandled:
+            addDispatchRuntimeStat(rStore.mnFormulaGroupHandledCount, nDelta);
+            return;
+        case ScInterpreterReachabilityStat::InterpretTail:
+            addDispatchRuntimeStat(rStore.mnInterpretTailCount, nDelta);
+            return;
+        case ScInterpreterReachabilityStat::ClassicInterpret:
+            addDispatchRuntimeStat(rStore.mnClassicInterpretCount, nDelta);
+            return;
+    }
+}
+
+ScInterpreterReachabilityStatsSnapshot getScInterpreterReachabilityStatsSnapshot()
+{
+    const auto& rStore = interpreterReachabilityStatsStore();
+    ScInterpreterReachabilityStatsSnapshot aSnapshot;
+    aSnapshot.mnFormulaCellInterpretCount
+        = rStore.mnFormulaCellInterpretCount.load(std::memory_order_relaxed);
+    aSnapshot.mnFormulaGroupAttemptCount
+        = rStore.mnFormulaGroupAttemptCount.load(std::memory_order_relaxed);
+    aSnapshot.mnFormulaGroupHandledCount
+        = rStore.mnFormulaGroupHandledCount.load(std::memory_order_relaxed);
+    aSnapshot.mnInterpretTailCount
+        = rStore.mnInterpretTailCount.load(std::memory_order_relaxed);
+    aSnapshot.mnClassicInterpretCount
+        = rStore.mnClassicInterpretCount.load(std::memory_order_relaxed);
     return aSnapshot;
 }
 
@@ -4153,6 +4218,7 @@ bool IsErrFunc(OpCode oc)
 
 StackVar ScInterpreter::Interpret()
 {
+    addScInterpreterReachabilityStat(ScInterpreterReachabilityStat::ClassicInterpret);
     SvNumFormatType nRetTypeExpr = SvNumFormatType::UNDEFINED;
     sal_uInt32 nRetIndexExpr = 0;
     sal_uInt16 nErrorFunction = 0;

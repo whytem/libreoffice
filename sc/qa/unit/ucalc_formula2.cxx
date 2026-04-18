@@ -524,9 +524,13 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterOperatorDispatch)
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
     ScopedEnvironmentOverride aMode(
         "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
 
     m_pDoc->InsertTab(0, u"Ops"_ustr);
     resetScInterpreterDispatchRuntimeStats();
+    resetScInterpreterReachabilityStats();
 
     m_pDoc->SetValue(ScAddress(0, 0, 0), 1.0);
     m_pDoc->SetValue(ScAddress(0, 1, 0), 0.0);
@@ -642,6 +646,27 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterOperatorDispatch)
                                  aDispatchStats.mnEngineAttemptedCount,
                                  aDispatchStats.mnEngineSucceededCount
                                      + aDispatchStats.mnEngineDeclinedCount);
+
+    const auto aReachabilityStats = getScInterpreterReachabilityStatsSnapshot();
+    const std::string aReachabilityStatsLabel
+        = "formula_cell=" + std::to_string(aReachabilityStats.mnFormulaCellInterpretCount)
+          + " group_attempt=" + std::to_string(aReachabilityStats.mnFormulaGroupAttemptCount)
+          + " group_handled=" + std::to_string(aReachabilityStats.mnFormulaGroupHandledCount)
+          + " interpret_tail=" + std::to_string(aReachabilityStats.mnInterpretTailCount)
+          + " classic=" + std::to_string(aReachabilityStats.mnClassicInterpretCount);
+    CPPUNIT_ASSERT_MESSAGE("operator dispatch test should enter formula-cell interpretation: "
+                               + aReachabilityStatsLabel,
+                           aReachabilityStats.mnFormulaCellInterpretCount > 0);
+    CPPUNIT_ASSERT_MESSAGE("operator dispatch test should reach InterpretTail under core forcing: "
+                               + aReachabilityStatsLabel,
+                           aReachabilityStats.mnInterpretTailCount > 0);
+    CPPUNIT_ASSERT_MESSAGE("operator dispatch test should reach classic ScInterpreter::Interpret(): "
+                               + aReachabilityStatsLabel,
+                           aReachabilityStats.mnClassicInterpretCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("core-forced operator dispatch test should not group-handle formulas: "
+                                     + aReachabilityStatsLabel,
+                                 sal_uInt64(0),
+                                 aReachabilityStats.mnFormulaGroupHandledCount);
 
     m_pDoc->DeleteTab(0);
 }

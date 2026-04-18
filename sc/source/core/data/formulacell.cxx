@@ -1544,6 +1544,7 @@ private:
 
 bool ScFormulaCell::Interpret(SCROW nStartOffset, SCROW nEndOffset)
 {
+    addScInterpreterReachabilityStat(ScInterpreterReachabilityStat::FormulaCellInterpret);
     ScRecursionHelper& rRecursionHelper = rDocument.GetRecursionHelper();
     bool bGroupInterpreted = false;
 
@@ -1560,7 +1561,7 @@ bool ScFormulaCell::Interpret(SCROW nStartOffset, SCROW nEndOffset)
     if (!aPreflightPlan.mbCanProceed)
         return false;
 
-    static ForceCalculationType forceType = ScCalcConfig::getForceCalculationType();
+    const ForceCalculationType forceType = ScCalcConfig::getForceCalculationType();
     TemporaryCellGroupMaker cellGroupMaker( this, forceType != ForceCalculationNone && forceType != ForceCalculationCore );
 
     ScFormulaCell* pTopCell = mxGroup ? mxGroup->mpTopCell : this;
@@ -1647,6 +1648,8 @@ bool ScFormulaCell::Interpret(SCROW nStartOffset, SCROW nEndOffset)
 #endif
         bool bPartOfCycleBefore = mxGroup && mxGroup->mbPartOfCycle;
         bGroupInterpreted = InterpretFormulaGroup(nStartOffset, nEndOffset);
+        if (bGroupInterpreted)
+            addScInterpreterReachabilityStat(ScInterpreterReachabilityStat::FormulaGroupHandled);
         bool bPartOfCycleAfter = mxGroup && mxGroup->mbPartOfCycle;
 
 #if DEBUG_CALCULATION
@@ -1947,6 +1950,7 @@ setaileval::FunctionKind classifyDelegatedInterpretTailFunction(std::u16string_v
 
 void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTailParameter eTailParam )
 {
+    addScInterpreterReachabilityStat(ScInterpreterReachabilityStat::InterpretTail);
     RecursionCounter aRecursionCounter( rDocument.GetRecursionHelper(), this);
     // TODO If this cell is not an iteration cell, add it to the list of iteration cells?
     if(bIsIterCell)
@@ -1991,7 +1995,8 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
           && setaileval::isHardRoutedFormula(std::u16string_view(
               rEngineFormulaSource.getStr(), rEngineFormulaSource.getLength()));
     const bool bEngineAuthoritativeWhileOff
-        = bDefaultAuthoritativeEngineFamily || bHardRoutedEngineFamily;
+        = setaileval::detail::authoritativeWhileOffEnabled()
+          && (bDefaultAuthoritativeEngineFamily || bHardRoutedEngineFamily);
     const auto maybeRecordPreRpnObserve = [&]() {
         if (eEngineRolloutMode != setaileval::RolloutMode::Observe || !bTailEligible)
             return;
@@ -5180,10 +5185,11 @@ bool ScFormulaCell::InterpretFormulaGroup(SCROW nStartOffset, SCROW nEndOffset)
     if (!mxGroup || !pCode)
         return false;
 
+    addScInterpreterReachabilityStat(ScInterpreterReachabilityStat::FormulaGroupAttempt);
     auto aScope = sc::FormulaLogger::get().enterGroup(rDocument, *this);
     ScRecursionHelper& rRecursionHelper = rDocument.GetRecursionHelper();
     // Use SC_FORCE_CALCULATION=opencl/threads to force calculation e.g. for unittests
-    static ForceCalculationType forceType = ScCalcConfig::getForceCalculationType();
+    const ForceCalculationType forceType = ScCalcConfig::getForceCalculationType();
     const auto applyPreflightPlan = [this, &aScope](
                                         const spreadsheetengine::core::formulacell::
                                             FormulaGroupPreflightPlan& rPlan) {

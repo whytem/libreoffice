@@ -307,6 +307,16 @@ void accumulateDispatchRuntimeStats(ScInterpreterDispatchRuntimeStatsSnapshot& r
     rAccumulator.mnEngineDeclinedCount += rDelta.mnEngineDeclinedCount;
 }
 
+void accumulateReachabilityStats(ScInterpreterReachabilityStatsSnapshot& rAccumulator,
+                                 const ScInterpreterReachabilityStatsSnapshot& rDelta)
+{
+    rAccumulator.mnFormulaCellInterpretCount += rDelta.mnFormulaCellInterpretCount;
+    rAccumulator.mnFormulaGroupAttemptCount += rDelta.mnFormulaGroupAttemptCount;
+    rAccumulator.mnFormulaGroupHandledCount += rDelta.mnFormulaGroupHandledCount;
+    rAccumulator.mnInterpretTailCount += rDelta.mnInterpretTailCount;
+    rAccumulator.mnClassicInterpretCount += rDelta.mnClassicInterpretCount;
+}
+
 Interp4LegacyLambdaInventory countInterp4LegacyLambdas()
 {
     const std::filesystem::path aRepoRoot
@@ -2418,7 +2428,9 @@ void printLiveAuthoritativeSummary(
     const Interp4LegacyLambdaInventory& rLegacyLambdaInventory,
     const Interp4EngineDispatchInventory& rEngineDispatchInventory,
     const ScInterpreterDispatchRuntimeStatsSnapshot& rLiveDispatchRuntimeStats,
-    const ScInterpreterDispatchRuntimeStatsSnapshot& rSeamDisabledDispatchRuntimeStats)
+    const ScInterpreterDispatchRuntimeStatsSnapshot& rCoreForcedSeamDisabledDispatchRuntimeStats,
+    const ScInterpreterReachabilityStatsSnapshot& rLiveReachabilityStats,
+    const ScInterpreterReachabilityStatsSnapshot& rCoreForcedSeamDisabledReachabilityStats)
 {
     const sal_uInt64 nAuthoritative = rRun.maLiveAuthoritativeStats.mnAuthoritativeCount;
     const sal_uInt64 nFallback = rRun.maLiveAuthoritativeStats.mnAuthoritativeFallbackCount;
@@ -2455,12 +2467,32 @@ void printLiveAuthoritativeSummary(
               << rLiveDispatchRuntimeStats.mnEngineSucceededCount << '\n';
     std::cout << "interp4_dispatch_engine_declined_total="
               << rLiveDispatchRuntimeStats.mnEngineDeclinedCount << '\n';
-    std::cout << "interp4_dispatch_engine_attempted_total_seam_disabled="
-              << rSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount << '\n';
-    std::cout << "interp4_dispatch_engine_succeeded_total_seam_disabled="
-              << rSeamDisabledDispatchRuntimeStats.mnEngineSucceededCount << '\n';
-    std::cout << "interp4_dispatch_engine_declined_total_seam_disabled="
-              << rSeamDisabledDispatchRuntimeStats.mnEngineDeclinedCount << '\n';
+    std::cout << "interp4_dispatch_engine_attempted_total_core_forced_full_legacy="
+              << rCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount << '\n';
+    std::cout << "interp4_dispatch_engine_succeeded_total_core_forced_full_legacy="
+              << rCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineSucceededCount << '\n';
+    std::cout << "interp4_dispatch_engine_declined_total_core_forced_full_legacy="
+              << rCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineDeclinedCount << '\n';
+    std::cout << "sc_formula_executor_formula_cell_interpret_total_live="
+              << rLiveReachabilityStats.mnFormulaCellInterpretCount << '\n';
+    std::cout << "sc_formula_executor_formula_group_attempt_total_live="
+              << rLiveReachabilityStats.mnFormulaGroupAttemptCount << '\n';
+    std::cout << "sc_formula_executor_formula_group_handled_total_live="
+              << rLiveReachabilityStats.mnFormulaGroupHandledCount << '\n';
+    std::cout << "sc_formula_executor_interpret_tail_total_live="
+              << rLiveReachabilityStats.mnInterpretTailCount << '\n';
+    std::cout << "sc_formula_executor_classic_interpret_total_live="
+              << rLiveReachabilityStats.mnClassicInterpretCount << '\n';
+    std::cout << "sc_formula_executor_formula_cell_interpret_total_core_forced_full_legacy="
+              << rCoreForcedSeamDisabledReachabilityStats.mnFormulaCellInterpretCount << '\n';
+    std::cout << "sc_formula_executor_formula_group_attempt_total_core_forced_full_legacy="
+              << rCoreForcedSeamDisabledReachabilityStats.mnFormulaGroupAttemptCount << '\n';
+    std::cout << "sc_formula_executor_formula_group_handled_total_core_forced_full_legacy="
+              << rCoreForcedSeamDisabledReachabilityStats.mnFormulaGroupHandledCount << '\n';
+    std::cout << "sc_formula_executor_interpret_tail_total_core_forced_full_legacy="
+              << rCoreForcedSeamDisabledReachabilityStats.mnInterpretTailCount << '\n';
+    std::cout << "sc_formula_executor_classic_interpret_total_core_forced_full_legacy="
+              << rCoreForcedSeamDisabledReachabilityStats.mnClassicInterpretCount << '\n';
     std::cout << "interp4_dispatch_legacy_quarantine_covered_lambda_count="
               << rLegacyLambdaInventory.mnQuarantineCoveredLambdaCount << '\n';
     std::cout << "interp4_dispatch_legacy_quarantine_missing_lambda_count="
@@ -2504,26 +2536,28 @@ void printLiveAuthoritativeSummary(
                                              / static_cast<double>(
                                                  rLiveDispatchRuntimeStats.mnEngineAttemptedCount))
                                           : 0.0;
-    const double fSeamDisabledEngineSuccessRate
-        = rSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount
-              ? (static_cast<double>(rSeamDisabledDispatchRuntimeStats.mnEngineSucceededCount)
+    const double fCoreForcedSeamDisabledEngineSuccessRate
+        = rCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount
+              ? (static_cast<double>(rCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineSucceededCount)
                  * 100.0
-                 / static_cast<double>(rSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount))
+                 / static_cast<double>(
+                     rCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount))
               : 0.0;
-    const double fSeamDisabledEngineDeclineRate
-        = rSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount
-              ? (static_cast<double>(rSeamDisabledDispatchRuntimeStats.mnEngineDeclinedCount)
+    const double fCoreForcedSeamDisabledEngineDeclineRate
+        = rCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount
+              ? (static_cast<double>(rCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineDeclinedCount)
                  * 100.0
-                 / static_cast<double>(rSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount))
+                 / static_cast<double>(
+                     rCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount))
               : 0.0;
     std::cout << "interp4_dispatch_engine_success_rate="
               << fEngineSuccessRate << '\n';
     std::cout << "interp4_dispatch_engine_decline_rate="
               << fEngineDeclineRate << '\n';
-    std::cout << "interp4_dispatch_engine_success_rate_seam_disabled="
-              << fSeamDisabledEngineSuccessRate << '\n';
-    std::cout << "interp4_dispatch_engine_decline_rate_seam_disabled="
-              << fSeamDisabledEngineDeclineRate << '\n';
+    std::cout << "interp4_dispatch_engine_success_rate_core_forced_full_legacy="
+              << fCoreForcedSeamDisabledEngineSuccessRate << '\n';
+    std::cout << "interp4_dispatch_engine_decline_rate_core_forced_full_legacy="
+              << fCoreForcedSeamDisabledEngineDeclineRate << '\n';
     std::cout.flags(aOldFlags);
     std::cout.precision(nOldPrecision);
 
@@ -4813,7 +4847,9 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     resetReplayEligibilityDiagnosticSamples();
     spreadsheetengine::core::datetime::resetWorkdayRuntimeStats();
     ScInterpreterDispatchRuntimeStatsSnapshot aLiveDispatchRuntimeStats;
-    ScInterpreterDispatchRuntimeStatsSnapshot aSeamDisabledDispatchRuntimeStats;
+    ScInterpreterDispatchRuntimeStatsSnapshot aCoreForcedSeamDisabledDispatchRuntimeStats;
+    ScInterpreterReachabilityStatsSnapshot aLiveReachabilityStats;
+    ScInterpreterReachabilityStatsSnapshot aCoreForcedSeamDisabledReachabilityStats;
 
     std::size_t nWorkbookCount = 0;
     std::size_t nFormulaCellCount = 0;
@@ -4847,6 +4883,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                 ScopedEnvironmentOverride aObserveMode(
                     "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "observe");
                 resetScInterpreterDispatchRuntimeStats();
+                resetScInterpreterReachabilityStats();
                 spreadsheetengine::compat::libreoffice::interprettaileval::resetStats();
                 spreadsheetengine::compat::libreoffice::interprettaileval::setDiagnosticWorkbookLabel(
                     OUString::fromUtf8(rWorkbookPath.string()));
@@ -4856,6 +4893,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                 xDocShell->DoHardRecalc();
                 accumulateDispatchRuntimeStats(aLiveDispatchRuntimeStats,
                     getScInterpreterDispatchRuntimeStatsSnapshot());
+                accumulateReachabilityStats(aLiveReachabilityStats,
+                    getScInterpreterReachabilityStatsSnapshot());
                 const StatsSnapshot aWorkbookLiveAttemptStats
                     = spreadsheetengine::compat::libreoffice::interprettaileval::getStatsSnapshot();
                 const auto aWorkbookLiveInventory = buildObserveSurfaceInventory(
@@ -4899,13 +4938,19 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
             {
                 ScopedEnvironmentOverride aOffMode(
                     "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+                ScopedEnvironmentOverride aCoreMode("SC_FORCE_CALCULATION", "core");
+                ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+                    "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
                 resetScInterpreterDispatchRuntimeStats();
+                resetScInterpreterReachabilityStats();
                 sc::SetFormulaDirtyContext aDirtyCxt;
                 rDoc.SetAllFormulasDirty(aDirtyCxt);
                 rDoc.InterpretCellsIfNeeded(aWorkbookRanges);
                 xDocShell->DoHardRecalc();
-                accumulateDispatchRuntimeStats(aSeamDisabledDispatchRuntimeStats,
+                accumulateDispatchRuntimeStats(aCoreForcedSeamDisabledDispatchRuntimeStats,
                     getScInterpreterDispatchRuntimeStatsSnapshot());
+                accumulateReachabilityStats(aCoreForcedSeamDisabledReachabilityStats,
+                    getScInterpreterReachabilityStatsSnapshot());
             }
 
             {
@@ -5071,10 +5116,10 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     CPPUNIT_ASSERT_MESSAGE("interp4 engine attempt metric should scan interpr4.cxx",
         aEngineDispatchInventory.mnAttemptCaseCount > 0);
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
-        "seam-disabled engine dispatch accounting should stay balanced",
-        aSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount,
-        aSeamDisabledDispatchRuntimeStats.mnEngineSucceededCount
-            + aSeamDisabledDispatchRuntimeStats.mnEngineDeclinedCount);
+        "core-forced full-legacy engine dispatch accounting should stay balanced",
+        aCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount,
+        aCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineSucceededCount
+            + aCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineDeclinedCount);
     {
         SupportedProbeRun aPrintedProbeRun;
         aPrintedProbeRun.mnRawFormulaCount = nProbeFormulaCount;
@@ -5087,7 +5132,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         printLiveAuthoritativeSummary(
             nFormulaCellCount, aPrintedProbeRun, nLegacyInterpreterSubroutineCount,
             aLegacyLambdaInventory, aEngineDispatchInventory, aLiveDispatchRuntimeStats,
-            aSeamDisabledDispatchRuntimeStats);
+            aCoreForcedSeamDisabledDispatchRuntimeStats, aLiveReachabilityStats,
+            aCoreForcedSeamDisabledReachabilityStats);
         printLiveTargetProbeSummary(aPrintedProbeRun);
     }
     printReplayEligibilityInventory(aReplayEligibilityInventory);
@@ -5109,6 +5155,9 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         "full replay live unique inventory should support at least one formula cell",
         aLiveUniqueInventory.mnSupportedFormulaCells > 0);
     CPPUNIT_ASSERT_MESSAGE(
+        "full replay live observe should reach formula-cell interpretation",
+        aLiveReachabilityStats.mnFormulaCellInterpretCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
         "full replay live unique inventory should cover every formula cell in the corpus",
         aLiveUniqueInventory.mnFormulaCells == nFormulaCellCount);
     CPPUNIT_ASSERT_EQUAL(
@@ -5117,6 +5166,13 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     CPPUNIT_ASSERT_MESSAGE(
         "full replay live unique supported cells should be a subset of seen cells",
         aLiveUniqueInventory.mnSupportedFormulaCells <= aLiveUniqueInventory.mnSeenFormulaCells);
+    CPPUNIT_ASSERT_MESSAGE(
+        "core-forced full-legacy replay should reach classic ScInterpreter::Interpret()",
+        aCoreForcedSeamDisabledReachabilityStats.mnClassicInterpretCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "core forcing should prevent formula-group handling on the full-legacy replay lane",
+        sal_uInt64(0),
+        aCoreForcedSeamDisabledReachabilityStats.mnFormulaGroupHandledCount);
     CPPUNIT_ASSERT_MESSAGE(
         "full replay forced-interpret observe should touch every formula cell in the corpus",
         aForcedDirectInventory.mnFormulaCells == nFormulaCellCount);

@@ -359,6 +359,16 @@ inline void markObservedFormulaCell(const ScAddress& rFormulaPos, bool bSupporte
     return true;
 }
 
+[[nodiscard]] inline bool authoritativeWhileOffEnabled()
+{
+    if (const char* pValue
+        = std::getenv("SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF"))
+    {
+        return envEnabled(pValue);
+    }
+    return true;
+}
+
 [[nodiscard]] inline std::size_t diagnosticSampleLimit()
 {
     if (const char* pValue = std::getenv("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_DIAGNOSTIC_LIMIT"))

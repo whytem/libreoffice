@@ -1012,16 +1012,15 @@ static ForceCalculationType toScForceCalculationType(
 ForceCalculationType ScCalcConfig::getForceCalculationType()
 {
     static_assert(spreadsheetengine::bridge::kCalcBridgeEnabled);
-    static const ForceCalculationType type
-        = toScForceCalculationType(spreadsheetengine::core::config::getForceCalculationModeFromEnv());
-    return type;
+    return toScForceCalculationType(
+        spreadsheetengine::core::config::getForceCalculationModeFromEnv());
 }
 
 bool ScCalcConfig::isOpenCLEnabled()
 {
     if (comphelper::IsFuzzing())
         return false;
-    static ForceCalculationType force = getForceCalculationType();
+    const ForceCalculationType force = getForceCalculationType();
     if( force != ForceCalculationNone )
         return force == ForceCalculationOpenCL;
     static comphelper::ConfigurationListenerProperty<bool> gOpenCLEnabled(getMiscListener(), u"UseOpenCL"_ustr);
@@ -1032,7 +1031,7 @@ bool ScCalcConfig::isThreadingEnabled()
 {
     if (comphelper::IsFuzzing())
         return false;
-    static ForceCalculationType force = getForceCalculationType();
+    const ForceCalculationType force = getForceCalculationType();
     if( force != ForceCalculationNone )
         return force == ForceCalculationThreads;
     static comphelper::ConfigurationListenerProperty<bool> gThreadingEnabled(getFormulaCalculationListener(), u"UseThreadedCalculationForFormulaGroups"_ustr);

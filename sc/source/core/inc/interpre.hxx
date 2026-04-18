@@ -75,9 +75,32 @@ struct SC_DLLPUBLIC ScInterpreterDispatchRuntimeStatsSnapshot
     sal_uInt64 mnEngineDeclinedCount = 0;
 };
 
+struct SC_DLLPUBLIC ScInterpreterReachabilityStatsSnapshot
+{
+    sal_uInt64 mnFormulaCellInterpretCount = 0;
+    sal_uInt64 mnFormulaGroupAttemptCount = 0;
+    sal_uInt64 mnFormulaGroupHandledCount = 0;
+    sal_uInt64 mnInterpretTailCount = 0;
+    sal_uInt64 mnClassicInterpretCount = 0;
+};
+
+enum class ScInterpreterReachabilityStat
+{
+    FormulaCellInterpret,
+    FormulaGroupAttempt,
+    FormulaGroupHandled,
+    InterpretTail,
+    ClassicInterpret
+};
+
 SC_DLLPUBLIC void resetScInterpreterDispatchRuntimeStats();
 SC_DLLPUBLIC ScInterpreterDispatchRuntimeStatsSnapshot
 getScInterpreterDispatchRuntimeStatsSnapshot();
+SC_DLLPUBLIC void resetScInterpreterReachabilityStats();
+SC_DLLPUBLIC void addScInterpreterReachabilityStat(ScInterpreterReachabilityStat eStat,
+                                                   sal_uInt64 nDelta = 1);
+SC_DLLPUBLIC ScInterpreterReachabilityStatsSnapshot
+getScInterpreterReachabilityStatsSnapshot();
 
 enum MatchMode{ exactorNA=0, exactorS=-1, exactorG=1, wildcard=2, regex=3 };
 // mode for the TOCOL and TOROW formula functions
