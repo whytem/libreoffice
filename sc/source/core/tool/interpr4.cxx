@@ -81,6 +81,7 @@
 #include <spreadsheetengine/runtime/DateTimeParts.hxx>
 #include <spreadsheetengine/runtime/DateTimeWeek.hxx>
 #include <spreadsheetengine/runtime/DateTimeWorkday.hxx>
+#include <spreadsheetengine/runtime/FinancialRuntime.hxx>
 #include <spreadsheetengine/runtime/MathFunctionRuntime.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathMatrix.hxx>
@@ -112,6 +113,7 @@ namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace selogic = spreadsheetengine::api::logic;
 namespace seconvert = spreadsheetengine::core::convert;
 namespace sedatetime = spreadsheetengine::core::datetime;
+namespace sefinance = spreadsheetengine::core::finance;
 namespace semath = spreadsheetengine::core::math;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 namespace seswitchexec = spreadsheetengine::compat::libreoffice::switchexecution;
@@ -4235,17 +4237,6 @@ StackVar ScInterpreter::Interpret()
                                     << " reached ScInterpreter for " << aFormulaSource);
                     OSL_FAIL(pFailureMessage);
                 };
-                const auto pushLegacyLogicalConstant = [&](bool bValue) {
-                    warnIfLegacyDispatchReached(
-                        "family-local default-on", bValue ? u"TRUE()" : u"FALSE()",
-                        [](std::u16string_view rFormula) {
-                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
-                        },
-                        "family-local default-on logical constant reached ScInterpreter");
-
-                    nFuncFmtType = SvNumFormatType::LOGICAL;
-                    PushInt(bValue ? 1 : 0);
-                };
                 const auto warnIfLegacyScalarRootReached = [&](std::u16string_view rLabel) {
                     warnIfLegacyDispatchReached(
                         "family-local default-on", rLabel,
@@ -4281,27 +4272,6 @@ StackVar ScInterpreter::Interpret()
                         warnIfLegacyDefaultOnReached(
                             rLabel,
                             "family-local default-on growth projection reached ScInterpreter");
-                    };
-                const auto pushLegacyMathScalarUnary =
-                    [&](std::u16string_view rLabel, auto aEvaluator) {
-                        warnIfLegacyDefaultOnReached(
-                            rLabel, "family-local default-on math scalar reached ScInterpreter");
-                        PushDouble(aEvaluator(GetDouble()));
-                    };
-                const auto pushLegacyMathScalarNullary =
-                    [&](std::u16string_view rLabel, auto aEvaluator) {
-                        warnIfLegacyDefaultOnReached(
-                            rLabel, "family-local default-on math scalar reached ScInterpreter");
-                        PushDouble(aEvaluator());
-                    };
-                const auto pushLegacyMathScalarUnaryOptional =
-                    [&](std::u16string_view rLabel, auto aEvaluator) {
-                        warnIfLegacyDefaultOnReached(
-                            rLabel, "family-local default-on math scalar reached ScInterpreter");
-                        if (std::optional<double> fResult = aEvaluator(GetDouble()))
-                            PushDouble(*fResult);
-                        else
-                            PushIllegalArgument();
                     };
                 const auto toCalcMathFormulaError =
                     [](spreadsheetengine::api::Error eError) {
@@ -5043,185 +5013,6 @@ StackVar ScInterpreter::Interpret()
                             break;
                     }
                 };
-                const auto pushLegacyRound =
-                    [&](std::u16string_view rLabel, rtl_math_RoundingMode eMode) {
-                        warnIfLegacyDefaultOnReached(
-                            rLabel, "family-local default-on round reached ScInterpreter");
-                        RoundNumber(eMode);
-                    };
-                const auto pushLegacyArcTan2 = [&]() {
-                    warnIfLegacyDefaultOnReached(
-                        u"ATAN2", "family-local default-on math scalar reached ScInterpreter");
-                    if (MustHaveParamCount(GetByte(), 2))
-                    {
-                        double fVal2 = GetDouble();
-                        double fVal1 = GetDouble();
-                        PushDouble(semath::computeArcTan2(fVal2, fVal1));
-                    }
-                };
-                const auto pushLegacyLog = [&]() {
-                    warnIfLegacyDefaultOnReached(
-                        u"LOG", "family-local default-on math scalar reached ScInterpreter");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 1, 2))
-                        return;
-
-                    double fBase = nParamCount == 2 ? GetDouble() : 10.0;
-                    double fVal = GetDouble();
-                    if (std::optional<double> fResult = semath::computeLog(fVal, fBase))
-                        PushDouble(*fResult);
-                    else
-                        PushIllegalArgument();
-                };
-                const auto pushLegacyMod = [&]() {
-                    warnIfLegacyDefaultOnReached(
-                        u"MOD", "family-local default-on math scalar reached ScInterpreter");
-                    if (!MustHaveParamCount(GetByte(), 2))
-                        return;
-
-                    double fDenom = GetDouble();
-                    if (fDenom == 0.0)
-                    {
-                        PushError(FormulaError::DivisionByZero);
-                        return;
-                    }
-
-                    double fNum = GetDouble();
-                    if (std::optional<double> fResult = semath::computeMod(fNum, fDenom))
-                        PushDouble(*fResult);
-                    else
-                        PushError(FormulaError::NoValue);
-                };
-                const auto pushLegacyCeil = [&](std::u16string_view rLabel, bool bODFF) {
-                    warnIfLegacyDefaultOnReached(
-                        rLabel, "family-local default-on math scalar reached ScInterpreter");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 1, 3))
-                        return;
-
-                    bool bAbs = nParamCount == 3 && GetBool();
-                    double fDec;
-                    double fVal;
-                    if (nParamCount == 1)
-                    {
-                        fVal = GetDouble();
-                        fDec = (fVal < 0 ? -1 : 1);
-                    }
-                    else
-                    {
-                        bool bArgumentMissing = IsMissing();
-                        fDec = GetDouble();
-                        fVal = GetDouble();
-                        if (bArgumentMissing)
-                            fDec = (fVal < 0 ? -1 : 1);
-                    }
-
-                    if (fVal == 0 || fDec == 0.0)
-                        PushInt(0);
-                    else if (std::optional<double> fResult
-                             = semath::computeCeiling(fVal, fDec, bAbs, bODFF))
-                        PushDouble(*fResult);
-                    else
-                        PushIllegalArgument();
-                };
-                const auto pushLegacyCeilMs = [&](std::u16string_view rLabel) {
-                    warnIfLegacyDefaultOnReached(
-                        rLabel, "family-local default-on math scalar reached ScInterpreter");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 2))
-                        return;
-
-                    double fDec = GetDouble();
-                    double fVal = GetDouble();
-                    if (std::optional<double> fResult = semath::computeCeilingMs(fVal, fDec))
-                        PushDouble(*fResult);
-                    else
-                        PushIllegalArgument();
-                };
-                const auto pushLegacyCeilPrecise = [&](std::u16string_view rLabel) {
-                    warnIfLegacyDefaultOnReached(
-                        rLabel, "family-local default-on math scalar reached ScInterpreter");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 1, 2))
-                        return;
-
-                    double fDec;
-                    double fVal;
-                    if (nParamCount == 1)
-                    {
-                        fVal = GetDouble();
-                        fDec = 1.0;
-                    }
-                    else
-                    {
-                        fDec = std::abs(GetDoubleWithDefault(1.0));
-                        fVal = GetDouble();
-                    }
-                    if (fDec == 0.0 || fVal == 0.0)
-                        PushInt(0);
-                    else
-                        PushDouble(semath::computeCeilingPrecise(fVal, fDec));
-                };
-                const auto pushLegacyFloor = [&](std::u16string_view rLabel, bool bODFF) {
-                    warnIfLegacyDefaultOnReached(
-                        rLabel, "family-local default-on math scalar reached ScInterpreter");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 1, 3))
-                        return;
-
-                    bool bAbs = (nParamCount == 3 && GetBool());
-                    double fDec;
-                    double fVal;
-                    if (nParamCount == 1)
-                    {
-                        fVal = GetDouble();
-                        fDec = (fVal < 0 ? -1 : 1);
-                    }
-                    else
-                    {
-                        bool bArgumentMissing = IsMissing();
-                        fDec = GetDouble();
-                        fVal = GetDouble();
-                        if (bArgumentMissing)
-                            fDec = (fVal < 0 ? -1 : 1);
-                    }
-
-                    if (fDec == 0.0 || fVal == 0.0)
-                        PushInt(0);
-                    else if (std::optional<double> fResult
-                             = semath::computeFloor(fVal, fDec, bAbs, bODFF))
-                        PushDouble(*fResult);
-                    else
-                        PushIllegalArgument();
-                };
-                const auto pushLegacyFloorMs = [&](std::u16string_view rLabel) {
-                    warnIfLegacyDefaultOnReached(
-                        rLabel, "family-local default-on math scalar reached ScInterpreter");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 2))
-                        return;
-
-                    double fDec = GetDouble();
-                    double fVal = GetDouble();
-                    if (std::optional<double> fResult = semath::computeFloorMs(fVal, fDec))
-                        PushDouble(*fResult);
-                    else
-                        PushIllegalArgument();
-                };
-                const auto pushLegacyFloorPrecise = [&](std::u16string_view rLabel) {
-                    warnIfLegacyDefaultOnReached(
-                        rLabel, "family-local default-on math scalar reached ScInterpreter");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 1, 2))
-                        return;
-
-                    double fDec = nParamCount == 1 ? 1.0 : std::abs(GetDoubleWithDefault(1.0));
-                    double fVal = GetDouble();
-                    if (fDec == 0.0 || fVal == 0.0)
-                        PushInt(0);
-                    else
-                        PushDouble(semath::computeFloorPrecise(fVal, fDec));
-                };
                 const auto pushLegacyGcdOrLcm = [&](std::u16string_view rLabel, bool bLcm) {
                     warnIfLegacyDefaultOnReached(
                         rLabel, "family-local default-on math scalar reached ScInterpreter");
@@ -5412,272 +5203,6 @@ StackVar ScInterpreter::Interpret()
                             return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
                         },
                         "family-local default-on date family reached ScInterpreter");
-                };
-                const auto pushLegacyCurrentDate = [&]() {
-                    warnIfLegacyDateFamilyReached(u"TODAY");
-                    nFuncFmtType = SvNumFormatType::DATE;
-                    Date aActDate(Date::SYSTEM);
-                    tools::Long nDiff = aActDate - mrContext.NFGetNullDate();
-                    PushDouble(static_cast<double>(nDiff));
-                };
-                const auto pushLegacyCurrentTime = [&]() {
-                    warnIfLegacyDateFamilyReached(u"NOW");
-                    nFuncFmtType = SvNumFormatType::DATETIME;
-                    DateTime aActTime(DateTime::SYSTEM);
-                    tools::Long nDiff = aActTime - mrContext.NFGetNullDate();
-                    double fTime = aActTime.GetHour()
-                                       / static_cast<double>(::tools::Time::hourPerDay)
-                                   + aActTime.GetMin()
-                                       / static_cast<double>(::tools::Time::minutePerDay)
-                                   + aActTime.GetSec()
-                                       / static_cast<double>(::tools::Time::secondPerDay)
-                                   + aActTime.GetNanoSec()
-                                       / static_cast<double>(::tools::Time::nanoSecPerDay);
-                    PushDouble(static_cast<double>(nDiff) + fTime);
-                };
-                const auto pushLegacyExtractYear = [&]() {
-                    warnIfLegacyDateFamilyReached(u"YEAR");
-                    PushDouble(sedatetime::extractYear(
-                        selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32()));
-                };
-                const auto pushLegacyExtractMonth = [&]() {
-                    warnIfLegacyDateFamilyReached(u"MONTH");
-                    PushDouble(sedatetime::extractMonth(
-                        selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32()));
-                };
-                const auto pushLegacyExtractDay = [&]() {
-                    warnIfLegacyDateFamilyReached(u"DAY");
-                    if (std::optional<double> fDay = sedatetime::extractDay(
-                            selibreoffice::toApiDateParts(mrContext.NFGetNullDate()),
-                            GetFloor32()))
-                        PushDouble(*fDay);
-                    else
-                    {
-                        SetError(FormulaError::IllegalArgument);
-                        PushDouble(HUGE_VAL);
-                    }
-                };
-                const auto pushLegacyExtractMinute = [&]() {
-                    warnIfLegacyDateFamilyReached(u"MINUTE");
-                    PushDouble(sedatetime::extractMinute(GetDouble()));
-                };
-                const auto pushLegacyExtractSecond = [&]() {
-                    warnIfLegacyDateFamilyReached(u"SECOND");
-                    PushDouble(sedatetime::extractSecond(GetDouble()));
-                };
-                const auto pushLegacyExtractHour = [&]() {
-                    warnIfLegacyDateFamilyReached(u"HOUR");
-                    PushDouble(sedatetime::extractHour(GetDouble()));
-                };
-                const auto pushLegacyDayOfWeek = [&]() {
-                    warnIfLegacyDateFamilyReached(u"WEEKDAY");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 1, 2))
-                        return;
-
-                    sal_Int16 nFlag = (nParamCount == 2) ? GetInt16() : 1;
-                    const auto aResult = sedatetime::computeDayOfWeek(
-                        selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32(),
-                        nFlag);
-                    if (!aResult.mbValid)
-                        SetError(FormulaError::IllegalArgument);
-                    PushInt(aResult.mnValue);
-                };
-                const auto pushLegacyWeeknumOOo = [&]() {
-                    warnIfLegacyDateFamilyReached(u"WEEKNUM");
-                    if (!MustHaveParamCount(GetByte(), 2))
-                        return;
-                    const sal_Int16 nFlag = GetInt16();
-                    PushInt(sedatetime::computeWeeknumOOo(
-                        selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32(),
-                        nFlag));
-                };
-                const auto pushLegacyWeekOfYear = [&]() {
-                    warnIfLegacyDateFamilyReached(u"WEEKNUM");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 1, 2))
-                        return;
-                    sal_Int16 nFlag = (nParamCount == 1) ? 1 : GetInt16WithDefault(1);
-                    if (std::optional<int> nWeek = sedatetime::computeWeekOfYear(
-                            selibreoffice::toApiDateParts(mrContext.NFGetNullDate()),
-                            GetFloor32(), nFlag))
-                        PushInt(*nWeek);
-                    else
-                        PushIllegalArgument();
-                };
-                const auto pushLegacyIsoWeekOfYear = [&]() {
-                    warnIfLegacyDateFamilyReached(u"ISOWEEKNUM");
-                    if (!MustHaveParamCount(GetByte(), 1))
-                        return;
-                    PushInt(sedatetime::computeIsoWeekOfYear(
-                        selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32()));
-                };
-                const auto pushLegacyEasterSunday = [&]() {
-                    warnIfLegacyDateFamilyReached(u"EASTERSUNDAY");
-                    nFuncFmtType = SvNumFormatType::DATE;
-                    if (!MustHaveParamCount(GetByte(), 1))
-                        return;
-                    sal_Int16 nYear = GetInt16();
-                    if (nGlobalError != FormulaError::NONE)
-                    {
-                        PushError(nGlobalError);
-                        return;
-                    }
-                    if (nYear < 100)
-                        nYear = mrContext.NFExpandTwoDigitYear(nYear);
-                    if (std::optional<double> fSerial = sedatetime::computeEasterSundaySerial(
-                            selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), nYear))
-                        PushDouble(*fSerial);
-                    else
-                        PushIllegalArgument();
-                };
-                const auto pushLegacyNetworkdays = [&](bool bOOXML_Version) {
-                    warnIfLegacyDateFamilyReached(
-                        bOOXML_Version ? u"NETWORKDAYS.INTL" : u"NETWORKDAYS");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 2, 4))
-                        return;
-
-                    std::vector<double> nSortArray;
-                    bool bWeekendMask[7];
-                    const Date& rNullDate = mrContext.NFGetNullDate();
-                    sal_Int32 nNullDate = rNullDate.GetAsNormalizedDays();
-                    FormulaError nErr = bOOXML_Version
-                                            ? GetWeekendAndHolidayMasks_MS(
-                                                  nParamCount, nNullDate, nSortArray,
-                                                  bWeekendMask, false)
-                                            : GetWeekendAndHolidayMasks(
-                                                  nParamCount, nNullDate, nSortArray,
-                                                  bWeekendMask);
-                    if (nErr != FormulaError::NONE)
-                    {
-                        PushError(nErr);
-                        return;
-                    }
-                    sal_Int32 nDate2 = GetFloor32();
-                    sal_Int32 nDate1 = GetFloor32();
-                    if (nGlobalError != FormulaError::NONE
-                        || (nDate1 > SAL_MAX_INT32 - nNullDate)
-                        || nDate2 > (SAL_MAX_INT32 - nNullDate))
-                    {
-                        PushIllegalArgument();
-                        return;
-                    }
-                    nDate2 += nNullDate;
-                    nDate1 += nNullDate;
-                    const auto aHolidaySerials = selibreoffice::toApiDateSerials(nSortArray);
-                    PushDouble(static_cast<double>(sedatetime::countWorkdays(
-                        nDate1, nDate2, aHolidaySerials,
-                        selibreoffice::toApiWeekendMask(bWeekendMask))));
-                };
-                const auto pushLegacyWorkdayMs = [&]() {
-                    warnIfLegacyDateFamilyReached(u"WORKDAY.INTL");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 2, 4))
-                        return;
-
-                    nFuncFmtType = SvNumFormatType::DATE;
-                    std::vector<double> nSortArray;
-                    bool bWeekendMask[7];
-                    const Date& rNullDate = mrContext.NFGetNullDate();
-                    sal_Int32 nNullDate = rNullDate.GetAsNormalizedDays();
-                    FormulaError nErr = GetWeekendAndHolidayMasks_MS(
-                        nParamCount, nNullDate, nSortArray, bWeekendMask, true);
-                    if (nErr != FormulaError::NONE)
-                    {
-                        PushError(nErr);
-                        return;
-                    }
-                    sal_Int32 nDays = GetFloor32();
-                    sal_Int32 nDate = GetFloor32();
-                    if (nGlobalError != FormulaError::NONE
-                        || (nDate > SAL_MAX_INT32 - nNullDate))
-                    {
-                        PushIllegalArgument();
-                        return;
-                    }
-                    nDate += nNullDate;
-                    if (!nDays)
-                    {
-                        PushDouble(static_cast<double>(nDate - nNullDate));
-                        return;
-                    }
-                    const auto aHolidaySerials = selibreoffice::toApiDateSerials(nSortArray);
-                    PushDouble(static_cast<double>(sedatetime::advanceWorkday(
-                                   nDate, nDays, aHolidaySerials,
-                                   selibreoffice::toApiWeekendMask(bWeekendMask))
-                               - nNullDate));
-                };
-                const auto pushLegacyDate = [&]() {
-                    warnIfLegacyDateFamilyReached(u"DATE");
-                    nFuncFmtType = SvNumFormatType::DATE;
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-                    sal_Int16 nDay = GetInt16();
-                    sal_Int16 nMonth = GetInt16();
-                    if (IsMissing())
-                        SetError(FormulaError::ParameterExpected);
-                    sal_Int16 nYear = GetInt16();
-                    if (nGlobalError != FormulaError::NONE || nYear < 0)
-                        PushIllegalArgument();
-                    else
-                        PushDouble(GetDateSerial(nYear, nMonth, nDay, false));
-                };
-                const auto pushLegacyTime = [&]() {
-                    warnIfLegacyDateFamilyReached(u"TIME");
-                    nFuncFmtType = SvNumFormatType::TIME;
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-                    double fSec = GetDouble();
-                    double fMin = GetDouble();
-                    double fHour = GetDouble();
-                    if (std::optional<double> fTime = sedatetime::makeTimeSerial(
-                            fHour, fMin, fSec))
-                        PushDouble(*fTime);
-                    else
-                        PushIllegalArgument();
-                };
-                const auto pushLegacyDiffDate = [&]() {
-                    warnIfLegacyDateFamilyReached(u"DAYS");
-                    if (!MustHaveParamCount(GetByte(), 2))
-                        return;
-                    double fDate2 = GetDouble();
-                    double fDate1 = GetDouble();
-                    PushDouble(sedatetime::computeDiffDate(fDate1, fDate2));
-                };
-                const auto pushLegacyDiffDate360 = [&]() {
-                    warnIfLegacyDateFamilyReached(u"DAYS360");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 2, 3))
-                        return;
-                    bool bFlag = nParamCount == 3 && GetBool();
-                    sal_Int32 nDate2 = GetFloor32();
-                    sal_Int32 nDate1 = GetFloor32();
-                    if (nGlobalError != FormulaError::NONE)
-                        PushError(nGlobalError);
-                    else
-                        PushDouble(sedatetime::computeDiffDate360(
-                            selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), nDate1,
-                            nDate2, bFlag));
-                };
-                const auto pushLegacyDateDif = [&]() {
-                    warnIfLegacyDateFamilyReached(u"DATEDIF");
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-                    OUString aInterval = GetString().getString();
-                    sal_Int32 nDate2 = GetFloor32();
-                    sal_Int32 nDate1 = GetFloor32();
-                    if (nGlobalError != FormulaError::NONE)
-                    {
-                        PushError(nGlobalError);
-                        return;
-                    }
-                    if (std::optional<double> fResult = sedatetime::computeDateDif(
-                            selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), nDate1,
-                            nDate2, selibreoffice::toApiString(aInterval)))
-                        PushDouble(*fResult);
-                    else
-                        PushIllegalArgument();
                 };
                 const auto warnIfLegacyRateFamilyReached = [&](std::u16string_view rFunctionName) {
                     warnIfLegacyDispatchReached(
@@ -6009,320 +5534,6 @@ StackVar ScInterpreter::Interpret()
                     fResult *= pow(fRate1_reinvest, static_cast<double>(nCount - 1));
                     fResult = pow(fResult, div(1.0, (nCount - 1)));
                     PushDouble(fResult - 1.0);
-                };
-                const auto pushLegacyIspmt = [&]() {
-                    warnIfLegacyRateFamilyReached(u"ISPMT");
-                    if (!MustHaveParamCount(GetByte(), 4))
-                        return;
-                    double fInvest = GetDouble();
-                    double fTotal = GetDouble();
-                    double fPeriod = GetDouble();
-                    double fRate = GetDouble();
-                    if (nGlobalError != FormulaError::NONE)
-                        PushError(nGlobalError);
-                    else
-                        PushDouble(
-                            semath::computeInterestSchedulePayment(fRate, fPeriod, fTotal, fInvest));
-                };
-                const auto pushLegacyPv = [&]() {
-                    warnIfLegacyRateFamilyReached(u"PV");
-                    nFuncFmtType = SvNumFormatType::CURRENCY;
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 3, 5))
-                        return;
-                    bool bPayInAdvance = nParamCount == 5 && GetBool();
-                    double fFv = nParamCount >= 4 ? GetDouble() : 0;
-                    double fPmt = GetDouble();
-                    double fNper = GetDouble();
-                    double fRate = GetDouble();
-                    PushDouble(ScGetPV(fRate, fNper, fPmt, fFv, bPayInAdvance));
-                };
-                const auto pushLegacySyd = [&]() {
-                    warnIfLegacyRateFamilyReached(u"SYD");
-                    nFuncFmtType = SvNumFormatType::CURRENCY;
-                    if (!MustHaveParamCount(GetByte(), 4))
-                        return;
-                    double fPer = GetDouble();
-                    double fLife = GetDouble();
-                    double fSalvage = GetDouble();
-                    double fCost = GetDouble();
-                    PushDouble(
-                        semath::computeSumOfYearsDepreciation(fCost, fSalvage, fLife, fPer));
-                };
-                const auto pushLegacyDdb = [&]() {
-                    warnIfLegacyRateFamilyReached(u"DDB");
-                    nFuncFmtType = SvNumFormatType::CURRENCY;
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 4, 5))
-                        return;
-                    double fFactor = nParamCount == 5 ? GetDouble() : 2.0;
-                    double fPeriod = GetDouble();
-                    double fLife = GetDouble();
-                    double fSalvage = GetDouble();
-                    double fCost = GetDouble();
-                    if (fCost < 0.0 || fSalvage < 0.0 || fFactor <= 0.0 || fSalvage > fCost
-                        || fPeriod < 1.0 || fPeriod > fLife)
-                        PushIllegalArgument();
-                    else
-                        PushDouble(ScGetDDB(fCost, fSalvage, fLife, fPeriod, fFactor));
-                };
-                const auto pushLegacyDb = [&]() {
-                    warnIfLegacyRateFamilyReached(u"DB");
-                    nFuncFmtType = SvNumFormatType::CURRENCY;
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 4, 5))
-                        return;
-                    double fMonths = nParamCount == 4 ? 12.0 : ::rtl::math::approxFloor(GetDouble());
-                    double fPeriod = GetDouble();
-                    double fLife = GetDouble();
-                    double fSalvage = GetDouble();
-                    double fCost = GetDouble();
-                    if (fMonths < 1.0 || fMonths > 12.0 || fLife > 1200.0
-                        || fSalvage < 0.0 || fPeriod > (fLife + 1.0) || fSalvage > fCost
-                        || fCost <= 0.0 || fLife <= 0 || fPeriod <= 0)
-                    {
-                        PushIllegalArgument();
-                        return;
-                    }
-                    PushDouble(
-                        semath::computeFixedDecliningBalance(fCost, fSalvage, fLife, fPeriod, fMonths));
-                };
-                const auto pushLegacyVdb = [&]() {
-                    warnIfLegacyRateFamilyReached(u"VDB");
-                    nFuncFmtType = SvNumFormatType::CURRENCY;
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 5, 7))
-                        return;
-                    KahanSum fVdb = 0.0;
-                    bool bNoSwitch = nParamCount == 7 && GetBool();
-                    double fFactor = nParamCount >= 6 ? GetDouble() : 2.0;
-                    double fEnd = GetDouble();
-                    double fStart = GetDouble();
-                    double fLife = GetDouble();
-                    double fSalvage = GetDouble();
-                    double fCost = GetDouble();
-                    if (fStart < 0.0 || fEnd < fStart || fEnd > fLife || fCost < 0.0
-                        || fSalvage > fCost || fFactor <= 0.0)
-                        PushIllegalArgument();
-                    else
-                        fVdb = semath::computeVariableDecliningBalance(
-                            fCost, fSalvage, fLife, fStart, fEnd, fFactor, bNoSwitch);
-                    PushDouble(fVdb.get());
-                };
-                const auto pushLegacyPDuration = [&]() {
-                    warnIfLegacyRateFamilyReached(u"PDURATION");
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-                    double fFuture = GetDouble();
-                    double fPresent = GetDouble();
-                    double fRate = GetDouble();
-                    if (fFuture <= 0.0 || fPresent <= 0.0 || fRate <= 0.0)
-                        PushIllegalArgument();
-                    else
-                        PushDouble(semath::computePaybackDuration(fRate, fPresent, fFuture));
-                };
-                const auto pushLegacySln = [&]() {
-                    warnIfLegacyRateFamilyReached(u"SLN");
-                    nFuncFmtType = SvNumFormatType::CURRENCY;
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-                    double fLife = GetDouble();
-                    double fSalvage = GetDouble();
-                    double fCost = GetDouble();
-                    PushDouble(semath::computeStraightLineDepreciation(fCost, fSalvage, fLife));
-                };
-                const auto pushLegacyPmt = [&]() {
-                    warnIfLegacyRateFamilyReached(u"PMT");
-                    nFuncFmtType = SvNumFormatType::CURRENCY;
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 3, 5))
-                        return;
-                    bool bPayInAdvance = nParamCount == 5 && GetBool();
-                    double fFv = nParamCount >= 4 ? GetDouble() : 0;
-                    double fPv = GetDouble();
-                    double fNper = GetDouble();
-                    double fRate = GetDouble();
-                    PushDouble(ScGetPMT(fRate, fNper, fPv, fFv, bPayInAdvance));
-                };
-                const auto pushLegacyRri = [&]() {
-                    warnIfLegacyRateFamilyReached(u"RRI");
-                    nFuncFmtType = SvNumFormatType::PERCENT;
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-                    double fFutureValue = GetDouble();
-                    double fPresentValue = GetDouble();
-                    double fNrOfPeriods = GetDouble();
-                    if (fNrOfPeriods <= 0.0 || fPresentValue == 0.0)
-                        PushIllegalArgument();
-                    else
-                        PushDouble(semath::computeGrowthRateOverPeriods(
-                            fNrOfPeriods, fPresentValue, fFutureValue));
-                };
-                const auto pushLegacyFv = [&]() {
-                    warnIfLegacyRateFamilyReached(u"FV");
-                    nFuncFmtType = SvNumFormatType::CURRENCY;
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 3, 5))
-                        return;
-                    bool bPayInAdvance = nParamCount == 5 && GetBool();
-                    double fPv = nParamCount >= 4 ? GetDouble() : 0;
-                    double fPmt = GetDouble();
-                    double fNper = GetDouble();
-                    double fRate = GetDouble();
-                    PushDouble(ScGetFV(fRate, fNper, fPmt, fPv, bPayInAdvance));
-                };
-                const auto pushLegacyNper = [&]() {
-                    warnIfLegacyRateFamilyReached(u"NPER");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 3, 5))
-                        return;
-                    bool bPayInAdvance = nParamCount == 5 && GetBool();
-                    double fFV = nParamCount >= 4 ? GetDouble() : 0;
-                    double fPV = GetDouble();
-                    double fPmt = GetDouble();
-                    double fRate = GetDouble();
-                    PushDouble(
-                        semath::computePeriodsForFutureValue(fRate, fPmt, fPV, fFV, bPayInAdvance));
-                };
-                const auto pushLegacyRate = [&]() {
-                    warnIfLegacyRateFamilyReached(u"RATE");
-                    nFuncFmtType = SvNumFormatType::PERCENT;
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 3, 6))
-                        return;
-                    double fGuess = nParamCount == 6 ? GetDouble() : 0.1;
-                    bool bDefaultGuess = nParamCount != 6;
-                    bool bPayType = nParamCount >= 5 && GetBool();
-                    double fFv = nParamCount >= 4 ? GetDouble() : 0;
-                    double fPv = GetDouble();
-                    double fPayment = GetDouble();
-                    double fNper = GetDouble();
-                    if (fNper <= 0.0)
-                    {
-                        PushIllegalArgument();
-                        return;
-                    }
-                    const semath::FinancialRateResult aResult = semath::solveRate(
-                        fNper, fPayment, fPv, fFv, bPayType, fGuess, bDefaultGuess);
-                    if (!aResult.mbConverged)
-                        SetError(FormulaError::NoConvergence);
-                    PushDouble(aResult.mfRate);
-                };
-                const auto pushLegacyIpmt = [&]() {
-                    warnIfLegacyRateFamilyReached(u"IPMT");
-                    nFuncFmtType = SvNumFormatType::CURRENCY;
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 4, 6))
-                        return;
-                    bool bPayInAdvance = nParamCount == 6 && GetBool();
-                    double fFv = nParamCount >= 5 ? GetDouble() : 0;
-                    double fPv = GetDouble();
-                    double fNper = GetDouble();
-                    double fPer = GetDouble();
-                    double fRate = GetDouble();
-                    if (fPer < 1.0 || fPer > fNper)
-                        PushIllegalArgument();
-                    else
-                    {
-                        double fPmt;
-                        PushDouble(ScGetIpmt(fRate, fPer, fNper, fPv, fFv, bPayInAdvance, fPmt));
-                    }
-                };
-                const auto pushLegacyPpmt = [&]() {
-                    warnIfLegacyRateFamilyReached(u"PPMT");
-                    nFuncFmtType = SvNumFormatType::CURRENCY;
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 4, 6))
-                        return;
-                    bool bPayInAdvance = nParamCount == 6 && GetBool();
-                    double fFv = nParamCount >= 5 ? GetDouble() : 0;
-                    double fPv = GetDouble();
-                    double fNper = GetDouble();
-                    double fPer = GetDouble();
-                    double fRate = GetDouble();
-                    if (fPer < 1.0 || fPer > fNper)
-                        PushIllegalArgument();
-                    else
-                    {
-                        double fPmt;
-                        double fInterestPer = ScGetIpmt(
-                            fRate, fPer, fNper, fPv, fFv, bPayInAdvance, fPmt);
-                        PushDouble(fPmt - fInterestPer);
-                    }
-                };
-                const auto pushLegacyCumIpmt = [&]() {
-                    warnIfLegacyRateFamilyReached(u"CUMIPMT");
-                    nFuncFmtType = SvNumFormatType::CURRENCY;
-                    if (!MustHaveParamCount(GetByte(), 6))
-                        return;
-                    double fFlag = GetDoubleWithDefault(-1.0);
-                    double fEnd = ::rtl::math::approxFloor(GetDouble());
-                    double fStart = ::rtl::math::approxFloor(GetDouble());
-                    double fPv = GetDouble();
-                    double fNper = GetDouble();
-                    double fRate = GetDouble();
-                    if (fStart < 1.0 || fEnd < fStart || fRate <= 0.0 || fEnd > fNper
-                        || fNper <= 0.0 || fPv <= 0.0 || (fFlag != 0.0 && fFlag != 1.0))
-                        PushIllegalArgument();
-                    else
-                    {
-                        bool bPayInAdvance = static_cast<bool>(fFlag);
-                        PushDouble(semath::computeCumulativeInterest(
-                            fRate, fStart, fEnd, fNper, fPv, 0.0, bPayInAdvance));
-                    }
-                };
-                const auto pushLegacyCumPrinc = [&]() {
-                    warnIfLegacyRateFamilyReached(u"CUMPRINC");
-                    nFuncFmtType = SvNumFormatType::CURRENCY;
-                    if (!MustHaveParamCount(GetByte(), 6))
-                        return;
-                    double fFlag = GetDoubleWithDefault(-1.0);
-                    double fEnd = ::rtl::math::approxFloor(GetDouble());
-                    double fStart = ::rtl::math::approxFloor(GetDouble());
-                    double fPv = GetDouble();
-                    double fNper = GetDouble();
-                    double fRate = GetDouble();
-                    if (fStart < 1.0 || fEnd < fStart || fRate <= 0.0 || fEnd > fNper
-                        || fNper <= 0.0 || fPv <= 0.0 || (fFlag != 0.0 && fFlag != 1.0))
-                        PushIllegalArgument();
-                    else
-                    {
-                        bool bPayInAdvance = static_cast<bool>(fFlag);
-                        PushDouble(semath::computeCumulativePrincipal(
-                            fRate, fStart, fEnd, fNper, fPv, 0.0, bPayInAdvance));
-                    }
-                };
-                const auto pushLegacyEffect = [&]() {
-                    warnIfLegacyRateFamilyReached(u"EFFECT");
-                    nFuncFmtType = SvNumFormatType::PERCENT;
-                    if (!MustHaveParamCount(GetByte(), 2))
-                        return;
-                    double fPeriods = GetDouble();
-                    double fNominal = GetDouble();
-                    if (fPeriods < 1.0 || fNominal < 0.0)
-                        PushIllegalArgument();
-                    else if (fNominal == 0.0)
-                        PushDouble(0.0);
-                    else
-                    {
-                        fPeriods = ::rtl::math::approxFloor(fPeriods);
-                        PushDouble(semath::computeEffectiveAnnualRate(fNominal, fPeriods));
-                    }
-                };
-                const auto pushLegacyNominal = [&]() {
-                    warnIfLegacyRateFamilyReached(u"NOMINAL");
-                    nFuncFmtType = SvNumFormatType::PERCENT;
-                    if (!MustHaveParamCount(GetByte(), 2))
-                        return;
-                    double fPeriods = GetDouble();
-                    double fEffective = GetDouble();
-                    if (fPeriods < 1.0 || fEffective <= 0.0)
-                        PushIllegalArgument();
-                    else
-                    {
-                        fPeriods = ::rtl::math::approxFloor(fPeriods);
-                        PushDouble(semath::computeNominalAnnualRate(fEffective, fPeriods));
-                    }
                 };
                 const auto pushLegacySumProduct = [&]() {
                     warnIfLegacyNumericAggregateReached(u"SUMPRODUCT");
@@ -6723,69 +5934,6 @@ StackVar ScInterpreter::Interpret()
                         return sqrt(fVal / nValCount);
                     };
                     GetStVarParams(bTextAsZero, VarResult);
-                };
-                const auto pushLegacyConvert = [&]() {
-                    warnIfLegacyDispatchReached(
-                        "family-local default-on", u"CONVERT",
-                        [](std::u16string_view rFormula) {
-                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
-                        },
-                        "family-local default-on CONVERT reached ScInterpreter");
-
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-
-                    OUString aToUnit = GetString().getString();
-                    OUString aFromUnit = GetString().getString();
-                    double fVal = GetDouble();
-                    if (nGlobalError != FormulaError::NONE)
-                        PushError(nGlobalError);
-                    else
-                    {
-                        double fConv;
-                        if (ScGlobal::GetUnitConverter()->GetValue(fConv, aFromUnit, aToUnit))
-                            PushDouble(fVal * fConv);
-                        else if (ScGlobal::GetUnitConverter()->GetValue(fConv, aToUnit, aFromUnit))
-                            PushDouble(fVal / fConv);
-                        else
-                            PushNA();
-                    }
-                };
-                const auto pushLegacyNumeralConversion = [&](std::u16string_view rFunctionName) {
-                    warnIfLegacyDispatchReached(
-                        "family-local default-on", rFunctionName,
-                        [](std::u16string_view rFormula) {
-                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
-                        },
-                        "family-local default-on numeral conversion reached ScInterpreter");
-                };
-                const auto pushLegacyRoundSignificant = [&]() {
-                    warnIfLegacyDispatchReached(
-                        "family-local default-on", u"ROUNDSIG",
-                        [](std::u16string_view rFormula) {
-                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
-                        },
-                        "family-local default-on ROUNDSIG reached ScInterpreter");
-
-                    if (!MustHaveParamCount(GetByte(), 2))
-                        return;
-
-                    double fDigits = ::rtl::math::approxFloor(GetDouble());
-                    double fX = GetDouble();
-                    if (nGlobalError != FormulaError::NONE || fDigits < 1.0)
-                    {
-                        PushIllegalArgument();
-                        return;
-                    }
-
-                    if (fX == 0.0)
-                        PushDouble(0.0);
-                    else
-                    {
-                        double fRes;
-                        RoundSignificant(fX, fDigits, fRes);
-                        PushDouble(fRes);
-                    }
                 };
                 const auto pushLegacyMatrixDeterminant = [&]() {
                     warnIfLegacyDispatchReached(
@@ -7492,160 +6640,6 @@ StackVar ScInterpreter::Interpret()
                     const double fLeft = GetDouble();
                     if (std::optional<double> fResult = aOperator(fLeft, fRight))
                         PushDouble(*fResult);
-                    else
-                        PushIllegalArgument();
-                };
-                const auto pushLegacyEuroConvert = [&]() {
-                    pushLegacyNumeralConversion(u"EUROCONVERT");
-
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 3, 5))
-                        return;
-
-                    double fPrecision = 0.0;
-                    if (nParamCount == 5)
-                    {
-                        fPrecision = ::rtl::math::approxFloor(GetDouble());
-                        if (fPrecision < 3)
-                        {
-                            PushIllegalArgument();
-                            return;
-                        }
-                    }
-
-                    bool bFullPrecision = nParamCount >= 4 && GetBool();
-                    OUString aToUnit = GetString().getString();
-                    OUString aFromUnit = GetString().getString();
-                    double fVal = GetDouble();
-                    if (nGlobalError != FormulaError::NONE)
-                    {
-                        PushError(nGlobalError);
-                        return;
-                    }
-
-                    const auto aConverted = seconvert::evaluateEuroConvertValue(
-                        fVal, selibreoffice::toApiString(aFromUnit),
-                        selibreoffice::toApiString(aToUnit), true, !bFullPrecision);
-                    if (!aConverted)
-                    {
-                        PushIllegalArgument();
-                        return;
-                    }
-
-                    double fRes = aConverted.maValue;
-                    if (fPrecision && !aFromUnit.equalsIgnoreAsciiCase("EUR")
-                        && !aFromUnit.equalsIgnoreAsciiCase(aToUnit))
-                    {
-                        const auto aIntermediate = seconvert::evaluateEuroConvertValue(
-                            fVal, selibreoffice::toApiString(aFromUnit), u"EUR", true, false);
-                        if (!aIntermediate)
-                        {
-                            PushIllegalArgument();
-                            return;
-                        }
-                        const double fRoundedIntermediate
-                            = ::rtl::math::round(aIntermediate.maValue, static_cast<int>(fPrecision));
-                        const auto aTriangulated = seconvert::evaluateEuroConvertValue(
-                            fRoundedIntermediate, u"EUR", selibreoffice::toApiString(aToUnit), true,
-                            !bFullPrecision);
-                        if (!aTriangulated)
-                        {
-                            PushIllegalArgument();
-                            return;
-                        }
-                        fRes = aTriangulated.maValue;
-                    }
-
-                    PushDouble(fRes);
-                };
-                const auto pushLegacyBase = [&]() {
-                    pushLegacyNumeralConversion(u"BASE");
-
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 2, 3))
-                        return;
-
-                    std::optional<double> ofMinLength;
-                    if (nParamCount == 3)
-                        ofMinLength = GetDouble();
-                    const double fBase = GetDouble();
-                    const double fValue = GetDouble();
-                    if (nGlobalError != FormulaError::NONE)
-                    {
-                        PushIllegalArgument();
-                        return;
-                    }
-
-                    const auto aResult = seconvert::evaluateBaseValue(fValue, fBase, ofMinLength);
-                    if (aResult)
-                        PushString(selibreoffice::toLibreOfficeString(aResult.maValue));
-                    else if (aResult.meError == spreadsheetengine::api::Error::StringOverflow)
-                        PushError(FormulaError::StringOverflow);
-                    else
-                        PushIllegalArgument();
-                };
-                const auto pushLegacyDecimal = [&]() {
-                    pushLegacyNumeralConversion(u"DECIMAL");
-
-                    if (!MustHaveParamCount(GetByte(), 2))
-                        return;
-
-                    const double fBase = GetDouble();
-                    const OUString aText = GetString().getString();
-                    if (nGlobalError != FormulaError::NONE)
-                    {
-                        PushIllegalArgument();
-                        return;
-                    }
-
-                    const auto aResult
-                        = seconvert::evaluateDecimalValue(selibreoffice::toApiString(aText), fBase);
-                    if (aResult)
-                        PushDouble(aResult.maValue);
-                    else
-                        PushIllegalArgument();
-                };
-                const auto pushLegacyRoman = [&]() {
-                    pushLegacyNumeralConversion(u"ROMAN");
-
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 1, 2))
-                        return;
-
-                    std::optional<double> ofMode;
-                    if (nParamCount == 2)
-                        ofMode = GetDouble();
-                    const double fValue = GetDouble();
-                    if (nGlobalError != FormulaError::NONE)
-                    {
-                        PushError(nGlobalError);
-                        return;
-                    }
-
-                    const auto aResult = seconvert::evaluateRomanValue(fValue, ofMode);
-                    if (aResult)
-                        PushString(selibreoffice::toLibreOfficeString(aResult.maValue));
-                    else
-                        PushIllegalArgument();
-                };
-                const auto pushLegacyArabic = [&]() {
-                    pushLegacyNumeralConversion(u"ARABIC");
-
-                    if (!MustHaveParamCount(GetByte(), 1))
-                        return;
-
-                    const OUString aRoman = GetString().getString();
-                    if (nGlobalError != FormulaError::NONE)
-                    {
-                        PushError(nGlobalError);
-                        return;
-                    }
-
-                    if (const auto oArabic
-                        = seconvert::convertFromRoman(selibreoffice::toApiString(aRoman)))
-                    {
-                        PushInt(*oArabic);
-                    }
                     else
                         PushIllegalArgument();
                 };
@@ -10176,7 +9170,9 @@ StackVar ScInterpreter::Interpret()
                         ScSyntheticBinaryOp(ocDiv, &ScInterpreter::ScDiv);
                         break;
                     case ocPi               :
-                        pushLegacyMathScalarNullary(u"PI", semath::computePi);
+                        warnIfLegacyDefaultOnReached(
+                            u"PI", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computePi());
                         break;
                     case ocRandom           : ScRandom();                   break;
                     case ocRandArray        : ScRandArray();                break;
@@ -10199,122 +9195,411 @@ StackVar ScInterpreter::Interpret()
                     case ocLet              : ScLet();                  break;
                     case ocWrapCols         : ScWrapColsOrRows(true);   break;
                     case ocWrapRows         : ScWrapColsOrRows(false);  break;
-                    case ocTrue             : pushLegacyLogicalConstant(true);  break;
-                    case ocFalse            : pushLegacyLogicalConstant(false); break;
-                    case ocGetActDate       : pushLegacyCurrentDate();  break;
-                    case ocGetActTime       : pushLegacyCurrentTime();  break;
+                    case ocTrue             :
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", u"TRUE()",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            "family-local default-on logical constant reached ScInterpreter");
+                        nFuncFmtType = SvNumFormatType::LOGICAL;
+                        PushInt(1);
+                        break;
+                    case ocFalse            :
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", u"FALSE()",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            "family-local default-on logical constant reached ScInterpreter");
+                        nFuncFmtType = SvNumFormatType::LOGICAL;
+                        PushInt(0);
+                        break;
+                    case ocGetActDate       :
+                    {
+                        warnIfLegacyDateFamilyReached(u"TODAY");
+                        nFuncFmtType = SvNumFormatType::DATE;
+                        Date aActDate(Date::SYSTEM);
+                        tools::Long nDiff = aActDate - mrContext.NFGetNullDate();
+                        PushDouble(static_cast<double>(nDiff));
+                    }
+                    break;
+                    case ocGetActTime       :
+                    {
+                        warnIfLegacyDateFamilyReached(u"NOW");
+                        nFuncFmtType = SvNumFormatType::DATETIME;
+                        DateTime aActTime(DateTime::SYSTEM);
+                        tools::Long nDiff = aActTime - mrContext.NFGetNullDate();
+                        double fTime = aActTime.GetHour()
+                                           / static_cast<double>(::tools::Time::hourPerDay)
+                                       + aActTime.GetMin()
+                                           / static_cast<double>(::tools::Time::minutePerDay)
+                                       + aActTime.GetSec()
+                                           / static_cast<double>(::tools::Time::secondPerDay)
+                                       + aActTime.GetNanoSec()
+                                           / static_cast<double>(::tools::Time::nanoSecPerDay);
+                        PushDouble(static_cast<double>(nDiff) + fTime);
+                    }
+                    break;
                     case ocNotAvail         : PushError( FormulaError::NotAvailable); break;
                     case ocDeg              :
-                        pushLegacyMathScalarUnary(u"DEGREES", semath::computeDegrees);
+                        warnIfLegacyDefaultOnReached(
+                            u"DEGREES", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeDegrees(GetDouble()));
                         break;
                     case ocRad              :
-                        pushLegacyMathScalarUnary(u"RADIANS", semath::computeRadians);
+                        warnIfLegacyDefaultOnReached(
+                            u"RADIANS", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeRadians(GetDouble()));
                         break;
                     case ocSin              :
-                        pushLegacyMathScalarUnary(u"SIN", semath::computeSin);
+                        warnIfLegacyDefaultOnReached(
+                            u"SIN", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeSin(GetDouble()));
                         break;
                     case ocCos              :
-                        pushLegacyMathScalarUnary(u"COS", semath::computeCos);
+                        warnIfLegacyDefaultOnReached(
+                            u"COS", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeCos(GetDouble()));
                         break;
                     case ocTan              :
-                        pushLegacyMathScalarUnary(u"TAN", semath::computeTan);
+                        warnIfLegacyDefaultOnReached(
+                            u"TAN", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeTan(GetDouble()));
                         break;
                     case ocCot              :
-                        pushLegacyMathScalarUnary(u"COT", semath::computeCot);
+                        warnIfLegacyDefaultOnReached(
+                            u"COT", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeCot(GetDouble()));
                         break;
                     case ocArcSin           :
-                        pushLegacyMathScalarUnary(u"ASIN", semath::computeArcSin);
+                        warnIfLegacyDefaultOnReached(
+                            u"ASIN", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeArcSin(GetDouble()));
                         break;
                     case ocArcCos           :
-                        pushLegacyMathScalarUnary(u"ACOS", semath::computeArcCos);
+                        warnIfLegacyDefaultOnReached(
+                            u"ACOS", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeArcCos(GetDouble()));
                         break;
                     case ocArcTan           :
-                        pushLegacyMathScalarUnary(u"ATAN", semath::computeArcTan);
+                        warnIfLegacyDefaultOnReached(
+                            u"ATAN", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeArcTan(GetDouble()));
                         break;
                     case ocArcCot           :
-                        pushLegacyMathScalarUnary(u"ACOT", semath::computeArcCot);
+                        warnIfLegacyDefaultOnReached(
+                            u"ACOT", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeArcCot(GetDouble()));
                         break;
                     case ocSinHyp           :
-                        pushLegacyMathScalarUnary(u"SINH", semath::computeSinHyp);
+                        warnIfLegacyDefaultOnReached(
+                            u"SINH", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeSinHyp(GetDouble()));
                         break;
                     case ocCosHyp           :
-                        pushLegacyMathScalarUnary(u"COSH", semath::computeCosHyp);
+                        warnIfLegacyDefaultOnReached(
+                            u"COSH", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeCosHyp(GetDouble()));
                         break;
                     case ocTanHyp           :
-                        pushLegacyMathScalarUnary(u"TANH", semath::computeTanHyp);
+                        warnIfLegacyDefaultOnReached(
+                            u"TANH", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeTanHyp(GetDouble()));
                         break;
                     case ocCotHyp           :
-                        pushLegacyMathScalarUnary(u"COTH", semath::computeCotHyp);
+                        warnIfLegacyDefaultOnReached(
+                            u"COTH", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeCotHyp(GetDouble()));
                         break;
                     case ocArcSinHyp        :
-                        pushLegacyMathScalarUnary(u"ASINH", semath::computeArcSinHyp);
+                        warnIfLegacyDefaultOnReached(
+                            u"ASINH", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeArcSinHyp(GetDouble()));
                         break;
                     case ocArcCosHyp        :
-                        pushLegacyMathScalarUnaryOptional(u"ACOSH", semath::computeArcCosHyp);
+                        warnIfLegacyDefaultOnReached(
+                            u"ACOSH", "family-local default-on math scalar reached ScInterpreter");
+                        if (std::optional<double> fResult = semath::computeArcCosHyp(GetDouble()))
+                            PushDouble(*fResult);
+                        else
+                            PushIllegalArgument();
                         break;
                     case ocArcTanHyp        :
-                        pushLegacyMathScalarUnaryOptional(u"ATANH", semath::computeArcTanHyp);
+                        warnIfLegacyDefaultOnReached(
+                            u"ATANH", "family-local default-on math scalar reached ScInterpreter");
+                        if (std::optional<double> fResult = semath::computeArcTanHyp(GetDouble()))
+                            PushDouble(*fResult);
+                        else
+                            PushIllegalArgument();
                         break;
                     case ocArcCotHyp        :
-                        pushLegacyMathScalarUnaryOptional(u"ACOTH", semath::computeArcCotHyp);
+                        warnIfLegacyDefaultOnReached(
+                            u"ACOTH", "family-local default-on math scalar reached ScInterpreter");
+                        if (std::optional<double> fResult = semath::computeArcCotHyp(GetDouble()))
+                            PushDouble(*fResult);
+                        else
+                            PushIllegalArgument();
                         break;
                     case ocCosecant         :
-                        pushLegacyMathScalarUnary(u"CSC", semath::computeCosecant);
+                        warnIfLegacyDefaultOnReached(
+                            u"CSC", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeCosecant(GetDouble()));
                         break;
                     case ocSecant           :
-                        pushLegacyMathScalarUnary(u"SEC", semath::computeSecant);
+                        warnIfLegacyDefaultOnReached(
+                            u"SEC", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeSecant(GetDouble()));
                         break;
                     case ocCosecantHyp      :
-                        pushLegacyMathScalarUnary(u"CSCH", semath::computeCosecantHyp);
+                        warnIfLegacyDefaultOnReached(
+                            u"CSCH", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeCosecantHyp(GetDouble()));
                         break;
                     case ocSecantHyp        :
-                        pushLegacyMathScalarUnary(u"SECH", semath::computeSecantHyp);
+                        warnIfLegacyDefaultOnReached(
+                            u"SECH", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeSecantHyp(GetDouble()));
                         break;
                     case ocExp              :
-                        pushLegacyMathScalarUnary(u"EXP", semath::computeExp);
+                        warnIfLegacyDefaultOnReached(
+                            u"EXP", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeExp(GetDouble()));
                         break;
                     case ocLn               :
-                        pushLegacyMathScalarUnaryOptional(u"LN", semath::computeLn);
+                        warnIfLegacyDefaultOnReached(
+                            u"LN", "family-local default-on math scalar reached ScInterpreter");
+                        if (std::optional<double> fResult = semath::computeLn(GetDouble()))
+                            PushDouble(*fResult);
+                        else
+                            PushIllegalArgument();
                         break;
                     case ocLog10            :
-                        pushLegacyMathScalarUnaryOptional(u"LOG10", semath::computeLog10);
+                        warnIfLegacyDefaultOnReached(
+                            u"LOG10", "family-local default-on math scalar reached ScInterpreter");
+                        if (std::optional<double> fResult = semath::computeLog10(GetDouble()))
+                            PushDouble(*fResult);
+                        else
+                            PushIllegalArgument();
                         break;
                     case ocSqrt             :
-                        pushLegacyMathScalarUnaryOptional(u"SQRT", semath::computeSqrt);
+                        warnIfLegacyDefaultOnReached(
+                            u"SQRT", "family-local default-on math scalar reached ScInterpreter");
+                        if (std::optional<double> fResult = semath::computeSqrt(GetDouble()))
+                            PushDouble(*fResult);
+                        else
+                            PushIllegalArgument();
                         break;
                     case ocFact             :
                         warnIfLegacyStatisticalDistributionReached(u"FACT");
                         pushCalcMathValueResult(semath::evaluateFactorialValue(GetDouble()));
                         break;
-                    case ocGetYear          : pushLegacyExtractYear();  break;
-                    case ocGetMonth         : pushLegacyExtractMonth(); break;
-                    case ocGetDay           : pushLegacyExtractDay();   break;
-                    case ocGetDayOfWeek     : pushLegacyDayOfWeek();    break;
-                    case ocWeek             : pushLegacyWeekOfYear();   break;
-                    case ocIsoWeeknum       : pushLegacyIsoWeekOfYear(); break;
-                    case ocWeeknumOOo       : pushLegacyWeeknumOOo();   break;
-                    case ocEasterSunday     : pushLegacyEasterSunday(); break;
-                    case ocNetWorkdays      : pushLegacyNetworkdays(false); break;
-                    case ocNetWorkdays_MS   : pushLegacyNetworkdays(true); break;
-                    case ocWorkday_MS       : pushLegacyWorkdayMs();    break;
-                    case ocGetHour          : pushLegacyExtractHour();  break;
-                    case ocGetMin           : pushLegacyExtractMinute(); break;
-                    case ocGetSec           : pushLegacyExtractSecond(); break;
+                    case ocGetYear          :
+                        warnIfLegacyDateFamilyReached(u"YEAR");
+                        PushDouble(sedatetime::extractYear(
+                            selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32()));
+                        break;
+                    case ocGetMonth         :
+                        warnIfLegacyDateFamilyReached(u"MONTH");
+                        PushDouble(sedatetime::extractMonth(
+                            selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32()));
+                        break;
+                    case ocGetDay           :
+                        warnIfLegacyDateFamilyReached(u"DAY");
+                        if (std::optional<double> fDay = sedatetime::extractDay(
+                                selibreoffice::toApiDateParts(mrContext.NFGetNullDate()),
+                                GetFloor32()))
+                            PushDouble(*fDay);
+                        else
+                        {
+                            SetError(FormulaError::IllegalArgument);
+                            PushDouble(HUGE_VAL);
+                        }
+                        break;
+                    case ocGetDayOfWeek     :
+                    {
+                        warnIfLegacyDateFamilyReached(u"WEEKDAY");
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 1, 2))
+                            break;
+                        sal_Int16 nFlag = (nParamCount == 2) ? GetInt16() : 1;
+                        const auto aResult = sedatetime::computeDayOfWeek(
+                            selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32(),
+                            nFlag);
+                        if (!aResult.mbValid)
+                            SetError(FormulaError::IllegalArgument);
+                        PushInt(aResult.mnValue);
+                    }
+                    break;
+                    case ocWeek             :
+                    {
+                        warnIfLegacyDateFamilyReached(u"WEEKNUM");
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 1, 2))
+                            break;
+                        sal_Int16 nFlag = (nParamCount == 1) ? 1 : GetInt16WithDefault(1);
+                        if (std::optional<int> nWeek = sedatetime::computeWeekOfYear(
+                                selibreoffice::toApiDateParts(mrContext.NFGetNullDate()),
+                                GetFloor32(), nFlag))
+                            PushInt(*nWeek);
+                        else
+                            PushIllegalArgument();
+                    }
+                    break;
+                    case ocIsoWeeknum       :
+                        warnIfLegacyDateFamilyReached(u"ISOWEEKNUM");
+                        if (!MustHaveParamCount(GetByte(), 1))
+                            break;
+                        PushInt(sedatetime::computeIsoWeekOfYear(
+                            selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32()));
+                        break;
+                    case ocWeeknumOOo       :
+                        warnIfLegacyDateFamilyReached(u"WEEKNUM");
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            break;
+                        PushInt(sedatetime::computeWeeknumOOo(
+                            selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), GetFloor32(),
+                            GetInt16()));
+                        break;
+                    case ocEasterSunday     :
+                    {
+                        warnIfLegacyDateFamilyReached(u"EASTERSUNDAY");
+                        nFuncFmtType = SvNumFormatType::DATE;
+                        if (!MustHaveParamCount(GetByte(), 1))
+                            break;
+                        sal_Int16 nYear = GetInt16();
+                        if (nGlobalError != FormulaError::NONE)
+                        {
+                            PushError(nGlobalError);
+                            break;
+                        }
+                        if (nYear < 100)
+                            nYear = mrContext.NFExpandTwoDigitYear(nYear);
+                        if (std::optional<double> fSerial = sedatetime::computeEasterSundaySerial(
+                                selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), nYear))
+                            PushDouble(*fSerial);
+                        else
+                            PushIllegalArgument();
+                    }
+                    break;
+                    case ocNetWorkdays      :
+                    case ocNetWorkdays_MS   :
+                    {
+                        const bool bOOXML_Version = eOp == ocNetWorkdays_MS;
+                        warnIfLegacyDateFamilyReached(
+                            bOOXML_Version ? u"NETWORKDAYS.INTL" : u"NETWORKDAYS");
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 2, 4))
+                            break;
+
+                        std::vector<double> nSortArray;
+                        bool bWeekendMask[7];
+                        const Date& rNullDate = mrContext.NFGetNullDate();
+                        sal_Int32 nNullDate = rNullDate.GetAsNormalizedDays();
+                        FormulaError nErr = bOOXML_Version
+                                                ? GetWeekendAndHolidayMasks_MS(
+                                                      nParamCount, nNullDate, nSortArray,
+                                                      bWeekendMask, false)
+                                                : GetWeekendAndHolidayMasks(
+                                                      nParamCount, nNullDate, nSortArray,
+                                                      bWeekendMask);
+                        if (nErr != FormulaError::NONE)
+                        {
+                            PushError(nErr);
+                            break;
+                        }
+                        sal_Int32 nDate2 = GetFloor32();
+                        sal_Int32 nDate1 = GetFloor32();
+                        if (nGlobalError != FormulaError::NONE
+                            || (nDate1 > SAL_MAX_INT32 - nNullDate)
+                            || nDate2 > (SAL_MAX_INT32 - nNullDate))
+                        {
+                            PushIllegalArgument();
+                            break;
+                        }
+                        nDate2 += nNullDate;
+                        nDate1 += nNullDate;
+                        const auto aHolidaySerials = selibreoffice::toApiDateSerials(nSortArray);
+                        PushDouble(static_cast<double>(sedatetime::countWorkdays(
+                            nDate1, nDate2, aHolidaySerials,
+                            selibreoffice::toApiWeekendMask(bWeekendMask))));
+                    }
+                    break;
+                    case ocWorkday_MS       :
+                    {
+                        warnIfLegacyDateFamilyReached(u"WORKDAY.INTL");
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 2, 4))
+                            break;
+
+                        nFuncFmtType = SvNumFormatType::DATE;
+                        std::vector<double> nSortArray;
+                        bool bWeekendMask[7];
+                        const Date& rNullDate = mrContext.NFGetNullDate();
+                        sal_Int32 nNullDate = rNullDate.GetAsNormalizedDays();
+                        FormulaError nErr = GetWeekendAndHolidayMasks_MS(
+                            nParamCount, nNullDate, nSortArray, bWeekendMask, true);
+                        if (nErr != FormulaError::NONE)
+                        {
+                            PushError(nErr);
+                            break;
+                        }
+                        sal_Int32 nDays = GetFloor32();
+                        sal_Int32 nDate = GetFloor32();
+                        if (nGlobalError != FormulaError::NONE
+                            || (nDate > SAL_MAX_INT32 - nNullDate))
+                        {
+                            PushIllegalArgument();
+                            break;
+                        }
+                        nDate += nNullDate;
+                        if (!nDays)
+                        {
+                            PushDouble(static_cast<double>(nDate - nNullDate));
+                            break;
+                        }
+                        const auto aHolidaySerials = selibreoffice::toApiDateSerials(nSortArray);
+                        PushDouble(static_cast<double>(sedatetime::advanceWorkday(
+                                       nDate, nDays, aHolidaySerials,
+                                       selibreoffice::toApiWeekendMask(bWeekendMask))
+                                   - nNullDate));
+                    }
+                    break;
+                    case ocGetHour          :
+                        warnIfLegacyDateFamilyReached(u"HOUR");
+                        PushDouble(sedatetime::extractHour(GetDouble()));
+                        break;
+                    case ocGetMin           :
+                        warnIfLegacyDateFamilyReached(u"MINUTE");
+                        PushDouble(sedatetime::extractMinute(GetDouble()));
+                        break;
+                    case ocGetSec           :
+                        warnIfLegacyDateFamilyReached(u"SECOND");
+                        PushDouble(sedatetime::extractSecond(GetDouble()));
+                        break;
                     case ocPlusMinus        :
                         warnIfLegacyScalarRootReached(u"UNARY_PLUS");
                         PushInt(semath::computePlusMinus(GetDouble()));
                         break;
                     case ocAbs              :
-                        pushLegacyMathScalarUnary(u"ABS", semath::computeAbs);
+                        warnIfLegacyDefaultOnReached(
+                            u"ABS", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeAbs(GetDouble()));
                         break;
                     case ocInt              :
-                        pushLegacyMathScalarUnary(u"INT", semath::computeInt);
+                        warnIfLegacyDefaultOnReached(
+                            u"INT", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeInt(GetDouble()));
                         break;
                     case ocEven             :
-                        pushLegacyMathScalarUnary(u"EVEN", semath::computeEven);
+                        warnIfLegacyDefaultOnReached(
+                            u"EVEN", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeEven(GetDouble()));
                         break;
                     case ocOdd              :
-                        pushLegacyMathScalarUnary(u"ODD", semath::computeOdd);
+                        warnIfLegacyDefaultOnReached(
+                            u"ODD", "family-local default-on math scalar reached ScInterpreter");
+                        PushDouble(semath::computeOdd(GetDouble()));
                         break;
                     case ocPhi              :
                         PushDouble(semath::evaluateNormalDistribution(GetDouble(), 0.0, 1.0, false)
@@ -10415,51 +9700,218 @@ StackVar ScInterpreter::Interpret()
                     case ocValue            : pushLegacyValue();        break;
                     case ocNumberValue      : pushLegacyNumberValue();  break;
                     case ocChar             : pushLegacyChar();             break;
-                    case ocArcTan2          : pushLegacyArcTan2();          break;
-                    case ocMod              : pushLegacyMod();              break;
+                    case ocArcTan2          :
+                        warnIfLegacyDefaultOnReached(
+                            u"ATAN2", "family-local default-on math scalar reached ScInterpreter");
+                        if (MustHaveParamCount(GetByte(), 2))
+                        {
+                            double fVal2 = GetDouble();
+                            double fVal1 = GetDouble();
+                            PushDouble(semath::computeArcTan2(fVal2, fVal1));
+                        }
+                        break;
+                    case ocMod              :
+                    {
+                        warnIfLegacyDefaultOnReached(
+                            u"MOD", "family-local default-on math scalar reached ScInterpreter");
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            break;
+                        double fDenom = GetDouble();
+                        if (fDenom == 0.0)
+                        {
+                            PushError(FormulaError::DivisionByZero);
+                            break;
+                        }
+                        double fNum = GetDouble();
+                        if (std::optional<double> fResult = semath::computeMod(fNum, fDenom))
+                            PushDouble(*fResult);
+                        else
+                            PushError(FormulaError::NoValue);
+                    }
+                    break;
                     case ocPower            :
                         if (MustHaveParamCount(GetByte(), 2))
                             ScPow();
                         break;
                     case ocRound            :
-                        pushLegacyRound(u"ROUND", rtl_math_RoundingMode_Corrected);
+                        warnIfLegacyDefaultOnReached(
+                            u"ROUND", "family-local default-on round reached ScInterpreter");
+                        RoundNumber(rtl_math_RoundingMode_Corrected);
                         break;
-                    case ocRoundSig         : pushLegacyRoundSignificant(); break;
+                    case ocRoundSig         :
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", u"ROUNDSIG",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            "family-local default-on ROUNDSIG reached ScInterpreter");
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            break;
+                        {
+                            const double fDigits = GetDouble();
+                            const double fValue = GetDouble();
+                            pushValueResult(semath::evaluateRoundSigValue(fValue, fDigits));
+                        }
+                        break;
                     case ocRoundUp          :
-                        pushLegacyRound(u"ROUNDUP", rtl_math_RoundingMode_Up);
+                        warnIfLegacyDefaultOnReached(
+                            u"ROUNDUP", "family-local default-on round reached ScInterpreter");
+                        RoundNumber(rtl_math_RoundingMode_Up);
                         break;
                     case ocTrunc            :
-                        pushLegacyRound(u"TRUNC", rtl_math_RoundingMode_Down);
+                        warnIfLegacyDefaultOnReached(
+                            u"TRUNC", "family-local default-on round reached ScInterpreter");
+                        RoundNumber(rtl_math_RoundingMode_Down);
                         break;
                     case ocRoundDown        :
-                        pushLegacyRound(u"ROUNDDOWN", rtl_math_RoundingMode_Down);
+                        warnIfLegacyDefaultOnReached(
+                            u"ROUNDDOWN", "family-local default-on round reached ScInterpreter");
+                        RoundNumber(rtl_math_RoundingMode_Down);
                         break;
                     case ocCeil             :
-                        pushLegacyCeil(u"CEILING", true);
-                        break;
+                    case ocCeil_Math        :
+                    {
+                        const bool bODFF = eOp == ocCeil;
+                        warnIfLegacyDefaultOnReached(
+                            bODFF ? u"CEILING" : u"CEILING.MATH",
+                            "family-local default-on math scalar reached ScInterpreter");
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 1, 3))
+                            break;
+                        bool bAbs = nParamCount == 3 && GetBool();
+                        double fDec;
+                        double fVal;
+                        if (nParamCount == 1)
+                        {
+                            fVal = GetDouble();
+                            fDec = (fVal < 0 ? -1 : 1);
+                        }
+                        else
+                        {
+                            bool bArgumentMissing = IsMissing();
+                            fDec = GetDouble();
+                            fVal = GetDouble();
+                            if (bArgumentMissing)
+                                fDec = (fVal < 0 ? -1 : 1);
+                        }
+                        if (fVal == 0 || fDec == 0.0)
+                            PushInt(0);
+                        else if (std::optional<double> fResult
+                                 = semath::computeCeiling(fVal, fDec, bAbs, bODFF))
+                            PushDouble(*fResult);
+                        else
+                            PushIllegalArgument();
+                    }
+                    break;
                     case ocCeil_MS          :
-                        pushLegacyCeilMs(u"COM.MICROSOFT.CEILING");
+                        warnIfLegacyDefaultOnReached(
+                            u"COM.MICROSOFT.CEILING",
+                            "family-local default-on math scalar reached ScInterpreter");
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            break;
+                        {
+                            double fDec = GetDouble();
+                            double fVal = GetDouble();
+                            if (std::optional<double> fResult
+                                = semath::computeCeilingMs(fVal, fDec))
+                                PushDouble(*fResult);
+                            else
+                                PushIllegalArgument();
+                        }
                         break;
                     case ocCeil_Precise     :
-                        pushLegacyCeilPrecise(u"CEILING.PRECISE");
-                        break;
                     case ocCeil_ISO         :
-                        pushLegacyCeilPrecise(u"ISO.CEILING");
-                        break;
-                    case ocCeil_Math        :
-                        pushLegacyCeil(u"CEILING.MATH", false);
-                        break;
+                    {
+                        warnIfLegacyDefaultOnReached(
+                            eOp == ocCeil_Precise ? u"CEILING.PRECISE" : u"ISO.CEILING",
+                            "family-local default-on math scalar reached ScInterpreter");
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 1, 2))
+                            break;
+                        double fDec;
+                        double fVal;
+                        if (nParamCount == 1)
+                        {
+                            fVal = GetDouble();
+                            fDec = 1.0;
+                        }
+                        else
+                        {
+                            fDec = std::abs(GetDoubleWithDefault(1.0));
+                            fVal = GetDouble();
+                        }
+                        if (fDec == 0.0 || fVal == 0.0)
+                            PushInt(0);
+                        else
+                            PushDouble(semath::computeCeilingPrecise(fVal, fDec));
+                    }
+                    break;
                     case ocFloor            :
-                        pushLegacyFloor(u"FLOOR", true);
-                        break;
+                    case ocFloor_Math       :
+                    {
+                        const bool bODFF = eOp == ocFloor;
+                        warnIfLegacyDefaultOnReached(
+                            bODFF ? u"FLOOR" : u"FLOOR.MATH",
+                            "family-local default-on math scalar reached ScInterpreter");
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 1, 3))
+                            break;
+                        bool bAbs = (nParamCount == 3 && GetBool());
+                        double fDec;
+                        double fVal;
+                        if (nParamCount == 1)
+                        {
+                            fVal = GetDouble();
+                            fDec = (fVal < 0 ? -1 : 1);
+                        }
+                        else
+                        {
+                            bool bArgumentMissing = IsMissing();
+                            fDec = GetDouble();
+                            fVal = GetDouble();
+                            if (bArgumentMissing)
+                                fDec = (fVal < 0 ? -1 : 1);
+                        }
+                        if (fDec == 0.0 || fVal == 0.0)
+                            PushInt(0);
+                        else if (std::optional<double> fResult
+                                 = semath::computeFloor(fVal, fDec, bAbs, bODFF))
+                            PushDouble(*fResult);
+                        else
+                            PushIllegalArgument();
+                    }
+                    break;
                     case ocFloor_MS         :
-                        pushLegacyFloorMs(u"COM.MICROSOFT.FLOOR");
+                        warnIfLegacyDefaultOnReached(
+                            u"COM.MICROSOFT.FLOOR",
+                            "family-local default-on math scalar reached ScInterpreter");
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            break;
+                        {
+                            double fDec = GetDouble();
+                            double fVal = GetDouble();
+                            if (std::optional<double> fResult
+                                = semath::computeFloorMs(fVal, fDec))
+                                PushDouble(*fResult);
+                            else
+                                PushIllegalArgument();
+                        }
                         break;
                     case ocFloor_Precise    :
-                        pushLegacyFloorPrecise(u"FLOOR.PRECISE");
-                        break;
-                    case ocFloor_Math       :
-                        pushLegacyFloor(u"FLOOR.MATH", false);
+                        warnIfLegacyDefaultOnReached(
+                            u"FLOOR.PRECISE",
+                            "family-local default-on math scalar reached ScInterpreter");
+                        {
+                            sal_uInt8 nParamCount = GetByte();
+                            if (!MustHaveParamCount(nParamCount, 1, 2))
+                                break;
+                            double fDec = nParamCount == 1 ? 1.0 : std::abs(GetDoubleWithDefault(1.0));
+                            double fVal = GetDouble();
+                            if (fDec == 0.0 || fVal == 0.0)
+                                PushInt(0);
+                            else
+                                PushDouble(semath::computeFloorPrecise(fVal, fDec));
+                        }
                         break;
                     case ocSumProduct       : pushLegacySumProduct();       break;
                     case ocSumSQ            : pushLegacySumSq();            break;
@@ -10467,14 +9919,104 @@ StackVar ScInterpreter::Interpret()
                     case ocSumX2DY2         : ScSumX2DY2();                 break;
                     case ocSumXMY2          : ScSumXMY2();                  break;
                     case ocRawSubtract      : pushLegacyRawSubtract();      break;
-                    case ocLog              : pushLegacyLog();              break;
+                    case ocLog              :
+                    {
+                        warnIfLegacyDefaultOnReached(
+                            u"LOG", "family-local default-on math scalar reached ScInterpreter");
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 1, 2))
+                            break;
+                        double fBase = nParamCount == 2 ? GetDouble() : 10.0;
+                        double fVal = GetDouble();
+                        if (std::optional<double> fResult = semath::computeLog(fVal, fBase))
+                            PushDouble(*fResult);
+                        else
+                            PushIllegalArgument();
+                    }
+                    break;
                     case ocGCD              : pushLegacyGcdOrLcm(u"GCD", false); break;
                     case ocLCM              : pushLegacyGcdOrLcm(u"LCM", true); break;
-                    case ocGetDate          : pushLegacyDate();         break;
-                    case ocGetTime          : pushLegacyTime();         break;
-                    case ocGetDiffDate      : pushLegacyDiffDate();     break;
-                    case ocGetDiffDate360   : pushLegacyDiffDate360();  break;
-                    case ocGetDateDif       : pushLegacyDateDif();      break;
+                    case ocGetDate          :
+                        warnIfLegacyDateFamilyReached(u"DATE");
+                        nFuncFmtType = SvNumFormatType::DATE;
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        {
+                            sal_Int16 nDay = GetInt16();
+                            sal_Int16 nMonth = GetInt16();
+                            if (IsMissing())
+                                SetError(FormulaError::ParameterExpected);
+                            sal_Int16 nYear = GetInt16();
+                            if (nGlobalError != FormulaError::NONE || nYear < 0)
+                                PushIllegalArgument();
+                            else
+                                PushDouble(GetDateSerial(nYear, nMonth, nDay, false));
+                        }
+                        break;
+                    case ocGetTime          :
+                        warnIfLegacyDateFamilyReached(u"TIME");
+                        nFuncFmtType = SvNumFormatType::TIME;
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        {
+                            double fSec = GetDouble();
+                            double fMin = GetDouble();
+                            double fHour = GetDouble();
+                            if (std::optional<double> fTime
+                                = sedatetime::makeTimeSerial(fHour, fMin, fSec))
+                                PushDouble(*fTime);
+                            else
+                                PushIllegalArgument();
+                        }
+                        break;
+                    case ocGetDiffDate      :
+                        warnIfLegacyDateFamilyReached(u"DAYS");
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            break;
+                        {
+                            double fDate2 = GetDouble();
+                            double fDate1 = GetDouble();
+                            PushDouble(sedatetime::computeDiffDate(fDate1, fDate2));
+                        }
+                        break;
+                    case ocGetDiffDate360   :
+                    {
+                        warnIfLegacyDateFamilyReached(u"DAYS360");
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 2, 3))
+                            break;
+                        bool bFlag = nParamCount == 3 && GetBool();
+                        sal_Int32 nDate2 = GetFloor32();
+                        sal_Int32 nDate1 = GetFloor32();
+                        if (nGlobalError != FormulaError::NONE)
+                            PushError(nGlobalError);
+                        else
+                            PushDouble(sedatetime::computeDiffDate360(
+                                selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), nDate1,
+                                nDate2, bFlag));
+                    }
+                    break;
+                    case ocGetDateDif       :
+                        warnIfLegacyDateFamilyReached(u"DATEDIF");
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        {
+                            OUString aInterval = GetString().getString();
+                            sal_Int32 nDate2 = GetFloor32();
+                            sal_Int32 nDate1 = GetFloor32();
+                            if (nGlobalError != FormulaError::NONE)
+                            {
+                                PushError(nGlobalError);
+                                break;
+                            }
+                            if (std::optional<double> fResult = sedatetime::computeDateDif(
+                                    selibreoffice::toApiDateParts(mrContext.NFGetNullDate()), nDate1,
+                                    nDate2, selibreoffice::toApiString(aInterval)))
+                                PushDouble(*fResult);
+                            else
+                                PushIllegalArgument();
+                        }
+                        break;
                     case ocMin              : pushLegacyMin(false);         break;
                     case ocMinA             : pushLegacyMin(true);          break;
                     case ocMax              : pushLegacyMax(false);         break;
@@ -10484,7 +10026,19 @@ StackVar ScInterpreter::Interpret()
                     case ocNPV              : pushLegacyNpv();          break;
                     case ocIRR              : pushLegacyIrr();          break;
                     case ocMIRR             : pushLegacyMirr();         break;
-                    case ocISPMT            : pushLegacyIspmt();        break;
+                    case ocISPMT            :
+                    {
+                        warnIfLegacyRateFamilyReached(u"ISPMT");
+                        if (!MustHaveParamCount(GetByte(), 4))
+                            break;
+                        double fInvest = GetDouble();
+                        double fTotal = GetDouble();
+                        double fPeriod = GetDouble();
+                        double fRate = GetDouble();
+                        pushValueResult(sefinance::evaluateInterestSchedulePayment(
+                            fRate, fPeriod, fTotal, fInvest));
+                    }
+                    break;
                     case ocAverage          : pushLegacyAverage(false);     break;
                     case ocAverageA         : pushLegacyAverage(true);      break;
                     case ocCount            : ScCount();                    break;
@@ -10501,24 +10055,203 @@ StackVar ScInterpreter::Interpret()
                     case ocStDevP           :
                     case ocStDevP_MS        : pushLegacyStDevP(false);      break;
                     case ocStDevPA          : pushLegacyStDevP(true);       break;
-                    case ocPV               : pushLegacyPv();           break;
-                    case ocSYD              : pushLegacySyd();          break;
-                    case ocDDB              : pushLegacyDdb();          break;
-                    case ocDB               : pushLegacyDb();           break;
-                    case ocVBD              : pushLegacyVdb();          break;
-                    case ocPDuration        : pushLegacyPDuration();    break;
-                    case ocSLN              : pushLegacySln();          break;
-                    case ocPMT              : pushLegacyPmt();          break;
+                    case ocPV               :
+                    {
+                        warnIfLegacyRateFamilyReached(u"PV");
+                        nFuncFmtType = SvNumFormatType::CURRENCY;
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 3, 5))
+                            break;
+                        bool bPayInAdvance = nParamCount == 5 && GetBool();
+                        double fFv = nParamCount >= 4 ? GetDouble() : 0.0;
+                        double fPmt = GetDouble();
+                        double fNper = GetDouble();
+                        double fRate = GetDouble();
+                        pushValueResult(sefinance::evaluatePresentValue(
+                            fRate, fNper, fPmt, fFv, bPayInAdvance));
+                    }
+                    break;
+                    case ocSYD              :
+                    {
+                        warnIfLegacyRateFamilyReached(u"SYD");
+                        nFuncFmtType = SvNumFormatType::CURRENCY;
+                        if (!MustHaveParamCount(GetByte(), 4))
+                            break;
+                        double fPer = GetDouble();
+                        double fLife = GetDouble();
+                        double fSalvage = GetDouble();
+                        double fCost = GetDouble();
+                        pushValueResult(sefinance::evaluateSumOfYearsDepreciation(
+                            fCost, fSalvage, fLife, fPer));
+                    }
+                    break;
+                    case ocDDB              :
+                    {
+                        warnIfLegacyRateFamilyReached(u"DDB");
+                        nFuncFmtType = SvNumFormatType::CURRENCY;
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 4, 5))
+                            break;
+                        double fFactor = nParamCount == 5 ? GetDouble() : 2.0;
+                        double fPeriod = GetDouble();
+                        double fLife = GetDouble();
+                        double fSalvage = GetDouble();
+                        double fCost = GetDouble();
+                        pushValueResult(sefinance::evaluateDoubleDecliningBalance(
+                            fCost, fSalvage, fLife, fPeriod, fFactor));
+                    }
+                    break;
+                    case ocDB               :
+                    {
+                        warnIfLegacyRateFamilyReached(u"DB");
+                        nFuncFmtType = SvNumFormatType::CURRENCY;
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 4, 5))
+                            break;
+                        double fMonths = nParamCount == 4 ? 12.0 : ::rtl::math::approxFloor(GetDouble());
+                        double fPeriod = GetDouble();
+                        double fLife = GetDouble();
+                        double fSalvage = GetDouble();
+                        double fCost = GetDouble();
+                        pushValueResult(sefinance::evaluateFixedDecliningBalance(
+                            fCost, fSalvage, fLife, fPeriod, fMonths));
+                    }
+                    break;
+                    case ocVBD              :
+                    {
+                        warnIfLegacyRateFamilyReached(u"VDB");
+                        nFuncFmtType = SvNumFormatType::CURRENCY;
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 5, 7))
+                            break;
+                        bool bNoSwitch = nParamCount == 7 && GetBool();
+                        double fFactor = nParamCount >= 6 ? GetDouble() : 2.0;
+                        double fEnd = GetDouble();
+                        double fStart = GetDouble();
+                        double fLife = GetDouble();
+                        double fSalvage = GetDouble();
+                        double fCost = GetDouble();
+                        pushValueResult(sefinance::evaluateVariableDecliningBalance(
+                            fCost, fSalvage, fLife, fStart, fEnd, fFactor, bNoSwitch));
+                    }
+                    break;
+                    case ocPDuration        :
+                    {
+                        warnIfLegacyRateFamilyReached(u"PDURATION");
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        double fFuture = GetDouble();
+                        double fPresent = GetDouble();
+                        double fRate = GetDouble();
+                        pushValueResult(sefinance::evaluatePaybackDuration(
+                            fRate, fPresent, fFuture));
+                    }
+                    break;
+                    case ocSLN              :
+                    {
+                        warnIfLegacyRateFamilyReached(u"SLN");
+                        nFuncFmtType = SvNumFormatType::CURRENCY;
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        double fLife = GetDouble();
+                        double fSalvage = GetDouble();
+                        double fCost = GetDouble();
+                        pushValueResult(sefinance::evaluateStraightLineDepreciation(
+                            fCost, fSalvage, fLife));
+                    }
+                    break;
+                    case ocPMT              :
+                    {
+                        warnIfLegacyRateFamilyReached(u"PMT");
+                        nFuncFmtType = SvNumFormatType::CURRENCY;
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 3, 5))
+                            break;
+                        bool bPayInAdvance = nParamCount == 5 && GetBool();
+                        double fFv = nParamCount >= 4 ? GetDouble() : 0.0;
+                        double fPv = GetDouble();
+                        double fNper = GetDouble();
+                        double fRate = GetDouble();
+                        pushValueResult(sefinance::evaluatePayment(
+                            fRate, fNper, fPv, fFv, bPayInAdvance));
+                    }
+                    break;
                     case ocColumns          : ScColumns();              break;
                     case ocRows             : ScRows();                 break;
                     case ocSheets           : ScSheets();               break;
                     case ocColumn           : ScColumn();               break;
                     case ocRow              : ScRow();                  break;
                     case ocSheet            : ScSheet();                break;
-                    case ocRRI              : pushLegacyRri();          break;
-                    case ocFV               : pushLegacyFv();           break;
-                    case ocNper             : pushLegacyNper();         break;
-                    case ocRate             : pushLegacyRate();         break;
+                    case ocRRI              :
+                    {
+                        warnIfLegacyRateFamilyReached(u"RRI");
+                        nFuncFmtType = SvNumFormatType::PERCENT;
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        double fFutureValue = GetDouble();
+                        double fPresentValue = GetDouble();
+                        double fNrOfPeriods = GetDouble();
+                        pushValueResult(sefinance::evaluateGrowthRateOverPeriods(
+                            fNrOfPeriods, fPresentValue, fFutureValue));
+                    }
+                    break;
+                    case ocFV               :
+                    {
+                        warnIfLegacyRateFamilyReached(u"FV");
+                        nFuncFmtType = SvNumFormatType::CURRENCY;
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 3, 5))
+                            break;
+                        bool bPayInAdvance = nParamCount == 5 && GetBool();
+                        double fPv = nParamCount >= 4 ? GetDouble() : 0.0;
+                        double fPmt = GetDouble();
+                        double fNper = GetDouble();
+                        double fRate = GetDouble();
+                        pushValueResult(sefinance::evaluateFutureValue(
+                            fRate, fNper, fPmt, fPv, bPayInAdvance));
+                    }
+                    break;
+                    case ocNper             :
+                    {
+                        warnIfLegacyRateFamilyReached(u"NPER");
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 3, 5))
+                            break;
+                        bool bPayInAdvance = nParamCount == 5 && GetBool();
+                        double fFV = nParamCount >= 4 ? GetDouble() : 0.0;
+                        double fPV = GetDouble();
+                        double fPmt = GetDouble();
+                        double fRate = GetDouble();
+                        pushValueResult(sefinance::evaluatePeriodsForFutureValue(
+                            fRate, fPmt, fPV, fFV, bPayInAdvance));
+                    }
+                    break;
+                    case ocRate             :
+                    {
+                        warnIfLegacyRateFamilyReached(u"RATE");
+                        nFuncFmtType = SvNumFormatType::PERCENT;
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 3, 6))
+                            break;
+                        double fGuess = nParamCount == 6 ? GetDouble() : 0.1;
+                        bool bDefaultGuess = nParamCount != 6;
+                        bool bPayType = nParamCount >= 5 && GetBool();
+                        double fFv = nParamCount >= 4 ? GetDouble() : 0.0;
+                        double fPv = GetDouble();
+                        double fPayment = GetDouble();
+                        double fNper = GetDouble();
+                        if (fNper <= 0.0)
+                        {
+                            PushIllegalArgument();
+                            break;
+                        }
+                        const semath::FinancialRateResult aResult = semath::solveRate(
+                            fNper, fPayment, fPv, fFv, bPayType, fGuess, bDefaultGuess);
+                        if (!aResult.mbConverged)
+                            SetError(FormulaError::NoConvergence);
+                        PushDouble(aResult.mfRate);
+                    }
+                    break;
                     case ocFilterXML        : ScFilterXML();            break;
                     case ocWebservice       : ScWebservice();           break;
                     case ocEncodeURL        : pushLegacyEncodeUrl();    break;
@@ -10538,12 +10271,94 @@ StackVar ScInterpreter::Interpret()
                                 semath::evaluateComplementaryErrorFunction(GetDouble()));
                         }
                         break;
-                    case ocIpmt             : pushLegacyIpmt();         break;
-                    case ocPpmt             : pushLegacyPpmt();         break;
-                    case ocCumIpmt          : pushLegacyCumIpmt();      break;
-                    case ocCumPrinc         : pushLegacyCumPrinc();     break;
-                    case ocEffect           : pushLegacyEffect();       break;
-                    case ocNominal          : pushLegacyNominal();      break;
+                    case ocIpmt             :
+                    {
+                        warnIfLegacyRateFamilyReached(u"IPMT");
+                        nFuncFmtType = SvNumFormatType::CURRENCY;
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 4, 6))
+                            break;
+                        bool bPayInAdvance = nParamCount == 6 && GetBool();
+                        double fFv = nParamCount >= 5 ? GetDouble() : 0.0;
+                        double fPv = GetDouble();
+                        double fNper = GetDouble();
+                        double fPer = GetDouble();
+                        double fRate = GetDouble();
+                        pushValueResult(sefinance::evaluateInterestPayment(
+                            fRate, fPer, fNper, fPv, fFv, bPayInAdvance));
+                    }
+                    break;
+                    case ocPpmt             :
+                    {
+                        warnIfLegacyRateFamilyReached(u"PPMT");
+                        nFuncFmtType = SvNumFormatType::CURRENCY;
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 4, 6))
+                            break;
+                        bool bPayInAdvance = nParamCount == 6 && GetBool();
+                        double fFv = nParamCount >= 5 ? GetDouble() : 0.0;
+                        double fPv = GetDouble();
+                        double fNper = GetDouble();
+                        double fPer = GetDouble();
+                        double fRate = GetDouble();
+                        pushValueResult(sefinance::evaluatePrincipalPayment(
+                            fRate, fPer, fNper, fPv, fFv, bPayInAdvance));
+                    }
+                    break;
+                    case ocCumIpmt          :
+                    {
+                        warnIfLegacyRateFamilyReached(u"CUMIPMT");
+                        nFuncFmtType = SvNumFormatType::CURRENCY;
+                        if (!MustHaveParamCount(GetByte(), 6))
+                            break;
+                        double fFlag = GetDoubleWithDefault(-1.0);
+                        double fEnd = ::rtl::math::approxFloor(GetDouble());
+                        double fStart = ::rtl::math::approxFloor(GetDouble());
+                        double fPv = GetDouble();
+                        double fNper = GetDouble();
+                        double fRate = GetDouble();
+                        pushValueResult(sefinance::evaluateCumulativeInterest(
+                            fRate, fNper, fPv, fStart, fEnd, static_cast<bool>(fFlag)));
+                    }
+                    break;
+                    case ocCumPrinc         :
+                    {
+                        warnIfLegacyRateFamilyReached(u"CUMPRINC");
+                        nFuncFmtType = SvNumFormatType::CURRENCY;
+                        if (!MustHaveParamCount(GetByte(), 6))
+                            break;
+                        double fFlag = GetDoubleWithDefault(-1.0);
+                        double fEnd = ::rtl::math::approxFloor(GetDouble());
+                        double fStart = ::rtl::math::approxFloor(GetDouble());
+                        double fPv = GetDouble();
+                        double fNper = GetDouble();
+                        double fRate = GetDouble();
+                        pushValueResult(sefinance::evaluateCumulativePrincipal(
+                            fRate, fNper, fPv, fStart, fEnd, static_cast<bool>(fFlag)));
+                    }
+                    break;
+                    case ocEffect           :
+                    {
+                        warnIfLegacyRateFamilyReached(u"EFFECT");
+                        nFuncFmtType = SvNumFormatType::PERCENT;
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            break;
+                        double fPeriods = ::rtl::math::approxFloor(GetDouble());
+                        double fNominal = GetDouble();
+                        pushValueResult(sefinance::evaluateEffectiveAnnualRate(fNominal, fPeriods));
+                    }
+                    break;
+                    case ocNominal          :
+                    {
+                        warnIfLegacyRateFamilyReached(u"NOMINAL");
+                        nFuncFmtType = SvNumFormatType::PERCENT;
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            break;
+                        double fPeriods = ::rtl::math::approxFloor(GetDouble());
+                        double fEffective = GetDouble();
+                        pushValueResult(sefinance::evaluateNominal(fEffective, fPeriods));
+                    }
+                    break;
                     case ocSubTotal         : ScSubTotal();                 break;
                     case ocAggregate        : pushLegacyAggregate();        break;
                     case ocDBSum            : ScDBSum();                    break;
@@ -11375,12 +11190,202 @@ StackVar ScInterpreter::Interpret()
                     case ocCurrent          : ScCurrent();                  break;
                     case ocStyle            : ScStyle();                    break;
                     case ocDde              : ScDde();                      break;
-                    case ocBase             : pushLegacyBase();             break;
-                    case ocDecimal          : pushLegacyDecimal();          break;
-                    case ocConvertOOo       : pushLegacyConvert();          break;
-                    case ocEuroConvert      : pushLegacyEuroConvert();      break;
-                    case ocRoman            : pushLegacyRoman();            break;
-                    case ocArabic           : pushLegacyArabic();           break;
+                    case ocBase             :
+                    {
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", u"BASE",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            "family-local default-on numeral conversion reached ScInterpreter");
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 2, 3))
+                            break;
+                        std::optional<double> ofMinLength;
+                        if (nParamCount == 3)
+                            ofMinLength = GetDouble();
+                        const double fBase = GetDouble();
+                        const double fValue = GetDouble();
+                        if (nGlobalError != FormulaError::NONE)
+                        {
+                            PushIllegalArgument();
+                            break;
+                        }
+                        const auto aResult = seconvert::evaluateBaseValue(fValue, fBase, ofMinLength);
+                        if (aResult)
+                            PushString(selibreoffice::toLibreOfficeString(aResult.maValue));
+                        else if (aResult.meError == spreadsheetengine::api::Error::StringOverflow)
+                            PushError(FormulaError::StringOverflow);
+                        else
+                            PushIllegalArgument();
+                    }
+                    break;
+                    case ocDecimal          :
+                    {
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", u"DECIMAL",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            "family-local default-on numeral conversion reached ScInterpreter");
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            break;
+                        const double fBase = GetDouble();
+                        const OUString aText = GetString().getString();
+                        if (nGlobalError != FormulaError::NONE)
+                        {
+                            PushIllegalArgument();
+                            break;
+                        }
+                        const auto aResult
+                            = seconvert::evaluateDecimalValue(selibreoffice::toApiString(aText), fBase);
+                        if (aResult)
+                            PushDouble(aResult.maValue);
+                        else
+                            PushIllegalArgument();
+                    }
+                    break;
+                    case ocConvertOOo       :
+                    {
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", u"CONVERT",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            "family-local default-on CONVERT reached ScInterpreter");
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        OUString aToUnit = GetString().getString();
+                        OUString aFromUnit = GetString().getString();
+                        double fVal = GetDouble();
+                        if (nGlobalError != FormulaError::NONE)
+                        {
+                            PushError(nGlobalError);
+                            break;
+                        }
+                        const auto aResult = seconvert::evaluateConvertValue(
+                            fVal, selibreoffice::toApiString(aFromUnit),
+                            selibreoffice::toApiString(aToUnit));
+                        if (aResult)
+                            PushDouble(aResult.maValue);
+                        else
+                            PushNA();
+                    }
+                    break;
+                    case ocEuroConvert      :
+                    {
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", u"EUROCONVERT",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            "family-local default-on numeral conversion reached ScInterpreter");
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 3, 5))
+                            break;
+                        double fPrecision = 0.0;
+                        if (nParamCount == 5)
+                        {
+                            fPrecision = ::rtl::math::approxFloor(GetDouble());
+                            if (fPrecision < 3)
+                            {
+                                PushIllegalArgument();
+                                break;
+                            }
+                        }
+                        bool bFullPrecision = nParamCount >= 4 && GetBool();
+                        OUString aToUnit = GetString().getString();
+                        OUString aFromUnit = GetString().getString();
+                        double fVal = GetDouble();
+                        if (nGlobalError != FormulaError::NONE)
+                        {
+                            PushError(nGlobalError);
+                            break;
+                        }
+                        const auto aConverted = seconvert::evaluateEuroConvertValue(
+                            fVal, selibreoffice::toApiString(aFromUnit),
+                            selibreoffice::toApiString(aToUnit), true, !bFullPrecision);
+                        if (!aConverted)
+                        {
+                            PushIllegalArgument();
+                            break;
+                        }
+                        double fRes = aConverted.maValue;
+                        if (fPrecision && !aFromUnit.equalsIgnoreAsciiCase("EUR")
+                            && !aFromUnit.equalsIgnoreAsciiCase(aToUnit))
+                        {
+                            const auto aIntermediate = seconvert::evaluateEuroConvertValue(
+                                fVal, selibreoffice::toApiString(aFromUnit), u"EUR", true, false);
+                            if (!aIntermediate)
+                            {
+                                PushIllegalArgument();
+                                break;
+                            }
+                            const double fRoundedIntermediate
+                                = ::rtl::math::round(aIntermediate.maValue, static_cast<int>(fPrecision));
+                            const auto aTriangulated = seconvert::evaluateEuroConvertValue(
+                                fRoundedIntermediate, u"EUR", selibreoffice::toApiString(aToUnit),
+                                true, !bFullPrecision);
+                            if (!aTriangulated)
+                            {
+                                PushIllegalArgument();
+                                break;
+                            }
+                            fRes = aTriangulated.maValue;
+                        }
+                        PushDouble(fRes);
+                    }
+                    break;
+                    case ocRoman            :
+                    {
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", u"ROMAN",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            "family-local default-on numeral conversion reached ScInterpreter");
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 1, 2))
+                            break;
+                        std::optional<double> ofMode;
+                        if (nParamCount == 2)
+                            ofMode = GetDouble();
+                        const double fValue = GetDouble();
+                        if (nGlobalError != FormulaError::NONE)
+                        {
+                            PushError(nGlobalError);
+                            break;
+                        }
+                        const auto aResult = seconvert::evaluateRomanValue(fValue, ofMode);
+                        if (aResult)
+                            PushString(selibreoffice::toLibreOfficeString(aResult.maValue));
+                        else
+                            PushIllegalArgument();
+                    }
+                    break;
+                    case ocArabic           :
+                    {
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", u"ARABIC",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            "family-local default-on numeral conversion reached ScInterpreter");
+                        if (!MustHaveParamCount(GetByte(), 1))
+                            break;
+                        const OUString aRoman = GetString().getString();
+                        if (nGlobalError != FormulaError::NONE)
+                        {
+                            PushError(nGlobalError);
+                            break;
+                        }
+                        if (const auto oArabic
+                            = seconvert::convertFromRoman(selibreoffice::toApiString(aRoman)))
+                            PushInt(*oArabic);
+                        else
+                            PushIllegalArgument();
+                    }
+                    break;
                     case ocInfo             : ScInfo();                 break;
                     case ocHyperLink        : ScHyperLink();            break;
                     case ocBahtText         : pushLegacyBahtText();     break;
