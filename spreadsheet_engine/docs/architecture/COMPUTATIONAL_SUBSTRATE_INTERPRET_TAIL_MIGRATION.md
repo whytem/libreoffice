@@ -298,7 +298,11 @@ actually using them. On the standing corpus those runtime counters are still
 `0 / 0 / 0` for operator attempts even though it now reaches classic
 `ScInterpreter::Interpret()` `602` times. So the next operator slice should be
 judged by moving those runtime numbers inside the residual classic tail, not
-just by growing the static case count.
+just by growing the static case count. The first census of that tail shows
+`Bad=506` and `Range=96` as the dominant classic opcodes, with sampled formulas
+like `=of:#N/A` and `=of:#ERR504!`, which points the next slice toward
+error-literal and residual range handling rather than more scalar operator
+widening.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 

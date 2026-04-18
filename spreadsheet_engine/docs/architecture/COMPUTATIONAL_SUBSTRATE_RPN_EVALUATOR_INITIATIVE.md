@@ -155,6 +155,9 @@ Checkpoint:
   `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=0`, so the
   operator pilot is not yet carrying corpus load inside that residual classic
   tail
+- the first opcode census of that residual classic tail shows it is dominated
+  by `Bad=506` and `Range=96`, not by arithmetic or comparison opcodes, so the
+  next real engine-admission value is in error-literal and range handling
 - it covers:
   - unary numeric `Plus` / `Minus`
   - binary scalar `Add`, `Subtract`, `Multiply`, `Divide`, `Power`

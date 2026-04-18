@@ -147,7 +147,10 @@ lane also reports `0 / 0 / 0` for operator attempts even though it now reaches
 classic `ScInterpreter::Interpret()` `602` times. So the measurement is already
 doing useful work: the operator pilot is structurally landed, the audit lane is
 real, and the next gap is that the residual classic tail is not yet hitting the
-instrumented operator opcodes.
+instrumented operator opcodes. The new classic-tail opcode census shows that
+tail is mostly `Bad=506` and `Range=96`, anchored by formulas like
+`=of:#N/A` and `=of:#ERR504!`, so the next engine slice should target
+error-literal and residual range semantics before broadening operator work.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 

@@ -81,7 +81,11 @@ full-legacy replay lane also reports `0 / 0 / 0` for the operator pilot even
 though it now reaches classic `ScInterpreter::Interpret()` `602` times. That is
 the important new result: the operator pilot is landed, the audit lane is real,
 and the next bottleneck is not seam bypass anymore. The remaining classic tail
-simply is not hitting the operator opcodes we instrumented yet.
+simply is not hitting the operator opcodes we instrumented yet. The new opcode
+census shows the classic tail is dominated by `Bad=506` and `Range=96`, with
+sample formulas like `=of:#N/A` and `=of:#ERR504!`, so the next slice should
+focus on error-literal and residual range semantics rather than widening the
+scalar-operator pilot blindly.
 The current value reflects the restored original `Sc*` names after backing out
 earlier rename-only metric compression, and the quarantine audit currently
 shows `62 / 62` dispatch-reachable legacy lambdas warning when reached. This
