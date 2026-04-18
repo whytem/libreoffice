@@ -11,6 +11,10 @@ After the current honest baseline of:
 
 - `legacy_interpreter_subroutine_count=100`
 - `interp4_dispatch_legacy_lambda_count=62`
+- `interp4_dispatch_engine_attempt_count=12`
+- `interp4_dispatch_engine_attempted_total=0`
+- `interp4_dispatch_engine_succeeded_total=0`
+- `interp4_dispatch_engine_declined_total=0`
 - `interpret_tail_live_unique_unseen_formula_cells=49`
 - `interpret_tail_live_unique_fallback_formula_cells=0`
 - `interpret_tail_live_unique_unsupported_function_formula_cells=0`
@@ -135,6 +139,9 @@ Checkpoint:
 
 - the initial scalar operator contract now exists in
   `spreadsheetengine/runtime/RpnOperators.hxx`
+- Calc now has a first engine-opcode pilot for scalar binary operators in
+  `ScInterpreter::Interpret()`, but the broad replay corpus still reports
+  `interp4_dispatch_engine_attempted_total=0`
 - it covers:
   - unary numeric `Plus` / `Minus`
   - binary scalar `Add`, `Subtract`, `Multiply`, `Divide`, `Power`
@@ -142,8 +149,12 @@ Checkpoint:
   - scalar comparisons
 - reference and matrix operands still defer explicitly through
   `NeedsReferenceResolution` / `NeedsMatrixMaterialization`
-- no Calc opcode is routed through this layer yet; this checkpoint exists to
-  lock semantics before dispatch migration begins
+- the current bridge is intentionally transitional:
+  `FormulaToken` is still the operand boundary type for the pilot, and that
+  debt should shrink as the engine-native RPN loop takes shape
+- the next operator slice should be measured by moving the runtime attempt /
+  success / decline totals, not just by increasing the static attempt-case
+  count
 
 ### 4. Engine Control Flow
 

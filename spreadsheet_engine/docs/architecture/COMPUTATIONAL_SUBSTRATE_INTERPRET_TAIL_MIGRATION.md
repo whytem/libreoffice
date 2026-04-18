@@ -255,16 +255,20 @@ Two different denominators matter, and both are now reported.
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=50354`
-- `interpret_tail_live_authoritative_match_total=50350`
+- `interpret_tail_live_authoritative_probe_formula_cells=50358`
+- `interpret_tail_live_authoritative_match_total=50354`
 - `interpret_tail_live_authoritative_fallback_total=4`
 - `legacy_interpreter_subroutine_count=100`
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
+- `interp4_dispatch_engine_attempt_count=12`
+- `interp4_dispatch_engine_attempted_total=0`
+- `interp4_dispatch_engine_succeeded_total=0`
+- `interp4_dispatch_engine_declined_total=0`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
-- live authoritative-match rate over the corpus: `99.3861%`
-- live authoritative-match rate over the current promoted probe: `99.9960%`
+- live authoritative-match rate over the corpus: `99.3940%`
+- live authoritative-match rate over the current promoted probe: `99.9921%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -281,7 +285,12 @@ This latest drop came from moving the compatibility-heavy statistical /
 aggregate / test / growth block out of `Interpret()` and into
 [InterpreterCompatDispatch.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpreterCompatDispatch.hxx),
 so it is a real reduction in the relocated legacy surface rather than another
-wrapper-count-only cleanup.
+wrapper-count-only cleanup. `interp4_dispatch_engine_attempt_count` now tracks
+the new operator pilot cases that try the standalone engine first from
+`Interpret()`, and the paired runtime totals show whether replay traffic is
+actually using them. On the standing corpus those runtime counters are still
+`0 / 0 / 0`, so the next operator slice should be judged by moving those
+runtime numbers, not just by growing the static case count.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 
@@ -453,7 +462,7 @@ actually seen and supported by the seam:
 
 This is the promoted-family Calc-backed probe over the same replay corpus:
 
-- `interpret_tail_probe_formula_cells=50354`
+- `interpret_tail_probe_formula_cells=50358`
 - `interpret_tail_authoritative_total=300`
 - `interpret_tail_authoritative_fallback_total=50048`
 - raw promoted authoritative rate: `0.61%`
@@ -550,7 +559,7 @@ This is the new per-cell replay inventory over the promoted-family replay
 surface after forcing each promoted replay formula through direct live
 `Interpret()`:
 
-- `interpret_tail_replay_promoted_formula_cells=50354`
+- `interpret_tail_replay_promoted_formula_cells=50358`
 - `interpret_tail_replay_promoted_direct_seen=44741`
 - `interpret_tail_replay_promoted_direct_supported=44741`
 - `interpret_tail_replay_promoted_direct_fallback=0`
@@ -563,7 +572,7 @@ surface after forcing each promoted replay formula through direct live
 - `interpret_tail_replay_promoted_unseen_shared_member=2606`
 - `interpret_tail_replay_promoted_unseen_non_shared=2692`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=50354`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=50358`
 - `interpret_tail_replay_promoted_dirty_after_interpret=5607`
 
 Interpretation:

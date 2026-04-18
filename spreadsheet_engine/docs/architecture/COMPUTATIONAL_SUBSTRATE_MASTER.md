@@ -64,7 +64,7 @@ Today:
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to
-  `50350 / 50,661` (`99.3861%`) on the standing replay corpus, with the broad
+  `50354 / 50,661` (`99.3940%`) on the standing replay corpus, with the broad
   corpus lane stable again after fixing the intermittent `CONVERT(...)`
   runtime crash in the shared BFS conversion path, aligning imported root
   host truth for token-backed `VariableExpected` cells, promoting the
@@ -102,16 +102,20 @@ delegation.”
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=50354`
-- `interpret_tail_live_authoritative_match_total=50350`
+- `interpret_tail_live_authoritative_probe_formula_cells=50358`
+- `interpret_tail_live_authoritative_match_total=50354`
 - `interpret_tail_live_authoritative_fallback_total=4`
 - `legacy_interpreter_subroutine_count=100`
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
+- `interp4_dispatch_engine_attempt_count=12`
+- `interp4_dispatch_engine_attempted_total=0`
+- `interp4_dispatch_engine_succeeded_total=0`
+- `interp4_dispatch_engine_declined_total=0`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
-- live authoritative-match rate over the corpus: `99.3861%`
-- live authoritative-match rate over the current promoted probe: `99.9960%`
+- live authoritative-match rate over the corpus: `99.3940%`
+- live authoritative-match rate over the current promoted probe: `99.9921%`
 
 Everything below is diagnostic context for improving that number.
 
@@ -129,7 +133,13 @@ moving the compatibility-heavy statistical / aggregate / test / growth block
 out of `Interpret()` and into
 [InterpreterCompatDispatch.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpreterCompatDispatch.hxx),
 so it is a real reduction in the relocated legacy surface rather than another
-wrapper-count-only cleanup.
+wrapper-count-only cleanup. `interp4_dispatch_engine_attempt_count` is the
+static companion for the first engine-opcode pilot: it counts dispatch cases in
+`Interpret()` that now try the standalone engine first. The runtime totals tell
+us whether replay traffic is actually using that path. Today they are still
+`0 / 0 / 0` on the standing corpus, so the measurement is already doing useful
+work by showing that the operator pilot has landed structurally without yet
+carrying broad replay load.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 
@@ -232,7 +242,7 @@ forcing each replay formula cell once.
 
 ### Raw Cached-Workbook Promoted Probe
 
-- `interpret_tail_probe_formula_cells=50354`
+- `interpret_tail_probe_formula_cells=50358`
 - `interpret_tail_authoritative_total=300`
 - `interpret_tail_authoritative_fallback_total=50048`
 - raw promoted authoritative rate: `0.61%`
@@ -466,7 +476,7 @@ The highest-value remaining blockers are now:
    from the Calc side while holding the live authoritative rate above `90%`
 
 The live authoritative-match north-star on the standing replay corpus is now
-`50350 / 50,661` (`99.3861%`). The honest live unique-cell inventory now
+`50354 / 50,661` (`99.3940%`). The honest live unique-cell inventory now
 shows `50612 / 50,661` formula cells seen (`99.90%`) and
 `50612 / 50,661` supported (`99.90%`) during the bulk live observe run, while
 the forced-direct comparison surface now sits at
@@ -490,7 +500,7 @@ clusters are all engine-owned, seam-admitted, or mechanically relocated
 paths, with the blunt retirement metric now down to `50` while the live
 unique surface widens further without reintroducing any live fallback or
 unsupported-function residue. The raw promoted replay probe now sits at
-`300 / 50354` and remains purely diagnostic rather than a retirement
+`300 / 50358` and remains purely diagnostic rather than a retirement
 denominator.
 
 Inside the current families, the semantically distinct env-independent

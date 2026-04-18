@@ -36,16 +36,20 @@ That splits into two tracks:
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=50354`
-- `interpret_tail_live_authoritative_match_total=50350`
+- `interpret_tail_live_authoritative_probe_formula_cells=50358`
+- `interpret_tail_live_authoritative_match_total=50354`
 - `interpret_tail_live_authoritative_fallback_total=4`
 - `legacy_interpreter_subroutine_count=100`
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
+- `interp4_dispatch_engine_attempt_count=12`
+- `interp4_dispatch_engine_attempted_total=0`
+- `interp4_dispatch_engine_succeeded_total=0`
+- `interp4_dispatch_engine_declined_total=0`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
-- live authoritative-match rate over the corpus: `99.3861%`
-- live authoritative-match rate over the current promoted probe: `99.9960%`
+- live authoritative-match rate over the corpus: `99.3940%`
+- live authoritative-match rate over the current promoted probe: `99.9921%`
 
 The north-star measures live authority transfer. `legacy_interpreter_subroutine_count`
 is the blunt retirement-progress companion metric, derived from the remaining
@@ -55,6 +59,13 @@ companion metric: it counts `pushLegacy*` lambdas still living inside
 [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx).
 If the wrapper count falls while the lambda count stays flat or rises, we are
 relocating Calc logic rather than moving authority into the standalone engine.
+`interp4_dispatch_engine_attempt_count` is the new static companion for the
+first real engine-opcode pilot: it counts `Interpret()` dispatch cases that now
+try the standalone engine first before falling back to Calc. The paired runtime
+totals show whether that path is actually carrying replay load. On the current
+standing corpus those totals are still `0 / 0 / 0`, which is an important
+result in itself: the operator pilot is landed, but broad replay traffic is not
+yet flowing through it.
 The current value reflects the restored original `Sc*` names after backing out
 earlier rename-only metric compression, and the quarantine audit currently
 shows `62 / 62` dispatch-reachable legacy lambdas warning when reached. This
@@ -203,7 +214,7 @@ actually seen and supported by the seam.
 
 ### Raw Cached-Workbook Promoted Probe
 
-- `interpret_tail_probe_formula_cells=50354`
+- `interpret_tail_probe_formula_cells=50358`
 - `interpret_tail_authoritative_total=300`
 - `interpret_tail_authoritative_fallback_total=50048`
 - raw promoted authoritative rate: `0.61%`
@@ -236,7 +247,7 @@ Interpretation:
 
 ### Promoted Replay Eligibility Inventory
 
-- `interpret_tail_replay_promoted_formula_cells=50354`
+- `interpret_tail_replay_promoted_formula_cells=50358`
 - `interpret_tail_replay_promoted_direct_seen=44741`
 - `interpret_tail_replay_promoted_direct_supported=44741`
 - `interpret_tail_replay_promoted_direct_fallback=0`
@@ -246,7 +257,7 @@ Interpretation:
 - `interpret_tail_replay_promoted_unseen_shared_member=2606`
 - `interpret_tail_replay_promoted_unseen_non_shared=2692`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=50354`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=50358`
 - `interpret_tail_replay_promoted_dirty_after_interpret=5607`
 
 ### Engine-Authoritative Families
@@ -348,8 +359,8 @@ Still not true:
   live fallback on the validated standing corpus: both are now at `0`, so
   the next ceiling is the unseen live surface plus further Calc-path
   retirement
-- the live authoritative-match north-star has now moved to
-  `50350 / 50,661` (`99.3861%`) on the replay corpus
+- the live authoritative-match north-star now sits at
+  `50354 / 50,661` (`99.3940%`) on the replay corpus
 - that gain now includes the earlier imported-root host-truth alignment work,
   the supported-unknown-root promotion pass that re-homed `NA`, `IMREAL`,
   `IMAGINARY`, `BESSEL*`, `PRICE`, and `SUMPRODUCT` into real evaluator
@@ -364,7 +375,7 @@ Still not true:
   from opcode dispatch
 - the raw promoted replay probe remains a diagnostic surface rather than the
   retirement denominator; the live-authoritative probe now sits at
-  `50350 / 50354`, with only `4` live-authoritative fallback rows left on the
+  `50354 / 50358`, with only `4` live-authoritative fallback rows left on the
   standing corpus
 - a focused live-host check now shows the replay-imported whole-row
   `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to
