@@ -56,7 +56,11 @@ Today:
   dedicated `ISPMT`, `PV`, `SYD`, `DDB`, `DB`, `VDB`, `PDURATION`, `SLN`,
   `PMT`, `RRI`, `FV`, `NPER`, `RATE`, `IPMT`, `PPMT`, `CUMIPMT`,
   `CUMPRINC`, `EFFECT`, and `NOMINAL` wrappers, bringing the honest blunt
-  metric down further to `legacy_interpreter_subroutine_count=166`
+  metric down further to `legacy_interpreter_subroutine_count=166`; the latest
+  genuine text-utility retirement pass then removes the dedicated `SEARCH`,
+  `REGEX`, `TEXTJOIN`, `BAHTTEXT`, the `*B` byte-text wrappers, and
+  `ENCODEURL`, bringing the honest blunt metric to
+  `legacy_interpreter_subroutine_count=100`
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to
@@ -67,8 +71,8 @@ Today:
   supported unknown-root band into real evaluator families, then promoting
   the remaining high-volume imported unknown roots into real probe families,
   then genuinely retiring the dedicated date/time wrapper surface to `185`,
-  and now genuinely retiring the dedicated financial scalar wrapper surface
-  to `166`
+  and now genuinely retiring the dedicated text-utility wrapper surface
+  to `100`
 - the broad corpus lane now completes again with `BusinessDay` admitted on the
   default ambient surface after rejecting zero-workday `WORKDAY` weekend masks
   before they enter the shared runtime, and the next `BusinessDay` slice has
@@ -101,7 +105,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_probe_formula_cells=50354`
 - `interpret_tail_live_authoritative_match_total=50350`
 - `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=166`
+- `legacy_interpreter_subroutine_count=100`
 - live authoritative-match rate over the corpus: `99.3861%`
 - live authoritative-match rate over the current promoted probe: `99.9960%`
 
@@ -429,7 +433,8 @@ the forced-direct comparison surface now sits at
 `44773 / 50,661` seen (`88.38%`) and `44773 / 50,661` supported (`88.38%`).
 Those are the coverage-style numbers we should currently use alongside the
 north-star; the broader live and forced-interpret counters are still attempt
-telemetry rather than a deletion denominator.
+telemetry rather than a deletion denominator. The latest genuine text-utility
+retirement pass also brings the honest blunt Calc-wrapper metric down to `100`.
 
 That gain came first from imported-root host-truth alignment and the earlier
 bounded family admissions, and now further from the supported-unknown-root

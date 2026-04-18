@@ -257,7 +257,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_probe_formula_cells=50354`
 - `interpret_tail_live_authoritative_match_total=50350`
 - `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=166`
+- `legacy_interpreter_subroutine_count=100`
 - live authoritative-match rate over the corpus: `99.3861%`
 - live authoritative-match rate over the current promoted probe: `99.9960%`
 
@@ -313,12 +313,10 @@ Interpretation:
   `VariableExpected` as authoritative live host truth at the seam, and the
   latest scalar-root / round / math-scalar retirement push then carried the
   live unique fallback and unsupported-function residue all the way to `0`
-- the latest genuine financial scalar retirement pass now removes the
-  dedicated `ISPMT`, `PV`, `SYD`, `DDB`, `DB`, `VDB`, `PDURATION`, `SLN`,
-  `PMT`, `RRI`, `FV`, `NPER`, `RATE`, `IPMT`, `PPMT`, `CUMIPMT`,
-  `CUMPRINC`, `EFFECT`, and `NOMINAL` wrappers while preserving the same
-  engine-authoritative live behavior, bringing
-  `legacy_interpreter_subroutine_count` down from `185` to `166`
+- the latest genuine text-utility retirement pass now removes the dedicated
+  `SEARCH`, `REGEX`, `TEXTJOIN`, `BAHTTEXT`, the `*B` byte-text wrappers, and
+  `ENCODEURL` while preserving the same engine-authoritative live behavior,
+  bringing `legacy_interpreter_subroutine_count` down from `112` to `100`
 - the ambient replay surface now includes large real traffic from
   information predicates, logical folds, round-family formulas, scalar-math
   helpers, bounded financial feeders, bounded numeric aggregates, bounded

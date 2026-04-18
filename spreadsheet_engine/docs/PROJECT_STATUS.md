@@ -37,7 +37,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_probe_formula_cells=50354`
 - `interpret_tail_live_authoritative_match_total=50350`
 - `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=166`
+- `legacy_interpreter_subroutine_count=100`
 - live authoritative-match rate over the corpus: `99.3861%`
 - live authoritative-match rate over the current promoted probe: `99.9960%`
 
@@ -307,10 +307,10 @@ Still not true:
   `IMAGINARY`, `BESSEL*`, `PRICE`, and `SUMPRODUCT` into real evaluator
   families, the latest imported stored-host-value routing pass that promoted
   the remaining high-volume unknown roots into real probe families, and the
-  latest genuine financial scalar retirement push that removes the dedicated
-  `ISPMT`, `PV`, `SYD`, `DDB`, `DB`, `VDB`, `PDURATION`, `SLN`, `PMT`, `RRI`,
-  `FV`, `NPER`, `RATE`, `IPMT`, `PPMT`, `CUMIPMT`, `CUMPRINC`, `EFFECT`, and
-  `NOMINAL` wrappers and brings the blunt legacy wrapper metric down to `166`
+  latest genuine text-utility retirement push that removes the dedicated
+  `SEARCH`, `REGEX`, `TEXTJOIN`, `BAHTTEXT`, the `*B` byte-text wrappers, and
+  `ENCODEURL` wrappers after the earlier financial-scalar relocation, bringing
+  the blunt legacy wrapper metric down to `100`
 - the raw promoted replay probe remains a diagnostic surface rather than the
   retirement denominator; the live-authoritative probe now sits at
   `50350 / 50354`, with only `4` live-authoritative fallback rows left on the
