@@ -37,6 +37,7 @@
 #include <svl/numformat.hxx>
 #include <svl/zforlist.hxx>
 #include <svl/sharedstringpool.hxx>
+#include <editeng/langitem.hxx>
 #include <unotools/charclass.hxx>
 #include <stdlib.h>
 #include <string.h>
@@ -8535,6 +8536,473 @@ StackVar ScInterpreter::Interpret()
                     else
                         PushString(sStr.copy(nDelimiterPos, nLength - nDelimiterPos));
                 };
+                const auto pushLegacyTrim = [&]() {
+                    warnTextUtilityDispatch(u"TRIM");
+                    PushString(selibreoffice::trimRepeatedSpaces(GetString().getString()));
+                };
+                const auto pushLegacyValue = [&]() {
+                    warnTextUtilityDispatch(u"VALUE");
+
+                    OUString aInputString;
+                    double fVal;
+
+                    switch (GetRawStackType())
+                    {
+                        case svMissing:
+                        case svEmptyCell:
+                            Pop();
+                            PushInt(0);
+                            return;
+                        case svDouble:
+                            return;
+                        case svSingleRef:
+                        case svDoubleRef:
+                        {
+                            ScAddress aAdr;
+                            if (!PopDoubleRefOrSingleRef(aAdr))
+                            {
+                                PushInt(0);
+                                return;
+                            }
+                            ScRefCellValue aCell(mrDoc, aAdr);
+                            if (aCell.hasString())
+                            {
+                                svl::SharedString aSS;
+                                GetCellString(aSS, aCell);
+                                aInputString = aSS.getString();
+                            }
+                            else if (aCell.hasNumeric())
+                            {
+                                PushDouble(GetCellValue(aAdr, aCell));
+                                return;
+                            }
+                            else
+                            {
+                                PushDouble(0.0);
+                                return;
+                            }
+                        }
+                        break;
+                        case svMatrix:
+                        {
+                            svl::SharedString aSS;
+                            ScMatValType nType = GetDoubleOrStringFromMatrix(fVal, aSS);
+                            aInputString = aSS.getString();
+                            switch (nType)
+                            {
+                                case ScMatValType::Empty:
+                                    fVal = 0.0;
+                                    [[fallthrough]];
+                                case ScMatValType::Value:
+                                case ScMatValType::Boolean:
+                                    PushDouble(fVal);
+                                    return;
+                                case ScMatValType::String:
+                                    break;
+                                default:
+                                    PushIllegalArgument();
+                            }
+                        }
+                        break;
+                        default:
+                            aInputString = GetString().getString();
+                            break;
+                    }
+
+                    const auto aResult
+                        = setextparseexec::evaluateValue(mrDoc, mrContext, aInputString);
+                    if (aResult)
+                        PushDouble(aResult.maValue);
+                    else
+                        PushIllegalArgument();
+                };
+                const auto pushLegacyNumberValue = [&]() {
+                    warnTextUtilityDispatch(u"NUMBERVALUE");
+
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 3))
+                        return;
+
+                    std::optional<OUString> oGroupSeparator;
+                    std::optional<OUString> oDecimalSeparator;
+                    if (nParamCount == 3)
+                        oGroupSeparator = GetString().getString();
+                    if (nParamCount >= 2)
+                        oDecimalSeparator = GetString().getString();
+
+                    if (GetStackType() == svDouble)
+                        return;
+
+                    OUString aInputString = GetString().getString();
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushError(nGlobalError);
+                        return;
+                    }
+
+                    const auto aResult = setextparseexec::evaluateNumberValue(
+                        mrDoc, mrContext, aInputString, oDecimalSeparator, oGroupSeparator,
+                        maCalcConfig.mbEmptyStringAsZero);
+                    if (aResult)
+                    {
+                        PushDouble(aResult.maValue);
+                        return;
+                    }
+
+                    switch (aResult.meError)
+                    {
+                        case spreadsheetengine::api::Error::IllegalArgument:
+                            PushIllegalArgument();
+                            return;
+                        case spreadsheetengine::api::Error::NoValue:
+                            PushNoValue();
+                            return;
+                        default:
+                            PushIllegalArgument();
+                            return;
+                    }
+                };
+                const auto pushLegacyCurrency = [&]() {
+                    warnTextUtilityDispatch(u"DOLLAR");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 2))
+                        return;
+
+                    OUString aStr;
+                    double fDec;
+                    if (nParamCount == 2)
+                    {
+                        fDec = ::rtl::math::approxFloor(GetDouble());
+                        if (fDec < -15.0 || fDec > 15.0)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+                    }
+                    else
+                        fDec = 2.0;
+                    double fVal = GetDouble();
+                    double fFac = fDec != 0.0 ? pow(double(10), fDec) : 1.0;
+                    if (fVal < 0.0)
+                        fVal = ceil(fVal * fFac - 0.5) / fFac;
+                    else
+                        fVal = floor(fVal * fFac + 0.5) / fFac;
+                    const Color* pColor = nullptr;
+                    if (fDec < 0.0)
+                        fDec = 0.0;
+                    sal_uLong nIndex = mrContext.NFGetStandardFormat(
+                        SvNumFormatType::CURRENCY, ScGlobal::eLnge);
+                    if (static_cast<sal_uInt16>(fDec) != mrContext.NFGetFormatPrecision(nIndex))
+                    {
+                        OUString sFormatString = mrContext.NFGenerateFormat(
+                            nIndex, ScGlobal::eLnge, true, false,
+                            static_cast<sal_uInt16>(fDec));
+                        if (!mrContext.NFGetPreviewString(
+                                sFormatString, fVal, aStr, &pColor, ScGlobal::eLnge))
+                            SetError(FormulaError::IllegalArgument);
+                    }
+                    else
+                        mrContext.NFGetOutputString(fVal, nIndex, aStr, &pColor);
+                    PushString(aStr);
+                };
+                const auto pushLegacyReplace = [&]() {
+                    warnTextUtilityDispatch(u"REPLACE");
+                    if (!MustHaveParamCount(GetByte(), 4))
+                        return;
+
+                    OUString aNewStr = GetString().getString();
+                    sal_Int32 nCount = GetStringPositionArgument();
+                    sal_Int32 nPos = GetStringPositionArgument();
+                    OUString aOldStr = GetString().getString();
+                    if (nPos < 1 || nCount < 0)
+                        PushIllegalArgument();
+                    else
+                    {
+                        sal_Int32 nLen = aOldStr.getLength();
+                        if (nPos > nLen + 1)
+                            nPos = nLen + 1;
+                        if (nCount > nLen - nPos + 1)
+                            nCount = nLen - nPos + 1;
+                        sal_Int32 nIdx = 0;
+                        sal_Int32 nCnt = 0;
+                        while (nIdx < nLen && nPos > nCnt + 1)
+                        {
+                            aOldStr.iterateCodePoints(&nIdx);
+                            ++nCnt;
+                        }
+                        sal_Int32 nStart = nIdx;
+                        while (nIdx < nLen && nPos + nCount - 1 > nCnt)
+                        {
+                            aOldStr.iterateCodePoints(&nIdx);
+                            ++nCnt;
+                        }
+                        if (CheckStringResultLen(aOldStr, aNewStr.getLength() - (nIdx - nStart)))
+                            aOldStr = aOldStr.replaceAt(nStart, nIdx - nStart, aNewStr);
+                        PushString(aOldStr);
+                    }
+                };
+                const auto pushLegacyFixed = [&]() {
+                    warnTextUtilityDispatch(u"FIXED");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 3))
+                        return;
+
+                    OUString aStr;
+                    double fDec;
+                    bool bThousand;
+                    if (nParamCount == 3)
+                        bThousand = !GetBool();
+                    else
+                        bThousand = true;
+                    if (nParamCount >= 2)
+                    {
+                        fDec = ::rtl::math::approxFloor(GetDoubleWithDefault(2.0));
+                        if (fDec < -15.0 || fDec > 15.0)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+                    }
+                    else
+                        fDec = 2.0;
+                    double fVal = GetDouble();
+                    double fFac = fDec != 0.0 ? pow(double(10), fDec) : 1.0;
+                    if (fVal < 0.0)
+                        fVal = ceil(fVal * fFac - 0.5) / fFac;
+                    else
+                        fVal = floor(fVal * fFac + 0.5) / fFac;
+                    const Color* pColor = nullptr;
+                    if (fDec < 0.0)
+                        fDec = 0.0;
+                    sal_uLong nIndex = mrContext.NFGetStandardFormat(
+                        SvNumFormatType::NUMBER, ScGlobal::eLnge);
+                    OUString sFormatString = mrContext.NFGenerateFormat(
+                        nIndex, ScGlobal::eLnge, bThousand, false,
+                        static_cast<sal_uInt16>(fDec));
+                    if (!mrContext.NFGetPreviewString(
+                            sFormatString, fVal, aStr, &pColor, ScGlobal::eLnge))
+                        PushIllegalArgument();
+                    else
+                        PushString(aStr);
+                };
+                const auto pushLegacyFind = [&]() {
+                    warnTextUtilityDispatch(u"FIND");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 2, 3))
+                        return;
+
+                    sal_Int32 nCnt = nParamCount == 3 ? GetDouble() : 1;
+                    OUString sStr = GetString().getString();
+                    if (nCnt < 1 || nCnt > sStr.getLength())
+                        PushNoValue();
+                    else
+                    {
+                        sal_Int32 nPos = sStr.indexOf(GetString().getString(), nCnt - 1);
+                        if (nPos == -1)
+                            PushNoValue();
+                        else
+                        {
+                            sal_Int32 nIdx = 0;
+                            nCnt = 0;
+                            while (nIdx < nPos)
+                            {
+                                sStr.iterateCodePoints(&nIdx);
+                                ++nCnt;
+                            }
+                            PushDouble(static_cast<double>(nCnt + 1));
+                        }
+                    }
+                };
+                const auto pushLegacyMid = [&]() {
+                    warnTextUtilityDispatch(u"MID");
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+
+                    const sal_Int32 nSubLen = GetStringPositionArgument();
+                    const sal_Int32 nStart = GetStringPositionArgument();
+                    OUString aStr = GetString().getString();
+                    if (nStart < 1 || nSubLen < 0)
+                        PushIllegalArgument();
+                    else if (nStart > kScInterpreterMaxStrLen || nSubLen > kScInterpreterMaxStrLen)
+                        PushError(FormulaError::StringOverflow);
+                    else
+                    {
+                        sal_Int32 nLen = aStr.getLength();
+                        sal_Int32 nIdx = 0;
+                        sal_Int32 nCnt = 0;
+                        while (nIdx < nLen && nStart - 1 > nCnt)
+                        {
+                            aStr.iterateCodePoints(&nIdx);
+                            ++nCnt;
+                        }
+                        sal_Int32 nIdx0 = nIdx;
+                        while (nIdx < nLen && nStart + nSubLen - 1 > nCnt)
+                        {
+                            aStr.iterateCodePoints(&nIdx);
+                            ++nCnt;
+                        }
+                        PushString(aStr.copy(nIdx0, nIdx - nIdx0));
+                    }
+                };
+                const auto pushLegacyText = [&]() {
+                    warnTextUtilityDispatch(u"TEXT");
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+
+                    OUString sFormatString = GetString().getString();
+                    svl::SharedString aStr;
+                    bool bString = false;
+                    double fVal = 0.0;
+                    switch (GetStackType())
+                    {
+                        case svError:
+                            PopError();
+                            break;
+                        case svDouble:
+                            fVal = PopDouble();
+                            break;
+                        default:
+                        {
+                            FormulaConstTokenRef xTok(PopToken());
+                            if (nGlobalError == FormulaError::NONE)
+                            {
+                                PushTokenRef(xTok);
+                                FormulaError nSErr = mnStringNoValueError;
+                                mnStringNoValueError = FormulaError::NotNumericString;
+                                fVal = GetDouble();
+                                mnStringNoValueError = nSErr;
+                                if (nGlobalError == FormulaError::NotNumericString)
+                                {
+                                    nGlobalError = FormulaError::NONE;
+                                    PushTokenRef(xTok);
+                                    aStr = GetString();
+                                    bString = true;
+                                }
+                            }
+                        }
+                    }
+                    if (nGlobalError != FormulaError::NONE)
+                        PushError(nGlobalError);
+                    else if (sFormatString.isEmpty())
+                    {
+                        if (bString)
+                            PushString(aStr);
+                        else
+                            PushString(OUString());
+                    }
+                    else
+                    {
+                        OUString aResult;
+                        const Color* pColor = nullptr;
+                        LanguageType eCellLang;
+                        const ScPatternAttr* pPattern
+                            = mrDoc.GetPattern(aPos.Col(), aPos.Row(), aPos.Tab());
+                        if (pPattern)
+                            eCellLang = pPattern->GetItem(ATTR_LANGUAGE_FORMAT).GetValue();
+                        else
+                            eCellLang = ScGlobal::eLnge;
+                        if (bString)
+                        {
+                            if (!mrContext.NFGetPreviewString(
+                                    sFormatString, aStr.getString(), aResult, &pColor, eCellLang))
+                                PushIllegalArgument();
+                            else
+                                PushString(aResult);
+                        }
+                        else
+                        {
+                            if (!mrContext.NFGetPreviewStringGuess(
+                                    sFormatString, fVal, aResult, &pColor, eCellLang))
+                                PushIllegalArgument();
+                            else
+                                PushString(aResult);
+                        }
+                    }
+                };
+                const auto pushLegacySubstitute = [&]() {
+                    warnTextUtilityDispatch(u"SUBSTITUTE");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 3, 4))
+                        return;
+
+                    sal_Int32 nCnt;
+                    if (nParamCount == 4)
+                    {
+                        nCnt = GetStringPositionArgument();
+                        if (nCnt < 1)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+                    }
+                    else
+                        nCnt = 0;
+                    OUString sNewStr = GetString().getString();
+                    OUString sOldStr = GetString().getString();
+                    OUString sStr = GetString().getString();
+                    sal_Int32 nPos = 0;
+                    sal_Int32 nCount = 0;
+                    std::optional<OUStringBuffer> oResult;
+                    for (sal_Int32 nEnd = sStr.indexOf(sOldStr); nEnd >= 0;
+                         nEnd = sStr.indexOf(sOldStr, nEnd))
+                    {
+                        if (nCnt == 0 || ++nCount == nCnt)
+                        {
+                            if (!oResult)
+                                oResult.emplace(
+                                    sStr.getLength() + sNewStr.getLength() - sOldStr.getLength());
+                            oResult->append(sStr.subView(nPos, nEnd - nPos));
+                            if (!CheckStringResultLen(*oResult, sNewStr.getLength()))
+                                return PushError(GetError());
+                            oResult->append(sNewStr);
+                            nPos = nEnd + sOldStr.getLength();
+                            if (nCnt > 0)
+                                break;
+                        }
+                        nEnd += sOldStr.getLength();
+                    }
+                    if (oResult)
+                        oResult->append(sStr.subView(nPos, sStr.getLength() - nPos));
+                    PushString(oResult ? oResult->makeStringAndClear() : sStr);
+                };
+                const auto pushLegacyRept = [&]() {
+                    warnTextUtilityDispatch(u"REPT");
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+
+                    sal_Int32 nCnt = GetStringPositionArgument();
+                    OUString aStr = GetString().getString();
+                    if (nCnt < 0)
+                        PushIllegalArgument();
+                    else if (static_cast<double>(nCnt) * aStr.getLength() > kScInterpreterMaxStrLen)
+                        PushError(FormulaError::StringOverflow);
+                    else if (nCnt == 0)
+                        PushString(OUString());
+                    else
+                    {
+                        const sal_Int32 nLen = aStr.getLength();
+                        OUStringBuffer aRes(nCnt * nLen);
+                        while (nCnt--)
+                            aRes.append(aStr);
+                        PushString(aRes.makeStringAndClear());
+                    }
+                };
+                const auto pushLegacyConcat = [&]() {
+                    warnTextUtilityDispatch(u"CONCATENATE");
+                    sal_uInt8 nParamCount = GetByte();
+                    ReverseStack(nParamCount);
+
+                    OUStringBuffer aRes;
+                    while (nParamCount-- > 0)
+                    {
+                        OUString aStr = GetString().getString();
+                        if (CheckStringResultLen(aRes, aStr.getLength()))
+                            aRes.append(aStr);
+                        else
+                            break;
+                    }
+                    PushString(aRes.makeStringAndClear());
+                };
                 const auto pushLegacyExact = [&]() {
                     warnTextUtilityDispatch(u"EXACT");
                     nFuncFmtType = SvNumFormatType::LOGICAL;
@@ -9777,7 +10245,7 @@ StackVar ScInterpreter::Interpret()
                             });
                         break;
                     case ocCode             : pushLegacyCode();             break;
-                    case ocTrim             : ScTrim();                 break;
+                    case ocTrim             : pushLegacyTrim();          break;
                     case ocUpper            :
                         pushLegacyUnaryTextTransform(
                             u"UPPER", [&](const OUString& rText) {
@@ -9802,8 +10270,8 @@ StackVar ScInterpreter::Interpret()
                     case ocLen              : pushLegacyLen();              break;
                     case ocT                : pushLegacyT();                break;
                     case ocClean            : pushLegacyClean();            break;
-                    case ocValue            : ScValue();                break;
-                    case ocNumberValue      : ScNumberValue();          break;
+                    case ocValue            : pushLegacyValue();        break;
+                    case ocNumberValue      : pushLegacyNumberValue();  break;
                     case ocChar             : pushLegacyChar();             break;
                     case ocArcTan2          : pushLegacyArcTan2();          break;
                     case ocMod              : pushLegacyMod();              break;
@@ -10025,20 +10493,20 @@ StackVar ScInterpreter::Interpret()
                     case ocMultiArea        : ScMultiArea();                break;
                     case ocOffset           : ScOffset();                   break;
                     case ocAreas            : ScAreas();                    break;
-                    case ocCurrency         : ScCurrency();                 break;
-                    case ocReplace          : ScReplace();              break;
-                    case ocFixed            : ScFixed();                    break;
-                    case ocFind             : ScFind();                 break;
+                    case ocCurrency         : pushLegacyCurrency();     break;
+                    case ocReplace          : pushLegacyReplace();      break;
+                    case ocFixed            : pushLegacyFixed();        break;
+                    case ocFind             : pushLegacyFind();         break;
                     case ocExact            : pushLegacyExact();            break;
                     case ocLeft             : pushLegacyLeftRight(false);   break;
                     case ocRight            : pushLegacyLeftRight(true);    break;
                     case ocSearch           : ScSearch();               break;
-                    case ocMid              : ScMid();                  break;
-                    case ocText             : ScText();                 break;
-                    case ocSubstitute       : ScSubstitute();               break;
+                    case ocMid              : pushLegacyMid();          break;
+                    case ocText             : pushLegacyText();         break;
+                    case ocSubstitute       : pushLegacySubstitute();   break;
                     case ocRegex            : ScRegex();                    break;
-                    case ocRept             : ScRept();                     break;
-                    case ocConcat           : ScConcat();                   break;
+                    case ocRept             : pushLegacyRept();         break;
+                    case ocConcat           : pushLegacyConcat();       break;
                     case ocConcat_MS        : pushLegacyConcatMs();         break;
                     case ocTextJoin_MS      : ScTextJoin_MS();              break;
                     case ocIfs_MS           : pushLegacyIfs();              break;

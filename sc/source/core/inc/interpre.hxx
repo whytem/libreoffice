@@ -570,9 +570,6 @@ private:
     void ScCellExternal();
     bool IsEven();
     void ScN();
-    void ScTrim();
-    void ScValue();
-    void ScNumberValue();
     /** Check for array of references to determine the maximum size of a return
         column vector if in array context. */
     size_t GetRefListArrayMaxSize( short nParamCount );
@@ -650,17 +647,8 @@ public:
     void ScIndex();
     void ScMultiArea();
     void ScAreas();
-    void ScCurrency();
-    void ScReplace();
-    void ScFixed();
-    void ScFind();
     void ScSearch();
-    void ScMid();
-    void ScText();
-    void ScSubstitute();
-    void ScRept();
     void ScRegex();
-    void ScConcat();
     void ScTextJoin_MS();
     void ScExternal();
     void ScMissing();

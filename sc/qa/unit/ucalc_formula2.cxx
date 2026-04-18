@@ -3350,7 +3350,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorTextUtilityDe
         m_pDoc->SetString(2, 0, 0, u"=RIGHT(\"LibreOffice\";6)"_ustr);
         m_pDoc->SetString(3, 0, 0, u"=TEXTAFTER(\"alpha-beta-gamma\";\"-\";2)"_ustr);
         m_pDoc->SetString(4, 0, 0, u"=TEXTBEFORE(\"Brown, Lucas, Manager\";\",\";2)"_ustr);
-        m_pDoc->SetString(5, 0, 0, u"=CONCAT(\"a\";\"b\";\"c\")"_ustr);
+        m_pDoc->SetString(5, 0, 0, u"=CONCATENATE(\"a\";\"b\";\"c\")"_ustr);
         m_pDoc->SetString(6, 0, 0, u"=EXACT(\"A\";\"a\")"_ustr);
         m_pDoc->SetString(7, 0, 0, u"=T(123)"_ustr);
 
