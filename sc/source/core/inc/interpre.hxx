@@ -647,9 +647,6 @@ public:
     void ScIndex();
     void ScMultiArea();
     void ScAreas();
-    void ScSearch();
-    void ScRegex();
-    void ScTextJoin_MS();
     void ScExternal();
     void ScMissing();
     void ScMacro();
@@ -659,7 +656,6 @@ public:
     void ScColRowNameAuto();
     void ScGetPivotData();
     void ScHyperLink();
-    void ScBahtText();
     void ScTTT();
     void ScDebugVar();
 
@@ -761,17 +757,9 @@ private:
     void ScFrequency();
     void ScTrend();
     void ScInfo();
-    void ScLenB();
-    void ScRightB();
-    void ScLeftB();
-    void ScMidB();
-    void ScReplaceB();
-    void ScFindB();
-    void ScSearchB();
 
     void ScFilterXML();
     void ScWebservice();
-    void ScEncodeURL();
     void ScForecast_Ets( ScETSType eETSType );
 
     // probability density function; fLambda is "scale" parameter

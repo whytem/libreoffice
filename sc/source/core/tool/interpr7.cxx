@@ -403,53 +403,6 @@ void ScInterpreter::ScWebservice()
     mpLinkManager->CloseCachedComps();
 }
 
-/**
- Returns a string in which all non-alphanumeric characters except stroke and
- underscore (-_) have been replaced with a percent (%) sign
- followed by hex digits.
- It is encoded the same way that the posted data from a WWW form is encoded,
- that is the same way as in application/x-www-form-urlencoded media type and
- as per RFC 3986.
-
- @see fdo#76870
-*/
-void ScInterpreter::ScEncodeURL()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 1 ) )
-        return;
-
-    OUString aStr = GetString().getString();
-    if ( aStr.isEmpty() )
-    {
-        PushError( FormulaError::NoValue );
-        return;
-    }
-
-    OString aUtf8Str( aStr.toUtf8());
-    const sal_Int32 nLen = aUtf8Str.getLength();
-    OStringBuffer aUrlBuf( nLen );
-    for ( int i = 0; i < nLen; i++ )
-    {
-        char c = aUtf8Str[ i ];
-        if ( rtl::isAsciiAlphanumeric( static_cast<unsigned char>( c ) ) || c == '-' || c == '_' )
-            aUrlBuf.append( c );
-        else
-        {
-            aUrlBuf.append( '%' );
-            auto convertedChar = OString::number( static_cast<unsigned char>( c ), 16 ).toAsciiUpperCase();
-            // RFC 3986 indicates:
-            // "A percent-encoded octet is encoded as a character triplet,
-            // consisting of the percent character "%" followed by the two hexadecimal digits
-            // representing that octet's numeric value"
-            if (convertedChar.length == 1)
-                aUrlBuf.append("0");
-            aUrlBuf.append(convertedChar);
-        }
-    }
-    PushString( OUString::fromUtf8( aUrlBuf ) );
-}
-
 void ScInterpreter::ScDebugVar()
 {
     // This is to be used by developers only!  Never document this for end

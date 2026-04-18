@@ -38,7 +38,13 @@
 #include <svl/zforlist.hxx>
 #include <svl/sharedstringpool.hxx>
 #include <editeng/langitem.hxx>
+#include <unotools/textsearch.hxx>
 #include <unotools/charclass.hxx>
+#include <rtl/character.hxx>
+#include <rtl/ustring.hxx>
+#include <unicode/uchar.h>
+#include <unicode/regex.h>
+#include <i18nlangtag/mslangid.hxx>
 #include <stdlib.h>
 #include <string.h>
 
@@ -110,6 +116,193 @@ namespace semath = spreadsheetengine::core::math;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 namespace seswitchexec = spreadsheetengine::compat::libreoffice::switchexecution;
 namespace setextparseexec = spreadsheetengine::compat::libreoffice::textparsingexecution;
+
+namespace {
+
+struct UBlockScript {
+    UBlockCode from;
+    UBlockCode to;
+};
+
+const UBlockScript scriptList[] = {
+    { UBLOCK_HANGUL_JAMO, UBLOCK_HANGUL_JAMO },
+    { UBLOCK_CJK_RADICALS_SUPPLEMENT, UBLOCK_HANGUL_SYLLABLES },
+    { UBLOCK_CJK_COMPATIBILITY_IDEOGRAPHS, UBLOCK_CJK_RADICALS_SUPPLEMENT },
+    { UBLOCK_IDEOGRAPHIC_DESCRIPTION_CHARACTERS, UBLOCK_CJK_COMPATIBILITY_IDEOGRAPHS },
+    { UBLOCK_CJK_COMPATIBILITY_FORMS, UBLOCK_CJK_COMPATIBILITY_FORMS },
+    { UBLOCK_HALFWIDTH_AND_FULLWIDTH_FORMS, UBLOCK_HALFWIDTH_AND_FULLWIDTH_FORMS },
+    { UBLOCK_CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B, UBLOCK_CJK_COMPATIBILITY_IDEOGRAPHS_SUPPLEMENT },
+    { UBLOCK_CJK_STROKES, UBLOCK_CJK_STROKES }
+};
+
+bool IsDBCS(sal_Unicode currentChar)
+{
+    if ((currentChar == 0x005c || currentChar == 0x20ac)
+        && (MsLangId::getConfiguredSystemLanguage() == LANGUAGE_JAPANESE))
+        return true;
+    sal_uInt16 i;
+    UBlockCode block = ublock_getCode(currentChar);
+    for (i = 0; i < SAL_N_ELEMENTS(scriptList); i++)
+        if (block <= scriptList[i].to)
+            break;
+    return i < SAL_N_ELEMENTS(scriptList) && block >= scriptList[i].from;
+}
+
+sal_Int32 lcl_getLengthB(std::u16string_view str, sal_Int32 nPos)
+{
+    sal_Int32 index = 0;
+    sal_Int32 length = 0;
+    while (index < nPos)
+    {
+        if (IsDBCS(str[index]))
+            length += 2;
+        else
+            length++;
+        index++;
+    }
+    return length;
+}
+
+sal_Int32 getLengthB(std::u16string_view str)
+{
+    if (str.empty())
+        return 0;
+    return lcl_getLengthB(str, str.size());
+}
+
+OUString lcl_RightB(const OUString& rStr, sal_Int32 n)
+{
+    if (n < getLengthB(rStr))
+    {
+        OUStringBuffer aBuf(rStr);
+        sal_Int32 index = aBuf.getLength();
+        while (index-- >= 0)
+        {
+            if (0 == n)
+            {
+                aBuf.remove(0, index + 1);
+                break;
+            }
+            if (-1 == n)
+            {
+                aBuf.remove(0, index + 2);
+                aBuf.insert(0, " ");
+                break;
+            }
+            if (IsDBCS(aBuf[index]))
+                n -= 2;
+            else
+                n--;
+        }
+        return aBuf.makeStringAndClear();
+    }
+    return rStr;
+}
+
+OUString lcl_LeftB(const OUString& rStr, sal_Int32 n)
+{
+    if (n < getLengthB(rStr))
+    {
+        OUStringBuffer aBuf(rStr);
+        sal_Int32 index = -1;
+        while (index++ < aBuf.getLength())
+        {
+            if (0 == n)
+            {
+                aBuf.truncate(index);
+                break;
+            }
+            if (-1 == n)
+            {
+                aBuf.truncate(index - 1);
+                aBuf.append(" ");
+                break;
+            }
+            if (IsDBCS(aBuf[index]))
+                n -= 2;
+            else
+                n--;
+        }
+        return aBuf.makeStringAndClear();
+    }
+    return rStr;
+}
+
+constexpr std::u16string_view TH_0 = u"ศูนย์";
+constexpr std::u16string_view TH_1 = u"หนึ่ง";
+constexpr std::u16string_view TH_2 = u"สอง";
+constexpr std::u16string_view TH_3 = u"สาม";
+constexpr std::u16string_view TH_4 = u"สี่";
+constexpr std::u16string_view TH_5 = u"ห้า";
+constexpr std::u16string_view TH_6 = u"หก";
+constexpr std::u16string_view TH_7 = u"เจ็ด";
+constexpr std::u16string_view TH_8 = u"แปด";
+constexpr std::u16string_view TH_9 = u"เก้า";
+constexpr std::u16string_view TH_10 = u"สิบ";
+constexpr std::u16string_view TH_11 = u"เอ็ด";
+constexpr std::u16string_view TH_20 = u"ยี่";
+constexpr std::u16string_view TH_1E2 = u"ร้อย";
+constexpr std::u16string_view TH_1E3 = u"พัน";
+constexpr std::u16string_view TH_1E4 = u"หมื่น";
+constexpr std::u16string_view TH_1E5 = u"แสน";
+constexpr std::u16string_view TH_1E6 = u"ล้าน";
+constexpr std::u16string_view TH_DOT0 = u"ถ้วน";
+constexpr std::u16string_view TH_BAHT = u"บาท";
+constexpr std::u16string_view TH_SATANG = u"สตางค์";
+constexpr std::u16string_view TH_MINUS = u"ลบ";
+
+void lclAppendDigit(OUStringBuffer& rText, char nDigit)
+{
+    switch (nDigit)
+    {
+        case '1': rText.append(TH_1); break;
+        case '2': rText.append(TH_2); break;
+        case '3': rText.append(TH_3); break;
+        case '4': rText.append(TH_4); break;
+        case '5': rText.append(TH_5); break;
+        case '6': rText.append(TH_6); break;
+        case '7': rText.append(TH_7); break;
+        case '8': rText.append(TH_8); break;
+        case '9': rText.append(TH_9); break;
+    }
+}
+
+void lclAppendPow10(OUStringBuffer& rText, char nDigit, sal_Int32 nPow10)
+{
+    lclAppendDigit(rText, nDigit);
+    switch (nPow10)
+    {
+        case 2: rText.append(TH_1E2); break;
+        case 3: rText.append(TH_1E3); break;
+        case 4: rText.append(TH_1E4); break;
+        case 5: rText.append(TH_1E5); break;
+    }
+}
+
+void lclAppendBlock(OUStringBuffer& rText, std::string_view block)
+{
+    auto it = block.begin();
+    for (size_t pow = block.size() - 1; pow >= 2; --pow)
+        if (char ch = *it++; ch != '0')
+            lclAppendPow10(rText, ch, pow);
+
+    char ten = block.size() > 1 ? *it++ : '0';
+    char one = *it;
+    if (ten >= '1')
+    {
+        if (ten >= '3')
+            lclAppendDigit(rText, ten);
+        else if (ten == '2')
+            rText.append(TH_20);
+        rText.append(TH_10);
+    }
+    if ((ten > '0') && (one == '1'))
+        rText.append(TH_11);
+    else if (one > '0')
+        lclAppendDigit(rText, one);
+}
+
+}
 
 #define ADDIN_MAXSTRLEN 256
 
@@ -9003,6 +9196,663 @@ StackVar ScInterpreter::Interpret()
                     }
                     PushString(aRes.makeStringAndClear());
                 };
+                const auto pushLegacySearch = [&]() {
+                    warnTextUtilityDispatch(u"SEARCH");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 2, 3))
+                        return;
+
+                    sal_Int32 nStart;
+                    if (nParamCount == 3)
+                    {
+                        nStart = GetStringPositionArgument();
+                        if (nStart < 1)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+                    }
+                    else
+                        nStart = 1;
+                    OUString sStr = GetString().getString();
+                    OUString SearchStr = GetString().getString();
+                    sal_Int32 nPos = nStart - 1;
+                    sal_Int32 nEndPos = sStr.getLength();
+                    if (nPos >= nEndPos)
+                        PushNoValue();
+                    else
+                    {
+                        utl::SearchParam::SearchType eSearchType
+                            = DetectSearchType(SearchStr, mrDoc);
+                        utl::SearchParam sPar(SearchStr, eSearchType, false, '~', false);
+                        utl::TextSearch sT(sPar, ScGlobal::getCharClass());
+                        bool bBool = sT.SearchForward(sStr, &nPos, &nEndPos);
+                        if (!bBool)
+                            PushNoValue();
+                        else
+                        {
+                            sal_Int32 nIdx = 0;
+                            sal_Int32 nCnt = 0;
+                            while (nIdx < nPos)
+                            {
+                                sStr.iterateCodePoints(&nIdx);
+                                ++nCnt;
+                            }
+                            PushDouble(static_cast<double>(nCnt + 1));
+                        }
+                    }
+                };
+                const auto pushLegacyRegex = [&]() {
+                    warnTextUtilityDispatch(u"REGEX");
+                    const sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 2, 4))
+                        return;
+
+                    bool bGlobalReplacement = false;
+                    sal_Int32 nOccurrence = 1;
+                    if (nParamCount == 4)
+                    {
+                        double fOccurrence;
+                        svl::SharedString aFlagsString;
+                        bool bDouble;
+                        if (!IsMissing())
+                            bDouble = GetDoubleOrString(fOccurrence, aFlagsString);
+                        else
+                        {
+                            PopError();
+                            bDouble = true;
+                            fOccurrence = nOccurrence;
+                        }
+                        if (nGlobalError != FormulaError::NONE)
+                        {
+                            PushError(nGlobalError);
+                            return;
+                        }
+                        if (bDouble)
+                        {
+                            if (!CheckStringPositionArgument(fOccurrence))
+                            {
+                                PushError(FormulaError::IllegalArgument);
+                                return;
+                            }
+                            nOccurrence = static_cast<sal_Int32>(fOccurrence);
+                        }
+                        else
+                        {
+                            const OUString& aFlags(aFlagsString.getString());
+                            if (aFlags.getLength() > 1)
+                            {
+                                PushIllegalArgument();
+                                return;
+                            }
+                            if (aFlags.getLength() == 1)
+                            {
+                                if (aFlags.indexOf('g') >= 0)
+                                    bGlobalReplacement = true;
+                                else
+                                {
+                                    PushIllegalArgument();
+                                    return;
+                                }
+                            }
+                        }
+                    }
+
+                    bool bReplacement = false;
+                    OUString aReplacement;
+                    if (nParamCount >= 3)
+                    {
+                        if (IsMissing() || nOccurrence == 0)
+                            PopError();
+                        else
+                        {
+                            aReplacement = GetString().getString();
+                            bReplacement = true;
+                        }
+                    }
+
+                    const OUString aExpression = GetString().getString();
+                    const OUString aText = GetString().getString();
+
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushError(nGlobalError);
+                        return;
+                    }
+                    if (nOccurrence == 0)
+                    {
+                        PushString(aText);
+                        return;
+                    }
+
+                    const icu::UnicodeString aIcuExpression(
+                        false, reinterpret_cast<const UChar*>(aExpression.getStr()),
+                        aExpression.getLength());
+                    UErrorCode status = U_ZERO_ERROR;
+                    icu::RegexMatcher aRegexMatcher(aIcuExpression, 0, status);
+                    if (U_FAILURE(status))
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    aRegexMatcher.setTimeLimit(23 * 1000, status);
+
+                    const icu::UnicodeString aIcuText(
+                        false, reinterpret_cast<const UChar*>(aText.getStr()),
+                        aText.getLength());
+                    aRegexMatcher.reset(aIcuText);
+
+                    if (!bReplacement)
+                    {
+                        sal_Int32 nCount = 0;
+                        while (aRegexMatcher.find(status) && U_SUCCESS(status)
+                               && ++nCount < nOccurrence)
+                            ;
+                        if (U_FAILURE(status))
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+                        if (nCount != nOccurrence)
+                        {
+                            PushError(FormulaError::NotAvailable);
+                            return;
+                        }
+                        icu::UnicodeString aMatch(aRegexMatcher.group(status));
+                        if (U_FAILURE(status))
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+                        PushString(OUString(
+                            reinterpret_cast<const sal_Unicode*>(aMatch.getBuffer()),
+                            aMatch.length()));
+                        return;
+                    }
+
+                    const icu::UnicodeString aIcuReplacement(
+                        false, reinterpret_cast<const UChar*>(aReplacement.getStr()),
+                        aReplacement.getLength());
+                    icu::UnicodeString aReplaced;
+                    if (bGlobalReplacement)
+                        aReplaced = aRegexMatcher.replaceAll(aIcuReplacement, status);
+                    else if (nOccurrence == 1)
+                        aReplaced = aRegexMatcher.replaceFirst(aIcuReplacement, status);
+                    else
+                    {
+                        sal_Int32 nCount = 0;
+                        while (aRegexMatcher.find(status) && U_SUCCESS(status))
+                        {
+                            if (++nCount == nOccurrence)
+                            {
+                                aRegexMatcher.appendReplacement(
+                                    aReplaced, aIcuReplacement, status);
+                                break;
+                            }
+                        }
+                        aRegexMatcher.appendTail(aReplaced);
+                    }
+                    if (U_FAILURE(status))
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    PushString(OUString(
+                        reinterpret_cast<const sal_Unicode*>(aReplaced.getBuffer()),
+                        aReplaced.length()));
+                };
+                const auto pushLegacyLenB = [&]() {
+                    warnTextUtilityDispatch(u"LENB");
+                    PushDouble(getLengthB(GetString().getString()));
+                };
+                const auto pushLegacyRightB = [&]() {
+                    warnTextUtilityDispatch(u"RIGHTB");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 2))
+                        return;
+                    sal_Int32 n = 1;
+                    if (nParamCount == 2)
+                    {
+                        n = GetStringPositionArgument();
+                        if (n < 0)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+                    }
+                    PushString(lcl_RightB(GetString().getString(), n));
+                };
+                const auto pushLegacyLeftB = [&]() {
+                    warnTextUtilityDispatch(u"LEFTB");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1, 2))
+                        return;
+                    sal_Int32 n = 1;
+                    if (nParamCount == 2)
+                    {
+                        n = GetStringPositionArgument();
+                        if (n < 0)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+                    }
+                    PushString(lcl_LeftB(GetString().getString(), n));
+                };
+                const auto pushLegacyMidB = [&]() {
+                    warnTextUtilityDispatch(u"MIDB");
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+                    const sal_Int32 nCount = GetStringPositionArgument();
+                    const sal_Int32 nStart = GetStringPositionArgument();
+                    OUString aStr = GetString().getString();
+                    if (nStart < 1 || nCount < 0)
+                        PushIllegalArgument();
+                    else
+                    {
+                        aStr = lcl_LeftB(aStr, nStart + nCount - 1);
+                        sal_Int32 nCnt = getLengthB(aStr) - nStart + 1;
+                        PushString(lcl_RightB(aStr, std::max<sal_Int32>(nCnt, 0)));
+                    }
+                };
+                const auto pushLegacyReplaceB = [&]() {
+                    warnTextUtilityDispatch(u"REPLACEB");
+                    if (!MustHaveParamCount(GetByte(), 4))
+                        return;
+                    OUString aNewStr = GetString().getString();
+                    const sal_Int32 nCount = GetStringPositionArgument();
+                    const sal_Int32 nPos = GetStringPositionArgument();
+                    OUString aOldStr = GetString().getString();
+                    int nLen = getLengthB(aOldStr);
+                    if (nPos < 1.0 || nPos > nLen || nCount < 0.0 || nPos + nCount - 1 > nLen)
+                        PushIllegalArgument();
+                    else
+                    {
+                        OUString aStr1 = lcl_LeftB(aOldStr, nPos - 1);
+                        OUString aStr3 = lcl_RightB(aOldStr, nLen - nPos - nCount + 1);
+                        PushString(aStr1 + aNewStr + aStr3);
+                    }
+                };
+                const auto pushLegacyFindB = [&]() {
+                    warnTextUtilityDispatch(u"FINDB");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 2, 3))
+                        return;
+                    sal_Int32 nStart = nParamCount == 3 ? GetStringPositionArgument() : 1;
+                    OUString aStr = GetString().getString();
+                    int nLen = getLengthB(aStr);
+                    OUString asStr = GetString().getString();
+                    int nsLen = getLengthB(asStr);
+                    if (nStart < 1 || nStart > nLen - nsLen + 1)
+                        PushIllegalArgument();
+                    else
+                    {
+                        OUString aBuf = lcl_RightB(aStr, nLen - nStart + 1);
+                        sal_Int32 nPos = aBuf.indexOf(asStr, 0);
+                        if (nPos == -1)
+                            PushNoValue();
+                        else
+                        {
+                            int nBytePos = lcl_getLengthB(aBuf, nPos);
+                            PushDouble(nBytePos + nStart);
+                        }
+                    }
+                };
+                const auto pushLegacySearchB = [&]() {
+                    warnTextUtilityDispatch(u"SEARCHB");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 2, 3))
+                        return;
+
+                    sal_Int32 nStart;
+                    if (nParamCount == 3)
+                    {
+                        nStart = GetStringPositionArgument();
+                        if (nStart < 1)
+                        {
+                            PushIllegalArgument();
+                            return;
+                        }
+                    }
+                    else
+                        nStart = 1;
+                    OUString aStr = GetString().getString();
+                    sal_Int32 nLen = getLengthB(aStr);
+                    OUString asStr = GetString().getString();
+                    sal_Int32 nsLen = nStart - 1;
+                    if (nsLen >= nLen)
+                        PushNoValue();
+                    else
+                    {
+                        OUString aSubStr(lcl_RightB(aStr, nLen - nStart + 1));
+                        sal_Int32 nPos = 0;
+                        sal_Int32 nEndPos = aSubStr.getLength();
+                        utl::SearchParam::SearchType eSearchType
+                            = DetectSearchType(asStr, mrDoc);
+                        utl::SearchParam sPar(asStr, eSearchType, false, '~', false);
+                        utl::TextSearch sT(sPar, ScGlobal::getCharClass());
+                        if (!sT.SearchForward(aSubStr, &nPos, &nEndPos))
+                            PushNoValue();
+                        else
+                        {
+                            int nBytePos = lcl_getLengthB(aSubStr, nPos);
+                            PushDouble(nBytePos + nStart);
+                        }
+                    }
+                };
+                const auto pushLegacyEncodeUrl = [&]() {
+                    warnTextUtilityDispatch(u"ENCODEURL");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1))
+                        return;
+
+                    OUString aStr = GetString().getString();
+                    if (aStr.isEmpty())
+                    {
+                        PushError(FormulaError::NoValue);
+                        return;
+                    }
+
+                    OString aUtf8Str(aStr.toUtf8());
+                    const sal_Int32 nLen = aUtf8Str.getLength();
+                    OStringBuffer aUrlBuf(nLen);
+                    for (int i = 0; i < nLen; i++)
+                    {
+                        char c = aUtf8Str[i];
+                        if (rtl::isAsciiAlphanumeric(static_cast<unsigned char>(c)) || c == '-'
+                            || c == '_')
+                        {
+                            aUrlBuf.append(c);
+                        }
+                        else
+                        {
+                            aUrlBuf.append('%');
+                            auto convertedChar = OString::number(
+                                                     static_cast<unsigned char>(c), 16)
+                                                     .toAsciiUpperCase();
+                            if (convertedChar.length == 1)
+                                aUrlBuf.append("0");
+                            aUrlBuf.append(convertedChar);
+                        }
+                    }
+                    PushString(OUString::fromUtf8(aUrlBuf));
+                };
+                const auto pushLegacyTextJoinMs = [&]() {
+                    warnTextUtilityDispatch(u"TEXTJOIN");
+                    short nParamCount = GetByte();
+                    if (!MustHaveParamCountMin(nParamCount, 3))
+                        return;
+
+                    ReverseStack(nParamCount);
+
+                    std::vector<OUString> aDelimiters;
+                    size_t nRefInList = 0;
+                    switch (GetStackType())
+                    {
+                        case svString:
+                        case svDouble:
+                            aDelimiters.push_back(GetString().getString());
+                            break;
+                        case svSingleRef:
+                        {
+                            ScAddress aAdr;
+                            PopSingleRef(aAdr);
+                            if (nGlobalError != FormulaError::NONE)
+                                break;
+                            ScRefCellValue aCell(mrDoc, aAdr);
+                            if (aCell.hasEmptyValue())
+                                aDelimiters.emplace_back("");
+                            else
+                            {
+                                svl::SharedString aSS;
+                                GetCellString(aSS, aCell);
+                                aDelimiters.push_back(aSS.getString());
+                            }
+                        }
+                        break;
+                        case svDoubleRef:
+                        case svRefList:
+                        {
+                            ScRange aRange;
+                            PopDoubleRef(aRange, nParamCount, nRefInList);
+                            if (nGlobalError != FormulaError::NONE)
+                                break;
+                            SCCOL nCol1, nCol2;
+                            SCROW nRow1, nRow2;
+                            SCTAB nTab1, nTab2;
+                            aRange.GetVars(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+                            if (nTab1 != nTab2)
+                            {
+                                SetError(FormulaError::IllegalParameter);
+                                break;
+                            }
+                            PutInOrder(nRow1, nRow2);
+                            PutInOrder(nCol1, nCol2);
+                            ScAddress aAdr;
+                            aAdr.SetTab(nTab1);
+                            for (SCROW nRow = nRow1; nRow <= nRow2; nRow++)
+                            {
+                                for (SCCOL nCol = nCol1; nCol <= nCol2; nCol++)
+                                {
+                                    aAdr.SetRow(nRow);
+                                    aAdr.SetCol(nCol);
+                                    ScRefCellValue aCell(mrDoc, aAdr);
+                                    if (aCell.hasEmptyValue())
+                                        aDelimiters.emplace_back("");
+                                    else
+                                    {
+                                        svl::SharedString aSS;
+                                        GetCellString(aSS, aCell);
+                                        aDelimiters.push_back(aSS.getString());
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                        case svMatrix:
+                        case svExternalSingleRef:
+                        case svExternalDoubleRef:
+                        {
+                            ScMatrixRef pMat = GetMatrix();
+                            if (pMat)
+                            {
+                                SCSIZE nC, nR;
+                                pMat->GetDimensions(nC, nR);
+                                if (nC == 0 || nR == 0)
+                                    SetError(FormulaError::IllegalArgument);
+                                else
+                                {
+                                    for (SCSIZE k = 0; k < nR; ++k)
+                                        for (SCSIZE j = 0; j < nC; ++j)
+                                            aDelimiters.push_back(pMat->GetString(j, k).getString());
+                                }
+                            }
+                        }
+                        break;
+                        default:
+                            PushIllegalArgument();
+                            return;
+                    }
+
+                    bool bSkipEmpty = GetBool();
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushError(nGlobalError);
+                        return;
+                    }
+
+                    OUStringBuffer aResBuf;
+                    if (nGlobalError == FormulaError::NONE && nParamCount > 2)
+                    {
+                        std::vector<bool> aResArray;
+                        nParamCount -= 2;
+                        while (nParamCount-- > 0)
+                        {
+                            switch (GetStackType())
+                            {
+                                case svString:
+                                case svDouble:
+                                {
+                                    OUString aStr = GetString().getString();
+                                    if (!aStr.isEmpty() || !bSkipEmpty)
+                                    {
+                                        if (!aResBuf.isEmpty())
+                                            aResBuf.append(aDelimiters[aResArray.size() % aDelimiters.size()]);
+                                        if (CheckStringResultLen(aResBuf, aStr.getLength()))
+                                            aResBuf.append(aStr);
+                                    }
+                                    aResArray.push_back(true);
+                                }
+                                break;
+                                case svSingleRef:
+                                {
+                                    ScAddress aAdr;
+                                    PopSingleRef(aAdr);
+                                    if (nGlobalError != FormulaError::NONE)
+                                        break;
+                                    ScRefCellValue aCell(mrDoc, aAdr);
+                                    if (!aCell.isEmpty() || !bSkipEmpty)
+                                    {
+                                        svl::SharedString aSS;
+                                        GetCellString(aSS, aCell);
+                                        OUString aStr = aSS.getString();
+                                        if (!aResBuf.isEmpty())
+                                            aResBuf.append(aDelimiters[aResArray.size() % aDelimiters.size()]);
+                                        if (CheckStringResultLen(aResBuf, aStr.getLength()))
+                                            aResBuf.append(aStr);
+                                    }
+                                    aResArray.push_back(true);
+                                }
+                                break;
+                                case svDoubleRef:
+                                case svRefList:
+                                {
+                                    ScRange aRange;
+                                    PopDoubleRef(aRange, nParamCount, nRefInList);
+                                    if (nGlobalError != FormulaError::NONE)
+                                        break;
+                                    SCCOL nCol1, nCol2;
+                                    SCROW nRow1, nRow2;
+                                    SCTAB nTab1, nTab2;
+                                    aRange.GetVars(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+                                    if (nTab1 != nTab2)
+                                    {
+                                        SetError(FormulaError::IllegalParameter);
+                                        break;
+                                    }
+                                    PutInOrder(nRow1, nRow2);
+                                    PutInOrder(nCol1, nCol2);
+                                    ScAddress aAdr;
+                                    aAdr.SetTab(nTab1);
+                                    for (SCROW nRow = nRow1; nRow <= nRow2; nRow++)
+                                    {
+                                        for (SCCOL nCol = nCol1; nCol <= nCol2; nCol++)
+                                        {
+                                            aAdr.SetRow(nRow);
+                                            aAdr.SetCol(nCol);
+                                            ScRefCellValue aCell(mrDoc, aAdr);
+                                            if (!aCell.isEmpty() || !bSkipEmpty)
+                                            {
+                                                svl::SharedString aSS;
+                                                GetCellString(aSS, aCell);
+                                                OUString aStr = aSS.getString();
+                                                if (!aResBuf.isEmpty())
+                                                    aResBuf.append(aDelimiters[aResArray.size() % aDelimiters.size()]);
+                                                if (CheckStringResultLen(aResBuf, aStr.getLength()))
+                                                    aResBuf.append(aStr);
+                                            }
+                                            aResArray.push_back(true);
+                                        }
+                                    }
+                                }
+                                break;
+                                case svMatrix:
+                                case svExternalSingleRef:
+                                case svExternalDoubleRef:
+                                {
+                                    ScMatrixRef pMat = GetMatrix();
+                                    if (pMat)
+                                    {
+                                        SCSIZE nC, nR;
+                                        pMat->GetDimensions(nC, nR);
+                                        if (nC == 0 || nR == 0)
+                                            SetError(FormulaError::IllegalArgument);
+                                        else
+                                        {
+                                            for (SCSIZE k = 0; k < nR; ++k)
+                                            {
+                                                for (SCSIZE j = 0; j < nC; ++j)
+                                                {
+                                                    OUString aStr = pMat->GetString(j, k).getString();
+                                                    if (!aStr.isEmpty() || !bSkipEmpty)
+                                                    {
+                                                        if (!aResBuf.isEmpty())
+                                                            aResBuf.append(aDelimiters[aResArray.size() % aDelimiters.size()]);
+                                                        if (CheckStringResultLen(aResBuf, aStr.getLength()))
+                                                            aResBuf.append(aStr);
+                                                    }
+                                                    aResArray.push_back(true);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                break;
+                                default:
+                                    PushIllegalArgument();
+                                    return;
+                            }
+                        }
+                    }
+                    PushString(aResBuf.makeStringAndClear());
+                };
+                const auto pushLegacyBahtText = [&]() {
+                    warnTextUtilityDispatch(u"BAHTTEXT");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 1))
+                        return;
+                    double fValue = GetDouble();
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushError(nGlobalError);
+                        return;
+                    }
+                    OString number = rtl::math::doubleToString(
+                        std::abs(fValue), rtl_math_StringFormat_F, 2, '.');
+                    const sal_Int32 dotPos = number.getLength() - 3;
+                    std::string_view sBaht(number.subView(0, dotPos)),
+                        sSatang(number.subView(dotPos + 1));
+                    bool noBaht = sBaht == "0", noSatang = sSatang == "00";
+                    if (noBaht && noSatang)
+                        return PushString(OUString::Concat(TH_0) + TH_BAHT + TH_DOT0);
+
+                    OUStringBuffer aText;
+                    if (fValue < 0.0)
+                        aText.append(TH_MINUS);
+                    if (!noBaht)
+                    {
+                        size_t blocksize = sBaht.size() % 6;
+                        if (blocksize == 0)
+                            blocksize = 6;
+                        while (!sBaht.empty())
+                        {
+                            lclAppendBlock(aText, sBaht.substr(0, blocksize));
+                            sBaht.remove_prefix(blocksize);
+                            blocksize = 6;
+                            if (!sBaht.empty())
+                                aText.append(TH_1E6);
+                        }
+                        aText.append(TH_BAHT);
+                    }
+                    if (noSatang)
+                        aText.append(TH_DOT0);
+                    else
+                    {
+                        lclAppendBlock(aText, sSatang);
+                        aText.append(TH_SATANG);
+                    }
+                    PushString(aText.makeStringAndClear());
+                };
                 const auto pushLegacyExact = [&]() {
                     warnTextUtilityDispatch(u"EXACT");
                     nFuncFmtType = SvNumFormatType::LOGICAL;
@@ -10379,7 +11229,7 @@ StackVar ScInterpreter::Interpret()
                     case ocRate             : pushLegacyRate();         break;
                     case ocFilterXML        : ScFilterXML();            break;
                     case ocWebservice       : ScWebservice();           break;
-                    case ocEncodeURL        : ScEncodeURL();            break;
+                    case ocEncodeURL        : pushLegacyEncodeUrl();    break;
                     case ocColor            : pushLegacyColor();            break;
                     case ocErf_MS           :
                         if (MustHaveParamCount(GetByte(), 1))
@@ -10500,15 +11350,15 @@ StackVar ScInterpreter::Interpret()
                     case ocExact            : pushLegacyExact();            break;
                     case ocLeft             : pushLegacyLeftRight(false);   break;
                     case ocRight            : pushLegacyLeftRight(true);    break;
-                    case ocSearch           : ScSearch();               break;
+                    case ocSearch           : pushLegacySearch();       break;
                     case ocMid              : pushLegacyMid();          break;
                     case ocText             : pushLegacyText();         break;
                     case ocSubstitute       : pushLegacySubstitute();   break;
-                    case ocRegex            : ScRegex();                    break;
+                    case ocRegex            : pushLegacyRegex();        break;
                     case ocRept             : pushLegacyRept();         break;
                     case ocConcat           : pushLegacyConcat();       break;
                     case ocConcat_MS        : pushLegacyConcatMs();         break;
-                    case ocTextJoin_MS      : ScTextJoin_MS();              break;
+                    case ocTextJoin_MS      : pushLegacyTextJoinMs();   break;
                     case ocIfs_MS           : pushLegacyIfs();              break;
                     case ocSwitch_MS        : pushLegacySwitch();           break;
                     case ocMinIfs_MS:
@@ -10754,7 +11604,7 @@ StackVar ScInterpreter::Interpret()
                     case ocArabic           : pushLegacyArabic();           break;
                     case ocInfo             : ScInfo();                 break;
                     case ocHyperLink        : ScHyperLink();            break;
-                    case ocBahtText         : ScBahtText();                 break;
+                    case ocBahtText         : pushLegacyBahtText();     break;
                     case ocGetPivotData     : ScGetPivotData();             break;
                     case ocJis              :
                         pushLegacyJisAsc(u"JIS", [&](const OUString& rText) {
@@ -10766,13 +11616,13 @@ StackVar ScInterpreter::Interpret()
                             return selibreoffice::convertIntoHalfWidth(rText);
                         });
                         break;
-                    case ocLenB             : ScLenB();                 break;
-                    case ocRightB           : ScRightB();               break;
-                    case ocLeftB            : ScLeftB();                break;
-                    case ocMidB             : ScMidB();                 break;
-                    case ocReplaceB         : ScReplaceB();             break;
-                    case ocFindB            : ScFindB();                break;
-                    case ocSearchB          : ScSearchB();              break;
+                    case ocLenB             : pushLegacyLenB();         break;
+                    case ocRightB           : pushLegacyRightB();       break;
+                    case ocLeftB            : pushLegacyLeftB();        break;
+                    case ocMidB             : pushLegacyMidB();         break;
+                    case ocReplaceB         : pushLegacyReplaceB();     break;
+                    case ocFindB            : pushLegacyFindB();        break;
+                    case ocSearchB          : pushLegacySearchB();      break;
                     case ocUnicode          : pushLegacyUnicode();          break;
                     case ocUnichar          : pushLegacyUnichar();          break;
                     case ocBitAnd           :
