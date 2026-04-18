@@ -3735,6 +3735,67 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorStatisticalDi
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2,
+    testInterpretTailEngineEvaluatorStatisticalDistributionCompatDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineStatisticalDistributionCompatDefaultOn"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 0, 0, u"=NORMSDIST(1)"_ustr);
+        m_pDoc->SetString(1, 0, 0, u"=GAMMAINV(0.6321205588285577;1;2)"_ustr);
+        m_pDoc->SetString(2, 0, 0, u"=EXPONDIST(1;1;1)"_ustr);
+        m_pDoc->SetString(3, 0, 0, u"=PERMUT(5.9;2.1)"_ustr);
+        m_pDoc->SetString(4, 0, 0, u"=WEIBULL(2.5;3;4;0)"_ustr);
+        m_pDoc->SetString(5, 0, 0, u"=CHISQDIST(2;4)"_ustr);
+        m_pDoc->SetString(6, 0, 0, u"=CHIDIST(2;4)"_ustr);
+        m_pDoc->SetString(7, 0, 0, u"=GAMMADIST(2;1;2;TRUE())"_ustr);
+        m_pDoc->SetString(8, 0, 0, u"=TDIST(1;1;2)"_ustr);
+        m_pDoc->SetString(9, 0, 0, u"=FDIST(1;2;2)"_ustr);
+        m_pDoc->SetString(10, 0, 0, u"=NORMDIST(1;2;3;TRUE())"_ustr);
+        m_pDoc->SetString(11, 0, 0, u"=HYPGEOMDIST(1;2;3;4)"_ustr);
+        m_pDoc->SetString(12, 0, 0, u"=LOGINV(0.5)"_ustr);
+        m_pDoc->SetString(13, 0, 0, u"=CRITBINOM(5;0.5;0.7)"_ustr);
+        m_pDoc->SetString(14, 0, 0, u"=CHISQINV(0.26424111765711533;4)"_ustr);
+        m_pDoc->SetString(15, 0, 0, u"=FINV(0.5;2;2)"_ustr);
+        m_pDoc->SetString(16, 0, 0, u"=TINV(0.5;1)"_ustr);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.841344746068543, m_pDoc->GetValue(0, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(1, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.6321205588285577, m_pDoc->GetValue(2, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(20.0, m_pDoc->GetValue(3, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.22950511642406825, m_pDoc->GetValue(4, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.26424111765711533, m_pDoc->GetValue(5, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.7357588823428847, m_pDoc->GetValue(6, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.6321205588285577, m_pDoc->GetValue(7, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(8, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(9, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.36944134018176367, m_pDoc->GetValue(10, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(11, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(12, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(13, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(14, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(15, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(16, 0, 0), 1e-12);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 17);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::StatisticalDistribution)]
+            >= 17);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorBusinessDayAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

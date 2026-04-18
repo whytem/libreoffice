@@ -4316,763 +4316,21 @@ StackVar ScInterpreter::Interpret()
                             "family-local default-on statistical distribution reached "
                             "ScInterpreter");
                     };
-                const auto pushLegacyUnaryValueResult =
-                    [&](std::u16string_view rLabel, auto aEvaluator) {
-                        warnIfLegacyStatisticalDistributionReached(rLabel);
-                        const auto aResult = aEvaluator(GetDouble());
-                        if (!aResult)
-                        {
-                            PushError(selibreoffice::toFormulaError(aResult.meError));
-                            return;
-                        }
-                        PushDouble(aResult.maValue);
-                    };
-                const auto pushLegacyUnaryCalcMathValueResult =
-                    [&](std::u16string_view rLabel, auto aEvaluator) {
-                        warnIfLegacyStatisticalDistributionReached(rLabel);
-                        const auto aResult = aEvaluator(GetDouble());
-                        if (!aResult)
-                        {
-                            PushError(toCalcMathFormulaError(aResult.meError));
-                            return;
-                        }
-                        PushDouble(aResult.maValue);
-                    };
-                const auto pushLegacyStdNormDist = [&](bool bMicrosoftSyntax) {
-                    warnIfLegacyStatisticalDistributionReached(
-                        bMicrosoftSyntax ? u"NORM.S.DIST" : u"NORMSDIST");
-                    if (!MustHaveParamCount(GetByte(), bMicrosoftSyntax ? 2 : 1))
-                        return;
-
-                    bool bCumulative = true;
-                    double fX = 0.0;
-                    if (bMicrosoftSyntax)
+                const auto pushValueResult = [&](const auto& rResult) {
+                    if (!rResult)
                     {
-                        bCumulative = GetBool();
-                        fX = GetDouble();
+                        PushError(selibreoffice::toFormulaError(rResult.meError));
+                        return;
                     }
-                    else
-                        fX = GetDouble();
-
-                    PushDouble(semath::evaluateNormalDistribution(fX, 0.0, 1.0, bCumulative)
-                                   .maValue);
+                    PushDouble(rResult.maValue);
                 };
-                const auto pushLegacyExponentialDist = [&]() {
-                    warnIfLegacyStatisticalDistributionReached(u"EXPONDIST");
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-
-                    const bool bCumulative = GetDouble() != 0.0;
-                    const double fLambda = GetDouble();
-                    const double fX = GetDouble();
-                    const auto aResult
-                        = semath::evaluateExponentialDistribution(fX, fLambda, bCumulative);
-                    if (!aResult)
+                const auto pushCalcMathValueResult = [&](const auto& rResult) {
+                    if (!rResult)
                     {
-                        PushError(toCalcMathFormulaError(aResult.meError));
+                        PushError(toCalcMathFormulaError(rResult.meError));
                         return;
                     }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyPermutation = [&](bool bAllowRepetition) {
-                    warnIfLegacyStatisticalDistributionReached(
-                        bAllowRepetition ? u"PERMUTATIONA" : u"PERMUT");
-                    if (!MustHaveParamCount(GetByte(), 2))
-                        return;
-
-                    const double fK = GetDouble();
-                    const double fN = GetDouble();
-                    const auto aResult = bAllowRepetition
-                                             ? semath::evaluatePermutationAValue(fN, fK)
-                                             : semath::evaluatePermutationValue(fN, fK);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyWeibull = [&]() {
-                    warnIfLegacyStatisticalDistributionReached(u"WEIBULL");
-                    if (!MustHaveParamCount(GetByte(), 4))
-                        return;
-
-                    const bool bCumulative = GetDouble() != 0.0;
-                    const double fBeta = GetDouble();
-                    const double fAlpha = GetDouble();
-                    const double fX = GetDouble();
-                    const auto aResult
-                        = semath::evaluateWeibullDistribution(fX, fAlpha, fBeta, bCumulative);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacySNormInv = [&]() {
-                    warnIfLegacyStatisticalDistributionReached(u"NORMSINV");
-                    if (!MustHaveParamCount(GetByte(), 1))
-                        return;
-
-                    const auto aResult = semath::evaluateStandardNormalInverse(GetDouble());
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyGammaInverse = [&]() {
-                    warnIfLegacyStatisticalDistributionReached(u"GAMMAINV");
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-
-                    const double fBeta = GetDouble();
-                    const double fAlpha = GetDouble();
-                    const double fProbability = GetDouble();
-                    const auto aResult
-                        = semath::evaluateGammaInverse(fProbability, fAlpha, fBeta);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyBinomDistLegacy = [&]() {
-                    warnIfLegacyStatisticalDistributionReached(u"BINOMDIST");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 3, 4))
-                        return;
-
-                    if (nParamCount == 3)
-                    {
-                        const double fX = GetDouble();
-                        const double fP = GetDouble();
-                        const double fN = GetDouble();
-                        const auto aResult
-                            = semath::evaluateBinomialDistribution(fX, fN, fP, false);
-                        if (!aResult)
-                        {
-                            PushError(toCalcMathFormulaError(aResult.meError));
-                            return;
-                        }
-                        PushDouble(aResult.maValue);
-                        return;
-                    }
-
-                    const double fUpper = GetDouble();
-                    const double fLower = GetDouble();
-                    const double fP = GetDouble();
-                    const double fN = GetDouble();
-                    const auto aResult
-                        = semath::evaluateBinomialRangeDistribution(fN, fP, fLower, fUpper);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyNormDist =
-                    [&](std::u16string_view rLabel, int nMinParamCount) {
-                        warnIfLegacyStatisticalDistributionReached(rLabel);
-                        sal_uInt8 nParamCount = GetByte();
-                        if (!MustHaveParamCount(nParamCount, nMinParamCount, 4))
-                            return;
-
-                        const bool bCumulative = nParamCount != 4 || GetBool();
-                        const double fSigma = GetDouble();
-                        const double fMean = GetDouble();
-                        const double fX = GetDouble();
-                        const auto aResult
-                            = semath::evaluateNormalDistribution(fX, fMean, fSigma, bCumulative);
-                        if (!aResult)
-                        {
-                            PushError(toCalcMathFormulaError(aResult.meError));
-                            return;
-                        }
-                        PushDouble(aResult.maValue);
-                    };
-                const auto pushLegacyHypGeomDist =
-                    [&](std::u16string_view rLabel, int nMinParamCount) {
-                        warnIfLegacyStatisticalDistributionReached(rLabel);
-                        sal_uInt8 nParamCount = GetByte();
-                        if (!MustHaveParamCount(nParamCount, nMinParamCount, 5))
-                            return;
-
-                        const bool bCumulative = (nParamCount == 5 && GetBool());
-                        const double fN = ::rtl::math::approxFloor(GetDouble());
-                        const double fM = ::rtl::math::approxFloor(GetDouble());
-                        const double fn = ::rtl::math::approxFloor(GetDouble());
-                        const double fX = ::rtl::math::approxFloor(GetDouble());
-
-                        if ((fX < 0.0) || (fn < fX) || (fN < fn) || (fN < fM) || (fM < 0.0))
-                        {
-                            PushIllegalArgument();
-                            return;
-                        }
-
-                        const auto aResult = semath::evaluateHypergeometricDistribution(
-                            fX, fn, fM, fN, bCumulative);
-                        if (!aResult)
-                        {
-                            PushError(toCalcMathFormulaError(aResult.meError));
-                            return;
-                        }
-                        PushDouble(aResult.maValue);
-                    };
-                const auto pushLegacyLogNormDist =
-                    [&](std::u16string_view rLabel, int nMinParamCount) {
-                        warnIfLegacyStatisticalDistributionReached(rLabel);
-                        sal_uInt8 nParamCount = GetByte();
-                        if (!MustHaveParamCount(nParamCount, nMinParamCount, 4))
-                            return;
-
-                        const bool bCumulative = nParamCount != 4 || GetBool();
-                        const double fSigma = nParamCount >= 3 ? GetDouble() : 1.0;
-                        const double fMean = nParamCount >= 2 ? GetDouble() : 0.0;
-                        const double fX = GetDouble();
-                        const auto aResult = semath::evaluateLogNormalDistribution(
-                            fX, fMean, fSigma, bCumulative);
-                        if (!aResult)
-                        {
-                            PushError(toCalcMathFormulaError(aResult.meError));
-                            return;
-                        }
-                        PushDouble(aResult.maValue);
-                    };
-                const auto pushLegacyLogNormInv = [&]() {
-                    warnIfLegacyStatisticalDistributionReached(u"LOGINV");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 1, 3))
-                        return;
-
-                    const double fSigma = (nParamCount == 3 ? GetDouble() : 1.0);
-                    const double fMean = (nParamCount >= 2 ? GetDouble() : 0.0);
-                    const double fP = GetDouble();
-                    const auto aResult
-                        = semath::evaluateLogNormalInverse(fP, fMean, fSigma);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyBetaDistMS = [&]() {
-                    warnIfLegacyStatisticalDistributionReached(u"BETA.DIST");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 4, 6))
-                        return;
-
-                    const double fUpperBound = nParamCount == 6 ? GetDouble() : 1.0;
-                    const double fLowerBound = nParamCount >= 5 ? GetDouble() : 0.0;
-                    const bool bCumulative = GetBool();
-                    const double fBeta = GetDouble();
-                    const double fAlpha = GetDouble();
-                    const double fX = GetDouble();
-                    const auto aResult = semath::evaluateBetaDistribution(
-                        fX, fAlpha, fBeta, fLowerBound, fUpperBound, bCumulative, true);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyBetaInv = [&](std::u16string_view rLabel) {
-                    warnIfLegacyStatisticalDistributionReached(rLabel);
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 3, 5))
-                        return;
-
-                    const double fUpperBound = nParamCount == 5 ? GetDouble() : 1.0;
-                    const double fLowerBound = nParamCount >= 4 ? GetDouble() : 0.0;
-                    const double fBeta = GetDouble();
-                    const double fAlpha = GetDouble();
-                    const double fP = GetDouble();
-                    const auto aResult = semath::evaluateBetaInverse(
-                        fP, fAlpha, fBeta, fLowerBound, fUpperBound);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyCritBinom = [&]() {
-                    warnIfLegacyStatisticalDistributionReached(u"CRITBINOM");
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-
-                    const double fAlpha = GetDouble();
-                    const double fP = GetDouble();
-                    const double fN = GetDouble();
-                    const auto aResult = semath::evaluateBinomialInverse(fN, fP, fAlpha);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyNegBinomDist =
-                    [&](std::u16string_view rLabel, bool bMicrosoftSyntax) {
-                        warnIfLegacyStatisticalDistributionReached(rLabel);
-                        if (!MustHaveParamCount(GetByte(), bMicrosoftSyntax ? 4 : 3))
-                            return;
-
-                        const bool bCumulative = bMicrosoftSyntax ? GetBool() : false;
-                        const double fP = GetDouble();
-                        const double fS = GetDouble();
-                        const double fF = GetDouble();
-                        const auto aResult = semath::evaluateNegativeBinomialDistribution(
-                            fF, fS, fP, bCumulative, bMicrosoftSyntax);
-                        if (!aResult)
-                        {
-                            PushError(toCalcMathFormulaError(aResult.meError));
-                            return;
-                        }
-                        PushDouble(aResult.maValue);
-                    };
-                const auto pushLegacyStandardize = [&]() {
-                    warnIfLegacyStatisticalDistributionReached(u"STANDARDIZE");
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-
-                    const double fSigma = GetDouble();
-                    const double fMean = GetDouble();
-                    const double fX = GetDouble();
-                    if (fSigma < 0.0)
-                        PushError(FormulaError::IllegalArgument);
-                    else if (fSigma == 0.0)
-                        PushError(FormulaError::DivisionByZero);
-                    else
-                        PushDouble((fX - fMean) / fSigma);
-                };
-                const auto pushLegacyChiSqDist =
-                    [&](std::u16string_view rLabel, bool bMicrosoftSyntax) {
-                        warnIfLegacyStatisticalDistributionReached(rLabel);
-                        const sal_uInt8 nParamCount = GetByte();
-                        if (!MustHaveParamCount(nParamCount, bMicrosoftSyntax ? 3 : 2,
-                                bMicrosoftSyntax ? 3 : 3))
-                        {
-                            return;
-                        }
-
-                        bool bCumulative = true;
-                        if (bMicrosoftSyntax || nParamCount == 3)
-                            bCumulative = GetBool();
-
-                        const double fDF = ::rtl::math::approxFloor(GetDouble());
-                        if (fDF < 1.0 || (bMicrosoftSyntax && fDF > 1E10))
-                        {
-                            PushIllegalArgument();
-                            return;
-                        }
-
-                        const double fX = GetDouble();
-                        if (bMicrosoftSyntax && fX < 0.0)
-                        {
-                            PushIllegalArgument();
-                            return;
-                        }
-
-                        const auto aResult = semath::evaluateChiSquareDistribution(
-                            fX, fDF, bCumulative, false);
-                        if (!aResult)
-                        {
-                            PushError(toCalcMathFormulaError(aResult.meError));
-                            return;
-                        }
-                        PushDouble(aResult.maValue);
-                    };
-                const auto pushLegacyTDistLegacy = [&]() {
-                    warnIfLegacyStatisticalDistributionReached(u"TDIST");
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-
-                    const double fFlag = ::rtl::math::approxFloor(GetDouble());
-                    const double fDF = ::rtl::math::approxFloor(GetDouble());
-                    const double fT = GetDouble();
-                    if (fDF < 1.0 || fT < 0.0 || (fFlag != 1.0 && fFlag != 2.0))
-                    {
-                        PushIllegalArgument();
-                        return;
-                    }
-
-                    const auto aResult = semath::evaluateStudentDistribution(
-                        fT, fDF, static_cast<int>(fFlag));
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyTDistTails =
-                    [&](std::u16string_view rLabel, int nTails) {
-                        warnIfLegacyStatisticalDistributionReached(rLabel);
-                        if (!MustHaveParamCount(GetByte(), 2))
-                            return;
-
-                        const double fDF = ::rtl::math::approxFloor(GetDouble());
-                        const double fT = GetDouble();
-                        if (fDF < 1.0 || (nTails == 2 && fT < 0.0))
-                        {
-                            PushIllegalArgument();
-                            return;
-                        }
-
-                        const auto aResult = semath::evaluateStudentDistribution(fT, fDF, nTails);
-                        if (!aResult)
-                        {
-                            PushError(toCalcMathFormulaError(aResult.meError));
-                            return;
-                        }
-
-                        if (nTails == 1 && fT < 0.0)
-                            PushDouble(1.0 - aResult.maValue);
-                        else
-                            PushDouble(aResult.maValue);
-                    };
-                const auto pushLegacyTDistMs = [&](std::u16string_view rLabel) {
-                    warnIfLegacyStatisticalDistributionReached(rLabel);
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-
-                    const bool bCumulative = GetBool();
-                    const double fDF = ::rtl::math::approxFloor(GetDouble());
-                    const double fT = GetDouble();
-                    if (fDF < 1.0)
-                    {
-                        PushIllegalArgument();
-                        return;
-                    }
-
-                    const auto aResult
-                        = semath::evaluateStudentDistribution(fT, fDF, bCumulative ? 4 : 3);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyFDistRightTail =
-                    [&](std::u16string_view rLabel) {
-                        warnIfLegacyStatisticalDistributionReached(rLabel);
-                        if (!MustHaveParamCount(GetByte(), 3))
-                            return;
-
-                        const double fDF2 = ::rtl::math::approxFloor(GetDouble());
-                        const double fDF1 = ::rtl::math::approxFloor(GetDouble());
-                        const double fRatio = GetDouble();
-                        if (fRatio < 0.0 || fDF1 < 1.0 || fDF2 < 1.0 || fDF1 >= 1.0E10
-                            || fDF2 >= 1.0E10)
-                        {
-                            PushIllegalArgument();
-                            return;
-                        }
-
-                        const auto aResult
-                            = semath::evaluateFRightTailDistribution(fRatio, fDF1, fDF2);
-                        if (!aResult)
-                        {
-                            PushError(toCalcMathFormulaError(aResult.meError));
-                            return;
-                        }
-                        PushDouble(aResult.maValue);
-                    };
-                const auto pushLegacyFDistLeftTail =
-                    [&](std::u16string_view rLabel) {
-                        warnIfLegacyStatisticalDistributionReached(rLabel);
-                        const int nParamCount = GetByte();
-                        if (!MustHaveParamCount(nParamCount, 3, 4))
-                            return;
-
-                        bool bCumulative = true;
-                        if (nParamCount == 4)
-                        {
-                            if (IsMissing())
-                            {
-                                Pop();
-                            }
-                            else
-                            {
-                                bCumulative = GetBool();
-                            }
-                        }
-
-                        const double fDF2 = ::rtl::math::approxFloor(GetDouble());
-                        const double fDF1 = ::rtl::math::approxFloor(GetDouble());
-                        const double fRatio = GetDouble();
-                        if (fRatio < 0.0 || fDF1 < 1.0 || fDF2 < 1.0 || fDF1 >= 1.0E10
-                            || fDF2 >= 1.0E10)
-                        {
-                            PushIllegalArgument();
-                            return;
-                        }
-
-                        if (bCumulative)
-                        {
-                            const auto aRightTail
-                                = semath::evaluateFRightTailDistribution(fRatio, fDF1, fDF2);
-                            if (!aRightTail)
-                            {
-                                PushError(toCalcMathFormulaError(aRightTail.meError));
-                                return;
-                            }
-                            PushDouble(1.0 - aRightTail.maValue);
-                            return;
-                        }
-
-                        PushDouble(pow(fDF1 / fDF2, fDF1 / 2.0)
-                                   * pow(fRatio, (fDF1 / 2.0) - 1.0)
-                                   / (pow(1.0 + (fRatio * fDF1 / fDF2),
-                                          (fDF1 + fDF2) / 2.0)
-                                      * GetBeta(fDF1 / 2.0, fDF2 / 2.0)));
-                    };
-                const auto pushLegacyChiDist =
-                    [&](std::u16string_view rLabel, bool bOdfSyntax) {
-                        warnIfLegacyStatisticalDistributionReached(rLabel);
-                        if (!MustHaveParamCount(GetByte(), 2))
-                            return;
-
-                        const double fDF = ::rtl::math::approxFloor(GetDouble());
-                        const double fChi = GetDouble();
-                        if (fDF < 1.0 || (!bOdfSyntax && fChi < 0.0))
-                        {
-                            PushIllegalArgument();
-                            return;
-                        }
-
-                        const auto aResult = semath::evaluateLegacyChiDist(fChi, fDF);
-                        if (!aResult)
-                        {
-                            PushError(toCalcMathFormulaError(aResult.meError));
-                            return;
-                        }
-                        PushDouble(aResult.maValue);
-                    };
-                const auto pushLegacyGammaDist =
-                    [&](std::u16string_view rLabel, bool bOdfSyntax) {
-                        warnIfLegacyStatisticalDistributionReached(rLabel);
-                        const sal_uInt8 nMinParamCount = bOdfSyntax ? 3 : 4;
-                        const sal_uInt8 nParamCount = GetByte();
-                        if (!MustHaveParamCount(nParamCount, nMinParamCount, 4))
-                            return;
-
-                        bool bCumulative = true;
-                        if (nParamCount == 4)
-                            bCumulative = GetBool();
-
-                        const double fBeta = GetDouble();
-                        const double fAlpha = GetDouble();
-                        const double fX = GetDouble();
-                        if ((!bOdfSyntax && fX < 0.0) || fAlpha <= 0.0 || fBeta <= 0.0)
-                        {
-                            PushIllegalArgument();
-                            return;
-                        }
-
-                        const auto aResult = semath::evaluateGammaDistribution(
-                            fX, fAlpha, fBeta, bCumulative, !bOdfSyntax);
-                        if (!aResult)
-                        {
-                            PushError(toCalcMathFormulaError(aResult.meError));
-                            return;
-                        }
-                        PushDouble(aResult.maValue);
-                    };
-                const auto pushLegacyTInv =
-                    [&](std::u16string_view rLabel, int nType) {
-                        warnIfLegacyStatisticalDistributionReached(rLabel);
-                        if (!MustHaveParamCount(GetByte(), 2))
-                            return;
-
-                        const double fDF = ::rtl::math::approxFloor(GetDouble());
-                        const double fProbability = GetDouble();
-                        if (fDF < 1.0 || fProbability <= 0.0 || fProbability > 1.0)
-                        {
-                            PushIllegalArgument();
-                            return;
-                        }
-
-                        if (nType == 4)
-                        {
-                            if (fProbability == 1.0)
-                            {
-                                PushIllegalArgument();
-                                return;
-                            }
-
-                            const auto aProbability = fProbability < 0.5 ? 1.0 - fProbability
-                                                                          : fProbability;
-                            const auto aResult
-                                = semath::evaluateTInverse(aProbability, fDF, nType);
-                            if (!aResult)
-                            {
-                                PushError(toCalcMathFormulaError(aResult.meError));
-                                return;
-                            }
-                            PushDouble(fProbability < 0.5 ? -aResult.maValue : aResult.maValue);
-                            return;
-                        }
-
-                        const auto aResult = semath::evaluateTInverse(fProbability, fDF, nType);
-                        if (!aResult)
-                        {
-                            PushError(toCalcMathFormulaError(aResult.meError));
-                            return;
-                        }
-                        PushDouble(aResult.maValue);
-                    };
-                const auto pushLegacyFInv =
-                    [&](std::u16string_view rLabel, bool bLeftTail) {
-                        warnIfLegacyStatisticalDistributionReached(rLabel);
-                        if (!MustHaveParamCount(GetByte(), 3))
-                            return;
-
-                        const double fDF2 = ::rtl::math::approxFloor(GetDouble());
-                        const double fDF1 = ::rtl::math::approxFloor(GetDouble());
-                        const double fProbability = GetDouble();
-                        if (fProbability <= 0.0 || fProbability > 1.0 || fDF1 < 1.0
-                            || fDF2 < 1.0 || fDF1 >= 1.0E10 || fDF2 >= 1.0E10)
-                        {
-                            PushIllegalArgument();
-                            return;
-                        }
-
-                        const auto aRightTail = bLeftTail ? 1.0 - fProbability : fProbability;
-                        const auto aResult
-                            = semath::evaluateFInverseRightTail(aRightTail, fDF1, fDF2);
-                        if (!aResult)
-                        {
-                            PushError(toCalcMathFormulaError(aResult.meError));
-                            return;
-                        }
-                        PushDouble(aResult.maValue);
-                    };
-                const auto pushLegacyChiInv = [&](std::u16string_view rLabel) {
-                    warnIfLegacyStatisticalDistributionReached(rLabel);
-                    if (!MustHaveParamCount(GetByte(), 2))
-                        return;
-
-                    const double fDF = ::rtl::math::approxFloor(GetDouble());
-                    const double fProbability = GetDouble();
-                    const auto aResult = semath::evaluateLegacyChiInverse(fProbability, fDF);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyChiSqInv = [&](std::u16string_view rLabel) {
-                    warnIfLegacyStatisticalDistributionReached(rLabel);
-                    if (!MustHaveParamCount(GetByte(), 2))
-                        return;
-
-                    const double fDF = ::rtl::math::approxFloor(GetDouble());
-                    const double fProbability = GetDouble();
-                    const auto aResult = semath::evaluateChiSquareInverse(fProbability, fDF);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyBetaDist = [&]() {
-                    warnIfLegacyStatisticalDistributionReached(u"BETADIST");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 3, 6))
-                        return;
-                    bool bIsCumulative = nParamCount == 6 ? GetBool() : true;
-                    double fUpperBound = nParamCount >= 5 ? GetDouble() : 1.0;
-                    double fLowerBound = nParamCount >= 4 ? GetDouble() : 0.0;
-                    double fBeta = GetDouble();
-                    double fAlpha = GetDouble();
-                    double fX = GetDouble();
-                    const auto aResult = semath::evaluateBetaDistribution(
-                        fX, fAlpha, fBeta, fLowerBound, fUpperBound, bIsCumulative, false);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyBinomDistMs = [&]() {
-                    warnIfLegacyStatisticalDistributionReached(u"BINOM.DIST");
-                    if (!MustHaveParamCount(GetByte(), 4))
-                        return;
-                    bool bIsCumulative = GetBool();
-                    double fP = GetDouble();
-                    double fN = GetDouble();
-                    double fX = GetDouble();
-                    const auto aResult
-                        = semath::evaluateBinomialDistribution(fX, fN, fP, bIsCumulative);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyPoissonDist = [&](bool bODFF) {
-                    warnIfLegacyStatisticalDistributionReached(
-                        bODFF ? u"POISSON" : u"POISSON.DIST");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, bODFF ? 2 : 3, 3))
-                        return;
-                    bool bCumulative = nParamCount != 3 || GetBool();
-                    double fLambda = GetDouble();
-                    double fX = GetDouble();
-                    const auto aResult
-                        = semath::evaluatePoissonDistribution(fX, fLambda, bCumulative);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyNormInv = [&]() {
-                    warnIfLegacyStatisticalDistributionReached(u"NORMINV");
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-                    double fSigma = GetDouble();
-                    double fMean = GetDouble();
-                    double fX = GetDouble();
-                    const auto aResult = semath::evaluateNormalInverse(fX, fMean, fSigma);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
-                };
-                const auto pushLegacyConfidence = [&](bool bStudent) {
-                    warnIfLegacyStatisticalDistributionReached(
-                        bStudent ? u"CONFIDENCE.T" : u"CONFIDENCE");
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-                    double fN = ::rtl::math::approxFloor(GetDouble());
-                    double fSigma = GetDouble();
-                    double fAlpha = GetDouble();
-                    const auto aResult = bStudent
-                                             ? semath::evaluateConfidenceT(fAlpha, fSigma, fN)
-                                             : semath::evaluateConfidence(fAlpha, fSigma, fN);
-                    if (!aResult)
-                    {
-                        PushError(toCalcMathFormulaError(aResult.meError));
-                        return;
-                    }
-                    PushDouble(aResult.maValue);
+                    PushDouble(rResult.maValue);
                 };
                 const auto pushLegacyKurt = [&]() {
                     warnIfLegacyStatisticalDistributionReached(u"KURT");
@@ -11025,8 +10283,8 @@ StackVar ScInterpreter::Interpret()
                         pushLegacyMathScalarUnaryOptional(u"SQRT", semath::computeSqrt);
                         break;
                     case ocFact             :
-                        pushLegacyUnaryCalcMathValueResult(
-                            u"FACT", semath::evaluateFactorialValue);
+                        warnIfLegacyStatisticalDistributionReached(u"FACT");
+                        pushCalcMathValueResult(semath::evaluateFactorialValue(GetDouble()));
                         break;
                     case ocGetYear          : pushLegacyExtractYear();  break;
                     case ocGetMonth         : pushLegacyExtractMonth(); break;
@@ -11065,11 +10323,33 @@ StackVar ScInterpreter::Interpret()
                     case ocGauss            :
                         PushDouble(semath::gaussValue(GetDouble()));
                         break;
-                    case ocStdNormDist      : pushLegacyStdNormDist(false); break;
-                    case ocStdNormDist_MS   : pushLegacyStdNormDist(true);  break;
+                    case ocStdNormDist:
+                    case ocStdNormDist_MS:
+                    {
+                        const bool bMicrosoftSyntax = eOp == ocStdNormDist_MS;
+                        warnIfLegacyStatisticalDistributionReached(
+                            bMicrosoftSyntax ? u"NORM.S.DIST" : u"NORMSDIST");
+                        if (!MustHaveParamCount(GetByte(), bMicrosoftSyntax ? 2 : 1))
+                            break;
+
+                        bool bCumulative = true;
+                        double fX = 0.0;
+                        if (bMicrosoftSyntax)
+                        {
+                            bCumulative = GetBool();
+                            fX = GetDouble();
+                        }
+                        else
+                            fX = GetDouble();
+
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyStdNormDist(fX, bCumulative));
+                    }
+                    break;
                     case ocFisher           :
-                        pushLegacyUnaryCalcMathValueResult(
-                            u"FISHER", semath::fisherTransform);
+                        warnIfLegacyStatisticalDistributionReached(u"FISHER");
+                        pushCalcMathValueResult(semath::fisherTransform(GetDouble()));
                         break;
                     case ocFisherInv        :
                         PushDouble(semath::inverseFisherTransform(GetDouble()));
@@ -11245,12 +10525,18 @@ StackVar ScInterpreter::Interpret()
                     case ocColor            : pushLegacyColor();            break;
                     case ocErf_MS           :
                         if (MustHaveParamCount(GetByte(), 1))
-                            pushLegacyUnaryValueResult(u"ERF", semath::evaluateErrorFunction);
+                        {
+                            warnIfLegacyStatisticalDistributionReached(u"ERF");
+                            pushValueResult(semath::evaluateErrorFunction(GetDouble()));
+                        }
                         break;
                     case ocErfc_MS          :
                         if (MustHaveParamCount(GetByte(), 1))
-                            pushLegacyUnaryValueResult(
-                                u"ERFC", semath::evaluateComplementaryErrorFunction);
+                        {
+                            warnIfLegacyStatisticalDistributionReached(u"ERFC");
+                            pushValueResult(
+                                semath::evaluateComplementaryErrorFunction(GetDouble()));
+                        }
                         break;
                     case ocIpmt             : pushLegacyIpmt();         break;
                     case ocPpmt             : pushLegacyPpmt();         break;
@@ -11407,35 +10693,284 @@ StackVar ScInterpreter::Interpret()
                     case ocMatSequence      : ScMatSequence();              break;
                     case ocMatTrans         : ScMatTrans();                 break;
                     case ocMatRef           : ScMatRef();                   break;
-                    case ocB                : pushLegacyBinomDistLegacy();  break;
-                    case ocNormDist         : pushLegacyNormDist(u"NORMDIST", 3); break;
-                    case ocNormDist_MS      : pushLegacyNormDist(u"NORM.DIST", 4); break;
-                    case ocExpDist          :
-                    case ocExpDist_MS       : pushLegacyExponentialDist();  break;
-                    case ocBinomDist        :
-                    case ocBinomDist_MS     : pushLegacyBinomDistMs();  break;
-                    case ocPoissonDist      : pushLegacyPoissonDist(true); break;
-                    case ocPoissonDist_MS   : pushLegacyPoissonDist(false); break;
+                    case ocB:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"BINOMDIST");
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 3, 4))
+                            break;
+
+                        if (nParamCount == 3)
+                        {
+                            const double fSuccesses = GetDouble();
+                            const double fProbability = GetDouble();
+                            const double fTrials = GetDouble();
+                            pushCalcMathValueResult(
+                                spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                    evaluateLegacyBinomDist(
+                                        fSuccesses, fTrials, fProbability));
+                            break;
+                        }
+
+                        const double fUpper = GetDouble();
+                        const double fLower = GetDouble();
+                        const double fProbability = GetDouble();
+                        const double fTrials = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyBinomRange(
+                                    fTrials, fProbability, fLower, fUpper));
+                    }
+                    break;
+                    case ocNormDist:
+                    case ocNormDist_MS:
+                    {
+                        const bool bMicrosoftSyntax = eOp == ocNormDist_MS;
+                        warnIfLegacyStatisticalDistributionReached(
+                            bMicrosoftSyntax ? u"NORM.DIST" : u"NORMDIST");
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, bMicrosoftSyntax ? 4 : 3, 4))
+                            break;
+
+                        const bool bCumulative = nParamCount != 4 || GetBool();
+                        const double fSigma = GetDouble();
+                        const double fMean = GetDouble();
+                        const double fX = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyNormDist(fX, fMean, fSigma, bCumulative));
+                    }
+                    break;
+                    case ocExpDist:
+                    case ocExpDist_MS:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"EXPONDIST");
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        const bool bCumulative = GetDouble() != 0.0;
+                        const double fLambda = GetDouble();
+                        const double fX = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyExponentialDist(fX, fLambda, bCumulative));
+                    }
+                    break;
+                    case ocBinomDist:
+                    case ocBinomDist_MS:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"BINOM.DIST");
+                        if (!MustHaveParamCount(GetByte(), 4))
+                            break;
+                        const bool bCumulative = GetBool();
+                        const double fProbability = GetDouble();
+                        const double fTrials = GetDouble();
+                        const double fSuccesses = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyBinomDistMs(
+                                    fSuccesses, fTrials, fProbability, bCumulative));
+                    }
+                    break;
+                    case ocPoissonDist:
+                    case ocPoissonDist_MS:
+                    {
+                        const bool bOdfSyntax = eOp == ocPoissonDist;
+                        warnIfLegacyStatisticalDistributionReached(
+                            bOdfSyntax ? u"POISSON" : u"POISSON.DIST");
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, bOdfSyntax ? 2 : 3, 3))
+                            break;
+                        const bool bCumulative = nParamCount != 3 || GetBool();
+                        const double fLambda = GetDouble();
+                        const double fX = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyPoissonDist(fX, fLambda, bCumulative));
+                    }
+                    break;
                     case ocCombin           : pushLegacyCombin(u"COMBIN", false);  break;
                     case ocCombinA          : pushLegacyCombin(u"COMBINA", true);  break;
-                    case ocPermut           : pushLegacyPermutation(false); break;
-                    case ocPermutationA     : pushLegacyPermutation(true);  break;
-                    case ocHypGeomDist      : pushLegacyHypGeomDist(u"HYPGEOMDIST", 4); break;
-                    case ocHypGeomDist_MS   : pushLegacyHypGeomDist(u"HYPGEOM.DIST", 5); break;
-                    case ocLogNormDist      : pushLegacyLogNormDist(u"LOGNORMDIST", 1); break;
-                    case ocLogNormDist_MS   : pushLegacyLogNormDist(u"LOGNORM.DIST", 4); break;
-                    case ocTDist            : pushLegacyTDistLegacy();      break;
-                    case ocTDist_MS         : pushLegacyTDistMs(u"T.DIST"); break;
-                    case ocTDist_RT         : pushLegacyTDistTails(u"T.DIST.RT", 1); break;
-                    case ocTDist_2T         : pushLegacyTDistTails(u"T.DIST.2T", 2); break;
-                    case ocFDist            :
-                    case ocFDist_RT         : pushLegacyFDistRightTail(u"FDIST"); break;
-                    case ocFDist_LT         : pushLegacyFDistLeftTail(u"F.DIST"); break;
-                    case ocChiDist          : pushLegacyChiDist(u"LEGACY.CHIDIST", true); break;
-                    case ocChiDist_MS       : pushLegacyChiDist(u"CHISQ.DIST.RT", false); break;
-                    case ocChiSqDist        : pushLegacyChiSqDist(u"CHISQDIST", false); break;
-                    case ocChiSqDist_MS     : pushLegacyChiSqDist(u"CHISQ.DIST", true); break;
-                    case ocStandard         : pushLegacyStandardize();      break;
+                    case ocPermut:
+                    case ocPermutationA:
+                    {
+                        const bool bAllowRepetition = eOp == ocPermutationA;
+                        warnIfLegacyStatisticalDistributionReached(
+                            bAllowRepetition ? u"PERMUTATIONA" : u"PERMUT");
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            break;
+                        const double fK = GetDouble();
+                        const double fN = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyPermutation(fN, fK, bAllowRepetition));
+                    }
+                    break;
+                    case ocHypGeomDist:
+                    case ocHypGeomDist_MS:
+                    {
+                        const bool bMicrosoftSyntax = eOp == ocHypGeomDist_MS;
+                        warnIfLegacyStatisticalDistributionReached(
+                            bMicrosoftSyntax ? u"HYPGEOM.DIST" : u"HYPGEOMDIST");
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, bMicrosoftSyntax ? 5 : 4, 5))
+                            break;
+                        const bool bCumulative = nParamCount == 5 && GetBool();
+                        const double fPopulationSize = GetDouble();
+                        const double fPopulationSuccesses = GetDouble();
+                        const double fSampleSuccesses = GetDouble();
+                        const double fX = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyHypGeomDist(
+                                    fX, fSampleSuccesses, fPopulationSuccesses,
+                                    fPopulationSize, bCumulative));
+                    }
+                    break;
+                    case ocLogNormDist:
+                    case ocLogNormDist_MS:
+                    {
+                        const bool bMicrosoftSyntax = eOp == ocLogNormDist_MS;
+                        warnIfLegacyStatisticalDistributionReached(
+                            bMicrosoftSyntax ? u"LOGNORM.DIST" : u"LOGNORMDIST");
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, bMicrosoftSyntax ? 4 : 1, 4))
+                            break;
+                        const bool bCumulative = nParamCount != 4 || GetBool();
+                        const double fSigma = nParamCount >= 3 ? GetDouble() : 1.0;
+                        const double fMean = nParamCount >= 2 ? GetDouble() : 0.0;
+                        const double fX = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyLogNormDist(fX, fMean, fSigma, bCumulative));
+                    }
+                    break;
+                    case ocTDist:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"TDIST");
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        const double fFlag = GetDouble();
+                        const double fDegreesFreedom = GetDouble();
+                        const double fT = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyTDistLegacy(fT, fDegreesFreedom, fFlag));
+                    }
+                    break;
+                    case ocTDist_MS:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"T.DIST");
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        const bool bCumulative = GetBool();
+                        const double fDegreesFreedom = GetDouble();
+                        const double fT = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyTDistMs(fT, fDegreesFreedom, bCumulative));
+                    }
+                    break;
+                    case ocTDist_RT:
+                    case ocTDist_2T:
+                    {
+                        const int nTails = eOp == ocTDist_RT ? 1 : 2;
+                        warnIfLegacyStatisticalDistributionReached(
+                            nTails == 1 ? u"T.DIST.RT" : u"T.DIST.2T");
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            break;
+                        const double fDegreesFreedom = GetDouble();
+                        const double fT = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyTDistTails(fT, fDegreesFreedom, nTails));
+                    }
+                    break;
+                    case ocFDist:
+                    case ocFDist_RT:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"FDIST");
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        const double fDegreesFreedom2 = GetDouble();
+                        const double fDegreesFreedom1 = GetDouble();
+                        const double fRatio = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyFDistRightTail(
+                                    fRatio, fDegreesFreedom1, fDegreesFreedom2));
+                    }
+                    break;
+                    case ocFDist_LT:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"F.DIST");
+                        const int nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 3, 4))
+                            break;
+                        bool bCumulative = true;
+                        if (nParamCount == 4)
+                        {
+                            if (IsMissing())
+                                Pop();
+                            else
+                                bCumulative = GetBool();
+                        }
+                        const double fDegreesFreedom2 = GetDouble();
+                        const double fDegreesFreedom1 = GetDouble();
+                        const double fRatio = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyFDistLeftTail(
+                                    fRatio, fDegreesFreedom1, fDegreesFreedom2, bCumulative));
+                    }
+                    break;
+                    case ocChiDist:
+                    case ocChiDist_MS:
+                    {
+                        const bool bOdfSyntax = eOp == ocChiDist;
+                        warnIfLegacyStatisticalDistributionReached(
+                            bOdfSyntax ? u"LEGACY.CHIDIST" : u"CHISQ.DIST.RT");
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            break;
+                        const double fDegreesFreedom = GetDouble();
+                        const double fChi = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyChiDist(fChi, fDegreesFreedom, bOdfSyntax));
+                    }
+                    break;
+                    case ocChiSqDist:
+                    case ocChiSqDist_MS:
+                    {
+                        const bool bMicrosoftSyntax = eOp == ocChiSqDist_MS;
+                        warnIfLegacyStatisticalDistributionReached(
+                            bMicrosoftSyntax ? u"CHISQ.DIST" : u"CHISQDIST");
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, bMicrosoftSyntax ? 3 : 2, 3))
+                            break;
+                        bool bCumulative = true;
+                        if (bMicrosoftSyntax || nParamCount == 3)
+                            bCumulative = GetBool();
+                        const double fDegreesFreedom = GetDouble();
+                        const double fX = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyChiSqDist(
+                                    fX, fDegreesFreedom, bCumulative, bMicrosoftSyntax));
+                    }
+                    break;
+                    case ocStandard:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"STANDARDIZE");
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        const double fSigma = GetDouble();
+                        const double fMean = GetDouble();
+                        const double fX = GetDouble();
+                        pushValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyStandardize(fX, fMean, fSigma));
+                    }
+                    break;
                     case ocAveDev           : pushLegacyAveDev();       break;
                     case ocDevSq            : pushLegacyDevSq();        break;
                     case ocKurt             : pushLegacyKurt();         break;
@@ -11447,12 +10982,55 @@ StackVar ScInterpreter::Interpret()
                     case ocMedian           : pushLegacyMedian();       break;
                     case ocGeoMean          : pushLegacyGeoMean();      break;
                     case ocHarMean          : pushLegacyHarMean();      break;
-                    case ocWeibull          :
-                    case ocWeibull_MS       : pushLegacyWeibull();          break;
-                    case ocBinomInv         :
-                    case ocCritBinom        : pushLegacyCritBinom();        break;
-                    case ocNegBinomVert     : pushLegacyNegBinomDist(u"NEGBINOMDIST", false); break;
-                    case ocNegBinomDist_MS  : pushLegacyNegBinomDist(u"NEGBINOM.DIST", true); break;
+                    case ocWeibull:
+                    case ocWeibull_MS:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"WEIBULL");
+                        if (!MustHaveParamCount(GetByte(), 4))
+                            break;
+                        const bool bCumulative = GetDouble() != 0.0;
+                        const double fBeta = GetDouble();
+                        const double fAlpha = GetDouble();
+                        const double fX = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyWeibull(fX, fAlpha, fBeta, bCumulative));
+                    }
+                    break;
+                    case ocBinomInv:
+                    case ocCritBinom:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"CRITBINOM");
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        const double fAlpha = GetDouble();
+                        const double fProbability = GetDouble();
+                        const double fTrials = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyCritBinom(
+                                    fTrials, fProbability, fAlpha));
+                    }
+                    break;
+                    case ocNegBinomVert:
+                    case ocNegBinomDist_MS:
+                    {
+                        const bool bMicrosoftSyntax = eOp == ocNegBinomDist_MS;
+                        warnIfLegacyStatisticalDistributionReached(
+                            bMicrosoftSyntax ? u"NEGBINOM.DIST" : u"NEGBINOMDIST");
+                        if (!MustHaveParamCount(GetByte(), bMicrosoftSyntax ? 4 : 3))
+                            break;
+                        const bool bCumulative = bMicrosoftSyntax ? GetBool() : false;
+                        const double fProbability = GetDouble();
+                        const double fSuccesses = GetDouble();
+                        const double fFailures = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyNegBinomDist(
+                                    fFailures, fSuccesses, fProbability,
+                                    bCumulative, bMicrosoftSyntax));
+                    }
+                    break;
                     case ocNoName           : ScNoName();               break;
                     case ocBad              : ScBadName();              break;
                     case ocZTest            :
@@ -11476,13 +11054,49 @@ StackVar ScInterpreter::Interpret()
                     case ocQuartile         :
                     case ocQuartile_Inc     : pushLegacyQuartile(true); break;
                     case ocQuartile_Exc     : pushLegacyQuartile(false); break;
-                    case ocNormInv          :
-                    case ocNormInv_MS       : pushLegacyNormInv();      break;
-                    case ocSNormInv         :
-                    case ocSNormInv_MS      : pushLegacySNormInv();         break;
-                    case ocConfidence       :
-                    case ocConfidence_N     : pushLegacyConfidence(false); break;
-                    case ocConfidence_T     : pushLegacyConfidence(true); break;
+                    case ocNormInv:
+                    case ocNormInv_MS:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"NORMINV");
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        const double fSigma = GetDouble();
+                        const double fMean = GetDouble();
+                        const double fProbability = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyNormInv(fProbability, fMean, fSigma));
+                    }
+                    break;
+                    case ocSNormInv:
+                    case ocSNormInv_MS:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"NORMSINV");
+                        if (!MustHaveParamCount(GetByte(), 1))
+                            break;
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacySNormInv(GetDouble()));
+                    }
+                    break;
+                    case ocConfidence:
+                    case ocConfidence_N:
+                    case ocConfidence_T:
+                    {
+                        const bool bStudent = eOp == ocConfidence_T;
+                        warnIfLegacyStatisticalDistributionReached(
+                            bStudent ? u"CONFIDENCE.T" : u"CONFIDENCE");
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        const double fSampleSize = GetDouble();
+                        const double fSigma = GetDouble();
+                        const double fAlpha = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyConfidence(
+                                    fAlpha, fSigma, fSampleSize, bStudent));
+                    }
+                    break;
                     case ocTrimMean         : pushLegacyTrimMean();     break;
                     case ocProb             : pushLegacyProbability();      break;
                     case ocCorrel           : CalculatePearsonCovar(true, false, false); break;
@@ -11509,34 +11123,186 @@ StackVar ScInterpreter::Interpret()
                     case ocForecast_ETS_STM : ScForecast_Ets( etsStatMult );  break;
                     case ocGammaLn          :
                     case ocGammaLn_MS       :
-                        pushLegacyUnaryCalcMathValueResult(
-                            u"GAMMALN", semath::evaluateLogGammaValue);
+                        warnIfLegacyStatisticalDistributionReached(u"GAMMALN");
+                        pushCalcMathValueResult(semath::evaluateLogGammaValue(GetDouble()));
                         break;
                     case ocGamma            :
-                        pushLegacyUnaryCalcMathValueResult(u"GAMMA", semath::evaluateGammaValue);
+                        warnIfLegacyStatisticalDistributionReached(u"GAMMA");
+                        pushCalcMathValueResult(semath::evaluateGammaValue(GetDouble()));
                         break;
-                    case ocGammaDist        : pushLegacyGammaDist(u"GAMMADIST", true); break;
-                    case ocGammaDist_MS     : pushLegacyGammaDist(u"GAMMA.DIST", false); break;
-                    case ocGammaInv         :
-                    case ocGammaInv_MS      : pushLegacyGammaInverse();     break;
+                    case ocGammaDist:
+                    case ocGammaDist_MS:
+                    {
+                        const bool bOdfSyntax = eOp == ocGammaDist;
+                        warnIfLegacyStatisticalDistributionReached(
+                            bOdfSyntax ? u"GAMMADIST" : u"GAMMA.DIST");
+                        const sal_uInt8 nMinParamCount = bOdfSyntax ? 3 : 4;
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, nMinParamCount, 4))
+                            break;
+                        bool bCumulative = true;
+                        if (nParamCount == 4)
+                            bCumulative = GetBool();
+                        const double fBeta = GetDouble();
+                        const double fAlpha = GetDouble();
+                        const double fX = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyGammaDist(
+                                    fX, fAlpha, fBeta, bCumulative, bOdfSyntax));
+                    }
+                    break;
+                    case ocGammaInv:
+                    case ocGammaInv_MS:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"GAMMAINV");
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        const double fBeta = GetDouble();
+                        const double fAlpha = GetDouble();
+                        const double fProbability = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyGammaInverse(
+                                    fProbability, fAlpha, fBeta));
+                    }
+                    break;
                     case ocChiTest          :
                     case ocChiTest_MS       : pushLegacyChiTest();      break;
-                    case ocChiInv           :
-                    case ocChiInv_MS        : pushLegacyChiInv(u"CHIINV");  break;
-                    case ocChiSqInv         :
-                    case ocChiSqInv_MS      : pushLegacyChiSqInv(u"CHISQ.INV"); break;
-                    case ocTInv             :
-                    case ocTInv_2T          : pushLegacyTInv(u"TINV", 2);   break;
-                    case ocTInv_MS          : pushLegacyTInv(u"T.INV", 4);  break;
-                    case ocFInv             :
-                    case ocFInv_RT          : pushLegacyFInv(u"LEGACY.FINV", false); break;
-                    case ocFInv_LT          : pushLegacyFInv(u"F.INV", true); break;
-                    case ocLogInv           :
-                    case ocLogInv_MS        : pushLegacyLogNormInv();       break;
-                    case ocBetaDist         : pushLegacyBetaDist();     break;
-                    case ocBetaDist_MS      : pushLegacyBetaDistMS();       break;
-                    case ocBetaInv          :
-                    case ocBetaInv_MS       : pushLegacyBetaInv(u"BETAINV"); break;
+                    case ocChiInv:
+                    case ocChiInv_MS:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"CHIINV");
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            break;
+                        const double fDegreesFreedom = GetDouble();
+                        const double fProbability = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyChiInv(fProbability, fDegreesFreedom));
+                    }
+                    break;
+                    case ocChiSqInv:
+                    case ocChiSqInv_MS:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"CHISQ.INV");
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            break;
+                        const double fDegreesFreedom = GetDouble();
+                        const double fProbability = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyChiSqInv(fProbability, fDegreesFreedom));
+                    }
+                    break;
+                    case ocTInv:
+                    case ocTInv_2T:
+                    case ocTInv_MS:
+                    {
+                        const int nType = eOp == ocTInv_MS ? 4 : 2;
+                        warnIfLegacyStatisticalDistributionReached(
+                            nType == 4 ? u"T.INV" : u"TINV");
+                        if (!MustHaveParamCount(GetByte(), 2))
+                            break;
+                        const double fDegreesFreedom = GetDouble();
+                        const double fProbability = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyTInv(fProbability, fDegreesFreedom, nType));
+                    }
+                    break;
+                    case ocFInv:
+                    case ocFInv_RT:
+                    case ocFInv_LT:
+                    {
+                        const bool bLeftTail = eOp == ocFInv_LT;
+                        warnIfLegacyStatisticalDistributionReached(
+                            bLeftTail ? u"F.INV" : u"LEGACY.FINV");
+                        if (!MustHaveParamCount(GetByte(), 3))
+                            break;
+                        const double fDegreesFreedom2 = GetDouble();
+                        const double fDegreesFreedom1 = GetDouble();
+                        const double fProbability = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyFInv(
+                                    fProbability, fDegreesFreedom1,
+                                    fDegreesFreedom2, bLeftTail));
+                    }
+                    break;
+                    case ocLogInv:
+                    case ocLogInv_MS:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"LOGINV");
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 1, 3))
+                            break;
+                        const double fSigma = nParamCount == 3 ? GetDouble() : 1.0;
+                        const double fMean = nParamCount >= 2 ? GetDouble() : 0.0;
+                        const double fProbability = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyLogNormInv(
+                                    fProbability, fMean, fSigma));
+                    }
+                    break;
+                    case ocBetaDist:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"BETADIST");
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 3, 6))
+                            break;
+                        const bool bCumulative = nParamCount == 6 ? GetBool() : true;
+                        const double fUpperBound = nParamCount >= 5 ? GetDouble() : 1.0;
+                        const double fLowerBound = nParamCount >= 4 ? GetDouble() : 0.0;
+                        const double fBeta = GetDouble();
+                        const double fAlpha = GetDouble();
+                        const double fX = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyBetaDist(
+                                    fX, fAlpha, fBeta, fLowerBound, fUpperBound,
+                                    bCumulative, false));
+                    }
+                    break;
+                    case ocBetaDist_MS:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"BETA.DIST");
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 4, 6))
+                            break;
+                        const double fUpperBound = nParamCount == 6 ? GetDouble() : 1.0;
+                        const double fLowerBound = nParamCount >= 5 ? GetDouble() : 0.0;
+                        const bool bCumulative = GetBool();
+                        const double fBeta = GetDouble();
+                        const double fAlpha = GetDouble();
+                        const double fX = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyBetaDist(
+                                    fX, fAlpha, fBeta, fLowerBound, fUpperBound,
+                                    bCumulative, true));
+                    }
+                    break;
+                    case ocBetaInv:
+                    case ocBetaInv_MS:
+                    {
+                        warnIfLegacyStatisticalDistributionReached(u"BETAINV");
+                        const sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 3, 5))
+                            break;
+                        const double fUpperBound = nParamCount == 5 ? GetDouble() : 1.0;
+                        const double fLowerBound = nParamCount >= 4 ? GetDouble() : 0.0;
+                        const double fBeta = GetDouble();
+                        const double fAlpha = GetDouble();
+                        const double fProbability = GetDouble();
+                        pushCalcMathValueResult(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                evaluateLegacyBetaInv(
+                                    fProbability, fAlpha, fBeta,
+                                    fLowerBound, fUpperBound));
+                    }
+                    break;
                     case ocFourier          : ScFourier();              break;
                     case ocExternal         : ScExternal();                 break;
                     case ocTableOp          : ScTableOp();                  break;
