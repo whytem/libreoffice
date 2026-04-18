@@ -2065,6 +2065,48 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorStatisticalAg
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorStatisticalAggregateDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineStatisticalAggregateDefaultOn"_ustr));
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 3.0);
+    m_pDoc->SetValue(0, 3, 0, 4.0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"=MAX(A1:A4)"_ustr);
+        m_pDoc->SetString(1, 7, 0, u"=MINA({TRUE;2;\"x\"})"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=VAR.S(A1:A4)"_ustr);
+        m_pDoc->SetString(3, 7, 0, u"=STDEV.P(A1:A4)"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(0, 7, 0));
+        ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(1, 7, 0));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0 / 3.0, m_pDoc->GetValue(2, 7, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(std::sqrt(1.25), m_pDoc->GetValue(3, 7, 0), 1e-12);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 4);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::StatisticalAggregate)]
+            >= 4);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::StatisticalAggregate)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRoundSigAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

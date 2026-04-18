@@ -573,8 +573,6 @@ private:
     void ScTrim();
     void ScValue();
     void ScNumberValue();
-    void ScMin( bool bTextAsZero = false );
-    void ScMax( bool bTextAsZero = false );
     /** Check for array of references to determine the maximum size of a return
         column vector if in array context. */
     size_t GetRefListArrayMaxSize( short nParamCount );
@@ -583,17 +581,9 @@ private:
     bool SwitchToArrayRefList( ScMatrixRef& xResMat, SCSIZE nMatRows, double fCurrent,
             const std::function<void( SCSIZE i, double fCurrent )>& MatOpFunc, bool bDoMatOp );
     void IterateParameters( ScIterFunc, bool bTextAsZero = false );
-    void ScSumSQ();
-    void ScSum();
-    void ScProduct();
-    void ScAverage( bool bTextAsZero = false );
     void ScCount();
     void ScCount2();
     void GetStVarParams( bool bTextAsZero, double(*VarResult)( double fVal, size_t nValCount ) );
-    void ScVar( bool bTextAsZero = false );
-    void ScVarP( bool bTextAsZero = false );
-    void ScStDev( bool bTextAsZero = false );
-    void ScStDevP( bool bTextAsZero = false );
     void ScColumns();
     void ScRows();
     void ScSheets();

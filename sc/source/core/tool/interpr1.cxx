@@ -2431,320 +2431,6 @@ bool ScInterpreter::SwitchToArrayRefList( ScMatrixRef& xResMat, SCSIZE nMatRows,
     return true;
 }
 
-void ScInterpreter::ScMin( bool bTextAsZero )
-{
-    short nParamCount = GetByte();
-    if (!MustHaveParamCountMin( nParamCount, 1))
-        return;
-
-    ScMatrixRef xResMat;
-    double nMin = ::std::numeric_limits<double>::max();
-    auto MatOpFunc = [&xResMat]( SCSIZE i, double fCurMin )
-    {
-        double fVecRes = xResMat->GetDouble(0,i);
-        if (fVecRes > fCurMin)
-            xResMat->PutDouble( fCurMin, 0,i);
-    };
-    const SCSIZE nMatRows = GetRefListArrayMaxSize( nParamCount);
-    size_t nRefArrayPos = std::numeric_limits<size_t>::max();
-
-    double nVal = 0.0;
-    ScAddress aAdr;
-    ScRange aRange;
-    size_t nRefInList = 0;
-    while (nParamCount-- > 0)
-    {
-        switch (GetStackType())
-        {
-            case svDouble :
-            {
-                nVal = GetDouble();
-                if (nMin > nVal) nMin = nVal;
-                nFuncFmtType = SvNumFormatType::NUMBER;
-            }
-            break;
-            case svSingleRef :
-            {
-                PopSingleRef( aAdr );
-                ScRefCellValue aCell(mrDoc, aAdr);
-                if (aCell.hasNumeric())
-                {
-                    nVal = GetCellValue(aAdr, aCell);
-                    CurFmtToFuncFmt();
-                    if (nMin > nVal) nMin = nVal;
-                }
-                else if (bTextAsZero && aCell.hasString())
-                {
-                    if ( nMin > 0.0 )
-                        nMin = 0.0;
-                }
-            }
-            break;
-            case svRefList :
-            {
-                // bDoMatOp only for non-array value when switching to
-                // ArrayRefList.
-                if (SwitchToArrayRefList( xResMat, nMatRows, nMin, MatOpFunc,
-                            nRefArrayPos == std::numeric_limits<size_t>::max()))
-                {
-                    nRefArrayPos = nRefInList;
-                }
-            }
-            [[fallthrough]];
-            case svDoubleRef :
-            {
-                FormulaError nErr = FormulaError::NONE;
-                PopDoubleRef( aRange, nParamCount, nRefInList);
-                ScValueIterator aValIter( mrContext, aRange, mnSubTotalFlags, bTextAsZero );
-                if (aValIter.GetFirst(nVal, nErr))
-                {
-                    if (nMin > nVal)
-                        nMin = nVal;
-                    aValIter.GetCurNumFmtInfo( nFuncFmtType, nFuncFmtIndex );
-                    while ((nErr == FormulaError::NONE) && aValIter.GetNext(nVal, nErr))
-                    {
-                        if (nMin > nVal)
-                            nMin = nVal;
-                    }
-                    SetError(nErr);
-                }
-                if (nRefArrayPos != std::numeric_limits<size_t>::max())
-                {
-                    // Update vector element with current value.
-                    MatOpFunc( nRefArrayPos, nMin);
-
-                    // Reset.
-                    nMin = std::numeric_limits<double>::max();
-                    nVal = 0.0;
-                    nRefArrayPos = std::numeric_limits<size_t>::max();
-                }
-            }
-            break;
-            case svMatrix :
-            case svExternalSingleRef:
-            case svExternalDoubleRef:
-            {
-                ScMatrixRef pMat = GetMatrix();
-                if (pMat)
-                {
-                    nFuncFmtType = SvNumFormatType::NUMBER;
-                    nVal = pMat->GetMinValue(bTextAsZero, bool(mnSubTotalFlags & SubtotalFlags::IgnoreErrVal));
-                    if (nMin > nVal)
-                        nMin = nVal;
-                }
-            }
-            break;
-            case svString :
-            {
-                Pop();
-                if ( bTextAsZero )
-                {
-                    if ( nMin > 0.0 )
-                        nMin = 0.0;
-                }
-                else
-                    SetError(FormulaError::IllegalParameter);
-            }
-            break;
-            default :
-                PopError();
-                SetError(FormulaError::IllegalParameter);
-        }
-    }
-
-    if (xResMat)
-    {
-        // Include value of last non-references-array type and calculate final result.
-        if (nMin < std::numeric_limits<double>::max())
-        {
-            for (SCSIZE i=0; i < nMatRows; ++i)
-            {
-                MatOpFunc( i, nMin);
-            }
-        }
-        else
-        {
-            /* TODO: the awkward "no value is minimum 0.0" is likely the case
-             * if a value is numeric_limits::max. Still, that could be a valid
-             * minimum value as well, but nVal and nMin had been reset after
-             * the last svRefList... so we may lie here. */
-            for (SCSIZE i=0; i < nMatRows; ++i)
-            {
-                double fVecRes = xResMat->GetDouble(0,i);
-                if (fVecRes == std::numeric_limits<double>::max())
-                    xResMat->PutDouble( 0.0, 0,i);
-            }
-        }
-        PushMatrix( xResMat);
-    }
-    else
-    {
-        if (!std::isfinite(nVal))
-            PushError( GetDoubleErrorValue( nVal));
-        else if ( nVal < nMin  )
-            PushDouble(0.0);    // zero or only empty arguments
-        else
-            PushDouble(nMin);
-    }
-}
-
-void ScInterpreter::ScMax( bool bTextAsZero )
-{
-    short nParamCount = GetByte();
-    if (!MustHaveParamCountMin( nParamCount, 1))
-        return;
-
-    ScMatrixRef xResMat;
-    double nMax = std::numeric_limits<double>::lowest();
-    auto MatOpFunc = [&xResMat]( SCSIZE i, double fCurMax )
-    {
-        double fVecRes = xResMat->GetDouble(0,i);
-        if (fVecRes < fCurMax)
-            xResMat->PutDouble( fCurMax, 0,i);
-    };
-    const SCSIZE nMatRows = GetRefListArrayMaxSize( nParamCount);
-    size_t nRefArrayPos = std::numeric_limits<size_t>::max();
-
-    double nVal = 0.0;
-    ScAddress aAdr;
-    ScRange aRange;
-    size_t nRefInList = 0;
-    while (nParamCount-- > 0)
-    {
-        switch (GetStackType())
-        {
-            case svDouble :
-            {
-                nVal = GetDouble();
-                if (nMax < nVal) nMax = nVal;
-                nFuncFmtType = SvNumFormatType::NUMBER;
-            }
-            break;
-            case svSingleRef :
-            {
-                PopSingleRef( aAdr );
-                ScRefCellValue aCell(mrDoc, aAdr);
-                if (aCell.hasNumeric())
-                {
-                    nVal = GetCellValue(aAdr, aCell);
-                    CurFmtToFuncFmt();
-                    if (nMax < nVal) nMax = nVal;
-                }
-                else if (bTextAsZero && aCell.hasString())
-                {
-                    if ( nMax < 0.0 )
-                        nMax = 0.0;
-                }
-            }
-            break;
-            case svRefList :
-            {
-                // bDoMatOp only for non-array value when switching to
-                // ArrayRefList.
-                if (SwitchToArrayRefList( xResMat, nMatRows, nMax, MatOpFunc,
-                            nRefArrayPos == std::numeric_limits<size_t>::max()))
-                {
-                    nRefArrayPos = nRefInList;
-                }
-            }
-            [[fallthrough]];
-            case svDoubleRef :
-            {
-                FormulaError nErr = FormulaError::NONE;
-                PopDoubleRef( aRange, nParamCount, nRefInList);
-                ScValueIterator aValIter( mrContext, aRange, mnSubTotalFlags, bTextAsZero );
-                if (aValIter.GetFirst(nVal, nErr))
-                {
-                    if (nMax < nVal)
-                        nMax = nVal;
-                    aValIter.GetCurNumFmtInfo( nFuncFmtType, nFuncFmtIndex );
-                    while ((nErr == FormulaError::NONE) && aValIter.GetNext(nVal, nErr))
-                    {
-                        if (nMax < nVal)
-                            nMax = nVal;
-                    }
-                    SetError(nErr);
-                }
-                if (nRefArrayPos != std::numeric_limits<size_t>::max())
-                {
-                    // Update vector element with current value.
-                    MatOpFunc( nRefArrayPos, nMax);
-
-                    // Reset.
-                    nMax = std::numeric_limits<double>::lowest();
-                    nVal = 0.0;
-                    nRefArrayPos = std::numeric_limits<size_t>::max();
-                }
-            }
-            break;
-            case svMatrix :
-            case svExternalSingleRef:
-            case svExternalDoubleRef:
-            {
-                ScMatrixRef pMat = GetMatrix();
-                if (pMat)
-                {
-                    nFuncFmtType = SvNumFormatType::NUMBER;
-                    nVal = pMat->GetMaxValue(bTextAsZero, bool(mnSubTotalFlags & SubtotalFlags::IgnoreErrVal));
-                    if (nMax < nVal)
-                        nMax = nVal;
-                }
-            }
-            break;
-            case svString :
-            {
-                Pop();
-                if ( bTextAsZero )
-                {
-                    if ( nMax < 0.0 )
-                        nMax = 0.0;
-                }
-                else
-                    SetError(FormulaError::IllegalParameter);
-            }
-            break;
-            default :
-                PopError();
-                SetError(FormulaError::IllegalParameter);
-        }
-    }
-
-    if (xResMat)
-    {
-        // Include value of last non-references-array type and calculate final result.
-        if (nMax > std::numeric_limits<double>::lowest())
-        {
-            for (SCSIZE i=0; i < nMatRows; ++i)
-            {
-                MatOpFunc( i, nMax);
-            }
-        }
-        else
-        {
-            /* TODO: the awkward "no value is maximum 0.0" is likely the case
-             * if a value is numeric_limits::lowest. Still, that could be a
-             * valid maximum value as well, but nVal and nMax had been reset
-             * after the last svRefList... so we may lie here. */
-            for (SCSIZE i=0; i < nMatRows; ++i)
-            {
-                double fVecRes = xResMat->GetDouble(0,i);
-                if (fVecRes == -std::numeric_limits<double>::max())
-                    xResMat->PutDouble( 0.0, 0,i);
-            }
-        }
-        PushMatrix( xResMat);
-    }
-    else
-    {
-        if (!std::isfinite(nVal))
-            PushError( GetDoubleErrorValue( nVal));
-        else if ( nVal > nMax  )
-            PushDouble(0.0);    // zero or only empty arguments
-        else
-            PushDouble(nMax);
-    }
-}
-
 void ScInterpreter::GetStVarParams( bool bTextAsZero, double(*VarResult)( double fVal, size_t nValCount ) )
 {
     short nParamCount = GetByte();
@@ -2964,69 +2650,6 @@ void ScInterpreter::GetStVarParams( bool bTextAsZero, double(*VarResult)( double
         }
         PushDouble( VarResult( vSum, n));
     }
-}
-
-void ScInterpreter::ScVar( bool bTextAsZero )
-{
-    auto VarResult = []( double fVal, size_t nValCount )
-    {
-        if (nValCount <= 1)
-            return CreateDoubleError( FormulaError::DivisionByZero );
-        else
-            return fVal / (nValCount - 1);
-    };
-    GetStVarParams( bTextAsZero, VarResult );
-}
-
-void ScInterpreter::ScVarP( bool bTextAsZero )
-{
-    auto VarResult = []( double fVal, size_t nValCount )
-    {
-        return sc::div( fVal, nValCount);
-    };
-    GetStVarParams( bTextAsZero, VarResult );
-
-}
-
-void ScInterpreter::ScStDev( bool bTextAsZero )
-{
-    auto VarResult = []( double fVal, size_t nValCount )
-    {
-        if (nValCount <= 1)
-            return CreateDoubleError( FormulaError::DivisionByZero );
-        else
-            return sqrt( fVal / (nValCount - 1));
-    };
-    GetStVarParams( bTextAsZero, VarResult );
-}
-
-void ScInterpreter::ScStDevP( bool bTextAsZero )
-{
-    auto VarResult = []( double fVal, size_t nValCount )
-    {
-        if (nValCount == 0)
-            return CreateDoubleError( FormulaError::DivisionByZero );
-        else
-            return sqrt( fVal / nValCount);
-    };
-    GetStVarParams( bTextAsZero, VarResult );
-
-    /* this was: PushDouble( sqrt( div( nVal, nValCount)));
-     *
-     * Besides that the special NAN gets lost in the call through sqrt(),
-     * unxlngi6.pro then looped back and forth somewhere between div() and
-     * ::rtl::math::setNan(). Tests showed that
-     *
-     *      sqrt( div( 1, 0));
-     *
-     * produced a loop, but
-     *
-     *      double f1 = div( 1, 0);
-     *      sqrt( f1 );
-     *
-     * was fine. There seems to be some compiler optimization problem. It does
-     * not occur when compiled with debug=t.
-     */
 }
 
 void ScInterpreter::ScColumns()
@@ -6888,19 +6511,313 @@ void ScInterpreter::ScSubTotal()
     else
     {
         cPar = nParamCount - 1;
+        const auto pushSubtotalMin = [&]() {
+            short nSubParamCount = GetByte();
+            if (!MustHaveParamCountMin(nSubParamCount, 1))
+                return;
+
+            ScMatrixRef xResMat;
+            double nMin = ::std::numeric_limits<double>::max();
+            auto MatOpFunc = [&xResMat](SCSIZE i, double fCurMin) {
+                double fVecRes = xResMat->GetDouble(0, i);
+                if (fVecRes > fCurMin)
+                    xResMat->PutDouble(fCurMin, 0, i);
+            };
+            const SCSIZE nMatRows = GetRefListArrayMaxSize(nSubParamCount);
+            size_t nRefArrayPos = std::numeric_limits<size_t>::max();
+
+            double nVal = 0.0;
+            ScAddress aAdr;
+            ScRange aRange;
+            size_t nRefInList = 0;
+            while (nSubParamCount-- > 0)
+            {
+                switch (GetStackType())
+                {
+                    case svDouble:
+                    {
+                        nVal = GetDouble();
+                        if (nMin > nVal)
+                            nMin = nVal;
+                        nFuncFmtType = SvNumFormatType::NUMBER;
+                    }
+                    break;
+                    case svSingleRef:
+                    {
+                        PopSingleRef(aAdr);
+                        ScRefCellValue aCell(mrDoc, aAdr);
+                        if (aCell.hasNumeric())
+                        {
+                            nVal = GetCellValue(aAdr, aCell);
+                            CurFmtToFuncFmt();
+                            if (nMin > nVal)
+                                nMin = nVal;
+                        }
+                    }
+                    break;
+                    case svRefList:
+                    {
+                        if (SwitchToArrayRefList(
+                                xResMat, nMatRows, nMin, MatOpFunc,
+                                nRefArrayPos == std::numeric_limits<size_t>::max()))
+                            nRefArrayPos = nRefInList;
+                    }
+                    [[fallthrough]];
+                    case svDoubleRef:
+                    {
+                        FormulaError nErr = FormulaError::NONE;
+                        PopDoubleRef(aRange, nSubParamCount, nRefInList);
+                        ScValueIterator aValIter(mrContext, aRange, mnSubTotalFlags, false);
+                        if (aValIter.GetFirst(nVal, nErr))
+                        {
+                            if (nMin > nVal)
+                                nMin = nVal;
+                            aValIter.GetCurNumFmtInfo(nFuncFmtType, nFuncFmtIndex);
+                            while ((nErr == FormulaError::NONE) && aValIter.GetNext(nVal, nErr))
+                            {
+                                if (nMin > nVal)
+                                    nMin = nVal;
+                            }
+                            SetError(nErr);
+                        }
+                        if (nRefArrayPos != std::numeric_limits<size_t>::max())
+                        {
+                            MatOpFunc(nRefArrayPos, nMin);
+                            nMin = std::numeric_limits<double>::max();
+                            nVal = 0.0;
+                            nRefArrayPos = std::numeric_limits<size_t>::max();
+                        }
+                    }
+                    break;
+                    case svMatrix:
+                    case svExternalSingleRef:
+                    case svExternalDoubleRef:
+                    {
+                        ScMatrixRef pMat = GetMatrix();
+                        if (pMat)
+                        {
+                            nFuncFmtType = SvNumFormatType::NUMBER;
+                            nVal = pMat->GetMinValue(
+                                false, bool(mnSubTotalFlags & SubtotalFlags::IgnoreErrVal));
+                            if (nMin > nVal)
+                                nMin = nVal;
+                        }
+                    }
+                    break;
+                    case svString:
+                        Pop();
+                        SetError(FormulaError::IllegalParameter);
+                        break;
+                    default:
+                        PopError();
+                        SetError(FormulaError::IllegalParameter);
+                }
+            }
+
+            if (xResMat)
+            {
+                if (nMin < std::numeric_limits<double>::max())
+                {
+                    for (SCSIZE i = 0; i < nMatRows; ++i)
+                        MatOpFunc(i, nMin);
+                }
+                else
+                {
+                    for (SCSIZE i = 0; i < nMatRows; ++i)
+                    {
+                        double fVecRes = xResMat->GetDouble(0, i);
+                        if (fVecRes == std::numeric_limits<double>::max())
+                            xResMat->PutDouble(0.0, 0, i);
+                    }
+                }
+                PushMatrix(xResMat);
+            }
+            else if (!std::isfinite(nVal))
+                PushError(GetDoubleErrorValue(nVal));
+            else if (nVal < nMin)
+                PushDouble(0.0);
+            else
+                PushDouble(nMin);
+        };
+        const auto pushSubtotalMax = [&]() {
+            short nSubParamCount = GetByte();
+            if (!MustHaveParamCountMin(nSubParamCount, 1))
+                return;
+
+            ScMatrixRef xResMat;
+            double nMax = std::numeric_limits<double>::lowest();
+            auto MatOpFunc = [&xResMat](SCSIZE i, double fCurMax) {
+                double fVecRes = xResMat->GetDouble(0, i);
+                if (fVecRes < fCurMax)
+                    xResMat->PutDouble(fCurMax, 0, i);
+            };
+            const SCSIZE nMatRows = GetRefListArrayMaxSize(nSubParamCount);
+            size_t nRefArrayPos = std::numeric_limits<size_t>::max();
+
+            double nVal = 0.0;
+            ScAddress aAdr;
+            ScRange aRange;
+            size_t nRefInList = 0;
+            while (nSubParamCount-- > 0)
+            {
+                switch (GetStackType())
+                {
+                    case svDouble:
+                    {
+                        nVal = GetDouble();
+                        if (nMax < nVal)
+                            nMax = nVal;
+                        nFuncFmtType = SvNumFormatType::NUMBER;
+                    }
+                    break;
+                    case svSingleRef:
+                    {
+                        PopSingleRef(aAdr);
+                        ScRefCellValue aCell(mrDoc, aAdr);
+                        if (aCell.hasNumeric())
+                        {
+                            nVal = GetCellValue(aAdr, aCell);
+                            CurFmtToFuncFmt();
+                            if (nMax < nVal)
+                                nMax = nVal;
+                        }
+                    }
+                    break;
+                    case svRefList:
+                    {
+                        if (SwitchToArrayRefList(
+                                xResMat, nMatRows, nMax, MatOpFunc,
+                                nRefArrayPos == std::numeric_limits<size_t>::max()))
+                            nRefArrayPos = nRefInList;
+                    }
+                    [[fallthrough]];
+                    case svDoubleRef:
+                    {
+                        FormulaError nErr = FormulaError::NONE;
+                        PopDoubleRef(aRange, nSubParamCount, nRefInList);
+                        ScValueIterator aValIter(mrContext, aRange, mnSubTotalFlags, false);
+                        if (aValIter.GetFirst(nVal, nErr))
+                        {
+                            if (nMax < nVal)
+                                nMax = nVal;
+                            aValIter.GetCurNumFmtInfo(nFuncFmtType, nFuncFmtIndex);
+                            while ((nErr == FormulaError::NONE) && aValIter.GetNext(nVal, nErr))
+                            {
+                                if (nMax < nVal)
+                                    nMax = nVal;
+                            }
+                            SetError(nErr);
+                        }
+                        if (nRefArrayPos != std::numeric_limits<size_t>::max())
+                        {
+                            MatOpFunc(nRefArrayPos, nMax);
+                            nMax = std::numeric_limits<double>::lowest();
+                            nVal = 0.0;
+                            nRefArrayPos = std::numeric_limits<size_t>::max();
+                        }
+                    }
+                    break;
+                    case svMatrix:
+                    case svExternalSingleRef:
+                    case svExternalDoubleRef:
+                    {
+                        ScMatrixRef pMat = GetMatrix();
+                        if (pMat)
+                        {
+                            nFuncFmtType = SvNumFormatType::NUMBER;
+                            nVal = pMat->GetMaxValue(
+                                false, bool(mnSubTotalFlags & SubtotalFlags::IgnoreErrVal));
+                            if (nMax < nVal)
+                                nMax = nVal;
+                        }
+                    }
+                    break;
+                    case svString:
+                        Pop();
+                        SetError(FormulaError::IllegalParameter);
+                        break;
+                    default:
+                        PopError();
+                        SetError(FormulaError::IllegalParameter);
+                }
+            }
+
+            if (xResMat)
+            {
+                if (nMax > std::numeric_limits<double>::lowest())
+                {
+                    for (SCSIZE i = 0; i < nMatRows; ++i)
+                        MatOpFunc(i, nMax);
+                }
+                else
+                {
+                    for (SCSIZE i = 0; i < nMatRows; ++i)
+                    {
+                        double fVecRes = xResMat->GetDouble(0, i);
+                        if (fVecRes == -std::numeric_limits<double>::max())
+                            xResMat->PutDouble(0.0, 0, i);
+                    }
+                }
+                PushMatrix(xResMat);
+            }
+            else if (!std::isfinite(nVal))
+                PushError(GetDoubleErrorValue(nVal));
+            else if (nVal > nMax)
+                PushDouble(0.0);
+            else
+                PushDouble(nMax);
+        };
+        const auto pushSubtotalVar = [&](bool bPopulation) {
+            if (bPopulation)
+            {
+                auto VarResult = [](double fVal, size_t nValCount) {
+                    return sc::div(fVal, nValCount);
+                };
+                GetStVarParams(false, VarResult);
+            }
+            else
+            {
+                auto VarResult = [](double fVal, size_t nValCount) {
+                    if (nValCount <= 1)
+                        return CreateDoubleError(FormulaError::DivisionByZero);
+                    return fVal / (nValCount - 1);
+                };
+                GetStVarParams(false, VarResult);
+            }
+        };
+        const auto pushSubtotalStDev = [&](bool bPopulation) {
+            if (bPopulation)
+            {
+                auto VarResult = [](double fVal, size_t nValCount) {
+                    if (nValCount == 0)
+                        return CreateDoubleError(FormulaError::DivisionByZero);
+                    return sqrt(fVal / nValCount);
+                };
+                GetStVarParams(false, VarResult);
+            }
+            else
+            {
+                auto VarResult = [](double fVal, size_t nValCount) {
+                    if (nValCount <= 1)
+                        return CreateDoubleError(FormulaError::DivisionByZero);
+                    return sqrt(fVal / (nValCount - 1));
+                };
+                GetStVarParams(false, VarResult);
+            }
+        };
         switch( nFunc )
         {
-            case SUBTOTAL_FUNC_AVE  : ScAverage(); break;
+            case SUBTOTAL_FUNC_AVE  : IterateParameters(ifAVERAGE); break;
             case SUBTOTAL_FUNC_CNT  : ScCount();   break;
             case SUBTOTAL_FUNC_CNT2 : ScCount2();  break;
-            case SUBTOTAL_FUNC_MAX  : ScMax();     break;
-            case SUBTOTAL_FUNC_MIN  : ScMin();     break;
-            case SUBTOTAL_FUNC_PROD : ScProduct(); break;
-            case SUBTOTAL_FUNC_STD  : ScStDev();   break;
-            case SUBTOTAL_FUNC_STDP : ScStDevP();  break;
-            case SUBTOTAL_FUNC_SUM  : ScSum();     break;
-            case SUBTOTAL_FUNC_VAR  : ScVar();     break;
-            case SUBTOTAL_FUNC_VARP : ScVarP();    break;
+            case SUBTOTAL_FUNC_MAX  : pushSubtotalMax();            break;
+            case SUBTOTAL_FUNC_MIN  : pushSubtotalMin();            break;
+            case SUBTOTAL_FUNC_PROD : IterateParameters(ifPRODUCT); break;
+            case SUBTOTAL_FUNC_STD  : pushSubtotalStDev(false);     break;
+            case SUBTOTAL_FUNC_STDP : pushSubtotalStDev(true);      break;
+            case SUBTOTAL_FUNC_SUM  : IterateParameters(ifSUM);     break;
+            case SUBTOTAL_FUNC_VAR  : pushSubtotalVar(false);       break;
+            case SUBTOTAL_FUNC_VARP : pushSubtotalVar(true);        break;
             default : PushIllegalArgument();       break;
         }
     }

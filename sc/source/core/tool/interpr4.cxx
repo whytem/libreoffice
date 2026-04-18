@@ -4075,6 +4075,13 @@ StackVar ScInterpreter::Interpret()
                             rLabel,
                             "family-local default-on numeric aggregate reached ScInterpreter");
                     };
+                const auto warnIfLegacyStatisticalAggregateReached =
+                    [&](std::u16string_view rLabel) {
+                        warnIfLegacyDefaultOnReached(
+                            rLabel,
+                            "family-local default-on statistical aggregate reached "
+                            "ScInterpreter");
+                    };
                 const auto warnIfLegacyGrowthProjectionReached =
                     [&](std::u16string_view rLabel) {
                         warnIfLegacyDefaultOnReached(
@@ -6911,6 +6918,350 @@ StackVar ScInterpreter::Interpret()
 
                     PushDouble(fSum.get());
                 };
+                const auto pushLegacySumSq = [&]() {
+                    warnIfLegacyNumericAggregateReached(u"SUMSQ");
+                    IterateParameters(ifSUMSQ);
+                };
+                const auto pushLegacySum = [&]() {
+                    warnIfLegacyNumericAggregateReached(u"SUM");
+                    IterateParameters(ifSUM);
+                };
+                const auto pushLegacyProduct = [&]() {
+                    warnIfLegacyNumericAggregateReached(u"PRODUCT");
+                    IterateParameters(ifPRODUCT);
+                };
+                const auto pushLegacyAverage = [&](bool bTextAsZero) {
+                    warnIfLegacyNumericAggregateReached(bTextAsZero ? u"AVERAGEA" : u"AVERAGE");
+                    IterateParameters(ifAVERAGE, bTextAsZero);
+                };
+                const auto pushLegacyMin = [&](bool bTextAsZero) {
+                    warnIfLegacyStatisticalAggregateReached(bTextAsZero ? u"MINA" : u"MIN");
+
+                    short nParamCount = GetByte();
+                    if (!MustHaveParamCountMin(nParamCount, 1))
+                        return;
+
+                    ScMatrixRef xResMat;
+                    double nMin = ::std::numeric_limits<double>::max();
+                    auto MatOpFunc = [&xResMat](SCSIZE i, double fCurMin) {
+                        double fVecRes = xResMat->GetDouble(0, i);
+                        if (fVecRes > fCurMin)
+                            xResMat->PutDouble(fCurMin, 0, i);
+                    };
+                    const SCSIZE nMatRows = GetRefListArrayMaxSize(nParamCount);
+                    size_t nRefArrayPos = std::numeric_limits<size_t>::max();
+
+                    double nVal = 0.0;
+                    ScAddress aAdr;
+                    ScRange aRange;
+                    size_t nRefInList = 0;
+                    while (nParamCount-- > 0)
+                    {
+                        switch (GetStackType())
+                        {
+                            case svDouble:
+                            {
+                                nVal = GetDouble();
+                                if (nMin > nVal)
+                                    nMin = nVal;
+                                nFuncFmtType = SvNumFormatType::NUMBER;
+                            }
+                            break;
+                            case svSingleRef:
+                            {
+                                PopSingleRef(aAdr);
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                if (aCell.hasNumeric())
+                                {
+                                    nVal = GetCellValue(aAdr, aCell);
+                                    CurFmtToFuncFmt();
+                                    if (nMin > nVal)
+                                        nMin = nVal;
+                                }
+                                else if (bTextAsZero && aCell.hasString())
+                                {
+                                    if (nMin > 0.0)
+                                        nMin = 0.0;
+                                }
+                            }
+                            break;
+                            case svRefList:
+                            {
+                                if (SwitchToArrayRefList(
+                                        xResMat, nMatRows, nMin, MatOpFunc,
+                                        nRefArrayPos == std::numeric_limits<size_t>::max()))
+                                    nRefArrayPos = nRefInList;
+                            }
+                            [[fallthrough]];
+                            case svDoubleRef:
+                            {
+                                FormulaError nErr = FormulaError::NONE;
+                                PopDoubleRef(aRange, nParamCount, nRefInList);
+                                ScValueIterator aValIter(
+                                    mrContext, aRange, mnSubTotalFlags, bTextAsZero);
+                                if (aValIter.GetFirst(nVal, nErr))
+                                {
+                                    if (nMin > nVal)
+                                        nMin = nVal;
+                                    aValIter.GetCurNumFmtInfo(nFuncFmtType, nFuncFmtIndex);
+                                    while ((nErr == FormulaError::NONE)
+                                           && aValIter.GetNext(nVal, nErr))
+                                    {
+                                        if (nMin > nVal)
+                                            nMin = nVal;
+                                    }
+                                    SetError(nErr);
+                                }
+                                if (nRefArrayPos != std::numeric_limits<size_t>::max())
+                                {
+                                    MatOpFunc(nRefArrayPos, nMin);
+                                    nMin = std::numeric_limits<double>::max();
+                                    nVal = 0.0;
+                                    nRefArrayPos = std::numeric_limits<size_t>::max();
+                                }
+                            }
+                            break;
+                            case svMatrix:
+                            case svExternalSingleRef:
+                            case svExternalDoubleRef:
+                            {
+                                ScMatrixRef pMat = GetMatrix();
+                                if (pMat)
+                                {
+                                    nFuncFmtType = SvNumFormatType::NUMBER;
+                                    nVal = pMat->GetMinValue(
+                                        bTextAsZero,
+                                        bool(mnSubTotalFlags & SubtotalFlags::IgnoreErrVal));
+                                    if (nMin > nVal)
+                                        nMin = nVal;
+                                }
+                            }
+                            break;
+                            case svString:
+                            {
+                                Pop();
+                                if (bTextAsZero)
+                                {
+                                    if (nMin > 0.0)
+                                        nMin = 0.0;
+                                }
+                                else
+                                    SetError(FormulaError::IllegalParameter);
+                            }
+                            break;
+                            default:
+                                PopError();
+                                SetError(FormulaError::IllegalParameter);
+                        }
+                    }
+
+                    if (xResMat)
+                    {
+                        if (nMin < std::numeric_limits<double>::max())
+                        {
+                            for (SCSIZE i = 0; i < nMatRows; ++i)
+                                MatOpFunc(i, nMin);
+                        }
+                        else
+                        {
+                            for (SCSIZE i = 0; i < nMatRows; ++i)
+                            {
+                                double fVecRes = xResMat->GetDouble(0, i);
+                                if (fVecRes == std::numeric_limits<double>::max())
+                                    xResMat->PutDouble(0.0, 0, i);
+                            }
+                        }
+                        PushMatrix(xResMat);
+                    }
+                    else if (!std::isfinite(nVal))
+                        PushError(GetDoubleErrorValue(nVal));
+                    else if (nVal < nMin)
+                        PushDouble(0.0);
+                    else
+                        PushDouble(nMin);
+                };
+                const auto pushLegacyMax = [&](bool bTextAsZero) {
+                    warnIfLegacyStatisticalAggregateReached(bTextAsZero ? u"MAXA" : u"MAX");
+
+                    short nParamCount = GetByte();
+                    if (!MustHaveParamCountMin(nParamCount, 1))
+                        return;
+
+                    ScMatrixRef xResMat;
+                    double nMax = std::numeric_limits<double>::lowest();
+                    auto MatOpFunc = [&xResMat](SCSIZE i, double fCurMax) {
+                        double fVecRes = xResMat->GetDouble(0, i);
+                        if (fVecRes < fCurMax)
+                            xResMat->PutDouble(fCurMax, 0, i);
+                    };
+                    const SCSIZE nMatRows = GetRefListArrayMaxSize(nParamCount);
+                    size_t nRefArrayPos = std::numeric_limits<size_t>::max();
+
+                    double nVal = 0.0;
+                    ScAddress aAdr;
+                    ScRange aRange;
+                    size_t nRefInList = 0;
+                    while (nParamCount-- > 0)
+                    {
+                        switch (GetStackType())
+                        {
+                            case svDouble:
+                            {
+                                nVal = GetDouble();
+                                if (nMax < nVal)
+                                    nMax = nVal;
+                                nFuncFmtType = SvNumFormatType::NUMBER;
+                            }
+                            break;
+                            case svSingleRef:
+                            {
+                                PopSingleRef(aAdr);
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                if (aCell.hasNumeric())
+                                {
+                                    nVal = GetCellValue(aAdr, aCell);
+                                    CurFmtToFuncFmt();
+                                    if (nMax < nVal)
+                                        nMax = nVal;
+                                }
+                                else if (bTextAsZero && aCell.hasString())
+                                {
+                                    if (nMax < 0.0)
+                                        nMax = 0.0;
+                                }
+                            }
+                            break;
+                            case svRefList:
+                            {
+                                if (SwitchToArrayRefList(
+                                        xResMat, nMatRows, nMax, MatOpFunc,
+                                        nRefArrayPos == std::numeric_limits<size_t>::max()))
+                                    nRefArrayPos = nRefInList;
+                            }
+                            [[fallthrough]];
+                            case svDoubleRef:
+                            {
+                                FormulaError nErr = FormulaError::NONE;
+                                PopDoubleRef(aRange, nParamCount, nRefInList);
+                                ScValueIterator aValIter(
+                                    mrContext, aRange, mnSubTotalFlags, bTextAsZero);
+                                if (aValIter.GetFirst(nVal, nErr))
+                                {
+                                    if (nMax < nVal)
+                                        nMax = nVal;
+                                    aValIter.GetCurNumFmtInfo(nFuncFmtType, nFuncFmtIndex);
+                                    while ((nErr == FormulaError::NONE)
+                                           && aValIter.GetNext(nVal, nErr))
+                                    {
+                                        if (nMax < nVal)
+                                            nMax = nVal;
+                                    }
+                                    SetError(nErr);
+                                }
+                                if (nRefArrayPos != std::numeric_limits<size_t>::max())
+                                {
+                                    MatOpFunc(nRefArrayPos, nMax);
+                                    nMax = std::numeric_limits<double>::lowest();
+                                    nVal = 0.0;
+                                    nRefArrayPos = std::numeric_limits<size_t>::max();
+                                }
+                            }
+                            break;
+                            case svMatrix:
+                            case svExternalSingleRef:
+                            case svExternalDoubleRef:
+                            {
+                                ScMatrixRef pMat = GetMatrix();
+                                if (pMat)
+                                {
+                                    nFuncFmtType = SvNumFormatType::NUMBER;
+                                    nVal = pMat->GetMaxValue(
+                                        bTextAsZero,
+                                        bool(mnSubTotalFlags & SubtotalFlags::IgnoreErrVal));
+                                    if (nMax < nVal)
+                                        nMax = nVal;
+                                }
+                            }
+                            break;
+                            case svString:
+                            {
+                                Pop();
+                                if (bTextAsZero)
+                                {
+                                    if (nMax < 0.0)
+                                        nMax = 0.0;
+                                }
+                                else
+                                    SetError(FormulaError::IllegalParameter);
+                            }
+                            break;
+                            default:
+                                PopError();
+                                SetError(FormulaError::IllegalParameter);
+                        }
+                    }
+
+                    if (xResMat)
+                    {
+                        if (nMax > std::numeric_limits<double>::lowest())
+                        {
+                            for (SCSIZE i = 0; i < nMatRows; ++i)
+                                MatOpFunc(i, nMax);
+                        }
+                        else
+                        {
+                            for (SCSIZE i = 0; i < nMatRows; ++i)
+                            {
+                                double fVecRes = xResMat->GetDouble(0, i);
+                                if (fVecRes == -std::numeric_limits<double>::max())
+                                    xResMat->PutDouble(0.0, 0, i);
+                            }
+                        }
+                        PushMatrix(xResMat);
+                    }
+                    else if (!std::isfinite(nVal))
+                        PushError(GetDoubleErrorValue(nVal));
+                    else if (nVal > nMax)
+                        PushDouble(0.0);
+                    else
+                        PushDouble(nMax);
+                };
+                const auto pushLegacyVar = [&](bool bTextAsZero) {
+                    warnIfLegacyStatisticalAggregateReached(bTextAsZero ? u"VARA" : u"VAR.S");
+                    auto VarResult = [](double fVal, size_t nValCount) {
+                        if (nValCount <= 1)
+                            return CreateDoubleError(FormulaError::DivisionByZero);
+                        return fVal / (nValCount - 1);
+                    };
+                    GetStVarParams(bTextAsZero, VarResult);
+                };
+                const auto pushLegacyVarP = [&](bool bTextAsZero) {
+                    warnIfLegacyStatisticalAggregateReached(bTextAsZero ? u"VARPA" : u"VAR.P");
+                    auto VarResult = [](double fVal, size_t nValCount) {
+                        return sc::div(fVal, nValCount);
+                    };
+                    GetStVarParams(bTextAsZero, VarResult);
+                };
+                const auto pushLegacyStDev = [&](bool bTextAsZero) {
+                    warnIfLegacyStatisticalAggregateReached(
+                        bTextAsZero ? u"STDEVA" : u"STDEV.S");
+                    auto VarResult = [](double fVal, size_t nValCount) {
+                        if (nValCount <= 1)
+                            return CreateDoubleError(FormulaError::DivisionByZero);
+                        return sqrt(fVal / (nValCount - 1));
+                    };
+                    GetStVarParams(bTextAsZero, VarResult);
+                };
+                const auto pushLegacyStDevP = [&](bool bTextAsZero) {
+                    warnIfLegacyStatisticalAggregateReached(
+                        bTextAsZero ? u"STDEVPA" : u"STDEV.P");
+                    auto VarResult = [](double fVal, size_t nValCount) {
+                        if (nValCount == 0)
+                            return CreateDoubleError(FormulaError::DivisionByZero);
+                        return sqrt(fVal / nValCount);
+                    };
+                    GetStVarParams(bTextAsZero, VarResult);
+                };
                 const auto pushLegacyConvert = [&]() {
                     warnIfLegacyDispatchReached(
                         "family-local default-on", u"CONVERT",
@@ -7101,7 +7452,7 @@ StackVar ScInterpreter::Interpret()
                     switch (nFunc)
                     {
                         case AGGREGATE_FUNC_AVE:
-                            ScAverage();
+                            pushLegacyAverage(false);
                             break;
                         case AGGREGATE_FUNC_CNT:
                             ScCount();
@@ -7110,28 +7461,28 @@ StackVar ScInterpreter::Interpret()
                             ScCount2();
                             break;
                         case AGGREGATE_FUNC_MAX:
-                            ScMax();
+                            pushLegacyMax(false);
                             break;
                         case AGGREGATE_FUNC_MIN:
-                            ScMin();
+                            pushLegacyMin(false);
                             break;
                         case AGGREGATE_FUNC_PROD:
-                            ScProduct();
+                            pushLegacyProduct();
                             break;
                         case AGGREGATE_FUNC_STD:
-                            ScStDev();
+                            pushLegacyStDev(false);
                             break;
                         case AGGREGATE_FUNC_STDP:
-                            ScStDevP();
+                            pushLegacyStDevP(false);
                             break;
                         case AGGREGATE_FUNC_SUM:
-                            ScSum();
+                            pushLegacySum();
                             break;
                         case AGGREGATE_FUNC_VAR:
-                            ScVar();
+                            pushLegacyVar(false);
                             break;
                         case AGGREGATE_FUNC_VARP:
-                            ScVarP();
+                            pushLegacyVarP(false);
                             break;
                         case AGGREGATE_FUNC_MEDIAN:
                             pushLegacyMedian();
@@ -9501,7 +9852,7 @@ StackVar ScInterpreter::Interpret()
                         pushLegacyFloor(u"FLOOR.MATH", false);
                         break;
                     case ocSumProduct       : pushLegacySumProduct();       break;
-                    case ocSumSQ            : ScSumSQ();                    break;
+                    case ocSumSQ            : pushLegacySumSq();            break;
                     case ocSumX2MY2         : ScSumX2MY2();                 break;
                     case ocSumX2DY2         : ScSumX2DY2();                 break;
                     case ocSumXMY2          : ScSumXMY2();                  break;
@@ -9514,32 +9865,32 @@ StackVar ScInterpreter::Interpret()
                     case ocGetDiffDate      : pushLegacyDiffDate();     break;
                     case ocGetDiffDate360   : pushLegacyDiffDate360();  break;
                     case ocGetDateDif       : pushLegacyDateDif();      break;
-                    case ocMin              : ScMin()       ;               break;
-                    case ocMinA             : ScMin( true );                break;
-                    case ocMax              : ScMax();                      break;
-                    case ocMaxA             : ScMax( true );                break;
-                    case ocSum              : ScSum();                      break;
-                    case ocProduct          : ScProduct();                  break;
+                    case ocMin              : pushLegacyMin(false);         break;
+                    case ocMinA             : pushLegacyMin(true);          break;
+                    case ocMax              : pushLegacyMax(false);         break;
+                    case ocMaxA             : pushLegacyMax(true);          break;
+                    case ocSum              : pushLegacySum();              break;
+                    case ocProduct          : pushLegacyProduct();          break;
                     case ocNPV              : pushLegacyNpv();          break;
                     case ocIRR              : pushLegacyIrr();          break;
                     case ocMIRR             : pushLegacyMirr();         break;
                     case ocISPMT            : pushLegacyIspmt();        break;
-                    case ocAverage          : ScAverage()       ;           break;
-                    case ocAverageA         : ScAverage( true );            break;
+                    case ocAverage          : pushLegacyAverage(false);     break;
+                    case ocAverageA         : pushLegacyAverage(true);      break;
                     case ocCount            : ScCount();                    break;
                     case ocCount2           : ScCount2();                   break;
                     case ocVar              :
-                    case ocVarS             : ScVar();                      break;
-                    case ocVarA             : ScVar( true );                break;
+                    case ocVarS             : pushLegacyVar(false);         break;
+                    case ocVarA             : pushLegacyVar(true);          break;
                     case ocVarP             :
-                    case ocVarP_MS          : ScVarP();                     break;
-                    case ocVarPA            : ScVarP( true );               break;
+                    case ocVarP_MS          : pushLegacyVarP(false);        break;
+                    case ocVarPA            : pushLegacyVarP(true);         break;
                     case ocStDev            :
-                    case ocStDevS           : ScStDev();                    break;
-                    case ocStDevA           : ScStDev( true );              break;
+                    case ocStDevS           : pushLegacyStDev(false);       break;
+                    case ocStDevA           : pushLegacyStDev(true);        break;
                     case ocStDevP           :
-                    case ocStDevP_MS        : ScStDevP();                   break;
-                    case ocStDevPA          : ScStDevP( true );             break;
+                    case ocStDevP_MS        : pushLegacyStDevP(false);      break;
+                    case ocStDevPA          : pushLegacyStDevP(true);       break;
                     case ocPV               : pushLegacyPv();           break;
                     case ocSYD              : pushLegacySyd();          break;
                     case ocDDB              : pushLegacyDdb();          break;
