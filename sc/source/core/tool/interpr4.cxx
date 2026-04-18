@@ -89,6 +89,7 @@
 #include <spreadsheetengine/runtime/MathScalar.hxx>
 #include <spreadsheetengine/runtime/MathStatistical.hxx>
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
+#include <spreadsheetengine/runtime/RpnOperators.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
@@ -101,6 +102,7 @@
 
 #include <map>
 #include <algorithm>
+#include <optional>
 #include <basic/basmgr.hxx>
 #include <vbahelper/vbaaccesshelper.hxx>
 #include <memory>
@@ -117,6 +119,7 @@ namespace seconvert = spreadsheetengine::core::convert;
 namespace sedatetime = spreadsheetengine::core::datetime;
 namespace sefinance = spreadsheetengine::core::finance;
 namespace semath = spreadsheetengine::core::math;
+namespace serpn = spreadsheetengine::core::rpn;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 namespace seswitchexec = spreadsheetengine::compat::libreoffice::switchexecution;
 namespace setextparseexec = spreadsheetengine::compat::libreoffice::textparsingexecution;
@@ -4304,6 +4307,118 @@ StackVar ScInterpreter::Interpret()
                     }
                     PushDouble(rResult.maValue);
                 };
+                // The first operator pilot only accepts plain scalar tokens.
+                // Reference and matrix operands still fall back to the legacy
+                // interpreter so we do not guess at broadcast or reference
+                // resolution semantics.
+                const auto tryBuildEngineScalarBinaryOperand
+                    = [&](const FormulaToken& rToken,
+                          serpn::BinaryScalarOperator eOperator)
+                    -> std::optional<serpn::RpnValue> {
+                    switch (rToken.GetType())
+                    {
+                        case svDouble:
+                        {
+                            const auto eType
+                                = static_cast<SvNumFormatType>(rToken.GetDoubleType());
+                            if (!serpn::isComparisonOperator(eOperator))
+                            {
+                                switch (eType)
+                                {
+                                    case SvNumFormatType::ALL:
+                                    case SvNumFormatType::UNDEFINED:
+                                    case SvNumFormatType::NUMBER:
+                                    case SvNumFormatType::LOGICAL:
+                                        break;
+                                    default:
+                                        return std::nullopt;
+                                }
+                            }
+
+                            if (serpn::isConcatenationOperator(eOperator))
+                                return std::nullopt;
+
+                            return serpn::RpnValue::number(rToken.GetDouble());
+                        }
+                        case svString:
+                        case svStringName:
+                            return serpn::RpnValue::text(rToken.GetString().getString());
+                        case svMissing:
+                        case svEmptyCell:
+                            return serpn::RpnValue::empty();
+                        case svError:
+                            return serpn::RpnValue::error(
+                                selibreoffice::toApiError(rToken.GetError()));
+                        default:
+                            return std::nullopt;
+                    }
+                };
+                const auto tryPushEngineScalarBinaryOp
+                    = [&](serpn::BinaryScalarOperator eOperator) {
+                    if (sp < 2)
+                        return false;
+
+                    const FormulaToken* pRight = pStack[sp - 1];
+                    const FormulaToken* pLeft = pStack[sp - 2];
+                    if (!pLeft || !pRight)
+                        return false;
+
+                    if (serpn::isComparisonOperator(eOperator)
+                        && ((pLeft->GetType() == svString || pLeft->GetType() == svStringName)
+                            && (pRight->GetType() == svString || pRight->GetType() == svStringName)))
+                    {
+                        return false;
+                    }
+
+                    const auto oLeft
+                        = tryBuildEngineScalarBinaryOperand(*pLeft, eOperator);
+                    const auto oRight
+                        = tryBuildEngineScalarBinaryOperand(*pRight, eOperator);
+                    if (!oLeft || !oRight)
+                        return false;
+
+                    const auto aResult
+                        = serpn::evaluateBinaryScalarOperator(eOperator, *oLeft, *oRight);
+                    if (aResult.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                        return false;
+
+                    sp -= 2;
+                    nGlobalError = FormulaError::NONE;
+
+                    if (!aResult)
+                    {
+                        PushError(selibreoffice::toFormulaError(aResult.meError));
+                        return true;
+                    }
+
+                    switch (aResult.maValue.meKind)
+                    {
+                        case serpn::RpnValueKind::Number:
+                            nFuncFmtType = SvNumFormatType::NUMBER;
+                            PushDouble(aResult.maValue.maScalar.mfNumber);
+                            return true;
+                        case serpn::RpnValueKind::Boolean:
+                            nFuncFmtType = SvNumFormatType::LOGICAL;
+                            PushInt(aResult.maValue.maScalar.mfNumber != 0.0);
+                            return true;
+                        case serpn::RpnValueKind::String:
+                            PushString(selibreoffice::toLibreOfficeString(
+                                aResult.maValue.maScalar.maString));
+                            return true;
+                        case serpn::RpnValueKind::Empty:
+                            PushString(OUString());
+                            return true;
+                        case serpn::RpnValueKind::Error:
+                            PushError(selibreoffice::toFormulaError(
+                                aResult.maValue.maScalar.meError));
+                            return true;
+                        case serpn::RpnValueKind::Reference:
+                        case serpn::RpnValueKind::Matrix:
+                            return false;
+                    }
+
+                    return false;
+                };
                 const auto pushLegacyGcdOrLcm = [&](std::u16string_view rLabel, bool bLcm) {
                     warnIfLegacyDefaultOnReached(
                         rLabel, "family-local default-on math scalar reached ScInterpreter");
@@ -7285,58 +7400,100 @@ StackVar ScInterpreter::Interpret()
                     case ocChooseCols       : ScChooseColsOrRows(true); break;
                     case ocChooseRows       : ScChooseColsOrRows(false); break;
                     case ocAdd              :
-                        warnIfLegacyScalarRootReached(u"ADD");
-                        CalculateAddSub(false);
+                        if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Add))
+                        {
+                            warnIfLegacyScalarRootReached(u"ADD");
+                            CalculateAddSub(false);
+                        }
                         break;
                     case ocSub              :
-                        warnIfLegacyScalarRootReached(u"SUB");
-                        CalculateAddSub(true);
+                        if (!tryPushEngineScalarBinaryOp(
+                                serpn::BinaryScalarOperator::Subtract))
+                        {
+                            warnIfLegacyScalarRootReached(u"SUB");
+                            CalculateAddSub(true);
+                        }
                         break;
-                    case ocMul              : ScMul();                      break;
-                    case ocDiv              : ScDiv();                      break;
-                    case ocAmpersand        : ScAmpersand();                break;
-                    case ocPow              : ScPow();                      break;
+                    case ocMul              :
+                        if (!tryPushEngineScalarBinaryOp(
+                                serpn::BinaryScalarOperator::Multiply))
+                            ScMul();
+                        break;
+                    case ocDiv              :
+                        if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Divide))
+                            ScDiv();
+                        break;
+                    case ocAmpersand        :
+                        if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Concat))
+                            ScAmpersand();
+                        break;
+                    case ocPow              :
+                        if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Power))
+                            ScPow();
+                        break;
                     case ocEqual            :
-                        warnIfLegacyScalarRootReached(u"EQUAL");
-                        ScCompareOp(
-                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                                ComparisonMode::Equal,
-                            SC_EQUAL);
+                        if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Equal))
+                        {
+                            warnIfLegacyScalarRootReached(u"EQUAL");
+                            ScCompareOp(
+                                spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                    ComparisonMode::Equal,
+                                SC_EQUAL);
+                        }
                         break;
                     case ocNotEqual         :
-                        warnIfLegacyScalarRootReached(u"NOT_EQUAL");
-                        ScCompareOp(
-                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                                ComparisonMode::NotEqual,
-                            SC_NOT_EQUAL);
+                        if (!tryPushEngineScalarBinaryOp(
+                                serpn::BinaryScalarOperator::NotEqual))
+                        {
+                            warnIfLegacyScalarRootReached(u"NOT_EQUAL");
+                            ScCompareOp(
+                                spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                    ComparisonMode::NotEqual,
+                                SC_NOT_EQUAL);
+                        }
                         break;
                     case ocLess             :
-                        warnIfLegacyScalarRootReached(u"LESS");
-                        ScCompareOp(
-                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                                ComparisonMode::Less,
-                            SC_LESS);
+                        if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Less))
+                        {
+                            warnIfLegacyScalarRootReached(u"LESS");
+                            ScCompareOp(
+                                spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                    ComparisonMode::Less,
+                                SC_LESS);
+                        }
                         break;
                     case ocGreater          :
-                        warnIfLegacyScalarRootReached(u"GREATER");
-                        ScCompareOp(
-                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                                ComparisonMode::Greater,
-                            SC_GREATER);
+                        if (!tryPushEngineScalarBinaryOp(
+                                serpn::BinaryScalarOperator::Greater))
+                        {
+                            warnIfLegacyScalarRootReached(u"GREATER");
+                            ScCompareOp(
+                                spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                    ComparisonMode::Greater,
+                                SC_GREATER);
+                        }
                         break;
                     case ocLessEqual        :
-                        warnIfLegacyScalarRootReached(u"LESS_EQUAL");
-                        ScCompareOp(
-                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                                ComparisonMode::LessEqual,
-                            SC_LESS_EQUAL);
+                        if (!tryPushEngineScalarBinaryOp(
+                                serpn::BinaryScalarOperator::LessEqual))
+                        {
+                            warnIfLegacyScalarRootReached(u"LESS_EQUAL");
+                            ScCompareOp(
+                                spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                    ComparisonMode::LessEqual,
+                                SC_LESS_EQUAL);
+                        }
                         break;
                     case ocGreaterEqual     :
-                        warnIfLegacyScalarRootReached(u"GREATER_EQUAL");
-                        ScCompareOp(
-                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                                ComparisonMode::GreaterEqual,
-                            SC_GREATER_EQUAL);
+                        if (!tryPushEngineScalarBinaryOp(
+                                serpn::BinaryScalarOperator::GreaterEqual))
+                        {
+                            warnIfLegacyScalarRootReached(u"GREATER_EQUAL");
+                            ScCompareOp(
+                                spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                    ComparisonMode::GreaterEqual,
+                                SC_GREATER_EQUAL);
+                        }
                         break;
                     case ocAnd              :
                         pushLegacyLogicalFold(
