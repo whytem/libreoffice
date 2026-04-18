@@ -16,6 +16,7 @@
 #include <spreadsheetengine/detail/WorkbookCompilerLowering.hxx>
 #include <spreadsheetengine/detail/substrate/AuthorityPilot.hxx>
 #include <spreadsheetengine/detail/substrate/ComputationalShadowBuilder.hxx>
+#include <spreadsheetengine/detail/substrate/DependencyGraphShadowBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/ExecutionIrBuilder.hxx>
 #include <spreadsheetengine/detail/substrate/DependencyGraphShadowMapping.hxx>
 #include <spreadsheetengine/detail/workbook/FacadeConsumers.hxx>
@@ -1731,6 +1732,13 @@ buildPredictedSharedGroupNonStructuralComputationalShadow(
 
     if (!mutateSharedGroupNonStructuralCell(aPredicted, rInput, rReason))
         return std::nullopt;
+
+    // The topology rebuild must see the observed-after formula payloads for
+    // neighbor cells in the touched shared-group window, otherwise regroup and
+    // collapse cases will be classified against stale pre-mutation formulas.
+    overlayObservedCellPayloadsPreservingGroupBindings(
+        aPredicted, *rInput.moObservedAfterComputationalShadow);
+
     if (!applyPredictedSharedGroupNonStructuralTopology(aPredicted, rInput, rReason))
     {
         return std::nullopt;
@@ -2011,7 +2019,7 @@ inline void collectResolvedDependencySources(const dependency::DependencySnapsho
     const ComputationalWorkbookShadow& rShadow, const dependency::DependencySnapshot&,
     const dependency::RecalcPlan&)
 {
-    return buildDependencyGraphShadow(rShadow);
+    return spreadsheetengine::detail::substrate::buildDependencyGraphShadow(rShadow);
 }
 
 } // namespace authoritybuilddetail

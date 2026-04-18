@@ -6,6 +6,7 @@
 
 #include <spreadsheetengine/api/MatrixFrame.hxx>
 #include <spreadsheetengine/detail/ExecutionContext.hxx>
+#include <spreadsheetengine/runtime/RpnOperators.hxx>
 #include <spreadsheetengine/runtime/RpnValue.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 
@@ -61,8 +62,12 @@ int main()
     using spreadsheetengine::core::coercion::normalizeStringPositionArgument;
     using spreadsheetengine::core::rpn::RpnCoercionReadiness;
     using spreadsheetengine::core::rpn::RpnValue;
+    using spreadsheetengine::core::rpn::BinaryScalarOperator;
+    using spreadsheetengine::core::rpn::UnaryNumericOperator;
     using spreadsheetengine::core::rpn::classifyBinaryScalarOperatorReadiness;
     using spreadsheetengine::core::rpn::classifyUnaryScalarOperatorReadiness;
+    using spreadsheetengine::core::rpn::evaluateBinaryScalarOperator;
+    using spreadsheetengine::core::rpn::evaluateUnaryNumericOperator;
     using spreadsheetengine::standalone::test::fail;
 
     const auto aNumericText = coerceToNumber(CellValue::text(u"12.5"));
@@ -115,6 +120,38 @@ int main()
         || aMixedReferenceReadiness != RpnCoercionReadiness::NeedsReferenceResolution)
     {
         return fail("spreadsheetengine_execution_tests", "rpn value coercion contract mismatch");
+    }
+
+    const auto aUnaryMinus = evaluateUnaryNumericOperator(
+        UnaryNumericOperator::Minus, RpnValue::number(3.5));
+    const auto aBinaryAdd = evaluateBinaryScalarOperator(
+        BinaryScalarOperator::Add, RpnValue::number(1.5), RpnValue::text(u"2.5"));
+    const auto aConcat = evaluateBinaryScalarOperator(
+        BinaryScalarOperator::Concat, RpnValue::text(u"ab"), RpnValue::boolean(true));
+    const auto aStringLess = evaluateBinaryScalarOperator(
+        BinaryScalarOperator::Less, RpnValue::text(u"apple"), RpnValue::text(u"banana"));
+    const auto aNumericEqual = evaluateBinaryScalarOperator(
+        BinaryScalarOperator::Equal, RpnValue::number(4.0), RpnValue::text(u"4"));
+    const auto aDivisionByZero = evaluateBinaryScalarOperator(
+        BinaryScalarOperator::Divide, RpnValue::number(1.0), RpnValue::number(0.0));
+    const auto aDeferredBinary = evaluateBinaryScalarOperator(
+        BinaryScalarOperator::Multiply,
+        RpnValue::reference(ResolvedReference { { { 0, 6, 7 }, { 0, 6, 7 } } }),
+        RpnValue::number(5.0));
+    const auto aDeferredPower = evaluateBinaryScalarOperator(
+        BinaryScalarOperator::Power, RpnValue::matrix({ 2, 2 }), RpnValue::number(2.0));
+
+    if (!aUnaryMinus || aUnaryMinus.maValue.maScalar.mfNumber != -3.5 || !aBinaryAdd
+        || aBinaryAdd.maValue.maScalar.mfNumber != 4.0 || !aConcat
+        || aConcat.maValue.maScalar.maString != u"abTRUE" || !aStringLess
+        || !aStringLess.maValue.maScalar.mfNumber || !aNumericEqual
+        || !aNumericEqual.maValue.maScalar.mfNumber || aDivisionByZero
+        || aDivisionByZero.meError != Error::DivisionByZero || aDeferredBinary
+        || aDeferredBinary.meReadiness != RpnCoercionReadiness::NeedsReferenceResolution
+        || aDeferredPower
+        || aDeferredPower.meReadiness != RpnCoercionReadiness::NeedsMatrixMaterialization)
+    {
+        return fail("spreadsheetengine_execution_tests", "rpn operator contract mismatch");
     }
 
     if (!shouldConvertJumpConditionToMatrix(StackKind::DoubleRef, StackKind::Other)

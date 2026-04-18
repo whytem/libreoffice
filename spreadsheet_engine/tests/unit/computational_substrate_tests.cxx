@@ -34,9 +34,19 @@ int main()
     using spreadsheetengine::detail::substrate::mutationentrydetail::classifyMutationEntryPath;
     using spreadsheetengine::detail::substrate::structuraldetail::classifyStructuralMutation;
     using spreadsheetengine::detail::substrate::structuraldetail::makeStructuralVerification;
+    namespace facade = spreadsheetengine::detail::facade;
     namespace mapping = spreadsheetengine::detail::substrate::mapping;
     using spreadsheetengine::api::CellValue;
     using spreadsheetengine::standalone::test::fail;
+
+    const auto buildObservedAuthorityObservation
+        = [](const auto& rPlan, const auto& rBeforeShadow, const auto& rAfterShadow,
+             const auto& rMutation) {
+              const auto aOptions = authoritybuilddetail::buildAuthorityObservationBuildOptions(
+                  rBeforeShadow, rAfterShadow, rMutation);
+              return authoritybuilddetail::buildAuthorityObservationState(
+                  rPlan.maDependencySnapshot, rPlan.maRecalcPlan, aOptions);
+          };
 
     {
         ExecutionIrInstruction aInstruction {
@@ -1958,8 +1968,8 @@ int main()
                     "shared-group non-structural lifecycle verdict mismatch");
             }
 
-            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
-                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aPredictedObservation = buildObservedAuthorityObservation(
+                aLifecyclePlan, aBeforeShadow, aAfterShadow, aLifecycleInput.maMutation);
             const auto aComputationalComparison = compareComputationalShadow(
                 aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
             if (!aComputationalComparison.mbFullMatch || !aLifecyclePlan.maComputationalAfter.maFormulaGroups.empty())
@@ -2080,8 +2090,8 @@ int main()
                     "shared-group same-text preserve lifecycle verdict mismatch");
             }
 
-            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
-                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aPredictedObservation = buildObservedAuthorityObservation(
+                aLifecyclePlan, aBeforeShadow, aAfterShadow, aLifecycleInput.maMutation);
             const auto aComputationalComparison = compareComputationalShadow(
                 aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
             if (!aComputationalComparison.mbFullMatch
@@ -2167,8 +2177,8 @@ int main()
                     "shared-group named-range preserve lifecycle verdict mismatch");
             }
 
-            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
-                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aPredictedObservation = buildObservedAuthorityObservation(
+                aLifecyclePlan, aBeforeShadow, aAfterShadow, aLifecycleInput.maMutation);
             const auto aComputationalComparison = compareComputationalShadow(
                 aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
             if (!aComputationalComparison.mbFullMatch || !aComputationalComparison.mbNamedRangeMatch
@@ -2275,8 +2285,8 @@ int main()
                     "shared-group named-range regroup lifecycle verdict mismatch");
             }
 
-            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
-                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aPredictedObservation = buildObservedAuthorityObservation(
+                aLifecyclePlan, aBeforeShadow, aAfterShadow, aLifecycleInput.maMutation);
             const auto aComputationalComparison = compareComputationalShadow(
                 aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
             if (!aComputationalComparison.mbFullMatch || !aComputationalComparison.mbNamedRangeMatch
@@ -2426,8 +2436,8 @@ int main()
                     "shared-group named-range split-outcome lifecycle verdict mismatch");
             }
 
-            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
-                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aPredictedObservation = buildObservedAuthorityObservation(
+                aLifecyclePlan, aBeforeShadow, aAfterShadow, aLifecycleInput.maMutation);
             const auto aComputationalComparison = compareComputationalShadow(
                 aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
             if (!aComputationalComparison.mbFullMatch || !aComputationalComparison.mbNamedRangeMatch
@@ -2533,8 +2543,8 @@ int main()
                     "shared-group named-range one-sided insert lifecycle verdict mismatch");
             }
 
-            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
-                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aPredictedObservation = buildObservedAuthorityObservation(
+                aLifecyclePlan, aBeforeShadow, aAfterShadow, aLifecycleInput.maMutation);
             const auto aComputationalComparison = compareComputationalShadow(
                 aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
             if (!aComputationalComparison.mbFullMatch || !aComputationalComparison.mbNamedRangeMatch
@@ -2847,8 +2857,8 @@ int main()
                     "shared-group named-range setformula member-exit lifecycle verdict mismatch");
             }
 
-            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
-                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aPredictedObservation = buildObservedAuthorityObservation(
+                aLifecyclePlan, aBeforeShadow, aAfterShadow, aLifecycleInput.maMutation);
             const auto aComputationalComparison = compareComputationalShadow(
                 aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
             if (!aComputationalComparison.mbFullMatch || !aComputationalComparison.mbGroupMatch
@@ -2944,8 +2954,8 @@ int main()
                     "shared-group regroup lifecycle verdict mismatch");
             }
 
-            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
-                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aPredictedObservation = buildObservedAuthorityObservation(
+                aLifecyclePlan, aBeforeShadow, aAfterShadow, aLifecycleInput.maMutation);
             const auto aComputationalComparison = compareComputationalShadow(
                 aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
             if (!aComputationalComparison.mbFullMatch
@@ -3033,8 +3043,8 @@ int main()
                     "shared-group merge lifecycle verdict mismatch");
             }
 
-            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
-                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aPredictedObservation = buildObservedAuthorityObservation(
+                aLifecyclePlan, aBeforeShadow, aAfterShadow, aLifecycleInput.maMutation);
             const auto aComputationalComparison = compareComputationalShadow(
                 aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
             if (!aComputationalComparison.mbFullMatch
@@ -3118,8 +3128,8 @@ int main()
                     "shared-group replacement-merge lifecycle verdict mismatch");
             }
 
-            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
-                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aPredictedObservation = buildObservedAuthorityObservation(
+                aLifecyclePlan, aBeforeShadow, aAfterShadow, aLifecycleInput.maMutation);
             const auto aComputationalComparison = compareComputationalShadow(
                 aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
             const auto* pResidualCell
@@ -3195,8 +3205,8 @@ int main()
                     "shared-group one-sided insert lifecycle verdict mismatch");
             }
 
-            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
-                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aPredictedObservation = buildObservedAuthorityObservation(
+                aLifecyclePlan, aBeforeShadow, aAfterShadow, aLifecycleInput.maMutation);
             const auto aComputationalComparison = compareComputationalShadow(
                 aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
             if (!aComputationalComparison.mbFullMatch
@@ -3863,8 +3873,8 @@ int main()
                     "shared-group off-sheet named-range regroup lifecycle verdict mismatch");
             }
 
-            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
-                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aPredictedObservation = buildObservedAuthorityObservation(
+                aLifecyclePlan, aBeforeShadow, aAfterShadow, aLifecycleInput.maMutation);
             const auto aComputationalComparison = compareComputationalShadow(
                 aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
             if (!aComputationalComparison.mbFullMatch || !aComputationalComparison.mbNamedRangeMatch
@@ -3970,8 +3980,8 @@ int main()
                     "shared-group off-sheet named-range one-sided insert lifecycle verdict mismatch");
             }
 
-            const auto aPredictedObservation = authoritybuilddetail::buildAuthorityObservationState(
-                aLifecyclePlan.maDependencySnapshot, aLifecyclePlan.maRecalcPlan);
+            const auto aPredictedObservation = buildObservedAuthorityObservation(
+                aLifecyclePlan, aBeforeShadow, aAfterShadow, aLifecycleInput.maMutation);
             const auto aComputationalComparison = compareComputationalShadow(
                 aLifecyclePlan.maComputationalAfter, aAfterFacade, aPredictedObservation);
             if (!aComputationalComparison.mbFullMatch || !aComputationalComparison.mbNamedRangeMatch

@@ -131,6 +131,20 @@ Admit the hot operator opcodes into the engine:
 This is expected to be the first large, honest drop in
 `interp4_dispatch_legacy_lambda_count`.
 
+Checkpoint:
+
+- the initial scalar operator contract now exists in
+  `spreadsheetengine/runtime/RpnOperators.hxx`
+- it covers:
+  - unary numeric `Plus` / `Minus`
+  - binary scalar `Add`, `Subtract`, `Multiply`, `Divide`, `Power`
+  - concatenation
+  - scalar comparisons
+- reference and matrix operands still defer explicitly through
+  `NeedsReferenceResolution` / `NeedsMatrixMaterialization`
+- no Calc opcode is routed through this layer yet; this checkpoint exists to
+  lock semantics before dispatch migration begins
+
 ### 4. Engine Control Flow
 
 Move jump and lazy-evaluation semantics into engine code:

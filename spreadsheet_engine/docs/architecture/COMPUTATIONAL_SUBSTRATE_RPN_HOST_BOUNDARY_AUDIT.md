@@ -181,6 +181,9 @@ Immediate implication:
   - `RpnCoercionReadiness::{Ready, NeedsReferenceResolution, NeedsMatrixMaterialization}`
   - unary/binary scalar operator readiness classifiers that can refuse
     reference and matrix operands explicitly
+- the first scalar operator layer now exists in `RpnOperators.hxx`, which
+  mirrors Calc's current scalar arithmetic / concat / comparison semantics
+  without routing live opcodes through the engine yet
 
 ## Category 6: Matrix Frame And Spill State
 
