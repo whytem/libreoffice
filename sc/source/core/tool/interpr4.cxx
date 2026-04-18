@@ -4309,8 +4309,16 @@ StackVar ScInterpreter::Interpret()
                             return FormulaError::IllegalArgument;
                         return selibreoffice::toFormulaError(eError);
                     };
+                const auto warnIfLegacyStatisticalDistributionReached =
+                    [&](std::u16string_view rLabel) {
+                        warnIfLegacyDefaultOnReached(
+                            rLabel,
+                            "family-local default-on statistical distribution reached "
+                            "ScInterpreter");
+                    };
                 const auto pushLegacyUnaryValueResult =
-                    [&](auto aEvaluator) {
+                    [&](std::u16string_view rLabel, auto aEvaluator) {
+                        warnIfLegacyStatisticalDistributionReached(rLabel);
                         const auto aResult = aEvaluator(GetDouble());
                         if (!aResult)
                         {
@@ -4320,7 +4328,8 @@ StackVar ScInterpreter::Interpret()
                         PushDouble(aResult.maValue);
                     };
                 const auto pushLegacyUnaryCalcMathValueResult =
-                    [&](auto aEvaluator) {
+                    [&](std::u16string_view rLabel, auto aEvaluator) {
+                        warnIfLegacyStatisticalDistributionReached(rLabel);
                         const auto aResult = aEvaluator(GetDouble());
                         if (!aResult)
                         {
@@ -4329,14 +4338,9 @@ StackVar ScInterpreter::Interpret()
                         }
                         PushDouble(aResult.maValue);
                     };
-                const auto warnIfLegacyStatisticalDistributionReached =
-                    [&](std::u16string_view rLabel) {
-                        warnIfLegacyDefaultOnReached(
-                            rLabel,
-                            "family-local default-on statistical distribution reached "
-                            "ScInterpreter");
-                    };
                 const auto pushLegacyStdNormDist = [&](bool bMicrosoftSyntax) {
+                    warnIfLegacyStatisticalDistributionReached(
+                        bMicrosoftSyntax ? u"NORM.S.DIST" : u"NORMSDIST");
                     if (!MustHaveParamCount(GetByte(), bMicrosoftSyntax ? 2 : 1))
                         return;
 
@@ -4354,6 +4358,7 @@ StackVar ScInterpreter::Interpret()
                                    .maValue);
                 };
                 const auto pushLegacyExponentialDist = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"EXPONDIST");
                     if (!MustHaveParamCount(GetByte(), 3))
                         return;
 
@@ -4370,6 +4375,8 @@ StackVar ScInterpreter::Interpret()
                     PushDouble(aResult.maValue);
                 };
                 const auto pushLegacyPermutation = [&](bool bAllowRepetition) {
+                    warnIfLegacyStatisticalDistributionReached(
+                        bAllowRepetition ? u"PERMUTATIONA" : u"PERMUT");
                     if (!MustHaveParamCount(GetByte(), 2))
                         return;
 
@@ -4386,6 +4393,7 @@ StackVar ScInterpreter::Interpret()
                     PushDouble(aResult.maValue);
                 };
                 const auto pushLegacyWeibull = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"WEIBULL");
                     if (!MustHaveParamCount(GetByte(), 4))
                         return;
 
@@ -4403,6 +4411,7 @@ StackVar ScInterpreter::Interpret()
                     PushDouble(aResult.maValue);
                 };
                 const auto pushLegacySNormInv = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"NORMSINV");
                     if (!MustHaveParamCount(GetByte(), 1))
                         return;
 
@@ -4629,6 +4638,7 @@ StackVar ScInterpreter::Interpret()
                         PushDouble(aResult.maValue);
                     };
                 const auto pushLegacyStandardize = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"STANDARDIZE");
                     if (!MustHaveParamCount(GetByte(), 3))
                         return;
 
@@ -11015,7 +11025,8 @@ StackVar ScInterpreter::Interpret()
                         pushLegacyMathScalarUnaryOptional(u"SQRT", semath::computeSqrt);
                         break;
                     case ocFact             :
-                        pushLegacyUnaryCalcMathValueResult(semath::evaluateFactorialValue);
+                        pushLegacyUnaryCalcMathValueResult(
+                            u"FACT", semath::evaluateFactorialValue);
                         break;
                     case ocGetYear          : pushLegacyExtractYear();  break;
                     case ocGetMonth         : pushLegacyExtractMonth(); break;
@@ -11057,7 +11068,8 @@ StackVar ScInterpreter::Interpret()
                     case ocStdNormDist      : pushLegacyStdNormDist(false); break;
                     case ocStdNormDist_MS   : pushLegacyStdNormDist(true);  break;
                     case ocFisher           :
-                        pushLegacyUnaryCalcMathValueResult(semath::fisherTransform);
+                        pushLegacyUnaryCalcMathValueResult(
+                            u"FISHER", semath::fisherTransform);
                         break;
                     case ocFisherInv        :
                         PushDouble(semath::inverseFisherTransform(GetDouble()));
@@ -11233,12 +11245,12 @@ StackVar ScInterpreter::Interpret()
                     case ocColor            : pushLegacyColor();            break;
                     case ocErf_MS           :
                         if (MustHaveParamCount(GetByte(), 1))
-                            pushLegacyUnaryValueResult(semath::evaluateErrorFunction);
+                            pushLegacyUnaryValueResult(u"ERF", semath::evaluateErrorFunction);
                         break;
                     case ocErfc_MS          :
                         if (MustHaveParamCount(GetByte(), 1))
                             pushLegacyUnaryValueResult(
-                                semath::evaluateComplementaryErrorFunction);
+                                u"ERFC", semath::evaluateComplementaryErrorFunction);
                         break;
                     case ocIpmt             : pushLegacyIpmt();         break;
                     case ocPpmt             : pushLegacyPpmt();         break;
@@ -11497,10 +11509,11 @@ StackVar ScInterpreter::Interpret()
                     case ocForecast_ETS_STM : ScForecast_Ets( etsStatMult );  break;
                     case ocGammaLn          :
                     case ocGammaLn_MS       :
-                        pushLegacyUnaryCalcMathValueResult(semath::evaluateLogGammaValue);
+                        pushLegacyUnaryCalcMathValueResult(
+                            u"GAMMALN", semath::evaluateLogGammaValue);
                         break;
                     case ocGamma            :
-                        pushLegacyUnaryCalcMathValueResult(semath::evaluateGammaValue);
+                        pushLegacyUnaryCalcMathValueResult(u"GAMMA", semath::evaluateGammaValue);
                         break;
                     case ocGammaDist        : pushLegacyGammaDist(u"GAMMADIST", true); break;
                     case ocGammaDist_MS     : pushLegacyGammaDist(u"GAMMA.DIST", false); break;

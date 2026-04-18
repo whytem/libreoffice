@@ -35,6 +35,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <map>
@@ -278,6 +279,182 @@ std::size_t countLegacyInterpreterSubroutines()
     return static_cast<std::size_t>(
         std::distance(std::sregex_iterator(aText.begin(), aText.end(), aPattern),
             std::sregex_iterator()));
+}
+
+struct Interp4LegacyLambdaInventory
+{
+    std::size_t mnLambdaCount = 0;
+    std::size_t mnDispatchLambdaCount = 0;
+    std::size_t mnDispatchCallCount = 0;
+    std::size_t mnQuarantineCoveredLambdaCount = 0;
+    std::size_t mnQuarantineMissingLambdaCount = 0;
+    std::size_t mnQuarantineCoveredDispatchLambdaCount = 0;
+    std::size_t mnQuarantineMissingDispatchLambdaCount = 0;
+    std::vector<std::string> maMissingDispatchLambdaNames;
+};
+
+Interp4LegacyLambdaInventory countInterp4LegacyLambdas()
+{
+    const std::filesystem::path aRepoRoot
+        = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
+    const std::filesystem::path aSourcePath
+        = aRepoRoot / "sc" / "source" / "core" / "tool" / "interpr4.cxx";
+
+    std::ifstream aStream(aSourcePath);
+    if (!aStream.is_open())
+        return {};
+
+    std::vector<std::string> aLines;
+    for (std::string aLine; std::getline(aStream, aLine);)
+        aLines.push_back(aLine);
+
+    static const std::regex aDefinitionPattern(
+        R"(const\s+auto\s+(pushLegacy[A-Za-z0-9_]+)\s*=)");
+    static const std::regex aPushCallPattern(R"(\b(pushLegacy[A-Za-z0-9_]+)\s*\()");
+    static const std::regex aOpcodeCasePattern(R"(\bcase\s+oc[A-Za-z0-9_]+\b)");
+    const std::array<std::string_view, 5> aWarningMarkers = {
+        "warnIfLegacy", "warnTextUtilityDispatch", "warnInformationPredicateDispatch",
+        "warnLogicalDispatch", "warnConditionalDispatch"
+    };
+
+    struct LambdaRecord
+    {
+        std::string maName;
+        bool mbDirectWarning = false;
+        bool mbDispatchReferenced = false;
+        std::set<std::string> maDependencies;
+    };
+
+    std::vector<std::pair<std::size_t, std::string>> aDefinitions;
+    for (std::size_t nLine = 0; nLine < aLines.size(); ++nLine)
+    {
+        std::smatch aMatch;
+        if (std::regex_search(aLines[nLine], aMatch, aDefinitionPattern))
+            aDefinitions.emplace_back(nLine, aMatch[1].str());
+    }
+
+    Interp4LegacyLambdaInventory aInventory;
+    if (aDefinitions.empty())
+        return aInventory;
+
+    std::map<std::string, std::size_t> aLambdaIndexByName;
+    std::vector<LambdaRecord> aRecords;
+    aRecords.reserve(aDefinitions.size());
+    for (std::size_t nIndex = 0; nIndex < aDefinitions.size(); ++nIndex)
+    {
+        const auto& [nStartLine, rName] = aDefinitions[nIndex];
+        const std::size_t nEndLine
+            = (nIndex + 1 < aDefinitions.size()) ? aDefinitions[nIndex + 1].first : aLines.size();
+
+        std::ostringstream aBlockBuilder;
+        for (std::size_t nLine = nStartLine; nLine < nEndLine; ++nLine)
+            aBlockBuilder << aLines[nLine] << '\n';
+        const std::string aBlock = aBlockBuilder.str();
+
+        LambdaRecord aRecord;
+        aRecord.maName = rName;
+        for (std::string_view rMarker : aWarningMarkers)
+        {
+            if (aBlock.find(rMarker) != std::string::npos)
+            {
+                aRecord.mbDirectWarning = true;
+                break;
+            }
+        }
+
+        for (std::sregex_iterator aIt(aBlock.begin(), aBlock.end(), aPushCallPattern), aEnd;
+             aIt != aEnd; ++aIt)
+        {
+            const std::string aDependency = (*aIt)[1].str();
+            if (aDependency != aRecord.maName)
+                aRecord.maDependencies.insert(aDependency);
+        }
+
+        aLambdaIndexByName.emplace(aRecord.maName, aRecords.size());
+        aRecords.push_back(std::move(aRecord));
+    }
+
+    bool bInsideOpcodeCase = false;
+    std::ostringstream aCaseBlockBuilder;
+    for (const std::string& rLine : aLines)
+    {
+        if (std::regex_search(rLine, aOpcodeCasePattern) && !bInsideOpcodeCase)
+        {
+            bInsideOpcodeCase = true;
+            aCaseBlockBuilder.str({});
+            aCaseBlockBuilder.clear();
+        }
+        if (!bInsideOpcodeCase)
+            continue;
+
+        aCaseBlockBuilder << rLine << '\n';
+        if (rLine.find("break;") == std::string::npos)
+            continue;
+
+        const std::string aCaseBlock = aCaseBlockBuilder.str();
+        for (std::sregex_iterator aIt(aCaseBlock.begin(), aCaseBlock.end(), aPushCallPattern), aEnd;
+             aIt != aEnd; ++aIt)
+        {
+            const std::string aName = (*aIt)[1].str();
+            auto aFound = aLambdaIndexByName.find(aName);
+            if (aFound == aLambdaIndexByName.end())
+                continue;
+            aRecords[aFound->second].mbDispatchReferenced = true;
+            ++aInventory.mnDispatchCallCount;
+        }
+
+        bInsideOpcodeCase = false;
+    }
+
+    std::vector<bool> aCovered(aRecords.size(), false);
+    std::vector<bool> aVisiting(aRecords.size(), false);
+    std::function<bool(std::size_t)> aIsCovered = [&](std::size_t nIndex) -> bool {
+        if (aCovered[nIndex])
+            return true;
+        if (aVisiting[nIndex])
+            return false;
+        aVisiting[nIndex] = true;
+        if (aRecords[nIndex].mbDirectWarning)
+        {
+            aVisiting[nIndex] = false;
+            aCovered[nIndex] = true;
+            return true;
+        }
+        for (const std::string& rDependency : aRecords[nIndex].maDependencies)
+        {
+            auto aFound = aLambdaIndexByName.find(rDependency);
+            if (aFound != aLambdaIndexByName.end() && aIsCovered(aFound->second))
+            {
+                aVisiting[nIndex] = false;
+                aCovered[nIndex] = true;
+                return true;
+            }
+        }
+        aVisiting[nIndex] = false;
+        return false;
+    };
+
+    aInventory.mnLambdaCount = aRecords.size();
+    for (std::size_t nIndex = 0; nIndex < aRecords.size(); ++nIndex)
+    {
+        const bool bCovered = aIsCovered(nIndex);
+        if (bCovered)
+            ++aInventory.mnQuarantineCoveredLambdaCount;
+        if (aRecords[nIndex].mbDispatchReferenced)
+        {
+            ++aInventory.mnDispatchLambdaCount;
+            if (bCovered)
+                ++aInventory.mnQuarantineCoveredDispatchLambdaCount;
+            else
+                aInventory.maMissingDispatchLambdaNames.push_back(aRecords[nIndex].maName);
+        }
+    }
+
+    aInventory.mnQuarantineMissingLambdaCount
+        = aInventory.mnLambdaCount - aInventory.mnQuarantineCoveredLambdaCount;
+    aInventory.mnQuarantineMissingDispatchLambdaCount
+        = aInventory.mnDispatchLambdaCount - aInventory.mnQuarantineCoveredDispatchLambdaCount;
+    return aInventory;
 }
 
 void resetProbeDiagnosticSamples()
@@ -2202,7 +2379,8 @@ void printLiveTargetProbeSummary(const SupportedProbeRun& rRun)
 
 void printLiveAuthoritativeSummary(
     std::size_t nCorpusFormulaCount, const SupportedProbeRun& rRun,
-    std::size_t nLegacyInterpreterSubroutineCount)
+    std::size_t nLegacyInterpreterSubroutineCount,
+    const Interp4LegacyLambdaInventory& rLegacyLambdaInventory)
 {
     const sal_uInt64 nAuthoritative = rRun.maLiveAuthoritativeStats.mnAuthoritativeCount;
     const sal_uInt64 nFallback = rRun.maLiveAuthoritativeStats.mnAuthoritativeFallbackCount;
@@ -2225,6 +2403,33 @@ void printLiveAuthoritativeSummary(
               << nFallback << '\n';
     std::cout << "legacy_interpreter_subroutine_count="
               << nLegacyInterpreterSubroutineCount << '\n';
+    std::cout << "interp4_dispatch_legacy_lambda_count="
+              << rLegacyLambdaInventory.mnLambdaCount << '\n';
+    std::cout << "interp4_dispatch_legacy_dispatch_target_count="
+              << rLegacyLambdaInventory.mnDispatchLambdaCount << '\n';
+    std::cout << "interp4_dispatch_legacy_call_count="
+              << rLegacyLambdaInventory.mnDispatchCallCount << '\n';
+    std::cout << "interp4_dispatch_legacy_quarantine_covered_lambda_count="
+              << rLegacyLambdaInventory.mnQuarantineCoveredLambdaCount << '\n';
+    std::cout << "interp4_dispatch_legacy_quarantine_missing_lambda_count="
+              << rLegacyLambdaInventory.mnQuarantineMissingLambdaCount << '\n';
+    std::cout << "interp4_dispatch_legacy_quarantine_covered_dispatch_target_count="
+              << rLegacyLambdaInventory.mnQuarantineCoveredDispatchLambdaCount << '\n';
+    std::cout << "interp4_dispatch_legacy_quarantine_missing_dispatch_target_count="
+              << rLegacyLambdaInventory.mnQuarantineMissingDispatchLambdaCount << '\n';
+    if (!rLegacyLambdaInventory.maMissingDispatchLambdaNames.empty())
+    {
+        std::ostringstream aMissingNames;
+        for (std::size_t nIndex = 0; nIndex < rLegacyLambdaInventory.maMissingDispatchLambdaNames.size();
+             ++nIndex)
+        {
+            if (nIndex > 0)
+                aMissingNames << ",";
+            aMissingNames << rLegacyLambdaInventory.maMissingDispatchLambdaNames[nIndex];
+        }
+        std::cout << "interp4_dispatch_legacy_quarantine_missing_dispatch_target_names="
+                  << aMissingNames.str() << '\n';
+    }
 
     const auto aOldFlags = std::cout.flags();
     const auto nOldPrecision = std::cout.precision();
@@ -4754,6 +4959,11 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     const std::size_t nLegacyInterpreterSubroutineCount = countLegacyInterpreterSubroutines();
     CPPUNIT_ASSERT_MESSAGE("legacy interpreter subroutine metric should scan interpre.hxx",
         nLegacyInterpreterSubroutineCount > 0);
+    const auto aLegacyLambdaInventory = countInterp4LegacyLambdas();
+    CPPUNIT_ASSERT_MESSAGE("interp4 legacy lambda metric should scan interpr4.cxx",
+        aLegacyLambdaInventory.mnLambdaCount > 0);
+    CPPUNIT_ASSERT_EQUAL(std::size_t(0),
+        aLegacyLambdaInventory.mnQuarantineMissingDispatchLambdaCount);
     {
         SupportedProbeRun aPrintedProbeRun;
         aPrintedProbeRun.mnRawFormulaCount = nProbeFormulaCount;
@@ -4764,7 +4974,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         aPrintedProbeRun.maLiveTargetStats = aLiveTargetProbeStats;
         aPrintedProbeRun.maHostTruthArtifactFunctionCount = aProbeHostTruthArtifactFunctionCount;
         printLiveAuthoritativeSummary(
-            nFormulaCellCount, aPrintedProbeRun, nLegacyInterpreterSubroutineCount);
+            nFormulaCellCount, aPrintedProbeRun, nLegacyInterpreterSubroutineCount,
+            aLegacyLambdaInventory);
         printLiveTargetProbeSummary(aPrintedProbeRun);
     }
     printReplayEligibilityInventory(aReplayEligibilityInventory);
