@@ -4353,6 +4353,141 @@ StackVar ScInterpreter::Interpret()
                             return std::nullopt;
                     }
                 };
+                const auto tryBuildEngineScalarReferenceOperand
+                    = [&](const FormulaToken& rToken,
+                          serpn::BinaryScalarOperator eOperator)
+                    -> std::optional<serpn::RpnValue> {
+                    if (mrDoc.m_TableOpList.empty() == false || pJumpMatrix)
+                        return std::nullopt;
+
+                    const FormulaError nSavedError = nGlobalError;
+                    const SvNumFormatType eSavedCurFmtType = nCurFmtType;
+                    const sal_uInt32 nSavedCurFmtIndex = nCurFmtIndex;
+                    const auto restoreInterpreterState = [&]() {
+                        nGlobalError = nSavedError;
+                        nCurFmtType = eSavedCurFmtType;
+                        nCurFmtIndex = nSavedCurFmtIndex;
+                    };
+                    const auto makeErrorResult = [&](FormulaError eError) {
+                        restoreInterpreterState();
+                        return std::optional<serpn::RpnValue>(
+                            serpn::RpnValue::error(selibreoffice::toApiError(eError)));
+                    };
+                    const auto buildFromCellAddress = [&](const ScAddress& rAddress)
+                        -> std::optional<serpn::RpnValue> {
+                        ScRefCellValue aCell(mrDoc, rAddress);
+                        const FormulaError eCellError = GetCellErrCode(aCell);
+                        if (eCellError != FormulaError::NONE)
+                            return makeErrorResult(eCellError);
+
+                        switch (aCell.getType())
+                        {
+                            case CELLTYPE_NONE:
+                                restoreInterpreterState();
+                                return serpn::RpnValue::empty();
+                            case CELLTYPE_VALUE:
+                                if (serpn::isConcatenationOperator(eOperator))
+                                {
+                                    restoreInterpreterState();
+                                    return std::nullopt;
+                                }
+                                {
+                                    const double fValue = GetCellValue(rAddress, aCell);
+                                    if (nGlobalError != FormulaError::NONE)
+                                        return makeErrorResult(nGlobalError);
+                                    restoreInterpreterState();
+                                    return serpn::RpnValue::number(fValue);
+                                }
+                            case CELLTYPE_STRING:
+                            case CELLTYPE_EDIT:
+                                if (!serpn::isConcatenationOperator(eOperator))
+                                {
+                                    restoreInterpreterState();
+                                    return std::nullopt;
+                                }
+                                {
+                                    svl::SharedString aString;
+                                    GetCellString(aString, aCell);
+                                    if (nGlobalError != FormulaError::NONE)
+                                        return makeErrorResult(nGlobalError);
+                                    restoreInterpreterState();
+                                    return serpn::RpnValue::text(aString.getString());
+                                }
+                            case CELLTYPE_FORMULA:
+                                if (aCell.getFormula()->IsValue())
+                                {
+                                    if (serpn::isConcatenationOperator(eOperator))
+                                    {
+                                        restoreInterpreterState();
+                                        return std::nullopt;
+                                    }
+                                    const double fValue = GetCellValue(rAddress, aCell);
+                                    if (nGlobalError != FormulaError::NONE)
+                                        return makeErrorResult(nGlobalError);
+                                    restoreInterpreterState();
+                                    return serpn::RpnValue::number(fValue);
+                                }
+
+                                if (!serpn::isConcatenationOperator(eOperator))
+                                {
+                                    restoreInterpreterState();
+                                    return std::nullopt;
+                                }
+                                {
+                                    svl::SharedString aString;
+                                    GetCellString(aString, aCell);
+                                    if (nGlobalError != FormulaError::NONE)
+                                        return makeErrorResult(nGlobalError);
+                                    restoreInterpreterState();
+                                    return serpn::RpnValue::text(aString.getString());
+                                }
+                        }
+
+                        restoreInterpreterState();
+                        return std::nullopt;
+                    };
+
+                    nGlobalError = FormulaError::NONE;
+                    switch (rToken.GetType())
+                    {
+                        case svSingleRef:
+                        {
+                            const ScSingleRefData* pRefData = rToken.GetSingleRef();
+                            if (pRefData->IsDeleted())
+                                return makeErrorResult(FormulaError::NoRef);
+
+                            SCCOL nCol = 0;
+                            SCROW nRow = 0;
+                            SCTAB nTab = 0;
+                            SingleRefToVars(*pRefData, nCol, nRow, nTab);
+                            if (nGlobalError != FormulaError::NONE)
+                                return makeErrorResult(nGlobalError);
+
+                            return buildFromCellAddress(ScAddress(nCol, nRow, nTab));
+                        }
+                        case svDoubleRef:
+                        {
+                            ScRange aRange;
+                            DoubleRefToRange(*rToken.GetDoubleRef(), aRange);
+                            if (nGlobalError != FormulaError::NONE)
+                                return makeErrorResult(nGlobalError);
+
+                            ScAddress aAddress;
+                            if (!DoubleRefToPosSingleRef(aRange, aAddress))
+                            {
+                                if (nGlobalError != FormulaError::NONE)
+                                    return makeErrorResult(nGlobalError);
+                                restoreInterpreterState();
+                                return std::nullopt;
+                            }
+
+                            return buildFromCellAddress(aAddress);
+                        }
+                        default:
+                            restoreInterpreterState();
+                            return std::nullopt;
+                    }
+                };
                 const auto tryPushEngineScalarBinaryOp
                     = [&](serpn::BinaryScalarOperator eOperator) {
                     if (sp < 2)
@@ -4370,10 +4505,12 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
 
-                    const auto oLeft
-                        = tryBuildEngineScalarBinaryOperand(*pLeft, eOperator);
-                    const auto oRight
-                        = tryBuildEngineScalarBinaryOperand(*pRight, eOperator);
+                    auto oLeft = tryBuildEngineScalarBinaryOperand(*pLeft, eOperator);
+                    if (!oLeft)
+                        oLeft = tryBuildEngineScalarReferenceOperand(*pLeft, eOperator);
+                    auto oRight = tryBuildEngineScalarBinaryOperand(*pRight, eOperator);
+                    if (!oRight)
+                        oRight = tryBuildEngineScalarReferenceOperand(*pRight, eOperator);
                     if (!oLeft || !oRight)
                         return false;
 

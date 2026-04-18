@@ -575,6 +575,39 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterOperatorDispatch)
     m_pDoc->SetString(ScAddress(4, 7, 0), u"=1/0"_ustr);
     CPPUNIT_ASSERT_EQUAL(u"#DIV/0!"_ustr, m_pDoc->GetString(ScAddress(4, 7, 0)));
 
+    m_pDoc->SetValue(ScAddress(6, 0, 0), 10.0);
+    m_pDoc->SetValue(ScAddress(7, 0, 0), 5.0);
+    m_pDoc->SetString(ScAddress(6, 1, 0), u"ab"_ustr);
+    m_pDoc->SetString(ScAddress(7, 1, 0), u"cd"_ustr);
+    m_pDoc->SetString(ScAddress(6, 3, 0), u"=1/0"_ustr);
+
+    m_pDoc->SetString(ScAddress(8, 0, 0), u"=G1+H1"_ustr);
+    ASSERT_DOUBLES_EQUAL(15.0, m_pDoc->GetValue(ScAddress(8, 0, 0)));
+
+    m_pDoc->SetString(ScAddress(8, 1, 0), u"=G1-H1"_ustr);
+    ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(ScAddress(8, 1, 0)));
+
+    m_pDoc->SetString(ScAddress(8, 2, 0), u"=G1*H1"_ustr);
+    ASSERT_DOUBLES_EQUAL(50.0, m_pDoc->GetValue(ScAddress(8, 2, 0)));
+
+    m_pDoc->SetString(ScAddress(8, 3, 0), u"=G1/H1"_ustr);
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(8, 3, 0)));
+
+    m_pDoc->SetString(ScAddress(8, 4, 0), u"=G1^H1"_ustr);
+    ASSERT_DOUBLES_EQUAL(100000.0, m_pDoc->GetValue(ScAddress(8, 4, 0)));
+
+    m_pDoc->SetString(ScAddress(8, 5, 0), u"=G1>H1"_ustr);
+    CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(8, 5, 0))));
+
+    m_pDoc->SetString(ScAddress(8, 6, 0), u"=G2&H2"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"abcd"_ustr, m_pDoc->GetString(ScAddress(8, 6, 0)));
+
+    m_pDoc->SetString(ScAddress(8, 7, 0), u"=G3+H1"_ustr);
+    ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(ScAddress(8, 7, 0)));
+
+    m_pDoc->SetString(ScAddress(8, 8, 0), u"=G4+1"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"#DIV/0!"_ustr, m_pDoc->GetString(ScAddress(8, 8, 0)));
+
     ScMarkData aMark(m_pDoc->GetSheetLimits());
     aMark.SelectOneTable(0);
     m_pDoc->InsertMatrixFormula(2, 0, 2, 1, aMark, u"=A1:A2>0"_ustr);
