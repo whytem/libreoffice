@@ -509,7 +509,7 @@ Interp4EngineDispatchInventory countInterp4EngineDispatchAttempts()
         return {};
 
     Interp4EngineDispatchInventory aInventory;
-    static const std::regex aAttemptPattern(R"(\bif\s*\(!tryPushEngineScalarBinaryOp\s*\()");
+    static const std::regex aAttemptPattern(R"(\bif\s*\(!tryPushEngine[A-Za-z0-9_]*\s*\()");
     for (std::string aLine; std::getline(aStream, aLine);)
     {
         if (std::regex_search(aLine, aAttemptPattern))
@@ -5194,6 +5194,12 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         aCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount,
         aCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineSucceededCount
             + aCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "core-forced full-legacy replay should now exercise engine-first dispatch",
+        aCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "core-forced full-legacy replay should now succeed through engine-first dispatch",
+        aCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineSucceededCount > 0);
     {
         SupportedProbeRun aPrintedProbeRun;
         aPrintedProbeRun.mnRawFormulaCount = nProbeFormulaCount;

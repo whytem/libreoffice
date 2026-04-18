@@ -4820,6 +4820,44 @@ StackVar ScInterpreter::Interpret()
 
                     return false;
                 };
+                const auto tryPushEngineBadLiteralError = [&]() {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore().mnEngineAttemptedCount);
+                    if (!pMyFormulaCell || !pArr)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const OUString aFormulaSource
+                        = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
+                    if (aFormulaSource.isEmpty())
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const auto aAttempt = setaileval::tryEvaluateFormula(
+                        mrDoc, mrContext, aPos,
+                        std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+                        mrDoc.GetCalcConfig().mbEmptyStringAsZero, pArr);
+                    if (!aAttempt.mbSupported
+                        || aAttempt.maResult.meType
+                               != spreadsheetengine::api::formulavalue::ValueType::Error)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
+                        return false;
+                    }
+
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore().mnEngineSucceededCount);
+                    PushError(selibreoffice::toFormulaError(aAttempt.maResult.meError));
+                    return true;
+                };
                 const auto pushLegacyGcdOrLcm = [&](std::u16string_view rLabel, bool bLcm) {
                     warnIfLegacyDefaultOnReached(
                         rLabel, "family-local default-on math scalar reached ScInterpreter");
@@ -9707,7 +9745,18 @@ StackVar ScInterpreter::Interpret()
                     }
                     break;
                     case ocNoName           : ScNoName();               break;
-                    case ocBad              : ScBadName();              break;
+                    case ocBad              :
+                        if (!tryPushEngineBadLiteralError())
+                        {
+                            warnIfLegacyDispatchReached(
+                                "engine-first root error literal", u"ERROR_LITERAL",
+                                [](std::u16string_view rFormula) {
+                                    return setaileval::isRootErrorLiteralFormula(rFormula);
+                                },
+                                "engine-backed root error literal reached ScInterpreter");
+                            ScBadName();
+                        }
+                        break;
                     case ocZTest            :
                     case ocZTest_MS:
                         warnIfLegacyStatisticalDistributionReached(u"ZTEST");

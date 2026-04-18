@@ -13601,6 +13601,14 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                detail::uppercaseAscii(aParse.mpRoot->maPrimaryText));
 }
 
+[[nodiscard]] inline bool isRootErrorLiteralFormula(std::u16string_view rFormulaSource)
+{
+    const api::String aNormalized = detail::normalizeFormulaSource(rFormulaSource);
+    const auto aParse = core::formula::parseFormula(aNormalized);
+    return aParse && aParse.mpRoot
+           && aParse.mpRoot->meKind == core::formula::NodeKind::ErrorLiteral;
+}
+
 inline void resetStats()
 {
     auto& rStore = detail::statsStore();

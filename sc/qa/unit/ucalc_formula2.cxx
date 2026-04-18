@@ -683,6 +683,62 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterOperatorDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"BadLiterals"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+    resetScInterpreterReachabilityStats();
+    resetScInterpreterClassicOpcodeRuntimeStats();
+
+    m_pDoc->SetFormula(
+        ScAddress(0, 0, 0), u"of:#N/A"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 1, 0), u"of:#ERR504!"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+
+    CPPUNIT_ASSERT_EQUAL(FormulaError::NotAvailable, m_pDoc->GetErrCode(ScAddress(0, 0, 0)));
+    CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(0, 1, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aDispatchStatsLabel
+        = "attempted=" + std::to_string(aDispatchStats.mnEngineAttemptedCount)
+          + " succeeded=" + std::to_string(aDispatchStats.mnEngineSucceededCount)
+          + " declined=" + std::to_string(aDispatchStats.mnEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE("bad literal dispatch should attempt engine evaluation: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnEngineAttemptedCount >= 2);
+    CPPUNIT_ASSERT_MESSAGE("bad literal dispatch should succeed through the engine path: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnEngineSucceededCount >= 2);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("bad literal dispatch should not need legacy fallback here: "
+                                     + aDispatchStatsLabel,
+                                 sal_uInt64(0),
+                                 aDispatchStats.mnEngineDeclinedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("dispatch accounting should stay balanced: "
+                                     + aDispatchStatsLabel,
+                                 aDispatchStats.mnEngineAttemptedCount,
+                                 aDispatchStats.mnEngineSucceededCount
+                                     + aDispatchStats.mnEngineDeclinedCount);
+
+    const auto aReachabilityStats = getScInterpreterReachabilityStatsSnapshot();
+    CPPUNIT_ASSERT_MESSAGE(
+        "bad literal dispatch test should still reach classic ScInterpreter::Interpret()",
+        aReachabilityStats.mnClassicInterpretCount > 0);
+
+    const auto aClassicOpcodeStats = getScInterpreterClassicOpcodeRuntimeStatsSnapshot();
+    CPPUNIT_ASSERT_MESSAGE("bad literal dispatch test should record ocBad in the classic census",
+                           aClassicOpcodeStats.maOpcodeCounts[static_cast<std::size_t>(ocBad)]
+                               >= 2);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncIFERROR)
 {
     // IFERROR/IFNA (fdo#56124)
