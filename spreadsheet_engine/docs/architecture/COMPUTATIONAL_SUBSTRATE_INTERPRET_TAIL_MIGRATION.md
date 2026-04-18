@@ -262,13 +262,13 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=13`
+- `interp4_dispatch_engine_attempt_count=14`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
-- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=506`
+- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=602`
 - `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=506`
-- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=0`
+- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=96`
 - `sc_formula_executor_classic_interpret_total_live=0`
 - `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=602`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
@@ -294,13 +294,17 @@ wrapper-count-only cleanup. `interp4_dispatch_engine_attempt_count` now tracks
 the engine-first dispatch cases inside `Interpret()`, and the paired runtime
 totals show whether replay traffic is actually using them. On the standing live
 corpus those runtime counters are still `0 / 0 / 0`, but the core-forced
-full-legacy replay lane now reports `506 / 506 / 0`, which means the engine is
-carrying the full `ocBad` error-literal block when the classic interpreter is
-deliberately exercised. The classic opcode census still shows `Bad=506` and
-`Range=96` as the dominant entries because that census records opcode entry
-before the switch decides whether engine or legacy computes the result. So the
-next slice is no longer “make `Bad` real”; it is residual range handling and
-the broader reference substrate that `ocRange` represents.
+full-legacy replay lane now reports `602 / 506 / 96`, which means the engine
+is carrying the full `ocBad` error-literal block and is now actively attempting
+the residual `ocRange` block when the classic interpreter is deliberately
+exercised. The classic opcode census still shows `Bad=506` and `Range=96` as
+the dominant entries because that census records opcode entry before the switch
+decides whether engine or legacy computes the result. The important nuance is
+that the `96` `Range` rows are now measured engine attempts that all decline on
+the standing corpus, even though the focused `OFFSET(...):OFFSET(...)` proof
+shows valid dynamic range construction can already succeed through the engine.
+So the next slice is no longer “make `Bad` real”; it is residual range-operand
+shape support and the broader reference substrate that `ocRange` represents.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 
