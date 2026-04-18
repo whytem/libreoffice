@@ -262,12 +262,12 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=12`
+- `interp4_dispatch_engine_attempt_count=13`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
-- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=0`
-- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=0`
+- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=506`
+- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=506`
 - `interp4_dispatch_engine_declined_total_core_forced_full_legacy=0`
 - `sc_formula_executor_classic_interpret_total_live=0`
 - `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=602`
@@ -291,18 +291,16 @@ aggregate / test / growth block out of `Interpret()` and into
 [InterpreterCompatDispatch.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpreterCompatDispatch.hxx),
 so it is a real reduction in the relocated legacy surface rather than another
 wrapper-count-only cleanup. `interp4_dispatch_engine_attempt_count` now tracks
-the new operator pilot cases that try the standalone engine first from
-`Interpret()`, and the paired runtime totals show whether replay traffic is
-actually using them. On the standing corpus those runtime counters are still
-`0 / 0 / 0`, and the new core-forced full-legacy replay lane also still shows
-`0 / 0 / 0` for operator attempts even though it now reaches classic
-`ScInterpreter::Interpret()` `602` times. So the next operator slice should be
-judged by moving those runtime numbers inside the residual classic tail, not
-just by growing the static case count. The first census of that tail shows
-`Bad=506` and `Range=96` as the dominant classic opcodes, with sampled formulas
-like `=of:#N/A` and `=of:#ERR504!`, which points the next slice toward
-error-literal and residual range handling rather than more scalar operator
-widening.
+the engine-first dispatch cases inside `Interpret()`, and the paired runtime
+totals show whether replay traffic is actually using them. On the standing live
+corpus those runtime counters are still `0 / 0 / 0`, but the core-forced
+full-legacy replay lane now reports `506 / 506 / 0`, which means the engine is
+carrying the full `ocBad` error-literal block when the classic interpreter is
+deliberately exercised. The classic opcode census still shows `Bad=506` and
+`Range=96` as the dominant entries because that census records opcode entry
+before the switch decides whether engine or legacy computes the result. So the
+next slice is no longer “make `Bad` real”; it is residual range handling and
+the broader reference substrate that `ocRange` represents.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 

@@ -43,12 +43,12 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=12`
+- `interp4_dispatch_engine_attempt_count=13`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
-- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=0`
-- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=0`
+- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=506`
+- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=506`
 - `interp4_dispatch_engine_declined_total_core_forced_full_legacy=0`
 - `sc_formula_executor_formula_cell_interpret_total_live=2446901`
 - `sc_formula_executor_formula_group_attempt_total_live=1220544`
@@ -72,20 +72,20 @@ companion metric: it counts `pushLegacy*` lambdas still living inside
 [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx).
 If the wrapper count falls while the lambda count stays flat or rises, we are
 relocating Calc logic rather than moving authority into the standalone engine.
-`interp4_dispatch_engine_attempt_count` is the new static companion for the
-first real engine-opcode pilot: it counts `Interpret()` dispatch cases that now
-try the standalone engine first before falling back to Calc. The paired runtime
-totals show whether that path is actually carrying replay load. On the current
-standing corpus those totals are still `0 / 0 / 0`, and the new core-forced
-full-legacy replay lane also reports `0 / 0 / 0` for the operator pilot even
-though it now reaches classic `ScInterpreter::Interpret()` `602` times. That is
-the important new result: the operator pilot is landed, the audit lane is real,
-and the next bottleneck is not seam bypass anymore. The remaining classic tail
-simply is not hitting the operator opcodes we instrumented yet. The new opcode
-census shows the classic tail is dominated by `Bad=506` and `Range=96`, with
-sample formulas like `=of:#N/A` and `=of:#ERR504!`, so the next slice should
-focus on error-literal and residual range semantics rather than widening the
-scalar-operator pilot blindly.
+`interp4_dispatch_engine_attempt_count` is the static companion for the first
+real engine-first dispatch work inside `Interpret()`: it counts dispatch cases
+that now try the standalone engine first before falling back to Calc. The
+paired runtime totals show whether that path is actually carrying replay load.
+On the standing live corpus those totals are still `0 / 0 / 0`, which is still
+an honest sign that the upstream seam prevents this path from seeing ordinary
+replay traffic. But the core-forced full-legacy audit lane now reports
+`506 / 506 / 0`, so the engine-first dispatch path is no longer theoretical: it
+is carrying the entire `ocBad` error-literal block when the classic interpreter
+is actually exercised. The classic opcode census still shows `Bad=506` and
+`Range=96` because that census counts opcode entry before the switch decides
+whether engine or legacy computes the result. So the next bottleneck is now
+narrower and clearer: residual range handling, not root error literals and not
+scalar-operator reachability.
 The current value reflects the restored original `Sc*` names after backing out
 earlier rename-only metric compression, and the quarantine audit currently
 shows `62 / 62` dispatch-reachable legacy lambdas warning when reached. This

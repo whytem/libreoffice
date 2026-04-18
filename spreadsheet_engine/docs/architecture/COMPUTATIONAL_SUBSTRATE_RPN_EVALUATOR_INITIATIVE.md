@@ -11,12 +11,12 @@ After the current honest baseline of:
 
 - `legacy_interpreter_subroutine_count=100`
 - `interp4_dispatch_legacy_lambda_count=62`
-- `interp4_dispatch_engine_attempt_count=12`
+- `interp4_dispatch_engine_attempt_count=13`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
-- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=0`
-- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=0`
+- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=506`
+- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=506`
 - `interp4_dispatch_engine_declined_total_core_forced_full_legacy=0`
 - `sc_formula_executor_classic_interpret_total_live=0`
 - `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=602`
@@ -151,13 +151,15 @@ Checkpoint:
   `interp4_dispatch_engine_attempted_total=0`
 - the new core-forced full-legacy replay lane now proves that classic
   `ScInterpreter::Interpret()` is reachable again (`602` executions on the
-  standing corpus), but it still reports
-  `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=0`, so the
-  operator pilot is not yet carrying corpus load inside that residual classic
-  tail
-- the first opcode census of that residual classic tail shows it is dominated
-  by `Bad=506` and `Range=96`, not by arithmetic or comparison opcodes, so the
-  next real engine-admission value is in error-literal and range handling
+  standing corpus), and it now reports
+  `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=506` with
+  `506` successes and `0` declines, so engine-first dispatch is carrying real
+  load inside the residual classic tail
+- that movement comes from the `ocBad` root-error-literal slice; the classic
+  opcode census still shows `Bad=506` and `Range=96` because it records opcode
+  entry before the switch decides whether engine or legacy computes the result
+- the next real engine-admission value is therefore the residual range and
+  reference substrate, not more error-literal work
 - it covers:
   - unary numeric `Plus` / `Minus`
   - binary scalar `Add`, `Subtract`, `Multiply`, `Divide`, `Power`
