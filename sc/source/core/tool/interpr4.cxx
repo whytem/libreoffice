@@ -48,6 +48,7 @@
 #include <i18nlangtag/mslangid.hxx>
 #include <stdlib.h>
 #include <string.h>
+#include <mutex>
 
 #include <com/sun/star/table/XCellRange.hpp>
 #include <com/sun/star/script/XInvocation.hpp>
@@ -73,6 +74,7 @@
 #include <externalrefmgr.hxx>
 #include <unitconv.hxx>
 #include <formula/FormulaCompiler.hxx>
+#include <formula/opcode.hxx>
 #include <macromgr.hxx>
 #include <doubleref.hxx>
 #include <queryparam.hxx>
@@ -345,9 +347,87 @@ InterpreterReachabilityStatsStore& interpreterReachabilityStatsStore()
     return aStore;
 }
 
+struct InterpreterClassicOpcodeRuntimeStatsStore
+{
+    std::atomic<sal_uInt64> mnInterestingOpcodeCount { 0 };
+    std::array<std::atomic<sal_uInt64>, SC_OPCODE_LAST_OPCODE_ID + 1> maOpcodeCounts {};
+    std::mutex maSampleMutex;
+    std::vector<ScInterpreterClassicOpcodeDiagnosticSample> maSamples;
+};
+
+InterpreterClassicOpcodeRuntimeStatsStore& interpreterClassicOpcodeRuntimeStatsStore()
+{
+    static InterpreterClassicOpcodeRuntimeStatsStore aStore;
+    return aStore;
+}
+
+struct PendingClassicOpcodeSampleContext
+{
+    OUString maFormulaSource;
+    bool mbRecorded = false;
+};
+
+std::vector<PendingClassicOpcodeSampleContext>& pendingClassicOpcodeSampleContexts()
+{
+    thread_local std::vector<PendingClassicOpcodeSampleContext> aContexts;
+    return aContexts;
+}
+
 void addDispatchRuntimeStat(std::atomic<sal_uInt64>& rTarget, sal_uInt64 nDelta = 1)
 {
     rTarget.fetch_add(nDelta, std::memory_order_relaxed);
+}
+
+[[nodiscard]] bool isInterestingClassicOpcode(OpCode eOp)
+{
+    switch (eOp)
+    {
+        case ocPush:
+        case ocOpen:
+        case ocClose:
+        case ocSep:
+        case ocArrayOpen:
+        case ocArrayClose:
+        case ocArrayRowSep:
+        case ocArrayColSep:
+        case ocMissing:
+        case ocSpaces:
+        case ocWhitespace:
+        case ocStringXML:
+        case ocStringName:
+        case ocSkip:
+            return false;
+        default:
+            return true;
+    }
+}
+
+void maybeRecordClassicOpcodeDiagnosticSample(OpCode eOp)
+{
+    auto& rContexts = pendingClassicOpcodeSampleContexts();
+    if (rContexts.empty())
+        return;
+
+    auto& rTop = rContexts.back();
+    if (rTop.mbRecorded)
+        return;
+
+    auto& rStore = interpreterClassicOpcodeRuntimeStatsStore();
+    std::lock_guard aGuard(rStore.maSampleMutex);
+    if (rStore.maSamples.size() < 16)
+    {
+        rStore.maSamples.push_back(
+            { rTop.maFormulaSource, OUString::fromUtf8(OpCodeEnumToString(eOp)) });
+    }
+    rTop.mbRecorded = true;
+}
+
+void addClassicOpcodeRuntimeStat(OpCode eOp, sal_uInt64 nDelta = 1)
+{
+    auto& rStore = interpreterClassicOpcodeRuntimeStatsStore();
+    addDispatchRuntimeStat(rStore.mnInterestingOpcodeCount, nDelta);
+    addDispatchRuntimeStat(rStore.maOpcodeCounts[static_cast<std::size_t>(eOp)], nDelta);
+    maybeRecordClassicOpcodeDiagnosticSample(eOp);
 }
 
 }
@@ -424,6 +504,49 @@ ScInterpreterReachabilityStatsSnapshot getScInterpreterReachabilityStatsSnapshot
     aSnapshot.mnClassicInterpretCount
         = rStore.mnClassicInterpretCount.load(std::memory_order_relaxed);
     return aSnapshot;
+}
+
+void resetScInterpreterClassicOpcodeRuntimeStats()
+{
+    auto& rStore = interpreterClassicOpcodeRuntimeStatsStore();
+    rStore.mnInterestingOpcodeCount.store(0, std::memory_order_relaxed);
+    for (auto& rCount : rStore.maOpcodeCounts)
+        rCount.store(0, std::memory_order_relaxed);
+    {
+        std::lock_guard aGuard(rStore.maSampleMutex);
+        rStore.maSamples.clear();
+    }
+    pendingClassicOpcodeSampleContexts().clear();
+}
+
+ScInterpreterClassicOpcodeRuntimeStatsSnapshot getScInterpreterClassicOpcodeRuntimeStatsSnapshot()
+{
+    auto& rStore = interpreterClassicOpcodeRuntimeStatsStore();
+    ScInterpreterClassicOpcodeRuntimeStatsSnapshot aSnapshot;
+    aSnapshot.mnInterestingOpcodeCount
+        = rStore.mnInterestingOpcodeCount.load(std::memory_order_relaxed);
+    for (std::size_t nIndex = 0; nIndex < aSnapshot.maOpcodeCounts.size(); ++nIndex)
+    {
+        aSnapshot.maOpcodeCounts[nIndex]
+            = rStore.maOpcodeCounts[nIndex].load(std::memory_order_relaxed);
+    }
+    {
+        std::lock_guard aGuard(rStore.maSampleMutex);
+        aSnapshot.maSamples = rStore.maSamples;
+    }
+    return aSnapshot;
+}
+
+void pushScInterpreterClassicOpcodeFormulaContext(const OUString& rFormulaSource)
+{
+    pendingClassicOpcodeSampleContexts().push_back({ rFormulaSource, false });
+}
+
+void popScInterpreterClassicOpcodeFormulaContext()
+{
+    auto& rContexts = pendingClassicOpcodeSampleContexts();
+    if (!rContexts.empty())
+        rContexts.pop_back();
 }
 
 // document access functions
@@ -4251,6 +4374,8 @@ StackVar ScInterpreter::Interpret()
         if (!pCur || (nGlobalError != FormulaError::NONE && nErrorFunction > nErrorFunctionCount) )
             break;
         eOp = pCur->GetOpCode();
+        if (isInterestingClassicOpcode(eOp))
+            addClassicOpcodeRuntimeStat(eOp);
         cPar = pCur->GetByte();
         if ( eOp == ocPush )
         {

@@ -531,6 +531,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterOperatorDispatch)
     m_pDoc->InsertTab(0, u"Ops"_ustr);
     resetScInterpreterDispatchRuntimeStats();
     resetScInterpreterReachabilityStats();
+    resetScInterpreterClassicOpcodeRuntimeStats();
 
     m_pDoc->SetValue(ScAddress(0, 0, 0), 1.0);
     m_pDoc->SetValue(ScAddress(0, 1, 0), 0.0);
@@ -667,6 +668,17 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterOperatorDispatch)
                                      + aReachabilityStatsLabel,
                                  sal_uInt64(0),
                                  aReachabilityStats.mnFormulaGroupHandledCount);
+
+    const auto aClassicOpcodeStats = getScInterpreterClassicOpcodeRuntimeStatsSnapshot();
+    CPPUNIT_ASSERT_MESSAGE("operator dispatch test should record interesting classic opcodes",
+                           aClassicOpcodeStats.mnInterestingOpcodeCount > 0);
+    CPPUNIT_ASSERT_MESSAGE("operator dispatch test should record Add in the classic opcode census",
+                           aClassicOpcodeStats.maOpcodeCounts[static_cast<std::size_t>(ocAdd)] > 0);
+    CPPUNIT_ASSERT_MESSAGE("operator dispatch test should record Ampersand in the classic opcode census",
+                           aClassicOpcodeStats.maOpcodeCounts[static_cast<std::size_t>(ocAmpersand)]
+                               > 0);
+    CPPUNIT_ASSERT_MESSAGE("operator dispatch test should capture at least one opcode sample",
+                           !aClassicOpcodeStats.maSamples.empty());
 
     m_pDoc->DeleteTab(0);
 }

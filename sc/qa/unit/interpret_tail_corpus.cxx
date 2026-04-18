@@ -12,6 +12,7 @@
 #include <docoptio.hxx>
 #include <formula/errorcodes.hxx>
 #include <formula/grammar.hxx>
+#include <formula/opcode.hxx>
 #include <formulacell.hxx>
 #include <interpre.hxx>
 #include <refupdatecontext.hxx>
@@ -315,6 +316,21 @@ void accumulateReachabilityStats(ScInterpreterReachabilityStatsSnapshot& rAccumu
     rAccumulator.mnFormulaGroupHandledCount += rDelta.mnFormulaGroupHandledCount;
     rAccumulator.mnInterpretTailCount += rDelta.mnInterpretTailCount;
     rAccumulator.mnClassicInterpretCount += rDelta.mnClassicInterpretCount;
+}
+
+void accumulateClassicOpcodeRuntimeStats(
+    ScInterpreterClassicOpcodeRuntimeStatsSnapshot& rAccumulator,
+    const ScInterpreterClassicOpcodeRuntimeStatsSnapshot& rDelta)
+{
+    rAccumulator.mnInterestingOpcodeCount += rDelta.mnInterestingOpcodeCount;
+    for (std::size_t nIndex = 0; nIndex < rAccumulator.maOpcodeCounts.size(); ++nIndex)
+        rAccumulator.maOpcodeCounts[nIndex] += rDelta.maOpcodeCounts[nIndex];
+    for (const auto& rSample : rDelta.maSamples)
+    {
+        if (rAccumulator.maSamples.size() >= 16)
+            break;
+        rAccumulator.maSamples.push_back(rSample);
+    }
 }
 
 Interp4LegacyLambdaInventory countInterp4LegacyLambdas()
@@ -2630,6 +2646,54 @@ void printWorkdayRuntimeStats()
               << aStats.mnAdvanceWorkdayTotalHolidaySkips << '\n';
 }
 
+void printClassicOpcodeRuntimeStats(
+    const char* pPrefix, const ScInterpreterClassicOpcodeRuntimeStatsSnapshot& rStats)
+{
+    std::cout << pPrefix << "_interesting_total=" << rStats.mnInterestingOpcodeCount << '\n';
+
+    std::vector<std::pair<std::string, sal_uInt64>> aTopOpcodes;
+    for (std::size_t nIndex = 0; nIndex < rStats.maOpcodeCounts.size(); ++nIndex)
+    {
+        const sal_uInt64 nCount = rStats.maOpcodeCounts[nIndex];
+        if (!nCount)
+            continue;
+        aTopOpcodes.emplace_back(
+            OpCodeEnumToString(static_cast<OpCode>(nIndex)), nCount);
+    }
+
+    std::sort(aTopOpcodes.begin(), aTopOpcodes.end(),
+              [](const auto& rLeft, const auto& rRight) {
+                  if (rLeft.second != rRight.second)
+                      return rLeft.second > rRight.second;
+                  return rLeft.first < rRight.first;
+              });
+
+    const std::size_t nTopCount = std::min<std::size_t>(10, aTopOpcodes.size());
+    std::cout << pPrefix << "_top_count=" << nTopCount << '\n';
+    for (std::size_t nIndex = 0; nIndex < nTopCount; ++nIndex)
+    {
+        std::cout << pPrefix << "_top_" << nIndex << "_opcode="
+                  << aTopOpcodes[nIndex].first << '\n';
+        std::cout << pPrefix << "_top_" << nIndex << "_count="
+                  << aTopOpcodes[nIndex].second << '\n';
+    }
+
+    std::cout << pPrefix << "_sample_count=" << rStats.maSamples.size() << '\n';
+    for (std::size_t nIndex = 0; nIndex < rStats.maSamples.size(); ++nIndex)
+    {
+        std::cout << pPrefix << "_sample_" << nIndex << "_opcode="
+                  << OUStringToOString(rStats.maSamples[nIndex].maOpcodeName,
+                                       RTL_TEXTENCODING_UTF8)
+                         .getStr()
+                  << '\n';
+        std::cout << pPrefix << "_sample_" << nIndex << "_formula="
+                  << OUStringToOString(rStats.maSamples[nIndex].maFormulaSource,
+                                       RTL_TEXTENCODING_UTF8)
+                         .getStr()
+                  << '\n';
+    }
+}
+
 void appendDiagnosticSamples(
     std::vector<DiagnosticSample>& rTarget, const std::vector<DiagnosticSample>& rSource)
 {
@@ -4850,6 +4914,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     ScInterpreterDispatchRuntimeStatsSnapshot aCoreForcedSeamDisabledDispatchRuntimeStats;
     ScInterpreterReachabilityStatsSnapshot aLiveReachabilityStats;
     ScInterpreterReachabilityStatsSnapshot aCoreForcedSeamDisabledReachabilityStats;
+    ScInterpreterClassicOpcodeRuntimeStatsSnapshot aLiveClassicOpcodeRuntimeStats;
+    ScInterpreterClassicOpcodeRuntimeStatsSnapshot aCoreForcedSeamDisabledClassicOpcodeRuntimeStats;
 
     std::size_t nWorkbookCount = 0;
     std::size_t nFormulaCellCount = 0;
@@ -4884,6 +4950,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                     "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "observe");
                 resetScInterpreterDispatchRuntimeStats();
                 resetScInterpreterReachabilityStats();
+                resetScInterpreterClassicOpcodeRuntimeStats();
                 spreadsheetengine::compat::libreoffice::interprettaileval::resetStats();
                 spreadsheetengine::compat::libreoffice::interprettaileval::setDiagnosticWorkbookLabel(
                     OUString::fromUtf8(rWorkbookPath.string()));
@@ -4895,6 +4962,9 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                     getScInterpreterDispatchRuntimeStatsSnapshot());
                 accumulateReachabilityStats(aLiveReachabilityStats,
                     getScInterpreterReachabilityStatsSnapshot());
+                accumulateClassicOpcodeRuntimeStats(
+                    aLiveClassicOpcodeRuntimeStats,
+                    getScInterpreterClassicOpcodeRuntimeStatsSnapshot());
                 const StatsSnapshot aWorkbookLiveAttemptStats
                     = spreadsheetengine::compat::libreoffice::interprettaileval::getStatsSnapshot();
                 const auto aWorkbookLiveInventory = buildObserveSurfaceInventory(
@@ -4943,6 +5013,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                     "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
                 resetScInterpreterDispatchRuntimeStats();
                 resetScInterpreterReachabilityStats();
+                resetScInterpreterClassicOpcodeRuntimeStats();
                 sc::SetFormulaDirtyContext aDirtyCxt;
                 rDoc.SetAllFormulasDirty(aDirtyCxt);
                 rDoc.InterpretCellsIfNeeded(aWorkbookRanges);
@@ -4951,6 +5022,9 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
                     getScInterpreterDispatchRuntimeStatsSnapshot());
                 accumulateReachabilityStats(aCoreForcedSeamDisabledReachabilityStats,
                     getScInterpreterReachabilityStatsSnapshot());
+                accumulateClassicOpcodeRuntimeStats(
+                    aCoreForcedSeamDisabledClassicOpcodeRuntimeStats,
+                    getScInterpreterClassicOpcodeRuntimeStatsSnapshot());
             }
 
             {
@@ -5136,6 +5210,10 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
             aCoreForcedSeamDisabledReachabilityStats);
         printLiveTargetProbeSummary(aPrintedProbeRun);
     }
+    printClassicOpcodeRuntimeStats("sc_interpreter_classic_opcode_live",
+        aLiveClassicOpcodeRuntimeStats);
+    printClassicOpcodeRuntimeStats("sc_interpreter_classic_opcode_core_forced_full_legacy",
+        aCoreForcedSeamDisabledClassicOpcodeRuntimeStats);
     printReplayEligibilityInventory(aReplayEligibilityInventory);
     printWorkdayRuntimeStats();
     printDiagnosticSamples(aLiveDiagnosticSamples);
@@ -5173,6 +5251,12 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         "core forcing should prevent formula-group handling on the full-legacy replay lane",
         sal_uInt64(0),
         aCoreForcedSeamDisabledReachabilityStats.mnFormulaGroupHandledCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "core-forced full-legacy replay should record interesting classic opcodes",
+        aCoreForcedSeamDisabledClassicOpcodeRuntimeStats.mnInterestingOpcodeCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "core-forced full-legacy replay should capture classic opcode samples",
+        !aCoreForcedSeamDisabledClassicOpcodeRuntimeStats.maSamples.empty());
     CPPUNIT_ASSERT_MESSAGE(
         "full replay forced-interpret observe should touch every formula cell in the corpus",
         aForcedDirectInventory.mnFormulaCells == nFormulaCellCount);

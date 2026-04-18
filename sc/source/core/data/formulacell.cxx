@@ -2374,7 +2374,9 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
 
         bool bOldRunning = bRunning;
         bRunning = true;
+        pushScInterpreterClassicOpcodeFormulaContext(rEngineFormulaSource);
         pInterpreter->Interpret();
+        popScInterpreterClassicOpcodeFormulaContext();
 
         if (oEngineAttempt && oEngineAttempt->mbSupported
             && eEngineRolloutMode == setaileval::RolloutMode::ShadowCompare)

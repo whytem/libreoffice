@@ -42,6 +42,7 @@
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 
 #include <unordered_map>
+#include <array>
 #include <memory>
 #include <vector>
 #include <limits>
@@ -84,6 +85,19 @@ struct SC_DLLPUBLIC ScInterpreterReachabilityStatsSnapshot
     sal_uInt64 mnClassicInterpretCount = 0;
 };
 
+struct SC_DLLPUBLIC ScInterpreterClassicOpcodeDiagnosticSample
+{
+    OUString maFormulaSource;
+    OUString maOpcodeName;
+};
+
+struct SC_DLLPUBLIC ScInterpreterClassicOpcodeRuntimeStatsSnapshot
+{
+    sal_uInt64 mnInterestingOpcodeCount = 0;
+    std::array<sal_uInt64, SC_OPCODE_LAST_OPCODE_ID + 1> maOpcodeCounts {};
+    std::vector<ScInterpreterClassicOpcodeDiagnosticSample> maSamples;
+};
+
 enum class ScInterpreterReachabilityStat
 {
     FormulaCellInterpret,
@@ -101,6 +115,11 @@ SC_DLLPUBLIC void addScInterpreterReachabilityStat(ScInterpreterReachabilityStat
                                                    sal_uInt64 nDelta = 1);
 SC_DLLPUBLIC ScInterpreterReachabilityStatsSnapshot
 getScInterpreterReachabilityStatsSnapshot();
+SC_DLLPUBLIC void resetScInterpreterClassicOpcodeRuntimeStats();
+SC_DLLPUBLIC ScInterpreterClassicOpcodeRuntimeStatsSnapshot
+getScInterpreterClassicOpcodeRuntimeStatsSnapshot();
+SC_DLLPUBLIC void pushScInterpreterClassicOpcodeFormulaContext(const OUString& rFormulaSource);
+SC_DLLPUBLIC void popScInterpreterClassicOpcodeFormulaContext();
 
 enum MatchMode{ exactorNA=0, exactorS=-1, exactorG=1, wildcard=2, regex=3 };
 // mode for the TOCOL and TOROW formula functions
