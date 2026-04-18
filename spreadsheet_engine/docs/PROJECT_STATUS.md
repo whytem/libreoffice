@@ -38,8 +38,9 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_match_total=50350`
 - `interpret_tail_live_authoritative_fallback_total=4`
 - `legacy_interpreter_subroutine_count=100`
-- `interp4_dispatch_legacy_lambda_count=96`
-- `interp4_dispatch_legacy_dispatch_target_count=96`
+- `interp4_dispatch_legacy_lambda_count=62`
+- `interp4_dispatch_legacy_dispatch_target_count=62`
+- `interp4_dispatch_legacy_call_count=80`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
 - live authoritative-match rate over the corpus: `99.3861%`
 - live authoritative-match rate over the current promoted probe: `99.9960%`
@@ -54,7 +55,12 @@ If the wrapper count falls while the lambda count stays flat or rises, we are
 relocating Calc logic rather than moving authority into the standalone engine.
 The current value reflects the restored original `Sc*` names after backing out
 earlier rename-only metric compression, and the quarantine audit currently
-shows `96 / 96` dispatch-reachable legacy lambdas warning when reached.
+shows `62 / 62` dispatch-reachable legacy lambdas warning when reached. This
+latest drop came from moving the compatibility-heavy statistical / aggregate /
+test / growth block out of `Interpret()` and into
+[InterpreterCompatDispatch.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpreterCompatDispatch.hxx),
+so it is a real reduction in the relocated legacy surface rather than another
+wrapper-count-only cleanup.
 
 Everything below is diagnostic context for improving that number.
 
@@ -324,7 +330,7 @@ Still not true:
   `ENCODEURL` wrappers after the earlier financial-scalar relocation, bringing
   the blunt legacy wrapper metric down to `100`; the latest scalar/default-on
   dispatch collapse then cuts the relocated-legacy companion metric to
-  `96` `pushLegacy*` lambdas in `Interpret()`, with all `96` still reachable
+  `62` `pushLegacy*` lambdas in `Interpret()`, with all `96` still reachable
   from opcode dispatch
 - the raw promoted replay probe remains a diagnostic surface rather than the
   retirement denominator; the live-authoritative probe now sits at

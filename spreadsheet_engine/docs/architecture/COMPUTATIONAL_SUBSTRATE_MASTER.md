@@ -106,8 +106,9 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_match_total=50350`
 - `interpret_tail_live_authoritative_fallback_total=4`
 - `legacy_interpreter_subroutine_count=100`
-- `interp4_dispatch_legacy_lambda_count=96`
-- `interp4_dispatch_legacy_dispatch_target_count=96`
+- `interp4_dispatch_legacy_lambda_count=62`
+- `interp4_dispatch_legacy_dispatch_target_count=62`
+- `interp4_dispatch_legacy_call_count=80`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
 - live authoritative-match rate over the corpus: `99.3861%`
 - live authoritative-match rate over the current promoted probe: `99.9960%`
@@ -122,8 +123,13 @@ companion metric for [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/cor
 it counts `pushLegacy*` lambdas that still compute through Calc even after
 wrapper deletion. If wrapper count falls while lambda count does not, we are
 shuffling implementation inside Calc rather than moving authority into the
-standalone engine. The quarantine audit currently shows `96 / 96`
-dispatch-reachable lambdas warning when reached.
+standalone engine. The quarantine audit currently shows `62 / 62`
+dispatch-reachable lambdas warning when reached. This latest drop came from
+moving the compatibility-heavy statistical / aggregate / test / growth block
+out of `Interpret()` and into
+[InterpreterCompatDispatch.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpreterCompatDispatch.hxx),
+so it is a real reduction in the relocated legacy surface rather than another
+wrapper-count-only cleanup.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 
@@ -446,7 +452,7 @@ north-star; the broader live and forced-interpret counters are still attempt
 telemetry rather than a deletion denominator. The latest genuine text-utility
 retirement pass brings the honest blunt Calc-wrapper metric down to `100`, and
 the follow-on scalar/default-on dispatch collapse cuts the relocated-legacy
-companion metric to `96` `pushLegacy*` lambdas still resident in `Interpret()`,
+companion metric to `62` `pushLegacy*` lambdas still resident in `Interpret()`,
 so wrapper deletion should not be read as full standalone-engine migration by
 itself.
 

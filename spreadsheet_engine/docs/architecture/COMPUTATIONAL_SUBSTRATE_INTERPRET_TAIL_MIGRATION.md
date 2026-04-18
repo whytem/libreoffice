@@ -258,8 +258,9 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_match_total=50350`
 - `interpret_tail_live_authoritative_fallback_total=4`
 - `legacy_interpreter_subroutine_count=100`
-- `interp4_dispatch_legacy_lambda_count=96`
-- `interp4_dispatch_legacy_dispatch_target_count=96`
+- `interp4_dispatch_legacy_lambda_count=62`
+- `interp4_dispatch_legacy_dispatch_target_count=62`
+- `interp4_dispatch_legacy_call_count=80`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
 - live authoritative-match rate over the corpus: `99.3861%`
 - live authoritative-match rate over the current promoted probe: `99.9960%`
@@ -272,9 +273,14 @@ is the blunt retirement-progress companion metric, derived from the remaining
 Lower is better. `interp4_dispatch_legacy_lambda_count` is the relocated-legacy
 companion metric: it counts `pushLegacy*` lambdas still computing inside
 [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx)
-after wrapper deletion. The quarantine audit currently shows `96 / 96`
+after wrapper deletion. The quarantine audit currently shows `62 / 62`
 dispatch-reachable lambdas warning when reached, but the absolute count makes
 clear that relocation and engine migration are different kinds of progress.
+This latest drop came from moving the compatibility-heavy statistical /
+aggregate / test / growth block out of `Interpret()` and into
+[InterpreterCompatDispatch.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpreterCompatDispatch.hxx),
+so it is a real reduction in the relocated legacy surface rather than another
+wrapper-count-only cleanup.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 
@@ -325,8 +331,8 @@ Interpretation:
   `ENCODEURL` while preserving the same engine-authoritative live behavior,
   bringing `legacy_interpreter_subroutine_count` down from `112` to `100`
 - the follow-on scalar/default-on dispatch collapse cuts the relocated-legacy
-  companion metric to `96` `pushLegacy*` lambdas still present in `Interpret()`,
-  with all `96` reachable from opcode dispatch; future work should reduce that
+  companion metric to `62` `pushLegacy*` lambdas still present in `Interpret()`,
+  with all `62` reachable from opcode dispatch; future work should reduce that
   surface rather than treating wrapper deletion alone as migration
 - the ambient replay surface now includes large real traffic from
   information predicates, logical folds, round-family formulas, scalar-math
