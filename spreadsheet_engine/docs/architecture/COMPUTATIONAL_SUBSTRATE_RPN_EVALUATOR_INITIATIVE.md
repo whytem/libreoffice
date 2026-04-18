@@ -15,6 +15,9 @@ After the current honest baseline of:
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
+- `interp4_dispatch_engine_attempted_total_seam_disabled=0`
+- `interp4_dispatch_engine_succeeded_total_seam_disabled=0`
+- `interp4_dispatch_engine_declined_total_seam_disabled=0`
 - `interpret_tail_live_unique_unseen_formula_cells=49`
 - `interpret_tail_live_unique_fallback_formula_cells=0`
 - `interpret_tail_live_unique_unsupported_function_formula_cells=0`
@@ -76,6 +79,8 @@ For this initiative, the project should use the following working rules:
 - if a family is not yet engine-authoritative, leaving it as
   `ScInterpreter::ScXxx()` is preferable to growing `Interpret()`
 - every surviving `pushLegacy*` path must remain quarantine-warned
+- a static rise in `interp4_dispatch_engine_attempt_count` is not by itself
+  migration progress unless the live or seam-disabled runtime counters move
 - the next success metric is meaningful reduction in
   `interp4_dispatch_legacy_lambda_count`, not just another drop in
   `legacy_interpreter_subroutine_count`
@@ -142,6 +147,9 @@ Checkpoint:
 - Calc now has a first engine-opcode pilot for scalar binary operators in
   `ScInterpreter::Interpret()`, but the broad replay corpus still reports
   `interp4_dispatch_engine_attempted_total=0`
+- the new seam-disabled replay lane also still reports
+  `interp4_dispatch_engine_attempted_total_seam_disabled=0`, so the operator
+  pilot is not yet carrying corpus load even when the seam is forced off
 - it covers:
   - unary numeric `Plus` / `Minus`
   - binary scalar `Add`, `Subtract`, `Multiply`, `Divide`, `Power`
@@ -187,6 +195,9 @@ signatures rather than against Calc's stack machine.
 The initiative is making real progress when:
 
 - `interp4_dispatch_legacy_lambda_count` falls materially
+- `interp4_dispatch_engine_attempted_total` or
+  `interp4_dispatch_engine_attempted_total_seam_disabled` move for real
+  workload lanes rather than staying flat while static attempt sites grow
 - `legacy_interpreter_subroutine_count` also falls, but no longer leads the
   story by itself
 - `interpret_tail_live_unique_fallback_formula_cells` stays `0`

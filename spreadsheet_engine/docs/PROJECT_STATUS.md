@@ -47,6 +47,9 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
+- `interp4_dispatch_engine_attempted_total_seam_disabled=0`
+- `interp4_dispatch_engine_succeeded_total_seam_disabled=0`
+- `interp4_dispatch_engine_declined_total_seam_disabled=0`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
 - live authoritative-match rate over the corpus: `99.3940%`
 - live authoritative-match rate over the current promoted probe: `99.9921%`
@@ -63,9 +66,11 @@ relocating Calc logic rather than moving authority into the standalone engine.
 first real engine-opcode pilot: it counts `Interpret()` dispatch cases that now
 try the standalone engine first before falling back to Calc. The paired runtime
 totals show whether that path is actually carrying replay load. On the current
-standing corpus those totals are still `0 / 0 / 0`, which is an important
-result in itself: the operator pilot is landed, but broad replay traffic is not
-yet flowing through it.
+standing corpus those totals are still `0 / 0 / 0`, and the new
+seam-disabled replay lane is also still `0 / 0 / 0`. That is an important
+result in itself: the operator pilot is landed, but neither the normal replay
+path nor the current seam-disabled replay pass is yet carrying broad corpus
+load through those engine-first dispatch cases.
 The current value reflects the restored original `Sc*` names after backing out
 earlier rename-only metric compression, and the quarantine audit currently
 shows `62 / 62` dispatch-reachable legacy lambdas warning when reached. This
@@ -98,6 +103,9 @@ Immediate consequence:
 
 - the next honest migration metric is reduction in
   `interp4_dispatch_legacy_lambda_count`
+- `interp4_dispatch_engine_attempt_count` is now a companion, not a success
+  metric by itself; it must be read alongside the live and seam-disabled
+  runtime totals
 - no new `pushLegacy*` lambdas should be treated as progress unless they are
   temporary compatibility fallbacks for already engine-owned roots
 - the first prerequisite before opcode-by-opcode migration is a fixed
@@ -154,6 +162,8 @@ Next routing policy:
 - keep `unsupported_function=0` as an explicit regression guard
 - steer the next phase off unseen live surface and genuine reduction in
   `interp4_dispatch_legacy_lambda_count`
+- treat growth in `interp4_dispatch_engine_attempt_count` without corresponding
+  movement in the runtime totals as a new gaming risk to guard against
 - treat wrapper deletion as secondary unless the relocated legacy dispatch
   surface also falls
 - use the host-boundary audit as the design gate for the next subsystem work
