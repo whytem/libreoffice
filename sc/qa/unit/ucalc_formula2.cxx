@@ -13,6 +13,7 @@
 #include <formulacell.hxx>
 #include <docfunc.hxx>
 #include <interpretercontext.hxx>
+#include <interpre.hxx>
 #include <tokenstringcontext.hxx>
 #include <dbdata.hxx>
 #include <scmatrix.hxx>
@@ -521,8 +522,11 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedStatisticalDelegations)
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterOperatorDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
 
     m_pDoc->InsertTab(0, u"Ops"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
 
     m_pDoc->SetValue(ScAddress(0, 0, 0), 1.0);
     m_pDoc->SetValue(ScAddress(0, 1, 0), 0.0);
@@ -621,6 +625,23 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterOperatorDispatch)
     m_pDoc->InsertMatrixFormula(3, 0, 3, 1, aMark, u"=NOT(A1:A2)"_ustr);
     CPPUNIT_ASSERT_EQUAL(u"FALSE"_ustr, m_pDoc->GetString(ScAddress(3, 0, 0)));
     CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(ScAddress(3, 1, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aDispatchStatsLabel
+        = "attempted=" + std::to_string(aDispatchStats.mnEngineAttemptedCount)
+          + " succeeded=" + std::to_string(aDispatchStats.mnEngineSucceededCount)
+          + " declined=" + std::to_string(aDispatchStats.mnEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE("scalar operator dispatch should attempt engine evaluation: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_MESSAGE("scalar operator dispatch should still decline legacy-only shapes: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnEngineDeclinedCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("dispatch accounting should stay balanced: "
+                                     + aDispatchStatsLabel,
+                                 aDispatchStats.mnEngineAttemptedCount,
+                                 aDispatchStats.mnEngineSucceededCount
+                                     + aDispatchStats.mnEngineDeclinedCount);
 
     m_pDoc->DeleteTab(0);
 }

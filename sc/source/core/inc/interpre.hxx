@@ -68,6 +68,17 @@ struct ScInterpreterContext;
 class ScJumpMatrix;
 struct ScRefCellValue;
 
+struct SC_DLLPUBLIC ScInterpreterDispatchRuntimeStatsSnapshot
+{
+    sal_uInt64 mnEngineAttemptedCount = 0;
+    sal_uInt64 mnEngineSucceededCount = 0;
+    sal_uInt64 mnEngineDeclinedCount = 0;
+};
+
+SC_DLLPUBLIC void resetScInterpreterDispatchRuntimeStats();
+SC_DLLPUBLIC ScInterpreterDispatchRuntimeStatsSnapshot
+getScInterpreterDispatchRuntimeStatsSnapshot();
+
 enum MatchMode{ exactorNA=0, exactorS=-1, exactorG=1, wildcard=2, regex=3 };
 // mode for the TOCOL and TOROW formula functions
 enum class IgnoreValues{ DEFAULT=0, BLANKS=1, ERRORS=2, ALL=3 };

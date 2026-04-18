@@ -33,6 +33,7 @@
 #include <basic/sbxobj.hxx>
 #include <basic/sbuno.hxx>
 #include <osl/thread.h>
+#include <atomic>
 #include <spreadsheetengine/detail/ExecutionContext.hxx>
 #include <svl/numformat.hxx>
 #include <svl/zforlist.hxx>
@@ -313,8 +314,52 @@ void lclAppendBlock(OUStringBuffer& rText, std::string_view block)
 
 #define ADDIN_MAXSTRLEN 256
 
+namespace
+{
+
+struct InterpreterDispatchRuntimeStatsStore
+{
+    std::atomic<sal_uInt64> mnEngineAttemptedCount { 0 };
+    std::atomic<sal_uInt64> mnEngineSucceededCount { 0 };
+    std::atomic<sal_uInt64> mnEngineDeclinedCount { 0 };
+};
+
+InterpreterDispatchRuntimeStatsStore& interpreterDispatchRuntimeStatsStore()
+{
+    static InterpreterDispatchRuntimeStatsStore aStore;
+    return aStore;
+}
+
+void addDispatchRuntimeStat(std::atomic<sal_uInt64>& rTarget, sal_uInt64 nDelta = 1)
+{
+    rTarget.fetch_add(nDelta, std::memory_order_relaxed);
+}
+
+}
+
 thread_local std::unique_ptr<ScTokenStack> ScInterpreter::pGlobalStack;
 thread_local bool ScInterpreter::bGlobalStackInUse = false;
+
+void resetScInterpreterDispatchRuntimeStats()
+{
+    auto& rStore = interpreterDispatchRuntimeStatsStore();
+    rStore.mnEngineAttemptedCount.store(0, std::memory_order_relaxed);
+    rStore.mnEngineSucceededCount.store(0, std::memory_order_relaxed);
+    rStore.mnEngineDeclinedCount.store(0, std::memory_order_relaxed);
+}
+
+ScInterpreterDispatchRuntimeStatsSnapshot getScInterpreterDispatchRuntimeStatsSnapshot()
+{
+    const auto& rStore = interpreterDispatchRuntimeStatsStore();
+    ScInterpreterDispatchRuntimeStatsSnapshot aSnapshot;
+    aSnapshot.mnEngineAttemptedCount
+        = rStore.mnEngineAttemptedCount.load(std::memory_order_relaxed);
+    aSnapshot.mnEngineSucceededCount
+        = rStore.mnEngineSucceededCount.load(std::memory_order_relaxed);
+    aSnapshot.mnEngineDeclinedCount
+        = rStore.mnEngineDeclinedCount.load(std::memory_order_relaxed);
+    return aSnapshot;
+}
 
 // document access functions
 
@@ -4321,6 +4366,12 @@ StackVar ScInterpreter::Interpret()
                         {
                             const auto eType
                                 = static_cast<SvNumFormatType>(rToken.GetDoubleType());
+                            // Arithmetic must preserve Calc's format-sensitive
+                            // semantics, so the engine path only accepts plain
+                            // numeric/logical doubles here. Comparisons do not
+                            // depend on number-format propagation, so they may
+                            // accept wider scalar shapes later without changing
+                            // this arithmetic contract.
                             if (!serpn::isComparisonOperator(eOperator))
                             {
                                 switch (eType)
@@ -4490,18 +4541,30 @@ StackVar ScInterpreter::Interpret()
                 };
                 const auto tryPushEngineScalarBinaryOp
                     = [&](serpn::BinaryScalarOperator eOperator) {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore().mnEngineAttemptedCount);
                     if (sp < 2)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
                         return false;
+                    }
 
                     const FormulaToken* pRight = pStack[sp - 1];
                     const FormulaToken* pLeft = pStack[sp - 2];
                     if (!pLeft || !pRight)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
                         return false;
+                    }
 
                     if (serpn::isComparisonOperator(eOperator)
                         && ((pLeft->GetType() == svString || pLeft->GetType() == svStringName)
                             && (pRight->GetType() == svString || pRight->GetType() == svStringName)))
                     {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
                         return false;
                     }
 
@@ -4512,15 +4575,25 @@ StackVar ScInterpreter::Interpret()
                     if (!oRight)
                         oRight = tryBuildEngineScalarReferenceOperand(*pRight, eOperator);
                     if (!oLeft || !oRight)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
                         return false;
+                    }
 
                     const auto aResult
                         = serpn::evaluateBinaryScalarOperator(eOperator, *oLeft, *oRight);
                     if (aResult.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
                         return false;
+                    }
 
                     sp -= 2;
                     nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore().mnEngineSucceededCount);
 
                     if (!aResult)
                     {

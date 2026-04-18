@@ -13,6 +13,7 @@
 #include <formula/errorcodes.hxx>
 #include <formula/grammar.hxx>
 #include <formulacell.hxx>
+#include <interpre.hxx>
 #include <refupdatecontext.hxx>
 #include <rangelst.hxx>
 #include <rangenam.hxx>
@@ -293,6 +294,11 @@ struct Interp4LegacyLambdaInventory
     std::vector<std::string> maMissingDispatchLambdaNames;
 };
 
+struct Interp4EngineDispatchInventory
+{
+    std::size_t mnAttemptCaseCount = 0;
+};
+
 Interp4LegacyLambdaInventory countInterp4LegacyLambdas()
 {
     const std::filesystem::path aRepoRoot
@@ -454,6 +460,27 @@ Interp4LegacyLambdaInventory countInterp4LegacyLambdas()
         = aInventory.mnLambdaCount - aInventory.mnQuarantineCoveredLambdaCount;
     aInventory.mnQuarantineMissingDispatchLambdaCount
         = aInventory.mnDispatchLambdaCount - aInventory.mnQuarantineCoveredDispatchLambdaCount;
+    return aInventory;
+}
+
+Interp4EngineDispatchInventory countInterp4EngineDispatchAttempts()
+{
+    const std::filesystem::path aRepoRoot
+        = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
+    const std::filesystem::path aSourcePath
+        = aRepoRoot / "sc" / "source" / "core" / "tool" / "interpr4.cxx";
+
+    std::ifstream aStream(aSourcePath);
+    if (!aStream.is_open())
+        return {};
+
+    Interp4EngineDispatchInventory aInventory;
+    static const std::regex aAttemptPattern(R"(\bif\s*\(!tryPushEngineScalarBinaryOp\s*\()");
+    for (std::string aLine; std::getline(aStream, aLine);)
+    {
+        if (std::regex_search(aLine, aAttemptPattern))
+            ++aInventory.mnAttemptCaseCount;
+    }
     return aInventory;
 }
 
@@ -2380,7 +2407,9 @@ void printLiveTargetProbeSummary(const SupportedProbeRun& rRun)
 void printLiveAuthoritativeSummary(
     std::size_t nCorpusFormulaCount, const SupportedProbeRun& rRun,
     std::size_t nLegacyInterpreterSubroutineCount,
-    const Interp4LegacyLambdaInventory& rLegacyLambdaInventory)
+    const Interp4LegacyLambdaInventory& rLegacyLambdaInventory,
+    const Interp4EngineDispatchInventory& rEngineDispatchInventory,
+    const ScInterpreterDispatchRuntimeStatsSnapshot& rDispatchRuntimeStats)
 {
     const sal_uInt64 nAuthoritative = rRun.maLiveAuthoritativeStats.mnAuthoritativeCount;
     const sal_uInt64 nFallback = rRun.maLiveAuthoritativeStats.mnAuthoritativeFallbackCount;
@@ -2409,6 +2438,14 @@ void printLiveAuthoritativeSummary(
               << rLegacyLambdaInventory.mnDispatchLambdaCount << '\n';
     std::cout << "interp4_dispatch_legacy_call_count="
               << rLegacyLambdaInventory.mnDispatchCallCount << '\n';
+    std::cout << "interp4_dispatch_engine_attempt_count="
+              << rEngineDispatchInventory.mnAttemptCaseCount << '\n';
+    std::cout << "interp4_dispatch_engine_attempted_total="
+              << rDispatchRuntimeStats.mnEngineAttemptedCount << '\n';
+    std::cout << "interp4_dispatch_engine_succeeded_total="
+              << rDispatchRuntimeStats.mnEngineSucceededCount << '\n';
+    std::cout << "interp4_dispatch_engine_declined_total="
+              << rDispatchRuntimeStats.mnEngineDeclinedCount << '\n';
     std::cout << "interp4_dispatch_legacy_quarantine_covered_lambda_count="
               << rLegacyLambdaInventory.mnQuarantineCoveredLambdaCount << '\n';
     std::cout << "interp4_dispatch_legacy_quarantine_missing_lambda_count="
@@ -2438,6 +2475,24 @@ void printLiveAuthoritativeSummary(
               << fCorpusMatchRate << '\n';
     std::cout << "interpret_tail_live_authoritative_probe_match_rate="
               << fProbeMatchRate << '\n';
+    const double fEngineSuccessRate = rDispatchRuntimeStats.mnEngineAttemptedCount
+                                          ? (static_cast<double>(
+                                                 rDispatchRuntimeStats.mnEngineSucceededCount)
+                                             * 100.0
+                                             / static_cast<double>(
+                                                 rDispatchRuntimeStats.mnEngineAttemptedCount))
+                                          : 0.0;
+    const double fEngineDeclineRate = rDispatchRuntimeStats.mnEngineAttemptedCount
+                                          ? (static_cast<double>(
+                                                 rDispatchRuntimeStats.mnEngineDeclinedCount)
+                                             * 100.0
+                                             / static_cast<double>(
+                                                 rDispatchRuntimeStats.mnEngineAttemptedCount))
+                                          : 0.0;
+    std::cout << "interp4_dispatch_engine_success_rate="
+              << fEngineSuccessRate << '\n';
+    std::cout << "interp4_dispatch_engine_decline_rate="
+              << fEngineDeclineRate << '\n';
     std::cout.flags(aOldFlags);
     std::cout.precision(nOldPrecision);
 
@@ -4726,6 +4781,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     resetProbeDiagnosticSamples();
     resetReplayEligibilityDiagnosticSamples();
     spreadsheetengine::core::datetime::resetWorkdayRuntimeStats();
+    resetScInterpreterDispatchRuntimeStats();
 
     std::size_t nWorkbookCount = 0;
     std::size_t nFormulaCellCount = 0;
@@ -4964,6 +5020,10 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         aLegacyLambdaInventory.mnLambdaCount > 0);
     CPPUNIT_ASSERT_EQUAL(std::size_t(0),
         aLegacyLambdaInventory.mnQuarantineMissingDispatchLambdaCount);
+    const auto aEngineDispatchInventory = countInterp4EngineDispatchAttempts();
+    CPPUNIT_ASSERT_MESSAGE("interp4 engine attempt metric should scan interpr4.cxx",
+        aEngineDispatchInventory.mnAttemptCaseCount > 0);
+    const auto aDispatchRuntimeStats = getScInterpreterDispatchRuntimeStatsSnapshot();
     {
         SupportedProbeRun aPrintedProbeRun;
         aPrintedProbeRun.mnRawFormulaCount = nProbeFormulaCount;
@@ -4975,7 +5035,7 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         aPrintedProbeRun.maHostTruthArtifactFunctionCount = aProbeHostTruthArtifactFunctionCount;
         printLiveAuthoritativeSummary(
             nFormulaCellCount, aPrintedProbeRun, nLegacyInterpreterSubroutineCount,
-            aLegacyLambdaInventory);
+            aLegacyLambdaInventory, aEngineDispatchInventory, aDispatchRuntimeStats);
         printLiveTargetProbeSummary(aPrintedProbeRun);
     }
     printReplayEligibilityInventory(aReplayEligibilityInventory);
