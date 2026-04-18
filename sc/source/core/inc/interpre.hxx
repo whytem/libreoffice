@@ -49,6 +49,11 @@
 
 namespace sfx2 { class LinkManager; }
 
+namespace spreadsheetengine::compat::libreoffice::interpretercompatdispatch
+{
+struct Dispatcher;
+}
+
 class ScDocument;
 class SbxVariable;
 class ScFormulaCell;
@@ -160,6 +165,7 @@ class ScInterpreter
     friend class ScFDistFunction;
     friend class ScChiDistFunction;
     friend class ScChiSqDistFunction;
+    friend struct spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher;
 
 public:
     static void SetGlobalConfig(const ScCalcConfig& rConfig);
