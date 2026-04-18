@@ -6,6 +6,7 @@
 
 #include <spreadsheetengine/api/MatrixFrame.hxx>
 #include <spreadsheetengine/detail/ExecutionContext.hxx>
+#include <spreadsheetengine/runtime/RpnValue.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 
 #include "TestSupport.hxx"
@@ -43,6 +44,7 @@ int main()
 {
     using spreadsheetengine::api::CellValue;
     using spreadsheetengine::api::Error;
+    using spreadsheetengine::api::ResolvedReference;
     using spreadsheetengine::api::matrixframe::allowsReferenceListParameter;
     using spreadsheetengine::api::matrixframe::ParamKind;
     using spreadsheetengine::api::matrixframe::shouldConvertDoubleRefParameter;
@@ -57,6 +59,10 @@ int main()
     using spreadsheetengine::core::coercion::normalizeNonNegativeLengthArgument;
     using spreadsheetengine::core::coercion::normalizeOneBasedStringPositionArgument;
     using spreadsheetengine::core::coercion::normalizeStringPositionArgument;
+    using spreadsheetengine::core::rpn::RpnCoercionReadiness;
+    using spreadsheetengine::core::rpn::RpnValue;
+    using spreadsheetengine::core::rpn::classifyBinaryScalarOperatorReadiness;
+    using spreadsheetengine::core::rpn::classifyUnaryScalarOperatorReadiness;
     using spreadsheetengine::standalone::test::fail;
 
     const auto aNumericText = coerceToNumber(CellValue::text(u"12.5"));
@@ -82,6 +88,33 @@ int main()
         || aInvalidOneBased.meError != Error::IllegalArgument)
     {
         return fail("spreadsheetengine_execution_tests", "scalar coercion helper mismatch");
+    }
+
+    const auto aRpnNumericText = spreadsheetengine::core::rpn::coerceToNumber(RpnValue::text(u"12.5"));
+    const auto aRpnBooleanString
+        = spreadsheetengine::core::rpn::coerceToString(RpnValue::boolean(true));
+    const auto aRpnError = spreadsheetengine::core::rpn::coerceToNumber(
+        RpnValue::error(Error::DivisionByZero));
+    const auto aReferenceReadiness = classifyUnaryScalarOperatorReadiness(
+        RpnValue::reference(ResolvedReference { { { 0, 1, 2 }, { 0, 1, 2 } } }));
+    const auto aDeferredBoolean = spreadsheetengine::core::rpn::coerceToBoolean(
+        RpnValue::reference(ResolvedReference { { { 0, 2, 3 }, { 0, 2, 3 } } }));
+    const auto aMatrixReadiness = classifyBinaryScalarOperatorReadiness(
+        RpnValue::matrix({ 2, 3 }), RpnValue::number(9.0));
+    const auto aMixedReferenceReadiness = classifyBinaryScalarOperatorReadiness(
+        RpnValue::number(1.0),
+        RpnValue::reference(ResolvedReference { { { 0, 4, 5 }, { 0, 4, 5 } } }));
+
+    if (!aRpnNumericText || aRpnNumericText.maValue != 12.5 || !aRpnBooleanString
+        || aRpnBooleanString.maValue != u"TRUE" || aRpnError
+        || aRpnError.meError != Error::DivisionByZero
+        || aReferenceReadiness != RpnCoercionReadiness::NeedsReferenceResolution
+        || aDeferredBoolean
+        || aDeferredBoolean.meReadiness != RpnCoercionReadiness::NeedsReferenceResolution
+        || aMatrixReadiness != RpnCoercionReadiness::NeedsMatrixMaterialization
+        || aMixedReferenceReadiness != RpnCoercionReadiness::NeedsReferenceResolution)
+    {
+        return fail("spreadsheetengine_execution_tests", "rpn value coercion contract mismatch");
     }
 
     if (!shouldConvertJumpConditionToMatrix(StackKind::DoubleRef, StackKind::Other)

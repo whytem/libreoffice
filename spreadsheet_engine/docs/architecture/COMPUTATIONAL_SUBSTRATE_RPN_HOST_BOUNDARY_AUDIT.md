@@ -176,6 +176,11 @@ Immediate implication:
 
 - the next meaningful engine step is a typed operator subsystem, not another
   sequence of leaf-function migrations
+- the initial contract now exists as:
+  - `RpnValueKind::{Empty, Number, Boolean, String, Error, Reference, Matrix}`
+  - `RpnCoercionReadiness::{Ready, NeedsReferenceResolution, NeedsMatrixMaterialization}`
+  - unary/binary scalar operator readiness classifiers that can refuse
+    reference and matrix operands explicitly
 
 ## Category 6: Matrix Frame And Spill State
 
@@ -285,6 +290,8 @@ Immediate implication:
 
 - the engine needs its own stack-value model and evaluator state object before
   the remaining operator and control-flow migration can be honest
+- the first piece of that stack model is now landed in `RpnValue.hxx`, but the
+  evaluator state object itself is still outstanding
 
 ## Remaining `pushLegacy*` Surface By Cluster
 

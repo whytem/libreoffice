@@ -22,6 +22,8 @@
 #include <cstdint>
 using sal_Int32  = std::int32_t;
 using sal_uInt32 = std::uint32_t;
+using sal_Int64  = std::int64_t;
+using sal_uInt64 = std::uint64_t;
 #define SAL_DLLPUBLIC_EXPORT
 #define SAL_DLLPUBLIC_IMPORT
 #endif

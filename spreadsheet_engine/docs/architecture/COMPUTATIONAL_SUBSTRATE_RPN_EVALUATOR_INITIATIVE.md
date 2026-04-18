@@ -106,6 +106,19 @@ Introduce an engine-native tagged value model for:
 This replaces implicit `PushDouble()` / `PopType()`-style control with typed
 operations and explicit coercion rules.
 
+Checkpoint:
+
+- the initial substrate now exists in
+  `spreadsheetengine/runtime/RpnValue.hxx`
+- the first contract is intentionally narrow:
+  - scalar kinds are fully modeled
+  - reference and matrix operands are explicit value kinds
+  - typed coercion returns `NeedsReferenceResolution` or
+    `NeedsMatrixMaterialization` instead of silently pretending those cases are
+    scalar-ready
+- no opcode routes through this layer yet; it is a prerequisite slice for the
+  later operator migration, not a stealth dispatch change
+
 ### 3. Engine Operator Dispatch
 
 Admit the hot operator opcodes into the engine:
