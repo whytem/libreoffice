@@ -38,8 +38,8 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_match_total=50350`
 - `interpret_tail_live_authoritative_fallback_total=4`
 - `legacy_interpreter_subroutine_count=100`
-- `interp4_dispatch_legacy_lambda_count=192`
-- `interp4_dispatch_legacy_dispatch_target_count=191`
+- `interp4_dispatch_legacy_lambda_count=157`
+- `interp4_dispatch_legacy_dispatch_target_count=156`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
 - live authoritative-match rate over the corpus: `99.3861%`
 - live authoritative-match rate over the current promoted probe: `99.9960%`
@@ -54,7 +54,7 @@ If the wrapper count falls while the lambda count stays flat or rises, we are
 relocating Calc logic rather than moving authority into the standalone engine.
 The current value reflects the restored original `Sc*` names after backing out
 earlier rename-only metric compression, and the quarantine audit currently
-shows `191 / 191` dispatch-reachable legacy lambdas warning when reached.
+shows `156 / 156` dispatch-reachable legacy lambdas warning when reached.
 
 Everything below is diagnostic context for improving that number.
 
@@ -322,9 +322,10 @@ Still not true:
   latest genuine text-utility retirement push that removes the dedicated
   `SEARCH`, `REGEX`, `TEXTJOIN`, `BAHTTEXT`, the `*B` byte-text wrappers, and
   `ENCODEURL` wrappers after the earlier financial-scalar relocation, bringing
-  the blunt legacy wrapper metric down to `100`; the new relocated-legacy
-  companion metric now shows `192` `pushLegacy*` lambdas still present in
-  `Interpret()`, with `191` reachable from opcode dispatch
+  the blunt legacy wrapper metric down to `100`; the latest compat-heavy
+  statistical relocation push cuts the relocated-legacy companion metric to
+  `157` `pushLegacy*` lambdas in `Interpret()`, with `156` still reachable
+  from opcode dispatch
 - the raw promoted replay probe remains a diagnostic surface rather than the
   retirement denominator; the live-authoritative probe now sits at
   `50350 / 50354`, with only `4` live-authoritative fallback rows left on the
