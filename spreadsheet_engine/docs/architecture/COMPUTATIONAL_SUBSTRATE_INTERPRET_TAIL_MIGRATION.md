@@ -266,9 +266,11 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
-- `interp4_dispatch_engine_attempted_total_seam_disabled=0`
-- `interp4_dispatch_engine_succeeded_total_seam_disabled=0`
-- `interp4_dispatch_engine_declined_total_seam_disabled=0`
+- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=0`
+- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=0`
+- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=0`
+- `sc_formula_executor_classic_interpret_total_live=0`
+- `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=602`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
 - live authoritative-match rate over the corpus: `99.3940%`
 - live authoritative-match rate over the current promoted probe: `99.9921%`
@@ -292,9 +294,11 @@ wrapper-count-only cleanup. `interp4_dispatch_engine_attempt_count` now tracks
 the new operator pilot cases that try the standalone engine first from
 `Interpret()`, and the paired runtime totals show whether replay traffic is
 actually using them. On the standing corpus those runtime counters are still
-`0 / 0 / 0`, and the new seam-disabled replay lane is also still `0 / 0 / 0`,
-so the next operator slice should be judged by moving those runtime numbers,
-not just by growing the static case count.
+`0 / 0 / 0`, and the new core-forced full-legacy replay lane also still shows
+`0 / 0 / 0` for operator attempts even though it now reaches classic
+`ScInterpreter::Interpret()` `602` times. So the next operator slice should be
+judged by moving those runtime numbers inside the residual classic tail, not
+just by growing the static case count.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 

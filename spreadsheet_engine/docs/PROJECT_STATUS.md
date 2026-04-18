@@ -47,9 +47,19 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
-- `interp4_dispatch_engine_attempted_total_seam_disabled=0`
-- `interp4_dispatch_engine_succeeded_total_seam_disabled=0`
-- `interp4_dispatch_engine_declined_total_seam_disabled=0`
+- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=0`
+- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=0`
+- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=0`
+- `sc_formula_executor_formula_cell_interpret_total_live=2446901`
+- `sc_formula_executor_formula_group_attempt_total_live=1220544`
+- `sc_formula_executor_formula_group_handled_total_live=105`
+- `sc_formula_executor_interpret_tail_total_live=2442428`
+- `sc_formula_executor_classic_interpret_total_live=0`
+- `sc_formula_executor_formula_cell_interpret_total_core_forced_full_legacy=105004`
+- `sc_formula_executor_formula_group_attempt_total_core_forced_full_legacy=75516`
+- `sc_formula_executor_formula_group_handled_total_core_forced_full_legacy=0`
+- `sc_formula_executor_interpret_tail_total_core_forced_full_legacy=90144`
+- `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=602`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
 - live authoritative-match rate over the corpus: `99.3940%`
 - live authoritative-match rate over the current promoted probe: `99.9921%`
@@ -66,11 +76,12 @@ relocating Calc logic rather than moving authority into the standalone engine.
 first real engine-opcode pilot: it counts `Interpret()` dispatch cases that now
 try the standalone engine first before falling back to Calc. The paired runtime
 totals show whether that path is actually carrying replay load. On the current
-standing corpus those totals are still `0 / 0 / 0`, and the new
-seam-disabled replay lane is also still `0 / 0 / 0`. That is an important
-result in itself: the operator pilot is landed, but neither the normal replay
-path nor the current seam-disabled replay pass is yet carrying broad corpus
-load through those engine-first dispatch cases.
+standing corpus those totals are still `0 / 0 / 0`, and the new core-forced
+full-legacy replay lane also reports `0 / 0 / 0` for the operator pilot even
+though it now reaches classic `ScInterpreter::Interpret()` `602` times. That is
+the important new result: the operator pilot is landed, the audit lane is real,
+and the next bottleneck is not seam bypass anymore. The remaining classic tail
+simply is not hitting the operator opcodes we instrumented yet.
 The current value reflects the restored original `Sc*` names after backing out
 earlier rename-only metric compression, and the quarantine audit currently
 shows `62 / 62` dispatch-reachable legacy lambdas warning when reached. This
@@ -104,7 +115,7 @@ Immediate consequence:
 - the next honest migration metric is reduction in
   `interp4_dispatch_legacy_lambda_count`
 - `interp4_dispatch_engine_attempt_count` is now a companion, not a success
-  metric by itself; it must be read alongside the live and seam-disabled
+  metric by itself; it must be read alongside the live and full-legacy
   runtime totals
 - no new `pushLegacy*` lambdas should be treated as progress unless they are
   temporary compatibility fallbacks for already engine-owned roots

@@ -113,9 +113,11 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
-- `interp4_dispatch_engine_attempted_total_seam_disabled=0`
-- `interp4_dispatch_engine_succeeded_total_seam_disabled=0`
-- `interp4_dispatch_engine_declined_total_seam_disabled=0`
+- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=0`
+- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=0`
+- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=0`
+- `sc_formula_executor_classic_interpret_total_live=0`
+- `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=602`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
 - live authoritative-match rate over the corpus: `99.3940%`
 - live authoritative-match rate over the current promoted probe: `99.9921%`
@@ -140,10 +142,12 @@ wrapper-count-only cleanup. `interp4_dispatch_engine_attempt_count` is the
 static companion for the first engine-opcode pilot: it counts dispatch cases in
 `Interpret()` that now try the standalone engine first. The runtime totals tell
 us whether replay traffic is actually using that path. Today they are still
-`0 / 0 / 0` on the standing corpus, and the new seam-disabled replay lane is
-also still `0 / 0 / 0`, so the measurement is already doing useful work by
-showing that the operator pilot has landed structurally without yet carrying
-broad replay load.
+`0 / 0 / 0` on the standing corpus, and the new core-forced full-legacy replay
+lane also reports `0 / 0 / 0` for operator attempts even though it now reaches
+classic `ScInterpreter::Interpret()` `602` times. So the measurement is already
+doing useful work: the operator pilot is structurally landed, the audit lane is
+real, and the next gap is that the residual classic tail is not yet hitting the
+instrumented operator opcodes.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 
