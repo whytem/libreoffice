@@ -4763,6 +4763,805 @@ StackVar ScInterpreter::Interpret()
                     }
                     PushDouble(aResult.maValue);
                 };
+                const auto pushLegacyBetaDist = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"BETADIST");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 3, 6))
+                        return;
+                    bool bIsCumulative = nParamCount == 6 ? GetBool() : true;
+                    double fUpperBound = nParamCount >= 5 ? GetDouble() : 1.0;
+                    double fLowerBound = nParamCount >= 4 ? GetDouble() : 0.0;
+                    double fBeta = GetDouble();
+                    double fAlpha = GetDouble();
+                    double fX = GetDouble();
+                    const auto aResult = semath::evaluateBetaDistribution(
+                        fX, fAlpha, fBeta, fLowerBound, fUpperBound, bIsCumulative, false);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyBinomDistMs = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"BINOM.DIST");
+                    if (!MustHaveParamCount(GetByte(), 4))
+                        return;
+                    bool bIsCumulative = GetBool();
+                    double fP = GetDouble();
+                    double fN = GetDouble();
+                    double fX = GetDouble();
+                    const auto aResult
+                        = semath::evaluateBinomialDistribution(fX, fN, fP, bIsCumulative);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyPoissonDist = [&](bool bODFF) {
+                    warnIfLegacyStatisticalDistributionReached(
+                        bODFF ? u"POISSON" : u"POISSON.DIST");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, bODFF ? 2 : 3, 3))
+                        return;
+                    bool bCumulative = nParamCount != 3 || GetBool();
+                    double fLambda = GetDouble();
+                    double fX = GetDouble();
+                    const auto aResult
+                        = semath::evaluatePoissonDistribution(fX, fLambda, bCumulative);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyNormInv = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"NORMINV");
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+                    double fSigma = GetDouble();
+                    double fMean = GetDouble();
+                    double fX = GetDouble();
+                    const auto aResult = semath::evaluateNormalInverse(fX, fMean, fSigma);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyConfidence = [&](bool bStudent) {
+                    warnIfLegacyStatisticalDistributionReached(
+                        bStudent ? u"CONFIDENCE.T" : u"CONFIDENCE");
+                    if (!MustHaveParamCount(GetByte(), 3))
+                        return;
+                    double fN = ::rtl::math::approxFloor(GetDouble());
+                    double fSigma = GetDouble();
+                    double fAlpha = GetDouble();
+                    const auto aResult = bStudent
+                                             ? semath::evaluateConfidenceT(fAlpha, fSigma, fN)
+                                             : semath::evaluateConfidence(fAlpha, fSigma, fN);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyKurt = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"KURT");
+                    KahanSum fSum;
+                    double fCount = 0.0;
+                    std::vector<double> aValues;
+                    if (!CalculateSkew(fSum, fCount, aValues))
+                        return;
+                    const auto aResult = semath::evaluateKurtosisNumbers(aValues);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyHarMean = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"HARMEAN");
+                    short nParamCount = GetByte();
+                    std::vector<double> aValues;
+                    ScAddress aAdr;
+                    ScRange aRange;
+                    size_t nRefInList = 0;
+                    while ((nGlobalError == FormulaError::NONE) && (nParamCount-- > 0))
+                    {
+                        switch (GetStackType())
+                        {
+                            case svDouble:
+                            {
+                                double x = GetDouble();
+                                if (x > 0.0)
+                                    aValues.push_back(x);
+                                else
+                                    SetError(FormulaError::IllegalArgument);
+                                break;
+                            }
+                            case svSingleRef:
+                            {
+                                PopSingleRef(aAdr);
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                if (aCell.hasNumeric())
+                                {
+                                    double x = GetCellValue(aAdr, aCell);
+                                    if (x > 0.0)
+                                        aValues.push_back(x);
+                                    else
+                                        SetError(FormulaError::IllegalArgument);
+                                }
+                                break;
+                            }
+                            case svDoubleRef:
+                            case svRefList:
+                            {
+                                FormulaError nErr = FormulaError::NONE;
+                                PopDoubleRef(aRange, nParamCount, nRefInList);
+                                double nCellVal;
+                                ScValueIterator aValIter(mrContext, aRange, mnSubTotalFlags);
+                                if (aValIter.GetFirst(nCellVal, nErr))
+                                {
+                                    if (nCellVal > 0.0)
+                                        aValues.push_back(nCellVal);
+                                    else
+                                        SetError(FormulaError::IllegalArgument);
+                                    SetError(nErr);
+                                    while ((nErr == FormulaError::NONE)
+                                           && aValIter.GetNext(nCellVal, nErr))
+                                    {
+                                        if (nCellVal > 0.0)
+                                            aValues.push_back(nCellVal);
+                                        else
+                                            SetError(FormulaError::IllegalArgument);
+                                    }
+                                    SetError(nErr);
+                                }
+                                break;
+                            }
+                            case svMatrix:
+                            case svExternalSingleRef:
+                            case svExternalDoubleRef:
+                            {
+                                ScMatrixRef pMat = GetMatrix();
+                                if (pMat)
+                                {
+                                    SCSIZE nCount = pMat->GetElementCount();
+                                    if (pMat->IsNumeric())
+                                    {
+                                        for (SCSIZE nElem = 0; nElem < nCount; nElem++)
+                                        {
+                                            double x = pMat->GetDouble(nElem);
+                                            if (x > 0.0)
+                                                aValues.push_back(x);
+                                            else
+                                                SetError(FormulaError::IllegalArgument);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        for (SCSIZE nElem = 0; nElem < nCount; nElem++)
+                                        {
+                                            if (!pMat->IsStringOrEmpty(nElem))
+                                            {
+                                                double x = pMat->GetDouble(nElem);
+                                                if (x > 0.0)
+                                                    aValues.push_back(x);
+                                                else
+                                                    SetError(FormulaError::IllegalArgument);
+                                            }
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                            default:
+                                SetError(FormulaError::IllegalParameter);
+                                break;
+                        }
+                    }
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushError(nGlobalError);
+                        return;
+                    }
+                    const auto aResult = semath::evaluateHarmonicMeanNumbers(aValues);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyGeoMean = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"GEOMEAN");
+                    short nParamCount = GetByte();
+                    std::vector<double> aValues;
+                    ScAddress aAdr;
+                    ScRange aRange;
+                    size_t nRefInList = 0;
+                    while ((nGlobalError == FormulaError::NONE) && (nParamCount-- > 0))
+                    {
+                        switch (GetStackType())
+                        {
+                            case svDouble:
+                            {
+                                double x = GetDouble();
+                                if (x > 0.0)
+                                    aValues.push_back(x);
+                                else if (x == 0.0)
+                                {
+                                    while (nParamCount-- > 0)
+                                        PopError();
+                                    PushDouble(0.0);
+                                    return;
+                                }
+                                else
+                                    SetError(FormulaError::IllegalArgument);
+                                break;
+                            }
+                            case svSingleRef:
+                            {
+                                PopSingleRef(aAdr);
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                if (aCell.hasNumeric())
+                                {
+                                    double x = GetCellValue(aAdr, aCell);
+                                    if (x > 0.0)
+                                        aValues.push_back(x);
+                                    else if (x == 0.0)
+                                    {
+                                        while (nParamCount-- > 0)
+                                            PopError();
+                                        PushDouble(0.0);
+                                        return;
+                                    }
+                                    else
+                                        SetError(FormulaError::IllegalArgument);
+                                }
+                                break;
+                            }
+                            case svDoubleRef:
+                            case svRefList:
+                            {
+                                FormulaError nErr = FormulaError::NONE;
+                                PopDoubleRef(aRange, nParamCount, nRefInList);
+                                double nCellVal;
+                                ScValueIterator aValIter(mrContext, aRange, mnSubTotalFlags);
+                                if (aValIter.GetFirst(nCellVal, nErr))
+                                {
+                                    if (nCellVal > 0.0)
+                                        aValues.push_back(nCellVal);
+                                    else if (nCellVal == 0.0)
+                                    {
+                                        while (nParamCount-- > 0)
+                                            PopError();
+                                        PushDouble(0.0);
+                                        return;
+                                    }
+                                    else
+                                        SetError(FormulaError::IllegalArgument);
+                                    SetError(nErr);
+                                    while ((nErr == FormulaError::NONE)
+                                           && aValIter.GetNext(nCellVal, nErr))
+                                    {
+                                        if (nCellVal > 0.0)
+                                            aValues.push_back(nCellVal);
+                                        else if (nCellVal == 0.0)
+                                        {
+                                            while (nParamCount-- > 0)
+                                                PopError();
+                                            PushDouble(0.0);
+                                            return;
+                                        }
+                                        else
+                                            SetError(FormulaError::IllegalArgument);
+                                    }
+                                    SetError(nErr);
+                                }
+                                break;
+                            }
+                            case svMatrix:
+                            case svExternalSingleRef:
+                            case svExternalDoubleRef:
+                            {
+                                ScMatrixRef pMat = GetMatrix();
+                                if (pMat)
+                                {
+                                    SCSIZE nCount = pMat->GetElementCount();
+                                    if (pMat->IsNumeric())
+                                    {
+                                        for (SCSIZE ui = 0; ui < nCount; ui++)
+                                        {
+                                            double x = pMat->GetDouble(ui);
+                                            if (x > 0.0)
+                                                aValues.push_back(x);
+                                            else if (x == 0.0)
+                                            {
+                                                while (nParamCount-- > 0)
+                                                    PopError();
+                                                PushDouble(0.0);
+                                                return;
+                                            }
+                                            else
+                                                SetError(FormulaError::IllegalArgument);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        for (SCSIZE ui = 0; ui < nCount; ui++)
+                                        {
+                                            if (!pMat->IsStringOrEmpty(ui))
+                                            {
+                                                double x = pMat->GetDouble(ui);
+                                                if (x > 0.0)
+                                                    aValues.push_back(x);
+                                                else if (x == 0.0)
+                                                {
+                                                    while (nParamCount-- > 0)
+                                                        PopError();
+                                                    PushDouble(0.0);
+                                                    return;
+                                                }
+                                                else
+                                                    SetError(FormulaError::IllegalArgument);
+                                            }
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                            default:
+                                SetError(FormulaError::IllegalParameter);
+                                break;
+                        }
+                    }
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushError(nGlobalError);
+                        return;
+                    }
+                    const auto aResult = semath::evaluateGeometricMeanNumbers(aValues);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacySkew = [&](bool bPopulation) {
+                    warnIfLegacyStatisticalDistributionReached(bPopulation ? u"SKEWP" : u"SKEW");
+                    KahanSum fSum;
+                    double fCount = 0.0;
+                    std::vector<double> aValues;
+                    if (!CalculateSkew(fSum, fCount, aValues))
+                        return;
+                    const auto aResult = semath::evaluateSkewNumbers(aValues, bPopulation);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyMedian = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"MEDIAN");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCountMin(nParamCount, 1))
+                        return;
+                    std::vector<double> aArray;
+                    GetNumberSequenceArray(nParamCount, aArray, false);
+                    if (aArray.empty() || nGlobalError != FormulaError::NONE)
+                    {
+                        PushNoValue();
+                        return;
+                    }
+                    semath::AggregateScan aScan;
+                    aScan.maNumbers = std::move(aArray);
+                    const auto aResult = semath::evaluateAggregateNumbers(12, aScan);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyMode = [&](bool bSingle) {
+                    warnIfLegacyStatisticalDistributionReached(
+                        bSingle ? u"MODE.SNGL" : u"MODE.MULT");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCountMin(nParamCount, 1))
+                        return;
+                    std::vector<double> aArray;
+                    GetNumberSequenceArray(nParamCount, aArray, false);
+                    if (aArray.empty() || nGlobalError != FormulaError::NONE)
+                    {
+                        PushNoValue();
+                        return;
+                    }
+                    const auto aModes = semath::evaluateModeValues(aArray);
+                    if (!aModes)
+                    {
+                        PushError(toCalcMathFormulaError(aModes.meError));
+                        return;
+                    }
+                    if (bSingle)
+                        PushDouble(aModes.maValue.front());
+                    else
+                    {
+                        ScMatrixRef pResMatrix = GetNewMat(1, aModes.maValue.size(), true);
+                        pResMatrix->PutDoubleVector(aModes.maValue, 0, 0);
+                        PushMatrix(pResMatrix);
+                    }
+                };
+                const auto pushLegacyPercentile = [&](bool bInclusive) {
+                    warnIfLegacyStatisticalDistributionReached(
+                        bInclusive ? u"PERCENTILE.INC" : u"PERCENTILE.EXC");
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+                    double fAlpha = GetDouble();
+                    if (bInclusive ? (fAlpha < 0.0 || fAlpha > 1.0)
+                                   : (fAlpha <= 0.0 || fAlpha >= 1.0))
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    std::vector<double> aArray;
+                    GetNumberSequenceArray(1, aArray, false);
+                    if (aArray.empty() || nGlobalError != FormulaError::NONE)
+                    {
+                        PushNoValue();
+                        return;
+                    }
+                    semath::AggregateScan aScan;
+                    aScan.maNumbers = std::move(aArray);
+                    const auto aResult = semath::evaluateAggregateRankedNumbers(
+                        bInclusive ? 16 : 18, aScan, fAlpha);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyQuartile = [&](bool bInclusive) {
+                    warnIfLegacyStatisticalDistributionReached(
+                        bInclusive ? u"QUARTILE.INC" : u"QUARTILE.EXC");
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+                    double fFlag = ::rtl::math::approxFloor(GetDouble());
+                    if (bInclusive ? (fFlag < 0.0 || fFlag > 4.0)
+                                   : (fFlag <= 0.0 || fFlag >= 4.0))
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    std::vector<double> aArray;
+                    GetNumberSequenceArray(1, aArray, false);
+                    if (aArray.empty() || nGlobalError != FormulaError::NONE)
+                    {
+                        PushNoValue();
+                        return;
+                    }
+                    semath::AggregateScan aScan;
+                    aScan.maNumbers = std::move(aArray);
+                    const auto aResult = semath::evaluateAggregateRankedNumbers(
+                        bInclusive ? 17 : 19, aScan, fFlag);
+                    if (!aResult)
+                    {
+                        PushError(toCalcMathFormulaError(aResult.meError));
+                        return;
+                    }
+                    PushDouble(aResult.maValue);
+                };
+                const auto pushLegacyPercentrank = [&](bool bInclusive) {
+                    warnIfLegacyStatisticalDistributionReached(
+                        bInclusive ? u"PERCENTRANK.INC" : u"PERCENTRANK.EXC");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 2, 3))
+                        return;
+                    double fSignificance
+                        = (nParamCount == 3 ? ::rtl::math::approxFloor(GetDouble()) : 3.0);
+                    if (fSignificance < 1.0)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    double fNum = GetDouble();
+                    std::vector<double> aSortArray;
+                    GetSortArray(1, aSortArray, nullptr, false, false);
+                    SCSIZE nSize = aSortArray.size();
+                    if (nSize == 0 || nGlobalError != FormulaError::NONE)
+                    {
+                        PushNoValue();
+                        return;
+                    }
+                    if (fNum < aSortArray[0] || fNum > aSortArray[nSize - 1])
+                    {
+                        PushNoValue();
+                        return;
+                    }
+                    double fRes = nSize == 1 ? 1.0 : GetPercentrank(aSortArray, fNum, bInclusive);
+                    if (fRes != 0.0)
+                    {
+                        double fExp = ::rtl::math::approxFloor(log10(fRes)) + 1.0 - fSignificance;
+                        fRes = ::rtl::math::round(fRes * pow(10, -fExp)) / pow(10, -fExp);
+                    }
+                    PushDouble(fRes);
+                };
+                const auto pushLegacyTrimMean = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"TRIMMEAN");
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+                    double fAlpha = GetDouble();
+                    if (fAlpha < 0.0 || fAlpha >= 1.0)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    std::vector<double> aSortArray;
+                    GetSortArray(1, aSortArray, nullptr, false, false);
+                    SCSIZE nSize = aSortArray.size();
+                    if (nSize == 0 || nGlobalError != FormulaError::NONE)
+                    {
+                        PushNoValue();
+                        return;
+                    }
+                    sal_uLong nIndex = static_cast<sal_uLong>(
+                        ::rtl::math::approxFloor(fAlpha * static_cast<double>(nSize)));
+                    if (nIndex % 2 != 0)
+                        nIndex--;
+                    nIndex /= 2;
+                    KahanSum fSum = 0.0;
+                    for (SCSIZE i = nIndex; i < nSize - nIndex; i++)
+                        fSum += aSortArray[i];
+                    PushDouble(fSum.get() / static_cast<double>(nSize - 2 * nIndex));
+                };
+                const auto pushLegacyRank = [&](bool bAverage) {
+                    warnIfLegacyStatisticalDistributionReached(
+                        bAverage ? u"RANK.AVG" : u"RANK.EQ");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCount(nParamCount, 2, 3))
+                        return;
+                    bool bAscending = nParamCount == 3 && GetBool();
+                    std::vector<double> aSortArray;
+                    GetSortArray(1, aSortArray, nullptr, false, false);
+                    double fVal = GetDouble();
+                    SCSIZE nSize = aSortArray.size();
+                    if (nSize == 0 || nGlobalError != FormulaError::NONE)
+                    {
+                        PushNoValue();
+                        return;
+                    }
+                    if (fVal < aSortArray[0] || fVal > aSortArray[nSize - 1])
+                    {
+                        PushError(FormulaError::NotAvailable);
+                        return;
+                    }
+                    double fLastPos = 0.0;
+                    double fFirstPos = -1.0;
+                    bool bFinished = false;
+                    SCSIZE i = 0;
+                    for (; i < nSize && !bFinished; i++)
+                    {
+                        if (aSortArray[i] == fVal)
+                        {
+                            if (fFirstPos < 0.0)
+                                fFirstPos = i + 1.0;
+                        }
+                        else if (aSortArray[i] > fVal)
+                        {
+                            fLastPos = i;
+                            bFinished = true;
+                        }
+                    }
+                    if (!bFinished)
+                        fLastPos = i;
+                    if (fFirstPos <= 0.0)
+                    {
+                        PushError(FormulaError::NotAvailable);
+                    }
+                    else if (!bAverage)
+                    {
+                        PushDouble(bAscending ? fFirstPos : nSize + 1.0 - fLastPos);
+                    }
+                    else
+                    {
+                        const double fAverage = (fFirstPos + fLastPos) / 2.0;
+                        PushDouble(bAscending ? fAverage : nSize + 1.0 - fAverage);
+                    }
+                };
+                const auto pushLegacyAveDev = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"AVEDEV");
+                    sal_uInt8 nParamCount = GetByte();
+                    if (!MustHaveParamCountMin(nParamCount, 1))
+                        return;
+                    sal_uInt16 nSaveSP = sp;
+                    double fMiddle = 0.0;
+                    KahanSum fValue = 0.0;
+                    double fValueCount = 0.0;
+                    ScAddress aAdr;
+                    ScRange aRange;
+                    short nParam = nParamCount;
+                    size_t nRefInList = 0;
+                    while (nParam-- > 0)
+                    {
+                        switch (GetStackType())
+                        {
+                            case svDouble:
+                                fValue += GetDouble();
+                                fValueCount++;
+                                break;
+                            case svSingleRef:
+                            {
+                                PopSingleRef(aAdr);
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                if (aCell.hasNumeric())
+                                {
+                                    fValue += GetCellValue(aAdr, aCell);
+                                    fValueCount++;
+                                }
+                                break;
+                            }
+                            case svDoubleRef:
+                            case svRefList:
+                            {
+                                FormulaError nErr = FormulaError::NONE;
+                                double nCellVal;
+                                PopDoubleRef(aRange, nParam, nRefInList);
+                                ScValueIterator aValIter(mrContext, aRange, mnSubTotalFlags);
+                                if (aValIter.GetFirst(nCellVal, nErr))
+                                {
+                                    fValue += nCellVal;
+                                    fValueCount++;
+                                    SetError(nErr);
+                                    while ((nErr == FormulaError::NONE)
+                                           && aValIter.GetNext(nCellVal, nErr))
+                                    {
+                                        fValue += nCellVal;
+                                        fValueCount++;
+                                    }
+                                    SetError(nErr);
+                                }
+                                break;
+                            }
+                            case svMatrix:
+                            case svExternalSingleRef:
+                            case svExternalDoubleRef:
+                            {
+                                ScMatrixRef pMat = GetMatrix();
+                                if (pMat)
+                                {
+                                    SCSIZE nCount = pMat->GetElementCount();
+                                    if (pMat->IsNumeric())
+                                    {
+                                        for (SCSIZE nElem = 0; nElem < nCount; nElem++)
+                                        {
+                                            fValue += pMat->GetDouble(nElem);
+                                            fValueCount++;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        for (SCSIZE nElem = 0; nElem < nCount; nElem++)
+                                        {
+                                            if (!pMat->IsStringOrEmpty(nElem))
+                                            {
+                                                fValue += pMat->GetDouble(nElem);
+                                                fValueCount++;
+                                            }
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                            default:
+                                SetError(FormulaError::IllegalParameter);
+                                break;
+                        }
+                    }
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushError(nGlobalError);
+                        return;
+                    }
+                    fMiddle = fValue.get() / fValueCount;
+                    sp = nSaveSP;
+                    fValue = 0.0;
+                    nParam = nParamCount;
+                    nRefInList = 0;
+                    while (nParam-- > 0)
+                    {
+                        switch (GetStackType())
+                        {
+                            case svDouble:
+                                fValue += std::abs(GetDouble() - fMiddle);
+                                break;
+                            case svSingleRef:
+                            {
+                                PopSingleRef(aAdr);
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                if (aCell.hasNumeric())
+                                    fValue += std::abs(GetCellValue(aAdr, aCell) - fMiddle);
+                                break;
+                            }
+                            case svDoubleRef:
+                            case svRefList:
+                            {
+                                FormulaError nErr = FormulaError::NONE;
+                                double nCellVal;
+                                PopDoubleRef(aRange, nParam, nRefInList);
+                                ScValueIterator aValIter(mrContext, aRange, mnSubTotalFlags);
+                                if (aValIter.GetFirst(nCellVal, nErr))
+                                {
+                                    fValue += std::abs(nCellVal - fMiddle);
+                                    while (aValIter.GetNext(nCellVal, nErr))
+                                        fValue += std::abs(nCellVal - fMiddle);
+                                }
+                                break;
+                            }
+                            case svMatrix:
+                            case svExternalSingleRef:
+                            case svExternalDoubleRef:
+                            {
+                                ScMatrixRef pMat = GetMatrix();
+                                if (pMat)
+                                {
+                                    SCSIZE nCount = pMat->GetElementCount();
+                                    if (pMat->IsNumeric())
+                                    {
+                                        for (SCSIZE nElem = 0; nElem < nCount; nElem++)
+                                            fValue += std::abs(pMat->GetDouble(nElem) - fMiddle);
+                                    }
+                                    else
+                                    {
+                                        for (SCSIZE nElem = 0; nElem < nCount; nElem++)
+                                        {
+                                            if (!pMat->IsStringOrEmpty(nElem))
+                                                fValue += std::abs(pMat->GetDouble(nElem) - fMiddle);
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                            default:
+                                SetError(FormulaError::IllegalParameter);
+                                break;
+                        }
+                    }
+                    PushDouble(fValue.get() / fValueCount);
+                };
+                const auto pushLegacyDevSq = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"DEVSQ");
+                    auto VarResult = [](double fVal, size_t) { return fVal; };
+                    GetStVarParams(false, VarResult);
+                };
+                const auto pushLegacyRSQ = [&]() {
+                    warnIfLegacyStatisticalDistributionReached(u"RSQ");
+                    CalculatePearsonCovar(true, false, false);
+                    if (nGlobalError != FormulaError::NONE)
+                        return;
+                    switch (GetStackType())
+                    {
+                        case svDouble:
+                        {
+                            double fVal = PopDouble();
+                            PushDouble(fVal * fVal);
+                            break;
+                        }
+                        default:
+                            PopError();
+                            PushNoValue();
+                            break;
+                    }
+                };
                 const auto pushLegacyRound =
                     [&](std::u16string_view rLabel, rtl_math_RoundingMode eMode) {
                         warnIfLegacyDefaultOnReached(
@@ -5944,10 +6743,10 @@ StackVar ScInterpreter::Interpret()
                             ScVarP();
                             break;
                         case AGGREGATE_FUNC_MEDIAN:
-                            ScMedian();
+                            pushLegacyMedian();
                             break;
                         case AGGREGATE_FUNC_MODSNGL:
-                            ScModalValue();
+                            pushLegacyMode(true);
                             break;
                         case AGGREGATE_FUNC_LARGE:
                             CalculateSmallLarge(false);
@@ -5956,16 +6755,16 @@ StackVar ScInterpreter::Interpret()
                             CalculateSmallLarge(true);
                             break;
                         case AGGREGATE_FUNC_PERCINC:
-                            ScPercentile(true);
+                            pushLegacyPercentile(true);
                             break;
                         case AGGREGATE_FUNC_QRTINC:
-                            ScQuartile(true);
+                            pushLegacyQuartile(true);
                             break;
                         case AGGREGATE_FUNC_PERCEXC:
-                            ScPercentile(false);
+                            pushLegacyPercentile(false);
                             break;
                         case AGGREGATE_FUNC_QRTEXC:
-                            ScQuartile(false);
+                            pushLegacyQuartile(false);
                             break;
                         default:
                             nGlobalError = nErr;
@@ -8118,9 +8917,9 @@ StackVar ScInterpreter::Interpret()
                     case ocExpDist          :
                     case ocExpDist_MS       : pushLegacyExponentialDist();  break;
                     case ocBinomDist        :
-                    case ocBinomDist_MS     : ScBinomDist();            break;
-                    case ocPoissonDist      : ScPoissonDist( true );    break;
-                    case ocPoissonDist_MS   : ScPoissonDist( false );   break;
+                    case ocBinomDist_MS     : pushLegacyBinomDistMs();  break;
+                    case ocPoissonDist      : pushLegacyPoissonDist(true); break;
+                    case ocPoissonDist_MS   : pushLegacyPoissonDist(false); break;
                     case ocCombin           : pushLegacyCombin(u"COMBIN", false);  break;
                     case ocCombinA          : pushLegacyCombin(u"COMBINA", true);  break;
                     case ocPermut           : pushLegacyPermutation(false); break;
@@ -8141,17 +8940,17 @@ StackVar ScInterpreter::Interpret()
                     case ocChiSqDist        : pushLegacyChiSqDist(u"CHISQDIST", false); break;
                     case ocChiSqDist_MS     : pushLegacyChiSqDist(u"CHISQ.DIST", true); break;
                     case ocStandard         : pushLegacyStandardize();      break;
-                    case ocAveDev           : ScAveDev();               break;
-                    case ocDevSq            : ScDevSq();                break;
-                    case ocKurt             : ScKurt();                 break;
-                    case ocSkew             : ScSkew();                 break;
-                    case ocSkewp            : ScSkewp();                break;
-                    case ocModalValue       : ScModalValue();           break;
-                    case ocModalValue_MS    : ScModalValue_MS( true );   break;
-                    case ocModalValue_Multi : ScModalValue_MS( false );  break;
-                    case ocMedian           : ScMedian();               break;
-                    case ocGeoMean          : ScGeoMean();              break;
-                    case ocHarMean          : ScHarMean();              break;
+                    case ocAveDev           : pushLegacyAveDev();       break;
+                    case ocDevSq            : pushLegacyDevSq();        break;
+                    case ocKurt             : pushLegacyKurt();         break;
+                    case ocSkew             : pushLegacySkew(false);    break;
+                    case ocSkewp            : pushLegacySkew(true);     break;
+                    case ocModalValue       : pushLegacyMode(true);     break;
+                    case ocModalValue_MS    : pushLegacyMode(true);     break;
+                    case ocModalValue_Multi : pushLegacyMode(false);    break;
+                    case ocMedian           : pushLegacyMedian();       break;
+                    case ocGeoMean          : pushLegacyGeoMean();      break;
+                    case ocHarMean          : pushLegacyHarMean();      break;
                     case ocWeibull          :
                     case ocWeibull_MS       : pushLegacyWeibull();          break;
                     case ocBinomInv         :
@@ -8167,35 +8966,35 @@ StackVar ScInterpreter::Interpret()
                     case ocFTest            :
                     case ocFTest_MS         : ScFTest();                break;
                     case ocRank             :
-                    case ocRank_Eq          : ScRank( false );          break;
-                    case ocRank_Avg         : ScRank( true );           break;
+                    case ocRank_Eq          : pushLegacyRank(false);    break;
+                    case ocRank_Avg         : pushLegacyRank(true);     break;
                     case ocPercentile       :
-                    case ocPercentile_Inc   : ScPercentile( true );     break;
-                    case ocPercentile_Exc   : ScPercentile( false );    break;
+                    case ocPercentile_Inc   : pushLegacyPercentile(true); break;
+                    case ocPercentile_Exc   : pushLegacyPercentile(false); break;
                     case ocPercentrank      :
-                    case ocPercentrank_Inc  : ScPercentrank( true );    break;
-                    case ocPercentrank_Exc  : ScPercentrank( false );   break;
+                    case ocPercentrank_Inc  : pushLegacyPercentrank(true); break;
+                    case ocPercentrank_Exc  : pushLegacyPercentrank(false); break;
                     case ocLarge            : CalculateSmallLarge(false); break;
                     case ocSmall            : CalculateSmallLarge(true);  break;
                     case ocFrequency        : ScFrequency();            break;
                     case ocQuartile         :
-                    case ocQuartile_Inc     : ScQuartile( true );       break;
-                    case ocQuartile_Exc     : ScQuartile( false );      break;
+                    case ocQuartile_Inc     : pushLegacyQuartile(true); break;
+                    case ocQuartile_Exc     : pushLegacyQuartile(false); break;
                     case ocNormInv          :
-                    case ocNormInv_MS       : ScNormInv();              break;
+                    case ocNormInv_MS       : pushLegacyNormInv();      break;
                     case ocSNormInv         :
                     case ocSNormInv_MS      : pushLegacySNormInv();         break;
                     case ocConfidence       :
-                    case ocConfidence_N     : ScConfidence();           break;
-                    case ocConfidence_T     : ScConfidenceT();          break;
-                    case ocTrimMean         : ScTrimMean();             break;
+                    case ocConfidence_N     : pushLegacyConfidence(false); break;
+                    case ocConfidence_T     : pushLegacyConfidence(true); break;
+                    case ocTrimMean         : pushLegacyTrimMean();     break;
                     case ocProb             : pushLegacyProbability();      break;
                     case ocCorrel           : CalculatePearsonCovar(true, false, false); break;
                     case ocCovar            :
                     case ocCovarianceP      : CalculatePearsonCovar(false, false, false); break;
                     case ocCovarianceS      : CalculatePearsonCovar(false, false, true); break;
                     case ocPearson          : CalculatePearsonCovar(true, false, false); break;
-                    case ocRSQ              : ScRSQ();                  break;
+                    case ocRSQ              : pushLegacyRSQ();          break;
                     case ocSTEYX            : CalculatePearsonCovar(true, true, false); break;
                     case ocSlope            : CalculateSlopeIntercept(true); break;
                     case ocIntercept        : CalculateSlopeIntercept(false); break;
@@ -8237,7 +9036,7 @@ StackVar ScInterpreter::Interpret()
                     case ocFInv_LT          : pushLegacyFInv(u"F.INV", true); break;
                     case ocLogInv           :
                     case ocLogInv_MS        : pushLegacyLogNormInv();       break;
-                    case ocBetaDist         : ScBetaDist();             break;
+                    case ocBetaDist         : pushLegacyBetaDist();     break;
                     case ocBetaDist_MS      : pushLegacyBetaDistMS();       break;
                     case ocBetaInv          :
                     case ocBetaInv_MS       : pushLegacyBetaInv(u"BETAINV"); break;
