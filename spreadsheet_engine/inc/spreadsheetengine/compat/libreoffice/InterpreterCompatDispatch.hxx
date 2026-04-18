@@ -94,6 +94,16 @@ struct Dispatcher
         PushDouble(rResult.maValue);
     }
 
+ #undef mrDoc
+    [[nodiscard]] static FormulaTokenRef rangeReferenceToken(
+        ScInterpreter& rCalc, const FormulaToken& rLeft, const FormulaToken& rRight)
+    {
+        return extendRangeReference(rCalc.mrDoc.GetSheetLimits(),
+            const_cast<FormulaToken&>(rLeft), const_cast<FormulaToken&>(rRight), rCalc.aPos,
+            false);
+    }
+#define mrDoc SEIC.mrDoc
+
     static void statisticalKurt(ScInterpreter& rCalc)
     {
         KahanSum fSum;

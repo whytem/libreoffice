@@ -4858,6 +4858,42 @@ StackVar ScInterpreter::Interpret()
                     PushError(selibreoffice::toFormulaError(aAttempt.maResult.meError));
                     return true;
                 };
+                const auto tryPushEngineRangeReference = [&]() {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore().mnEngineAttemptedCount);
+                    if (nGlobalError != FormulaError::NONE || sp < 2)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const FormulaToken* pRight = pStack[sp - 1];
+                    const FormulaToken* pLeft = pStack[sp - 2];
+                    if (!pLeft || !pRight)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
+                        return false;
+                    }
+
+                    FormulaTokenRef xRangeResult
+                        = seinterpcompatdispatch::Dispatcher::rangeReferenceToken(
+                            *this, *pLeft, *pRight);
+                    if (!xRangeResult)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
+                        return false;
+                    }
+
+                    sp -= 2;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore().mnEngineSucceededCount);
+                    PushTokenRef(xRangeResult);
+                    return true;
+                };
                 const auto pushLegacyGcdOrLcm = [&](std::u16string_view rLabel, bool bLcm) {
                     warnIfLegacyDefaultOnReached(
                         rLabel, "family-local default-on math scalar reached ScInterpreter");
@@ -7950,7 +7986,18 @@ StackVar ScInterpreter::Interpret()
                                         LogicalFoldMode::Xor);
                         break;
                     case ocIntersect        : ScIntersect();                break;
-                    case ocRange            : ScRangeFunc();                break;
+                    case ocRange            :
+                        if (!tryPushEngineRangeReference())
+                        {
+                            warnIfLegacyDispatchReached(
+                                "engine-first root range reference", u"RANGE_REFERENCE",
+                                [](std::u16string_view rFormula) {
+                                    return setaileval::isRootRangeReferenceFormula(rFormula);
+                                },
+                                "engine-backed root range reference reached ScInterpreter");
+                            ScRangeFunc();
+                        }
+                        break;
                     case ocUnion            : ScUnionFunc();                break;
                     case ocNot              : pushLegacyNot();              break;
                     case ocNegSub           :

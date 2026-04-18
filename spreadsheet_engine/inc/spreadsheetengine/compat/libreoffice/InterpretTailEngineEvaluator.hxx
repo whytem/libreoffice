@@ -13609,6 +13609,14 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
            && aParse.mpRoot->meKind == core::formula::NodeKind::ErrorLiteral;
 }
 
+[[nodiscard]] inline bool isRootRangeReferenceFormula(std::u16string_view rFormulaSource)
+{
+    const api::String aNormalized = detail::normalizeFormulaSource(rFormulaSource);
+    const auto aParse = core::formula::parseFormula(aNormalized);
+    return aParse && aParse.mpRoot
+           && aParse.mpRoot->meKind == core::formula::NodeKind::RangeReference;
+}
+
 inline void resetStats()
 {
     auto& rStore = detail::statsStore();

@@ -739,6 +739,63 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterRangeDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"RangeDispatch"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+    resetScInterpreterReachabilityStats();
+    resetScInterpreterClassicOpcodeRuntimeStats();
+
+    m_pDoc->SetValue(ScAddress(0, 0, 0), 1.0);
+    m_pDoc->SetValue(ScAddress(1, 0, 0), 2.0);
+    m_pDoc->SetValue(ScAddress(0, 1, 0), 3.0);
+    m_pDoc->SetValue(ScAddress(1, 1, 0), 4.0);
+
+    m_pDoc->SetString(
+        ScAddress(3, 0, 0), u"=SUM(OFFSET(A1;0;0):OFFSET(B2;0;0))"_ustr);
+    ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(ScAddress(3, 0, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aDispatchStatsLabel
+        = "attempted=" + std::to_string(aDispatchStats.mnEngineAttemptedCount)
+          + " succeeded=" + std::to_string(aDispatchStats.mnEngineSucceededCount)
+          + " declined=" + std::to_string(aDispatchStats.mnEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE("range dispatch should attempt engine evaluation: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnEngineAttemptedCount >= 1);
+    CPPUNIT_ASSERT_MESSAGE("range dispatch should succeed through the engine path: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnEngineSucceededCount >= 1);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("range dispatch should not need legacy fallback here: "
+                                     + aDispatchStatsLabel,
+                                 sal_uInt64(0),
+                                 aDispatchStats.mnEngineDeclinedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("dispatch accounting should stay balanced: "
+                                     + aDispatchStatsLabel,
+                                 aDispatchStats.mnEngineAttemptedCount,
+                                 aDispatchStats.mnEngineSucceededCount
+                                     + aDispatchStats.mnEngineDeclinedCount);
+
+    const auto aReachabilityStats = getScInterpreterReachabilityStatsSnapshot();
+    CPPUNIT_ASSERT_MESSAGE(
+        "range dispatch test should reach classic ScInterpreter::Interpret()",
+        aReachabilityStats.mnClassicInterpretCount > 0);
+
+    const auto aClassicOpcodeStats = getScInterpreterClassicOpcodeRuntimeStatsSnapshot();
+    CPPUNIT_ASSERT_MESSAGE("range dispatch test should record ocRange in the classic census",
+                           aClassicOpcodeStats.maOpcodeCounts[static_cast<std::size_t>(ocRange)]
+                               >= 1);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncIFERROR)
 {
     // IFERROR/IFNA (fdo#56124)
