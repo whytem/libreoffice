@@ -89,6 +89,9 @@ struct SC_DLLPUBLIC ScInterpreterDispatchRuntimeStatsSnapshot
     sal_uInt64 mnCriteriaEngineAttemptedCount = 0;
     sal_uInt64 mnCriteriaEngineSucceededCount = 0;
     sal_uInt64 mnCriteriaEngineDeclinedCount = 0;
+    sal_uInt64 mnMatrixEngineAttemptedCount = 0;
+    sal_uInt64 mnMatrixEngineSucceededCount = 0;
+    sal_uInt64 mnMatrixEngineDeclinedCount = 0;
     std::vector<OUString> maRangeDeclinedFormulaSamples;
 };
 

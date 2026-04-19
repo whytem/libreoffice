@@ -94,6 +94,7 @@
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
 #include <spreadsheetengine/runtime/RpnControlFlow.hxx>
 #include <spreadsheetengine/runtime/RpnCriteria.hxx>
+#include <spreadsheetengine/runtime/RpnMatrix.hxx>
 #include <spreadsheetengine/runtime/RpnOperators.hxx>
 #include <spreadsheetengine/runtime/RpnReference.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
@@ -345,6 +346,9 @@ struct InterpreterDispatchRuntimeStatsStore
     std::atomic<sal_uInt64> mnCriteriaEngineAttemptedCount { 0 };
     std::atomic<sal_uInt64> mnCriteriaEngineSucceededCount { 0 };
     std::atomic<sal_uInt64> mnCriteriaEngineDeclinedCount { 0 };
+    std::atomic<sal_uInt64> mnMatrixEngineAttemptedCount { 0 };
+    std::atomic<sal_uInt64> mnMatrixEngineSucceededCount { 0 };
+    std::atomic<sal_uInt64> mnMatrixEngineDeclinedCount { 0 };
     std::mutex maRangeDeclinedSampleMutex;
     std::vector<OUString> maRangeDeclinedFormulaSamples;
 };
@@ -496,6 +500,9 @@ void resetScInterpreterDispatchRuntimeStats()
     rStore.mnCriteriaEngineAttemptedCount.store(0, std::memory_order_relaxed);
     rStore.mnCriteriaEngineSucceededCount.store(0, std::memory_order_relaxed);
     rStore.mnCriteriaEngineDeclinedCount.store(0, std::memory_order_relaxed);
+    rStore.mnMatrixEngineAttemptedCount.store(0, std::memory_order_relaxed);
+    rStore.mnMatrixEngineSucceededCount.store(0, std::memory_order_relaxed);
+    rStore.mnMatrixEngineDeclinedCount.store(0, std::memory_order_relaxed);
     {
         std::lock_guard aGuard(rStore.maRangeDeclinedSampleMutex);
         rStore.maRangeDeclinedFormulaSamples.clear();
@@ -543,6 +550,12 @@ ScInterpreterDispatchRuntimeStatsSnapshot getScInterpreterDispatchRuntimeStatsSn
         = rStore.mnCriteriaEngineSucceededCount.load(std::memory_order_relaxed);
     aSnapshot.mnCriteriaEngineDeclinedCount
         = rStore.mnCriteriaEngineDeclinedCount.load(std::memory_order_relaxed);
+    aSnapshot.mnMatrixEngineAttemptedCount
+        = rStore.mnMatrixEngineAttemptedCount.load(std::memory_order_relaxed);
+    aSnapshot.mnMatrixEngineSucceededCount
+        = rStore.mnMatrixEngineSucceededCount.load(std::memory_order_relaxed);
+    aSnapshot.mnMatrixEngineDeclinedCount
+        = rStore.mnMatrixEngineDeclinedCount.load(std::memory_order_relaxed);
     {
         std::lock_guard aGuard(rStore.maRangeDeclinedSampleMutex);
         aSnapshot.maRangeDeclinedFormulaSamples = rStore.maRangeDeclinedFormulaSamples;
@@ -8065,6 +8078,204 @@ StackVar ScInterpreter::Interpret()
                         sequery::CriteriaAggregateKind::Count, false);
                 };
 
+                // Batch 4 pure-scalar-input matrix admissions: MUNIT
+                // (ocMatrixUnit) and MSEQUENCE (ocMatSequence). These
+                // produce matrices without requiring host-side range
+                // materialization, so they cleanly demonstrate the
+                // RpnMatrix substrate end-to-end. Matrix-consuming
+                // opcodes (MDETERM / MINVERSE / MMULT / TRANSPOSE / the
+                // SUMPRODUCT family) need the reference-to-matrix host
+                // materialization contract and are deferred.
+                const auto convertMatrixOperandToMatrixRef
+                    = [&](const serpn::MatrixOperand& rOperand) -> ScMatrixRef {
+                    if (rOperand.isEmpty())
+                        return nullptr;
+                    const SCSIZE nCols
+                        = static_cast<SCSIZE>(rOperand.maDimensions.mnColumns);
+                    const SCSIZE nRows
+                        = static_cast<SCSIZE>(rOperand.maDimensions.mnRows);
+                    if (!ScMatrix::IsSizeAllocatable(nCols, nRows))
+                        return nullptr;
+                    ScMatrixRef pResult = GetNewMat(nCols, nRows, /*bEmpty*/true);
+                    if (!pResult)
+                        return nullptr;
+                    for (SCSIZE r = 0; r < nRows; ++r)
+                    {
+                        for (SCSIZE c = 0; c < nCols; ++c)
+                        {
+                            const auto& rCell
+                                = rOperand.maValues[static_cast<std::size_t>(r) * nCols + c];
+                            switch (rCell.meKind)
+                            {
+                                case spreadsheetengine::api::CellValueKind::Number:
+                                case spreadsheetengine::api::CellValueKind::Boolean:
+                                    pResult->PutDouble(rCell.mfNumber, c, r);
+                                    break;
+                                case spreadsheetengine::api::CellValueKind::Text:
+                                    pResult->PutString(
+                                        mrDoc.GetSharedStringPool().intern(
+                                            selibreoffice::toLibreOfficeString(rCell.maString)),
+                                        c, r);
+                                    break;
+                                case spreadsheetengine::api::CellValueKind::Error:
+                                    pResult->PutError(
+                                        selibreoffice::toFormulaError(rCell.meError), c, r);
+                                    break;
+                                case spreadsheetengine::api::CellValueKind::Empty:
+                                    pResult->PutEmpty(c, r);
+                                    break;
+                            }
+                        }
+                    }
+                    return pResult;
+                };
+
+                const auto tryPlanEngineIdentityMatrix = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount != 1 || !sp)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    const FormulaToken* pDimTok = pStack[sp - 1];
+                    if (!pDimTok || pDimTok->GetType() != svDouble)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    const double fDim = pDimTok->GetDouble();
+                    if (fDim < 1.0 || fDim > 65535.0)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    const auto aPlan
+                        = serpn::planIdentityMatrix(static_cast<std::size_t>(fDim));
+                    if (!aPlan
+                        || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    ScMatrixRef pMat = convertMatrixOperandToMatrixRef(aPlan.maValue);
+                    if (!pMat)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    sp -= 1;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineSucceededCount);
+                    PushMatrix(pMat);
+                    return true;
+                };
+
+                const auto tryPlanEngineSequenceMatrix = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount < 1 || nParamCount > 4 || sp < nParamCount)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+
+                    // Scope fence: only admit when every argument is a
+                    // scalar svDouble so the full planning path is
+                    // host-free. Missing / defaulted args still reach
+                    // here as svMissing, which we decline.
+                    for (sal_uInt8 i = 1; i <= nParamCount; ++i)
+                    {
+                        const FormulaToken* pTok = pStack[sp - i];
+                        if (!pTok || pTok->GetType() != svDouble)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                    }
+
+                    // Arguments pushed in order (rows, cols, start, step);
+                    // stack top is the last pushed.
+                    double fStep = 1.0;
+                    double fStart = 1.0;
+                    sal_Int32 nColumns = 1;
+                    sal_Int32 nRows = 1;
+                    std::size_t nIdx = 0;
+                    if (nParamCount >= 4)
+                        fStep = pStack[sp - (++nIdx)]->GetDouble();
+                    if (nParamCount >= 3)
+                        fStart = pStack[sp - (++nIdx)]->GetDouble();
+                    if (nParamCount >= 2)
+                    {
+                        nColumns
+                            = static_cast<sal_Int32>(pStack[sp - (++nIdx)]->GetDouble());
+                        if (nColumns < 1)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                    }
+                    nRows = static_cast<sal_Int32>(pStack[sp - (++nIdx)]->GetDouble());
+                    if (nRows < 1)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const auto aPlan = serpn::planSequenceMatrix(
+                        static_cast<std::size_t>(nRows),
+                        static_cast<std::size_t>(nColumns), fStart, fStep);
+                    if (!aPlan
+                        || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    ScMatrixRef pMat = convertMatrixOperandToMatrixRef(aPlan.maValue);
+                    if (!pMat)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    sp -= nParamCount;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineSucceededCount);
+                    PushMatrix(pMat);
+                    return true;
+                };
+
                 // Batch 3 DB family admission (DSUM / DCOUNT / DAVERAGE
                 // / DMAX / DMIN). The 3-arg shape is
                 // (database_range, field, criteria_range). Scope fence:
@@ -11085,7 +11296,10 @@ StackVar ScInterpreter::Interpret()
                     }
                     break;
                     case ocMatValue         : ScMatValue();                 break;
-                    case ocMatrixUnit       : ScEMat();                     break;
+                    case ocMatrixUnit       :
+                        if (!tryPlanEngineIdentityMatrix())
+                            ScEMat();
+                        break;
                     case ocMatDet:
                         warnIfLegacyDispatchReached(
                             "family-local default-on", u"MDETERM",
@@ -11097,7 +11311,10 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocMatInv           : ScMatInv();                   break;
                     case ocMatMult          : ScMatMult();                  break;
-                    case ocMatSequence      : ScMatSequence();              break;
+                    case ocMatSequence      :
+                        if (!tryPlanEngineSequenceMatrix())
+                            ScMatSequence();
+                        break;
                     case ocMatTrans         : ScMatTrans();                 break;
                     case ocMatRef           : ScMatRef();                   break;
                     case ocB:
