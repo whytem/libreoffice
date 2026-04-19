@@ -24,42 +24,44 @@ runs the test and exits non-zero only if the failure set differs from this
 list (i.e., a *new* regression slipped in, or an old one was *unintentionally*
 fixed without the list being updated).
 
-## Failure baseline (2026-04-19, branch tip after `0e94cc217`)
+## Failure baseline (2026-04-19, after stored-host-truth self-referential fix)
 
-30 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 125 tests.
+18 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 134 tests.
 
-### External reference (2)
+Previous baseline was 30 tests. One fix — gating the
+`importedRootUsesStoredHostValueTruth` fallback behind imported-canonical /
+imported-cached-formula predicates — cleared 12 tests at once. The fallback
+was firing in live-recalc (e.g. `SetString` + `CalcFormulaTree`) contexts
+where the "host value" is the previous result of the *same* cell we are
+currently recomputing. Returning that stale value as authoritative left
+formulas like `=SHEETS()`, `=IF(...)`, `=FTEST(...)`, etc. frozen at zero
+after the first recalc that touched them.
 
-- `testExternalRefFunctions`
-- `testExternalRefUnresolved`
+### External reference (0)
+
+All two previous failures cleared by the stored-host-truth fix (imports
+now correctly consume the cached value; live calc no longer shadows it).
 
 ### Recalc / dependency tracking (2)
 
 - `testFormulaDepTrackingDeleteCol`
 - `testIterations`
 
-### Function evaluation (17)
+### Function evaluation (10)
 
 Likely root cause: legacy fallback paths regressed during retirement +
 relocation episodes; recalc/observe interaction with the seam returns wrong
 values or false `Err:522` (Circular Reference) on dependency change.
 
-- `testFuncCHITEST`
-- `testFuncCHOOSE`
-- `testFuncFTEST`
-- `testFuncFTESTBug`
 - `testFuncGCD`
 - `testFuncIF`
 - `testFuncLCM`
 - `testFuncMATCH`
 - `testFuncNOW`
 - `testFuncRefListArraySUBTOTAL`
-- `testFuncRowsHidden`
-- `testFuncSHEET`
 - `testFuncSUMSQ`
 - `testFuncSUMX2MY2`
 - `testFuncSUMX2PY2`
-- `testFuncTTEST`
 - `testFuncTableRef`
 
 ### InterpretTail engine evaluator (3)
@@ -72,15 +74,12 @@ paths regressed.
 - `testInterpretTailEngineEvaluatorMathScalarAuthoritative`
 - `testInterpretTailEngineEvaluatorStatisticalDistributionAuthoritative`
 
-### Specific tdf bugs (3)
+### Specific tdf bugs (1)
 
-- `testTdf93415`
-- `testTdf147398`
 - `testTdf156985`
 
-### Shell / shared / coercion (3)
+### Shell / shared / coercion (2)
 
-- `testModernLogicalNameShellPhase7`
 - `testReferenceShapePhase5`
 - `testSharedStatisticalDelegations`
 

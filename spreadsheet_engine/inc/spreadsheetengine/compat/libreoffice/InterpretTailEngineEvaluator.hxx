@@ -13709,7 +13709,16 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         rRoot, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 0, bImportedCanonicalSource);
     if (!aAttempt.mbSupported)
     {
-        if (detail::importedRootUsesStoredHostValueTruth(aRootFunctionName))
+        // The stored-host-value-truth fallback only applies when the formula
+        // is a freshly-imported cached root: the host document still holds
+        // the importer's stored value and the engine has declined to
+        // recompute it. For live recalc (SetString, UI edits, CalcFormulaTree)
+        // there is no imported cached truth — the host cell value is the
+        // previous result of *this* formula, so returning it here would be
+        // a self-referential trap that leaves the live result stale.
+        if ((bImportedCanonicalSource
+             || detail::isImportedCachedFormulaRoot(rDoc, rFormulaPos))
+            && detail::importedRootUsesStoredHostValueTruth(aRootFunctionName))
         {
             const auto aHostValue
                 = spreadsheetengine::compat::libreoffice::readHostDocumentCellValue(rDoc, rFormulaPos);
