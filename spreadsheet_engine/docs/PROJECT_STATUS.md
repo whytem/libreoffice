@@ -45,7 +45,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=34`
+- `interp4_dispatch_engine_attempt_count=38`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -173,10 +173,26 @@ accepted when it is an svDoubleRef on a single sheet.
 `ocCountEmptyCells` is intentionally deferred until the engine has a
 streaming range-iteration primitive; materializing a range into a
 `std::vector` just to count empties would be a perf regression vs. the
-legacy `ScCellIterator`. Remaining Batch 3 members are the twelve
-`ocDB*` database functions, which still need the data/criteria range
-resolution bridge plus the `DatabaseQueryDescriptor` applyFieldSelector
-path to land.
+legacy `ScCellIterator`.
+
+The DB aggregate family first admission has now landed: `ocDBSum` /
+`ocDBAverage` / `ocDBMax` / `ocDBMin` route through
+`tryPlanEngineDatabaseAggregate(kind)` which translates the
+3-argument database-query shape into a `planMultiCriterionAggregate`
+call. The helper walks the criteria header, matches each non-empty
+criteria column to a database column by header-text equality, and
+builds a parallel `(CriteriaAggregateInput, CriteriaPredicate)` pair
+per matched column. The existing
+`seitee::detail::CriteriaAggregateMaterializer` plus
+`readMaterializedHostCellValue` cover the host-side cell reads.
+Scope fence: single-sheet svDoubleRef ranges; database ≥ 2 rows;
+criteria exactly 2 rows (header + one criteria data row; multi-row OR
+criteria defer to legacy); field is svDouble (1-based index) or
+svString (matching a database header); criteria cells must be Number
+/ Text / Boolean. Remaining DB family (`ocDBCount` / `ocDBCount2` /
+`ocDBProduct` / `ocDBGet` / `ocDBStdDev(P)` / `ocDBVar(P)`) still
+defers — each needs its own iteration path (count-with-missing-field,
+product accumulation, unique-match scalar return, variance).
 
 Remaining Batch 1 members (`ocIfs_MS`, `ocSwitch_MS`, `ocIfError`,
 `ocIfNA`, `ocLet`) already delegate to `api::logic` / `seswitchexec`
