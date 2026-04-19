@@ -8083,6 +8083,81 @@ StackVar ScInterpreter::Interpret()
                         sequery::CriteriaAggregateKind::Count, false);
                 };
 
+                // Batch 3 tail ocCountEmptyCells admission. COUNTBLANK
+                // takes a single range argument and counts cells whose
+                // content is empty (blank cell, or formula cell whose
+                // result is an empty string). Scope fence: single-sheet
+                // svDoubleRef only; svSingleRef / svRefList / svMatrix /
+                // external refs defer to legacy.
+                const auto tryPlanEngineCountEmptyCells = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnCriteriaEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount != 1 || sp < 1)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+                    const FormulaToken* pTok = pStack[sp - 1];
+                    if (!pTok || pTok->GetType() != svDoubleRef)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const ScRange aRange
+                        = pTok->GetDoubleRef()->toAbs(mrDoc, aPos);
+                    if (aRange.aStart.Tab() != aRange.aEnd.Tab())
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+
+                    sequery::CriteriaAggregateInput aInput;
+                    aInput.mbScalar = false;
+                    aInput.maReference.maRange.maStart = {
+                        static_cast<spreadsheetengine::api::SheetId>(aRange.aStart.Tab()),
+                        static_cast<spreadsheetengine::api::ColumnIndex>(aRange.aStart.Col()),
+                        static_cast<spreadsheetengine::api::RowIndex>(aRange.aStart.Row())
+                    };
+                    aInput.maReference.maRange.maEnd = {
+                        static_cast<spreadsheetengine::api::SheetId>(aRange.aEnd.Tab()),
+                        static_cast<spreadsheetengine::api::ColumnIndex>(aRange.aEnd.Col()),
+                        static_cast<spreadsheetengine::api::RowIndex>(aRange.aEnd.Row())
+                    };
+                    aInput.mnColumns = static_cast<spreadsheetengine::api::MatrixSize>(
+                        aRange.aEnd.Col() - aRange.aStart.Col() + 1);
+                    aInput.mnRows = static_cast<spreadsheetengine::api::MatrixSize>(
+                        aRange.aEnd.Row() - aRange.aStart.Row() + 1);
+
+                    const seitee::detail::CriteriaAggregateMaterializer aMaterializer(
+                        mrDoc, mrContext);
+                    const auto aResult = serpn::planCountEmptyRange(aMaterializer, aInput);
+                    if (!aResult)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+
+                    sp -= nParamCount;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnCriteriaEngineSucceededCount);
+                    PushDouble(aResult.maValue);
+                    return true;
+                };
+
                 // Batch 4 matrix admissions. The pure-scalar-input
                 // constructors (MUNIT / MSEQUENCE) demonstrate the
                 // RpnMatrix substrate end-to-end without host-side
@@ -12396,7 +12471,10 @@ StackVar ScInterpreter::Interpret()
                         ScMatchOp(true);
                     }
                     break;
-                    case ocCountEmptyCells  : ScCountEmptyCells();      break;
+                    case ocCountEmptyCells  :
+                        if (!tryPlanEngineCountEmptyCells())
+                            ScCountEmptyCells();
+                        break;
                     case ocCountIf          :
                         if (!tryPlanEngineCountIf())
                             ScCountIf();

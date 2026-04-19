@@ -1067,6 +1067,51 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterDatabaseDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterCountEmptyCellsDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"CBlank"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    // Populate A1:C3 with a mix. 9 cells total, 4 non-empty:
+    //   1    empty  "x"
+    //   ""   2      empty
+    //   3    empty  empty
+    // So 5 empty (counting the "" in A2 as empty per COUNTBLANK).
+    m_pDoc->SetValue(ScAddress(0, 0, 0), 1.0);
+    m_pDoc->SetString(ScAddress(2, 0, 0), u"x"_ustr);
+    m_pDoc->SetString(ScAddress(0, 1, 0), u""_ustr);
+    m_pDoc->SetValue(ScAddress(1, 1, 0), 2.0);
+    m_pDoc->SetValue(ScAddress(0, 2, 0), 3.0);
+
+    // COUNTBLANK(A1:C3) -> 5
+    m_pDoc->SetString(ScAddress(4, 0, 0), u"=COUNTBLANK(A1:C3)"_ustr);
+    ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(ScAddress(4, 0, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "criteria_attempted="
+          + std::to_string(aDispatchStats.mnCriteriaEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnCriteriaEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnCriteriaEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "COUNTBLANK should attempt engine dispatch: " + aLabel,
+        aDispatchStats.mnCriteriaEngineAttemptedCount >= 1);
+    CPPUNIT_ASSERT_MESSAGE(
+        "COUNTBLANK should succeed through engine: " + aLabel,
+        aDispatchStats.mnCriteriaEngineSucceededCount >= 1);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterDatabaseVarianceDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);

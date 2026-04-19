@@ -144,6 +144,40 @@ struct MultiCriterionAggregateRequest
     return RpnCoercionResult<double>::success(fCount);
 }
 
+// Stream-count empty cells over a range described by a
+// CriteriaAggregateInput. Iterates the coordinate grid and asks the
+// materializer for each cell, counting those whose CellValue reports
+// Empty or empty Text. Mirrors legacy ScCountEmptyCells's
+// isCellContentEmpty semantics (empty cell or formula cell whose
+// result is an empty string). Errors short-circuit the count and
+// propagate.
+[[nodiscard]] inline api::ValueResult<double> planCountEmptyRange(
+    const core::query::CriteriaAggregateMaterializer& rMaterializer,
+    const core::query::CriteriaAggregateInput& rRange)
+{
+    std::size_t nEmptyCount = 0;
+    for (api::MatrixSize nRow = 0; nRow < rRange.mnRows; ++nRow)
+    {
+        for (api::MatrixSize nCol = 0; nCol < rRange.mnColumns; ++nCol)
+        {
+            const api::MatrixCoordinate aCoord { nCol, nRow };
+            const auto aResult = rMaterializer.materialize(rRange, aCoord);
+            if (!aResult)
+                return api::ValueResult<double>::failure(aResult.meError);
+            if (aResult.maValue.meKind == api::CellValueKind::Empty)
+            {
+                ++nEmptyCount;
+            }
+            else if (aResult.maValue.meKind == api::CellValueKind::Text
+                     && aResult.maValue.maString.empty())
+            {
+                ++nEmptyCount;
+            }
+        }
+    }
+    return api::ValueResult<double>::success(static_cast<double>(nEmptyCount));
+}
+
 } // namespace spreadsheetengine::core::rpn
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
