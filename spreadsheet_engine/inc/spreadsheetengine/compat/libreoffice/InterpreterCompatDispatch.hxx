@@ -70,8 +70,6 @@ using namespace formula;
 #define GetChiDist(...) SEIC.GetChiDist(__VA_ARGS__)
 #define GetFDist(...) SEIC.GetFDist(__VA_ARGS__)
 #define GetTDist(...) SEIC.GetTDist(__VA_ARGS__)
-#define ScCount(...) SEIC.ScCount(__VA_ARGS__)
-#define ScCount2(...) SEIC.ScCount2(__VA_ARGS__)
 #define CalculateTrendGrowth(...) SEIC.CalculateTrendGrowth(__VA_ARGS__)
 
 struct Dispatcher
@@ -1294,10 +1292,10 @@ inline void Dispatcher::aggregateFunction(ScInterpreter& rCalc)
             aggregateAverage(rCalc, false);
             break;
         case AGGREGATE_FUNC_CNT:
-            ScCount();
+            IterateParameters(ifCOUNT);
             break;
         case AGGREGATE_FUNC_CNT2:
-            ScCount2();
+            IterateParameters(ifCOUNT2);
             break;
         case AGGREGATE_FUNC_MAX:
             aggregateMax(rCalc, false);
@@ -1887,6 +1885,4 @@ inline void Dispatcher::forecast(ScInterpreter& rCalc)
 #undef GetChiDist
 #undef GetFDist
 #undef GetTDist
-#undef ScCount
-#undef ScCount2
 #undef CalculateTrendGrowth
