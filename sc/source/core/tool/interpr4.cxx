@@ -5726,14 +5726,6 @@ StackVar ScInterpreter::Interpret()
                             PushError(FormulaError::UnknownOpCode);
                     }
                 };
-                const auto pushLegacyClean = [&]() {
-                    warnTextUtilityDispatch(u"CLEAN");
-                    PushString(selibreoffice::cleanPrintable(GetString().getString()));
-                };
-                const auto pushLegacyCode = [&]() {
-                    warnTextUtilityDispatch(u"CODE");
-                    PushInt(selibreoffice::codeFromText(GetString().getString()));
-                };
                 const auto pushLegacyChar = [&]() {
                     warnTextUtilityDispatch(u"CHAR");
                     if (auto aStr = selibreoffice::charFromValue(GetDouble()))
@@ -5922,10 +5914,6 @@ StackVar ScInterpreter::Interpret()
                         PushString(sStr.copy(0, nDelimiterPos));
                     else
                         PushString(sStr.copy(nDelimiterPos, nLength - nDelimiterPos));
-                };
-                const auto pushLegacyTrim = [&]() {
-                    warnTextUtilityDispatch(u"TRIM");
-                    PushString(selibreoffice::trimRepeatedSpaces(GetString().getString()));
                 };
                 const auto pushLegacyValue = [&]() {
                     warnTextUtilityDispatch(u"VALUE");
@@ -6594,10 +6582,6 @@ StackVar ScInterpreter::Interpret()
                     PushString(OUString(
                         reinterpret_cast<const sal_Unicode*>(aReplaced.getBuffer()),
                         aReplaced.length()));
-                };
-                const auto pushLegacyLenB = [&]() {
-                    warnTextUtilityDispatch(u"LENB");
-                    PushDouble(getLengthB(GetString().getString()));
                 };
                 const auto pushLegacyRightB = [&]() {
                     warnTextUtilityDispatch(u"RIGHTB");
@@ -10654,10 +10638,6 @@ StackVar ScInterpreter::Interpret()
                             .mnControlFlowEngineSucceededCount);
                     return true;
                 };
-                const auto pushLegacyIfJump = [&]() {
-                    warnConditionalDispatch(u"IF");
-                    ScIfJump();
-                };
                 const auto pushLegacyIfError = [&](bool bNAonly) {
                     warnConditionalDispatch(bNAonly ? u"IFNA" : u"IFERROR");
 
@@ -11261,7 +11241,10 @@ StackVar ScInterpreter::Interpret()
                     case ocColRowNameAuto   : ScColRowNameAuto();           break;
                     case ocIf               :
                         if (!tryPlanEngineIfJump())
-                            pushLegacyIfJump();
+                        {
+                            warnConditionalDispatch(u"IF");
+                            ScIfJump();
+                        }
                         break;
                     case ocIfError          :
                         if (!tryPlanEngineIfError(false))
@@ -11920,8 +11903,14 @@ StackVar ScInterpreter::Interpret()
                                     mrDoc, mrContext, rInputString);
                             });
                         break;
-                    case ocCode             : pushLegacyCode();             break;
-                    case ocTrim             : pushLegacyTrim();          break;
+                    case ocCode             :
+                        warnTextUtilityDispatch(u"CODE");
+                        PushInt(selibreoffice::codeFromText(GetString().getString()));
+                        break;
+                    case ocTrim             :
+                        warnTextUtilityDispatch(u"TRIM");
+                        PushString(selibreoffice::trimRepeatedSpaces(GetString().getString()));
+                        break;
                     case ocUpper            :
                         pushLegacyUnaryTextTransform(
                             u"UPPER", [&](const OUString& rText) {
@@ -11945,7 +11934,10 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocLen              : pushLegacyLen();              break;
                     case ocT                : pushLegacyT();                break;
-                    case ocClean            : pushLegacyClean();            break;
+                    case ocClean            :
+                        warnTextUtilityDispatch(u"CLEAN");
+                        PushString(selibreoffice::cleanPrintable(GetString().getString()));
+                        break;
                     case ocValue            : pushLegacyValue();        break;
                     case ocNumberValue      : pushLegacyNumberValue();  break;
                     case ocChar             : pushLegacyChar();             break;
@@ -13942,7 +13934,10 @@ StackVar ScInterpreter::Interpret()
                             return selibreoffice::convertIntoHalfWidth(rText);
                         });
                         break;
-                    case ocLenB             : pushLegacyLenB();         break;
+                    case ocLenB             :
+                        warnTextUtilityDispatch(u"LENB");
+                        PushDouble(getLengthB(GetString().getString()));
+                        break;
                     case ocRightB           : pushLegacyRightB();       break;
                     case ocLeftB            : pushLegacyLeftB();        break;
                     case ocMidB             : pushLegacyMidB();         break;
