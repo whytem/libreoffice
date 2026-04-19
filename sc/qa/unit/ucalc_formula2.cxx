@@ -683,6 +683,78 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterOperatorDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterControlFlowIfDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"ControlFlow"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    // Scalar IF conditions exercise the engine-first planIfBranch path.
+    // Use semicolon separators to match the ODF grammar used by this test
+    // fixture (comma parses as Err:508).
+    m_pDoc->SetString(ScAddress(0, 0, 0), u"=IF(TRUE();10;20)"_ustr);
+    ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 1, 0), u"=IF(FALSE();10;20)"_ustr);
+    ASSERT_DOUBLES_EQUAL(20.0, m_pDoc->GetValue(ScAddress(0, 1, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 2, 0), u"=IF(1;\"yes\";\"no\")"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"yes"_ustr, m_pDoc->GetString(ScAddress(0, 2, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 3, 0), u"=IF(0;\"yes\";\"no\")"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"no"_ustr, m_pDoc->GetString(ScAddress(0, 3, 0)));
+
+    // Missing else branch: scalar IF(cond) with just then slot.
+    m_pDoc->SetString(ScAddress(0, 4, 0), u"=IF(TRUE();42)"_ustr);
+    ASSERT_DOUBLES_EQUAL(42.0, m_pDoc->GetValue(ScAddress(0, 4, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 5, 0), u"=IF(FALSE();42)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(false, static_cast<bool>(m_pDoc->GetValue(ScAddress(0, 5, 0))));
+
+    // Reference condition — engine declines, legacy handles it.
+    m_pDoc->SetValue(ScAddress(1, 0, 0), 1.0);
+    m_pDoc->SetValue(ScAddress(1, 1, 0), 0.0);
+    m_pDoc->SetString(ScAddress(2, 0, 0), u"=IF(B1;\"yes\";\"no\")"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"yes"_ustr, m_pDoc->GetString(ScAddress(2, 0, 0)));
+    m_pDoc->SetString(ScAddress(2, 1, 0), u"=IF(B2;\"yes\";\"no\")"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"no"_ustr, m_pDoc->GetString(ScAddress(2, 1, 0)));
+
+    // Matrix condition stays on legacy ScIfJump matrix path.
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+    m_pDoc->InsertMatrixFormula(3, 0, 3, 1, aMark, u"=IF(B1:B2;10;20)"_ustr);
+    ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(ScAddress(3, 0, 0)));
+    ASSERT_DOUBLES_EQUAL(20.0, m_pDoc->GetValue(ScAddress(3, 1, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "controlflow_attempted="
+          + std::to_string(aDispatchStats.mnControlFlowEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnControlFlowEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnControlFlowEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE("IF dispatch should attempt engine evaluation: " + aLabel,
+                           aDispatchStats.mnControlFlowEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_MESSAGE("IF scalar conditions should succeed through engine: " + aLabel,
+                           aDispatchStats.mnControlFlowEngineSucceededCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "IF reference and matrix conditions should produce engine declines: " + aLabel,
+        aDispatchStats.mnControlFlowEngineDeclinedCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("control-flow dispatch accounting should stay balanced: " + aLabel,
+                                 aDispatchStats.mnControlFlowEngineAttemptedCount,
+                                 aDispatchStats.mnControlFlowEngineSucceededCount
+                                     + aDispatchStats.mnControlFlowEngineDeclinedCount);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);

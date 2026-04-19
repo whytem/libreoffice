@@ -92,6 +92,7 @@
 #include <spreadsheetengine/runtime/MathScalar.hxx>
 #include <spreadsheetengine/runtime/MathStatistical.hxx>
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
+#include <spreadsheetengine/runtime/RpnControlFlow.hxx>
 #include <spreadsheetengine/runtime/RpnOperators.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
@@ -330,6 +331,9 @@ struct InterpreterDispatchRuntimeStatsStore
     std::atomic<sal_uInt64> mnRangeEngineDeclinedGlobalErrorOrStackCount { 0 };
     std::atomic<sal_uInt64> mnRangeEngineDeclinedNullTokenCount { 0 };
     std::atomic<sal_uInt64> mnRangeEngineDeclinedBuildFailureCount { 0 };
+    std::atomic<sal_uInt64> mnControlFlowEngineAttemptedCount { 0 };
+    std::atomic<sal_uInt64> mnControlFlowEngineSucceededCount { 0 };
+    std::atomic<sal_uInt64> mnControlFlowEngineDeclinedCount { 0 };
     std::mutex maRangeDeclinedSampleMutex;
     std::vector<OUString> maRangeDeclinedFormulaSamples;
 };
@@ -472,6 +476,9 @@ void resetScInterpreterDispatchRuntimeStats()
     rStore.mnRangeEngineDeclinedGlobalErrorOrStackCount.store(0, std::memory_order_relaxed);
     rStore.mnRangeEngineDeclinedNullTokenCount.store(0, std::memory_order_relaxed);
     rStore.mnRangeEngineDeclinedBuildFailureCount.store(0, std::memory_order_relaxed);
+    rStore.mnControlFlowEngineAttemptedCount.store(0, std::memory_order_relaxed);
+    rStore.mnControlFlowEngineSucceededCount.store(0, std::memory_order_relaxed);
+    rStore.mnControlFlowEngineDeclinedCount.store(0, std::memory_order_relaxed);
     {
         std::lock_guard aGuard(rStore.maRangeDeclinedSampleMutex);
         rStore.maRangeDeclinedFormulaSamples.clear();
@@ -501,6 +508,12 @@ ScInterpreterDispatchRuntimeStatsSnapshot getScInterpreterDispatchRuntimeStatsSn
         = rStore.mnRangeEngineDeclinedNullTokenCount.load(std::memory_order_relaxed);
     aSnapshot.mnRangeEngineDeclinedBuildFailureCount
         = rStore.mnRangeEngineDeclinedBuildFailureCount.load(std::memory_order_relaxed);
+    aSnapshot.mnControlFlowEngineAttemptedCount
+        = rStore.mnControlFlowEngineAttemptedCount.load(std::memory_order_relaxed);
+    aSnapshot.mnControlFlowEngineSucceededCount
+        = rStore.mnControlFlowEngineSucceededCount.load(std::memory_order_relaxed);
+    aSnapshot.mnControlFlowEngineDeclinedCount
+        = rStore.mnControlFlowEngineDeclinedCount.load(std::memory_order_relaxed);
     {
         std::lock_guard aGuard(rStore.maRangeDeclinedSampleMutex);
         aSnapshot.maRangeDeclinedFormulaSamples = rStore.maRangeDeclinedFormulaSamples;
@@ -7636,6 +7649,114 @@ StackVar ScInterpreter::Interpret()
                         },
                         "family-local default-on conditional slice reached ScInterpreter");
                 };
+                // Batch 1 first admission: scalar IF condition through the
+                // engine-native planIfBranch. Reference and matrix operands
+                // defer to the legacy ScIfJump path, which still owns the
+                // matrix-frame JumpMatrix protocol until Batch 4 lands.
+                const auto tryPlanEngineIfJump = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnControlFlowEngineAttemptedCount);
+
+                    const short* pJump = pCur->GetJump();
+                    const short nJumpCount = pJump[0];
+                    if (!sp || nJumpCount < 2 || nJumpCount > 3)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const FormulaToken* pConditionToken = pStack[sp - 1];
+                    if (!pConditionToken)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+
+                    std::optional<serpn::RpnValue> oCondition;
+                    switch (pConditionToken->GetType())
+                    {
+                        case svDouble:
+                            oCondition = serpn::RpnValue::number(pConditionToken->GetDouble());
+                            break;
+                        case svError:
+                            oCondition = serpn::RpnValue::error(
+                                selibreoffice::toApiError(pConditionToken->GetError()));
+                            break;
+                        case svEmptyCell:
+                        case svMissing:
+                            oCondition = serpn::RpnValue::empty();
+                            break;
+                        default:
+                            // Reference, matrix, external-ref, string,
+                            // jump-matrix tokens all defer to legacy so we
+                            // do not guess at coercion or matrix-broadcast
+                            // semantics here.
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineDeclinedCount);
+                            return false;
+                    }
+
+                    const std::optional<std::size_t> oThenSlot
+                        = nJumpCount >= 2 ? std::optional<std::size_t>(0) : std::nullopt;
+                    const std::optional<std::size_t> oElseSlot
+                        = nJumpCount == 3 ? std::optional<std::size_t>(1) : std::nullopt;
+
+                    const auto aPlan = serpn::planIfBranch(*oCondition, oThenSlot, oElseSlot);
+                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+                    if (!aPlan)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+
+                    Pop();
+                    nGlobalError = FormulaError::NONE;
+
+                    switch (aPlan.maValue.meDirective)
+                    {
+                        case serpn::BranchDirective::TakeSlot:
+                            aCode.Jump(
+                                pJump[aPlan.maValue.mnSlot + 1], pJump[nJumpCount]);
+                            break;
+                        case serpn::BranchDirective::PropagateError:
+                            PushError(selibreoffice::toFormulaError(aPlan.maValue.meError));
+                            aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                            break;
+                        case serpn::BranchDirective::ReturnSyntheticBoolean:
+                            nFuncFmtType = SvNumFormatType::LOGICAL;
+                            PushInt(aPlan.maValue.mbSyntheticBool ? 1 : 0);
+                            aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                            break;
+                        default:
+                            // ReturnNotAvailable / ReturnParameterExpected /
+                            // KeepPrimaryValue / EvaluateAlternate are not
+                            // produced by planIfBranch; treat defensively as
+                            // decline so legacy re-runs unchanged.
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineDeclinedCount);
+                            return false;
+                    }
+
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnControlFlowEngineSucceededCount);
+                    return true;
+                };
                 const auto pushLegacyIfJump = [&]() {
                     warnConditionalDispatch(u"IF");
                     ScIfJump();
@@ -7948,7 +8069,10 @@ StackVar ScInterpreter::Interpret()
                     case ocMacro            : ScMacro();                    break;
                     case ocDBArea           : ScDBArea();                   break;
                     case ocColRowNameAuto   : ScColRowNameAuto();           break;
-                    case ocIf               : pushLegacyIfJump();           break;
+                    case ocIf               :
+                        if (!tryPlanEngineIfJump())
+                            pushLegacyIfJump();
+                        break;
                     case ocIfError          : pushLegacyIfError(false);     break;
                     case ocIfNA             : pushLegacyIfError(true);      break;
                     case ocChoose           : ScChooseJump();               break;

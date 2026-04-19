@@ -80,6 +80,9 @@ struct SC_DLLPUBLIC ScInterpreterDispatchRuntimeStatsSnapshot
     sal_uInt64 mnRangeEngineDeclinedGlobalErrorOrStackCount = 0;
     sal_uInt64 mnRangeEngineDeclinedNullTokenCount = 0;
     sal_uInt64 mnRangeEngineDeclinedBuildFailureCount = 0;
+    sal_uInt64 mnControlFlowEngineAttemptedCount = 0;
+    sal_uInt64 mnControlFlowEngineSucceededCount = 0;
+    sal_uInt64 mnControlFlowEngineDeclinedCount = 0;
     std::vector<OUString> maRangeDeclinedFormulaSamples;
 };
 
