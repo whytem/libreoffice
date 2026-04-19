@@ -5728,32 +5728,6 @@ StackVar ScInterpreter::Interpret()
                     if (MustHaveParamCount(GetByte(), 1))
                         PushString(aTransform(GetString().getString()));
                 };
-                const auto pushLegacyUnicode = [&]() {
-                    warnTextUtilityDispatch(u"UNICODE");
-                    if (MustHaveParamCount(GetByte(), 1))
-                    {
-                        if (std::optional<double> fValue
-                            = selibreoffice::unicodeFromText(GetString().getString()))
-                        {
-                            PushDouble(*fValue);
-                        }
-                        else
-                            PushIllegalParameter();
-                    }
-                };
-                const auto pushLegacyUnichar = [&]() {
-                    warnTextUtilityDispatch(u"UNICHAR");
-                    if (MustHaveParamCount(GetByte(), 1))
-                    {
-                        sal_uInt32 nCodePoint = GetUInt32();
-                        if (nGlobalError != FormulaError::NONE)
-                            PushIllegalArgument();
-                        else if (auto aStr = selibreoffice::unicharFromCodePoint(nCodePoint))
-                            PushString(*aStr);
-                        else
-                            PushIllegalArgument();
-                    }
-                };
                 const auto pushLegacyTextBeforeAfter = [&](bool bBefore) {
                     warnTextUtilityDispatch(bBefore ? u"TEXTBEFORE" : u"TEXTAFTER");
                     sal_uInt8 nParamCount = GetByte();
@@ -13949,8 +13923,32 @@ StackVar ScInterpreter::Interpret()
                     case ocReplaceB         : pushLegacyReplaceB();     break;
                     case ocFindB            : pushLegacyFindB();        break;
                     case ocSearchB          : pushLegacySearchB();      break;
-                    case ocUnicode          : pushLegacyUnicode();          break;
-                    case ocUnichar          : pushLegacyUnichar();          break;
+                    case ocUnicode          :
+                        warnTextUtilityDispatch(u"UNICODE");
+                        if (MustHaveParamCount(GetByte(), 1))
+                        {
+                            if (std::optional<double> fValue
+                                = selibreoffice::unicodeFromText(GetString().getString()))
+                            {
+                                PushDouble(*fValue);
+                            }
+                            else
+                                PushIllegalParameter();
+                        }
+                        break;
+                    case ocUnichar          :
+                        warnTextUtilityDispatch(u"UNICHAR");
+                        if (MustHaveParamCount(GetByte(), 1))
+                        {
+                            sal_uInt32 nCodePoint = GetUInt32();
+                            if (nGlobalError != FormulaError::NONE)
+                                PushIllegalArgument();
+                            else if (auto aStr = selibreoffice::unicharFromCodePoint(nCodePoint))
+                                PushString(*aStr);
+                            else
+                                PushIllegalArgument();
+                        }
+                        break;
                     case ocBitAnd           :
                         pushLegacyBitwise(u"BITAND",
                                           [](double fLeft, double fRight) {
