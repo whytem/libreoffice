@@ -24,18 +24,38 @@ runs the test and exits non-zero only if the failure set differs from this
 list (i.e., a *new* regression slipped in, or an old one was *unintentionally*
 fixed without the list being updated).
 
-## Failure baseline (2026-04-19, after stored-host-truth self-referential fix)
+## Failure baseline (2026-04-19, after SUMSQ / SUMX2MY2 / SUMX2PY2 engine fix)
 
-18 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 134 tests.
+15 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 135 tests.
 
-Previous baseline was 30 tests. One fix — gating the
-`importedRootUsesStoredHostValueTruth` fallback behind imported-canonical /
-imported-cached-formula predicates — cleared 12 tests at once. The fallback
-was firing in live-recalc (e.g. `SetString` + `CalcFormulaTree`) contexts
-where the "host value" is the previous result of the *same* cell we are
-currently recomputing. Returning that stale value as authoritative left
-formulas like `=SHEETS()`, `=IF(...)`, `=FTEST(...)`, etc. frozen at zero
-after the first recalc that touched them.
+Previous baseline was 30 tests. Progress so far:
+
+- **Stored-host-value-truth self-referential gate (30 → 18, -12)**: gated the
+  `importedRootUsesStoredHostValueTruth` fallback behind imported-canonical /
+  imported-cached-formula predicates. The fallback was firing in
+  live-recalc (e.g. `SetString` + `CalcFormulaTree`) contexts where the
+  "host value" is the previous result of the *same* cell we are currently
+  recomputing. Returning that stale value as authoritative left formulas
+  like `=SHEETS()`, `=IF(...)`, `=FTEST(...)`, etc. frozen at zero after
+  the first recalc that touched them.
+- **ScCount/ScCount2 wrapper retirement (18 → 17, -1)**: inlining
+  `IterateParameters(ifCOUNT)` at the compat-dispatch call sites
+  incidentally cleared `testFuncSUMSQ` on the first unrelated SUMSQ edge
+  case.
+- **NumericAggregate engine surface fixes (17 → 14, -3)**:
+  - Scalar-text argument in SUM / SUMSQ / AVERAGE / PRODUCT / DEVSQ now
+    surfaces #VALUE! (NoValue) instead of Err:502 (IllegalArgument),
+    matching legacy `=SUMSQ("a";1;-4;2)` error semantics.
+  - `SUMX2MY2 / SUMX2PY2 / SUMXMY2` now walk the two matrix operands in
+    lockstep, skipping a pair only when *either* matrix has a non-numeric
+    cell, matching legacy `CalculateSumX2MY2SumX2DY2` pairing. Previously
+    the engine collected each matrix independently, which desynced pair
+    ordering when empty cells appeared asymmetrically between X and Y
+    ranges.
+  - Arity mismatch (non-two parameters) declines to legacy so that
+    legacy `MustHaveParamCount(2, 2)` still surfaces Err:511
+    (ParameterExpected); the engine's api::Error enum doesn't model
+    ParameterExpected, and we must not flatten it to IllegalArgument.
 
 ### External reference (0)
 
@@ -47,7 +67,7 @@ now correctly consume the cached value; live calc no longer shadows it).
 - `testFormulaDepTrackingDeleteCol`
 - `testIterations`
 
-### Function evaluation (10)
+### Function evaluation (7)
 
 Likely root cause: legacy fallback paths regressed during retirement +
 relocation episodes; recalc/observe interaction with the seam returns wrong
@@ -59,9 +79,6 @@ values or false `Err:522` (Circular Reference) on dependency change.
 - `testFuncMATCH`
 - `testFuncNOW`
 - `testFuncRefListArraySUBTOTAL`
-- `testFuncSUMSQ`
-- `testFuncSUMX2MY2`
-- `testFuncSUMX2PY2`
 - `testFuncTableRef`
 
 ### InterpretTail engine evaluator (3)

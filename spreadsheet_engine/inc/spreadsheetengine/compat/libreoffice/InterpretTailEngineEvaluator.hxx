@@ -7973,7 +7973,14 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             if (aScalar.moValue->isEmpty())
                 continue;
             if (aScalar.moValue->isText())
-                return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+            {
+                // Legacy SUM / SUMSQ / AVERAGE / DEVSQ / PRODUCT surface
+                // #VALUE! (NoValue) when a scalar text argument can't be
+                // coerced to a number (e.g. =SUMSQ("a";1;-4;2)). The
+                // engine's prior IllegalArgument mapped to Err:502 instead
+                // of the expected #VALUE!, so route through NoValue.
+                return makeMaterializedError<std::vector<double>>(api::Error::NoValue);
+            }
 
             const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aScalar.moValue);
             if (!aNumber)
@@ -7986,57 +7993,84 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
     const auto collectPairedNumericAggregateValues
         = [&]() -> Materialization<std::pair<std::vector<double>, std::vector<double>>> {
+        // Legacy SUMX2MY2 / SUMX2PY2 / SUMXMY2 require exactly two parameters
+        // and MustHaveParamCount(2, 2) surfaces Err:511 (ParameterExpected)
+        // for arity mismatch. The engine's api::Error enum doesn't model
+        // ParameterExpected, so decline to legacy for that case.
         if (rNode.maChildren.size() != 2)
         {
+            return makeUnsupportedMaterialization<
+                std::pair<std::vector<double>, std::vector<double>>>(
+                FallbackReason::UnsupportedFormulaShape);
+        }
+
+        // Legacy CalculateSumX2MY2SumX2DY2 walks the two matrices in
+        // lockstep, skipping a pair only when EITHER matrix carries a
+        // non-numeric (text or empty) cell at that position. Collecting
+        // values independently (skip empty/text in each matrix) desyncs
+        // pair ordering and yields wrong sums, e.g.
+        //   SUMX2MY2(A1:C3; D1:F3) with A1=10, B1=2, D1=-9 and
+        //   everything else empty would legacy-pair (10,-9) only and
+        //   sum 100 - 81 = 19, but independent skipping pairs 10 with -9
+        //   and 2 with 0 and sums 19 + 4 = 23.
+        Materialization<ScMatrixRef> aMatrices[2];
+        SCSIZE nColumns[2] = { 0, 0 };
+        SCSIZE nRows[2] = { 0, 0 };
+        for (std::size_t nIndex = 0; nIndex < 2; ++nIndex)
+        {
+            aMatrices[nIndex] = materializeMatrixNode(
+                *rNode.maChildren[nIndex], rDoc, rContext, rFormulaPos);
+            if (!aMatrices[nIndex].mbSupported)
+            {
+                return makeUnsupportedMaterialization<
+                    std::pair<std::vector<double>, std::vector<double>>>(
+                    aMatrices[nIndex].meFallbackReason);
+            }
+            if (!aMatrices[nIndex].moValue)
+            {
+                return makeMaterializedError<std::pair<std::vector<double>, std::vector<double>>>(
+                    aMatrices[nIndex].meError);
+            }
+
+            (*aMatrices[nIndex].moValue)->GetDimensions(nColumns[nIndex], nRows[nIndex]);
+        }
+        if (nColumns[0] != nColumns[1] || nRows[0] != nRows[1])
+        {
             return makeMaterializedError<std::pair<std::vector<double>, std::vector<double>>>(
-                api::Error::IllegalArgument);
+                api::Error::NoValue);
         }
 
         std::pair<std::vector<double>, std::vector<double>> aPair;
-        for (std::size_t nIndex = 0; nIndex < 2; ++nIndex)
+        for (SCSIZE nRow = 0; nRow < nRows[0]; ++nRow)
         {
-            const auto aMatrix = materializeMatrixNode(
-                *rNode.maChildren[nIndex], rDoc, rContext, rFormulaPos);
-            if (!aMatrix.mbSupported)
+            for (SCSIZE nColumn = 0; nColumn < nColumns[0]; ++nColumn)
             {
-                return makeUnsupportedMaterialization<
-                    std::pair<std::vector<double>, std::vector<double>>>(aMatrix.meFallbackReason);
-            }
-            if (!aMatrix.moValue)
-            {
-                return makeMaterializedError<std::pair<std::vector<double>, std::vector<double>>>(
-                    aMatrix.meError);
-            }
-
-            auto& rValues = nIndex == 0 ? aPair.first : aPair.second;
-            SCSIZE nColumns = 0;
-            SCSIZE nRows = 0;
-            (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
-            for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
-            {
-                for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                const auto aLeft = lookupexecution::detail::toApiCellValue(
+                    (*aMatrices[0].moValue)->Get(nColumn, nRow));
+                const auto aRight = lookupexecution::detail::toApiCellValue(
+                    (*aMatrices[1].moValue)->Get(nColumn, nRow));
+                if (aLeft.isEmpty() || aLeft.isText()
+                    || aRight.isEmpty() || aRight.isText())
                 {
-                    const auto aValue = lookupexecution::detail::toApiCellValue(
-                        (*aMatrix.moValue)->Get(nColumn, nRow));
-                    if (aValue.isEmpty() || aValue.isText())
-                        continue;
-
-                    const auto aNumber = coerceScalarToNumber(rDoc, rContext, aValue);
-                    if (!aNumber)
-                    {
-                        return makeMaterializedError<
-                            std::pair<std::vector<double>, std::vector<double>>>(
-                            aNumber.meError);
-                    }
-                    rValues.push_back(aNumber.maValue);
+                    continue;
                 }
+                const auto aLeftNumber = coerceScalarToNumber(rDoc, rContext, aLeft);
+                if (!aLeftNumber)
+                {
+                    return makeMaterializedError<
+                        std::pair<std::vector<double>, std::vector<double>>>(
+                        aLeftNumber.meError);
+                }
+                const auto aRightNumber = coerceScalarToNumber(rDoc, rContext, aRight);
+                if (!aRightNumber)
+                {
+                    return makeMaterializedError<
+                        std::pair<std::vector<double>, std::vector<double>>>(
+                        aRightNumber.meError);
+                }
+                aPair.first.push_back(aLeftNumber.maValue);
+                aPair.second.push_back(aRightNumber.maValue);
             }
-        }
-
-        if (aPair.first.size() != aPair.second.size())
-        {
-            return makeMaterializedError<std::pair<std::vector<double>, std::vector<double>>>(
-                api::Error::IllegalArgument);
         }
         return makeMaterializedValue(std::move(aPair));
     };
