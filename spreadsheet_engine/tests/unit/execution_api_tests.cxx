@@ -7,6 +7,8 @@
 #include <spreadsheetengine/api/MatrixFrame.hxx>
 #include <spreadsheetengine/detail/ExecutionContext.hxx>
 #include <spreadsheetengine/runtime/RpnControlFlow.hxx>
+#include <spreadsheetengine/runtime/RpnCriteria.hxx>
+#include <spreadsheetengine/runtime/RpnDatabase.hxx>
 #include <spreadsheetengine/runtime/RpnOperators.hxx>
 #include <spreadsheetengine/runtime/RpnReference.hxx>
 #include <spreadsheetengine/runtime/RpnValue.hxx>
@@ -376,6 +378,122 @@ int main()
             || aRefProjDefer.meReadiness != RpnCoercionReadiness::NeedsReferenceResolution)
         {
             return fail("spreadsheetengine_execution_tests", "Index projection contract mismatch");
+        }
+    }
+
+    {
+        using spreadsheetengine::core::rpn::AggregationBridge;
+        using spreadsheetengine::core::rpn::applyFieldSelector;
+        using spreadsheetengine::core::rpn::bridgeAggregation;
+        using spreadsheetengine::core::rpn::buildCriteriaPredicate;
+        using spreadsheetengine::core::rpn::countEmptyCells;
+        using spreadsheetengine::core::rpn::DatabaseAggregation;
+        using spreadsheetengine::core::rpn::DatabaseQueryDescriptor;
+        using spreadsheetengine::core::rpn::RpnValue;
+
+        // Minimal parsers to exercise the criteria-predicate contract.
+        const auto pParseNumberText
+            = +[](spreadsheetengine::api::StringView) -> std::optional<spreadsheetengine::api::NumberParseResult> {
+            return std::nullopt;
+        };
+        const auto pParseAsciiDouble
+            = +[](spreadsheetengine::api::StringView) -> std::optional<double> {
+            return std::nullopt;
+        };
+
+        const auto aNumericPred = buildCriteriaPredicate(
+            RpnValue::number(42.0), pParseNumberText, pParseAsciiDouble);
+        const auto aTextPred = buildCriteriaPredicate(
+            RpnValue::text(u"apple"), pParseNumberText, pParseAsciiDouble);
+        const auto aRefPredDefer = buildCriteriaPredicate(
+            RpnValue::reference(ResolvedReference { { { 0, 1, 2 }, { 0, 1, 2 } } }),
+            pParseNumberText, pParseAsciiDouble);
+
+        if (!aNumericPred
+            || !aTextPred
+            || aRefPredDefer
+            || aRefPredDefer.meReadiness != RpnCoercionReadiness::NeedsReferenceResolution)
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "buildCriteriaPredicate contract mismatch");
+        }
+
+        // countEmptyCells: mix of empty, number, empty-text, text.
+        const std::vector<spreadsheetengine::api::CellValue> aValues = {
+            spreadsheetengine::api::CellValue::empty(),
+            spreadsheetengine::api::CellValue::number(1.0),
+            spreadsheetengine::api::CellValue::text(u""),
+            spreadsheetengine::api::CellValue::text(u"x")
+        };
+        const auto aEmptyCount = countEmptyCells(aValues);
+        if (!aEmptyCount || aEmptyCount.maValue != 2.0)
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "countEmptyCells contract mismatch");
+        }
+
+        // applyFieldSelector branches.
+        DatabaseQueryDescriptor aDesc;
+        const auto aEmptySelector = applyFieldSelector(RpnValue::empty(), aDesc);
+        if (!aEmptySelector || !aDesc.mbFieldMissing)
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "applyFieldSelector(empty) mismatch");
+        }
+
+        DatabaseQueryDescriptor aDescIndex;
+        const auto aNumberSelector = applyFieldSelector(RpnValue::number(3.0), aDescIndex);
+        if (!aNumberSelector || !aDescIndex.moFieldByIndex
+            || *aDescIndex.moFieldByIndex != 3)
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "applyFieldSelector(number) mismatch");
+        }
+
+        DatabaseQueryDescriptor aDescName;
+        const auto aTextSelector = applyFieldSelector(RpnValue::text(u"Amount"), aDescName);
+        if (!aTextSelector || !aDescName.moFieldByName
+            || *aDescName.moFieldByName != u"Amount")
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "applyFieldSelector(text) mismatch");
+        }
+
+        DatabaseQueryDescriptor aDescRef;
+        const auto aRefSelector = applyFieldSelector(
+            RpnValue::reference(ResolvedReference { { { 0, 0, 0 }, { 0, 0, 0 } } }),
+            aDescRef);
+        if (aRefSelector
+            || aRefSelector.meReadiness != RpnCoercionReadiness::NeedsReferenceResolution)
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "applyFieldSelector(ref) should defer");
+        }
+
+        // bridgeAggregation routing.
+        const auto aSumBridge = bridgeAggregation(DatabaseAggregation::Sum);
+        const auto aAvgBridge = bridgeAggregation(DatabaseAggregation::Average);
+        const auto aStdDevBridge = bridgeAggregation(DatabaseAggregation::StandardDeviation);
+        const auto aStdDevPBridge
+            = bridgeAggregation(DatabaseAggregation::StandardDeviationPopulation);
+        const auto aProductBridge = bridgeAggregation(DatabaseAggregation::Product);
+        const auto aGetBridge = bridgeAggregation(DatabaseAggregation::Get);
+
+        if (!aSumBridge.moKind
+            || *aSumBridge.moKind != spreadsheetengine::core::query::CriteriaAggregateKind::Sum
+            || !aAvgBridge.moKind
+            || *aAvgBridge.moKind
+                != spreadsheetengine::core::query::CriteriaAggregateKind::Average
+            || aStdDevBridge.moKind
+            || !aStdDevBridge.mbRequiresVarianceAggregation
+            || aStdDevBridge.mbPopulation
+            || !aStdDevPBridge.mbRequiresVarianceAggregation
+            || !aStdDevPBridge.mbPopulation
+            || !aProductBridge.mbRequiresProductAggregation
+            || !aGetBridge.mbRequiresGetAggregation)
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "bridgeAggregation contract mismatch");
         }
     }
 
