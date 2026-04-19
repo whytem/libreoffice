@@ -184,10 +184,36 @@ Each (criteria_range, criterion) pair is validated through the same
 `buildCriteriaRangeInput` bridge as the single-criterion family, and
 the optional target range (SUMIFS / AVERAGEIFS / MINIFS / MAXIFS) is
 accepted when it is an svDoubleRef on a single sheet.
-`ocCountEmptyCells` is intentionally deferred until the engine has a
-streaming range-iteration primitive; materializing a range into a
-`std::vector` just to count empties would be a perf regression vs. the
-legacy `ScCellIterator`.
+`ocCountEmptyCells` now routes through `serpn::planCountEmptyRange`,
+which streams a `CriteriaAggregateInput` range through the same
+materializer the other criteria admissions use and counts cells whose
+`CellValue` reports Empty or empty Text — mirroring legacy
+`isCellContentEmpty` semantics. Scope fence: single-sheet svDoubleRef
+only; svSingleRef / svRefList / svMatrix / external refs defer.
+
+Batch 3 tail admissions now additionally cover DCOUNT / DCOUNTA and
+the DB variance family plus DGET. Two new `CriteriaAggregateKind`
+values, `Count2` and `CountNumeric`, carry legacy DCOUNTA /
+DCOUNT-with-field-specified semantics through
+`evaluateCriteriaAggregate`; both plug into the existing
+`tryPlanEngineDatabaseAggregate` helper, declining only for the
+bMissingField branch of DCOUNT where no field column resolves.
+
+`RpnVariance.hxx` provides a Welford-style `VarianceAccumulator` plus
+`planDatabaseVarianceAggregate` for the DSTDEV / DSTDEVP / DVAR /
+DVARP family and `planDatabaseGet` for DGET's uniqueness-enforcing
+return. Both planners drive the same CriteriaAggregateMaterializer,
+stream the criteria grid, and finalize as:
+  - variance: population / sample divisor, optional sqrt, errors on
+    insufficient count
+  - get: exactly one match -> success; zero -> NoValue; two or more
+    -> IllegalArgument
+The Calc-side helpers `tryPlanEngineDatabaseVariance` and
+`tryPlanEngineDatabaseGet` share the 3-arg DB scope fence
+(single-sheet svDoubleRef on both ranges, exactly one criteria data
+row, scalar field by index or header name). External refs, RefList,
+multi-sheet, multi-criteria-row, and missing-field cases still defer
+to legacy.
 
 Batch 4 substrate (`runtime/RpnMatrix.hxx`) has landed with six
 admissions so far. The pure-scalar constructors `ocMatrixUnit`
