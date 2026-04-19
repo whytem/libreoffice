@@ -98,8 +98,10 @@
 #include <spreadsheetengine/runtime/RpnOperators.hxx>
 #include <spreadsheetengine/runtime/RpnReference.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
+#include <spreadsheetengine/api/StringReference.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/IndirectExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpreterCompatDispatch.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx>
 #include <spreadsheetengine/compat/libreoffice/JumpExecution.hxx>
@@ -133,6 +135,8 @@ namespace secoercion = spreadsheetengine::core::coercion;
 namespace seitee = spreadsheetengine::compat::libreoffice::interprettaileval;
 namespace seswitchexec = spreadsheetengine::compat::libreoffice::switchexecution;
 namespace setextparseexec = spreadsheetengine::compat::libreoffice::textparsingexecution;
+namespace sestringref = spreadsheetengine::api::stringreference;
+namespace seindirectexec = spreadsheetengine::compat::libreoffice::indirectexecution;
 
 namespace {
 
@@ -8921,6 +8925,116 @@ StackVar ScInterpreter::Interpret()
                 // and absolute mode 1. Any other parameter combination
                 // (3-5 args with abs mode, style flag, sheet token) or
                 // non-scalar arguments defer to legacy ScAddressFunc.
+                const auto tryPlanEngineIndirect = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnReferenceEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount < 1 || nParamCount > 2 || sp < nParamCount)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    // Scope fence: reference text must already be an
+                    // svString token (no live coercion); optional A1/R1C1
+                    // flag must be a scalar svDouble.
+                    const FormulaToken* pFlagTok
+                        = (nParamCount == 2) ? pStack[sp - 1] : nullptr;
+                    const FormulaToken* pTextTok
+                        = pStack[sp - nParamCount];
+                    if (!pTextTok || pTextTok->GetType() != svString
+                        || (pFlagTok && pFlagTok->GetType() != svDouble))
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const bool bForceR1C1
+                        = (pFlagTok != nullptr && pFlagTok->GetDouble() == 0.0);
+                    const auto aSyntaxPolicy
+                        = sestringref::resolveIndirectAddressSyntaxPolicy(
+                            selibreoffice::toApiAddressConvention(
+                                maCalcConfig.meStringRefAddressSyntax),
+                            selibreoffice::toApiAddressConvention(
+                                mrDoc.GetAddressConvention()),
+                            maCalcConfig.meStringRefAddressSyntax
+                                == FormulaGrammar::CONV_A1_XL_A1,
+                            bForceR1C1);
+                    const FormulaGrammar::AddressConvention eConv
+                        = selibreoffice::toLibreOfficeAddressConvention(
+                            aSyntaxPolicy.mePrimary);
+                    const bool bTryXlA1
+                        = aSyntaxPolicy.moFallback
+                          == spreadsheetengine::api::AddressConvention::XlA1;
+
+                    const svl::SharedString sRefStr = pTextTok->GetString();
+                    if (sRefStr.getString().isEmpty())
+                    {
+                        sp -= nParamCount;
+                        nGlobalError = FormulaError::NONE;
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineSucceededCount);
+                        PushError(FormulaError::NoRef);
+                        return true;
+                    }
+
+                    const auto oResolved = seindirectexec::resolveIndirectReference(
+                        mrDoc, aPos, sRefStr, eConv, bTryXlA1);
+                    if (!oResolved)
+                    {
+                        sp -= nParamCount;
+                        nGlobalError = FormulaError::NONE;
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineSucceededCount);
+                        PushError(FormulaError::NoRef);
+                        return true;
+                    }
+
+                    sp -= nParamCount;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnReferenceEngineSucceededCount);
+                    switch (oResolved->meKind)
+                    {
+                        case seindirectexec::IndirectExecutionResult::Kind::SingleRef:
+                            PushSingleRef(oResolved->maRef1);
+                            break;
+                        case seindirectexec::IndirectExecutionResult::Kind::DoubleRef:
+                            PushDoubleRef(oResolved->maRef1, oResolved->maRef2);
+                            break;
+                        case seindirectexec::IndirectExecutionResult::Kind::ExternalSingleRef:
+                            PushExternalSingleRef(
+                                oResolved->mnFileId, oResolved->maTabName,
+                                oResolved->maRef1.Col(),
+                                oResolved->maRef1.Row(),
+                                oResolved->maRef1.Tab());
+                            break;
+                        case seindirectexec::IndirectExecutionResult::Kind::ExternalDoubleRef:
+                            PushExternalDoubleRef(
+                                oResolved->mnFileId, oResolved->maTabName,
+                                oResolved->maRef1.Col(),
+                                oResolved->maRef1.Row(),
+                                oResolved->maRef1.Tab(),
+                                oResolved->maRef2.Col(),
+                                oResolved->maRef2.Row(),
+                                oResolved->maRef2.Tab());
+                            break;
+                        case seindirectexec::IndirectExecutionResult::Kind::Token:
+                            PushTokenRef(oResolved->mxToken);
+                            break;
+                    }
+                    return true;
+                };
+
                 const auto tryPlanEngineAddress = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
@@ -11651,7 +11765,10 @@ StackVar ScInterpreter::Interpret()
                     case ocDBStdDevP        : ScDBStdDevP();                break;
                     case ocDBVar            : ScDBVar();                    break;
                     case ocDBVarP           : ScDBVarP();                   break;
-                    case ocIndirect         : ScIndirect();                 break;
+                    case ocIndirect         :
+                        if (!tryPlanEngineIndirect())
+                            ScIndirect();
+                        break;
                     case ocAddress          :
                         if (!tryPlanEngineAddress())
                             ScAddressFunc();
