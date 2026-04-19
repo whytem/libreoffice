@@ -6,6 +6,9 @@
 
 #include <spreadsheetengine/api/MatrixFrame.hxx>
 #include <spreadsheetengine/detail/ExecutionContext.hxx>
+#include <spreadsheetengine/runtime/ForecastEngine.hxx>
+#include <spreadsheetengine/runtime/ForecastEtsEngine.hxx>
+#include <spreadsheetengine/runtime/LinestEngine.hxx>
 #include <spreadsheetengine/runtime/RpnControlFlow.hxx>
 #include <spreadsheetengine/runtime/RpnCriteria.hxx>
 #include <spreadsheetengine/runtime/RpnDatabase.hxx>
@@ -599,6 +602,148 @@ int main()
         {
             return fail(
                 "spreadsheetengine_execution_tests", "planSumReductionPair contract mismatch");
+        }
+    }
+
+    {
+        // Batch 4 regression/forecast substrate: LINEST / LOGEST / TREND /
+        // GROWTH + FORECAST + FOURIER.
+        using spreadsheetengine::core::rpn::MatrixOperand;
+        using spreadsheetengine::core::rpn::MatrixProvenance;
+        using spreadsheetengine::core::rpn::planForecast;
+        using spreadsheetengine::core::rpn::planFourier;
+        using spreadsheetengine::core::rpn::planGrowth;
+        using spreadsheetengine::core::rpn::planLinest;
+        using spreadsheetengine::core::rpn::planLogest;
+        using spreadsheetengine::core::rpn::planTrend;
+
+        auto makeCol = [](std::initializer_list<double> aValues) {
+            MatrixOperand aOp;
+            aOp.maDimensions
+                = { 1,
+                    static_cast<spreadsheetengine::api::MatrixSize>(aValues.size()) };
+            for (double v : aValues)
+                aOp.maValues.push_back(
+                    spreadsheetengine::api::CellValue::number(v));
+            aOp.meProvenance = MatrixProvenance::InlineLiteral;
+            return aOp;
+        };
+        const auto aX = makeCol({ 1.0, 2.0, 3.0, 4.0 });
+        const auto aY = makeCol({ 3.0, 5.0, 7.0, 9.0 });
+
+        // LINEST known answer: Y = 2X + 1 -> slope=2, intercept=1.
+        const auto aLin = planLinest(&aX, aY, true, false);
+        if (!aLin
+            || std::fabs(aLin.maValue.maMatrix.maValues[0].mfNumber - 2.0) > 1e-12
+            || std::fabs(aLin.maValue.maMatrix.maValues[1].mfNumber - 1.0) > 1e-12)
+        {
+            return fail("spreadsheetengine_execution_tests",
+                        "planLinest known-answer mismatch");
+        }
+
+        // LOGEST: Y = 2 * 3^X -> slope coef 3, intercept coef 2.
+        const auto aXlog = makeCol({ 1.0, 2.0, 3.0 });
+        const auto aYlog = makeCol({ 6.0, 18.0, 54.0 });
+        const auto aLog = planLogest(&aXlog, aYlog, true, false);
+        if (!aLog
+            || std::fabs(aLog.maValue.maMatrix.maValues[0].mfNumber - 3.0) > 1e-9
+            || std::fabs(aLog.maValue.maMatrix.maValues[1].mfNumber - 2.0) > 1e-9)
+        {
+            return fail("spreadsheetengine_execution_tests",
+                        "planLogest known-answer mismatch");
+        }
+
+        // TREND: project Y = 2X + 1 onto new X = [5, 6] -> [11, 13].
+        const auto aNewX = makeCol({ 5.0, 6.0 });
+        const auto aTr = planTrend(aY, &aX, &aNewX, true);
+        if (!aTr
+            || aTr.maValue.maMatrix.maValues.size() != 2
+            || std::fabs(aTr.maValue.maMatrix.maValues[0].mfNumber - 11.0) > 1e-12
+            || std::fabs(aTr.maValue.maMatrix.maValues[1].mfNumber - 13.0) > 1e-12)
+        {
+            return fail("spreadsheetengine_execution_tests",
+                        "planTrend known-answer mismatch");
+        }
+
+        // GROWTH: Y = 2 * 3^X; new X = [4] -> 2 * 81 = 162.
+        const auto aNewXg = makeCol({ 4.0 });
+        const auto aGr = planGrowth(aYlog, &aXlog, &aNewXg, true);
+        if (!aGr
+            || aGr.maValue.maMatrix.maValues.size() != 1
+            || std::fabs(aGr.maValue.maMatrix.maValues[0].mfNumber - 162.0) > 1e-6)
+        {
+            return fail("spreadsheetengine_execution_tests",
+                        "planGrowth known-answer mismatch");
+        }
+
+        // FORECAST: x=5, known Y = [3,5,7,9], known X = [1,2,3,4]
+        // -> 2*5 + 1 = 11.
+        const auto aFc = planForecast(5.0, aY, aX);
+        if (!aFc || std::fabs(aFc.maValue - 11.0) > 1e-12)
+        {
+            return fail("spreadsheetengine_execution_tests",
+                        "planForecast known-answer mismatch");
+        }
+
+        // FOURIER: 4-point real input = [1,0,0,0]. The FFT of a unit
+        // impulse is {1,1,1,1} with zero imaginary parts.
+        MatrixOperand aImpulse;
+        aImpulse.maDimensions = { 1, 4 };
+        aImpulse.maValues = { spreadsheetengine::api::CellValue::number(1.0),
+                              spreadsheetengine::api::CellValue::number(0.0),
+                              spreadsheetengine::api::CellValue::number(0.0),
+                              spreadsheetengine::api::CellValue::number(0.0) };
+        aImpulse.meProvenance = MatrixProvenance::InlineLiteral;
+        const auto aFft = planFourier(aImpulse, true /*byColumn*/,
+                                      false /*inverse*/, false /*polar*/, 0.0);
+        if (!aFft || aFft.maValue.maMatrix.maDimensions.mnRows != 4
+            || aFft.maValue.maMatrix.maDimensions.mnColumns != 2)
+        {
+            return fail("spreadsheetengine_execution_tests",
+                        "planFourier shape mismatch");
+        }
+        for (std::size_t i = 0; i < 4; ++i)
+        {
+            const double fRe
+                = aFft.maValue.maMatrix.maValues[i * 2].mfNumber;
+            const double fIm
+                = aFft.maValue.maMatrix.maValues[i * 2 + 1].mfNumber;
+            if (std::fabs(fRe - 1.0) > 1e-12 || std::fabs(fIm) > 1e-12)
+            {
+                return fail("spreadsheetengine_execution_tests",
+                            "planFourier impulse mismatch");
+            }
+        }
+
+        // ForecastEts scaffold: non-stats variants currently defer so
+        // the dispatch lambda declines and the legacy state machine
+        // keeps authority. Verify the contract: deferred readiness,
+        // no Ready result.
+        using spreadsheetengine::core::rpn::ForecastEtsVariant;
+        using spreadsheetengine::core::rpn::planForecastEts;
+        MatrixOperand aEmpty;
+        aEmpty.maDimensions = { 1, 1 };
+        aEmpty.maValues.push_back(
+            spreadsheetengine::api::CellValue::number(0.0));
+        const auto aEtsNonStats = planForecastEts(
+            ForecastEtsVariant::Add, aEmpty, aEmpty, aEmpty, nullptr,
+            nullptr, nullptr, nullptr);
+        if (aEtsNonStats.meReadiness
+            != spreadsheetengine::core::rpn::RpnCoercionReadiness::
+                NeedsMatrixMaterialization)
+        {
+            return fail("spreadsheetengine_execution_tests",
+                        "planForecastEts non-stats scaffold must defer");
+        }
+        const auto aEtsStats = planForecastEts(
+            ForecastEtsVariant::StatAdd, aEmpty, aEmpty, aEmpty, nullptr,
+            nullptr, nullptr, nullptr);
+        if (aEtsStats
+            || aEtsStats.meError
+                   != spreadsheetengine::api::Error::IllegalArgument)
+        {
+            return fail("spreadsheetengine_execution_tests",
+                        "planForecastEts stats variant must fail hard");
         }
     }
 
