@@ -778,12 +778,10 @@ public:
 
     // matrix functions
     void ScMatValue();
-    static void MEMat(const ScMatrixRef& mM, SCSIZE n);
     void ScMatInv();
     void ScMatMult();
     void ScMatSequence();
     void ScMatTrans();
-    void ScEMat();
     void ScMatRef();
     ScMatrixRef MatConcat(const ScMatrixRef& pMat1, const ScMatrixRef& pMat2);
     void ScSumX2MY2();

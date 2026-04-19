@@ -5726,13 +5726,6 @@ StackVar ScInterpreter::Interpret()
                             PushError(FormulaError::UnknownOpCode);
                     }
                 };
-                const auto pushLegacyChar = [&]() {
-                    warnTextUtilityDispatch(u"CHAR");
-                    if (auto aStr = selibreoffice::charFromValue(GetDouble()))
-                        PushString(*aStr);
-                    else
-                        PushIllegalArgument();
-                };
                 const auto pushLegacyJisAsc = [&](std::u16string_view rFunctionName,
                                                   auto aTransform) {
                     warnTextUtilityDispatch(rFunctionName);
@@ -11940,7 +11933,13 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocValue            : pushLegacyValue();        break;
                     case ocNumberValue      : pushLegacyNumberValue();  break;
-                    case ocChar             : pushLegacyChar();             break;
+                    case ocChar             :
+                        warnTextUtilityDispatch(u"CHAR");
+                        if (auto aStr = selibreoffice::charFromValue(GetDouble()))
+                            PushString(*aStr);
+                        else
+                            PushIllegalArgument();
+                        break;
                     case ocArcTan2          :
                         warnIfLegacyDefaultOnReached(
                             u"ATAN2", "family-local default-on math scalar reached ScInterpreter");
@@ -12919,7 +12918,10 @@ StackVar ScInterpreter::Interpret()
                     case ocMatValue         : ScMatValue();                 break;
                     case ocMatrixUnit       :
                         if (!tryPlanEngineIdentityMatrix())
-                            ScEMat();
+                        {
+                            OSL_FAIL("engine-backed MUNIT declined ocMatrixUnit");
+                            PushIllegalArgument();
+                        }
                         break;
                     case ocMatDet:
                         if (!tryPlanEngineMatrixDeterminant())

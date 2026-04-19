@@ -562,36 +562,6 @@ void ScInterpreter::CalculateMatrixValue(const ScMatrix* pMat,SCSIZE nC,SCSIZE n
         PushNoValue();
 }
 
-void ScInterpreter::ScEMat()
-{
-    if ( !MustHaveParamCount( GetByte(), 1 ) )
-        return;
-
-    SCSIZE nDim = static_cast<SCSIZE>(GetUInt32());
-    if (nGlobalError != FormulaError::NONE || nDim == 0)
-        PushIllegalArgument();
-    else if (!ScMatrix::IsSizeAllocatable( nDim, nDim))
-        PushError( FormulaError::MatrixSize);
-    else
-    {
-        ScMatrixRef pRMat = GetNewMat(nDim, nDim, /*bEmpty*/true);
-        if (pRMat)
-        {
-            MEMat(pRMat, nDim);
-            PushMatrix(pRMat);
-        }
-        else
-            PushIllegalArgument();
-    }
-}
-
-void ScInterpreter::MEMat(const ScMatrixRef& mM, SCSIZE n)
-{
-    mM->FillDouble(0.0, 0, 0, n-1, n-1);
-    for (SCSIZE i = 0; i < n; i++)
-        mM->PutDouble(1.0, i, i);
-}
-
 /* Matrix LUP decomposition according to the pseudocode of "Introduction to
  * Algorithms" by Cormen, Leiserson, Rivest, Stein.
  *
