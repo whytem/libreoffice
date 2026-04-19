@@ -26,7 +26,7 @@ fixed without the list being updated).
 
 ## Failure baseline (2026-04-19, after SUMSQ / SUMX2MY2 / SUMX2PY2 engine fix)
 
-15 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 135 tests.
+13 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 135 tests.
 
 Previous baseline was 30 tests. Progress so far:
 
@@ -56,6 +56,18 @@ Previous baseline was 30 tests. Progress so far:
     legacy `MustHaveParamCount(2, 2)` still surfaces Err:511
     (ParameterExpected); the engine's api::Error enum doesn't model
     ParameterExpected, and we must not flatten it to IllegalArgument.
+- **GCD / LCM argument-shape error semantics (15 → 13, -2)**:
+  `collectNumericArguments` now classifies the argument node and
+  dispatches text and empty cells differently for each:
+    - Multi-cell range refs skip text and empty silently (legacy
+      `ScValueIterator`).
+    - Inline array constants surface `Err:502` on text / empty
+      (legacy `CalcGcdLcm` matrix walk).
+    - Single-cell references coerce empty to 0.0 and let scalar text
+      coercion raise `#VALUE!` (legacy `GetDouble`).
+  Also corrected the empty-values fallthrough: `GCD` now returns 0 and
+  `LCM` returns 1 when the collected vector is empty, matching the
+  initial accumulator in `pushLegacyGcdOrLcm`.
 
 ### External reference (0)
 
@@ -67,15 +79,13 @@ now correctly consume the cached value; live calc no longer shadows it).
 - `testFormulaDepTrackingDeleteCol`
 - `testIterations`
 
-### Function evaluation (7)
+### Function evaluation (5)
 
 Likely root cause: legacy fallback paths regressed during retirement +
 relocation episodes; recalc/observe interaction with the seam returns wrong
 values or false `Err:522` (Circular Reference) on dependency change.
 
-- `testFuncGCD`
 - `testFuncIF`
-- `testFuncLCM`
 - `testFuncMATCH`
 - `testFuncNOW`
 - `testFuncRefListArraySUBTOTAL`

@@ -2116,6 +2116,24 @@ template <typename T>
             if (!rxChild)
                 return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
 
+            // Legacy GCD / LCM treat the argument shapes differently:
+            //   - svDoubleRef / svRefList (multi-cell range): ScValueIterator
+            //     SKIPS text and empty cells silently.
+            //   - svMatrix (inline array constant): CalcGcdLcm matrix walk
+            //     raises Err:502 (IllegalArgument) on text/empty/negative.
+            //   - svSingleRef (single cell ref): GetDouble returns 0 for
+            //     an empty cell and NoValue for text — so empty is treated
+            //     as a zero VALUE, not skipped.
+            //   - svDouble / svString scalar: GetDouble returns the number
+            //     or NoValue (text).
+            const bool bIsRangeReference
+                = rxChild->meKind == core::formula::NodeKind::RangeReference
+                  || rxChild->meKind == core::formula::NodeKind::NamedReference;
+            const bool bIsArrayConstant
+                = rxChild->meKind == core::formula::NodeKind::ArrayConstant;
+            const bool bIsSingleCellReference
+                = rxChild->meKind == core::formula::NodeKind::CellReference;
+
             const auto aMatrix = materializeMatrixNode(*rxChild, rDoc, rContext, rFormulaPos);
             if (!aMatrix.mbSupported)
             {
@@ -2135,7 +2153,37 @@ template <typename T>
                     const auto aValue = lookupexecution::detail::toApiCellValue(
                         (*aMatrix.moValue)->Get(nColumn, nRow));
                     if (aValue.isEmpty())
+                    {
+                        if (bIsArrayConstant)
+                        {
+                            // Inline array constants treat empty as
+                            // IllegalArgument (matches CalcGcdLcm).
+                            return makeMaterializedError<std::vector<double>>(
+                                api::Error::IllegalArgument);
+                        }
+                        if (bIsSingleCellReference)
+                        {
+                            // Single-cell references coerce empty -> 0 in
+                            // legacy GetDouble; mirror that here.
+                            aValues.push_back(0.0);
+                        }
+                        // Range references skip empty silently (ScValueIterator
+                        // passes over them), and scalars can't reach this
+                        // branch via the CellReference materialization.
                         continue;
+                    }
+                    if (aValue.isText())
+                    {
+                        if (bIsRangeReference)
+                            continue;
+                        if (bIsArrayConstant)
+                        {
+                            return makeMaterializedError<std::vector<double>>(
+                                api::Error::IllegalArgument);
+                        }
+                        // Fall through to coerceScalarToNumber which will
+                        // report NoValue for scalar svSingleRef / svString.
+                    }
 
                     const auto aNumber = coerceScalarToNumber(rDoc, rContext, aValue);
                     if (!aNumber)
@@ -2406,8 +2454,12 @@ template <typename T>
             return makeUnsupported(eFunction, aNumbers.meFallbackReason);
         if (!aNumbers.moValue)
             return makeErrorAttempt(aNumbers.meError);
+        // Legacy GCD/LCM initialize fy to 0/1 respectively and accumulate as
+        // ScValueIterator yields values. When a range ref yields no numeric
+        // cells (e.g. =LCM(A1:B2) where all cells are text or empty), the
+        // loop never updates fy, so GCD returns 0 and LCM returns 1.
         if (aNumbers.moValue->empty())
-            return makeErrorAttempt(api::Error::IllegalArgument);
+            return makeNumericAttempt(aCanonicalName == u"LCM" ? 1.0 : 0.0);
 
         std::int64_t nResult = 0;
         bool bSawValue = false;
