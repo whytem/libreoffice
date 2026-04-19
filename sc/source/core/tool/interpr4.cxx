@@ -7866,6 +7866,53 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
+                // Batch 2 third admission: ocAreas with a single scalar
+                // reference always has an area count of 1. svRefList and
+                // anything else defer to legacy where iteration over the
+                // reference list is canonical.
+                const auto tryPlanEngineAreaCount = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnReferenceEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount != 1 || !sp)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+                    const FormulaToken* pTop = pStack[sp - 1];
+                    if (!pTop
+                        || (pTop->GetType() != svSingleRef
+                            && pTop->GetType() != svDoubleRef))
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    // Single scalar reference operand — exactly one area.
+                    const auto aPlan = serpn::planAreaCount(1);
+                    if (!aPlan)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    Pop();
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnReferenceEngineSucceededCount);
+                    PushDouble(aPlan.maValue);
+                    return true;
+                };
+
                 // Batch 2 first admission: scalar axis-ordinal
                 // COLUMN / ROW / SHEET. Covers no-argument (use aPos) and
                 // single-reference argument via planAxisOrdinal.
@@ -9863,7 +9910,10 @@ StackVar ScInterpreter::Interpret()
                     case ocIndex            : ScIndex();                    break;
                     case ocMultiArea        : ScMultiArea();                break;
                     case ocOffset           : ScOffset();                   break;
-                    case ocAreas            : ScAreas();                    break;
+                    case ocAreas            :
+                        if (!tryPlanEngineAreaCount())
+                            ScAreas();
+                        break;
                     case ocCurrency         : pushLegacyCurrency();     break;
                     case ocReplace          : pushLegacyReplace();      break;
                     case ocFixed            : pushLegacyFixed();        break;

@@ -853,6 +853,43 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceSpanCountDispat
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAreaCountDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"Areas"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    // Single-cell reference is exactly one area.
+    m_pDoc->SetString(ScAddress(0, 0, 0), u"=AREAS(B2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
+    // Range reference is also one area.
+    m_pDoc->SetString(ScAddress(0, 1, 0), u"=AREAS(B2:D5)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 1, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "ref_attempted="
+          + std::to_string(aDispatchStats.mnReferenceEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnReferenceEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnReferenceEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "AREAS should attempt engine dispatch: " + aLabel,
+        aDispatchStats.mnReferenceEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "single-ref AREAS should succeed through engine: " + aLabel,
+        aDispatchStats.mnReferenceEngineSucceededCount > 0);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAxisOrdinalDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
