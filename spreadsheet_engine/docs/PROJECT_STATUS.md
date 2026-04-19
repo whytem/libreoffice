@@ -45,7 +45,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=26`
+- `interp4_dispatch_engine_attempt_count=29`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -149,19 +149,25 @@ substantively complete; the RPN evaluator initiative advances to Batch 3
 (criteria / database).
 
 Batch 3 substrate (`runtime/RpnCriteria.hxx` + `runtime/RpnDatabase.hxx`)
-has landed as the next checkpoint. `RpnCriteria.hxx` provides
-`buildCriteriaPredicate`, `SingleCriterionAggregateRequest` +
-`planSingleCriterionAggregate` for the IF family, a parallel
-`Multi*` pair for the IFS family, and `countEmptyCells`.
-`RpnDatabase.hxx` defines `DatabaseQueryDescriptor` plus the
-`applyFieldSelector` and `bridgeAggregation` bridges that translate the
-3-argument DB-function shape to the shared criteria-aggregate
-evaluator. All planners dispatch to existing `core::query` primitives
-(`makeCriteriaPredicate`, `matchesCriteriaPredicate`,
-`evaluateCriteriaAggregate`) with RpnValue-aware deferral on reference
-and matrix operands. No opcode routes through the substrate yet —
-Batch 3 admission (COUNTIF / SUMIF / AVERAGEIF and the DB family) is
-the next step.
+has landed plus three admissions: `ocCountIf`, `ocSumIf`, and
+`ocAverageIf` now try the engine-native
+`planSingleCriterionAggregate` before falling back to legacy
+`ScCountIf` / `IterateParametersIf(ifSUMIF|ifAVERAGEIF)`. Acceptance
+is scope-fenced to svDoubleRef ranges with a single-sheet absolute
+resolution and a scalar svDouble or svString criterion; external refs,
+RefList, matrices, multi-sheet ranges, and non-scalar criteria defer
+to legacy. The existing
+`seitee::detail::CriteriaAggregateMaterializer` serves as the host
+bridge for cell materialization, so this admission did not require new
+Host facade work. Three new `criteria_engine_*` runtime totals are
+published and currently `0 / 0 / 0` on the live corpus for the same
+seam-captures-upstream reason as the control-flow and reference
+counters. Remaining Batch 3 members (`ocCountIfs` / `ocSumIfs` /
+`ocAverageIfs` / `ocMinIfs_MS` / `ocMaxIfs_MS` / `ocCountEmptyCells`,
+plus the twelve `ocDB*` database members) will follow — the IFS family
+uses the parallel `planMultiCriterionAggregate` helper; the DB family
+needs the data/criteria range resolution bridge plus the
+`DatabaseQueryDescriptor` applyFieldSelector path to land.
 
 Remaining Batch 1 members (`ocIfs_MS`, `ocSwitch_MS`, `ocIfError`,
 `ocIfNA`, `ocLet`) already delegate to `api::logic` / `seswitchexec`
