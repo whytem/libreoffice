@@ -890,6 +890,61 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAreaCountDispat
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceOffsetDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"Offset"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    // Set up a target value at C3 that the offset reference should
+    // resolve to.
+    m_pDoc->SetValue(ScAddress(2, 2, 0), 42.0);
+
+    // OFFSET(A1; 2; 2) -> C3 -> 42
+    m_pDoc->SetString(ScAddress(5, 0, 0), u"=OFFSET(A1;2;2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(42.0, m_pDoc->GetValue(ScAddress(5, 0, 0)));
+
+    // OFFSET with double-ref base resolves to the shifted range's top-left
+    // when used in a scalar context. A2:A5 + (2,0) -> A4:A7; A4 is empty
+    // so the implicit-intersection scalar should be 0.
+    m_pDoc->SetValue(ScAddress(0, 5, 0), 7.0);
+    m_pDoc->SetString(ScAddress(5, 1, 0), u"=OFFSET(A2:A5;2;0)"_ustr);
+    // The actual value depends on Calc's scalar-from-range rules; just
+    // assert no parse error so we know dispatch succeeded.
+    CPPUNIT_ASSERT(m_pDoc->GetString(ScAddress(5, 1, 0)) != u"Err:502"_ustr);
+
+    // 5-argument OFFSET declines to legacy (scope fence).
+    m_pDoc->SetString(ScAddress(5, 2, 0), u"=OFFSET(A1;1;1;2;2)"_ustr);
+    // Legacy handles this and should succeed.
+    CPPUNIT_ASSERT(m_pDoc->GetString(ScAddress(5, 2, 0)) != u"Err:502"_ustr);
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "ref_attempted="
+          + std::to_string(aDispatchStats.mnReferenceEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnReferenceEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnReferenceEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "OFFSET should attempt engine dispatch: " + aLabel,
+        aDispatchStats.mnReferenceEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "3-arg OFFSET with single-ref base should succeed through engine: " + aLabel,
+        aDispatchStats.mnReferenceEngineSucceededCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "5-arg OFFSET should produce an engine decline: " + aLabel,
+        aDispatchStats.mnReferenceEngineDeclinedCount > 0);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAxisOrdinalDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);

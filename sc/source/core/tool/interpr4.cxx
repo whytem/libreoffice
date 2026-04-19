@@ -7866,6 +7866,132 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
+                // Batch 2 fourth admission: OFFSET with scalar int offsets
+                // and a single-reference base. Covers 3-argument form only
+                // (no new-height / new-width) to keep the first pass
+                // narrow. Complex parameter combinations and external refs
+                // defer to legacy.
+                const auto tryPlanEngineOffset = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnReferenceEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    // Scope fence: only the three-argument form for now.
+                    if (nParamCount != 3 || sp < 3)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const FormulaToken* pColOffsetTok = pStack[sp - 1];
+                    const FormulaToken* pRowOffsetTok = pStack[sp - 2];
+                    const FormulaToken* pBaseTok = pStack[sp - 3];
+                    if (!pColOffsetTok || !pRowOffsetTok || !pBaseTok
+                        || pColOffsetTok->GetType() != svDouble
+                        || pRowOffsetTok->GetType() != svDouble
+                        || (pBaseTok->GetType() != svSingleRef
+                            && pBaseTok->GetType() != svDoubleRef))
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const std::int64_t nColOffset
+                        = static_cast<std::int64_t>(pColOffsetTok->GetDouble());
+                    const std::int64_t nRowOffset
+                        = static_cast<std::int64_t>(pRowOffsetTok->GetDouble());
+
+                    // Drop the three operands now that we've peeked them.
+                    sp -= 3;
+                    nGlobalError = FormulaError::NONE;
+
+                    // Build the base ResolvedReference from the popped token.
+                    spreadsheetengine::api::ResolvedReference aBase;
+                    if (pBaseTok->GetType() == svSingleRef)
+                    {
+                        const ScSingleRefData& rRef = *pBaseTok->GetSingleRef();
+                        const ScAddress aAbs = rRef.toAbs(mrDoc, aPos);
+                        aBase.maRange.maStart = {
+                            static_cast<spreadsheetengine::api::SheetId>(aAbs.Tab()),
+                            static_cast<spreadsheetengine::api::ColumnIndex>(aAbs.Col()),
+                            static_cast<spreadsheetengine::api::RowIndex>(aAbs.Row())
+                        };
+                        aBase.maRange.maEnd = aBase.maRange.maStart;
+                    }
+                    else
+                    {
+                        const ScComplexRefData& rRef = *pBaseTok->GetDoubleRef();
+                        const ScRange aAbs = rRef.toAbs(mrDoc, aPos);
+                        aBase.maRange.maStart = {
+                            static_cast<spreadsheetengine::api::SheetId>(aAbs.aStart.Tab()),
+                            static_cast<spreadsheetengine::api::ColumnIndex>(aAbs.aStart.Col()),
+                            static_cast<spreadsheetengine::api::RowIndex>(aAbs.aStart.Row())
+                        };
+                        aBase.maRange.maEnd = {
+                            static_cast<spreadsheetengine::api::SheetId>(aAbs.aEnd.Tab()),
+                            static_cast<spreadsheetengine::api::ColumnIndex>(aAbs.aEnd.Col()),
+                            static_cast<spreadsheetengine::api::RowIndex>(aAbs.aEnd.Row())
+                        };
+                    }
+
+                    serpn::OffsetParameters aParams;
+                    aParams.mnRowOffset = nRowOffset;
+                    aParams.mnColumnOffset = nColOffset;
+                    aParams.mnMaxColumn = mrDoc.MaxCol();
+                    aParams.mnMaxRow = mrDoc.MaxRow();
+
+                    const auto aPlan = serpn::planOffset(
+                        serpn::RpnValue::reference(aBase), aParams);
+                    if (!aPlan
+                        || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        // We already popped the operands; push the error
+                        // through the engine path too so the caller doesn't
+                        // re-run the legacy on a drained stack.
+                        if (!aPlan
+                            && aPlan.meError != spreadsheetengine::api::Error::None)
+                        {
+                            PushError(selibreoffice::toFormulaError(aPlan.meError));
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnReferenceEngineSucceededCount);
+                            return true;
+                        }
+                        return false;
+                    }
+
+                    const spreadsheetengine::api::CellRange& rRange = aPlan.maValue;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnReferenceEngineSucceededCount);
+                    if (rRange.isSingleCell())
+                    {
+                        PushSingleRef(
+                            static_cast<SCCOL>(rRange.maStart.mnColumn),
+                            static_cast<SCROW>(rRange.maStart.mnRow),
+                            static_cast<SCTAB>(rRange.maStart.mnSheet));
+                    }
+                    else
+                    {
+                        PushDoubleRef(
+                            static_cast<SCCOL>(rRange.maStart.mnColumn),
+                            static_cast<SCROW>(rRange.maStart.mnRow),
+                            static_cast<SCTAB>(rRange.maStart.mnSheet),
+                            static_cast<SCCOL>(rRange.maEnd.mnColumn),
+                            static_cast<SCROW>(rRange.maEnd.mnRow),
+                            static_cast<SCTAB>(rRange.maEnd.mnSheet));
+                    }
+                    return true;
+                };
+
                 // Batch 2 third admission: ocAreas with a single scalar
                 // reference always has an area count of 1. svRefList and
                 // anything else defer to legacy where iteration over the
@@ -9909,7 +10035,10 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocIndex            : ScIndex();                    break;
                     case ocMultiArea        : ScMultiArea();                break;
-                    case ocOffset           : ScOffset();                   break;
+                    case ocOffset           :
+                        if (!tryPlanEngineOffset())
+                            ScOffset();
+                        break;
                     case ocAreas            :
                         if (!tryPlanEngineAreaCount())
                             ScAreas();
