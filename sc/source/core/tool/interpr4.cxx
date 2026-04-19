@@ -7024,16 +7024,6 @@ StackVar ScInterpreter::Interpret()
                     }
                     PushString(aText.makeStringAndClear());
                 };
-                const auto pushLegacyExact = [&]() {
-                    warnTextUtilityDispatch(u"EXACT");
-                    nFuncFmtType = SvNumFormatType::LOGICAL;
-                    if (MustHaveParamCount(GetByte(), 2))
-                    {
-                        svl::SharedString s1 = GetString();
-                        svl::SharedString s2 = GetString();
-                        PushInt(int(s1 == s2));
-                    }
-                };
                 const auto pushLegacyLeftRight = [&](bool bRight) {
                     warnTextUtilityDispatch(bRight ? u"RIGHT" : u"LEFT");
                     sal_uInt8 nParamCount = GetByte();
@@ -7657,13 +7647,6 @@ StackVar ScInterpreter::Interpret()
                                                                eMode) {
                     warnLogicalDispatch(rFunctionName);
                     ScLogicalFoldOp(eMode);
-                };
-                const auto pushLegacyNot = [&]() {
-                    warnLogicalDispatch(u"NOT");
-                    nFuncFmtType = SvNumFormatType::LOGICAL;
-                    ScUnaryMatrixOrScalarOp(
-                        spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                            UnaryMatrixScalarMode::LogicalNot);
                 };
                 const auto warnConditionalDispatch = [&](std::u16string_view rFunctionName) {
                     warnIfLegacyDispatchReached(
@@ -11379,7 +11362,13 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocUnion            : ScUnionFunc();                break;
-                    case ocNot              : pushLegacyNot();              break;
+                    case ocNot              :
+                        warnLogicalDispatch(u"NOT");
+                        nFuncFmtType = SvNumFormatType::LOGICAL;
+                        ScUnaryMatrixOrScalarOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                UnaryMatrixScalarMode::LogicalNot);
+                        break;
                     case ocNegSub           :
                     case ocNeg              :
                         warnIfLegacyScalarRootReached(u"NEGATE");
@@ -12863,7 +12852,16 @@ StackVar ScInterpreter::Interpret()
                     case ocReplace          : pushLegacyReplace();      break;
                     case ocFixed            : pushLegacyFixed();        break;
                     case ocFind             : pushLegacyFind();         break;
-                    case ocExact            : pushLegacyExact();            break;
+                    case ocExact            :
+                        warnTextUtilityDispatch(u"EXACT");
+                        nFuncFmtType = SvNumFormatType::LOGICAL;
+                        if (MustHaveParamCount(GetByte(), 2))
+                        {
+                            svl::SharedString s1 = GetString();
+                            svl::SharedString s2 = GetString();
+                            PushInt(int(s1 == s2));
+                        }
+                        break;
                     case ocLeft             : pushLegacyLeftRight(false);   break;
                     case ocRight            : pushLegacyLeftRight(true);    break;
                     case ocSearch           : pushLegacySearch();       break;
