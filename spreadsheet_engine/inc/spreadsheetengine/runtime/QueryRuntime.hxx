@@ -56,7 +56,8 @@ enum class CriteriaAggregateKind : std::uint8_t
     Sum,
     Average,
     Max,
-    Min
+    Min,
+    Product
 };
 
 class CriteriaAggregateMaterializer

@@ -11760,7 +11760,11 @@ StackVar ScInterpreter::Interpret()
                                 sequery::CriteriaAggregateKind::Min))
                             ScDBMin();
                         break;
-                    case ocDBProduct        : ScDBProduct();                break;
+                    case ocDBProduct        :
+                        if (!tryPlanEngineDatabaseAggregate(
+                                sequery::CriteriaAggregateKind::Product))
+                            ScDBProduct();
+                        break;
                     case ocDBStdDev         : ScDBStdDev();                 break;
                     case ocDBStdDevP        : ScDBStdDevP();                break;
                     case ocDBVar            : ScDBVar();                    break;

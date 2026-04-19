@@ -581,6 +581,7 @@ api::ValueResult<api::CellValue> evaluateCriteriaAggregate(
 
     std::size_t nCount = 0;
     double fSum = 0.0;
+    double fProduct = 1.0;
     double fBest = 0.0;
     bool bHasBest = false;
 
@@ -643,6 +644,10 @@ api::ValueResult<api::CellValue> evaluateCriteriaAggregate(
                         bHasBest = true;
                     }
                     break;
+                case CriteriaAggregateKind::Product:
+                    fProduct = fProduct * *oNumber;
+                    ++nCount;
+                    break;
             }
         }
     }
@@ -663,6 +668,10 @@ api::ValueResult<api::CellValue> evaluateCriteriaAggregate(
         case CriteriaAggregateKind::Min:
             return api::ValueResult<api::CellValue>::success(
                 api::CellValue::number(bHasBest ? fBest : 0.0));
+        case CriteriaAggregateKind::Product:
+            // Empty product: legacy DBProduct returns 0 when no row matches.
+            return api::ValueResult<api::CellValue>::success(
+                api::CellValue::number(nCount == 0 ? 0.0 : fProduct));
     }
 
     return api::ValueResult<api::CellValue>::failure(api::Error::IllegalArgument);
