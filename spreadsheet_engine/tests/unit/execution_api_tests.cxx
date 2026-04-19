@@ -9,6 +9,7 @@
 #include <spreadsheetengine/runtime/RpnControlFlow.hxx>
 #include <spreadsheetengine/runtime/RpnCriteria.hxx>
 #include <spreadsheetengine/runtime/RpnDatabase.hxx>
+#include <spreadsheetengine/runtime/RpnMatrix.hxx>
 #include <spreadsheetengine/runtime/RpnOperators.hxx>
 #include <spreadsheetengine/runtime/RpnReference.hxx>
 #include <spreadsheetengine/runtime/RpnValue.hxx>
@@ -494,6 +495,110 @@ int main()
         {
             return fail(
                 "spreadsheetengine_execution_tests", "bridgeAggregation contract mismatch");
+        }
+    }
+
+    {
+        using spreadsheetengine::core::rpn::MatrixOperand;
+        using spreadsheetengine::core::rpn::MatrixProvenance;
+        using spreadsheetengine::core::rpn::planBroadcastScalarOverMatrix;
+        using spreadsheetengine::core::rpn::planDeterminant;
+        using spreadsheetengine::core::rpn::planElementwiseBinary;
+        using spreadsheetengine::core::rpn::planIdentityMatrix;
+        using spreadsheetengine::core::rpn::planSequenceMatrix;
+        using spreadsheetengine::core::rpn::planSumReductionPair;
+        using spreadsheetengine::core::rpn::planTranspose;
+        using spreadsheetengine::core::rpn::RpnValue;
+        using spreadsheetengine::core::rpn::SumReductionKind;
+
+        // Identity matrix planning.
+        const auto aId3 = planIdentityMatrix(3);
+        if (!aId3 || aId3.maValue.maDimensions.mnColumns != 3
+            || aId3.maValue.maDimensions.mnRows != 3
+            || aId3.maValue.maValues[0].mfNumber != 1.0
+            || aId3.maValue.maValues[4].mfNumber != 1.0
+            || aId3.maValue.maValues[8].mfNumber != 1.0
+            || aId3.maValue.maValues[1].mfNumber != 0.0)
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "planIdentityMatrix contract mismatch");
+        }
+        const auto aIdZero = planIdentityMatrix(0);
+        if (aIdZero || aIdZero.meError != Error::IllegalArgument)
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "planIdentityMatrix(0) must fail");
+        }
+
+        // Sequence matrix: 2x3 starting at 10, step 5:
+        //   10 15 20
+        //   25 30 35
+        const auto aSeq = planSequenceMatrix(2, 3, 10.0, 5.0);
+        if (!aSeq || aSeq.maValue.maDimensions.mnRows != 2
+            || aSeq.maValue.maDimensions.mnColumns != 3
+            || aSeq.maValue.maValues[0].mfNumber != 10.0
+            || aSeq.maValue.maValues[2].mfNumber != 20.0
+            || aSeq.maValue.maValues[5].mfNumber != 35.0)
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "planSequenceMatrix contract mismatch");
+        }
+
+        // Transpose: 1 2 / 3 4 -> 1 3 / 2 4.
+        MatrixOperand a22;
+        a22.maDimensions = { 2, 2 };
+        a22.maValues = { spreadsheetengine::api::CellValue::number(1.0),
+                          spreadsheetengine::api::CellValue::number(2.0),
+                          spreadsheetengine::api::CellValue::number(3.0),
+                          spreadsheetengine::api::CellValue::number(4.0) };
+        a22.meProvenance = MatrixProvenance::InlineLiteral;
+        const auto aT = planTranspose(a22);
+        if (!aT || aT.maValue.maValues[0].mfNumber != 1.0
+            || aT.maValue.maValues[1].mfNumber != 3.0
+            || aT.maValue.maValues[2].mfNumber != 2.0
+            || aT.maValue.maValues[3].mfNumber != 4.0)
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "planTranspose contract mismatch");
+        }
+
+        // Determinant of 1 2 / 3 4 = -2.
+        const auto aDet = planDeterminant(a22);
+        if (!aDet || aDet.maValue != -2.0)
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "planDeterminant contract mismatch");
+        }
+
+        // Broadcast scalar over matrix: 2 * a22.
+        const auto aScaled = planBroadcastScalarOverMatrix(
+            spreadsheetengine::core::rpn::BinaryScalarOperator::Multiply,
+            RpnValue::number(2.0), a22);
+        if (!aScaled
+            || aScaled.maValue.maValues[0].mfNumber != 2.0
+            || aScaled.maValue.maValues[3].mfNumber != 8.0)
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "planBroadcastScalarOverMatrix mismatch");
+        }
+
+        // Elementwise: a22 + a22.
+        const auto aSum = planElementwiseBinary(
+            spreadsheetengine::core::rpn::BinaryScalarOperator::Add, a22, a22);
+        if (!aSum
+            || aSum.maValue.maValues[0].mfNumber != 2.0
+            || aSum.maValue.maValues[3].mfNumber != 8.0)
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "planElementwiseBinary contract mismatch");
+        }
+
+        // Sum reduction: SumProduct(a22, a22) = 1 + 4 + 9 + 16 = 30.
+        const auto aSp = planSumReductionPair(SumReductionKind::SumProduct, a22, a22);
+        if (!aSp || aSp.maValue != 30.0)
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "planSumReductionPair contract mismatch");
         }
     }
 

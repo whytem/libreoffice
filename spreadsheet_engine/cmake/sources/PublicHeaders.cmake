@@ -47,6 +47,7 @@ set(SPREADSHEETENGINE_STANDALONE_PUBLIC_RUNTIME_HEADERS
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/RpnControlFlow.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/RpnCriteria.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/RpnDatabase.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/RpnMatrix.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/RpnOperators.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/RpnReference.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/RpnValue.hxx"

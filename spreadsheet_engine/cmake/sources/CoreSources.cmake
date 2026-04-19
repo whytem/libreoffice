@@ -32,6 +32,7 @@ set(SPREADSHEETENGINE_STANDALONE_CORE_SOURCES
     "${SPREADSHEETENGINE_ROOT}/source/core/MathBitwise.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/MathFinancial.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/MathFunctionRuntime.cxx"
+    "${SPREADSHEETENGINE_ROOT}/source/core/MathMatrix.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/MathRounding.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/MathScalar.cxx"
     "${SPREADSHEETENGINE_ROOT}/source/core/MathStatistical.cxx"
