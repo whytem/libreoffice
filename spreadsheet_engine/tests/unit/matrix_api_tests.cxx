@@ -1,5 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
+#include <cmath>
 #include <iostream>
 #include <vector>
 
@@ -7,8 +8,22 @@
 #include <spreadsheetengine/detail/JumpMatrixRuntime.hxx>
 #include <spreadsheetengine/detail/MatrixGeometry.hxx>
 #include <spreadsheetengine/detail/MatrixRuntime.hxx>
+#include <spreadsheetengine/runtime/MathMatrix.hxx>
+#include <spreadsheetengine/runtime/RpnMatrix.hxx>
 
 #include "TestSupport.hxx"
+
+namespace
+{
+
+constexpr double kMatrixParityEpsilon = 1.0e-10;
+
+[[nodiscard]] bool approxEqual(double fLeft, double fRight)
+{
+    return std::fabs(fLeft - fRight) <= kMatrixParityEpsilon;
+}
+
+} // namespace
 
 int main()
 {
@@ -468,6 +483,250 @@ int main()
             .mbBufferWrite)
     {
         return fail("spreadsheetengine_matrix_tests", "jump direct-write plan mismatch");
+    }
+
+    // MMULT / MINVERSE numerical-core parity fixtures.
+    {
+        using spreadsheetengine::core::math::evaluateMatrixInverse;
+        using spreadsheetengine::core::math::evaluateMatrixMultiply;
+
+        // Identity times identity stays identity.
+        const std::vector<double> aId3 {
+            1.0, 0.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 0.0, 1.0
+        };
+        const auto aIdProduct = evaluateMatrixMultiply(aId3, 3, 3, aId3, 3);
+        if (!aIdProduct || aIdProduct.maValue.size() != 9
+            || !approxEqual(aIdProduct.maValue[0], 1.0)
+            || !approxEqual(aIdProduct.maValue[4], 1.0)
+            || !approxEqual(aIdProduct.maValue[8], 1.0)
+            || !approxEqual(aIdProduct.maValue[1], 0.0))
+        {
+            return fail(
+                "spreadsheetengine_matrix_tests",
+                "evaluateMatrixMultiply identity parity mismatch");
+        }
+
+        // 2x2 product: {{1,2},{3,4}} * {{5,6},{7,8}} = {{19,22},{43,50}}.
+        const std::vector<double> aA22 { 1.0, 2.0, 3.0, 4.0 };
+        const std::vector<double> aB22 { 5.0, 6.0, 7.0, 8.0 };
+        const auto a22Product = evaluateMatrixMultiply(aA22, 2, 2, aB22, 2);
+        if (!a22Product || a22Product.maValue.size() != 4
+            || !approxEqual(a22Product.maValue[0], 19.0)
+            || !approxEqual(a22Product.maValue[1], 22.0)
+            || !approxEqual(a22Product.maValue[2], 43.0)
+            || !approxEqual(a22Product.maValue[3], 50.0))
+        {
+            return fail(
+                "spreadsheetengine_matrix_tests",
+                "evaluateMatrixMultiply 2x2 parity mismatch");
+        }
+
+        // Non-square: 2x3 * 3x2 product
+        //   {{1,2,3},{4,5,6}} * {{7,8},{9,10},{11,12}}
+        //   = {{58,64},{139,154}}.
+        const std::vector<double> aA23 { 1.0, 2.0, 3.0, 4.0, 5.0, 6.0 };
+        const std::vector<double> aB32 { 7.0, 8.0, 9.0, 10.0, 11.0, 12.0 };
+        const auto aNonSquareProduct = evaluateMatrixMultiply(aA23, 2, 3, aB32, 2);
+        if (!aNonSquareProduct || aNonSquareProduct.maValue.size() != 4
+            || !approxEqual(aNonSquareProduct.maValue[0], 58.0)
+            || !approxEqual(aNonSquareProduct.maValue[1], 64.0)
+            || !approxEqual(aNonSquareProduct.maValue[2], 139.0)
+            || !approxEqual(aNonSquareProduct.maValue[3], 154.0))
+        {
+            return fail(
+                "spreadsheetengine_matrix_tests",
+                "evaluateMatrixMultiply non-square parity mismatch");
+        }
+
+        // Dimension mismatch: (2x3) * (2x3) has incompatible inner
+        // dimensions.
+        const auto aBadProduct = evaluateMatrixMultiply(aA23, 2, 3, aA23, 3);
+        if (aBadProduct
+            || aBadProduct.meError != spreadsheetengine::api::Error::IllegalArgument)
+        {
+            return fail(
+                "spreadsheetengine_matrix_tests",
+                "evaluateMatrixMultiply dimension mismatch should fail");
+        }
+
+        // MINVERSE of identity is identity.
+        const auto aIdInverse = evaluateMatrixInverse(aId3, 3);
+        if (!aIdInverse || aIdInverse.maValue.size() != 9
+            || !approxEqual(aIdInverse.maValue[0], 1.0)
+            || !approxEqual(aIdInverse.maValue[4], 1.0)
+            || !approxEqual(aIdInverse.maValue[8], 1.0)
+            || !approxEqual(aIdInverse.maValue[1], 0.0))
+        {
+            return fail(
+                "spreadsheetengine_matrix_tests",
+                "evaluateMatrixInverse identity parity mismatch");
+        }
+
+        // MINVERSE 2x2: {{4,7},{2,6}} -> {{0.6,-0.7},{-0.2,0.4}}.
+        const std::vector<double> aInv22 { 4.0, 7.0, 2.0, 6.0 };
+        const auto aInv22Result = evaluateMatrixInverse(aInv22, 2);
+        if (!aInv22Result || aInv22Result.maValue.size() != 4
+            || !approxEqual(aInv22Result.maValue[0], 0.6)
+            || !approxEqual(aInv22Result.maValue[1], -0.7)
+            || !approxEqual(aInv22Result.maValue[2], -0.2)
+            || !approxEqual(aInv22Result.maValue[3], 0.4))
+        {
+            return fail(
+                "spreadsheetengine_matrix_tests",
+                "evaluateMatrixInverse 2x2 parity mismatch");
+        }
+
+        // MINVERSE 3x3 self-consistency: inverse(A) * A = I.
+        const std::vector<double> aInv33 {
+            2.0, 1.0, 3.0,
+            1.0, 3.0, 2.0,
+            3.0, 2.0, 1.0
+        };
+        const auto aInv33Result = evaluateMatrixInverse(aInv33, 3);
+        if (!aInv33Result)
+        {
+            return fail(
+                "spreadsheetengine_matrix_tests",
+                "evaluateMatrixInverse 3x3 parity mismatch");
+        }
+        const auto aRoundTrip = evaluateMatrixMultiply(
+            aInv33Result.maValue, 3, 3, aInv33, 3);
+        if (!aRoundTrip
+            || !approxEqual(aRoundTrip.maValue[0], 1.0)
+            || !approxEqual(aRoundTrip.maValue[4], 1.0)
+            || !approxEqual(aRoundTrip.maValue[8], 1.0)
+            || !approxEqual(aRoundTrip.maValue[1], 0.0)
+            || !approxEqual(aRoundTrip.maValue[2], 0.0)
+            || !approxEqual(aRoundTrip.maValue[3], 0.0))
+        {
+            return fail(
+                "spreadsheetengine_matrix_tests",
+                "evaluateMatrixInverse 3x3 round-trip mismatch");
+        }
+
+        // Singular matrix: zero row surfaces as IllegalArgument.
+        const std::vector<double> aSingular {
+            1.0, 2.0, 3.0,
+            2.0, 4.0, 6.0,
+            0.0, 0.0, 0.0
+        };
+        const auto aSingularResult = evaluateMatrixInverse(aSingular, 3);
+        if (aSingularResult
+            || aSingularResult.meError != spreadsheetengine::api::Error::IllegalArgument)
+        {
+            return fail(
+                "spreadsheetengine_matrix_tests",
+                "evaluateMatrixInverse singular detection mismatch");
+        }
+    }
+
+    // planMatrixMultiply / planMatrixInverse RPN planner contract.
+    {
+        using spreadsheetengine::core::rpn::MatrixOperand;
+        using spreadsheetengine::core::rpn::MatrixProvenance;
+        using spreadsheetengine::core::rpn::planMatrixInverse;
+        using spreadsheetengine::core::rpn::planMatrixMultiply;
+
+        MatrixOperand aLeft;
+        aLeft.maDimensions = { 2, 2 };
+        aLeft.maValues
+            = { spreadsheetengine::api::CellValue::number(1.0),
+                spreadsheetengine::api::CellValue::number(2.0),
+                spreadsheetengine::api::CellValue::number(3.0),
+                spreadsheetengine::api::CellValue::number(4.0) };
+        aLeft.meProvenance = MatrixProvenance::InlineLiteral;
+
+        MatrixOperand aRight;
+        aRight.maDimensions = { 2, 2 };
+        aRight.maValues
+            = { spreadsheetengine::api::CellValue::number(5.0),
+                spreadsheetengine::api::CellValue::number(6.0),
+                spreadsheetengine::api::CellValue::number(7.0),
+                spreadsheetengine::api::CellValue::number(8.0) };
+        aRight.meProvenance = MatrixProvenance::InlineLiteral;
+
+        const auto aProduct = planMatrixMultiply(aLeft, aRight);
+        if (!aProduct || aProduct.maValue.maDimensions.mnColumns != 2
+            || aProduct.maValue.maDimensions.mnRows != 2
+            || !approxEqual(aProduct.maValue.maValues[0].mfNumber, 19.0)
+            || !approxEqual(aProduct.maValue.maValues[3].mfNumber, 50.0))
+        {
+            return fail(
+                "spreadsheetengine_matrix_tests",
+                "planMatrixMultiply contract mismatch");
+        }
+
+        // Mismatched inner dimensions decline.
+        MatrixOperand aIncompat;
+        aIncompat.maDimensions = { 2, 3 };
+        aIncompat.maValues.assign(6, spreadsheetengine::api::CellValue::number(1.0));
+        const auto aBad = planMatrixMultiply(aLeft, aIncompat);
+        if (aBad
+            || aBad.meError != spreadsheetengine::api::Error::IllegalArgument)
+        {
+            return fail(
+                "spreadsheetengine_matrix_tests",
+                "planMatrixMultiply dimension fence mismatch");
+        }
+
+        MatrixOperand aSquare;
+        aSquare.maDimensions = { 2, 2 };
+        aSquare.maValues
+            = { spreadsheetengine::api::CellValue::number(4.0),
+                spreadsheetengine::api::CellValue::number(7.0),
+                spreadsheetengine::api::CellValue::number(2.0),
+                spreadsheetengine::api::CellValue::number(6.0) };
+        aSquare.meProvenance = MatrixProvenance::InlineLiteral;
+        const auto aInverse = planMatrixInverse(aSquare);
+        if (!aInverse
+            || !approxEqual(aInverse.maValue.maValues[0].mfNumber, 0.6)
+            || !approxEqual(aInverse.maValue.maValues[1].mfNumber, -0.7)
+            || !approxEqual(aInverse.maValue.maValues[2].mfNumber, -0.2)
+            || !approxEqual(aInverse.maValue.maValues[3].mfNumber, 0.4))
+        {
+            return fail(
+                "spreadsheetengine_matrix_tests",
+                "planMatrixInverse contract mismatch");
+        }
+
+        // Non-square input declines via IllegalArgument.
+        MatrixOperand aNonSquare;
+        aNonSquare.maDimensions = { 3, 2 };
+        aNonSquare.maValues.assign(6, spreadsheetengine::api::CellValue::number(1.0));
+        const auto aBadInverse = planMatrixInverse(aNonSquare);
+        if (aBadInverse
+            || aBadInverse.meError != spreadsheetengine::api::Error::IllegalArgument)
+        {
+            return fail(
+                "spreadsheetengine_matrix_tests",
+                "planMatrixInverse shape fence mismatch");
+        }
+
+        // Singular input surfaces as IllegalArgument (same error as
+        // Calc's PushIllegalArgument).
+        MatrixOperand aSingular;
+        aSingular.maDimensions = { 3, 3 };
+        aSingular.maValues = {
+            spreadsheetengine::api::CellValue::number(1.0),
+            spreadsheetengine::api::CellValue::number(2.0),
+            spreadsheetengine::api::CellValue::number(3.0),
+            spreadsheetengine::api::CellValue::number(2.0),
+            spreadsheetengine::api::CellValue::number(4.0),
+            spreadsheetengine::api::CellValue::number(6.0),
+            spreadsheetengine::api::CellValue::number(3.0),
+            spreadsheetengine::api::CellValue::number(6.0),
+            spreadsheetengine::api::CellValue::number(9.0)
+        };
+        const auto aSingularInverse = planMatrixInverse(aSingular);
+        if (aSingularInverse
+            || aSingularInverse.meError != spreadsheetengine::api::Error::IllegalArgument)
+        {
+            return fail(
+                "spreadsheetengine_matrix_tests",
+                "planMatrixInverse singular should fail");
+        }
     }
 
     std::cout << "spreadsheetengine matrix api tests passed\n";

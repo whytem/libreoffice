@@ -159,6 +159,46 @@ struct MatrixOperand
     return RpnCoercionResult<MatrixOperand>::success(aResult);
 }
 
+namespace detail
+{
+
+// Flatten a MatrixOperand row-major to a std::vector<double>. Numeric
+// and boolean cells coerce via `CellValue.mfNumber`; empty cells map
+// to `0.0`; text cells surface as `IllegalArgument`; error cells
+// propagate their `meError`.
+[[nodiscard]] inline bool tryFlattenNumericMatrix(
+    const MatrixOperand& rMatrix, std::vector<double>& rOut, api::Error& rError)
+{
+    rOut.clear();
+    rOut.reserve(rMatrix.cellCount());
+    for (const auto& rValue : rMatrix.maValues)
+    {
+        if (rValue.meKind == api::CellValueKind::Error)
+        {
+            rError = rValue.meError;
+            return false;
+        }
+        if (rValue.meKind == api::CellValueKind::Number
+            || rValue.meKind == api::CellValueKind::Boolean)
+        {
+            rOut.push_back(rValue.mfNumber);
+        }
+        else if (rValue.meKind == api::CellValueKind::Empty)
+        {
+            rOut.push_back(0.0);
+        }
+        else
+        {
+            // Text cells are invalid input for numeric matrix ops.
+            rError = api::Error::IllegalArgument;
+            return false;
+        }
+    }
+    return true;
+}
+
+} // namespace detail
+
 // Determinant: bridges to core::math::evaluateMatrixDeterminant. The
 // source matrix must be square and numeric; non-numeric cells coerce
 // via CellValue.mfNumber directly (empty = 0, errors propagate).
@@ -171,32 +211,90 @@ struct MatrixOperand
     }
 
     std::vector<double> aFlat;
-    aFlat.reserve(rSource.cellCount());
-    for (const auto& rValue : rSource.maValues)
-    {
-        if (rValue.meKind == api::CellValueKind::Error)
-            return RpnCoercionResult<double>::failure(rValue.meError);
-        if (rValue.meKind == api::CellValueKind::Number
-            || rValue.meKind == api::CellValueKind::Boolean)
-        {
-            aFlat.push_back(rValue.mfNumber);
-        }
-        else if (rValue.meKind == api::CellValueKind::Empty)
-        {
-            aFlat.push_back(0.0);
-        }
-        else
-        {
-            // Text cells in a determinant input are invalid.
-            return RpnCoercionResult<double>::failure(api::Error::IllegalArgument);
-        }
-    }
+    api::Error eFlattenError = api::Error::None;
+    if (!detail::tryFlattenNumericMatrix(rSource, aFlat, eFlattenError))
+        return RpnCoercionResult<double>::failure(eFlattenError);
 
     const auto aResult = core::math::evaluateMatrixDeterminant(
         aFlat, static_cast<std::size_t>(rSource.maDimensions.mnColumns));
     if (!aResult)
         return RpnCoercionResult<double>::failure(aResult.meError);
     return RpnCoercionResult<double>::success(aResult.maValue);
+}
+
+// Matrix product: LEFT (m x k) * RIGHT (k x n) -> (m x n). The engine
+// `evaluateMatrixMultiply` walks the same summation order as
+// `ScInterpreter::ScMatMult`. Non-square shapes with compatible inner
+// dimensions are accepted.
+[[nodiscard]] inline RpnCoercionResult<MatrixOperand> planMatrixMultiply(
+    const MatrixOperand& rLeft, const MatrixOperand& rRight)
+{
+    if (rLeft.isEmpty() || rRight.isEmpty()
+        || rLeft.maDimensions.mnColumns != rRight.maDimensions.mnRows)
+    {
+        return RpnCoercionResult<MatrixOperand>::failure(api::Error::IllegalArgument);
+    }
+
+    std::vector<double> aLeftFlat;
+    api::Error eLeftError = api::Error::None;
+    if (!detail::tryFlattenNumericMatrix(rLeft, aLeftFlat, eLeftError))
+        return RpnCoercionResult<MatrixOperand>::failure(eLeftError);
+
+    std::vector<double> aRightFlat;
+    api::Error eRightError = api::Error::None;
+    if (!detail::tryFlattenNumericMatrix(rRight, aRightFlat, eRightError))
+        return RpnCoercionResult<MatrixOperand>::failure(eRightError);
+
+    const std::size_t nLeftRows = static_cast<std::size_t>(rLeft.maDimensions.mnRows);
+    const std::size_t nInner = static_cast<std::size_t>(rLeft.maDimensions.mnColumns);
+    const std::size_t nRightCols = static_cast<std::size_t>(rRight.maDimensions.mnColumns);
+
+    const auto aResult = core::math::evaluateMatrixMultiply(
+        aLeftFlat, nLeftRows, nInner, aRightFlat, nRightCols);
+    if (!aResult)
+        return RpnCoercionResult<MatrixOperand>::failure(aResult.meError);
+
+    MatrixOperand aOut;
+    aOut.maDimensions = { static_cast<api::MatrixSize>(nRightCols),
+                          static_cast<api::MatrixSize>(nLeftRows) };
+    aOut.maValues.reserve(nLeftRows * nRightCols);
+    for (double fValue : aResult.maValue)
+        aOut.maValues.push_back(api::CellValue::number(fValue));
+    aOut.meProvenance = MatrixProvenance::ComputedResult;
+    return RpnCoercionResult<MatrixOperand>::success(std::move(aOut));
+}
+
+// Matrix inverse via LUP decomposition. Source must be square and
+// strictly numeric (empty = 0, text = IllegalArgument, error =
+// propagated). Singular inputs surface as `Error::IllegalArgument`
+// matching the legacy `ScMatInv` PushIllegalArgument path (Calc maps
+// it to `#VALUE!`).
+[[nodiscard]] inline RpnCoercionResult<MatrixOperand> planMatrixInverse(
+    const MatrixOperand& rSource)
+{
+    if (rSource.isEmpty()
+        || rSource.maDimensions.mnColumns != rSource.maDimensions.mnRows)
+    {
+        return RpnCoercionResult<MatrixOperand>::failure(api::Error::IllegalArgument);
+    }
+
+    std::vector<double> aFlat;
+    api::Error eFlattenError = api::Error::None;
+    if (!detail::tryFlattenNumericMatrix(rSource, aFlat, eFlattenError))
+        return RpnCoercionResult<MatrixOperand>::failure(eFlattenError);
+
+    const std::size_t nDimension = static_cast<std::size_t>(rSource.maDimensions.mnColumns);
+    const auto aResult = core::math::evaluateMatrixInverse(aFlat, nDimension);
+    if (!aResult)
+        return RpnCoercionResult<MatrixOperand>::failure(aResult.meError);
+
+    MatrixOperand aOut;
+    aOut.maDimensions = rSource.maDimensions;
+    aOut.maValues.reserve(nDimension * nDimension);
+    for (double fValue : aResult.maValue)
+        aOut.maValues.push_back(api::CellValue::number(fValue));
+    aOut.meProvenance = MatrixProvenance::ComputedResult;
+    return RpnCoercionResult<MatrixOperand>::success(std::move(aOut));
 }
 
 // Broadcast binary: MMULT / Add / Subtract etc. broadcast rules are
