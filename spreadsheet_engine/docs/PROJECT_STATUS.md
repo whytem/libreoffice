@@ -45,7 +45,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=38`
+- `interp4_dispatch_engine_attempt_count=40`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -175,7 +175,28 @@ streaming range-iteration primitive; materializing a range into a
 `std::vector` just to count empties would be a perf regression vs. the
 legacy `ScCellIterator`.
 
-The DB aggregate family first admission has now landed: `ocDBSum` /
+Batch 4 substrate (`runtime/RpnMatrix.hxx`) has now landed together with
+two first admissions: `ocMatrixUnit` (MUNIT) and `ocMatSequence`
+(MSEQUENCE) route through `serpn::planIdentityMatrix` /
+`planSequenceMatrix`. Both produce matrices from pure-scalar
+arguments, so no host-side range materialization is needed for the
+first admission. A new `convertMatrixOperandToMatrixRef` bridge
+converts the engine's `MatrixOperand` (row-major
+`std::vector<CellValue>`) to an `ScMatrixRef` for `PushMatrix`.
+Richer matrix opcodes (MDETERM / MINVERSE / MMULT / TRANSPOSE /
+SUMPRODUCT family / regression-forecast) are deferred pending a Host
+facade range-iteration primitive — the substrate is ready, the
+reference-to-matrix bridge is the remaining work.
+
+Three new `matrix_engine_*` runtime totals are published. A separate
+cleanup fix gated `importedRootUsesStoredHostValueTruth` behind the
+imported-root predicate, clearing 12 tests from the known-regressions
+list (30 -> 18): the fallback was firing in live-recalc contexts
+where the "host cell value" was the previous result of the same
+formula, leaving `=SHEETS()` / `=IF(...)` / `=FTEST(...)` etc. frozen
+at zero after the first recalc.
+
+The DB aggregate family first admission: `ocDBSum` /
 `ocDBAverage` / `ocDBMax` / `ocDBMin` route through
 `tryPlanEngineDatabaseAggregate(kind)` which translates the
 3-argument database-query shape into a `planMultiCriterionAggregate`
