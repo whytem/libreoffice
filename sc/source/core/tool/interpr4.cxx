@@ -93,6 +93,7 @@
 #include <spreadsheetengine/runtime/MathStatistical.hxx>
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
 #include <spreadsheetengine/runtime/RpnControlFlow.hxx>
+#include <spreadsheetengine/runtime/RpnCriteria.hxx>
 #include <spreadsheetengine/runtime/RpnOperators.hxx>
 #include <spreadsheetengine/runtime/RpnReference.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
@@ -126,6 +127,9 @@ namespace sefinance = spreadsheetengine::core::finance;
 namespace semath = spreadsheetengine::core::math;
 namespace serpn = spreadsheetengine::core::rpn;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
+namespace sequery = spreadsheetengine::core::query;
+namespace secoercion = spreadsheetengine::core::coercion;
+namespace seitee = spreadsheetengine::compat::libreoffice::interprettaileval;
 namespace seswitchexec = spreadsheetengine::compat::libreoffice::switchexecution;
 namespace setextparseexec = spreadsheetengine::compat::libreoffice::textparsingexecution;
 
@@ -338,6 +342,9 @@ struct InterpreterDispatchRuntimeStatsStore
     std::atomic<sal_uInt64> mnReferenceEngineAttemptedCount { 0 };
     std::atomic<sal_uInt64> mnReferenceEngineSucceededCount { 0 };
     std::atomic<sal_uInt64> mnReferenceEngineDeclinedCount { 0 };
+    std::atomic<sal_uInt64> mnCriteriaEngineAttemptedCount { 0 };
+    std::atomic<sal_uInt64> mnCriteriaEngineSucceededCount { 0 };
+    std::atomic<sal_uInt64> mnCriteriaEngineDeclinedCount { 0 };
     std::mutex maRangeDeclinedSampleMutex;
     std::vector<OUString> maRangeDeclinedFormulaSamples;
 };
@@ -486,6 +493,9 @@ void resetScInterpreterDispatchRuntimeStats()
     rStore.mnReferenceEngineAttemptedCount.store(0, std::memory_order_relaxed);
     rStore.mnReferenceEngineSucceededCount.store(0, std::memory_order_relaxed);
     rStore.mnReferenceEngineDeclinedCount.store(0, std::memory_order_relaxed);
+    rStore.mnCriteriaEngineAttemptedCount.store(0, std::memory_order_relaxed);
+    rStore.mnCriteriaEngineSucceededCount.store(0, std::memory_order_relaxed);
+    rStore.mnCriteriaEngineDeclinedCount.store(0, std::memory_order_relaxed);
     {
         std::lock_guard aGuard(rStore.maRangeDeclinedSampleMutex);
         rStore.maRangeDeclinedFormulaSamples.clear();
@@ -527,6 +537,12 @@ ScInterpreterDispatchRuntimeStatsSnapshot getScInterpreterDispatchRuntimeStatsSn
         = rStore.mnReferenceEngineSucceededCount.load(std::memory_order_relaxed);
     aSnapshot.mnReferenceEngineDeclinedCount
         = rStore.mnReferenceEngineDeclinedCount.load(std::memory_order_relaxed);
+    aSnapshot.mnCriteriaEngineAttemptedCount
+        = rStore.mnCriteriaEngineAttemptedCount.load(std::memory_order_relaxed);
+    aSnapshot.mnCriteriaEngineSucceededCount
+        = rStore.mnCriteriaEngineSucceededCount.load(std::memory_order_relaxed);
+    aSnapshot.mnCriteriaEngineDeclinedCount
+        = rStore.mnCriteriaEngineDeclinedCount.load(std::memory_order_relaxed);
     {
         std::lock_guard aGuard(rStore.maRangeDeclinedSampleMutex);
         aSnapshot.maRangeDeclinedFormulaSamples = rStore.maRangeDeclinedFormulaSamples;
@@ -7866,6 +7882,146 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
+                // Batch 3 first admission: COUNTIF with a double-ref
+                // criteria range and a scalar criterion argument routes
+                // through planSingleCriterionAggregate. External refs,
+                // matrices, multi-dimensional criteria, and non-scalar
+                // criteria defer to legacy ScCountIf.
+                const auto tryPlanEngineCountIf = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnCriteriaEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount != 2 || sp < 2)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const FormulaToken* pCriterionTok = pStack[sp - 1];
+                    const FormulaToken* pRangeTok = pStack[sp - 2];
+                    if (!pCriterionTok || !pRangeTok
+                        || pRangeTok->GetType() != svDoubleRef)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+
+                    // Build the criterion RpnValue from the top token.
+                    std::optional<serpn::RpnValue> oCriterion;
+                    switch (pCriterionTok->GetType())
+                    {
+                        case svDouble:
+                            oCriterion = serpn::RpnValue::number(
+                                pCriterionTok->GetDouble());
+                            break;
+                        case svString:
+                            oCriterion = serpn::RpnValue::text(
+                                pCriterionTok->GetString().getString());
+                            break;
+                        default:
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnCriteriaEngineDeclinedCount);
+                            return false;
+                    }
+
+                    const auto aPredicateResult = serpn::buildCriteriaPredicate(
+                        *oCriterion, sedatetime::parseStandaloneNumberText,
+                        secoercion::parseAsciiDouble);
+                    if (!aPredicateResult
+                        || aPredicateResult.meReadiness
+                               != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+
+                    // Pop the range token. Use PopDoubleRef to drop through
+                    // canonical absolute-range resolution.
+                    sp -= 2;
+                    SCCOL nCol1, nCol2;
+                    SCROW nRow1, nRow2;
+                    SCTAB nTab1, nTab2;
+                    // Re-read via the saved ScComplexRefData since we
+                    // already adjusted sp; mirror toAbs manually.
+                    const ScComplexRefData& rRef = *pRangeTok->GetDoubleRef();
+                    const ScRange aAbs = rRef.toAbs(mrDoc, aPos);
+                    nCol1 = aAbs.aStart.Col();
+                    nRow1 = aAbs.aStart.Row();
+                    nTab1 = aAbs.aStart.Tab();
+                    nCol2 = aAbs.aEnd.Col();
+                    nRow2 = aAbs.aEnd.Row();
+                    nTab2 = aAbs.aEnd.Tab();
+                    // Only single-sheet ranges in this first admission;
+                    // 3D criteria ranges defer to legacy.
+                    if (nTab1 != nTab2)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        // Re-push the operands so legacy has them.
+                        sp += 2;
+                        return false;
+                    }
+
+                    sequery::CriteriaAggregateInput aInput;
+                    aInput.mbScalar = false;
+                    aInput.maReference.maRange.maStart = {
+                        static_cast<spreadsheetengine::api::SheetId>(nTab1),
+                        static_cast<spreadsheetengine::api::ColumnIndex>(nCol1),
+                        static_cast<spreadsheetengine::api::RowIndex>(nRow1)
+                    };
+                    aInput.maReference.maRange.maEnd = {
+                        static_cast<spreadsheetengine::api::SheetId>(nTab2),
+                        static_cast<spreadsheetengine::api::ColumnIndex>(nCol2),
+                        static_cast<spreadsheetengine::api::RowIndex>(nRow2)
+                    };
+                    aInput.mnColumns = static_cast<spreadsheetengine::api::MatrixSize>(
+                        nCol2 - nCol1 + 1);
+                    aInput.mnRows = static_cast<spreadsheetengine::api::MatrixSize>(
+                        nRow2 - nRow1 + 1);
+
+                    serpn::SingleCriterionAggregateRequest aRequest;
+                    aRequest.maCriteriaRange = aInput;
+                    aRequest.maPredicate = aPredicateResult.maValue;
+                    aRequest.meKind = sequery::CriteriaAggregateKind::Count;
+                    aRequest.meSearchType
+                        = seitee::detail::searchTypeFromDocument(mrDoc);
+                    aRequest.mbMatchWholeCell = true;
+
+                    const seitee::detail::CriteriaAggregateMaterializer aMaterializer(
+                        mrDoc, mrContext);
+                    const auto aResult = serpn::planSingleCriterionAggregate(
+                        aMaterializer, aRequest);
+                    if (!aResult
+                        || aResult.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        // Re-push for legacy fallback.
+                        sp += 2;
+                        return false;
+                    }
+
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnCriteriaEngineSucceededCount);
+
+                    // Count aggregate result is a Number.
+                    PushDouble(aResult.maValue.mfNumber);
+                    return true;
+                };
+
                 // Batch 2 sixth admission: ADDRESS with the narrow
                 // 2-argument form (row, col). Uses default A1 convention
                 // and absolute mode 1. Any other parameter combination
@@ -10219,7 +10375,10 @@ StackVar ScInterpreter::Interpret()
                     }
                     break;
                     case ocCountEmptyCells  : ScCountEmptyCells();      break;
-                    case ocCountIf          : ScCountIf();              break;
+                    case ocCountIf          :
+                        if (!tryPlanEngineCountIf())
+                            ScCountIf();
+                        break;
                     case ocSumIf            : IterateParametersIf(ifSUMIF); break;
                     case ocAverageIf        : IterateParametersIf(ifAVERAGEIF); break;
                     case ocSumIfs:

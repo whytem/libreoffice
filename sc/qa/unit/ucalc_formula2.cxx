@@ -890,6 +890,55 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAreaCountDispat
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterCriteriaCountIfDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"CountIf"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    // Populate A1:A5 with mixed values.
+    m_pDoc->SetValue(ScAddress(0, 0, 0), 10.0);
+    m_pDoc->SetValue(ScAddress(0, 1, 0), 20.0);
+    m_pDoc->SetValue(ScAddress(0, 2, 0), 10.0);
+    m_pDoc->SetValue(ScAddress(0, 3, 0), 30.0);
+    m_pDoc->SetValue(ScAddress(0, 4, 0), 10.0);
+
+    // COUNTIF(A1:A5, 10) -> 3
+    m_pDoc->SetString(ScAddress(2, 0, 0), u"=COUNTIF(A1:A5;10)"_ustr);
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(2, 0, 0)));
+
+    // COUNTIF(A1:A5, 20) -> 1
+    m_pDoc->SetString(ScAddress(2, 1, 0), u"=COUNTIF(A1:A5;20)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(2, 1, 0)));
+
+    // COUNTIF with operator-string criterion
+    m_pDoc->SetString(ScAddress(2, 2, 0), u"=COUNTIF(A1:A5;\">15\")"_ustr);
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(2, 2, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "criteria_attempted="
+          + std::to_string(aDispatchStats.mnCriteriaEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnCriteriaEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnCriteriaEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "COUNTIF should attempt engine dispatch: " + aLabel,
+        aDispatchStats.mnCriteriaEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "scalar COUNTIF should succeed through engine: " + aLabel,
+        aDispatchStats.mnCriteriaEngineSucceededCount > 0);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAddressDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
