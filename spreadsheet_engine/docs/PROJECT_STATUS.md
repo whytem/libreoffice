@@ -243,9 +243,7 @@ unique-match scalar return, variance accumulator).
 `ocMatDet` (MDETERM) is the fourth Batch 4 admission: it routes
 through `serpn::planDeterminant` when the single argument is an
 svMatrix token, reusing the same `convertMatrixRefToMatrixOperand`
-bridge as TRANSPOSE. Range arguments still need the broader
-reference-to-matrix materialization contract and decline to the
-warn-gated compat dispatcher.
+bridge as TRANSPOSE.
 
 `ocMatMult` (MMULT) and `ocMatInv` (MINVERSE) are the fifth and
 sixth Batch 4 admissions (Phase C of the Close-Out Plan). Both
@@ -261,10 +259,25 @@ equality-to-zero test is preserved so near-singular-but-non-zero
 pivots still invert. `serpn::planMatrixMultiply` and
 `serpn::planMatrixInverse` bridge the numerical cores to the RPN
 matrix operand shape via a shared `tryFlattenNumericMatrix` helper.
-Scope fence: both admissions still require in-memory svMatrix
-tokens; range-input widening for these two waits on Phase D's
-host-facade reference-to-matrix materialization primitive alongside
-the SUMPRODUCT family.
+Scope fence: MMULT / MINVERSE require in-memory svMatrix tokens;
+range-input widening for these two waits on the same host-facade
+primitive used below by TRANSPOSE / MDETERM.
+
+Phase D of the Close-Out Plan widens the TRANSPOSE and MDETERM
+admissions to accept svSingleRef / svDoubleRef range tokens by
+landing the first documented Host facade primitive,
+`seitee::detail::materializeHostRangeToMatrixOperand`. The helper
+wraps the existing `readMaterializedHostCellValue` pipeline and
+produces a `serpn::MatrixOperand` directly, so the engine-first
+dispatch path no longer declines when a single-cell or range
+reference reaches the TRANSPOSE / MDETERM admissions (e.g.
+`=MDETERM(A1)`, `=TRANSPOSE(A1:C2)`). svRefList and multi-sheet
+surfaces still decline; MMULT / MINVERSE / the SUMPRODUCT family
+will pick up the same bridge when their own admissions extend.
+The contract for this primitive is tracked in
+[architecture/HOST_FACADE_CONTRACTS.md](architecture/HOST_FACADE_CONTRACTS.md);
+Phase I will extend that document with the remaining address /
+range-resolution / iteration / spill contracts.
 
 `ocLet` remains the last unstarted Batch 1 member; the nested-
 interpreter spawn contract for binding resolution is the gating

@@ -8085,13 +8085,13 @@ StackVar ScInterpreter::Interpret()
                 // Batch 4 matrix admissions. The pure-scalar-input
                 // constructors (MUNIT / MSEQUENCE) demonstrate the
                 // RpnMatrix substrate end-to-end without host-side
-                // range materialization; TRANSPOSE / MDETERM / MMULT /
-                // MINVERSE exercise the matrix-consuming path by
-                // accepting in-memory svMatrix tokens. The SUMPRODUCT
-                // family and range-input widening of the Batch 4
-                // members still defer to legacy — they depend on a
-                // host-facade reference-to-matrix materialization
-                // primitive.
+                // range materialization; MMULT / MINVERSE exercise the
+                // matrix-consuming path with in-memory svMatrix
+                // tokens; TRANSPOSE / MDETERM additionally accept
+                // svSingleRef / svDoubleRef range tokens routed through
+                // the `materializeHostRangeToMatrixOperand` host-facade
+                // primitive. The SUMPRODUCT family and range-input
+                // widening for MMULT / MINVERSE still defer to legacy.
                 const auto convertMatrixOperandToMatrixRef
                     = [&](const serpn::MatrixOperand& rOperand) -> ScMatrixRef {
                     if (rOperand.isEmpty())
@@ -8191,6 +8191,44 @@ StackVar ScInterpreter::Interpret()
                         }
                     }
                     return aOperand;
+                };
+
+                // Host facade bridge: materialize a svSingleRef /
+                // svDoubleRef token into a serpn::MatrixOperand so the
+                // matrix-consuming engine admissions (TRANSPOSE /
+                // MDETERM / ...) can accept range inputs without needing
+                // to iterate the host document themselves. Delegates to
+                // `seitee::detail::materializeHostRangeToMatrixOperand`,
+                // which wraps the existing `readMaterializedHostCellValue`
+                // pipeline. Returns std::nullopt for unsupported surfaces
+                // (multi-sheet ranges, svRefList, unresolved references);
+                // callers should decline to legacy in that case.
+                const auto materializeRangeTokenToMatrixOperand
+                    = [&](const FormulaToken* pTok)
+                    -> std::optional<serpn::MatrixOperand> {
+                    if (!pTok)
+                        return std::nullopt;
+                    ScRange aAbs;
+                    switch (pTok->GetType())
+                    {
+                        case svSingleRef:
+                        {
+                            const ScSingleRefData& rRef = *pTok->GetSingleRef();
+                            const ScAddress aAddr = rRef.toAbs(mrDoc, aPos);
+                            aAbs = ScRange(aAddr, aAddr);
+                            break;
+                        }
+                        case svDoubleRef:
+                        {
+                            const ScComplexRefData& rRef = *pTok->GetDoubleRef();
+                            aAbs = rRef.toAbs(mrDoc, aPos);
+                            break;
+                        }
+                        default:
+                            return std::nullopt;
+                    }
+                    return seitee::detail::materializeHostRangeToMatrixOperand(
+                        aAbs, mrDoc, mrContext);
                 };
 
                 const auto tryPlanEngineIdentityMatrix = [&]() -> bool {
@@ -8352,27 +8390,41 @@ StackVar ScInterpreter::Interpret()
                                 .mnMatrixEngineDeclinedCount);
                         return false;
                     }
-                    // Scope fence: admit only in-memory matrix
-                    // operands. Range tokens (svDoubleRef / svSingleRef
-                    // / svRefList) still need the reference-to-matrix
-                    // materialization contract and defer to legacy.
+                    // Scope fence: admit in-memory matrix operands and
+                    // svSingleRef / svDoubleRef range tokens (routed
+                    // through the Phase D host-facade materialization
+                    // primitive). svRefList still defers: its
+                    // multi-area iteration shape is out of scope for
+                    // this admission.
                     const FormulaToken* pTok = pStack[sp - 1];
-                    if (!pTok || pTok->GetType() != svMatrix)
+                    if (!pTok
+                        || (pTok->GetType() != svMatrix
+                            && pTok->GetType() != svSingleRef
+                            && pTok->GetType() != svDoubleRef))
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
                                 .mnMatrixEngineDeclinedCount);
                         return false;
                     }
-                    ScMatrix* pSourceMat = const_cast<FormulaToken*>(pTok)->GetMatrix();
-                    if (!pSourceMat)
+                    std::optional<serpn::MatrixOperand> oOperand;
+                    if (pTok->GetType() == svMatrix)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
+                        ScMatrix* pSourceMat
+                            = const_cast<FormulaToken*>(pTok)->GetMatrix();
+                        if (!pSourceMat)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                        oOperand = convertMatrixRefToMatrixOperand(*pSourceMat);
                     }
-                    auto oOperand = convertMatrixRefToMatrixOperand(*pSourceMat);
+                    else
+                    {
+                        oOperand = materializeRangeTokenToMatrixOperand(pTok);
+                    }
                     if (!oOperand)
                     {
                         addDispatchRuntimeStat(
@@ -8419,27 +8471,39 @@ StackVar ScInterpreter::Interpret()
                                 .mnMatrixEngineDeclinedCount);
                         return false;
                     }
-                    // Scope fence: only admit svMatrix sources. Range
-                    // tokens still need the reference-to-matrix
-                    // materialization contract.
+                    // Scope fence: admit svMatrix sources plus
+                    // svSingleRef / svDoubleRef range tokens via the
+                    // Phase D host-facade materialization primitive.
+                    // svRefList still defers.
                     const FormulaToken* pTok = pStack[sp - 1];
-                    if (!pTok || pTok->GetType() != svMatrix)
+                    if (!pTok
+                        || (pTok->GetType() != svMatrix
+                            && pTok->GetType() != svSingleRef
+                            && pTok->GetType() != svDoubleRef))
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
                                 .mnMatrixEngineDeclinedCount);
                         return false;
                     }
-                    ScMatrix* pSourceMat
-                        = const_cast<FormulaToken*>(pTok)->GetMatrix();
-                    if (!pSourceMat)
+                    std::optional<serpn::MatrixOperand> oOperand;
+                    if (pTok->GetType() == svMatrix)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
+                        ScMatrix* pSourceMat
+                            = const_cast<FormulaToken*>(pTok)->GetMatrix();
+                        if (!pSourceMat)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                        oOperand = convertMatrixRefToMatrixOperand(*pSourceMat);
                     }
-                    auto oOperand = convertMatrixRefToMatrixOperand(*pSourceMat);
+                    else
+                    {
+                        oOperand = materializeRangeTokenToMatrixOperand(pTok);
+                    }
                     if (!oOperand)
                     {
                         addDispatchRuntimeStat(

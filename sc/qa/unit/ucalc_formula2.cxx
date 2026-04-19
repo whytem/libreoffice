@@ -1395,6 +1395,37 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterMatrixEngineDispatch)
     CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument,
                          m_pDoc->GetErrCode(ScAddress(0, 39, 0)));
 
+    // Phase D: TRANSPOSE / MDETERM accept svSingleRef / svDoubleRef
+    // range tokens via the host-facade reference-to-matrix
+    // materialization primitive (`materializeHostRangeToMatrixOperand`).
+    // svDoubleRef arguments to ForceArray-classified opcodes are
+    // normally pre-converted to svMatrix by ConvertMatrixParameters
+    // before dispatch, so the A46:B47 case below primarily guards
+    // parity through the pre-converted path; the svSingleRef fixtures
+    // exercise the new bridge directly because single-cell refs are
+    // not pre-converted.
+
+    // MDETERM of a 2x2 range: det({{1,2},{3,4}}) = 1*4 - 2*3 = -2.
+    m_pDoc->SetValue(ScAddress(0, 45, 0), 1.0); // A46
+    m_pDoc->SetValue(ScAddress(1, 45, 0), 2.0); // B46
+    m_pDoc->SetValue(ScAddress(0, 46, 0), 3.0); // A47
+    m_pDoc->SetValue(ScAddress(1, 46, 0), 4.0); // B47
+    m_pDoc->SetString(ScAddress(3, 45, 0), u"=MDETERM(A46:B47)"_ustr);
+    ASSERT_DOUBLES_EQUAL(-2.0, m_pDoc->GetValue(ScAddress(3, 45, 0)));
+
+    // MDETERM of a 1x1 svSingleRef: det([[v]]) = v. ConvertMatrixParameters
+    // leaves single-cell refs untouched, so this reaches dispatch as
+    // svSingleRef and exercises the new reference-to-matrix bridge.
+    m_pDoc->SetValue(ScAddress(0, 48, 0), 7.0); // A49
+    m_pDoc->SetString(ScAddress(3, 48, 0), u"=MDETERM(A49)"_ustr);
+    ASSERT_DOUBLES_EQUAL(7.0, m_pDoc->GetValue(ScAddress(3, 48, 0)));
+
+    // TRANSPOSE of an svSingleRef: transpose of [[v]] is [[v]]. Same
+    // svSingleRef-path coverage as above, for the TRANSPOSE admission.
+    m_pDoc->SetValue(ScAddress(0, 49, 0), 42.0); // A50
+    m_pDoc->SetString(ScAddress(3, 49, 0), u"=TRANSPOSE(A50)"_ustr);
+    ASSERT_DOUBLES_EQUAL(42.0, m_pDoc->GetValue(ScAddress(3, 49, 0)));
+
     const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
     const std::string aLabel
         = "matrix_attempted="
