@@ -9933,6 +9933,147 @@ StackVar ScInterpreter::Interpret()
                     else
                         PushError(FormulaError::UnknownStackVariable);
                 };
+                const auto tryPlanEngineSwitch = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnControlFlowEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount < 3 || sp < nParamCount)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+
+                    // Stack window (pre-reverse): selector at
+                    // sp - nParamCount, then case0, result0, case1, result1,
+                    // ..., last pushed at sp - 1. Even total → trailing
+                    // default; odd total → no default.
+                    const std::size_t nBase
+                        = static_cast<std::size_t>(sp - nParamCount);
+                    const bool bHasDefault = (nParamCount % 2) == 0;
+                    const std::size_t nPairBytes
+                        = nParamCount - 1 - (bHasDefault ? 1 : 0);
+                    const std::size_t nPairs = nPairBytes / 2;
+
+                    auto buildScalar
+                        = [&](const FormulaToken* pTok) -> std::optional<serpn::RpnValue> {
+                        if (!pTok)
+                            return std::nullopt;
+                        switch (pTok->GetType())
+                        {
+                            case svDouble:
+                                return serpn::RpnValue::number(pTok->GetDouble());
+                            case svString:
+                                return serpn::RpnValue::text(
+                                    selibreoffice::toApiString(
+                                        pTok->GetString().getString()));
+                            case svError:
+                                return serpn::RpnValue::error(
+                                    selibreoffice::toApiError(pTok->GetError()));
+                            case svEmptyCell:
+                            case svMissing:
+                                return serpn::RpnValue::empty();
+                            default:
+                                return std::nullopt;
+                        }
+                    };
+
+                    const FormulaToken* pSelectorTok = pStack[nBase];
+                    auto oSelector = buildScalar(pSelectorTok);
+                    if (!oSelector)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+
+                    std::vector<serpn::RpnValue> aCaseLabels;
+                    aCaseLabels.reserve(nPairs);
+                    for (std::size_t i = 0; i < nPairs; ++i)
+                    {
+                        const FormulaToken* pCaseTok = pStack[nBase + 1 + 2 * i];
+                        auto oCase = buildScalar(pCaseTok);
+                        if (!oCase)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineDeclinedCount);
+                            return false;
+                        }
+                        aCaseLabels.push_back(std::move(*oCase));
+                    }
+
+                    const std::optional<std::size_t> oDefaultSlot
+                        = bHasDefault ? std::optional<std::size_t>(nPairs)
+                                      : std::nullopt;
+                    const auto aPlan = serpn::planSwitchBranch(
+                        *oSelector,
+                        std::span<const serpn::RpnValue>(aCaseLabels.data(),
+                                                         aCaseLabels.size()),
+                        oDefaultSlot);
+                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready
+                        || !aPlan)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+
+                    switch (aPlan.maValue.meDirective)
+                    {
+                        case serpn::BranchDirective::TakeSlot:
+                        {
+                            const std::size_t nSlot = aPlan.maValue.mnSlot;
+                            // Pair-result slot k → token at nBase+2+2k.
+                            // Default slot k == nPairs → token at sp-1.
+                            const std::size_t nResultIndex
+                                = (nSlot < nPairs)
+                                      ? (nBase + 2 + 2 * nSlot)
+                                      : static_cast<std::size_t>(sp - 1);
+                            FormulaConstTokenRef xWinning(pStack[nResultIndex]);
+                            sp -= nParamCount;
+                            nGlobalError = FormulaError::NONE;
+                            if (xWinning)
+                                PushTokenRef(xWinning);
+                            else
+                                PushError(FormulaError::UnknownStackVariable);
+                            break;
+                        }
+                        case serpn::BranchDirective::ReturnNotAvailable:
+                            sp -= nParamCount;
+                            nGlobalError = FormulaError::NONE;
+                            PushNA();
+                            break;
+                        case serpn::BranchDirective::PropagateError:
+                            sp -= nParamCount;
+                            nGlobalError = FormulaError::NONE;
+                            PushError(selibreoffice::toFormulaError(
+                                aPlan.maValue.meError));
+                            break;
+                        default:
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineDeclinedCount);
+                            return false;
+                    }
+
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnControlFlowEngineSucceededCount);
+                    return true;
+                };
                 const auto pushLegacySwitch = [&]() {
                     warnConditionalDispatch(u"COM.MICROSOFT.SWITCH");
 
@@ -11643,7 +11784,10 @@ StackVar ScInterpreter::Interpret()
                         if (!tryPlanEngineIfs())
                             pushLegacyIfs();
                         break;
-                    case ocSwitch_MS        : pushLegacySwitch();           break;
+                    case ocSwitch_MS        :
+                        if (!tryPlanEngineSwitch())
+                            pushLegacySwitch();
+                        break;
                     case ocMinIfs_MS:
                     {
                         if (tryPlanEngineMultiCriterionAggregate(
