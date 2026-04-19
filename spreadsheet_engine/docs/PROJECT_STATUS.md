@@ -45,7 +45,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=48`
+- `interp4_dispatch_engine_attempt_count=50`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -189,21 +189,23 @@ streaming range-iteration primitive; materializing a range into a
 `std::vector` just to count empties would be a perf regression vs. the
 legacy `ScCellIterator`.
 
-Batch 4 substrate (`runtime/RpnMatrix.hxx`) has landed with three
+Batch 4 substrate (`runtime/RpnMatrix.hxx`) has landed with six
 admissions so far. The pure-scalar constructors `ocMatrixUnit`
 (MUNIT) and `ocMatSequence` (SEQUENCE) route through
 `serpn::planIdentityMatrix` / `planSequenceMatrix`: they produce
 matrices from scalar-only arguments, so no host-side range
-materialization is needed. The third admission, `ocMatTrans`
-(TRANSPOSE), exercises the matrix-consuming path for in-memory
-`svMatrix` tokens via `serpn::planTranspose`. Two bridges span the
-host boundary: `convertMatrixOperandToMatrixRef` copies the engine's
+materialization is needed. `ocMatTrans` (TRANSPOSE), `ocMatDet`
+(MDETERM), `ocMatMult` (MMULT), and `ocMatInv` (MINVERSE) exercise
+the matrix-consuming path for in-memory `svMatrix` tokens via
+`serpn::planTranspose` / `planDeterminant` / `planMatrixMultiply` /
+`planMatrixInverse`. Two bridges span the host boundary:
+`convertMatrixOperandToMatrixRef` copies the engine's
 `MatrixOperand` (row-major `std::vector<CellValue>`) into an
-`ScMatrixRef` for `PushMatrix`, and the new
-`convertMatrixRefToMatrixOperand` does the reverse for svMatrix
-inputs. Reference-consuming matrix opcodes (MDETERM / MINVERSE /
-MMULT / SUMPRODUCT family / regression-forecast) still need a
-range-iteration primitive on the Host facade and decline to the
+`ScMatrixRef` for `PushMatrix`, and `convertMatrixRefToMatrixOperand`
+does the reverse for svMatrix inputs. Range-input widening for
+TRANSPOSE / MDETERM / MMULT / MINVERSE and the SUMPRODUCT /
+regression-forecast family still need a reference-to-matrix
+materialization primitive on the Host facade and decline to the
 legacy path when their argument arrives as `svDoubleRef` /
 `svSingleRef` / `svRefList`.
 
@@ -243,9 +245,26 @@ through `serpn::planDeterminant` when the single argument is an
 svMatrix token, reusing the same `convertMatrixRefToMatrixOperand`
 bridge as TRANSPOSE. Range arguments still need the broader
 reference-to-matrix materialization contract and decline to the
-warn-gated compat dispatcher. MMULT / MINVERSE need their own
-numerical cores in the engine (`evaluateMatrixMultiply`,
-`evaluateMatrixInverse`) before they can follow the same pattern.
+warn-gated compat dispatcher.
+
+`ocMatMult` (MMULT) and `ocMatInv` (MINVERSE) are the fifth and
+sixth Batch 4 admissions (Phase C of the Close-Out Plan). Both
+route through engine-native numerical cores:
+`semath::evaluateMatrixMultiply` walks the same ascending-k Kahan
+summation order as legacy `ScInterpreter::ScMatMult`, and
+`semath::evaluateMatrixInverse` runs an LUP decomposition whose
+singular-matrix policy matches legacy `ScMatInv` exactly (zero
+max-absolute row during scaling, or zero on the diagonal after
+decomposition, both surface as `Error::IllegalArgument` → `#VALUE!`).
+No separate epsilon is applied; the legacy code's strict
+equality-to-zero test is preserved so near-singular-but-non-zero
+pivots still invert. `serpn::planMatrixMultiply` and
+`serpn::planMatrixInverse` bridge the numerical cores to the RPN
+matrix operand shape via a shared `tryFlattenNumericMatrix` helper.
+Scope fence: both admissions still require in-memory svMatrix
+tokens; range-input widening for these two waits on Phase D's
+host-facade reference-to-matrix materialization primitive alongside
+the SUMPRODUCT family.
 
 `ocLet` remains the last unstarted Batch 1 member; the nested-
 interpreter spawn contract for binding resolution is the gating

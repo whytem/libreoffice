@@ -1342,6 +1342,59 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterMatrixEngineDispatch)
     ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(ScAddress(1, 12, 0)));
     ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(ScAddress(1, 14, 0)));
 
+    // Phase C: MMULT with two inline literal matrices. The inline
+    // matrix-literal syntax uses `;` between columns and `|` between
+    // rows. The parser emits these as svMatrix tokens, which the
+    // Phase C admission accepts. Identity * identity stays identity.
+    m_pDoc->InsertMatrixFormula(0, 17, 1, 18, aMark,
+                                u"=MMULT({1;0|0;1};{1;0|0;1})"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 17, 0)));
+    ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(ScAddress(1, 17, 0)));
+    ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(ScAddress(0, 18, 0)));
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(1, 18, 0)));
+
+    // Phase C: MMULT 2x2 * 2x2: {{1,2},{3,4}} * {{5,6},{7,8}} =
+    // {{19,22},{43,50}}.
+    m_pDoc->InsertMatrixFormula(0, 21, 1, 22, aMark,
+                                u"=MMULT({1;2|3;4};{5;6|7;8})"_ustr);
+    ASSERT_DOUBLES_EQUAL(19.0, m_pDoc->GetValue(ScAddress(0, 21, 0)));
+    ASSERT_DOUBLES_EQUAL(22.0, m_pDoc->GetValue(ScAddress(1, 21, 0)));
+    ASSERT_DOUBLES_EQUAL(43.0, m_pDoc->GetValue(ScAddress(0, 22, 0)));
+    ASSERT_DOUBLES_EQUAL(50.0, m_pDoc->GetValue(ScAddress(1, 22, 0)));
+
+    // Phase C: MMULT 3x3 identity * 3x3 data forwards the data.
+    m_pDoc->InsertMatrixFormula(
+        0, 25, 2, 27, aMark,
+        u"=MMULT({1;0;0|0;1;0|0;0;1};{2;3;4|5;6;7|8;9;10})"_ustr);
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(0, 25, 0)));
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(1, 25, 0)));
+    ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(ScAddress(2, 25, 0)));
+    ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(ScAddress(2, 27, 0)));
+
+    // Phase C: MINVERSE on 2x2 literal {{4,7},{2,6}} ->
+    // {{0.6,-0.7},{-0.2,0.4}}.
+    m_pDoc->InsertMatrixFormula(0, 30, 1, 31, aMark,
+                                u"=MINVERSE({4;7|2;6})"_ustr);
+    ASSERT_DOUBLES_EQUAL(0.6, m_pDoc->GetValue(ScAddress(0, 30, 0)));
+    ASSERT_DOUBLES_EQUAL(-0.7, m_pDoc->GetValue(ScAddress(1, 30, 0)));
+    ASSERT_DOUBLES_EQUAL(-0.2, m_pDoc->GetValue(ScAddress(0, 31, 0)));
+    ASSERT_DOUBLES_EQUAL(0.4, m_pDoc->GetValue(ScAddress(1, 31, 0)));
+
+    // Phase C: MINVERSE on the 3x3 identity is itself.
+    m_pDoc->InsertMatrixFormula(0, 34, 2, 36, aMark,
+                                u"=MINVERSE({1;0;0|0;1;0|0;0;1})"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 34, 0)));
+    ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(ScAddress(1, 34, 0)));
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(1, 35, 0)));
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(2, 36, 0)));
+
+    // Phase C: MINVERSE on a singular 3x3 matrix (zero row) must
+    // surface #VALUE! through the PushIllegalArgument parity path.
+    m_pDoc->InsertMatrixFormula(0, 39, 2, 41, aMark,
+                                u"=MINVERSE({1;2;3|2;4;6|0;0;0})"_ustr);
+    CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument,
+                         m_pDoc->GetErrCode(ScAddress(0, 39, 0)));
+
     const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
     const std::string aLabel
         = "matrix_attempted="
@@ -1351,7 +1404,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterMatrixEngineDispatch)
           + " declined="
           + std::to_string(aDispatchStats.mnMatrixEngineDeclinedCount);
     CPPUNIT_ASSERT_MESSAGE(
-        "MUNIT/SEQUENCE/TRANSPOSE should attempt engine dispatch: " + aLabel,
+        "MUNIT/SEQUENCE/TRANSPOSE/MMULT/MINVERSE should attempt engine dispatch: "
+            + aLabel,
         aDispatchStats.mnMatrixEngineAttemptedCount > 0);
     CPPUNIT_ASSERT_MESSAGE(
         "pure-scalar and svMatrix inputs should succeed through engine: " + aLabel,

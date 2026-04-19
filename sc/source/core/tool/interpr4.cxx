@@ -8085,12 +8085,13 @@ StackVar ScInterpreter::Interpret()
                 // Batch 4 matrix admissions. The pure-scalar-input
                 // constructors (MUNIT / MSEQUENCE) demonstrate the
                 // RpnMatrix substrate end-to-end without host-side
-                // range materialization; TRANSPOSE additionally
-                // exercises the matrix-consuming path by accepting an
-                // in-memory svMatrix token. Reference-consuming matrix
-                // opcodes (MDETERM / MINVERSE / MMULT / the SUMPRODUCT
-                // family) still need the full reference-to-matrix
-                // materialization contract and are deferred.
+                // range materialization; TRANSPOSE / MDETERM / MMULT /
+                // MINVERSE exercise the matrix-consuming path by
+                // accepting in-memory svMatrix tokens. The SUMPRODUCT
+                // family and range-input widening of the Batch 4
+                // members still defer to legacy — they depend on a
+                // host-facade reference-to-matrix materialization
+                // primitive.
                 const auto convertMatrixOperandToMatrixRef
                     = [&](const serpn::MatrixOperand& rOperand) -> ScMatrixRef {
                     if (rOperand.isEmpty())
@@ -8467,6 +8468,157 @@ StackVar ScInterpreter::Interpret()
                     {
                         PushDouble(aPlan.maValue);
                     }
+                    return true;
+                };
+
+                const auto tryPlanEngineMatrixMultiply = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount != 2 || sp < 2)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    // Scope fence (Phase C): both arguments must be
+                    // in-memory svMatrix tokens. Range tokens still
+                    // need the reference-to-matrix materialization
+                    // contract and decline to legacy for now so
+                    // ScMatMult keeps ownership of that path.
+                    const FormulaToken* pRightTok = pStack[sp - 1];
+                    const FormulaToken* pLeftTok = pStack[sp - 2];
+                    if (!pRightTok || !pLeftTok
+                        || pRightTok->GetType() != svMatrix
+                        || pLeftTok->GetType() != svMatrix)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    ScMatrix* pRightMat
+                        = const_cast<FormulaToken*>(pRightTok)->GetMatrix();
+                    ScMatrix* pLeftMat
+                        = const_cast<FormulaToken*>(pLeftTok)->GetMatrix();
+                    if (!pRightMat || !pLeftMat)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    auto oLeftOperand = convertMatrixRefToMatrixOperand(*pLeftMat);
+                    auto oRightOperand = convertMatrixRefToMatrixOperand(*pRightMat);
+                    if (!oLeftOperand || !oRightOperand)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    const auto aPlan
+                        = serpn::planMatrixMultiply(*oLeftOperand, *oRightOperand);
+                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    sp -= 2;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineSucceededCount);
+                    if (!aPlan)
+                    {
+                        PushError(selibreoffice::toFormulaError(aPlan.meError));
+                        return true;
+                    }
+                    ScMatrixRef pResult = convertMatrixOperandToMatrixRef(aPlan.maValue);
+                    if (!pResult)
+                    {
+                        PushError(FormulaError::MatrixSize);
+                        return true;
+                    }
+                    PushMatrix(pResult);
+                    return true;
+                };
+
+                const auto tryPlanEngineMatrixInverse = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount != 1 || !sp)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    // Scope fence (Phase C): only admit in-memory
+                    // svMatrix tokens. Range-input MINVERSE still
+                    // defers: it needs the reference-to-matrix
+                    // materialization contract.
+                    const FormulaToken* pTok = pStack[sp - 1];
+                    if (!pTok || pTok->GetType() != svMatrix)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    ScMatrix* pSourceMat
+                        = const_cast<FormulaToken*>(pTok)->GetMatrix();
+                    if (!pSourceMat)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    auto oOperand = convertMatrixRefToMatrixOperand(*pSourceMat);
+                    if (!oOperand)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    const auto aPlan = serpn::planMatrixInverse(*oOperand);
+                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    sp -= 1;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineSucceededCount);
+                    if (!aPlan)
+                    {
+                        // Singular / non-numeric matrix surfaces as
+                        // IllegalArgument -> #VALUE!, matching the
+                        // legacy PushIllegalArgument path in ScMatInv.
+                        PushError(selibreoffice::toFormulaError(aPlan.meError));
+                        return true;
+                    }
+                    ScMatrixRef pResult = convertMatrixOperandToMatrixRef(aPlan.maValue);
+                    if (!pResult)
+                    {
+                        PushError(FormulaError::MatrixSize);
+                        return true;
+                    }
+                    PushMatrix(pResult);
                     return true;
                 };
 
@@ -12023,8 +12175,14 @@ StackVar ScInterpreter::Interpret()
                             seinterpcompatdispatch::Dispatcher::matrixDeterminant(*this);
                         }
                         break;
-                    case ocMatInv           : ScMatInv();                   break;
-                    case ocMatMult          : ScMatMult();                  break;
+                    case ocMatInv:
+                        if (!tryPlanEngineMatrixInverse())
+                            ScMatInv();
+                        break;
+                    case ocMatMult:
+                        if (!tryPlanEngineMatrixMultiply())
+                            ScMatMult();
+                        break;
                     case ocMatSequence      :
                         if (!tryPlanEngineSequenceMatrix())
                             ScMatSequence();
