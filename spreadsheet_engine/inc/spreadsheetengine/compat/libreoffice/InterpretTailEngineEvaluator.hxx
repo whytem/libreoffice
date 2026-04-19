@@ -69,6 +69,7 @@
 #include <spreadsheetengine/runtime/MathStatistical.hxx>
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
 #include <spreadsheetengine/runtime/QueryRuntime.hxx>
+#include <spreadsheetengine/runtime/RpnMatrix.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 #include <spreadsheetengine/runtime/TextFunctionRuntime.hxx>
 #include <spreadsheetengine/runtime/TextRuntimeSupport.hxx>
@@ -3711,6 +3712,72 @@ inline void putScalarIntoMatrix(
     }
 
     return makeMaterializedValue(xMatrix);
+}
+
+// Host facade primitive: materialize a single-sheet cell range into a
+// row-major `serpn::MatrixOperand` by iterating the range via the
+// existing `readMaterializedHostCellValue` pipeline. This is the
+// canonical bridge used by the engine-first dispatch path
+// (`tryPlanEngine*` lambdas in interpr4.cxx) so that matrix-consuming
+// opcodes with range arguments (TRANSPOSE(A1:C2), MDETERM(A1:B2), ...)
+// can admit through the RpnMatrix substrate instead of declining to
+// legacy.
+//
+// Semantics:
+// - `rAbsRange` must be single-sheet and normalized. Multi-sheet ranges
+//   return std::nullopt (caller should decline to legacy).
+// - Empty / error / text / numeric / boolean cells are preserved as
+//   `api::CellValue` variants. Empty cells become `CellValue::empty()`
+//   rather than zero-doubles, matching the legacy matrix-frame read.
+// - The resulting operand carries `MatrixProvenance::MaterializedReference`.
+// - Errors are propagated per-cell; the operand itself is only failed
+//   when the range shape is invalid.
+//
+// Caller contract: the caller owns pre-validation of stack types
+// (svSingleRef / svDoubleRef), absolute-range conversion, and any
+// additional scope fencing (e.g. determinant squareness). This helper
+// does not inspect `rFormulaPos` for self-reference because TRANSPOSE /
+// MDETERM already require a non-scalar input and the matrix-frame path
+// catches self-reference before dispatch.
+[[nodiscard]] inline std::optional<spreadsheetengine::core::rpn::MatrixOperand>
+materializeHostRangeToMatrixOperand(
+    const ScRange& rAbsRange, const ScDocument& rDoc, ScInterpreterContext& rContext)
+{
+    if (rAbsRange.aStart.Tab() != rAbsRange.aEnd.Tab())
+        return std::nullopt;
+    if (rAbsRange.aStart.Col() > rAbsRange.aEnd.Col()
+        || rAbsRange.aStart.Row() > rAbsRange.aEnd.Row())
+    {
+        return std::nullopt;
+    }
+
+    const auto nColumns
+        = static_cast<api::MatrixSize>(rAbsRange.aEnd.Col() - rAbsRange.aStart.Col() + 1);
+    const auto nRows
+        = static_cast<api::MatrixSize>(rAbsRange.aEnd.Row() - rAbsRange.aStart.Row() + 1);
+    if (nColumns == 0 || nRows == 0)
+        return std::nullopt;
+
+    spreadsheetengine::core::rpn::MatrixOperand aOperand;
+    aOperand.maDimensions = { nColumns, nRows };
+    aOperand.meProvenance
+        = spreadsheetengine::core::rpn::MatrixProvenance::MaterializedReference;
+    aOperand.maValues.reserve(static_cast<std::size_t>(nColumns) * nRows);
+
+    for (api::MatrixSize nRow = 0; nRow < nRows; ++nRow)
+    {
+        for (api::MatrixSize nColumn = 0; nColumn < nColumns; ++nColumn)
+        {
+            const ScAddress aAddress(
+                rAbsRange.aStart.Col() + static_cast<SCCOL>(nColumn),
+                rAbsRange.aStart.Row() + static_cast<SCROW>(nRow),
+                rAbsRange.aStart.Tab());
+            aOperand.maValues.push_back(
+                readMaterializedHostCellValue(rDoc, rContext, aAddress));
+        }
+    }
+
+    return aOperand;
 }
 
 [[nodiscard]] inline api::CellValue readMaterializedHostCellValue(
