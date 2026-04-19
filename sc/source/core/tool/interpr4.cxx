@@ -7866,6 +7866,80 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
+                // Batch 2 sixth admission: ADDRESS with the narrow
+                // 2-argument form (row, col). Uses default A1 convention
+                // and absolute mode 1. Any other parameter combination
+                // (3-5 args with abs mode, style flag, sheet token) or
+                // non-scalar arguments defer to legacy ScAddressFunc.
+                const auto tryPlanEngineAddress = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnReferenceEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount != 2 || sp < 2)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+                    const FormulaToken* pColTok = pStack[sp - 1];
+                    const FormulaToken* pRowTok = pStack[sp - 2];
+                    if (!pColTok || !pRowTok
+                        || pColTok->GetType() != svDouble
+                        || pRowTok->GetType() != svDouble)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const sal_Int32 nCol
+                        = static_cast<sal_Int32>(pColTok->GetDouble());
+                    const sal_Int32 nRow
+                        = static_cast<sal_Int32>(pRowTok->GetDouble());
+
+                    // 1-based row/col validation.
+                    if (nCol < 1 || nRow < 1
+                        || !mrDoc.ValidCol(static_cast<SCCOL>(nCol - 1))
+                        || !mrDoc.ValidRow(static_cast<SCROW>(nRow - 1)))
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    serefexec::AddressFunctionRequest aRequest;
+                    aRequest.mnRow
+                        = static_cast<spreadsheetengine::api::RowIndex>(nRow - 1);
+                    aRequest.mnColumn
+                        = static_cast<spreadsheetengine::api::ColumnIndex>(nCol - 1);
+                    aRequest.mnAbsMode = 1;
+                    aRequest.mbA1Style = true;
+                    aRequest.meConvention = mrDoc.GetAddressConvention();
+
+                    const auto aFormatted
+                        = serefexec::formatAddressFunctionResult(aRequest);
+                    if (!aFormatted)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    sp -= 2;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnReferenceEngineSucceededCount);
+                    PushString(aFormatted.maValue);
+                    return true;
+                };
+
                 // Batch 2 fifth admission: INDEX scalar-reference selection.
                 // Covers INDEX(ref, row) and INDEX(ref, row, col) where:
                 //   - base is svSingleRef or svDoubleRef (no matrix, no
@@ -10118,7 +10192,10 @@ StackVar ScInterpreter::Interpret()
                     case ocDBVar            : ScDBVar();                    break;
                     case ocDBVarP           : ScDBVarP();                   break;
                     case ocIndirect         : ScIndirect();                 break;
-                    case ocAddress          : ScAddressFunc();          break;
+                    case ocAddress          :
+                        if (!tryPlanEngineAddress())
+                            ScAddressFunc();
+                        break;
                     case ocMatch:
                     {
                         warnIfLegacyDispatchReached(

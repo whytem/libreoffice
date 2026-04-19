@@ -890,6 +890,51 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAreaCountDispat
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAddressDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"Address"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    // ADDRESS(1,1) -> $A$1 (default absolute mode).
+    m_pDoc->SetString(ScAddress(0, 0, 0), u"=ADDRESS(1;1)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"$A$1"_ustr, m_pDoc->GetString(ScAddress(0, 0, 0)));
+
+    // ADDRESS(5,3) -> $C$5.
+    m_pDoc->SetString(ScAddress(0, 1, 0), u"=ADDRESS(5;3)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"$C$5"_ustr, m_pDoc->GetString(ScAddress(0, 1, 0)));
+
+    // 3-arg form with explicit abs mode declines to legacy.
+    m_pDoc->SetString(ScAddress(0, 2, 0), u"=ADDRESS(1;1;4)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"A1"_ustr, m_pDoc->GetString(ScAddress(0, 2, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "ref_attempted="
+          + std::to_string(aDispatchStats.mnReferenceEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnReferenceEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnReferenceEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "ADDRESS should attempt engine dispatch: " + aLabel,
+        aDispatchStats.mnReferenceEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "2-arg ADDRESS should succeed through engine: " + aLabel,
+        aDispatchStats.mnReferenceEngineSucceededCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "3-arg ADDRESS should produce an engine decline: " + aLabel,
+        aDispatchStats.mnReferenceEngineDeclinedCount > 0);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceIndexDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
