@@ -45,7 +45,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=41`
+- `interp4_dispatch_engine_attempt_count=48`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -104,15 +104,27 @@ no longer root error literals or this faux-range tail; it is the remaining real
 reference and control/matrix substrate behind the still-unseen live surface.
 
 Batch 1 of the five-batch RPN evaluator plan has now landed its substrate
-(`runtime/RpnControlFlow.hxx`) and its first admission: `ocIf` with a scalar
-condition now tries the engine-native `planIfBranch` inside `Interpret()`
-before falling back to `ScIfJump`. Reference, matrix, external-ref, string,
-and jump-matrix conditions defer explicitly to the legacy path, which still
-owns the matrix-frame `JumpMatrix` protocol until Batch 4 lands. The three
-new `controlflow_engine_*` runtime totals are published above so the batch
-has its own accounting independent of the scalar-operator counters; they
-stay at `0 / 0 / 0` on the live corpus because the upstream seam captures
-virtually all IF traffic before reaching `Interpret()`, matching the
+(`runtime/RpnControlFlow.hxx`) and six explicit admissions:
+- `ocIf` with a scalar condition routes through `planIfBranch`.
+- `ocChoose` (CHOOSE) routes through `planChooseBranch`.
+- `ocIfError` / `ocIfNA` route through `planIfErrorBranch` when the
+  primary value at top of stack is a simple scalar (svDouble /
+  svString / svError / svEmpty / svMissing) and there is no
+  pre-existing global error.
+- `ocIfs_MS` (IFS) routes through `planIfsBranch` driven one pair at
+  a time when every condition token is a simple scalar; the selected
+  pair's value is preserved as a `FormulaConstTokenRef` so any
+  result type survives the stack drop.
+- `ocSwitch_MS` (SWITCH) routes through `planSwitchBranch` when the
+  selector and every case label are simple scalars; case-result and
+  default slots are resolved off the un-reversed param window.
+Reference, matrix, external-ref, and jump-matrix shapes still defer
+to the legacy `pushLegacy*` lambdas, which own the matrix-frame
+`JumpMatrix` protocol until Batch 4 lands. `ocLet` remains deferred
+pending the nested-interpreter spawn contract. The three
+`controlflow_engine_*` runtime totals stay at `0 / 0 / 0` on the
+live corpus because the upstream seam captures virtually all
+control-flow traffic before reaching `Interpret()`, matching the
 expected shape documented in the initiative policy.
 
 Batch 2 substrate (`runtime/RpnReference.hxx`) has now landed together with
@@ -139,14 +151,16 @@ Matrix-context no-arg, external-ref, multi-argument, 5-arg OFFSET with
 new-height/new-width, and INDEX zero-axis forms defer to legacy. Three new
 `reference_engine_*` runtime totals are published above, currently
 `0 / 0 / 0` in the live lane for the same seam-captures-upstream reason
-as the control-flow counters. Remaining Batch 2 members are now narrow:
-`ocIndirect` is already engine-authoritative via
-`seindirectexec::resolveIndirectReference`; `ocMultiArea` is a trivial
-`ScUnionFunc` wrapper with no computation to migrate; INDEX matrix-return
-form and wider ADDRESS parameter combinations are gated on the Batch 4
-matrix-materialization contract. Batch 2 is therefore treated as
-substantively complete; the RPN evaluator initiative advances to Batch 3
-(criteria / database).
+as the control-flow counters. `ocIndirect` is now the sixth Batch 2
+admission: it routes through `seindirectexec::resolveIndirectReference`
+when the reference text is already an svString token and the optional
+A1/R1C1 flag is a scalar svDouble; the helper preserves the existing
+syntax-policy resolution and pushes the resolved Single / Double /
+ExternalSingle / ExternalDouble / Token result. `ocMultiArea` remains
+on the trivial `ScUnionFunc` wrapper with no computation to migrate;
+INDEX matrix-return form and wider ADDRESS parameter combinations are
+gated on the Batch 4 matrix-materialization contract. Batch 2 is
+substantively complete and the initiative advances to Batch 3.
 
 Batch 3 substrate (`runtime/RpnCriteria.hxx` + `runtime/RpnDatabase.hxx`)
 has landed plus three admissions: `ocCountIf`, `ocSumIf`, and
@@ -215,18 +229,27 @@ Scope fence: single-sheet svDoubleRef ranges; database ≥ 2 rows;
 criteria exactly 2 rows (header + one criteria data row; multi-row OR
 criteria defer to legacy); field is svDouble (1-based index) or
 svString (matching a database header); criteria cells must be Number
-/ Text / Boolean. Remaining DB family (`ocDBCount` / `ocDBCount2` /
-`ocDBProduct` / `ocDBGet` / `ocDBStdDev(P)` / `ocDBVar(P)`) still
-defers — each needs its own iteration path (count-with-missing-field,
-product accumulation, unique-match scalar return, variance).
+/ Text / Boolean. The `CriteriaAggregateKind` enum has been extended
+with a `Product` accumulator (empty-product yields 0 to match legacy
+DBProduct), wiring `ocDBProduct` through the same scope-fenced
+admission alongside Sum / Average / Max / Min. Remaining DB family
+(`ocDBCount` / `ocDBCount2` / `ocDBGet` / `ocDBStdDev(P)` /
+`ocDBVar(P)`) still defers — each needs its own iteration path
+(count-with-missing-field, count-non-empty-including-text,
+unique-match scalar return, variance accumulator).
 
-Remaining Batch 1 members (`ocIfs_MS`, `ocSwitch_MS`, `ocIfError`,
-`ocIfNA`, `ocLet`) already delegate to `api::logic` / `seswitchexec`
-helpers inside their `pushLegacy*` lambdas. They are effectively
-engine-authoritative today; re-routing them through explicit
-`tryPlanEngine*` wrappers would be bookkeeping rather than migration.
-The initiative doc treats them as de-facto admitted and the engine-first
-dispatch work now advances Batch 2 proper.
+`ocMatDet` (MDETERM) is the fourth Batch 4 admission: it routes
+through `serpn::planDeterminant` when the single argument is an
+svMatrix token, reusing the same `convertMatrixRefToMatrixOperand`
+bridge as TRANSPOSE. Range arguments still need the broader
+reference-to-matrix materialization contract and decline to the
+warn-gated compat dispatcher. MMULT / MINVERSE need their own
+numerical cores in the engine (`evaluateMatrixMultiply`,
+`evaluateMatrixInverse`) before they can follow the same pattern.
+
+`ocLet` remains the last unstarted Batch 1 member; the nested-
+interpreter spawn contract for binding resolution is the gating
+substrate work.
 The current value reflects the restored original `Sc*` names after backing out
 earlier rename-only metric compression, and the quarantine audit currently
 shows `62 / 62` dispatch-reachable legacy lambdas warning when reached. This
