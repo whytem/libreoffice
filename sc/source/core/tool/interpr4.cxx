@@ -5658,10 +5658,6 @@ StackVar ScInterpreter::Interpret()
                         warnTextUtilityDispatch(rFunctionName);
                         PushString(aTransform(GetString().getString()));
                     };
-                const auto pushLegacyLen = [&]() {
-                    warnTextUtilityDispatch(u"LEN");
-                    PushDouble(selibreoffice::countCodePoints(GetString().getString()));
-                };
                 const auto pushLegacyT = [&]() {
                     warnTextUtilityDispatch(u"T");
                     switch (GetStackType())
@@ -11914,7 +11910,10 @@ StackVar ScInterpreter::Interpret()
                                     ScGlobal::getCharClass(), rText);
                             });
                         break;
-                    case ocLen              : pushLegacyLen();              break;
+                    case ocLen              :
+                        warnTextUtilityDispatch(u"LEN");
+                        PushDouble(selibreoffice::countCodePoints(GetString().getString()));
+                        break;
                     case ocT                : pushLegacyT();                break;
                     case ocClean            :
                         warnTextUtilityDispatch(u"CLEAN");
