@@ -43,13 +43,16 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=14`
+- `interp4_dispatch_engine_attempt_count=15`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
 - `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=602`
 - `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=602`
 - `interp4_dispatch_engine_declined_total_core_forced_full_legacy=0`
+- `interp4_dispatch_controlflow_engine_attempted_total=0`
+- `interp4_dispatch_controlflow_engine_succeeded_total=0`
+- `interp4_dispatch_controlflow_engine_declined_total=0`
 - `sc_formula_executor_formula_cell_interpret_total_live=2446901`
 - `sc_formula_executor_formula_group_attempt_total_live=1220544`
 - `sc_formula_executor_formula_group_handled_total_live=105`
@@ -94,6 +97,18 @@ shows `Bad=506` and `Range=96` because it counts opcode entry before the
 switch decides whether engine or legacy computes the result. So the next bottleneck is
 no longer root error literals or this faux-range tail; it is the remaining real
 reference and control/matrix substrate behind the still-unseen live surface.
+
+Batch 1 of the five-batch RPN evaluator plan has now landed its substrate
+(`runtime/RpnControlFlow.hxx`) and its first admission: `ocIf` with a scalar
+condition now tries the engine-native `planIfBranch` inside `Interpret()`
+before falling back to `ScIfJump`. Reference, matrix, external-ref, string,
+and jump-matrix conditions defer explicitly to the legacy path, which still
+owns the matrix-frame `JumpMatrix` protocol until Batch 4 lands. The three
+new `controlflow_engine_*` runtime totals are published above so the batch
+has its own accounting independent of the scalar-operator counters; they
+stay at `0 / 0 / 0` on the live corpus because the upstream seam captures
+virtually all IF traffic before reaching `Interpret()`, matching the
+expected shape documented in the initiative policy.
 The current value reflects the restored original `Sc*` names after backing out
 earlier rename-only metric compression, and the quarantine audit currently
 shows `62 / 62` dispatch-reachable legacy lambdas warning when reached. This
