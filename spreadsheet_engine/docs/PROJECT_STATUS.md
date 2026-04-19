@@ -45,7 +45,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=29`
+- `interp4_dispatch_engine_attempt_count=34`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -162,12 +162,21 @@ bridge for cell materialization, so this admission did not require new
 Host facade work. Three new `criteria_engine_*` runtime totals are
 published and currently `0 / 0 / 0` on the live corpus for the same
 seam-captures-upstream reason as the control-flow and reference
-counters. Remaining Batch 3 members (`ocCountIfs` / `ocSumIfs` /
-`ocAverageIfs` / `ocMinIfs_MS` / `ocMaxIfs_MS` / `ocCountEmptyCells`,
-plus the twelve `ocDB*` database members) will follow — the IFS family
-uses the parallel `planMultiCriterionAggregate` helper; the DB family
-needs the data/criteria range resolution bridge plus the
-`DatabaseQueryDescriptor` applyFieldSelector path to land.
+counters. The IFS family (`ocCountIfs` / `ocSumIfs` / `ocAverageIfs` /
+`ocMinIfs_MS` / `ocMaxIfs_MS`) now also routes through
+`planMultiCriterionAggregate` via the shared
+`tryPlanEngineMultiCriterionAggregate(kind, withTargetRange)` helper.
+Each (criteria_range, criterion) pair is validated through the same
+`buildCriteriaRangeInput` bridge as the single-criterion family, and
+the optional target range (SUMIFS / AVERAGEIFS / MINIFS / MAXIFS) is
+accepted when it is an svDoubleRef on a single sheet.
+`ocCountEmptyCells` is intentionally deferred until the engine has a
+streaming range-iteration primitive; materializing a range into a
+`std::vector` just to count empties would be a perf regression vs. the
+legacy `ScCellIterator`. Remaining Batch 3 members are the twelve
+`ocDB*` database functions, which still need the data/criteria range
+resolution bridge plus the `DatabaseQueryDescriptor` applyFieldSelector
+path to land.
 
 Remaining Batch 1 members (`ocIfs_MS`, `ocSwitch_MS`, `ocIfError`,
 `ocIfNA`, `ocLet`) already delegate to `api::logic` / `seswitchexec`
