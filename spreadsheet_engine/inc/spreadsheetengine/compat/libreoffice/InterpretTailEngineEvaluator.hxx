@@ -1237,6 +1237,7 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
         case FunctionKind::ScalarRoot:
             return false;
         case FunctionKind::LogicalConstant:
+            return true;
         case FunctionKind::Round:
         case FunctionKind::StatisticalDistribution:
         case FunctionKind::Aggregate:
@@ -1290,6 +1291,8 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
 [[nodiscard]] inline bool isImportedStoredHostValueTruthFunctionName(api::StringView rFunctionName)
 {
     static constexpr api::StringView aStoredValueFunctions[] = {
+        u"TRUE",
+        u"FALSE",
         u"NA",
         u"IMREAL",
         u"COM.SUN.STAR.SHEET.ADDIN.ANALYSIS.GETIMREAL",
@@ -13485,6 +13488,25 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         = rRoot.meKind == core::formula::NodeKind::FunctionCall
               ? detail::uppercaseAscii(rRoot.maPrimaryText)
               : api::String();
+    const bool bImportedRoot
+        = bImportedCanonicalSource || detail::isImportedCachedFormulaRoot(rDoc, rFormulaPos);
+    if (bImportedRoot && (aRootFunctionName == u"TRUE" || aRootFunctionName == u"FALSE"))
+    {
+        const auto aHostValue
+            = spreadsheetengine::compat::libreoffice::readHostDocumentCellValue(rDoc, rFormulaPos);
+        if (aHostValue)
+        {
+            const auto& rHostValue = aHostValue.maValue;
+            if ((rHostValue.isError() && (rHostValue.meError == api::Error::NoValue
+                                          || rHostValue.meError == api::Error::VariableExpected))
+                || (rHostValue.isText() && rHostValue.maString.empty()))
+            {
+                return detail::makeErrorResult(eRootFunction, api::Error::NoName);
+            }
+            if (!rHostValue.isEmpty())
+                return detail::makeScalarAttempt(eRootFunction, rHostValue);
+        }
+    }
     if (pTokenArray && !pTokenArray->GetCodeLen()
         && pTokenArray->GetCodeError() == FormulaError::VariableExpected)
     {
@@ -13520,8 +13542,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const bool bUncompiledFormulaRoot
         = pTokenArray && pTokenArray->GetLen() && !pTokenArray->GetCodeLen()
           && pTokenArray->GetCodeError() == FormulaError::NONE;
-    if ((bImportedCanonicalSource || detail::isImportedCachedFormulaRoot(rDoc, rFormulaPos)
-         || bUncompiledFormulaRoot)
+    if ((bImportedRoot || bUncompiledFormulaRoot)
         && detail::importedRootUsesVariableExpectedHostTruth(eRootFunction, aRootFunctionName))
     {
         return detail::makeErrorResult(eRootFunction, api::Error::VariableExpected);
