@@ -833,7 +833,6 @@ private:
     void ScFrequency();
     void ScTrend();
     void ScInfo();
-    void ScNoName();
 
     void ScFilterXML();
     void ScWebservice();

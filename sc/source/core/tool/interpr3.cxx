@@ -68,11 +68,6 @@ FormulaError lcl_ToCalcMathFormulaError(spreadsheetengine::api::Error eError)
 
 // General functions
 
-void ScInterpreter::ScNoName()
-{
-    PushError(FormulaError::NoName);
-}
-
 //  #i26836# new gaussinv implementation by Martin Eitzenberger <m.eitzenberger@unix.net>
 
 double ScInterpreter::gaussinv(double x)
