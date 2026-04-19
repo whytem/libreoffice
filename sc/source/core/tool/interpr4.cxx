@@ -7770,6 +7770,102 @@ StackVar ScInterpreter::Interpret()
                             .mnControlFlowEngineSucceededCount);
                     return true;
                 };
+                // Batch 2 second admission: span-count COLUMNS / ROWS /
+                // SHEETS. Covers single-argument svSingleRef and svDoubleRef;
+                // anything else (multi-arg, matrices, external refs) defers
+                // to legacy.
+                const auto tryPlanEngineSpanCount
+                    = [&](serpn::SpanCountKind eKind) -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnReferenceEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount != 1 || !sp)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+                    const FormulaToken* pTop = pStack[sp - 1];
+                    if (!pTop)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    spreadsheetengine::api::ResolvedReference aResolved;
+                    if (pTop->GetType() == svSingleRef)
+                    {
+                        ScAddress aAdr;
+                        PopSingleRef(aAdr);
+                        if (nGlobalError != FormulaError::NONE)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnReferenceEngineDeclinedCount);
+                            return false;
+                        }
+                        aResolved.maRange.maStart = {
+                            static_cast<spreadsheetengine::api::SheetId>(aAdr.Tab()),
+                            static_cast<spreadsheetengine::api::ColumnIndex>(aAdr.Col()),
+                            static_cast<spreadsheetengine::api::RowIndex>(aAdr.Row())
+                        };
+                        aResolved.maRange.maEnd = aResolved.maRange.maStart;
+                    }
+                    else if (pTop->GetType() == svDoubleRef)
+                    {
+                        SCCOL nCol1, nCol2;
+                        SCROW nRow1, nRow2;
+                        SCTAB nTab1, nTab2;
+                        PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+                        if (nGlobalError != FormulaError::NONE)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnReferenceEngineDeclinedCount);
+                            return false;
+                        }
+                        aResolved.maRange.maStart = {
+                            static_cast<spreadsheetengine::api::SheetId>(nTab1),
+                            static_cast<spreadsheetengine::api::ColumnIndex>(nCol1),
+                            static_cast<spreadsheetengine::api::RowIndex>(nRow1)
+                        };
+                        aResolved.maRange.maEnd = {
+                            static_cast<spreadsheetengine::api::SheetId>(nTab2),
+                            static_cast<spreadsheetengine::api::ColumnIndex>(nCol2),
+                            static_cast<spreadsheetengine::api::RowIndex>(nRow2)
+                        };
+                    }
+                    else
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const auto aPlan = serpn::planSpanCount(
+                        serpn::RpnValue::reference(aResolved), eKind);
+                    if (!aPlan
+                        || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnReferenceEngineSucceededCount);
+                    PushDouble(aPlan.maValue);
+                    return true;
+                };
+
                 // Batch 2 first admission: scalar axis-ordinal
                 // COLUMN / ROW / SHEET. Covers no-argument (use aPos) and
                 // single-reference argument via planAxisOrdinal.
@@ -7845,6 +7941,95 @@ StackVar ScInterpreter::Interpret()
                         interpreterDispatchRuntimeStatsStore()
                             .mnReferenceEngineSucceededCount);
                     PushDouble(aPlan.maValue);
+                    return true;
+                };
+                // Batch 1 second admission: scalar-selector CHOOSE through
+                // engine-native planChooseBranch. Matrix selector defers to
+                // legacy ScChooseJump which owns the JumpMatrix protocol.
+                const auto tryPlanEngineChooseJump = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnControlFlowEngineAttemptedCount);
+
+                    const short* pJump = pCur->GetJump();
+                    const short nJumpCount = pJump[0];
+                    if (!sp || nJumpCount < 1)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const FormulaToken* pSelectorToken = pStack[sp - 1];
+                    if (!pSelectorToken)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+
+                    std::optional<serpn::RpnValue> oSelector;
+                    switch (pSelectorToken->GetType())
+                    {
+                        case svDouble:
+                            oSelector = serpn::RpnValue::number(
+                                pSelectorToken->GetDouble());
+                            break;
+                        case svError:
+                            oSelector = serpn::RpnValue::error(
+                                selibreoffice::toApiError(pSelectorToken->GetError()));
+                            break;
+                        default:
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineDeclinedCount);
+                            return false;
+                    }
+
+                    // planChooseBranch wants the count of branch slots,
+                    // which is nJumpCount - 1 (since pJump[nJumpCount] is
+                    // the endpoint, not a branch).
+                    const auto aPlan = serpn::planChooseBranch(
+                        *oSelector,
+                        static_cast<std::int16_t>(nJumpCount - 1));
+                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready
+                        || !aPlan)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+
+                    Pop();
+                    nGlobalError = FormulaError::NONE;
+
+                    switch (aPlan.maValue.meDirective)
+                    {
+                        case serpn::BranchDirective::TakeSlot:
+                            // planChooseBranch slot is 1-based (matches
+                            // CHOOSE semantics), and pJump[slot] is the
+                            // target for branch `slot`.
+                            aCode.Jump(
+                                pJump[aPlan.maValue.mnSlot], pJump[nJumpCount]);
+                            break;
+                        case serpn::BranchDirective::PropagateError:
+                            PushError(selibreoffice::toFormulaError(
+                                aPlan.maValue.meError));
+                            aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                            break;
+                        default:
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineDeclinedCount);
+                            return false;
+                    }
+
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnControlFlowEngineSucceededCount);
                     return true;
                 };
                 const auto pushLegacyIfJump = [&]() {
@@ -8165,7 +8350,10 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocIfError          : pushLegacyIfError(false);     break;
                     case ocIfNA             : pushLegacyIfError(true);      break;
-                    case ocChoose           : ScChooseJump();               break;
+                    case ocChoose           :
+                        if (!tryPlanEngineChooseJump())
+                            ScChooseJump();
+                        break;
                     case ocChooseCols       : ScChooseColsOrRows(true); break;
                     case ocChooseRows       : ScChooseColsOrRows(false); break;
                     case ocAdd              :
@@ -9370,9 +9558,18 @@ StackVar ScInterpreter::Interpret()
                             fRate, fNper, fPv, fFv, bPayInAdvance));
                     }
                     break;
-                    case ocColumns          : ScColumns();              break;
-                    case ocRows             : ScRows();                 break;
-                    case ocSheets           : ScSheets();               break;
+                    case ocColumns          :
+                        if (!tryPlanEngineSpanCount(serpn::SpanCountKind::Columns))
+                            ScColumns();
+                        break;
+                    case ocRows             :
+                        if (!tryPlanEngineSpanCount(serpn::SpanCountKind::Rows))
+                            ScRows();
+                        break;
+                    case ocSheets           :
+                        if (!tryPlanEngineSpanCount(serpn::SpanCountKind::Sheets))
+                            ScSheets();
+                        break;
                     case ocColumn           :
                         if (!tryPlanEngineAxisOrdinal(serpn::AxisOrdinalKind::Column))
                             ScColumn();

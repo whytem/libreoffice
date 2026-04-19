@@ -755,6 +755,104 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterControlFlowIfDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterControlFlowChooseDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"Choose"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    m_pDoc->SetString(ScAddress(0, 0, 0), u"=CHOOSE(1;\"a\";\"b\";\"c\")"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"a"_ustr, m_pDoc->GetString(ScAddress(0, 0, 0)));
+    m_pDoc->SetString(ScAddress(0, 1, 0), u"=CHOOSE(2;\"a\";\"b\";\"c\")"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"b"_ustr, m_pDoc->GetString(ScAddress(0, 1, 0)));
+    m_pDoc->SetString(ScAddress(0, 2, 0), u"=CHOOSE(3;\"a\";\"b\";\"c\")"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"c"_ustr, m_pDoc->GetString(ScAddress(0, 2, 0)));
+
+    // Out-of-range selector produces Err:502 (IllegalArgument), matching
+    // the legacy ScChooseJump behaviour.
+    m_pDoc->SetString(ScAddress(0, 3, 0), u"=CHOOSE(5;\"a\";\"b\")"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"Err:502"_ustr, m_pDoc->GetString(ScAddress(0, 3, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "cf_attempted="
+          + std::to_string(aDispatchStats.mnControlFlowEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnControlFlowEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnControlFlowEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "CHOOSE should attempt engine dispatch: " + aLabel,
+        aDispatchStats.mnControlFlowEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "CHOOSE with scalar selector should succeed through engine: " + aLabel,
+        aDispatchStats.mnControlFlowEngineSucceededCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "control-flow dispatch accounting should stay balanced: " + aLabel,
+        aDispatchStats.mnControlFlowEngineAttemptedCount,
+        aDispatchStats.mnControlFlowEngineSucceededCount
+            + aDispatchStats.mnControlFlowEngineDeclinedCount);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceSpanCountDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"Span"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    // Single-cell reference has span 1 in each axis.
+    m_pDoc->SetString(ScAddress(0, 0, 0), u"=COLUMNS(B2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
+    m_pDoc->SetString(ScAddress(0, 1, 0), u"=ROWS(B2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 1, 0)));
+
+    // Range span.
+    m_pDoc->SetString(ScAddress(0, 2, 0), u"=COLUMNS(B2:D8)"_ustr);
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(0, 2, 0)));
+    m_pDoc->SetString(ScAddress(0, 3, 0), u"=ROWS(B2:D8)"_ustr);
+    ASSERT_DOUBLES_EQUAL(7.0, m_pDoc->GetValue(ScAddress(0, 3, 0)));
+
+    // SHEETS with a single sheet range — span is 1.
+    m_pDoc->SetString(ScAddress(0, 4, 0), u"=SHEETS(A1:Z100)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 4, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "ref_attempted="
+          + std::to_string(aDispatchStats.mnReferenceEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnReferenceEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnReferenceEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "COLUMNS/ROWS/SHEETS should attempt engine dispatch: " + aLabel,
+        aDispatchStats.mnReferenceEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "single-reference span count should succeed through engine: " + aLabel,
+        aDispatchStats.mnReferenceEngineSucceededCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "reference dispatch accounting should stay balanced: " + aLabel,
+        aDispatchStats.mnReferenceEngineAttemptedCount,
+        aDispatchStats.mnReferenceEngineSucceededCount
+            + aDispatchStats.mnReferenceEngineDeclinedCount);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAxisOrdinalDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
