@@ -2141,16 +2141,29 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                     rDocument.GetFormulaCodeInTree() / MIN_NO_CODES_PER_PROGRESS_UPDATE);
             }
 
+            // Legacy Interpret() decides between VOLATILE (keep in tree,
+            // keep listening) and NOT_VOLATILE (drop from tree, stop
+            // listening) based on the ScInterpreter's VolatileType, which
+            // reflects whether NOW / TODAY / RAND / volatile macros were
+            // actually invoked during evaluation. The engine-authoritative
+            // path has no such signal, so for any formula that was marked
+            // RecalcModeAlways (e.g. the compile flag set by NOW() in
+            // =IF(A1>0;NOW();0)) we conservatively keep the formula in
+            // the formula tree and keep it listening. Otherwise a short-
+            // circuited IF branch (condition FALSE, 0 returned) would
+            // strip the listening that the TRUE-branch (NOW()) still needs.
             if (pCode->IsRecalcModeAlways())
             {
-                EndListeningTo(rDocument);
-                pCode->SetExclusiveRecalcModeNormal();
+                // Keep listening and keep the formula in the tree so the
+                // volatile branch keeps being recomputed when dependencies
+                // change. Do not drop the RecalcModeAlways flag until
+                // legacy Interpret() sees NOT_VOLATILE itself.
             }
             else
             {
                 rDocument.EndListeningArea(BCA_LISTEN_ALWAYS, false, this);
+                rDocument.RemoveFromFormulaTree(this);
             }
-            rDocument.RemoveFromFormulaTree(this);
         }
 
         if (pCode->IsRecalcModeForced())

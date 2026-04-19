@@ -24,9 +24,9 @@ runs the test and exits non-zero only if the failure set differs from this
 list (i.e., a *new* regression slipped in, or an old one was *unintentionally*
 fixed without the list being updated).
 
-## Failure baseline (2026-04-19, after SUMSQ / SUMX2MY2 / SUMX2PY2 engine fix)
+## Failure baseline (2026-04-19, after volatile-listener retention fix)
 
-13 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 135 tests.
+12 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 135 tests.
 
 Previous baseline was 30 tests. Progress so far:
 
@@ -68,6 +68,18 @@ Previous baseline was 30 tests. Progress so far:
   Also corrected the empty-values fallthrough: `GCD` now returns 0 and
   `LCM` returns 1 when the collected vector is empty, matching the
   initial accumulator in `pushLegacyGcdOrLcm`.
+- **Volatile-listener retention in engine-authoritative path (13 → 12, -1)**:
+  `applyEngineAuthoritativeResult` in `formulacell.cxx` was unconditionally
+  ending `BCA_LISTEN_ALWAYS` and `SetExclusiveRecalcModeNormal` after
+  applying the engine's result, even when the formula contained NOW() /
+  TODAY() / RAND() / a volatile macro. Legacy `Interpret()` only clears
+  these when `VolatileType == NOT_VOLATILE` after running the formula.
+  For short-circuited IFs like `=IF(A1>0;NOW();0)` the engine may
+  evaluate the FALSE branch (returning 0) without executing `NOW()`,
+  so the volatile flag is still warranted. Now we keep listeners and
+  keep the formula in the formula tree whenever `IsRecalcModeAlways()`
+  is set, and defer the mode drop to a legacy run. Clears
+  `testFuncNOW`.
 
 ### External reference (0)
 
@@ -79,7 +91,7 @@ now correctly consume the cached value; live calc no longer shadows it).
 - `testFormulaDepTrackingDeleteCol`
 - `testIterations`
 
-### Function evaluation (5)
+### Function evaluation (4)
 
 Likely root cause: legacy fallback paths regressed during retirement +
 relocation episodes; recalc/observe interaction with the seam returns wrong
@@ -87,7 +99,6 @@ values or false `Err:522` (Circular Reference) on dependency change.
 
 - `testFuncIF`
 - `testFuncMATCH`
-- `testFuncNOW`
 - `testFuncRefListArraySUBTOTAL`
 - `testFuncTableRef`
 
