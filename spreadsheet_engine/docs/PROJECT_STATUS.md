@@ -45,7 +45,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=25`
+- `interp4_dispatch_engine_attempt_count=26`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -130,14 +130,23 @@ five admissions:
   Scalar and KeepSource selection kinds are accepted; RowSlice /
   ColumnSlice (zero-axis matrix returns) still defer to legacy pending
   the Batch 4 matrix-materialization contract.
+- `ocAddress` in its narrow 2-argument form (row, col) routes through
+  `serefexec::formatAddressFunctionResult` with default A1 style and
+  absolute mode 1. Any 3-5 argument form with abs mode, style flag, or
+  sheet token defers to legacy until the parameter-parsing contract is
+  extended.
 Matrix-context no-arg, external-ref, multi-argument, 5-arg OFFSET with
 new-height/new-width, and INDEX zero-axis forms defer to legacy. Three new
 `reference_engine_*` runtime totals are published above, currently
 `0 / 0 / 0` in the live lane for the same seam-captures-upstream reason
-as the control-flow counters. Remaining Batch 2 members (`ocAddress`,
-`ocIndirect`, `ocMultiArea`, INDEX matrix-return form) will follow once
-the address-text resolution and matrix-materialization contracts are
-designed.
+as the control-flow counters. Remaining Batch 2 members are now narrow:
+`ocIndirect` is already engine-authoritative via
+`seindirectexec::resolveIndirectReference`; `ocMultiArea` is a trivial
+`ScUnionFunc` wrapper with no computation to migrate; INDEX matrix-return
+form and wider ADDRESS parameter combinations are gated on the Batch 4
+matrix-materialization contract. Batch 2 is therefore treated as
+substantively complete; the RPN evaluator initiative advances to Batch 3
+(criteria / database).
 
 Remaining Batch 1 members (`ocIfs_MS`, `ocSwitch_MS`, `ocIfError`,
 `ocIfNA`, `ocLet`) already delegate to `api::logic` / `seswitchexec`
