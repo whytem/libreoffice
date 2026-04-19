@@ -8064,6 +8064,191 @@ StackVar ScInterpreter::Interpret()
                     return tryPlanEngineSingleCriterionAggregate(
                         sequery::CriteriaAggregateKind::Count, false);
                 };
+
+                // Batch 3 multi-criterion admissions: COUNTIFS, SUMIFS,
+                // AVERAGEIFS, MINIFS_MS, MAXIFS_MS. All take N parallel
+                // (criteria_range, criterion) pairs plus an optional
+                // aggregation target at the bottom. The admission
+                // accepts svDoubleRef ranges on a single sheet and
+                // scalar svDouble or svString criteria. External refs,
+                // matrices, RefList, multi-sheet, and non-scalar
+                // criteria defer to legacy.
+                const auto tryPlanEngineMultiCriterionAggregate
+                    = [&](sequery::CriteriaAggregateKind eKind,
+                          bool bWithTargetRange) -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnCriteriaEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    // COUNTIFS: even, ≥2. SUMIFS/AVERAGEIFS/MINIFS/MAXIFS:
+                    // odd, ≥3 (target_range at the bottom).
+                    if (bWithTargetRange)
+                    {
+                        if (nParamCount < 3 || (nParamCount % 2 != 1))
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnCriteriaEngineDeclinedCount);
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        if (nParamCount < 2 || (nParamCount % 2 != 0))
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnCriteriaEngineDeclinedCount);
+                            return false;
+                        }
+                    }
+                    if (sp < nParamCount)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const std::size_t nPairs
+                        = bWithTargetRange
+                              ? static_cast<std::size_t>((nParamCount - 1) / 2)
+                              : static_cast<std::size_t>(nParamCount / 2);
+
+                    // Validate all tokens and build the inputs /
+                    // predicates ahead of committing the sp decrement.
+                    std::vector<sequery::CriteriaAggregateInput> aRanges;
+                    std::vector<sequery::CriteriaPredicate> aCriteria;
+                    aRanges.reserve(nPairs);
+                    aCriteria.reserve(nPairs);
+
+                    // Pairs are [crit_range_1, crit_1, crit_range_2,
+                    // crit_2, ...] from the BOTTOM. The last pair's
+                    // criterion is at sp-1, its range at sp-2.
+                    const std::size_t nPairsBase
+                        = bWithTargetRange
+                              ? static_cast<std::size_t>(sp - nParamCount + 1)
+                              : static_cast<std::size_t>(sp - nParamCount);
+
+                    for (std::size_t i = 0; i < nPairs; ++i)
+                    {
+                        const FormulaToken* pRangeTok
+                            = pStack[nPairsBase + 2 * i];
+                        const FormulaToken* pCriterionTok
+                            = pStack[nPairsBase + 2 * i + 1];
+                        if (!pRangeTok || !pCriterionTok)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnCriteriaEngineDeclinedCount);
+                            return false;
+                        }
+
+                        sequery::CriteriaAggregateInput aInput;
+                        if (!buildCriteriaRangeInput(pRangeTok, aInput))
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnCriteriaEngineDeclinedCount);
+                            return false;
+                        }
+
+                        std::optional<serpn::RpnValue> oCriterion;
+                        switch (pCriterionTok->GetType())
+                        {
+                            case svDouble:
+                                oCriterion = serpn::RpnValue::number(
+                                    pCriterionTok->GetDouble());
+                                break;
+                            case svString:
+                                oCriterion = serpn::RpnValue::text(
+                                    pCriterionTok->GetString().getString());
+                                break;
+                            default:
+                                addDispatchRuntimeStat(
+                                    interpreterDispatchRuntimeStatsStore()
+                                        .mnCriteriaEngineDeclinedCount);
+                                return false;
+                        }
+                        const auto aPredicate = serpn::buildCriteriaPredicate(
+                            *oCriterion,
+                            sedatetime::parseStandaloneNumberText,
+                            secoercion::parseAsciiDouble);
+                        if (!aPredicate
+                            || aPredicate.meReadiness
+                                   != serpn::RpnCoercionReadiness::Ready)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnCriteriaEngineDeclinedCount);
+                            return false;
+                        }
+
+                        aRanges.push_back(aInput);
+                        aCriteria.push_back(aPredicate.maValue);
+                    }
+
+                    std::optional<sequery::CriteriaAggregateInput> oTarget;
+                    if (bWithTargetRange)
+                    {
+                        const FormulaToken* pTargetTok
+                            = pStack[sp - nParamCount];
+                        sequery::CriteriaAggregateInput aTarget;
+                        if (!buildCriteriaRangeInput(pTargetTok, aTarget))
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnCriteriaEngineDeclinedCount);
+                            return false;
+                        }
+                        oTarget = aTarget;
+                    }
+
+                    serpn::MultiCriterionAggregateRequest aRequest;
+                    aRequest.maCriteriaRanges = std::move(aRanges);
+                    aRequest.maCriteria = std::move(aCriteria);
+                    aRequest.moTargetRange = oTarget;
+                    aRequest.meKind = eKind;
+                    aRequest.meSearchType
+                        = seitee::detail::searchTypeFromDocument(mrDoc);
+                    aRequest.mbMatchWholeCell = true;
+
+                    const seitee::detail::CriteriaAggregateMaterializer aMaterializer(
+                        mrDoc, mrContext);
+                    const auto aResult = serpn::planMultiCriterionAggregate(
+                        aMaterializer, aRequest);
+                    if (!aResult
+                        || aResult.meReadiness
+                               != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+
+                    sp -= nParamCount;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnCriteriaEngineSucceededCount);
+
+                    switch (aResult.maValue.meKind)
+                    {
+                        case spreadsheetengine::api::CellValueKind::Number:
+                            PushDouble(aResult.maValue.mfNumber);
+                            break;
+                        case spreadsheetengine::api::CellValueKind::Error:
+                            PushError(selibreoffice::toFormulaError(
+                                aResult.maValue.meError));
+                            break;
+                        default:
+                            PushError(FormulaError::IllegalArgument);
+                            break;
+                    }
+                    return true;
+                };
                 const auto tryPlanEngineSumIf = [&]() -> bool {
                     return tryPlanEngineSingleCriterionAggregate(
                         sequery::CriteriaAggregateKind::Sum, true);
@@ -10440,6 +10625,9 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocSumIfs:
                     {
+                        if (tryPlanEngineMultiCriterionAggregate(
+                                sequery::CriteriaAggregateKind::Sum, true))
+                            break;
                         const sal_uInt8 nParamCount = GetByte();
                         if (nParamCount < 3 || (nParamCount % 2 != 1))
                             PushError(FormulaError::ParameterExpected);
@@ -10450,6 +10638,9 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocAverageIfs:
                     {
+                        if (tryPlanEngineMultiCriterionAggregate(
+                                sequery::CriteriaAggregateKind::Average, true))
+                            break;
                         const sal_uInt8 nParamCount = GetByte();
                         if (nParamCount < 3 || (nParamCount % 2 != 1))
                             PushError(FormulaError::ParameterExpected);
@@ -10461,6 +10652,9 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocCountIfs:
                     {
+                        if (tryPlanEngineMultiCriterionAggregate(
+                                sequery::CriteriaAggregateKind::Count, false))
+                            break;
                         const sal_uInt8 nParamCount = GetByte();
                         if (nParamCount < 2 || (nParamCount % 2 != 0))
                             PushError(FormulaError::ParameterExpected);
@@ -10522,6 +10716,9 @@ StackVar ScInterpreter::Interpret()
                     case ocSwitch_MS        : pushLegacySwitch();           break;
                     case ocMinIfs_MS:
                     {
+                        if (tryPlanEngineMultiCriterionAggregate(
+                                sequery::CriteriaAggregateKind::Min, true))
+                            break;
                         const sal_uInt8 nParamCount = GetByte();
                         if (nParamCount < 3 || (nParamCount % 2 != 1))
                             PushError(FormulaError::ParameterExpected);
@@ -10535,6 +10732,9 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocMaxIfs_MS:
                     {
+                        if (tryPlanEngineMultiCriterionAggregate(
+                                sequery::CriteriaAggregateKind::Max, true))
+                            break;
                         const sal_uInt8 nParamCount = GetByte();
                         if (nParamCount < 3 || (nParamCount % 2 != 1))
                             PushError(FormulaError::ParameterExpected);

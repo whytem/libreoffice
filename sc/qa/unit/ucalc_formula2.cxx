@@ -940,6 +940,31 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterCriteriaCountIfDispatch)
     // A2=20 → B2=200; A4=30 → B4=400. Avg = 300.
     ASSERT_DOUBLES_EQUAL(300.0, m_pDoc->GetValue(ScAddress(2, 5, 0)));
 
+    // COUNTIFS single-pair: A1:A5=10 → 3 matches.
+    m_pDoc->SetString(ScAddress(3, 0, 0), u"=COUNTIFS(A1:A5;10)"_ustr);
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(3, 0, 0)));
+
+    // COUNTIFS two pairs: A=10 AND B>200 → rows 3 (A3=10, B3=300),
+    // 5 (A5=10, B5=500). Row 1 (A1=10, B1=100) fails.
+    m_pDoc->SetString(ScAddress(3, 1, 0), u"=COUNTIFS(A1:A5;10;B1:B5;\">200\")"_ustr);
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(3, 1, 0)));
+
+    // SUMIFS: sum B column where A=10 AND B>200 → 300+500 = 800.
+    m_pDoc->SetString(ScAddress(3, 2, 0), u"=SUMIFS(B1:B5;A1:A5;10;B1:B5;\">200\")"_ustr);
+    ASSERT_DOUBLES_EQUAL(800.0, m_pDoc->GetValue(ScAddress(3, 2, 0)));
+
+    // AVERAGEIFS: avg B where A=10 AND B>200 → (300+500)/2 = 400.
+    m_pDoc->SetString(ScAddress(3, 3, 0), u"=AVERAGEIFS(B1:B5;A1:A5;10;B1:B5;\">200\")"_ustr);
+    ASSERT_DOUBLES_EQUAL(400.0, m_pDoc->GetValue(ScAddress(3, 3, 0)));
+
+    // MINIFS_MS: min B where A=10 → 100 (A1=10, B1=100 is smallest).
+    m_pDoc->SetString(ScAddress(3, 4, 0), u"=MINIFS(B1:B5;A1:A5;10)"_ustr);
+    ASSERT_DOUBLES_EQUAL(100.0, m_pDoc->GetValue(ScAddress(3, 4, 0)));
+
+    // MAXIFS_MS: max B where A=10 → 500.
+    m_pDoc->SetString(ScAddress(3, 5, 0), u"=MAXIFS(B1:B5;A1:A5;10)"_ustr);
+    ASSERT_DOUBLES_EQUAL(500.0, m_pDoc->GetValue(ScAddress(3, 5, 0)));
+
     const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
     const std::string aLabel
         = "criteria_attempted="
