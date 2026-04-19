@@ -13488,25 +13488,6 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         = rRoot.meKind == core::formula::NodeKind::FunctionCall
               ? detail::uppercaseAscii(rRoot.maPrimaryText)
               : api::String();
-    const bool bImportedRoot
-        = bImportedCanonicalSource || detail::isImportedCachedFormulaRoot(rDoc, rFormulaPos);
-    if (bImportedRoot && (aRootFunctionName == u"TRUE" || aRootFunctionName == u"FALSE"))
-    {
-        const auto aHostValue
-            = spreadsheetengine::compat::libreoffice::readHostDocumentCellValue(rDoc, rFormulaPos);
-        if (aHostValue)
-        {
-            const auto& rHostValue = aHostValue.maValue;
-            if ((rHostValue.isError() && (rHostValue.meError == api::Error::NoValue
-                                          || rHostValue.meError == api::Error::VariableExpected))
-                || (rHostValue.isText() && rHostValue.maString.empty()))
-            {
-                return detail::makeErrorResult(eRootFunction, api::Error::NoName);
-            }
-            if (!rHostValue.isEmpty())
-                return detail::makeScalarAttempt(eRootFunction, rHostValue);
-        }
-    }
     if (pTokenArray && !pTokenArray->GetCodeLen()
         && pTokenArray->GetCodeError() == FormulaError::VariableExpected)
     {
@@ -13542,7 +13523,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const bool bUncompiledFormulaRoot
         = pTokenArray && pTokenArray->GetLen() && !pTokenArray->GetCodeLen()
           && pTokenArray->GetCodeError() == FormulaError::NONE;
-    if ((bImportedRoot || bUncompiledFormulaRoot)
+    if ((bImportedCanonicalSource || detail::isImportedCachedFormulaRoot(rDoc, rFormulaPos)
+         || bUncompiledFormulaRoot)
         && detail::importedRootUsesVariableExpectedHostTruth(eRootFunction, aRootFunctionName))
     {
         return detail::makeErrorResult(eRootFunction, api::Error::VariableExpected);
