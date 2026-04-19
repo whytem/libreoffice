@@ -12023,8 +12023,16 @@ StackVar ScInterpreter::Interpret()
                                 sequery::CriteriaAggregateKind::Sum))
                             ScDBSum();
                         break;
-                    case ocDBCount          : ScDBCount();                  break;
-                    case ocDBCount2         : ScDBCount2();                 break;
+                    case ocDBCount          :
+                        if (!tryPlanEngineDatabaseAggregate(
+                                sequery::CriteriaAggregateKind::CountNumeric))
+                            ScDBCount();
+                        break;
+                    case ocDBCount2         :
+                        if (!tryPlanEngineDatabaseAggregate(
+                                sequery::CriteriaAggregateKind::Count2))
+                            ScDBCount2();
+                        break;
                     case ocDBAverage        :
                         if (!tryPlanEngineDatabaseAggregate(
                                 sequery::CriteriaAggregateKind::Average))

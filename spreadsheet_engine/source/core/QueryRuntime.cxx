@@ -617,6 +617,19 @@ api::ValueResult<api::CellValue> evaluateCriteriaAggregate(
             if (!aTarget)
                 return aTarget;
 
+            if (eAggregateKind == CriteriaAggregateKind::Count2)
+            {
+                // Count every matched row with a non-empty field value.
+                // Empty cells and empty-text cells do not contribute.
+                if (aTarget.maValue.meKind == api::CellValueKind::Empty)
+                    continue;
+                if (aTarget.maValue.meKind == api::CellValueKind::Text
+                    && aTarget.maValue.maString.empty())
+                    continue;
+                ++nCount;
+                continue;
+            }
+
             const auto oNumber = coerceCriteriaAggregateNumber(aTarget.maValue);
             if (!oNumber)
                 continue;
@@ -624,6 +637,10 @@ api::ValueResult<api::CellValue> evaluateCriteriaAggregate(
             switch (eAggregateKind)
             {
                 case CriteriaAggregateKind::Count:
+                case CriteriaAggregateKind::Count2:
+                    break;
+                case CriteriaAggregateKind::CountNumeric:
+                    ++nCount;
                     break;
                 case CriteriaAggregateKind::Sum:
                 case CriteriaAggregateKind::Average:
@@ -655,6 +672,8 @@ api::ValueResult<api::CellValue> evaluateCriteriaAggregate(
     switch (eAggregateKind)
     {
         case CriteriaAggregateKind::Count:
+        case CriteriaAggregateKind::Count2:
+        case CriteriaAggregateKind::CountNumeric:
             return api::ValueResult<api::CellValue>::success(
                 api::CellValue::number(static_cast<double>(nCount)));
         case CriteriaAggregateKind::Sum:

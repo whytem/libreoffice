@@ -1066,6 +1066,73 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterDatabaseDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterDatabaseCountDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"DBCount"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    // Database at A1:C5 with header row. The Amount column is a mix of
+    // numeric values and a text value so DCOUNT (numeric only) and
+    // DCOUNT2 (any non-empty) diverge.
+    m_pDoc->SetString(ScAddress(0, 0, 0), u"Region"_ustr);
+    m_pDoc->SetString(ScAddress(1, 0, 0), u"Amount"_ustr);
+    m_pDoc->SetString(ScAddress(2, 0, 0), u"Quantity"_ustr);
+    m_pDoc->SetString(ScAddress(0, 1, 0), u"West"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 1, 0), 100.0);
+    m_pDoc->SetValue(ScAddress(2, 1, 0), 10.0);
+    m_pDoc->SetString(ScAddress(0, 2, 0), u"East"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 2, 0), 200.0);
+    m_pDoc->SetValue(ScAddress(2, 2, 0), 20.0);
+    m_pDoc->SetString(ScAddress(0, 3, 0), u"West"_ustr);
+    // Non-numeric text value in Amount for this row.
+    m_pDoc->SetString(ScAddress(1, 3, 0), u"pending"_ustr);
+    m_pDoc->SetValue(ScAddress(2, 3, 0), 15.0);
+    m_pDoc->SetString(ScAddress(0, 4, 0), u"West"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 4, 0), 300.0);
+    m_pDoc->SetValue(ScAddress(2, 4, 0), 25.0);
+
+    // Criteria at E1:F2: Region=West
+    m_pDoc->SetString(ScAddress(4, 0, 0), u"Region"_ustr);
+    m_pDoc->SetString(ScAddress(5, 0, 0), u"Amount"_ustr);
+    m_pDoc->SetString(ScAddress(4, 1, 0), u"West"_ustr);
+
+    // DCOUNT(A1:C5, "Amount", E1:F2) -> count rows matching West with
+    // numeric Amount = {100, 300} = 2
+    m_pDoc->SetString(ScAddress(7, 0, 0),
+                      u"=DCOUNT(A1:C5;\"Amount\";E1:F2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(7, 0, 0)));
+
+    // DCOUNTA(A1:C5, "Amount", E1:F2) -> count rows matching West with
+    // any non-empty Amount = {100, "pending", 300} = 3
+    m_pDoc->SetString(ScAddress(7, 1, 0),
+                      u"=DCOUNTA(A1:C5;\"Amount\";E1:F2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(7, 1, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "criteria_attempted="
+          + std::to_string(aDispatchStats.mnCriteriaEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnCriteriaEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnCriteriaEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "DCOUNT/DCOUNTA should attempt engine dispatch: " + aLabel,
+        aDispatchStats.mnCriteriaEngineAttemptedCount >= 2);
+    CPPUNIT_ASSERT_MESSAGE(
+        "DCOUNT/DCOUNTA should succeed through engine: " + aLabel,
+        aDispatchStats.mnCriteriaEngineSucceededCount >= 2);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAddressDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);

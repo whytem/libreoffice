@@ -57,7 +57,17 @@ enum class CriteriaAggregateKind : std::uint8_t
     Average,
     Max,
     Min,
-    Product
+    Product,
+    // Count2 mirrors legacy ScDBCount2: counts every matching row whose
+    // field value is not empty — numbers, booleans, text, and errors
+    // all contribute. (Empty strings / Empty cells do not.)
+    Count2,
+    // CountNumeric mirrors legacy ScDBCount with a specified field: counts
+    // only matching rows whose target field holds a numeric value. The
+    // "missing field" legacy variant (count all matching rows irrespective
+    // of any field value) is encoded as ordinary Count against any target
+    // column and lives outside CriteriaAggregateKind.
+    CountNumeric
 };
 
 class CriteriaAggregateMaterializer

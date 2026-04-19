@@ -133,8 +133,10 @@ struct AggregationBridge
             aBridge.moKind = core::query::CriteriaAggregateKind::Sum;
             return aBridge;
         case DatabaseAggregation::Count:
+            aBridge.moKind = core::query::CriteriaAggregateKind::CountNumeric;
+            return aBridge;
         case DatabaseAggregation::Count2:
-            aBridge.moKind = core::query::CriteriaAggregateKind::Count;
+            aBridge.moKind = core::query::CriteriaAggregateKind::Count2;
             return aBridge;
         case DatabaseAggregation::Average:
             aBridge.moKind = core::query::CriteriaAggregateKind::Average;
