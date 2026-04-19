@@ -45,7 +45,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=50`
+- `interp4_dispatch_engine_attempt_count=58`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
