@@ -26,7 +26,7 @@ fixed without the list being updated).
 
 ## Failure baseline (2026-04-19, branch tip after `0e94cc217`)
 
-35 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 125 tests.
+34 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 125 tests.
 
 ### External reference (2)
 
@@ -82,11 +82,10 @@ paths regressed.
 - `testTdf147398`
 - `testTdf156985`
 
-### Shell / shared / coercion (4)
+### Shell / shared / coercion (3)
 
 - `testModernLogicalNameShellPhase7`
 - `testReferenceShapePhase5`
-- `testSharedScalarCoercionAndPositionNormalization`
 - `testSharedStatisticalDelegations`
 
 ## Bisect notes (partial)

@@ -11438,15 +11438,185 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aLength.moValue);
             if (!aNumber)
                 return makeErrorResult(eFunction, aNumber.meError);
-            const auto oWhole = coerceWholeNumber(aNumber.maValue);
-            if (!oWhole || *oWhole < 0)
+            // LEFT/RIGHT truncate the length argument toward zero (legacy Calc
+            // semantics), they do not require an integer input.
+            if (!std::isfinite(aNumber.maValue) || aNumber.maValue < 0.0)
                 return makeErrorResult(eFunction, api::Error::IllegalArgument);
-            nLength = *oWhole;
+            const double fTruncated = std::trunc(aNumber.maValue);
+            if (fTruncated > static_cast<double>(std::numeric_limits<sal_Int32>::max()))
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            nLength = static_cast<sal_Int32>(fTruncated);
         }
 
         return makeStringResult(eFunction,
             toLibreOfficeString(spreadsheetengine::core::text::sliceTextLeftRight(
                 toApiString(aText.maValue), nLength, aFunctionName == u"RIGHT")));
+    }
+
+    const auto coerceStringPosition = [&](double fValue,
+                                          bool bOneBased) -> std::optional<sal_Int32> {
+        if (!std::isfinite(fValue))
+            return std::nullopt;
+        const double fFloored = rtl::math::approxFloor(fValue);
+        if (bOneBased && fFloored < 1.0)
+            return std::nullopt;
+        if (!bOneBased && fFloored < 0.0)
+            return std::nullopt;
+        if (fFloored > static_cast<double>(std::numeric_limits<sal_Int32>::max()))
+            return std::nullopt;
+        return static_cast<sal_Int32>(fFloored);
+    };
+
+    if (aFunctionName == u"MID")
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto aText = materializeTextArgument(*rNode.maChildren[0]);
+        if (!aText)
+            return makeErrorResult(eFunction, aText.meError);
+        const auto aStartArg = materializeArgument(*rNode.maChildren[1]);
+        if (!aStartArg.mbSupported)
+            return makeUnsupported(eFunction, aStartArg.meFallbackReason);
+        if (!aStartArg.moValue)
+            return makeErrorResult(eFunction, aStartArg.meError);
+        const auto aLengthArg = materializeArgument(*rNode.maChildren[2]);
+        if (!aLengthArg.mbSupported)
+            return makeUnsupported(eFunction, aLengthArg.meFallbackReason);
+        if (!aLengthArg.moValue)
+            return makeErrorResult(eFunction, aLengthArg.meError);
+
+        const auto aStartNumber = coerceScalarToNumber(rDoc, rContext, *aStartArg.moValue);
+        if (!aStartNumber)
+            return makeErrorResult(eFunction, aStartNumber.meError);
+        const auto aLengthNumber = coerceScalarToNumber(rDoc, rContext, *aLengthArg.moValue);
+        if (!aLengthNumber)
+            return makeErrorResult(eFunction, aLengthNumber.meError);
+
+        // MID truncates toward zero (legacy Calc semantics), start must be >= 1,
+        // length must be >= 0.
+        const auto oStart = coerceStringPosition(aStartNumber.maValue, true);
+        const auto oLength = coerceStringPosition(aLengthNumber.maValue, false);
+        if (!oStart || !oLength)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        return makeStringResult(eFunction,
+            toLibreOfficeString(spreadsheetengine::core::text::sliceText(
+                toApiString(aText.maValue), *oStart - 1, *oLength)));
+    }
+
+    if (aFunctionName == u"SEARCH" || aFunctionName == u"FIND")
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto aNeedle = materializeTextArgument(*rNode.maChildren[0]);
+        if (!aNeedle)
+            return makeErrorResult(eFunction, aNeedle.meError);
+        const auto aHaystack = materializeTextArgument(*rNode.maChildren[1]);
+        if (!aHaystack)
+            return makeErrorResult(eFunction, aHaystack.meError);
+
+        sal_Int32 nStart = 1;
+        if (rNode.maChildren.size() == 3
+            && rNode.maChildren[2]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aStartArg = materializeArgument(*rNode.maChildren[2]);
+            if (!aStartArg.mbSupported)
+                return makeUnsupported(eFunction, aStartArg.meFallbackReason);
+            if (!aStartArg.moValue)
+                return makeErrorResult(eFunction, aStartArg.meError);
+            const auto aStartNumber = coerceScalarToNumber(rDoc, rContext, *aStartArg.moValue);
+            if (!aStartNumber)
+                return makeErrorResult(eFunction, aStartNumber.meError);
+            const auto oStart = coerceStringPosition(aStartNumber.maValue, true);
+            if (!oStart)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            nStart = *oStart;
+        }
+
+        const auto oFoundIndex = spreadsheetengine::core::text::findText(
+            toApiString(aNeedle.maValue), toApiString(aHaystack.maValue), nStart - 1,
+            aFunctionName == u"SEARCH");
+        if (!oFoundIndex)
+            return makeErrorResult(eFunction, api::Error::NotAvailable);
+        return makeNumericResult(eFunction, static_cast<double>(*oFoundIndex + 1),
+            SvNumFormatType::NUMBER);
+    }
+
+    if (aFunctionName == u"REPLACE")
+    {
+        if (rNode.maChildren.size() != 4)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto aSource = materializeTextArgument(*rNode.maChildren[0]);
+        if (!aSource)
+            return makeErrorResult(eFunction, aSource.meError);
+        const auto aStartArg = materializeArgument(*rNode.maChildren[1]);
+        if (!aStartArg.mbSupported)
+            return makeUnsupported(eFunction, aStartArg.meFallbackReason);
+        if (!aStartArg.moValue)
+            return makeErrorResult(eFunction, aStartArg.meError);
+        const auto aLengthArg = materializeArgument(*rNode.maChildren[2]);
+        if (!aLengthArg.mbSupported)
+            return makeUnsupported(eFunction, aLengthArg.meFallbackReason);
+        if (!aLengthArg.moValue)
+            return makeErrorResult(eFunction, aLengthArg.meError);
+        const auto aReplacement = materializeTextArgument(*rNode.maChildren[3]);
+        if (!aReplacement)
+            return makeErrorResult(eFunction, aReplacement.meError);
+
+        const auto aStartNumber = coerceScalarToNumber(rDoc, rContext, *aStartArg.moValue);
+        if (!aStartNumber)
+            return makeErrorResult(eFunction, aStartNumber.meError);
+        const auto aLengthNumber = coerceScalarToNumber(rDoc, rContext, *aLengthArg.moValue);
+        if (!aLengthNumber)
+            return makeErrorResult(eFunction, aLengthNumber.meError);
+
+        const auto oStart = coerceStringPosition(aStartNumber.maValue, true);
+        const auto oLength = coerceStringPosition(aLengthNumber.maValue, false);
+        if (!oStart || !oLength)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        return makeStringResult(eFunction,
+            toLibreOfficeString(spreadsheetengine::core::text::replaceText(
+                toApiString(aSource.maValue), *oStart - 1, *oLength,
+                toApiString(aReplacement.maValue))));
+    }
+
+    if (aFunctionName == u"SUBSTITUTE")
+    {
+        if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 4)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+        const auto aSource = materializeTextArgument(*rNode.maChildren[0]);
+        if (!aSource)
+            return makeErrorResult(eFunction, aSource.meError);
+        const auto aOld = materializeTextArgument(*rNode.maChildren[1]);
+        if (!aOld)
+            return makeErrorResult(eFunction, aOld.meError);
+        const auto aNew = materializeTextArgument(*rNode.maChildren[2]);
+        if (!aNew)
+            return makeErrorResult(eFunction, aNew.meError);
+
+        std::optional<sal_Int32> oInstance;
+        if (rNode.maChildren.size() == 4
+            && rNode.maChildren[3]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aInstArg = materializeArgument(*rNode.maChildren[3]);
+            if (!aInstArg.mbSupported)
+                return makeUnsupported(eFunction, aInstArg.meFallbackReason);
+            if (!aInstArg.moValue)
+                return makeErrorResult(eFunction, aInstArg.meError);
+            const auto aInstNumber = coerceScalarToNumber(rDoc, rContext, *aInstArg.moValue);
+            if (!aInstNumber)
+                return makeErrorResult(eFunction, aInstNumber.meError);
+            const auto oInst = coerceStringPosition(aInstNumber.maValue, true);
+            if (!oInst)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            oInstance = *oInst;
+        }
+
+        return makeStringResult(eFunction,
+            toLibreOfficeString(spreadsheetengine::core::text::substituteText(
+                toApiString(aSource.maValue), toApiString(aOld.maValue),
+                toApiString(aNew.maValue), oInstance)));
     }
 
     if (aFunctionName == u"T")
