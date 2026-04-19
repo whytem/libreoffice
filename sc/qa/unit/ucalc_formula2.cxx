@@ -32,6 +32,7 @@
 #include <functional>
 #include <set>
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <optional>
 #include <vector>
@@ -1062,6 +1063,84 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterDatabaseDispatch)
     CPPUNIT_ASSERT_MESSAGE(
         "DB functions should succeed through engine: " + aLabel,
         aDispatchStats.mnCriteriaEngineSucceededCount >= 5);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterDatabaseVarianceDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"DBVar"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    // Database at A1:C5: Region | Amount | Quantity
+    //   West | 100 | 10 ; East | 200 | 20 ; West | 300 | 15 ; West | 500 | 25
+    m_pDoc->SetString(ScAddress(0, 0, 0), u"Region"_ustr);
+    m_pDoc->SetString(ScAddress(1, 0, 0), u"Amount"_ustr);
+    m_pDoc->SetString(ScAddress(2, 0, 0), u"Quantity"_ustr);
+    m_pDoc->SetString(ScAddress(0, 1, 0), u"West"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 1, 0), 100.0);
+    m_pDoc->SetValue(ScAddress(2, 1, 0), 10.0);
+    m_pDoc->SetString(ScAddress(0, 2, 0), u"East"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 2, 0), 200.0);
+    m_pDoc->SetValue(ScAddress(2, 2, 0), 20.0);
+    m_pDoc->SetString(ScAddress(0, 3, 0), u"West"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 3, 0), 300.0);
+    m_pDoc->SetValue(ScAddress(2, 3, 0), 15.0);
+    m_pDoc->SetString(ScAddress(0, 4, 0), u"West"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 4, 0), 500.0);
+    m_pDoc->SetValue(ScAddress(2, 4, 0), 25.0);
+
+    // Criteria at E1:F2: Region=West
+    m_pDoc->SetString(ScAddress(4, 0, 0), u"Region"_ustr);
+    m_pDoc->SetString(ScAddress(5, 0, 0), u"Amount"_ustr);
+    m_pDoc->SetString(ScAddress(4, 1, 0), u"West"_ustr);
+
+    // West Amount values: {100, 300, 500}. Mean = 300.
+    // Sum of squared deviations = 200^2 + 0 + 200^2 = 80000.
+    // Sample variance = 80000 / 2 = 40000. Population variance = 80000/3.
+
+    // DVAR sample -> 40000
+    m_pDoc->SetString(ScAddress(7, 0, 0),
+                      u"=DVAR(A1:C5;\"Amount\";E1:F2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(40000.0, m_pDoc->GetValue(ScAddress(7, 0, 0)));
+
+    // DVARP population -> 80000/3
+    m_pDoc->SetString(ScAddress(7, 1, 0),
+                      u"=DVARP(A1:C5;\"Amount\";E1:F2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(80000.0 / 3.0, m_pDoc->GetValue(ScAddress(7, 1, 0)));
+
+    // DSTDEV sample -> sqrt(40000) = 200
+    m_pDoc->SetString(ScAddress(7, 2, 0),
+                      u"=DSTDEV(A1:C5;\"Amount\";E1:F2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(200.0, m_pDoc->GetValue(ScAddress(7, 2, 0)));
+
+    // DSTDEVP population -> sqrt(80000/3)
+    m_pDoc->SetString(ScAddress(7, 3, 0),
+                      u"=DSTDEVP(A1:C5;\"Amount\";E1:F2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(std::sqrt(80000.0 / 3.0),
+                         m_pDoc->GetValue(ScAddress(7, 3, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "criteria_attempted="
+          + std::to_string(aDispatchStats.mnCriteriaEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnCriteriaEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnCriteriaEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "DB variance family should attempt engine dispatch: " + aLabel,
+        aDispatchStats.mnCriteriaEngineAttemptedCount >= 4);
+    CPPUNIT_ASSERT_MESSAGE(
+        "DB variance family should succeed through engine: " + aLabel,
+        aDispatchStats.mnCriteriaEngineSucceededCount >= 4);
 
     m_pDoc->DeleteTab(0);
 }
