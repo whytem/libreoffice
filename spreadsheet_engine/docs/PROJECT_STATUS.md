@@ -61,7 +61,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `sc_formula_executor_interpret_tail_total_core_forced_full_legacy=90144`
 - `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=602`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
-- live authoritative-match rate over the corpus: `99.3940%`
+- live authoritative-match rate over the corpus: `99.4493%`
 - live authoritative-match rate over the current promoted probe: `99.9921%`
 
 The north-star measures live authority transfer. `legacy_interpreter_subroutine_count`
@@ -162,11 +162,11 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=50612`
-- `interpret_tail_live_unique_supported_formula_cells=50612`
+- `interpret_tail_live_unique_seen_formula_cells=50640`
+- `interpret_tail_live_unique_supported_formula_cells=50640`
 - `interpret_tail_live_unique_fallback_formula_cells=0`
 - `interpret_tail_live_unique_unsupported_function_formula_cells=0`
-- `interpret_tail_live_unique_unseen_formula_cells=49`
+- `interpret_tail_live_unique_unseen_formula_cells=21`
 - `interpret_tail_live_unique_seen_rate=99.90`
 - `interpret_tail_live_unique_supported_rate=99.90`
 
@@ -196,16 +196,16 @@ unknown-surface tail.
 
 Top unseen unknown-surface roots:
 
-- `operator:+`: `34` formula cells, `34` unseen
 - `parse_failure`: `14` formula cells, `12` unseen
 - `root:array_constant`: `10` formula cells, `0` unseen
 - `COM.MICROSOFT.COVARIANCE.P`: `7` formula cells, `0` unseen
-- `COM.MICROSOFT.COVARIANCE.S`: `7` formula cells, `0` unseen
-- `COM.MICROSOFT.F.TEST`: `7` formula cells, `0` unseen
-- `CORREL`: `7` formula cells, `0` unseen
-- `COVAR`: `7` formula cells, `0` unseen
-- `PEARSON`: `7` formula cells, `0` unseen
-- `SHEET`: `7` formula cells, `0` unseen
+
+The unknown-root samples made the last residual `operator:+` band legible:
+those `34` unseen cells were imported `TODAY() + n` date-offset formulas from
+`sequence.fods`, not a generic scalar-operator gap. The engine now admits
+`TODAY()` as a scalar child inside promoted scalar-root expressions, which is
+why that bucket disappears from the live unknown-surface table without widening
+root `TODAY()` into a new global default-on family.
 
 Updated next routing policy:
 
@@ -390,7 +390,7 @@ Still not true:
   the next ceiling is the unseen live surface plus further Calc-path
   retirement
 - the live authoritative-match north-star now sits at
-  `50354 / 50,661` (`99.3940%`) on the replay corpus
+  `50382 / 50,661` (`99.4493%`) on the replay corpus
 - that gain now includes the earlier imported-root host-truth alignment work,
   the supported-unknown-root promotion pass that re-homed `NA`, `IMREAL`,
   `IMAGINARY`, `BESSEL*`, `PRICE`, and `SUMPRODUCT` into real evaluator

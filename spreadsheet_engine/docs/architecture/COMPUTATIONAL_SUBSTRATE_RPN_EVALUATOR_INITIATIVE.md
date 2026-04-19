@@ -20,7 +20,7 @@ After the current honest baseline of:
 - `interp4_dispatch_engine_declined_total_core_forced_full_legacy=0`
 - `sc_formula_executor_classic_interpret_total_live=0`
 - `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=602`
-- `interpret_tail_live_unique_unseen_formula_cells=49`
+- `interpret_tail_live_unique_unseen_formula_cells=21`
 - `interpret_tail_live_unique_fallback_formula_cells=0`
 - `interpret_tail_live_unique_unsupported_function_formula_cells=0`
 
@@ -30,6 +30,15 @@ the hard part is the RPN evaluator subsystem itself:
 - control-flow opcodes and jump execution
 - reference-shaped operands
 - matrix broadcast and array-formula state
+
+The latest classic-tail follow-through proved an important planning point:
+before widening more opcode pilots, we needed to make the unseen unknown-root
+tail legible. The new per-root samples showed the old `operator:+` bucket was
+really imported `TODAY() + n` date-offset formulas, not a broad arithmetic
+contract gap. That band is now closed by materializing `TODAY()` as a scalar
+child inside promoted scalar-root expressions, which cuts unseen live cells
+from `49` to `21` without pretending root `TODAY()` has already migrated as its
+own delegated family.
 - criteria/database iteration
 - stack and format/error propagation state
 

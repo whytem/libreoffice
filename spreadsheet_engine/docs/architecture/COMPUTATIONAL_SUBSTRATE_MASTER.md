@@ -64,7 +64,7 @@ Today:
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to
-  `50354 / 50,661` (`99.3940%`) on the standing replay corpus, with the broad
+  `50382 / 50,661` (`99.4493%`) on the standing replay corpus, with the broad
   corpus lane stable again after fixing the intermittent `CONVERT(...)`
   runtime crash in the shared BFS conversion path, aligning imported root
   host truth for token-backed `VariableExpected` cells, promoting the
@@ -119,7 +119,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `sc_formula_executor_classic_interpret_total_live=0`
 - `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=602`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
-- live authoritative-match rate over the corpus: `99.3940%`
+- live authoritative-match rate over the corpus: `99.4493%`
 - live authoritative-match rate over the current promoted probe: `99.9921%`
 
 Everything below is diagnostic context for improving that number.
@@ -185,11 +185,11 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=50612`
-- `interpret_tail_live_unique_supported_formula_cells=50612`
+- `interpret_tail_live_unique_seen_formula_cells=50640`
+- `interpret_tail_live_unique_supported_formula_cells=50640`
 - `interpret_tail_live_unique_fallback_formula_cells=0`
 - `interpret_tail_live_unique_unsupported_function_formula_cells=0`
-- `interpret_tail_live_unique_unseen_formula_cells=49`
+- `interpret_tail_live_unique_unseen_formula_cells=21`
 - `interpret_tail_live_unique_seen_rate=99.90`
 - `interpret_tail_live_unique_supported_rate=99.90`
 
@@ -207,13 +207,15 @@ Routing policy:
 
 Unknown-surface tail:
 
-- `operator:+`: `34` formula cells, `34` unseen
 - `parse_failure`: `14` formula cells, `12` unseen
 - `root:array_constant`: `10` formula cells, `0` unseen
 - `COM.MICROSOFT.COVARIANCE.P`: `7` formula cells, `0` unseen
-- `COM.MICROSOFT.COVARIANCE.S`: `7` formula cells, `0` unseen
-- `COM.MICROSOFT.F.TEST`: `7` formula cells, `0` unseen
-- `CORREL`: `7` formula cells, `0` unseen
+
+The new unknown-root samples closed the ambiguity around the old `operator:+`
+bucket: the unseen rows were imported `TODAY() + n` date-offset formulas in
+`sequence.fods`. The engine now materializes `TODAY()` as a scalar child inside
+promoted scalar-root expressions, so that bucket is gone without widening root
+`TODAY()` into a standalone delegated family yet.
 - `COVAR`: `7` formula cells, `0` unseen
 - `PEARSON`: `7` formula cells, `0` unseen
 - `SHEET`: `7` formula cells, `0` unseen
@@ -483,7 +485,7 @@ remain archived reference material only.
 The highest-value remaining blockers are now:
 
 1. unseen live surface:
-   the seam now supports `50612` live-unique cells, but `49` replay
+   the seam now supports `50640` live-unique cells, but `21` replay
    formula cells still do not enter the live unique surface
 2. raw promoted diagnostic debt:
    the raw promoted replay probe is now entirely imported-artifact-only and
@@ -493,9 +495,9 @@ The highest-value remaining blockers are now:
    from the Calc side while holding the live authoritative rate above `90%`
 
 The live authoritative-match north-star on the standing replay corpus is now
-`50354 / 50,661` (`99.3940%`). The honest live unique-cell inventory now
-shows `50612 / 50,661` formula cells seen (`99.90%`) and
-`50612 / 50,661` supported (`99.90%`) during the bulk live observe run, while
+`50382 / 50,661` (`99.4493%`). The honest live unique-cell inventory now
+shows `50640 / 50,661` formula cells seen (`99.90%`) and
+`50640 / 50,661` supported (`99.90%`) during the bulk live observe run, while
 the forced-direct comparison surface now sits at
 `44773 / 50,661` seen (`88.38%`) and `44773 / 50,661` supported (`88.38%`).
 Those are the coverage-style numbers we should currently use alongside the

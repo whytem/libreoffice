@@ -272,7 +272,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `sc_formula_executor_classic_interpret_total_live=0`
 - `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=602`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
-- live authoritative-match rate over the corpus: `99.3940%`
+- live authoritative-match rate over the corpus: `99.4493%`
 - live authoritative-match rate over the current promoted probe: `99.9921%`
 
 Everything below is diagnostic context for improving that number.
@@ -304,9 +304,13 @@ still shows `Bad=506` and `Range=96` as the dominant entries because that
 census records opcode entry before the switch decides whether engine or legacy
 computes the result. The focused `OFFSET(...):OFFSET(...)` proof still shows
 valid dynamic range construction can already succeed through the dedicated
-range path. So the next slice is no longer “make `Bad` real” or “fix the faux
-range tail”; it is the broader real reference substrate and the control/matrix
-work beyond it.
+range path. The next unknown-root sample pass then showed the old `operator:+`
+tail was really imported `TODAY() + n` date-offset formulas from
+`sequence.fods`. The engine now materializes `TODAY()` as a scalar child inside
+promoted scalar-root expressions, so unseen live cells drop from `49` to `21`
+without widening root `TODAY()` into a new delegated family. The next slice is
+therefore no longer generic scalar operators either; it is the residual
+parse-failure pocket and the broader reference/control/matrix work beyond it.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 
@@ -335,11 +339,11 @@ replay corpus. It counts whether each formula cell was actually seen and
 supported during the bulk live observe run.
 
 - `interpret_tail_live_unique_formula_cells=50661`
-- `interpret_tail_live_unique_seen_formula_cells=50612`
-- `interpret_tail_live_unique_supported_formula_cells=50612`
+- `interpret_tail_live_unique_seen_formula_cells=50640`
+- `interpret_tail_live_unique_supported_formula_cells=50640`
 - `interpret_tail_live_unique_fallback_formula_cells=0`
 - `interpret_tail_live_unique_unsupported_function_formula_cells=0`
-- `interpret_tail_live_unique_unseen_formula_cells=49`
+- `interpret_tail_live_unique_unseen_formula_cells=21`
 - `interpret_tail_live_unique_seen_rate=99.90`
 - `interpret_tail_live_unique_supported_rate=99.90`
 
