@@ -9876,13 +9876,8 @@ StackVar ScInterpreter::Interpret()
                     case ocBad              :
                         if (!tryPushEngineBadLiteralError())
                         {
-                            warnIfLegacyDispatchReached(
-                                "engine-first root error literal", u"ERROR_LITERAL",
-                                [](std::u16string_view rFormula) {
-                                    return setaileval::isRootErrorLiteralFormula(rFormula);
-                                },
-                                "engine-backed root error literal reached ScInterpreter");
-                            ScBadName();
+                            OSL_FAIL("engine-backed root error literal declined ocBad");
+                            PushError(FormulaError::NoName);
                         }
                         break;
                     case ocZTest            :

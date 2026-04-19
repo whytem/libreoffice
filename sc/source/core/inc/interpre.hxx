@@ -799,7 +799,6 @@ public:
     void ScLogest();
     void ScFourier();
     void ScNoName();
-    void ScBadName();
     // Statistics:
 public:
     static double gaussinv(double x);

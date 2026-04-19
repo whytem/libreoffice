@@ -60,7 +60,7 @@ Today:
   genuine text-utility retirement pass then removes the dedicated `SEARCH`,
   `REGEX`, `TEXTJOIN`, `BAHTTEXT`, the `*B` byte-text wrappers, and
   `ENCODEURL`, bringing the honest blunt metric to
-  `legacy_interpreter_subroutine_count=100`
+  `legacy_interpreter_subroutine_count=99`
 - hard-route widening is now frozen unless it removes a live fallback reason
   or live mismatch bucket
 - the deletion-gating live authoritative-match north-star has now moved to
@@ -72,7 +72,8 @@ Today:
   the remaining high-volume imported unknown roots into real probe families,
   then genuinely retiring the dedicated date/time wrapper surface to `185`,
   and now genuinely retiring the dedicated text-utility wrapper surface
-  to `100`
+  to `100`, with the next engine-first retirement deleting the dedicated
+  `ScBadName()` fallback so `ocBad` now leaves Calc through engine authority
 - the broad corpus lane now completes again with `BusinessDay` admitted on the
   default ambient surface after rejecting zero-workday `WORKDAY` weekend masks
   before they enter the shared runtime, and the next `BusinessDay` slice has
@@ -102,10 +103,10 @@ delegation.”
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=50358`
-- `interpret_tail_live_authoritative_match_total=50354`
+- `interpret_tail_live_authoritative_probe_formula_cells=50386`
+- `interpret_tail_live_authoritative_match_total=50382`
 - `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=100`
+- `legacy_interpreter_subroutine_count=99`
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
@@ -150,7 +151,9 @@ deliberately exercised. That movement now comes from two engine-first slices:
 audit proved that the remaining `96` classic `Range` rows were really
 bracketed ODF error-literal syntax like `=[.OF:.ERR]:502`, not true
 reference-range work. Those rows now reroute through the engine-backed
-bad-literal path. The classic opcode census still shows `Bad=506` and
+bad-literal path, and the legacy `ScBadName()` fallback is now deleted, so
+`ocBad` is the first opcode that no longer coexists with an alternate Calc
+implementation. The classic opcode census still shows `Bad=506` and
 `Range=96`, anchored by formulas like `=of:#N/A` and `=[.OF:.ERR]:502`,
 because the census counts opcode entry before the switch decides whether
 engine or legacy computes the result. The focused `OFFSET(...):OFFSET(...)`
@@ -261,14 +264,14 @@ forcing each replay formula cell once.
 
 ### Raw Cached-Workbook Promoted Probe
 
-- `interpret_tail_probe_formula_cells=50358`
+- `interpret_tail_probe_formula_cells=50386`
 - `interpret_tail_authoritative_total=300`
-- `interpret_tail_authoritative_fallback_total=50048`
+- `interpret_tail_authoritative_fallback_total=50086`
 - raw promoted authoritative rate: `0.61%`
 
 Dominant promoted-family fallback reasons:
 
-- `shadow_mismatch=50048`
+- `shadow_mismatch=50086`
 - `unsupported_function=0`
 - `unsupported_formula_shape=0`
 - `unsupported_host_surface=0`
@@ -276,7 +279,7 @@ Dominant promoted-family fallback reasons:
 ### Live-Reachable vs Imported-Artifact Promoted Probe
 
 - `interpret_tail_probe_live_reachable_formula_cells=300`
-- `interpret_tail_probe_imported_artifact_formula_cells=50048`
+- `interpret_tail_probe_imported_artifact_formula_cells=50086`
 - live-reachable promoted rate: `0.61%`
 - imported-artifact-only promoted rate: `99.39%`
 
@@ -284,7 +287,7 @@ Interpretation:
 
 - the promoted probe is now diagnostic-only and only meaningful when split
   into live-reachable vs imported-artifact-only buckets
-- the `shadow_mismatch=50048` wall is overwhelmingly imported cached-workbook
+- the `shadow_mismatch=50086` wall is overwhelmingly imported cached-workbook
   debt, not a live parity denominator
 - the raw promoted authoritative rate is now `0.61%`, so this
   surface remains useful for diagnostics but not for retirement steering
@@ -519,7 +522,7 @@ clusters are all engine-owned, seam-admitted, or mechanically relocated
 paths, with the blunt retirement metric now down to `50` while the live
 unique surface widens further without reintroducing any live fallback or
 unsupported-function residue. The raw promoted replay probe now sits at
-`300 / 50358` and remains purely diagnostic rather than a retirement
+`300 / 50386` and remains purely diagnostic rather than a retirement
 denominator.
 
 Inside the current families, the semantically distinct env-independent
@@ -577,7 +580,7 @@ A bounded live-host-truth pass now also shows the replay-imported
 cached workbook non-error row is likewise not treated as a real runtime
 conversion target.
 
-With the new host-truth filtered probe, `50048` promoted replay probe rows now
+With the new host-truth filtered probe, `50086` promoted replay probe rows now
 classify as imported host-truth artifacts under seam-off direct legacy
 interpretation, while `300` rows are live-reachable and authoritative. So that
 probe remains useful as a cached imported correctness surface, but not as the

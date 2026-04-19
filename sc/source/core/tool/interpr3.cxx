@@ -73,16 +73,6 @@ void ScInterpreter::ScNoName()
     PushError(FormulaError::NoName);
 }
 
-void ScInterpreter::ScBadName()
-{
-    short nParamCount = GetByte();
-    while (nParamCount-- > 0)
-    {
-        PopError();
-    }
-    PushError( FormulaError::NoName);
-}
-
 //  #i26836# new gaussinv implementation by Martin Eitzenberger <m.eitzenberger@unix.net>
 
 double ScInterpreter::gaussinv(double x)

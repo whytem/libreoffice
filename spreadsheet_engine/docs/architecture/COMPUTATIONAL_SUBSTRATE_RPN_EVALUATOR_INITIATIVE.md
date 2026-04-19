@@ -9,7 +9,7 @@ hundred functions."
 
 After the current honest baseline of:
 
-- `legacy_interpreter_subroutine_count=100`
+- `legacy_interpreter_subroutine_count=99`
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_engine_attempt_count=14`
 - `interp4_dispatch_engine_attempted_total=0`

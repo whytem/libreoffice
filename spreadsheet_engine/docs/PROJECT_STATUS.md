@@ -36,10 +36,10 @@ That splits into two tracks:
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=50358`
-- `interpret_tail_live_authoritative_match_total=50354`
+- `interpret_tail_live_authoritative_probe_formula_cells=50386`
+- `interpret_tail_live_authoritative_match_total=50382`
 - `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=100`
+- `legacy_interpreter_subroutine_count=99`
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
@@ -86,9 +86,12 @@ all `96` residual `Range` rows were really bracketed ODF error-literal syntax
 like `=[.OF:.ERR]:502`, not true reference-range work. Those rows now route
 through the engine-backed bad-literal path, while the focused dynamic-range
 lane still proves valid `OFFSET(...):OFFSET(...)` range construction can
-succeed through the dedicated range path. The classic opcode census still shows
-`Bad=506` and `Range=96` because it counts opcode entry before the switch
-decides whether engine or legacy computes the result. So the next bottleneck is
+succeed through the dedicated range path. The `ocBad` switch case is now the
+first real retirement through engine authority: the legacy `ScBadName()` path
+is deleted, and the classic interpreter no longer coexists with an alternate
+Calc implementation for root error literals. The classic opcode census still
+shows `Bad=506` and `Range=96` because it counts opcode entry before the
+switch decides whether engine or legacy computes the result. So the next bottleneck is
 no longer root error literals or this faux-range tail; it is the remaining real
 reference and control/matrix substrate behind the still-unseen live surface.
 The current value reflects the restored original `Sc*` names after backing out
@@ -244,14 +247,14 @@ actually seen and supported by the seam.
 
 ### Raw Cached-Workbook Promoted Probe
 
-- `interpret_tail_probe_formula_cells=50358`
+- `interpret_tail_probe_formula_cells=50386`
 - `interpret_tail_authoritative_total=300`
-- `interpret_tail_authoritative_fallback_total=50048`
+- `interpret_tail_authoritative_fallback_total=50086`
 - raw promoted authoritative rate: `0.61%`
 
 Raw promoted fallback reasons:
 
-- `shadow_mismatch=50048`
+- `shadow_mismatch=50086`
 - `unsupported_function=0`
 - `unsupported_formula_shape=0`
 - `unsupported_host_surface=0`
@@ -262,8 +265,8 @@ Raw promoted fallback reasons:
 - `interpret_tail_live_target_authoritative_total=300`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 - `interpret_tail_probe_live_reachable_rate=0.60%`
-- `interpret_tail_probe_imported_artifact_formula_cells=50048`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=50048`
+- `interpret_tail_probe_imported_artifact_formula_cells=50086`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=50086`
 - `interpret_tail_probe_imported_artifact_rate=99.40%`
 
 Interpretation:
@@ -272,23 +275,23 @@ Interpretation:
   not a live parity denominator
 - the promoted probe is only interpretable when split into live-reachable vs
   imported-artifact-only buckets
-- the `shadow_mismatch=50048` wall is real diagnostic debt, but it is almost
+- the `shadow_mismatch=50086` wall is real diagnostic debt, but it is almost
   entirely on imported-artifact-only rows rather than live-reachable parity rows
 
 ### Promoted Replay Eligibility Inventory
 
-- `interpret_tail_replay_promoted_formula_cells=50358`
-- `interpret_tail_replay_promoted_direct_seen=44741`
-- `interpret_tail_replay_promoted_direct_supported=44741`
+- `interpret_tail_replay_promoted_formula_cells=50386`
+- `interpret_tail_replay_promoted_direct_seen=44743`
+- `interpret_tail_replay_promoted_direct_supported=44743`
 - `interpret_tail_replay_promoted_direct_fallback=0`
-- `interpret_tail_replay_promoted_direct_unseen=5607`
+- `interpret_tail_replay_promoted_direct_unseen=5643`
 - `interpret_tail_replay_promoted_shared_formula_cells=40577`
-- `interpret_tail_replay_promoted_non_shared_formula_cells=9771`
-- `interpret_tail_replay_promoted_unseen_shared_member=2606`
-- `interpret_tail_replay_promoted_unseen_non_shared=2692`
+- `interpret_tail_replay_promoted_non_shared_formula_cells=9809`
+- `interpret_tail_replay_promoted_unseen_shared_member=2636`
+- `interpret_tail_replay_promoted_unseen_non_shared=2743`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=50358`
-- `interpret_tail_replay_promoted_dirty_after_interpret=5607`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=50386`
+- `interpret_tail_replay_promoted_dirty_after_interpret=5643`
 
 ### Engine-Authoritative Families
 
@@ -383,8 +386,8 @@ Still not true:
   mechanical relocation wave collapses the legacy statistical/test,
   forecasting, byte-text, and web wrapper declarations into internal helper
   paths
-- multiple interpreter hard-route milestones have landed, but full legacy
-  opcode retirement has not
+- the first real interpreter opcode retirement has now landed through engine
+  authority, but the broader legacy opcode subsystem still remains
 - the dominant retained live blocker is no longer unsupported function or
   live fallback on the validated standing corpus: both are now at `0`, so
   the next ceiling is the unseen live surface plus further Calc-path
@@ -399,13 +402,15 @@ Still not true:
   latest genuine text-utility retirement push that removes the dedicated
   `SEARCH`, `REGEX`, `TEXTJOIN`, `BAHTTEXT`, the `*B` byte-text wrappers, and
   `ENCODEURL` wrappers after the earlier financial-scalar relocation, bringing
-  the blunt legacy wrapper metric down to `100`; the latest scalar/default-on
+  the blunt legacy wrapper metric down to `100`; the latest `ocBad`
+  retirement then deletes the dedicated `ScBadName()` fallback and brings the
+  honest metric down to `99`; the latest scalar/default-on
   dispatch collapse then cuts the relocated-legacy companion metric to
   `62` `pushLegacy*` lambdas in `Interpret()`, with all `96` still reachable
   from opcode dispatch
 - the raw promoted replay probe remains a diagnostic surface rather than the
   retirement denominator; the live-authoritative probe now sits at
-  `50354 / 50358`, with only `4` live-authoritative fallback rows left on the
+  `50382 / 50386`, with only `4` live-authoritative fallback rows left on the
   standing corpus
 - a focused live-host check now shows the replay-imported whole-row
   `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to
@@ -446,7 +451,7 @@ Still not true:
 - the promoted replay probe is now explicitly split into raw cached-workbook
   parity and live-target filtered parity: `300` rows are live-reachable and
   authoritative under seam-off direct legacy interpretation, while the
-  remaining `50048` rows are imported host-truth artifacts
+  remaining `50086` rows are imported host-truth artifacts
 - the dominant retained live bucket is now unsupported shape rather than
   unsupported function; the raw promoted buckets remain diagnostic debt, not
   the deletion-gating story
