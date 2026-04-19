@@ -96,7 +96,37 @@ For this initiative, the project should use the following working rules:
   `interp4_dispatch_legacy_lambda_count`, not just another drop in
   `legacy_interpreter_subroutine_count`
 
+### Retirement Template
+
+A batch member can retire its legacy `ScInterpreter::Sc*` body or
+`pushLegacy*` lambda fallback only when all of the following hold:
+
+- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy` is
+  non-zero for the opcode across the standing corpus, i.e. the engine-first
+  path has been exercised under real workload (not only unit tests)
+- acceptance rate is `100%`, or every decline path has a documented legacy
+  counterpart that produces the same observable result as the deleted
+  `Sc*`/`pushLegacy*` implementation would have
+- a deliberate-decline test exists for at least one operand shape the engine
+  intentionally does not own, so the decline instrumentation is known to fire
+- the retirement commit deletes the method declaration from
+  [interpre.hxx](/home/ubuntu/repos/libreoffice/sc/source/core/inc/interpre.hxx),
+  the body from `interpr*.cxx`, and any corresponding `pushLegacy*` lambda
+  from [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx)
+- the fallback path is replaced with `OSL_FAIL(...)` + an engine-consistent
+  error push (`FormulaError::UnknownState` or batch-appropriate), never with
+  a silent `PushError(FormulaError::NONE)` or an unchecked fall-through
+
+The reference implementation of this template is
+`532b10392 computational: retire ocBad legacy fallback`. Every future
+engine-authoritative retirement should match its shape.
+
 ## Milestone Plan
+
+The per-batch execution sequence, dependencies, member lists, and retirement
+gates are tracked in:
+
+- [COMPUTATIONAL_SUBSTRATE_RPN_BATCH_EXECUTION_PLAN.md](COMPUTATIONAL_SUBSTRATE_RPN_BATCH_EXECUTION_PLAN.md)
 
 ### 1. Host-Boundary Audit
 
@@ -198,6 +228,27 @@ Move jump and lazy-evaluation semantics into engine code:
 - `CHOOSE`
 - `LET`
 - matrix-aware jump variants
+
+Checkpoint:
+
+- the initial control-flow substrate now exists in
+  `spreadsheetengine/runtime/RpnControlFlow.hxx`
+- it covers:
+  - `planIfBranch(RpnValue, then-slot?, else-slot?)` → `BranchPlan`
+  - `planChooseBranch(RpnValue, branch-count)` → `BranchPlan`
+  - `planIfsBranch(RpnValue, condition-index, remaining-params)` → `BranchPlan`
+  - `planSwitchBranch(RpnValue, case-labels, default-slot?)` → `BranchPlan`
+  - `planIfErrorBranch(error, bNAOnly, alternate-slot)` → `BranchPlan`
+  - `LetScope` with `bind()` / `lookup()` for scalar name binding
+- planners are *pure*: they never mutate PC state, never read Calc state,
+  never touch `FormulaToken`
+- matrix and reference conditions defer explicitly through
+  `NeedsMatrixMaterialization` / `NeedsReferenceResolution`
+- no Calc opcode routes through this layer yet; this checkpoint exists to
+  lock the decision substrate before dispatch migration begins
+- first admission target: `ocIf` scalar-condition path; matrix-condition
+  path stays on legacy `ScIfJumpNotMatrix` until Batch 4 lands the matrix
+  operand model
 
 ### 5. Engine Reference & Matrix Frame
 

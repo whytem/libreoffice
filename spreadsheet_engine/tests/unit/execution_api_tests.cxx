@@ -6,6 +6,7 @@
 
 #include <spreadsheetengine/api/MatrixFrame.hxx>
 #include <spreadsheetengine/detail/ExecutionContext.hxx>
+#include <spreadsheetengine/runtime/RpnControlFlow.hxx>
 #include <spreadsheetengine/runtime/RpnOperators.hxx>
 #include <spreadsheetengine/runtime/RpnValue.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
@@ -152,6 +153,124 @@ int main()
         || aDeferredPower.meReadiness != RpnCoercionReadiness::NeedsMatrixMaterialization)
     {
         return fail("spreadsheetengine_execution_tests", "rpn operator contract mismatch");
+    }
+
+    {
+        using spreadsheetengine::core::rpn::BranchDirective;
+        using spreadsheetengine::core::rpn::LetScope;
+        using spreadsheetengine::core::rpn::planChooseBranch;
+        using spreadsheetengine::core::rpn::planIfBranch;
+        using spreadsheetengine::core::rpn::planIfErrorBranch;
+        using spreadsheetengine::core::rpn::planIfsBranch;
+        using spreadsheetengine::core::rpn::planSwitchBranch;
+        using spreadsheetengine::core::rpn::RpnValue;
+
+        const auto aIfTrue = planIfBranch(RpnValue::boolean(true), std::size_t { 0 }, std::size_t { 1 });
+        const auto aIfFalse = planIfBranch(RpnValue::boolean(false), std::size_t { 0 }, std::size_t { 1 });
+        const auto aIfBareTrue = planIfBranch(RpnValue::number(1.0), std::nullopt, std::nullopt);
+        const auto aIfBareFalse = planIfBranch(RpnValue::number(0.0), std::nullopt, std::nullopt);
+        const auto aIfDeferredMatrix = planIfBranch(
+            RpnValue::matrix({ 2, 2 }), std::size_t { 0 }, std::size_t { 1 });
+        const auto aIfDeferredRef = planIfBranch(
+            RpnValue::reference(ResolvedReference { { { 0, 3, 4 }, { 0, 3, 4 } } }),
+            std::size_t { 0 }, std::size_t { 1 });
+
+        if (!aIfTrue || aIfTrue.maValue.meDirective != BranchDirective::TakeSlot
+            || aIfTrue.maValue.mnSlot != 0
+            || !aIfFalse || aIfFalse.maValue.meDirective != BranchDirective::TakeSlot
+            || aIfFalse.maValue.mnSlot != 1
+            || !aIfBareTrue
+            || aIfBareTrue.maValue.meDirective != BranchDirective::ReturnSyntheticBoolean
+            || !aIfBareTrue.maValue.mbSyntheticBool
+            || !aIfBareFalse
+            || aIfBareFalse.maValue.meDirective != BranchDirective::ReturnSyntheticBoolean
+            || aIfBareFalse.maValue.mbSyntheticBool
+            || aIfDeferredMatrix
+            || aIfDeferredMatrix.meReadiness != RpnCoercionReadiness::NeedsMatrixMaterialization
+            || aIfDeferredRef
+            || aIfDeferredRef.meReadiness != RpnCoercionReadiness::NeedsReferenceResolution)
+        {
+            return fail("spreadsheetengine_execution_tests", "planIfBranch contract mismatch");
+        }
+
+        const auto aChoose2of3 = planChooseBranch(RpnValue::number(2.0), 3);
+        const auto aChooseOutOfRange = planChooseBranch(RpnValue::number(5.0), 3);
+
+        if (!aChoose2of3 || aChoose2of3.maValue.meDirective != BranchDirective::TakeSlot
+            || aChoose2of3.maValue.mnSlot != 2
+            || !aChooseOutOfRange
+            || aChooseOutOfRange.maValue.meDirective != BranchDirective::PropagateError
+            || aChooseOutOfRange.maValue.meError != Error::IllegalArgument)
+        {
+            return fail("spreadsheetengine_execution_tests", "planChooseBranch contract mismatch");
+        }
+
+        const auto aIfsMatch = planIfsBranch(RpnValue::boolean(true), std::size_t { 2 },
+                                              static_cast<std::int16_t>(3));
+        const auto aIfsSkip = planIfsBranch(RpnValue::boolean(false), std::size_t { 2 },
+                                             static_cast<std::int16_t>(5));
+        const auto aIfsNA = planIfsBranch(RpnValue::boolean(false), std::size_t { 2 },
+                                           static_cast<std::int16_t>(1));
+
+        if (!aIfsMatch || aIfsMatch.maValue.meDirective != BranchDirective::TakeSlot
+            || aIfsMatch.maValue.mnSlot != 2
+            || !aIfsSkip || aIfsSkip.maValue.meDirective != BranchDirective::TakeSlot
+            || aIfsSkip.maValue.mnSlot != 3
+            || !aIfsNA || aIfsNA.maValue.meDirective != BranchDirective::ReturnNotAvailable)
+        {
+            return fail("spreadsheetengine_execution_tests", "planIfsBranch contract mismatch");
+        }
+
+        const std::array<RpnValue, 3> aCaseLabels = {
+            RpnValue::number(1.0),
+            RpnValue::number(2.0),
+            RpnValue::number(3.0)
+        };
+        const std::span<const RpnValue> aCaseSpan(aCaseLabels.data(), aCaseLabels.size());
+        const auto aSwitchHit = planSwitchBranch(RpnValue::number(2.0), aCaseSpan, std::nullopt);
+        const auto aSwitchMiss = planSwitchBranch(RpnValue::number(7.0), aCaseSpan, std::nullopt);
+        const auto aSwitchDefault = planSwitchBranch(RpnValue::number(7.0), aCaseSpan,
+                                                      std::size_t { 99 });
+
+        if (!aSwitchHit || aSwitchHit.maValue.meDirective != BranchDirective::TakeSlot
+            || aSwitchHit.maValue.mnSlot != 1
+            || !aSwitchMiss
+            || aSwitchMiss.maValue.meDirective != BranchDirective::PropagateError
+            || aSwitchMiss.maValue.meError != Error::NotAvailable
+            || !aSwitchDefault
+            || aSwitchDefault.maValue.meDirective != BranchDirective::TakeSlot
+            || aSwitchDefault.maValue.mnSlot != 99)
+        {
+            return fail("spreadsheetengine_execution_tests", "planSwitchBranch contract mismatch");
+        }
+
+        const auto aIfErrorKeep = planIfErrorBranch(Error::None, false, 0);
+        const auto aIfErrorReplace = planIfErrorBranch(Error::DivisionByZero, false, 5);
+        const auto aIfNAOnlyKeep = planIfErrorBranch(Error::DivisionByZero, true, 5);
+        const auto aIfNAOnlyReplace = planIfErrorBranch(Error::NotAvailable, true, 5);
+
+        if (aIfErrorKeep.meDirective != BranchDirective::KeepPrimaryValue
+            || aIfErrorReplace.meDirective != BranchDirective::EvaluateAlternate
+            || aIfErrorReplace.mnSlot != 5
+            || aIfNAOnlyKeep.meDirective != BranchDirective::KeepPrimaryValue
+            || aIfNAOnlyReplace.meDirective != BranchDirective::EvaluateAlternate)
+        {
+            return fail("spreadsheetengine_execution_tests", "planIfErrorBranch contract mismatch");
+        }
+
+        LetScope aScope;
+        aScope.bind(spreadsheetengine::api::String(u"x"), RpnValue::number(10.0));
+        aScope.bind(spreadsheetengine::api::String(u"y"), RpnValue::text(u"hello"));
+        const auto oX = aScope.lookup(spreadsheetengine::api::StringView(u"x"));
+        const auto oY = aScope.lookup(spreadsheetengine::api::StringView(u"y"));
+        const auto oMissing = aScope.lookup(spreadsheetengine::api::StringView(u"z"));
+
+        if (!oX || oX->maScalar.mfNumber != 10.0
+            || !oY || oY->maScalar.maString != u"hello"
+            || oMissing.has_value())
+        {
+            return fail("spreadsheetengine_execution_tests", "LetScope contract mismatch");
+        }
     }
 
     if (!shouldConvertJumpConditionToMatrix(StackKind::DoubleRef, StackKind::Other)
