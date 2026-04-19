@@ -9725,6 +9725,158 @@ StackVar ScInterpreter::Interpret()
                         aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
                     }
                 };
+                const auto tryPlanEngineIfs = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnControlFlowEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount == 0 || (nParamCount % 2) != 0
+                        || sp < nParamCount)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+
+                    // Conditions sit at the even offsets from the bottom of
+                    // the param window: c0 at sp - nParamCount + 0,
+                    // c1 at +2, c2 at +4, ... Values follow at +1, +3, +5.
+                    // Scope fence: every condition must be a simple scalar
+                    // token so the planner can decide locally without host
+                    // resolution. Any non-scalar condition declines to the
+                    // legacy ReverseStack walk.
+                    const std::size_t nPairs
+                        = static_cast<std::size_t>(nParamCount) / 2;
+                    std::size_t winningPair = nPairs;
+                    enum class Outcome
+                    {
+                        Continue,
+                        Selected,
+                        ReturnNotAvailable,
+                        ReturnParameterExpected,
+                        PropagateError
+                    };
+                    Outcome eOutcome = Outcome::Continue;
+                    spreadsheetengine::api::Error ePropagated
+                        = spreadsheetengine::api::Error::None;
+                    for (std::size_t i = 0; i < nPairs; ++i)
+                    {
+                        const FormulaToken* pCond
+                            = pStack[sp - nParamCount + 2 * i];
+                        if (!pCond)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineDeclinedCount);
+                            return false;
+                        }
+                        std::optional<serpn::RpnValue> oCond;
+                        switch (pCond->GetType())
+                        {
+                            case svDouble:
+                                oCond = serpn::RpnValue::number(pCond->GetDouble());
+                                break;
+                            case svError:
+                                oCond = serpn::RpnValue::error(
+                                    selibreoffice::toApiError(pCond->GetError()));
+                                break;
+                            case svEmptyCell:
+                            case svMissing:
+                                oCond = serpn::RpnValue::empty();
+                                break;
+                            default:
+                                addDispatchRuntimeStat(
+                                    interpreterDispatchRuntimeStatsStore()
+                                        .mnControlFlowEngineDeclinedCount);
+                                return false;
+                        }
+                        const std::int16_t nRemainingAfter
+                            = static_cast<std::int16_t>(nParamCount - 2 * i - 2);
+                        const auto aPlan = serpn::planIfsBranch(
+                            *oCond, i, nRemainingAfter);
+                        if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready
+                            || !aPlan)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineDeclinedCount);
+                            return false;
+                        }
+                        switch (aPlan.maValue.meDirective)
+                        {
+                            case serpn::BranchDirective::TakeSlot:
+                                winningPair = aPlan.maValue.mnSlot;
+                                eOutcome = Outcome::Selected;
+                                break;
+                            case serpn::BranchDirective::ReturnNotAvailable:
+                                eOutcome = Outcome::ReturnNotAvailable;
+                                break;
+                            case serpn::BranchDirective::ReturnParameterExpected:
+                                eOutcome = Outcome::ReturnParameterExpected;
+                                break;
+                            case serpn::BranchDirective::PropagateError:
+                                eOutcome = Outcome::PropagateError;
+                                ePropagated = aPlan.maValue.meError;
+                                break;
+                            default:
+                                // SkipCurrentResult: keep walking.
+                                break;
+                        }
+                        if (eOutcome != Outcome::Continue)
+                            break;
+                    }
+
+                    if (eOutcome == Outcome::Continue)
+                    {
+                        // Walked all pairs without selection — N/A.
+                        eOutcome = Outcome::ReturnNotAvailable;
+                    }
+
+                    if (eOutcome == Outcome::Selected)
+                    {
+                        FormulaConstTokenRef xValue(
+                            pStack[sp - nParamCount + 2 * winningPair + 1]);
+                        sp -= nParamCount;
+                        nGlobalError = FormulaError::NONE;
+                        if (xValue)
+                            PushTokenRef(xValue);
+                        else
+                            PushError(FormulaError::UnknownStackVariable);
+                    }
+                    else
+                    {
+                        sp -= nParamCount;
+                        nGlobalError = FormulaError::NONE;
+                        switch (eOutcome)
+                        {
+                            case Outcome::ReturnNotAvailable:
+                                PushNA();
+                                break;
+                            case Outcome::ReturnParameterExpected:
+                                PushParameterExpected();
+                                break;
+                            case Outcome::PropagateError:
+                                PushError(selibreoffice::toFormulaError(ePropagated));
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnControlFlowEngineSucceededCount);
+                    return true;
+                };
                 const auto pushLegacyIfs = [&]() {
                     warnConditionalDispatch(u"IFS");
 
@@ -11487,7 +11639,10 @@ StackVar ScInterpreter::Interpret()
                     case ocConcat           : pushLegacyConcat();       break;
                     case ocConcat_MS        : pushLegacyConcatMs();         break;
                     case ocTextJoin_MS      : pushLegacyTextJoinMs();   break;
-                    case ocIfs_MS           : pushLegacyIfs();              break;
+                    case ocIfs_MS           :
+                        if (!tryPlanEngineIfs())
+                            pushLegacyIfs();
+                        break;
                     case ocSwitch_MS        : pushLegacySwitch();           break;
                     case ocMinIfs_MS:
                     {
