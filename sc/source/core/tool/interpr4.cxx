@@ -5181,22 +5181,6 @@ StackVar ScInterpreter::Interpret()
                     PushDouble(256 * 256 * 256 * nAlpha + 256 * 256 * nRed + 256 * nGreen
                                + nBlue);
                 };
-                const auto pushLegacyRawSubtract = [&]() {
-                    warnIfLegacyDefaultOnReached(
-                        u"RAWSUBTRACT",
-                        "family-local default-on math scalar reached ScInterpreter");
-                    short nParamCount = GetByte();
-                    if (!MustHaveParamCountMin(nParamCount, 2))
-                        return;
-
-                    ReverseStack(nParamCount);
-                    double fRes = GetDouble();
-                    while (nGlobalError == FormulaError::NONE && --nParamCount > 0)
-                        fRes -= GetDouble();
-                    while (nParamCount-- > 0)
-                        PopError();
-                    PushDouble(fRes);
-                };
                 const auto pushLegacyDateOrTimeValue =
                     [&](const char* pFunctionName, SvNumFormatType eFormatType,
                         auto aEvaluator) {
@@ -12126,7 +12110,24 @@ StackVar ScInterpreter::Interpret()
                     case ocSumX2MY2         : ScSumX2MY2();                 break;
                     case ocSumX2DY2         : ScSumX2DY2();                 break;
                     case ocSumXMY2          : ScSumXMY2();                  break;
-                    case ocRawSubtract      : pushLegacyRawSubtract();      break;
+                    case ocRawSubtract      :
+                    {
+                        warnIfLegacyDefaultOnReached(
+                            u"RAWSUBTRACT",
+                            "family-local default-on math scalar reached ScInterpreter");
+                        short nParamCount = GetByte();
+                        if (!MustHaveParamCountMin(nParamCount, 2))
+                            break;
+
+                        ReverseStack(nParamCount);
+                        double fRes = GetDouble();
+                        while (nGlobalError == FormulaError::NONE && --nParamCount > 0)
+                            fRes -= GetDouble();
+                        while (nParamCount-- > 0)
+                            PopError();
+                        PushDouble(fRes);
+                    }
+                    break;
                     case ocLog              :
                     {
                         warnIfLegacyDefaultOnReached(
