@@ -8405,6 +8405,71 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
+                const auto tryPlanEngineMatrixDeterminant = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount != 1 || !sp)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    // Scope fence: only admit svMatrix sources. Range
+                    // tokens still need the reference-to-matrix
+                    // materialization contract.
+                    const FormulaToken* pTok = pStack[sp - 1];
+                    if (!pTok || pTok->GetType() != svMatrix)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    ScMatrix* pSourceMat
+                        = const_cast<FormulaToken*>(pTok)->GetMatrix();
+                    if (!pSourceMat)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    auto oOperand = convertMatrixRefToMatrixOperand(*pSourceMat);
+                    if (!oOperand)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    const auto aPlan = serpn::planDeterminant(*oOperand);
+                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    sp -= 1;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineSucceededCount);
+                    if (!aPlan)
+                    {
+                        PushError(selibreoffice::toFormulaError(aPlan.meError));
+                    }
+                    else
+                    {
+                        PushDouble(aPlan.maValue);
+                    }
+                    return true;
+                };
+
                 // Batch 3 DB family admission (DSUM / DCOUNT / DAVERAGE
                 // / DMAX / DMIN). The 3-arg shape is
                 // (database_range, field, criteria_range). Scope fence:
@@ -11947,13 +12012,16 @@ StackVar ScInterpreter::Interpret()
                             ScEMat();
                         break;
                     case ocMatDet:
-                        warnIfLegacyDispatchReached(
-                            "family-local default-on", u"MDETERM",
-                            [](std::u16string_view rFormula) {
-                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
-                            },
-                            "family-local default-on MDETERM reached ScInterpreter");
-                        seinterpcompatdispatch::Dispatcher::matrixDeterminant(*this);
+                        if (!tryPlanEngineMatrixDeterminant())
+                        {
+                            warnIfLegacyDispatchReached(
+                                "family-local default-on", u"MDETERM",
+                                [](std::u16string_view rFormula) {
+                                    return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                                },
+                                "family-local default-on MDETERM reached ScInterpreter");
+                            seinterpcompatdispatch::Dispatcher::matrixDeterminant(*this);
+                        }
                         break;
                     case ocMatInv           : ScMatInv();                   break;
                     case ocMatMult          : ScMatMult();                  break;
