@@ -45,7 +45,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=40`
+- `interp4_dispatch_engine_attempt_count=41`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -175,18 +175,23 @@ streaming range-iteration primitive; materializing a range into a
 `std::vector` just to count empties would be a perf regression vs. the
 legacy `ScCellIterator`.
 
-Batch 4 substrate (`runtime/RpnMatrix.hxx`) has now landed together with
-two first admissions: `ocMatrixUnit` (MUNIT) and `ocMatSequence`
-(MSEQUENCE) route through `serpn::planIdentityMatrix` /
-`planSequenceMatrix`. Both produce matrices from pure-scalar
-arguments, so no host-side range materialization is needed for the
-first admission. A new `convertMatrixOperandToMatrixRef` bridge
-converts the engine's `MatrixOperand` (row-major
-`std::vector<CellValue>`) to an `ScMatrixRef` for `PushMatrix`.
-Richer matrix opcodes (MDETERM / MINVERSE / MMULT / TRANSPOSE /
-SUMPRODUCT family / regression-forecast) are deferred pending a Host
-facade range-iteration primitive — the substrate is ready, the
-reference-to-matrix bridge is the remaining work.
+Batch 4 substrate (`runtime/RpnMatrix.hxx`) has landed with three
+admissions so far. The pure-scalar constructors `ocMatrixUnit`
+(MUNIT) and `ocMatSequence` (SEQUENCE) route through
+`serpn::planIdentityMatrix` / `planSequenceMatrix`: they produce
+matrices from scalar-only arguments, so no host-side range
+materialization is needed. The third admission, `ocMatTrans`
+(TRANSPOSE), exercises the matrix-consuming path for in-memory
+`svMatrix` tokens via `serpn::planTranspose`. Two bridges span the
+host boundary: `convertMatrixOperandToMatrixRef` copies the engine's
+`MatrixOperand` (row-major `std::vector<CellValue>`) into an
+`ScMatrixRef` for `PushMatrix`, and the new
+`convertMatrixRefToMatrixOperand` does the reverse for svMatrix
+inputs. Reference-consuming matrix opcodes (MDETERM / MINVERSE /
+MMULT / SUMPRODUCT family / regression-forecast) still need a
+range-iteration primitive on the Host facade and decline to the
+legacy path when their argument arrives as `svDoubleRef` /
+`svSingleRef` / `svRefList`.
 
 Three new `matrix_engine_*` runtime totals are published. A separate
 cleanup fix gated `importedRootUsesStoredHostValueTruth` behind the
