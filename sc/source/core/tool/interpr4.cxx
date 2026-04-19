@@ -9492,6 +9492,101 @@ StackVar ScInterpreter::Interpret()
                             .mnControlFlowEngineSucceededCount);
                     return true;
                 };
+                const auto tryPlanEngineIfError = [&](bool bNAonly) -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnControlFlowEngineAttemptedCount);
+
+                    const short* pJump = pCur->GetJump();
+                    const short nJumpCount = pJump[0];
+                    if (!sp || nJumpCount != 2)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+
+                    // Scope fence: only admit when the primary is a simple
+                    // scalar token (svDouble / svString / svError / svEmpty
+                    // / svMissing). Reference, matrix, external-ref, and
+                    // jump-matrix shapes still need the legacy MatrixJump
+                    // protocol and defer.
+                    const FormulaToken* pPrimary = pStack[sp - 1];
+                    if (!pPrimary)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+                    spreadsheetengine::api::Error ePrimaryError
+                        = spreadsheetengine::api::Error::None;
+                    switch (pPrimary->GetType())
+                    {
+                        case svDouble:
+                        case svString:
+                        case svEmptyCell:
+                        case svMissing:
+                            // No error state — IFERROR/IFNA keep the value.
+                            break;
+                        case svError:
+                            ePrimaryError = selibreoffice::toApiError(pPrimary->GetError());
+                            break;
+                        default:
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineDeclinedCount);
+                            return false;
+                    }
+                    // Pre-existing global error from a prior popped operand
+                    // also matters; only admit when it is None so the engine's
+                    // single-error decision matches the legacy path.
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const auto aPlan
+                        = serpn::planIfErrorBranch(ePrimaryError, bNAonly,
+                                                   /*nAlternateSlot=*/1);
+                    FormulaConstTokenRef xPrimary(pPrimary);
+                    Pop();
+                    nGlobalError = FormulaError::NONE;
+
+                    switch (aPlan.meDirective)
+                    {
+                        case serpn::BranchDirective::KeepPrimaryValue:
+                            PushTokenRef(xPrimary);
+                            aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                            break;
+                        case serpn::BranchDirective::EvaluateAlternate:
+                            aCode.Jump(pJump[1], pJump[nJumpCount]);
+                            break;
+                        case serpn::BranchDirective::PropagateError:
+                            PushError(selibreoffice::toFormulaError(aPlan.meError));
+                            aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                            break;
+                        default:
+                            // ReturnNotAvailable / ReturnParameterExpected /
+                            // TakeSlot / ReturnSyntheticBoolean are not
+                            // produced by planIfErrorBranch; treat
+                            // defensively as decline so legacy re-runs.
+                            PushTokenRef(xPrimary);
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineDeclinedCount);
+                            return false;
+                    }
+
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnControlFlowEngineSucceededCount);
+                    return true;
+                };
                 const auto pushLegacyIfJump = [&]() {
                     warnConditionalDispatch(u"IF");
                     ScIfJump();
@@ -9808,8 +9903,14 @@ StackVar ScInterpreter::Interpret()
                         if (!tryPlanEngineIfJump())
                             pushLegacyIfJump();
                         break;
-                    case ocIfError          : pushLegacyIfError(false);     break;
-                    case ocIfNA             : pushLegacyIfError(true);      break;
+                    case ocIfError          :
+                        if (!tryPlanEngineIfError(false))
+                            pushLegacyIfError(false);
+                        break;
+                    case ocIfNA             :
+                        if (!tryPlanEngineIfError(true))
+                            pushLegacyIfError(true);
+                        break;
                     case ocChoose           :
                         if (!tryPlanEngineChooseJump())
                             ScChooseJump();
