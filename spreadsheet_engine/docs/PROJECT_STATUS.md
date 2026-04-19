@@ -537,7 +537,11 @@ Still not true:
   `ENCODEURL` wrappers after the earlier financial-scalar relocation, bringing
   the blunt legacy wrapper metric down to `100`; the latest `ocBad`
   retirement then deletes the dedicated `ScBadName()` fallback and brings the
-  honest metric down to `99`; the latest scalar/default-on
+  honest metric down to `99`; the latest parallel-lane retirements then
+  delete the one-liner `ScNoName` and `ScCount` / `ScCount2` wrappers whose
+  bodies were single delegations to `PushError(FormulaError::NoName)` and
+  `IterateParameters(ifCOUNT|ifCOUNT2)` respectively, bringing the honest
+  metric down to `96`; the latest scalar/default-on
   dispatch collapse then cuts the relocated-legacy companion metric to
   `62` `pushLegacy*` lambdas in `Interpret()`, with all `96` still reachable
   from opcode dispatch
