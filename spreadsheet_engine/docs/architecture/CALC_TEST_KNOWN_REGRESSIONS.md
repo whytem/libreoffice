@@ -26,7 +26,7 @@ fixed without the list being updated).
 
 ## Failure baseline (2026-04-19, branch tip after `0e94cc217`)
 
-40 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 125 tests.
+38 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 125 tests.
 
 ### External reference (2)
 
@@ -41,7 +41,7 @@ fixed without the list being updated).
 - `testFormulaDepTrackingDeleteRow`
 - `testIterations`
 
-### Function evaluation (20)
+### Function evaluation (19)
 
 Likely root cause: legacy fallback paths regressed during retirement +
 relocation episodes; recalc/observe interaction with the seam returns wrong
@@ -55,7 +55,6 @@ values or false `Err:522` (Circular Reference) on dependency change.
 - `testFuncFTESTBug`
 - `testFuncGCD`
 - `testFuncIF`
-- `testFuncIFERROR`
 - `testFuncLCM`
 - `testFuncMATCH`
 - `testFuncNOW`
@@ -68,14 +67,13 @@ values or false `Err:522` (Circular Reference) on dependency change.
 - `testFuncTTEST`
 - `testFuncTableRef`
 
-### InterpretTail engine evaluator (6)
+### InterpretTail engine evaluator (5)
 
 These directly exercise the seam. Their failure suggests the seam's
-authoritative-with-fallback / conditional-default-on / formula-text /
-math-scalar / statistical-distribution paths regressed.
+authoritative-with-fallback / formula-text / math-scalar /
+statistical-distribution paths regressed.
 
 - `testInterpretTailEngineEvaluatorAuthoritativeWithFallback`
-- `testInterpretTailEngineEvaluatorConditionalDefaultOn`
 - `testInterpretTailEngineEvaluatorFormulaTextAuthoritative`
 - `testInterpretTailEngineEvaluatorFormulaTextDefaultOn`
 - `testInterpretTailEngineEvaluatorMathScalarAuthoritative`

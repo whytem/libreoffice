@@ -13386,9 +13386,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             return makeErrorResult(FunctionKind::Unknown, api::Error::IllegalArgument);
 
         const FunctionKind ePrimaryFunction = classifyDelegatedFunctionNode(*rNode.maChildren[0]);
-        auto aPrimary = evaluateDelegatedNode(
-            *rNode.maChildren[0], rDoc, rContext, rFormulaPos, bEmptyStringAsZero, nDepth + 1,
-            bImportedCanonicalSource);
+        auto aPrimary = evaluateScalarOrDelegatedNode(
+            *rNode.maChildren[0], ePrimaryFunction, rDoc, rContext, rFormulaPos,
+            bEmptyStringAsZero, nDepth + 1, bImportedCanonicalSource);
         if (!aPrimary.mbSupported)
         {
             if (aPrimary.meFunction == FunctionKind::Unknown)
