@@ -45,7 +45,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=22`
+- `interp4_dispatch_engine_attempt_count=24`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -116,19 +116,22 @@ virtually all IF traffic before reaching `Interpret()`, matching the
 expected shape documented in the initiative policy.
 
 Batch 2 substrate (`runtime/RpnReference.hxx`) has now landed together with
-its first two admissions:
+four admissions:
 - `ocColumn` / `ocRow` / `ocSheet` with no argument or a single-reference
   argument route through `planAxisOrdinal`.
 - `ocColumns` / `ocRows` / `ocSheets` with a single `svSingleRef` or
   `svDoubleRef` argument route through `planSpanCount`.
-Matrix-context no-arg, external-ref, multi-argument, and other shapes defer
-to legacy so the matrix-axis expansion and external-ref resolution stay
-with legacy until the reference-resolution host contract is widened later
-in Batch 2. Three new `reference_engine_*` runtime totals are published
-above, currently `0 / 0 / 0` in the live lane for the same seam-captures-
-upstream reason as the control-flow counters. The full legacy lane will
-pick up the attempt sites as subsequent admissions (INDEX, OFFSET,
-INDIRECT, AREAS, ADDRESS) land.
+- `ocAreas` with a single scalar reference routes through
+  `planAreaCount(1)`.
+- `ocOffset` in its 3-argument form with a single-reference base and
+  scalar row/col offsets routes through `planOffset`.
+Matrix-context no-arg, external-ref, multi-argument, 5-arg OFFSET with
+new-height/new-width, and other shapes defer to legacy. Three new
+`reference_engine_*` runtime totals are published above, currently
+`0 / 0 / 0` in the live lane for the same seam-captures-upstream reason
+as the control-flow counters. Remaining Batch 2 members (`ocAddress`,
+`ocIndirect`, `ocIndex`, `ocMultiArea`) will follow once the address-text
+resolution and INDEX matrix-materialization contracts are designed.
 
 Remaining Batch 1 members (`ocIfs_MS`, `ocSwitch_MS`, `ocIfError`,
 `ocIfNA`, `ocLet`) already delegate to `api::logic` / `seswitchexec`
