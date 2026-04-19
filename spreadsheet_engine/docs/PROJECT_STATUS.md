@@ -45,7 +45,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=62`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=15`
+- `interp4_dispatch_engine_attempt_count=18`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -55,6 +55,9 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_controlflow_engine_attempted_total=0`
 - `interp4_dispatch_controlflow_engine_succeeded_total=0`
 - `interp4_dispatch_controlflow_engine_declined_total=0`
+- `interp4_dispatch_reference_engine_attempted_total=0`
+- `interp4_dispatch_reference_engine_succeeded_total=0`
+- `interp4_dispatch_reference_engine_declined_total=0`
 - `sc_formula_executor_formula_cell_interpret_total_live=2446901`
 - `sc_formula_executor_formula_group_attempt_total_live=1220544`
 - `sc_formula_executor_formula_group_handled_total_live=105`
@@ -111,6 +114,19 @@ has its own accounting independent of the scalar-operator counters; they
 stay at `0 / 0 / 0` on the live corpus because the upstream seam captures
 virtually all IF traffic before reaching `Interpret()`, matching the
 expected shape documented in the initiative policy.
+
+Batch 2 substrate (`runtime/RpnReference.hxx`) has now landed together with
+its first admission: `ocColumn` / `ocRow` / `ocSheet` with no argument or a
+single-reference argument now try the engine-native `planAxisOrdinal`
+before falling back to the legacy `ScColumn` / `ScRow` / `ScSheet`. Matrix-
+context no-arg, external-ref, double-ref, and any other shape defer to
+legacy so the matrix-axis expansion and external-ref resolution stay with
+legacy until the reference-resolution host contract is widened later in
+Batch 2. Three new `reference_engine_*` runtime totals are published above,
+currently `0 / 0 / 0` in the live lane for the same seam-captures-upstream
+reason as the control-flow counters. The full legacy lane will pick up the
+three new attempt sites as subsequent admissions (span-count, INDEX,
+OFFSET, INDIRECT) land.
 The current value reflects the restored original `Sc*` names after backing out
 earlier rename-only metric compression, and the quarantine audit currently
 shows `62 / 62` dispatch-reachable legacy lambdas warning when reached. This
