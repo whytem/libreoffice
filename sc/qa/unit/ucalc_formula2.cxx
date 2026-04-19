@@ -983,6 +983,89 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterCriteriaCountIfDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterDatabaseDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"DB"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    // Database at A1:C5 with header row:
+    //   Region | Amount | Quantity
+    //   West   | 100    | 10
+    //   East   | 200    | 20
+    //   West   | 300    | 15
+    //   North  | 150    | 5
+    m_pDoc->SetString(ScAddress(0, 0, 0), u"Region"_ustr);
+    m_pDoc->SetString(ScAddress(1, 0, 0), u"Amount"_ustr);
+    m_pDoc->SetString(ScAddress(2, 0, 0), u"Quantity"_ustr);
+    m_pDoc->SetString(ScAddress(0, 1, 0), u"West"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 1, 0), 100.0);
+    m_pDoc->SetValue(ScAddress(2, 1, 0), 10.0);
+    m_pDoc->SetString(ScAddress(0, 2, 0), u"East"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 2, 0), 200.0);
+    m_pDoc->SetValue(ScAddress(2, 2, 0), 20.0);
+    m_pDoc->SetString(ScAddress(0, 3, 0), u"West"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 3, 0), 300.0);
+    m_pDoc->SetValue(ScAddress(2, 3, 0), 15.0);
+    m_pDoc->SetString(ScAddress(0, 4, 0), u"North"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 4, 0), 150.0);
+    m_pDoc->SetValue(ScAddress(2, 4, 0), 5.0);
+
+    // Criteria at E1:F2:
+    //   Region | Amount
+    //   West   | (empty)
+    m_pDoc->SetString(ScAddress(4, 0, 0), u"Region"_ustr);
+    m_pDoc->SetString(ScAddress(5, 0, 0), u"Amount"_ustr);
+    m_pDoc->SetString(ScAddress(4, 1, 0), u"West"_ustr);
+
+    // DSUM(A1:C5, "Amount", E1:F2) -> 100+300 = 400
+    m_pDoc->SetString(ScAddress(7, 0, 0),
+                      u"=DSUM(A1:C5;\"Amount\";E1:F2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(400.0, m_pDoc->GetValue(ScAddress(7, 0, 0)));
+
+    // DSUM(A1:C5, 2, E1:F2) with integer field index -> same 400
+    m_pDoc->SetString(ScAddress(7, 1, 0), u"=DSUM(A1:C5;2;E1:F2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(400.0, m_pDoc->GetValue(ScAddress(7, 1, 0)));
+
+    // DMAX(A1:C5, "Amount", E1:F2) -> 300
+    m_pDoc->SetString(ScAddress(7, 2, 0),
+                      u"=DMAX(A1:C5;\"Amount\";E1:F2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(300.0, m_pDoc->GetValue(ScAddress(7, 2, 0)));
+
+    // DMIN(A1:C5, "Amount", E1:F2) -> 100
+    m_pDoc->SetString(ScAddress(7, 3, 0),
+                      u"=DMIN(A1:C5;\"Amount\";E1:F2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(100.0, m_pDoc->GetValue(ScAddress(7, 3, 0)));
+
+    // DAVERAGE(A1:C5, "Amount", E1:F2) -> 200
+    m_pDoc->SetString(ScAddress(7, 4, 0),
+                      u"=DAVERAGE(A1:C5;\"Amount\";E1:F2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(200.0, m_pDoc->GetValue(ScAddress(7, 4, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "criteria_attempted="
+          + std::to_string(aDispatchStats.mnCriteriaEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnCriteriaEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnCriteriaEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "DB functions should attempt engine dispatch: " + aLabel,
+        aDispatchStats.mnCriteriaEngineAttemptedCount >= 5);
+    CPPUNIT_ASSERT_MESSAGE(
+        "DB functions should succeed through engine: " + aLabel,
+        aDispatchStats.mnCriteriaEngineSucceededCount >= 5);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAddressDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);

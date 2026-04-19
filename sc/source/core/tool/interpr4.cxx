@@ -8065,6 +8065,328 @@ StackVar ScInterpreter::Interpret()
                         sequery::CriteriaAggregateKind::Count, false);
                 };
 
+                // Batch 3 DB family admission (DSUM / DCOUNT / DAVERAGE
+                // / DMAX / DMIN). The 3-arg shape is
+                // (database_range, field, criteria_range). Scope fence:
+                // both ranges must be single-sheet svDoubleRef; field
+                // must be a scalar svDouble (1-based column index) or
+                // svString (matching a database header); criteria range
+                // must have a header row plus exactly one data row
+                // (multi-row OR criteria defer to legacy).
+                const auto tryPlanEngineDatabaseAggregate
+                    = [&](sequery::CriteriaAggregateKind eKind) -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnCriteriaEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount != 3 || sp < 3)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const FormulaToken* pCriteriaTok = pStack[sp - 1];
+                    const FormulaToken* pFieldTok = pStack[sp - 2];
+                    const FormulaToken* pDbTok = pStack[sp - 3];
+
+                    if (!pDbTok || !pFieldTok || !pCriteriaTok
+                        || pDbTok->GetType() != svDoubleRef
+                        || pCriteriaTok->GetType() != svDoubleRef)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const ScRange aDbRange
+                        = pDbTok->GetDoubleRef()->toAbs(mrDoc, aPos);
+                    const ScRange aCriteriaRange
+                        = pCriteriaTok->GetDoubleRef()->toAbs(mrDoc, aPos);
+                    if (aDbRange.aStart.Tab() != aDbRange.aEnd.Tab()
+                        || aCriteriaRange.aStart.Tab() != aCriteriaRange.aEnd.Tab())
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const SCROW nDbRowCount
+                        = aDbRange.aEnd.Row() - aDbRange.aStart.Row() + 1;
+                    const SCROW nCriteriaRowCount
+                        = aCriteriaRange.aEnd.Row() - aCriteriaRange.aStart.Row() + 1;
+                    // Need header + at least one data row on both sides;
+                    // and (scope fence) exactly one criteria data row.
+                    if (nDbRowCount < 2 || nCriteriaRowCount != 2)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+
+                    // Field resolution.
+                    std::optional<SCCOL> oFieldColumn;
+                    if (pFieldTok->GetType() == svDouble)
+                    {
+                        const double fIdx = pFieldTok->GetDouble();
+                        const SCCOL nDbCols
+                            = aDbRange.aEnd.Col() - aDbRange.aStart.Col() + 1;
+                        if (fIdx < 1.0
+                            || fIdx > static_cast<double>(nDbCols))
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnCriteriaEngineDeclinedCount);
+                            return false;
+                        }
+                        oFieldColumn = aDbRange.aStart.Col()
+                                       + static_cast<SCCOL>(fIdx) - 1;
+                    }
+                    else if (pFieldTok->GetType() == svString)
+                    {
+                        const OUString aFieldName
+                            = pFieldTok->GetString().getString();
+                        for (SCCOL nCol = aDbRange.aStart.Col();
+                             nCol <= aDbRange.aEnd.Col(); ++nCol)
+                        {
+                            const ScAddress aHdr(
+                                nCol, aDbRange.aStart.Row(), aDbRange.aStart.Tab());
+                            const auto aHdrVal = seitee::detail::readMaterializedHostCellValue(
+                                mrDoc, mrContext, aHdr);
+                            if (aHdrVal.meKind
+                                    == spreadsheetengine::api::CellValueKind::Text
+                                && aHdrVal.maString
+                                       == spreadsheetengine::api::StringView(
+                                           aFieldName.getStr(),
+                                           aFieldName.getLength()))
+                            {
+                                oFieldColumn = nCol;
+                                break;
+                            }
+                        }
+                    }
+                    // DCOUNT may have missing field (count all matching
+                    // rows regardless of field). Defer that case.
+                    if (!oFieldColumn)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+
+                    // Walk criteria columns. For each criteria column
+                    // where the data cell is non-empty, find the matching
+                    // database column by header text.
+                    std::vector<sequery::CriteriaAggregateInput> aRanges;
+                    std::vector<sequery::CriteriaPredicate> aPredicates;
+                    const SCROW nCriteriaDataRow
+                        = aCriteriaRange.aStart.Row() + 1;
+                    for (SCCOL nCritCol = aCriteriaRange.aStart.Col();
+                         nCritCol <= aCriteriaRange.aEnd.Col(); ++nCritCol)
+                    {
+                        const ScAddress aCritDataAddr(
+                            nCritCol, nCriteriaDataRow, aCriteriaRange.aStart.Tab());
+                        const auto aCritDataVal = seitee::detail::readMaterializedHostCellValue(
+                            mrDoc, mrContext, aCritDataAddr);
+                        if (aCritDataVal.meKind
+                            == spreadsheetengine::api::CellValueKind::Empty)
+                        {
+                            continue;
+                        }
+
+                        const ScAddress aCritHdrAddr(
+                            nCritCol, aCriteriaRange.aStart.Row(),
+                            aCriteriaRange.aStart.Tab());
+                        const auto aCritHdrVal = seitee::detail::readMaterializedHostCellValue(
+                            mrDoc, mrContext, aCritHdrAddr);
+                        if (aCritHdrVal.meKind
+                            != spreadsheetengine::api::CellValueKind::Text)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnCriteriaEngineDeclinedCount);
+                            return false;
+                        }
+
+                        // Find matching database column.
+                        std::optional<SCCOL> oMatchedCol;
+                        for (SCCOL nDbCol = aDbRange.aStart.Col();
+                             nDbCol <= aDbRange.aEnd.Col(); ++nDbCol)
+                        {
+                            const ScAddress aDbHdrAddr(
+                                nDbCol, aDbRange.aStart.Row(),
+                                aDbRange.aStart.Tab());
+                            const auto aDbHdrVal
+                                = seitee::detail::readMaterializedHostCellValue(
+                                    mrDoc, mrContext, aDbHdrAddr);
+                            if (aDbHdrVal.meKind
+                                    == spreadsheetengine::api::CellValueKind::Text
+                                && aDbHdrVal.maString == aCritHdrVal.maString)
+                            {
+                                oMatchedCol = nDbCol;
+                                break;
+                            }
+                        }
+                        if (!oMatchedCol)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnCriteriaEngineDeclinedCount);
+                            return false;
+                        }
+
+                        // Build predicate from criterion value.
+                        serpn::RpnValue aCriterion;
+                        switch (aCritDataVal.meKind)
+                        {
+                            case spreadsheetengine::api::CellValueKind::Number:
+                                aCriterion = serpn::RpnValue::number(
+                                    aCritDataVal.mfNumber);
+                                break;
+                            case spreadsheetengine::api::CellValueKind::Text:
+                                aCriterion = serpn::RpnValue::text(
+                                    aCritDataVal.maString);
+                                break;
+                            case spreadsheetengine::api::CellValueKind::Boolean:
+                                aCriterion = serpn::RpnValue::boolean(
+                                    aCritDataVal.mfNumber != 0.0);
+                                break;
+                            default:
+                                addDispatchRuntimeStat(
+                                    interpreterDispatchRuntimeStatsStore()
+                                        .mnCriteriaEngineDeclinedCount);
+                                return false;
+                        }
+                        const auto aPredicate = serpn::buildCriteriaPredicate(
+                            aCriterion,
+                            sedatetime::parseStandaloneNumberText,
+                            secoercion::parseAsciiDouble);
+                        if (!aPredicate
+                            || aPredicate.meReadiness
+                                   != serpn::RpnCoercionReadiness::Ready)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnCriteriaEngineDeclinedCount);
+                            return false;
+                        }
+
+                        // Build CriteriaAggregateInput spanning the
+                        // matched database column's data rows.
+                        sequery::CriteriaAggregateInput aRangeInput;
+                        aRangeInput.mbScalar = false;
+                        aRangeInput.maReference.maRange.maStart = {
+                            static_cast<spreadsheetengine::api::SheetId>(
+                                aDbRange.aStart.Tab()),
+                            static_cast<spreadsheetengine::api::ColumnIndex>(
+                                *oMatchedCol),
+                            static_cast<spreadsheetengine::api::RowIndex>(
+                                aDbRange.aStart.Row() + 1)
+                        };
+                        aRangeInput.maReference.maRange.maEnd = {
+                            static_cast<spreadsheetengine::api::SheetId>(
+                                aDbRange.aStart.Tab()),
+                            static_cast<spreadsheetengine::api::ColumnIndex>(
+                                *oMatchedCol),
+                            static_cast<spreadsheetengine::api::RowIndex>(
+                                aDbRange.aEnd.Row())
+                        };
+                        aRangeInput.mnColumns = 1;
+                        aRangeInput.mnRows
+                            = static_cast<spreadsheetengine::api::MatrixSize>(
+                                nDbRowCount - 1);
+
+                        aRanges.push_back(aRangeInput);
+                        aPredicates.push_back(aPredicate.maValue);
+                    }
+
+                    if (aRanges.empty())
+                    {
+                        // No criteria → all rows match. Bridge by
+                        // treating the first database column as criterion
+                        // range with a "non-empty" predicate equivalent.
+                        // Decline for now; legacy handles this fine.
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+
+                    // Target range = field column's data rows.
+                    sequery::CriteriaAggregateInput aTargetInput;
+                    aTargetInput.mbScalar = false;
+                    aTargetInput.maReference.maRange.maStart = {
+                        static_cast<spreadsheetengine::api::SheetId>(
+                            aDbRange.aStart.Tab()),
+                        static_cast<spreadsheetengine::api::ColumnIndex>(
+                            *oFieldColumn),
+                        static_cast<spreadsheetengine::api::RowIndex>(
+                            aDbRange.aStart.Row() + 1)
+                    };
+                    aTargetInput.maReference.maRange.maEnd = {
+                        static_cast<spreadsheetengine::api::SheetId>(
+                            aDbRange.aStart.Tab()),
+                        static_cast<spreadsheetengine::api::ColumnIndex>(
+                            *oFieldColumn),
+                        static_cast<spreadsheetengine::api::RowIndex>(
+                            aDbRange.aEnd.Row())
+                    };
+                    aTargetInput.mnColumns = 1;
+                    aTargetInput.mnRows
+                        = static_cast<spreadsheetengine::api::MatrixSize>(
+                            nDbRowCount - 1);
+
+                    serpn::MultiCriterionAggregateRequest aRequest;
+                    aRequest.maCriteriaRanges = std::move(aRanges);
+                    aRequest.maCriteria = std::move(aPredicates);
+                    aRequest.moTargetRange = aTargetInput;
+                    aRequest.meKind = eKind;
+                    aRequest.meSearchType
+                        = seitee::detail::searchTypeFromDocument(mrDoc);
+                    aRequest.mbMatchWholeCell = true;
+
+                    const seitee::detail::CriteriaAggregateMaterializer aMaterializer(
+                        mrDoc, mrContext);
+                    const auto aResult = serpn::planMultiCriterionAggregate(
+                        aMaterializer, aRequest);
+                    if (!aResult
+                        || aResult.meReadiness
+                               != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnCriteriaEngineDeclinedCount);
+                        return false;
+                    }
+
+                    sp -= nParamCount;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnCriteriaEngineSucceededCount);
+
+                    switch (aResult.maValue.meKind)
+                    {
+                        case spreadsheetengine::api::CellValueKind::Number:
+                            PushDouble(aResult.maValue.mfNumber);
+                            break;
+                        case spreadsheetengine::api::CellValueKind::Error:
+                            PushError(selibreoffice::toFormulaError(
+                                aResult.maValue.meError));
+                            break;
+                        default:
+                            PushError(FormulaError::IllegalArgument);
+                            break;
+                    }
+                    return true;
+                };
+
                 // Batch 3 multi-criterion admissions: COUNTIFS, SUMIFS,
                 // AVERAGEIFS, MINIFS_MS, MAXIFS_MS. All take N parallel
                 // (criteria_range, criterion) pairs plus an optional
@@ -10571,13 +10893,29 @@ StackVar ScInterpreter::Interpret()
                             "family-local default-on AGGREGATE reached ScInterpreter");
                         seinterpcompatdispatch::Dispatcher::aggregateFunction(*this);
                         break;
-                    case ocDBSum            : ScDBSum();                    break;
+                    case ocDBSum            :
+                        if (!tryPlanEngineDatabaseAggregate(
+                                sequery::CriteriaAggregateKind::Sum))
+                            ScDBSum();
+                        break;
                     case ocDBCount          : ScDBCount();                  break;
                     case ocDBCount2         : ScDBCount2();                 break;
-                    case ocDBAverage        : ScDBAverage();                break;
+                    case ocDBAverage        :
+                        if (!tryPlanEngineDatabaseAggregate(
+                                sequery::CriteriaAggregateKind::Average))
+                            ScDBAverage();
+                        break;
                     case ocDBGet            : ScDBGet();                    break;
-                    case ocDBMax            : ScDBMax();                    break;
-                    case ocDBMin            : ScDBMin();                    break;
+                    case ocDBMax            :
+                        if (!tryPlanEngineDatabaseAggregate(
+                                sequery::CriteriaAggregateKind::Max))
+                            ScDBMax();
+                        break;
+                    case ocDBMin            :
+                        if (!tryPlanEngineDatabaseAggregate(
+                                sequery::CriteriaAggregateKind::Min))
+                            ScDBMin();
+                        break;
                     case ocDBProduct        : ScDBProduct();                break;
                     case ocDBStdDev         : ScDBStdDev();                 break;
                     case ocDBStdDevP        : ScDBStdDevP();                break;
