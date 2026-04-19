@@ -11710,8 +11710,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     if (rNode.maChildren.size() != 1)
         return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-    if ((bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
-        && containsReferenceLikeDescendant(rNode))
+    if (bImportedCanonicalSource && containsReferenceLikeDescendant(rNode))
     {
         return makeErrorResult(eFunction, api::Error::VariableExpected);
     }
