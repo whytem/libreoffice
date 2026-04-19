@@ -8078,13 +8078,14 @@ StackVar ScInterpreter::Interpret()
                         sequery::CriteriaAggregateKind::Count, false);
                 };
 
-                // Batch 4 pure-scalar-input matrix admissions: MUNIT
-                // (ocMatrixUnit) and MSEQUENCE (ocMatSequence). These
-                // produce matrices without requiring host-side range
-                // materialization, so they cleanly demonstrate the
-                // RpnMatrix substrate end-to-end. Matrix-consuming
-                // opcodes (MDETERM / MINVERSE / MMULT / TRANSPOSE / the
-                // SUMPRODUCT family) need the reference-to-matrix host
+                // Batch 4 matrix admissions. The pure-scalar-input
+                // constructors (MUNIT / MSEQUENCE) demonstrate the
+                // RpnMatrix substrate end-to-end without host-side
+                // range materialization; TRANSPOSE additionally
+                // exercises the matrix-consuming path by accepting an
+                // in-memory svMatrix token. Reference-consuming matrix
+                // opcodes (MDETERM / MINVERSE / MMULT / the SUMPRODUCT
+                // family) still need the full reference-to-matrix
                 // materialization contract and are deferred.
                 const auto convertMatrixOperandToMatrixRef
                     = [&](const serpn::MatrixOperand& rOperand) -> ScMatrixRef {
@@ -8128,6 +8129,63 @@ StackVar ScInterpreter::Interpret()
                         }
                     }
                     return pResult;
+                };
+
+                const auto convertMatrixRefToMatrixOperand
+                    = [&](const ScMatrix& rMat) -> std::optional<serpn::MatrixOperand> {
+                    SCSIZE nCols = 0;
+                    SCSIZE nRows = 0;
+                    rMat.GetDimensions(nCols, nRows);
+                    if (nCols == 0 || nRows == 0)
+                        return std::nullopt;
+                    serpn::MatrixOperand aOperand;
+                    aOperand.maDimensions.mnColumns
+                        = static_cast<spreadsheetengine::api::MatrixSize>(nCols);
+                    aOperand.maDimensions.mnRows
+                        = static_cast<spreadsheetengine::api::MatrixSize>(nRows);
+                    aOperand.maValues.reserve(static_cast<std::size_t>(nRows) * nCols);
+                    for (SCSIZE r = 0; r < nRows; ++r)
+                    {
+                        for (SCSIZE c = 0; c < nCols; ++c)
+                        {
+                            if (rMat.IsStringOrEmpty(c, r))
+                            {
+                                if (rMat.IsEmpty(c, r))
+                                {
+                                    aOperand.maValues.push_back(
+                                        spreadsheetengine::api::CellValue::empty());
+                                }
+                                else
+                                {
+                                    aOperand.maValues.push_back(
+                                        spreadsheetengine::api::CellValue::text(
+                                            selibreoffice::toApiString(
+                                                rMat.GetString(c, r).getString())));
+                                }
+                                continue;
+                            }
+                            const FormulaError eErr = rMat.GetErrorIfNotString(c, r);
+                            if (eErr != FormulaError::NONE)
+                            {
+                                aOperand.maValues.push_back(
+                                    spreadsheetengine::api::CellValue::error(
+                                        selibreoffice::toApiError(eErr)));
+                                continue;
+                            }
+                            const double fValue = rMat.GetDouble(c, r);
+                            if (rMat.IsBoolean(c, r))
+                            {
+                                aOperand.maValues.push_back(
+                                    spreadsheetengine::api::CellValue::boolean(fValue != 0.0));
+                            }
+                            else
+                            {
+                                aOperand.maValues.push_back(
+                                    spreadsheetengine::api::CellValue::number(fValue));
+                            }
+                        }
+                    }
+                    return aOperand;
                 };
 
                 const auto tryPlanEngineIdentityMatrix = [&]() -> bool {
@@ -8273,6 +8331,73 @@ StackVar ScInterpreter::Interpret()
                         interpreterDispatchRuntimeStatsStore()
                             .mnMatrixEngineSucceededCount);
                     PushMatrix(pMat);
+                    return true;
+                };
+
+                const auto tryPlanEngineTranspose = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount != 1 || !sp)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    // Scope fence: admit only in-memory matrix
+                    // operands. Range tokens (svDoubleRef / svSingleRef
+                    // / svRefList) still need the reference-to-matrix
+                    // materialization contract and defer to legacy.
+                    const FormulaToken* pTok = pStack[sp - 1];
+                    if (!pTok || pTok->GetType() != svMatrix)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    ScMatrix* pSourceMat = const_cast<FormulaToken*>(pTok)->GetMatrix();
+                    if (!pSourceMat)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    auto oOperand = convertMatrixRefToMatrixOperand(*pSourceMat);
+                    if (!oOperand)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    const auto aPlan = serpn::planTranspose(*oOperand);
+                    if (!aPlan
+                        || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    ScMatrixRef pResult = convertMatrixOperandToMatrixRef(aPlan.maValue);
+                    if (!pResult)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    sp -= 1;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineSucceededCount);
+                    PushMatrix(pResult);
                     return true;
                 };
 
@@ -10734,8 +10859,8 @@ StackVar ScInterpreter::Interpret()
                         warnIfLegacyNumericAggregateReached(u"AVERAGEA");
                         seinterpcompatdispatch::Dispatcher::aggregateAverage(*this, true);
                         break;
-                    case ocCount            : ScCount();                    break;
-                    case ocCount2           : ScCount2();                   break;
+                    case ocCount            : IterateParameters(ifCOUNT);   break;
+                    case ocCount2           : IterateParameters(ifCOUNT2);  break;
                     case ocVar              :
                     case ocVarS:
                         warnIfLegacyStatisticalAggregateReached(u"VAR.S");
@@ -11315,7 +11440,10 @@ StackVar ScInterpreter::Interpret()
                         if (!tryPlanEngineSequenceMatrix())
                             ScMatSequence();
                         break;
-                    case ocMatTrans         : ScMatTrans();                 break;
+                    case ocMatTrans         :
+                        if (!tryPlanEngineTranspose())
+                            ScMatTrans();
+                        break;
                     case ocMatRef           : ScMatRef();                   break;
                     case ocB:
                     {
@@ -11685,7 +11813,7 @@ StackVar ScInterpreter::Interpret()
                                     bCumulative, bMicrosoftSyntax));
                     }
                     break;
-                    case ocNoName           : ScNoName();               break;
+                    case ocNoName           : PushError(FormulaError::NoName); break;
                     case ocBad              :
                         if (!tryPushEngineBadLiteralError())
                         {

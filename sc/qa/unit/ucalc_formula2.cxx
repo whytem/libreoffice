@@ -1289,6 +1289,82 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAxisOrdinalDisp
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterMatrixEngineDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"Matrix"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+
+    // MUNIT(3): pure-scalar identity matrix via planIdentityMatrix.
+    m_pDoc->InsertMatrixFormula(0, 0, 2, 2, aMark, u"=MUNIT(3)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
+    ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(ScAddress(1, 0, 0)));
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(1, 1, 0)));
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(2, 2, 0)));
+
+    // SEQUENCE(2;3;10;5): (rows, cols, start, step) = {10,15,20 / 25,30,35}.
+    m_pDoc->InsertMatrixFormula(0, 4, 2, 5, aMark, u"=SEQUENCE(2;3;10;5)"_ustr);
+    ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(ScAddress(0, 4, 0)));
+    ASSERT_DOUBLES_EQUAL(15.0, m_pDoc->GetValue(ScAddress(1, 4, 0)));
+    ASSERT_DOUBLES_EQUAL(20.0, m_pDoc->GetValue(ScAddress(2, 4, 0)));
+    ASSERT_DOUBLES_EQUAL(25.0, m_pDoc->GetValue(ScAddress(0, 5, 0)));
+    ASSERT_DOUBLES_EQUAL(35.0, m_pDoc->GetValue(ScAddress(2, 5, 0)));
+
+    // TRANSPOSE(MUNIT(2)) — matrix-consuming engine path: the
+    // MUNIT result is an svMatrix token, which the engine path
+    // accepts.
+    m_pDoc->InsertMatrixFormula(0, 8, 1, 9, aMark, u"=TRANSPOSE(MUNIT(2))"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 8, 0)));
+    ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(ScAddress(1, 8, 0)));
+    ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(ScAddress(0, 9, 0)));
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(1, 9, 0)));
+
+    // Cell-range source: insertion as an array formula still exercises
+    // the engine-admission path because the parameter classifier
+    // materializes the range into an svMatrix token before dispatch.
+    m_pDoc->SetValue(ScAddress(4, 0, 0), 1.0);
+    m_pDoc->SetValue(ScAddress(5, 0, 0), 2.0);
+    m_pDoc->SetValue(ScAddress(6, 0, 0), 3.0);
+    m_pDoc->SetValue(ScAddress(4, 1, 0), 4.0);
+    m_pDoc->SetValue(ScAddress(5, 1, 0), 5.0);
+    m_pDoc->SetValue(ScAddress(6, 1, 0), 6.0);
+    m_pDoc->InsertMatrixFormula(0, 12, 1, 14, aMark, u"=TRANSPOSE(E1:G2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 12, 0)));
+    ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(ScAddress(1, 12, 0)));
+    ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(ScAddress(1, 14, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "matrix_attempted="
+          + std::to_string(aDispatchStats.mnMatrixEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnMatrixEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnMatrixEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "MUNIT/SEQUENCE/TRANSPOSE should attempt engine dispatch: " + aLabel,
+        aDispatchStats.mnMatrixEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "pure-scalar and svMatrix inputs should succeed through engine: " + aLabel,
+        aDispatchStats.mnMatrixEngineSucceededCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "matrix dispatch accounting should stay balanced: " + aLabel,
+        aDispatchStats.mnMatrixEngineAttemptedCount,
+        aDispatchStats.mnMatrixEngineSucceededCount
+            + aDispatchStats.mnMatrixEngineDeclinedCount);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
