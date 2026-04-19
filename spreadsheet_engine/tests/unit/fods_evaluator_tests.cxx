@@ -1635,8 +1635,19 @@ int main()
             }
             return true;
         };
+        const auto checkExactError = [&](const char* pLabel, const auto& rResult,
+                                         spreadsheetengine::api::Error eExpected) -> bool {
+            if (!rResult || rResult.mbUsedCachedValue || !rResult.maValue.maValue.isError()
+                || rResult.maValue.maValue.meError != eExpected)
+            {
+                return reportErrorTypeMismatch(pLabel);
+            }
+            return true;
+        };
 
         const CellAddress aSheet2Origin { 1, 0, 0 };
+        const auto aLiteralName
+            = aErrorTypeEvaluator.evaluateFormula(u"of:#NAME?", aSheet2Origin);
         const auto aNa = aErrorTypeEvaluator.evaluateFormula(u"of:=ERROR.TYPE(NA())", aSheet2Origin);
         const auto aRef
             = aErrorTypeEvaluator.evaluateFormula(u"of:=ERROR.TYPE(#REF!)", aSheet2Origin);
@@ -1657,6 +1668,8 @@ int main()
 
         const auto aCompiledNa = aErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=ERROR.TYPE(NA())", aSheet2Origin);
+        const auto aCompiledLiteralName = aErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
+            u"of:#NAME?", aSheet2Origin);
         const auto aCompiledRef = aErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
             u"of:=ERROR.TYPE(#REF!)", aSheet2Origin);
         const auto aCompiledGettingData = aErrorTypeEvaluator.evaluateFormulaViaCompiledTokens(
@@ -1716,7 +1729,8 @@ int main()
         const auto aCompiledLegacyCellA19
             = aLegacyErrorTypeEvaluator.evaluateCellViaCompiledTokens({ 1, 0, 18 });
 
-        if (!checkErrorTypeNumber("ERROR.TYPE(NA())", aNa, 7.0)
+        if (!checkExactError("literal #NAME?", aLiteralName, spreadsheetengine::api::Error::NoName)
+            || !checkErrorTypeNumber("ERROR.TYPE(NA())", aNa, 7.0)
             || !checkErrorTypeNumber("ERROR.TYPE(#REF!)", aRef, 4.0)
             || !checkErrorTypeValueError("ERROR.TYPE(#getting_data)", aGettingData)
             || !checkErrorTypeNumber("ERROR.TYPE(#NAME?)", aName, 5.0)
@@ -1725,6 +1739,8 @@ int main()
             || !checkErrorTypeNumber("ERROR.TYPE(ahoj)", aUnknownName, 5.0)
             || !checkErrorTypeNa("ERROR.TYPE(5)", aNonError)
             || !checkErrorTypeNumber("ERROR.TYPE({#N/A})", aArrayConstant, 7.0)
+            || !checkExactError(
+                "compiled literal #NAME?", aCompiledLiteralName, spreadsheetengine::api::Error::NoName)
             || !checkErrorTypeNumber("compiled ERROR.TYPE(NA())", aCompiledNa, 7.0)
             || !checkErrorTypeNumber("compiled ERROR.TYPE(#REF!)", aCompiledRef, 4.0)
             || !checkErrorTypeValueError(

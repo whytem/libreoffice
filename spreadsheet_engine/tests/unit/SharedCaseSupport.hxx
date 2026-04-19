@@ -235,6 +235,8 @@ inline api::Error parseExpectedError(std::string_view rValue)
         return api::Error::StringOverflow;
     if (rValue == "NoValue")
         return api::Error::NoValue;
+    if (rValue == "NoName")
+        return api::Error::NoName;
     if (rValue == "Domain")
         return api::Error::Domain;
     if (rValue == "NoConvergence")

@@ -1635,9 +1635,11 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
         return api::Error::DivisionByZero;
     if (rText == u"#VALUE!")
         return api::Error::NoValue;
+    if (rText == u"#NAME?")
+        return api::Error::NoName;
     if (rText == u"#NUM!")
         return api::Error::NoConvergence;
-    if (rText == u"#NAME?" || rText == u"#REF!" || rText == u"#NULL!")
+    if (rText == u"#REF!" || rText == u"#NULL!")
         return api::Error::IllegalArgument;
 
     constexpr api::StringView aErrPrefix = u"#ERR";

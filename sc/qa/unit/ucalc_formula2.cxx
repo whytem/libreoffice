@@ -703,10 +703,13 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
         ScAddress(0, 1, 0), u"of:#ERR504!"_ustr, formula::FormulaGrammar::GRAM_ODFF);
     m_pDoc->SetFormula(
         ScAddress(0, 2, 0), u"[.OF:.ERR]:502"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 3, 0), u"of:#NAME?"_ustr, formula::FormulaGrammar::GRAM_ODFF);
 
     CPPUNIT_ASSERT_EQUAL(FormulaError::NotAvailable, m_pDoc->GetErrCode(ScAddress(0, 0, 0)));
     CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(0, 1, 0)));
     CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(0, 2, 0)));
+    CPPUNIT_ASSERT_EQUAL(FormulaError::NoName, m_pDoc->GetErrCode(ScAddress(0, 3, 0)));
 
     const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
     const std::string aDispatchStatsLabel
@@ -715,10 +718,10 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
           + " declined=" + std::to_string(aDispatchStats.mnEngineDeclinedCount);
     CPPUNIT_ASSERT_MESSAGE("bad literal dispatch should attempt engine evaluation: "
                                + aDispatchStatsLabel,
-                           aDispatchStats.mnEngineAttemptedCount >= 3);
+                           aDispatchStats.mnEngineAttemptedCount >= 4);
     CPPUNIT_ASSERT_MESSAGE("bad literal dispatch should succeed through the engine path: "
                                + aDispatchStatsLabel,
-                           aDispatchStats.mnEngineSucceededCount >= 3);
+                           aDispatchStats.mnEngineSucceededCount >= 4);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("bad literal dispatch should not need legacy fallback here: "
                                      + aDispatchStatsLabel,
                                  sal_uInt64(0),

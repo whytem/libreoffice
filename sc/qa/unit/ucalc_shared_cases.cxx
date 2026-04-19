@@ -264,6 +264,8 @@ FormulaError parseExpectedError(std::string_view rValue)
         return FormulaError::StringOverflow;
     if (rValue == "NoValue")
         return FormulaError::NoValue;
+    if (rValue == "NoName")
+        return FormulaError::NoName;
     if (rValue == "Domain")
         return FormulaError::IllegalFPOperation;
     if (rValue == "NoConvergence")

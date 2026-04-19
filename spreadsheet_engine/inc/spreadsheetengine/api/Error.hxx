@@ -23,6 +23,7 @@ enum class Error
     Domain,
     StringOverflow,
     NoValue,
+    NoName,
     NoConvergence,
     NotAvailable
 };

@@ -798,7 +798,6 @@ public:
     void ScLinest();
     void ScLogest();
     void ScFourier();
-    void ScNoName();
     // Statistics:
 public:
     static double gaussinv(double x);
@@ -822,6 +821,7 @@ private:
     void ScFrequency();
     void ScTrend();
     void ScInfo();
+    void ScNoName();
 
     void ScFilterXML();
     void ScWebservice();

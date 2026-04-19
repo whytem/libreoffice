@@ -56,9 +56,11 @@ namespace secompiler = spreadsheetengine::detail::compiler;
         return api::Error::DivisionByZero;
     if (rText == u"#VALUE!")
         return api::Error::NoValue;
+    if (rText == u"#NAME?")
+        return api::Error::NoName;
     if (rText == u"#NUM!")
         return api::Error::NoConvergence;
-    if (rText == u"#NAME?" || rText == u"#REF!" || rText == u"#NULL!")
+    if (rText == u"#REF!" || rText == u"#NULL!")
         return api::Error::IllegalArgument;
     const std::size_t nColon = rText.rfind(u':');
     if (nColon != api::StringView::npos && nColon + 1 < rText.size())
@@ -220,6 +222,8 @@ std::optional<std::int16_t> classifyOdfErrorType(api::Error eError)
             return 2;
         case api::Error::NoValue:
             return 3;
+        case api::Error::NoName:
+            return 5;
         case api::Error::NoConvergence:
         case api::Error::Domain:
             return 6;
@@ -297,6 +301,8 @@ std::optional<std::int32_t> classifyLegacyErrorType(api::Error eError)
             return 513;
         case api::Error::NoValue:
             return 519;
+        case api::Error::NoName:
+            return 525;
         case api::Error::NoConvergence:
         case api::Error::Domain:
             return 503;

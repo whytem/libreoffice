@@ -192,6 +192,8 @@ std::string formatError(Error eError)
         case Error::Domain:
         case Error::NoConvergence:
             return "#NUM!";
+        case Error::NoName:
+            return "#NAME?";
         case Error::StringOverflow:
             return "#STRING!";
         case Error::NotAvailable:

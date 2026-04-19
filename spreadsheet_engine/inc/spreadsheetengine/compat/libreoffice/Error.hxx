@@ -32,6 +32,8 @@ inline spreadsheetengine::api::Error toApiError(FormulaError eError)
             return spreadsheetengine::api::Error::StringOverflow;
         case FormulaError::NoValue:
             return spreadsheetengine::api::Error::NoValue;
+        case FormulaError::NoName:
+            return spreadsheetengine::api::Error::NoName;
         case FormulaError::NoConvergence:
             return spreadsheetengine::api::Error::NoConvergence;
         case FormulaError::NotAvailable:
@@ -58,6 +60,8 @@ inline FormulaError toFormulaError(spreadsheetengine::api::Error eError)
             return FormulaError::StringOverflow;
         case spreadsheetengine::api::Error::NoValue:
             return FormulaError::NoValue;
+        case spreadsheetengine::api::Error::NoName:
+            return FormulaError::NoName;
         case spreadsheetengine::api::Error::NoConvergence:
             return FormulaError::NoConvergence;
         case spreadsheetengine::api::Error::NotAvailable:
