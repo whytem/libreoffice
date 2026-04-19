@@ -8,6 +8,7 @@
 #include <spreadsheetengine/detail/ExecutionContext.hxx>
 #include <spreadsheetengine/runtime/RpnControlFlow.hxx>
 #include <spreadsheetengine/runtime/RpnOperators.hxx>
+#include <spreadsheetengine/runtime/RpnReference.hxx>
 #include <spreadsheetengine/runtime/RpnValue.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 
@@ -270,6 +271,111 @@ int main()
             || oMissing.has_value())
         {
             return fail("spreadsheetengine_execution_tests", "LetScope contract mismatch");
+        }
+    }
+
+    {
+        using spreadsheetengine::core::rpn::AxisOrdinalKind;
+        using spreadsheetengine::core::rpn::coerceToPositiveIndex;
+        using spreadsheetengine::core::rpn::coerceToSignedOffset;
+        using spreadsheetengine::core::rpn::IndexProjectionParameters;
+        using spreadsheetengine::core::rpn::OffsetParameters;
+        using spreadsheetengine::core::rpn::planAreaCount;
+        using spreadsheetengine::core::rpn::planAxisOrdinal;
+        using spreadsheetengine::core::rpn::planOffset;
+        using spreadsheetengine::core::rpn::planSpanCount;
+        using spreadsheetengine::core::rpn::projectIndexMatrix;
+        using spreadsheetengine::core::rpn::projectIndexReference;
+        using spreadsheetengine::core::rpn::RpnValue;
+        using spreadsheetengine::core::rpn::SpanCountKind;
+
+        const auto aSingleC2R3
+            = RpnValue::reference(ResolvedReference { { { 0, 1, 2 }, { 0, 1, 2 } } });
+        const auto aRangeB2C5
+            = RpnValue::reference(ResolvedReference { { { 0, 1, 1 }, { 0, 2, 4 } } });
+        const auto aMatrix3x2 = RpnValue::matrix({ 3, 2 });
+
+        const auto aColumn = planAxisOrdinal(aSingleC2R3, AxisOrdinalKind::Column);
+        const auto aRow = planAxisOrdinal(aSingleC2R3, AxisOrdinalKind::Row);
+        const auto aSheet = planAxisOrdinal(aSingleC2R3, AxisOrdinalKind::Sheet);
+        const auto aColumnDefer = planAxisOrdinal(RpnValue::number(5.0), AxisOrdinalKind::Column);
+
+        if (!aColumn || aColumn.maValue != 2.0 || !aRow || aRow.maValue != 3.0
+            || !aSheet || aSheet.maValue != 1.0
+            || aColumnDefer
+            || aColumnDefer.meReadiness != RpnCoercionReadiness::NeedsReferenceResolution)
+        {
+            return fail("spreadsheetengine_execution_tests", "planAxisOrdinal contract mismatch");
+        }
+
+        const auto aColumnsRef = planSpanCount(aRangeB2C5, SpanCountKind::Columns);
+        const auto aRowsRef = planSpanCount(aRangeB2C5, SpanCountKind::Rows);
+        const auto aSheetsRef = planSpanCount(aRangeB2C5, SpanCountKind::Sheets);
+        const auto aColumnsMatrix = planSpanCount(aMatrix3x2, SpanCountKind::Columns);
+        const auto aRowsMatrix = planSpanCount(aMatrix3x2, SpanCountKind::Rows);
+
+        if (!aColumnsRef || aColumnsRef.maValue != 2.0
+            || !aRowsRef || aRowsRef.maValue != 4.0
+            || !aSheetsRef || aSheetsRef.maValue != 1.0
+            || !aColumnsMatrix || aColumnsMatrix.maValue != 3.0
+            || !aRowsMatrix || aRowsMatrix.maValue != 2.0)
+        {
+            return fail("spreadsheetengine_execution_tests", "planSpanCount contract mismatch");
+        }
+
+        const auto aThreeAreas = planAreaCount(3);
+        const auto aZeroAreas = planAreaCount(0);
+        if (!aThreeAreas || aThreeAreas.maValue != 3.0
+            || aZeroAreas || aZeroAreas.meError != Error::IllegalArgument)
+        {
+            return fail("spreadsheetengine_execution_tests", "planAreaCount contract mismatch");
+        }
+
+        OffsetParameters aOffsetShift;
+        aOffsetShift.mnRowOffset = 1;
+        aOffsetShift.mnColumnOffset = 1;
+        aOffsetShift.mnMaxColumn = 1023;
+        aOffsetShift.mnMaxRow = 1048575;
+        const auto aOffsetResult = planOffset(aSingleC2R3, aOffsetShift);
+        if (!aOffsetResult
+            || aOffsetResult.maValue.maStart.mnColumn != 2
+            || aOffsetResult.maValue.maStart.mnRow != 3
+            || aOffsetResult.maValue.maEnd.mnColumn != 2
+            || aOffsetResult.maValue.maEnd.mnRow != 3)
+        {
+            return fail("spreadsheetengine_execution_tests", "planOffset contract mismatch");
+        }
+
+        const auto aIdxScalar = coerceToPositiveIndex(RpnValue::number(3.0));
+        const auto aIdxBad = coerceToPositiveIndex(RpnValue::number(0.0));
+        const auto aIdxRef = coerceToPositiveIndex(aSingleC2R3);
+        const auto aOffSigned = coerceToSignedOffset(RpnValue::number(-2.0));
+
+        if (!aIdxScalar || aIdxScalar.maValue != 3
+            || aIdxBad || aIdxBad.meError != Error::IllegalArgument
+            || aIdxRef
+            || aIdxRef.meReadiness != RpnCoercionReadiness::NeedsReferenceResolution
+            || !aOffSigned || aOffSigned.maValue != -2)
+        {
+            return fail("spreadsheetengine_execution_tests", "coerce index/offset contract mismatch");
+        }
+
+        IndexProjectionParameters aProj;
+        aProj.mnRowIndex = 2;
+        aProj.mnColumnIndex = 1;
+        aProj.mbColumnArgumentMissing = false;
+        aProj.mnParamCount = 3;
+        aProj.mnAreaIndex = 1;
+        aProj.mnAreaCount = 1;
+        const auto aRefProj = projectIndexReference(aRangeB2C5, aProj);
+        const auto aMatProj = projectIndexMatrix(aMatrix3x2, aProj);
+        const auto aRefProjDefer = projectIndexReference(aMatrix3x2, aProj);
+
+        if (!aRefProj || !aMatProj
+            || aRefProjDefer
+            || aRefProjDefer.meReadiness != RpnCoercionReadiness::NeedsReferenceResolution)
+        {
+            return fail("spreadsheetengine_execution_tests", "Index projection contract mismatch");
         }
     }
 

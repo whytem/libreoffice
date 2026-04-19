@@ -46,6 +46,7 @@ set(SPREADSHEETENGINE_STANDALONE_PUBLIC_RUNTIME_HEADERS
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/ReferenceText.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/RpnControlFlow.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/RpnOperators.hxx"
+    "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/RpnReference.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/RpnValue.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/ScalarCoercion.hxx"
     "${SPREADSHEETENGINE_ROOT}/inc/spreadsheetengine/runtime/TextCase.hxx"
