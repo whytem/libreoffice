@@ -825,16 +825,6 @@ void ScInterpreter::IterateParameters( ScIterFunc eFunc, bool bTextAsZero )
     }
 }
 
-void ScInterpreter::ScCount()
-{
-    IterateParameters( ifCOUNT );
-}
-
-void ScInterpreter::ScCount2()
-{
-    IterateParameters( ifCOUNT2 );
-}
-
 /**
  * The purpose of RAWSUBTRACT() is exactly to not apply any error correction, approximation etc.
  * But use the "raw" IEEE 754 double subtraction.

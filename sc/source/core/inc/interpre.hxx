@@ -656,8 +656,6 @@ private:
     bool SwitchToArrayRefList( ScMatrixRef& xResMat, SCSIZE nMatRows, double fCurrent,
             const std::function<void( SCSIZE i, double fCurrent )>& MatOpFunc, bool bDoMatOp );
     void IterateParameters( ScIterFunc, bool bTextAsZero = false );
-    void ScCount();
-    void ScCount2();
     void GetStVarParams( bool bTextAsZero, double(*VarResult)( double fVal, size_t nValCount ) );
     void ScColumns();
     void ScRows();

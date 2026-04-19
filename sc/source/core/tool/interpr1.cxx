@@ -6648,8 +6648,8 @@ void ScInterpreter::ScSubTotal()
         switch( nFunc )
         {
             case SUBTOTAL_FUNC_AVE  : IterateParameters(ifAVERAGE); break;
-            case SUBTOTAL_FUNC_CNT  : ScCount();   break;
-            case SUBTOTAL_FUNC_CNT2 : ScCount2();  break;
+            case SUBTOTAL_FUNC_CNT  : IterateParameters(ifCOUNT);   break;
+            case SUBTOTAL_FUNC_CNT2 : IterateParameters(ifCOUNT2);  break;
             case SUBTOTAL_FUNC_MAX  : pushSubtotalMax();            break;
             case SUBTOTAL_FUNC_MIN  : pushSubtotalMin();            break;
             case SUBTOTAL_FUNC_PROD : IterateParameters(ifPRODUCT); break;
