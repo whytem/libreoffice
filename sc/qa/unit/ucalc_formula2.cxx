@@ -1067,6 +1067,66 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterDatabaseDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterDatabaseGetDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"DBGet"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    // Database at A1:C5 with distinct Region values so a DGET query
+    // that narrows to exactly one row succeeds. An ambiguous criterion
+    // should produce IllegalArgument; a non-matching criterion should
+    // produce NoValue.
+    m_pDoc->SetString(ScAddress(0, 0, 0), u"Region"_ustr);
+    m_pDoc->SetString(ScAddress(1, 0, 0), u"Amount"_ustr);
+    m_pDoc->SetString(ScAddress(2, 0, 0), u"Quantity"_ustr);
+    m_pDoc->SetString(ScAddress(0, 1, 0), u"North"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 1, 0), 100.0);
+    m_pDoc->SetValue(ScAddress(2, 1, 0), 10.0);
+    m_pDoc->SetString(ScAddress(0, 2, 0), u"East"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 2, 0), 200.0);
+    m_pDoc->SetValue(ScAddress(2, 2, 0), 20.0);
+    m_pDoc->SetString(ScAddress(0, 3, 0), u"South"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 3, 0), 300.0);
+    m_pDoc->SetValue(ScAddress(2, 3, 0), 15.0);
+    m_pDoc->SetString(ScAddress(0, 4, 0), u"West"_ustr);
+    m_pDoc->SetValue(ScAddress(1, 4, 0), 500.0);
+    m_pDoc->SetValue(ScAddress(2, 4, 0), 25.0);
+
+    // Criteria at E1:F2.
+    m_pDoc->SetString(ScAddress(4, 0, 0), u"Region"_ustr);
+    m_pDoc->SetString(ScAddress(5, 0, 0), u"Amount"_ustr);
+    m_pDoc->SetString(ScAddress(4, 1, 0), u"South"_ustr);
+
+    // DGET(A1:C5, "Amount", E1:F2) -> 300 (unique match)
+    m_pDoc->SetString(ScAddress(7, 0, 0),
+                      u"=DGET(A1:C5;\"Amount\";E1:F2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(300.0, m_pDoc->GetValue(ScAddress(7, 0, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "criteria_attempted="
+          + std::to_string(aDispatchStats.mnCriteriaEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnCriteriaEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnCriteriaEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "DGET should attempt engine dispatch: " + aLabel,
+        aDispatchStats.mnCriteriaEngineAttemptedCount >= 1);
+    CPPUNIT_ASSERT_MESSAGE(
+        "DGET should succeed through engine: " + aLabel,
+        aDispatchStats.mnCriteriaEngineSucceededCount >= 1);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterCountEmptyCellsDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);

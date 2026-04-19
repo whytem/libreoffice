@@ -202,6 +202,88 @@ struct DatabaseVarianceRequest
     return finalizeVariance(aAccumulator, rRequest.meKind);
 }
 
+// DBGet: uniqueness-enforcing scalar DB lookup. Iterates the criteria
+// grid, keeps the target-range cell for the single matching row if any,
+// and enforces uniqueness. Maps directly onto legacy ScDBGet semantics:
+//   - no matching row     -> FormulaError::NoValue
+//   - exactly one match   -> success (returns that cell's CellValue)
+//   - two or more matches -> FormulaError::IllegalArgument
+//
+// Non-numeric target values are preserved as-is (legacy's
+// pQueryParam->mbSkipString = false behavior): strings, numbers, and
+// booleans all propagate.
+struct DatabaseGetRequest
+{
+    std::vector<core::query::CriteriaAggregateInput> maCriteriaRanges;
+    std::vector<core::query::CriteriaPredicate> maCriteria;
+    core::query::CriteriaAggregateInput maTargetRange;
+    api::query::SearchType meSearchType = api::query::SearchType::Normal;
+    bool mbMatchWholeCell = true;
+};
+
+[[nodiscard]] inline api::ValueResult<api::CellValue> planDatabaseGet(
+    const core::query::CriteriaAggregateMaterializer& rMaterializer,
+    const DatabaseGetRequest& rRequest)
+{
+    if (rRequest.maCriteriaRanges.empty()
+        || rRequest.maCriteriaRanges.size() != rRequest.maCriteria.size())
+    {
+        return api::ValueResult<api::CellValue>::failure(api::Error::IllegalArgument);
+    }
+
+    const auto& rBase = rRequest.maCriteriaRanges.front();
+    for (std::size_t nIndex = 1; nIndex < rRequest.maCriteriaRanges.size(); ++nIndex)
+    {
+        const auto& rOther = rRequest.maCriteriaRanges[nIndex];
+        if (rOther.mnColumns != rBase.mnColumns || rOther.mnRows != rBase.mnRows)
+            return api::ValueResult<api::CellValue>::failure(api::Error::IllegalArgument);
+    }
+    if (rRequest.maTargetRange.mnColumns != rBase.mnColumns
+        || rRequest.maTargetRange.mnRows != rBase.mnRows)
+    {
+        return api::ValueResult<api::CellValue>::failure(api::Error::IllegalArgument);
+    }
+
+    std::optional<api::CellValue> oMatch;
+    for (api::MatrixSize nRow = 0; nRow < rBase.mnRows; ++nRow)
+    {
+        for (api::MatrixSize nCol = 0; nCol < rBase.mnColumns; ++nCol)
+        {
+            const api::MatrixCoordinate aCoord { nCol, nRow };
+            bool bAllMatch = true;
+            for (std::size_t nIndex = 0; nIndex < rRequest.maCriteriaRanges.size(); ++nIndex)
+            {
+                const auto aCandidate
+                    = rMaterializer.materialize(rRequest.maCriteriaRanges[nIndex], aCoord);
+                if (!aCandidate
+                    || !core::query::matchesCriteriaPredicate(rRequest.maCriteria[nIndex],
+                        aCandidate.maValue, rRequest.meSearchType, rRequest.mbMatchWholeCell))
+                {
+                    bAllMatch = false;
+                    break;
+                }
+            }
+            if (!bAllMatch)
+                continue;
+
+            const auto aTarget = rMaterializer.materialize(rRequest.maTargetRange, aCoord);
+            if (!aTarget)
+                return aTarget;
+
+            if (oMatch.has_value())
+            {
+                // Legacy ScDBGet returns IllegalArgument on duplicate.
+                return api::ValueResult<api::CellValue>::failure(api::Error::IllegalArgument);
+            }
+            oMatch = aTarget.maValue;
+        }
+    }
+
+    if (!oMatch.has_value())
+        return api::ValueResult<api::CellValue>::failure(api::Error::NoValue);
+    return api::ValueResult<api::CellValue>::success(*oMatch);
+}
+
 } // namespace spreadsheetengine::core::rpn
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
