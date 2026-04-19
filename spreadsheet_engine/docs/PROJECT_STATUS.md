@@ -148,6 +148,21 @@ matrix-materialization contract. Batch 2 is therefore treated as
 substantively complete; the RPN evaluator initiative advances to Batch 3
 (criteria / database).
 
+Batch 3 substrate (`runtime/RpnCriteria.hxx` + `runtime/RpnDatabase.hxx`)
+has landed as the next checkpoint. `RpnCriteria.hxx` provides
+`buildCriteriaPredicate`, `SingleCriterionAggregateRequest` +
+`planSingleCriterionAggregate` for the IF family, a parallel
+`Multi*` pair for the IFS family, and `countEmptyCells`.
+`RpnDatabase.hxx` defines `DatabaseQueryDescriptor` plus the
+`applyFieldSelector` and `bridgeAggregation` bridges that translate the
+3-argument DB-function shape to the shared criteria-aggregate
+evaluator. All planners dispatch to existing `core::query` primitives
+(`makeCriteriaPredicate`, `matchesCriteriaPredicate`,
+`evaluateCriteriaAggregate`) with RpnValue-aware deferral on reference
+and matrix operands. No opcode routes through the substrate yet —
+Batch 3 admission (COUNTIF / SUMIF / AVERAGEIF and the DB family) is
+the next step.
+
 Remaining Batch 1 members (`ocIfs_MS`, `ocSwitch_MS`, `ocIfError`,
 `ocIfNA`, `ocLet`) already delegate to `api::logic` / `seswitchexec`
 helpers inside their `pushLegacy*` lambdas. They are effectively

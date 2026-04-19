@@ -250,6 +250,44 @@ Checkpoint:
   path stays on legacy `ScIfJumpNotMatrix` until Batch 4 lands the matrix
   operand model
 
+### 4b. Criteria and Database (Batch 3)
+
+The criteria / database family shares a single predicate machinery across
+nine criteria functions (COUNTIF / SUMIF / AVERAGEIF / COUNTIFS / SUMIFS
+/ AVERAGEIFS / MINIFS_MS / MAXIFS_MS / COUNTEMPTY) and twelve database
+functions (DSUM / DCOUNT / DCOUNT2 / DAVERAGE / DGET / DMAX / DMIN /
+DPRODUCT / DSTDEV(P) / DVAR(P)).
+
+Checkpoint:
+
+- the criteria and database substrate now exists in
+  `spreadsheetengine/runtime/RpnCriteria.hxx` and
+  `spreadsheetengine/runtime/RpnDatabase.hxx`
+- it covers:
+  - `buildCriteriaPredicate(RpnValue, parsers)` returning a
+    `core::query::CriteriaPredicate` with explicit reference / matrix
+    deferral
+  - `SingleCriterionAggregateRequest` + `planSingleCriterionAggregate`
+    for the IF family (one criteria range, one predicate, optional
+    aggregation range)
+  - `MultiCriterionAggregateRequest` + `planMultiCriterionAggregate`
+    for the IFS family (N parallel (range, predicate) pairs)
+  - `countEmptyCells` for COUNTBLANK-style scalar iteration
+  - `DatabaseQueryDescriptor` with a 1-based-column-index or
+    header-name field selector and the three canonical references
+    (data range with header, criteria range with header, optional
+    field)
+  - `applyFieldSelector` to bridge RpnValue arguments into the
+    descriptor
+  - `bridgeAggregation` mapping `DatabaseAggregation` to
+    `core::query::CriteriaAggregateKind` for the simple reductions
+    plus flags for variance / stddev / product / get which need their
+    own variant-specific iteration
+- reference and matrix operands defer explicitly through
+  `NeedsReferenceResolution` / `NeedsMatrixMaterialization`
+- no Calc opcode routes through this layer yet; this checkpoint exists
+  to lock the contract before dispatch migration begins
+
 ### 5. Engine Reference & Matrix Frame
 
 Complete the hard substrate for:
