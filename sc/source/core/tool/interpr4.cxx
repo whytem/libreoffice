@@ -12945,11 +12945,17 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocMatSequence      :
                         if (!tryPlanEngineSequenceMatrix())
-                            ScMatSequence();
+                        {
+                            OSL_FAIL("engine-backed SEQUENCE declined ocMatSequence");
+                            PushIllegalArgument();
+                        }
                         break;
                     case ocMatTrans         :
                         if (!tryPlanEngineTranspose())
-                            ScMatTrans();
+                        {
+                            OSL_FAIL("engine-backed TRANSPOSE declined ocMatTrans");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocMatRef           : ScMatRef();                   break;
                     case ocB:

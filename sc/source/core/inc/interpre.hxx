@@ -780,8 +780,6 @@ public:
     void ScMatValue();
     void ScMatInv();
     void ScMatMult();
-    void ScMatSequence();
-    void ScMatTrans();
     void ScMatRef();
     ScMatrixRef MatConcat(const ScMatrixRef& pMat1, const ScMatrixRef& pMat2);
     void ScSumX2MY2();
