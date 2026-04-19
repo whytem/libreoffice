@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <variant>
+
 #include <spreadsheetengine/api/Date.hxx>
 #include <spreadsheetengine/api/Error.hxx>
 #include <spreadsheetengine/api/Matrix.hxx>
@@ -279,6 +281,54 @@ public:
 
     [[nodiscard]] virtual DateParts getNullDate() const = 0;
     [[nodiscard]] virtual String getLocaleTag() const = 0;
+};
+
+// Spill-range allocation contract.  See RpnSpill.hxx for the engine-side
+// planners.  The allocator surfaces `#SPILL!` on collision — this is NEW
+// behavior relative to legacy Calc, which never emits `#SPILL!` from
+// member functions.  Phase 5A admissions do not yet reach the allocator
+// (they PushMatrix directly like legacy ScFilter / ScSort), so only the
+// contract is established here; the host implementation for spill lands
+// with Phase 5B.
+enum class SpillAllocationError : std::uint8_t
+{
+    Collision,
+    OutOfBounds,
+    InvalidShape,
+    InvalidRequest
+};
+
+class SpillRangeAllocator
+{
+public:
+    virtual ~SpillRangeAllocator() = default;
+
+    // Ask the host to reserve a contiguous range of cells for a dynamic-
+    // array result anchored at `rAnchor`.  The host checks the target
+    // rectangle for collisions and returns either the allocated CellRange
+    // or a SpillAllocationError describing why the request cannot be
+    // satisfied.  On Collision the dispatch bridge translates the result
+    // to `#SPILL!`; OutOfBounds / InvalidShape / InvalidRequest surface as
+    // IllegalArgument so the caller can decline cleanly.
+    [[nodiscard]] virtual std::variant<CellRange, SpillAllocationError> allocateSpillRange(
+        const CellAddress& rAnchor, const MatrixDimensions& rDimensions) = 0;
+
+    // Non-destructive collision probe.  Returns true when any cell inside
+    // `rRange` (other than `rAnchor` itself) is non-empty.  Callers use
+    // this as a planning prerequisite before asking the host to commit to
+    // a particular shape.
+    [[nodiscard]] virtual bool checkSpillCollision(const CellRange& rRange) const = 0;
+
+    // Report the sheet position of the formula currently being
+    // evaluated.  Matches `ScInterpreter::aPos` on the libreoffice side;
+    // standalone hosts return whatever anchor the current driver
+    // publishes.
+    [[nodiscard]] virtual CellAddress getCurrentFormulaPosition() const = 0;
+
+    // Record the bounds of the dynamic-array formula after a successful
+    // allocation so the host's downstream machinery (dependency tracking,
+    // draw-layer overlay, etc.) stays in sync with the spilled rectangle.
+    virtual void markArrayFormulaBounds(const CellRange& rRange) = 0;
 };
 
 class EvaluationHost : public CellReader,

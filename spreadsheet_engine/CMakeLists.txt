@@ -118,6 +118,10 @@ add_spreadsheetengine_test(spreadsheetengine_array_tests
     ${SPREADSHEETENGINE_STANDALONE_ARRAY_TEST_SOURCES}
 )
 
+add_spreadsheetengine_test(spreadsheetengine_spill_tests
+    ${SPREADSHEETENGINE_STANDALONE_SPILL_TEST_SOURCES}
+)
+
 add_spreadsheetengine_test(spreadsheetengine_reference_tests
     ${SPREADSHEETENGINE_STANDALONE_REFERENCE_TEST_SOURCES}
 )
