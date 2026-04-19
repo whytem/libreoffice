@@ -3426,6 +3426,13 @@ inline void putScalarIntoMatrix(
         case core::formula::NodeKind::FunctionCall:
         {
             const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+            if (aFunctionName == u"TODAY" && rNode.maChildren.empty())
+            {
+                Date aActDate(Date::SYSTEM);
+                const tools::Long nDiff = aActDate - rContext.NFGetNullDate();
+                return makeMaterializedValue(
+                    api::CellValue::number(static_cast<double>(nDiff)));
+            }
             const FunctionKind eFunction = classifyFunction(aFunctionName);
             if (eFunction == FunctionKind::LogicalConstant && rNode.maChildren.empty())
             {
@@ -5732,6 +5739,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         return false;
 
     const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    if (aFunctionName == u"TODAY" && rNode.maChildren.empty())
+        return true;
     const FunctionKind eFunction = classifyFunction(aFunctionName);
     if (eFunction == FunctionKind::LogicalConstant && rNode.maChildren.empty())
         return true;
@@ -9598,6 +9607,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
         return materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
     };
+
     const auto materializeCalendarDateArgument = [&](const core::formula::Node& rArgument)
         -> Materialization<api::DateSerial> {
         const auto aScalar = materializeCalendarScalar(rArgument);

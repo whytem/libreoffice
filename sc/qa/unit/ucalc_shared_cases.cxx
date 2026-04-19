@@ -4608,6 +4608,7 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCalendarUt
         spreadsheetengine::api::formulavalue::ValueType::Value, aWeeksInYear.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(53.0, aWeeksInYear.maResult.mfValue, 1e-12);
     CPPUNIT_ASSERT_EQUAL(SvNumFormatType::NUMBER, aWeeksInYear.meFormatType);
+
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorDateDifferenceHelper)

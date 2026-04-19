@@ -3071,8 +3071,6 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorScalarRootAut
     m_pDoc->SetValue(3, 0, 0, 2.0);
     m_pDoc->SetString(4, 0, 0, u"ab"_ustr);
     m_pDoc->SetString(5, 0, 0, u"cd"_ustr);
-    m_pDoc->SetString(0, 1, 0, u"=2"_ustr);
-
     {
         ScopedEnvironmentOverride aMode(
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
@@ -3093,6 +3091,10 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorScalarRootAut
         m_pDoc->SetString(12, 7, 0, u"=SQRT(4)=2"_ustr);
         m_pDoc->SetString(13, 7, 0,
             u"=COM.MICROSOFT.POISSON.DIST(1;1;TRUE())>0.73"_ustr);
+        m_pDoc->SetString(14, 1, 0, u"=TODAY()+7"_ustr);
+
+        Date aActDate(Date::SYSTEM);
+        const tools::Long nTodaySerial = aActDate - m_pDoc->GetFormatTable()->GetNullDate();
 
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(0, 7, 0));
         ASSERT_DOUBLES_EQUAL(12.0, m_pDoc->GetValue(1, 7, 0));
@@ -3108,14 +3110,15 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorScalarRootAut
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(11, 7, 0));
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(12, 7, 0));
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(13, 7, 0));
+        ASSERT_DOUBLES_EQUAL(static_cast<double>(nTodaySerial) + 7.0, m_pDoc->GetValue(14, 1, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 14);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 15);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::ScalarRoot)]
-            >= 14);
+            >= 15);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::ScalarRoot)]);
@@ -3136,7 +3139,6 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorScalarRootDef
     m_pDoc->SetValue(1, 0, 0, 10.0);
     m_pDoc->SetString(2, 0, 0, u"ab"_ustr);
     m_pDoc->SetString(3, 0, 0, u"cd"_ustr);
-    m_pDoc->SetString(0, 1, 0, u"=2"_ustr);
 
     {
         ScopedEnvironmentOverride aMode(
@@ -3154,6 +3156,10 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorScalarRootDef
         m_pDoc->SetString(8, 7, 0, u"=SQRT(4)=2"_ustr);
         m_pDoc->SetString(9, 7, 0,
             u"=COM.MICROSOFT.POISSON.DIST(1;1;TRUE())>0.73"_ustr);
+        m_pDoc->SetString(10, 1, 0, u"=TODAY()+7"_ustr);
+
+        Date aActDate(Date::SYSTEM);
+        const tools::Long nTodaySerial = aActDate - m_pDoc->GetFormatTable()->GetNullDate();
 
         ASSERT_DOUBLES_EQUAL(12.0, m_pDoc->GetValue(0, 7, 0));
         ASSERT_DOUBLES_EQUAL(20.0, m_pDoc->GetValue(1, 7, 0));
@@ -3165,14 +3171,15 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorScalarRootDef
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(7, 7, 0));
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(8, 7, 0));
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(9, 7, 0));
+        ASSERT_DOUBLES_EQUAL(static_cast<double>(nTodaySerial) + 7.0, m_pDoc->GetValue(10, 1, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 10);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 11);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::ScalarRoot)]
-            >= 10);
+            >= 11);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::ScalarRoot)]);
