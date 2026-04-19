@@ -74,6 +74,13 @@ struct SC_DLLPUBLIC ScInterpreterDispatchRuntimeStatsSnapshot
     sal_uInt64 mnEngineAttemptedCount = 0;
     sal_uInt64 mnEngineSucceededCount = 0;
     sal_uInt64 mnEngineDeclinedCount = 0;
+    sal_uInt64 mnRangeEngineAttemptedCount = 0;
+    sal_uInt64 mnRangeEngineSucceededCount = 0;
+    sal_uInt64 mnRangeEngineDeclinedCount = 0;
+    sal_uInt64 mnRangeEngineDeclinedGlobalErrorOrStackCount = 0;
+    sal_uInt64 mnRangeEngineDeclinedNullTokenCount = 0;
+    sal_uInt64 mnRangeEngineDeclinedBuildFailureCount = 0;
+    std::vector<OUString> maRangeDeclinedFormulaSamples;
 };
 
 struct SC_DLLPUBLIC ScInterpreterReachabilityStatsSnapshot

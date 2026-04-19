@@ -324,6 +324,14 @@ struct InterpreterDispatchRuntimeStatsStore
     std::atomic<sal_uInt64> mnEngineAttemptedCount { 0 };
     std::atomic<sal_uInt64> mnEngineSucceededCount { 0 };
     std::atomic<sal_uInt64> mnEngineDeclinedCount { 0 };
+    std::atomic<sal_uInt64> mnRangeEngineAttemptedCount { 0 };
+    std::atomic<sal_uInt64> mnRangeEngineSucceededCount { 0 };
+    std::atomic<sal_uInt64> mnRangeEngineDeclinedCount { 0 };
+    std::atomic<sal_uInt64> mnRangeEngineDeclinedGlobalErrorOrStackCount { 0 };
+    std::atomic<sal_uInt64> mnRangeEngineDeclinedNullTokenCount { 0 };
+    std::atomic<sal_uInt64> mnRangeEngineDeclinedBuildFailureCount { 0 };
+    std::mutex maRangeDeclinedSampleMutex;
+    std::vector<OUString> maRangeDeclinedFormulaSamples;
 };
 
 InterpreterDispatchRuntimeStatsStore& interpreterDispatchRuntimeStatsStore()
@@ -376,6 +384,23 @@ std::vector<PendingClassicOpcodeSampleContext>& pendingClassicOpcodeSampleContex
 void addDispatchRuntimeStat(std::atomic<sal_uInt64>& rTarget, sal_uInt64 nDelta = 1)
 {
     rTarget.fetch_add(nDelta, std::memory_order_relaxed);
+}
+
+void maybeRecordRangeDispatchDeclineFormulaSample()
+{
+    auto& rContexts = pendingClassicOpcodeSampleContexts();
+    if (rContexts.empty())
+        return;
+
+    const OUString& rFormulaSource = rContexts.back().maFormulaSource;
+    if (rFormulaSource.isEmpty())
+        return;
+
+    auto& rStore = interpreterDispatchRuntimeStatsStore();
+    std::lock_guard aGuard(rStore.maRangeDeclinedSampleMutex);
+    if (rStore.maRangeDeclinedFormulaSamples.size() >= 16)
+        return;
+    rStore.maRangeDeclinedFormulaSamples.push_back(rFormulaSource);
 }
 
 [[nodiscard]] bool isInterestingClassicOpcode(OpCode eOp)
@@ -441,11 +466,21 @@ void resetScInterpreterDispatchRuntimeStats()
     rStore.mnEngineAttemptedCount.store(0, std::memory_order_relaxed);
     rStore.mnEngineSucceededCount.store(0, std::memory_order_relaxed);
     rStore.mnEngineDeclinedCount.store(0, std::memory_order_relaxed);
+    rStore.mnRangeEngineAttemptedCount.store(0, std::memory_order_relaxed);
+    rStore.mnRangeEngineSucceededCount.store(0, std::memory_order_relaxed);
+    rStore.mnRangeEngineDeclinedCount.store(0, std::memory_order_relaxed);
+    rStore.mnRangeEngineDeclinedGlobalErrorOrStackCount.store(0, std::memory_order_relaxed);
+    rStore.mnRangeEngineDeclinedNullTokenCount.store(0, std::memory_order_relaxed);
+    rStore.mnRangeEngineDeclinedBuildFailureCount.store(0, std::memory_order_relaxed);
+    {
+        std::lock_guard aGuard(rStore.maRangeDeclinedSampleMutex);
+        rStore.maRangeDeclinedFormulaSamples.clear();
+    }
 }
 
 ScInterpreterDispatchRuntimeStatsSnapshot getScInterpreterDispatchRuntimeStatsSnapshot()
 {
-    const auto& rStore = interpreterDispatchRuntimeStatsStore();
+    auto& rStore = interpreterDispatchRuntimeStatsStore();
     ScInterpreterDispatchRuntimeStatsSnapshot aSnapshot;
     aSnapshot.mnEngineAttemptedCount
         = rStore.mnEngineAttemptedCount.load(std::memory_order_relaxed);
@@ -453,6 +488,23 @@ ScInterpreterDispatchRuntimeStatsSnapshot getScInterpreterDispatchRuntimeStatsSn
         = rStore.mnEngineSucceededCount.load(std::memory_order_relaxed);
     aSnapshot.mnEngineDeclinedCount
         = rStore.mnEngineDeclinedCount.load(std::memory_order_relaxed);
+    aSnapshot.mnRangeEngineAttemptedCount
+        = rStore.mnRangeEngineAttemptedCount.load(std::memory_order_relaxed);
+    aSnapshot.mnRangeEngineSucceededCount
+        = rStore.mnRangeEngineSucceededCount.load(std::memory_order_relaxed);
+    aSnapshot.mnRangeEngineDeclinedCount
+        = rStore.mnRangeEngineDeclinedCount.load(std::memory_order_relaxed);
+    aSnapshot.mnRangeEngineDeclinedGlobalErrorOrStackCount
+        = rStore.mnRangeEngineDeclinedGlobalErrorOrStackCount.load(
+            std::memory_order_relaxed);
+    aSnapshot.mnRangeEngineDeclinedNullTokenCount
+        = rStore.mnRangeEngineDeclinedNullTokenCount.load(std::memory_order_relaxed);
+    aSnapshot.mnRangeEngineDeclinedBuildFailureCount
+        = rStore.mnRangeEngineDeclinedBuildFailureCount.load(std::memory_order_relaxed);
+    {
+        std::lock_guard aGuard(rStore.maRangeDeclinedSampleMutex);
+        aSnapshot.maRangeDeclinedFormulaSamples = rStore.maRangeDeclinedFormulaSamples;
+    }
     return aSnapshot;
 }
 
@@ -4858,13 +4910,35 @@ StackVar ScInterpreter::Interpret()
                     PushError(selibreoffice::toFormulaError(aAttempt.maResult.meError));
                     return true;
                 };
+                const auto tryPushEngineBadLiteralRangeOpcode = [&]() {
+                    if (!pMyFormulaCell || !pArr)
+                        return false;
+
+                    const OUString aFormulaSource
+                        = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
+                    if (aFormulaSource.isEmpty())
+                        return false;
+
+                    if (!setaileval::isRootErrorLiteralFormula(
+                            std::u16string_view(aFormulaSource.getStr(),
+                                aFormulaSource.getLength())))
+                    {
+                        return false;
+                    }
+
+                    return tryPushEngineBadLiteralError();
+                };
                 const auto tryPushEngineRangeReference = [&]() {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore().mnEngineAttemptedCount);
+                    auto& rDispatchStats = interpreterDispatchRuntimeStatsStore();
+                    addDispatchRuntimeStat(rDispatchStats.mnEngineAttemptedCount);
+                    addDispatchRuntimeStat(rDispatchStats.mnRangeEngineAttemptedCount);
                     if (nGlobalError != FormulaError::NONE || sp < 2)
                     {
+                        addDispatchRuntimeStat(rDispatchStats.mnEngineDeclinedCount);
+                        addDispatchRuntimeStat(rDispatchStats.mnRangeEngineDeclinedCount);
                         addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
+                            rDispatchStats.mnRangeEngineDeclinedGlobalErrorOrStackCount);
+                        maybeRecordRangeDispatchDeclineFormulaSample();
                         return false;
                     }
 
@@ -4872,8 +4946,11 @@ StackVar ScInterpreter::Interpret()
                     const FormulaToken* pLeft = pStack[sp - 2];
                     if (!pLeft || !pRight)
                     {
+                        addDispatchRuntimeStat(rDispatchStats.mnEngineDeclinedCount);
+                        addDispatchRuntimeStat(rDispatchStats.mnRangeEngineDeclinedCount);
                         addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
+                            rDispatchStats.mnRangeEngineDeclinedNullTokenCount);
+                        maybeRecordRangeDispatchDeclineFormulaSample();
                         return false;
                     }
 
@@ -4882,15 +4959,18 @@ StackVar ScInterpreter::Interpret()
                             *this, *pLeft, *pRight);
                     if (!xRangeResult)
                     {
+                        addDispatchRuntimeStat(rDispatchStats.mnEngineDeclinedCount);
+                        addDispatchRuntimeStat(rDispatchStats.mnRangeEngineDeclinedCount);
                         addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
+                            rDispatchStats.mnRangeEngineDeclinedBuildFailureCount);
+                        maybeRecordRangeDispatchDeclineFormulaSample();
                         return false;
                     }
 
                     sp -= 2;
                     nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore().mnEngineSucceededCount);
+                    addDispatchRuntimeStat(rDispatchStats.mnEngineSucceededCount);
+                    addDispatchRuntimeStat(rDispatchStats.mnRangeEngineSucceededCount);
                     PushTokenRef(xRangeResult);
                     return true;
                 };
@@ -7987,7 +8067,8 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocIntersect        : ScIntersect();                break;
                     case ocRange            :
-                        if (!tryPushEngineRangeReference())
+                        if (!tryPushEngineBadLiteralRangeOpcode()
+                            && !tryPushEngineRangeReference())
                         {
                             warnIfLegacyDispatchReached(
                                 "engine-first root range reference", u"RANGE_REFERENCE",

@@ -701,9 +701,12 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
         ScAddress(0, 0, 0), u"of:#N/A"_ustr, formula::FormulaGrammar::GRAM_ODFF);
     m_pDoc->SetFormula(
         ScAddress(0, 1, 0), u"of:#ERR504!"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 2, 0), u"[.OF:.ERR]:502"_ustr, formula::FormulaGrammar::GRAM_ODFF);
 
     CPPUNIT_ASSERT_EQUAL(FormulaError::NotAvailable, m_pDoc->GetErrCode(ScAddress(0, 0, 0)));
     CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(0, 1, 0)));
+    CPPUNIT_ASSERT_EQUAL(FormulaError::IllegalArgument, m_pDoc->GetErrCode(ScAddress(0, 2, 0)));
 
     const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
     const std::string aDispatchStatsLabel
@@ -712,14 +715,18 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
           + " declined=" + std::to_string(aDispatchStats.mnEngineDeclinedCount);
     CPPUNIT_ASSERT_MESSAGE("bad literal dispatch should attempt engine evaluation: "
                                + aDispatchStatsLabel,
-                           aDispatchStats.mnEngineAttemptedCount >= 2);
+                           aDispatchStats.mnEngineAttemptedCount >= 3);
     CPPUNIT_ASSERT_MESSAGE("bad literal dispatch should succeed through the engine path: "
                                + aDispatchStatsLabel,
-                           aDispatchStats.mnEngineSucceededCount >= 2);
+                           aDispatchStats.mnEngineSucceededCount >= 3);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("bad literal dispatch should not need legacy fallback here: "
                                      + aDispatchStatsLabel,
                                  sal_uInt64(0),
                                  aDispatchStats.mnEngineDeclinedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("bracketed ODF error literals should not fall into range dispatch decline accounting: "
+                                     + aDispatchStatsLabel,
+                                 sal_uInt64(0),
+                                 aDispatchStats.mnRangeEngineDeclinedCount);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("dispatch accounting should stay balanced: "
                                      + aDispatchStatsLabel,
                                  aDispatchStats.mnEngineAttemptedCount,
@@ -770,18 +777,33 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterRangeDispatch)
     CPPUNIT_ASSERT_MESSAGE("range dispatch should attempt engine evaluation: "
                                + aDispatchStatsLabel,
                            aDispatchStats.mnEngineAttemptedCount >= 1);
+    CPPUNIT_ASSERT_MESSAGE("range dispatch should register a dedicated range attempt: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnRangeEngineAttemptedCount >= 1);
     CPPUNIT_ASSERT_MESSAGE("range dispatch should succeed through the engine path: "
                                + aDispatchStatsLabel,
                            aDispatchStats.mnEngineSucceededCount >= 1);
+    CPPUNIT_ASSERT_MESSAGE("range dispatch should succeed through the dedicated range path: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnRangeEngineSucceededCount >= 1);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("range dispatch should not need legacy fallback here: "
                                      + aDispatchStatsLabel,
                                  sal_uInt64(0),
                                  aDispatchStats.mnEngineDeclinedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("range dispatch should not decline through the dedicated range path here: "
+                                     + aDispatchStatsLabel,
+                                 sal_uInt64(0),
+                                 aDispatchStats.mnRangeEngineDeclinedCount);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("dispatch accounting should stay balanced: "
                                      + aDispatchStatsLabel,
                                  aDispatchStats.mnEngineAttemptedCount,
                                  aDispatchStats.mnEngineSucceededCount
                                      + aDispatchStats.mnEngineDeclinedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("range dispatch accounting should stay balanced: "
+                                     + aDispatchStatsLabel,
+                                 aDispatchStats.mnRangeEngineAttemptedCount,
+                                 aDispatchStats.mnRangeEngineSucceededCount
+                                     + aDispatchStats.mnRangeEngineDeclinedCount);
 
     const auto aReachabilityStats = getScInterpreterReachabilityStatsSnapshot();
     CPPUNIT_ASSERT_MESSAGE(

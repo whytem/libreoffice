@@ -306,6 +306,21 @@ void accumulateDispatchRuntimeStats(ScInterpreterDispatchRuntimeStatsSnapshot& r
     rAccumulator.mnEngineAttemptedCount += rDelta.mnEngineAttemptedCount;
     rAccumulator.mnEngineSucceededCount += rDelta.mnEngineSucceededCount;
     rAccumulator.mnEngineDeclinedCount += rDelta.mnEngineDeclinedCount;
+    rAccumulator.mnRangeEngineAttemptedCount += rDelta.mnRangeEngineAttemptedCount;
+    rAccumulator.mnRangeEngineSucceededCount += rDelta.mnRangeEngineSucceededCount;
+    rAccumulator.mnRangeEngineDeclinedCount += rDelta.mnRangeEngineDeclinedCount;
+    rAccumulator.mnRangeEngineDeclinedGlobalErrorOrStackCount
+        += rDelta.mnRangeEngineDeclinedGlobalErrorOrStackCount;
+    rAccumulator.mnRangeEngineDeclinedNullTokenCount
+        += rDelta.mnRangeEngineDeclinedNullTokenCount;
+    rAccumulator.mnRangeEngineDeclinedBuildFailureCount
+        += rDelta.mnRangeEngineDeclinedBuildFailureCount;
+    for (const auto& rSample : rDelta.maRangeDeclinedFormulaSamples)
+    {
+        if (rAccumulator.maRangeDeclinedFormulaSamples.size() >= 16)
+            break;
+        rAccumulator.maRangeDeclinedFormulaSamples.push_back(rSample);
+    }
 }
 
 void accumulateReachabilityStats(ScInterpreterReachabilityStatsSnapshot& rAccumulator,
@@ -2483,12 +2498,39 @@ void printLiveAuthoritativeSummary(
               << rLiveDispatchRuntimeStats.mnEngineSucceededCount << '\n';
     std::cout << "interp4_dispatch_engine_declined_total="
               << rLiveDispatchRuntimeStats.mnEngineDeclinedCount << '\n';
+    std::cout << "interp4_dispatch_range_attempted_total="
+              << rLiveDispatchRuntimeStats.mnRangeEngineAttemptedCount << '\n';
+    std::cout << "interp4_dispatch_range_succeeded_total="
+              << rLiveDispatchRuntimeStats.mnRangeEngineSucceededCount << '\n';
+    std::cout << "interp4_dispatch_range_declined_total="
+              << rLiveDispatchRuntimeStats.mnRangeEngineDeclinedCount << '\n';
     std::cout << "interp4_dispatch_engine_attempted_total_core_forced_full_legacy="
               << rCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount << '\n';
     std::cout << "interp4_dispatch_engine_succeeded_total_core_forced_full_legacy="
               << rCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineSucceededCount << '\n';
     std::cout << "interp4_dispatch_engine_declined_total_core_forced_full_legacy="
               << rCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineDeclinedCount << '\n';
+    std::cout << "interp4_dispatch_range_attempted_total_core_forced_full_legacy="
+              << rCoreForcedSeamDisabledDispatchRuntimeStats.mnRangeEngineAttemptedCount
+              << '\n';
+    std::cout << "interp4_dispatch_range_succeeded_total_core_forced_full_legacy="
+              << rCoreForcedSeamDisabledDispatchRuntimeStats.mnRangeEngineSucceededCount
+              << '\n';
+    std::cout << "interp4_dispatch_range_declined_total_core_forced_full_legacy="
+              << rCoreForcedSeamDisabledDispatchRuntimeStats.mnRangeEngineDeclinedCount
+              << '\n';
+    std::cout << "interp4_dispatch_range_declined_global_error_or_stack_total_core_forced_full_legacy="
+              << rCoreForcedSeamDisabledDispatchRuntimeStats
+                     .mnRangeEngineDeclinedGlobalErrorOrStackCount
+              << '\n';
+    std::cout << "interp4_dispatch_range_declined_null_token_total_core_forced_full_legacy="
+              << rCoreForcedSeamDisabledDispatchRuntimeStats
+                     .mnRangeEngineDeclinedNullTokenCount
+              << '\n';
+    std::cout << "interp4_dispatch_range_declined_build_failure_total_core_forced_full_legacy="
+              << rCoreForcedSeamDisabledDispatchRuntimeStats
+                     .mnRangeEngineDeclinedBuildFailureCount
+              << '\n';
     std::cout << "sc_formula_executor_formula_cell_interpret_total_live="
               << rLiveReachabilityStats.mnFormulaCellInterpretCount << '\n';
     std::cout << "sc_formula_executor_formula_group_attempt_total_live="
@@ -2574,8 +2616,45 @@ void printLiveAuthoritativeSummary(
               << fCoreForcedSeamDisabledEngineSuccessRate << '\n';
     std::cout << "interp4_dispatch_engine_decline_rate_core_forced_full_legacy="
               << fCoreForcedSeamDisabledEngineDeclineRate << '\n';
+    const double fCoreForcedRangeSuccessRate
+        = rCoreForcedSeamDisabledDispatchRuntimeStats.mnRangeEngineAttemptedCount
+              ? (static_cast<double>(
+                     rCoreForcedSeamDisabledDispatchRuntimeStats.mnRangeEngineSucceededCount)
+                 * 100.0
+                 / static_cast<double>(rCoreForcedSeamDisabledDispatchRuntimeStats
+                                           .mnRangeEngineAttemptedCount))
+              : 0.0;
+    const double fCoreForcedRangeDeclineRate
+        = rCoreForcedSeamDisabledDispatchRuntimeStats.mnRangeEngineAttemptedCount
+              ? (static_cast<double>(
+                     rCoreForcedSeamDisabledDispatchRuntimeStats.mnRangeEngineDeclinedCount)
+                 * 100.0
+                 / static_cast<double>(rCoreForcedSeamDisabledDispatchRuntimeStats
+                                           .mnRangeEngineAttemptedCount))
+              : 0.0;
+    std::cout << "interp4_dispatch_range_success_rate_core_forced_full_legacy="
+              << fCoreForcedRangeSuccessRate << '\n';
+    std::cout << "interp4_dispatch_range_decline_rate_core_forced_full_legacy="
+              << fCoreForcedRangeDeclineRate << '\n';
     std::cout.flags(aOldFlags);
     std::cout.precision(nOldPrecision);
+
+    std::cout << "interp4_dispatch_range_declined_formula_sample_count_core_forced_full_legacy="
+              << rCoreForcedSeamDisabledDispatchRuntimeStats.maRangeDeclinedFormulaSamples.size()
+              << '\n';
+    for (std::size_t nIndex = 0;
+         nIndex < rCoreForcedSeamDisabledDispatchRuntimeStats.maRangeDeclinedFormulaSamples.size();
+         ++nIndex)
+    {
+        std::cout << "interp4_dispatch_range_declined_formula_sample_core_forced_full_legacy_"
+                  << nIndex << '='
+                  << OUStringToOString(
+                         rCoreForcedSeamDisabledDispatchRuntimeStats
+                             .maRangeDeclinedFormulaSamples[nIndex],
+                         RTL_TEXTENCODING_UTF8)
+                         .getStr()
+                  << '\n';
+    }
 
     std::cout << std::fixed << std::setprecision(2);
     for (std::size_t nIndex = 1; nIndex < static_cast<std::size_t>(FunctionKind::Count); ++nIndex)
