@@ -755,6 +755,67 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterControlFlowIfDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAxisOrdinalDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"AxisOrd"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    // No-argument COLUMN()/ROW()/SHEET() — engine uses aPos directly.
+    m_pDoc->SetString(ScAddress(0, 0, 0), u"=COLUMN()"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
+    m_pDoc->SetString(ScAddress(2, 4, 0), u"=COLUMN()"_ustr);
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(2, 4, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 9, 0), u"=ROW()"_ustr);
+    ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(ScAddress(0, 9, 0)));
+
+    m_pDoc->SetString(ScAddress(1, 0, 0), u"=SHEET()"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(1, 0, 0)));
+
+    // Single-reference argument — engine resolves and returns the ordinal.
+    m_pDoc->SetString(ScAddress(5, 0, 0), u"=COLUMN(C7)"_ustr);
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(5, 0, 0)));
+    m_pDoc->SetString(ScAddress(5, 1, 0), u"=ROW(C7)"_ustr);
+    ASSERT_DOUBLES_EQUAL(7.0, m_pDoc->GetValue(ScAddress(5, 1, 0)));
+
+    // Double-ref argument declines to legacy; legacy returns the leftmost
+    // column scalar when not in matrix context.
+    m_pDoc->SetString(ScAddress(5, 2, 0), u"=COLUMN(B5:D8)"_ustr);
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(5, 2, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "ref_attempted="
+          + std::to_string(aDispatchStats.mnReferenceEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnReferenceEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnReferenceEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "COLUMN/ROW/SHEET should attempt engine dispatch: " + aLabel,
+        aDispatchStats.mnReferenceEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "scalar COLUMN/ROW/SHEET should succeed through engine: " + aLabel,
+        aDispatchStats.mnReferenceEngineSucceededCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "double-ref COLUMN(B5:D8) should produce an engine decline: " + aLabel,
+        aDispatchStats.mnReferenceEngineDeclinedCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "reference dispatch accounting should stay balanced: " + aLabel,
+        aDispatchStats.mnReferenceEngineAttemptedCount,
+        aDispatchStats.mnReferenceEngineSucceededCount
+            + aDispatchStats.mnReferenceEngineDeclinedCount);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);

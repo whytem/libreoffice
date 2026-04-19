@@ -94,6 +94,7 @@
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
 #include <spreadsheetengine/runtime/RpnControlFlow.hxx>
 #include <spreadsheetengine/runtime/RpnOperators.hxx>
+#include <spreadsheetengine/runtime/RpnReference.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
@@ -334,6 +335,9 @@ struct InterpreterDispatchRuntimeStatsStore
     std::atomic<sal_uInt64> mnControlFlowEngineAttemptedCount { 0 };
     std::atomic<sal_uInt64> mnControlFlowEngineSucceededCount { 0 };
     std::atomic<sal_uInt64> mnControlFlowEngineDeclinedCount { 0 };
+    std::atomic<sal_uInt64> mnReferenceEngineAttemptedCount { 0 };
+    std::atomic<sal_uInt64> mnReferenceEngineSucceededCount { 0 };
+    std::atomic<sal_uInt64> mnReferenceEngineDeclinedCount { 0 };
     std::mutex maRangeDeclinedSampleMutex;
     std::vector<OUString> maRangeDeclinedFormulaSamples;
 };
@@ -479,6 +483,9 @@ void resetScInterpreterDispatchRuntimeStats()
     rStore.mnControlFlowEngineAttemptedCount.store(0, std::memory_order_relaxed);
     rStore.mnControlFlowEngineSucceededCount.store(0, std::memory_order_relaxed);
     rStore.mnControlFlowEngineDeclinedCount.store(0, std::memory_order_relaxed);
+    rStore.mnReferenceEngineAttemptedCount.store(0, std::memory_order_relaxed);
+    rStore.mnReferenceEngineSucceededCount.store(0, std::memory_order_relaxed);
+    rStore.mnReferenceEngineDeclinedCount.store(0, std::memory_order_relaxed);
     {
         std::lock_guard aGuard(rStore.maRangeDeclinedSampleMutex);
         rStore.maRangeDeclinedFormulaSamples.clear();
@@ -514,6 +521,12 @@ ScInterpreterDispatchRuntimeStatsSnapshot getScInterpreterDispatchRuntimeStatsSn
         = rStore.mnControlFlowEngineSucceededCount.load(std::memory_order_relaxed);
     aSnapshot.mnControlFlowEngineDeclinedCount
         = rStore.mnControlFlowEngineDeclinedCount.load(std::memory_order_relaxed);
+    aSnapshot.mnReferenceEngineAttemptedCount
+        = rStore.mnReferenceEngineAttemptedCount.load(std::memory_order_relaxed);
+    aSnapshot.mnReferenceEngineSucceededCount
+        = rStore.mnReferenceEngineSucceededCount.load(std::memory_order_relaxed);
+    aSnapshot.mnReferenceEngineDeclinedCount
+        = rStore.mnReferenceEngineDeclinedCount.load(std::memory_order_relaxed);
     {
         std::lock_guard aGuard(rStore.maRangeDeclinedSampleMutex);
         aSnapshot.maRangeDeclinedFormulaSamples = rStore.maRangeDeclinedFormulaSamples;
@@ -7757,6 +7770,83 @@ StackVar ScInterpreter::Interpret()
                             .mnControlFlowEngineSucceededCount);
                     return true;
                 };
+                // Batch 2 first admission: scalar axis-ordinal
+                // COLUMN / ROW / SHEET. Covers no-argument (use aPos) and
+                // single-reference argument via planAxisOrdinal.
+                // Matrix-context no-arg, external-ref, double-ref, and any
+                // other shape defer to the legacy ScColumn / ScRow / ScSheet.
+                const auto tryPlanEngineAxisOrdinal
+                    = [&](serpn::AxisOrdinalKind eKind) -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnReferenceEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount > 1)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    ScAddress aRefPos;
+                    if (nParamCount == 0)
+                    {
+                        if (bMatrixFormula)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnReferenceEngineDeclinedCount);
+                            return false;
+                        }
+                        aRefPos = aPos;
+                    }
+                    else
+                    {
+                        if (!sp || !pStack[sp - 1]
+                            || pStack[sp - 1]->GetType() != svSingleRef)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnReferenceEngineDeclinedCount);
+                            return false;
+                        }
+                        PopSingleRef(aRefPos);
+                        if (nGlobalError != FormulaError::NONE)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnReferenceEngineDeclinedCount);
+                            return false;
+                        }
+                    }
+
+                    spreadsheetengine::api::ResolvedReference aResolved;
+                    aResolved.maRange.maStart = {
+                        static_cast<spreadsheetengine::api::SheetId>(aRefPos.Tab()),
+                        static_cast<spreadsheetengine::api::ColumnIndex>(aRefPos.Col()),
+                        static_cast<spreadsheetengine::api::RowIndex>(aRefPos.Row())
+                    };
+                    aResolved.maRange.maEnd = aResolved.maRange.maStart;
+
+                    const auto aPlan = serpn::planAxisOrdinal(
+                        serpn::RpnValue::reference(aResolved), eKind);
+                    if (!aPlan
+                        || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnReferenceEngineSucceededCount);
+                    PushDouble(aPlan.maValue);
+                    return true;
+                };
                 const auto pushLegacyIfJump = [&]() {
                     warnConditionalDispatch(u"IF");
                     ScIfJump();
@@ -9283,9 +9373,18 @@ StackVar ScInterpreter::Interpret()
                     case ocColumns          : ScColumns();              break;
                     case ocRows             : ScRows();                 break;
                     case ocSheets           : ScSheets();               break;
-                    case ocColumn           : ScColumn();               break;
-                    case ocRow              : ScRow();                  break;
-                    case ocSheet            : ScSheet();                break;
+                    case ocColumn           :
+                        if (!tryPlanEngineAxisOrdinal(serpn::AxisOrdinalKind::Column))
+                            ScColumn();
+                        break;
+                    case ocRow              :
+                        if (!tryPlanEngineAxisOrdinal(serpn::AxisOrdinalKind::Row))
+                            ScRow();
+                        break;
+                    case ocSheet            :
+                        if (!tryPlanEngineAxisOrdinal(serpn::AxisOrdinalKind::Sheet))
+                            ScSheet();
+                        break;
                     case ocRRI              :
                     {
                         warnIfLegacyRateFamilyReached(u"RRI");
