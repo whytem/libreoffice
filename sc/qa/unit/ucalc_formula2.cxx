@@ -921,6 +921,25 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterCriteriaCountIfDispatch)
     m_pDoc->SetString(ScAddress(2, 2, 0), u"=COUNTIF(A1:A5;\">15\")"_ustr);
     ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(2, 2, 0)));
 
+    // SUMIF 2-arg form: aggregate matching cells in the criteria range.
+    m_pDoc->SetString(ScAddress(2, 3, 0), u"=SUMIF(A1:A5;10)"_ustr);
+    ASSERT_DOUBLES_EQUAL(30.0, m_pDoc->GetValue(ScAddress(2, 3, 0)));
+
+    // SUMIF 3-arg form: separate target range.
+    m_pDoc->SetValue(ScAddress(1, 0, 0), 100.0);
+    m_pDoc->SetValue(ScAddress(1, 1, 0), 200.0);
+    m_pDoc->SetValue(ScAddress(1, 2, 0), 300.0);
+    m_pDoc->SetValue(ScAddress(1, 3, 0), 400.0);
+    m_pDoc->SetValue(ScAddress(1, 4, 0), 500.0);
+    m_pDoc->SetString(ScAddress(2, 4, 0), u"=SUMIF(A1:A5;10;B1:B5)"_ustr);
+    // A1=10,A3=10,A5=10 → sum B1+B3+B5 = 100+300+500 = 900
+    ASSERT_DOUBLES_EQUAL(900.0, m_pDoc->GetValue(ScAddress(2, 4, 0)));
+
+    // AVERAGEIF: average B column where A>15.
+    m_pDoc->SetString(ScAddress(2, 5, 0), u"=AVERAGEIF(A1:A5;\">15\";B1:B5)"_ustr);
+    // A2=20 → B2=200; A4=30 → B4=400. Avg = 300.
+    ASSERT_DOUBLES_EQUAL(300.0, m_pDoc->GetValue(ScAddress(2, 5, 0)));
+
     const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
     const std::string aLabel
         = "criteria_attempted="

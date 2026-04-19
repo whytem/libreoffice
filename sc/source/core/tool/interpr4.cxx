@@ -7882,18 +7882,58 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                // Batch 3 first admission: COUNTIF with a double-ref
-                // criteria range and a scalar criterion argument routes
-                // through planSingleCriterionAggregate. External refs,
-                // matrices, multi-dimensional criteria, and non-scalar
-                // criteria defer to legacy ScCountIf.
-                const auto tryPlanEngineCountIf = [&]() -> bool {
+                // Batch 3 admissions: COUNTIF / SUMIF / AVERAGEIF route
+                // through planSingleCriterionAggregate when the criteria
+                // range and (for SUMIF/AVERAGEIF) target range are scalar
+                // svDoubleRefs, the criterion is a scalar svDouble or
+                // svString, and all ranges live on a single sheet.
+                // External refs, matrices, RefList, and multi-sheet
+                // operands defer to legacy.
+                const auto buildCriteriaRangeInput
+                    = [&](const FormulaToken* pRangeTok,
+                          sequery::CriteriaAggregateInput& rInput) -> bool {
+                    if (!pRangeTok || pRangeTok->GetType() != svDoubleRef)
+                        return false;
+                    const ScComplexRefData& rRef = *pRangeTok->GetDoubleRef();
+                    const ScRange aAbs = rRef.toAbs(mrDoc, aPos);
+                    if (aAbs.aStart.Tab() != aAbs.aEnd.Tab())
+                        return false;
+                    rInput.mbScalar = false;
+                    rInput.maReference.maRange.maStart = {
+                        static_cast<spreadsheetengine::api::SheetId>(aAbs.aStart.Tab()),
+                        static_cast<spreadsheetengine::api::ColumnIndex>(aAbs.aStart.Col()),
+                        static_cast<spreadsheetengine::api::RowIndex>(aAbs.aStart.Row())
+                    };
+                    rInput.maReference.maRange.maEnd = {
+                        static_cast<spreadsheetengine::api::SheetId>(aAbs.aEnd.Tab()),
+                        static_cast<spreadsheetengine::api::ColumnIndex>(aAbs.aEnd.Col()),
+                        static_cast<spreadsheetengine::api::RowIndex>(aAbs.aEnd.Row())
+                    };
+                    rInput.mnColumns
+                        = static_cast<spreadsheetengine::api::MatrixSize>(
+                            aAbs.aEnd.Col() - aAbs.aStart.Col() + 1);
+                    rInput.mnRows
+                        = static_cast<spreadsheetengine::api::MatrixSize>(
+                            aAbs.aEnd.Row() - aAbs.aStart.Row() + 1);
+                    return true;
+                };
+
+                const auto tryPlanEngineSingleCriterionAggregate
+                    = [&](sequery::CriteriaAggregateKind eKind,
+                          bool bWithTargetRange) -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnCriteriaEngineAttemptedCount);
 
                     const sal_uInt8 nParamCount = pCur->GetByte();
-                    if (nParamCount != 2 || sp < 2)
+                    const sal_uInt8 nExpectedCount
+                        = bWithTargetRange ? 3 : 2;
+                    // SUMIF / AVERAGEIF also accept 2-arg form (aggregate
+                    // over the criteria range itself).
+                    const bool bHasTargetArg
+                        = bWithTargetRange && nParamCount == 3;
+                    if ((nParamCount != nExpectedCount && nParamCount != 2)
+                        || sp < nParamCount)
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
@@ -7901,10 +7941,17 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
 
-                    const FormulaToken* pCriterionTok = pStack[sp - 1];
-                    const FormulaToken* pRangeTok = pStack[sp - 2];
-                    if (!pCriterionTok || !pRangeTok
-                        || pRangeTok->GetType() != svDoubleRef)
+                    const FormulaToken* pTargetTok
+                        = bHasTargetArg ? pStack[sp - 1] : nullptr;
+                    const FormulaToken* pCriterionTok
+                        = pStack[sp - (bHasTargetArg ? 2 : 1)];
+                    const FormulaToken* pCriteriaRangeTok
+                        = pStack[sp - nParamCount];
+
+                    if (!pCriterionTok || !pCriteriaRangeTok
+                        || pCriteriaRangeTok->GetType() != svDoubleRef
+                        || (bHasTargetArg && pTargetTok
+                            && pTargetTok->GetType() != svDoubleRef))
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
@@ -7912,7 +7959,6 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
 
-                    // Build the criterion RpnValue from the top token.
                     std::optional<serpn::RpnValue> oCriterion;
                     switch (pCriterionTok->GetType())
                     {
@@ -7944,55 +7990,34 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
 
-                    // Pop the range token. Use PopDoubleRef to drop through
-                    // canonical absolute-range resolution.
-                    sp -= 2;
-                    SCCOL nCol1, nCol2;
-                    SCROW nRow1, nRow2;
-                    SCTAB nTab1, nTab2;
-                    // Re-read via the saved ScComplexRefData since we
-                    // already adjusted sp; mirror toAbs manually.
-                    const ScComplexRefData& rRef = *pRangeTok->GetDoubleRef();
-                    const ScRange aAbs = rRef.toAbs(mrDoc, aPos);
-                    nCol1 = aAbs.aStart.Col();
-                    nRow1 = aAbs.aStart.Row();
-                    nTab1 = aAbs.aStart.Tab();
-                    nCol2 = aAbs.aEnd.Col();
-                    nRow2 = aAbs.aEnd.Row();
-                    nTab2 = aAbs.aEnd.Tab();
-                    // Only single-sheet ranges in this first admission;
-                    // 3D criteria ranges defer to legacy.
-                    if (nTab1 != nTab2)
+                    sequery::CriteriaAggregateInput aCriteriaInput;
+                    if (!buildCriteriaRangeInput(pCriteriaRangeTok, aCriteriaInput))
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
                                 .mnCriteriaEngineDeclinedCount);
-                        // Re-push the operands so legacy has them.
-                        sp += 2;
                         return false;
                     }
 
-                    sequery::CriteriaAggregateInput aInput;
-                    aInput.mbScalar = false;
-                    aInput.maReference.maRange.maStart = {
-                        static_cast<spreadsheetengine::api::SheetId>(nTab1),
-                        static_cast<spreadsheetengine::api::ColumnIndex>(nCol1),
-                        static_cast<spreadsheetengine::api::RowIndex>(nRow1)
-                    };
-                    aInput.maReference.maRange.maEnd = {
-                        static_cast<spreadsheetengine::api::SheetId>(nTab2),
-                        static_cast<spreadsheetengine::api::ColumnIndex>(nCol2),
-                        static_cast<spreadsheetengine::api::RowIndex>(nRow2)
-                    };
-                    aInput.mnColumns = static_cast<spreadsheetengine::api::MatrixSize>(
-                        nCol2 - nCol1 + 1);
-                    aInput.mnRows = static_cast<spreadsheetengine::api::MatrixSize>(
-                        nRow2 - nRow1 + 1);
+                    std::optional<sequery::CriteriaAggregateInput> oTargetInput;
+                    if (bHasTargetArg)
+                    {
+                        sequery::CriteriaAggregateInput aTargetInput;
+                        if (!buildCriteriaRangeInput(pTargetTok, aTargetInput))
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnCriteriaEngineDeclinedCount);
+                            return false;
+                        }
+                        oTargetInput = aTargetInput;
+                    }
 
                     serpn::SingleCriterionAggregateRequest aRequest;
-                    aRequest.maCriteriaRange = aInput;
+                    aRequest.maCriteriaRange = aCriteriaInput;
                     aRequest.maPredicate = aPredicateResult.maValue;
-                    aRequest.meKind = sequery::CriteriaAggregateKind::Count;
+                    aRequest.moTargetRange = oTargetInput;
+                    aRequest.meKind = eKind;
                     aRequest.meSearchType
                         = seitee::detail::searchTypeFromDocument(mrDoc);
                     aRequest.mbMatchWholeCell = true;
@@ -8007,19 +8032,45 @@ StackVar ScInterpreter::Interpret()
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
                                 .mnCriteriaEngineDeclinedCount);
-                        // Re-push for legacy fallback.
-                        sp += 2;
                         return false;
                     }
 
+                    // Commit: drop operands and push result.
+                    sp -= nParamCount;
                     nGlobalError = FormulaError::NONE;
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnCriteriaEngineSucceededCount);
 
-                    // Count aggregate result is a Number.
-                    PushDouble(aResult.maValue.mfNumber);
+                    switch (aResult.maValue.meKind)
+                    {
+                        case spreadsheetengine::api::CellValueKind::Number:
+                            PushDouble(aResult.maValue.mfNumber);
+                            break;
+                        case spreadsheetengine::api::CellValueKind::Error:
+                            PushError(selibreoffice::toFormulaError(
+                                aResult.maValue.meError));
+                            break;
+                        default:
+                            // Numeric aggregate produced a non-number;
+                            // treat as error.
+                            PushError(FormulaError::IllegalArgument);
+                            break;
+                    }
                     return true;
+                };
+
+                const auto tryPlanEngineCountIf = [&]() -> bool {
+                    return tryPlanEngineSingleCriterionAggregate(
+                        sequery::CriteriaAggregateKind::Count, false);
+                };
+                const auto tryPlanEngineSumIf = [&]() -> bool {
+                    return tryPlanEngineSingleCriterionAggregate(
+                        sequery::CriteriaAggregateKind::Sum, true);
+                };
+                const auto tryPlanEngineAverageIf = [&]() -> bool {
+                    return tryPlanEngineSingleCriterionAggregate(
+                        sequery::CriteriaAggregateKind::Average, true);
                 };
 
                 // Batch 2 sixth admission: ADDRESS with the narrow
@@ -10379,8 +10430,14 @@ StackVar ScInterpreter::Interpret()
                         if (!tryPlanEngineCountIf())
                             ScCountIf();
                         break;
-                    case ocSumIf            : IterateParametersIf(ifSUMIF); break;
-                    case ocAverageIf        : IterateParametersIf(ifAVERAGEIF); break;
+                    case ocSumIf            :
+                        if (!tryPlanEngineSumIf())
+                            IterateParametersIf(ifSUMIF);
+                        break;
+                    case ocAverageIf        :
+                        if (!tryPlanEngineAverageIf())
+                            IterateParametersIf(ifAVERAGEIF);
+                        break;
                     case ocSumIfs:
                     {
                         const sal_uInt8 nParamCount = GetByte();
