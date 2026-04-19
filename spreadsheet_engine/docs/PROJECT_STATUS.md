@@ -48,8 +48,8 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
 - `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=602`
-- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=506`
-- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=96`
+- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=602`
+- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=0`
 - `sc_formula_executor_formula_cell_interpret_total_live=2446901`
 - `sc_formula_executor_formula_group_attempt_total_live=1220544`
 - `sc_formula_executor_formula_group_handled_total_live=105`
@@ -79,17 +79,18 @@ paired runtime totals show whether that path is actually carrying replay load.
 On the standing live corpus those totals are still `0 / 0 / 0`, which is still
 an honest sign that the upstream seam prevents this path from seeing ordinary
 replay traffic. But the core-forced full-legacy audit lane now reports
-`602 / 506 / 96`, so the engine-first dispatch path is no longer theoretical:
-it is carrying the entire `ocBad` error-literal block and actively attempting
-the residual `ocRange` block when the classic interpreter is actually
-exercised. The classic opcode census still shows `Bad=506` and `Range=96`
-because that census counts opcode entry before the switch decides whether
-engine or legacy computes the result. The important nuance is that the `96`
-`Range` cases are now measured engine attempts that all declined on the
-standing corpus, even though the focused dynamic-range lane proves valid
-`OFFSET(...):OFFSET(...)` range construction can succeed through the engine.
-So the next bottleneck is now even clearer: residual range-operand shape
-support, not root error literals and not scalar-operator reachability.
+`602 / 602 / 0`, so the engine-first dispatch path is no longer theoretical:
+it is carrying the entire residual classic tail when the classic interpreter is
+actually exercised. The `ocRange` audit turned out to be especially useful:
+all `96` residual `Range` rows were really bracketed ODF error-literal syntax
+like `=[.OF:.ERR]:502`, not true reference-range work. Those rows now route
+through the engine-backed bad-literal path, while the focused dynamic-range
+lane still proves valid `OFFSET(...):OFFSET(...)` range construction can
+succeed through the dedicated range path. The classic opcode census still shows
+`Bad=506` and `Range=96` because it counts opcode entry before the switch
+decides whether engine or legacy computes the result. So the next bottleneck is
+no longer root error literals or this faux-range tail; it is the remaining real
+reference and control/matrix substrate behind the still-unseen live surface.
 The current value reflects the restored original `Sc*` names after backing out
 earlier rename-only metric compression, and the quarantine audit currently
 shows `62 / 62` dispatch-reachable legacy lambdas warning when reached. This

@@ -16,8 +16,8 @@ After the current honest baseline of:
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
 - `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=602`
-- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=506`
-- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=96`
+- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=602`
+- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=0`
 - `sc_formula_executor_classic_interpret_total_live=0`
 - `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=602`
 - `interpret_tail_live_unique_unseen_formula_cells=49`
@@ -153,18 +153,20 @@ Checkpoint:
   `ScInterpreter::Interpret()` is reachable again (`602` executions on the
   standing corpus), and it now reports
   `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=602` with
-  `506` successes and `96` declines, so engine-first dispatch is carrying real
+  `602` successes and `0` declines, so engine-first dispatch is carrying real
   load inside the residual classic tail
 - that movement now comes from both the `ocBad` root-error-literal slice and
-  the first `ocRange` pilot; the classic opcode census still shows `Bad=506`
-  and `Range=96` because it records opcode entry before the switch decides
-  whether engine or legacy computes the result
-- the focused `OFFSET(...):OFFSET(...)` proof shows valid dynamic range
-  construction already succeeds through the engine-first path, but the standing
-  corpus still declines all `96` residual `ocRange` rows
-- the next real engine-admission value is therefore residual range-operand
-  shape support and the broader reference substrate, not more error-literal
-  work
+  the follow-up `ocRange` audit/fix; the classic opcode census still shows
+  `Bad=506` and `Range=96` because it records opcode entry before the switch
+  decides whether engine or legacy computes the result
+- the `ocRange` audit proved that the standing corpus’s `96` apparent `Range`
+  rows were really bracketed ODF error-literal syntax like `=[.OF:.ERR]:502`,
+  not true reference-range work, so they now reroute through the bad-literal
+  engine path
+- the focused `OFFSET(...):OFFSET(...)` proof still shows valid dynamic range
+  construction already succeeds through the dedicated range path
+- the next real engine-admission value is therefore the broader real reference
+  substrate and the control/matrix work beyond it, not more error-literal work
 - it covers:
   - unary numeric `Plus` / `Minus`
   - binary scalar `Add`, `Subtract`, `Multiply`, `Divide`, `Power`

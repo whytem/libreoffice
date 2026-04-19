@@ -114,8 +114,8 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
 - `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=602`
-- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=506`
-- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=96`
+- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=602`
+- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=0`
 - `sc_formula_executor_classic_interpret_total_live=0`
 - `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=602`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
@@ -143,19 +143,20 @@ static companion for the first engine-first dispatch work inside `Interpret()`:
 it counts dispatch cases that now try the standalone engine first. The runtime
 totals tell us whether replay traffic is actually using that path. Today they
 are still `0 / 0 / 0` on the standing live corpus, but the core-forced
-full-legacy replay lane now reports `602 / 506 / 96`, so the dispatch bridge is
-carrying real workload when the classic interpreter is deliberately exercised.
-That movement now comes from two engine-first slices: `ocBad` succeeds across
-the full `506` error-literal rows, and `ocRange` is now actively attempted in
-the remaining `96` classic range rows. The classic opcode census still shows
-`Bad=506` and `Range=96`, anchored by formulas like `=of:#N/A` and
-`=of:#ERR504!`, because the census counts opcode entry before the switch
-decides whether engine or legacy computes the result. The important new readout
-is that all `96` corpus `ocRange` attempts still decline, even though the
-focused `OFFSET(...):OFFSET(...)` proof shows valid dynamic range construction
-already succeeds through the engine-first path. So the next gap is narrower and
-clearer: residual range-operand shapes and the broader reference substrate, not
-error literals and not simple operator reachability.
+full-legacy replay lane now reports `602 / 602 / 0`, so the dispatch bridge is
+carrying the entire residual classic tail when the classic interpreter is
+deliberately exercised. That movement now comes from two engine-first slices:
+`ocBad` succeeds across the full `506` error-literal rows, and the `ocRange`
+audit proved that the remaining `96` classic `Range` rows were really
+bracketed ODF error-literal syntax like `=[.OF:.ERR]:502`, not true
+reference-range work. Those rows now reroute through the engine-backed
+bad-literal path. The classic opcode census still shows `Bad=506` and
+`Range=96`, anchored by formulas like `=of:#N/A` and `=[.OF:.ERR]:502`,
+because the census counts opcode entry before the switch decides whether
+engine or legacy computes the result. The focused `OFFSET(...):OFFSET(...)`
+proof still shows valid dynamic range construction already succeeds through the
+dedicated range path. So the next gap is no longer faux-range error syntax; it
+is the broader real reference and control/matrix substrate.
 
 ### Full Replay Corpus: Ambient Live Observe Attempts
 
