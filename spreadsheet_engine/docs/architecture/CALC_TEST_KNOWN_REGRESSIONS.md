@@ -26,22 +26,19 @@ fixed without the list being updated).
 
 ## Failure baseline (2026-04-19, branch tip after `0e94cc217`)
 
-34 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 125 tests.
+30 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 125 tests.
 
 ### External reference (2)
 
 - `testExternalRefFunctions`
 - `testExternalRefUnresolved`
 
-### Recalc / dependency tracking (5)
+### Recalc / dependency tracking (2)
 
-- `testFormulaDepTracking`
-- `testFormulaDepTracking3`
 - `testFormulaDepTrackingDeleteCol`
-- `testFormulaDepTrackingDeleteRow`
 - `testIterations`
 
-### Function evaluation (18)
+### Function evaluation (17)
 
 Likely root cause: legacy fallback paths regressed during retirement +
 relocation episodes; recalc/observe interaction with the seam returns wrong
@@ -49,7 +46,6 @@ values or false `Err:522` (Circular Reference) on dependency change.
 
 - `testFuncCHITEST`
 - `testFuncCHOOSE`
-- `testFuncDATEDIF`
 - `testFuncFTEST`
 - `testFuncFTESTBug`
 - `testFuncGCD`

@@ -3210,6 +3210,17 @@ bool ScFormulaCell::IsEmptyDisplayedAsString()
     return aResult.IsEmptyDisplayedAsString();
 }
 
+bool ScFormulaCell::IsEmptyDisplayedAsStringCached() const
+{
+    // Non-triggering: read the cached aResult directly. Callers that
+    // must not recurse through Interpret() (e.g. the InterpretTail
+    // seam's imported-cached-root probe, which runs before bRunning
+    // is set and would otherwise cascade back into Interpret via
+    // MaybeInterpret) should prefer this over the triggering variant
+    // above.
+    return aResult.IsEmptyDisplayedAsString();
+}
+
 bool ScFormulaCell::IsValue()
 {
     MaybeInterpret();

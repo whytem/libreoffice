@@ -329,6 +329,12 @@ public:
     bool            IsEmpty();      // formula::svEmptyCell result
                     // display as empty string if formula::svEmptyCell result
     bool            IsEmptyDisplayedAsString();
+                    // non-triggering variant: reads aResult directly without
+                    // calling MaybeInterpret(). Safe to use from the
+                    // InterpretTail seam's imported-cached probe, where a
+                    // MaybeInterpret() call here recurses via the seam's
+                    // authoritative-while-off path.
+    SC_DLLPUBLIC bool IsEmptyDisplayedAsStringCached() const;
     SC_DLLPUBLIC bool IsValue();      // also true if formula::svEmptyCell
     bool            IsValueNoError();
     bool            IsValueNoError() const;

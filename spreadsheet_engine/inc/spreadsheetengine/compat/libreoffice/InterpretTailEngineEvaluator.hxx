@@ -1959,9 +1959,15 @@ template <typename T>
     const ScAddress& rAddress)
 {
     ScFormulaCell* pFormula = const_cast<ScDocument&>(rDoc).GetFormulaCell(rAddress);
+    // IsEmptyDisplayedAsStringCached() reads aResult directly; the
+    // triggering IsEmptyDisplayedAsString() cascades through
+    // MaybeInterpret() -> Interpret() -> back into the seam's
+    // authoritative-while-off path which calls this probe BEFORE
+    // bRunning is set, producing recursion to MAXRECURSION depth.
     return pFormula
            && (pFormula->GetCode()->IsRecalcModeMustAfterImport()
-               || pFormula->HasHybridStringResult() || pFormula->IsEmptyDisplayedAsString()
+               || pFormula->HasHybridStringResult()
+               || pFormula->IsEmptyDisplayedAsStringCached()
                || !pFormula->GetHybridFormula().isEmpty());
 }
 
