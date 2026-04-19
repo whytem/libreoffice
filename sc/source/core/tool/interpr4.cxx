@@ -6309,22 +6309,6 @@ StackVar ScInterpreter::Interpret()
                         PushString(aRes.makeStringAndClear());
                     }
                 };
-                const auto pushLegacyConcat = [&]() {
-                    warnTextUtilityDispatch(u"CONCATENATE");
-                    sal_uInt8 nParamCount = GetByte();
-                    ReverseStack(nParamCount);
-
-                    OUStringBuffer aRes;
-                    while (nParamCount-- > 0)
-                    {
-                        OUString aStr = GetString().getString();
-                        if (CheckStringResultLen(aRes, aStr.getLength()))
-                            aRes.append(aStr);
-                        else
-                            break;
-                    }
-                    PushString(aRes.makeStringAndClear());
-                };
                 const auto pushLegacySearch = [&]() {
                     warnTextUtilityDispatch(u"SEARCH");
                     sal_uInt8 nParamCount = GetByte();
@@ -12844,7 +12828,24 @@ StackVar ScInterpreter::Interpret()
                     case ocSubstitute       : pushLegacySubstitute();   break;
                     case ocRegex            : pushLegacyRegex();        break;
                     case ocRept             : pushLegacyRept();         break;
-                    case ocConcat           : pushLegacyConcat();       break;
+                    case ocConcat           :
+                    {
+                        warnTextUtilityDispatch(u"CONCATENATE");
+                        sal_uInt8 nParamCount = GetByte();
+                        ReverseStack(nParamCount);
+
+                        OUStringBuffer aRes;
+                        while (nParamCount-- > 0)
+                        {
+                            OUString aStr = GetString().getString();
+                            if (CheckStringResultLen(aRes, aStr.getLength()))
+                                aRes.append(aStr);
+                            else
+                                break;
+                        }
+                        PushString(aRes.makeStringAndClear());
+                    }
+                    break;
                     case ocConcat_MS        : pushLegacyConcatMs();         break;
                     case ocTextJoin_MS      : pushLegacyTextJoinMs();   break;
                     case ocIfs_MS           :
