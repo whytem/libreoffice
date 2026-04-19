@@ -890,6 +890,68 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAreaCountDispat
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceIndexDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"Index"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    // Populate a 3x3 block at A1:C3.
+    m_pDoc->SetValue(ScAddress(0, 0, 0), 1.0);
+    m_pDoc->SetValue(ScAddress(1, 0, 0), 2.0);
+    m_pDoc->SetValue(ScAddress(2, 0, 0), 3.0);
+    m_pDoc->SetValue(ScAddress(0, 1, 0), 4.0);
+    m_pDoc->SetValue(ScAddress(1, 1, 0), 5.0);
+    m_pDoc->SetValue(ScAddress(2, 1, 0), 6.0);
+    m_pDoc->SetValue(ScAddress(0, 2, 0), 7.0);
+    m_pDoc->SetValue(ScAddress(1, 2, 0), 8.0);
+    m_pDoc->SetValue(ScAddress(2, 2, 0), 9.0);
+
+    // INDEX(A1:C3; 2; 2) -> B2 -> 5
+    m_pDoc->SetString(ScAddress(5, 0, 0), u"=INDEX(A1:C3;2;2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(ScAddress(5, 0, 0)));
+
+    // INDEX(A1:C3; 3; 3) -> C3 -> 9
+    m_pDoc->SetString(ScAddress(5, 1, 0), u"=INDEX(A1:C3;3;3)"_ustr);
+    ASSERT_DOUBLES_EQUAL(9.0, m_pDoc->GetValue(ScAddress(5, 1, 0)));
+
+    // INDEX(A1:A3; 2) with single-column range: scalar row pick -> 4
+    m_pDoc->SetString(ScAddress(5, 2, 0), u"=INDEX(A1:A3;2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(ScAddress(5, 2, 0)));
+
+    // Zero-axis form declines to legacy matrix-return path (scope fence).
+    // Legacy resolves INDEX(A1:C3;0;2) to column 2 -> in scalar context,
+    // it should not produce a parse error.
+    m_pDoc->SetString(ScAddress(5, 3, 0), u"=INDEX(A1:C3;0;2)"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetString(ScAddress(5, 3, 0)) != u"Err:502"_ustr);
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "ref_attempted="
+          + std::to_string(aDispatchStats.mnReferenceEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnReferenceEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnReferenceEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "INDEX should attempt engine dispatch: " + aLabel,
+        aDispatchStats.mnReferenceEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "scalar INDEX should succeed through engine: " + aLabel,
+        aDispatchStats.mnReferenceEngineSucceededCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "zero-axis INDEX should produce an engine decline: " + aLabel,
+        aDispatchStats.mnReferenceEngineDeclinedCount > 0);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceOffsetDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);

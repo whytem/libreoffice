@@ -7866,6 +7866,169 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
+                // Batch 2 fifth admission: INDEX scalar-reference selection.
+                // Covers INDEX(ref, row) and INDEX(ref, row, col) where:
+                //   - base is svSingleRef or svDoubleRef (no matrix, no
+                //     external, no RefList — those stay on legacy)
+                //   - row is a positive scalar double
+                //   - col is a positive scalar double (if present)
+                // Matrix-returning forms (row=0 or col=0) and external /
+                // matrix / RefList bases defer to legacy.
+                const auto tryPlanEngineIndex = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnReferenceEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount < 2 || nParamCount > 3)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+                    if (sp < nParamCount)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const FormulaToken* pColTok
+                        = (nParamCount == 3) ? pStack[sp - 1] : nullptr;
+                    const FormulaToken* pRowTok
+                        = pStack[sp - (nParamCount == 3 ? 2 : 1)];
+                    const FormulaToken* pBaseTok
+                        = pStack[sp - nParamCount];
+
+                    const StackVar eBaseType = pBaseTok ? pBaseTok->GetType() : svUnknown;
+                    if ((eBaseType != svSingleRef && eBaseType != svDoubleRef)
+                        || !pRowTok || pRowTok->GetType() != svDouble
+                        || (pColTok && pColTok->GetType() != svDouble))
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const double fRow = pRowTok->GetDouble();
+                    const double fCol = pColTok ? pColTok->GetDouble() : 0.0;
+                    // Scope fence: zero-axis (whole row / column slice)
+                    // produces a matrix result; defer to legacy.
+                    if (fRow <= 0.0 || (nParamCount == 3 && fCol <= 0.0))
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    // Peek the base range before popping so we can decline
+                    // cleanly if anything goes wrong building the plan.
+                    spreadsheetengine::api::ResolvedReference aBase;
+                    if (eBaseType == svSingleRef)
+                    {
+                        const ScSingleRefData& rRef = *pBaseTok->GetSingleRef();
+                        const ScAddress aAbs = rRef.toAbs(mrDoc, aPos);
+                        aBase.maRange.maStart = {
+                            static_cast<spreadsheetengine::api::SheetId>(aAbs.Tab()),
+                            static_cast<spreadsheetengine::api::ColumnIndex>(aAbs.Col()),
+                            static_cast<spreadsheetengine::api::RowIndex>(aAbs.Row())
+                        };
+                        aBase.maRange.maEnd = aBase.maRange.maStart;
+                    }
+                    else
+                    {
+                        const ScComplexRefData& rRef = *pBaseTok->GetDoubleRef();
+                        const ScRange aAbs = rRef.toAbs(mrDoc, aPos);
+                        aBase.maRange.maStart = {
+                            static_cast<spreadsheetengine::api::SheetId>(aAbs.aStart.Tab()),
+                            static_cast<spreadsheetengine::api::ColumnIndex>(aAbs.aStart.Col()),
+                            static_cast<spreadsheetengine::api::RowIndex>(aAbs.aStart.Row())
+                        };
+                        aBase.maRange.maEnd = {
+                            static_cast<spreadsheetengine::api::SheetId>(aAbs.aEnd.Tab()),
+                            static_cast<spreadsheetengine::api::ColumnIndex>(aAbs.aEnd.Col()),
+                            static_cast<spreadsheetengine::api::RowIndex>(aAbs.aEnd.Row())
+                        };
+                    }
+
+                    serpn::IndexProjectionParameters aParams;
+                    aParams.mnRowIndex
+                        = static_cast<spreadsheetengine::api::RowIndex>(fRow);
+                    aParams.mnColumnIndex
+                        = (nParamCount == 3)
+                              ? static_cast<spreadsheetengine::api::ColumnIndex>(fCol)
+                              : 0;
+                    aParams.mbColumnArgumentMissing = (nParamCount != 3);
+                    aParams.mnParamCount = nParamCount;
+                    aParams.mnAreaIndex = 1;
+                    aParams.mnAreaCount = 1;
+
+                    const auto aPlan = serpn::projectIndexReference(
+                        serpn::RpnValue::reference(aBase), aParams);
+                    if (!aPlan
+                        || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    // Only Scalar and KeepSource are scope-fence-safe here.
+                    // RowSlice / ColumnSlice need matrix materialization.
+                    using SelectionKind
+                        = spreadsheetengine::api::reference::IndexSelectionKind;
+                    if (aPlan.maValue.meKind != SelectionKind::KeepSource
+                        && aPlan.maValue.meKind != SelectionKind::Scalar)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    // Commit: drop the operands and push the selection.
+                    sp -= nParamCount;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnReferenceEngineSucceededCount);
+
+                    if (aPlan.maValue.meKind == SelectionKind::KeepSource)
+                    {
+                        // Push the base unchanged.
+                        if (eBaseType == svSingleRef)
+                        {
+                            PushSingleRef(
+                                static_cast<SCCOL>(aBase.maRange.maStart.mnColumn),
+                                static_cast<SCROW>(aBase.maRange.maStart.mnRow),
+                                static_cast<SCTAB>(aBase.maRange.maStart.mnSheet));
+                        }
+                        else
+                        {
+                            PushDoubleRef(
+                                static_cast<SCCOL>(aBase.maRange.maStart.mnColumn),
+                                static_cast<SCROW>(aBase.maRange.maStart.mnRow),
+                                static_cast<SCTAB>(aBase.maRange.maStart.mnSheet),
+                                static_cast<SCCOL>(aBase.maRange.maEnd.mnColumn),
+                                static_cast<SCROW>(aBase.maRange.maEnd.mnRow),
+                                static_cast<SCTAB>(aBase.maRange.maEnd.mnSheet));
+                        }
+                    }
+                    else
+                    {
+                        PushSingleRef(
+                            static_cast<SCCOL>(aPlan.maValue.maRange.maStart.mnColumn),
+                            static_cast<SCROW>(aPlan.maValue.maRange.maStart.mnRow),
+                            static_cast<SCTAB>(aPlan.maValue.maRange.maStart.mnSheet));
+                    }
+                    return true;
+                };
+
                 // Batch 2 fourth admission: OFFSET with scalar int offsets
                 // and a single-reference base. Covers 3-argument form only
                 // (no new-height / new-width) to keep the first pass
@@ -10033,7 +10196,10 @@ StackVar ScInterpreter::Interpret()
                             "hard-routed HLOOKUP reached ScInterpreter");
                         CalculateLookup(true);
                         break;
-                    case ocIndex            : ScIndex();                    break;
+                    case ocIndex            :
+                        if (!tryPlanEngineIndex())
+                            ScIndex();
+                        break;
                     case ocMultiArea        : ScMultiArea();                break;
                     case ocOffset           :
                         if (!tryPlanEngineOffset())
