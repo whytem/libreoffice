@@ -9078,41 +9078,72 @@ StackVar ScInterpreter::Interpret()
                                 .mnMatrixEngineDeclinedCount);
                         return false;
                     }
-                    // Scope fence (Phase C): both arguments must be
-                    // in-memory svMatrix tokens. Range tokens still
-                    // need the reference-to-matrix materialization
-                    // contract and decline to legacy for now so
-                    // ScMatMult keeps ownership of that path.
+                    // Scope fence: both arguments may be in-memory
+                    // svMatrix tokens or svSingleRef / svDoubleRef
+                    // range tokens (routed through the Phase D
+                    // host-facade materialization primitive).
+                    // svRefList still defers.
                     const FormulaToken* pRightTok = pStack[sp - 1];
                     const FormulaToken* pLeftTok = pStack[sp - 2];
-                    if (!pRightTok || !pLeftTok
-                        || pRightTok->GetType() != svMatrix
-                        || pLeftTok->GetType() != svMatrix)
+                    auto isAccepted = [](const FormulaToken* pTok) {
+                        if (!pTok)
+                            return false;
+                        const StackVar eType = pTok->GetType();
+                        return eType == svMatrix || eType == svSingleRef
+                               || eType == svDoubleRef;
+                    };
+                    if (!isAccepted(pRightTok) || !isAccepted(pLeftTok))
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
                                 .mnMatrixEngineDeclinedCount);
                         return false;
                     }
-                    ScMatrix* pRightMat
-                        = const_cast<FormulaToken*>(pRightTok)->GetMatrix();
-                    ScMatrix* pLeftMat
-                        = const_cast<FormulaToken*>(pLeftTok)->GetMatrix();
-                    if (!pRightMat || !pLeftMat)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    auto oLeftOperand = convertMatrixRefToMatrixOperand(*pLeftMat);
-                    auto oRightOperand = convertMatrixRefToMatrixOperand(*pRightMat);
+                    auto fetchOperand = [&](const FormulaToken* pTok)
+                        -> std::optional<serpn::MatrixOperand> {
+                        if (pTok->GetType() == svMatrix)
+                        {
+                            ScMatrix* pSourceMat
+                                = const_cast<FormulaToken*>(pTok)->GetMatrix();
+                            if (!pSourceMat)
+                                return std::nullopt;
+                            return convertMatrixRefToMatrixOperand(*pSourceMat);
+                        }
+                        return materializeRangeTokenToMatrixOperand(pTok);
+                    };
+                    auto oLeftOperand = fetchOperand(pLeftTok);
+                    auto oRightOperand = fetchOperand(pRightTok);
                     if (!oLeftOperand || !oRightOperand)
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
                                 .mnMatrixEngineDeclinedCount);
                         return false;
+                    }
+                    // Legacy ScMatMult pushes NoValue (#N/A) when either
+                    // source matrix contains non-numeric cells, whereas
+                    // planMatrixMultiply surfaces that case as
+                    // IllegalArgument. Pre-check so the retired
+                    // ocMatMult dispatch preserves the legacy diagnostic
+                    // signal.
+                    auto hasNonNumericCell = [](const serpn::MatrixOperand& rOp) {
+                        for (const auto& rCell : rOp.maValues)
+                        {
+                            if (rCell.meKind == spreadsheetengine::api::CellValueKind::Text)
+                                return true;
+                        }
+                        return false;
+                    };
+                    if (hasNonNumericCell(*oLeftOperand)
+                        || hasNonNumericCell(*oRightOperand))
+                    {
+                        sp -= 2;
+                        nGlobalError = FormulaError::NONE;
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineSucceededCount);
+                        PushNoValue();
+                        return true;
                     }
                     const auto aPlan
                         = serpn::planMatrixMultiply(*oLeftOperand, *oRightOperand);
@@ -15672,7 +15703,10 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocMatMult:
                         if (!tryPlanEngineMatrixMultiply())
-                            ScMatMult();
+                        {
+                            OSL_FAIL("engine-backed MMULT declined ocMatMult");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocMatSequence      :
                         if (!tryPlanEngineSequenceMatrix())

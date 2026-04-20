@@ -833,56 +833,6 @@ void ScInterpreter::ScMatInv()
     }
 }
 
-void ScInterpreter::ScMatMult()
-{
-    if ( !MustHaveParamCount( GetByte(), 2 ) )
-        return;
-
-    ScMatrixRef pMat2 = GetMatrix();
-    ScMatrixRef pMat1 = GetMatrix();
-    ScMatrixRef pRMat;
-    if (pMat1 && pMat2)
-    {
-        if ( pMat1->IsNumeric() && pMat2->IsNumeric() )
-        {
-            SCSIZE nC1, nC2;
-            SCSIZE nR1, nR2;
-            pMat1->GetDimensions(nC1, nR1);
-            pMat2->GetDimensions(nC2, nR2);
-            if (nC1 != nR2)
-                PushIllegalArgument();
-            else
-            {
-                pRMat = GetNewMat(nC2, nR1, /*bEmpty*/true);
-                if (pRMat)
-                {
-                    KahanSum fSum;
-                    for (SCSIZE i = 0; i < nR1; i++)
-                    {
-                        for (SCSIZE j = 0; j < nC2; j++)
-                        {
-                            fSum = 0.0;
-                            for (SCSIZE k = 0; k < nC1; k++)
-                            {
-                                fSum += pMat1->GetDouble(k,i)*pMat2->GetDouble(j,k);
-                            }
-                            pRMat->PutDouble(fSum.get(), j, i);
-                        }
-                    }
-                    PushMatrix(pRMat);
-                }
-                else
-                    PushIllegalArgument();
-            }
-        }
-        else
-            PushNoValue();
-    }
-    else
-        PushIllegalParameter();
-}
-
-
 /** Minimum extent of one result matrix dimension.
     For a row or column vector to be replicated the larger matrix dimension is
     returned, else the smaller dimension.
