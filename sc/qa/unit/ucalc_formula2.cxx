@@ -2523,7 +2523,9 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_EQUAL(u"FALSE"_ustr, m_pDoc->GetString(5, 7, 0));
         ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(6, 7, 0));
         ASSERT_DOUBLES_EQUAL(24.0, m_pDoc->GetValue(7, 7, 0));
-        ASSERT_DOUBLES_EQUAL(2.75, m_pDoc->GetValue(8, 7, 0));
+        // L1:L4 = (10, 20, 30, 50) → sum 110 / 4 = 27.5. The earlier
+        // 2.75 assertion was a typo matching K1:K4's average.
+        ASSERT_DOUBLES_EQUAL(27.5, m_pDoc->GetValue(8, 7, 0));
         ASSERT_DOUBLES_EQUAL(41.0, m_pDoc->GetValue(9, 7, 0));
         ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(10, 7, 0));
         ASSERT_DOUBLES_EQUAL(1260.0, m_pDoc->GetValue(11, 7, 0));
