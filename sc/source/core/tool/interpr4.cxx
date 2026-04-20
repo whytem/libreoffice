@@ -9966,18 +9966,28 @@ StackVar ScInterpreter::Interpret()
                               : nullptr;
                     const FormulaToken* pTextTok
                         = pStack[sp - nParamCount];
-                    if (!pTextTok || pTextTok->GetType() != svString)
+                    // Scope fence: text can arrive as svString (literal
+                    // or coerced) or svDouble (legacy's GetString()
+                    // converted numeric text).  Range-typed text defers.
+                    if (!pTextTok
+                        || (pTextTok->GetType() != svString
+                            && pTextTok->GetType() != svDouble))
                     {
                         pushSpillEngineDecline();
                         return false;
                     }
-                    const auto isStringOrMissing
+                    const auto isAdmissibleDelim
                         = [](const FormulaToken* pTok) {
-                              return !pTok || pTok->GetType() == svString
-                                     || pTok->GetType() == svMissing;
+                              if (!pTok)
+                                  return true;
+                              const auto eType = pTok->GetType();
+                              return eType == svString || eType == svMissing
+                                     || eType == svMatrix
+                                     || eType == svSingleRef
+                                     || eType == svDoubleRef;
                           };
-                    if (!isStringOrMissing(pColDelimTok)
-                        || !isStringOrMissing(pRowDelimTok))
+                    if (!isAdmissibleDelim(pColDelimTok)
+                        || !isAdmissibleDelim(pRowDelimTok))
                     {
                         pushSpillEngineDecline();
                         return false;
@@ -10001,20 +10011,89 @@ StackVar ScInterpreter::Interpret()
                         pushSpillEngineDecline();
                         return false;
                     }
-                    const spreadsheetengine::api::String aText
-                        = selibreoffice::toApiString(
-                            pTextTok->GetString().getString());
-                    std::vector<spreadsheetengine::api::String> aColDelims;
-                    if (pColDelimTok && pColDelimTok->GetType() == svString)
+                    OUString aTextRaw;
+                    if (pTextTok->GetType() == svString)
                     {
-                        aColDelims.push_back(selibreoffice::toApiString(
-                            pColDelimTok->GetString().getString()));
+                        aTextRaw = pTextTok->GetString().getString();
                     }
-                    std::vector<spreadsheetengine::api::String> aRowDelims;
-                    if (pRowDelimTok && pRowDelimTok->GetType() == svString)
+                    else
                     {
-                        aRowDelims.push_back(selibreoffice::toApiString(
-                            pRowDelimTok->GetString().getString()));
+                        // Coerce svDouble to Calc's locale-aware decimal
+                        // representation, matching ScInterpreter::GetString().
+                        aTextRaw = OUString::number(pTextTok->GetDouble());
+                    }
+                    const spreadsheetengine::api::String aText
+                        = selibreoffice::toApiString(aTextRaw);
+                    // Gather delimiters: scalar string -> single entry;
+                    // matrix / range -> enumerate all string cells in
+                    // column-major order to match the legacy
+                    // ScTextSplit traversal.
+                    const auto collectDelimiters
+                        = [&](const FormulaToken* pTok,
+                              std::vector<spreadsheetengine::api::String>& rOut) -> bool {
+                        if (!pTok)
+                            return true;
+                        const auto eType = pTok->GetType();
+                        if (eType == svMissing)
+                            return true;
+                        if (eType == svString)
+                        {
+                            rOut.push_back(selibreoffice::toApiString(
+                                pTok->GetString().getString()));
+                            return true;
+                        }
+                        std::optional<serpn::MatrixOperand> oDelimMat;
+                        if (eType == svMatrix)
+                        {
+                            ScMatrix* pMat
+                                = const_cast<FormulaToken*>(pTok)->GetMatrix();
+                            if (!pMat)
+                                return false;
+                            oDelimMat = convertMatrixRefToMatrixOperand(*pMat);
+                        }
+                        else
+                        {
+                            oDelimMat = materializeRangeTokenToMatrixOperand(pTok);
+                        }
+                        if (!oDelimMat)
+                            return false;
+                        const auto nCols = oDelimMat->maDimensions.mnColumns;
+                        const auto nRows = oDelimMat->maDimensions.mnRows;
+                        for (spreadsheetengine::api::MatrixSize c = 0;
+                             c < nCols; ++c)
+                        {
+                            for (spreadsheetengine::api::MatrixSize r = 0;
+                                 r < nRows; ++r)
+                            {
+                                const auto& rCell
+                                    = oDelimMat->maValues[
+                                        static_cast<std::size_t>(r) * nCols + c];
+                                if (rCell.meKind
+                                    == spreadsheetengine::api::CellValueKind::Text)
+                                {
+                                    rOut.push_back(rCell.maString);
+                                }
+                                else
+                                {
+                                    // Legacy pulls strings via
+                                    // pMatSource->GetString(...) which
+                                    // coerces any cell into text; for the
+                                    // engine-backed path we only admit
+                                    // text-kind cells and decline mixed
+                                    // shapes.
+                                    return false;
+                                }
+                            }
+                        }
+                        return true;
+                    };
+                    std::vector<spreadsheetengine::api::String> aColDelims;
+                    std::vector<spreadsheetengine::api::String> aRowDelims;
+                    if (!collectDelimiters(pColDelimTok, aColDelims)
+                        || !collectDelimiters(pRowDelimTok, aRowDelims))
+                    {
+                        pushSpillEngineDecline();
+                        return false;
                     }
                     const bool bIgnoreEmpty
                         = pIgnoreTok && pIgnoreTok->GetType() == svDouble
@@ -10037,8 +10116,20 @@ StackVar ScInterpreter::Interpret()
                     const auto aPlan = sespill::planTextSplit(
                         aText, aColDelims, aRowDelims, bIgnoreEmpty,
                         bMatchMode, oPadValue);
-                    if (!aPlan
-                        || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    if (!aPlan)
+                    {
+                        // planTextSplit returns IllegalArgument for an
+                        // empty text operand, matching the legacy
+                        // sText.isEmpty() IllegalParameter surface.
+                        sp -= nParamCount;
+                        nGlobalError = FormulaError::NONE;
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnSpillEngineSucceededCount);
+                        PushError(FormulaError::IllegalParameter);
+                        return true;
+                    }
+                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
                     {
                         pushSpillEngineDecline();
                         return false;
@@ -13319,7 +13410,10 @@ StackVar ScInterpreter::Interpret()
                     case ocTextBefore       : pushLegacyTextBeforeAfter(true);  break;
                     case ocTextSplit        :
                         if (!tryPlanEngineSpillTextSplit())
-                            ScTextSplit();
+                        {
+                            OSL_FAIL("engine-backed TEXTSPLIT declined ocTextSplit");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocToCol            :
                         if (!tryPlanEngineSpillToColOrRow(/*bToColumn*/ true))

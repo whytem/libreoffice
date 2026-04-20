@@ -662,7 +662,6 @@ private:
     void ScLookup();
     void ScXLookup();
     void ScSortBy();
-    void ScTextSplit();
     void ScLet();
     void ScSubTotal();
 
