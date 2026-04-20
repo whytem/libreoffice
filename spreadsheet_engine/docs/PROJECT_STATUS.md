@@ -45,7 +45,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=45`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=58`
+- `interp4_dispatch_engine_attempt_count=65`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -304,6 +304,26 @@ The contract for this primitive is tracked in
 [architecture/HOST_FACADE_CONTRACTS.md](architecture/HOST_FACADE_CONTRACTS.md);
 Phase I will extend that document with the remaining address /
 range-resolution / iteration / spill contracts.
+
+Batch 4 regression/forecast admissions (Phase E of the Close-Out
+Plan) route seven additional opcodes through the engine-first
+dispatch. `ocLinest` / `ocLogest` (LINEST / LOGEST) route through
+`serpn::planLinest` / `planLogest`, `ocTrend` / `ocGrowth` (TREND /
+GROWTH) through `serpn::planTrend` / `planGrowth`, `ocForecast_LIN`
+/ `ocForecast` (FORECAST) through `serpn::planForecast`, and
+`ocFourier` (FOURIER) through `serpn::planFourier`. GROWTH and
+FORECAST additionally keep the existing
+`Dispatcher::growth` / `Dispatcher::forecast` indirection and its
+`warnIfLegacyGrowthProjectionReached` /
+`warnIfLegacyStatisticalDistributionReached` observability on the
+decline path, so the legacy audit surface is preserved. Scope
+fence: matrix inputs must arrive as svMatrix tokens, flags must be
+svDouble; range tokens decline to the legacy path pending the same
+reference-to-matrix widening that TRANSPOSE / MDETERM already use.
+The admissions reuse the `mnMatrixEngine*` counters because the
+regression/forecast family produces matrix or scalar numeric
+results on the same semantic surface as MDETERM / TRANSPOSE / MMULT
+/ MINVERSE. No new counter triple is introduced.
 
 `ocLet` remains the last unstarted Batch 1 member; the nested-
 interpreter spawn contract for binding resolution is the gating
