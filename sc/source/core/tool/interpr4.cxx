@@ -13455,10 +13455,10 @@ StackVar ScInterpreter::Interpret()
                     // Conditions sit at the even offsets from the bottom of
                     // the param window: c0 at sp - nParamCount + 0,
                     // c1 at +2, c2 at +4, ... Values follow at +1, +3, +5.
-                    // Scope fence: every condition must be a simple scalar
-                    // token so the planner can decide locally without host
-                    // resolution. Any non-scalar condition declines to the
-                    // legacy ReverseStack walk.
+                    // Every non-scalar condition shape is resolved up-front
+                    // via the usual cell-materialization paths so the
+                    // planner can decide locally; legacy `pushLegacyIfs`
+                    // used `GetBool()` which unifies the same shapes.
                     const std::size_t nPairs
                         = static_cast<std::size_t>(nParamCount) / 2;
                     std::size_t winningPair = nPairs;
@@ -13473,36 +13473,82 @@ StackVar ScInterpreter::Interpret()
                     Outcome eOutcome = Outcome::Continue;
                     spreadsheetengine::api::Error ePropagated
                         = spreadsheetengine::api::Error::None;
+                    const auto buildIfsConditionValue
+                        = [&](const FormulaToken* pCond)
+                              -> std::optional<serpn::RpnValue> {
+                        if (!pCond)
+                            return std::nullopt;
+                        switch (pCond->GetType())
+                        {
+                            case svDouble:
+                                return serpn::RpnValue::number(pCond->GetDouble());
+                            case svError:
+                                return serpn::RpnValue::error(
+                                    selibreoffice::toApiError(pCond->GetError()));
+                            case svEmptyCell:
+                            case svMissing:
+                                return serpn::RpnValue::empty();
+                            case svString:
+                                // Legacy GetBool() → String::ToDouble →
+                                // NoValue on failure; matches the error
+                                // RpnValue path since we do not parse
+                                // number-like strings here.
+                                return serpn::RpnValue::error(
+                                    spreadsheetengine::api::Error::NoValue);
+                            case svSingleRef:
+                            case svDoubleRef:
+                            {
+                                ScAddress aAdr;
+                                const ScSingleRefData* pSingle
+                                    = pCond->GetType() == svSingleRef
+                                          ? pCond->GetSingleRef()
+                                          : nullptr;
+                                if (pSingle)
+                                    aAdr = pSingle->toAbs(mrDoc, aPos);
+                                else
+                                {
+                                    const ScComplexRefData& rRef
+                                        = *pCond->GetDoubleRef();
+                                    const ScRange aRange = rRef.toAbs(mrDoc, aPos);
+                                    if (aRange.aStart != aRange.aEnd
+                                        && aRange.aStart.Tab() != aRange.aEnd.Tab())
+                                        return std::nullopt;
+                                    // 1x1 double-ref or collapsed to start
+                                    // for implicit intersection is beyond
+                                    // this path; decline those.
+                                    if (aRange.aStart != aRange.aEnd)
+                                        return std::nullopt;
+                                    aAdr = aRange.aStart;
+                                }
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                const FormulaError eCellError = GetCellErrCode(aCell);
+                                if (eCellError != FormulaError::NONE)
+                                    return serpn::RpnValue::error(
+                                        selibreoffice::toApiError(eCellError));
+                                if (aCell.hasEmptyValue() || aCell.isEmpty())
+                                    return serpn::RpnValue::empty();
+                                if (aCell.hasNumeric())
+                                    return serpn::RpnValue::number(
+                                        GetCellValue(aAdr, aCell));
+                                // Text cell: legacy GetBool → NoValue.
+                                return serpn::RpnValue::error(
+                                    spreadsheetengine::api::Error::NoValue);
+                            }
+                            default:
+                                return std::nullopt;
+                        }
+                    };
                     for (std::size_t i = 0; i < nPairs; ++i)
                     {
                         const FormulaToken* pCond
                             = pStack[sp - nParamCount + 2 * i];
-                        if (!pCond)
+                        auto oCond = buildIfsConditionValue(pCond);
+                        if (!oCond)
                         {
                             addDispatchRuntimeStat(
                                 interpreterDispatchRuntimeStatsStore()
                                     .mnControlFlowEngineDeclinedCount);
                             return false;
-                        }
-                        std::optional<serpn::RpnValue> oCond;
-                        switch (pCond->GetType())
-                        {
-                            case svDouble:
-                                oCond = serpn::RpnValue::number(pCond->GetDouble());
-                                break;
-                            case svError:
-                                oCond = serpn::RpnValue::error(
-                                    selibreoffice::toApiError(pCond->GetError()));
-                                break;
-                            case svEmptyCell:
-                            case svMissing:
-                                oCond = serpn::RpnValue::empty();
-                                break;
-                            default:
-                                addDispatchRuntimeStat(
-                                    interpreterDispatchRuntimeStatsStore()
-                                        .mnControlFlowEngineDeclinedCount);
-                                return false;
                         }
                         const std::int16_t nRemainingAfter
                             = static_cast<std::int16_t>(nParamCount - 2 * i - 2);
@@ -13581,62 +13627,6 @@ StackVar ScInterpreter::Interpret()
                         interpreterDispatchRuntimeStatsStore()
                             .mnControlFlowEngineSucceededCount);
                     return true;
-                };
-                const auto pushLegacyIfs = [&]() {
-                    warnConditionalDispatch(u"IFS");
-
-                    short nParamCount = GetByte();
-                    ReverseStack(nParamCount);
-
-                    nGlobalError = FormulaError::NONE;
-                    bool bFinished = false;
-                    while (nParamCount > 0 && !bFinished && nGlobalError == FormulaError::NONE)
-                    {
-                        bool bVal = GetBool();
-                        nParamCount--;
-                        switch (spreadsheetengine::api::logic::evaluateIfsCondition(
-                                    bVal, nGlobalError != FormulaError::NONE, nParamCount))
-                        {
-                            case spreadsheetengine::api::logic::IfsAction::SelectCurrentResult:
-                                bFinished = true;
-                                break;
-                            case spreadsheetengine::api::logic::IfsAction::SkipCurrentResult:
-                                Pop();
-                                nParamCount--;
-                                break;
-                            case spreadsheetengine::api::logic::IfsAction::ReturnParameterExpected:
-                                PushParameterExpected();
-                                return;
-                            case spreadsheetengine::api::logic::IfsAction::ReturnNotAvailable:
-                                PushNA();
-                                return;
-                            case spreadsheetengine::api::logic::IfsAction::ReturnNoValue:
-                                PushNoValue();
-                                return;
-                        }
-                    }
-
-                    if (nGlobalError != FormulaError::NONE || !bFinished)
-                    {
-                        if (!bFinished)
-                            PushNA();
-                        if (nGlobalError != FormulaError::NONE)
-                            PushNoValue();
-                        return;
-                    }
-
-                    FormulaConstTokenRef xToken(PopToken());
-                    if (xToken)
-                    {
-                        while (nParamCount > 1)
-                        {
-                            Pop();
-                            nParamCount--;
-                        }
-                        PushTokenRef(xToken);
-                    }
-                    else
-                        PushError(FormulaError::UnknownStackVariable);
                 };
                 const auto tryPlanEngineSwitch = [&]() -> bool {
                     addDispatchRuntimeStat(
@@ -15690,7 +15680,10 @@ StackVar ScInterpreter::Interpret()
                     case ocTextJoin_MS      : pushLegacyTextJoinMs();   break;
                     case ocIfs_MS           :
                         if (!tryPlanEngineIfs())
-                            pushLegacyIfs();
+                        {
+                            OSL_FAIL("engine-backed IFS declined ocIfs_MS");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocSwitch_MS        :
                         if (!tryPlanEngineSwitch())
