@@ -2,6 +2,9 @@
 
 Status: active next-phase initiative
 
+Detailed execution of the current strategic pivot is tracked in
+[COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md).
+
 ## Purpose
 
 The remaining Calc migration work is no longer well-described as "the next
@@ -133,6 +136,7 @@ The per-batch execution sequence, dependencies, member lists, and retirement
 gates are tracked in:
 
 - [COMPUTATIONAL_SUBSTRATE_RPN_BATCH_EXECUTION_PLAN.md](COMPUTATIONAL_SUBSTRATE_RPN_BATCH_EXECUTION_PLAN.md)
+- [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md)
 
 ### 1. Host-Boundary Audit
 

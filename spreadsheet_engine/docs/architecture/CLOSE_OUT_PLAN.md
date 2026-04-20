@@ -4,6 +4,9 @@ Status: active working plan extending
 [COMPUTATIONAL_SUBSTRATE_RPN_BATCH_EXECUTION_PLAN.md](COMPUTATIONAL_SUBSTRATE_RPN_BATCH_EXECUTION_PLAN.md)
 toward its Success Criteria.
 
+Execution of the current strategic pivot is tracked in
+[COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md).
+
 ## Goal
 
 Close out the five-batch RPN Evaluator plan against its explicit Success

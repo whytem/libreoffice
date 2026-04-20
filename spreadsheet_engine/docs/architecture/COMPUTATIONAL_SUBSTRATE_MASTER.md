@@ -1,6 +1,11 @@
 # Computational Substrate Master
 
-Status: canonical current-state, scope, and roadmap reference
+Status: narrative current-state, scope, and roadmap reference
+
+Canonical current metrics now live in
+[../PROJECT_STATUS.md](../PROJECT_STATUS.md). This document is the broader
+program narrative and may intentionally lag the dashboard when work is being
+rebased or regrouped.
 
 ## Executive Summary
 
