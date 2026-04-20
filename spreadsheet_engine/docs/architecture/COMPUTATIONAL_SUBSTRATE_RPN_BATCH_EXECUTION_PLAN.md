@@ -295,5 +295,8 @@ as non-migration scope in a future initiative closeout.
 - Batch 3 substrate and first criteria/database admissions: **landed**
 - Batch 4 substrate and first matrix admissions: **landed**
 - Batch 5 substrate and simple-shape / shape-reshaping admissions: **landed**
-- Parallel wrapper-cleanup: ongoing; next highest-leverage wave is tracked in
+- Parallel wrapper-cleanup: the focused pure text/info and
+  parsing/inspection wave tracked in
   [COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md)
+  is complete; the next remaining interpreter-resident cleanup target is the
+  host-sensitive text tail

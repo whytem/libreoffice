@@ -10,7 +10,7 @@ Close out the five-batch RPN Evaluator plan against its explicit Success
 Criteria:
 
 - `legacy_interpreter_subroutine_count` ≤ `40` (currently `51`)
-- `interp4_dispatch_legacy_lambda_count` ≤ `10` (currently `25`)
+- `interp4_dispatch_legacy_lambda_count` ≤ `10` (currently `21`)
 - every retired opcode shows non-zero exercised engine-first runtime on a
   focused or corpus audit lane before fallback deletion
 - acceptance rate ≥ `0.95` across the exercised retirement lane for each
@@ -26,9 +26,11 @@ Criteria:
 
 Retirement — not admission — remains the main lever that reduces the two
 headline counters, but the recent Batch-5 sweep changed the local optimum.
-With the honest baseline now at `51` subroutines and `25` lambdas, the
-highest-leverage remaining surface is the text/info and parsing/inspection
-cluster inside `Interpret()`, not another generic retirement grab-bag.
+With the honest baseline now at `51` subroutines and `21` lambdas, the
+highest-leverage remaining surface is no longer the pure text/info and
+parsing/inspection cluster inside `Interpret()` because that focused wave is
+now complete. The next leverage point is the remaining host-sensitive text
+tail plus the substrate-gated phases below.
 
 The remaining admissions all gate on substrate or numerical cores
 that do not yet exist. Each of Phases B–F adds one such substrate and
@@ -37,7 +39,9 @@ run in parallel worktrees.
 
 ## Phase A — Text/Info Retirement Wave
 
-Immediate next leverage. Execute the focused plan in
+Status: complete on the current tree.
+
+Executed through the focused plan in
 [COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md):
 
 - Wave A: pure text/info subset
@@ -45,12 +49,14 @@ Immediate next leverage. Execute the focused plan in
 - Wave C: close any remaining authoritative-match gaps owned by those waves
   before fallback deletion
 
-Gate per retirement: the family has engine/shared coverage already, the
-focused or corpus audit lane shows exercised engine-first runtime, and
-the known-regressions baseline does not change.
+Result:
 
-Expected delta: `interp4_dispatch_legacy_lambda_count` `25` → low-teens,
-with a smaller but still real follow-on drop in `legacy_interpreter_subroutine_count`.
+- Wave A pure text/info subset: complete
+- Wave B parsing/inspection subset: complete
+- wave-owned authoritative-match gaps: complete at `0`
+- `interp4_dispatch_legacy_lambda_count` moved `25` → `21`
+- the remaining text surface is now predominantly the explicitly-deferred
+  host-sensitive tail rather than the pure/scalar subset
 
 ## Phase B — Batch 3 tail substrate + admissions
 

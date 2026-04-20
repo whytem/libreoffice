@@ -10,7 +10,7 @@ hundred functions."
 After the current honest baseline of:
 
 - `legacy_interpreter_subroutine_count=51`
-- `interp4_dispatch_legacy_lambda_count=25`
+- `interp4_dispatch_legacy_lambda_count=21`
 - `interp4_dispatch_engine_attempt_count=14`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
@@ -96,9 +96,11 @@ For this initiative, the project should use the following working rules:
   `interp4_dispatch_legacy_lambda_count`, not just another drop in
   `legacy_interpreter_subroutine_count`
 - the next retirement wave should preferentially target the densest remaining
-  interpreter clusters that already lean on engine/shared helpers, beginning
-  with the text/info and parsing/inspection subset tracked in
+  interpreter clusters that already lean on engine/shared helpers; the pure
+  text/info and parsing/inspection subset tracked in
   [COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md)
+  is now complete on the current tree, so the remaining follow-on target is
+  the host-sensitive text tail rather than another broad pure-text sweep
 
 ### Retirement Template
 

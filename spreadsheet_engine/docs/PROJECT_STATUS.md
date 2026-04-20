@@ -44,9 +44,9 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_fallback_total=0`
 - `known_regressions_baseline=0`
 - `legacy_interpreter_subroutine_count=51`
-- `interp4_dispatch_legacy_lambda_count=25`
-- `interp4_dispatch_legacy_dispatch_target_count=25`
-- `interp4_dispatch_legacy_call_count=37`
+- `interp4_dispatch_legacy_lambda_count=21`
+- `interp4_dispatch_legacy_dispatch_target_count=21`
+- `interp4_dispatch_legacy_call_count=31`
 - `interp4_dispatch_engine_attempt_count=14`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
@@ -527,22 +527,17 @@ Phase-0 classification for the new text/info retirement wave is now complete:
   arithmetic shapes, again outside the pure text/info and parsing/inspection
   wave
 
-Phase 1 is now underway:
+The text/info retirement wave is now complete on the current tree:
 
 - [testSharedInterpreterTextInfoDispatch](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_formula2.cxx)
   proves engine-first success for the safe Wave-A unary shapes
-- that Phase-1 surface now includes non-jump scalar matrix and
+- that Wave-A surface now includes non-jump scalar matrix and
   external-matrix-backed operands in addition to direct scalars and
   scalarized single-cell references
 - `ISBLANK` now preserves the inherited-empty distinction on the engine-first
   path instead of flattening all direct `svEmptyCell` tokens to blank
 - the same focused lane also proves deliberate decline on a matrix shape, so
   the classic fallback boundary remains explicit instead of accidental
-- no fallback deletion is claimed yet, so `interp4_dispatch_legacy_lambda_count`
-  remains the honest retirement gate for the next step
-
-The first Phase-2 retirement slice is now banked:
-
 - the Wave-A fallback bodies for `ISBLANK`, `ISTEXT`, `ISNONTEXT`,
   `ISNUMBER`, `ISNA`, `ISERR`, `ISERROR`, `CODE`, `TRIM`, `CLEAN`, `LEN`,
   `CHAR`, `UNICODE`, `UNICHAR`, `ASC`, and `JIS` no longer live inline in
@@ -552,9 +547,6 @@ The first Phase-2 retirement slice is now banked:
   [InterpreterCompatDispatch.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpreterCompatDispatch.hxx)
 - `pushLegacyIsErrLike` is gone from Calc source, which is the first real
   text/info legacy-lambda reduction in this wave
-
-Phase 3 of the parsing/inspection half is now landed:
-
 - `VALUE`, `NUMBERVALUE`, `DATEVALUE`, `TIMEVALUE`, `FORMULA`, and
   `ISFORMULA` now have exercised engine-first dispatch for the safe scalar and
   scalarized-reference shapes
@@ -563,6 +555,15 @@ Phase 3 of the parsing/inspection half is now landed:
 - the same lane still proves a deliberate decline on a matrix-inspection
   shape, so the remaining Wave-B fallback boundary is explicit instead of
   accidental
+- the Wave-B fallback bodies for `VALUE`, `NUMBERVALUE`, `DATEVALUE`,
+  `TIMEVALUE`, `FORMULA`, and `ISFORMULA` no longer live inline in
+  [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx)
+- the same Calc switch now routes those functions through engine-first
+  dispatch plus standalone compat fallback in
+  [InterpreterCompatDispatch.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpreterCompatDispatch.hxx)
+- as a result, the honest relocated-legacy metric has dropped from `25` to
+  `21`, which is the real completion signal for this plan rather than just a
+  new batch of admission wiring
 
 Updated next routing policy:
 

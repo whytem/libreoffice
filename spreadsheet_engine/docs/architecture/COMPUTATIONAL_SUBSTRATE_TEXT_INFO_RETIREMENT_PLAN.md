@@ -1,6 +1,6 @@
 # Text/Info Retirement Wave Plan
 
-Status: active focused retirement plan
+Status: complete on the current tree
 
 ## Purpose
 
@@ -15,7 +15,7 @@ This is the next practical step after the recent Batch-5 sweep. The honest
 baseline on the current tree is:
 
 - `legacy_interpreter_subroutine_count=51`
-- `interp4_dispatch_legacy_lambda_count=25`
+- `interp4_dispatch_legacy_lambda_count=21`
 - `interpret_tail_live_authoritative_match_rate=99.4690%`
 - `interpret_tail_live_unique_unseen_formula_cells=21`
 - `interpret_tail_live_unique_fallback_formula_cells=0`
@@ -307,9 +307,34 @@ Status:
 - delete `pushLegacyFormulaText`
 - delete `pushLegacyIsFormula`
 
+Status:
+
+- complete for the Calc-source surface on the current tree
+- the remaining Wave-B fallback bodies no longer live inline in
+  [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx)
+- `VALUE`, `NUMBERVALUE`, `DATEVALUE`, `TIMEVALUE`, `FORMULA`, and
+  `ISFORMULA` now use:
+  - engine-first dispatch in Calc
+  - standalone compat fallback in
+    [InterpreterCompatDispatch.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpreterCompatDispatch.hxx)
+- `pushLegacyValue`, `pushLegacyNumberValue`, and
+  `pushLegacyDateOrTimeValue` are gone from Calc source, and the
+  `FORMULA` / `ISFORMULA` switch cases no longer embed their old fallback
+  bodies directly
+
+## Result
+
+This plan is now complete on the current tree:
+
+- Wave A admission tightening is landed and exercised
+- Wave A Calc-source fallback bodies are retired out of `interpr4.cxx`
+- Wave B admission tightening is landed and exercised
+- Wave B Calc-source fallback bodies are retired out of `interpr4.cxx`
+- `interp4_dispatch_legacy_lambda_count` has dropped from `25` to `21`
+
 ## Expected Outcome
 
-If this wave lands cleanly:
+Achieved on the current tree:
 
 - `interp4_dispatch_legacy_lambda_count` should drop materially from `25`
 - the remaining interpreter-side text/info surface becomes mostly the
