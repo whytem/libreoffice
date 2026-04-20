@@ -9576,7 +9576,13 @@ StackVar ScInterpreter::Interpret()
                         = pStack[sp - (nParamCount - 1)];
                     const FormulaToken* pSourceTok
                         = pStack[sp - nParamCount];
-                    if (!pSourceTok || pSourceTok->GetType() != svMatrix)
+                    // Scope fence: admit svMatrix directly plus
+                    // svSingleRef / svDoubleRef via the Phase D
+                    // host-facade materialization primitive.
+                    if (!pSourceTok
+                        || (pSourceTok->GetType() != svMatrix
+                            && pSourceTok->GetType() != svSingleRef
+                            && pSourceTok->GetType() != svDoubleRef))
                     {
                         pushSpillEngineDecline();
                         return false;
@@ -9600,14 +9606,22 @@ StackVar ScInterpreter::Interpret()
                         pushSpillEngineDecline();
                         return false;
                     }
-                    ScMatrix* pSourceMat
-                        = const_cast<FormulaToken*>(pSourceTok)->GetMatrix();
-                    if (!pSourceMat)
+                    std::optional<serpn::MatrixOperand> oSource;
+                    if (pSourceTok->GetType() == svMatrix)
                     {
-                        pushSpillEngineDecline();
-                        return false;
+                        ScMatrix* pSourceMat
+                            = const_cast<FormulaToken*>(pSourceTok)->GetMatrix();
+                        if (!pSourceMat)
+                        {
+                            pushSpillEngineDecline();
+                            return false;
+                        }
+                        oSource = convertMatrixRefToMatrixOperand(*pSourceMat);
                     }
-                    auto oSource = convertMatrixRefToMatrixOperand(*pSourceMat);
+                    else
+                    {
+                        oSource = materializeRangeTokenToMatrixOperand(pSourceTok);
+                    }
                     if (!oSource)
                     {
                         pushSpillEngineDecline();
@@ -13184,7 +13198,10 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocExpand           :
                         if (!tryPlanEngineSpillExpand())
-                            ScExpand();
+                        {
+                            OSL_FAIL("engine-backed EXPAND declined ocExpand");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocHStack           :
                         if (!tryPlanEngineSpillHStackOrVStack(/*bHorizontal*/ true))
