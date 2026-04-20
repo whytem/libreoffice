@@ -5161,131 +5161,6 @@ StackVar ScInterpreter::Interpret()
                         },
                         "family-local default-on financial rate family reached ScInterpreter");
                 };
-                const auto pushLegacyMirr = [&]() {
-                    warnIfLegacyRateFamilyReached(u"MIRR");
-                    nFuncFmtType = SvNumFormatType::PERCENT;
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-
-                    const double fRate1_reinvest = GetDouble() + 1;
-                    const double fRate1_invest = GetDouble() + 1;
-
-                    ScRange aRange;
-                    ScMatrixRef pMat;
-                    SCSIZE nC = 0;
-                    SCSIZE nR = 0;
-                    bool bIsMatrix = false;
-                    switch (GetStackType())
-                    {
-                        case svDoubleRef:
-                            PopDoubleRef(aRange);
-                            break;
-                        case svMatrix:
-                        case svExternalSingleRef:
-                        case svExternalDoubleRef:
-                            pMat = GetMatrix();
-                            if (pMat)
-                            {
-                                pMat->GetDimensions(nC, nR);
-                                if (nC == 0 || nR == 0)
-                                    SetError(FormulaError::IllegalArgument);
-                                bIsMatrix = true;
-                            }
-                            else
-                                SetError(FormulaError::IllegalArgument);
-                            break;
-                        default:
-                            SetError(FormulaError::IllegalParameter);
-                            break;
-                    }
-
-                    if (nGlobalError != FormulaError::NONE)
-                    {
-                        PushError(nGlobalError);
-                        return;
-                    }
-
-                    KahanSum fNPV_reinvest = 0.0;
-                    double fPow_reinvest = 1.0;
-                    KahanSum fNPV_invest = 0.0;
-                    double fPow_invest = 1.0;
-                    sal_uLong nCount = 0;
-                    bool bHasPosValue = false;
-                    bool bHasNegValue = false;
-
-                    if (bIsMatrix)
-                    {
-                        for (SCSIZE j = 0; j < nC; j++)
-                        {
-                            for (SCSIZE k = 0; k < nR; ++k)
-                            {
-                                if (!pMat->IsValue(j, k))
-                                    continue;
-                                const double fX = pMat->GetDouble(j, k);
-                                if (nGlobalError != FormulaError::NONE)
-                                    break;
-
-                                if (fX > 0.0)
-                                {
-                                    bHasPosValue = true;
-                                    fNPV_reinvest += fX * fPow_reinvest;
-                                }
-                                else if (fX < 0.0)
-                                {
-                                    bHasNegValue = true;
-                                    fNPV_invest += fX * fPow_invest;
-                                }
-                                fPow_reinvest /= fRate1_reinvest;
-                                fPow_invest /= fRate1_invest;
-                                nCount++;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        ScValueIterator aValIter(mrContext, aRange, mnSubTotalFlags);
-                        double fCellValue = 0.0;
-                        FormulaError nIterError = FormulaError::NONE;
-
-                        bool bLoop = aValIter.GetFirst(fCellValue, nIterError);
-                        while (bLoop)
-                        {
-                            if (fCellValue > 0.0)
-                            {
-                                bHasPosValue = true;
-                                fNPV_reinvest += fCellValue * fPow_reinvest;
-                            }
-                            else if (fCellValue < 0.0)
-                            {
-                                bHasNegValue = true;
-                                fNPV_invest += fCellValue * fPow_invest;
-                            }
-                            fPow_reinvest /= fRate1_reinvest;
-                            fPow_invest /= fRate1_invest;
-                            nCount++;
-
-                            bLoop = aValIter.GetNext(fCellValue, nIterError);
-                        }
-
-                        if (nIterError != FormulaError::NONE)
-                            SetError(nIterError);
-                    }
-
-                    if (!(bHasPosValue && bHasNegValue))
-                        SetError(FormulaError::IllegalArgument);
-
-                    if (nGlobalError != FormulaError::NONE)
-                    {
-                        PushError(nGlobalError);
-                        return;
-                    }
-
-                    double fResult = -o3tl::div_allow_zero(
-                        fNPV_reinvest.get(), fNPV_invest.get());
-                    fResult *= pow(fRate1_reinvest, static_cast<double>(nCount - 1));
-                    fResult = pow(fResult, div(1.0, (nCount - 1)));
-                    PushDouble(fResult - 1.0);
-                };
                 const auto pushLegacyBitwise = [&](std::u16string_view rFunctionName,
                                                    auto aOperator) {
                     warnIfLegacyDispatchReached(
@@ -15005,7 +14880,133 @@ StackVar ScInterpreter::Interpret()
                                 PushError(FormulaError::NoConvergence);
                         }();
                         break;
-                    case ocMIRR             : pushLegacyMirr();         break;
+                    case ocMIRR             :
+                        [&]() {
+                            warnIfLegacyRateFamilyReached(u"MIRR");
+                            nFuncFmtType = SvNumFormatType::PERCENT;
+                            if (!MustHaveParamCount(GetByte(), 3))
+                                return;
+
+                            const double fRate1_reinvest = GetDouble() + 1;
+                            const double fRate1_invest = GetDouble() + 1;
+
+                            ScRange aRange;
+                            ScMatrixRef pMat;
+                            SCSIZE nC = 0;
+                            SCSIZE nR = 0;
+                            bool bIsMatrix = false;
+                            switch (GetStackType())
+                            {
+                                case svDoubleRef:
+                                    PopDoubleRef(aRange);
+                                    break;
+                                case svMatrix:
+                                case svExternalSingleRef:
+                                case svExternalDoubleRef:
+                                    pMat = GetMatrix();
+                                    if (pMat)
+                                    {
+                                        pMat->GetDimensions(nC, nR);
+                                        if (nC == 0 || nR == 0)
+                                            SetError(FormulaError::IllegalArgument);
+                                        bIsMatrix = true;
+                                    }
+                                    else
+                                        SetError(FormulaError::IllegalArgument);
+                                    break;
+                                default:
+                                    SetError(FormulaError::IllegalParameter);
+                                    break;
+                            }
+
+                            if (nGlobalError != FormulaError::NONE)
+                            {
+                                PushError(nGlobalError);
+                                return;
+                            }
+
+                            KahanSum fNPV_reinvest = 0.0;
+                            double fPow_reinvest = 1.0;
+                            KahanSum fNPV_invest = 0.0;
+                            double fPow_invest = 1.0;
+                            sal_uLong nCount = 0;
+                            bool bHasPosValue = false;
+                            bool bHasNegValue = false;
+
+                            if (bIsMatrix)
+                            {
+                                for (SCSIZE j = 0; j < nC; j++)
+                                {
+                                    for (SCSIZE k = 0; k < nR; ++k)
+                                    {
+                                        if (!pMat->IsValue(j, k))
+                                            continue;
+                                        const double fX = pMat->GetDouble(j, k);
+                                        if (nGlobalError != FormulaError::NONE)
+                                            break;
+
+                                        if (fX > 0.0)
+                                        {
+                                            bHasPosValue = true;
+                                            fNPV_reinvest += fX * fPow_reinvest;
+                                        }
+                                        else if (fX < 0.0)
+                                        {
+                                            bHasNegValue = true;
+                                            fNPV_invest += fX * fPow_invest;
+                                        }
+                                        fPow_reinvest /= fRate1_reinvest;
+                                        fPow_invest /= fRate1_invest;
+                                        nCount++;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                ScValueIterator aValIter(mrContext, aRange, mnSubTotalFlags);
+                                double fCellValue = 0.0;
+                                FormulaError nIterError = FormulaError::NONE;
+
+                                bool bLoop = aValIter.GetFirst(fCellValue, nIterError);
+                                while (bLoop)
+                                {
+                                    if (fCellValue > 0.0)
+                                    {
+                                        bHasPosValue = true;
+                                        fNPV_reinvest += fCellValue * fPow_reinvest;
+                                    }
+                                    else if (fCellValue < 0.0)
+                                    {
+                                        bHasNegValue = true;
+                                        fNPV_invest += fCellValue * fPow_invest;
+                                    }
+                                    fPow_reinvest /= fRate1_reinvest;
+                                    fPow_invest /= fRate1_invest;
+                                    nCount++;
+
+                                    bLoop = aValIter.GetNext(fCellValue, nIterError);
+                                }
+
+                                if (nIterError != FormulaError::NONE)
+                                    SetError(nIterError);
+                            }
+
+                            if (!(bHasPosValue && bHasNegValue))
+                                SetError(FormulaError::IllegalArgument);
+
+                            if (nGlobalError != FormulaError::NONE)
+                            {
+                                PushError(nGlobalError);
+                                return;
+                            }
+
+                            double fResult = -o3tl::div_allow_zero(
+                                fNPV_reinvest.get(), fNPV_invest.get());
+                            fResult *= pow(fRate1_reinvest, static_cast<double>(nCount - 1));
+                            fResult = pow(fResult, div(1.0, (nCount - 1)));
+                            PushDouble(fResult - 1.0);
+                        }();
+                        break;
                     case ocISPMT            :
                     {
                         warnIfLegacyRateFamilyReached(u"ISPMT");
