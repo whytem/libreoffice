@@ -5681,6 +5681,34 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         aReplayEligibilityInventory.mnDirectSeen > 0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testInterpretTailRpnCountersNonZero)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    m_pDoc->InsertTab(0, u"Test"_ustr);
+    m_pDoc->SetValue(ScAddress(0, 0, 0), 1.0);
+    m_pDoc->SetValue(ScAddress(1, 0, 0), 2.0);
+    m_pDoc->SetString(ScAddress(2, 0, 0), u"=A1+B1"_ustr);
+
+    ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(2, 0, 0));
+    CPPUNIT_ASSERT(pFormula);
+
+    setaileval::resetStats();
+    pFormula->SetDirty();
+    (void)pFormula->Interpret();
+
+    const StatsSnapshot aStats = setaileval::getStatsSnapshot();
+    CPPUNIT_ASSERT_MESSAGE(
+        "ambient RPN attempted counter should be non-zero after formula evaluation",
+        aStats.mnRpnAttemptedTotal > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "ambient RPN succeeded counter should be non-zero for a simple arithmetic formula",
+        aStats.mnRpnSucceededTotal > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "attempted should equal succeeded + declined",
+        aStats.mnRpnAttemptedTotal == aStats.mnRpnSucceededTotal + aStats.mnRpnDeclinedTotal);
+}
+
 } // namespace
 
 CPPUNIT_PLUGIN_IMPLEMENT();

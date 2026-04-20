@@ -219,6 +219,8 @@ Implemented result:
 
 ## Phase 3: Build the Upstream RPN Entry Point
 
+Status: complete on the current tree
+
 ### Goal
 
 Create a real `InterpretTail -> RpnEvaluator` execution path that can see
@@ -246,6 +248,30 @@ ambient traffic.
 - ambient traffic reaches the upstream RPN path
 - ambient counters are non-zero outside debug-only forced modes
 - the team can measure real reach of upstream RPN execution
+
+Implemented result:
+
+- `RpnCategory` enum (Operator, ControlFlow, Reference, Matrix, General) and
+  `toRpnCategory(FunctionKind)` mapping added to
+  [InterpretTailEngineEvaluator.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx)
+- `StatsSnapshot` and the internal `StatsStore` now carry
+  `mnRpnAttemptedTotal`, `mnRpnSucceededTotal`, `mnRpnDeclinedTotal` plus
+  per-category arrays (`maRpnCategoryAttempted/Succeeded/Declined`)
+- `recordRpnAttempt`, `recordRpnSuccess`, `recordRpnDecline` recording
+  functions increment the total and per-category counters atomically
+- all three `tryEvaluateFormula` call sites in
+  [formulacell.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/data/formulacell.cxx)
+  `InterpretTail()` now call the RPN recording functions alongside the
+  existing observe/shadow/authoritative recording
+- `resolveRolloutMode()` now defaults to `Observe` in all builds (release
+  and debug), lifting the blanket ambient observation veto
+- the "Ambient Authority" section in
+  [PROJECT_STATUS.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/PROJECT_STATUS.md)
+  now publishes the upstream RPN counter names
+- `testInterpretTailRpnCountersNonZero` in
+  [interpret_tail_corpus.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/interpret_tail_corpus.cxx)
+  enforces the exit criterion that ambient RPN counters are non-zero after
+  formula evaluation
 
 ## Phase 4: Implement the RPN Subsystem in Dependency Order
 

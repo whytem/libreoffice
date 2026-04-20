@@ -49,15 +49,21 @@ This is the deletion-gating replay surface for the standing corpus:
 
 ### Ambient Authority
 
-Ambient non-debug authority transfer is not yet a headline metric.
+These are the upstream `InterpretTail -> RpnEvaluator` counters introduced by
+Phase 3 of the authority-transfer pivot plan. Observation is now default-on in
+all builds (release and debug).
 
-- the substrate still does not own ordinary AutoCalc traffic broadly enough to
-  claim ambient authority transfer
-- upstream ambient `InterpretTail -> RpnEvaluator` counters do not exist yet
-- Phase 3 of
-  [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md)
-  is the step that adds those counters and promotes ambient authority to a
-  first-class dashboard section
+- `interpret_tail_rpn_attempted_total=0`
+- `interpret_tail_rpn_succeeded_total=0`
+- `interpret_tail_rpn_declined_total=0`
+- `interpret_tail_rpn_operator_attempted=0`
+- `interpret_tail_rpn_operator_succeeded=0`
+- `interpret_tail_rpn_controlflow_attempted=0`
+- `interpret_tail_rpn_controlflow_succeeded=0`
+- `interpret_tail_rpn_reference_attempted=0`
+- `interpret_tail_rpn_reference_succeeded=0`
+- `interpret_tail_rpn_matrix_attempted=0`
+- `interpret_tail_rpn_matrix_succeeded=0`
 
 ### Forced-Legacy Audit And Retirement
 
@@ -119,8 +125,8 @@ also complete: [HOST_FACADE_CONTRACTS.md](architecture/HOST_FACADE_CONTRACTS.md)
 and
 [COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
 now give the project one explicit host-contract inventory for the remaining
-legacy surface. The next highest-leverage execution step is Phase 3:
-upstream `InterpretTail -> RpnEvaluator` counters and ambient observation.
+legacy surface. Phase 3 is now complete: upstream `InterpretTail -> RpnEvaluator` counters
+are wired and observation is default-on in all builds.
 
 Batch 1 of the five-batch RPN evaluator plan has now landed its substrate
 (`runtime/RpnControlFlow.hxx`) and six explicit admissions:

@@ -152,6 +152,47 @@ enum class FunctionKind : sal_uInt8
     Count
 };
 
+enum class RpnCategory : sal_uInt8
+{
+    Operator,
+    ControlFlow,
+    Reference,
+    Matrix,
+    General,
+    Count
+};
+
+[[nodiscard]] constexpr RpnCategory toRpnCategory(FunctionKind eKind)
+{
+    switch (eKind)
+    {
+        case FunctionKind::ScalarRoot:
+        case FunctionKind::Conversion:
+        case FunctionKind::Round:
+        case FunctionKind::MathScalar:
+        case FunctionKind::Not:
+            return RpnCategory::Operator;
+        case FunctionKind::Conditional:
+        case FunctionKind::LogicalFold:
+        case FunctionKind::LogicalConstant:
+            return RpnCategory::ControlFlow;
+        case FunctionKind::Match:
+        case FunctionKind::XMatch:
+        case FunctionKind::Selector:
+        case FunctionKind::Lookup:
+        case FunctionKind::VLookup:
+        case FunctionKind::HLookup:
+        case FunctionKind::XLookup:
+        case FunctionKind::Index:
+            return RpnCategory::Reference;
+        case FunctionKind::MatrixMath:
+        case FunctionKind::SpillArray:
+            return RpnCategory::Matrix;
+        default:
+            return RpnCategory::General;
+    }
+}
+
 struct EvaluationAttempt
 {
     bool mbSupported = false;
@@ -181,6 +222,12 @@ struct StatsSnapshot
     std::array<std::array<sal_uInt64, static_cast<std::size_t>(FallbackReason::Count)>,
         static_cast<std::size_t>(FunctionKind::Count)>
         maFunctionFallbackReasons {};
+    sal_uInt64 mnRpnAttemptedTotal = 0;
+    sal_uInt64 mnRpnSucceededTotal = 0;
+    sal_uInt64 mnRpnDeclinedTotal = 0;
+    std::array<sal_uInt64, static_cast<std::size_t>(RpnCategory::Count)> maRpnCategoryAttempted {};
+    std::array<sal_uInt64, static_cast<std::size_t>(RpnCategory::Count)> maRpnCategorySucceeded {};
+    std::array<sal_uInt64, static_cast<std::size_t>(RpnCategory::Count)> maRpnCategoryDeclined {};
 };
 
 struct DiagnosticSample
@@ -235,6 +282,15 @@ struct StatsStore
     std::array<std::array<std::atomic<sal_uInt64>, static_cast<std::size_t>(FallbackReason::Count)>,
         static_cast<std::size_t>(FunctionKind::Count)>
         maFunctionFallbackReasons {};
+    std::atomic<sal_uInt64> mnRpnAttemptedTotal { 0 };
+    std::atomic<sal_uInt64> mnRpnSucceededTotal { 0 };
+    std::atomic<sal_uInt64> mnRpnDeclinedTotal { 0 };
+    std::array<std::atomic<sal_uInt64>, static_cast<std::size_t>(RpnCategory::Count)>
+        maRpnCategoryAttempted {};
+    std::array<std::atomic<sal_uInt64>, static_cast<std::size_t>(RpnCategory::Count)>
+        maRpnCategorySucceeded {};
+    std::array<std::atomic<sal_uInt64>, static_cast<std::size_t>(RpnCategory::Count)>
+        maRpnCategoryDeclined {};
 };
 
 struct DiagnosticStore
@@ -13884,11 +13940,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const char* pValue = std::getenv("SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR");
     if (!pValue || !*pValue)
     {
-#ifdef DBG_UTIL
         return RolloutMode::Observe;
-#else
-        return RolloutMode::Off;
-#endif
     }
 
     const std::string_view aValue(pValue);
@@ -14123,6 +14175,15 @@ inline void resetStats()
         for (auto& rValue : rFunctionReasons)
             rValue.store(0);
     }
+    rStore.mnRpnAttemptedTotal.store(0);
+    rStore.mnRpnSucceededTotal.store(0);
+    rStore.mnRpnDeclinedTotal.store(0);
+    for (auto& rValue : rStore.maRpnCategoryAttempted)
+        rValue.store(0);
+    for (auto& rValue : rStore.maRpnCategorySucceeded)
+        rValue.store(0);
+    for (auto& rValue : rStore.maRpnCategoryDeclined)
+        rValue.store(0);
 
     auto& rDiagnostics = detail::diagnosticStore();
     {
@@ -14165,7 +14226,37 @@ inline void resetStats()
                 = rStore.maFunctionFallbackReasons[i][j].load();
         }
     }
+    aSnapshot.mnRpnAttemptedTotal = rStore.mnRpnAttemptedTotal.load();
+    aSnapshot.mnRpnSucceededTotal = rStore.mnRpnSucceededTotal.load();
+    aSnapshot.mnRpnDeclinedTotal = rStore.mnRpnDeclinedTotal.load();
+    for (std::size_t i = 0; i < aSnapshot.maRpnCategoryAttempted.size(); ++i)
+        aSnapshot.maRpnCategoryAttempted[i] = rStore.maRpnCategoryAttempted[i].load();
+    for (std::size_t i = 0; i < aSnapshot.maRpnCategorySucceeded.size(); ++i)
+        aSnapshot.maRpnCategorySucceeded[i] = rStore.maRpnCategorySucceeded[i].load();
+    for (std::size_t i = 0; i < aSnapshot.maRpnCategoryDeclined.size(); ++i)
+        aSnapshot.maRpnCategoryDeclined[i] = rStore.maRpnCategoryDeclined[i].load();
     return aSnapshot;
+}
+
+inline void recordRpnAttempt(FunctionKind eFunction)
+{
+    auto& rStore = detail::statsStore();
+    rStore.mnRpnAttemptedTotal.fetch_add(1);
+    rStore.maRpnCategoryAttempted[static_cast<std::size_t>(toRpnCategory(eFunction))].fetch_add(1);
+}
+
+inline void recordRpnSuccess(FunctionKind eFunction)
+{
+    auto& rStore = detail::statsStore();
+    rStore.mnRpnSucceededTotal.fetch_add(1);
+    rStore.maRpnCategorySucceeded[static_cast<std::size_t>(toRpnCategory(eFunction))].fetch_add(1);
+}
+
+inline void recordRpnDecline(FunctionKind eFunction)
+{
+    auto& rStore = detail::statsStore();
+    rStore.mnRpnDeclinedTotal.fetch_add(1);
+    rStore.maRpnCategoryDeclined[static_cast<std::size_t>(toRpnCategory(eFunction))].fetch_add(1);
 }
 
 inline void recordObserveSupport(FunctionKind eFunction)
