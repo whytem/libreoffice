@@ -663,7 +663,6 @@ private:
     void IterateParametersIf( ScIterFuncIf );
     void ScCountIf();
     void IterateParametersIfs( double(*ResultFunc)( const sc::ParamIfsResult& rRes ) );
-    void ScCountEmptyCells();
     void ScLookup();
     void ScXLookup();
     void ScFilter();

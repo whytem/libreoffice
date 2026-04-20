@@ -8167,6 +8167,135 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
+                // Legacy fallback for ocCountEmptyCells (COUNTBLANK):
+                // handles svSingleRef, svRefList, svDoubleRef, svMatrix,
+                // svExternalSingleRef, and svExternalDoubleRef arguments
+                // by counting cells whose content is empty (blank cell
+                // or formula cell whose result is empty string).
+                // Collapses the retired ScCountEmptyCells() body into
+                // this lambda.
+                const auto evaluateLegacyCountEmptyCells = [&]() {
+                    if (!MustHaveParamCount(GetByte(), 1))
+                        return;
+
+                    // Inlines the isCellContentEmpty() helper from
+                    // interpr1.cxx: a cell is "empty" if it is a blank
+                    // cell, or a formula cell whose result is the empty
+                    // string "". Display-blank behaviour matches Excel
+                    // COUNTBLANK / ODFF.
+                    const auto isCellContentEmptyLocal
+                        = [](const ScRefCellValue& rCell) -> bool {
+                        switch (rCell.getType())
+                        {
+                            case CELLTYPE_VALUE:
+                            case CELLTYPE_STRING:
+                            case CELLTYPE_EDIT:
+                                return false;
+                            case CELLTYPE_FORMULA:
+                            {
+                                sc::FormulaResultValue aRes
+                                    = rCell.getFormula()->GetResult();
+                                if (aRes.meType != sc::FormulaResultValue::String)
+                                    return false;
+                                if (!aRes.maString.isEmpty())
+                                    return false;
+                            }
+                            break;
+                            default:
+                                ;
+                        }
+                        return true;
+                    };
+
+                    const SCSIZE nMatRows = GetRefListArrayMaxSize(1);
+                    // There's either one RefList and nothing else, or none.
+                    ScMatrixRef xResMat
+                        = (nMatRows ? GetNewMat(1, nMatRows, /*bEmpty*/ true)
+                                    : nullptr);
+                    sal_uLong nMaxCount = 0, nCount = 0;
+                    switch (GetStackType())
+                    {
+                        case svSingleRef:
+                        {
+                            nMaxCount = 1;
+                            ScAddress aAdr;
+                            PopSingleRef(aAdr);
+                            ScRefCellValue aCell(mrDoc, aAdr);
+                            if (!isCellContentEmptyLocal(aCell))
+                                nCount = 1;
+                        }
+                        break;
+                        case svRefList:
+                        case svDoubleRef:
+                        {
+                            ScRange aRange;
+                            short nParam = 1;
+                            SCSIZE nRefListArrayPos = 0;
+                            size_t nRefInList = 0;
+                            while (nParam-- > 0)
+                            {
+                                nRefListArrayPos = nRefInList;
+                                PopDoubleRef(aRange, nParam, nRefInList);
+                                nMaxCount
+                                    += static_cast<sal_uLong>(
+                                           aRange.aEnd.Row()
+                                           - aRange.aStart.Row() + 1)
+                                       * static_cast<sal_uLong>(
+                                           aRange.aEnd.Col()
+                                           - aRange.aStart.Col() + 1)
+                                       * static_cast<sal_uLong>(
+                                           aRange.aEnd.Tab()
+                                           - aRange.aStart.Tab() + 1);
+
+                                ScCellIterator aIter(mrDoc, aRange, mnSubTotalFlags);
+                                for (bool bHas = aIter.first(); bHas; bHas = aIter.next())
+                                {
+                                    const ScRefCellValue& rCell
+                                        = aIter.getRefCellValue();
+                                    if (!isCellContentEmptyLocal(rCell))
+                                        ++nCount;
+                                }
+                                if (xResMat)
+                                {
+                                    xResMat->PutDouble(
+                                        nMaxCount - nCount, 0, nRefListArrayPos);
+                                    nMaxCount = nCount = 0;
+                                }
+                            }
+                        }
+                        break;
+                        case svMatrix:
+                        case svExternalSingleRef:
+                        case svExternalDoubleRef:
+                        {
+                            ScMatrixRef xMat = GetMatrix();
+                            if (!xMat)
+                                SetError(FormulaError::IllegalParameter);
+                            else
+                            {
+                                SCSIZE nC, nR;
+                                xMat->GetDimensions(nC, nR);
+                                nMaxCount = nC * nR;
+                                // Numbers (implicit), strings and error
+                                // values, ignore empty strings as those
+                                // if not entered in an inline array are
+                                // the result of a formula, to be par with
+                                // a reference to formula cell as *visual*
+                                // blank, see isCellContentEmpty() above.
+                                nCount = xMat->Count(true, true, true);
+                            }
+                        }
+                        break;
+                        default:
+                            SetError(FormulaError::IllegalParameter);
+                            break;
+                    }
+                    if (xResMat)
+                        PushMatrix(xResMat);
+                    else
+                        PushDouble(nMaxCount - nCount);
+                };
+
                 // Batch 4 matrix admissions. The pure-scalar-input
                 // constructors (MUNIT / MSEQUENCE) demonstrate the
                 // RpnMatrix substrate end-to-end without host-side
@@ -15048,7 +15177,7 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocCountEmptyCells  :
                         if (!tryPlanEngineCountEmptyCells())
-                            ScCountEmptyCells();
+                            evaluateLegacyCountEmptyCells();
                         break;
                     case ocCountIf          :
                         if (!tryPlanEngineCountIf())
