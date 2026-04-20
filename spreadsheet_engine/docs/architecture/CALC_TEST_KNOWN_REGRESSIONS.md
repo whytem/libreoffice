@@ -24,7 +24,7 @@ runs the test and exits non-zero only if the failure set differs from this
 list (i.e., a *new* regression slipped in, or an old one was *unintentionally*
 fixed without the list being updated).
 
-## Failure baseline (2026-04-19, after NEGBINOMDIST off-by-one alignment)
+## Failure baseline (2026-04-20, after isImportedCachedFormulaCell tightening + ocTableRef NamedReference fence)
 
 1 test fails in `CppunitTest_sc_ucalc_formula2`. Total run: 141 tests.
 
@@ -141,16 +141,37 @@ narrow shapes the engine's text-reparse model cannot express:
 
 ### Function evaluation (0)
 
-(Cleared: `testFuncRefListArraySUBTOTAL` — passes consistently
-(3/3 gate runs) after the `formulaContainsAggregateLike` guard in
-`materializeMatchLookupInputSourceNode` that declines the engine
-route when any child contains SUBTOTAL / AGGREGATE, combined with
-the recalc-subsystem guards landed in c230133b0 and the NEGBINOMDIST
-GROWTH-projection routing fix in 09be9dea6.)
+(Cleared: `testFuncRefListArraySUBTOTAL` — root cause was a false
+positive in `isImportedCachedFormulaCell` (`spreadsheet_engine/inc/.../
+InterpretTailEngineEvaluator.hxx`): `IsRecalcModeMustAfterImport()` is
+defined as `(nMode & EMask) <= ScRecalcMode::ONLOAD_ONCE`, which
+matches the volatile ALWAYS (0x01) exclusive bit that OFFSET / NOW /
+RAND set for live volatile formulas — not just genuine post-import
+markers. The cached-formula predicate thus returned true for
+`=SUMPRODUCT(SUBTOTAL(109;OFFSET(A1;ROW(A1:A7)-ROW(A1);;1)))` on a
+freshly-inserted cell, causing `tryEvaluateFormula`'s stored-host-
+value fallback (SUMPRODUCT is on the `aStoredValueFunctions` list) to
+publish the stale zero from the host's `aResult` instead of the
+newly-calculated 49. The probe now trusts only the strong-truth
+signals (hybrid string / empty-displayed-as-string cache /
+HybridFormula) and accepts `IsRecalcModeMustAfterImport()` only when
+the exclusive-mode is not ALWAYS-only. Works in combination with the
+`formulaContainsAggregateLike` scope fence (c230133b0) which defends
+the engine from attempting the reflist iteration in the first place.)
 
-(Cleared: `testFuncTableRef` — passes consistently (5/5 gate runs)
-after the cumulative recalc-subsystem guards landed in c230133b0
-and the NEGBINOMDIST GROWTH-projection routing fix in 09be9dea6.)
+(Cleared: `testFuncTableRef` — structured table references
+(`ocTableRef`) with row-scope markers (`THIS_ROW` / `ALL` / `HEADERS`
+/ `DATA` / `TOTALS`) need per-row intersection at the formula cell's
+position, e.g. `=SUM(table[[#This Row]])` at L3 resolves to the
+intersection of the table's data area with row 3, not to the full
+column range. `tryResolveNamedRangeReference` passes the name's
+anchor position to `ScRangeData::IsReference`, losing the per-row
+context and collapsing the range to the first data row
+(=SUM(this_row) = 0 instead of 12 at L3). The
+`NamedReference` arm of `resolveReferenceRangeNode` now walks the
+name's compiled token array for `ocTableRef` and declines to legacy,
+which honours the stored `ScTableRefToken` area and implicit-
+intersection rules.)
 
 (Cleared: `testFuncIF` — `tryPlanEngineIfJump` and `tryPlanEngineIfError`
 in `interpr4.cxx` lacked a JumpMatrix-on-stack scope fence. The matrix
