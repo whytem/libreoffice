@@ -5586,70 +5586,6 @@ StackVar ScInterpreter::Interpret()
                         warnTextUtilityDispatch(rFunctionName);
                         PushString(aTransform(GetString().getString()));
                     };
-                const auto pushLegacyT = [&]() {
-                    warnTextUtilityDispatch(u"T");
-                    switch (GetStackType())
-                    {
-                        case svDoubleRef:
-                        case svSingleRef:
-                        {
-                            ScAddress aAdr;
-                            if (!PopDoubleRefOrSingleRef(aAdr))
-                            {
-                                PushInt(0);
-                                return;
-                            }
-                            bool bValue = false;
-                            ScRefCellValue aCell(mrDoc, aAdr);
-                            if (GetCellErrCode(aCell) == FormulaError::NONE)
-                            {
-                                switch (aCell.getType())
-                                {
-                                    case CELLTYPE_VALUE:
-                                        bValue = true;
-                                        break;
-                                    case CELLTYPE_FORMULA:
-                                        bValue = aCell.getFormula()->IsValue();
-                                        break;
-                                    default:
-                                        break;
-                                }
-                            }
-                            if (bValue)
-                                PushString(OUString());
-                            else
-                            {
-                                svl::SharedString aStr;
-                                GetCellString(aStr, aCell);
-                                PushString(aStr);
-                            }
-                        }
-                        break;
-                        case svMatrix:
-                        case svExternalSingleRef:
-                        case svExternalDoubleRef:
-                        {
-                            double fVal;
-                            svl::SharedString aStr;
-                            ScMatValType nMatValType = GetDoubleOrStringFromMatrix(fVal, aStr);
-                            if (ScMatrix::IsValueType(nMatValType))
-                                PushString(svl::SharedString::getEmptyString());
-                            else
-                                PushString(aStr);
-                        }
-                        break;
-                        case svDouble:
-                        {
-                            PopError();
-                            PushString(OUString());
-                        }
-                        break;
-                        case svString:
-                            break;
-                        default:
-                            PushError(FormulaError::UnknownOpCode);
-                    }
-                };
                 const auto pushLegacyTextBeforeAfter = [&](bool bBefore) {
                     warnTextUtilityDispatch(bBefore ? u"TEXTBEFORE" : u"TEXTAFTER");
                     sal_uInt8 nParamCount = GetByte();
@@ -14619,7 +14555,72 @@ StackVar ScInterpreter::Interpret()
                         warnTextUtilityDispatch(u"LEN");
                         PushDouble(selibreoffice::countCodePoints(GetString().getString()));
                         break;
-                    case ocT                : pushLegacyT();                break;
+                    case ocT                :
+                        [&]() {
+                            warnTextUtilityDispatch(u"T");
+                            switch (GetStackType())
+                            {
+                                case svDoubleRef:
+                                case svSingleRef:
+                                {
+                                    ScAddress aAdr;
+                                    if (!PopDoubleRefOrSingleRef(aAdr))
+                                    {
+                                        PushInt(0);
+                                        return;
+                                    }
+                                    bool bValue = false;
+                                    ScRefCellValue aCell(mrDoc, aAdr);
+                                    if (GetCellErrCode(aCell) == FormulaError::NONE)
+                                    {
+                                        switch (aCell.getType())
+                                        {
+                                            case CELLTYPE_VALUE:
+                                                bValue = true;
+                                                break;
+                                            case CELLTYPE_FORMULA:
+                                                bValue = aCell.getFormula()->IsValue();
+                                                break;
+                                            default:
+                                                break;
+                                        }
+                                    }
+                                    if (bValue)
+                                        PushString(OUString());
+                                    else
+                                    {
+                                        svl::SharedString aStr;
+                                        GetCellString(aStr, aCell);
+                                        PushString(aStr);
+                                    }
+                                }
+                                break;
+                                case svMatrix:
+                                case svExternalSingleRef:
+                                case svExternalDoubleRef:
+                                {
+                                    double fVal;
+                                    svl::SharedString aStr;
+                                    ScMatValType nMatValType = GetDoubleOrStringFromMatrix(fVal, aStr);
+                                    if (ScMatrix::IsValueType(nMatValType))
+                                        PushString(svl::SharedString::getEmptyString());
+                                    else
+                                        PushString(aStr);
+                                }
+                                break;
+                                case svDouble:
+                                {
+                                    PopError();
+                                    PushString(OUString());
+                                }
+                                break;
+                                case svString:
+                                    break;
+                                default:
+                                    PushError(FormulaError::UnknownOpCode);
+                            }
+                        }();
+                        break;
                     case ocClean            :
                         warnTextUtilityDispatch(u"CLEAN");
                         PushString(selibreoffice::cleanPrintable(GetString().getString()));
