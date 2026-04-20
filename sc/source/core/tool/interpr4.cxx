@@ -38,6 +38,7 @@
 #include <svl/numformat.hxx>
 #include <svl/zforlist.hxx>
 #include <svl/sharedstringpool.hxx>
+#include <compare.hxx>
 #include <editeng/langitem.hxx>
 #include <unotools/textsearch.hxx>
 #include <unotools/charclass.hxx>
