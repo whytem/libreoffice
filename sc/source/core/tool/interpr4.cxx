@@ -5544,50 +5544,6 @@ StackVar ScInterpreter::Interpret()
                         PushString(aOldStr);
                     }
                 };
-                const auto pushLegacyFixed = [&]() {
-                    warnTextUtilityDispatch(u"FIXED");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 1, 3))
-                        return;
-
-                    OUString aStr;
-                    double fDec;
-                    bool bThousand;
-                    if (nParamCount == 3)
-                        bThousand = !GetBool();
-                    else
-                        bThousand = true;
-                    if (nParamCount >= 2)
-                    {
-                        fDec = ::rtl::math::approxFloor(GetDoubleWithDefault(2.0));
-                        if (fDec < -15.0 || fDec > 15.0)
-                        {
-                            PushIllegalArgument();
-                            return;
-                        }
-                    }
-                    else
-                        fDec = 2.0;
-                    double fVal = GetDouble();
-                    double fFac = fDec != 0.0 ? pow(double(10), fDec) : 1.0;
-                    if (fVal < 0.0)
-                        fVal = ceil(fVal * fFac - 0.5) / fFac;
-                    else
-                        fVal = floor(fVal * fFac + 0.5) / fFac;
-                    const Color* pColor = nullptr;
-                    if (fDec < 0.0)
-                        fDec = 0.0;
-                    sal_uLong nIndex = mrContext.NFGetStandardFormat(
-                        SvNumFormatType::NUMBER, ScGlobal::eLnge);
-                    OUString sFormatString = mrContext.NFGenerateFormat(
-                        nIndex, ScGlobal::eLnge, bThousand, false,
-                        static_cast<sal_uInt16>(fDec));
-                    if (!mrContext.NFGetPreviewString(
-                            sFormatString, fVal, aStr, &pColor, ScGlobal::eLnge))
-                        PushIllegalArgument();
-                    else
-                        PushString(aStr);
-                };
                 const auto pushLegacyFind = [&]() {
                     warnTextUtilityDispatch(u"FIND");
                     sal_uInt8 nParamCount = GetByte();
@@ -15643,7 +15599,52 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocCurrency         : pushLegacyCurrency();     break;
                     case ocReplace          : pushLegacyReplace();      break;
-                    case ocFixed            : pushLegacyFixed();        break;
+                    case ocFixed            :
+                        [&]() {
+                            warnTextUtilityDispatch(u"FIXED");
+                            sal_uInt8 nParamCount = GetByte();
+                            if (!MustHaveParamCount(nParamCount, 1, 3))
+                                return;
+
+                            OUString aStr;
+                            double fDec;
+                            bool bThousand;
+                            if (nParamCount == 3)
+                                bThousand = !GetBool();
+                            else
+                                bThousand = true;
+                            if (nParamCount >= 2)
+                            {
+                                fDec = ::rtl::math::approxFloor(GetDoubleWithDefault(2.0));
+                                if (fDec < -15.0 || fDec > 15.0)
+                                {
+                                    PushIllegalArgument();
+                                    return;
+                                }
+                            }
+                            else
+                                fDec = 2.0;
+                            double fVal = GetDouble();
+                            double fFac = fDec != 0.0 ? pow(double(10), fDec) : 1.0;
+                            if (fVal < 0.0)
+                                fVal = ceil(fVal * fFac - 0.5) / fFac;
+                            else
+                                fVal = floor(fVal * fFac + 0.5) / fFac;
+                            const Color* pColor = nullptr;
+                            if (fDec < 0.0)
+                                fDec = 0.0;
+                            sal_uLong nIndex = mrContext.NFGetStandardFormat(
+                                SvNumFormatType::NUMBER, ScGlobal::eLnge);
+                            OUString sFormatString = mrContext.NFGenerateFormat(
+                                nIndex, ScGlobal::eLnge, bThousand, false,
+                                static_cast<sal_uInt16>(fDec));
+                            if (!mrContext.NFGetPreviewString(
+                                    sFormatString, fVal, aStr, &pColor, ScGlobal::eLnge))
+                                PushIllegalArgument();
+                            else
+                                PushString(aStr);
+                        }();
+                        break;
                     case ocFind             : pushLegacyFind();         break;
                     case ocExact            :
                         warnTextUtilityDispatch(u"EXACT");
