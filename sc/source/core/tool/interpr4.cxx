@@ -5544,37 +5544,6 @@ StackVar ScInterpreter::Interpret()
                         PushString(aOldStr);
                     }
                 };
-                const auto pushLegacyMid = [&]() {
-                    warnTextUtilityDispatch(u"MID");
-                    if (!MustHaveParamCount(GetByte(), 3))
-                        return;
-
-                    const sal_Int32 nSubLen = GetStringPositionArgument();
-                    const sal_Int32 nStart = GetStringPositionArgument();
-                    OUString aStr = GetString().getString();
-                    if (nStart < 1 || nSubLen < 0)
-                        PushIllegalArgument();
-                    else if (nStart > kScInterpreterMaxStrLen || nSubLen > kScInterpreterMaxStrLen)
-                        PushError(FormulaError::StringOverflow);
-                    else
-                    {
-                        sal_Int32 nLen = aStr.getLength();
-                        sal_Int32 nIdx = 0;
-                        sal_Int32 nCnt = 0;
-                        while (nIdx < nLen && nStart - 1 > nCnt)
-                        {
-                            aStr.iterateCodePoints(&nIdx);
-                            ++nCnt;
-                        }
-                        sal_Int32 nIdx0 = nIdx;
-                        while (nIdx < nLen && nStart + nSubLen - 1 > nCnt)
-                        {
-                            aStr.iterateCodePoints(&nIdx);
-                            ++nCnt;
-                        }
-                        PushString(aStr.copy(nIdx0, nIdx - nIdx0));
-                    }
-                };
                 const auto pushLegacyText = [&]() {
                     warnTextUtilityDispatch(u"TEXT");
                     if (!MustHaveParamCount(GetByte(), 2))
@@ -15660,7 +15629,39 @@ StackVar ScInterpreter::Interpret()
                     case ocLeft             : pushLegacyLeftRight(false);   break;
                     case ocRight            : pushLegacyLeftRight(true);    break;
                     case ocSearch           : pushLegacySearch();       break;
-                    case ocMid              : pushLegacyMid();          break;
+                    case ocMid              :
+                        [&]() {
+                            warnTextUtilityDispatch(u"MID");
+                            if (!MustHaveParamCount(GetByte(), 3))
+                                return;
+
+                            const sal_Int32 nSubLen = GetStringPositionArgument();
+                            const sal_Int32 nStart = GetStringPositionArgument();
+                            OUString aStr = GetString().getString();
+                            if (nStart < 1 || nSubLen < 0)
+                                PushIllegalArgument();
+                            else if (nStart > kScInterpreterMaxStrLen || nSubLen > kScInterpreterMaxStrLen)
+                                PushError(FormulaError::StringOverflow);
+                            else
+                            {
+                                sal_Int32 nLen = aStr.getLength();
+                                sal_Int32 nIdx = 0;
+                                sal_Int32 nCnt = 0;
+                                while (nIdx < nLen && nStart - 1 > nCnt)
+                                {
+                                    aStr.iterateCodePoints(&nIdx);
+                                    ++nCnt;
+                                }
+                                sal_Int32 nIdx0 = nIdx;
+                                while (nIdx < nLen && nStart + nSubLen - 1 > nCnt)
+                                {
+                                    aStr.iterateCodePoints(&nIdx);
+                                    ++nCnt;
+                                }
+                                PushString(aStr.copy(nIdx0, nIdx - nIdx0));
+                            }
+                        }();
+                        break;
                     case ocText             : pushLegacyText();         break;
                     case ocSubstitute       : pushLegacySubstitute();   break;
                     case ocRegex            : pushLegacyRegex();        break;
