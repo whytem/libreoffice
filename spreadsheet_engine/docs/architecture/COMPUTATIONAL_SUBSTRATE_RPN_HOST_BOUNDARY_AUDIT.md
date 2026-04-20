@@ -1,10 +1,10 @@
 # Host-Boundary Audit For Full RPN Evaluation
 
-Status: initial audit, active working document
+Status: phase-2 audit complete, active reference document
 
 ## Purpose
 
-This document begins the host-boundary audit for a full engine-side RPN
+This document began the host-boundary audit for a full engine-side RPN
 evaluator.
 
 The goal is to define the minimal host contract required by the remaining
@@ -12,9 +12,30 @@ Calc evaluator subsystem so that `spreadsheet_engine/` can own the execution
 model without re-absorbing broad Calc runtime state.
 
 Canonical current metrics now live in
-[../PROJECT_STATUS.md](../PROJECT_STATUS.md). This audit document keeps the
-host-service classification and ownership boundaries, not the moving
+[../PROJECT_STATUS.md](../PROJECT_STATUS.md). The explicit contract inventory
+produced by this audit now lives in
+[HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md). This file remains the
+classification and boundary-analysis memo behind that inventory, not the moving
 dashboard snapshot.
+
+## Phase 2 Result
+
+Phase 2 of
+[COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md)
+is complete on the current tree:
+
+- every remaining legacy cluster is now mapped to one or more host-service
+  categories
+- [HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md) now records the
+  contract-status matrix for those categories using the pivot plan's four
+  labels:
+  - `already exposed`
+  - `exposed but too broad`
+  - `missing`
+  - `intentionally unsupported`
+- the next subsystem phases can now point at named missing contracts
+  (`RangeIterator`, evaluation-time `RangeResolver`, explicit search-policy
+  API, formula-inspection API) instead of reopening the audit from scratch
 
 ## Audit Scope
 
@@ -28,6 +49,136 @@ It includes:
   [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx)
 
 This audit categorizes the host services those surfaces still depend on.
+
+## Phase 2 Service Ledger
+
+The service IDs below are the stable labels used by the remaining-surface
+inventory later in this document.
+
+- `HS1` visible scalar cell read / text parse / value formatting
+  Current contracts: `CellReader`, `TextCoercion`, `ValueFormatting`,
+  `readMaterializedHostCellValue`, `readTextParsingHostCellValue`.
+  Status: `already exposed`.
+  Ownership: host performs document reads and formatting; engine owns coercion
+  and function semantics.
+- `HS2` compile-time named / DB / table / external resolution
+  Current contracts: `DocumentCompileHost` resolver interfaces in
+  `CompileHost.hxx`.
+  Status: `already exposed`.
+  Ownership: host owns document catalogs and compiler context; engine consumes
+  opaque compile-time identities.
+- `HS3` evaluation-time concrete reference normalization
+  Current contracts: `api::ReferenceResolver`, `ResolvedReference`,
+  external-ref fetch helpers.
+  Status: `exposed but too broad`.
+  Ownership: host normalizes concrete cell/range coordinates; engine should not
+  see `ScAddress` / `ScRange` internals.
+  Gap: this does not yet unify named / DB / table / external symbolic
+  resolution at evaluation time.
+- `HS4` evaluation-time symbolic range resolution
+  Current shape: `resolveIndirectReference` plus scattered legacy interpreter
+  bodies.
+  Status: `missing`.
+  Ownership: host must resolve names / DB ranges / table refs / external refs
+  into `ResolvedReference`-shaped results; engine owns downstream execution.
+- `HS5` matrix materialization and matrix-reference projection
+  Current contracts: `materializeHostRangeToMatrixOperand`,
+  `projectExternalDoubleRefMatrix`, matrix-reference aware `CellValueView`.
+  Status: `already exposed`.
+  Ownership: host reads cells and cache arrays; engine owns matrix planners and
+  coercion.
+- `HS6` range iteration / criteria walk
+  Current shape: `CriteriaAggregateMaterializer` stopgap embedded in compat
+  code.
+  Status: `missing`.
+  Ownership: host should provide ordered range walking with visibility /
+  emptiness semantics; engine owns aggregate/query policy.
+- `HS7` cell type / format inspection
+  Current shape: direct `ScDocument` / `ScRefCellValue` inspection and a
+  handful of compat helpers.
+  Status: `exposed but too broad`.
+  Ownership: host should answer narrow questions about cell kind / format /
+  inspection data; engine should stop poking raw document internals.
+- `HS8` runtime search / regex / wildcard policy
+  Current shape: `searchTypeFromDocument(const ScDocument&)`.
+  Status: `missing`.
+  Ownership: host supplies search policy (`Normal` / `Wildcard` / `Regex`);
+  engine owns matching semantics.
+- `HS9` spill allocation lifecycle
+  Current contracts: `SpillRangeAllocator` and
+  `compat::libreoffice::spillallocation::*`.
+  Status: `already exposed`.
+  Ownership: host owns collision checks and spill reservation; engine owns
+  result-shape planning.
+  Gap: the abstract allocator is defined, but `EvaluationHost` binding and
+  downstream bounds lifecycle are still pending.
+- `HS10` runtime environment / workbook metadata
+  Current contracts: `WorkbookInfo`, `RuntimeEnvironment`.
+  Status: `already exposed`.
+  Ownership: host owns sheet catalog, locale tag, null-date, and document
+  environment.
+- `HS11` evaluator state / control flow / typed stack
+  Current shape: `RpnValue.hxx` plus legacy `ScInterpreter` state.
+  Status: `missing`.
+  Ownership: engine must own the evaluator state object, typed stack, operator
+  dispatch, and control-flow loop; host should not re-grow stack-machine state.
+- `HS12` external computation terminals
+  Current shape: Calc-only interpreter terminals (`ScMacro`, `ScDde`,
+  `ScWebservice`, `ScFilterXML`, `ScGetPivotData`, `ScHyperLink`).
+  Status: `intentionally unsupported`.
+  Ownership: remain host terminals unless the project explicitly decides to
+  surface them through a dedicated engine contract.
+
+## Phase 2 Remaining Legacy Surface Inventory
+
+Every remaining `Sc*` method and `pushLegacy*` lambda is now mapped to one or
+more service IDs from the ledger above.
+
+### `Sc*` methods by primary host-service dependency
+
+- `HS11` evaluator state / control flow / typed stack:
+  `ScTableOp`, `ScLet`, `ScCompareOp`, `ScLogicalFoldOp`,
+  `ScUnaryMatrixOrScalarOp`, `ScSyntheticBinaryOp`, `ScAmpersand`, `ScMul`,
+  `ScDiv`, `ScPow`, `ScTTT`, `ScDebugVar`
+- `HS4` symbolic range resolution with `HS3` / `HS5` follow-through:
+  `ScIntersect`, `ScRangeFunc`, `ScUnionFunc`, `ScLookup`, `ScXLookup`,
+  `ScMatchOp`, `ScIndirect`, `ScAddressFunc`, `ScIndex`, `ScMultiArea`,
+  `ScExternal`, `ScMissing`, `ScColRowNameAuto`
+- `HS7` cell type / format inspection:
+  `ScType`, `ScCell`, `ScCellExternal`, `ScCurrent`, `ScStyle`, `ScInfo`
+- `HS6` range iteration / criteria walk:
+  `ScSubTotal`, `ScDBArea`
+- `HS5` matrix materialization / matrix frame, often with `HS6`:
+  `ScSortBy`, `ScMatValue`, `ScMatRef`, `ScSumXMY2`, `ScFourier`,
+  `ScFrequency`, `ScForecast_Ets`
+- `HS10` runtime environment / workbook metadata:
+  `ScRandom`, `ScRandbetween`, `ScRandArray`, `ScRandomImpl`
+- `HS1` visible scalar read / text parse / formatting plus `HS11` coercion:
+  `ScN`
+- `HS12` intentionally unsupported host terminals:
+  `ScMacro`, `ScDde`, `ScGetPivotData`, `ScHyperLink`, `ScFilterXML`,
+  `ScWebservice`
+
+### `pushLegacy*` lambdas by primary host-service dependency
+
+- `HS11` evaluator state / operator substrate:
+  `pushLegacyGcdOrLcm`, `pushLegacyCombin`, `pushLegacyBitwise`,
+  `pushLegacyTextJoinMs`, `pushLegacyConcatMs`
+- `HS1` visible scalar read / text parse / formatting:
+  `pushLegacyReplace`, `pushLegacySubstitute`, `pushLegacyLeftRight`,
+  `pushLegacyEncodeUrl`, `pushLegacyRightB`, `pushLegacyLeftB`,
+  `pushLegacyMidB`, `pushLegacyReplaceB`
+- `HS8` runtime search / regex / wildcard policy, with `HS1` string material:
+  `pushLegacyRegex`, `pushLegacyFindB`, `pushLegacySearchB`
+- `HS7` cell type / format inspection:
+  `pushLegacyCurrency`, `pushLegacyText`
+- `HS10` runtime environment / locale-sensitive text services:
+  `pushLegacyUnaryTextTransform`, `pushLegacyTextBeforeAfter`,
+  `pushLegacyBahtText`
+
+These inventories are intentionally exhaustive for the current tree. When the
+remaining legacy surface changes, this document must be updated in the same
+commit.
 
 ## Category 1: Reference Resolution
 
@@ -294,56 +445,15 @@ Immediate implication:
 - the first piece of that stack model is now landed in `RpnValue.hxx`, but the
   evaluator state object itself is still outstanding
 
-## Remaining `pushLegacy*` Surface By Cluster
+## Phase 2 Conclusions
 
-The surviving `pushLegacy*` lambdas are already clustered by subsystem rather
-than by isolated function:
+Phase 2 closes the audit from "next steps" into a usable contract baseline:
 
-- text / formatting / search:
-  `pushLegacyText`, `pushLegacyFind`, `pushLegacySearch`,
-  `pushLegacyRegex`, `pushLegacyTextBeforeAfter`, `pushLegacyTextJoinMs`,
-  `pushLegacyBahtText`, `pushLegacyCurrency`, `pushLegacyFixed`,
-  `pushLegacyReplace`, `pushLegacySubstitute`, `pushLegacyRept`,
-  `pushLegacyConcat`, `pushLegacyConcatMs`, `pushLegacyExact`,
-  `pushLegacyEncodeUrl`, `pushLegacyValue`, `pushLegacyNumberValue`,
-  and the `*B` byte-text variants
-- logical / conditional / predicate:
-  `pushLegacyIfJump`, `pushLegacyIfError`, `pushLegacyIfs`,
-  `pushLegacySwitch`, `pushLegacyLogicalFold`, `pushLegacyNot`,
-  `pushLegacyIsEmpty`, `pushLegacyIsString`, `pushLegacyIsLogical`,
-  `pushLegacyIsRef`, `pushLegacyIsValue`, `pushLegacyIsFormula`,
-  `pushLegacyIsNA`, `pushLegacyIsErrLike`
-- scalar math / finance / helper:
-  `pushLegacyGcdOrLcm`, `pushLegacyCombin`, `pushLegacyBitwise`,
-  `pushLegacyNpv`, `pushLegacyIrr`, `pushLegacyMirr`,
-  `pushLegacyDateOrTimeValue`, `pushLegacyRawSubtract`, `pushLegacyColor`
-- formula-source helper:
-  `pushLegacyFormulaText`
-
-That clustering reinforces the subsystem framing: the next honest drops in the
-lambda metric should come from shared engine primitives, not one-off lambda
-removals.
-
-## Initial Conclusions
-
-The audit already points to three immediate decisions:
-
-1. the next engine milestone should be stack value model plus operator
-   dispatch, because that removes a true subsystem blocker rather than one
-   more leaf wrapper
-2. no new `pushLegacy*` lambdas should be added for families the engine does
-   not already own at the root
-3. external computation surfaces (`Macro`, `DDE`, `Webservice`, `FilterXML`,
-   `GetPivotData`) should be treated as explicit host-boundary questions, not
-   silently absorbed into the engine
-
-## Next Audit Steps
-
-The next pass on this document should:
-
-1. map every remaining `Sc*` method and surviving `pushLegacy*` lambda to one
-   or more host-service categories
-2. define the minimal engine-facing interface for each category
-3. mark which categories are in-scope for `RpnEvaluator` and which stay
-   host-owned
-4. align `Host.hxx` and future compat helpers against that fixed contract
+1. every remaining legacy execution surface is now mapped to an explicit host
+   service ledger entry
+2. the missing contracts are narrowed to a small set:
+   `HS4`, `HS6`, `HS8`, and `HS11`
+3. the intentionally host-terminal set is explicit:
+   `HS12`
+4. the next subsystem phases can now point at concrete missing contracts
+   instead of inventing new Host surfaces ad hoc

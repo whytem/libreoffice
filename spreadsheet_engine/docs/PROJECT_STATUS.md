@@ -114,7 +114,13 @@ path is deleted, and the classic interpreter no longer coexists with an
 alternate Calc implementation for root error literals. The focused pure
 text/info and parsing/inspection retirement wave is now complete, so the next
 interpreter-resident cleanup target is the host-sensitive text tail rather than
-another pure-scalar text sweep.
+another pure-scalar text sweep. Phase 2 of the authority-transfer pivot is now
+also complete: [HOST_FACADE_CONTRACTS.md](architecture/HOST_FACADE_CONTRACTS.md)
+and
+[COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
+now give the project one explicit host-contract inventory for the remaining
+legacy surface. The next highest-leverage execution step is Phase 3:
+upstream `InterpretTail -> RpnEvaluator` counters and ambient observation.
 
 Batch 1 of the five-batch RPN evaluator plan has now landed its substrate
 (`runtime/RpnControlFlow.hxx`) and six explicit admissions:

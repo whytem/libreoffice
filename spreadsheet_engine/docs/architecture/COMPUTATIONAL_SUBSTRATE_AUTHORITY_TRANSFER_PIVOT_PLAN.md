@@ -45,7 +45,7 @@ finishing the migration:
 The existing metrics already show the boundary clearly:
 
 - replay parity is strong in
-  [PROJECT_STATUS.md](PROJECT_STATUS.md)
+  [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
 - live `Interpret()` engine-attempt counters are still `0 / 0 / 0`
 - the core-forced full-legacy audit lane proves the lower seam is real and
   useful, but it is not the same thing as ambient production traffic
@@ -78,7 +78,7 @@ work lands.
 ### Work
 
 1. Make
-   [PROJECT_STATUS.md](PROJECT_STATUS.md)
+   [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
    the only canonical current-state metrics file.
 2. Reframe
    [COMPUTATIONAL_SUBSTRATE_MASTER.md](COMPUTATIONAL_SUBSTRATE_MASTER.md)
@@ -155,6 +155,8 @@ Implemented result:
 
 ## Phase 2: Finish the Host-Boundary Audit
 
+Status: complete on the current tree
+
 ### Goal
 
 Convert the host-boundary audit from a useful sketch into a complete contract
@@ -194,6 +196,22 @@ inventory for the remaining Calc evaluator surface.
 - no future Host API addition is ad hoc
 - the next subsystem phases can point to concrete required contracts
 
+Implemented result:
+
+- [HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md) is now the single
+  contract inventory for the remaining Calc evaluator surface
+- the inventory now marks every required service using the pivot plan's four
+  statuses:
+  - `already exposed`
+  - `exposed but too broad`
+  - `missing`
+  - `intentionally unsupported`
+- [COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
+  now points to that contract inventory as the concrete Phase 2 artifact
+- the remaining legacy surface is now grouped against named contracts rather
+  than loose narrative categories, which gives Phase 3 and Phase 4 concrete
+  contract targets instead of reopening the audit
+
 ## Phase 3: Build the Upstream RPN Entry Point
 
 ### Goal
@@ -216,7 +234,7 @@ ambient traffic.
 4. Remove the blanket AutoCalc veto for non-authoritative ambient observation
    once safety checks are in place.
 5. Publish ambient counters next to replay counters in
-   [PROJECT_STATUS.md](PROJECT_STATUS.md).
+   [../PROJECT_STATUS.md](../PROJECT_STATUS.md).
 
 ### Exit Criteria
 
@@ -375,7 +393,7 @@ Anti-metrics:
 
 ## Relationship To Existing Docs
 
-- [PROJECT_STATUS.md](PROJECT_STATUS.md): canonical dashboard
+- [../PROJECT_STATUS.md](../PROJECT_STATUS.md): canonical dashboard
 - [COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md):
   architectural rationale and working rules
 - [CLOSE_OUT_PLAN.md](CLOSE_OUT_PLAN.md): closeout framing for the current

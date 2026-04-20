@@ -288,6 +288,44 @@ std::size_t countLegacyInterpreterSubroutines()
             std::sregex_iterator()));
 }
 
+std::vector<std::string> extractNamedRegexMatches(
+    const std::string& rText, const std::regex& rPattern)
+{
+    std::vector<std::string> aMatches;
+    std::set<std::string> aSeen;
+    for (std::sregex_iterator it(rText.begin(), rText.end(), rPattern), end; it != end; ++it)
+    {
+        const std::string aName = (*it)[1].str();
+        if (aSeen.insert(aName).second)
+            aMatches.push_back(aName);
+    }
+    return aMatches;
+}
+
+std::vector<std::string> listLegacyInterpreterSubroutineNames()
+{
+    const std::string aText
+        = readRepoTextFile(std::filesystem::path("sc") / "source" / "core" / "inc"
+                           / "interpre.hxx");
+    if (aText.empty())
+        return {};
+
+    static const std::regex aPattern(R"(\bvoid\s+(Sc[A-Za-z0-9_]+)\s*\()");
+    return extractNamedRegexMatches(aText, aPattern);
+}
+
+std::vector<std::string> listInterp4PushLegacyNames()
+{
+    const std::string aText
+        = readRepoTextFile(std::filesystem::path("sc") / "source" / "core" / "tool"
+                           / "interpr4.cxx");
+    if (aText.empty())
+        return {};
+
+    static const std::regex aPattern(R"(\bconst auto\s+(pushLegacy[A-Za-z0-9_]+)\b)");
+    return extractNamedRegexMatches(aText, aPattern);
+}
+
 struct Interp4LegacyLambdaInventory
 {
     std::size_t mnLambdaCount = 0;
@@ -629,6 +667,78 @@ void assertProjectStatusCanonicalDashboard()
                 OUStringToOString(aCanonicalMessage, RTL_TEXTENCODING_UTF8).getStr(),
                 !std::regex_search(aDocText, rPattern));
         }
+    }
+}
+
+void assertHostFacadeContractsInventoryPresent()
+{
+    const std::string aAuditText
+        = readRepoTextFile(std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
+                           / "COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md");
+    const std::string aContractsText
+        = readRepoTextFile(std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
+                           / "HOST_FACADE_CONTRACTS.md");
+    CPPUNIT_ASSERT_MESSAGE("COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md should be readable",
+                           !aAuditText.empty());
+    CPPUNIT_ASSERT_MESSAGE("HOST_FACADE_CONTRACTS.md should be readable", !aContractsText.empty());
+    const std::string aCombined = aAuditText + "\n" + aContractsText;
+
+    const std::array<std::string_view, 9> aRequiredMarkers = {
+        "## Phase 2 Inventory Snapshot",
+        "### Status legend",
+        "`already exposed`",
+        "`exposed but too broad`",
+        "`missing`",
+        "`intentionally unsupported`",
+        "## Remaining legacy surface mapped to host services",
+        "`RangeIterator`",
+        "evaluation-time `RangeResolver`",
+    };
+
+    for (const auto rMarker : aRequiredMarkers)
+    {
+        const OUString aMessage = u"missing host-facade contract inventory marker: "_ustr
+                                  + OUString::fromUtf8(std::string(rMarker));
+        CPPUNIT_ASSERT_MESSAGE(OUStringToOString(aMessage, RTL_TEXTENCODING_UTF8).getStr(),
+                               aContractsText.find(rMarker) != std::string::npos);
+    }
+
+    const std::array<std::string_view, 5> aAuditMarkers = {
+        "## Phase 2 Service Ledger",
+        "## Phase 2 Remaining Legacy Surface Inventory",
+        "### `Sc*` methods by primary host-service dependency",
+        "### `pushLegacy*` lambdas by primary host-service dependency",
+        "## Phase 2 Conclusions",
+    };
+
+    for (const auto rMarker : aAuditMarkers)
+    {
+        const OUString aMessage = u"missing host-boundary audit marker: "_ustr
+                                  + OUString::fromUtf8(std::string(rMarker));
+        CPPUNIT_ASSERT_MESSAGE(OUStringToOString(aMessage, RTL_TEXTENCODING_UTF8).getStr(),
+                               aAuditText.find(rMarker) != std::string::npos);
+    }
+
+    for (const auto& rSymbol : listLegacyInterpreterSubroutineNames())
+    {
+        const std::string aNeedle = "`" + rSymbol + "`";
+        const OUString aMessage
+            = u"remaining Sc* surface should be mapped in host-boundary docs: "_ustr
+              + OUString::fromUtf8(rSymbol);
+        CPPUNIT_ASSERT_MESSAGE(
+            OUStringToOString(aMessage, RTL_TEXTENCODING_UTF8).getStr(),
+            aCombined.find(aNeedle) != std::string::npos);
+    }
+
+    for (const auto& rSymbol : listInterp4PushLegacyNames())
+    {
+        const std::string aNeedle = "`" + rSymbol + "`";
+        const OUString aMessage
+            = u"remaining pushLegacy* surface should be mapped in host-boundary docs: "_ustr
+              + OUString::fromUtf8(rSymbol);
+        CPPUNIT_ASSERT_MESSAGE(
+            OUStringToOString(aMessage, RTL_TEXTENCODING_UTF8).getStr(),
+            aCombined.find(aNeedle) != std::string::npos);
     }
 }
 
@@ -5136,6 +5246,11 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedDateValueReferencedFor
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testProjectStatusOwnsCanonicalDashboardMetrics)
 {
     assertProjectStatusCanonicalDashboard();
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testHostFacadeContractsInventoryPresent)
+{
+    assertHostFacadeContractsInventoryPresent();
 }
 
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testLowerSeamEngineAttemptsCarryPivotRationale)

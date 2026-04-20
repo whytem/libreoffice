@@ -1,12 +1,12 @@
 # Host Facade Contracts
 
-Phase I deliverable for the
-[RPN Evaluator Close-Out Plan](CLOSE_OUT_PLAN.md). This document
-inventories the stable, explicit contracts the engine RPN evaluator
-depends on when it asks the host for document-side information it
-cannot compute in isolation: address resolution, named / external /
-database range resolution, range iteration, regex / wildcard mode,
-spill allocation, and matrix materialization.
+Phase 2 deliverable for the
+[Computational Substrate Authority Transfer Pivot Plan](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md).
+This document is the explicit contract inventory for the remaining
+Calc-resident evaluator surface: it records which host-facing services are
+already real, which are still too broad or fragmented, which are missing, and
+which are intentionally staying on the host side rather than being absorbed
+into the standalone engine.
 
 ## How to read this doc
 
@@ -24,6 +24,80 @@ spill allocation, and matrix materialization.
 The primary source of truth is always the code. If a contract below
 disagrees with the header, the header wins and this document must be
 updated in the same commit.
+
+---
+
+## Phase 2 Inventory Snapshot
+
+This matrix is paired with the exhaustive symbol-level inventory in
+[COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md).
+The corpus test harness now checks that every remaining `Sc*` method and
+`pushLegacy*` lambda is named in one of these two documents, so Phase 2 cannot
+quietly drift out of date.
+
+### Status legend
+
+- `already exposed`: the contract is already available through `api/Host.hxx`
+  or a production compat helper and is considered stable enough for further
+  migration work.
+- `exposed but too broad`: the engine can reach the service today, but the
+  surface is fragmented, stopgap, or too tied to Calc internals to treat as
+  the final contract.
+- `missing`: the remaining legacy surface still depends on behavior that has
+  not yet been formalized as a stable host contract.
+- `intentionally unsupported`: the capability should remain an explicit
+  host-owned terminal and is not part of the engine-native evaluator contract.
+
+### Contract status matrix
+
+| Service category | Primary current contract(s) | Status | Representative remaining legacy surface | Ownership note |
+| --- | --- | --- | --- | --- |
+| Scalar cell read / visible value materialization | `CellReader`, `readMaterializedHostCellValue`, `CellValueView` | `already exposed` | text/info predicates, VALUE/DATEVALUE/TIMEVALUE, DB aggregate admissions, matrix consumers | Host owns cell read mechanics; engine owns coercion, aggregation, and error propagation |
+| Basic reference resolution | `ReferenceResolver::resolveReference`, external-ref fetch helpers, `resolveIndirectReference` | `exposed but too broad` | `ScLookup`, `ScXLookup`, `ScIndirect`, `ScAddressFunc`, `ScIndex`, `ScMultiArea`, `ScExternal`, `ScMissing`, residual `ocRange` handling | Usable today, but compile-time and evaluation-time reference resolution are still fragmented |
+| Named / external / database / structured range resolution | compile-host lookup resolvers plus the INDIRECT resolver | `missing` | named DB ranges, external names, structured-table references, INDIRECT database/name resolution | Needs a single evaluation-time `RangeResolver` contract |
+| Matrix materialization | `materializeHostRangeToMatrixOperand`, `CellValueView::matrixReference`, matrix operand bridges | `already exposed` | `ScMatValue`, `ScMatRef`, `ScFrequency`, `ScForecast_Ets`, matrix-return lookup/stat tails | Stable compat-layer contract; may later move behind public API if non-LO hosts need it |
+| Criteria / range iteration | `CriteriaAggregateMaterializer` stopgap inside query runtime | `missing` | `ScSubTotal`, DB-family tails, COUNTBLANK widening, future streaming criteria work | Needs a standalone `RangeIterator` or equivalent streaming walker |
+| Formula text / inspection | family-local compat helpers for `FORMULA` / `ISFORMULA` | `missing` | `ScCell`, `ScCellExternal`, `ScCurrent`, `ScStyle`, formula inspection residue | Behavior exists, but no explicit engine-facing host interface yet |
+| Format / type inspection | `ValueFormatting`, direct cell-kind checks in compat helpers | `exposed but too broad` | `ScType`, `ScCell`, `ScCellExternal`, `ScCurrent`, `ScStyle`, host-sensitive text/formatting lambdas | Formatting is exposed; cell-kind and style inspection are still Calc-specific |
+| Locale / calendar / date / search policy | `RuntimeEnvironment`, `TextCoercion`, `searchTypeFromDocument` stopgap | `exposed but too broad` | `ScRandom*`, `pushLegacyRegex`, `pushLegacySearch`, `pushLegacyTextBeforeAfter`, date/time parsing tails | Locale and null-date are exposed; search policy still needs a formal host method |
+| Spill allocation | `SpillRangeAllocator` | `already exposed` | dynamic-array reshaping / spill-shaping tails | Contract is fixed; binding into `EvaluationHost` remains an adapter step, not a contract-definition gap |
+| Control-flow / interpreter state | engine substrates (`RpnValue`, `RpnControlFlow`), no host method by design | `intentionally unsupported` | `ScLet`, `ScIfJump*`, `ScChooseJump`, jump-matrix state | This state should live inside the engine evaluator, not inside the Host facade |
+| External computation terminals | no engine contract by design | `intentionally unsupported` | `ScMacro`, `ScDde`, `ScWebservice`, `ScFilterXML`, `ScGetPivotData`, `ScHyperLink` | These remain explicit host terminals unless the project makes a separate product decision |
+
+## Remaining legacy surface mapped to host services
+
+### Surviving `pushLegacy*` clusters
+
+| Legacy cluster | Current surviving surface | Required host-service categories | Contract status summary |
+| --- | --- | --- | --- |
+| Host-sensitive text / formatting / search | `pushLegacyUnaryTextTransform`, `pushLegacyTextBeforeAfter`, `pushLegacyCurrency`, `pushLegacyReplace`, `pushLegacyText`, `pushLegacySubstitute`, `pushLegacyRegex`, `pushLegacyRightB`, `pushLegacyLeftB`, `pushLegacyMidB`, `pushLegacyReplaceB`, `pushLegacyFindB`, `pushLegacySearchB`, `pushLegacyEncodeUrl`, `pushLegacyTextJoinMs`, `pushLegacyBahtText`, `pushLegacyLeftRight`, `pushLegacyConcatMs` | scalar cell read, format/type inspection, locale/calendar/date mode, regex/text services | Blocked mostly on format/type inspection and explicit search-policy contracts, not on raw scalar evaluation |
+| Scalar helper / finance-adjacent | `pushLegacyGcdOrLcm`, `pushLegacyCombin`, `pushLegacyBitwise` | scalar cell read only | No new host contract is required; these are deletion-backed cleanup candidates once exercised retirement evidence is strong enough |
+
+### Surviving `Sc*` clusters
+
+| Legacy cluster | Representative surviving surface | Required host-service categories | Contract status summary |
+| --- | --- | --- | --- |
+| Reference / lookup / addressing | `ScLookup`, `ScXLookup`, `ScIndirect`, `ScAddressFunc`, `ScIndex`, `ScMultiArea`, `ScExternal`, `ScMissing`, `ScRangeFunc`, `ScUnionFunc`, `ScIntersect` | reference resolution, named/external/database range resolution, matrix materialization | Still gated on unifying the fragmented reference/range resolver surface |
+| DB / criteria / transform | `ScSubTotal`, `ScDBArea`, `ScSortBy`, `ScColRowNameAuto` | criteria/range iteration, named/database range resolution, spill allocation | The major missing contract here is streaming range iteration; spill is defined but not yet the limiting blocker |
+| Cell / metadata / inspection | `ScType`, `ScCell`, `ScCellExternal`, `ScCurrent`, `ScStyle`, `ScInfo`, `ScN` | scalar cell read, formula text/inspection, format/type inspection | Host interfaces exist only partially; inspection behavior is still mostly Calc-local |
+| Operator / control / stack state | `ScCompareOp`, `ScLogicalFoldOp`, `ScUnaryMatrixOrScalarOp`, `ScSyntheticBinaryOp`, `ScLet` | control-flow/interpreter state, matrix materialization, format propagation | Not a Host-facade gap; this is engine-native evaluator-state work |
+| Matrix / statistical tails | `ScMatValue`, `ScMatRef`, `ScFrequency`, `ScForecast_Ets`, `ScFourier`, `ScSumXMY2` | matrix materialization, scalar cell read, criteria/range iteration | Matrix materialization is real; iteration and matrix-frame state still limit wider retirement |
+| Random / system-policy | `ScRandom`, `ScRandbetween`, `ScRandArray`, `ScRandomImpl` | locale/calendar/date mode, deterministic system-state policy | Host environment contract exists, but deterministic/random policy still needs an explicit project decision |
+| External computation terminals | `ScMacro`, `ScDde`, `ScWebservice`, `ScFilterXML`, `ScGetPivotData`, `ScHyperLink` | external computation | Intentionally host-owned and outside the engine-native evaluator contract |
+
+### Missing or fragmented contracts that Phase 3+ depend on
+
+| Contract | Current status | Why it is still needed |
+| --- | --- | --- |
+| `RangeIterator` | `missing` | Required to stop baking iteration into query/materializer helpers and to widen DB / criteria / COUNTBLANK work honestly |
+| Evaluation-time `RangeResolver` | `missing` | Required to reconcile compile-time, INDIRECT-time, and classic-evaluation reference resolution into one engine-facing surface |
+| `RuntimeEnvironment::getSearchType()` | `missing` | Required to remove the current direct `ScDocOptions` stopgap from regex / wildcard admissions |
+| Explicit formula inspection host interface | `missing` | Required to finish `FORMULA` / `ISFORMULA`-adjacent and cell-inspection migration without leaning on raw Calc document access |
+| Narrow cell/type inspection API | `exposed but too broad` | Required to shrink the host-sensitive text/formatting tail without growing a catch-all "tell me everything about this cell" surface |
+
+This matrix is the Phase 2 completion artifact the pivot plan refers to. New
+Host-facing work should extend one of the rows above rather than inventing an
+ad hoc compat helper without classifying it here first.
 
 ---
 
