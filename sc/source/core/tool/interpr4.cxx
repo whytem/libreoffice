@@ -7776,8 +7776,12 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
 
+                    // Cross-sheet ranges multiply the axis span by the sheet
+                    // span (e.g. COLUMNS(Sheet1.A1:Sheet3.B2) = 2*3 = 6),
+                    // matching legacy Calc semantics for COLUMNS / ROWS.
                     const auto aPlan = serpn::planSpanCount(
-                        serpn::RpnValue::reference(aResolved), eKind);
+                        serpn::RpnValue::reference(aResolved), eKind,
+                        /*bMultiplyAcrossSheets*/ true);
                     if (!aPlan
                         || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
                     {

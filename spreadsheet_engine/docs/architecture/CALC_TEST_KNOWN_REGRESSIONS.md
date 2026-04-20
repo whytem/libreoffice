@@ -24,9 +24,9 @@ runs the test and exits non-zero only if the failure set differs from this
 list (i.e., a *new* regression slipped in, or an old one was *unintentionally*
 fixed without the list being updated).
 
-## Failure baseline (2026-04-19, after MODE tie-breaker split)
+## Failure baseline (2026-04-19, after cross-sheet span-count fix)
 
-11 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 135 tests.
+10 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 135 tests.
 
 Previous baseline was 30 tests. Progress so far:
 
@@ -116,9 +116,9 @@ paths regressed.
 
 - `testTdf156985`
 
-### Shell / shared / coercion (1)
+### Shell / shared / coercion (0)
 
-- `testReferenceShapePhase5`
+(All cleared.)
 
 ## Bisect notes (partial)
 
