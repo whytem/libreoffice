@@ -661,7 +661,6 @@ private:
     void IterateParameters( ScIterFunc, bool bTextAsZero = false );
     void GetStVarParams( bool bTextAsZero, double(*VarResult)( double fVal, size_t nValCount ) );
     void IterateParametersIf( ScIterFuncIf );
-    void ScCountIf();
     void IterateParametersIfs( double(*ResultFunc)( const sc::ParamIfsResult& rRes ) );
     void ScLookup();
     void ScXLookup();

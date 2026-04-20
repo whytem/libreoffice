@@ -8296,6 +8296,239 @@ StackVar ScInterpreter::Interpret()
                         PushDouble(nMaxCount - nCount);
                 };
 
+                // Legacy fallback for ocCountIf (COUNTIF): counts cells
+                // matching the criterion through ScCountIfCellIterator
+                // (with sorted-cache fast path) for reference ranges,
+                // or through QueryMat for inline matrices / external
+                // refs. Handles svDoubleRef, svSingleRef, svMatrix,
+                // svExternalSingleRef, svExternalDoubleRef, svRefList,
+                // svString, and coercible scalar criteria. Produces a
+                // matrix result when driven by a RefList array.
+                // Collapses the retired ScCountIf() body into this
+                // lambda.
+                const auto evaluateLegacyCountIf = [&]() {
+                    if (!MustHaveParamCount(GetByte(), 2))
+                        return;
+
+                    svl::SharedString aString;
+                    double fVal = 0.0;
+                    bool bIsString = true;
+                    switch (GetStackType())
+                    {
+                        case svDoubleRef:
+                        case svSingleRef:
+                        {
+                            ScAddress aAdr;
+                            if (!PopDoubleRefOrSingleRef(aAdr))
+                            {
+                                PushInt(0);
+                                return;
+                            }
+                            ScRefCellValue aCell(mrDoc, aAdr);
+                            switch (aCell.getType())
+                            {
+                                case CELLTYPE_VALUE:
+                                    fVal = GetCellValue(aAdr, aCell);
+                                    bIsString = false;
+                                    break;
+                                case CELLTYPE_FORMULA:
+                                    if (aCell.getFormula()->IsValue())
+                                    {
+                                        fVal = GetCellValue(aAdr, aCell);
+                                        bIsString = false;
+                                    }
+                                    else
+                                        GetCellString(aString, aCell);
+                                    break;
+                                case CELLTYPE_STRING:
+                                case CELLTYPE_EDIT:
+                                    GetCellString(aString, aCell);
+                                    break;
+                                default:
+                                    fVal = 0.0;
+                                    bIsString = false;
+                            }
+                        }
+                        break;
+                        case svMatrix:
+                        case svExternalSingleRef:
+                        case svExternalDoubleRef:
+                        {
+                            ScMatValType nType
+                                = GetDoubleOrStringFromMatrix(fVal, aString);
+                            bIsString = ScMatrix::IsRealStringType(nType);
+                        }
+                        break;
+                        case svString:
+                            aString = GetString();
+                            break;
+                        default:
+                        {
+                            fVal = GetDouble();
+                            bIsString = false;
+                        }
+                    }
+                    double fCount = 0.0;
+                    short nParam = 1;
+                    const SCSIZE nMatRows = GetRefListArrayMaxSize(nParam);
+                    // There's either one RefList and nothing else, or none.
+                    ScMatrixRef xResMat
+                        = (nMatRows ? GetNewMat(1, nMatRows, /*bEmpty*/ true)
+                                    : nullptr);
+                    SCSIZE nRefListArrayPos = 0;
+                    size_t nRefInList = 0;
+                    while (nParam-- > 0)
+                    {
+                        SCCOL nCol1 = 0;
+                        SCROW nRow1 = 0;
+                        SCTAB nTab1 = 0;
+                        SCCOL nCol2 = 0;
+                        SCROW nRow2 = 0;
+                        SCTAB nTab2 = 0;
+                        ScMatrixRef pQueryMatrix;
+                        const ScComplexRefData* refData = nullptr;
+                        switch (GetStackType())
+                        {
+                            case svRefList:
+                                nRefListArrayPos = nRefInList;
+                                [[fallthrough]];
+                            case svDoubleRef:
+                            {
+                                refData = GetStackDoubleRef(nRefInList);
+                                ScRange aRange;
+                                PopDoubleRef(aRange, nParam, nRefInList);
+                                aRange.GetVars(
+                                    nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+                            }
+                            break;
+                            case svSingleRef:
+                                PopSingleRef(nCol1, nRow1, nTab1);
+                                nCol2 = nCol1;
+                                nRow2 = nRow1;
+                                nTab2 = nTab1;
+                                break;
+                            case svMatrix:
+                            case svExternalSingleRef:
+                            case svExternalDoubleRef:
+                            {
+                                pQueryMatrix = GetMatrix();
+                                if (!pQueryMatrix)
+                                {
+                                    PushIllegalParameter();
+                                    return;
+                                }
+                                nCol1 = 0;
+                                nRow1 = 0;
+                                nTab1 = 0;
+                                SCSIZE nC, nR;
+                                pQueryMatrix->GetDimensions(nC, nR);
+                                nCol2 = static_cast<SCCOL>(nC - 1);
+                                nRow2 = static_cast<SCROW>(nR - 1);
+                                nTab2 = 0;
+                            }
+                            break;
+                            default:
+                                PopError(); // Propagate it further
+                                PushIllegalParameter();
+                                return;
+                        }
+                        if (nTab1 != nTab2)
+                        {
+                            PushIllegalParameter();
+                            return;
+                        }
+                        if (nCol1 > nCol2)
+                        {
+                            PushIllegalParameter();
+                            return;
+                        }
+                        if (nGlobalError == FormulaError::NONE)
+                        {
+                            ScQueryParam rParam;
+                            rParam.nRow1 = nRow1;
+                            rParam.nRow2 = nRow2;
+                            rParam.nTab = nTab1;
+
+                            ScQueryEntry& rEntry = rParam.GetEntry(0);
+                            ScQueryEntry::Item& rItem = rEntry.GetQueryItem();
+                            rEntry.bDoQuery = true;
+                            if (!bIsString)
+                            {
+                                rItem.meType = ScQueryEntry::ByValue;
+                                rItem.mfVal = fVal;
+                                rEntry.eOp = SC_EQUAL;
+                            }
+                            else
+                            {
+                                rParam.FillInExcelSyntax(
+                                    mrDoc.GetSharedStringPool(),
+                                    aString.getString(), 0, &mrContext);
+                                if (rItem.meType == ScQueryEntry::ByString)
+                                    rParam.eSearchType = DetectSearchType(
+                                        rItem.maString.getString(), mrDoc);
+                            }
+                            rParam.nCol1 = nCol1;
+                            rParam.nCol2 = nCol2;
+                            rEntry.nField = nCol1;
+                            if (pQueryMatrix)
+                            {
+                                // Never case-sensitive.
+                                sc::CompareOptions aOptions(
+                                    mrDoc, rEntry, rParam.eSearchType);
+                                ScMatrixRef pResultMatrix
+                                    = QueryMat(pQueryMatrix, aOptions);
+                                if (nGlobalError != FormulaError::NONE
+                                    || !pResultMatrix)
+                                {
+                                    PushIllegalParameter();
+                                    return;
+                                }
+
+                                SCSIZE nSize = pResultMatrix->GetElementCount();
+                                for (SCSIZE nIndex = 0; nIndex < nSize; ++nIndex)
+                                {
+                                    if (pResultMatrix->IsValue(nIndex)
+                                        && pResultMatrix->GetDouble(nIndex))
+                                        ++fCount;
+                                }
+                            }
+                            else
+                            {
+                                if (ScCountIfCellIteratorSortedCache::CanBeUsed(
+                                        mrDoc, rParam, nTab1, pMyFormulaCell,
+                                        refData, mrContext))
+                                {
+                                    ScCountIfCellIteratorSortedCache aCellIter(
+                                        mrDoc, mrContext, nTab1, rParam,
+                                        false, false);
+                                    fCount += aCellIter.GetCount();
+                                }
+                                else
+                                {
+                                    ScCountIfCellIteratorDirect aCellIter(
+                                        mrDoc, mrContext, nTab1, rParam,
+                                        false, false);
+                                    fCount += aCellIter.GetCount();
+                                }
+                            }
+                        }
+                        else
+                        {
+                            PushIllegalParameter();
+                            return;
+                        }
+                        if (xResMat)
+                        {
+                            xResMat->PutDouble(fCount, 0, nRefListArrayPos);
+                            fCount = 0.0;
+                        }
+                    }
+                    if (xResMat)
+                        PushMatrix(xResMat);
+                    else
+                        PushDouble(fCount);
+                };
+
                 // Batch 4 matrix admissions. The pure-scalar-input
                 // constructors (MUNIT / MSEQUENCE) demonstrate the
                 // RpnMatrix substrate end-to-end without host-side
@@ -15181,7 +15414,7 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocCountIf          :
                         if (!tryPlanEngineCountIf())
-                            ScCountIf();
+                            evaluateLegacyCountIf();
                         break;
                     case ocSumIf            :
                         if (!tryPlanEngineSumIf())
