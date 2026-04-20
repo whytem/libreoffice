@@ -7075,68 +7075,6 @@ StackVar ScInterpreter::Interpret()
                               "family-local default-on information predicate reached "
                               "ScInterpreter");
                       };
-                const auto pushLegacyIsNA = [&]() {
-                    warnInformationPredicateDispatch(u"ISNA");
-                    nFuncFmtType = SvNumFormatType::LOGICAL;
-                    bool bRes = false;
-                    switch (GetStackType())
-                    {
-                        case svDoubleRef:
-                        case svSingleRef:
-                        {
-                            ScAddress aAdr;
-                            const bool bOk = PopDoubleRefOrSingleRef(aAdr);
-                            if (nGlobalError == FormulaError::NotAvailable)
-                                bRes = true;
-                            else if (bOk)
-                            {
-                                ScRefCellValue aCell(mrDoc, aAdr);
-                                bRes = (GetCellErrCode(aCell) == FormulaError::NotAvailable);
-                            }
-                        }
-                        break;
-                        case svExternalSingleRef:
-                        {
-                            ScExternalRefCache::TokenRef pToken;
-                            PopExternalSingleRef(pToken);
-                            if (nGlobalError == FormulaError::NotAvailable
-                                || (pToken && pToken->GetType() == svError
-                                    && pToken->GetError() == FormulaError::NotAvailable))
-                            {
-                                bRes = true;
-                            }
-                        }
-                        break;
-                        case svExternalDoubleRef:
-                        case svMatrix:
-                        {
-                            ScMatrixRef pMat = GetMatrix();
-                            if (!pMat)
-                                break;
-                            if (!pJumpMatrix)
-                                bRes = (pMat->GetErrorIfNotString(0, 0)
-                                        == FormulaError::NotAvailable);
-                            else
-                            {
-                                SCSIZE nCols, nRows, nC, nR;
-                                pMat->GetDimensions(nCols, nRows);
-                                pJumpMatrix->GetPos(nC, nR);
-                                if (nC < nCols && nR < nRows)
-                                {
-                                    bRes = (pMat->GetErrorIfNotString(nC, nR)
-                                            == FormulaError::NotAvailable);
-                                }
-                            }
-                        }
-                        break;
-                        default:
-                            PopError();
-                            if (nGlobalError == FormulaError::NotAvailable)
-                                bRes = true;
-                    }
-                    nGlobalError = FormulaError::NONE;
-                    PushInt(int(bRes));
-                };
                 const auto pushLegacyIsErrLike = [&](std::u16string_view rFunctionName,
                                                      bool bTreatNAAsError) {
                     warnInformationPredicateDispatch(rFunctionName);
@@ -14557,7 +14495,70 @@ StackVar ScInterpreter::Interpret()
                         }();
                         break;
                     case ocFormula          : pushLegacyFormulaText();      break;
-                    case ocIsNA             : pushLegacyIsNA();             break;
+                    case ocIsNA             :
+                    {
+                        warnInformationPredicateDispatch(u"ISNA");
+                        nFuncFmtType = SvNumFormatType::LOGICAL;
+                        bool bRes = false;
+                        switch (GetStackType())
+                        {
+                            case svDoubleRef:
+                            case svSingleRef:
+                            {
+                                ScAddress aAdr;
+                                const bool bOk = PopDoubleRefOrSingleRef(aAdr);
+                                if (nGlobalError == FormulaError::NotAvailable)
+                                    bRes = true;
+                                else if (bOk)
+                                {
+                                    ScRefCellValue aCell(mrDoc, aAdr);
+                                    bRes = (GetCellErrCode(aCell) == FormulaError::NotAvailable);
+                                }
+                            }
+                            break;
+                            case svExternalSingleRef:
+                            {
+                                ScExternalRefCache::TokenRef pToken;
+                                PopExternalSingleRef(pToken);
+                                if (nGlobalError == FormulaError::NotAvailable
+                                    || (pToken && pToken->GetType() == svError
+                                        && pToken->GetError() == FormulaError::NotAvailable))
+                                {
+                                    bRes = true;
+                                }
+                            }
+                            break;
+                            case svExternalDoubleRef:
+                            case svMatrix:
+                            {
+                                ScMatrixRef pMat = GetMatrix();
+                                if (!pMat)
+                                    break;
+                                if (!pJumpMatrix)
+                                    bRes = (pMat->GetErrorIfNotString(0, 0)
+                                            == FormulaError::NotAvailable);
+                                else
+                                {
+                                    SCSIZE nCols, nRows, nC, nR;
+                                    pMat->GetDimensions(nCols, nRows);
+                                    pJumpMatrix->GetPos(nC, nR);
+                                    if (nC < nCols && nR < nRows)
+                                    {
+                                        bRes = (pMat->GetErrorIfNotString(nC, nR)
+                                                == FormulaError::NotAvailable);
+                                    }
+                                }
+                            }
+                            break;
+                            default:
+                                PopError();
+                                if (nGlobalError == FormulaError::NotAvailable)
+                                    bRes = true;
+                        }
+                        nGlobalError = FormulaError::NONE;
+                        PushInt(int(bRes));
+                    }
+                    break;
                     case ocIsErr            : pushLegacyIsErrLike(u"ISERR", false); break;
                     case ocIsError          : pushLegacyIsErrLike(u"ISERROR", true); break;
                     case ocIsEven           :
