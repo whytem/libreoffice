@@ -1964,16 +1964,38 @@ template <typename T>
     const ScAddress& rAddress)
 {
     ScFormulaCell* pFormula = const_cast<ScDocument&>(rDoc).GetFormulaCell(rAddress);
+    if (!pFormula)
+        return false;
     // IsEmptyDisplayedAsStringCached() reads aResult directly; the
     // triggering IsEmptyDisplayedAsString() cascades through
     // MaybeInterpret() -> Interpret() -> back into the seam's
     // authoritative-while-off path which calls this probe BEFORE
     // bRunning is set, producing recursion to MAXRECURSION depth.
-    return pFormula
-           && (pFormula->GetCode()->IsRecalcModeMustAfterImport()
-               || pFormula->HasHybridStringResult()
-               || pFormula->IsEmptyDisplayedAsStringCached()
-               || !pFormula->GetHybridFormula().isEmpty());
+    //
+    // IsRecalcModeMustAfterImport() is implemented as (nMode & EMask)
+    // <= ScRecalcMode::ONLOAD_ONCE (0x04), which matches 0x00 (unset),
+    // 0x01 (ALWAYS, volatile), 0x02 (ONLOAD_MUST), 0x03, and 0x04
+    // (ONLOAD_ONCE). Only ONLOAD_MUST and ONLOAD_ONCE are genuine post-
+    // import markers set by the import filter; the plain ALWAYS bit is
+    // set for volatile live formulas like =OFFSET(...) / =NOW() /
+    // =RAND(). Treating those as imported-cached causes the downstream
+    // VariableExpected and stored-host-value fallbacks (see
+    // evaluateNumericAggregateFunction / tryEvaluateFormula) to publish
+    // stale zeros over live recalculation, e.g.
+    // =SUMPRODUCT(SUBTOTAL(...;OFFSET(...))) at a freshly-inserted cell
+    // where the host document still holds the prior (zero) value.
+    // Trust the strong-truth signals first; only accept
+    // IsRecalcModeMustAfterImport() when the exclusive-mode is not
+    // ALWAYS-only (i.e. genuine ONLOAD_MUST / ONLOAD_ONCE set).
+    if (pFormula->HasHybridStringResult()
+        || pFormula->IsEmptyDisplayedAsStringCached()
+        || !pFormula->GetHybridFormula().isEmpty())
+    {
+        return true;
+    }
+    if (!pFormula->GetCode()->IsRecalcModeMustAfterImport())
+        return false;
+    return !pFormula->GetCode()->IsRecalcModeAlways();
 }
 
 [[nodiscard]] inline bool isImportedCachedFormulaRoot(
@@ -3153,6 +3175,29 @@ template <typename T>
             {
                 return makeUnsupportedMaterialization<ScRange>(
                     FallbackReason::UnsupportedHostSurface);
+            }
+
+            // Scope-fence: structured table references (ocTableRef) with
+            // row-scope markers (THIS_ROW / ALL / HEADERS / DATA / TOTALS)
+            // need per-row intersection at the formula cell's position,
+            // e.g. =SUM(table[[#This Row]]) at L3 should resolve to the
+            // intersection of the table's data area with row 3, not to
+            // the full column range. tryResolveNamedRangeReference
+            // resolves at the name's anchor position and loses that
+            // per-row context, so decline to legacy ScInterpreter which
+            // honours the stored ScTableRefToken area and implicit-
+            // intersection rules.
+            if (const ScTokenArray* pCode = pRangeData->GetCode())
+            {
+                formula::FormulaTokenArrayPlainIterator aIter(*pCode);
+                for (const formula::FormulaToken* p = aIter.First(); p; p = aIter.Next())
+                {
+                    if (p->GetOpCode() == ocTableRef)
+                    {
+                        return makeUnsupportedMaterialization<ScRange>(
+                            FallbackReason::UnsupportedFormulaShape);
+                    }
+                }
             }
 
             ScRange aRange;
