@@ -5665,28 +5665,6 @@ StackVar ScInterpreter::Interpret()
                         oResult->append(sStr.subView(nPos, sStr.getLength() - nPos));
                     PushString(oResult ? oResult->makeStringAndClear() : sStr);
                 };
-                const auto pushLegacyRept = [&]() {
-                    warnTextUtilityDispatch(u"REPT");
-                    if (!MustHaveParamCount(GetByte(), 2))
-                        return;
-
-                    sal_Int32 nCnt = GetStringPositionArgument();
-                    OUString aStr = GetString().getString();
-                    if (nCnt < 0)
-                        PushIllegalArgument();
-                    else if (static_cast<double>(nCnt) * aStr.getLength() > kScInterpreterMaxStrLen)
-                        PushError(FormulaError::StringOverflow);
-                    else if (nCnt == 0)
-                        PushString(OUString());
-                    else
-                    {
-                        const sal_Int32 nLen = aStr.getLength();
-                        OUStringBuffer aRes(nCnt * nLen);
-                        while (nCnt--)
-                            aRes.append(aStr);
-                        PushString(aRes.makeStringAndClear());
-                    }
-                };
                 const auto pushLegacySearch = [&]() {
                     warnTextUtilityDispatch(u"SEARCH");
                     sal_uInt8 nParamCount = GetByte();
@@ -15665,7 +15643,30 @@ StackVar ScInterpreter::Interpret()
                     case ocText             : pushLegacyText();         break;
                     case ocSubstitute       : pushLegacySubstitute();   break;
                     case ocRegex            : pushLegacyRegex();        break;
-                    case ocRept             : pushLegacyRept();         break;
+                    case ocRept             :
+                        [&]() {
+                            warnTextUtilityDispatch(u"REPT");
+                            if (!MustHaveParamCount(GetByte(), 2))
+                                return;
+
+                            sal_Int32 nCnt = GetStringPositionArgument();
+                            OUString aStr = GetString().getString();
+                            if (nCnt < 0)
+                                PushIllegalArgument();
+                            else if (static_cast<double>(nCnt) * aStr.getLength() > kScInterpreterMaxStrLen)
+                                PushError(FormulaError::StringOverflow);
+                            else if (nCnt == 0)
+                                PushString(OUString());
+                            else
+                            {
+                                const sal_Int32 nLen = aStr.getLength();
+                                OUStringBuffer aRes(nCnt * nLen);
+                                while (nCnt--)
+                                    aRes.append(aStr);
+                                PushString(aRes.makeStringAndClear());
+                            }
+                        }();
+                        break;
                     case ocConcat           :
                     {
                         warnTextUtilityDispatch(u"CONCATENATE");
