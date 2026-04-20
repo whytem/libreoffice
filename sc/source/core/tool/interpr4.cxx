@@ -5503,76 +5503,6 @@ StackVar ScInterpreter::Interpret()
                     else
                         PushIllegalArgument();
                 };
-                const auto pushLegacyFormulaText = [&]() {
-                    warnIfLegacyDispatchReached(
-                        "family-local default-on", u"FORMULA",
-                        [](std::u16string_view rFormula) {
-                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
-                        },
-                        "family-local default-on FORMULA reached ScInterpreter", true);
-
-                    OUString aFormula;
-                    switch (GetStackType())
-                    {
-                        case svDoubleRef:
-                            if (IsInArrayContext())
-                            {
-                                SCCOL nCol1, nCol2;
-                                SCROW nRow1, nRow2;
-                                SCTAB nTab1, nTab2;
-                                PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
-                                if (nGlobalError != FormulaError::NONE)
-                                    break;
-
-                                if (nTab1 != nTab2)
-                                {
-                                    SetError(FormulaError::IllegalArgument);
-                                    break;
-                                }
-
-                                const auto aMatrixResult = seformulainspect::buildFormulaTextMatrix(
-                                    mrDoc, mrContext,
-                                    ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2), mrStrPool,
-                                    [this](SCSIZE nColumns, SCSIZE nRows) {
-                                        return GetNewMat(nColumns, nRows, true);
-                                    });
-                                if (aMatrixResult.meFailure
-                                    == seformulainspect::MatrixInspectionFailure::IllegalArgument)
-                                {
-                                    SetError(FormulaError::IllegalArgument);
-                                    break;
-                                }
-                                if (aMatrixResult.meFailure
-                                    == seformulainspect::MatrixInspectionFailure::MatrixSize)
-                                {
-                                    break;
-                                }
-
-                                PushMatrix(aMatrixResult.mpMatrix);
-                                return;
-                            }
-                            [[fallthrough]];
-                        case svSingleRef:
-                        {
-                            ScAddress aAdr;
-                            if (!PopDoubleRefOrSingleRef(aAdr))
-                                break;
-
-                            const auto aFormulaText
-                                = seformulainspect::formulaTextForCell(mrDoc, mrContext, aAdr);
-                            if (!aFormulaText)
-                                SetError(selibreoffice::toFormulaError(aFormulaText.meError));
-                            else
-                                aFormula = aFormulaText.maValue;
-                        }
-                        break;
-                        default:
-                            PopError();
-                            SetError(FormulaError::NotAvailable);
-                    }
-
-                    PushString(aFormula);
-                };
                 const auto warnTextUtilityDispatch = [&](std::u16string_view rFunctionName) {
                     warnIfLegacyDispatchReached(
                         "family-local default-on", rFunctionName,
@@ -14430,7 +14360,80 @@ StackVar ScInterpreter::Interpret()
                             PushInt(int(bRes));
                         }();
                         break;
-                    case ocFormula          : pushLegacyFormulaText();      break;
+                    case ocFormula          :
+                        [&]() {
+                            warnIfLegacyDispatchReached(
+                                "family-local default-on", u"FORMULA",
+                                [](std::u16string_view rFormula) {
+                                    return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                                },
+                                "family-local default-on FORMULA reached ScInterpreter", true);
+
+                            OUString aFormula;
+                            switch (GetStackType())
+                            {
+                                case svDoubleRef:
+                                    if (IsInArrayContext())
+                                    {
+                                        SCCOL nCol1, nCol2;
+                                        SCROW nRow1, nRow2;
+                                        SCTAB nTab1, nTab2;
+                                        PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+                                        if (nGlobalError != FormulaError::NONE)
+                                            break;
+
+                                        if (nTab1 != nTab2)
+                                        {
+                                            SetError(FormulaError::IllegalArgument);
+                                            break;
+                                        }
+
+                                        const auto aMatrixResult
+                                            = seformulainspect::buildFormulaTextMatrix(
+                                                mrDoc, mrContext,
+                                                ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2),
+                                                mrStrPool,
+                                                [this](SCSIZE nColumns, SCSIZE nRows) {
+                                                    return GetNewMat(nColumns, nRows, true);
+                                                });
+                                        if (aMatrixResult.meFailure
+                                            == seformulainspect::MatrixInspectionFailure::IllegalArgument)
+                                        {
+                                            SetError(FormulaError::IllegalArgument);
+                                            break;
+                                        }
+                                        if (aMatrixResult.meFailure
+                                            == seformulainspect::MatrixInspectionFailure::MatrixSize)
+                                        {
+                                            break;
+                                        }
+
+                                        PushMatrix(aMatrixResult.mpMatrix);
+                                        return;
+                                    }
+                                    [[fallthrough]];
+                                case svSingleRef:
+                                {
+                                    ScAddress aAdr;
+                                    if (!PopDoubleRefOrSingleRef(aAdr))
+                                        break;
+
+                                    const auto aFormulaText
+                                        = seformulainspect::formulaTextForCell(mrDoc, mrContext, aAdr);
+                                    if (!aFormulaText)
+                                        SetError(selibreoffice::toFormulaError(aFormulaText.meError));
+                                    else
+                                        aFormula = aFormulaText.maValue;
+                                }
+                                break;
+                                default:
+                                    PopError();
+                                    SetError(FormulaError::NotAvailable);
+                            }
+
+                            PushString(aFormula);
+                        }();
+                        break;
                     case ocIsNA             :
                     {
                         warnInformationPredicateDispatch(u"ISNA");
