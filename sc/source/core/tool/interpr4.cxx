@@ -7075,67 +7075,6 @@ StackVar ScInterpreter::Interpret()
                               "family-local default-on information predicate reached "
                               "ScInterpreter");
                       };
-                const auto pushLegacyIsFormula = [&]() {
-                    warnInformationPredicateDispatch(u"ISFORMULA");
-                    nFuncFmtType = SvNumFormatType::LOGICAL;
-                    bool bRes = false;
-                    switch (GetStackType())
-                    {
-                        case svDoubleRef:
-                            if (IsInArrayContext())
-                            {
-                                SCCOL nCol1, nCol2;
-                                SCROW nRow1, nRow2;
-                                SCTAB nTab1, nTab2;
-                                PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
-                                if (nGlobalError != FormulaError::NONE)
-                                {
-                                    PushError(nGlobalError);
-                                    return;
-                                }
-                                if (nTab1 != nTab2)
-                                {
-                                    PushIllegalArgument();
-                                    return;
-                                }
-
-                                const auto aMatrixResult = seformulainspect::buildIsFormulaMatrix(
-                                    mrDoc, mrContext,
-                                    ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2),
-                                    [this](SCSIZE nColumns, SCSIZE nRows) {
-                                        return GetNewMat(nColumns, nRows, true);
-                                    });
-                                if (aMatrixResult.meFailure
-                                    == seformulainspect::MatrixInspectionFailure::IllegalArgument)
-                                {
-                                    PushIllegalArgument();
-                                    return;
-                                }
-                                if (aMatrixResult.meFailure
-                                    == seformulainspect::MatrixInspectionFailure::MatrixSize)
-                                {
-                                    PushError(FormulaError::MatrixSize);
-                                    return;
-                                }
-
-                                PushMatrix(aMatrixResult.mpMatrix);
-                                return;
-                            }
-                            [[fallthrough]];
-                        case svSingleRef:
-                        {
-                            ScAddress aAdr;
-                            if (!PopDoubleRefOrSingleRef(aAdr))
-                                break;
-                            bRes = seformulainspect::isFormulaCell(mrDoc, mrContext, aAdr);
-                        }
-                        break;
-                        default:
-                            Pop();
-                    }
-                    nGlobalError = FormulaError::NONE;
-                    PushInt(int(bRes));
-                };
                 const auto pushLegacyIsNA = [&]() {
                     warnInformationPredicateDispatch(u"ISNA");
                     nFuncFmtType = SvNumFormatType::LOGICAL;
@@ -14553,7 +14492,70 @@ StackVar ScInterpreter::Interpret()
                         PushInt(int(bRes));
                     }
                     break;
-                    case ocIsFormula        : pushLegacyIsFormula();        break;
+                    case ocIsFormula        :
+                        [&]() {
+                            warnInformationPredicateDispatch(u"ISFORMULA");
+                            nFuncFmtType = SvNumFormatType::LOGICAL;
+                            bool bRes = false;
+                            switch (GetStackType())
+                            {
+                                case svDoubleRef:
+                                    if (IsInArrayContext())
+                                    {
+                                        SCCOL nCol1, nCol2;
+                                        SCROW nRow1, nRow2;
+                                        SCTAB nTab1, nTab2;
+                                        PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+                                        if (nGlobalError != FormulaError::NONE)
+                                        {
+                                            PushError(nGlobalError);
+                                            return;
+                                        }
+                                        if (nTab1 != nTab2)
+                                        {
+                                            PushIllegalArgument();
+                                            return;
+                                        }
+
+                                        const auto aMatrixResult
+                                            = seformulainspect::buildIsFormulaMatrix(
+                                                mrDoc, mrContext,
+                                                ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2),
+                                                [this](SCSIZE nColumns, SCSIZE nRows) {
+                                                    return GetNewMat(nColumns, nRows, true);
+                                                });
+                                        if (aMatrixResult.meFailure
+                                            == seformulainspect::MatrixInspectionFailure::IllegalArgument)
+                                        {
+                                            PushIllegalArgument();
+                                            return;
+                                        }
+                                        if (aMatrixResult.meFailure
+                                            == seformulainspect::MatrixInspectionFailure::MatrixSize)
+                                        {
+                                            PushError(FormulaError::MatrixSize);
+                                            return;
+                                        }
+
+                                        PushMatrix(aMatrixResult.mpMatrix);
+                                        return;
+                                    }
+                                    [[fallthrough]];
+                                case svSingleRef:
+                                {
+                                    ScAddress aAdr;
+                                    if (!PopDoubleRefOrSingleRef(aAdr))
+                                        break;
+                                    bRes = seformulainspect::isFormulaCell(mrDoc, mrContext, aAdr);
+                                }
+                                break;
+                                default:
+                                    Pop();
+                            }
+                            nGlobalError = FormulaError::NONE;
+                            PushInt(int(bRes));
+                        }();
+                        break;
                     case ocFormula          : pushLegacyFormulaText();      break;
                     case ocIsNA             : pushLegacyIsNA();             break;
                     case ocIsErr            : pushLegacyIsErrLike(u"ISERR", false); break;
