@@ -553,6 +553,17 @@ The first Phase-2 retirement slice is now banked:
 - `pushLegacyIsErrLike` is gone from Calc source, which is the first real
   text/info legacy-lambda reduction in this wave
 
+Phase 3 of the parsing/inspection half is now landed:
+
+- `VALUE`, `NUMBERVALUE`, `DATEVALUE`, `TIMEVALUE`, `FORMULA`, and
+  `ISFORMULA` now have exercised engine-first dispatch for the safe scalar and
+  scalarized-reference shapes
+- [testSharedInterpreterParsingInspectionDispatch](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_formula2.cxx)
+  is the focused runtime gate for that surface
+- the same lane still proves a deliberate decline on a matrix-inspection
+  shape, so the remaining Wave-B fallback boundary is explicit instead of
+  accidental
+
 Updated next routing policy:
 
 - the next big value is retirement plus unseen-surface reduction inside the

@@ -280,6 +280,25 @@ Status:
   `ISFORMULA` to the remaining safe root / scalarized-reference shapes
 - explicitly defer matrix and other host-heavy shapes that remain out of scope
 
+Status:
+
+- complete for the safe scalar / scalarized-reference surface on the current
+  tree
+- the engine-first path now exercises:
+  - `VALUE`
+  - `NUMBERVALUE`
+  - `DATEVALUE`
+  - `TIMEVALUE`
+  - `FORMULA`
+  - `ISFORMULA`
+- the focused Calc runtime gate is now
+  [testSharedInterpreterParsingInspectionDispatch](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_formula2.cxx),
+  which proves both:
+  - engine-first success on the safe Wave-B scalar and scalarized-reference
+    shapes
+  - deliberate decline on at least one matrix inspection shape that still
+    belongs to the legacy fallback path
+
 ### Phase 4: Parsing/Inspection Retirement
 
 - delete `pushLegacyValue`

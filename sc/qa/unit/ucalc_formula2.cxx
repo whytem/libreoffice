@@ -1967,6 +1967,96 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterTextInfoDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterParsingInspectionDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"ParsingDispatch"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+    resetScInterpreterReachabilityStats();
+    resetScInterpreterClassicOpcodeRuntimeStats();
+
+    m_pDoc->SetTextCell(ScAddress(0, 0, 0), u"42"_ustr);
+    m_pDoc->SetTextCell(ScAddress(0, 1, 0), u"1954-07-20"_ustr);
+    m_pDoc->SetTextCell(ScAddress(0, 2, 0), u"16:30:01"_ustr);
+    m_pDoc->SetTextCell(ScAddress(0, 3, 0), u"1,234.5"_ustr);
+    m_pDoc->SetTextCell(ScAddress(1, 3, 0), u"."_ustr);
+    m_pDoc->SetTextCell(ScAddress(2, 3, 0), u","_ustr);
+    m_pDoc->SetString(1, 0, 0, u"=1+1"_ustr);
+
+    m_pDoc->SetString(3, 0, 0, u"=VALUE(A1)"_ustr);
+    ASSERT_DOUBLES_EQUAL(42.0, m_pDoc->GetValue(3, 0, 0));
+
+    m_pDoc->SetString(3, 1, 0, u"=DATEVALUE(A2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(3, 1, 0));
+
+    m_pDoc->SetString(3, 2, 0, u"=TIMEVALUE(A3)"_ustr);
+    ASSERT_DOUBLES_EQUAL((16.0 * 3600.0 + 30.0 * 60.0 + 1.0) / 86400.0,
+                         m_pDoc->GetValue(3, 2, 0));
+
+    m_pDoc->SetString(3, 3, 0, u"=NUMBERVALUE(A4;B4;C4)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1234.5, m_pDoc->GetValue(3, 3, 0));
+
+    m_pDoc->SetString(4, 0, 0, u"=FORMULA(B1)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"=1+1"_ustr, m_pDoc->GetString(4, 0, 0));
+
+    m_pDoc->SetString(4, 1, 0, u"=ISFORMULA(B1)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(4, 1, 0)));
+
+    m_pDoc->SetString(4, 2, 0, u"=ISFORMULA(A1)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(false, static_cast<bool>(m_pDoc->GetValue(4, 2, 0)));
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+    m_pDoc->InsertMatrixFormula(6, 0, 6, 1, aMark, u"=VALUE(A1:A2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(42.0, m_pDoc->GetValue(6, 0, 0));
+    ASSERT_DOUBLES_EQUAL(19925.0, m_pDoc->GetValue(6, 1, 0));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aDispatchStatsLabel
+        = "parsing_attempted="
+          + std::to_string(aDispatchStats.mnTextInfoEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnTextInfoEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnTextInfoEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE("parsing/inspection dispatch should attempt engine evaluation: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnTextInfoEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_MESSAGE("parsing/inspection dispatch should succeed through the engine path: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnTextInfoEngineSucceededCount > 0);
+    CPPUNIT_ASSERT_MESSAGE("parsing/inspection dispatch should still decline at least one "
+                               "matrix inspection shape: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnTextInfoEngineDeclinedCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("parsing/inspection dispatch accounting should stay balanced: "
+                                     + aDispatchStatsLabel,
+                                 aDispatchStats.mnTextInfoEngineAttemptedCount,
+                                 aDispatchStats.mnTextInfoEngineSucceededCount
+                                     + aDispatchStats.mnTextInfoEngineDeclinedCount);
+
+    const auto aReachabilityStats = getScInterpreterReachabilityStatsSnapshot();
+    CPPUNIT_ASSERT_MESSAGE(
+        "parsing/inspection dispatch test should still reach classic ScInterpreter::Interpret()",
+        aReachabilityStats.mnClassicInterpretCount > 0);
+
+    const auto aClassicOpcodeStats = getScInterpreterClassicOpcodeRuntimeStatsSnapshot();
+    CPPUNIT_ASSERT_MESSAGE(
+        "parsing/inspection dispatch test should record VALUE in the classic census",
+        aClassicOpcodeStats.maOpcodeCounts[static_cast<std::size_t>(ocValue)] > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "parsing/inspection dispatch test should record FORMULA in the classic census",
+        aClassicOpcodeStats.maOpcodeCounts[static_cast<std::size_t>(ocFormula)] > 0);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterSpillEngineDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
